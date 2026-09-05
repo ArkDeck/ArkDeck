@@ -229,7 +229,7 @@ package final class RuntimeAgentExecutionStore: @unchecked Sendable {
       }
     }
     do {
-      let object = try ControlProtocolNegotiation.decodeObject(bytes, maximumBytes: Self.maximumRecordBytes)
+      let object = try ControlFrameJSON.decodeObject(bytes, maximumBytes: Self.maximumRecordBytes)
       guard Set(object.keys).isSubset(of: [
         "schemaVersion", "intent", "intentFingerprintSHA256", "catalogDigest", "createdAt", "deadline",
         "lastObservedAt", "generation", "state", "target", "submissionRequest", "jobID", "jobState",
@@ -278,14 +278,14 @@ package final class RuntimeAgentExecutionStore: @unchecked Sendable {
     else { throw AgentExecutionControlFailure("recordUnreadable", "execution action or target ownership is invalid") }
     if let bytes = record.submissionRequest {
       let request = try RuntimeOperationCodec.decodeRequest(bytes)
-      let document = try ControlProtocolNegotiation.decodeObject(bytes, maximumBytes: Self.maximumRecordBytes)
+      let document = try ControlFrameJSON.decodeObject(bytes, maximumBytes: Self.maximumRecordBytes)
       let seed = Self.fingerprint(Data(record.intent.executionID.utf8))
       guard let target = record.target,
         request.requestID == (record.intent.requestID ?? "agent-request-\(seed)"),
         request.idempotencyKey == (record.intent.idempotencyKey ?? "agent-execution-\(seed)"),
         request.operation.reference == record.intent.operationReference,
         request.target.targetID == target.targetID, request.target.expectedBindingRevision == target.bindingRevision,
-        request.authorization?.capabilityID == record.intent.capabilityReference, request.campaignReservation == nil,
+        request.authorization?.capabilityID == record.intent.capabilityReference,
         request.requestedOutputs.map(\.rawValue) == (record.intent.requestedOutputs ?? ["derivedArtifacts"]),
         document["reviewedPlanDigest"] == record.intent.reviewedPlanDigest.map(JSONValue.string),
         document["clientContext"] == record.intent.clientContext,

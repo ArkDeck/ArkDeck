@@ -3,7 +3,7 @@
 Task: TASK-AIN-021
 
 `arkdeck runtime tool select` changes the Runtime-owned active HDC selection
-from one registered `toolRef` to another. It is a protocol-2 target command and
+from one registered `toolRef` to another. It is a current v1 target command and
 accepts only typed references and concurrency identities:
 
 ```text

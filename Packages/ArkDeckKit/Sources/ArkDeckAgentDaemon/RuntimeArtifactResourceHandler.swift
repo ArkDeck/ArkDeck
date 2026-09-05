@@ -2,7 +2,7 @@ import ArkDeckCore
 import ArkDeckWorkflows
 import Foundation
 
-/// Protocol-2 Artifact resources never synthesize an Import-owned Job.
+/// Current v1 Artifact resources never synthesize an Import-owned Job.
 struct RuntimeArtifactResourceHandler {
   let engine: RuntimeJobEngine
   let artifacts: RuntimeArtifactStore?
@@ -13,7 +13,6 @@ struct RuntimeArtifactResourceHandler {
         details: ["phase": .string("artifactOwner"), "newDispatchCount": .integer(0)]))
     }
     do {
-      guard request.protocolVersion == ArkDeckControlProtocol.targetVersion else { return failed("unknownMethod", "tagged Artifact resources require protocol 2") }
       guard let artifacts else { return failed("operationUnavailable", "Artifact store is unavailable") }
       let fields = request.params ?? [:]
       let allowed: Set<String>

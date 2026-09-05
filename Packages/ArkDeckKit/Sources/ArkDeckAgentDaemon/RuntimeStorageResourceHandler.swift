@@ -2,7 +2,7 @@ import ArkDeckCore
 import ArkDeckWorkflows
 import Foundation
 
-/// Protocol-2 projection of the Runtime's two distinct storage domains.
+/// Current v1 projection of the Runtime's two distinct storage domains.
 ///
 /// Session output configuration and measurement come from one daemon-owned
 /// durable owner. Immutable Runtime Artifacts retain their existing owner and
@@ -24,9 +24,6 @@ struct RuntimeStorageResourceHandler {
           ]))
     }
     do {
-      guard request.protocolVersion == ArkDeckControlProtocol.targetVersion else {
-        return failed("unknownMethod", "Runtime storage requires protocol 2")
-      }
       guard let sessions, let artifacts else {
         return failed("operationUnavailable", "Runtime storage owners are not configured")
       }

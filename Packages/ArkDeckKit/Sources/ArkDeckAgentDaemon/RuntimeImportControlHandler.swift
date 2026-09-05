@@ -3,6 +3,73 @@ import ArkDeckWorkflows
 import Darwin
 import Foundation
 
+/// Keeps XPC uploads within the three App-owned kinds and the exact resources
+/// returned to that App. Every transport's begin passes this owner so checking
+/// for an existing CLI import and publishing a fresh App import cannot race.
+actor RuntimeImportControlGateway {
+  private var beginning: Set<String> = []
+  private var appRequests: [String: ArtifactImportIntent] = [:]
+  private var appImports: [String: ArtifactImportIntent] = [:]
+
+  func response(
+    _ request: AgentWireProtocol.Request, context: RuntimeControlRequestContext,
+    resources: RuntimeImportControlHandler
+  ) async -> AgentWireProtocol.Response {
+    func refused() -> AgentWireProtocol.Response {
+      .init(id: request.id, ok: false, result: nil,
+        error: .init(code: "admissionDenied", message: "Import is outside this App upload scope",
+          details: ["phase": .string("preAdmission"), "newDispatchCount": .integer(0)]))
+    }
+    let app = context.transport == .appXPC
+    var begin: ArtifactImportIntent?
+    if request.method == "artifact.import.begin" {
+      guard let intent = try? ArtifactImportIntent(request.params ?? [:]) else {
+        return app ? refused() : await resources.response(request)
+      }
+      guard beginning.insert(intent.importRequestID).inserted else {
+        return .init(id: request.id, ok: false, result: nil,
+          error: .init(code: "resourceConflict", message: "Import begin is already in progress",
+            details: ["phase": .string("preAdmission"), "newDispatchCount": .integer(0)]))
+      }
+      begin = intent
+      if app {
+        guard ["hap", "native-library", "flash-bundle"].contains(intent.kind),
+          appRequests[intent.importRequestID].map({ $0 == intent }) ?? true else {
+          beginning.remove(intent.importRequestID)
+          return refused()
+        }
+        if appRequests[intent.importRequestID] == nil {
+          do {
+            guard let artifacts = resources.artifacts else { throw AgentExecutionControlFailure("operationUnavailable", "Import owner unavailable") }
+            _ = try await artifacts.inspectImport(requestID: intent.importRequestID)
+            beginning.remove(intent.importRequestID)
+            return refused()
+          } catch let failure as AgentExecutionControlFailure where failure.code == "resourceNotFound" {
+            appRequests[intent.importRequestID] = intent
+          } catch {
+            beginning.remove(intent.importRequestID)
+            return refused()
+          }
+        }
+      }
+    } else if app {
+      if request.method == "artifact.import.abort" {
+        guard case .string(let id)? = request.params?["importRequestId"], appRequests[id] != nil else { return refused() }
+      } else {
+        guard ["artifact.import.append", "artifact.import.commit"].contains(request.method),
+          case .string(let id)? = request.params?["importId"], appImports[id] != nil else { return refused() }
+      }
+    }
+    defer { if let begin { beginning.remove(begin.importRequestID) } }
+    let response = await resources.response(request)
+    if app, let begin, response.ok, let result = response.result,
+      let projection = try? ArtifactImportProjection(result), projection.intent == begin {
+      appImports[projection.id] = begin
+    }
+    return response
+  }
+}
+
 struct RuntimeImportControlHandler {
   let artifacts: RuntimeArtifactStore?
   let targets: RuntimeTargetStore?
@@ -11,9 +78,6 @@ struct RuntimeImportControlHandler {
 
   func response(_ request: AgentWireProtocol.Request) async -> AgentWireProtocol.Response {
     do {
-      guard request.protocolVersion == ArkDeckControlProtocol.targetVersion else {
-        throw AgentExecutionControlFailure("unknownMethod", "durable Import resources require protocol 2")
-      }
       guard let artifacts, let targets else { throw AgentExecutionControlFailure("operationUnavailable", "Import owner services are unavailable") }
       let fields = request.params ?? [:]
       func exact(_ keys: Set<String>) throws {

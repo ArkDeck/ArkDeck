@@ -76,15 +76,16 @@ final class RuntimeTraceCacheControlContractTests: XCTestCase {
   private func request(
     _ handler: RuntimeControlPlaneHandler,
     method: String,
-    version: String = ArkDeckControlProtocol.targetVersion,
+    version: String = ArkDeckControlProtocol.currentVersion,
     params: [String: JSONValue]? = nil
   ) async throws -> AgentWireProtocol.Response {
     let frame = try CanonicalJSONEncoders.canonical().encode(
       JSONValue.object([
         "protocolVersion": .string(version),
+        "contractIdentity": .string(ArkDeckControlProtocol.contractIdentity),
         "id": .string("trace-cache-contract"),
         "method": .string(method),
-        "params": params.map(JSONValue.object) ?? .null,
+        "params": params.map(JSONValue.object) ?? .object([:]),
       ]))
     return try JSONDecoder().decode(
       AgentWireProtocol.Response.self, from: await handler.handleLine(frame))
@@ -119,7 +120,7 @@ final class RuntimeTraceCacheControlContractTests: XCTestCase {
     let owner = Owner()
     let configured = try handler(owner: owner)
     let legacy = try await request(
-      configured, method: "trace.cache.status", version: ArkDeckControlProtocol.legacyVersion)
+      configured, method: "trace.cache.status", version: "2.0.0")
     XCTAssertEqual(legacy.error?.code, "unsupportedProtocolVersion")
     let pathBearing = try await request(
       configured, method: "trace.cache.purge", params: ["path": .string("/tmp/cache")])

@@ -219,7 +219,7 @@ final class SettingsStorageDomainContractTests: XCTestCase {
       encoding: .utf8)
 
     XCTAssertTrue(facade.contains("method: \"runtime.storage.status\""))
-    XCTAssertTrue(facade.contains("ArkDeckControlProtocol.targetVersion"))
+    XCTAssertTrue(facade.contains("ArkDeckControlProtocol.currentVersion"))
     XCTAssertFalse(facade.contains("method: \"artifact.quota\""))
     XCTAssertTrue(view.contains("storage.runtimeArtifacts"))
     XCTAssertTrue(view.contains("sessionRoot.measuredBytes"))

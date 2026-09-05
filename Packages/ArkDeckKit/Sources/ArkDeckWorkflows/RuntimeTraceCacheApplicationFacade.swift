@@ -112,7 +112,7 @@ actor RuntimeTraceCacheXPCProvider: RuntimeTraceCacheApplicationProviding {
     request: @escaping Request = { method, params in
       switch await RuntimeXPCRequestTransport.request(
         method: method, params: params,
-        protocolVersion: ArkDeckControlProtocol.targetVersion)
+        protocolVersion: ArkDeckControlProtocol.currentVersion)
       {
       case .success(let data): return .success(data)
       case .failure(.timedOut):

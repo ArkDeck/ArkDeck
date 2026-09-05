@@ -31,5 +31,7 @@ Discovery alone cannot prove physical continuity across connect-key reuse.
 
 These IDs are observation metadata, not durable target identity or capability.
 This change does not implement observation-bound adoption, display-name writes,
-device waiting, protocol 2.x negotiation, or full target-contract conformance.
+device waiting or full target-contract conformance. Current control callers use
+TargetObservationCoordinator and the single-v1 contract; this display-cache
+registry cannot issue adoption authority.
 No real-device acceptance is claimed by the host-side contract tests.

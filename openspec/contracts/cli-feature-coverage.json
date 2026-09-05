@@ -1791,274 +1791,6 @@
       "targetCommand": "arkdeck artifact import workspace-patch --import-request-id <id> --target <target-id> --file <path>"
     },
     {
-      "classification": "internal",
-      "conformanceFixture": "argv/artifact.import-flash-bundle.json",
-      "equivalentCommands": [],
-      "feature": "artifact.importFlashBundle.abort",
-      "implementationStatusByPlatform": {
-        "macos": "implemented"
-      },
-      "lifecycle": "legacy",
-      "note": "1.x abort frame",
-      "requiredPlatforms": [
-        "macos"
-      ],
-      "source": "daemon:artifact.importFlashBundle.abort",
-      "targetClassification": "internal",
-      "targetCommand": "arkdeck artifact import-flash-bundle --target <target-id> --file <path>"
-    },
-    {
-      "classification": "internal",
-      "conformanceFixture": "argv/artifact.import-flash-bundle.json",
-      "equivalentCommands": [],
-      "feature": "artifact.importFlashBundle.append",
-      "implementationStatusByPlatform": {
-        "macos": "implemented"
-      },
-      "lifecycle": "legacy",
-      "note": "1.x chunk frame",
-      "requiredPlatforms": [
-        "macos"
-      ],
-      "source": "daemon:artifact.importFlashBundle.append",
-      "targetClassification": "internal",
-      "targetCommand": "arkdeck artifact import-flash-bundle --target <target-id> --file <path>"
-    },
-    {
-      "classification": "direct",
-      "conformanceFixture": "argv/artifact.import-flash-bundle.json",
-      "equivalentCommands": [],
-      "feature": "artifact.importFlashBundle.begin",
-      "implementationStatusByPlatform": {
-        "macos": "implemented"
-      },
-      "lifecycle": "legacy",
-      "requiredPlatforms": [
-        "macos"
-      ],
-      "source": "daemon:artifact.importFlashBundle.begin",
-      "targetClassification": "direct",
-      "targetCommand": "arkdeck artifact import-flash-bundle --target <target-id> --file <path>"
-    },
-    {
-      "classification": "internal",
-      "conformanceFixture": "argv/artifact.import-flash-bundle.json",
-      "equivalentCommands": [],
-      "feature": "artifact.importFlashBundle.commit",
-      "implementationStatusByPlatform": {
-        "macos": "implemented"
-      },
-      "lifecycle": "legacy",
-      "note": "1.x commit frame",
-      "requiredPlatforms": [
-        "macos"
-      ],
-      "source": "daemon:artifact.importFlashBundle.commit",
-      "targetClassification": "internal",
-      "targetCommand": "arkdeck artifact import-flash-bundle --target <target-id> --file <path>"
-    },
-    {
-      "classification": "internal",
-      "conformanceFixture": "argv/artifact.import-hap.json",
-      "equivalentCommands": [],
-      "feature": "artifact.importHap.abort",
-      "implementationStatusByPlatform": {
-        "macos": "implemented"
-      },
-      "lifecycle": "legacy",
-      "note": "1.x abort frame",
-      "requiredPlatforms": [
-        "macos"
-      ],
-      "source": "daemon:artifact.importHap.abort",
-      "targetClassification": "internal",
-      "targetCommand": "arkdeck artifact import-hap --target <target-id> --file <path>"
-    },
-    {
-      "classification": "internal",
-      "conformanceFixture": "argv/artifact.import-hap.json",
-      "equivalentCommands": [],
-      "feature": "artifact.importHap.append",
-      "implementationStatusByPlatform": {
-        "macos": "implemented"
-      },
-      "lifecycle": "legacy",
-      "note": "1.x chunk frame",
-      "requiredPlatforms": [
-        "macos"
-      ],
-      "source": "daemon:artifact.importHap.append",
-      "targetClassification": "internal",
-      "targetCommand": "arkdeck artifact import-hap --target <target-id> --file <path>"
-    },
-    {
-      "classification": "direct",
-      "conformanceFixture": "argv/artifact.import-hap.json",
-      "equivalentCommands": [],
-      "feature": "artifact.importHap.begin",
-      "implementationStatusByPlatform": {
-        "macos": "implemented"
-      },
-      "lifecycle": "legacy",
-      "requiredPlatforms": [
-        "macos"
-      ],
-      "source": "daemon:artifact.importHap.begin",
-      "targetClassification": "direct",
-      "targetCommand": "arkdeck artifact import-hap --target <target-id> --file <path>"
-    },
-    {
-      "classification": "internal",
-      "conformanceFixture": "argv/artifact.import-hap.json",
-      "equivalentCommands": [],
-      "feature": "artifact.importHap.commit",
-      "implementationStatusByPlatform": {
-        "macos": "implemented"
-      },
-      "lifecycle": "legacy",
-      "note": "1.x commit frame",
-      "requiredPlatforms": [
-        "macos"
-      ],
-      "source": "daemon:artifact.importHap.commit",
-      "targetClassification": "internal",
-      "targetCommand": "arkdeck artifact import-hap --target <target-id> --file <path>"
-    },
-    {
-      "classification": "internal",
-      "conformanceFixture": "argv/artifact.import-native-library.json",
-      "equivalentCommands": [],
-      "feature": "artifact.importNativeLibrary.abort",
-      "implementationStatusByPlatform": {
-        "macos": "implemented"
-      },
-      "lifecycle": "legacy",
-      "note": "1.x abort frame",
-      "requiredPlatforms": [
-        "macos"
-      ],
-      "source": "daemon:artifact.importNativeLibrary.abort",
-      "targetClassification": "internal",
-      "targetCommand": "arkdeck artifact import-native-library --target <target-id> --file <path>"
-    },
-    {
-      "classification": "internal",
-      "conformanceFixture": "argv/artifact.import-native-library.json",
-      "equivalentCommands": [],
-      "feature": "artifact.importNativeLibrary.append",
-      "implementationStatusByPlatform": {
-        "macos": "implemented"
-      },
-      "lifecycle": "legacy",
-      "note": "1.x chunk frame",
-      "requiredPlatforms": [
-        "macos"
-      ],
-      "source": "daemon:artifact.importNativeLibrary.append",
-      "targetClassification": "internal",
-      "targetCommand": "arkdeck artifact import-native-library --target <target-id> --file <path>"
-    },
-    {
-      "classification": "direct",
-      "conformanceFixture": "argv/artifact.import-native-library.json",
-      "equivalentCommands": [],
-      "feature": "artifact.importNativeLibrary.begin",
-      "implementationStatusByPlatform": {
-        "macos": "implemented"
-      },
-      "lifecycle": "legacy",
-      "requiredPlatforms": [
-        "macos"
-      ],
-      "source": "daemon:artifact.importNativeLibrary.begin",
-      "targetClassification": "direct",
-      "targetCommand": "arkdeck artifact import-native-library --target <target-id> --file <path>"
-    },
-    {
-      "classification": "internal",
-      "conformanceFixture": "argv/artifact.import-native-library.json",
-      "equivalentCommands": [],
-      "feature": "artifact.importNativeLibrary.commit",
-      "implementationStatusByPlatform": {
-        "macos": "implemented"
-      },
-      "lifecycle": "legacy",
-      "note": "1.x commit frame",
-      "requiredPlatforms": [
-        "macos"
-      ],
-      "source": "daemon:artifact.importNativeLibrary.commit",
-      "targetClassification": "internal",
-      "targetCommand": "arkdeck artifact import-native-library --target <target-id> --file <path>"
-    },
-    {
-      "classification": "internal",
-      "conformanceFixture": "argv/artifact.import-workspace-patch.json",
-      "equivalentCommands": [],
-      "feature": "artifact.importWorkspacePatch.abort",
-      "implementationStatusByPlatform": {
-        "macos": "implemented"
-      },
-      "lifecycle": "legacy",
-      "note": "1.x abort frame",
-      "requiredPlatforms": [
-        "macos"
-      ],
-      "source": "daemon:artifact.importWorkspacePatch.abort",
-      "targetClassification": "internal",
-      "targetCommand": "arkdeck artifact import-workspace-patch --target <target-id> --file <path>"
-    },
-    {
-      "classification": "internal",
-      "conformanceFixture": "argv/artifact.import-workspace-patch.json",
-      "equivalentCommands": [],
-      "feature": "artifact.importWorkspacePatch.append",
-      "implementationStatusByPlatform": {
-        "macos": "implemented"
-      },
-      "lifecycle": "legacy",
-      "note": "1.x chunk frame",
-      "requiredPlatforms": [
-        "macos"
-      ],
-      "source": "daemon:artifact.importWorkspacePatch.append",
-      "targetClassification": "internal",
-      "targetCommand": "arkdeck artifact import-workspace-patch --target <target-id> --file <path>"
-    },
-    {
-      "classification": "direct",
-      "conformanceFixture": "argv/artifact.import-workspace-patch.json",
-      "equivalentCommands": [],
-      "feature": "artifact.importWorkspacePatch.begin",
-      "implementationStatusByPlatform": {
-        "macos": "implemented"
-      },
-      "lifecycle": "legacy",
-      "requiredPlatforms": [
-        "macos"
-      ],
-      "source": "daemon:artifact.importWorkspacePatch.begin",
-      "targetClassification": "direct",
-      "targetCommand": "arkdeck artifact import-workspace-patch --target <target-id> --file <path>"
-    },
-    {
-      "classification": "internal",
-      "conformanceFixture": "argv/artifact.import-workspace-patch.json",
-      "equivalentCommands": [],
-      "feature": "artifact.importWorkspacePatch.commit",
-      "implementationStatusByPlatform": {
-        "macos": "implemented"
-      },
-      "lifecycle": "legacy",
-      "note": "1.x commit frame",
-      "requiredPlatforms": [
-        "macos"
-      ],
-      "source": "daemon:artifact.importWorkspacePatch.commit",
-      "targetClassification": "internal",
-      "targetCommand": "arkdeck artifact import-workspace-patch --target <target-id> --file <path>"
-    },
-    {
       "classification": "local",
       "conformanceFixture": "argv/artifact.inspect.json",
       "equivalentCommands": [],
@@ -2140,12 +1872,12 @@
         "windows": "notImplemented"
       },
       "lifecycle": "current",
-      "note": "capability authoring is Runtime-owned; the CLI names the method only to refuse it",
+      "note": "capability administration is Runtime-owned",
       "requiredPlatforms": [
         "macos",
         "windows"
       ],
-      "source": "daemon:capability.draft",
+      "source": "cli:capability.draft",
       "targetClassification": "refused",
       "targetCommand": "arkdeck capability draft"
     },
@@ -2177,12 +1909,12 @@
         "windows": "notImplemented"
       },
       "lifecycle": "current",
-      "note": "capability installation is Runtime-owned; the CLI names the method only to refuse it",
+      "note": "capability administration is Runtime-owned",
       "requiredPlatforms": [
         "macos",
         "windows"
       ],
-      "source": "daemon:capability.install",
+      "source": "cli:capability.install",
       "targetClassification": "refused",
       "targetCommand": "arkdeck capability install"
     },
@@ -2214,12 +1946,12 @@
         "windows": "notImplemented"
       },
       "lifecycle": "current",
-      "note": "capability revocation is Runtime-owned; the CLI names the method only to refuse it",
+      "note": "capability administration is Runtime-owned",
       "requiredPlatforms": [
         "macos",
         "windows"
       ],
-      "source": "daemon:capability.revoke",
+      "source": "cli:capability.revoke",
       "targetClassification": "refused",
       "targetCommand": "arkdeck capability revoke"
     },
@@ -2545,24 +2277,6 @@
       "source": "catalog:deploy.native-library.app-owned@1",
       "targetClassification": "direct",
       "targetCommand": "arkdeck debug native deploy"
-    },
-    {
-      "classification": "direct",
-      "conformanceFixture": "argv/device.candidates.json",
-      "equivalentCommands": [],
-      "feature": "device.candidates",
-      "implementationStatusByPlatform": {
-        "macos": "implemented",
-        "windows": "notImplemented"
-      },
-      "lifecycle": "current",
-      "requiredPlatforms": [
-        "macos",
-        "windows"
-      ],
-      "source": "daemon:device.candidates",
-      "targetClassification": "direct",
-      "targetCommand": "arkdeck device candidates"
     },
     {
       "classification": "local",
@@ -3207,25 +2921,6 @@
       "targetCommand": "arkdeck job list"
     },
     {
-      "classification": "internal",
-      "conformanceFixture": "argv/job.list.json",
-      "equivalentCommands": [],
-      "feature": "job.list-page",
-      "implementationStatusByPlatform": {
-        "macos": "implemented",
-        "windows": "notImplemented"
-      },
-      "lifecycle": "current",
-      "note": "cursor page form of job.list used by `job list`",
-      "requiredPlatforms": [
-        "macos",
-        "windows"
-      ],
-      "source": "daemon:job.list-page",
-      "targetClassification": "internal",
-      "targetCommand": "arkdeck job list"
-    },
-    {
       "classification": "direct",
       "conformanceFixture": "argv/job.plan.json",
       "equivalentCommands": [],
@@ -3610,25 +3305,6 @@
       "targetCommand": "arkdeck port-forward remove"
     },
     {
-      "classification": "internal",
-      "conformanceFixture": null,
-      "equivalentCommands": [],
-      "feature": "protocol.negotiate",
-      "implementationStatusByPlatform": {
-        "macos": "implemented",
-        "windows": "notImplemented"
-      },
-      "lifecycle": "current",
-      "note": "protocol bootstrap performed by every connecting leaf; never a feature of its own",
-      "requiredPlatforms": [
-        "macos",
-        "windows"
-      ],
-      "source": "daemon:protocol.negotiate",
-      "targetClassification": "internal",
-      "targetCommand": null
-    },
-    {
       "classification": "direct",
       "conformanceFixture": "argv/recovery.flash-invocation.list.json",
       "equivalentCommands": [],
@@ -3693,25 +3369,6 @@
       "source": "cli:runtime.bundle.remove",
       "targetClassification": "local",
       "targetCommand": "arkdeck runtime bundle remove --bundle <bundle:sha256:digest> --expected-generation <generation>"
-    },
-    {
-      "classification": "direct",
-      "conformanceFixture": "argv/runtime.hdc.status.json",
-      "equivalentCommands": [],
-      "feature": "runtime.hdc-status",
-      "implementationStatusByPlatform": {
-        "macos": "implemented",
-        "windows": "notImplemented"
-      },
-      "lifecycle": "legacy",
-      "note": "1.x spelling that `runtime hdc status` falls back to on a legacy Runtime",
-      "requiredPlatforms": [
-        "macos",
-        "windows"
-      ],
-      "source": "daemon:runtime.hdc-status",
-      "targetClassification": "direct",
-      "targetCommand": "arkdeck runtime hdc status"
     },
     {
       "classification": "direct",
@@ -4374,9 +4031,7 @@
     {
       "classification": "direct",
       "conformanceFixture": "argv/target.adopt.json",
-      "equivalentCommands": [
-        "arkdeck device adopt"
-      ],
+      "equivalentCommands": [],
       "feature": "target.adopt",
       "implementationStatusByPlatform": {
         "macos": "implemented",
@@ -5052,9 +4707,9 @@
   "summary": {
     "blocked": [],
     "byClassification": {
-      "direct": 131,
+      "direct": 125,
       "generic": 1,
-      "internal": 18,
+      "internal": 4,
       "local": 94,
       "platformService": 4,
       "presentation": 21,
@@ -5063,10 +4718,10 @@
     "bySource": {
       "app": 68,
       "catalog": 30,
-      "cli": 62,
-      "daemon": 119
+      "cli": 65,
+      "daemon": 96
     },
-    "entries": 279,
+    "entries": 259,
     "fullFunction": true
   }
 }

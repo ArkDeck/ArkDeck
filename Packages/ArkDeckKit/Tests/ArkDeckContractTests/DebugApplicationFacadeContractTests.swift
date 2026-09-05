@@ -31,7 +31,7 @@ final class DebugApplicationFacadeContractTests: XCTestCase {
           ]
         ])),
       jobResponse: .success(
-        try response([
+        try currentJobPageResponse([
           [
             "jobId": "job-debug-1", "operation": "debug.hap@1",
             "targetId": "target-dayu200-a", "state": "running",
@@ -86,7 +86,7 @@ final class DebugApplicationFacadeContractTests: XCTestCase {
       operationResponse: .success(try response([])),
       targetResponse: .success(try response([])),
       jobResponse: .success(
-        try response([
+        try currentJobPageResponse([
           [
             "jobId": "job-debug-failed", "operation": "debug.hap@1",
             "targetId": "target-dayu200-a", "state": "failed",
@@ -126,7 +126,7 @@ final class DebugApplicationFacadeContractTests: XCTestCase {
       operationResponse: .success(try response([])),
       targetResponse: .success(try response([])),
       jobResponse: .success(
-        try response([
+        try currentJobPageResponse([
           [
             "jobId": "job-debug-failed", "operation": "debug.hap@1",
             "targetId": "target-dayu200-a", "state": "failed",
@@ -157,7 +157,7 @@ final class DebugApplicationFacadeContractTests: XCTestCase {
       operationResponse: .success(try response([])),
       targetResponse: .success(try response([["targetId": "target-without-binding"]])),
       jobResponse: .success(
-        try response([
+        try currentJobPageResponse([
           [
             "jobId": "job-incomplete", "operation": "debug.hap@1",
             "targetId": "target-dayu200-a", "state": "running",
@@ -281,16 +281,16 @@ final class DebugApplicationFacadeContractTests: XCTestCase {
     guard case .submitted(let acceptance) = result else { return XCTFail("\(result)") }
     XCTAssertEqual(acceptance.jobID, "job-hap-fixture")
     let snapshot = await transport.snapshot()
-    XCTAssertEqual(snapshot.methods.filter { $0 == "artifact.importHap.commit" }.count, 3)
+    XCTAssertEqual(snapshot.methods.filter { $0 == "artifact.import.commit" }.count, 3)
     XCTAssertEqual(snapshot.methods.last, "job.submit")
     XCTAssertEqual(snapshot.requests.count, 1)
     let encoded = try XCTUnwrap(snapshot.requests.first)
     let request = try XCTUnwrap(
       JSONSerialization.jsonObject(with: Data(encoded.utf8)) as? [String: Any])
     let inputs = try XCTUnwrap(request["inputs"] as? [String: Any])
-    XCTAssertEqual(inputs["hapArtifactLease"] as? String, "lease-entry.hap")
+    XCTAssertEqual(inputs["hapArtifactLease"] as? String, snapshot.leases.first)
     XCTAssertEqual(
-      inputs["additionalHapArtifactLeases"] as? [String], ["lease-feature.hap", "lease-shared.hsp"])
+      inputs["additionalHapArtifactLeases"] as? [String], Array(snapshot.leases.dropFirst()))
     XCTAssertFalse(encoded.contains(files[0].deletingLastPathComponent().path))
     XCTAssertFalse(
       snapshot.methods.contains("job.run"), "execution remains the separate caller step")
@@ -305,9 +305,9 @@ final class DebugApplicationFacadeContractTests: XCTestCase {
       guard case .failed = result else { return XCTFail("\(result)") }
       let snapshot = await transport.snapshot()
       XCTAssertTrue(snapshot.requests.isEmpty)
-      XCTAssertEqual(snapshot.methods.filter { $0 == "artifact.importHap.begin" }.count, 2)
+      XCTAssertEqual(snapshot.methods.filter { $0 == "artifact.import.begin" }.count, 2)
       XCTAssertEqual(
-        snapshot.methods.filter { $0 == "artifact.importHap.abort" }.count,
+        snapshot.methods.filter { $0 == "artifact.import.abort" }.count,
         failure == .append ? 1 : 0,
         "only an uncommitted upload is aborted; committed immutable artifacts are not deleted")
     }
@@ -515,10 +515,6 @@ final class DebugApplicationFacadeContractTests: XCTestCase {
       "job.submit", "job.run", "job.cancel",
       "port-forward.create", "port-forward.remove",
       "deploy.native-library.app-owned",
-      "artifact.importHap.begin", "artifact.importHap.append",
-      "artifact.importHap.commit", "artifact.importHap.abort",
-      "artifact.importNativeLibrary.begin", "artifact.importNativeLibrary.append",
-      "artifact.importNativeLibrary.commit", "artifact.importNativeLibrary.abort",
     ] {
       XCTAssertTrue(source.contains("\"\(exposed)\""))
     }
@@ -776,59 +772,96 @@ private actor HAPSubmissionTransport {
   private let failure: Failure?
   private var methods: [String] = []
   private var requests: [String] = []
+  private var leases: [String] = []
   private var active: [String: JSONValue] = [:]
+  private var importID = ""
+  private var offset = 0
   private var uploadCount = 0
 
   init(failure: Failure? = nil) { self.failure = failure }
 
-  func snapshot() -> (methods: [String], requests: [String]) { (methods, requests) }
+  func snapshot() -> (methods: [String], requests: [String], leases: [String]) {
+    (methods, requests, leases)
+  }
 
   func request(_ method: String, _ params: [String: JSONValue]?)
     -> Result<Data, DebugXPCReadFailure>
   {
     methods.append(method)
     let params = params ?? [:]
-    var result: [String: JSONValue] = [:]
-    switch method {
-    case "artifact.importHap.begin":
-      active = params
-      uploadCount += 1
-      result = [
-        "uploadId": .string("upload-\(uploadCount)"), "maximumChunkBytes": .integer(512 * 1_024),
-        "targetId": .string("TGT-fixture"), "bindingRevision": .integer(9),
-      ]
-    case "artifact.importHap.append":
-      if uploadCount == 2, failure == .append {
-        return .failure(.transport("fixture refused append"))
-      }
-      guard case .integer(let offset)? = params["offset"],
-        case .string(let encoded)? = params["base64"], let data = Data(base64Encoded: encoded),
-        !data.isEmpty, data.count <= 512 * 1_024
-      else { return .failure(.transport("unbounded fixture chunk")) }
-      result = ["nextOffset": .integer(offset + Int64(data.count))]
-    case "artifact.importHap.commit":
-      guard case .string(let name)? = active["name"] else {
-        return .failure(.transport("no active upload"))
-      }
-      result = active
-      result["lease"] = .string("lease-\(name)")
-      result["bindingRevision"] = .integer(uploadCount == 2 && failure == .binding ? 10 : 9)
-    case "artifact.importHap.abort": break
-    case "job.submit":
-      guard case .string(let encoded)? = params["requestJson"] else {
-        return .failure(.transport("missing typed request"))
-      }
-      requests.append(encoded)
-      result = ["jobId": .string("job-hap-fixture")]
-    default: return .failure(.transport("unexpected fixture method: \(method)"))
-    }
     do {
-      return .success(
-        try CanonicalJSONEncoders.canonical().encode(
-          JSONValue.object([
-            "ok": .bool(true), "id": .string("fixture"), "result": .object(result),
-          ])))
+      var result: JSONValue
+      switch method {
+      case "artifact.import.begin":
+        active = params
+        _ = try ArtifactImportIntent(active)
+        uploadCount += 1
+        importID = "imp-" + UUID().uuidString.lowercased()
+        offset = 0
+        result = try projection(state: "inProgress")
+      case "artifact.import.append":
+        if uploadCount == 2, failure == .append {
+          return .failure(.transport("fixture refused append"))
+        }
+        guard params["importId"] == .string(importID), params["generation"] == .string("1"),
+          params["offset"] == .string(String(offset)),
+          case .string(let encoded)? = params["base64"], let data = Data(base64Encoded: encoded),
+          !data.isEmpty, data.count <= 512 * 1_024,
+          params["byteCount"] == .string(String(data.count)),
+          params["sha256"] == .string(SHA256Hex.string(of: data))
+        else { return .failure(.transport("invalid fixture chunk or selector")) }
+        offset += data.count
+        result = try projection(state: "inProgress")
+      case "artifact.import.commit":
+        guard params["importId"] == .string(importID), params["generation"] == .string("1") else {
+          return .failure(.transport("invalid commit selector"))
+        }
+        result = try projection(state: "committed")
+      case "artifact.import.abort": result = try projection(state: "aborted")
+      case "job.submit":
+        guard case .string(let encoded)? = params["requestJson"] else {
+          return .failure(.transport("missing typed request"))
+        }
+        requests.append(encoded)
+        result = .object(["jobId": .string("job-hap-fixture")])
+      default: return .failure(.transport("unexpected fixture method: \(method)"))
+      }
+      return .success(try CanonicalJSONEncoders.canonical().encode(JSONValue.object([
+        "ok": .bool(true), "id": .string("fixture"), "result": result,
+      ])))
     } catch { return .failure(.transport(String(describing: error))) }
+  }
+
+  private func projection(state: String) throws -> JSONValue {
+    let intent = try ArtifactImportIntent(active)
+    var receipt: JSONValue = .null
+    if state == "committed" {
+      let artifactID = "artifact-\(uploadCount)"
+      let lease = "lease-v1:\(importID):\(artifactID)"
+      leases.append(lease)
+      receipt = .object([
+        "schemaVersion": .string("arkdeck.import-receipt/1"), "importId": .string(importID),
+        "importRequestId": .string(intent.importRequestID),
+        "owner": .object(["kind": .string("import"), "id": .string(importID)]),
+        "artifactId": .string(artifactID), "artifactDigest": .string(intent.sha256),
+        "byteCount": .string(String(intent.byteCount)), "name": .string(intent.name),
+        "mediaType": .string(intent.name.hasSuffix(".hsp")
+          ? "application/vnd.openharmony.hsp" : "application/vnd.openharmony.hap"),
+        "privacy": .string("standard"), "targetId": .string(intent.targetID),
+        "bindingRevision": .string(uploadCount == 2 && failure == .binding ? "10" : "9"),
+        "lease": .string(lease), "generation": .string("2"),
+        "validation": .object(["kind": .string("hap")]),
+      ])
+    }
+    return .object([
+      "schemaVersion": .string("arkdeck.import/1"), "importId": .string(importID),
+      "importRequestId": .string(intent.importRequestID), "metadata": .object(active),
+      "metadataFingerprint": .string(try intent.fingerprint),
+      "generation": .string(state == "inProgress" ? "1" : "2"), "state": .string(state),
+      "nextOffset": .string(String(offset)), "maximumChunkBytes": .string("524288"),
+      "createdAtUtc": .string("2026-09-05T00:00:00Z"),
+      "updatedAtUtc": .string("2026-09-05T00:00:00Z"), "receipt": receipt,
+    ])
   }
 }
 

@@ -52,7 +52,7 @@ children before returning paths to Runtime composition.
 
 ## Typed workspace presets
 
-The target protocol 2 surface now provides:
+The target current v1 surface now provides:
 
 ```text
 arkdeck workspace preset list --project <project-ref> [--kind build|test|signing|symbol]

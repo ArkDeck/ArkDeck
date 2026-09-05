@@ -38,10 +38,10 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
   }
 
   private func chunk(
-    _ bytes: Data, total: Int, offset: Int, eof: Bool
+    _ bytes: Data, total: Int, offset: Int, eof: Bool, digest: String? = nil
   ) throws -> RuntimeHistoryTransportResult {
     try response([
-      "artifactId": "artifact-preview", "offset": offset, "nextOffset": offset + bytes.count,
+      "artifactId": "artifact-preview", "artifactDigest": digest ?? SHA256Hex.string(of: bytes), "offset": offset, "nextOffset": offset + bytes.count,
       "totalByteCount": total, "byteCount": bytes.count, "base64": bytes.base64EncodedString(),
       "eof": eof,
     ])
@@ -51,8 +51,8 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
     let bytes = Data(repeating: 65, count: 300_000)
     let boundary = 256 * 1_024
     let transport = HistoryRPCScenario([
-      ("artifact.read", try chunk(bytes.prefix(boundary), total: bytes.count, offset: 0, eof: false)),
-      ("artifact.read", try chunk(bytes.suffix(bytes.count - boundary), total: bytes.count, offset: boundary, eof: true)),
+      ("artifact.read", try chunk(bytes.prefix(boundary), total: bytes.count, offset: 0, eof: false, digest: SHA256Hex.string(of: bytes))),
+      ("artifact.read", try chunk(bytes.suffix(bytes.count - boundary), total: bytes.count, offset: boundary, eof: true, digest: SHA256Hex.string(of: bytes))),
     ])
     let reader = RuntimeJobDetailXPCProvider(request: { await transport.request($0, $1) })
     let result = await reader.readArtifact(
@@ -62,7 +62,7 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
     XCTAssertEqual(calls.map(\.0), ["artifact.read", "artifact.read"])
     XCTAssertEqual(calls.map { $0.1["offset"] }, [.integer(0), .integer(Int64(boundary))])
     XCTAssertTrue(calls.allSatisfy {
-      $0.1["jobId"] == .string("job-preview") && $0.1["artifactId"] == .string("artifact-preview")
+      $0.1["owner"] == .object(["kind": .string("job"), "id": .string("job-preview")]) && $0.1["artifactId"] == .string("artifact-preview")
         && $0.1["maxBytes"] == .integer(Int64(boundary)) && $0.1["allowSensitive"] == .bool(false)
     })
   }
@@ -159,14 +159,44 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
   func testACompleteJobListBecomesAvailableHistory() {
     let presentation = decode(
       """
-      {"ok":true,"id":"x","result":[
-        {"jobId":"job-1","operation":"observe.devices@1","targetId":"t-1",
-         "state":"succeeded","waitingForHuman":false,"outcomeUnknown":false,
-         "outstandingResidueCount":0,"timeline":["queued","running","succeeded"],
-         "executionMode":"execute","sessionId":"session-job-1","actualEffect":"readOnly",
-         "createdAtUtc":"2026-08-06T07:00:00Z",
-         "startedAtUtc":"2026-08-06T07:00:01Z",
-         "finishedAtUtc":"2026-08-06T07:00:02Z"}]}
+      {
+        "ok": true,
+        "id": "x",
+        "result": {
+          "schemaVersion": "arkdeck.cli.page/1",
+          "pageKind": "snapshot",
+          "items": [
+            {
+              "jobId": "job-1",
+              "operation": "observe.devices@1",
+              "targetId": "t-1",
+              "state": "succeeded",
+              "waitingForHuman": false,
+              "outcomeUnknown": false,
+              "outstandingResidueCount": 0,
+              "timeline": {
+                "kind": "inline",
+                "entries": [
+                  "queued",
+                  "running",
+                  "succeeded"
+                ]
+              },
+              "executionMode": "execute",
+              "sessionId": "session-job-1",
+              "actualEffect": "readOnly",
+              "createdAtUtc": "2026-08-06T07:00:00Z",
+              "startedAtUtc": "2026-08-06T07:00:01Z",
+              "finishedAtUtc": "2026-08-06T07:00:02Z",
+              "schemaVersion": "arkdeck.job-summary/1"
+            }
+          ],
+          "order": "createdAtDescJobIdAsc",
+          "snapshotRevision": "11111111-1111-4111-8111-111111111111",
+          "hasMore": false,
+          "nextCursor": null
+        }
+      }
       """)
 
     XCTAssertEqual(presentation.availability, .available)
@@ -187,13 +217,39 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
     XCTAssertEqual(job?.requiresRecoveryGuidance, false)
   }
 
-  func testAnOlderJobListDoesNotInventNewHistoryFacts() throws {
+  func testOptionalHistoryFactsAreNotInventedWhenAbsent() throws {
     let presentation = decode(
       """
-      {"ok":true,"id":"x","result":[
-        {"jobId":"job-old","operation":"observe.device@1","targetId":"t-1",
-         "state":"succeeded","waitingForHuman":false,"outcomeUnknown":false,
-         "outstandingResidueCount":0,"timeline":["succeeded"]}]}
+      {
+        "ok": true,
+        "id": "x",
+        "result": {
+          "schemaVersion": "arkdeck.cli.page/1",
+          "pageKind": "snapshot",
+          "items": [
+            {
+              "jobId": "job-old",
+              "operation": "observe.device@1",
+              "targetId": "t-1",
+              "state": "succeeded",
+              "waitingForHuman": false,
+              "outcomeUnknown": false,
+              "outstandingResidueCount": 0,
+              "timeline": {
+                "kind": "inline",
+                "entries": [
+                  "succeeded"
+                ]
+              },
+              "schemaVersion": "arkdeck.job-summary/1"
+            }
+          ],
+          "order": "createdAtDescJobIdAsc",
+          "snapshotRevision": "11111111-1111-4111-8111-111111111111",
+          "hasMore": false,
+          "nextCursor": null
+        }
+      }
       """)
 
     let job = try XCTUnwrap(presentation.jobs.first)
@@ -248,10 +304,37 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
   func testDeviceWorkspaceReadsThePublishedHistoryNameAfterRename() throws {
     let presentation = decode(
       """
-      {"ok":true,"id":"x","result":[
-        {"jobId":"job-device","operation":"input.tap@1","targetId":"t-1",
-         "workspaceKind":"toolkit","state":"succeeded","waitingForHuman":false,
-         "outcomeUnknown":false,"outstandingResidueCount":0,"timeline":["succeeded"]}]}
+      {
+        "ok": true,
+        "id": "x",
+        "result": {
+          "schemaVersion": "arkdeck.cli.page/1",
+          "pageKind": "snapshot",
+          "items": [
+            {
+              "jobId": "job-device",
+              "operation": "input.tap@1",
+              "targetId": "t-1",
+              "workspaceKind": "toolkit",
+              "state": "succeeded",
+              "waitingForHuman": false,
+              "outcomeUnknown": false,
+              "outstandingResidueCount": 0,
+              "timeline": {
+                "kind": "inline",
+                "entries": [
+                  "succeeded"
+                ]
+              },
+              "schemaVersion": "arkdeck.job-summary/1"
+            }
+          ],
+          "order": "createdAtDescJobIdAsc",
+          "snapshotRevision": "11111111-1111-4111-8111-111111111111",
+          "hasMore": false,
+          "nextCursor": null
+        }
+      }
       """)
     XCTAssertEqual(presentation.availability, .available)
     XCTAssertEqual(try XCTUnwrap(presentation.jobs.first).workspaceKind, .device)
@@ -285,16 +368,45 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
       "an older daemon did not publish enough facts to guess a shared diagnostics origin")
   }
 
-  func testCurrentDaemonWorkspaceKindDecodesWhileOlderUnambiguousJobsRemainCompatible() throws {
+  func testWorkspaceKindAndUnambiguousOperationProjectCurrentSummaries() throws {
     let presentation = decode(
       """
-      {"ok":true,"id":"x","result":[
-        {"jobId":"job-viewer","operation":"capture.diagnostics@1","targetId":"t-1",
-         "state":"succeeded","workspaceKind":"viewer"},
-        {"jobId":"job-old-debug","operation":"debug.hap@1","targetId":"t-1",
-         "state":"succeeded"},
-        {"jobId":"job-old-shared","operation":"capture.diagnostics@1","targetId":"t-1",
-         "state":"succeeded"}]}
+      {
+        "ok": true,
+        "id": "x",
+        "result": {
+          "schemaVersion": "arkdeck.cli.page/1",
+          "pageKind": "snapshot",
+          "items": [
+            {
+              "jobId": "job-viewer",
+              "operation": "capture.diagnostics@1",
+              "targetId": "t-1",
+              "state": "succeeded",
+              "workspaceKind": "viewer",
+              "schemaVersion": "arkdeck.job-summary/1"
+            },
+            {
+              "jobId": "job-old-debug",
+              "operation": "debug.hap@1",
+              "targetId": "t-1",
+              "state": "succeeded",
+              "schemaVersion": "arkdeck.job-summary/1"
+            },
+            {
+              "jobId": "job-old-shared",
+              "operation": "capture.diagnostics@1",
+              "targetId": "t-1",
+              "state": "succeeded",
+              "schemaVersion": "arkdeck.job-summary/1"
+            }
+          ],
+          "order": "createdAtDescJobIdAsc",
+          "snapshotRevision": "11111111-1111-4111-8111-111111111111",
+          "hasMore": false,
+          "nextCursor": null
+        }
+      }
       """)
 
     XCTAssertEqual(presentation.jobs[0].workspaceKind, .viewer)
@@ -354,7 +466,7 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
         "terminalState": "succeeded",
         "parameters": ["uiComponentTree": true],
       ]),
-      artifactResponse: try response([]))
+      artifactResponse: .success(try currentArtifactPageResponse([])))
 
     let context = try XCTUnwrap(RuntimeHistoryWorkspaceContext(job: job, detail: detail))
     XCTAssertEqual(context.jobID, job.id)
@@ -394,50 +506,34 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
         "terminalState": "succeeded",
         "parameters": ["captureHilog": true, "uiScreenshot": true],
       ]),
-      artifactResponse: try response([]))
+      artifactResponse: .success(try currentArtifactPageResponse([])))
     XCTAssertNil(
       RuntimeHistoryWorkspaceContext(job: legacyShared, detail: ambiguousDetail),
       "legacy diagnostics and Debug requests remain unknown without client provenance")
   }
 
-  func testPagedSummaryMergesCurrentJobsWithoutInventingACompactTimeline() throws {
-    let data = try JSONSerialization.data(
-      withJSONObject: [
-        "ok": true,
-        "id": "paged-history",
-        "result": [
-          "jobs": [
-            [
-              "jobId": "job-newest", "operation": "observe.device@1",
-              "targetId": "TGT-1", "state": "succeeded", "timeline": NSNull(),
-            ]
-          ],
-          "currentJobs": [
-            [
-              "jobId": "job-old-current", "operation": "flash.dayu200@1",
-              "targetId": "TGT-1", "state": "waitingForRecovery",
-              "outcomeUnknown": true, "timeline": NSNull(),
-            ]
-          ],
-          "nextCursor": "41",
-        ],
-      ])
-
+  func testPagedSummaryPreservesRuntimeCurrentRowsWithoutInventingACompactTimeline() throws {
+    let cursor = "11111111-1111-4111-8111-111111111111.41"
+    let data = try currentJobPageResponse([
+      ["jobId": "job-old-current", "operation": "flash.dayu200@1", "targetId": "TGT-1",
+       "state": "waitingForRecovery", "current": true, "outcomeUnknown": true, "timeline": NSNull()],
+      ["jobId": "job-newest", "operation": "observe.device@1", "targetId": "TGT-1",
+       "state": "succeeded", "current": false, "timeline": NSNull()],
+    ], cursor: cursor)
     switch RuntimeHistoryResponseDecoding.page(from: data) {
-    case .unavailable(let reason):
-      XCTFail("complete page must decode: \(reason)")
-    case .available(let jobs, let cursor):
+    case .unavailable(let reason): XCTFail("complete page must decode: \(reason)")
+    case .available(let jobs, let nextCursor):
       XCTAssertEqual(jobs.map(\.id), ["job-old-current", "job-newest"])
       XCTAssertEqual(jobs.map(\.timeline), [[], []])
       XCTAssertTrue(jobs[0].requiresRecoveryGuidance)
-      XCTAssertEqual(cursor, "41")
+      XCTAssertEqual(nextCursor, cursor)
     }
   }
 
   // The load-bearing distinction: a daemon that answered "no jobs" and a
   // daemon that could not be read must never produce the same presentation.
   func testAnEmptyHistoryIsNotTheSameAsAnUnreadableOne() {
-    let empty = decode(#"{"ok":true,"id":"x","result":[]}"#)
+    let empty = RuntimeHistoryResponseDecoding.presentation(from: try! currentJobPageResponse([]))
     XCTAssertEqual(empty.availability, .available)
     XCTAssertTrue(empty.jobs.isEmpty)
 
@@ -500,16 +596,71 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
   func testUnknownOutcomeAndHumanWaitBothRaiseNeedsAttention() {
     let presentation = decode(
       """
-      {"ok":true,"id":"x","result":[
-        {"jobId":"job-unknown","operation":"flash.dayu200","targetId":"t-1",
-         "state":"interrupted","waitingForHuman":false,"outcomeUnknown":true,
-         "outstandingResidueCount":2,"timeline":["queued","running","interrupted"]},
-        {"jobId":"job-waiting","operation":"flash.dayu200","targetId":"t-2",
-         "state":"running","waitingForHuman":true,"outcomeUnknown":false,
-         "outstandingResidueCount":0,"timeline":["queued","running"]},
-        {"jobId":"job-settled","operation":"observe.devices@1","targetId":"t-3",
-         "state":"succeeded","waitingForHuman":false,"outcomeUnknown":false,
-         "outstandingResidueCount":0,"timeline":["succeeded"]}]}
+      {
+        "ok": true,
+        "id": "x",
+        "result": {
+          "schemaVersion": "arkdeck.cli.page/1",
+          "pageKind": "snapshot",
+          "items": [
+            {
+              "jobId": "job-unknown",
+              "operation": "flash.dayu200",
+              "targetId": "t-1",
+              "state": "interrupted",
+              "waitingForHuman": false,
+              "outcomeUnknown": true,
+              "outstandingResidueCount": 2,
+              "timeline": {
+                "kind": "inline",
+                "entries": [
+                  "queued",
+                  "running",
+                  "interrupted"
+                ]
+              },
+              "schemaVersion": "arkdeck.job-summary/1"
+            },
+            {
+              "jobId": "job-waiting",
+              "operation": "flash.dayu200",
+              "targetId": "t-2",
+              "state": "running",
+              "waitingForHuman": true,
+              "outcomeUnknown": false,
+              "outstandingResidueCount": 0,
+              "timeline": {
+                "kind": "inline",
+                "entries": [
+                  "queued",
+                  "running"
+                ]
+              },
+              "schemaVersion": "arkdeck.job-summary/1"
+            },
+            {
+              "jobId": "job-settled",
+              "operation": "observe.devices@1",
+              "targetId": "t-3",
+              "state": "succeeded",
+              "waitingForHuman": false,
+              "outcomeUnknown": false,
+              "outstandingResidueCount": 0,
+              "timeline": {
+                "kind": "inline",
+                "entries": [
+                  "succeeded"
+                ]
+              },
+              "schemaVersion": "arkdeck.job-summary/1"
+            }
+          ],
+          "order": "createdAtDescJobIdAsc",
+          "snapshotRevision": "11111111-1111-4111-8111-111111111111",
+          "hasMore": false,
+          "nextCursor": null
+        }
+      }
       """)
 
     XCTAssertEqual(presentation.availability, .available)
@@ -552,11 +703,38 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
   func testTargetAliasResolutionKeepsUnknownOutcomeButSettlesCurrentEpochAttention() throws {
     let presentation = decode(
       """
-      {"ok":true,"id":"x","result":[
-        {"jobId":"job-unknown","operation":"flash.dayu200","targetId":"t-alias",
-         "state":"waitingForRecovery","waitingForHuman":false,"outcomeUnknown":true,
-         "outstandingResidueCount":1,"timeline":["running","waitingForRecovery"],
-         "resolvedByTargetAliasResolutionId":"target-alias-resolution-0123456789abcdef"}]}
+      {
+        "ok": true,
+        "id": "x",
+        "result": {
+          "schemaVersion": "arkdeck.cli.page/1",
+          "pageKind": "snapshot",
+          "items": [
+            {
+              "jobId": "job-unknown",
+              "operation": "flash.dayu200",
+              "targetId": "t-alias",
+              "state": "waitingForRecovery",
+              "waitingForHuman": false,
+              "outcomeUnknown": true,
+              "outstandingResidueCount": 1,
+              "timeline": {
+                "kind": "inline",
+                "entries": [
+                  "running",
+                  "waitingForRecovery"
+                ]
+              },
+              "resolvedByTargetAliasResolutionId": "target-alias-resolution-0123456789abcdef",
+              "schemaVersion": "arkdeck.job-summary/1"
+            }
+          ],
+          "order": "createdAtDescJobIdAsc",
+          "snapshotRevision": "11111111-1111-4111-8111-111111111111",
+          "hasMore": false,
+          "nextCursor": null
+        }
+      }
       """)
 
     let job = try XCTUnwrap(presentation.jobs.first)
@@ -576,25 +754,91 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
   func testFlashActivityUsesRecencyAfterResolvedUnknownsWithoutRewritingHistory() throws {
     let presentation = decode(
       """
-      {"ok":true,"id":"x","result":[
-        {"jobId":"old-alias","operation":"flash.dayu200","targetId":"t-alias",
-         "state":"waitingForRecovery","waitingForHuman":false,"outcomeUnknown":true,
-         "outstandingResidueCount":0,"timeline":["waitingForRecovery"],
-         "createdAtUtc":"2026-08-05T08:00:00Z",
-         "resolvedByTargetAliasResolutionId":"target-alias-resolution-fixture"},
-        {"jobId":"old-superseded","operation":"flash.dayu200","targetId":"t-1",
-         "state":"waitingForRecovery","waitingForHuman":false,"outcomeUnknown":true,
-         "outstandingResidueCount":0,"timeline":["waitingForRecovery"],
-         "createdAtUtc":"2026-08-05T09:00:00Z",
-         "supersededByRecoveryEpochId":"recovery-epoch-fixture"},
-        {"jobId":"latest-observe","operation":"observe.device@1","targetId":"t-1",
-         "state":"succeeded","waitingForHuman":false,"outcomeUnknown":false,
-         "outstandingResidueCount":0,"timeline":["succeeded"],
-         "createdAtUtc":"2026-08-06T10:00:00Z"},
-        {"jobId":"latest-flash","operation":"flash.full-restore@1","targetId":"t-1",
-         "state":"succeeded","waitingForHuman":false,"outcomeUnknown":false,
-         "outstandingResidueCount":0,"timeline":["succeeded"],
-         "createdAtUtc":"2026-08-06T08:00:00Z","finishedAtUtc":"2026-08-06T08:03:00Z"}]}
+      {
+        "ok": true,
+        "id": "x",
+        "result": {
+          "schemaVersion": "arkdeck.cli.page/1",
+          "pageKind": "snapshot",
+          "items": [
+            {
+              "jobId": "old-alias",
+              "operation": "flash.dayu200",
+              "targetId": "t-alias",
+              "state": "waitingForRecovery",
+              "waitingForHuman": false,
+              "outcomeUnknown": true,
+              "outstandingResidueCount": 0,
+              "timeline": {
+                "kind": "inline",
+                "entries": [
+                  "waitingForRecovery"
+                ]
+              },
+              "createdAtUtc": "2026-08-05T08:00:00Z",
+              "resolvedByTargetAliasResolutionId": "target-alias-resolution-fixture",
+              "schemaVersion": "arkdeck.job-summary/1"
+            },
+            {
+              "jobId": "old-superseded",
+              "operation": "flash.dayu200",
+              "targetId": "t-1",
+              "state": "waitingForRecovery",
+              "waitingForHuman": false,
+              "outcomeUnknown": true,
+              "outstandingResidueCount": 0,
+              "timeline": {
+                "kind": "inline",
+                "entries": [
+                  "waitingForRecovery"
+                ]
+              },
+              "createdAtUtc": "2026-08-05T09:00:00Z",
+              "supersededByRecoveryEpochId": "recovery-epoch-fixture",
+              "schemaVersion": "arkdeck.job-summary/1"
+            },
+            {
+              "jobId": "latest-observe",
+              "operation": "observe.device@1",
+              "targetId": "t-1",
+              "state": "succeeded",
+              "waitingForHuman": false,
+              "outcomeUnknown": false,
+              "outstandingResidueCount": 0,
+              "timeline": {
+                "kind": "inline",
+                "entries": [
+                  "succeeded"
+                ]
+              },
+              "createdAtUtc": "2026-08-06T10:00:00Z",
+              "schemaVersion": "arkdeck.job-summary/1"
+            },
+            {
+              "jobId": "latest-flash",
+              "operation": "flash.full-restore@1",
+              "targetId": "t-1",
+              "state": "succeeded",
+              "waitingForHuman": false,
+              "outcomeUnknown": false,
+              "outstandingResidueCount": 0,
+              "timeline": {
+                "kind": "inline",
+                "entries": [
+                  "succeeded"
+                ]
+              },
+              "createdAtUtc": "2026-08-06T08:00:00Z",
+              "finishedAtUtc": "2026-08-06T08:03:00Z",
+              "schemaVersion": "arkdeck.job-summary/1"
+            }
+          ],
+          "order": "createdAtDescJobIdAsc",
+          "snapshotRevision": "11111111-1111-4111-8111-111111111111",
+          "hasMore": false,
+          "nextCursor": null
+        }
+      }
       """)
     let originalJobs = presentation.jobs
     XCTAssertEqual(presentation.focusedFlashActivity?.id, "latest-flash")
@@ -656,13 +900,13 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
   }
 
   func testCompleteEvidenceAndArtifactMetadataBecomeReadOnlyDetail() throws {
-    let status = try response([
+    let status = RuntimeHistoryTransportResult.success(try currentJobDetailResponse([
       "jobId": "job-1",
       "operation": "observe.device@1",
       "targetId": "target-dayu200-a",
       "sessionId": "session-job-1",
       "timeline": ["queued", "running", "succeeded"],
-    ])
+    ]))
     let evidence = try response([
       "jobId": "job-1",
       "operationReference": "observe.device@1",
@@ -683,7 +927,7 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
       ],
       "blockers": [],
     ])
-    let artifacts = try response([
+    let artifacts = RuntimeHistoryTransportResult.success(try currentArtifactPageResponse([
       [
         "artifactId": "artifact-1",
         "jobId": "job-1",
@@ -698,7 +942,7 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
         "createdAtUtc": "2026-08-06T07:00:02Z",
         "redactionApplied": true,
       ]
-    ])
+    ]))
 
     let detail = RuntimeJobDetailResponseDecoding.presentation(
       jobID: "job-1",
@@ -731,12 +975,12 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
     let detail = RuntimeJobDetailResponseDecoding.presentation(
       jobID: "job-old",
       operationReference: "observe.device@1",
-      statusResponse: try response([
+      statusResponse: .success(try currentJobDetailResponse([
         "jobId": "job-old", "operation": "observe.device@1",
         "targetId": "target-dayu200-a", "timeline": ["succeeded"],
-      ]),
+      ])),
       evidenceResponse: .failure("not relevant"),
-      artifactResponse: try response([]))
+      artifactResponse: .success(try currentArtifactPageResponse([])))
 
     XCTAssertEqual(detail.timelineAvailability, .available)
     XCTAssertEqual(detail.timeline, ["succeeded"])
@@ -794,7 +1038,7 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
       jobID: "job-trace-1",
       operationReference: "capture.diagnostics@1",
       evidenceResponse: evidence,
-      artifactResponse: try response([]))
+      artifactResponse: .success(try currentArtifactPageResponse([])))
 
     let parameters = try XCTUnwrap(detail.evidence?.traceParameters)
     XCTAssertEqual(parameters.map(\.name), names)
@@ -855,7 +1099,7 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
       jobID: "job-selected",
       operationReference: "observe.device@1",
       evidenceResponse: evidence,
-      artifactResponse: try response([]))
+      artifactResponse: .success(try currentArtifactPageResponse([])))
 
     guard case .unavailable(let reason) = detail.evidenceAvailability else {
       return XCTFail("mismatched evidence must not become available")
@@ -865,7 +1109,7 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
   }
 
   func testOneMalformedArtifactFailsTheSectionWithoutPartialRows() throws {
-    let artifacts = try response([
+    let artifacts = RuntimeHistoryTransportResult.success(try currentArtifactPageResponse([
       [
         "artifactId": "artifact-complete",
         "jobId": "job-1",
@@ -880,7 +1124,7 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
         "redactionApplied": true,
       ],
       ["artifactId": "artifact-incomplete", "jobId": "job-1"],
-    ])
+    ]))
 
     let detail = RuntimeJobDetailResponseDecoding.presentation(
       jobID: "job-1",
@@ -941,13 +1185,13 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
         source.contains("\"\(mutating)"),
         "the App-facing facade must not be able to name \(mutating)")
     }
-    XCTAssertTrue(source.contains("method: \"job.list-page\""))
-    XCTAssertTrue(source.contains("\"order\": .string(\"newestFirst\")"))
+    XCTAssertTrue(source.contains("method: \"job.list\""))
+    XCTAssertTrue(source.contains("\"order\": .string(\"createdAtDescJobIdAsc\")"))
     XCTAssertTrue(source.contains("\"includeTimeline\": .bool(false)"))
-    XCTAssertTrue(source.contains("\"includeCurrent\"] = .bool(true)"))
-    XCTAssertTrue(source.contains("request(\"job.status\""))
+    XCTAssertTrue(source.contains("\"includeCurrent\": .bool(true)"))
+    XCTAssertTrue(source.contains("RuntimeAppReadResources.jobDetail("))
     XCTAssertTrue(source.contains("request(\"job.evidence\""))
-    XCTAssertTrue(source.contains("request(\"artifact.list\""))
+    XCTAssertTrue(source.contains("RuntimeAppReadResources.artifactInventory("))
     XCTAssertTrue(source.contains("method: \"artifact.read\""))
   }
 
@@ -963,7 +1207,7 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
       let source = try String(
         contentsOf: workflow.appending(path: file), encoding: .utf8)
       XCTAssertTrue(
-        source.contains("params: RuntimeAppJobListPolicy.recentSummaryParams"),
+        source.contains("params: RuntimeAppReadResources.recentSummaryParams"),
         "\(file) must not restore an unbounded startup history read")
     }
     let deviceList = try String(
@@ -977,10 +1221,10 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
     XCTAssertTrue(engine.contains("public func latestSucceededDeviceObservations("))
     XCTAssertTrue(engine.contains("pageSize: Int = 250"))
     let policy = try String(
-      contentsOf: workflow.appending(path: "RuntimeAppJobListPolicy.swift"),
+      contentsOf: workflow.appending(path: "XPCConnectionBox.swift"),
       encoding: .utf8)
     XCTAssertTrue(policy.contains("\"pageSize\": .integer(250)"))
-    XCTAssertTrue(policy.contains("\"order\": .string(\"newestFirst\")"))
+    XCTAssertTrue(policy.contains("\"order\": .string(\"createdAtDescJobIdAsc\")"))
     XCTAssertTrue(policy.contains("\"includeTimeline\": .bool(false)"))
   }
 

@@ -85,7 +85,7 @@ final class CLIMachineContractTests: XCTestCase {
     for method in CLIControlMethodRegistry.classifiedMethods {
       XCTAssertNotNil(features[method], "daemon method \(method) has no coverage entry")
     }
-    XCTAssertEqual(features[ArkDeckControlProtocol.bootstrapMethod]?.classification, "internal")
+    XCTAssertNil(features["protocol.negotiate"])
     for descriptor in RuntimeOperationCatalog.operations {
       XCTAssertNotNil(features[descriptor.reference], "Catalog operation \(descriptor.reference) is uncovered")
     }
@@ -106,7 +106,8 @@ final class CLIMachineContractTests: XCTestCase {
     XCTAssertEqual(features["capability.draft"]?.classification, "refused")
     XCTAssertEqual(features["artifact.import.append"]?.classification, "internal")
     XCTAssertEqual(features["session.list"]?.classification, "local")
-    XCTAssertEqual(features["runtime.hdc-status"]?.lifecycle, "legacy")
+    XCTAssertNil(features["runtime.hdc-status"])
+    XCTAssertNotNil(features["runtime.hdc.status"])
     XCTAssertEqual(features["agent.chat"]?.lifecycle, "removed")
     XCTAssertEqual(features["agent.chat"]?.classification, "refused")
     XCTAssertEqual(features["observe.device@1"]?.classification, "direct")
@@ -360,13 +361,12 @@ final class CLIMachineContractTests: XCTestCase {
       case .object(let method)? = properties["method"],
       case .array(let methods)? = method["enum"],
       case .object(let protocolVersion)? = properties["protocolVersion"],
-      case .array(let versions)? = protocolVersion["enum"]
+      let version = protocolVersion["const"]
     else { return XCTFail("control-plane schema lost its shape") }
-    let expectedMethods = CLIControlMethodRegistry.classifiedMethods
-      .union([ArkDeckControlProtocol.bootstrapMethod]).sorted().map { JSONValue.string($0) }
+    let expectedMethods = ArkDeckControlProtocol.methods.sorted().map { JSONValue.string($0) }
     XCTAssertEqual(methods, expectedMethods)
-    XCTAssertEqual(versions, ArkDeckControlProtocol.supportedExactVersions.map { .string($0) })
-    XCTAssertEqual(fields["x-arkdeck-targetProtocolVersion"], .string(ArkDeckControlProtocol.targetVersion))
+    XCTAssertEqual(version, .string(ArkDeckControlProtocol.currentVersion))
+    XCTAssertEqual(fields["x-arkdeck-currentProtocolVersion"], .string(ArkDeckControlProtocol.currentVersion))
   }
 
   func testVersionPinsAreSingleSourced() throws {
@@ -500,7 +500,7 @@ final class CLIMachineContractTests: XCTestCase {
     let request = try JSONValueBridge.value(
       from: ArkDeckAgentXPC.requestFrame(
         method: "job.status", params: ["jobId": .string("job-1")], requestID: "req-1",
-        protocolVersion: ArkDeckControlProtocol.targetVersion))
+        protocolVersion: ArkDeckControlProtocol.currentVersion))
     XCTAssertTrue(JSONSchemaSubset.validate(request, against: schema))
     let response: JSONValue = .object(["id": .string("req-1"), "ok": .bool(true), "result": .object([:])])
     XCTAssertTrue(JSONSchemaSubset.validate(response, against: schema))

@@ -2,7 +2,7 @@
 //
 // One question, answered honestly: which device candidates did HDC most
 // recently observe, at what time, with which raw state, and which are already
-// adopted targets. The projection is fed by the daemon's `device.candidates`
+// adopted targets. The projection is fed by the daemon's `device.observations`
 // method, which reads via the bootstrap's observation path and never
 // touches `advance` — so nothing reachable from this facade can create,
 // select or change a binding. Adoption stays a CLI act (`target.adopt` is
@@ -164,11 +164,7 @@ private actor DeviceListProductionApplicationProvider: DeviceListApplicationProv
   }
 
   private func candidates(useWarmSnapshot: Bool) async -> DeviceListPresentation {
-    let params: [String: JSONValue]? =
-      useWarmSnapshot
-      ? ["useWarmSnapshot": .bool(true)] : nil
-    switch await DeviceListXPCReadTransport.request(
-      method: "device.candidates", params: params)
+    switch await DeviceListXPCReadTransport.request(method: "device.observations")
     {
     case .failure(.transport(let reason)):
       return DeviceListPresentation(
@@ -253,7 +249,13 @@ enum DeviceCandidatesResponseDecoding {
       return DeviceListPresentation(
         availability: .unavailable(reason: message), candidates: [])
     }
-    guard let rows = object["result"] as? [[String: Any]] else {
+    guard let snapshot = object["result"] as? [String: Any],
+      snapshot["schemaVersion"] as? String == "arkdeck.device-observations/1",
+      let generation = snapshot["snapshotGeneration"] as? String,
+      let parsedGeneration = UInt64(generation), parsedGeneration > 0, String(parsedGeneration) == generation,
+      let observedAt = snapshot["observedAtUtc"] as? String, ISO8601Timestamps.parse(observedAt) != nil,
+      let health = snapshot["health"] as? String, ["current", "stale"].contains(health),
+      let rows = snapshot["observations"] as? [[String: Any]] else {
       return DeviceListPresentation(
         availability: .unavailable(reason: "Runtime response carries no candidate list"),
         candidates: [])
@@ -261,8 +263,8 @@ enum DeviceCandidatesResponseDecoding {
     var candidates: [DeviceCandidatePresentation] = []
     for row in rows {
       guard
-        let connectKey = row["connectKey"] as? String, !connectKey.isEmpty,
-        let state = row["state"] as? String, !state.isEmpty
+        let connectKey = row["candidateKey"] as? String, !connectKey.isEmpty,
+        let state = row["authorizationState"] as? String, !state.isEmpty
       else {
         return DeviceListPresentation(
           availability: .unavailable(reason: "Runtime response carries an incomplete candidate"),
@@ -306,11 +308,21 @@ enum DeviceCandidatesResponseDecoding {
           bindingRevision: (row["bindingRevision"] as? NSNumber)?.intValue,
           deviceInformation: deviceInformation,
           observedFacts: observedFacts,
-          stateObservedAtUTC: row["stateObservedAtUtc"] as? String,
+          stateObservedAtUTC: observedAt,
           stateObservationHealth: DeviceCandidatePresentation.StateObservationHealth(
-            rawValue: row["stateObservationHealth"] as? String ?? "current") ?? .stale))
+            rawValue: health) ?? .stale))
     }
-    return DeviceListPresentation(availability: .available, candidates: candidates)
+    // Multiple live transport faces may name one adopted target. Keep its
+    // strongest observed state, without using this display choice for adoption.
+    var displayed: [DeviceCandidatePresentation] = []
+    for candidate in candidates {
+      if let target = candidate.adoptedTargetID,
+        let index = displayed.firstIndex(where: { $0.adoptedTargetID == target }) {
+        func rank(_ state: String) -> Int { state == "Connected" ? 3 : state == "Unauthorized" ? 2 : 1 }
+        if rank(candidate.state) > rank(displayed[index].state) { displayed[index] = candidate }
+      } else { displayed.append(candidate) }
+    }
+    return DeviceListPresentation(availability: .available, candidates: displayed)
   }
 }
 

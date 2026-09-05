@@ -97,7 +97,7 @@ final class CLIDebugProbeContractTests: XCTestCase {
       case .object(let meta)? = envelope["meta"]
     else { return XCTFail("Debug probe CLI envelope is malformed") }
     XCTAssertEqual(envelope["command"], .string("debug.probe"))
-    XCTAssertEqual(meta["controlProtocolVersion"], .string("2.0.0"))
+    XCTAssertEqual(meta["controlProtocolVersion"], .string(ArkDeckControlProtocol.currentVersion))
     XCTAssertEqual(result["schemaVersion"], .string("arkdeck.debug-probe/1"))
     XCTAssertEqual(result["targetId"], .string("target-one"))
     XCTAssertEqual(result["bindingRevision"], .integer(7))
@@ -129,7 +129,7 @@ final class CLIDebugProbeContractTests: XCTestCase {
 
     let extra = try PortableCanonicalJSON.canonicalBytes(
       .object([
-        "protocolVersion": .string("2.0.0"),
+        "protocolVersion": .string(ArkDeckControlProtocol.currentVersion), "contractIdentity": .string(ArkDeckControlProtocol.contractIdentity),
         "id": .string("extra-field"),
         "method": .string("debug.probe"),
         "params": .object([
@@ -147,7 +147,7 @@ final class CLIDebugProbeContractTests: XCTestCase {
     await probe.corruptNextSnapshot()
     let mismatched = try PortableCanonicalJSON.canonicalBytes(
       .object([
-        "protocolVersion": .string("2.0.0"),
+        "protocolVersion": .string(ArkDeckControlProtocol.currentVersion), "contractIdentity": .string(ArkDeckControlProtocol.contractIdentity),
         "id": .string("mismatched-projection"),
         "method": .string("debug.probe"),
         "params": .object(["targetId": .string("target-one")]),

@@ -57,27 +57,7 @@ package enum ArkDeckAgentClientName {
 /// `MachServices` key; all three must agree or the lookup fails closed.
 package enum ArkDeckAgentXPC {
   package static let machServiceName = "com.arkdeck.agentd"
-  /// The frozen App/XPC and legacy client version. Exact versions are generated
-  /// from Contracts/control-negotiation.json; a target client negotiates instead.
-  package static let wireProtocolVersion = ArkDeckControlProtocol.legacyVersion
-
-  /// The major this build speaks, derived rather than restated.
-  ///
-  /// A major stated separately is the same defect one octave down: it can
-  /// disagree with the version it is supposed to be the major of, and the
-  /// daemon's admission check compares against it. Deriving it means the two
-  /// cannot part company.
-  package static let wireProtocolMajor: Int = {
-    guard let text = wireProtocolVersion.split(separator: ".").first, let major = Int(text) else {
-      preconditionFailure("the wire protocol version must begin with a numeric major")
-    }
-    return major
-  }()
-
-  /// Numeric-descending exact versions. Supporting a format does not publish
-  /// every method on it: the generated target method table remains explicit.
-  package static let supportedWireProtocolExactVersions = ArkDeckControlProtocol
-    .supportedExactVersions
+  package static let wireProtocolVersion = ArkDeckControlProtocol.currentVersion
 
   /// Builds the single versioned request shape accepted by the daemon. Method
   /// admission remains in `AgentXPCEndpoint`; this only prevents App facades
@@ -88,13 +68,14 @@ package enum ArkDeckAgentXPC {
     requestID: String = UUID().uuidString,
     protocolVersion: String = wireProtocolVersion
   ) throws -> Data {
-    guard supportedWireProtocolExactVersions.contains(protocolVersion) else {
+    guard protocolVersion == wireProtocolVersion else {
       throw RequestFrameFailure.unsupportedProtocolVersion
     }
     let encoder = CanonicalJSONEncoders.canonical()
     return try encoder.encode(
       RequestFrame(
         protocolVersion: protocolVersion,
+        contractIdentity: ArkDeckControlProtocol.contractIdentity,
         id: requestID,
         method: method,
         params: params))
@@ -109,7 +90,7 @@ package enum ArkDeckAgentXPC {
   /// import anything, so a sandboxed client of this transport cannot produce
   /// a device effect at any level.
   ///
-  /// `device.candidates` is the discovery read behind the App's device list:
+  /// `device.observations` is the discovery read behind the App's device list:
   /// it returns the daemon's timestamped HDC candidate observation with raw
   /// connection state and joins already-adopted targets by connect key. An
   /// explicit re-check may wait for a new observation, but both paths call
@@ -122,7 +103,8 @@ package enum ArkDeckAgentXPC {
     "artifact.list",
     "artifact.quota",
     "artifact.read",
-    "device.candidates",
+    "device.observations",
+    "health",
     "debug.probe",
     "flash.bootloader-status",
     "flash.device-access",
@@ -131,47 +113,21 @@ package enum ArkDeckAgentXPC {
     "history.filter.list",
     "job.evidence",
     "job.list",
-    "job.list-page",
     "job.status",
+    "job.show",
+    "job.timeline",
     "operation.list",
-    "runtime.hdc-status",
+    "runtime.hdc.status",
     "runtime.storage.status",
     "target.list",
     "trace.cache.status",
     "trace.probe",
   ]
 
-  /// Bundle ingestion is the stateless effectful part of the closed Flash
-  /// workflow. Unlike the generic job method names below, each entry is
-  /// intrinsically scoped to a Flash bundle.
-  package static let forwardableFlashBundleMethods: Set<String> = [
-    "artifact.importFlashBundle.abort",
-    "artifact.importFlashBundle.append",
-    "artifact.importFlashBundle.begin",
-    "artifact.importFlashBundle.commit",
-  ]
-
-  /// HAP ingestion is the other closed App-owned Artifact upload. The caller
-  /// supplies only an adopted target, a safe basename, exact byte facts and
-  /// bounded chunks; Runtime validates the container and returns an
-  /// identity-bound lease. No host or device path crosses XPC.
-  package static let forwardableHAPImportMethods: Set<String> = [
-    "artifact.importHap.abort",
-    "artifact.importHap.append",
-    "artifact.importHap.begin",
-    "artifact.importHap.commit",
-  ]
-
-  /// Native-library ingestion is the closed App-owned upload for the
-  /// published deploy.native-library.app-owned operation. The caller supplies
-  /// a selected target, a safe lib*.so basename, exact byte facts and bounded
-  /// chunks; Runtime validates the signed ELF and returns an identity-bound
-  /// lease. No host path or device destination crosses XPC.
-  package static let forwardableNativeLibraryImportMethods: Set<String> = [
-    "artifact.importNativeLibrary.abort",
-    "artifact.importNativeLibrary.append",
-    "artifact.importNativeLibrary.begin",
-    "artifact.importNativeLibrary.commit",
+  /// Generic import names remain constrained by typed kind and Runtime-owned
+  /// upload identity in the endpoint and the shared Import gateway.
+  package static let forwardableImportMethods: Set<String> = [
+    "artifact.import.begin", "artifact.import.append", "artifact.import.commit", "artifact.import.abort",
   ]
 
   /// The App may ask Runtime to bind one freshly re-read Loader candidate to
@@ -230,9 +186,7 @@ package enum ArkDeckAgentXPC {
 
   package static let forwardableMethods =
     forwardableReadOnlyMethods
-    .union(forwardableFlashBundleMethods)
-    .union(forwardableHAPImportMethods)
-    .union(forwardableNativeLibraryImportMethods)
+    .union(forwardableImportMethods)
     .union(forwardableRockchipBindingMethods)
     .union(forwardableHistoryFilterMethods)
     .union(forwardableTraceCacheMethods)
@@ -254,6 +208,7 @@ package enum ArkDeckAgentXPC {
 
   private struct RequestFrame: Encodable {
     let protocolVersion: String
+    let contractIdentity: String
     let id: String
     let method: String
     let params: [String: JSONValue]?

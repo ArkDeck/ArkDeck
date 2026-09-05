@@ -2,17 +2,13 @@ import ArkDeckCore
 import ArkDeckWorkflows
 import Foundation
 
-/// Typed v2 read resources. A result is assembled inside the Runtime owner;
+/// Current v1 read resources. A result is assembled inside the Runtime owner;
 /// the client never guesses that several unrelated reads form one Job result.
 struct RuntimeJobResourceReader {
   let engine: RuntimeJobEngine
   let artifactStore: RuntimeArtifactStore?
 
   func response(_ request: AgentWireProtocol.Request) async -> AgentWireProtocol.Response {
-    guard request.protocolVersion == ArkDeckControlProtocol.targetVersion else {
-      return .init(id: request.id, ok: false, result: nil,
-        error: .init(code: "unknownMethod", message: "this Job resource requires the target protocol"))
-    }
     do {
       let fields = request.params ?? [:]
       let result: JSONValue
@@ -144,11 +140,11 @@ struct RuntimeJobResourceReader {
         "outcomeUnknown": .bool(record.outcomeUnknown), "artifacts": .array([]),
         "blockers": .array(blockers.sorted().map(JSONValue.string))]
     }
-    for name in ["parameters", "traceProbeBefore", "traceProbeAfter"] { fields.removeValue(forKey: name) }
     // A failed evidence read retains the same closed shape. Unknown facts are
     // explicit nulls, not invented defaults or an alternate success schema.
     for name in ["bindingRevision", "providerId", "actualEffect", "authority", "observation", "actualStepKinds",
-      "executionMode", "startedAtUtc", "firstEvidenceStepAtUtc", "finishedAtUtc", "recoveryEpoch"] where fields[name] == nil {
+      "executionMode", "startedAtUtc", "firstEvidenceStepAtUtc", "finishedAtUtc", "recoveryEpoch",
+      "parameters", "traceProbeBefore", "traceProbeAfter"] where fields[name] == nil {
       fields[name] = .null
     }
     if case .array(let values)? = fields["artifacts"] {

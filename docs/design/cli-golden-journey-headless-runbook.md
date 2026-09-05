@@ -13,7 +13,7 @@ unknown replay。任何一步需要绕过这些面，就是 `BLOCKED_BY_PRODUCT_
 
 ## 0. 约定
 
-- 每条命令都带 `--output json --require-protocol 2`，stdout 原样保存到
+- 每条命令都带 `--output json`，stdout 原样保存到
   `/private/tmp/arkdeck-gj-headless-<date>/<journey>-<step>.json`（不入仓）。可入仓的是
   §6 的脱敏元数据。
 - 每条命令都给一个可读的 `--control-request-id`（如 `gj1-doctor`），失败 envelope 的
@@ -78,13 +78,13 @@ LaunchAgent 注入，不是当前 Runtime-owned workspace 注册。用当前拼�
 ## 2. GJ-1 Device Observe（约 10 分钟）
 
 ```text
-arkdeck device candidates --require-protocol 2 --output json
+arkdeck device candidates --output json
 # 未接管时：
 arkdeck target adopt --candidate <key> --observation <observation-id> \
   --observation-generation <generation> --output json
 arkdeck target show --target <TGT> --output json
 arkdeck target availability --target <TGT> --output json
-arkdeck agent run --require-protocol 2 --operation observe.device@1 --target <TGT> \
+arkdeck agent run --operation observe.device@1 --target <TGT> \
   --execution-id gj1-<date> --maximum-wait 5m --output json
 arkdeck agent status --execution-id gj1-<date> --output json
 arkdeck job result --job <job-id> --output json
@@ -105,7 +105,7 @@ effect 停在 `readOnly`，不需要 capability：
 ```
 
 ```text
-arkdeck agent run --require-protocol 2 --operation capture.diagnostics@1 --target <TGT> \
+arkdeck agent run --operation capture.diagnostics@1 --target <TGT> \
   --inputs-file gj1-capture.json --execution-id gj1-<date>-capture --maximum-wait 5m --output json
 arkdeck job evidence --job <job-id> --output json
 arkdeck artifact list --job <job-id> --output json
@@ -132,17 +132,17 @@ zero-candidate discovery 分支——它是唯一能确定性触发的 AgentExec
 
 ```text
 # 1. 拔掉设备 USB，确认 candidates 为空
-arkdeck device candidates --require-protocol 2 --output json
+arkdeck device candidates --output json
 # 2. 不带 --target 启动 execution：Runtime 持久化 physicalConnection（connectDevice）HAR
-arkdeck agent run --require-protocol 2 --operation observe.device@1 \
+arkdeck agent run --operation observe.device@1 \
   --execution-id gj1-<date>-har --maximum-wait 10m --output json
 # 3. 模拟客户进程在拿到 receipt 后崩溃：丢弃步骤 2 的 stdout，不从中抄任何 resumeReference
 # 4. 插回 USB，只用 execution ID 重取
-arkdeck agent status --require-protocol 2 --execution-id gj1-<date>-har --output json
-arkdeck human-action list --require-protocol 2 --owner-kind agentExecution --owner gj1-<date>-har --output json
-arkdeck human-action show --require-protocol 2 --human-action <id> --output json
-arkdeck agent resume --require-protocol 2 --resume-reference <ref> --output json
-arkdeck agent status --require-protocol 2 --execution-id gj1-<date>-har --output json
+arkdeck agent status --execution-id gj1-<date>-har --output json
+arkdeck human-action list --owner-kind agentExecution --owner gj1-<date>-har --output json
+arkdeck human-action show --human-action <id> --output json
+arkdeck agent resume --resume-reference <ref> --output json
+arkdeck agent status --execution-id gj1-<date>-har --output json
 arkdeck job result --job <job-id> --output json
 ```
 
@@ -212,7 +212,7 @@ arkdeck artifact import native-library --import-request-id gj3-<date>-lib --targ
 ```
 
 ```text
-arkdeck debug native deploy --require-protocol 2 --target <TGT> --inputs-file gj3.json \
+arkdeck debug native deploy --target <TGT> --inputs-file gj3.json \
   --execution-id gj3-<date> --output json
 arkdeck job wait --job <job-id> --output jsonl
 arkdeck job evidence --job <job-id> --output json
@@ -251,7 +251,7 @@ arkdeck flash bind-loader --target <TGT> --expected-binding-revision <n> --outpu
 同 08-28 的 `flash-canonical-verification-2026-08-28.json`），然后：
 
 ```text
-arkdeck flash run --require-protocol 2 --target <TGT> --inputs-file gj4.json \
+arkdeck flash run --target <TGT> --inputs-file gj4.json \
   --execution-id gj4-<date> --output json
 arkdeck job wait --job <job-id> --output jsonl
 arkdeck job evidence --job <job-id> --output json
@@ -263,9 +263,9 @@ arkdeck job evidence --job <job-id> --output json
 随后完成 §6 的「重新发现并接管设备 → 恢复正常 Debug Runtime」：
 
 ```text
-arkdeck device candidates --require-protocol 2 --output json
+arkdeck device candidates --output json
 arkdeck target show --target <TGT> --output json        # binding revision 若前进，记录新值
-arkdeck agent run --require-protocol 2 --operation observe.device@1 --target <TGT> \
+arkdeck agent run --operation observe.device@1 --target <TGT> \
   --execution-id gj4-<date>-postflight --maximum-wait 5m --output json
 ```
 
@@ -365,7 +365,7 @@ Runtime 自动签发 capability；对 `demo-app` 本体的 E1 请求仍然要求
 2026-09-02 在当前 Runtime/Catalog digest 上用候选 CLI 复跑后，domain leaf 返回
 `ok:false`、`error.code: invalidInput`、exit 65；`error.details` 同时给出
 `wireCode: invalidInput`、`method: job.submit`、`phase: preAdmission` 与
-`newDispatchCount: 0`。2.x `job list --page-size 1` 在调用前后都以
+`newDispatchCount: 0`。当前 v1 `job list --page-size 1` 在调用前后都以
 `job-cf76e61adb789f8b2bda5172a490d803`（`2026-09-02T09:56:27Z`）为 newest Job，
 精确证明没有创建 Job；这组结构化证据与台账不变量共同满足 §8.4/§9。
 

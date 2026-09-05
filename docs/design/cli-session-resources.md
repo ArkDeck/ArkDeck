@@ -1,6 +1,6 @@
 # Runtime Session resources
 
-`arkdeck session list`, `show`, `pin`, and `unpin` use protocol-2 control
+`arkdeck session list`, `show`, `pin`, and `unpin` use current v1 control
 methods owned by the daemon. They never scan an App container or accept a
 Session directory path.
 

@@ -19,7 +19,7 @@
 
 ## TASK-SVC-001 — Unify control-plane, Runtime requests, CLI and App on one v1
 
-- Status:ready
+- Status:done
 - Platform:macos（契约供Windows/Rust复用，本Task不实现新平台）
 - Decision grade:D1
 - Requirements/AC:SVC-AC-01, SVC-AC-02, SVC-AC-03, SVC-AC-04; POL-SAFETY-001, POL-TARGET-001, POL-RECOVERY-001, POL-AGENT-002
@@ -30,6 +30,7 @@
   - `Packages/ArkDeckKit/Contracts/control-negotiation.json`
   - `Packages/ArkDeckKit/Contracts/control-protocol.json`
   - `Packages/ArkDeckKit/Scripts/generate-control-contract.py`
+  - `Packages/ArkDeckKit/APIBaseline/Sources/APIBaseline/APIBaseline.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckCore/ControlProtocol*.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckCore/ControlFrameJSON.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckCore/AgentXPCContract.swift`
@@ -41,6 +42,8 @@
   - `Packages/ArkDeckKit/Sources/ArkDeckRuntime/RuntimeOperationFailure.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/XPCConnectionBox.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceListApplicationFacade.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceControlFacade.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DiagnosticSessionUIFixture.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/HDCApplicationDiagnosticsFacade.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/FlashApplicationFacade.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DebugApplicationFacade.swift`
@@ -97,6 +100,15 @@
   - `AGENTS.md`
 - Risk:high
 - Hardware required:no
+
+### Reviewed scope supplement (2026-09-05)
+
+用户确认三份具体补丁后明确要求“随 PR 一起提交”。本实现 PR 同车补充上列
+`DeviceControlFacade.swift`、`APIBaseline.swift`、`DiagnosticSessionUIFixture.swift`
+三条精确路径，分别覆盖生产 Device caller、公开 API 编译基线和本地诊断样例迁移。
+本地统一闸已通过；`done` 随实现提交供 review，不声明 main 批准、change verified 或
+真机验收。静态路径预检仍读取 base 范围并报告这三条路径，不修改 checker 或放宽安全校验。
+完整执行和授权记录见 [run.md](evidence/runs/TASK-SVC-001/run.md)。
 
 ### Deliverables
 

@@ -3,7 +3,7 @@
 This slice of `arkdeck-cli-product-spec.md` §7.6 makes registered input uploads
 resumable and discoverable for GJ-1–GJ-5. It changes no Catalog operation,
 provider, device admission policy or Runtime authority. These commands always
-negotiate control protocol 2 and never fall back to legacy upload coordinators:
+verify the current v1 control identity and never fall back to legacy upload coordinators:
 
 ```sh
 arkdeck artifact import hap --import-request-id build-123 --target TARGET_ID --file app.hap --output json
@@ -18,8 +18,8 @@ arkdeck artifact import release --import IMPORT_ID --generation 2 --output json
 ```
 
 The internal `artifact.import.begin/append/commit` RPCs are not public CLI
-leaves. The older `artifact import-*` leaves and their protocol-1 responses are
-unchanged during the staged migration.
+leaves. Use `artifact import <kind>`; the earlier `artifact import-*` commands
+and dedicated upload methods have been removed.
 
 Before upload the client hashes one stable regular-file descriptor in bounded
 chunks. Metadata binds the caller request identity, registered kind/schema,
@@ -116,9 +116,9 @@ arguments appear in this diagnostic. A `clear` reference state is only an
 observation, never a reservation or permission to release: release always rechecks
 its own serialized transition.
 
-The new `artifact.import.inspection` read RPC is negotiated separately. The
-existing `artifact.import.inspect` wire shape stays unchanged for upload recovery
-and earlier protocol-2 clients, and neither RPC dispatches a device operation.
+`artifact.import.inspection` reads exact Job references; `artifact.import.inspect`
+reads upload recovery state. Both belong to the current registry and neither
+dispatches a device operation.
 
 Import storage allows 4,096 retained owners, 16,384 chunk checkpoints per upload,
 2 MiB chunks and 8 GiB of declared active staging. Capacity exhaustion does not

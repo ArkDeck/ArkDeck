@@ -2,6 +2,7 @@ import Foundation
 import XCTest
 
 @testable import ArkDeckWorkflows
+@testable import ArkDeckRuntime
 
 final class HistoricalEvolutionCampaignArchiveContractTests: XCTestCase {
   func testHistoricalCampaignStatusIsReadOnlyAndProjectsLegacyFields() throws {
@@ -132,13 +133,15 @@ final class HistoricalEvolutionCampaignArchiveContractTests: XCTestCase {
     ] {
       XCTAssertFalse(engine.contains(retired), retired)
     }
-    let refusal = try XCTUnwrap(
-      engine.range(of: "legacy campaign reservations are decode/export-only"))
-    let readOnlyAdmission = try XCTUnwrap(engine.range(of: "if effect <= .readOnly"))
-    XCTAssertLessThan(
-      engine.distance(from: engine.startIndex, to: refusal.lowerBound),
-      engine.distance(from: engine.startIndex, to: readOnlyAdmission.lowerBound),
-      "legacy campaign references must fail before every current admission policy")
+    for retiredField in ["campaignReservation", "standingAuthorization", "chatConfirmation"] {
+      let request = Data("""
+        {"documentType":"runtime-operation-request","schemaVersion":"1.0.0",
+         "requestId":"archive-refusal","idempotencyKey":"archive-refusal",
+         "target":{"targetId":"target-1"},"operation":{"id":"observe.device","version":1},
+         "\(retiredField)":null}
+        """.utf8)
+      XCTAssertThrowsError(try RuntimeOperationCodec.decodeRequest(request), retiredField)
+    }
 
     let workflows = packageRoot.appending(
       path: "Sources/ArkDeckWorkflows", directoryHint: .isDirectory)

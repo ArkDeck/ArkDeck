@@ -259,13 +259,8 @@ package struct RuntimeHeadlessVerifier: Sendable {
       throw RuntimeAgentExecutorError.malformedResponse(
         "terminal receipt has no job id for Artifact lookup")
     }
-    let listed = try client.request(
-      method: "artifact.list", params: ["jobId": .string(jobID)])
-    guard case .array(let rows) = listed else {
-      throw RuntimeAgentExecutorError.malformedResponse(
-        "artifact.list did not return an array")
-    }
-    return try rows.map(Self.decodeArtifact).sorted { $0.artifactID < $1.artifactID }
+    return try CurrentRuntimeResourceReads.artifactInventory(client: client, jobID: jobID)
+      .map(Self.decodeArtifact).sorted { $0.artifactID < $1.artifactID }
   }
 
   private func persistedJobStatus(jobID: String) throws
@@ -306,9 +301,7 @@ package struct RuntimeHeadlessVerifier: Sendable {
     let value = try client.request(
       method: "job.evidence", params: ["jobId": .string(jobID)])
     do {
-      let bytes = try CanonicalJSONEncoders.canonical().encode(value)
-      return try JSONDecoder().decode(
-        RuntimeHardwareEvidenceTrustedFacts.self, from: bytes)
+      return try CurrentRuntimeResourceReads.evidence(value)
     } catch {
       throw RuntimeAgentExecutorError.malformedResponse(
         "job.evidence contains undecodable trusted Runtime facts: \(error)")
@@ -316,29 +309,30 @@ package struct RuntimeHeadlessVerifier: Sendable {
   }
 
   private static func decodeArtifact(_ value: JSONValue) throws -> RuntimeHeadlessArtifact {
+    let projection = try ArtifactResourceProjection(value)
     guard case .object(let fields) = value,
+      projection.owner.kind == "job", case .object(let binding)? = fields["binding"],
       case .string(let artifactID)? = fields["artifactId"], validIdentifier(artifactID),
-      case .string(let jobID)? = fields["jobId"], validIdentifier(jobID),
       case .string(let name)? = fields["name"], !name.isEmpty,
       let byteCount = exactInt(fields["byteCount"]), byteCount >= 0,
-      case .string(let sha256)? = fields["sha256"],
+      fields["artifactDigest"] == .null || projection.digest != nil,
       case .string(let status)? = fields["status"],
       case .string(let sourceOperation)? = fields["sourceOperation"],
-      case .string(let targetID)? = fields["targetId"], validIdentifier(targetID)
+      case .string(let targetID)? = binding["targetId"], validIdentifier(targetID)
     else {
       throw RuntimeAgentExecutorError.malformedResponse(
         "artifact.list contains incomplete metadata")
     }
-    let bindingRevision = exactInt(fields["bindingRevision"])
+    let bindingRevision = exactInt(binding["bindingRevision"])
     let stableIdentitySHA256: String?
-    if case .string(let identity)? = fields["stableIdentitySha256"] {
+    if case .string(let identity)? = binding["stableIdentitySha256"] {
       stableIdentitySHA256 = identity
     } else {
       stableIdentitySHA256 = nil
     }
     return RuntimeHeadlessArtifact(
-      artifactID: artifactID, jobID: jobID, name: name,
-      byteCount: byteCount, sha256: sha256, status: status,
+      artifactID: artifactID, jobID: projection.owner.id, name: name,
+      byteCount: byteCount, sha256: projection.digest ?? "", status: status,
       sourceOperation: sourceOperation, targetID: targetID,
       bindingRevision: bindingRevision,
       stableIdentitySHA256: stableIdentitySHA256)

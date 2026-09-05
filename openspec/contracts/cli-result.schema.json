@@ -113,10 +113,7 @@
           "type": "string"
         },
         "controlProtocolVersion": {
-          "enum": [
-            "2.0.0",
-            "1.0.0"
-          ]
+          "const": "1.0.0"
         },
         "controlRequestId": {
           "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",

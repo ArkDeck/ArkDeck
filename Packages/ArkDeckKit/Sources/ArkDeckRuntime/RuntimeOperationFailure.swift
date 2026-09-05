@@ -6,6 +6,7 @@
 // that text. Nothing in this projection grants dispatch, retry or recovery
 // authority.
 
+import ArkDeckCore
 import Foundation
 
 public enum RuntimeOperationFailureCode: String, Codable, Sendable, CaseIterable {
@@ -52,6 +53,24 @@ public struct RuntimeOperationFailure: Codable, Sendable, Equatable {
   public let category: RuntimeOperationFailureCategory
   public let retryability: RuntimeOperationFailureRetryability
   public let recovery: RuntimeOperationFailureRecovery
+
+  public init(from decoder: Decoder) throws {
+    let fields = try [String: JSONValue](from: decoder)
+    try RuntimeWireValidation.keys(fields, allowed: [
+      "schemaVersion", "code", "category", "retryability", "recovery",
+    ], path: "$.operationFailure")
+    guard fields["schemaVersion"] == .string(Self.schemaVersion) else {
+      throw RuntimeOperationRequestRejection(
+        code: .unsupportedVersion, path: "$.operationFailure.schemaVersion",
+        message: "operation failure requires the current schema version")
+    }
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    schemaVersion = Self.schemaVersion
+    code = try container.decode(RuntimeOperationFailureCode.self, forKey: .code)
+    category = try container.decode(RuntimeOperationFailureCategory.self, forKey: .category)
+    retryability = try container.decode(RuntimeOperationFailureRetryability.self, forKey: .retryability)
+    recovery = try container.decode(RuntimeOperationFailureRecovery.self, forKey: .recovery)
+  }
 
   public init(
     code: RuntimeOperationFailureCode,

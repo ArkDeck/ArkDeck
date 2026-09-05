@@ -6,24 +6,15 @@ import XCTest
 @testable import ArkDeckStorage
 @testable import ArkDeckWorkflows
 
-/// Historical campaign references remain wire-decodable so persisted jobs can
-/// be inspected, but every new submission refuses them before dispatch.
+/// Retired authority cannot enter through wire, Codable or durable Job decoding.
 final class RuntimeCampaignWireContractTests: XCTestCase {
-  func testHistoricalReservationRoundTripsButCannotMixWithRuntimeCapability() throws {
-    let request = try RuntimeOperationCodec.decodeRequest(
-      historicalRequest(reservationID: "ain019-abc123"))
-    let decoded = try RuntimeOperationCodec.decodeRequest(
-      try RuntimeOperationCodec.encodeRequest(request))
-    XCTAssertEqual(decoded.campaignReservation?.reservationID, "ain019-abc123")
-    XCTAssertNil(decoded.authorization)
-
-    XCTAssertThrowsError(
-      try RuntimeOperationCodec.decodeRequest(
-        historicalRequest(
-          reservationID: "ain019-abc123",
-          authorizationJSON: #", "authorization":{"capabilityId":"CAP-RT-X-1"}"#)))
-    XCTAssertThrowsError(
-      try RuntimeOperationCodec.decodeRequest(historicalRequest(reservationID: "no spaces")))
+  func testHistoricalReservationIsRejectedEvenUnderTheCurrentVersion() throws {
+    for version in ["1.0.0", "2.0.0"] {
+      let bytes = Data(String(decoding: historicalRequest(reservationID: "ain019-abc123"), as: UTF8.self)
+        .replacingOccurrences(of: "2.0.0", with: version).utf8)
+      XCTAssertThrowsError(try RuntimeOperationCodec.decodeRequest(bytes))
+      XCTAssertThrowsError(try JSONDecoder().decode(RuntimeOperationRequest.self, from: bytes))
+    }
   }
 
   func testNewSubmissionRejectsHistoricalReservationBeforeAnyDispatch() async throws {
@@ -56,7 +47,7 @@ final class RuntimeCampaignWireContractTests: XCTestCase {
         return XCTFail("unexpected rejection: \(error)")
       }
       XCTAssertEqual(code, .authorizationRequired)
-      XCTAssertTrue(detail.contains("decode/export-only"), detail)
+      XCTAssertTrue(detail.contains("retired authority"), detail)
     }
     let dispatchCount = await dispatchLog.count
     XCTAssertEqual(dispatchCount, 0)
@@ -82,7 +73,7 @@ final class RuntimeCampaignWireContractTests: XCTestCase {
   ) -> Data {
     Data(
       """
-      {"documentType":"runtime-operation-request","schemaVersion":"2.0.0",\
+      {"documentType":"runtime-operation-request","schemaVersion":"1.0.0",\
       "requestId":"req-campaign-wire","idempotencyKey":"idem-campaign-wire",\
       "target":{"targetId":"demo-app"},\
       "operation":{"id":"workspace.inspect-source","version":1},\

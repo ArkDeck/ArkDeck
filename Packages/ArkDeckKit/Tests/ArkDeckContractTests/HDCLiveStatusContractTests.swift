@@ -130,7 +130,7 @@ final class HDCLiveStatusContractTests: XCTestCase {
     XCTAssertNotEqual(row["availability"], .string("available")); XCTAssertEqual(row["newDispatchCount"], .integer(0))
   }
 
-  func testCLIAndDaemonUseTargetMethodByDefaultAndKeepExplicitLegacyRead() async throws {
+  func testCLIAndDaemonUseOnlyLiveCurrentStatusWithoutStartupFallback() async throws {
     let executable = try fixture()
     let capabilities = try RuntimeCapabilityStore(directoryURL: root.appending(path: "caps"))
     let dispatcher = RuntimeAgentExecutionContractTests.Dispatcher()
@@ -160,17 +160,15 @@ final class HDCLiveStatusContractTests: XCTestCase {
     let fresh = try object(XCTUnwrap(cli([])["result"]))
     XCTAssertEqual(fresh["schemaVersion"], .string("arkdeck.runtime-hdc-status/1")); XCTAssertEqual(fresh["generation"], .null)
     XCTAssertEqual(fresh["serverHealth"], .string("unknown")); XCTAssertEqual(fresh["availability"], .string("unavailable"))
-    let legacy = try object(XCTUnwrap(cli(["--require-protocol", "1"])["result"]))
-    XCTAssertEqual(legacy["serverVersion"], .string("cached-server")); XCTAssertEqual(legacy["availability"], .string("ready"))
     let withoutObserver = RuntimeControlPlaneHandler(engine: engine, capabilityStore: capabilities, providerIDs: [],
       nowUTC: { "2026-09-01T00:00:00Z" }, hdcRuntimeDiagnostics: startup(executable))
-    let freshRequest = try PortableCanonicalJSON.canonicalBytes(.object(["protocolVersion": .string("2.0.0"), "id": .string("unconfigured"), "method": .string("runtime.hdc.status")]))
+    let freshRequest = try PortableCanonicalJSON.canonicalBytes(.object(["protocolVersion": .string(ArkDeckControlProtocol.currentVersion), "contractIdentity": .string(ArkDeckControlProtocol.contractIdentity), "id": .string("unconfigured"), "method": .string("runtime.hdc.status")]))
     let absent = try JSONDecoder().decode(AgentWireProtocol.Response.self, from: await withoutObserver.handleLine(freshRequest))
     let absentFields = try object(XCTUnwrap(absent.result))
     XCTAssertEqual(absentFields["availability"], .string("unavailable")); XCTAssertEqual(absentFields["serverVersion"], .null)
     XCTAssertEqual(absentFields["generation"], .null, "missing live observation must not fall back to the startup cache")
-    for (version, params, code) in [("2.0.0", ["path": JSONValue.string(executable.path)], "invalidParams"), ("1.0.0", [:], "unsupportedProtocolVersion")] {
-      let data = try PortableCanonicalJSON.canonicalBytes(.object(["protocolVersion": .string(version), "id": .string("status-fixture"),
+    for (version, params, code) in [(ArkDeckControlProtocol.currentVersion, ["path": JSONValue.string(executable.path)], "invalidParams"), ("2.0.0", [:], "unsupportedProtocolVersion")] {
+      let data = try PortableCanonicalJSON.canonicalBytes(.object(["protocolVersion": .string(version), "contractIdentity": .string(ArkDeckControlProtocol.contractIdentity), "id": .string("status-fixture"),
         "method": .string("runtime.hdc.status"), "params": .object(params)]))
       let response = try JSONDecoder().decode(AgentWireProtocol.Response.self, from: await handler.handleLine(data))
       XCTAssertEqual(response.error?.code, code)

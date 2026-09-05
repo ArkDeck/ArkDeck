@@ -125,7 +125,7 @@ package final class RuntimeImportStore: @unchecked Sendable {
   }
   private func decode(_ url: URL) throws -> RuntimeImportRecord {
     let data = try read(url, maximum: maximumRecordBytes)
-    let object = try ControlProtocolNegotiation.decodeObject(data, maximumBytes: maximumRecordBytes)
+    let object = try ControlFrameJSON.decodeObject(data, maximumBytes: maximumRecordBytes)
     guard Set(object.keys).isSubset(of: ["schemaVersion", "importID", "intent", "intentFingerprint", "binding", "createdAtUTC", "updatedAtUTC", "generation", "state", "nextOffset", "chunks", "receipt", "validation", "releaseReceipt"]) else {
       throw Self.error("recordUnreadable", "Import record has unknown fields")
     }
@@ -210,7 +210,7 @@ package final class RuntimeImportStore: @unchecked Sendable {
     try validateDirectories()
     let url = try identityURL(id)
     if try exists(url) {
-      let fields = try ControlProtocolNegotiation.decodeObject(read(url, maximum: 1024), maximumBytes: 1024)
+      let fields = try ControlFrameJSON.decodeObject(read(url, maximum: 1024), maximumBytes: 1024)
       guard Set(fields.keys) == ["importRequestId"], case .string(let request)? = fields["importRequestId"],
         let record = try byRequest(request), record.importID == id else { throw Self.error("recordUnreadable", "Import identity mapping is unreadable") }
       return record

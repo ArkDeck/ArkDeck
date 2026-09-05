@@ -19,7 +19,7 @@ arkdeck history filter save \
 arkdeck history filter delete --expected-generation <n> --output json
 ```
 
-The CLI commands negotiate control protocol 2. `list` returns
+The CLI commands verify the current v1 control identity. `list` returns
 `arkdeck.history-filter-list/1`, the current generation, and zero or one
 `arkdeck.history-filter/1` record. An empty resource begins at generation `1`.
 Omitted search, status, mode, time and activity options save their documented

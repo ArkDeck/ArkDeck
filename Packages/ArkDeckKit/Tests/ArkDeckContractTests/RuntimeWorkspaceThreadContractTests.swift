@@ -133,7 +133,7 @@ final class RuntimeWorkspaceThreadContractTests: XCTestCase {
     ]
     for thread in rejected {
       let json = """
-        {"documentType":"runtime-operation-request","schemaVersion":"2.0.0",\
+        {"documentType":"runtime-operation-request","schemaVersion":"1.0.0",\
         "requestId":"thread-contract","idempotencyKey":"thread-contract-1",\
         "target":{"targetId":"target-1","expectedBindingRevision":2},\
         "operation":{"id":"capture.diagnostics","version":1},"inputs":{},\
@@ -147,7 +147,7 @@ final class RuntimeWorkspaceThreadContractTests: XCTestCase {
     }
 
     let accepted = """
-      {"documentType":"runtime-operation-request","schemaVersion":"2.0.0",\
+      {"documentType":"runtime-operation-request","schemaVersion":"1.0.0",\
       "requestId":"thread-contract","idempotencyKey":"thread-contract-1",\
       "target":{"targetId":"target-1","expectedBindingRevision":2},\
       "operation":{"id":"capture.diagnostics","version":1},"inputs":{},\
@@ -207,15 +207,10 @@ final class RuntimeWorkspaceThreadContractTests: XCTestCase {
       if let thread { value["threadId"] = thread }
       return value
     }
-    let data = try JSONSerialization.data(
-      withJSONObject: [
-        "ok": true, "id": "x",
-        "result": [
-          entry("job-1", thread: "t-0123456789ab"),
-          entry("job-2", thread: "t-0123456789ab"),
-          entry("job-3", thread: nil),
-        ],
-      ])
+    let data = try currentJobPageResponse([
+      entry("job-1", thread: "t-0123456789ab"), entry("job-2", thread: "t-0123456789ab"),
+      entry("job-3", thread: nil),
+    ])
 
     let presentation = RuntimeHistoryResponseDecoding.presentation(from: data)
     XCTAssertEqual(presentation.availability, .available)
@@ -236,7 +231,7 @@ final class RuntimeWorkspaceThreadContractTests: XCTestCase {
   ) throws -> Data {
     let provenance = threadID.map { #","provenance":{"arkdeck.threadId":"\#($0)"}"# } ?? ""
     let typedRequest = """
-      {"documentType":"runtime-operation-request","schemaVersion":"2.0.0",\
+      {"documentType":"runtime-operation-request","schemaVersion":"1.0.0",\
       "requestId":"ui-request","idempotencyKey":"ui-request-123",\
       "target":{"targetId":"target-1","expectedBindingRevision":2},\
       "operation":{"id":"\(operationID)","version":1},"inputs":{},\

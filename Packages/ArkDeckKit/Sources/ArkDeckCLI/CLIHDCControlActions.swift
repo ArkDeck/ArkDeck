@@ -44,7 +44,7 @@ extension RuntimeCLI {
       guard let duration = CLIDuration.parse(text, maximumMilliseconds: 86_400_000) else { throw session.fail(.invalidInput, "invalid bounded control timeout") }
       session.client = session.client.bounded(by: try AgentClientWaitDeadline(milliseconds: duration.milliseconds))
     }
-    try session.negotiate(requiredMajor: 2, forMethod: command)
+
     session.emit(try session.request(command, fields))
   }
 }

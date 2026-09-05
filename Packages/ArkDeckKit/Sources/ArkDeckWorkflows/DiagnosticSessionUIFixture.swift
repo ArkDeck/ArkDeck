@@ -47,10 +47,10 @@ enum DiagnosticSessionUIFixture {
     let inventory: [[String: Any]] = docs.keys.sorted().map { name in
       let bytes = docs[name]!
       return [
-        "jobId": job.id, "artifactId": "fixture-\(name)", "name": name,
+        "schemaVersion": "arkdeck.artifact/1", "owner": ["kind": "job", "id": job.id], "artifactId": "fixture-\(name)", "name": name,
         "role": name == "hilog.txt" ? "raw" : name == "capture.log" ? "log" : "derived",
         "mediaType": name.hasSuffix("json") ? "application/json" : "text/plain",
-        "byteCount": bytes.count, "sha256": SHA256Hex.string(of: bytes),
+        "byteCount": bytes.count, "artifactDigest": SHA256Hex.string(of: bytes),
         "privacy": name == "hilog.txt" ? "sensitive" : "standard", "status": "published",
         "sourceOperation": job.operationReference, "createdAtUtc": "2026-08-27T08:00:10Z", "redactionApplied": true,
       ]
@@ -58,8 +58,10 @@ enum DiagnosticSessionUIFixture {
     return RuntimeJobDetailResponseDecoding.presentation(
       jobID: job.id, operationReference: job.operationReference,
       statusResponse: try response([
-        "jobId": job.id, "operation": job.operationReference, "targetId": job.targetID,
-        "sessionId": job.sessionID!, "timeline": job.timeline,
+        "schemaVersion": "arkdeck.job/1",
+        "job": ["schemaVersion": "arkdeck.job-status/1", "jobId": job.id, "operation": job.operationReference, "targetId": job.targetID,
+                "sessionId": job.sessionID!],
+        "timeline": ["kind": "inline", "entries": job.timeline],
       ]),
       evidenceResponse: try response([
         "jobId": job.id, "operationReference": job.operationReference,
@@ -68,7 +70,7 @@ enum DiagnosticSessionUIFixture {
         "bindingRevision": 3,
         "parameters": ["durationSeconds": 10, "captureHilog": true, "uiDump": false] as [String: Any],
       ]),
-      artifactResponse: try response(inventory))
+      artifactResponse: try response(DiagnosticFixtureProjection.artifactPage(inventory)))
   }
 }
 
@@ -116,8 +118,10 @@ enum DiagnosticHilogSummaryUIFixture {
     return RuntimeJobDetailResponseDecoding.presentation(
       jobID: job.id, operationReference: job.operationReference,
       statusResponse: try response([
-        "jobId": job.id, "operation": job.operationReference, "targetId": job.targetID,
-        "sessionId": job.sessionID!, "timeline": job.timeline,
+        "schemaVersion": "arkdeck.job/1",
+        "job": ["schemaVersion": "arkdeck.job-status/1", "jobId": job.id, "operation": job.operationReference, "targetId": job.targetID,
+                "sessionId": job.sessionID!],
+        "timeline": ["kind": "inline", "entries": job.timeline],
       ]),
       evidenceResponse: try response([
         "jobId": job.id, "operationReference": job.operationReference,
@@ -125,12 +129,32 @@ enum DiagnosticHilogSummaryUIFixture {
         "executionMode": "execute", "terminalState": "succeeded", "actualEffect": "hostOnly",
         "parameters": ["sourceArtifactRef": "lease-v1:job-fixture-hilog-source-\(variant):fixture-hilog-source-\(variant)"],
       ]),
-      artifactResponse: try response([[
-        "jobId": job.id, "artifactId": "fixture-hilog-summary-\(variant)", "name": "hilog-summary.json",
+      artifactResponse: try response(DiagnosticFixtureProjection.artifactPage([[
+        "schemaVersion": "arkdeck.artifact/1", "owner": ["kind": "job", "id": job.id], "artifactId": "fixture-hilog-summary-\(variant)", "name": "hilog-summary.json",
         "role": "derived", "mediaType": "application/json", "byteCount": bytes.count,
-        "sha256": SHA256Hex.string(of: bytes), "privacy": "standard", "status": "published",
+        "artifactDigest": SHA256Hex.string(of: bytes), "privacy": "standard", "status": "published",
         "sourceOperation": job.operationReference, "createdAtUtc": "2026-08-29T08:00:10Z",
         "redactionApplied": true,
-      ]]))
+      ]])))
+  }
+}
+
+/// Local UI samples use the same current page and metadata vocabulary as Runtime.
+private enum DiagnosticFixtureProjection {
+  static func artifactPage(_ rows: [[String: Any]]) -> [String: Any] {
+    let items = rows.map { row in
+      var value = row
+      value.removeValue(forKey: "role")
+      value["lease"] = NSNull()
+      value["providerId"] = "fixture"
+      value["retention"] = ["class": "default", "pinned": false, "deadlineUtc": NSNull()]
+      value["binding"] = ["targetId": "target-fixture-dayu200", "bindingRevision": NSNull(),
+                          "stableIdentitySha256": NSNull()]
+      value["observationWindow"] = NSNull()
+      return value
+    }
+    return ["schemaVersion": "arkdeck.cli.page/1", "pageKind": "snapshot", "items": items,
+            "order": "createdAtDescArtifactIdAsc", "hasMore": false, "nextCursor": NSNull(),
+            "snapshotRevision": "11111111-1111-4111-8111-111111111111"]
   }
 }

@@ -160,18 +160,6 @@
         "grammar":
           "kind": "enumeration"
           "values":
-            - "1"
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "1|2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "negotiate this exact protocol major before reading health; never downgrade"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
             - "human"
             - "json"
             - "jsonl"
@@ -225,18 +213,6 @@
       - - "--output"
         - "--json"
     "options":
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "1"
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "1|2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "default 2 reads fresh facts; explicit 1 reads the frozen startup projection"
       - "form": "value"
         "grammar":
           "kind": "enumeration"
@@ -295,17 +271,6 @@
       - - "--output"
         - "--json"
     "options":
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
       - "form": "value"
         "grammar":
           "kind": "duration"
@@ -414,17 +379,6 @@
       - - "--output"
         - "--json"
     "options":
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
       - "form": "value"
         "grammar":
           "kind": "duration"
@@ -1896,17 +1850,6 @@
     "options":
       - "form": "value"
         "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
-      - "form": "value"
-        "grammar":
           "kind": "duration"
           "maximumMilliseconds": 86400000
           "pattern": "^[1-9][0-9]*(ms|s|m|h)$"
@@ -2438,17 +2381,6 @@
         "grammar":
           "kind": "enumeration"
           "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
             - "human"
             - "json"
             - "jsonl"
@@ -2547,17 +2479,6 @@
         "grammar":
           "kind": "enumeration"
           "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
             - "human"
             - "json"
             - "jsonl"
@@ -2637,17 +2558,6 @@
         "required": false
         "stability": "standard"
         "summary": "restore the Runtime's fixed default Session directory"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
       - "form": "value"
         "grammar":
           "kind": "enumeration"
@@ -3023,7 +2933,7 @@
         "published": true
         "required": false
         "stability": "standard"
-        "summary": "total client wait including negotiation and IO; default 30s, maximum 24h"
+        "summary": "total client wait including contract verification and IO; default 30s, maximum 24h"
       - "form": "value"
         "grammar":
           "kind": "enumeration"
@@ -3185,43 +3095,16 @@
     "positionals": []
     "replacementArgvPattern": "arkdeck target show --target <id>"
     "requiresExactlyOneOf": []
-    "summary": "show the frozen legacy target-list projection"
+    "summary": "show the current target-list projection"
   - "catalogOperation": null
     "command": "device.candidates"
     "connectsToRuntime": true
     "kind": "executable"
     "lifecycleStatus": "current"
     "mutuallyExclusive":
-      - - "--require-protocol"
-        - "--snapshot"
-      - - "--require-protocol"
-        - "--use-warm-snapshot"
       - - "--output"
         - "--json"
     "options":
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "read v2 physical observation references for target adopt; never downgrade"
-      - "form": "flag"
-        "name": "--snapshot"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "return a snapshot object with generation and observation IDs instead of an array"
-      - "form": "flag"
-        "name": "--use-warm-snapshot"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "read the Runtime's warm snapshot instead of forcing a fresh device read"
       - "form": "value"
         "grammar":
           "kind": "enumeration"
@@ -3270,72 +3153,6 @@
     "replacementArgvPattern": null
     "requiresExactlyOneOf": []
     "summary": "live HDC candidates, their authorization state and any adopted target"
-  - "catalogOperation": null
-    "command": "device.adopt"
-    "connectsToRuntime": true
-    "kind": "executable"
-    "lifecycleStatus": "legacy"
-    "mutuallyExclusive":
-      - - "--output"
-        - "--json"
-    "options":
-      - "form": "value"
-        "grammar":
-          "kind": "opaque"
-        "name": "--candidate"
-        "placeholder": "connect-key"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "exact observed candidate key"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "human"
-            - "json"
-            - "jsonl"
-        "name": "--output"
-        "placeholder": "human|json"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "output mode; machine modes emit one arkdeck.cli.result/1 document"
-      - "form": "flag"
-        "name": "--json"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "legacy: print the raw reply as JSON, without the result envelope"
-      - "form": "value"
-        "grammar":
-          "kind": "pattern"
-          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
-        "name": "--control-request-id"
-        "placeholder": "id"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "correlate this control-plane call; not a Job or request identity"
-      - "form": "value"
-        "grammar":
-          "kind": "opaque"
-        "name": "--socket"
-        "placeholder": "absolute-path"
-        "published": false
-        "required": false
-        "stability": "macosCompatibilityOnly"
-        "summary": "macOS-only compatibility alias for the local Runtime endpoint"
-    "outputModes":
-      - "human"
-      - "json"
-    "path":
-      - "device"
-      - "adopt"
-    "positionals": []
-    "replacementArgvPattern": null
-    "requiresExactlyOneOf": []
-    "summary": "establish or update a durable binding from an observed candidate"
   - "catalogOperation": null
     "command": "device.display-name.set"
     "connectsToRuntime": true
@@ -3925,17 +3742,6 @@
         "grammar":
           "kind": "enumeration"
           "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
             - "human"
             - "json"
             - "jsonl"
@@ -4009,17 +3815,6 @@
         "required": true
         "stability": "standard"
         "summary": "exact current generation; drift refuses the mutation"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
       - "form": "value"
         "grammar":
           "kind": "enumeration"
@@ -4276,17 +4071,6 @@
         "grammar":
           "kind": "enumeration"
           "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
             - "human"
             - "json"
             - "jsonl"
@@ -4390,17 +4174,6 @@
         "required": false
         "stability": "standard"
         "summary": "how long to wait before giving up; the job keeps running"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
       - "form": "value"
         "grammar":
           "kind": "enumeration"
@@ -4652,17 +4425,6 @@
         "summary": "caller-stable idempotency key; the same key returns the same job"
       - "form": "value"
         "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
-      - "form": "value"
-        "grammar":
           "kind": "duration"
           "maximumMilliseconds": 86400000
           "pattern": "^[1-9][0-9]*(ms|s|m|h)$"
@@ -4813,17 +4575,6 @@
         "summary": "deprecated 1.x compound; submit then run and wait explicitly"
       - "form": "value"
         "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
-      - "form": "value"
-        "grammar":
           "kind": "duration"
           "maximumMilliseconds": 86400000
           "pattern": "^[1-9][0-9]*(ms|s|m|h)$"
@@ -4899,17 +4650,6 @@
         "required": true
         "stability": "standard"
         "summary": "durable job identity"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
       - "form": "value"
         "grammar":
           "kind": "duration"
@@ -4989,17 +4729,6 @@
         "summary": "durable job identity"
       - "form": "value"
         "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
-      - "form": "value"
-        "grammar":
           "kind": "duration"
           "maximumMilliseconds": 86400000
           "pattern": "^[1-9][0-9]*(ms|s|m|h)$"
@@ -5075,17 +4804,6 @@
         "required": true
         "stability": "standard"
         "summary": "durable job identity"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
       - "form": "value"
         "grammar":
           "kind": "duration"
@@ -5196,17 +4914,6 @@
         "summary": "how long to wait before giving up; the job keeps running"
       - "form": "value"
         "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
-      - "form": "value"
-        "grammar":
           "kind": "opaque"
         "name": "--after-cursor"
         "placeholder": "cursor"
@@ -5292,17 +4999,6 @@
         "required": true
         "stability": "standard"
         "summary": "durable job identity"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
       - "form": "value"
         "grammar":
           "kind": "opaque"
@@ -5400,17 +5096,6 @@
         "required": true
         "stability": "standard"
         "summary": "durable job identity"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
       - "form": "value"
         "grammar":
           "kind": "opaque"
@@ -5532,7 +5217,7 @@
         "published": true
         "required": false
         "stability": "standard"
-        "summary": "v2 defaults to createdAtDescJobIdAsc; legacy order tokens require v1"
+        "summary": "current order: createdAtDescJobIdAsc"
       - "form": "flag"
         "name": "--include-current"
         "published": true
@@ -5545,17 +5230,6 @@
         "required": false
         "stability": "standard"
         "summary": "include each job's timeline entries"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
       - "form": "value"
         "grammar":
           "kind": "duration"
@@ -5669,17 +5343,6 @@
         "required": true
         "stability": "standard"
         "summary": "durable job identity"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
       - "form": "value"
         "grammar":
           "kind": "duration"
@@ -5825,17 +5488,6 @@
         "summary": "durable job identity"
       - "form": "value"
         "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
-      - "form": "value"
-        "grammar":
           "kind": "duration"
           "maximumMilliseconds": 86400000
           "pattern": "^[1-9][0-9]*(ms|s|m|h)$"
@@ -5911,17 +5563,6 @@
         "required": true
         "stability": "standard"
         "summary": "durable job identity"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
       - "form": "value"
         "grammar":
           "kind": "duration"
@@ -6080,17 +5721,6 @@
         "grammar":
           "kind": "enumeration"
           "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
             - "human"
             - "json"
             - "jsonl"
@@ -6153,17 +5783,6 @@
         "required": true
         "stability": "standard"
         "summary": "exact Session identity"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
       - "form": "value"
         "grammar":
           "kind": "enumeration"
@@ -6244,17 +5863,6 @@
         "grammar":
           "kind": "enumeration"
           "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
             - "human"
             - "json"
             - "jsonl"
@@ -6331,17 +5939,6 @@
         "grammar":
           "kind": "enumeration"
           "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
             - "human"
             - "json"
             - "jsonl"
@@ -6395,17 +5992,6 @@
       - - "--output"
         - "--json"
     "options":
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
       - "form": "value"
         "grammar":
           "kind": "enumeration"
@@ -6484,17 +6070,6 @@
         "required": true
         "stability": "standard"
         "summary": "exact canonical cleanup preview digest"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
       - "form": "value"
         "grammar":
           "kind": "enumeration"
@@ -6581,17 +6156,6 @@
         "grammar":
           "kind": "enumeration"
           "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
             - "human"
             - "json"
             - "jsonl"
@@ -6666,17 +6230,6 @@
         "required": true
         "stability": "standard"
         "summary": "exact canonical export preview digest"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
       - "form": "value"
         "grammar":
           "kind": "enumeration"
@@ -7012,315 +6565,6 @@
     "requiresExactlyOneOf": []
     "summary": "delete the saved query using generation compare-and-swap"
   - "catalogOperation": null
-    "command": "artifact.import-hap"
-    "connectsToRuntime": true
-    "kind": "executable"
-    "lifecycleStatus": "legacy"
-    "mutuallyExclusive":
-      - - "--output"
-        - "--json"
-    "options":
-      - "form": "value"
-        "grammar":
-          "kind": "opaque"
-        "name": "--target"
-        "placeholder": "target-id"
-        "published": true
-        "required": true
-        "stability": "standard"
-        "summary": "durable target the import is scoped to"
-      - "form": "value"
-        "grammar":
-          "kind": "opaque"
-        "name": "--file"
-        "placeholder": "path"
-        "published": true
-        "required": true
-        "stability": "standard"
-        "summary": "host file to import; validated by identity and digest"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "human"
-            - "json"
-            - "jsonl"
-        "name": "--output"
-        "placeholder": "human|json"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "output mode; machine modes emit one arkdeck.cli.result/1 document"
-      - "form": "flag"
-        "name": "--json"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "legacy: print the raw reply as JSON, without the result envelope"
-      - "form": "value"
-        "grammar":
-          "kind": "pattern"
-          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
-        "name": "--control-request-id"
-        "placeholder": "id"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "correlate this control-plane call; not a Job or request identity"
-      - "form": "value"
-        "grammar":
-          "kind": "opaque"
-        "name": "--socket"
-        "placeholder": "absolute-path"
-        "published": false
-        "required": false
-        "stability": "macosCompatibilityOnly"
-        "summary": "macOS-only compatibility alias for the local Runtime endpoint"
-    "outputModes":
-      - "human"
-      - "json"
-    "path":
-      - "artifact"
-      - "import-hap"
-    "positionals": []
-    "replacementArgvPattern": null
-    "requiresExactlyOneOf": []
-    "summary": "import a .hap/.hsp package as a typed input artifact"
-  - "catalogOperation": null
-    "command": "artifact.import-workspace-patch"
-    "connectsToRuntime": true
-    "kind": "executable"
-    "lifecycleStatus": "legacy"
-    "mutuallyExclusive":
-      - - "--output"
-        - "--json"
-    "options":
-      - "form": "value"
-        "grammar":
-          "kind": "opaque"
-        "name": "--target"
-        "placeholder": "target-id"
-        "published": true
-        "required": true
-        "stability": "standard"
-        "summary": "durable target the import is scoped to"
-      - "form": "value"
-        "grammar":
-          "kind": "opaque"
-        "name": "--file"
-        "placeholder": "path"
-        "published": true
-        "required": true
-        "stability": "standard"
-        "summary": "host file to import; validated by identity and digest"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "human"
-            - "json"
-            - "jsonl"
-        "name": "--output"
-        "placeholder": "human|json"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "output mode; machine modes emit one arkdeck.cli.result/1 document"
-      - "form": "flag"
-        "name": "--json"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "legacy: print the raw reply as JSON, without the result envelope"
-      - "form": "value"
-        "grammar":
-          "kind": "pattern"
-          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
-        "name": "--control-request-id"
-        "placeholder": "id"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "correlate this control-plane call; not a Job or request identity"
-      - "form": "value"
-        "grammar":
-          "kind": "opaque"
-        "name": "--socket"
-        "placeholder": "absolute-path"
-        "published": false
-        "required": false
-        "stability": "macosCompatibilityOnly"
-        "summary": "macOS-only compatibility alias for the local Runtime endpoint"
-    "outputModes":
-      - "human"
-      - "json"
-    "path":
-      - "artifact"
-      - "import-workspace-patch"
-    "positionals": []
-    "replacementArgvPattern": null
-    "requiresExactlyOneOf": []
-    "summary": "import a workspace patch as a typed input artifact"
-  - "catalogOperation": null
-    "command": "artifact.import-flash-bundle"
-    "connectsToRuntime": true
-    "kind": "executable"
-    "lifecycleStatus": "legacy"
-    "mutuallyExclusive":
-      - - "--output"
-        - "--json"
-    "options":
-      - "form": "value"
-        "grammar":
-          "kind": "opaque"
-        "name": "--target"
-        "placeholder": "target-id"
-        "published": true
-        "required": true
-        "stability": "standard"
-        "summary": "durable target the import is scoped to"
-      - "form": "value"
-        "grammar":
-          "kind": "opaque"
-        "name": "--file"
-        "placeholder": "path"
-        "published": true
-        "required": true
-        "stability": "standard"
-        "summary": "host file to import; validated by identity and digest"
-      - "form": "value"
-        "grammar":
-          "kind": "opaque"
-        "name": "--device-profile"
-        "placeholder": "dayu200"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "published device profile reference"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "human"
-            - "json"
-            - "jsonl"
-        "name": "--output"
-        "placeholder": "human|json"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "output mode; machine modes emit one arkdeck.cli.result/1 document"
-      - "form": "flag"
-        "name": "--json"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "legacy: print the raw reply as JSON, without the result envelope"
-      - "form": "value"
-        "grammar":
-          "kind": "pattern"
-          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
-        "name": "--control-request-id"
-        "placeholder": "id"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "correlate this control-plane call; not a Job or request identity"
-      - "form": "value"
-        "grammar":
-          "kind": "opaque"
-        "name": "--socket"
-        "placeholder": "absolute-path"
-        "published": false
-        "required": false
-        "stability": "macosCompatibilityOnly"
-        "summary": "macOS-only compatibility alias for the local Runtime endpoint"
-    "outputModes":
-      - "human"
-      - "json"
-    "path":
-      - "artifact"
-      - "import-flash-bundle"
-    "positionals": []
-    "replacementArgvPattern": null
-    "requiresExactlyOneOf": []
-    "summary": "import a firmware image archive as a typed input artifact"
-  - "catalogOperation": null
-    "command": "artifact.import-native-library"
-    "connectsToRuntime": true
-    "kind": "executable"
-    "lifecycleStatus": "legacy"
-    "mutuallyExclusive":
-      - - "--output"
-        - "--json"
-    "options":
-      - "form": "value"
-        "grammar":
-          "kind": "opaque"
-        "name": "--target"
-        "placeholder": "target-id"
-        "published": true
-        "required": true
-        "stability": "standard"
-        "summary": "durable target the import is scoped to"
-      - "form": "value"
-        "grammar":
-          "kind": "opaque"
-        "name": "--file"
-        "placeholder": "path"
-        "published": true
-        "required": true
-        "stability": "standard"
-        "summary": "host file to import; validated by identity and digest"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "human"
-            - "json"
-            - "jsonl"
-        "name": "--output"
-        "placeholder": "human|json"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "output mode; machine modes emit one arkdeck.cli.result/1 document"
-      - "form": "flag"
-        "name": "--json"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "legacy: print the raw reply as JSON, without the result envelope"
-      - "form": "value"
-        "grammar":
-          "kind": "pattern"
-          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
-        "name": "--control-request-id"
-        "placeholder": "id"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "correlate this control-plane call; not a Job or request identity"
-      - "form": "value"
-        "grammar":
-          "kind": "opaque"
-        "name": "--socket"
-        "placeholder": "absolute-path"
-        "published": false
-        "required": false
-        "stability": "macosCompatibilityOnly"
-        "summary": "macOS-only compatibility alias for the local Runtime endpoint"
-    "outputModes":
-      - "human"
-      - "json"
-    "path":
-      - "artifact"
-      - "import-native-library"
-    "positionals": []
-    "replacementArgvPattern": null
-    "requiresExactlyOneOf": []
-    "summary": "import a native library as a typed input artifact"
-  - "catalogOperation": null
     "command": "artifact.quota"
     "connectsToRuntime": true
     "kind": "executable"
@@ -7415,17 +6659,6 @@
         "required": false
         "stability": "standard"
         "summary": "how long to wait before giving up; the job keeps running"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
       - "form": "value"
         "grammar":
           "kind": "positiveInteger"
@@ -7551,17 +6784,6 @@
         "summary": "how long to wait before giving up; the job keeps running"
       - "form": "value"
         "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
-      - "form": "value"
-        "grammar":
           "kind": "opaque"
         "name": "--artifact"
         "placeholder": "artifact-id"
@@ -7667,17 +6889,6 @@
         "required": false
         "stability": "standard"
         "summary": "how long to wait before giving up; the job keeps running"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
       - "form": "value"
         "grammar":
           "kind": "opaque"
@@ -7811,17 +7022,6 @@
         "summary": "how long to wait before giving up; the job keeps running"
       - "form": "value"
         "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
-      - "form": "value"
-        "grammar":
           "kind": "opaque"
         "name": "--artifact"
         "placeholder": "artifact-id"
@@ -7952,17 +7152,6 @@
         "grammar":
           "kind": "enumeration"
           "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
             - "human"
             - "json"
             - "jsonl"
@@ -8060,17 +7249,6 @@
         "grammar":
           "kind": "enumeration"
           "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
             - "human"
             - "json"
             - "jsonl"
@@ -8164,17 +7342,6 @@
         "required": false
         "stability": "standard"
         "summary": "how long to wait before giving up; the job keeps running"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
       - "form": "value"
         "grammar":
           "kind": "enumeration"
@@ -8287,17 +7454,6 @@
         "grammar":
           "kind": "enumeration"
           "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
             - "human"
             - "json"
             - "jsonl"
@@ -8383,17 +7539,6 @@
         "required": false
         "stability": "standard"
         "summary": "how long to wait before giving up; the job keeps running"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
       - "form": "value"
         "grammar":
           "kind": "opaque"
@@ -8510,17 +7655,6 @@
         "grammar":
           "kind": "enumeration"
           "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
             - "human"
             - "json"
             - "jsonl"
@@ -8612,17 +7746,6 @@
         "grammar":
           "kind": "enumeration"
           "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
             - "human"
             - "json"
             - "jsonl"
@@ -8708,17 +7831,6 @@
         "required": false
         "stability": "standard"
         "summary": "how long to wait before giving up; the job keeps running"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
       - "form": "value"
         "grammar":
           "kind": "enumeration"
@@ -8868,17 +7980,6 @@
         "summary": "caller-stable durable execution identity"
       - "form": "value"
         "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
-      - "form": "value"
-        "grammar":
           "kind": "duration"
           "maximumMilliseconds": 86400000
           "pattern": "^[1-9][0-9]*(ms|s|m|h)$"
@@ -9000,17 +8101,6 @@
         "grammar":
           "kind": "enumeration"
           "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
             - "human"
             - "json"
             - "jsonl"
@@ -9096,17 +8186,6 @@
         "required": false
         "stability": "standard"
         "summary": "how long to wait before giving up; the job keeps running"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
       - "form": "value"
         "grammar":
           "kind": "enumeration"
@@ -9235,17 +8314,6 @@
         "grammar":
           "kind": "enumeration"
           "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
             - "human"
             - "json"
             - "jsonl"
@@ -9322,17 +8390,6 @@
         "summary": "typed JSON selection from a bounded UTF-8 document"
       - "form": "value"
         "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
-      - "form": "value"
-        "grammar":
           "kind": "duration"
           "maximumMilliseconds": 86400000
           "pattern": "^[1-9][0-9]*(ms|s|m|h)$"
@@ -9350,7 +8407,7 @@
         "published": true
         "required": false
         "stability": "standard"
-        "summary": "legacy token; with protocol 2, an exact-value alias of resume-reference"
+        "summary": "existing resume token spelling; Runtime executions require an exact resume reference"
       - "form": "value"
         "grammar":
           "kind": "opaque"
@@ -9471,17 +8528,6 @@
         "grammar":
           "kind": "enumeration"
           "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
             - "agentExecution"
             - "controlAction"
         "name": "--owner-kind"
@@ -9576,17 +8622,6 @@
         "required": false
         "stability": "standard"
         "summary": "how long to wait before giving up; the job keeps running"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
       - "form": "value"
         "grammar":
           "kind": "enumeration"
@@ -9686,17 +8721,6 @@
         "summary": "how long to wait before giving up; the job keeps running"
       - "form": "value"
         "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
-      - "form": "value"
-        "grammar":
           "kind": "opaque"
         "name": "--resume-reference"
         "placeholder": "ref"
@@ -9781,17 +8805,6 @@
         "required": false
         "stability": "standard"
         "summary": "continue the same immutable query and page size"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
       - "form": "value"
         "grammar":
           "kind": "duration"
@@ -9904,17 +8917,6 @@
         "summary": "exact durable control-action identity"
       - "form": "value"
         "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
-      - "form": "value"
-        "grammar":
           "kind": "duration"
           "maximumMilliseconds": 86400000
           "pattern": "^[1-9][0-9]*(ms|s|m|h)$"
@@ -9990,17 +8992,6 @@
         "required": true
         "stability": "standard"
         "summary": "exact durable control-action identity"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
       - "form": "value"
         "grammar":
           "kind": "duration"
@@ -10408,17 +9399,6 @@
         "required": false
         "stability": "standard"
         "summary": "continue the same immutable query and page size"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
       - "form": "value"
         "grammar":
           "kind": "enumeration"
@@ -11291,17 +10271,6 @@
         "grammar":
           "kind": "enumeration"
           "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
             - "human"
             - "json"
             - "jsonl"
@@ -11401,17 +10370,6 @@
         "required": false
         "stability": "standard"
         "summary": "how long to wait before giving up; the job keeps running"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
       - "form": "value"
         "grammar":
           "kind": "enumeration"
@@ -11519,17 +10477,6 @@
         "required": false
         "stability": "standard"
         "summary": "how long to wait before giving up; the job keeps running"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
       - "form": "value"
         "grammar":
           "kind": "enumeration"
@@ -13358,17 +12305,6 @@
         "grammar":
           "kind": "enumeration"
           "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
             - "human"
             - "json"
             - "jsonl"
@@ -13432,17 +12368,6 @@
         "required": true
         "stability": "standard"
         "summary": "registered project reference from `workspace project list`"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
       - "form": "value"
         "grammar":
           "kind": "enumeration"
@@ -13531,17 +12456,6 @@
         "required": true
         "stability": "standard"
         "summary": "host root accepted only by the registration owner"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
       - "form": "value"
         "grammar":
           "kind": "enumeration"
@@ -13644,17 +12558,6 @@
         "grammar":
           "kind": "enumeration"
           "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
             - "human"
             - "json"
             - "jsonl"
@@ -13728,17 +12631,6 @@
         "required": true
         "stability": "standard"
         "summary": "exact current generation; drift refuses the mutation"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
       - "form": "value"
         "grammar":
           "kind": "enumeration"
@@ -13824,17 +12716,6 @@
         "grammar":
           "kind": "enumeration"
           "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
             - "human"
             - "json"
             - "jsonl"
@@ -13907,17 +12788,6 @@
         "required": true
         "stability": "standard"
         "summary": "preset reference from `workspace preset list`"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
       - "form": "value"
         "grammar":
           "kind": "enumeration"
@@ -14092,17 +12962,6 @@
         "required": false
         "stability": "standard"
         "summary": "project-relative source-map output for a symbol preset"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
       - "form": "value"
         "grammar":
           "kind": "enumeration"
@@ -14300,17 +13159,6 @@
         "grammar":
           "kind": "enumeration"
           "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
             - "human"
             - "json"
             - "jsonl"
@@ -14406,17 +13254,6 @@
         "grammar":
           "kind": "enumeration"
           "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
             - "human"
             - "json"
             - "jsonl"
@@ -14491,17 +13328,6 @@
         "required": false
         "stability": "standard"
         "summary": "how long to wait before giving up; the job keeps running"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
       - "form": "value"
         "grammar":
           "kind": "enumeration"
@@ -14593,17 +13419,6 @@
         "grammar":
           "kind": "enumeration"
           "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
             - "human"
             - "json"
             - "jsonl"
@@ -14687,17 +13502,6 @@
         "required": false
         "stability": "standard"
         "summary": "how long to wait before giving up; the job keeps running"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
       - "form": "value"
         "grammar":
           "kind": "enumeration"
@@ -14908,17 +13712,6 @@
         "required": true
         "stability": "standard"
         "summary": "durable target identity"
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "2"
-        "name": "--require-protocol"
-        "placeholder": "2"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "use Runtime-owned v2 resources; never downgrade"
       - "form": "value"
         "grammar":
           "kind": "enumeration"

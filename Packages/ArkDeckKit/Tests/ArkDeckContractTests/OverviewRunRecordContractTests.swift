@@ -26,7 +26,7 @@ final class OverviewRunRecordContractTests: XCTestCase {
     XCTAssertNotEqual(first.requestID, second.requestID)
     XCTAssertNotEqual(first.idempotencyKey, second.idempotencyKey)
     XCTAssertNil(first.authorization)
-    XCTAssertNil(first.campaignReservation)
+    XCTAssertFalse(String(decoding: try JSONEncoder().encode(first), as: UTF8.self).contains("campaignReservation"))
     let json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(first)) as? [String: Any])
     XCTAssertNil(json["sessionId"], "a thread must not become a Runtime session identity")
   }
@@ -57,16 +57,16 @@ final class OverviewRunRecordContractTests: XCTestCase {
     for inputs in cases {
       let detail = RuntimeJobDetailResponseDecoding.presentation(
         jobID: job.id, operationReference: job.operationReference,
-        statusResponse: try response([
+        statusResponse: .success(try currentJobDetailResponse([
           "jobId": job.id, "operation": job.operationReference, "targetId": job.targetID,
           "sessionId": job.sessionID!, "timeline": [],
-        ]),
+        ])),
         evidenceResponse: try response([
           "jobId": job.id, "operationReference": job.operationReference,
           "catalogDigest": String(repeating: "a", count: 64), "providerId": "hdc",
           "executionMode": "execute", "terminalState": "succeeded", "actualEffect": "readOnly",
           "bindingRevision": 3, "parameters": inputs,
-        ]), artifactResponse: try response([]))
+        ]), artifactResponse: .success(try currentArtifactPageResponse([])))
       let result = RuntimeWorkspaceContinuation.prepare(
         job: job, detail: detail, currentTargetID: job.targetID, currentBindingRevision: 3)
       guard case .failure = result else { return XCTFail("accepted unsafe or invalid draft: \(inputs)") }

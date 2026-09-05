@@ -110,7 +110,11 @@ final class ObserveDeviceSkeletonContractTests: XCTestCase {
     let handler = RuntimeControlPlaneHandler(
       engine: engine, capabilityStore: capabilityStore,
       providerIDs: providers.registeredProviderIDs, nowUTC: { "2026-07-29T00:00:00Z" },
-      targetStore: targetStore, bootstrap: bootstrap, artifactStore: artifactStore)
+      targetStore: targetStore, bootstrap: bootstrap,
+      targetObservations: TargetObservationCoordinator(observation: ScriptedBootstrap(), targetStore: targetStore,
+        usbRelations: { [TargetUSBRelation(serial: String(repeating: "a", count: 32), location: "100", attachmentID: 17,
+          vendorID: RockchipProbeEvidence.rockUSBVendorID, productID: RockchipHDCIntegrationProfile.dayu200NormalProductID)] },
+        nowUTC: { "2026-07-29T00:00:00Z" }), artifactStore: artifactStore)
     return (handler, engine, targetStore)
   }
 
@@ -126,20 +130,36 @@ final class ObserveDeviceSkeletonContractTests: XCTestCase {
 
   private func observeRequestJSON(targetID: String, key: String = "idem-skeleton-01") -> String {
     """
-    {"documentType":"runtime-operation-request","schemaVersion":"2.0.0",\
+    {"documentType":"runtime-operation-request","schemaVersion":"1.0.0",\
     "requestId":"req-skeleton","idempotencyKey":"\(key)",\
     "target":{"targetId":"\(targetID)","expectedBindingRevision":1},\
     "operation":{"id":"observe.device","version":1}}
     """
   }
 
+  private func wire(_ method: String, params: [String: JSONValue] = [:]) throws -> Data {
+    try CanonicalJSONEncoders.canonical().encode(JSONValue.object([
+      "protocolVersion": .string(ArkDeckControlProtocol.currentVersion),
+      "contractIdentity": .string(ArkDeckControlProtocol.contractIdentity),
+      "id": .string("skeleton"), "method": .string(method), "params": .object(params),
+    ]))
+  }
+
+  private func adopt(_ handler: RuntimeControlPlaneHandler) async throws -> AgentWireProtocol.Response {
+    let observation = await handler.handleFrame(try wire("device.observations"))
+    guard case .object(let snapshot)? = observation.result, case .array(let rows)? = snapshot["observations"],
+      case .object(let row)? = rows.first else { throw BootstrapError.observationFailed("fixture observation missing") }
+    return await handler.handleFrame(try wire("target.adopt", params: [
+      "candidate": try XCTUnwrap(row["candidateKey"]), "observationId": try XCTUnwrap(row["observationId"]),
+      "observationGeneration": try XCTUnwrap(snapshot["snapshotGeneration"]),
+    ]))
+  }
+
   // MARK: - BER-SKEL-001
 
   func testAdoptThenObserveRunsThroughRealProcessDispatch() async throws {
     let (handler, engine, targetStore) = try makeStack()
-    // adopt via the control plane (bootstrap path)
-    let adopt = await handler.handleFrame(
-      Data("{\"protocolVersion\":\"1.0.0\",\"id\":\"a\",\"method\":\"target.adopt\"}".utf8))
+    let adopt = try await adopt(handler)
     guard adopt.ok, case .object(let adoptFields)? = adopt.result,
       case .string(let outcome)? = adoptFields["outcome"], outcome == "adopted",
       case .string(let targetID)? = adoptFields["targetId"]
@@ -149,12 +169,9 @@ final class ObserveDeviceSkeletonContractTests: XCTestCase {
     XCTAssertEqual(try targetStore.list().count, 1)
 
     // submit + run observe.device@1 against the real fixture process
-    let submit = await handler.handleFrame(
-      Data(
-        """
-        {"protocolVersion":"1.0.0","id":"s","method":"job.submit","params":\
-        {"requestJson":\(quoted(observeRequestJSON(targetID: targetID)))}}
-        """.utf8))
+    let submit = await handler.handleFrame(try wire("job.submit", params: [
+      "requestJson": .string(observeRequestJSON(targetID: targetID)),
+    ]))
     guard submit.ok, case .object(let submitFields)? = submit.result,
       case .string(let jobID)? = submitFields["jobId"]
     else {
@@ -176,21 +193,15 @@ final class ObserveDeviceSkeletonContractTests: XCTestCase {
 
   func testGovernanceFieldsAreRejectedAtTheDaemonBoundary() async throws {
     let (handler, _, targetStore) = try makeStack()
-    _ = await handler.handleFrame(
-      Data("{\"protocolVersion\":\"1.0.0\",\"id\":\"a\",\"method\":\"target.adopt\"}".utf8))
+    _ = try await adopt(handler)
     let targetID = try XCTUnwrap(try targetStore.list().first?.targetID)
     let withGovernance = """
-      {"documentType":"runtime-operation-request","schemaVersion":"2.0.0",\
+      {"documentType":"runtime-operation-request","schemaVersion":"1.0.0",\
       "requestId":"req-gov","idempotencyKey":"idem-gov-0001","changeId":"CHG-2026-048",\
       "target":{"targetId":"\(targetID)"},\
       "operation":{"id":"observe.device","version":1}}
       """
-    let response = await handler.handleFrame(
-      Data(
-        """
-        {"protocolVersion":"1.0.0","id":"g","method":"job.submit","params":\
-        {"requestJson":\(quoted(withGovernance))}}
-        """.utf8))
+    let response = await handler.handleFrame(try wire("job.submit", params: ["requestJson": .string(withGovernance)]))
     XCTAssertFalse(response.ok, "a runtime request carrying changeId must be rejected")
     XCTAssertTrue(
       (response.error?.message ?? "").contains("governance"),

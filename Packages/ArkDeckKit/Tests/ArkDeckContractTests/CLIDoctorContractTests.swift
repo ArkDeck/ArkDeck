@@ -54,7 +54,7 @@ final class CLIDoctorContractTests: XCTestCase {
     else { return XCTFail("doctor success envelope is malformed") }
     XCTAssertEqual(envelope["ok"], .bool(true))
     XCTAssertEqual(envelope["command"], .string("doctor"))
-    XCTAssertEqual(meta["controlProtocolVersion"], .string("2.0.0"))
+    XCTAssertEqual(meta["controlProtocolVersion"], .string(ArkDeckControlProtocol.currentVersion))
     XCTAssertEqual(result["schemaVersion"], .string("arkdeck.doctor-report/1"))
     XCTAssertEqual(result["ready"], .bool(false))
 

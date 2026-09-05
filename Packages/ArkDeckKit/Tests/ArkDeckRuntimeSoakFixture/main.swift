@@ -302,7 +302,7 @@ private func observationRequest(runID: String, cycle: Int, offset: Int) -> Data 
     """
     {
       "documentType": "runtime-operation-request",
-      "schemaVersion": "2.0.0",
+      "schemaVersion": "1.0.0",
       "requestId": "soak-\(runID)-\(cycle)-\(offset)",
       "idempotencyKey": "soak-\(runID)-\(cycle)-\(offset)",
       "target": { "targetId": "TGT-SOAK-01", "expectedBindingRevision": 7 },

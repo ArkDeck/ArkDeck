@@ -105,6 +105,48 @@ final class DurableImportContractTests: XCTestCase {
     return (process.terminationStatus, try object(CLIStrictJSON.decode(Data(contentsOf: output))))
   }
 
+  func testAppAndCLIUseTheSameTypedImportWithoutSharingUploadOwnership() async throws {
+    try startServer()
+    let endpoint = AgentXPCEndpoint(handler: try XCTUnwrap(handler), appJobs: AgentXPCAppJobGate())
+    let file = root.appending(path: "shared.hap")
+    try hap.write(to: file)
+    let cliReply = try cli(["artifact", "import", "hap", "--import-request-id", "cli-owner",
+      "--target", target.targetID, "--file", file.path])
+    XCTAssertEqual(cliReply.0, 0)
+    let cliImport = try ArtifactImportProjection(XCTUnwrap(cliReply.1["result"]))
+    let send: RuntimeAppArtifactUpload.Send = { method, params in
+      let id = UUID().uuidString
+      let frame = try ArkDeckAgentXPC.requestFrame(method: method, params: params, requestID: id)
+      let current = try ControlProtocolContract.requestFields(frame)
+      XCTAssertEqual(current["protocolVersion"], .string("1.0.0"))
+      return try await withCheckedThrowingContinuation { continuation in
+        endpoint.sendRequestFrame(frame) { bytes, refusal in
+          if let bytes { continuation.resume(returning: bytes) }
+          else { continuation.resume(throwing: AgentExecutionControlFailure("admissionDenied", refusal ?? "no reply")) }
+        }
+      }
+    }
+    let appReceipt = try await RuntimeAppArtifactUpload.upload(
+      fileURL: file, kind: "hap", targetID: target.targetID, bindingRevision: target.bindingRevision,
+      name: "shared.hap", byteCount: hap.count, sha256: SHA256Hex.string(of: hap), send: send)
+    guard case .object(let cliReceipt)? = try object(cliImport.value)["receipt"] else { return XCTFail("CLI receipt missing") }
+    XCTAssertEqual(appReceipt["sha256"], cliReceipt["sha256"])
+    XCTAssertEqual(appReceipt["byteCount"], cliReceipt["byteCount"])
+    XCTAssertNotEqual(appReceipt["lease"], cliReceipt["lease"], "each caller retains its own immutable owner")
+    guard case .object(let cliIntent) = cliImport.intent.projection else { return XCTFail("intent missing") }
+    let foreignBytes = try await send("artifact.import.begin", cliIntent)
+    let foreign = try JSONDecoder().decode([String: JSONValue].self, from: foreignBytes)
+    XCTAssertEqual(foreign["ok"], .bool(false))
+    if case .object(let error)? = foreign["error"] { XCTAssertEqual(error["code"], .string("admissionDenied")) }
+    else { XCTFail("ownership refusal is missing") }
+    var patch = cliIntent
+    patch["kind"] = .string("workspace-patch"); patch["name"] = .string("change.patch")
+    XCTAssertNil(AgentXPCEndpoint.admission(of: try ArkDeckAgentXPC.requestFrame(method: "artifact.import.begin", params: patch)))
+    let jobs = try await engine.listJobs()
+    XCTAssertTrue(jobs.isEmpty)
+    XCTAssertEqual(dispatcher.dispatchCount, 0)
+  }
+
   func testStableRequestOwnerExactRetryAndConflictingChunksAcrossRestart() async throws {
     let begun = try await begin()
     let first = Data(hap.prefix(100))
@@ -303,7 +345,7 @@ final class DurableImportContractTests: XCTestCase {
     let otherInspection = try ArtifactImportInspectionProjection(XCTUnwrap(unrelated.1["result"]))
     XCTAssertEqual(otherInspection.imported.id, other.id); XCTAssertEqual(otherInspection.activeJobIDs, [])
     let recovery = try AgentClient(socketPath: XCTUnwrap(server).socketURL.path)
-      .negotiated(requiredMajor: 2, forMethod: "artifact.import.inspect")
+
       .request(method: "artifact.import.inspect", params: ["importId": .string(imported.id)])
     XCTAssertEqual(try ArtifactImportProjection(recovery).value, imported.value)
     try await engine.requestCancel(jobID: accepted.jobID)
@@ -370,8 +412,8 @@ final class DurableImportContractTests: XCTestCase {
     DispatchQueue.global().async {
       defer { served.fulfill() }
       var dropped = Set<String>()
-      // negotiate, inspect, target, begin, inspect, append, inspect, commit, inspect
-      for _ in 0..<9 {
+      // Each of the eight business requests verifies health on the same connection.
+      for _ in 0..<8 {
         var ready = pollfd(fd: listener, events: Int16(POLLIN), revents: 0)
         guard poll(&ready, 1, 5000) > 0 else { return XCTFail("missing recovery request") }
         let connection = accept(listener, nil, nil)
@@ -381,6 +423,7 @@ final class DurableImportContractTests: XCTestCase {
         _ = setsockopt(connection, SOL_SOCKET, SO_NOSIGPIPE, &noSignal, socklen_t(MemoryLayout.size(ofValue: noSignal)))
         var timeout = timeval(tv_sec: 5, tv_usec: 0)
         _ = setsockopt(connection, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout.size(ofValue: timeout)))
+        for _ in 0..<2 {
         var frame = Data(); var buffer = [UInt8](repeating: 0, count: 8192)
         while !frame.contains(10) && frame.count < 4 * 1024 * 1024 {
           let count = read(connection, &buffer, buffer.count)
@@ -407,6 +450,7 @@ final class DurableImportContractTests: XCTestCase {
           }
         }
         guard done.wait(timeout: .now() + 5) == .success else { return XCTFail("fixture owner stalled") }
+        }
       }
       XCTAssertEqual(dropped.count, 3)
     }

@@ -8,8 +8,7 @@ import XCTest
 /// The read-only device discovery plane behind the App's device list.
 ///
 /// The load-bearing fact on both sides: listing candidates can never adopt.
-/// The daemon method calls the bootstrap's enumeration only (`advance` is the
-/// path that adopts a single Connected candidate), and the App-facing decode
+/// The Runtime observation owner lists without adopting, and the App-facing decode
 /// reports incomplete facts as a failure instead of a silently empty list.
 final class DeviceCandidatesContractTests: XCTestCase {
   private static let realDeviceLatencyEnvironmentKey =
@@ -44,7 +43,7 @@ final class DeviceCandidatesContractTests: XCTestCase {
   private func makeHandler(
     candidates: [BootstrapCandidate],
     deviceInformationByConnectKey: [String: BootstrapDeviceInformation] = [:],
-    bootstrapConfigured: Bool = true
+    bootstrapConfigured: Bool = true, physicalRelations: Bool = true
   ) throws -> (RuntimeControlPlaneHandler, RuntimeTargetStore) {
     let capabilityStore = try RuntimeCapabilityStore(
       directoryURL: stateDirectory.appending(path: "capabilities", directoryHint: .isDirectory))
@@ -58,6 +57,13 @@ final class DeviceCandidatesContractTests: XCTestCase {
       dispatcher: DescriptorBoundProcessDispatcher(resolver: resolver),
       capabilityStore: capabilityStore,
       nowUTC: { "2026-08-07T00:00:00Z" })
+    let observation = ScriptedCandidates(candidates: candidates, deviceInformationByConnectKey: deviceInformationByConnectKey)
+    let relations = physicalRelations ? candidates.enumerated().map { index, candidate in
+      TargetUSBRelation(serial: candidate.connectKey, location: String(index + 1), attachmentID: UInt64(index + 1),
+        vendorID: RockchipProbeEvidence.rockUSBVendorID, productID: RockchipHDCIntegrationProfile.dayu200NormalProductID)
+    } : []
+    let owner = bootstrapConfigured ? TargetObservationCoordinator(observation: observation, targetStore: targetStore,
+      usbRelations: { relations }, nowUTC: { "2026-08-07T00:00:00Z" }) : nil
     let bootstrap =
       bootstrapConfigured
       ? DeviceBootstrapMachine(
@@ -70,12 +76,29 @@ final class DeviceCandidatesContractTests: XCTestCase {
     let handler = RuntimeControlPlaneHandler(
       engine: engine, capabilityStore: capabilityStore,
       providerIDs: [], nowUTC: { "2026-08-07T00:00:00Z" },
-      targetStore: targetStore, bootstrap: bootstrap)
+      targetStore: targetStore, bootstrap: bootstrap, targetObservations: owner)
     return (handler, targetStore)
   }
 
-  private func frame(_ method: String) -> Data {
-    Data("{\"protocolVersion\":\"1.0.0\",\"id\":\"t\",\"method\":\"\(method)\"}".utf8)
+  private func frame(_ method: String, params: [String: JSONValue] = [:]) -> Data {
+    try! CanonicalJSONEncoders.canonical().encode(JSONValue.object([
+      "protocolVersion": .string(ArkDeckControlProtocol.currentVersion),
+      "contractIdentity": .string(ArkDeckControlProtocol.contractIdentity),
+      "id": .string("t"), "method": .string(method), "params": .object(params),
+    ]))
+  }
+
+  private func adopt(_ handler: RuntimeControlPlaneHandler, candidate: String) async throws -> AgentWireProtocol.Response {
+    let snapshot = await handler.handleFrame(frame("device.observations"))
+    guard case .object(let fields)? = snapshot.result, case .array(let rows)? = fields["observations"],
+      let row = rows.compactMap({ value -> [String: JSONValue]? in
+        guard case .object(let row) = value, row["candidateKey"] == .string(candidate) else { return nil }
+        return row
+      }).first else { throw BootstrapError.observationFailed("fixture snapshot missing") }
+    return await handler.handleFrame(frame("target.adopt", params: [
+      "candidate": .string(candidate), "observationId": try XCTUnwrap(row["observationId"]),
+      "observationGeneration": try XCTUnwrap(fields["snapshotGeneration"]),
+    ]))
   }
 
   /// Opt-in real Runtime acceptance. The App begins this exact read while its
@@ -116,16 +139,16 @@ final class DeviceCandidatesContractTests: XCTestCase {
       BootstrapCandidate(connectKey: String(repeating: "a", count: 32), state: "Connected")
     ])
 
-    let response = await handler.handleFrame(frame("device.candidates"))
+    let response = await handler.handleFrame(frame("device.observations"))
     XCTAssertTrue(response.ok, String(describing: response.error))
-    guard case .array(let rows)? = response.result else {
-      return XCTFail("device.candidates must return an array")
+    guard case .object(let snapshot)? = response.result, case .array(let rows)? = snapshot["observations"] else {
+      return XCTFail("device.observations must return snapshot rows")
     }
     XCTAssertEqual(rows.count, 1)
     guard case .object(let row) = rows[0] else { return XCTFail("row must be an object") }
-    XCTAssertEqual(row["state"], .string("Connected"))
-    XCTAssertEqual(row["stateObservedAtUtc"], .string("2026-08-07T00:00:00Z"))
-    XCTAssertEqual(row["stateObservationHealth"], .string("current"))
+    XCTAssertEqual(row["authorizationState"], .string("Connected"))
+    XCTAssertEqual(snapshot["observedAtUtc"], .string("2026-08-07T00:00:00Z"))
+    XCTAssertEqual(snapshot["health"], .string("current"))
     XCTAssertEqual(row["adoptedTargetId"], .null)
     XCTAssertEqual(row["bindingRevision"], .null)
 
@@ -134,10 +157,10 @@ final class DeviceCandidatesContractTests: XCTestCase {
       "the discovery read must not create a binding")
   }
 
-  func testObservationSnapshotsMintIdentityWithoutAdoptingOrChangingLegacyShape() async throws {
+  func testUnprovedObservationSnapshotsMintFreshIdentityAndRetiredMethodIsRefused() async throws {
     let (handler, targetStore) = try makeHandler(candidates: [
       BootstrapCandidate(connectKey: "candidate-route", state: "Connected")
-    ])
+    ], physicalRelations: false)
     let first = await handler.handleFrame(frame("device.observations"))
     let second = await handler.handleFrame(frame("device.observations"))
     XCTAssertTrue(first.ok)
@@ -149,11 +172,11 @@ final class DeviceCandidatesContractTests: XCTestCase {
       case .object(let firstRow)? = firstRows.first,
       case .object(let secondRow)? = secondRows.first
     else { return XCTFail("observation responses must carry snapshot rows") }
-    XCTAssertEqual(firstSnapshot["snapshotGeneration"], .integer(1))
-    XCTAssertEqual(secondSnapshot["snapshotGeneration"], .integer(2))
+    XCTAssertEqual(firstSnapshot["snapshotGeneration"], .string("1"))
+    XCTAssertEqual(secondSnapshot["snapshotGeneration"], .string("2"))
     XCTAssertEqual(firstSnapshot["health"], .string("current"))
     XCTAssertEqual(firstSnapshot["observedAtUtc"], .string("2026-08-07T00:00:00Z"))
-    XCTAssertEqual(firstSnapshot["observationContinuity"], .string("generationScoped"))
+    XCTAssertEqual(firstRow["observationContinuity"], .string("generationScoped"))
     guard case .string(let firstID)? = firstRow["observationId"] else {
       return XCTFail("the handler must publish a minted observation ID")
     }
@@ -161,18 +184,14 @@ final class DeviceCandidatesContractTests: XCTestCase {
     XCTAssertNotEqual(firstRow["observationId"], secondRow["observationId"])
     XCTAssertEqual(firstRow["candidateKey"], .string("candidate-route"))
     XCTAssertEqual(firstRow["adoptedTargetId"], .null)
-    XCTAssertEqual(firstRow["adoptedBindingRevision"], .null)
+    XCTAssertEqual(firstRow["bindingRevision"], .null)
     XCTAssertTrue(try targetStore.list().isEmpty, "snapshot reads must never adopt")
 
-    let legacy = await handler.handleFrame(frame("device.candidates"))
-    XCTAssertTrue(legacy.ok)
-    guard case .array(let legacyRows)? = legacy.result,
-      case .object(let legacyRow)? = legacyRows.first
-    else { return XCTFail("the 1.x method must retain its array") }
-    XCTAssertEqual(legacyRow["connectKey"], .string("candidate-route"))
-    XCTAssertEqual(legacyRow["state"], .string("Connected"))
-    XCTAssertNil(legacyRow["observationId"])
+    let retired = await handler.handleFrame(frame("device.candidates"))
+    XCTAssertFalse(retired.ok)
+    XCTAssertEqual(retired.error?.code, "unknownMethod")
     XCTAssertTrue(try targetStore.list().isEmpty)
+
   }
 
   func testObservationMethodRejectsCallerFactsAndMissingBootstrap() async throws {
@@ -181,18 +200,16 @@ final class DeviceCandidatesContractTests: XCTestCase {
       "{\"useWarmSnapshot\":false}", "{\"observationId\":\"caller-issued\"}",
       "{\"snapshotGeneration\":1}", "{\"candidateKey\":\"caller-route\"}",
     ] {
-      let response = await handler.handleFrame(
-        Data(
-          "{\"protocolVersion\":\"1.0.0\",\"id\":\"t\",\"method\":\"device.observations\",\"params\":\(params)}"
-            .utf8))
+      let fields = try JSONDecoder().decode([String: JSONValue].self, from: Data(params.utf8))
+      let response = await handler.handleFrame(frame("device.observations", params: fields))
       XCTAssertFalse(response.ok)
-      XCTAssertEqual(response.error?.code, "invalidParams")
+      XCTAssertEqual(response.error?.code, "invalidInput")
     }
     XCTAssertTrue(try targetStore.list().isEmpty)
     let (unconfigured, _) = try makeHandler(candidates: [], bootstrapConfigured: false)
     let response = await unconfigured.handleFrame(frame("device.observations"))
     XCTAssertFalse(response.ok)
-    XCTAssertEqual(response.error?.code, "internalError")
+    XCTAssertEqual(response.error?.code, "unknownMethod")
   }
 
   // An adopted device joins its durable record; an unauthorized one carries
@@ -204,26 +221,21 @@ final class DeviceCandidatesContractTests: XCTestCase {
       BootstrapCandidate(connectKey: "7f2c091a445e21", state: "Unauthorized"),
     ])
 
-    // Adopt the connected one through the real bootstrap path.
-    let adopt = await handler.handleFrame(
-      Data(
-        """
-        {"protocolVersion":"1.0.0","id":"a","method":"target.adopt",\
-        "params":{"candidate":"\(connected)"}}
-        """.utf8))
+    // Adopt only the exact Runtime observation with independent fixture USB proof.
+    let adopt = try await adopt(handler, candidate: connected)
     XCTAssertTrue(adopt.ok, String(describing: adopt.error))
     let adoptedID = try XCTUnwrap(try targetStore.list().first?.targetID)
 
-    let response = await handler.handleFrame(frame("device.candidates"))
-    guard case .array(let rows)? = response.result else {
-      return XCTFail("device.candidates must return an array")
+    let response = await handler.handleFrame(frame("device.observations"))
+    guard case .object(let snapshot)? = response.result, case .array(let rows)? = snapshot["observations"] else {
+      return XCTFail("device.observations must return snapshot rows")
     }
     XCTAssertEqual(rows.count, 2)
     var adoptedRow: [String: JSONValue]?
     var unauthorizedRow: [String: JSONValue]?
     for case .object(let row) in rows {
-      if row["connectKey"] == .string(connected) { adoptedRow = row }
-      if row["state"] == .string("Unauthorized") { unauthorizedRow = row }
+      if row["candidateKey"] == .string(connected) { adoptedRow = row }
+      if row["authorizationState"] == .string("Unauthorized") { unauthorizedRow = row }
     }
     XCTAssertEqual(try XCTUnwrap(adoptedRow)["adoptedTargetId"], .string(adoptedID))
     XCTAssertEqual(try XCTUnwrap(adoptedRow)["bindingRevision"], .integer(1))
@@ -247,12 +259,12 @@ final class DeviceCandidatesContractTests: XCTestCase {
           name: "must-not-be-read", systemVersion: nil, transport: "USB"),
       ])
 
-    let response = await handler.handleFrame(frame("device.candidates"))
-    guard case .array(let rows)? = response.result else {
-      return XCTFail("device.candidates must return an array")
+    let response = await handler.handleFrame(frame("device.observations"))
+    guard case .object(let snapshot)? = response.result, case .array(let rows)? = snapshot["observations"] else {
+      return XCTFail("device.observations must return snapshot rows")
     }
     let connectedRow = try XCTUnwrap(rows.compactMap { value -> [String: JSONValue]? in
-      guard case .object(let row) = value, row["connectKey"] == .string(connected) else {
+      guard case .object(let row) = value, row["candidateKey"] == .string(connected) else {
         return nil
       }
       return row
@@ -266,7 +278,7 @@ final class DeviceCandidatesContractTests: XCTestCase {
     XCTAssertEqual(connectedRow["adoptedTargetId"], .null)
 
     let unauthorizedRow = try XCTUnwrap(rows.compactMap { value -> [String: JSONValue]? in
-      guard case .object(let row) = value, row["connectKey"] == .string(unauthorized) else {
+      guard case .object(let row) = value, row["candidateKey"] == .string(unauthorized) else {
         return nil
       }
       return row
@@ -311,16 +323,17 @@ final class DeviceCandidatesContractTests: XCTestCase {
         ],
         coveredUnknownIntents: [], establishedAtUTC: "2026-08-07T00:10:00Z"))
 
-    let candidates = await handler.handleFrame(frame("device.candidates"))
-    guard case .array(let rows)? = candidates.result else {
-      return XCTFail("device.candidates must return an array")
-    }
-    XCTAssertEqual(rows.count, 1, "two transport faces must not duplicate the same target")
-    guard case .object(let row) = rows[0] else { return XCTFail("row must be an object") }
-    XCTAssertEqual(row["connectKey"], .string(aliasKey))
-    XCTAssertEqual(row["state"], .string("Connected"))
-    XCTAssertEqual(row["adoptedTargetId"], .string(canonical.targetID))
-    XCTAssertEqual(row["bindingRevision"], .integer(Int64(canonical.bindingRevision)))
+    let response = await handler.handleFrame(frame("device.observations"))
+    XCTAssertTrue(response.ok)
+    let data = try CanonicalJSONEncoders.canonical().encode(response)
+    let presentation = DeviceCandidatesResponseDecoding.presentation(data)
+    XCTAssertEqual(presentation.availability, .available)
+    XCTAssertEqual(presentation.candidates.count, 1, "the App collapses transport faces for one target")
+    let row = try XCTUnwrap(presentation.candidates.first)
+    XCTAssertEqual(row.connectKey, aliasKey)
+    XCTAssertEqual(row.state, "Connected")
+    XCTAssertEqual(row.adoptedTargetID, canonical.targetID)
+    XCTAssertEqual(row.bindingRevision, canonical.bindingRevision)
 
     let targetList = await handler.handleFrame(frame("target.list"))
     guard case .array(let targets)? = targetList.result else {
@@ -333,14 +346,15 @@ final class DeviceCandidatesContractTests: XCTestCase {
     guard case .object(let report)? = doctor.result else {
       return XCTFail("doctor must return a report")
     }
+    guard case .object(let checks)? = report["checks"], case .object(let targetCheck)? = checks["target"] else { return XCTFail("doctor target check missing") }
     XCTAssertEqual(
-      report["adoptedTargetCount"], .integer(1),
+      targetCheck["adoptedTargetCount"], .integer(1),
       "doctor must count selectable targets rather than retained alias history")
   }
 
   func testMissingBootstrapFailsLoudInsteadOfReturningAnEmptyList() async throws {
     let (handler, _) = try makeHandler(candidates: [], bootstrapConfigured: false)
-    let response = await handler.handleFrame(frame("device.candidates"))
+    let response = await handler.handleFrame(frame("device.observations"))
     XCTAssertFalse(response.ok, "an unconfigured bootstrap must be an error, not an empty list")
   }
 
@@ -353,7 +367,7 @@ final class DeviceCandidatesContractTests: XCTestCase {
     }
 
     let missingKey = DeviceCandidatesResponseDecoding.presentation(
-      Data(#"{"id":"t","ok":true,"result":[{"state":"Connected"}]}"#.utf8))
+      Data(#"{"id":"t","ok":true,"result":{"schemaVersion":"arkdeck.device-observations/1","snapshotGeneration":"1","observedAtUtc":"2026-08-24T00:00:00Z","health":"current","observations":[{"authorizationState":"Connected","observationId":"obs-fixture-0","observationContinuity":"relationProven","displayName":null,"displayNameGeneration":"0"}]}}"#.utf8))
     guard case .unavailable = missingKey.availability else {
       return XCTFail("a candidate without a connect key must be unavailable, not dropped")
     }
@@ -366,20 +380,13 @@ final class DeviceCandidatesContractTests: XCTestCase {
     XCTAssertEqual(reason, "boom")
 
     let empty = DeviceCandidatesResponseDecoding.presentation(
-      Data(#"{"id":"t","ok":true,"result":[]}"#.utf8))
+      Data(#"{"id":"t","ok":true,"result":{"schemaVersion":"arkdeck.device-observations/1","snapshotGeneration":"1","observedAtUtc":"2026-08-24T00:00:00Z","health":"current","observations":[]}}"#.utf8))
     XCTAssertEqual(empty.availability, .available)
     XCTAssertTrue(empty.candidates.isEmpty, "a genuinely empty list stays an empty list")
 
     let full = DeviceCandidatesResponseDecoding.presentation(
       Data(
-        #"""
-        {"id":"t","ok":true,"result":[
-          {"connectKey":"abc","state":"Connected","adoptedTargetId":"t-1","bindingRevision":3,
-           "deviceInformation":{"name":"Phone","systemVersion":"OpenHarmony-7.0.0.39",
-           "transport":"USB","observedAtUtc":"2026-08-24T00:00:00Z"}},
-          {"connectKey":"def","state":"Unauthorized","adoptedTargetId":null,"bindingRevision":null}
-        ]}
-        """#.utf8))
+        #"{"id":"t","ok":true,"result":{"schemaVersion":"arkdeck.device-observations/1","snapshotGeneration":"1","observedAtUtc":"2026-08-24T00:00:00Z","health":"current","observations":[{"adoptedTargetId":"t-1","bindingRevision":3,"deviceInformation":{"name":"Phone","systemVersion":"OpenHarmony-7.0.0.39","transport":"USB","observedAtUtc":"2026-08-24T00:00:00Z"},"candidateKey":"abc","authorizationState":"Connected","observationId":"obs-fixture-0","observationContinuity":"relationProven","displayName":null,"displayNameGeneration":"0"},{"adoptedTargetId":null,"bindingRevision":null,"candidateKey":"def","authorizationState":"Unauthorized","observationId":"obs-fixture-1","observationContinuity":"relationProven","displayName":null,"displayNameGeneration":"0"}]}}"#.utf8))
     XCTAssertEqual(full.availability, .available)
     XCTAssertEqual(full.candidates.count, 2)
     XCTAssertEqual(full.candidates[0].adoptedTargetID, "t-1")
@@ -398,16 +405,7 @@ final class DeviceCandidatesContractTests: XCTestCase {
   // the wrong physical device.
   func testObservedFactsProjectionRequiresMatchingTarget() throws {
     let response = Data(
-      #"""
-      {"id":"t","ok":true,"result":[
-        {"connectKey":"abc","state":"Connected","adoptedTargetId":"t-1",
-         "bindingRevision":3,"observedFacts":{"targetId":"t-1","model":"DAYU200",
-         "firmware":"OpenHarmony 5.0.0.71","transport":"USB",
-         "confirmedAtUtc":"2026-08-06T00:00:00Z"}},
-        {"connectKey":"def","state":"Connected","adoptedTargetId":"t-2",
-         "bindingRevision":1,"observedFacts":{"targetId":"t-1","model":"WRONG"}}
-      ]}
-      """#.utf8)
+      #"{"id":"t","ok":true,"result":{"schemaVersion":"arkdeck.device-observations/1","snapshotGeneration":"1","observedAtUtc":"2026-08-24T00:00:00Z","health":"current","observations":[{"adoptedTargetId":"t-1","bindingRevision":3,"observedFacts":{"targetId":"t-1","model":"DAYU200","firmware":"OpenHarmony 5.0.0.71","transport":"USB","confirmedAtUtc":"2026-08-06T00:00:00Z"},"candidateKey":"abc","authorizationState":"Connected","observationId":"obs-fixture-0","observationContinuity":"relationProven","displayName":null,"displayNameGeneration":"0"},{"adoptedTargetId":"t-2","bindingRevision":1,"observedFacts":{"targetId":"t-1","model":"WRONG"},"candidateKey":"def","authorizationState":"Connected","observationId":"obs-fixture-1","observationContinuity":"relationProven","displayName":null,"displayNameGeneration":"0"}]}}"#.utf8)
     let presentation = DeviceCandidatesResponseDecoding.presentation(response)
     let facts = try XCTUnwrap(presentation.candidates[0].observedFacts)
     XCTAssertEqual(facts.model, "DAYU200")
@@ -420,7 +418,7 @@ final class DeviceCandidatesContractTests: XCTestCase {
 
   func testStaleCandidateObservationCannotBePresentedAsAuthorized() throws {
     let response = Data(
-      #"{"id":"t","ok":true,"result":[{"connectKey":"abc","state":"Connected","stateObservedAtUtc":"2026-08-13T00:00:00Z","stateObservationHealth":"stale","adoptedTargetId":"t-1","bindingRevision":1}]}"#
+      #"{"id":"t","ok":true,"result":{"schemaVersion":"arkdeck.device-observations/1","snapshotGeneration":"1","observedAtUtc":"2026-08-13T00:00:00Z","health":"stale","observations":[{"adoptedTargetId":"t-1","bindingRevision":1,"candidateKey":"abc","authorizationState":"Connected","observationId":"obs-fixture-0","observationContinuity":"relationProven","displayName":null,"displayNameGeneration":"0"}]}}"#
         .utf8)
     let presentation = DeviceCandidatesResponseDecoding.presentation(response)
     let candidate = try XCTUnwrap(presentation.candidates.first)
@@ -479,7 +477,7 @@ final class DeviceCandidatesContractTests: XCTestCase {
     XCTAssertTrue(protocolBody.contains("func startupCandidates()"))
     XCTAssertTrue(protocolBody.contains("func refreshCandidates()"))
     XCTAssertTrue(protocolBody.contains("func waitForAuthorization(connectKey: String)"))
-    XCTAssertTrue(source.contains("method: \"device.candidates\""))
+    XCTAssertTrue(source.contains("method: \"device.observations\""))
     XCTAssertFalse(source.contains("method: \"job.list\""))
     XCTAssertFalse(source.contains("method: \"job.evidence\""))
     for forbidden in [
@@ -519,7 +517,7 @@ final class DeviceCandidatesContractTests: XCTestCase {
     ] {
       XCTAssertFalse(
         startup.contains(nonCritical),
-        "device.candidates must own the cold-start I/O lane: \(nonCritical)")
+        "device.observations must own the cold-start I/O lane: \(nonCritical)")
     }
 
     let secondaryStart = try XCTUnwrap(
@@ -716,13 +714,11 @@ final class DeviceCandidatesContractTests: XCTestCase {
       contentsOf: repository.appending(
         path: "Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/AgentDaemon.swift"),
       encoding: .utf8)
-    let candidates = try XCTUnwrap(daemon.range(of: "case \"device.candidates\":"))
-    let adoption = try XCTUnwrap(
-      daemon.range(of: "case \"target.adopt\":", range: candidates.lowerBound..<daemon.endIndex))
-    let projection = String(daemon[candidates.lowerBound..<adoption.lowerBound])
-
-    XCTAssertTrue(projection.contains("async let candidateRead"))
+    let start = try XCTUnwrap(daemon.range(of: "private func targetObservationRequest("))
+    let end = try XCTUnwrap(daemon.range(of: "private static func targetObservationReference", range: start.lowerBound..<daemon.endIndex))
+    let projection = String(daemon[start.lowerBound..<end.lowerBound])
     XCTAssertTrue(projection.contains("async let observationRead"))
+    XCTAssertTrue(projection.contains("async let informationRead"))
     XCTAssertTrue(projection.contains("latestSucceededDeviceObservations()"))
     XCTAssertTrue(projection.contains("deviceInformationSnapshotForPresentation"))
     XCTAssertTrue(projection.contains("\"deviceInformation\""))
