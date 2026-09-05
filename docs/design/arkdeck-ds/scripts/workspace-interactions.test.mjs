@@ -1361,6 +1361,13 @@ test('Settings panes expose the shared loading, error and success rows', () => {
         const pane = h.run('pSettings()');
         assert.ok(pane.includes(`data-sync-id="${id}"`), `${tab}/${state} row`);
         assert.ok(pane.includes(value(key, language)), `${tab}/${state} wording`);
+        // The error row carries its Refresh action; the App renders the same
+        // button under the same notice, so a pane never rests on a failure.
+        if (state === 'error') {
+          assert.ok(
+            pane.includes(value('settings.common.refresh', language)),
+            `${tab}/error refresh action`);
+        }
       }
     }
     // Toolchain switching says something different while Jobs are running.

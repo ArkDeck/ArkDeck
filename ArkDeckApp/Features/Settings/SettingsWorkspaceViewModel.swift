@@ -111,20 +111,27 @@ final class SettingsWorkspaceViewModel {
     }
   }
 
+  /// Runs when the Settings scene appears and again from the Refresh action
+  /// the unavailable row offers, so a Runtime that could not be reached the
+  /// first time is not a Runtime that cannot be reached until the window is
+  /// reopened. The failure being retried is cleared for the attempt, and the
+  /// in-flight flag is released on every path, or the entry point would seal
+  /// itself shut.
   func refresh() {
     guard !isRefreshing else { return }
     isRefreshing = true
+    storageError = nil
     let provider = provider
     Task { [weak self] in
       do {
         let presentation = try await provider.refresh()
+        self?.isRefreshing = false
         guard !Task.isCancelled else { return }
         self?.presentation = presentation
-        self?.storageError = nil
       } catch {
         self?.storageError = settingsText("settings.error.refresh")
+        self?.isRefreshing = false
       }
-      self?.isRefreshing = false
     }
   }
 
