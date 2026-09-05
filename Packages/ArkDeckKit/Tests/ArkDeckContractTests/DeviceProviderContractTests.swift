@@ -454,13 +454,20 @@ final class DeviceProviderContractTests: XCTestCase {
       if ["flash-partitions", "verify-flash-readback"].contains(step.stepID) {
         XCTAssertFalse(
           runtimeDescriptor.identifier.contains(".v1"), runtimeDescriptor.identifier)
-      } else if ["wait-for-hdc", "rebind-and-verify-build"].contains(step.stepID) {
-        XCTAssertTrue(
-          runtimeDescriptor.identifier.hasSuffix(".v2"), runtimeDescriptor.identifier)
       } else {
+        // One current label for every Rockchip host-managed action. The bound
+        // reconnect and build verification are no longer spelled `.v2`; their
+        // names, not a second label, distinguish them from the retired
+        // unbound verification.
         XCTAssertTrue(
           runtimeDescriptor.identifier.hasSuffix(".v1")
             || runtimeDescriptor.identifier.contains(".v1:"), runtimeDescriptor.identifier)
+        XCTAssertFalse(runtimeDescriptor.identifier.contains(".v2"), runtimeDescriptor.identifier)
+      }
+      if step.stepID == "wait-for-hdc" {
+        XCTAssertEqual(runtimeDescriptor.identifier, "rockchip.hdc.wait-bound-reconnect.v1")
+      } else if step.stepID == "rebind-and-verify-build" {
+        XCTAssertEqual(runtimeDescriptor.identifier, "rockchip.hdc.verify-bound-build.v1")
       }
       XCTAssertEqual(runtimeDescriptor.jobID, stepContext.jobID)
       XCTAssertEqual(runtimeDescriptor.stepID, step.stepID)

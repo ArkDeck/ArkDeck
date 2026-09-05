@@ -184,7 +184,7 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
           evidenceID: "EVD-AHE-RUNNER-001",
           acceptanceIDs: ["AC-WF-004-01"]))
     else {
-      return XCTFail("complete daemon-owned receipt must project to V5")
+      return XCTFail("complete daemon-owned receipt must project to the current evidence record")
     }
     XCTAssertEqual(evidence.runtime.jobId, receipt.jobID)
     XCTAssertEqual(evidence.device.bindingRevision, receipt.bindingRevision)

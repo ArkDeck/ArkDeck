@@ -14,6 +14,13 @@ import Foundation
 /// heads and no type. A descriptor that can only be produced here cannot
 /// disagree with the validator, and a new action that forgets to register
 /// fails to compile rather than failing on a bench.
+///
+/// Every identifier carries the single current `.v1` label. The bound
+/// reconnect and build verification used to be spelled `.v2` to distinguish
+/// them from the retired unbound verification; that distinction lives in the
+/// action names themselves (`wait-bound-reconnect`, `verify-bound-build`), and
+/// the retired `rockchip.verifyBuild` kind is refused by name before it could
+/// ever reach this table. There is no second label to negotiate.
 package enum RockchipHostManagedActionCatalog {
 
   /// The closed descriptor identifier for one action.
@@ -34,9 +41,9 @@ package enum RockchipHostManagedActionCatalog {
     case .waitForHDCReconnect:
       return "rockchip.hdc.wait-reconnect.v1"
     case .waitForBoundHDCReconnect:
-      return "rockchip.hdc.wait-bound-reconnect.v2"
+      return "rockchip.hdc.wait-bound-reconnect.v1"
     case .verifyBoundBuild:
-      return "rockchip.hdc.verify-bound-build.v2"
+      return "rockchip.hdc.verify-bound-build.v1"
     case .capturePostFlashDiagnostics:
       return "rockchip.hdc.capture-post-flash-hilog.v1"
     }

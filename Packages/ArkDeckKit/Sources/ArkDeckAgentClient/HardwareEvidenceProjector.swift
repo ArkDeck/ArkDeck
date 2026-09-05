@@ -12,9 +12,12 @@ package enum RuntimeHardwareEvidenceEffectLevel: String, Codable, Sendable {
 package enum RuntimeHardwareEvidenceAuthorityKind: String, Codable, Sendable {
   case defaultReadOnlyPolicy
   case runtimeCapability
+  /// Retired authority labels. The current Runtime never issues or emits
+  /// them; they remain in the vocabulary only so the projector and the
+  /// headless verifier refuse them by name instead of through an opaque
+  /// decode failure. Neither can mint a Runtime capability, reach a device
+  /// dispatcher, or become valid current evidence.
   case standingAuthorization
-  /// Historical campaign evidence. This is decode/export provenance only and
-  /// can never mint a Runtime capability or reach a device dispatcher.
   case evolutionCampaignConfirmation
 }
 
@@ -28,17 +31,10 @@ package struct RuntimeHardwareEvidenceAuthority: Codable, Sendable, Equatable {
   public let useOrdinal: Int?
   public let stepSetDigest: String?
   package let artifactDigest: String?
-  /// All campaign fields are daemon-owned durable correlation facts. They are
-  /// optional only so older read-only snapshots remain decodable; a campaign
-  /// record with any one missing is never published as hardware evidence.
-  public let campaignID: String?
-  public let attemptID: String?
-  public let attemptOrdinal: Int?
+  /// Runtime capability correlation returned by the daemon with the consumed
+  /// authority. Destructive evidence requires every one of them.
   public let planDigest: String?
   package let targetBindingDigest: String?
-  package let candidateDigest: String?
-  package let reviewDigest: String?
-  package let brokerDigest: String?
   /// Complete-overwrite lineage returned by the daemon with the consumed
   /// authority. Keeping it in an existing receipt field preserves the
   /// one-shot Agent runner's stable wire/storage shape.
@@ -54,14 +50,8 @@ package struct RuntimeHardwareEvidenceAuthority: Codable, Sendable, Equatable {
     useOrdinal: Int? = nil,
     stepSetDigest: String? = nil,
     artifactDigest: String? = nil,
-    campaignID: String? = nil,
-    attemptID: String? = nil,
-    attemptOrdinal: Int? = nil,
     planDigest: String? = nil,
     targetBindingDigest: String? = nil,
-    candidateDigest: String? = nil,
-    reviewDigest: String? = nil,
-    brokerDigest: String? = nil,
     recoveryEpoch: RuntimeHardwareEvidenceRecoveryEpoch? = nil
   ) {
     self.kind = kind
@@ -73,14 +63,8 @@ package struct RuntimeHardwareEvidenceAuthority: Codable, Sendable, Equatable {
     self.useOrdinal = useOrdinal
     self.stepSetDigest = stepSetDigest
     self.artifactDigest = artifactDigest
-    self.campaignID = campaignID
-    self.attemptID = attemptID
-    self.attemptOrdinal = attemptOrdinal
     self.planDigest = planDigest
     self.targetBindingDigest = targetBindingDigest
-    self.candidateDigest = candidateDigest
-    self.reviewDigest = reviewDigest
-    self.brokerDigest = brokerDigest
     self.recoveryEpoch = recoveryEpoch
   }
 
@@ -94,14 +78,8 @@ package struct RuntimeHardwareEvidenceAuthority: Codable, Sendable, Equatable {
     case useOrdinal
     case stepSetDigest
     case artifactDigest
-    case campaignID = "campaignId"
-    case attemptID = "attemptId"
-    case attemptOrdinal
     case planDigest
     case targetBindingDigest
-    case candidateDigest
-    case reviewDigest
-    case brokerDigest
     case recoveryEpoch
   }
 }
@@ -324,11 +302,21 @@ package struct HardwareEvidenceIncomplete: Sendable, Equatable {
 }
 
 package enum HardwareEvidenceProjectionResult: Sendable, Equatable {
-  case published(HardwareEvidenceV6Record)
+  case published(HardwareEvidenceRecord)
   case evidenceIncomplete(HardwareEvidenceIncomplete)
 }
 
-package struct HardwareEvidenceV6Record: Codable, Sendable, Equatable {
+/// The one current real-hardware evidence record, the Swift twin of
+/// `openspec/contracts/hardware-evidence.schema.json`. It carries every
+/// safety correlation the Runtime can prove: executor and admission authority,
+/// fresh target confirmation, reservation and use ordinal, actual typed step
+/// kinds, plan/step-set/target/Artifact digests, and the complete-overwrite
+/// recovery lineage with its uncertain effects, coverage, supersession,
+/// postflight and terminal disposition. The label is fixed; there is no other
+/// layout to select, migrate from, or fall back to.
+package struct HardwareEvidenceRecord: Codable, Sendable, Equatable {
+  package static let schemaVersion = "1.0.0"
+
   public let schemaVersion: String
   package let evidenceId: String
   public let executor: Executor
@@ -575,7 +563,7 @@ package enum HardwareEvidenceProjector {
       if authority.kind == .standingAuthorization
         || authority.kind == .evolutionCampaignConfirmation
       {
-        reasons.append("legacy authority kind cannot be emitted as V6 evidence")
+        reasons.append("retired authority kind cannot be emitted as hardware evidence")
       }
       if effect == .destructive, authority.kind == .runtimeCapability {
         guard
@@ -663,7 +651,7 @@ package enum HardwareEvidenceProjector {
       }
     }
 
-    let projectedRecovery: HardwareEvidenceV6Record.Recovery?
+    let projectedRecovery: HardwareEvidenceRecord.Recovery?
     if let recovery = receipt.recoveryEpoch {
       let requiredSteps: Set<String> = [
         "flash-partitions", "verify-flash-readback", "reboot-device", "wait-for-hdc",
@@ -732,7 +720,7 @@ package enum HardwareEvidenceProjector {
       if establishedAt == nil || establishedAt! > finishDate {
         reasons.append("recovery epoch time is malformed or follows evidence execution")
       }
-      let recoveryCapability: HardwareEvidenceV6Record.Recovery.RecoveryCapability?
+      let recoveryCapability: HardwareEvidenceRecord.Recovery.RecoveryCapability?
       if recovery.source == "distinctRecoveryExecution" {
         if recovery.recoveryJobID == jobID,
           receipt.terminalState == "recovered",
@@ -742,7 +730,7 @@ package enum HardwareEvidenceProjector {
           let useOrdinal = authority?.useOrdinal,
           useOrdinal >= 1
         {
-          recoveryCapability = HardwareEvidenceV6Record.Recovery.RecoveryCapability(
+          recoveryCapability = HardwareEvidenceRecord.Recovery.RecoveryCapability(
             reference: capabilityReference,
             reservationId: reservationID,
             useOrdinal: useOrdinal)
@@ -753,12 +741,12 @@ package enum HardwareEvidenceProjector {
       } else {
         recoveryCapability = nil
       }
-      projectedRecovery = HardwareEvidenceV6Record.Recovery(
+      projectedRecovery = HardwareEvidenceRecord.Recovery(
         disposition: "supersedingRecoveryEpoch",
         epochId: recovery.epochID,
         source: recovery.source,
         coveredIntents: recovery.coveredIntents.map {
-          HardwareEvidenceV6Record.Recovery.CoveredIntent(
+          HardwareEvidenceRecord.Recovery.CoveredIntent(
             jobId: $0.jobID, intentEventId: $0.intentEventID,
             operationReference: $0.operationReference,
             profileReference: $0.profileReference,
@@ -774,14 +762,14 @@ package enum HardwareEvidenceProjector {
         planDigest: recovery.materializedPlanDigestSHA256,
         artifactDigest: recovery.artifactSHA256,
         providerExecutableDigest: recovery.providerExecutableSHA256,
-        target: HardwareEvidenceV6Record.Recovery.RecoveryTarget(
+        target: HardwareEvidenceRecord.Recovery.RecoveryTarget(
           stableIdentitySHA256: recovery.stableTargetIdentitySHA256,
           bindingRevision: recovery.bindingRevision,
           confirmationMethod: observation.confirmationMethod,
           confirmedAt: confirmed),
         capability: recoveryCapability,
         confirmedStepIds: recovery.confirmedStepIDs,
-        postflight: HardwareEvidenceV6Record.Recovery.RecoveryPostflight(
+        postflight: HardwareEvidenceRecord.Recovery.RecoveryPostflight(
           flashReadbackConfirmed: true,
           rebootConfirmed: true,
           rebindConfirmed: true,
@@ -797,14 +785,14 @@ package enum HardwareEvidenceProjector {
     }
 
     guard reasons.isEmpty, let terminal else { return incomplete(reasons) }
-    let record = HardwareEvidenceV6Record(
-      schemaVersion: "6.0.0",
+    let record = HardwareEvidenceRecord(
+      schemaVersion: HardwareEvidenceRecord.schemaVersion,
       evidenceId: claims.evidenceID,
-      executor: HardwareEvidenceV6Record.Executor(
+      executor: HardwareEvidenceRecord.Executor(
         kind: receipt.executor,
         id: receipt.executorID,
         authority: authority.map {
-          HardwareEvidenceV6Record.Authority(
+          HardwareEvidenceRecord.Authority(
             kind: $0.kind,
             reference: $0.reference,
             reservationId: $0.reservationID,
@@ -814,24 +802,24 @@ package enum HardwareEvidenceProjector {
             targetBindingDigest: $0.targetBindingDigest,
             artifactDigest: $0.artifactDigest)
         }),
-      runtime: HardwareEvidenceV6Record.Runtime(
+      runtime: HardwareEvidenceRecord.Runtime(
         operationReference: receipt.operationReference,
         jobId: jobID,
         catalogDigest: receipt.catalogDigest,
         terminalState: terminal,
         startedAt: started,
         finishedAt: finished),
-      targetConfirmation: HardwareEvidenceV6Record.TargetConfirmation(
+      targetConfirmation: HardwareEvidenceRecord.TargetConfirmation(
         confirmedDeviceIdentitySHA256: identity,
         bindingRevision: bindingRevision,
         confirmedAt: confirmed,
         method: observation.confirmationMethod),
-      device: HardwareEvidenceV6Record.Device(
+      device: HardwareEvidenceRecord.Device(
         model: model,
         serialSHA256: identity,
         firmware: firmware,
         bindingRevision: bindingRevision),
-      toolchain: HardwareEvidenceV6Record.Toolchain(
+      toolchain: HardwareEvidenceRecord.Toolchain(
         hdcVersion: observation.toolVersion,
         hdcSHA256: observation.toolSHA256),
       transport: transport,
@@ -842,7 +830,7 @@ package enum HardwareEvidenceProjector {
       executedAt: finished,
       validUntil: claims.validUntilUTC,
       artifacts: receipt.artifacts.map {
-        HardwareEvidenceV6Record.Artifact(
+        HardwareEvidenceRecord.Artifact(
           reference: $0.reference, sha256: $0.sha256, note: nil)
       },
       recovery: projectedRecovery,
@@ -939,23 +927,45 @@ package enum HardwareEvidenceProjector {
   }
 }
 
-/// Read-only compatibility discriminator. Historical V1-V5 bytes are returned
-/// untouched; the V6 writer never attempts to migrate or re-encode them.
-package enum HardwareEvidenceDocumentReader {
-  package enum Version: String, Sendable, Equatable {
-    case legacyV1 = "1.0.0"
-    case legacyV2 = "2.0.0"
-    case legacyV3 = "3.0.0"
-    case legacyV4 = "4.0.0"
-    case legacyV5 = "5.0.0"
-    case currentV6 = "6.0.0"
-  }
+/// Refusals of the current evidence reader. Refused bytes are never rewritten,
+/// relabelled or migrated.
+package enum HardwareEvidenceRecordError: Error, Equatable, Sendable {
+  case malformed(String)
+  case unsupportedSchemaVersion(String)
+}
 
-  public static func version(of data: Data) -> Version? {
-    guard let value = try? JSONDecoder().decode(JSONValue.self, from: data),
-      case .object(let fields) = value,
-      case .string(let version)? = fields["schemaVersion"]
-    else { return nil }
-    return Version(rawValue: version)
+extension HardwareEvidenceRecord {
+  /// Reads exactly the record this writer produces. The label alone is not
+  /// proof of compatibility: a document carrying another version, duplicate
+  /// members, or any field shape other than the current complete one is
+  /// refused, including documents that spell `1.0.0` over a different
+  /// historical layout. Nothing here migrates, relabels or re-encodes bytes.
+  package static func decode(_ data: Data) throws -> HardwareEvidenceRecord {
+    var duplicates = StrictJSONDuplicateValidator(data: data)
+    do {
+      try duplicates.validate()
+    } catch {
+      throw HardwareEvidenceRecordError.malformed("evidence document has duplicate or malformed members")
+    }
+    let decoder = JSONDecoder()
+    guard let supplied = try? decoder.decode(JSONValue.self, from: data),
+      case .object(let fields) = supplied
+    else {
+      throw HardwareEvidenceRecordError.malformed("evidence document is not a JSON object")
+    }
+    guard case .string(let version)? = fields["schemaVersion"] else {
+      throw HardwareEvidenceRecordError.malformed("evidence document has no schemaVersion")
+    }
+    guard version == schemaVersion else {
+      throw HardwareEvidenceRecordError.unsupportedSchemaVersion(version)
+    }
+    guard let record = try? decoder.decode(HardwareEvidenceRecord.self, from: data),
+      let current = try? decoder.decode(JSONValue.self, from: JSONEncoder().encode(record)),
+      current == supplied
+    else {
+      throw HardwareEvidenceRecordError.malformed(
+        "evidence document does not have the current complete field shape")
+    }
+    return record
   }
 }

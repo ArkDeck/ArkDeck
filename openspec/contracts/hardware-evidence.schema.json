@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "arkdeck://contracts/hardware-evidence/6.0.0",
-  "title": "ArkDeck real-hardware evidence record (V6, CHG-2026-056 r7)",
-  "description": "Records real-hardware evidence and truthful complete-overwrite recovery lineage. Schema validity records provenance but never grants or widens RuntimeCapability or recovery coverage.",
+  "$id": "arkdeck://contracts/hardware-evidence/1.0.0",
+  "title": "ArkDeck real-hardware evidence record (current v1)",
+  "description": "Records real-hardware evidence and truthful complete-overwrite recovery lineage in the one current layout. The label is not a compatibility promise: a document must match this complete closed shape, and historical records with other labels or layouts stay as they are. Schema validity records provenance but never grants or widens RuntimeCapability or recovery coverage.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -21,7 +21,7 @@
     "artifacts"
   ],
   "properties": {
-    "schemaVersion": { "const": "6.0.0" },
+    "schemaVersion": { "const": "1.0.0" },
     "evidenceId": { "type": "string", "pattern": "^EVD-[A-Z0-9._-]+$" },
     "executor": {
       "type": "object",

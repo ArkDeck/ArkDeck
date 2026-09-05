@@ -199,8 +199,12 @@ public struct RuntimeDebugInvocationStatus: Codable, Equatable, Sendable {
 /// Durable per-attempt provenance consumed by RuntimeJobEngine while it
 /// materializes and executes the exact generated request. The file is not an
 /// authority: it cannot mint a capability or bypass normal admission.
+///
+/// One current layout, labelled `1.0.0`. The reader accepts only this exact
+/// field shape: a record with another label, or a `1.0.0` label over the
+/// retired tuning-record layout, is refused rather than decoded permissively.
 struct RuntimeDebugAttemptPermitRecord: Codable, Equatable, Sendable {
-  static let schemaVersion = "2.0.0"
+  static let schemaVersion = "1.0.0"
   let schemaVersion: String
   let invocationID: String
   let idempotencyKey: String
@@ -232,8 +236,14 @@ enum RuntimeDebugAttemptPermitStore {
   ) throws -> RuntimeDebugAttemptPermitRecord? {
     let location = url(stateDirectory: stateDirectory, idempotencyKey: request.idempotencyKey)
     guard FileManager.default.fileExists(atPath: location.path) else { return nil }
-    let record = try JSONDecoder().decode(
-      RuntimeDebugAttemptPermitRecord.self, from: Data(contentsOf: location))
+    let record: RuntimeDebugAttemptPermitRecord
+    do {
+      record = try CurrentDurableJSON.decode(
+        RuntimeDebugAttemptPermitRecord.self, from: Data(contentsOf: location))
+    } catch {
+      throw RuntimeDebugInvocationError.persistenceFailure(
+        "Runtime debug attempt provenance is not the current permit record")
+    }
     guard request.clientContext == nil else {
       throw RuntimeDebugInvocationError.persistenceFailure(
         "Runtime debug attempt cannot gain campaign or client provenance")
@@ -261,8 +271,14 @@ enum RuntimeDebugAttemptPermitStore {
         stateDirectory
         .appending(path: "runtime-debug-invocations", directoryHint: .isDirectory)
         .appending(path: "\(record.invocationID).json")
-      let invocation = try JSONDecoder().decode(
-        RuntimeDebugInvocationDocument.self, from: Data(contentsOf: invocationURL))
+      let invocation: RuntimeDebugInvocationDocument
+      do {
+        invocation = try CurrentDurableJSON.decode(
+          RuntimeDebugInvocationDocument.self, from: Data(contentsOf: invocationURL))
+      } catch {
+        throw RuntimeDebugInvocationError.persistenceFailure(
+          "Runtime debug attempt names an invocation that is not the current document")
+      }
       guard invocation.schemaVersion == RuntimeDebugInvocationDocument.schemaVersion,
         invocation.invocationID == record.invocationID,
         invocation.state == "active",
@@ -301,8 +317,11 @@ enum RuntimeDebugAttemptPermitStore {
   }
 }
 
+/// The Runtime-owned decision document of one protected Flash debug
+/// invocation. One current layout, labelled `1.0.0`; readers accept only the
+/// exact current field shape.
 private struct RuntimeDebugInvocationDocument: Codable, Equatable, Sendable {
-  static let schemaVersion = "2.0.0"
+  static let schemaVersion = "1.0.0"
   let schemaVersion: String
   let invocationID: String
   var state: String
@@ -669,7 +688,7 @@ public actor RuntimeDebugInvocationController {
       throw RuntimeDebugInvocationError.invocationNotFound(invocationID)
     }
     do {
-      let document = try JSONDecoder().decode(
+      let document = try CurrentDurableJSON.decode(
         RuntimeDebugInvocationDocument.self, from: try readInvocation(invocationID))
       guard document.schemaVersion == RuntimeDebugInvocationDocument.schemaVersion,
         document.invocationID == invocationID,

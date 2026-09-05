@@ -20,9 +20,13 @@ UTF-8 bytes.
 
 The Runtime scans only its private `runtime-debug-invocations` owner. Every
 record must be a private, same-user, single-link regular file with a bounded
-size and a matching invocation identity. An unknown directory entry, unsafe
-file, corrupt record, oversized inventory, foreign cursor, or reclaimed
-snapshot fails closed. No caller path or archive path enters the request.
+size and a matching invocation identity. Each record is the current `1.0.0`
+invocation document with exactly its published field shape; a record carrying
+another label, or the same label over a different layout, is unreadable and
+is never migrated or relabelled. An unknown directory entry, unsafe file,
+corrupt or unreadable record, oversized inventory, foreign cursor, or
+reclaimed snapshot fails closed. No caller path or archive path enters the
+request.
 
 The first request stores an immutable private snapshot ordered by
 `createdAtUtc` descending and `invocationId` ascending. Later pages retain that

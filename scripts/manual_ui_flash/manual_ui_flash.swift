@@ -135,7 +135,9 @@ private struct CandidateUIAction: Codable, Equatable {
 /// typed plan and performs the single Runtime submit.
 private struct ManualUIFlashCandidateProgram: Codable, Equatable {
   static let documentType = "manual-ui-flash-candidate-program"
-  static let schemaVersion = "2.0.0"
+  /// One current program layout; any other label is outside the invariant
+  /// bounds and refused before a single UI action is interpreted.
+  static let schemaVersion = "1.0.0"
 
   let documentType: String
   let schemaVersion: String
@@ -944,7 +946,9 @@ private struct ManualUIDebugAttempt: Codable {
 
 private struct ManualUIDebugSessionDocument: Codable {
   static let documentType = "manual-ui-flash-debug-session"
-  static let schemaVersion = "3.0.0"
+  /// One current session layout; a stored session with any other label cannot
+  /// be resumed and is reported as an unsupported development record.
+  static let schemaVersion = "1.0.0"
 
   let documentType: String
   let schemaVersion: String
