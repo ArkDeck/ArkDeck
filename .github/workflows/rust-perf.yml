@@ -24,11 +24,28 @@ on:
     - cron: "0 17 * * *"
     # 03:00 UTC Sunday for the long soak.
     - cron: "0 3 * * 0"
-  pull_request:
+  push:
+    # Push-triggered like swift-ci.yml, not pull_request-triggered. The Agent PR
+    # workflow opens pull requests with GITHUB_TOKEN, and a pull_request run on
+    # such a PR sits in action_required until a maintainer approves it by hand
+    # (#1716: the opening run waited 55 minutes for that click; #1723 waited the
+    # same way). A push to agent/** arrives through the deploy key, is
+    # attributed to its owner, and runs at once.
+    branches:
+      - main
+      - "agent/**"
+    # The executables measured below are the Swift daemon and the soak fixture,
+    # so their sources and build inputs must open this lane too. A filter that
+    # watched only the harness let a Runtime, Storage or Workflows change skip
+    # its own performance check.
     paths:
       - "scripts/bench/**"
       - "rust/**"
       - ".github/workflows/rust-perf.yml"
+      - "Packages/ArkDeckKit/Sources/**"
+      - "Packages/ArkDeckKit/Package.swift"
+      - "Packages/ArkDeckKit/Package.resolved"
+      - "Packages/ArkDeckKit/Scripts/run-swiftpm.sh"
       - "Packages/ArkDeckKit/Tests/ArkDeckRuntimeSoakFixture/**"
   workflow_dispatch:
     inputs:
@@ -67,10 +84,11 @@ jobs:
         run: python3 -m unittest discover -s bench -t .
 
   microbenchmarks:
-    # The PR lane. Ratio mode against the calibration workload measured in the
-    # same run, +20% per design section I.2: a runner that is uniformly slower
-    # moves both numbers and reads as no change.
-    if: github.event_name == 'pull_request'
+    # The pre-merge lane, run on every push to an agent branch and on main.
+    # Ratio mode against the calibration workload measured in the same run,
+    # +20% per design section I.2: a runner that is uniformly slower moves both
+    # numbers and reads as no change.
+    if: github.event_name == 'push'
     needs: harness-tests
     runs-on: macos-26
     # Measured locally (warm build, release): three runs at the reduced PR
@@ -109,13 +127,16 @@ jobs:
           cd scripts
           # A shared CI runner is never provably quiet, so the document records
           # itself as advisory rather than claiming baseline eligibility.
+          # Sample counts are reduced; the seed parameters are not. They are
+          # the workload scale the committed baseline was taken at, and
+          # `compare` refuses a candidate measured at another scale.
           python3 -m bench capture \
             --daemon "$BIN/arkdeck-agentd" \
             --soak "$BIN/ArkDeckRuntimeSoakFixture" \
             --build-configuration release \
             --out-dir "$RUNNER_TEMP/perf" \
             --runs 3 --cold-start-samples 10 --ipc-samples 200 \
-            --idle-seconds 20 --calibration-samples 100 --seed-seconds 4 \
+            --idle-seconds 20 --calibration-samples 100 \
             --allow-loaded-host
       - name: Compare against the committed baseline (ratio, +20%)
         # `pipefail` matters here: without it the exit status of the pipeline is
