@@ -67,8 +67,12 @@ the document records why, stays advisory, and must not be committed.
 only for a run that could have established a baseline. An advisory capture (a
 debug build, or `--allow-loaded-host`) is expected to be noisy, so instability
 is reported and the exit stays 0; failing there would kill a CI step before the
-comparison that actually gates it. `compare` exits 1 on a regression or a
-metric missing from the candidate.
+comparison that actually gates it. `compare` exits 1 on a regression, on a
+metric missing from the candidate, and on a metric it cannot judge: a committed
+reference of zero with no absolute budget in `compare.ABSOLUTE_BUDGETS`, or a
+candidate measured at a different workload scale. A zero reference that does
+have a budget (idle CPU, 0.5% from design section I.2) is judged against that
+budget instead of a ratio, in both modes.
 
 ## Comparing across machines
 
@@ -111,7 +115,13 @@ Every metric carries the `scale` it was measured at — the seeded Job count rea
 back from `job.list`, the page size, the seed parameters — because a budget only
 holds at its scale and the seeded count is not reconstructible from the seed
 parameters alone.  Runs that disagree on scale keep every value rather than
-being averaged.
+being averaged.  `compare` treats the workload fields of that scale
+(`seedSeconds`, `seedJobsPerCycle`, `seedRestartIntervalSeconds`,
+`jobListPageSize`, `jobStoreRowCount`) as part of the metric's identity: two
+documents that disagree on them are not compared and the comparison fails,
+because the same p95 over a smaller data set is not the same result.  The
+resident-set release observations recorded alongside them are not inputs and
+take no part in that check.
 
 The resident set is reported as two metrics, not one.  An idle daemon holds its
 start-up working set for tens of seconds and then returns most of it in a single

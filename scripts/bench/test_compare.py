@@ -73,11 +73,148 @@ class CoverageTests(unittest.TestCase):
         self.assertTrue(result["passed"])
         self.assertEqual([entry["metric"] for entry in result["comparisons"]], ["a"])
 
-    def test_a_zero_reference_is_incomparable_rather_than_a_pass(self) -> None:
-        result = compare.compare(document(a=0.0), document(a=5.0))
+    def test_a_zero_reference_without_a_budget_fails_closed(self) -> None:
+        # Before this test the entry was reported as incomparable and the
+        # comparison still passed, so a metric with a zero reference could not
+        # regress at all; a candidate of 100 sailed through.
+        result = compare.compare(document(a=0.0), document(a=100.0))
         entry = result["comparisons"][0]
         self.assertFalse(entry["comparable"])
+        self.assertEqual([item["metric"] for item in result["incomparable"]], ["a"])
+        self.assertFalse(result["passed"])
+        self.assertIn("!! a:", compare.render(result))
+
+
+IDLE_CPU = "daemon.idleCpuPercent"
+
+
+def with_calibration(doc: dict, value: float = 1.0) -> dict:
+    doc["metrics"][compare.CALIBRATION_METRIC] = {
+        "status": baseline.STATUS_MEASURED,
+        "unit": "milliseconds",
+        "aggregate": {"p50": value, "p95": value, "p99": value},
+    }
+    return doc
+
+
+class ZeroReferenceBudgetTests(unittest.TestCase):
+    def test_the_documented_idle_cpu_budget_is_half_a_percent(self) -> None:
+        # Design section I.2 keeps the product ceiling when the measurement sits
+        # on the instrument floor; 0.5% is that ceiling.
+        self.assertEqual(compare.ABSOLUTE_BUDGETS[IDLE_CPU], 0.5)
+
+    def test_a_candidate_within_the_budget_passes(self) -> None:
+        result = compare.compare(
+            document(unit="percent", **{IDLE_CPU: 0.0}),
+            document(unit="percent", **{IDLE_CPU: 0.3}),
+        )
+        entry = result["comparisons"][0]
+        self.assertTrue(entry["comparable"])
+        self.assertEqual(entry["basis"], "absoluteBudget")
+        self.assertEqual(entry["budget"], 0.5)
+        self.assertFalse(entry["regressed"])
         self.assertTrue(result["passed"])
+        self.assertIn("absolute budget", compare.render(result))
+
+    def test_a_candidate_over_the_budget_regresses(self) -> None:
+        result = compare.compare(
+            document(unit="percent", **{IDLE_CPU: 0.0}),
+            document(unit="percent", **{IDLE_CPU: 100.0}),
+        )
+        self.assertTrue(result["comparisons"][0]["regressed"])
+        self.assertEqual([item["metric"] for item in result["regressions"]], [IDLE_CPU])
+        self.assertFalse(result["passed"])
+
+    def test_the_budget_also_applies_in_ratio_mode(self) -> None:
+        # The ratio lane normalises durations by the calibration workload; a
+        # percentage is not a duration and the budget is absolute either way.
+        result = compare.compare(
+            with_calibration(document(unit="percent", **{IDLE_CPU: 0.0})),
+            with_calibration(document(unit="percent", **{IDLE_CPU: 100.0}), value=2.0),
+            mode=compare.MODE_RATIO,
+            threshold=compare.PR_THRESHOLD,
+        )
+        self.assertFalse(result["passed"])
+        self.assertEqual(result["comparisons"][0]["candidate"], 100.0)
+
+
+WORKLOAD = {
+    "seedSeconds": 6,
+    "seedJobsPerCycle": 10,
+    "seedRestartIntervalSeconds": 1,
+    "jobListPageSize": 50,
+    "jobStoreRowCount": 30,
+}
+
+
+def scaled(doc: dict, scale: object) -> dict:
+    for entry in doc["metrics"].values():
+        entry["scale"] = scale
+    return doc
+
+
+class WorkloadScaleTests(unittest.TestCase):
+    def test_matching_workload_scales_compare(self) -> None:
+        result = compare.compare(
+            scaled(document(a=10.0), dict(WORKLOAD)),
+            scaled(document(a=10.5), dict(WORKLOAD)),
+        )
+        self.assertTrue(result["comparisons"][0]["comparable"])
+        self.assertTrue(result["passed"])
+
+    def test_a_smaller_candidate_workload_is_incomparable_and_fails(self) -> None:
+        # The same p95 over one row instead of thirty is not the same result;
+        # before this test the comparison passed regardless of scale.
+        smaller = dict(WORKLOAD, jobStoreRowCount=1)
+        result = compare.compare(
+            scaled(document(a=10.0), dict(WORKLOAD)),
+            scaled(document(a=10.0), smaller),
+        )
+        entry = result["comparisons"][0]
+        self.assertFalse(entry["comparable"])
+        self.assertIn("jobStoreRowCount: 30 vs 1", entry["reason"])
+        self.assertFalse(result["passed"])
+
+    def test_a_different_seed_duration_is_incomparable(self) -> None:
+        result = compare.compare(
+            scaled(document(a=10.0), dict(WORKLOAD)),
+            scaled(document(a=10.0), dict(WORKLOAD, seedSeconds=4)),
+        )
+        self.assertIn("seedSeconds: 6 vs 4", result["comparisons"][0]["reason"])
+        self.assertFalse(result["passed"])
+
+    def test_release_observations_may_differ_between_runs(self) -> None:
+        # A document whose runs disagree only on the resident-set release
+        # observation keeps every scale as a list; the workload is still one.
+        runs = [
+            dict(WORKLOAD, residentSetReleaseAtSeconds=82, residentSetReleaseObserved=True),
+            dict(WORKLOAD, residentSetReleaseAtSeconds=16, residentSetReleaseObserved=True),
+        ]
+        result = compare.compare(
+            scaled(document(a=10.0), runs),
+            scaled(document(a=10.0), dict(WORKLOAD, residentSetReleaseAtSeconds=40)),
+        )
+        self.assertTrue(result["comparisons"][0]["comparable"])
+        self.assertTrue(result["passed"])
+
+    def test_a_scale_missing_on_one_side_is_incomparable(self) -> None:
+        result = compare.compare(
+            scaled(document(a=10.0), dict(WORKLOAD)),
+            document(a=10.0),
+        )
+        self.assertFalse(result["comparisons"][0]["comparable"])
+        self.assertFalse(result["passed"])
+
+    def test_documents_without_any_scale_still_compare(self) -> None:
+        # Synthetic and pre-1.1.0 documents carry no scale at all; that is a
+        # known state, not a drift between two measurements.
+        result = compare.compare(document(a=10.0), document(a=10.0))
+        self.assertTrue(result["passed"])
+
+    def test_runs_disagreeing_on_workload_within_a_document_are_refused(self) -> None:
+        runs = [dict(WORKLOAD), dict(WORKLOAD, jobStoreRowCount=20)]
+        with self.assertRaises(compare.ComparisonError):
+            compare.compare(scaled(document(a=10.0), runs), scaled(document(a=10.0), dict(WORKLOAD)))
 
 
 class RatioComparisonTests(unittest.TestCase):
