@@ -160,7 +160,7 @@ final class RuntimeDebugInvocationContractTests: XCTestCase {
       XCTAssertEqual(request.operation, seed.operation)
       XCTAssertEqual(request.inputs, seed.inputs)
       XCTAssertNil(request.authorization)
-      XCTAssertNil(request.campaignReservation)
+      XCTAssertFalse(String(decoding: try RuntimeOperationCodec.encodeRequest(request), as: UTF8.self).contains("campaignReservation"))
       XCTAssertNil(request.clientContext)
     }
     XCTAssertNotEqual(requests[0].idempotencyKey, requests[1].idempotencyKey)

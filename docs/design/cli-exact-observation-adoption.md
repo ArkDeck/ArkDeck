@@ -2,11 +2,10 @@
 
 Task: TASK-AIN-021
 
-This GJ-1 slice adds a negotiated target adoption path without changing the
-published 1.x discovery or automatic legacy adoption behavior.
+GJ-1 discovery and adoption use the current snapshot and exact observation references.
 
 ```text
-arkdeck device candidates --require-protocol 2 --output json
+arkdeck device candidates --output json
 arkdeck target adopt --candidate <key> --observation <id> --observation-generation <generation> --output json
 ```
 
@@ -35,12 +34,10 @@ Runtime-owned pre-admission/zero-dispatch details. There is no ownerless HAR,
 default first-device selection, device mutation or new Job. Existing target
 identity and cross-mode alias lineage remain owned by the current store.
 
-`target adopt` always negotiates major 2. The explicit discovery option cannot
-be combined with legacy `--snapshot` or `--use-warm-snapshot`. Omitting it keeps
-the original 1.x behavior; those generation-scoped legacy IDs do not authorize
-v2 adoption. Only the new table adds `device.observations` and `target.adopt` to
-the initial negotiated health surface. Structured target errors retain their
-actual protocol version in JSON metadata. A missing/malformed adoption receipt
+`target adopt` always requires the exact observation reference. Retired
+`--snapshot`, `--use-warm-snapshot` and `device adopt` forms are refused.
+Structured target errors retain the current protocol version in JSON metadata.
+A missing/malformed adoption receipt
 is an unknown outcome, never an invented success or a retry.
 
 Tests cover local socket/CLI round trips, trust transitions, exact-generation

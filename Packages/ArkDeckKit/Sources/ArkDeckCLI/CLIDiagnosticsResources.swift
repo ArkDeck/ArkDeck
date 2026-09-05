@@ -55,9 +55,6 @@ extension RuntimeCLI {
         milliseconds: duration.milliseconds))
 
     do {
-      try session.negotiate(
-        requiredMajor: 2,
-        forMethod: "artifact.list")
       let inventory = try diagnosticsInventory(
         owner: owner,
         session: session)

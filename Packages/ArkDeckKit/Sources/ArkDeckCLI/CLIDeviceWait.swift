@@ -31,7 +31,7 @@ extension RuntimeCLI {
     session.client = session.client.bounded(by: deadline)
     var lastGeneration: Int64?
     do {
-      try session.negotiate(requiredMajor: 2, forMethod: "device.observations")
+
       var interval = 100
       while true {
         let snapshot = try session.request("device.observations", ["following": .object(reference)])
@@ -61,6 +61,7 @@ extension RuntimeCLI {
           Set(row.keys) == [
             "candidateKey", "observationId", "authorizationState", "observationContinuity",
             "adoptedTargetId", "bindingRevision", "displayName", "displayNameGeneration",
+            "deviceInformation", "observedFacts",
           ],
           row["observationContinuity"] == .string("relationProven"),
           row["displayNameGeneration"] == .string(finalGeneration)

@@ -679,11 +679,11 @@ package final class BootstrapDevEcoToolchainRegistry: @unchecked Sendable {
       guard Files.Identity(try Files.status(fd)) == Files.Identity(before) else {
         throw Files.failure("DevEco toolchain index changed while reading")
       }
-      let raw = try ControlProtocolNegotiation.decodeObject(
+      let raw = try ControlFrameJSON.decodeObject(
         data, maximumBytes: Files.maximumMetadataBytes)
       let index = try JSONDecoder().decode(Index.self, from: data)
       let encoded = try CanonicalJSONEncoders.canonical().encode(index)
-      let roundtrip = try ControlProtocolNegotiation.decodeObject(
+      let roundtrip = try ControlFrameJSON.decodeObject(
         encoded, maximumBytes: Files.maximumMetadataBytes)
       guard raw == roundtrip,
         index.schemaVersion == "arkdeck.bootstrap-deveco-toolchains/1",

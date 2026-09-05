@@ -10,11 +10,10 @@ authority.
 arkdeck recovery flash-invocation list \
   [--page-size 100] \
   [--cursor <opaque-cursor>] \
-  [--require-protocol 2] \
-  [--output json]
+    [--output json]
 ```
 
-The CLI negotiates control protocol v2 and calls
+The CLI verifies the current v1 control identity and calls
 `recovery.flash-invocation.list`. The request accepts only `pageSize` and
 `cursor`; page size is bounded to `1...1000`, and a cursor is limited to 256
 UTF-8 bytes.

@@ -10,6 +10,7 @@
 // typed Job requests. A refused frame is never handled.
 
 import ArkDeckCore
+import ArkDeckWorkflows
 import Foundation
 
 package final class AgentXPCListener: NSObject, NSXPCListenerDelegate, @unchecked Sendable {
@@ -157,11 +158,9 @@ final class AgentXPCEndpoint: NSObject, ArkDeckAgentXPCProtocol, @unchecked Send
   /// daemon handler sees it. `job.submit` is admitted only for the typed UI
   /// request families; `job.run` still requires the shared one-shot Job gate.
   static func admission(of frame: Data) -> Admission? {
-    guard
+    guard (try? ControlProtocolContract.requestFields(frame)) != nil,
       let request = try? JSONDecoder().decode(AgentWireProtocol.Request.self, from: frame),
-      ArkDeckAgentXPC.supportedWireProtocolExactVersions.contains(request.protocolVersion),
-      request.protocolVersion != ArkDeckControlProtocol.targetVersion
-        || ArkDeckControlProtocol.targetMethods.contains(request.method)
+      ArkDeckControlProtocol.methods.contains(request.method)
     else { return nil }
 
     if request.method == "runtime.storage.status" {
@@ -177,10 +176,17 @@ final class AgentXPCEndpoint: NSObject, ArkDeckAgentXPCProtocol, @unchecked Send
       return .direct(method: request.method)
     }
 
+    if ArkDeckAgentXPC.forwardableImportMethods.contains(request.method) {
+      if request.method == "artifact.import.begin" {
+        guard let intent = try? ArtifactImportIntent(request.params ?? [:]),
+          ["hap", "native-library", "flash-bundle"].contains(intent.kind) else { return nil }
+      }
+      // The gateway checks exact generation/offset plus App ownership before
+      // forwarding follow-up import mutations to the Runtime resource owner.
+      return .direct(method: request.method)
+    }
+
     if ArkDeckAgentXPC.forwardableReadOnlyMethods.contains(request.method)
-      || ArkDeckAgentXPC.forwardableFlashBundleMethods.contains(request.method)
-      || ArkDeckAgentXPC.forwardableHAPImportMethods.contains(request.method)
-      || ArkDeckAgentXPC.forwardableNativeLibraryImportMethods.contains(request.method)
       || ArkDeckAgentXPC.forwardableRockchipBindingMethods.contains(request.method)
       || ArkDeckAgentXPC.forwardableHistoryFilterMethods.contains(request.method)
       || ArkDeckAgentXPC.forwardableTraceCacheMethods.contains(request.method)
@@ -329,9 +335,10 @@ final class AgentXPCEndpoint: NSObject, ArkDeckAgentXPCProtocol, @unchecked Send
   private static func typedAppJobKind(_ requestJSON: String) -> AgentXPCAppJobKind? {
     guard
       let data = requestJSON.data(using: .utf8),
+      (try? RuntimeRequestEnvelope.validate(data)) != nil,
       case .object(let request)? = try? JSONDecoder().decode(JSONValue.self, from: data),
       case .string("runtime-operation-request")? = request["documentType"],
-      case .string("2.0.0")? = request["schemaVersion"],
+      request["schemaVersion"] == .string(RuntimeRequestEnvelope.schemaVersion),
       case .object(let operation)? = request["operation"],
       case .string(let operationID)? = operation["id"],
       request["authorization"] == nil,

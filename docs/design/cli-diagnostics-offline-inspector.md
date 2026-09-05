@@ -11,7 +11,7 @@ CLI. It accepts immutable Artifact metadata plus already-read bytes. Before
 parsing it checks exact Job/operation correlation, unique Artifact identities
 and names, byte counts, lowercase SHA-256 digests, media types, privacy and
 fixed input bounds. The App adapter also preserves the Catalog-derived role
-check for session documents; protocol 2 Artifact resources do not expose a
+check for session documents; current v1 Artifact resources do not expose a
 second role field for the CLI to trust.
 
 Inspection reads only these standard-privacy JSON documents:
@@ -29,7 +29,7 @@ every source digest.
 ## Text preview
 
 `diagnostics preview --job <id> --artifact <id>` reads one exact text or JSON
-Artifact through protocol 2 range reads. The complete content is limited to
+Artifact through current v1 range reads. The complete content is limited to
 2 MiB and output to 120,000 Unicode characters by default. A sensitive
 Artifact requires `--allow-sensitive`; invalid UTF-8 replacement is allowed
 only for `text/plain` and is disclosed. Structured JSON text must be valid

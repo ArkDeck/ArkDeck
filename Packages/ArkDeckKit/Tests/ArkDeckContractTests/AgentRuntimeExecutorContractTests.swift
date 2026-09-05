@@ -129,10 +129,20 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
       observation: ScriptedBootstrap(candidates: candidateSource ?? { candidates }),
       targetStore: targetStore,
       nowUTC: { "2026-07-29T00:00:00Z" })
+    let observation = ScriptedBootstrap(candidates: candidateSource ?? { candidates })
+    let observations = TargetObservationCoordinator(
+      observation: observation, targetStore: targetStore,
+      usbRelations: {
+        (candidateSource?() ?? candidates).enumerated().map { index, candidate in
+          TargetUSBRelation(serial: candidate.connectKey, location: String(index + 1),
+            attachmentID: UInt64(index + 1), vendorID: RockchipProbeEvidence.rockUSBVendorID,
+            productID: RockchipHDCIntegrationProfile.dayu200NormalProductID)
+        }
+      }, nowUTC: { "2026-07-29T00:00:00Z" })
     let handler = RuntimeControlPlaneHandler(
       engine: engine, capabilityStore: capabilityStore,
       providerIDs: providers.registeredProviderIDs, nowUTC: { "2026-07-29T00:00:00Z" },
-      targetStore: targetStore, bootstrap: bootstrap, artifactStore: artifactStore,
+      targetStore: targetStore, bootstrap: bootstrap, targetObservations: observations, artifactStore: artifactStore,
       methodObserver: observer)
     let server = AgentDaemonServer(
       stateDirectory: stateDirectory, handler: handler, nowUTC: { "2026-07-29T00:00:00Z" })
@@ -182,10 +192,8 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
 
   func testTargetSubmissionClientKeepsTheOneShotSuccessReceiptCompatible() throws {
     let legacyReads = try startDaemon()
-    let targetSubmission = try legacyReads.negotiated(
-      requiredMajor: 2, forMethod: "job.submit")
     let outcome = try AgentRuntimeExecutor(
-      client: legacyReads, jobSubmissionClient: targetSubmission,
+      client: legacyReads,
       nowUTC: { "2026-07-29T00:00:00Z" }
     ).run(
       RuntimeAgentExecutionRequest(
@@ -244,7 +252,8 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
     else {
       return XCTFail("the initial observation must produce a persisted Job")
     }
-    guard case .array(let jobsBeforeRestart) = try firstClient.request(method: "job.list") else {
+    guard case .object(let jobsBeforeRestartPage) = try firstClient.request(method: "job.list"),
+      case .array(let jobsBeforeRestart)? = jobsBeforeRestartPage["items"] else {
       return XCTFail("job.list must answer before restart")
     }
     let originalArtifacts = firstReport.artifactInventory
@@ -280,10 +289,11 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
     XCTAssertEqual(report.trustedFacts.jobID, jobID)
     XCTAssertEqual(report.artifactInventory, originalArtifacts)
     XCTAssertEqual(
-      methodLog.snapshot(), ["health", "job.status", "job.evidence", "artifact.list"],
-      "reopening must remain a four-read proof with no submit, run, cancel or device dispatch")
+      methodLog.snapshot(), ["health", "health", "job.status", "health", "job.evidence", "health", "artifact.list"],
+      "every resource read verifies its connection; reopening sends no submit, run, cancel or device dispatch")
 
-    guard case .array(let jobsAfterRestart) = try reopenedClient.request(method: "job.list") else {
+    guard case .object(let jobsAfterRestartPage) = try reopenedClient.request(method: "job.list"),
+      case .array(let jobsAfterRestart)? = jobsAfterRestartPage["items"] else {
       return XCTFail("job.list must answer after restart")
     }
     XCTAssertEqual(
@@ -565,7 +575,8 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
       return XCTFail("an explicit offline target must pause before submit: \(paused)")
     }
     XCTAssertEqual(action.kind, .physicalReconnect)
-    guard case .array(let jobsBeforeReconnect) = try client.request(method: "job.list") else {
+    guard case .object(let jobsBeforeReconnectPage) = try client.request(method: "job.list"),
+      case .array(let jobsBeforeReconnect)? = jobsBeforeReconnectPage["items"] else {
       return XCTFail("job.list must answer")
     }
     XCTAssertTrue(
@@ -580,7 +591,8 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
     XCTAssertEqual(receipt.targetID, targetID)
     XCTAssertEqual(receipt.humanActions.count, 1)
     XCTAssertNotNil(receipt.humanActions[0].resolvedAtUTC)
-    guard case .array(let jobsAfterReconnect) = try client.request(method: "job.list") else {
+    guard case .object(let jobsAfterReconnectPage) = try client.request(method: "job.list"),
+      case .array(let jobsAfterReconnect)? = jobsAfterReconnectPage["items"] else {
       return XCTFail("job.list must answer")
     }
     XCTAssertEqual(
@@ -621,11 +633,12 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
     }
     XCTAssertEqual(receipt.targetID, requestedTargetID)
     XCTAssertTrue(receipt.humanActions.isEmpty)
-    XCTAssertTrue(log.snapshot().contains("device.candidates"))
+    XCTAssertTrue(log.snapshot().contains("device.observations"))
     XCTAssertFalse(
       log.snapshot().contains("target.adopt"),
       "an exact live-to-durable mapping must not repeat bootstrap adoption")
-    guard case .array(let jobs) = try client.request(method: "job.list") else {
+    guard case .object(let page) = try client.request(method: "job.list"),
+      case .array(let jobs)? = page["items"] else {
       return XCTFail("job.list must answer")
     }
     XCTAssertEqual(jobs.count, 1, "the exact route must submit one typed Runtime Job")
@@ -642,7 +655,7 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
       return XCTFail("two candidates must require a choice: \(outcome)")
     }
     XCTAssertEqual(action.kind, .selectTarget)
-    XCTAssertTrue(action.prompt.contains("candidates"), action.prompt)
+    XCTAssertTrue(action.prompt.contains("candidate"), action.prompt)
     XCTAssertEqual(action.selectionOptions, ["AAA", "BBB"])
   }
 
@@ -668,7 +681,8 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
     }
     XCTAssertEqual(receipt.humanActions.count, 1)
     XCTAssertNotNil(receipt.humanActions[0].resolvedAtUTC)
-    guard case .array(let jobs) = try client.request(method: "job.list") else {
+    guard case .object(let page) = try client.request(method: "job.list"),
+      case .array(let jobs)? = page["items"] else {
       return XCTFail("job.list must answer")
     }
     XCTAssertEqual(jobs.count, 1, "resume must not duplicate runtime jobs")
@@ -703,7 +717,8 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
       "raw connect keys that are not owned by the requested target are not valid choices")
     XCTAssertTrue(reconnect.prompt.contains("Reconnect"))
     XCTAssertNil(receipt.jobID)
-    guard case .array(let jobs) = try client.request(method: "job.list") else {
+    guard case .object(let page) = try client.request(method: "job.list"),
+      case .array(let jobs)? = page["items"] else {
       return XCTFail("job.list must answer")
     }
     XCTAssertTrue(jobs.isEmpty, "target mismatch must remain zero-dispatch")
@@ -726,7 +741,7 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
     XCTAssertTrue(
       called.allSatisfy { method in
         [
-          "health", "operation.describe", "target.list", "target.adopt", "job.submit", "job.run",
+          "health", "operation.describe", "device.observations", "target.list", "target.adopt", "job.submit", "job.run",
           "job.status", "artifact.list", "job.evidence",
         ].contains(method)
       },
@@ -742,23 +757,23 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
 
   func testHostOnlyAgentRequestDoesNotAdoptOrPinADevice() throws {
     let recorder = try startRecordingDaemon()
-    let outcome = try executor(recorder.client).run(
+    XCTAssertThrowsError(try executor(recorder.client).run(
       RuntimeAgentExecutionRequest(
         operationID: "workspace.build-openharmony", operationVersion: 1,
         inputs: [
           "projectRef": .string("demo-app"),
           "buildPresetRef": .string("waterflow-debug"),
         ],
-        executionID: "host-only-workspace-001"))
-    guard case .failed(let reason, let receipt) = outcome else {
-      return XCTFail("the unregistered fixture provider must reject the host operation")
+        executionID: "host-only-workspace-001"))) { error in
+      guard case AgentClientError.structuredDaemonError(let code, let message, let details) = error else {
+        return XCTFail("expected a current pre-admission refusal, got \(error)")
+      }
+      XCTAssertEqual(code, "invalidInput")
+      XCTAssertEqual(details["phase"], .string("preAdmission"))
+      XCTAssertEqual(details["newDispatchCount"], .integer(0))
+      XCTAssertFalse(message.contains("does not match projectRef"))
+      XCTAssertFalse(message.contains("is host-only"))
     }
-
-    XCTAssertEqual(receipt.targetID, "demo-app")
-    XCTAssertNil(receipt.bindingRevision)
-    XCTAssertFalse(
-      reason.contains("is host-only"),
-      "the Agent must not manufacture the binding-revision defect: \(reason)")
     let called = recorder.observedMethods()
     XCTAssertTrue(called.contains("operation.describe"))
     XCTAssertTrue(called.contains("job.submit"))
@@ -768,7 +783,7 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
 
   func testArtifactBoundSigningPreservesItsTargetWithoutAdoptingADevice() throws {
     let recorder = try startRecordingDaemon()
-    let outcome = try executor(recorder.client).run(
+    XCTAssertThrowsError(try executor(recorder.client).run(
       RuntimeAgentExecutionRequest(
         operationID: "workspace.sign-openharmony-hap", operationVersion: 1,
         inputs: [
@@ -777,14 +792,16 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
           "unsignedHapArtifactLease": .string("lease-v1:source:ART-INPUT"),
         ],
         targetID: "TGT-ARTIFACT-BOUND",
-        executionID: "artifact-bound-signing-001"))
-    guard case .failed(let reason, let receipt) = outcome else {
-      return XCTFail("the fixture lacks the workspace provider and must reject: \(outcome)")
+        executionID: "artifact-bound-signing-001"))) { error in
+      guard case AgentClientError.structuredDaemonError(let code, let message, let details) = error else {
+        return XCTFail("expected a current pre-admission refusal, got \(error)")
+      }
+      XCTAssertEqual(code, "invalidInput")
+      XCTAssertEqual(details["phase"], .string("preAdmission"))
+      XCTAssertEqual(details["newDispatchCount"], .integer(0))
+      XCTAssertFalse(message.contains("does not match projectRef"))
+      XCTAssertFalse(message.contains("is host-only"))
     }
-
-    XCTAssertEqual(receipt.targetID, "TGT-ARTIFACT-BOUND")
-    XCTAssertNil(receipt.bindingRevision)
-    XCTAssertFalse(reason.contains("does not match projectRef"), reason)
     let called = recorder.observedMethods()
     XCTAssertTrue(called.contains("job.submit"))
     XCTAssertFalse(called.contains("target.list"), "host-only signing must not list devices")
@@ -797,7 +814,7 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
     // scope, exactly as artifact-bound signing does; the project stays the
     // workspace root. A patch request without a lease keeps the strict rule.
     let recorder = try startRecordingDaemon()
-    let outcome = try executor(recorder.client).run(
+    XCTAssertThrowsError(try executor(recorder.client).run(
       RuntimeAgentExecutionRequest(
         operationID: "workspace.apply-patch", operationVersion: 1,
         inputs: [
@@ -806,13 +823,16 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
           "patchArtifactRef": .string("lease-v1:imp-example:ART-PATCH"),
         ],
         targetID: "TGT-ARTIFACT-BOUND",
-        executionID: "artifact-bound-patch-001"))
-    guard case .failed(let reason, let receipt) = outcome else {
-      return XCTFail("the fixture lacks the workspace provider and must reject: \(outcome)")
+        executionID: "artifact-bound-patch-001"))) { error in
+      guard case AgentClientError.structuredDaemonError(let code, let message, let details) = error else {
+        return XCTFail("expected a current pre-admission refusal, got \(error)")
+      }
+      XCTAssertEqual(code, "invalidInput")
+      XCTAssertEqual(details["phase"], .string("preAdmission"))
+      XCTAssertEqual(details["newDispatchCount"], .integer(0))
+      XCTAssertFalse(message.contains("does not match projectRef"))
+      XCTAssertFalse(message.contains("is host-only"))
     }
-    XCTAssertEqual(receipt.targetID, "TGT-ARTIFACT-BOUND")
-    XCTAssertNil(receipt.bindingRevision)
-    XCTAssertFalse(reason.contains("does not match projectRef"), reason)
     let called = recorder.observedMethods()
     XCTAssertTrue(called.contains("job.submit"))
     XCTAssertFalse(called.contains("target.list"), "host-only patching must not list devices")
@@ -856,7 +876,8 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
     let client = try startDaemon()
     _ = try executor(client).run(
       RuntimeAgentExecutionRequest(operationID: "observe.device", operationVersion: 1))
-    guard case .array(let jobs) = try client.request(method: "job.list") else {
+    guard case .object(let page) = try client.request(method: "job.list"),
+      case .array(let jobs)? = page["items"] else {
       return XCTFail("job.list must answer")
     }
     XCTAssertEqual(jobs.count, 1, "one invocation submits exactly one job, never a loop")

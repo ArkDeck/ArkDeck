@@ -190,7 +190,7 @@ final class ScreenshotEncodingContractTests: XCTestCase {
     func entry(_ name: String) -> [String: Any] {
       [
         "name": name, "artifactId": "ART-1", "status": "published",
-        "sha256": String(repeating: "a", count: 64), "byteCount": 41197,
+        "artifactDigest": String(repeating: "a", count: 64), "byteCount": 41197,
       ]
     }
     XCTAssertEqual(DeviceArtifactIndex.screenshot(in: [entry("screenshot.png")])?.byteCount, 41197)

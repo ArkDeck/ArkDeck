@@ -85,11 +85,13 @@ final class JobReadResourcesContractTests: XCTestCase {
   private func page(_ params: [String: JSONValue] = [:]) async throws -> [String: JSONValue] {
     try object(await engine.jobListSnapshot(RuntimeJobListQuery(params)))
   }
-  private func read(_ method: String, id: String, version: String = "2.0.0") async throws -> AgentWireProtocol.Response {
-    let request = try JSONDecoder().decode(AgentWireProtocol.Request.self,
-      from: PortableCanonicalJSON.canonicalBytes(.object(["protocolVersion": .string(version), "id": .string("read-fixture"),
-        "method": .string(method), "params": .object(["jobId": .string(id)])])))
-    return await RuntimeJobResourceReader(engine: engine, artifactStore: artifacts).response(request)
+  private func read(_ method: String, id: String, version: String = ArkDeckControlProtocol.currentVersion) async throws -> AgentWireProtocol.Response {
+    let handler = RuntimeControlPlaneHandler(engine: engine, capabilityStore: capabilities,
+      providerIDs: ["hdc"], nowUTC: { "2026-08-31T12:00:00Z" }, targetStore: targets, artifactStore: artifacts)
+    return await handler.handleFrame(try PortableCanonicalJSON.canonicalBytes(.object([
+      "protocolVersion": .string(version), "contractIdentity": .string(ArkDeckControlProtocol.contractIdentity),
+      "id": .string("read-fixture"), "method": .string(method), "params": .object(["jobId": .string(id)]),
+    ])))
   }
   private func cli(
     _ args: [String], outputArguments: [String] = ["--output", "json"]
@@ -269,15 +271,14 @@ final class JobReadResourcesContractTests: XCTestCase {
     XCTAssertEqual(plan["jobAdmitted"], .bool(false))
     XCTAssertEqual(
       try object(XCTUnwrap(planned.1["meta"]))["controlProtocolVersion"],
-      .string("2.0.0"))
+      .string(ArkDeckControlProtocol.currentVersion))
     XCTAssertEqual(dispatcher.dispatchCount, 0)
 
     let legacyPlan = try cli(
       ["job", "plan"] + requestArguments, outputArguments: ["--json"])
     XCTAssertEqual(legacyPlan.0, 0)
-    XCTAssertNil(legacyPlan.1["schemaVersion"])
-    XCTAssertEqual(
-      legacyPlan.1["operationReference"], .string("observe.device@1"))
+    XCTAssertEqual(legacyPlan.1["schemaVersion"], .string("arkdeck.job-plan/1"))
+    XCTAssertEqual(legacyPlan.1, plan, "--json only changes the envelope rendering")
     XCTAssertNil(legacyPlan.1["ok"])
     XCTAssertEqual(dispatcher.dispatchCount, 0)
 
@@ -341,7 +342,7 @@ final class JobReadResourcesContractTests: XCTestCase {
     let dispatches = dispatcher.dispatchCount
     XCTAssertGreaterThan(dispatches, 0)
     try startServer()
-    let result = try cli(["job", "result", "--job", id, "--require-protocol", "2"])
+    let result = try cli(["job", "result", "--job", id])
     XCTAssertEqual(result.0, 0); XCTAssertEqual(result.1["ok"], .bool(true))
     let fields = try object(XCTUnwrap(result.1["result"]))
     let evidence = try object(XCTUnwrap(fields["evidence"]))
@@ -382,7 +383,6 @@ final class JobReadResourcesContractTests: XCTestCase {
 
     let inspectEnvelope = try cli([
       "workspace", "continuation", "inspect", "--source-job", sourceJobID,
-      "--require-protocol", "2",
     ])
     XCTAssertEqual(inspectEnvelope.0, 0, "\(inspectEnvelope.1)")
     XCTAssertEqual(inspectEnvelope.1["ok"], .bool(true), "\(inspectEnvelope.1)")
@@ -398,7 +398,7 @@ final class JobReadResourcesContractTests: XCTestCase {
     let continuationID = "continuation-cli-uds-001"
     let firstEnvelope = try cli([
       "workspace", "continuation", "run", "--source-job", sourceJobID,
-      "--continuation-request-id", continuationID, "--require-protocol", "2",
+      "--continuation-request-id", continuationID,
     ])
     XCTAssertEqual(firstEnvelope.0, 0, "\(firstEnvelope.1)")
     XCTAssertEqual(firstEnvelope.1["ok"], .bool(true), "\(firstEnvelope.1)")
@@ -413,7 +413,7 @@ final class JobReadResourcesContractTests: XCTestCase {
 
     let retryEnvelope = try cli([
       "workspace", "continuation", "run", "--source-job", sourceJobID,
-      "--continuation-request-id", continuationID, "--require-protocol", "2",
+      "--continuation-request-id", continuationID,
     ])
     XCTAssertEqual(retryEnvelope.0, 0, "\(retryEnvelope.1)")
     XCTAssertEqual(retryEnvelope.1["ok"], .bool(true), "\(retryEnvelope.1)")
@@ -470,7 +470,7 @@ final class JobReadResourcesContractTests: XCTestCase {
     try seed("job-pending", status: "queued", timeline: ["historical entry"])
     try seed("job-failed", status: "failed")
     try startServer()
-    let listed = try cli(["job", "list", "--require-protocol", "2", "--include-current", "--include-timeline"])
+    let listed = try cli(["job", "list", "--include-current", "--include-timeline"])
     XCTAssertEqual(listed.0, 0)
     let page = try object(XCTUnwrap(listed.1["result"]))
     XCTAssertEqual(try rows(page).count, 2)
@@ -483,17 +483,17 @@ final class JobReadResourcesContractTests: XCTestCase {
     XCTAssertEqual(request["inputs"], .object(["privateInput": .string("private-input-value")]))
     XCTAssertNil(show["recoveryAction"]); XCTAssertNil(show["admissionEvidence"])
     XCTAssertEqual(show["events"], .object(["method": .string("job.events"), "jobId": .string("job-pending")]))
-    let failed = try cli(["job", "status", "--job", "job-failed", "--require-protocol", "2"])
+    let failed = try cli(["job", "status", "--job", "job-failed"])
     XCTAssertEqual(failed.0, 0); XCTAssertEqual(failed.1["ok"], .bool(true))
     XCTAssertEqual(dispatcher.dispatchCount, 0)
   }
 
   func testNonterminalResultIsNotReadyAndDoesNotStartTheJob() async throws {
     try seed("job-pending", status: "queued"); try startServer()
-    let result = try cli(["job", "result", "--job", "job-pending", "--require-protocol", "2"])
+    let result = try cli(["job", "result", "--job", "job-pending"])
     XCTAssertEqual(result.0, 75); XCTAssertEqual(result.1["ok"], .bool(false))
     XCTAssertEqual(try object(XCTUnwrap(result.1["error"]))["code"], .string("resultNotReady"))
-    let evidence = try cli(["job", "evidence", "--job", "job-pending", "--require-protocol", "2"])
+    let evidence = try cli(["job", "evidence", "--job", "job-pending"])
     XCTAssertEqual(evidence.0, 75); XCTAssertEqual(evidence.1["ok"], .bool(true))
     XCTAssertEqual(dispatcher.dispatchCount, 0)
   }
@@ -502,13 +502,13 @@ final class JobReadResourcesContractTests: XCTestCase {
     try seed("job-failed", status: "failed")
     let metadata = try await publishRequired("job-failed")
     try startServer()
-    let failed = try cli(["job", "result", "--job", "job-failed", "--require-protocol", "2"])
+    let failed = try cli(["job", "result", "--job", "job-failed"])
     XCTAssertEqual(failed.0, 1); XCTAssertEqual(failed.1["ok"], .bool(true))
     let result = try object(XCTUnwrap(failed.1["result"]))
     XCTAssertEqual(try object(XCTUnwrap(result["evidence"]))["status"], .string("verified"))
     let file = root.appending(path: "artifacts/job-failed/\(try XCTUnwrap(metadata.first).artifactID)")
     try FileManager.default.removeItem(at: file)
-    let broken = try cli(["job", "result", "--job", "job-failed", "--require-protocol", "2"])
+    let broken = try cli(["job", "result", "--job", "job-failed"])
     XCTAssertEqual(broken.0, 2); XCTAssertEqual(broken.1["ok"], .bool(true))
     let retained = try object(XCTUnwrap(broken.1["result"]))
     XCTAssertEqual(try object(XCTUnwrap(retained["job"]))["outcome"], .string("failed"))
@@ -550,7 +550,7 @@ final class JobReadResourcesContractTests: XCTestCase {
     try await artifacts.recordCleanupDebt(jobID: "job-cleanup", stepID: "cleanup-fixture",
       remotePath: "/private/device/residue", reason: "fixture-private-reason")
     try startServer()
-    let result = try cli(["job", "result", "--job", "job-cleanup", "--require-protocol", "2"])
+    let result = try cli(["job", "result", "--job", "job-cleanup"])
     XCTAssertEqual(result.0, 0)
     let fields = try object(XCTUnwrap(result.1["result"]))
     let next = try object(XCTUnwrap(fields["nextAction"]))
@@ -559,7 +559,7 @@ final class JobReadResourcesContractTests: XCTestCase {
     let encoded = String(decoding: try PortableCanonicalJSON.canonicalBytes(.object(fields)), as: UTF8.self)
     XCTAssertFalse(encoded.contains("/private/device/residue")); XCTAssertFalse(encoded.contains("fixture-private-reason"))
     try Data("{broken}".utf8).write(to: root.appending(path: "artifacts/cleanup-debt.json"))
-    let unreadable = try cli(["job", "result", "--job", "job-cleanup", "--require-protocol", "2"])
+    let unreadable = try cli(["job", "result", "--job", "job-cleanup"])
     XCTAssertEqual(unreadable.1["ok"], .bool(false)); XCTAssertNil(unreadable.1["result"])
     XCTAssertEqual(try object(XCTUnwrap(unreadable.1["error"]))["code"], .string("recordUnreadable"))
     XCTAssertEqual(dispatcher.dispatchCount, 0)
@@ -586,6 +586,21 @@ final class JobReadResourcesContractTests: XCTestCase {
     try startServer()
     let cliPage = try cli(["job", "timeline", "--job", "job-long", "--page-size", "3"])
     XCTAssertEqual(cliPage.0, 0)
+
+    // The production App reader consumes the same daemon as the real CLI.
+    // Its page reconstruction must preserve every Unicode byte and the
+    // separate final entry without running the already-recorded Job.
+    let client = AgentClient(socketPath: try XCTUnwrap(server).socketURL.path)
+    let appDetail = try await RuntimeAppReadResources.jobDetail(jobID: "job-long") { method, params in
+      let result = try client.request(method: method, params: params)
+      return try CanonicalJSONEncoders.canonical().encode(JSONValue.object([
+        "id": .string("app-test"), "ok": .bool(true), "result": result,
+      ]))
+    }
+    let appTimeline = try object(XCTUnwrap(try object(appDetail)["timeline"]))
+    XCTAssertEqual(appTimeline["kind"], .string("inline"))
+    XCTAssertEqual(appTimeline["entries"], .array([.string(original), .string("last entry")]))
+    XCTAssertEqual(dispatcher.dispatchCount, 0)
   }
 
   func testUnknownOutcomeRemainsReconcileAndSuccessfulStatusQuery() async throws {
@@ -593,9 +608,9 @@ final class JobReadResourcesContractTests: XCTestCase {
     record.outcomeUnknown = true; try save(record)
     _ = try await publishRequired(record.jobID)
     try startServer()
-    let status = try cli(["job", "status", "--job", record.jobID, "--require-protocol", "2"])
+    let status = try cli(["job", "status", "--job", record.jobID])
     XCTAssertEqual(status.0, 0)
-    let result = try cli(["job", "result", "--job", record.jobID, "--require-protocol", "2"])
+    let result = try cli(["job", "result", "--job", record.jobID])
     XCTAssertEqual(result.0, 75); XCTAssertEqual(result.1["ok"], .bool(true))
     let fields = try object(XCTUnwrap(result.1["result"]))
     XCTAssertEqual(fields["outcomeUnknown"], .bool(true))
@@ -621,7 +636,7 @@ final class JobReadResourcesContractTests: XCTestCase {
     }
   }
 
-  func testUnreadableAndOversizedRecordsFailBoundedAndLegacyResourcesStayFrozen() async throws {
+  func testUnreadableAndOversizedRecordsFailBoundedAndRetiredVersionIsRefused() async throws {
     let record = try seed("job-corrupt")
     let repository = try RuntimeJobRepository(stateDirectory: state)
     try repository.updateJobState(jobID: record.jobID, state: record.state, updatedAtUTC: date, recordData: Data("{bad}".utf8))
@@ -631,8 +646,8 @@ final class JobReadResourcesContractTests: XCTestCase {
       recordData: Data(repeating: 32, count: 16 * 1024 * 1024 + 1))
     let oversized = try await read("job.show", id: record.jobID)
     XCTAssertEqual(oversized.error?.code, "recordUnreadable")
-    let legacy = try await read("job.show", id: record.jobID, version: "1.0.0")
-    XCTAssertEqual(legacy.error?.code, "unknownMethod")
+    let legacy = try await read("job.show", id: record.jobID, version: "2.0.0")
+    XCTAssertEqual(legacy.error?.code, "unsupportedProtocolVersion")
     let missing = try await read("job.show", id: "job-absent")
     XCTAssertEqual(missing.error?.code, "notFound")
     XCTAssertEqual(dispatcher.dispatchCount, 0)

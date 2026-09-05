@@ -42,7 +42,7 @@ extension RuntimeCLI {
           session.client = session.client.bounded(
             by: try AgentClientWaitDeadline(milliseconds: duration.milliseconds))
         }
-        try session.negotiate(requiredMajor: 2, forMethod: "runtime.tool.select")
+
         session.emit(try session.request("runtime.tool.select", fields))
         return
       }

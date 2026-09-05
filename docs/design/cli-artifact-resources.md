@@ -1,24 +1,22 @@
 # Tagged CLI Artifact resources
 
-The protocol-2 Artifact surface completes the GJ-1/GJ-2 path from a Job or
+The current v1 Artifact surface completes the GJ-1/GJ-2 path from a Job or
 imported input to bounded inspection and explicit host export. It changes no
 Catalog operation, provider, device admission policy or capability authority.
 
 ```sh
-arkdeck artifact list --job JOB_ID --require-protocol 2 --page-size 20 --output json
+arkdeck artifact list --job JOB_ID --page-size 20 --output json
 arkdeck artifact inspect --import IMPORT_ID --artifact ARTIFACT_ID --output json
 arkdeck artifact read --import IMPORT_ID --artifact ARTIFACT_ID --offset 0 --max-bytes 1048576 --output json
-arkdeck artifact read --job JOB_ID --artifact ARTIFACT_ID --require-protocol 2 --raw
-arkdeck artifact export --job JOB_ID --artifact ARTIFACT_ID --require-protocol 2 --destination /absolute/existing/directory
+arkdeck artifact read --job JOB_ID --artifact ARTIFACT_ID --raw
+arkdeck artifact export --job JOB_ID --artifact ARTIFACT_ID --destination /absolute/existing/directory
 ```
 
 Select exactly one `--job` or `--import`. The daemon validates the tagged owner
 against its durable resource; an Import namespace is never a Job or hardware
 evidence. Released Imports remain readable while retention keeps their content,
 but their metadata exposes no executable input lease. Each command has a bounded
-`--timeout`. Import selectors and the new timeout, paging, overwrite or explicit
-protocol options select protocol 2 without fallback. Unqualified legacy Job
-commands retain protocol-1 behavior during the staged default migration.
+`--timeout`. All renderings use the same current tagged-owner contract.
 
 List returns a fixed `arkdeck.cli.page/1` snapshot ordered by parsed creation time
 descending and Artifact ID ascending. Its cursor binds the owner, page size and

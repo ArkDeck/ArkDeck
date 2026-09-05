@@ -480,15 +480,16 @@ private final class ManualFlashXPCBridge: NSObject, NSXPCListenerDelegate,
 {
   private enum Admission {
     case direct
+    case flashImportBegin(requestID: String, importRequestID: String)
+    case flashImport(importID: String)
+    case flashImportAbort(importRequestID: String)
     case flashSubmit(requestID: String, debugSeed: Data)
     case flashRun(jobID: String)
   }
 
   private static let directMethods: Set<String> = [
-    "artifact.importFlashBundle.abort", "artifact.importFlashBundle.append",
-    "artifact.importFlashBundle.begin", "artifact.importFlashBundle.commit",
-    "artifact.inspect", "artifact.list", "job.evidence", "job.list",
-    "job.list-page", "job.plan", "job.status", "operation.list", "target.list",
+    "health", "artifact.inspect", "artifact.list", "job.evidence", "job.list",
+    "job.plan", "job.show", "job.timeline", "operation.list", "target.list",
   ]
 
   private let socketPath: String
@@ -496,6 +497,8 @@ private final class ManualFlashXPCBridge: NSObject, NSXPCListenerDelegate,
   private let listener = NSXPCListener(machServiceName: "com.arkdeck.agentd")
   private let jobLock = NSLock()
   private var runnableJobIDs: Set<String> = []
+  private var importRequestIDs: Set<String> = []
+  private var importIDs: Set<String> = []
 
   init(socketPath: String, captureDebugSeedURL: URL?) {
     self.socketPath = socketPath
@@ -531,10 +534,17 @@ private final class ManualFlashXPCBridge: NSObject, NSXPCListenerDelegate,
       reply(nil, "methodNotAllowlisted")
       return
     }
+    if !ownsImport(for: admission) {
+      reply(nil, "methodNotAllowlisted")
+      return
+    }
     let socketPath = self.socketPath
     DispatchQueue.global(qos: .userInitiated).async {
       do {
         let response = try forward(frame: frame, socketPath: socketPath)
+        if case .flashImportBegin(let requestID, let importRequestID) = admission {
+          self.recordImport(in: response, requestID: requestID, importRequestID: importRequestID)
+        }
         if case .flashSubmit(let requestID, let debugSeed) = admission,
           let jobID = Self.successfulSubmittedJobID(in: response, requestID: requestID)
         {
@@ -563,23 +573,66 @@ private final class ManualFlashXPCBridge: NSObject, NSXPCListenerDelegate,
   private static func admission(of frame: Data) -> Admission? {
     guard
       let request = try? JSONSerialization.jsonObject(with: frame) as? [String: Any],
+      Set(request.keys).isSubset(of: ["protocolVersion", "contractIdentity", "id", "method", "params"]),
       request["protocolVersion"] as? String == "1.0.0",
+      let identity = request["contractIdentity"] as? String,
+      identity.range(of: "^[0-9a-f]{64}$", options: .regularExpression) != nil,
       let requestID = request["id"] as? String,
+      !requestID.isEmpty, requestID.utf8.count <= 128,
       let method = request["method"] as? String
     else { return nil }
+    if method == "health" {
+      guard request["params"] == nil || (request["params"] as? [String: Any])?.isEmpty == true else { return nil }
+      return .direct
+    }
     if directMethods.contains(method) { return .direct }
 
-    guard let params = request["params"] as? [String: Any], params.count == 1 else {
+    guard let params = request["params"] as? [String: Any] else {
       return nil
     }
+    func identifier(_ key: String) -> String? {
+      guard let value = params[key] as? String, !value.isEmpty, value.utf8.count <= 128 else { return nil }
+      return value
+    }
+    func decimal(_ key: String) -> Int? {
+      guard let text = params[key] as? String, let value = Int(text), value >= 0, String(value) == text else { return nil }
+      return value
+    }
     switch method {
+    case "artifact.import.begin":
+      guard Set(params.keys) == ["schemaVersion", "importRequestId", "kind", "targetId", "bindingRevision", "deviceProfile", "name", "byteCount", "sha256"],
+        params["schemaVersion"] as? String == "arkdeck.import-intent/1",
+        params["kind"] as? String == "flash-bundle", params["deviceProfile"] as? String == "dayu200",
+        params["name"] as? String == "images.tar.gz", identifier("targetId") != nil,
+        let importRequestID = identifier("importRequestId"), let revision = decimal("bindingRevision"), revision > 0,
+        let count = decimal("byteCount"), (1...8 * 1024 * 1024 * 1024).contains(count),
+        let digest = params["sha256"] as? String,
+        digest.range(of: "^[0-9a-f]{64}$", options: .regularExpression) != nil else { return nil }
+      return .flashImportBegin(requestID: requestID, importRequestID: importRequestID)
+    case "artifact.import.append":
+      guard Set(params.keys) == ["importId", "generation", "offset", "byteCount", "sha256", "base64"],
+        let id = identifier("importId"), decimal("generation") == 1, decimal("offset") != nil,
+        let count = decimal("byteCount"), (1...2 * 1024 * 1024).contains(count),
+        let encoded = params["base64"] as? String, encoded.utf8.count <= 4 * 1024 * 1024,
+        let bytes = Data(base64Encoded: encoded), bytes.count == count,
+        bytes.base64EncodedString() == encoded, params["sha256"] as? String == sha256(bytes) else { return nil }
+      return .flashImport(importID: id)
+    case "artifact.import.commit":
+      guard Set(params.keys) == ["importId", "generation"], let id = identifier("importId"),
+        decimal("generation") == 1 else { return nil }
+      return .flashImport(importID: id)
+    case "artifact.import.abort":
+      guard Set(params.keys) == ["importRequestId", "generation"], let id = identifier("importRequestId"),
+        decimal("generation") == 1 else { return nil }
+      return .flashImportAbort(importRequestID: id)
     case "job.submit":
       guard
+        params.count == 1,
         let requestJSON = params["requestJson"] as? String,
         let data = requestJSON.data(using: .utf8),
         let typed = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
         typed["documentType"] as? String == "runtime-operation-request",
-        typed["schemaVersion"] as? String == "2.0.0",
+        typed["schemaVersion"] as? String == "1.0.0",
         typed["authorization"] == nil,
         typed["campaignReservation"] == nil,
         let operation = typed["operation"] as? [String: Any],
@@ -595,13 +648,46 @@ private final class ManualFlashXPCBridge: NSObject, NSXPCListenerDelegate,
       else { return nil }
       return .flashSubmit(requestID: requestID, debugSeed: debugSeedData)
     case "job.run":
-      guard let jobID = params["jobId"] as? String,
+      guard params.count == 1, let jobID = params["jobId"] as? String,
         !jobID.isEmpty, jobID.count <= 128
       else { return nil }
       return .flashRun(jobID: jobID)
     default:
       return nil
     }
+  }
+
+  private func ownsImport(for admission: Admission) -> Bool {
+    jobLock.lock()
+    defer { jobLock.unlock() }
+    switch admission {
+    case .flashImport(let id): return importIDs.contains(id)
+    case .flashImportAbort(let id): return importRequestIDs.contains(id)
+    default: return true
+    }
+  }
+
+  private func recordImport(in response: Data, requestID: String, importRequestID: String) {
+    guard let wire = try? JSONSerialization.jsonObject(with: response) as? [String: Any],
+      wire["id"] as? String == requestID, wire["ok"] as? Bool == true,
+      let result = wire["result"] as? [String: Any], result["schemaVersion"] as? String == "arkdeck.import/1",
+      result["importRequestId"] as? String == importRequestID,
+      let metadata = result["metadata"] as? [String: Any], metadata["kind"] as? String == "flash-bundle",
+      let id = result["importId"] as? String, !id.isEmpty, id.utf8.count <= 128 else { return }
+    jobLock.lock()
+    importRequestIDs.insert(importRequestID)
+    importIDs.insert(id)
+    jobLock.unlock()
+  }
+
+  /// Pure admission validation for host contract tests; does not open a transport.
+  static func validateFrames(_ arguments: [String]) throws {
+    guard arguments.count == 1, arguments[0].hasPrefix("/"),
+      let frames = try JSONSerialization.jsonObject(with: Data(contentsOf: URL(fileURLWithPath: arguments[0]))) as? [[String: Any]] else {
+      throw DriverFailure.message("expected an absolute JSON frame-list path")
+    }
+    let accepted = try frames.map { admission(of: try JSONSerialization.data(withJSONObject: $0)) != nil }
+    FileHandle.standardOutput.write(try JSONSerialization.data(withJSONObject: accepted))
   }
 
   private static func successfulSubmittedJobID(in response: Data, requestID: String) -> String? {
@@ -2078,6 +2164,8 @@ do {
     validateManualFlashXPCInterface()
   } else if arguments.first == "--validate-candidate" {
     try validateCandidate(Array(arguments.dropFirst()))
+  } else if arguments.first == "--validate-xpc-frames" {
+    try ManualFlashXPCBridge.validateFrames(Array(arguments.dropFirst()))
   } else if arguments.first == "--debug-session-status" {
     try printDebugSessionStatus(Array(arguments.dropFirst()))
   } else {

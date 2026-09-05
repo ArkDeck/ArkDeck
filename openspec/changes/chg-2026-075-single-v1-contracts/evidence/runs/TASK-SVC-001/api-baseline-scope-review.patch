@@ -1,0 +1,17 @@
+--- a/Packages/ArkDeckKit/APIBaseline/Sources/APIBaseline/APIBaseline.swift
++++ b/Packages/ArkDeckKit/APIBaseline/Sources/APIBaseline/APIBaseline.swift
+@@ -80,12 +80,12 @@
+   }
+ }
+
+-// MARK: - ArkDeckRuntime: v2 wire models, request semantics, rejection contract
++// MARK: - ArkDeckRuntime: current v1 wire models, request semantics, rejection contract
+
+ private enum RuntimeSurface {
+   static let errorCodes = RuntimeOperationErrorCode.allCases
+   static let requestedOutputs = \RuntimeOperationRequest.requestedOutputs
+-  static let campaignReservation = \RuntimeOperationRequest.campaignReservation
++  static let reviewedPlanDigest = \RuntimeOperationRequest.reviewedPlanDigest
+   static let clientContext = \RuntimeOperationRequest.clientContext
+   static let rejection: RuntimeOperationRequestRejection.Type =
+     RuntimeOperationRequestRejection.self

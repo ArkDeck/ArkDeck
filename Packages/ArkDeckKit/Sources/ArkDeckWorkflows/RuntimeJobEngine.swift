@@ -60,6 +60,11 @@ package enum RuntimeCallerAuthorityBoundary {
 public enum RuntimeRequestEnvelope {
   public static let schemaVersion = RuntimeOperationRequest.schemaVersion
 
+  /// Shared by the outer App transport before its narrower operation gate.
+  package static func validate(_ data: Data) throws {
+    _ = try RuntimeOperationCodec.decodeRequest(data)
+  }
+
   /// A complete, decodable request for this operation, with every required
   /// input present.
   ///
@@ -7634,11 +7639,7 @@ public actor RuntimeJobEngine {
     try admitAgainstDeviceHold(
       request: request, descriptor: descriptor, effect: effect,
       deviceIdentity: materialized.stableTargetIdentitySHA256)
-    if request.campaignReservation != nil {
-      throw RuntimeJobEngineError.rejected(
-        .authorizationRequired,
-        "legacy campaign reservations are decode/export-only and cannot admit a new execution")
-    }
+
     if effect <= .readOnly {
       guard descriptor.authorization[effect] == .defaultReadOnly else {
         throw RuntimeJobEngineError.rejected(
@@ -8136,10 +8137,7 @@ public actor RuntimeJobEngine {
           "authorizationRequired: persisted admission evidence does not match the mutation")
       }
     }
-    if runtime.record.request.campaignReservation != nil {
-      throw RuntimeDispatchFailure.failed(
-        "authorizationRequired: legacy campaign records cannot dispatch a new mutation")
-    }
+
     guard let authorization = runtime.record.request.authorization else {
       throw RuntimeDispatchFailure.failed(
         "authorizationRequired: mutation has no runtime capability reference")
@@ -9350,10 +9348,9 @@ public actor RuntimeJobEngine {
     SHA256Hex.isLowercaseSHA256(value)
   }
 
-  /// `reviewedPlanDigest` is a forward-compatible request-envelope
-  /// precondition, not an operation input and never an authority source. The
-  /// typed v2 decoder deliberately ignores unknown minor-version keys, while
-  /// the engine checks this fail-closed constraint against the freshly
+  /// `reviewedPlanDigest` is an explicitly validated request-envelope
+  /// precondition, not an operation input and never an authority source.
+  /// The engine checks this constraint against the freshly
   /// materialized plan before preauthorization or admission. Canonical
   /// persistence and idempotency continue to use the decoded typed request, so
   /// the precondition cannot change operation semantics or become durable

@@ -1,49 +1,37 @@
-# CLI control protocol negotiation
+# Single v1 control contract
 
-Task: TASK-AIN-021
+Task: TASK-SVC-001
 
-This GJ-1 slice lets callers check the Runtime's exact protocol compatibility
-before attempting resource operations whose target contracts cannot preserve
-the published 1.x shape. It does not change an existing operation, identity
-policy, provider, or destructive admission rule.
+CLI, App/XPC and AgentRuntimeExecutor use one exact `1.0.0` control contract.
+Each business request checks current `health` on the same socket or XPC
+connection that will receive it. A reconnect checks again. The client verifies
+the closed health fields, contract identity, Catalog digest and exact published
+method set before sending business data. An old daemon that also reports
+`1.0.0` cannot satisfy this identity check.
 
-```text
-arkdeck runtime health --require-protocol 2 --output json
-arkdeck runtime health --require-protocol 1 --output json
+```sh
+arkdeck runtime health --output json
 ```
 
-The client sends the version-neutral `protocol.negotiate` frame first. Both
-peers validate the closed bootstrap shape, request identity, canonical numeric
-SemVer list, requested major, and highest common exact version. Bootstrap
-frames are limited to 65,536 bytes including the final LF. Duplicate JSON keys,
-invalid UTF-8/Unicode, extra fields, and cross-major selection are refused.
-Negotiation errors carry `newDispatchCount: 0` in CLI details; no domain request
-has been sent. A negotiated success reports the actual version in both health
-and `meta.controlProtocolVersion`.
+Every request carries `protocolVersion`, `contractIdentity`, `id`, `method`
+and optional object `params`. The registry fixes the exact version, method set,
+4 MiB request and 8 MiB response limits. Its canonical SHA-256 identifies this
+contract. UTF-8, duplicate keys, frame shape and response correlation are checked
+strictly; a request has exactly one LF-terminated response.
 
-Omitting `--require-protocol` preserves the direct 1.0.0 health call. Explicit major 1
-also supports the pre-bootstrap daemon's exact `malformedFrame` refusal, and
-only for methods in the generated legacy fallback table. Major 2 never falls
-back. A timeout, malformed reply, or arbitrary error is not a downgrade signal.
+The daemon rejects missing identity, other versions and unpublished methods
+before dispatch. Clients do not select versions, fall back, or replay a business
+request after a lost reply. Identity-check failure can prove zero business
+dispatch; a failure after sending a mutation remains subject to the existing
+unknown-outcome rules. Contract identity grants no Runtime authority.
 
-The daemon retains the original 1.0.0 health shape and App/XPC behavior. The
-2.0.0 table started with health and now also publishes `device.observations`
-and `target.adopt` through the [exact observation slice](cli-exact-observation-adoption.md).
-It reports its closed `publishedMethods` table; absent methods such as
-`job.submit` are rejected before their handlers on 2.0.0.
-Advertising the wire format is not a claim that all
-target CLI contracts have been implemented. Existing leaves continue using
-their published 1.x behavior until their own vertical migrations land.
+The vocabulary is `Packages/ArkDeckKit/Contracts/control-protocol.json`.
+Regenerate its Swift projection with
+`python3 Packages/ArkDeckKit/Scripts/generate-control-contract.py`; `--check`
+verifies drift. The CLI machine-contract exporter generates its matching schema,
+registry, coverage and argv fixtures. `--version` reports local
+`controlProtocolVersion` and `controlContractIdentity` without connecting.
 
-The language-neutral vocabulary is
-`Packages/ArkDeckKit/Contracts/control-negotiation.json`; its generated Swift
-projection is checked against that file in contract tests. Regenerate with
-`python3 Packages/ArkDeckKit/Scripts/generate-control-contract.py`, or pass
-`--check` for a read-only drift check. The package-local location respects this
-Task's path guard; it is not a replacement for the final full CLI contract
-bundle required by product spec §14.
-
-Host tests exercise real local sockets with fixture daemons and the CLI parser.
-They prove protocol behavior, not real-device execution or Golden Journey
-acceptance. The exact observation slice documents adoption coverage;
-Runtime-owned AgentExecution/HAR remains an unfinished product capability.
+Host tests cover real local sockets, current CLI/App serialization, exact
+request decoding, bounded deadlines and retired-peer refusal. These are fixtures;
+published device acceptance belongs to TASK-SVC-005.

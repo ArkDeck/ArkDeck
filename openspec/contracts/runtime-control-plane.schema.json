@@ -4,6 +4,9 @@
     "request": {
       "additionalProperties": false,
       "properties": {
+        "contractIdentity": {
+          "const": "1054d17b598ce23003ebbdec4d42eb359b63016d6421709ba53c3f21f7c6558d"
+        },
         "id": {
           "minLength": 1,
           "type": "string"
@@ -24,31 +27,12 @@
             "artifact.import.inspection",
             "artifact.import.list",
             "artifact.import.release",
-            "artifact.importFlashBundle.abort",
-            "artifact.importFlashBundle.append",
-            "artifact.importFlashBundle.begin",
-            "artifact.importFlashBundle.commit",
-            "artifact.importHap.abort",
-            "artifact.importHap.append",
-            "artifact.importHap.begin",
-            "artifact.importHap.commit",
-            "artifact.importNativeLibrary.abort",
-            "artifact.importNativeLibrary.append",
-            "artifact.importNativeLibrary.begin",
-            "artifact.importNativeLibrary.commit",
-            "artifact.importWorkspacePatch.abort",
-            "artifact.importWorkspacePatch.append",
-            "artifact.importWorkspacePatch.begin",
-            "artifact.importWorkspacePatch.commit",
             "artifact.inspect",
             "artifact.list",
             "artifact.quota",
             "artifact.read",
-            "capability.draft",
             "capability.inspect",
-            "capability.install",
             "capability.list",
-            "capability.revoke",
             "cleanupDebt.continue",
             "cleanupDebt.list",
             "control-action.list",
@@ -59,7 +43,6 @@
             "debug.start",
             "debug.status",
             "debug.template.run",
-            "device.candidates",
             "device.display-name.clear",
             "device.display-name.set",
             "device.observations",
@@ -80,7 +63,6 @@
             "job.events",
             "job.evidence",
             "job.list",
-            "job.list-page",
             "job.plan",
             "job.reconcile",
             "job.result",
@@ -91,9 +73,7 @@
             "job.timeline",
             "operation.describe",
             "operation.list",
-            "protocol.negotiate",
             "recovery.flash-invocation.list",
-            "runtime.hdc-status",
             "runtime.hdc.impact-preview",
             "runtime.hdc.restart",
             "runtime.hdc.status",
@@ -135,14 +115,12 @@
           "type": "object"
         },
         "protocolVersion": {
-          "enum": [
-            "2.0.0",
-            "1.0.0"
-          ]
+          "const": "1.0.0"
         }
       },
       "required": [
         "protocolVersion",
+        "contractIdentity",
         "id",
         "method"
       ],
@@ -161,9 +139,17 @@
             "ok": {
               "const": true
             }
-          }
+          },
+          "required": [
+            "result"
+          ]
         },
         {
+          "not": {
+            "required": [
+              "result"
+            ]
+          },
           "properties": {
             "ok": {
               "const": false
@@ -225,606 +211,394 @@
     }
   ],
   "title": "arkdeck.runtime-control-plane/1",
-  "x-arkdeck-bootstrapMethod": "protocol.negotiate",
   "x-arkdeck-bundleVersion": "arkdeck.cli.contracts/1",
   "x-arkdeck-cliVersion": "0.1.0",
-  "x-arkdeck-legacyProtocolVersion": "1.0.0",
+  "x-arkdeck-contractIdentity": "1054d17b598ce23003ebbdec4d42eb359b63016d6421709ba53c3f21f7c6558d",
+  "x-arkdeck-currentProtocolVersion": "1.0.0",
   "x-arkdeck-methods": [
     {
-      "bootstrap": false,
       "method": "agent.abandon",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "agent.list",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "agent.resume",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "agent.run",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "agent.status",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "artifact.export",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "artifact.import.abort",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "artifact.import.append",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "artifact.import.begin",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "artifact.import.commit",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "artifact.import.inspect",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "artifact.import.inspection",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "artifact.import.list",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "artifact.import.release",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
-      "method": "artifact.importFlashBundle.abort",
-      "publishedOnTargetProtocol": false
-    },
-    {
-      "bootstrap": false,
-      "method": "artifact.importFlashBundle.append",
-      "publishedOnTargetProtocol": false
-    },
-    {
-      "bootstrap": false,
-      "method": "artifact.importFlashBundle.begin",
-      "publishedOnTargetProtocol": false
-    },
-    {
-      "bootstrap": false,
-      "method": "artifact.importFlashBundle.commit",
-      "publishedOnTargetProtocol": false
-    },
-    {
-      "bootstrap": false,
-      "method": "artifact.importHap.abort",
-      "publishedOnTargetProtocol": false
-    },
-    {
-      "bootstrap": false,
-      "method": "artifact.importHap.append",
-      "publishedOnTargetProtocol": false
-    },
-    {
-      "bootstrap": false,
-      "method": "artifact.importHap.begin",
-      "publishedOnTargetProtocol": false
-    },
-    {
-      "bootstrap": false,
-      "method": "artifact.importHap.commit",
-      "publishedOnTargetProtocol": false
-    },
-    {
-      "bootstrap": false,
-      "method": "artifact.importNativeLibrary.abort",
-      "publishedOnTargetProtocol": false
-    },
-    {
-      "bootstrap": false,
-      "method": "artifact.importNativeLibrary.append",
-      "publishedOnTargetProtocol": false
-    },
-    {
-      "bootstrap": false,
-      "method": "artifact.importNativeLibrary.begin",
-      "publishedOnTargetProtocol": false
-    },
-    {
-      "bootstrap": false,
-      "method": "artifact.importNativeLibrary.commit",
-      "publishedOnTargetProtocol": false
-    },
-    {
-      "bootstrap": false,
-      "method": "artifact.importWorkspacePatch.abort",
-      "publishedOnTargetProtocol": false
-    },
-    {
-      "bootstrap": false,
-      "method": "artifact.importWorkspacePatch.append",
-      "publishedOnTargetProtocol": false
-    },
-    {
-      "bootstrap": false,
-      "method": "artifact.importWorkspacePatch.begin",
-      "publishedOnTargetProtocol": false
-    },
-    {
-      "bootstrap": false,
-      "method": "artifact.importWorkspacePatch.commit",
-      "publishedOnTargetProtocol": false
-    },
-    {
-      "bootstrap": false,
       "method": "artifact.inspect",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "artifact.list",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "artifact.quota",
-      "publishedOnTargetProtocol": false
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "artifact.read",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
-      "method": "capability.draft",
-      "publishedOnTargetProtocol": false
-    },
-    {
-      "bootstrap": false,
       "method": "capability.inspect",
-      "publishedOnTargetProtocol": false
+      "published": true
     },
     {
-      "bootstrap": false,
-      "method": "capability.install",
-      "publishedOnTargetProtocol": false
-    },
-    {
-      "bootstrap": false,
       "method": "capability.list",
-      "publishedOnTargetProtocol": false
+      "published": true
     },
     {
-      "bootstrap": false,
-      "method": "capability.revoke",
-      "publishedOnTargetProtocol": false
-    },
-    {
-      "bootstrap": false,
       "method": "cleanupDebt.continue",
-      "publishedOnTargetProtocol": false
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "cleanupDebt.list",
-      "publishedOnTargetProtocol": false
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "control-action.list",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "control-action.reconcile",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "control-action.show",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "debug.evaluate",
-      "publishedOnTargetProtocol": false
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "debug.probe",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "debug.start",
-      "publishedOnTargetProtocol": false
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "debug.status",
-      "publishedOnTargetProtocol": false
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "debug.template.run",
-      "publishedOnTargetProtocol": false
+      "published": true
     },
     {
-      "bootstrap": false,
-      "method": "device.candidates",
-      "publishedOnTargetProtocol": false
-    },
-    {
-      "bootstrap": false,
       "method": "device.display-name.clear",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "device.display-name.set",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "device.observations",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "doctor",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "flash.bind-current-loader",
-      "publishedOnTargetProtocol": false
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "flash.bootloader-status",
-      "publishedOnTargetProtocol": false
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "flash.device-access",
-      "publishedOnTargetProtocol": false
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "flash.lanePlanPreview",
-      "publishedOnTargetProtocol": false
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "flash.prerequisites",
-      "publishedOnTargetProtocol": false
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "health",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "history.filter.delete",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "history.filter.list",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "history.filter.save",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "human-action.list",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "human-action.resume",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "human-action.show",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "job.cancel",
-      "publishedOnTargetProtocol": false
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "job.events",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "job.evidence",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "job.list",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
-      "method": "job.list-page",
-      "publishedOnTargetProtocol": false
-    },
-    {
-      "bootstrap": false,
       "method": "job.plan",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "job.reconcile",
-      "publishedOnTargetProtocol": false
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "job.result",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "job.run",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "job.show",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "job.status",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "job.submit",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "job.timeline",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "operation.describe",
-      "publishedOnTargetProtocol": false
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "operation.list",
-      "publishedOnTargetProtocol": false
+      "published": true
     },
     {
-      "bootstrap": true,
-      "method": "protocol.negotiate",
-      "publishedOnTargetProtocol": false
-    },
-    {
-      "bootstrap": false,
       "method": "recovery.flash-invocation.list",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
-      "method": "runtime.hdc-status",
-      "publishedOnTargetProtocol": false
-    },
-    {
-      "bootstrap": false,
       "method": "runtime.hdc.impact-preview",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "runtime.hdc.restart",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "runtime.hdc.status",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "runtime.storage.policy",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "runtime.storage.root",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "runtime.storage.status",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "runtime.tool.select",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "session.cleanup.apply",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "session.cleanup.preview",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "session.export.apply",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "session.export.preview",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "session.list",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "session.pin",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "session.show",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "session.unpin",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "target.adopt",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "target.availability",
-      "publishedOnTargetProtocol": false
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "target.display-name.clear",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "target.display-name.set",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "target.list",
-      "publishedOnTargetProtocol": false
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "target.show",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "trace.cache.purge",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "trace.cache.status",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "trace.inspect",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "trace.probe",
-      "publishedOnTargetProtocol": false
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "workspace.preset.list",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "workspace.preset.register",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "workspace.preset.remove",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "workspace.preset.show",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "workspace.preset.update",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "workspace.project.list",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "workspace.project.register",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "workspace.project.remove",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "workspace.project.show",
-      "publishedOnTargetProtocol": true
+      "published": true
     },
     {
-      "bootstrap": false,
       "method": "workspace.project.update",
-      "publishedOnTargetProtocol": true
+      "published": true
     }
-  ],
-  "x-arkdeck-targetProtocolVersion": "2.0.0"
+  ]
 }

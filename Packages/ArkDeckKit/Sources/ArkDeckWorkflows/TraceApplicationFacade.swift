@@ -442,7 +442,7 @@ private actor TraceProductionApplicationProvider: TraceApplicationProviding {
     async let operations = TraceXPCReadTransport.request(method: "operation.list")
     async let targets = TraceXPCReadTransport.request(method: "target.list")
     async let jobs = TraceXPCReadTransport.request(
-      method: "job.list", params: RuntimeAppJobListPolicy.recentSummaryParams)
+      method: "job.list", params: RuntimeAppReadResources.recentSummaryParams)
     let base = TraceWorkspaceResponseDecoding.presentation(
       operationResponse: await operations,
       targetResponse: await targets,
@@ -515,9 +515,12 @@ private actor TraceProductionApplicationProvider: TraceApplicationProviding {
 
   func run(jobID: String) async -> TraceJobRunResult {
     do {
-      let result = try TraceXPCResponseDecoding.resultObject(
+      _ = try TraceXPCResponseDecoding.resultObject(
         await TraceXPCReadTransport.request(
           method: "job.run", params: ["jobId": .string(jobID)]))
+      let result = try await RuntimeAppReadResources.statusPresentation(jobID: jobID) { method, params in
+        try await TraceXPCReadTransport.request(method: method, params: params).get()
+      }
       guard result["jobId"] as? String == jobID,
         let state = result["state"] as? String,
         let outcomeUnknown = result["outcomeUnknown"] as? Bool,
@@ -752,7 +755,7 @@ enum TraceWorkspaceResponseDecoding {
     case .failure(let failure):
       return TraceDecodedList(failure: failure.message)
     case .success(let data):
-      switch decodeResultArray(data) {
+      switch Result(catching: { try RuntimeAppReadResources.recentJobSummaries(data) }).mapError({ TraceResponseFailure(message: String(describing: $0)) }) {
       case .failure(let failure):
         return TraceDecodedList(failure: failure.message)
       case .success(let entries):

@@ -24,9 +24,6 @@ struct RuntimeTraceInspectionResourceHandler {
     }
 
     do {
-      guard request.protocolVersion == ArkDeckControlProtocol.targetVersion else {
-        return failed("unknownMethod", "Trace inspection requires protocol 2")
-      }
       guard let artifacts, let inspector else {
         return failed("operationUnavailable", "Trace inspection is unavailable")
       }

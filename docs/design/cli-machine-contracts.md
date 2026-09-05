@@ -43,7 +43,7 @@ tooling and are macOS-only until a Windows profile is ratified.
 | `cli-page.schema.json` | §7.3 | `pageKind` conditionals: event pages fix `order` and always carry a cursor; exhausted snapshots carry `null` |
 | `cli-event.schema.json` | `CLIEventEnvelope` | terminal frame vs Runtime event frame |
 | `cli-next-action.schema.json` | §7.3 union | one closed branch per `kind`; resource kind mirrors owner kind where the spec says so |
-| `runtime-control-plane.schema.json` | `AgentWireProtocol`, `ArkDeckControlProtocol` | request/response frames; `method` enum is the classified method set plus the bootstrap method, annotated with 2.x publication |
+| `runtime-control-plane.schema.json` | `AgentWireProtocol`, `ArkDeckControlProtocol` | request/response frames; `method` enum is the exact current classified method set, with version and identity constants |
 
 `--version --output json` reports `pageSchemaVersion` and
 `nextActionSchemaVersion` as `arkdeck.cli.page/1` and
@@ -54,14 +54,13 @@ are the titles of the corresponding schema files.
 
 `cli-feature-coverage.json` has one entry per feature, keyed by `source`:
 
-- `daemon:<method>` — every method `CLIControlMethodRegistry` classifies, plus
-  `protocol.negotiate`. The generator refuses to run when a classified method
+- `daemon:<method>` — every method `CLIControlMethodRegistry` classifies. The generator refuses to run when a classified method
   has no ruling in `CLIMachineContracts.FeatureCoverage.daemonMethodCoverage`,
   so a new daemon method cannot enter the registry without a coverage
   decision. A ruling is one of: fronted by a leaf (with optional compatibility
   spellings, e.g. `debug.start` is reached by `recovery flash-invocation start`
   and the legacy `debug start`), closed plumbing behind a leaf (`internal`),
-  a refused stub (`refused`), or the bootstrap.
+  a refused stub (`refused`), or a refused product command.
 - `catalog:<reference>` — every published operation. `direct` when a leaf
   declares it as `catalogOperation`; `generic` otherwise, reachable through
   `job submit --operation <ref>`. Today only the `flash.dayu200` alias is
@@ -82,7 +81,7 @@ and `classification == targetClassification` unless the entry is `blocked`.
 closed entry, `partial` for `blocked`, and `notImplemented` for Windows, which
 has no ratified profile. `requiredPlatforms` is `["macos"]` for host-specific
 families (`legacy`, `agentd`, `signing`, `update-feed`, `maintainer`, `runtime
-service|signing|bundle|tool|update|support-bundle`, every frozen 1.x leaf and
+service|signing|bundle|tool|update|support-bundle`, legacy command spellings and
 every App surface) and `["macos", "windows"]` otherwise.
 
 `summary.fullFunction` is `true` exactly when no entry is `blocked`. It is the

@@ -13,7 +13,7 @@ arkdeck trace cache status --output json
 arkdeck trace cache purge --output json
 ```
 
-Both leaves negotiate control protocol 2. `status` returns
+Both leaves verify the current v1 control identity. `status` returns
 `arkdeck.trace-cache-status/1` with bounded entry, active-entry and byte counts.
 It also reports the fixed scope `inactiveDerivedDatabases`; it never publishes
 the cache path. `purge` returns `arkdeck.trace-cache-purge/1`, before/after

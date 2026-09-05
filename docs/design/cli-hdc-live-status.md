@@ -1,6 +1,6 @@
 # Live CLI HDC status
 
-`arkdeck runtime hdc status --output json` defaults to control protocol 2 and
+`arkdeck runtime hdc status --output json` defaults to the current v1 control contract and
 reads the new `runtime.hdc.status` method. It returns
 `arkdeck.runtime-hdc-status/1`, with the configured executable path/source,
 expected and verified hashes, static signature, client/server/daemon versions,
@@ -38,10 +38,9 @@ available` means that the identity observation succeeded, not that a restart is
 admitted or that the HDC service is healthy. Later control actions must obtain
 their own complete fresh facts and cannot use this JSON projection as authority.
 
-`--require-protocol 1` explicitly reads the frozen `runtime.hdc-status` startup
-projection for compatibility. A default/protocol-2 request never falls back to
-it after a negotiation failure. The new method rejects caller paths, generations
-or other parameters, and is not added to the existing App's 1.x XPC allowlist.
+CLI and App use `runtime.hdc.status`. The startup-cache alias has been removed.
+The current method rejects caller paths, generations and other parameters;
+missing live observation remains unavailable.
 
 This closes a status prerequisite for GJ-1 and the full CLI lifecycle surface.
 Control-action previews, tool selection, impact-approval HAR consumption,

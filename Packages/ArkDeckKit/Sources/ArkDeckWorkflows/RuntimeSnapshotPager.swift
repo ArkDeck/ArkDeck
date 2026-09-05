@@ -137,7 +137,7 @@ package final class RuntimeSnapshotPager: @unchecked Sendable {
       }
     }
     do {
-      let object = try ControlProtocolNegotiation.decodeObject(data, maximumBytes: Self.maximumSnapshotBytes)
+      let object = try ControlFrameJSON.decodeObject(data, maximumBytes: Self.maximumSnapshotBytes)
       guard Set(object.keys) == ["schemaVersion", "revision", "queryDigest", "order", "tokens", "pages"] else { throw invalidCursor() }
       let snapshot = try JSONDecoder().decode(Snapshot.self, from: data)
       guard snapshot.schemaVersion == "arkdeck.runtime-snapshot/1", snapshot.revision == revision,

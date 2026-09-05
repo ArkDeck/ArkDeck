@@ -32,23 +32,19 @@ enum CLIControlMethodRegistry {
   /// Read-only methods, each because its handler observes and reports.
   ///
   /// `job.plan` is here on the strength of the engine's own statement that
-  /// plan-only writes no lineage or ledger row; `device.candidates` on its
-  /// handler's, which reads candidates directly rather than through the
-  /// advance path that would adopt one. The device probes (`trace.probe`,
+  /// plan-only writes no lineage or ledger row; `device.observations` on its
+  /// owner's, which observes the physical relation without adopting it. The device probes (`trace.probe`,
   /// `debug.probe`, the three `flash.*` observations) read device and host
   /// facts without changing either — §8.4's test is mutation, not contact.
   private static let boundedReadOnlyMethods: Set<String> = [
-    ArkDeckControlProtocol.bootstrapMethod,
     "health",
     "doctor",
-    "runtime.hdc-status",
     "runtime.hdc.status",
     "runtime.storage.status",
     "session.list",
     "session.show",
     "operation.list",
     "operation.describe",
-    "device.candidates",
     // The object-shaped sibling §6.1 needs. Observes and reports: it reads the
     // discovery snapshot and mints identity for it, and creates no binding.
     "device.observations",
@@ -79,7 +75,6 @@ enum CLIControlMethodRegistry {
     "capability.inspect",
     "job.plan",
     "job.list",
-    "job.list-page",
     "job.status",
     "job.events",
     "job.show",
@@ -104,9 +99,6 @@ enum CLIControlMethodRegistry {
     // rather than `operationFailed` if the handler published the structured
     // pre-admission evidence §8.4 asks for; giving it to them is a daemon-side
     // change, not a classification change.
-    "capability.draft",
-    "capability.install",
-    "capability.revoke",
   ]
 
   /// Methods that can leave something behind: durable resources, lifecycle
@@ -166,22 +158,6 @@ enum CLIControlMethodRegistry {
     "job.reconcile",
     "cleanupDebt.continue",
     "artifact.export",
-    "artifact.importHap.begin",
-    "artifact.importHap.append",
-    "artifact.importHap.commit",
-    "artifact.importHap.abort",
-    "artifact.importWorkspacePatch.begin",
-    "artifact.importWorkspacePatch.append",
-    "artifact.importWorkspacePatch.commit",
-    "artifact.importWorkspacePatch.abort",
-    "artifact.importFlashBundle.begin",
-    "artifact.importFlashBundle.append",
-    "artifact.importFlashBundle.commit",
-    "artifact.importFlashBundle.abort",
-    "artifact.importNativeLibrary.begin",
-    "artifact.importNativeLibrary.append",
-    "artifact.importNativeLibrary.commit",
-    "artifact.importNativeLibrary.abort",
   ]
 
   /// Every classified method, for the exhaustiveness test.
@@ -379,7 +355,7 @@ enum CLIControlFailureMapper {
     case .lostResponse:
       // The frame never completed, which is an availability problem rather
       // than a schema violation: `protocolMalformed` is reserved for a frame
-      // that arrived and broke the negotiated shape.
+      // that arrived and broke the current shape.
       return isReadOnly ? .runtimeUnavailable : .outcomeUnknown
     case .clientTimeout:
       return isReadOnly ? .clientTimeout : .outcomeUnknown

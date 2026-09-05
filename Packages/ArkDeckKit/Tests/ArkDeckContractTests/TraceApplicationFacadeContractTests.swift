@@ -118,7 +118,7 @@ final class TraceApplicationFacadeContractTests: XCTestCase {
           ]
         ])),
       jobResponse: .success(
-        try response([
+        try currentJobPageResponse([
           [
             "jobId": "diagnostics-job",
             "operation": "capture.diagnostics@1",
@@ -229,7 +229,7 @@ final class TraceApplicationFacadeContractTests: XCTestCase {
           ["targetId": "unbound"]
         ])),
       jobResponse: .success(
-        try response([
+        try currentJobPageResponse([
           ["jobId": "incomplete", "operation": "capture.diagnostics@1"]
         ])))
 

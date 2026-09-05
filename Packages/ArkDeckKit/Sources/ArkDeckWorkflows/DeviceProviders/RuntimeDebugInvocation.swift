@@ -234,7 +234,7 @@ enum RuntimeDebugAttemptPermitStore {
     guard FileManager.default.fileExists(atPath: location.path) else { return nil }
     let record = try JSONDecoder().decode(
       RuntimeDebugAttemptPermitRecord.self, from: Data(contentsOf: location))
-    guard request.campaignReservation == nil, request.clientContext == nil else {
+    guard request.clientContext == nil else {
       throw RuntimeDebugInvocationError.persistenceFailure(
         "Runtime debug attempt cannot gain campaign or client provenance")
     }
@@ -355,7 +355,6 @@ public actor RuntimeDebugInvocationController {
       throw RuntimeDebugInvocationError.invalidSeedRequest("\(error)")
     }
     guard request.authorization == nil,
-      request.campaignReservation == nil,
       request.clientContext == nil
     else {
       throw RuntimeDebugInvocationError.invalidSeedRequest(

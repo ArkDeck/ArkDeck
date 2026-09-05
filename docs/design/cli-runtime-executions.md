@@ -7,13 +7,13 @@ or real-device acceptance has passed.
 
 ## Published entry points
 
-The target protocol (`2.0.0`) adds `agent.run`, `agent.status`, `agent.list`,
+The current protocol (`1.0.0`) publishes `agent.run`, `agent.status`, `agent.list`,
 `agent.abandon`, `agent.resume`, and `human-action.list/show/resume`. Their
 production owner is `RuntimeAgentExecutionCoordinator`, composed by
 `arkdeck-agentd`, rather than a CLI-local pending file.
 
 ```text
-arkdeck agent run --require-protocol 2 --operation observe.device@1 \
+arkdeck agent run --operation observe.device@1 \
   --execution-id observation-20260831 --maximum-wait 5m --timeout 30s --output json
 arkdeck agent status --execution-id observation-20260831 --output json
 arkdeck agent list --page-size 100 --output json
@@ -28,12 +28,9 @@ arkdeck agent abandon --execution-id observation-20260831 \
 
 `agent run` accepts either the existing typed operation request document or
 flag-form operation/target/binding/inputs/capability/request identities. Input
-and selection files also accept `-` for bounded strict JSON on stdin. New
-orchestration options and the new resource leaves select protocol 2; negotiation
-never downgrades a resource mutation. An unchanged legacy `agent run` or
-`agent resume --resume-token` invocation retains its 1.x behavior. With explicit
-protocol 2, `--resume-token` passes its exact value as `resumeReference`.
-The final default-v2 and domain-convenience migration remains a later slice.
+and selection files also accept `-` for bounded strict JSON on stdin. Every
+rendering uses the same Runtime-owned execution resource. `--resume-token`
+passes its exact value as `resumeReference`; it does not select another protocol.
 
 ## Ownership and replay
 

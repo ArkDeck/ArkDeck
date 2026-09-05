@@ -1500,8 +1500,11 @@ public actor RuntimeArtifactStore {
     }
   }
 
-  package func beginImport(_ intent: ArtifactImportIntent, binding: ArtifactBindingSnapshot) throws -> JSONValue {
-    let record = try imports().begin(intent, binding: binding, now: nowUTC())
+  package func beginImport(
+    _ intent: ArtifactImportIntent, binding: ArtifactBindingSnapshot, appOwned: Bool = false
+  ) throws -> JSONValue {
+    let record = try imports().begin(
+      intent, binding: binding, now: nowUTC(), appOwned: appOwned)
     try finishImportReleaseIfNeeded(record)
     return record.projection
   }

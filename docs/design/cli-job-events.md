@@ -6,16 +6,15 @@ recovery, journal canonicalization, or the Catalog digest.
 
 ## Published surface
 
-The negotiated 2.0.0 control vocabulary adds `job.events` and `job.status`.
-Protocol 1.0.0 `job.status` remains unchanged; 1.0.0 cannot call `job.events`.
+The current `1.0.0` registry publishes `job.events` and compact `job.status`.
 
 ```text
 arkdeck job events --job J --output json
 arkdeck job events --job J --after-cursor CURSOR --page-size 100 --output json
 arkdeck job watch --job J --output jsonl --timeout 30s
 arkdeck job wait --job J --output jsonl --timeout 5m
-arkdeck job wait --job J --require-protocol 2 --output json --timeout 5m
-arkdeck job status --job J --require-protocol 2 --output json
+arkdeck job wait --job J --output json --timeout 5m
+arkdeck job status --job J --output json
 ```
 
 `events` returns one `arkdeck.cli.page/1` envelope, with `pageKind:eventStream`,
@@ -82,15 +81,14 @@ with `ok:true` and exit 1. Timeout, human action, and unknown outcome use
 `ok:false`, exit 75; SIGINT uses exit 130 without cancelling the Job. An error's
 bounded details also retain the polling cursor for a call that saw no new row.
 
-An explicit timeout is one continuous/UTC budget across negotiation, reconnect,
+An explicit timeout is one continuous/UTC budget across contract identity verification, reconnect,
 reads, and backoff, capped at 24h. Without an explicit overall timeout, each
 unary exchange is bounded to 30s and the observer remains open. SIGINT can stop
 a stalled read without waiting for that 30s deadline. Transient connection
 unavailability gets at most two retries with the same exclusive cursor.
 
-Unmodified `job wait` human/JSON calls retain their legacy snapshot behavior;
-JSONL, cursor/page flags, or `--require-protocol 2` select the new event path.
-The final default-v2 migration is a separate remaining product slice.
+Human, JSON and JSONL waiting consume the same current event path. Formatting
+and cursor options do not change operation admission or protocol identity.
 
 ## Validation and remaining scope
 

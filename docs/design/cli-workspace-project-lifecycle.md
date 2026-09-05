@@ -4,7 +4,7 @@ Task: TASK-AIN-021
 
 `arkdeck workspace project register|update|remove|list|show` exposes the
 Runtime-owned project registration resource required by CLI-REQ-022. All five
-leaves negotiate control protocol 2 before sending a target request.
+leaves verify the current v1 control identity before sending a target request.
 
 ```text
 arkdeck workspace project register \

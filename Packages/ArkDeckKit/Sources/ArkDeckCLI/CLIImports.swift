@@ -21,7 +21,7 @@ extension RuntimeCLI {
     do {
       let method = verb == "inspect" ? "artifact.import.inspection"
         : ["list", "abort", "release"].contains(verb) ? "artifact.import.\(verb)" : "artifact.import.begin"
-      try session.negotiate(requiredMajor: 2, forMethod: method)
+
       if verb == "list" {
         var fields: [String: JSONValue] = [:]
         for (flag, key) in [("--target", "target"), ("--state", "state"), ("--cursor", "cursor")] {

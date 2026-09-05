@@ -8,7 +8,7 @@ extension RuntimeCLI {
   static func usesRuntimeExecution(_ arguments: [String]) -> Bool {
     if let verb = arguments.first, ["list", "status", "abandon"].contains(verb) { return true }
     return arguments.contains { [
-      "--require-protocol", "--resume-reference", "--selection-file", "--request-file", "--maximum-wait",
+      "--execution-id", "--resume-reference", "--selection-file", "--request-file", "--maximum-wait",
       "--timeout", "--expected-binding-revision", "--request-id", "--idempotency-key", "--reviewed-plan-digest",
     ].contains($0) }
   }
@@ -78,7 +78,6 @@ extension RuntimeCLI {
     } else { deadline = nil }
     var identity = params["executionId"]
     do {
-      try session.negotiate(requiredMajor: 2, forMethod: command)
       var result = try session.request(command, params)
       if family == "human-action", verb == "resume" {
         if case .object(let challenge) = result,

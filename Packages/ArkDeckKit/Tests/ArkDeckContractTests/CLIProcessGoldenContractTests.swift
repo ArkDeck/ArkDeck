@@ -164,8 +164,8 @@ final class CLIProcessGoldenContractTests: XCTestCase {
     XCTAssertEqual(envelope["ok"] as? Bool, true)
     let payload = try XCTUnwrap(envelope["result"] as? [String: Any])
     for key in [
-      "cliProductVersion", "commandRegistrySchemaVersion", "preferredControlProtocolVersion",
-      "supportedControlProtocolExactVersions", "machineContractVersion", "resultSchemaVersion",
+      "cliProductVersion", "commandRegistrySchemaVersion", "controlProtocolVersion",
+      "controlContractIdentity", "machineContractVersion", "resultSchemaVersion",
       "pageSchemaVersion", "eventSchemaVersion", "nextActionSchemaVersion",
       "errorRegistryVersion", "canonicalJsonVersion", "buildIdentity",
     ] {

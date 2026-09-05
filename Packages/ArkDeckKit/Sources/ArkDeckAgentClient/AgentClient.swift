@@ -21,109 +21,39 @@ public enum AgentClientError: Error, Equatable, Sendable {
 
 public struct AgentClient: Sendable {
   public let socketPath: String
-  /// Non-nil only after a successful version-neutral bootstrap (or the one
-  /// registry-authorized pre-bootstrap legacy fallback).
-  public let selectedProtocolVersion: String?
-  private let legacyFallbackMethod: String?
+  public var protocolVersion: String { ArkDeckControlProtocol.currentVersion }
   private var waitDeadline: AgentClientWaitDeadline?
 
   public init(socketPath: String) {
     self.socketPath = socketPath
-    self.selectedProtocolVersion = nil
-    self.legacyFallbackMethod = nil
     self.waitDeadline = nil
   }
 
-  private init(
-    socketPath: String, selectedProtocolVersion: String, legacyFallbackMethod: String? = nil,
-    waitDeadline: AgentClientWaitDeadline? = nil
-  ) {
-    self.socketPath = socketPath
-    self.selectedProtocolVersion = selectedProtocolVersion
-    self.legacyFallbackMethod = legacyFallbackMethod
-    self.waitDeadline = waitDeadline
-  }
-
-  /// All exchanges made with this copy, including negotiation, share the same
-  /// absolute deadline. Copying or negotiating it cannot renew the budget.
+  /// All exchanges made with this copy, including the connection identity check, share the same
+  /// absolute deadline. Copying it cannot renew the budget.
   package func bounded(by deadline: AgentClientWaitDeadline) -> Self {
     var copy = self
-    copy.waitDeadline = deadline
+    copy.waitDeadline = waitDeadline.map { $0.intersecting(deadline) } ?? deadline
     return copy
   }
 
-  public func negotiated(
-    requiredMajor: Int, forMethod method: String, timeoutSeconds: Int = 5
-  ) throws -> AgentClient {
-    let id = UUID().uuidString
-    let frame: Data
-    do {
-      frame = try ControlProtocolNegotiation.request(id: id, requiredMajor: requiredMajor)
-    } catch {
-      throw AgentClientError.malformedResponse("invalid negotiation request")
-    }
-    let response = try exchange(
-      frame, timeoutSeconds: timeoutSeconds,
-      maximumResponseBytes: ArkDeckControlProtocol.maximumBootstrapFrameBytes)
-    if ControlProtocolNegotiation.isPreBootstrapRefusal(response) {
-      guard requiredMajor == 1,
-        ArkDeckControlProtocol.preBootstrapLegacyMethods.contains(method)
-      else {
-        throw AgentClientError.daemonError(
-          code: "unsupportedProtocolVersion",
-          message: "the Runtime has no compatible negotiated protocol; no domain request was sent")
-      }
-      return AgentClient(
-        socketPath: socketPath, selectedProtocolVersion: ArkDeckControlProtocol.legacyVersion,
-        legacyFallbackMethod: method, waitDeadline: waitDeadline)
-    }
-    do {
-      let version = try ControlProtocolNegotiation.selectedVersion(
-        response: response, id: id, requiredMajor: requiredMajor)
-      return AgentClient(
-        socketPath: socketPath, selectedProtocolVersion: version, waitDeadline: waitDeadline)
-    } catch ControlProtocolNegotiation.Failure.unsupported {
-      throw AgentClientError.daemonError(
-        code: "unsupportedProtocolVersion",
-        message:
-          "no common exact protocol version in the required major; no domain request was sent")
-    } catch {
-      throw AgentClientError.malformedResponse("invalid protocol negotiation response")
-    }
-  }
-
-  /// One request per connection: simple, race-free, and cheap at local
-  /// UDS latencies. Pooling can come later without changing callers.
+  /// Each business request checks health on the same socket before sending.
+  /// A reconnect repeats the check; a lost reply is never replayed.
   public func request(
     method: String, params: [String: JSONValue]? = nil, id: String = UUID().uuidString,
     timeoutSeconds: Int? = nil
   ) throws -> JSONValue {
     try waitDeadline?.check()
-    if let legacyFallbackMethod, method != legacyFallbackMethod {
-      throw AgentClientError.daemonError(
-        code: "unsupportedProtocolVersion",
-        message: "legacy fallback is limited to its declared method; no domain request was sent")
-    }
     let wire = AgentWireRequest(
-      protocolVersion: selectedProtocolVersion ?? ArkDeckAgentXPC.wireProtocolVersion,
+      protocolVersion: ArkDeckControlProtocol.currentVersion,
+      contractIdentity: ArkDeckControlProtocol.contractIdentity,
       id: id, method: method, params: params)
     let payload = try CanonicalJSONEncoders.canonical().encode(wire)
-    let line = try exchange(payload, timeoutSeconds: timeoutSeconds)
+    let line = try exchange(payload, timeoutSeconds: timeoutSeconds, verifyContract: method != "health")
     let response: AgentWireResponse
     do {
-      if selectedProtocolVersion == ArkDeckControlProtocol.targetVersion {
-        let fields = try ControlProtocolNegotiation.decodeObject(line, maximumBytes: 8 * 1024 * 1024)
-        if fields["ok"] == .bool(true) {
-          guard Set(fields.keys) == ["id", "ok", "result"] else {
-            throw ControlProtocolNegotiation.Failure.malformed
-          }
-        } else {
-          guard Set(fields.keys) == ["id", "ok", "error"],
-            case .object(let error)? = fields["error"],
-            Set(error.keys).isSubset(of: ["code", "message", "details"])
-          else { throw ControlProtocolNegotiation.Failure.malformed }
-        }
-      }
+      _ = try ControlProtocolContract.responseFields(line, id: id)
+      if method == "health" { try ControlProtocolContract.validateHealth(line, id: id) }
       response = try JSONDecoder().decode(AgentWireResponse.self, from: line)
     } catch {
       throw AgentClientError.malformedResponse("\(error)")
@@ -133,8 +63,7 @@ public struct AgentClient: Sendable {
       throw AgentClientError.malformedResponse("response id mismatch")
     }
     if response.ok { return response.result ?? .null }
-    if selectedProtocolVersion == ArkDeckControlProtocol.targetVersion,
-      let error = response.error, let details = error.details
+    if let error = response.error, let details = error.details
     {
       throw AgentClientError.structuredDaemonError(
         code: error.code, message: error.message, details: details)
@@ -145,12 +74,13 @@ public struct AgentClient: Sendable {
   }
 
   private func exchange(
-    _ frame: Data, timeoutSeconds: Int?, maximumResponseBytes: Int = 8 * 1024 * 1024
+    _ frame: Data, timeoutSeconds: Int?, verifyContract: Bool
   ) throws -> Data {
     try waitDeadline?.check()
-    guard selectedProtocolVersion == nil || frame.count + 1 <= 4 * 1024 * 1024 else {
+    guard frame.count + 1 <= ArkDeckControlProtocol.maximumRequestFrameBytes else {
       throw AgentClientError.transport("oversized request; no request was sent")
     }
+    if let timeoutSeconds, timeoutSeconds <= 0 { throw AgentClientError.transport("timeout must be positive") }
     let fd = socket(AF_UNIX, SOCK_STREAM, 0)
     guard fd >= 0 else { throw AgentClientError.connectFailed("cannot create socket") }
     defer { close(fd) }
@@ -164,27 +94,11 @@ public struct AgentClient: Sendable {
         fd, SOL_SOCKET, SO_NOSIGPIPE, &suppressSignal,
         socklen_t(MemoryLayout<Int32>.size)) == 0
     else { throw AgentClientError.transport("cannot suppress SIGPIPE") }
-    if waitDeadline != nil {
-      // SO_RCVTIMEO alone resets on every read, allowing a trickling peer to
-      // keep a bounded invocation alive forever. Nonblocking IO plus poll
-      // uses the remaining *total* budget for connect, write and every read.
-      let flags = fcntl(fd, F_GETFL)
-      guard flags >= 0, fcntl(fd, F_SETFL, flags | O_NONBLOCK) == 0 else {
-        throw AgentClientError.transport("cannot configure nonblocking socket")
-      }
-    } else if let timeoutSeconds {
-      guard timeoutSeconds > 0 else {
-        throw AgentClientError.transport("timeout must be positive")
-      }
-      var timeout = timeval(tv_sec: timeoutSeconds, tv_usec: 0)
-      guard
-        setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, socklen_t(MemoryLayout.size(ofValue: timeout)))
-          == 0,
-        setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout.size(ofValue: timeout)))
-          == 0
-      else {
-        throw AgentClientError.transport("cannot configure bounded socket timeout")
-      }
+    var activeDeadline: AgentClientWaitDeadline? = try waitDeadline
+      ?? AgentClientWaitDeadline(milliseconds: min(timeoutSeconds ?? 5, 5) * 1000)
+    let originalFlags = fcntl(fd, F_GETFL)
+    guard originalFlags >= 0, fcntl(fd, F_SETFL, originalFlags | O_NONBLOCK) == 0 else {
+      throw AgentClientError.transport("cannot configure nonblocking socket")
     }
     var address = sockaddr_un()
     address.sun_family = sa_family_t(AF_UNIX)
@@ -206,10 +120,10 @@ public struct AgentClient: Sendable {
     }
     if connectResult != 0 {
       let connectError = errno
-      guard let waitDeadline,
+      guard let activeDeadline,
         connectError == EINPROGRESS || connectError == EALREADY || connectError == EWOULDBLOCK
       else { throw AgentClientError.connectFailed("connect failed: errno \(connectError)") }
-      try Self.waitForSocket(fd, events: Int16(POLLOUT), deadline: waitDeadline)
+      try Self.waitForSocket(fd, events: Int16(POLLOUT), deadline: activeDeadline)
       var socketError: Int32 = 0
       var size = socklen_t(MemoryLayout.size(ofValue: socketError))
       guard getsockopt(fd, SOL_SOCKET, SO_ERROR, &socketError, &size) == 0, socketError == 0 else {
@@ -217,72 +131,97 @@ public struct AgentClient: Sendable {
       }
     }
 
-    var payload = frame
-    payload.append(0x0A)
-    var written = 0
-    try payload.withUnsafeBytes { raw in
-      guard let base = raw.baseAddress else { throw AgentClientError.transport("empty request") }
-      while written < payload.count {
-        try waitDeadline?.check()
-        let result = write(fd, base + written, payload.count - written)
-        if result > 0 {
-          written += result
-        } else if result < 0, errno == EINTR {
-          continue
-        } else if result < 0, let waitDeadline, errno == EAGAIN || errno == EWOULDBLOCK {
-          try Self.waitForSocket(fd, events: Int16(POLLOUT), deadline: waitDeadline)
-        } else {
-          throw AgentClientError.transport("short write")
+    func exchangeOnConnection(_ frame: Data) throws -> Data {
+      var payload = frame
+      payload.append(0x0A)
+      var written = 0
+      try payload.withUnsafeBytes { raw in
+        guard let base = raw.baseAddress else { throw AgentClientError.transport("empty request") }
+        while written < payload.count {
+          try activeDeadline?.check()
+          let result = write(fd, base + written, payload.count - written)
+          if result > 0 {
+            written += result
+          } else if result < 0, errno == EINTR {
+            continue
+          } else if result < 0, let activeDeadline, errno == EAGAIN || errno == EWOULDBLOCK {
+            try Self.waitForSocket(fd, events: Int16(POLLOUT), deadline: activeDeadline)
+          } else {
+            throw AgentClientError.transport("short write")
+          }
         }
       }
-    }
 
-    // Only bytes that arrived since the last search can hold the terminator.
-    // Rescanning the whole buffer after every read is quadratic in response
-    // size, and responses run up to the 8 MB bound below; `memchr` also beats
-    // the byte-at-a-time `Collection` scan on the bytes it does look at.
-    var buffer = Data()
-    var scannedByteCount = 0
-    var chunk = [UInt8](repeating: 0, count: 64 * 1024)
-    var terminatorOffset: Int
-    while true {
-      try waitDeadline?.check()
-      let count = read(fd, &chunk, chunk.count)
-      if count < 0, errno == EINTR { continue }
-      if count < 0, let waitDeadline, errno == EAGAIN || errno == EWOULDBLOCK {
-        try Self.waitForSocket(fd, events: Int16(POLLIN), deadline: waitDeadline)
-        continue
-      }
-      if count <= 0 {
-        if count < 0, errno == EAGAIN || errno == EWOULDBLOCK {
-          throw AgentClientError.transport("request timed out before response")
+      // Only bytes that arrived since the last search can hold the terminator.
+      // Rescanning the whole buffer after every read is quadratic in response
+      // size, and responses run up to the 8 MB bound below; `memchr` also beats
+      // the byte-at-a-time `Collection` scan on the bytes it does look at.
+      var buffer = Data()
+      var scannedByteCount = 0
+      var chunk = [UInt8](repeating: 0, count: 64 * 1024)
+      var terminatorOffset: Int
+      while true {
+        try activeDeadline?.check()
+        let count = read(fd, &chunk, chunk.count)
+        if count < 0, errno == EINTR { continue }
+        if count < 0, let activeDeadline, errno == EAGAIN || errno == EWOULDBLOCK {
+          try Self.waitForSocket(fd, events: Int16(POLLIN), deadline: activeDeadline)
+          continue
         }
-        throw AgentClientError.transport("connection closed before response")
+        if count <= 0 {
+          if count < 0, errno == EAGAIN || errno == EWOULDBLOCK {
+            throw AgentClientError.transport("request timed out before response")
+          }
+          throw AgentClientError.transport("connection closed before response")
+        }
+        buffer.append(contentsOf: chunk[0..<count])
+        if buffer.count > ArkDeckControlProtocol.maximumResponseFrameBytes {
+          throw AgentClientError.transport("oversized response")
+        }
+        if let offset = Self.frameTerminatorOffset(in: buffer, from: scannedByteCount) {
+          terminatorOffset = offset
+          break
+        }
+        scannedByteCount = buffer.count
       }
-      buffer.append(contentsOf: chunk[0..<count])
-      if buffer.count > maximumResponseBytes {
-        throw AgentClientError.transport("oversized response")
+      let line = buffer.subdata(
+        in: buffer.startIndex..<(buffer.startIndex + terminatorOffset))
+      guard terminatorOffset + 1 == buffer.count else {
+        throw AgentClientError.malformedResponse("multiple response frames for one request")
       }
-      if let offset = Self.frameTerminatorOffset(in: buffer, from: scannedByteCount) {
-        terminatorOffset = offset
-        break
-      }
-      scannedByteCount = buffer.count
+      try activeDeadline?.check()
+      return line
     }
-    let line = buffer.subdata(
-      in: buffer.startIndex..<(buffer.startIndex + terminatorOffset))
-    guard terminatorOffset + 1 == buffer.count else {
-      throw AgentClientError.malformedResponse("multiple response frames for one request")
-    }
-    if selectedProtocolVersion != nil {
+    if verifyContract {
+      let healthID = UUID().uuidString
+      let health = AgentWireRequest(
+        protocolVersion: ArkDeckControlProtocol.currentVersion,
+        contractIdentity: ArkDeckControlProtocol.contractIdentity,
+        id: healthID, method: "health", params: nil)
       do {
-        _ = try ControlProtocolNegotiation.decodeObject(line, maximumBytes: maximumResponseBytes)
+        let response = try exchangeOnConnection(CanonicalJSONEncoders.canonical().encode(health))
+        try ControlProtocolContract.validateHealth(response, id: healthID)
       } catch {
-        throw AgentClientError.malformedResponse("invalid negotiated response frame")
+        if error is AgentClientWaitInterrupted { throw error }
+        try waitDeadline?.check()
+        throw AgentClientError.structuredDaemonError(
+          code: "unsupportedProtocolVersion",
+          message: "the connected Runtime could not prove the current contract; no business request was sent",
+          details: ["phase": .string("preAdmission"), "newDispatchCount": .integer(0)])
       }
     }
-    try waitDeadline?.check()
-    return line
+    if verifyContract { activeDeadline = waitDeadline }
+    if verifyContract && waitDeadline == nil {
+      guard fcntl(fd, F_SETFL, originalFlags) == 0 else {
+        throw AgentClientError.transport("cannot restore socket mode")
+      }
+      var timeout = timeval(tv_sec: timeoutSeconds ?? 0, tv_usec: 0)
+      guard setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, socklen_t(MemoryLayout.size(ofValue: timeout))) == 0,
+        setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout.size(ofValue: timeout))) == 0 else {
+        throw AgentClientError.transport("cannot configure socket timeout")
+      }
+    }
+    return try exchangeOnConnection(frame)
   }
 
   private static func waitForSocket(
@@ -323,6 +262,7 @@ public struct AgentClient: Sendable {
 
   private struct AgentWireRequest: Codable {
     let protocolVersion: String
+    let contractIdentity: String
     let id: String
     let method: String
     let params: [String: JSONValue]?
@@ -348,16 +288,34 @@ package struct AgentClientWaitDeadline: Sendable {
   private let wallDeadline: Date
   private let continuousDeadline: ContinuousClock.Instant
   private let budgetMilliseconds: Int
-  private let cancellation: AgentClientWaitCancellation?
+  private let cancellations: [AgentClientWaitCancellation]
 
   package init(milliseconds: Int, cancellation: AgentClientWaitCancellation? = nil) throws {
     guard (1...86_400_000).contains(milliseconds) else {
       throw AgentClientError.transport("client wait must be between 1ms and 24h")
     }
     budgetMilliseconds = milliseconds
-    self.cancellation = cancellation
+    cancellations = cancellation.map { [$0] } ?? []
     wallDeadline = Date().addingTimeInterval(Double(milliseconds) / 1000)
     continuousDeadline = ContinuousClock.now.advanced(by: .milliseconds(milliseconds))
+  }
+
+  private init(
+    wallDeadline: Date, continuousDeadline: ContinuousClock.Instant,
+    budgetMilliseconds: Int, cancellations: [AgentClientWaitCancellation]
+  ) {
+    self.wallDeadline = wallDeadline
+    self.continuousDeadline = continuousDeadline
+    self.budgetMilliseconds = budgetMilliseconds
+    self.cancellations = cancellations
+  }
+
+  fileprivate func intersecting(_ other: Self) -> Self {
+    Self(
+      wallDeadline: min(wallDeadline, other.wallDeadline),
+      continuousDeadline: min(continuousDeadline, other.continuousDeadline),
+      budgetMilliseconds: min(budgetMilliseconds, other.budgetMilliseconds),
+      cancellations: cancellations + other.cancellations)
   }
 
   package var remainingMilliseconds: Int {
@@ -371,12 +329,12 @@ package struct AgentClientWaitDeadline: Sendable {
   }
 
   package func check() throws {
-    if cancellation?.isCancelled == true { throw AgentClientWaitInterrupted() }
+    if cancellations.contains(where: { $0.isCancelled }) { throw AgentClientWaitInterrupted() }
     guard remainingMilliseconds > 0 else { throw AgentClientError.deadlineExceeded }
   }
 
   fileprivate var socketPollMilliseconds: Int {
-    min(remainingMilliseconds, cancellation == nil ? 86_400_000 : 100)
+    min(remainingMilliseconds, cancellations.isEmpty ? 86_400_000 : 100)
   }
 }
 

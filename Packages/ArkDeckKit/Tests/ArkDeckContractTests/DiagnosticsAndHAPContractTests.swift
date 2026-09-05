@@ -907,7 +907,7 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
       """
       {
         "documentType": "runtime-operation-request",
-        "schemaVersion": "2.0.0",
+        "schemaVersion": "1.0.0",
         "requestId": "req-capture",
         "idempotencyKey": "\(key)",
         "target": { "targetId": "TGT-1", "expectedBindingRevision": 7 },
@@ -923,7 +923,7 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
       """
       {
         "documentType": "runtime-operation-request",
-        "schemaVersion": "2.0.0",
+        "schemaVersion": "1.0.0",
         "requestId": "req-tap",
         "idempotencyKey": "\(key)",
         "target": { "targetId": "TGT-1", "expectedBindingRevision": 7 },
@@ -1047,7 +1047,7 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
   private func markedCaptureRequest(markers: [String], key: String) throws -> Data {
     let request: [String: Any] = [
       "documentType": "runtime-operation-request",
-      "schemaVersion": "2.0.0",
+      "schemaVersion": "1.0.0",
       "requestId": "req-marked",
       "idempotencyKey": key,
       "target": ["targetId": "TGT-1", "expectedBindingRevision": 7],
@@ -1104,7 +1104,7 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     return try JSONSerialization.data(
       withJSONObject: [
         "documentType": "runtime-operation-request",
-        "schemaVersion": "2.0.0",
+        "schemaVersion": "1.0.0",
         "requestId": "req-session-shot",
         "idempotencyKey": key,
         "target": ["targetId": "TGT-1", "expectedBindingRevision": 7],
@@ -1178,7 +1178,7 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
       """
       {
         "documentType": "runtime-operation-request",
-        "schemaVersion": "2.0.0",
+        "schemaVersion": "1.0.0",
         "requestId": "req-hap",
         "idempotencyKey": "\(key)",
         "target": { "targetId": "TGT-1", "expectedBindingRevision": 7 },

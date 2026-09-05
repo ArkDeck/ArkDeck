@@ -125,7 +125,7 @@ let request = Data(
   """
   {
     "documentType": "runtime-operation-request",
-    "schemaVersion": "2.0.0",
+    "schemaVersion": "1.0.0",
     "requestId": "req-crash",
     "idempotencyKey": "idem-crash-0001",
     "target": { "targetId": "TGT-CRASH-01", "expectedBindingRevision": 7 },

@@ -83,7 +83,7 @@ extension RuntimeCLI {
     }
     do {
       try boundRequest()
-      try session.negotiate(requiredMajor: 2, forMethod: "job.events")
+
       while true {
         var fields: [String: JSONValue] = ["jobId": .string(jobID), "pageSize": .integer(Int64(size))]
         if let cursor { fields["afterCursor"] = .string(cursor) }

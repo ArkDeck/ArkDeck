@@ -2,6 +2,8 @@ import CryptoKit
 import Foundation
 import XCTest
 
+@testable import ArkDeckCore
+
 final class ManualUIFlashDriverContractTests: XCTestCase {
   private func repositoryRoot() -> URL {
     var repositoryRoot = URL(filePath: #filePath)
@@ -24,6 +26,12 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
   private func runCandidateValidator(_ candidateURL: URL) throws -> (
     status: Int32, stdout: String, stderr: String
   ) {
+    try runValidator(["--validate-candidate", candidateURL.path])
+  }
+
+  private func runValidator(_ arguments: [String]) throws -> (
+    status: Int32, stdout: String, stderr: String
+  ) {
     // The validator script is interpreted from current source each time;
     // only the imported SDK modules are cached, in the directory every
     // interpreting test process shares (see ManualUIFlashFixtures).
@@ -38,8 +46,7 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
         path:
           "scripts/manual_ui_flash/manual_ui_flash.swift"
       ).path,
-      "--validate-candidate", candidateURL.path,
-    ]
+    ] + arguments
     process.standardOutput = output
     process.standardError = errors
     try process.run()
@@ -51,6 +58,51 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
       String(decoding: stdout, as: UTF8.self),
       String(decoding: stderr, as: UTF8.self)
     )
+  }
+
+  func testBridgeAcceptsCurrentFlashFramesAndRefusesRetiredOrUnboundedUploads() throws {
+    let bytes = Data([0x1f, 0x8b, 0x08])
+    let begin: [String: JSONValue] = [
+      "schemaVersion": .string("arkdeck.import-intent/1"), "importRequestId": .string("app-import-test"),
+      "kind": .string("flash-bundle"), "targetId": .string("target-test"), "bindingRevision": .string("1"),
+      "deviceProfile": .string("dayu200"), "name": .string("images.tar.gz"), "byteCount": .string("3"),
+      "sha256": .string(SHA256Hex.string(of: bytes)),
+    ]
+    let append: [String: JSONValue] = [
+      "importId": .string("imp-test"), "generation": .string("1"), "offset": .string("0"),
+      "byteCount": .string("3"), "sha256": .string(SHA256Hex.string(of: bytes)),
+      "base64": .string(bytes.base64EncodedString()),
+    ]
+    var cases: [(String, [String: JSONValue], Bool)] = [
+      ("health", [:], true), ("job.show", ["jobId": .string("job-test")], true),
+      ("job.timeline", ["jobId": .string("job-test")], true),
+      ("artifact.import.begin", begin, true), ("artifact.import.append", append, true),
+      ("artifact.import.commit", ["importId": .string("imp-test"), "generation": .string("1")], true),
+      ("artifact.import.abort", ["importRequestId": .string("app-import-test"), "generation": .string("1")], true),
+      ("health", ["unexpected": .bool(true)], false),
+      ("job.list-page", [:], false), ("job.status", [:], false),
+      ("artifact.importFlashBundle.begin", begin, false),
+      ("artifact.import.release", ["importId": .string("imp-test"), "generation": .string("2")], false),
+    ]
+    var foreign = begin; foreign["kind"] = .string("hap")
+    cases.append(("artifact.import.begin", foreign, false))
+    var unbounded = begin; unbounded["byteCount"] = .string("8589934593")
+    cases.append(("artifact.import.begin", unbounded, false))
+    var injected = begin; injected["path"] = .string("/tmp/foreign")
+    cases.append(("artifact.import.begin", injected, false))
+    var corrupt = append; corrupt["sha256"] = .string(String(repeating: "0", count: 64))
+    cases.append(("artifact.import.append", corrupt, false))
+    let frames = try cases.map { method, params, _ in
+      try JSONDecoder().decode([String: JSONValue].self, from: ArkDeckAgentXPC.requestFrame(method: method, params: params))
+    }
+    let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let path = directory.appending(path: "frames.json")
+    try CanonicalJSONEncoders.canonical().encode(frames).write(to: path)
+    let result = try runValidator(["--validate-xpc-frames", path.path])
+    XCTAssertEqual(result.status, 0, result.stderr)
+    XCTAssertEqual(try JSONDecoder().decode([Bool].self, from: Data(result.stdout.utf8)), cases.map(\.2))
   }
 
   func testDriverUsesThePublishedOneClickFlashSurface() throws {

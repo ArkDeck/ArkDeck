@@ -141,14 +141,13 @@ enum CLIHelpRenderer {
 
   /// §12: every independently versioned contract, reported separately, and a
   /// build identity. These are this client's own capabilities — nothing here
-  /// connects to a daemon, so none of it is a negotiated protocol version.
+  /// connects to a daemon, and reports the locally compiled current control contract.
   static func versionResult() -> JSONValue {
     var fields: [String: JSONValue] = [
       "cliProductVersion": .string(CLIProductVersion.product),
       "commandRegistrySchemaVersion": .string(CLIProductVersion.commandRegistrySchema),
-      "preferredControlProtocolVersion": .string(CLIProductVersion.preferredControlProtocol),
-      "supportedControlProtocolExactVersions": .array(
-        CLIProductVersion.supportedControlProtocolExactVersions.map(JSONValue.string)),
+      "controlProtocolVersion": .string(CLIProductVersion.controlProtocolVersion),
+      "controlContractIdentity": .string(ArkDeckControlProtocol.contractIdentity),
       "machineContractVersion": .string(CLIProductVersion.machineContract),
       "buildIdentity": CLIBuildIdentity.current().map(JSONValue.string) ?? .null,
     ]
@@ -177,9 +176,8 @@ enum CLIHelpRenderer {
       "arkdeck \(CLIProductVersion.product)",
       pad("  command registry schema", 34)
         + CLIProductVersion.commandRegistrySchema,
-      pad("  control protocol preferred", 34) + CLIProductVersion.preferredControlProtocol,
-      pad("  control protocol supported", 34)
-        + CLIProductVersion.supportedControlProtocolExactVersions.joined(separator: ", "),
+      pad("  control protocol", 34) + CLIProductVersion.controlProtocolVersion,
+      pad("  control contract identity", 34) + ArkDeckControlProtocol.contractIdentity,
       pad("  machine contract", 34) + CLIProductVersion.machineContract,
     ]
     for (key, value) in versionComponents {

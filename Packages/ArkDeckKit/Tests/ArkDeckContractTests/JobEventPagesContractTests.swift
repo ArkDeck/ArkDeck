@@ -362,12 +362,12 @@ final class JobEventPagesContractTests: XCTestCase {
     }
   }
 
-  func testProtocolOneFrozenAndMissingJobOrInvalidCursorAreExactFailures() async throws {
+  func testCurrentStatusAndMissingJobOrInvalidCursorHaveExactShapes() async throws {
     let runtime = try runtime(); let id = try await run(runtime)
     let old = AgentClient(socketPath: runtime.server.socketURL.path)
     let oldStatus = try object(old.request(method: "job.status", params: ["jobId": .string(id)]))
-    XCTAssertNotNil(oldStatus["timeline"]); XCTAssertNil(oldStatus["nextAction"])
-    XCTAssertThrowsError(try old.request(method: "job.events", params: ["jobId": .string(id)]))
+    XCTAssertNil(oldStatus["timeline"]); XCTAssertNotNil(oldStatus["nextAction"])
+    XCTAssertNoThrow(try old.request(method: "job.events", params: ["jobId": .string(id)]))
     let missing = try cli(["job", "events", "--job", "missing-job", "--output", "json"])
     XCTAssertEqual(missing.0, 65)
     XCTAssertEqual(try object(XCTUnwrap(missing.1[0]["error"]))["code"], .string("resourceNotFound"))

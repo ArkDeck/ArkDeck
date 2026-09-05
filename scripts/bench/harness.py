@@ -225,7 +225,7 @@ class IsolatedRuntime:
                 try:
                     client = control.ControlClient(str(self.socket_path))
                     client.connect()
-                    client.negotiate()
+                    client.verify_contract()
                     client.call("health")
                     elapsed = clocks.awake_seconds() - started
                     client.close()

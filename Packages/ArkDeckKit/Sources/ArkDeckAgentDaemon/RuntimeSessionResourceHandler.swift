@@ -2,7 +2,7 @@ import ArkDeckCore
 import ArkDeckWorkflows
 import Foundation
 
-/// Protocol-2 Session discovery and pinning over the daemon-owned storage
+/// Current v1 Session discovery and pinning over the daemon-owned storage
 /// resource. The caller supplies only an opaque Session identity, pagination
 /// token or catalog generation; no local path crosses this boundary.
 struct RuntimeSessionResourceHandler {
@@ -21,9 +21,6 @@ struct RuntimeSessionResourceHandler {
           ]))
     }
 
-    guard request.protocolVersion == ArkDeckControlProtocol.targetVersion else {
-      return failed("unknownMethod", "Session resources require protocol 2")
-    }
     guard let storage else {
       return failed("operationUnavailable", "Runtime Session storage is not configured")
     }

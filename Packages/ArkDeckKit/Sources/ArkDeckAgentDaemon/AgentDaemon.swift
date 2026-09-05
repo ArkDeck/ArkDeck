@@ -29,16 +29,17 @@ package struct RuntimeControlRequestContext: Sendable, Equatable {
 
 package enum AgentWireProtocol {
   public static let version = ArkDeckAgentXPC.wireProtocolVersion
-  package static let requiredMajor = ArkDeckAgentXPC.wireProtocolMajor
 
   package struct Request: Codable, Sendable {
     package let protocolVersion: String
+    package let contractIdentity: String
     public let id: String
     public let method: String
     package let params: [String: JSONValue]?
 
     public init(id: String, method: String, params: [String: JSONValue]? = nil) {
       self.protocolVersion = AgentWireProtocol.version
+      self.contractIdentity = ArkDeckControlProtocol.contractIdentity
       self.id = id
       self.method = method
       self.params = params
@@ -114,10 +115,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
   private let traceRuntimeProbe: (any TraceRuntimeProbing)?
   private let debugRuntimeProbe: (any DebugRuntimeProbing)?
   private let debugInvocationController: RuntimeDebugInvocationController?
-  private let hapImports: HAPArtifactImportCoordinator
-  private let workspacePatchImports: WorkspacePatchArtifactImportCoordinator
-  private let flashBundleImports: FlashBundleArtifactImportCoordinator
-  private let nativeLibraryImports: NativeLibraryArtifactImportCoordinator
+  private let importGateway = RuntimeImportControlGateway()
   /// Test seam: records which methods a client invoked. Production passes
   /// nil, so this cannot affect behaviour.
   /// The workspace projects this daemon actually derived a profile for.
@@ -255,17 +253,6 @@ public struct RuntimeControlPlaneHandler: Sendable {
     self.debugRuntimeProbe = debugRuntimeProbe
     self.debugInvocationController = debugInvocationController
     self.durableImportFlashPolicy = flashBundleImportPolicy
-    self.hapImports = HAPArtifactImportCoordinator()
-    self.workspacePatchImports = WorkspacePatchArtifactImportCoordinator()
-    if let flashBundleImportDirectory {
-      self.flashBundleImports = FlashBundleArtifactImportCoordinator(
-        directoryURL: flashBundleImportDirectory,
-        policy: flashBundleImportPolicy)
-    } else {
-      self.flashBundleImports = FlashBundleArtifactImportCoordinator(
-        policy: flashBundleImportPolicy)
-    }
-    self.nativeLibraryImports = NativeLibraryArtifactImportCoordinator()
     self.workspaceProjects = workspaceProjects.sorted { $0.projectRef < $1.projectRef }
     self.methodObserver = methodObserver
   }
@@ -277,9 +264,6 @@ public struct RuntimeControlPlaneHandler: Sendable {
   package func handleLine(
     _ line: Data, context: RuntimeControlRequestContext
   ) async -> Data {
-    if let response = ControlProtocolNegotiation.responseIfBootstrap(line) {
-      return response + Data("\n".utf8)
-    }
     let response = await handleFrame(line, context: context)
     let encoder = CanonicalJSONEncoders.canonical()
     let payload = (try? encoder.encode(response)) ?? Data("{}".utf8)
@@ -295,48 +279,37 @@ public struct RuntimeControlPlaneHandler: Sendable {
   ) async -> AgentWireProtocol.Response {
     let request: AgentWireProtocol.Request
     do {
-      var validator = StrictJSONDuplicateValidator(data: line)
-      try validator.validate()
+      _ = try ControlProtocolContract.requestFields(line)
       request = try JSONDecoder().decode(AgentWireProtocol.Request.self, from: line)
-      if request.protocolVersion == ArkDeckControlProtocol.targetVersion {
-        let object = try ControlProtocolNegotiation.decodeObject(line, maximumBytes: 4 * 1024 * 1024)
-        guard Set(object.keys).isSubset(of: ["protocolVersion", "id", "method", "params"]) else {
-          return failure(id: "-", code: .malformedFrame, message: "unknown target request field")
-        }
-      }
+    } catch ControlProtocolContract.Failure.unsupportedVersion {
+      return failure(id: Self.frameID(line), code: .unsupportedProtocolVersion,
+        message: "this Runtime requires exactly \(ArkDeckControlProtocol.currentVersion)")
+    } catch ControlProtocolContract.Failure.contractMismatch {
+      return failure(id: Self.frameID(line), code: .unsupportedProtocolVersion,
+        message: "client and Runtime must use the same current control contract")
     } catch {
-      return failure(id: "-", code: .malformedFrame, message: "undecodable request frame")
+      return failure(id: "-", code: .malformedFrame, message: "undecodable current request frame")
     }
-    // Preserve the published 1.x decoder's forward-minor behavior. The new
-    // target table and every negotiated selection use exact released versions.
-    let legacyMajor =
-      Int(request.protocolVersion.split(separator: ".").first ?? "")
-      == AgentWireProtocol.requiredMajor
-    guard
-      legacyMajor || ArkDeckControlProtocol.supportedExactVersions.contains(request.protocolVersion)
-    else {
-      return failure(
-        id: request.id, code: .unsupportedProtocolVersion,
-        message: "this daemon does not publish the requested exact protocol version")
-    }
-    if request.protocolVersion == ArkDeckControlProtocol.targetVersion,
-      !ArkDeckControlProtocol.targetMethods.contains(request.method)
-    {
-      return failure(
-        id: request.id, code: .unknownMethod,
-        message: "this method is not published on the negotiated target protocol")
+    guard ArkDeckControlProtocol.methods.contains(request.method) else {
+      return failure(id: request.id, code: .unknownMethod, message: "method is not published by this Runtime")
     }
     return await dispatch(request, context: context)
+  }
+
+  private static func frameID(_ line: Data) -> String {
+    guard let fields = try? ControlFrameJSON.decodeObject(line, maximumBytes: ArkDeckControlProtocol.maximumRequestFrameBytes),
+      case .string(let id)? = fields["id"], !id.isEmpty, id.utf8.count <= 128
+    else { return "-" }
+    return id
   }
 
   private func dispatch(
     _ request: AgentWireProtocol.Request, context: RuntimeControlRequestContext
   ) async -> AgentWireProtocol.Response {
     methodObserver?(request.method)
-    if request.protocolVersion == ArkDeckControlProtocol.targetVersion,
-      ["job.plan", "job.submit", "job.run"].contains(request.method)
+    if ["job.plan", "job.submit", "job.run"].contains(request.method)
     {
-      return await targetJobLifecycleRequest(request)
+      return await jobLifecycleRequest(request)
     }
     switch request.method {
     case "agent.run", "agent.status", "agent.list", "agent.abandon", "agent.resume":
@@ -344,29 +317,18 @@ public struct RuntimeControlPlaneHandler: Sendable {
     case "human-action.list", "human-action.show", "human-action.resume":
       return await humanActionRequest(request, context: context)
     case "health":
-      if request.protocolVersion == ArkDeckControlProtocol.targetVersion {
-        guard request.params == nil || request.params?.isEmpty == true else {
-          return failure(
-            id: request.id, code: .invalidParams, message: "health accepts no parameters")
-        }
-        return success(
-          id: request.id,
-          result: .object([
-            "status": .string("ok"),
-            "protocolVersion": .string(request.protocolVersion),
-            "supportedExactVersions": .array(
-              ArkDeckControlProtocol.supportedExactVersions.map(JSONValue.string)),
-            "publishedMethods": .array(
-              ArkDeckControlProtocol.targetMethods.sorted().map(JSONValue.string)),
-            "catalogDigest": .string(RuntimeOperationCatalog.catalogDigest),
-            "providers": .array(providerIDs.map(JSONValue.string)),
-          ]))
+      guard request.params == nil || request.params?.isEmpty == true else {
+        return failure(
+          id: request.id, code: .invalidParams, message: "health accepts no parameters")
       }
       return success(
         id: request.id,
         result: .object([
           "status": .string("ok"),
-          "protocolVersion": .string(AgentWireProtocol.version),
+          "protocolVersion": .string(request.protocolVersion),
+          "contractIdentity": .string(ArkDeckControlProtocol.contractIdentity),
+          "publishedMethods": .array(
+            ArkDeckControlProtocol.methods.sorted().map(JSONValue.string)),
           "catalogDigest": .string(RuntimeOperationCatalog.catalogDigest),
           "providers": .array(providerIDs.map(JSONValue.string)),
         ]))
@@ -383,42 +345,10 @@ public struct RuntimeControlPlaneHandler: Sendable {
         activeSessionIDs: { await engine.activeSessionIDsForRetention() })
         .response(request)
     case "runtime.hdc.status":
-      guard request.protocolVersion == ArkDeckControlProtocol.targetVersion else {
-        return failure(id: request.id, code: .unsupportedProtocolVersion, message: "live HDC status requires the target control protocol")
-      }
       guard request.params == nil || request.params?.isEmpty == true else {
         return failure(id: request.id, code: .invalidParams, message: "live HDC status does not accept caller facts or paths")
       }
       return success(id: request.id, result: await hdcStatusObserver?.snapshot() ?? HeadlessHDCStatusObserver.unconfigured())
-
-    case "runtime.hdc-status":
-      guard request.params == nil || request.params?.isEmpty == true else {
-        return failure(
-          id: request.id, code: .invalidParams,
-          message: "runtime.hdc-status does not accept parameters")
-      }
-      guard let diagnostics = hdcRuntimeDiagnostics else {
-        return success(
-          id: request.id,
-          result: .object([
-            "availability": .string("unavailable"),
-            "reason": .string("Runtime has no managed HDC server"),
-          ]))
-      }
-      return success(
-        id: request.id,
-        result: .object([
-          "availability": .string("ready"),
-          "source": .string("runtimeManaged"),
-          "toolSha256": .string(diagnostics.executableSHA256),
-          "clientVersion": .string(diagnostics.clientVersion),
-          "serverVersion": .string(diagnostics.serverVersion),
-          "endpoint": .string(diagnostics.endpoint),
-          "endpointSource": .string(diagnostics.endpointSource),
-          "serverHealth": .string("healthy"),
-          "ownership": .string("arkDeckManaged"),
-          "protocolVersion": .string(AgentWireProtocol.version),
-        ]))
 
     case "operation.list":
       let availability = await engine.operationAvailability()
@@ -714,8 +644,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
 
     case "debug.probe":
       let params = request.params ?? [:]
-      if request.protocolVersion == ArkDeckControlProtocol.targetVersion,
-        Set(params.keys) != ["targetId"]
+      if Set(params.keys) != ["targetId"]
       {
         return failure(
           id: request.id, code: .invalidParams,
@@ -725,8 +654,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
         return failure(
           id: request.id, code: .invalidParams, message: "targetId is required")
       }
-      if request.protocolVersion == ArkDeckControlProtocol.targetVersion,
-        targetID.isEmpty || targetID.utf8.count > 128
+      if targetID.isEmpty || targetID.utf8.count > 128
       {
         return failure(
           id: request.id, code: .invalidParams,
@@ -739,42 +667,39 @@ public struct RuntimeControlPlaneHandler: Sendable {
       }
       do {
         let snapshot = try await debugRuntimeProbe.probeDebugRuntime(targetID: targetID)
-        let isTargetProtocol = request.protocolVersion == ArkDeckControlProtocol.targetVersion
-        if isTargetProtocol {
-          let closedWarnings: Set<String> = [
-            "packageInventoryUnavailable", "packageInventoryUnparseable",
-            "forwardRulesUnavailable", "reverseRulesUnavailable",
-          ]
-          guard snapshot.targetID == targetID, snapshot.bindingRevision >= 1,
-            snapshot.packages.count <= 10_000,
-            Set(snapshot.packages).count == snapshot.packages.count,
-            snapshot.packages.allSatisfy({
-              DebugTypedValueValidator.isValidBundleName($0)
-            }),
-            snapshot.portRules.count <= 4_096,
-            snapshot.portRules.allSatisfy({
-              (1_024...65_535).contains($0.localPort)
-                && (1_024...65_535).contains($0.remotePort)
-            }),
-            snapshot.warnings.count <= closedWarnings.count,
-            Set(snapshot.warnings).count == snapshot.warnings.count,
-            snapshot.warnings.allSatisfy(closedWarnings.contains)
-          else {
-            return failure(
-              id: request.id, code: .internalError,
-              message: "Debug Runtime probe returned an invalid bounded projection")
-          }
+        let closedWarnings: Set<String> = [
+          "packageInventoryUnavailable", "packageInventoryUnparseable",
+          "forwardRulesUnavailable", "reverseRulesUnavailable",
+        ]
+        guard snapshot.targetID == targetID, snapshot.bindingRevision >= 1,
+          snapshot.packages.count <= 10_000,
+          Set(snapshot.packages).count == snapshot.packages.count,
+          snapshot.packages.allSatisfy({
+            DebugTypedValueValidator.isValidBundleName($0)
+          }),
+          snapshot.portRules.count <= 4_096,
+          snapshot.portRules.allSatisfy({
+            (1_024...65_535).contains($0.localPort)
+              && (1_024...65_535).contains($0.remotePort)
+          }),
+          snapshot.warnings.count <= closedWarnings.count,
+          Set(snapshot.warnings).count == snapshot.warnings.count,
+          snapshot.warnings.allSatisfy(closedWarnings.contains)
+        else {
+          return failure(
+            id: request.id, code: .internalError,
+            message: "Debug Runtime probe returned an invalid bounded projection")
         }
-        let packages = isTargetProtocol ? snapshot.packages.sorted() : snapshot.packages
-        let portRules = isTargetProtocol
-          ? snapshot.portRules.sorted {
+
+        let packages = snapshot.packages.sorted()
+        let portRules = snapshot.portRules.sorted {
             if $0.direction.rawValue != $1.direction.rawValue {
               return $0.direction.rawValue < $1.direction.rawValue
             }
             if $0.localPort != $1.localPort { return $0.localPort < $1.localPort }
             return $0.remotePort < $1.remotePort
-          } : snapshot.portRules
-        let warnings = isTargetProtocol ? snapshot.warnings.sorted() : snapshot.warnings
+          }
+        let warnings = snapshot.warnings.sorted()
         var result: [String: JSONValue] = [
           "targetId": .string(snapshot.targetID),
           "bindingRevision": .integer(Int64(snapshot.bindingRevision)),
@@ -789,9 +714,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
             }),
           "warnings": .array(warnings.map(JSONValue.string)),
         ]
-        if isTargetProtocol {
-          result["schemaVersion"] = .string("arkdeck.debug-probe/1")
-        }
+        result["schemaVersion"] = .string("arkdeck.debug-probe/1")
+
         return success(
           id: request.id,
           result: .object(result))
@@ -877,13 +801,6 @@ public struct RuntimeControlPlaneHandler: Sendable {
         return failure(id: request.id, code: .internalError, message: "\(error)")
       }
 
-    case "capability.draft", "capability.install", "capability.revoke":
-      return failure(
-        id: request.id, code: .rejected,
-        message:
-          "RuntimeCapability administration is not an Agent-facing API; "
-          + "the protected Runtime generates and consumes policy capabilities")
-
     case "debug.start":
       guard let debugInvocationController else {
         return failure(
@@ -965,11 +882,6 @@ public struct RuntimeControlPlaneHandler: Sendable {
       }
 
     case "recovery.flash-invocation.list":
-      guard request.protocolVersion == ArkDeckControlProtocol.targetVersion else {
-        return failure(
-          id: request.id, code: .unknownMethod,
-          message: "Flash invocation discovery requires protocol 2")
-      }
       guard let debugInvocationController else {
         return failure(
           id: request.id, code: .internalError,
@@ -1021,141 +933,13 @@ public struct RuntimeControlPlaneHandler: Sendable {
         return failure(id: request.id, code: .internalError, message: "\(error)")
       }
 
-    case "job.plan":
-      guard case .string(let requestJson)? = request.params?["requestJson"] else {
-        return failure(id: request.id, code: .invalidParams, message: "requestJson is required")
-      }
-      do {
-        let preview = try await engine.planOnly(Data(requestJson.utf8))
-        let encoded = try JSONEncoder().encode(preview)
-        let json = try JSONDecoder().decode(JSONValue.self, from: encoded)
-        return success(id: request.id, result: json)
-      } catch let error as RuntimeJobEngineError {
-        return failure(id: request.id, code: .rejected, message: "\(error)")
-      } catch {
-        return failure(id: request.id, code: .internalError, message: "\(error)")
-      }
-
-    case "job.submit":
-      guard case .string(let requestJson)? = request.params?["requestJson"] else {
-        return failure(id: request.id, code: .invalidParams, message: "requestJson is required")
-      }
-      do {
-        let acceptance = try await engine.submit(Data(requestJson.utf8))
-        return success(
-          id: request.id,
-          result: .object([
-            "jobId": .string(acceptance.jobID),
-            "deduplicated": .bool(acceptance.deduplicated),
-          ]))
-      } catch let error as RuntimeJobEngineError {
-        return failure(id: request.id, code: .rejected, message: "\(error)")
-      } catch {
-        return failure(id: request.id, code: .internalError, message: "\(error)")
-      }
-
-    case "job.run":
-      guard case .string(let jobID)? = request.params?["jobId"] else {
-        return failure(id: request.id, code: .invalidParams, message: "jobId is required")
-      }
-      do {
-        let status = try await engine.run(jobID: jobID)
-        // `recovered` is a durable Runtime terminal with richer lineage. The
-        // synchronous client terminal set (see AgentRuntimeExecutor) uses
-        // `succeeded` for successful completion. Evidence and subsequent
-        // status/list calls keep the exact `recovered` state; only this
-        // completion response uses the transport terminal so automation does
-        // not cancel a completed recovery Job.
-        let completionState =
-          status.state == JobState.recovered.rawValue
-          ? JobState.succeeded.rawValue : status.state
-        return success(
-          id: request.id,
-          result: Self.encodeStatus(status, stateOverride: completionState))
-      } catch let error as RuntimeJobEngineError {
-        return failure(id: request.id, code: .rejected, message: "\(error)")
-      } catch {
-        return failure(id: request.id, code: .internalError, message: "\(error)")
-      }
-
     case "job.list":
-      if request.protocolVersion == ArkDeckControlProtocol.targetVersion {
-        return await RuntimeJobResourceReader(engine: engine, artifactStore: artifactStore).response(request)
-      }
-      do {
-        if request.params?["pageSize"] != nil || request.params?["order"] != nil
-          || request.params?["includeTimeline"] != nil
-          || request.params?["includeCurrent"] != nil
-          || request.params?["cursor"] != nil
-        {
-          let options = try Self.jobListOptions(
-            request.params, acceptsCursor: false, acceptsCurrent: false)
-          let page = try await engine.listLegacyJobs(
-            pageSize: options.pageSize, newestFirst: options.newestFirst)
-          return success(
-            id: request.id,
-            result: .array(
-              page.jobs.map {
-                Self.encodeStatus($0, includeTimeline: options.includeTimeline)
-              }))
-        }
-        let statuses = try await engine.listJobs()
-        return success(id: request.id, result: .array(statuses.map { Self.encodeStatus($0) }))
-      } catch let error as JobListOptionsError {
-        return failure(id: request.id, code: .invalidParams, message: error.description)
-      } catch RuntimeJobEngineError.jobRecordUnreadable(let jobID) {
-        return failure(
-          id: request.id, code: .recordUnreadable,
-          message: "Runtime job record \(jobID) is unreadable")
-      } catch {
-        return failure(id: request.id, code: .internalError, message: "\(error)")
-      }
-
-    case "job.list-page":
-      do {
-        let options = try Self.jobListOptions(
-          request.params, acceptsCursor: true, acceptsCurrent: true)
-        let page = try await engine.listLegacyJobs(
-          pageSize: options.pageSize, cursor: options.cursor,
-          newestFirst: options.newestFirst)
-        let current = options.includeCurrent ? try await engine.listCurrentJobs() : []
-        return success(
-          id: request.id,
-          result: .object([
-            "jobs": .array(
-              page.jobs.map {
-                Self.encodeStatus($0, includeTimeline: options.includeTimeline)
-              }),
-            "currentJobs": .array(
-              current.map {
-                Self.encodeStatus($0, includeTimeline: options.includeTimeline)
-              }),
-            "nextCursor": page.nextCursor.map(JSONValue.string) ?? .null,
-          ]))
-      } catch let error as JobListOptionsError {
-        return failure(id: request.id, code: .invalidParams, message: error.description)
-      } catch RuntimeJobEngineError.jobRecordUnreadable(let jobID) {
-        return failure(
-          id: request.id, code: .recordUnreadable,
-          message: "Runtime job record \(jobID) is unreadable")
-      } catch {
-        // This used to be `invalidParams`, which was doing two jobs: it
-        // correctly named a malformed cursor as the caller's mistake, and it
-        // also told a caller whose request was fine that its parameters were
-        // wrong when the daemon had failed to read its own history — sending
-        // it to correct a correct request and retry forever. The cursor is now
-        // validated with the other parameters above, so the only thing that
-        // reaches here is unexpected, and `job.list` already ends this way.
-        return failure(id: request.id, code: .internalError, message: "\(error)")
-      }
+      return await RuntimeJobResourceReader(engine: engine, artifactStore: artifactStore).response(request)
 
     case "job.show", "job.result", "job.timeline":
       return await RuntimeJobResourceReader(engine: engine, artifactStore: artifactStore).response(request)
 
     case "job.events":
-      guard request.protocolVersion == ArkDeckControlProtocol.targetVersion else {
-        return failure(id: request.id, code: .unknownMethod, message: "Job events require the target protocol")
-      }
       do {
         let fields = request.params ?? [:]
         guard Set(fields.keys).isSubset(of: ["jobId", "afterCursor", "pageSize"]),
@@ -1188,70 +972,10 @@ public struct RuntimeControlPlaneHandler: Sendable {
       }
 
     case "job.status":
-      if request.protocolVersion == ArkDeckControlProtocol.targetVersion {
-        return await RuntimeJobResourceReader(engine: engine, artifactStore: artifactStore).response(request)
-      }
-      guard case .string(let jobID)? = request.params?["jobId"] else {
-        return failure(id: request.id, code: .invalidParams, message: "jobId is required")
-      }
-      do {
-        let status = try await engine.status(jobID: jobID)
-        return success(id: request.id, result: Self.encodeStatus(status))
-      } catch is AgentExecutionControlFailure {
-        return failure(id: request.id, code: .recordUnreadable, message: "Job status has no supported next action")
-      } catch RuntimeJobEngineError.jobNotFound {
-        return failure(id: request.id, code: .notFound, message: "unknown job \(jobID)")
-      } catch RuntimeJobEngineError.jobRecordUnreadable {
-        return failure(
-          id: request.id, code: .recordUnreadable,
-          message: "Runtime job record \(jobID) is unreadable")
-      } catch {
-        return failure(id: request.id, code: .internalError, message: "\(error)")
-      }
+      return await RuntimeJobResourceReader(engine: engine, artifactStore: artifactStore).response(request)
 
     case "job.evidence":
-      if request.protocolVersion == ArkDeckControlProtocol.targetVersion {
-        return await RuntimeJobResourceReader(engine: engine, artifactStore: artifactStore).response(request)
-      }
-      guard case .string(let jobID)? = request.params?["jobId"] else {
-        return failure(id: request.id, code: .invalidParams, message: "jobId is required")
-      }
-      do {
-        let snapshot = try await engine.evidenceSnapshot(jobID: jobID)
-        var artifacts: [RuntimeVerifiedArtifactEvidence] = []
-        var blockers: [String] = []
-        let declaresNoArtifacts = RuntimeOperationCatalog.descriptor(
-          reference: snapshot.operationReference)?.artifacts.isEmpty == true
-        if let artifactStore {
-          do {
-            let inventory = try await artifactStore.list(jobID: jobID)
-            // Typed input operations have journal evidence but no file output.
-            // Only the published descriptor can establish that empty is valid;
-            // any existing metadata still receives the full byte/hash check.
-            if !declaresNoArtifacts || !inventory.isEmpty {
-              let omitted = try await engine.intentionallyOmittedArtifactNames(jobID: jobID)
-              artifacts = try await artifactStore.verifiedEvidenceArtifacts(
-                jobID: jobID, intentionallyOmittedNames: omitted)
-            }
-          } catch {
-            blockers.append("artifactVerification:\(error)")
-          }
-        } else if !declaresNoArtifacts {
-          blockers.append("artifactStoreUnavailable")
-        }
-        return success(
-          id: request.id,
-          result: Self.encodeEvidence(
-            snapshot: snapshot, artifacts: artifacts, blockers: blockers))
-      } catch RuntimeJobEngineError.jobNotFound {
-        return failure(id: request.id, code: .notFound, message: "unknown job \(jobID)")
-      } catch RuntimeJobEngineError.jobRecordUnreadable {
-        return failure(
-          id: request.id, code: .recordUnreadable,
-          message: "Runtime job record \(jobID) is unreadable")
-      } catch {
-        return failure(id: request.id, code: .internalError, message: "\(error)")
-      }
+      return await RuntimeJobResourceReader(engine: engine, artifactStore: artifactStore).response(request)
 
     case "job.cancel":
       guard case .string(let jobID)? = request.params?["jobId"] else {
@@ -1280,7 +1004,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
       }
       do {
         let status = try await engine.reconcile(jobID: jobID)
-        return success(id: request.id, result: Self.encodeStatus(status))
+        return success(id: request.id, result: try RuntimeJobReadProjection.status(status))
       } catch RuntimeJobEngineError.jobNotFound {
         return failure(id: request.id, code: .notFound, message: "unknown job \(jobID)")
       } catch let error as RuntimeJobEngineError {
@@ -1342,633 +1066,29 @@ public struct RuntimeControlPlaneHandler: Sendable {
       }
 
     case "doctor":
-      if request.protocolVersion == ArkDeckControlProtocol.targetVersion {
-        let params = request.params ?? [:]
-        guard Set(params.keys).isSubset(of: ["deep"]) else {
+      let params = request.params ?? [:]
+      guard Set(params.keys).isSubset(of: ["deep"]) else {
+        return failure(
+          id: request.id, code: .invalidParams,
+          message: "doctor accepts only the deep boolean")
+      }
+      let deep: Bool
+      if let value = params["deep"] {
+        guard case .bool(let requested) = value else {
           return failure(
             id: request.id, code: .invalidParams,
-            message: "doctor accepts only the deep boolean")
+            message: "doctor deep must be a boolean")
         }
-        let deep: Bool
-        if let value = params["deep"] {
-          guard case .bool(let requested) = value else {
-            return failure(
-              id: request.id, code: .invalidParams,
-              message: "doctor deep must be a boolean")
-          }
-          deep = requested
-        } else {
-          deep = false
-        }
-        return success(id: request.id, result: await doctorReport(deep: deep))
+        deep = requested
+      } else {
+        deep = false
       }
-      // `doctor` is the first call a caller with no prior context makes, and
-      // the envelope contract was the thing it was about to need and could not
-      // ask for: submitting without `schemaVersion` answered "required" without
-      // naming a value, and guessing "1.0.0" only then reported that major 2 is
-      // accepted. Two round trips to learn one constant the daemon already
-      // holds. Both values below are forwarded from their definitions rather
-      // than restated, so this report cannot drift away from what admission
-      // actually enforces.
-      var report: [String: JSONValue] = [
-        "protocolVersion": .string(AgentWireProtocol.version),
-        "runtimeRequestSchemaVersion": .string(RuntimeRequestEnvelope.schemaVersion),
-        "catalogDigest": .string(RuntimeOperationCatalog.catalogDigest),
-        "operationCount": .integer(Int64(RuntimeOperationCatalog.operations.count)),
-        "providers": .array(providerIDs.map(JSONValue.string)),
-        "targetStore": .string(targetStore == nil ? "unavailable" : "ready"),
-        "bootstrap": .string(bootstrap == nil ? "unavailable" : "ready"),
-      ]
-      if let targetStore, let targets = try? targetStore.listActive() {
-        report["adoptedTargetCount"] = .integer(Int64(targets.count))
-      }
-      return success(id: request.id, result: .object(report))
+      return success(id: request.id, result: await doctorReport(deep: deep))
 
     case "artifact.import.begin", "artifact.import.append", "artifact.import.commit", "artifact.import.abort", "artifact.import.list", "artifact.import.inspect", "artifact.import.inspection", "artifact.import.release":
-      return await RuntimeImportControlHandler(artifacts: artifactStore, targets: targetStore,
-        flashPolicy: durableImportFlashPolicy, engine: engine).response(request)
-
-    case "artifact.importHap.begin":
-      guard artifactStore != nil, let targetStore else {
-        return failure(
-          id: request.id, code: .internalError,
-          message: "artifact store and target store are required for HAP import")
-      }
-      guard case .string(let targetID)? = request.params?["targetId"],
-        case .string(let name)? = request.params?["name"],
-        case .integer(let byteCountValue)? = request.params?["byteCount"],
-        case .string(let sha256)? = request.params?["sha256"],
-        byteCountValue >= 0, byteCountValue <= Int64(Int.max)
-      else {
-        return failure(
-          id: request.id, code: .invalidParams,
-          message: "targetId, name, byteCount and sha256 are required")
-      }
-      do {
-        guard let target = try targetStore.find(targetID: targetID) else {
-          return failure(
-            id: request.id, code: .notFound, message: "unknown target \(targetID)")
-        }
-        let uploadID = try await hapImports.begin(
-          target: target, name: name, byteCount: Int(byteCountValue), sha256: sha256)
-        return success(
-          id: request.id,
-          result: .object([
-            "uploadId": .string(uploadID),
-            "maximumChunkBytes": .integer(
-              Int64(HAPArtifactImportCoordinator.maximumChunkBytes)),
-            "targetId": .string(target.targetID),
-            "bindingRevision": .integer(Int64(target.bindingRevision)),
-          ]))
-      } catch let error as HAPArtifactImportError {
-        return failure(id: request.id, code: .invalidParams, message: error.description)
-      } catch {
-        return failure(id: request.id, code: .internalError, message: "\(error)")
-      }
-
-    case "artifact.importHap.append":
-      guard artifactStore != nil, targetStore != nil else {
-        return failure(
-          id: request.id, code: .internalError,
-          message: "artifact store and target store are required for HAP import")
-      }
-      guard case .string(let uploadID)? = request.params?["uploadId"],
-        case .integer(let offsetValue)? = request.params?["offset"],
-        offsetValue >= 0, offsetValue <= Int64(Int.max),
-        case .string(let base64)? = request.params?["base64"],
-        base64.utf8.count <= ((HAPArtifactImportCoordinator.maximumChunkBytes + 2) / 3) * 4,
-        let chunk = Data(base64Encoded: base64, options: [])
-      else {
-        return failure(
-          id: request.id, code: .invalidParams,
-          message: "uploadId, non-negative offset and a bounded base64 chunk are required")
-      }
-      do {
-        let nextOffset = try await hapImports.append(
-          uploadID: uploadID, offset: Int(offsetValue), chunk: chunk)
-        return success(
-          id: request.id,
-          result: .object(["nextOffset": .integer(Int64(nextOffset))]))
-      } catch let error as HAPArtifactImportError {
-        return failure(id: request.id, code: .rejected, message: error.description)
-      } catch {
-        return failure(id: request.id, code: .internalError, message: "\(error)")
-      }
-
-    case "artifact.importHap.commit":
-      guard let artifactStore, let targetStore else {
-        return failure(
-          id: request.id, code: .internalError,
-          message: "artifact store and target store are required for HAP import")
-      }
-      guard case .string(let uploadID)? = request.params?["uploadId"] else {
-        return failure(id: request.id, code: .invalidParams, message: "uploadId is required")
-      }
-      do {
-        let completed = try await hapImports.commit(uploadID: uploadID)
-        guard let currentTarget = try targetStore.find(targetID: completed.target.targetID),
-          currentTarget.bindingRevision == completed.target.bindingRevision,
-          currentTarget.stablePhysicalIdentitySHA256
-            == completed.target.stablePhysicalIdentitySHA256,
-          let hdcRoute = try targetStore.hdcExecutionRoute(targetID: currentTarget.targetID),
-          hdcRoute.bindingRevision == currentTarget.bindingRevision
-        else {
-          return failure(
-            id: request.id, code: .conflict,
-            message: "target binding changed during HAP import")
-        }
-        let hdcStableIdentity = HDCObservationProviderAdapter.stableIdentitySHA256(
-          connectKey: hdcRoute.connectKey)
-        let jobID =
-          "input-hap-\(currentTarget.targetID)-r\(currentTarget.bindingRevision)-"
-          + String(hdcStableIdentity.prefix(16)) + "-"
-          + String(completed.sha256.prefix(16))
-        let metadata = try await artifactStore.publish(
-          RuntimeArtifactPublicationRequest(
-            jobID: jobID,
-            sessionID: "session-\(jobID)",
-            stepID: "import-hap",
-            name: completed.name,
-            mediaType: completed.name.hasSuffix(".hsp")
-              ? "application/vnd.openharmony.hsp" : "application/vnd.openharmony.hap",
-            privacy: .standard,
-            retentionClass: .pinnedUntilVerified,
-            sourceOperation: "artifact.import-hap",
-            providerID: "host",
-            bindingSnapshot: ArtifactBindingSnapshot(
-              targetID: currentTarget.targetID,
-              bindingRevision: currentTarget.bindingRevision,
-              // A HAP is consumed by the HDC provider, whose identity is the
-              // connect-key derivation. After Flash, the canonical target's
-              // original connect key is historical; bind to the same proven
-              // alias route used by plan materialization and execution.
-              stableIdentitySHA256: hdcStableIdentity),
-            contents: completed.contents))
-        let lease = try await artifactStore.leaseReference(
-          jobID: metadata.jobID, artifactID: metadata.artifactID)
-        return success(
-          id: request.id,
-          result: .object([
-            "jobId": .string(metadata.jobID),
-            "artifactId": .string(metadata.artifactID),
-            "lease": .string(lease),
-            "name": .string(metadata.name),
-            "byteCount": .integer(Int64(metadata.byteCount)),
-            "sha256": .string(metadata.sha256),
-            "targetId": .string(currentTarget.targetID),
-            "bindingRevision": .integer(Int64(currentTarget.bindingRevision)),
-            "stableIdentitySha256": .string(hdcStableIdentity),
-          ]))
-      } catch let error as HAPArtifactImportError {
-        return failure(id: request.id, code: .rejected, message: error.description)
-      } catch let error as RuntimeArtifactError {
-        return failure(id: request.id, code: .rejected, message: "\(error)")
-      } catch {
-        return failure(id: request.id, code: .internalError, message: "\(error)")
-      }
-
-    case "artifact.importHap.abort":
-      guard case .string(let uploadID)? = request.params?["uploadId"] else {
-        return failure(id: request.id, code: .invalidParams, message: "uploadId is required")
-      }
-      let aborted = await hapImports.abort(uploadID: uploadID)
-      return success(
-        id: request.id, result: .object(["aborted": .bool(aborted)]))
-
-    case "artifact.importWorkspacePatch.begin":
-      guard artifactStore != nil, let targetStore else {
-        return failure(
-          id: request.id, code: .internalError,
-          message: "artifact store and target store are required for workspace patch import")
-      }
-      guard case .string(let targetID)? = request.params?["targetId"],
-        case .string(let name)? = request.params?["name"],
-        case .integer(let byteCountValue)? = request.params?["byteCount"],
-        case .string(let sha256)? = request.params?["sha256"],
-        byteCountValue >= 0, byteCountValue <= Int64(Int.max)
-      else {
-        return failure(
-          id: request.id, code: .invalidParams,
-          message: "targetId, name, byteCount and sha256 are required")
-      }
-      do {
-        guard try targetStore.find(targetID: targetID) != nil else {
-          return failure(
-            id: request.id, code: .notFound, message: "unknown target \(targetID)")
-        }
-        let uploadID = try await workspacePatchImports.begin(
-          targetID: targetID, name: name,
-          byteCount: Int(byteCountValue), sha256: sha256)
-        return success(
-          id: request.id,
-          result: .object([
-            "uploadId": .string(uploadID),
-            "maximumChunkBytes": .integer(
-              Int64(WorkspacePatchArtifactImportCoordinator.maximumChunkBytes)),
-            "targetId": .string(targetID),
-          ]))
-      } catch let error as WorkspacePatchArtifactImportError {
-        return failure(id: request.id, code: .invalidParams, message: error.description)
-      } catch {
-        return failure(id: request.id, code: .internalError, message: "\(error)")
-      }
-
-    case "artifact.importWorkspacePatch.append":
-      guard artifactStore != nil, targetStore != nil else {
-        return failure(
-          id: request.id, code: .internalError,
-          message: "artifact store and target store are required for workspace patch import")
-      }
-      guard case .string(let uploadID)? = request.params?["uploadId"],
-        case .integer(let offsetValue)? = request.params?["offset"],
-        offsetValue >= 0, offsetValue <= Int64(Int.max),
-        case .string(let base64)? = request.params?["base64"],
-        base64.utf8.count
-          <= ((WorkspacePatchArtifactImportCoordinator.maximumChunkBytes + 2) / 3) * 4,
-        let chunk = Data(base64Encoded: base64, options: [])
-      else {
-        return failure(
-          id: request.id, code: .invalidParams,
-          message: "uploadId, non-negative offset and a bounded base64 chunk are required")
-      }
-      do {
-        let nextOffset = try await workspacePatchImports.append(
-          uploadID: uploadID, offset: Int(offsetValue), chunk: chunk)
-        return success(
-          id: request.id,
-          result: .object(["nextOffset": .integer(Int64(nextOffset))]))
-      } catch let error as WorkspacePatchArtifactImportError {
-        return failure(id: request.id, code: .rejected, message: error.description)
-      } catch {
-        return failure(id: request.id, code: .internalError, message: "\(error)")
-      }
-
-    case "artifact.importWorkspacePatch.commit":
-      guard let artifactStore, let targetStore else {
-        return failure(
-          id: request.id, code: .internalError,
-          message: "artifact store and target store are required for workspace patch import")
-      }
-      guard case .string(let uploadID)? = request.params?["uploadId"] else {
-        return failure(id: request.id, code: .invalidParams, message: "uploadId is required")
-      }
-      do {
-        let completed = try await workspacePatchImports.commit(uploadID: uploadID)
-        guard try targetStore.find(targetID: completed.targetID) != nil else {
-          return failure(
-            id: request.id, code: .conflict,
-            message: "target was removed during workspace patch import")
-        }
-        let jobID =
-          "input-workspace-patch-\(completed.targetID)-"
-          + String(completed.sha256.prefix(16))
-        let metadata = try await artifactStore.publish(
-          RuntimeArtifactPublicationRequest(
-            jobID: jobID,
-            sessionID: "session-\(jobID)",
-            stepID: "import-workspace-patch",
-            name: completed.name,
-            mediaType: "text/x-diff",
-            privacy: .standard,
-            retentionClass: .pinnedUntilVerified,
-            sourceOperation: "artifact.import-workspace-patch",
-            providerID: "host",
-            bindingSnapshot: ArtifactBindingSnapshot(
-              targetID: completed.targetID,
-              bindingRevision: nil,
-              stableIdentitySHA256: nil),
-            contents: completed.contents))
-        let lease = try await artifactStore.leaseReference(
-          jobID: metadata.jobID, artifactID: metadata.artifactID)
-        return success(
-          id: request.id,
-          result: .object([
-            "jobId": .string(metadata.jobID),
-            "artifactId": .string(metadata.artifactID),
-            "lease": .string(lease),
-            "name": .string(metadata.name),
-            "byteCount": .integer(Int64(metadata.byteCount)),
-            "sha256": .string(metadata.sha256),
-            "targetId": .string(completed.targetID),
-            "touchedFiles": .array(completed.touchedFiles.map(JSONValue.string)),
-          ]))
-      } catch let error as WorkspacePatchArtifactImportError {
-        return failure(id: request.id, code: .rejected, message: error.description)
-      } catch let error as RuntimeArtifactError {
-        return failure(id: request.id, code: .rejected, message: "\(error)")
-      } catch {
-        return failure(id: request.id, code: .internalError, message: "\(error)")
-      }
-
-    case "artifact.importWorkspacePatch.abort":
-      guard case .string(let uploadID)? = request.params?["uploadId"] else {
-        return failure(id: request.id, code: .invalidParams, message: "uploadId is required")
-      }
-      let aborted = await workspacePatchImports.abort(uploadID: uploadID)
-      return success(
-        id: request.id, result: .object(["aborted": .bool(aborted)]))
-
-    case "artifact.importFlashBundle.begin":
-      guard artifactStore != nil, let targetStore else {
-        return failure(
-          id: request.id, code: .internalError,
-          message: "artifact store and target store are required for flash bundle import")
-      }
-      guard case .string(let targetID)? = request.params?["targetId"],
-        case .integer(let byteCountValue)? = request.params?["byteCount"],
-        case .string(let sha256)? = request.params?["sha256"],
-        byteCountValue >= 0, byteCountValue <= Int64(Int.max)
-      else {
-        return failure(
-          id: request.id, code: .invalidParams,
-          message: "targetId, byteCount and sha256 are required")
-      }
-      do {
-        guard let target = try targetStore.find(targetID: targetID) else {
-          return failure(
-            id: request.id, code: .notFound, message: "unknown target \(targetID)")
-        }
-        // `name`, when supplied by an older caller, is untrusted source
-        // metadata rather than an admission fact or daemon-local path. The
-        // bytes are staged under an opaque ID and judged on commit by
-        // gzip/tar, digest and DAYU200 structure. Keep the store's logical
-        // product name server-owned so local filenames neither gate import
-        // nor influence the artifact namespace.
-        let uploadID = try await flashBundleImports.begin(
-          target: target, name: "images.tar.gz", byteCount: Int(byteCountValue),
-          sha256: sha256)
-        return success(
-          id: request.id,
-          result: .object([
-            "uploadId": .string(uploadID),
-            "maximumChunkBytes": .integer(
-              Int64(FlashBundleArtifactImportCoordinator.maximumChunkBytes)),
-            "targetId": .string(target.targetID),
-            "bindingRevision": .integer(Int64(target.bindingRevision)),
-          ]))
-      } catch let error as FlashBundleArtifactImportError {
-        return failure(id: request.id, code: .invalidParams, message: error.description)
-      } catch {
-        return failure(id: request.id, code: .internalError, message: "\(error)")
-      }
-
-    case "artifact.importFlashBundle.append":
-      guard artifactStore != nil, targetStore != nil else {
-        return failure(
-          id: request.id, code: .internalError,
-          message: "artifact store and target store are required for flash bundle import")
-      }
-      guard case .string(let uploadID)? = request.params?["uploadId"],
-        case .integer(let offsetValue)? = request.params?["offset"],
-        offsetValue >= 0, offsetValue <= Int64(Int.max),
-        case .string(let base64)? = request.params?["base64"],
-        base64.utf8.count
-          <= ((FlashBundleArtifactImportCoordinator.maximumChunkBytes + 2) / 3) * 4,
-        let chunk = Data(base64Encoded: base64, options: [])
-      else {
-        return failure(
-          id: request.id, code: .invalidParams,
-          message: "uploadId, non-negative offset and a bounded base64 chunk are required")
-      }
-      do {
-        let nextOffset = try await flashBundleImports.append(
-          uploadID: uploadID, offset: Int(offsetValue), chunk: chunk)
-        return success(
-          id: request.id,
-          result: .object(["nextOffset": .integer(Int64(nextOffset))]))
-      } catch let error as FlashBundleArtifactImportError {
-        return failure(id: request.id, code: .rejected, message: error.description)
-      } catch {
-        return failure(id: request.id, code: .internalError, message: "\(error)")
-      }
-
-    case "artifact.importFlashBundle.commit":
-      guard let artifactStore, let targetStore else {
-        return failure(
-          id: request.id, code: .internalError,
-          message: "artifact store and target store are required for flash bundle import")
-      }
-      guard case .string(let uploadID)? = request.params?["uploadId"] else {
-        return failure(id: request.id, code: .invalidParams, message: "uploadId is required")
-      }
-      do {
-        let completed = try await flashBundleImports.commit(uploadID: uploadID)
-        defer { try? FileManager.default.removeItem(at: completed.fileURL) }
-        guard
-          let currentTarget = try targetStore.find(
-            targetID: completed.target.targetID),
-          currentTarget.bindingRevision == completed.target.bindingRevision,
-          currentTarget.stablePhysicalIdentitySHA256
-            == completed.target.stablePhysicalIdentitySHA256
-        else {
-          return failure(
-            id: request.id, code: .conflict,
-            message: "target binding changed during flash bundle import")
-        }
-        let jobID =
-          "input-flash-\(currentTarget.targetID)-r\(currentTarget.bindingRevision)-"
-          + String(completed.sha256.prefix(16))
-        let metadata = try await artifactStore.publishFile(
-          RuntimeArtifactFilePublicationRequest(
-            jobID: jobID, sessionID: "session-\(jobID)",
-            stepID: "import-flash-bundle", name: completed.name,
-            mediaType: "application/gzip",
-            privacy: .standard, retentionClass: .pinnedUntilVerified,
-            sourceOperation: "artifact.import-flash-bundle",
-            providerID: "host",
-            bindingSnapshot: ArtifactBindingSnapshot(
-              targetID: currentTarget.targetID,
-              bindingRevision: currentTarget.bindingRevision,
-              stableIdentitySHA256:
-                currentTarget.stablePhysicalIdentitySHA256),
-            sourceFileURL: completed.fileURL,
-            expectedByteCount: completed.byteCount,
-            expectedSHA256: completed.sha256))
-        let lease = try await artifactStore.leaseReference(
-          jobID: metadata.jobID, artifactID: metadata.artifactID)
-        return success(
-          id: request.id,
-          result: .object([
-            "jobId": .string(metadata.jobID),
-            "artifactId": .string(metadata.artifactID),
-            "lease": .string(lease),
-            "name": .string(metadata.name),
-            "byteCount": .integer(Int64(metadata.byteCount)),
-            "sha256": .string(metadata.sha256),
-            "targetId": .string(currentTarget.targetID),
-            "bindingRevision": .integer(
-              Int64(currentTarget.bindingRevision)),
-            "stableIdentitySha256": .string(
-              currentTarget.stablePhysicalIdentitySHA256),
-          ]))
-      } catch let error as FlashBundleArtifactImportError {
-        return failure(id: request.id, code: .rejected, message: error.description)
-      } catch let error as RuntimeArtifactError {
-        return failure(id: request.id, code: .rejected, message: "\(error)")
-      } catch {
-        return failure(id: request.id, code: .internalError, message: "\(error)")
-      }
-
-    case "artifact.importFlashBundle.abort":
-      guard case .string(let uploadID)? = request.params?["uploadId"] else {
-        return failure(id: request.id, code: .invalidParams, message: "uploadId is required")
-      }
-      let aborted = await flashBundleImports.abort(uploadID: uploadID)
-      return success(
-        id: request.id, result: .object(["aborted": .bool(aborted)]))
-
-    case "artifact.importNativeLibrary.begin":
-      guard artifactStore != nil, let targetStore else {
-        return failure(
-          id: request.id, code: .internalError,
-          message: "artifact store and target store are required for native library import")
-      }
-      guard case .string(let targetID)? = request.params?["targetId"],
-        case .string(let name)? = request.params?["name"],
-        case .integer(let byteCountValue)? = request.params?["byteCount"],
-        case .string(let sha256)? = request.params?["sha256"],
-        byteCountValue >= 0, byteCountValue <= Int64(Int.max)
-      else {
-        return failure(
-          id: request.id, code: .invalidParams,
-          message: "targetId, name, byteCount and sha256 are required")
-      }
-      do {
-        guard let target = try targetStore.find(targetID: targetID) else {
-          return failure(
-            id: request.id, code: .notFound, message: "unknown target \(targetID)")
-        }
-        let uploadID = try await nativeLibraryImports.begin(
-          target: target, name: name, byteCount: Int(byteCountValue),
-          sha256: sha256)
-        return success(
-          id: request.id,
-          result: .object([
-            "uploadId": .string(uploadID),
-            "maximumChunkBytes": .integer(
-              Int64(NativeLibraryArtifactImportCoordinator.maximumChunkBytes)),
-            "targetId": .string(target.targetID),
-            "bindingRevision": .integer(Int64(target.bindingRevision)),
-          ]))
-      } catch let error as NativeLibraryArtifactImportError {
-        return failure(id: request.id, code: .invalidParams, message: error.description)
-      } catch {
-        return failure(id: request.id, code: .internalError, message: "\(error)")
-      }
-
-    case "artifact.importNativeLibrary.append":
-      guard artifactStore != nil, targetStore != nil else {
-        return failure(
-          id: request.id, code: .internalError,
-          message: "artifact store and target store are required for native library import")
-      }
-      guard case .string(let uploadID)? = request.params?["uploadId"],
-        case .integer(let offsetValue)? = request.params?["offset"],
-        offsetValue >= 0, offsetValue <= Int64(Int.max),
-        case .string(let base64)? = request.params?["base64"],
-        base64.utf8.count
-          <= ((NativeLibraryArtifactImportCoordinator.maximumChunkBytes + 2) / 3) * 4,
-        let chunk = Data(base64Encoded: base64, options: [])
-      else {
-        return failure(
-          id: request.id, code: .invalidParams,
-          message: "uploadId, non-negative offset and a bounded base64 chunk are required")
-      }
-      do {
-        let nextOffset = try await nativeLibraryImports.append(
-          uploadID: uploadID, offset: Int(offsetValue), chunk: chunk)
-        return success(
-          id: request.id,
-          result: .object(["nextOffset": .integer(Int64(nextOffset))]))
-      } catch let error as NativeLibraryArtifactImportError {
-        return failure(id: request.id, code: .rejected, message: error.description)
-      } catch {
-        return failure(id: request.id, code: .internalError, message: "\(error)")
-      }
-
-    case "artifact.importNativeLibrary.commit":
-      guard let artifactStore, let targetStore else {
-        return failure(
-          id: request.id, code: .internalError,
-          message: "artifact store and target store are required for native library import")
-      }
-      guard case .string(let uploadID)? = request.params?["uploadId"] else {
-        return failure(id: request.id, code: .invalidParams, message: "uploadId is required")
-      }
-      do {
-        let completed = try await nativeLibraryImports.commit(uploadID: uploadID)
-        guard
-          let currentTarget = try targetStore.find(
-            targetID: completed.target.targetID),
-          currentTarget.bindingRevision == completed.target.bindingRevision,
-          currentTarget.stablePhysicalIdentitySHA256
-            == completed.target.stablePhysicalIdentitySHA256,
-          let hdcRoute = try targetStore.hdcExecutionRoute(targetID: currentTarget.targetID),
-          hdcRoute.bindingRevision == currentTarget.bindingRevision
-        else {
-          return failure(
-            id: request.id, code: .conflict,
-            message: "target binding changed during native library import")
-        }
-        let hdcStableIdentity = HDCObservationProviderAdapter.stableIdentitySHA256(
-          connectKey: hdcRoute.connectKey)
-        let jobID =
-          "input-so-\(currentTarget.targetID)-r\(currentTarget.bindingRevision)-"
-          + String(hdcStableIdentity.prefix(16)) + "-"
-          + String(completed.sha256.prefix(16))
-        let metadata = try await artifactStore.publish(
-          RuntimeArtifactPublicationRequest(
-            jobID: jobID, sessionID: "session-\(jobID)",
-            stepID: "import-native-library", name: completed.name,
-            mediaType: "application/x-elf",
-            privacy: .standard, retentionClass: .pinnedUntilVerified,
-            sourceOperation: "artifact.import-native-library",
-            providerID: "host",
-            bindingSnapshot: ArtifactBindingSnapshot(
-              targetID: currentTarget.targetID,
-              bindingRevision: currentTarget.bindingRevision,
-              // Consumed by the HDC provider: bind the lease to the
-              // same proven HDC route as plan materialization, like
-              // import-hap above. Only the flash bundle stays on the store
-              // identity — its consumer is the Rockchip provider.
-              stableIdentitySHA256: hdcStableIdentity),
-            contents: completed.contents))
-        let lease = try await artifactStore.leaseReference(
-          jobID: metadata.jobID, artifactID: metadata.artifactID)
-        return success(
-          id: request.id,
-          result: .object([
-            "jobId": .string(metadata.jobID),
-            "artifactId": .string(metadata.artifactID),
-            "lease": .string(lease),
-            "name": .string(metadata.name),
-            "byteCount": .integer(Int64(metadata.byteCount)),
-            "sha256": .string(metadata.sha256),
-            "abi": .string(completed.facts.abi.rawValue),
-            "elfClassBits": .integer(
-              Int64(completed.facts.elfClassBits)),
-            "machine": .integer(Int64(completed.facts.machine)),
-            "buildId": .string(completed.facts.buildID),
-            "targetId": .string(currentTarget.targetID),
-            "bindingRevision": .integer(
-              Int64(currentTarget.bindingRevision)),
-            "stableIdentitySha256": .string(hdcStableIdentity),
-          ]))
-      } catch let error as NativeLibraryArtifactImportError {
-        return failure(id: request.id, code: .rejected, message: error.description)
-      } catch let error as RuntimeArtifactError {
-        return failure(id: request.id, code: .rejected, message: "\(error)")
-      } catch {
-        return failure(id: request.id, code: .internalError, message: "\(error)")
-      }
-
-    case "artifact.importNativeLibrary.abort":
-      guard case .string(let uploadID)? = request.params?["uploadId"] else {
-        return failure(id: request.id, code: .invalidParams, message: "uploadId is required")
-      }
-      let aborted = await nativeLibraryImports.abort(uploadID: uploadID)
-      return success(
-        id: request.id, result: .object(["aborted": .bool(aborted)]))
+      return await importGateway.response(request, context: context,
+        resources: RuntimeImportControlHandler(artifacts: artifactStore, targets: targetStore,
+          flashPolicy: durableImportFlashPolicy, engine: engine))
 
     case "artifact.quota":
       // Read-only headroom, so a caller can be refused before it starts work
@@ -1995,146 +1115,16 @@ public struct RuntimeControlPlaneHandler: Sendable {
       }
 
     case "artifact.list":
-      if request.protocolVersion == ArkDeckControlProtocol.targetVersion {
-        return await RuntimeArtifactResourceHandler(engine: engine, artifacts: artifactStore).response(request)
-      }
-      guard let artifactStore else {
-        return failure(
-          id: request.id, code: .internalError, message: "artifact store is not configured")
-      }
-      guard case .string(let jobID)? = request.params?["jobId"] else {
-        return failure(id: request.id, code: .invalidParams, message: "jobId is required")
-      }
-      do {
-        let artifacts = try await artifactStore.list(jobID: jobID)
-        return success(
-          id: request.id,
-          result: .array(artifacts.map(Self.encodeArtifact)))
-      } catch {
-        return failure(id: request.id, code: .internalError, message: "\(error)")
-      }
+      return await RuntimeArtifactResourceHandler(engine: engine, artifacts: artifactStore).response(request)
 
     case "artifact.inspect":
-      if request.protocolVersion == ArkDeckControlProtocol.targetVersion {
-        return await RuntimeArtifactResourceHandler(engine: engine, artifacts: artifactStore).response(request)
-      }
-      guard let artifactStore else {
-        return failure(
-          id: request.id, code: .internalError, message: "artifact store is not configured")
-      }
-      guard case .string(let jobID)? = request.params?["jobId"],
-        case .string(let artifactID)? = request.params?["artifactId"]
-      else {
-        return failure(
-          id: request.id, code: .invalidParams, message: "jobId and artifactId are required")
-      }
-      do {
-        let metadata = try await artifactStore.inspect(jobID: jobID, artifactID: artifactID)
-        return success(id: request.id, result: Self.encodeArtifact(metadata))
-      } catch let error as RuntimeArtifactError {
-        return failure(id: request.id, code: Self.artifactErrorCode(error), message: "\(error)")
-      } catch {
-        return failure(id: request.id, code: .internalError, message: "\(error)")
-      }
+      return await RuntimeArtifactResourceHandler(engine: engine, artifacts: artifactStore).response(request)
 
     case "artifact.read":
-      if request.protocolVersion == ArkDeckControlProtocol.targetVersion {
-        return await RuntimeArtifactResourceHandler(engine: engine, artifacts: artifactStore).response(request)
-      }
-      guard let artifactStore else {
-        return failure(
-          id: request.id, code: .internalError, message: "artifact store is not configured")
-      }
-      guard case .string(let jobID)? = request.params?["jobId"],
-        case .string(let artifactID)? = request.params?["artifactId"]
-      else {
-        return failure(
-          id: request.id, code: .invalidParams, message: "jobId and artifactId are required")
-      }
-      var maximumBytes = 1 << 20
-      if case .integer(let requested)? = request.params?["maxBytes"] {
-        maximumBytes = max(1, min(Int(requested), 1 << 22))
-      }
-      var allowSensitive = false
-      if case .bool(let flag)? = request.params?["allowSensitive"] { allowSensitive = flag }
-      var offset = 0
-      if case .integer(let requestedOffset)? = request.params?["offset"] {
-        guard requestedOffset >= 0, requestedOffset <= Int64(Int.max) else {
-          return failure(
-            id: request.id, code: .invalidParams,
-            message: "offset must be a non-negative host integer")
-        }
-        offset = Int(requestedOffset)
-      }
-      do {
-        let metadata = try await artifactStore.inspect(
-          jobID: jobID, artifactID: artifactID)
-        let data = try await artifactStore.read(
-          jobID: jobID, artifactID: artifactID, offset: offset,
-          maximumBytes: maximumBytes,
-          allowSensitive: allowSensitive)
-        let nextOffset = offset + data.count
-        return success(
-          id: request.id,
-          result: .object([
-            "artifactId": .string(artifactID),
-            "offset": .integer(Int64(offset)),
-            "nextOffset": .integer(Int64(nextOffset)),
-            "totalByteCount": .integer(Int64(metadata.byteCount)),
-            "eof": .bool(nextOffset == metadata.byteCount),
-            "byteCount": .integer(Int64(data.count)),
-            "base64": .string(data.base64EncodedString()),
-          ]))
-      } catch let error as RuntimeArtifactError {
-        if case .sensitiveAccessRequiresOptIn = error {
-          return failure(
-            id: request.id, code: .rejected,
-            message: "artifact is sensitive; pass allowSensitive to read it")
-        }
-        return failure(id: request.id, code: Self.artifactErrorCode(error), message: "\(error)")
-      } catch {
-        return failure(id: request.id, code: .internalError, message: "\(error)")
-      }
+      return await RuntimeArtifactResourceHandler(engine: engine, artifacts: artifactStore).response(request)
 
     case "artifact.export":
-      if request.protocolVersion == ArkDeckControlProtocol.targetVersion {
-        return await RuntimeArtifactResourceHandler(engine: engine, artifacts: artifactStore).response(request)
-      }
-      guard let artifactStore else {
-        return failure(
-          id: request.id, code: .internalError, message: "artifact store is not configured")
-      }
-      guard case .string(let jobID)? = request.params?["jobId"],
-        case .string(let artifactID)? = request.params?["artifactId"],
-        case .string(let destination)? = request.params?["destinationDirectory"]
-      else {
-        return failure(
-          id: request.id, code: .invalidParams,
-          message: "jobId, artifactId and destinationDirectory are required")
-      }
-      var allowSensitive = false
-      if case .bool(let flag)? = request.params?["allowSensitive"] { allowSensitive = flag }
-      do {
-        let exported = try await artifactStore.export(
-          jobID: jobID, artifactID: artifactID,
-          destinationDirectory: URL(filePath: destination, directoryHint: .isDirectory),
-          allowSensitive: allowSensitive)
-        return success(
-          id: request.id,
-          result: .object([
-            "artifactId": .string(artifactID),
-            "exportedPath": .string(exported.path),
-          ]))
-      } catch let error as RuntimeArtifactError {
-        if case .sensitiveAccessRequiresOptIn = error {
-          return failure(
-            id: request.id, code: .rejected,
-            message: "artifact is sensitive; pass allowSensitive to export it")
-        }
-        return failure(id: request.id, code: .rejected, message: "\(error)")
-      } catch {
-        return failure(id: request.id, code: .internalError, message: "\(error)")
-      }
+      return await RuntimeArtifactResourceHandler(engine: engine, artifacts: artifactStore).response(request)
 
     case "history.filter.list", "history.filter.save", "history.filter.delete":
       guard let historyFilterStore else {
@@ -2227,11 +1217,6 @@ public struct RuntimeControlPlaneHandler: Sendable {
       ).response(request)
 
     case "trace.cache.status", "trace.cache.purge":
-      guard request.protocolVersion == ArkDeckControlProtocol.targetVersion else {
-        return failure(
-          id: request.id, code: .unsupportedProtocolVersion,
-          message: "Trace cache resources require the target control protocol")
-      }
       guard request.params?.isEmpty != false else {
         return failure(
           id: request.id, code: .invalidParams,
@@ -2268,11 +1253,6 @@ public struct RuntimeControlPlaneHandler: Sendable {
       }
 
     case "device.display-name.set", "device.display-name.clear":
-      guard request.protocolVersion == ArkDeckControlProtocol.targetVersion else {
-        return failure(
-          id: request.id, code: .unsupportedProtocolVersion,
-          message: "candidate display-name resources require the target control protocol")
-      }
       guard let targetObservations else {
         return failure(
           id: request.id, code: .internalError,
@@ -2331,11 +1311,6 @@ public struct RuntimeControlPlaneHandler: Sendable {
       }
 
     case "target.display-name.set", "target.display-name.clear":
-      guard request.protocolVersion == ArkDeckControlProtocol.targetVersion else {
-        return failure(
-          id: request.id, code: .unsupportedProtocolVersion,
-          message: "target display-name resources require the target control protocol")
-      }
       guard let targetStore else {
         return failure(
           id: request.id, code: .internalError,
@@ -2421,8 +1396,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
       // Additive and read-only: it creates nothing, and the field vocabulary is
       // shared with `device.candidates` so the two projections cannot describe
       // the same device in two spellings.
-      if request.protocolVersion == ArkDeckControlProtocol.targetVersion,
-        (Set((request.params ?? [:]).keys) != ["targetId"]
+      if (Set((request.params ?? [:]).keys) != ["targetId"]
           || request.params?["targetId"].flatMap({ value -> String? in
             if case .string(let id) = value, AgentExecutionIntent.validIdentifier(id) { return id }; return nil
           }) == nil) {
@@ -2480,9 +1454,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
               ])
             } ?? .null,
           ]
-        if request.protocolVersion == ArkDeckControlProtocol.targetVersion {
-          projection["schemaVersion"] = .string("arkdeck.target/1")
-        }
+        projection["schemaVersion"] = .string("arkdeck.target/1")
+
         return success(id: request.id, result: .object(projection))
       } catch {
         return failure(id: request.id, code: .internalError, message: "\(error)")
@@ -2532,11 +1505,6 @@ public struct RuntimeControlPlaneHandler: Sendable {
       }
 
     case "workspace.project.register", "workspace.project.update", "workspace.project.remove":
-      guard request.protocolVersion == ArkDeckControlProtocol.targetVersion else {
-        return failure(
-          id: request.id, code: .unsupportedProtocolVersion,
-          message: "workspace project mutation requires the target control protocol")
-      }
       let fields = request.params ?? [:]
       do {
         let resource: RuntimeWorkspaceProjectResource
@@ -2615,79 +1583,61 @@ public struct RuntimeControlPlaneHandler: Sendable {
       // grants nor widens anything — it is the discovery half, and today it is
       // the only way to learn a `projectRef` at all. §7.9 is explicit that the
       // free-form strings in Catalog descriptors do not count as discovery.
-      if request.protocolVersion == ArkDeckControlProtocol.targetVersion {
-        do {
-          let resources = try await engine.workspaceProjectList()
-          return success(
-            id: request.id,
-            result: .object([
-              "schemaVersion": .string("arkdeck.workspace-project-list/1"),
-              "projects": .array(resources.map { resource in
-                Self.encodeRegisteredWorkspaceProject(
-                  resource,
-                  publication: workspaceProjects.first { $0.projectRef == resource.projectRef })
-              }),
+      do {
+        let resources = try await engine.workspaceProjectList()
+        return success(
+          id: request.id,
+          result: .object([
+            "schemaVersion": .string("arkdeck.workspace-project-list/1"),
+            "projects": .array(resources.map { resource in
+              Self.encodeRegisteredWorkspaceProject(
+                resource,
+                publication: workspaceProjects.first { $0.projectRef == resource.projectRef })
+            }),
+          ]))
+      } catch let error as RuntimeWorkspaceProjectFailure {
+        return Self.workspaceProjectFailure(id: request.id, error: error)
+      } catch let error as AgentExecutionControlFailure {
+        return AgentWireProtocol.Response(
+          id: request.id, ok: false, result: nil,
+          error: .init(
+            code: error.code, message: error.message,
+            details: [
+              "phase": .string("workspaceProjectOwner"),
+              "newDispatchCount": .integer(0),
             ]))
-        } catch let error as RuntimeWorkspaceProjectFailure {
-          return Self.workspaceProjectFailure(id: request.id, error: error)
-        } catch let error as AgentExecutionControlFailure {
-          return AgentWireProtocol.Response(
-            id: request.id, ok: false, result: nil,
-            error: .init(
-              code: error.code, message: error.message,
-              details: [
-                "phase": .string("workspaceProjectOwner"),
-                "newDispatchCount": .integer(0),
-              ]))
-        } catch {
-          return failure(id: request.id, code: .recordUnreadable, message: "workspace project owner failed")
-        }
+      } catch {
+        return failure(id: request.id, code: .recordUnreadable, message: "workspace project owner failed")
       }
-      return success(
-        id: request.id,
-        result: .array(workspaceProjects.map(Self.encodeWorkspaceProject)))
 
     case "workspace.project.show":
       guard case .string(let projectRef)? = request.params?["projectRef"], !projectRef.isEmpty
       else {
         return failure(id: request.id, code: .invalidParams, message: "projectRef is required")
       }
-      if request.protocolVersion == ArkDeckControlProtocol.targetVersion {
-        do {
-          let resource = try await engine.workspaceProjectInspect(projectRef: projectRef)
-          return success(
-            id: request.id,
-            result: Self.encodeRegisteredWorkspaceProject(
-              resource,
-              publication: workspaceProjects.first { $0.projectRef == resource.projectRef }))
-        } catch let error as RuntimeWorkspaceProjectFailure {
-          return Self.workspaceProjectFailure(id: request.id, error: error)
-        } catch let error as AgentExecutionControlFailure {
-          return AgentWireProtocol.Response(
-            id: request.id, ok: false, result: nil,
-            error: .init(
-              code: error.code, message: error.message,
-              details: [
-                "phase": .string("workspaceProjectOwner"),
-                "newDispatchCount": .integer(0),
-              ]))
-        } catch {
-          return failure(id: request.id, code: .recordUnreadable, message: "workspace project owner failed")
-        }
+      do {
+        let resource = try await engine.workspaceProjectInspect(projectRef: projectRef)
+        return success(
+          id: request.id,
+          result: Self.encodeRegisteredWorkspaceProject(
+            resource,
+            publication: workspaceProjects.first { $0.projectRef == resource.projectRef }))
+      } catch let error as RuntimeWorkspaceProjectFailure {
+        return Self.workspaceProjectFailure(id: request.id, error: error)
+      } catch let error as AgentExecutionControlFailure {
+        return AgentWireProtocol.Response(
+          id: request.id, ok: false, result: nil,
+          error: .init(
+            code: error.code, message: error.message,
+            details: [
+              "phase": .string("workspaceProjectOwner"),
+              "newDispatchCount": .integer(0),
+            ]))
+      } catch {
+        return failure(id: request.id, code: .recordUnreadable, message: "workspace project owner failed")
       }
-      guard let project = workspaceProjects.first(where: { $0.projectRef == projectRef }) else {
-        return failure(
-          id: request.id, code: .workspaceReferenceNotFound,
-          message: "no workspace project \(projectRef) is registered on this host")
-      }
-      return success(id: request.id, result: Self.encodeWorkspaceProject(project))
 
     case "workspace.preset.register", "workspace.preset.update", "workspace.preset.remove":
-      guard request.protocolVersion == ArkDeckControlProtocol.targetVersion else {
-        return failure(
-          id: request.id, code: .unsupportedProtocolVersion,
-          message: "workspace preset mutation requires the target control protocol")
-      }
       let fields = request.params ?? [:]
       do {
         let resource: RuntimeWorkspacePresetResource
@@ -2775,60 +1725,42 @@ public struct RuntimeControlPlaneHandler: Sendable {
       else {
         return failure(id: request.id, code: .invalidParams, message: "projectRef is required")
       }
-      if request.protocolVersion == ArkDeckControlProtocol.targetVersion {
-        let fields = request.params ?? [:]
-        guard Set(fields.keys).isSubset(of: ["projectRef", "kind"]) else {
-          return failure(
-            id: request.id, code: .invalidParams,
-            message: "workspace preset list accepts only projectRef and kind")
-        }
-        let kind: String?
-        if let value = fields["kind"] {
-          guard case .string(let text) = value else {
-            return failure(id: request.id, code: .invalidParams, message: "kind must be text")
-          }
-          kind = text
-        } else {
-          kind = nil
-        }
-        do {
-          let presets = try await engine.workspacePresetList(
-            projectRef: projectRef, kind: kind)
-          return success(
-            id: request.id,
-            result: .object([
-              "schemaVersion": .string("arkdeck.workspace-preset-list/1"),
-              "projectRef": .string(projectRef),
-              "presets": .array(presets.map(\.projection)),
-            ]))
-        } catch let error as RuntimeWorkspaceProjectFailure {
-          return Self.workspacePresetFailure(id: request.id, error: error)
-        } catch let error as AgentExecutionControlFailure {
-          return Self.workspacePresetFailure(
-            id: request.id,
-            error: RuntimeWorkspaceProjectFailure(error.code, error.message))
-        } catch {
-          return failure(
-            id: request.id, code: .recordUnreadable,
-            message: "workspace preset owner failed")
-        }
-      }
-      guard let project = workspaceProjects.first(where: { $0.projectRef == projectRef }) else {
+      let fields = request.params ?? [:]
+      guard Set(fields.keys).isSubset(of: ["projectRef", "kind"]) else {
         return failure(
-          id: request.id, code: .workspaceReferenceNotFound,
-          message: "no workspace project \(projectRef) is registered on this host")
+          id: request.id, code: .invalidParams,
+          message: "workspace preset list accepts only projectRef and kind")
       }
-      var presets = project.presets
-      if case .string(let kind)? = request.params?["kind"] {
-        guard ["build", "test", "signing", "symbol"].contains(kind) else {
-          return failure(
-            id: request.id, code: .invalidParams,
-            message: "kind must be one of build|test|signing|symbol")
+      let kind: String?
+      if let value = fields["kind"] {
+        guard case .string(let text) = value else {
+          return failure(id: request.id, code: .invalidParams, message: "kind must be text")
         }
-        presets = presets.filter { $0.kind == kind }
+        kind = text
+      } else {
+        kind = nil
       }
-      return success(
-        id: request.id, result: .array(presets.map(Self.encodeWorkspacePreset)))
+      do {
+        let presets = try await engine.workspacePresetList(
+          projectRef: projectRef, kind: kind)
+        return success(
+          id: request.id,
+          result: .object([
+            "schemaVersion": .string("arkdeck.workspace-preset-list/1"),
+            "projectRef": .string(projectRef),
+            "presets": .array(presets.map(\.projection)),
+          ]))
+      } catch let error as RuntimeWorkspaceProjectFailure {
+        return Self.workspacePresetFailure(id: request.id, error: error)
+      } catch let error as AgentExecutionControlFailure {
+        return Self.workspacePresetFailure(
+          id: request.id,
+          error: RuntimeWorkspaceProjectFailure(error.code, error.message))
+      } catch {
+        return failure(
+          id: request.id, code: .recordUnreadable,
+          message: "workspace preset owner failed")
+      }
 
     case "workspace.preset.show":
       guard case .string(let projectRef)? = request.params?["projectRef"], !projectRef.isEmpty,
@@ -2838,230 +1770,32 @@ public struct RuntimeControlPlaneHandler: Sendable {
           id: request.id, code: .invalidParams,
           message: "projectRef and presetRef are required")
       }
-      if request.protocolVersion == ArkDeckControlProtocol.targetVersion {
-        guard Set(request.params?.keys.map { $0 } ?? []) == ["projectRef", "presetRef"] else {
-          return failure(
-            id: request.id, code: .invalidParams,
-            message: "workspace preset show requires exact projectRef and presetRef")
-        }
-        do {
-          let preset = try await engine.workspacePresetInspect(
-            projectRef: projectRef, presetRef: presetRef)
-          return success(id: request.id, result: preset.projection)
-        } catch let error as RuntimeWorkspaceProjectFailure {
-          return Self.workspacePresetFailure(id: request.id, error: error)
-        } catch let error as AgentExecutionControlFailure {
-          return Self.workspacePresetFailure(
-            id: request.id,
-            error: RuntimeWorkspaceProjectFailure(error.code, error.message))
-        } catch {
-          return failure(
-            id: request.id, code: .recordUnreadable,
-            message: "workspace preset owner failed")
-        }
-      }
-      guard let project = workspaceProjects.first(where: { $0.projectRef == projectRef }) else {
+      guard Set(request.params?.keys.map { $0 } ?? []) == ["projectRef", "presetRef"] else {
         return failure(
-          id: request.id, code: .workspaceReferenceNotFound,
-          message: "no workspace project \(projectRef) is registered on this host")
+          id: request.id, code: .invalidParams,
+          message: "workspace preset show requires exact projectRef and presetRef")
       }
-      guard let preset = project.presets.first(where: { $0.presetRef == presetRef }) else {
+      do {
+        let preset = try await engine.workspacePresetInspect(
+          projectRef: projectRef, presetRef: presetRef)
+        return success(id: request.id, result: preset.projection)
+      } catch let error as RuntimeWorkspaceProjectFailure {
+        return Self.workspacePresetFailure(id: request.id, error: error)
+      } catch let error as AgentExecutionControlFailure {
+        return Self.workspacePresetFailure(
+          id: request.id,
+          error: RuntimeWorkspaceProjectFailure(error.code, error.message))
+      } catch {
         return failure(
-          id: request.id, code: .workspaceReferenceNotFound,
-          message: "project \(projectRef) registers no preset \(presetRef)")
+          id: request.id, code: .recordUnreadable,
+          message: "workspace preset owner failed")
       }
-      return success(id: request.id, result: Self.encodeWorkspacePreset(preset))
 
     case "device.observations":
-      if request.protocolVersion == ArkDeckControlProtocol.targetVersion {
-        return await targetObservationRequest(request, adopting: false)
-      }
-      // §6.1's discovery shape, which `device.candidates` cannot carry: a
-      // bare array has nowhere to put the snapshot generation, and §6.1
-      // requires a fixed one. Rather than change a method the App and the
-      // Agent executor both parse, this is an additive object-shaped sibling.
-      // The CLI opts in with `device candidates --snapshot`; existing calls
-      // retain the array, including legacy-json output.
-      guard let bootstrap else {
-        return failure(
-          id: request.id, code: .internalError,
-          message: "bootstrap is not configured in this composition")
-      }
-      var observationsUseWarmSnapshot = false
-      switch request.params {
-      case nil, .some([:]):
-        observationsUseWarmSnapshot = false
-      case .some(["useWarmSnapshot": .bool(true)]):
-        observationsUseWarmSnapshot = true
-      default:
-        return failure(
-          id: request.id, code: .invalidParams,
-          message: "device.observations accepts only useWarmSnapshot=true")
-      }
-      do {
-        let snapshot =
-          observationsUseWarmSnapshot
-          ? try await bootstrap.candidateSnapshotForPresentation()
-          : try await bootstrap.refreshCandidateSnapshotForPresentation()
-        var rows: [JSONValue] = []
-        for candidate in snapshot.candidates {
-          let adopted = try targetStore?.candidateTarget(connectKey: candidate.connectKey)
-          rows.append(
-            Self.encodeDeviceObservation(candidate: candidate, adoptedTarget: adopted))
-        }
-        return success(
-          id: request.id, result: Self.encodeDeviceObservations(snapshot, rows: rows))
-      } catch {
-        return failure(id: request.id, code: .internalError, message: "\(error)")
-      }
-
-    case "device.candidates":
-      // Read-only discovery: the one enumeration the App's device list needs.
-      // It calls the bootstrap's candidate read directly — never `advance`,
-      // which adopts when a single Connected candidate is present — so this
-      // method cannot create, change or select a binding. Adopted targets are
-      // joined by connect key so a caller can tell a ready adopted device
-      // from a candidate that still needs physical trust.
-      guard let bootstrap else {
-        return failure(
-          id: request.id, code: .internalError,
-          message: "bootstrap is not configured in this composition")
-      }
-      let usesWarmSnapshot: Bool
-      switch request.params {
-      case nil, .some([:]):
-        usesWarmSnapshot = false
-      case .some(["useWarmSnapshot": .bool(true)]):
-        usesWarmSnapshot = true
-      default:
-        return failure(
-          id: request.id, code: .invalidParams,
-          message: "device.candidates accepts only useWarmSnapshot=true")
-      }
-      do {
-        // The daemon keeps the official HDC candidate read warm outside the
-        // App launch path. Reading that completed snapshot and the compact
-        // local observation history are independent, so both projections are
-        // still composed in one XPC response without a serial I/O chain.
-        async let candidateRead =
-          usesWarmSnapshot
-          ? bootstrap.candidateSnapshotForPresentation()
-          : bootstrap.refreshCandidateSnapshotForPresentation()
-        // Historical device facts are optional decoration. A damaged or
-        // temporarily unreadable history store must not hide the primary HDC
-        // candidate observation from the App.
-        async let observationRead = try? engine.latestSucceededDeviceObservations()
-        let (candidateSnapshot, observedFacts) = try await (candidateRead, observationRead)
-        let observations = observedFacts ?? [:]
-        let deviceInformationSnapshot =
-          candidateSnapshot.health == .current
-          ? await bootstrap.deviceInformationSnapshotForPresentation(
-            candidates: candidateSnapshot.candidates, useWarmSnapshot: usesWarmSnapshot)
-          : nil
-        var projected: [(candidate: BootstrapCandidate, target: RuntimeTargetRecord?)] = []
-        for candidate in candidateSnapshot.candidates {
-          let target = try targetStore?.candidateTarget(connectKey: candidate.connectKey)
-          if let target,
-            let index = projected.firstIndex(where: { $0.target?.targetID == target.targetID })
-          {
-            func rank(_ state: String) -> Int {
-              switch state {
-              case "Connected": return 3
-              case "Unauthorized": return 2
-              case "Offline": return 1
-              default: return 0
-              }
-            }
-            if rank(candidate.state) > rank(projected[index].candidate.state) {
-              projected[index] = (candidate, target)
-            }
-          } else {
-            projected.append((candidate, target))
-          }
-        }
-        return success(
-          id: request.id,
-          result: .array(
-            projected.map { row in
-              let observation = row.target.flatMap { observations[$0.targetID] }
-              let information = deviceInformationSnapshot?.information[row.candidate.connectKey]
-              return .object([
-                "connectKey": .string(row.candidate.connectKey),
-                "state": .string(row.candidate.state),
-                "stateObservedAtUtc": .string(candidateSnapshot.observedAtUTC),
-                "stateObservationHealth": .string(candidateSnapshot.health.rawValue),
-                "adoptedTargetId": row.target.map { .string($0.targetID) } ?? .null,
-                "bindingRevision": row.target.map {
-                  .integer(Int64($0.bindingRevision))
-                } ?? .null,
-                "deviceInformation": information.map {
-                  .object([
-                    "name": $0.name.map(JSONValue.string) ?? .null,
-                    "systemVersion": $0.systemVersion.map(JSONValue.string) ?? .null,
-                    "transport": .string($0.transport),
-                    "observedAtUtc": deviceInformationSnapshot.map {
-                      .string($0.observedAtUTC)
-                    } ?? .null,
-                  ])
-                } ?? .null,
-                "observedFacts": observation.map {
-                  .object([
-                    "targetId": $0.targetID.map(JSONValue.string) ?? .null,
-                    "model": $0.model.map(JSONValue.string) ?? .null,
-                    "firmware": $0.firmware.map(JSONValue.string) ?? .null,
-                    "transport": $0.transport.map(JSONValue.string) ?? .null,
-                    "confirmedAtUtc": $0.confirmedAtUTC.map(JSONValue.string) ?? .null,
-                  ])
-                } ?? .null,
-              ])
-            }))
-      } catch {
-        return failure(id: request.id, code: .internalError, message: "\(error)")
-      }
+      return await targetObservationRequest(request, adopting: false)
 
     case "target.adopt":
-      if request.protocolVersion == ArkDeckControlProtocol.targetVersion {
-        return await targetObservationRequest(request, adopting: true)
-      }
-      guard let bootstrap else {
-        return failure(
-          id: request.id, code: .internalError,
-          message: "bootstrap is not configured in this composition")
-      }
-      var selected: String?
-      if case .string(let candidate)? = request.params?["candidate"] {
-        selected = candidate
-      }
-      switch await bootstrap.advance(selectedConnectKey: selected) {
-      case .adopted(let record):
-        return success(
-          id: request.id,
-          result: .object([
-            "outcome": .string("adopted"),
-            "targetId": .string(record.targetID),
-            "bindingRevision": .integer(Int64(record.bindingRevision)),
-          ]))
-      case .needsSelection(let candidates):
-        return success(
-          id: request.id,
-          result: .object([
-            "outcome": .string("needsSelection"),
-            "candidates": .array(
-              candidates.map {
-                .object(["candidate": .string($0.connectKey), "state": .string($0.state)])
-              }),
-          ]))
-      case .waitingForHuman(let kind, let prompt):
-        return success(
-          id: request.id,
-          result: .object([
-            "outcome": .string("waitingForHuman"),
-            "humanActionKind": .string(kind.rawValue),
-            "prompt": .string(prompt),
-          ]))
-      case .failed(let reason):
-        return failure(id: request.id, code: .rejected, message: reason)
-      }
+      return await targetObservationRequest(request, adopting: true)
 
     default:
       return failure(
@@ -3304,7 +2038,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
       "findings": .array(findings),
       "checks": .object([
         "runtime": .object([
-          "protocolVersion": .string(ArkDeckControlProtocol.targetVersion),
+          "protocolVersion": .string(ArkDeckControlProtocol.currentVersion),
           "runtimeRequestSchemaVersion": .string(RuntimeRequestEnvelope.schemaVersion),
         ]),
         "catalog": .object([
@@ -3324,12 +2058,11 @@ public struct RuntimeControlPlaneHandler: Sendable {
     ])
   }
 
-  /// The negotiated target Job lifecycle. The legacy switch below remains
-  /// byte-for-byte compatible with control protocol 1.x; this owner gives 2.x
-  /// closed request shapes, stable result projections and the phase evidence
+  /// The current Job lifecycle uses closed request shapes, stable resource
+  /// projections and phase evidence
   /// required to distinguish a proven refusal from an unknown mutation
   /// outcome.
-  private func targetJobLifecycleRequest(
+  private func jobLifecycleRequest(
     _ request: AgentWireProtocol.Request
   ) async -> AgentWireProtocol.Response {
     let fields = request.params ?? [:]
@@ -3833,9 +2566,6 @@ public struct RuntimeControlPlaneHandler: Sendable {
   // MARK: device observations (§6.1, §8.5)
 
   private func hdcControlActionRequest(_ request: AgentWireProtocol.Request) async -> AgentWireProtocol.Response {
-    guard request.protocolVersion == ArkDeckControlProtocol.targetVersion else {
-      return failure(id: request.id, code: .unsupportedProtocolVersion, message: "control actions require protocol 2")
-    }
     let fields = request.params ?? [:]
     do {
       let result: JSONValue
@@ -3918,9 +2648,6 @@ public struct RuntimeControlPlaneHandler: Sendable {
   private func humanActionRequest(
     _ request: AgentWireProtocol.Request, context: RuntimeControlRequestContext
   ) async -> AgentWireProtocol.Response {
-    guard request.protocolVersion == ArkDeckControlProtocol.targetVersion else {
-      return failure(id: request.id, code: .unsupportedProtocolVersion, message: "human actions require protocol 2")
-    }
     guard let humanActionResources else {
       // Older/test compositions with only AgentExecution ownership preserve
       // their exact behavior. Production always installs the union owner.
@@ -4034,9 +2761,6 @@ public struct RuntimeControlPlaneHandler: Sendable {
   }
 
   private func agentExecutionRequest(_ request: AgentWireProtocol.Request) async -> AgentWireProtocol.Response {
-    guard request.protocolVersion == ArkDeckControlProtocol.targetVersion else {
-      return failure(id: request.id, code: .unknownMethod, message: "Runtime execution resources require the published target protocol")
-    }
     let fields = request.params ?? [:]
     func string(_ key: String) throws -> String {
       guard case .string(let value)? = fields[key], AgentExecutionIntent.validIdentifier(value) else {
@@ -4207,7 +2931,12 @@ public struct RuntimeControlPlaneHandler: Sendable {
       default:
         throw TargetObservationFailure("invalidInput", "device observations accepts only following")
       }
+      async let observationRead = engine.latestSucceededDeviceObservations()
       let snapshot = try await targetObservations.snapshot(following: following)
+      async let informationRead = bootstrap?.deviceInformationSnapshotForPresentation(
+        observation: snapshot)
+      let observedFacts = (try? await observationRead) ?? [:]
+      let information = await informationRead
       let rows: [JSONValue] = try snapshot.observations.map { row in
         guard let display = snapshot.displayNames[row.observationID] else {
           throw TargetObservationFailure(
@@ -4224,6 +2953,23 @@ public struct RuntimeControlPlaneHandler: Sendable {
           "bindingRevision": target.map { .integer(Int64($0.bindingRevision)) } ?? .null,
           "displayName": display.name.map(JSONValue.string) ?? .null,
           "displayNameGeneration": .string(String(display.generation)),
+          "deviceInformation": information?.information[row.candidate.connectKey].map { value in
+            .object([
+              "name": value.name.map(JSONValue.string) ?? .null,
+              "systemVersion": value.systemVersion.map(JSONValue.string) ?? .null,
+              "transport": .string(value.transport),
+              "observedAtUtc": information.map { .string($0.observedAtUTC) } ?? .null,
+            ])
+          } ?? .null,
+          "observedFacts": target.flatMap { observedFacts[$0.targetID] }.map { value in
+            .object([
+              "targetId": value.targetID.map(JSONValue.string) ?? .null,
+              "model": value.model.map(JSONValue.string) ?? .null,
+              "firmware": value.firmware.map(JSONValue.string) ?? .null,
+              "transport": value.transport.map(JSONValue.string) ?? .null,
+              "confirmedAtUtc": value.confirmedAtUTC.map(JSONValue.string) ?? .null,
+            ])
+          } ?? .null,
         ])
       }
       return success(id: request.id, result: .object([
@@ -4267,40 +3013,6 @@ public struct RuntimeControlPlaneHandler: Sendable {
         "invalidInput", "candidate, observationId and canonical positive observationGeneration are required")
     }
     return TargetObservationReference(candidate: candidate, observationID: observationID, generation: generation)
-  }
-
-  static func encodeDeviceObservations(
-    _ snapshot: BootstrapCandidateSnapshot, rows: [JSONValue]
-  ) -> JSONValue {
-    .object([
-      // Null rather than zero when unstamped: a generation a caller passes to
-      // `target adopt --observation-generation` has to be one the Runtime
-      // issued, and `0` would look like one.
-      "snapshotGeneration": snapshot.generation.map { .integer(Int64($0)) } ?? .null,
-      "observedAtUtc": .string(snapshot.observedAtUTC),
-      "health": .string(snapshot.health.rawValue),
-      // §8.5's lifetime rule, published rather than left to be discovered.
-      // A caller must not hold an observation ID across a refresh, and this
-      // says so in a field instead of in documentation nobody reads at 2am.
-      "observationContinuity": .string(DeviceObservationIdentity.continuity.rawValue),
-      "observationContinuityReason": .string(DeviceObservationIdentity.continuityReason),
-      "observations": .array(rows),
-    ])
-  }
-
-  static func encodeDeviceObservation(
-    candidate: BootstrapCandidate, adoptedTarget: RuntimeTargetRecord?
-  ) -> JSONValue {
-    .object([
-      "observationId": candidate.observationID.map(JSONValue.string) ?? .null,
-      "candidateKey": .string(candidate.connectKey),
-      "authorizationState": .string(candidate.state),
-      // The adopted-target link §6.1 asks for, so a caller can tell a
-      // candidate that still needs physical trust from one already bound.
-      "adoptedTargetId": adoptedTarget.map { .string($0.targetID) } ?? .null,
-      "adoptedBindingRevision": adoptedTarget.map { .integer(Int64($0.bindingRevision)) }
-        ?? .null,
-    ])
   }
 
   static func encodeOperationDescriptor(
@@ -4420,60 +3132,6 @@ public struct RuntimeControlPlaneHandler: Sendable {
     return .object(projected)
   }
 
-  private static func encodeArtifact(_ metadata: RuntimeArtifactMetadata) -> JSONValue {
-    var status = "published"
-    var detail: JSONValue = .null
-    switch metadata.status {
-    case .published: break
-    case .missing(let reason):
-      status = "missing"
-      detail = .string(reason)
-    case .truncated(let atBytes):
-      status = "truncated"
-      detail = .integer(Int64(atBytes))
-    }
-    // Every operation that consumes an Artifact declares its input as
-    // `artifactLease`, but the lease grammar appeared on no published surface:
-    // a caller held `jobId` and `artifactId` and still had to know they
-    // concatenate. Emitting it here grants nothing — both halves are already
-    // in this same object, the reference carries no secret, and
-    // `RuntimeArtifactStore.resolveLease` still re-inspects the index,
-    // re-checks publication and re-resolves a symlink-free payload before any
-    // provider sees a byte. `RuntimeArtifactStore.leaseReference` remains the
-    // grammar's source of truth; it refuses unpublished bytes, so this
-    // projection reports `null` for exactly the same rows rather than handing
-    // out a reference that would fail to resolve.
-    let lease: JSONValue =
-      metadata.status.isPublished
-      ? .string("lease-v1:\(metadata.jobID):\(metadata.artifactID)")
-      : .null
-    return .object([
-      "artifactId": .string(metadata.artifactID),
-      "jobId": .string(metadata.jobID),
-      "lease": lease,
-      "name": .string(metadata.name),
-      "mediaType": .string(metadata.mediaType),
-      "byteCount": .integer(Int64(metadata.byteCount)),
-      "sha256": .string(metadata.sha256),
-      "privacy": .string(metadata.privacy.rawValue),
-      "status": .string(status),
-      "statusDetail": detail,
-      "sourceOperation": .string(metadata.sourceOperation),
-      "createdAtUtc": .string(metadata.createdAtUTC),
-      "redactionApplied": .bool(metadata.redactionApplied),
-      "targetId": .string(metadata.bindingSnapshot.targetID),
-      "bindingRevision": metadata.bindingSnapshot.bindingRevision
-        .map { .integer(Int64($0)) } ?? .null,
-      "stableIdentitySha256": metadata.bindingSnapshot.stableIdentitySHA256
-        .map(JSONValue.string) ?? .null,
-      // When the producing step was reaching the device. A reader deciding
-      // whether a picture is a given moment needs this and not `createdAtUtc`,
-      // which is when the bytes were filed.
-      "observedFromUtc": metadata.observationWindow.map { .string($0.startUTC) } ?? .null,
-      "observedToUtc": metadata.observationWindow.map { .string($0.endUTC) } ?? .null,
-    ])
-  }
-
   private static func encodeCleanupDebt(_ debt: CleanupDebtRecord) -> JSONValue {
     .object([
       "jobId": .string(debt.jobID),
@@ -4493,146 +3151,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
     return try JSONDecoder().decode(JSONValue.self, from: encoder.encode(value))
   }
 
-  private struct JobListOptions {
-    let pageSize: Int
-    let cursor: String?
-    let newestFirst: Bool
-    let includeTimeline: Bool
-    let includeCurrent: Bool
-  }
-
-  private struct JobListOptionsError: Error, CustomStringConvertible {
-    let description: String
-  }
-
-  private static func jobListOptions(
-    _ params: [String: JSONValue]?, acceptsCursor: Bool, acceptsCurrent: Bool
-  ) throws -> JobListOptions {
-    let pageSize: Int
-    if let supplied = params?["pageSize"] {
-      guard case .integer(let raw) = supplied else {
-        throw JobListOptionsError(description: "pageSize must be 1...1000")
-      }
-      guard let value = Int(exactly: raw), (1...1_000).contains(value) else {
-        throw JobListOptionsError(description: "pageSize must be 1...1000")
-      }
-      pageSize = value
-    } else {
-      pageSize = 100
-    }
-    let cursor: String?
-    if let supplied = params?["cursor"] {
-      guard acceptsCursor, case .string(let value) = supplied else {
-        throw JobListOptionsError(description: "cursor must be a string")
-      }
-      // A cursor is opaque to the caller but not arbitrary: the repository
-      // requires a non-negative integer and rejects anything else as corrupt.
-      // Checking the same rule here keeps a bad cursor a typed request error,
-      // which is what it is, instead of letting it arrive as a storage
-      // failure that is indistinguishable from the store actually breaking.
-      guard let parsed = Int64(value), parsed >= 0 else {
-        throw JobListOptionsError(description: "cursor must be a non-negative integer")
-      }
-      cursor = value
-    } else {
-      cursor = nil
-    }
-    let newestFirst: Bool
-    if let supplied = params?["order"] {
-      guard case .string(let value) = supplied,
-        value == "oldestFirst" || value == "newestFirst"
-      else {
-        throw JobListOptionsError(description: "order must be oldestFirst or newestFirst")
-      }
-      newestFirst = value == "newestFirst"
-    } else {
-      newestFirst = false
-    }
-    let includeTimeline: Bool
-    if let supplied = params?["includeTimeline"] {
-      guard case .bool(let value) = supplied else {
-        throw JobListOptionsError(description: "includeTimeline must be a boolean")
-      }
-      includeTimeline = value
-    } else {
-      includeTimeline = true
-    }
-    let includeCurrent: Bool
-    if let supplied = params?["includeCurrent"] {
-      guard acceptsCurrent, case .bool(let value) = supplied else {
-        throw JobListOptionsError(
-          description: "includeCurrent must be a boolean on job.list-page")
-      }
-      includeCurrent = value
-    } else {
-      includeCurrent = false
-    }
-    return JobListOptions(
-      pageSize: pageSize, cursor: cursor, newestFirst: newestFirst,
-      includeTimeline: includeTimeline, includeCurrent: includeCurrent)
-  }
-
   private static func jobNextAction(_ status: RuntimeJobStatus) throws -> JSONValue {
     try RuntimeJobReadProjection.nextAction(status)
-  }
-
-  private static func encodeStatus(
-    _ status: RuntimeJobStatus,
-    stateOverride: String? = nil,
-    includeTimeline: Bool = true
-  ) -> JSONValue {
-    let encodedFailure: JSONValue
-    if let failure = status.operationFailure {
-      encodedFailure = .object([
-        "schemaVersion": .string(failure.schemaVersion),
-        "code": .string(failure.code.rawValue),
-        "category": .string(failure.category.rawValue),
-        "retryability": .string(failure.retryability.rawValue),
-        "recovery": .string(failure.recovery.rawValue),
-      ])
-    } else {
-      encodedFailure = .null
-    }
-    return .object([
-      "jobId": .string(status.jobID),
-      "operation": .string(status.operationReference),
-      "targetId": .string(status.targetID),
-      "state": .string(stateOverride ?? status.state),
-      "waitingForHuman": .bool(status.waitingForHuman),
-      "outcomeUnknown": .bool(status.outcomeUnknown),
-      "failure": encodedFailure,
-      "outstandingResidueCount": .integer(Int64(status.outstandingResidueCount ?? 0)),
-      "timeline": includeTimeline ? .array(status.timeline.map(JSONValue.string)) : .null,
-      "processProgress": encodeProcessProgress(status.processProgress),
-      "executionMode": status.executionMode.map(JSONValue.string) ?? .null,
-      "sessionId": status.sessionID.map(JSONValue.string) ?? .null,
-      "threadId": status.threadID.map(JSONValue.string) ?? .null,
-      "workspaceKind": status.workspaceKind.map { .string($0.rawValue) } ?? .null,
-      "actualEffect": status.actualEffect.map(JSONValue.string) ?? .null,
-      "createdAtUtc": status.createdAtUTC.map(JSONValue.string) ?? .null,
-      "startedAtUtc": status.startedAtUTC.map(JSONValue.string) ?? .null,
-      "finishedAtUtc": status.finishedAtUTC.map(JSONValue.string) ?? .null,
-      "supersededByRecoveryEpochId": status.supersededByRecoveryEpochID
-        .map(JSONValue.string) ?? .null,
-      "recoveryEpochId": status.recoveryEpochID.map(JSONValue.string) ?? .null,
-      "resolvedByTargetAliasResolutionId": status.resolvedByTargetAliasResolutionID
-        .map(JSONValue.string) ?? .null,
-    ])
-  }
-
-  private static func encodeProcessProgress(
-    _ progress: RuntimeJobProcessProgress?
-  ) -> JSONValue {
-    guard let progress else { return .null }
-    return .object([
-      "stepId": .string(progress.stepID),
-      "phase": .string(progress.phase.rawValue),
-      "unitName": progress.unitName.map(JSONValue.string) ?? .null,
-      "completedUnitCount": .integer(Int64(progress.completedUnitCount)),
-      "totalUnitCount": .integer(Int64(progress.totalUnitCount)),
-      "currentUnitPercent": progress.currentUnitPercent
-        .map { .integer(Int64($0)) } ?? .null,
-    ])
   }
 
   static func encodeEvidence(

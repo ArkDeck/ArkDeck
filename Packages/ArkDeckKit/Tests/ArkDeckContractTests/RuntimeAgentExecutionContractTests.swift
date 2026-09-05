@@ -164,7 +164,8 @@ final class RuntimeAgentExecutionContractTests: XCTestCase {
     while process.isRunning && Date() < limit { Thread.sleep(forTimeInterval: 0.01) }
     if process.isRunning { process.terminate(); throw AgentClientFixtureError.missingObject }
     let bytes = stdout.fileHandleForReading.readDataToEndOfFile()
-    _ = stderr.fileHandleForReading.readDataToEndOfFile()
+    let errorBytes = stderr.fileHandleForReading.readDataToEndOfFile()
+    if bytes.isEmpty { XCTFail("CLI \(arguments.prefix(2)) exited \(process.terminationStatus): \(String(decoding: errorBytes, as: UTF8.self))") }
     let document = try CLIStrictJSON.decode(bytes)
     return (process.terminationStatus, try object(document))
   }
@@ -468,7 +469,7 @@ final class RuntimeAgentExecutionContractTests: XCTestCase {
     port.setState("Unauthorized")
     let owner = try owner()
     let server = try startServer(owner)
-    let args = ["agent", "run", "--require-protocol", "2", "--execution-id", "execution-test", "--operation", "observe.device@1"]
+    let args = ["agent", "run", "--execution-id", "execution-test", "--operation", "observe.device@1"]
     let (pausedCode, paused) = try cli(args, server: server)
     XCTAssertEqual(pausedCode, 75)
     let error = try object(XCTUnwrap(paused["error"]))
@@ -500,7 +501,7 @@ final class RuntimeAgentExecutionContractTests: XCTestCase {
     dispatcher.hold(gate)
     let owner = try owner()
     let server = try startServer(owner)
-    let (code, result) = try cli(["agent", "run", "--require-protocol", "2", "--execution-id", "execution-test",
+    let (code, result) = try cli(["agent", "run", "--execution-id", "execution-test",
       "--operation", "observe.device@1", "--timeout", "400ms"], server: server)
     XCTAssertEqual(code, 75)
     XCTAssertEqual(try object(XCTUnwrap(result["error"]))["code"], .string("clientTimeout"))
@@ -520,7 +521,7 @@ final class RuntimeAgentExecutionContractTests: XCTestCase {
   func testReviewedPlanMismatchIsTypedAndNeverCreatesAJob() async throws {
     let owner = try owner()
     let server = try startServer(owner)
-    let (code, reply) = try cli(["agent", "run", "--require-protocol", "2", "--operation", "observe.device@1",
+    let (code, reply) = try cli(["agent", "run", "--operation", "observe.device@1",
       "--execution-id", "execution-test", "--reviewed-plan-digest", String(repeating: "a", count: 64)], server: server)
     XCTAssertEqual(code, 65)
     XCTAssertEqual(try object(XCTUnwrap(reply["error"]))["code"], .string("reviewedPlanMismatch"))
@@ -538,7 +539,7 @@ final class RuntimeAgentExecutionContractTests: XCTestCase {
     catch AgentClientFixtureError.missingObject {}
     let store = try RuntimeAgentExecutionStore(directory: directory.appending(path: "executions"))
     let record = try XCTUnwrap(store.load("execution-test"))
-    var submission = try ControlProtocolNegotiation.decodeObject(XCTUnwrap(record.submissionRequest), maximumBytes: 4 * 1024 * 1024)
+    var submission = try ControlFrameJSON.decodeObject(XCTUnwrap(record.submissionRequest), maximumBytes: 4 * 1024 * 1024)
     submission["reviewedPlanDigest"] = .string(String(repeating: "a", count: 64))
     let bytes = try CanonicalJSONEncoders.canonical().encode(JSONValue.object(submission))
     do { _ = try await engine.acceptedJobForAgent(bytes); XCTFail("existing admission is not proof of this reviewed precondition") }
@@ -546,15 +547,18 @@ final class RuntimeAgentExecutionContractTests: XCTestCase {
     XCTAssertEqual(dispatcher.dispatchCount, 0)
   }
 
-  func testLegacyProtocolCannotReachTheNewExecutionOwner() async throws {
+  func testMissingCurrentIdentityCannotReachTheExecutionOwner() async throws {
     let owner = try owner()
-    let server = try startServer(owner)
-    let legacy = AgentClient(socketPath: server.socketURL.path)
-    do { _ = try legacy.request(method: "agent.run", params: request()); XCTFail("new resources must not change protocol 1") }
-    catch let error as AgentClientError {
-      guard case .daemonError(let code, _) = error else { return XCTFail("wrong legacy error") }
-      XCTAssertEqual(code, "unknownMethod")
-    }
+    let handler = RuntimeControlPlaneHandler(
+      engine: engine, capabilityStore: try RuntimeCapabilityStore(directoryURL: directory.appending(path: "capabilities")),
+      providerIDs: ["hdc"], nowUTC: { "2026-08-31T12:00:00Z" }, targetStore: targets, agentExecutions: owner)
+    let frame = try PortableCanonicalJSON.canonicalBytes(.object([
+      "protocolVersion": .string("1.0.0"), "id": .string("retired-peer"),
+      "method": .string("agent.run"), "params": .object(request()),
+    ]))
+    let response = await handler.handleFrame(frame)
+    XCTAssertFalse(response.ok)
+    XCTAssertEqual(response.error?.code, "unsupportedProtocolVersion")
     let page = try object(await owner.list(filters: [:], pageSize: 10, cursor: nil))
     XCTAssertEqual(page["items"], .array([]))
     XCTAssertEqual(dispatcher.dispatchCount, 0)
@@ -566,7 +570,7 @@ final class RuntimeAgentExecutionContractTests: XCTestCase {
     _ = try await owner.run(request())
     let name = RuntimeAgentExecutionStore.fingerprint(Data("execution-test".utf8))
     let path = directory.appending(path: "executions/execution-\(name).json")
-    var document = try ControlProtocolNegotiation.decodeObject(Data(contentsOf: path), maximumBytes: 16 * 1024 * 1024)
+    var document = try ControlFrameJSON.decodeObject(Data(contentsOf: path), maximumBytes: 16 * 1024 * 1024)
     document["intentFingerprintSHA256"] = .string(String(repeating: "0", count: 64))
     try CanonicalJSONEncoders.canonical().encode(JSONValue.object(document)).write(to: path)
     do { _ = try await owner.run(request()); XCTFail("an unreadable record is not absence") }

@@ -42,7 +42,7 @@ public struct UIDumpTargetPresentation: Sendable, Equatable, Identifiable {
   public let bindingRevision: Int
   public let toolVersion: String
   public let adoptedAtUTC: String
-  /// A fresh `device.candidates` observation joined to this durable target.
+  /// A fresh `device.observations` observation joined to this durable target.
   /// Viewer must never turn a historical target record into permission to
   /// capture: only a current Connected route can submit the typed request.
   public let connection: UIDumpTargetConnection
@@ -1092,7 +1092,7 @@ private actor UIDumpProductionApplicationProvider: UIDumpApplicationProviding {
     // navigated here.
     async let targets = UIDumpXPCTransport.request(method: "target.list")
     async let jobs = UIDumpXPCTransport.request(
-      method: "job.list", params: RuntimeAppJobListPolicy.recentSummaryParams)
+      method: "job.list", params: RuntimeAppReadResources.recentSummaryParams)
     return UIDumpWorkspaceResponseDecoding.presentation(
       operationResponse: await operations,
       targetResponse: await targets,
@@ -1210,10 +1210,7 @@ private actor UIDumpProductionApplicationProvider: UIDumpApplicationProviding {
       else {
         return .failed("Advanced Dump did not produce a safe terminal result (\(facts.state))")
       }
-      let entries = try artifactList(
-        await UIDumpXPCTransport.request(
-          method: "artifact.list", params: ["jobId": .string(jobID)]),
-        jobID: jobID)
+      let entries = try await inventory(jobID: jobID)
       let artifact = try requiredArtifact(
         named: "advanced-dump.txt", mediaType: "text/plain", entries: entries)
       return .captured(try ViewerAdvancedDumpParser.parse(await readArtifact(artifact, jobID: jobID)))
@@ -1244,10 +1241,7 @@ private actor UIDumpProductionApplicationProvider: UIDumpApplicationProviding {
     runMilliseconds: Double = 0
   ) async throws -> ViewerCapture {
     let (selection, listMilliseconds) = try await ViewerSignpost.measure("viewer.artifactList") {
-      let entries = try artifactList(
-        await UIDumpXPCTransport.request(
-          method: "artifact.list", params: ["jobId": .string(facts.jobID)]),
-        jobID: facts.jobID)
+      let entries = try await inventory(jobID: facts.jobID)
       let screenshot = try requiredArtifact(
         named: "screenshot.png", mediaType: "image/png", entries: entries)
       let tree = try requiredArtifact(
@@ -1327,6 +1321,22 @@ private actor UIDumpProductionApplicationProvider: UIDumpApplicationProviding {
         nodeCount: capture.nodes.count))
   }
 
+  private func inventory(jobID: String) async throws -> [ViewerArtifactMetadata] {
+    let rows = try await RuntimeAppReadResources.artifactInventory(jobID: jobID) { method, params in
+      try await UIDumpXPCTransport.request(method: method, params: params).get()
+    }
+    return try rows.map { row in
+      let projection = try ArtifactResourceProjection(row)
+      guard case .object(let fields) = row,
+        case .string(let name)? = fields["name"], case .string(let media)? = fields["mediaType"],
+        case .string(let privacy)? = fields["privacy"], case .string(let status)? = fields["status"] else {
+        throw ViewerArtifactFailure(message: "Runtime returned incomplete Viewer Artifact metadata")
+      }
+      return ViewerArtifactMetadata(id: projection.id, name: name, mediaType: media,
+        byteCount: Int64(projection.byteCount), sha256: projection.digest ?? "", privacy: privacy, status: status)
+    }
+  }
+
   private func readArtifact(_ artifact: ViewerArtifactMetadata, jobID: String) async throws -> Data {
     var bytes = Data()
     var digest = SHA256()
@@ -1335,7 +1345,7 @@ private actor UIDumpProductionApplicationProvider: UIDumpApplicationProviding {
       let response = await UIDumpXPCTransport.request(
         method: "artifact.read",
         params: [
-          "jobId": .string(jobID), "artifactId": .string(artifact.id),
+          "owner": .object(["kind": .string("job"), "id": .string(jobID)]), "artifactId": .string(artifact.id),
           "offset": .integer(offset), "maxBytes": .integer(Self.artifactChunkBytes),
           "allowSensitive": .bool(true),
         ])
@@ -1543,7 +1553,7 @@ enum UIDumpWorkspaceResponseDecoding {
     _ response: Result<Data, ViewerTransportFailure>
   ) -> ViewerDecodedList<UIDumpJobPresentation> {
     do {
-      let entries = try resultArray(response.get(), label: "Job list")
+      let entries = try RuntimeAppReadResources.recentJobSummaries(response.get())
       var jobs: [UIDumpJobPresentation] = []
       for entry in entries {
         guard entry["operation"] as? String == UIDumpApplicationFacade.operationReference else { continue }
@@ -1650,43 +1660,17 @@ private func terminalFacts(
     finishedAtUTC: values["finishedAtUtc"] as? String)
 }
 
-private func artifactList(
-  _ response: Result<Data, ViewerTransportFailure>, jobID: String
-) throws -> [ViewerArtifactMetadata] {
-  let entries = try resultArray(response.get(), label: "Viewer Artifact list")
-  return try entries.map { value in
-    guard value["jobId"] as? String == jobID,
-      let id = value["artifactId"] as? String,
-      let name = value["name"] as? String,
-      let mediaType = value["mediaType"] as? String,
-      let byteCount = int64(value["byteCount"]),
-      let sha256 = value["sha256"] as? String,
-      let privacy = value["privacy"] as? String,
-      let status = value["status"] as? String
-    else { throw ViewerArtifactFailure(message: "Runtime returned incomplete Viewer Artifact metadata") }
-    return ViewerArtifactMetadata(
-      id: id, name: name, mediaType: mediaType, byteCount: byteCount,
-      sha256: sha256, privacy: privacy, status: status)
-  }
-}
-
 private func artifactChunk(
   _ response: Result<Data, ViewerTransportFailure>,
   artifact: ViewerArtifactMetadata,
   expectedOffset: Int64
 ) throws -> (data: Data, nextOffset: Int64, eof: Bool) {
-  let result = try resultObject(response, label: "Viewer Artifact read")
-  guard result["artifactId"] as? String == artifact.id,
-    int64(result["offset"]) == expectedOffset,
-    let nextOffset = int64(result["nextOffset"]), nextOffset > expectedOffset,
-    int64(result["totalByteCount"]) == artifact.byteCount,
-    let byteCount = int64(result["byteCount"]), byteCount == nextOffset - expectedOffset,
-    let base64 = result["base64"] as? String,
-    let data = Data(base64Encoded: base64), Int64(data.count) == byteCount,
-    let eof = result["eof"] as? Bool,
-    nextOffset <= artifact.byteCount
-  else { throw ViewerArtifactFailure(message: "Runtime returned drifting Viewer Artifact chunk facts") }
-  return (data, nextOffset, eof)
+  let chunk = try ArtifactReadProjection(RuntimeAppReadResources.result(response.get()))
+  guard chunk.artifactID == artifact.id, chunk.digest == artifact.sha256,
+    Int64(chunk.offset) == expectedOffset, Int64(chunk.totalByteCount) == artifact.byteCount else {
+    throw ViewerArtifactFailure(message: "Runtime returned drifting Viewer Artifact chunk facts")
+  }
+  return (chunk.bytes, Int64(chunk.nextOffset), chunk.nextOffset == chunk.totalByteCount)
 }
 
 private func int64(_ value: Any?) -> Int64? {

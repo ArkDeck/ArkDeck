@@ -16,6 +16,9 @@ package struct RuntimeImportRecord: Codable, Sendable {
   package let intent: ArtifactImportIntent
   package let intentFingerprint: String
   package let binding: ArtifactBindingSnapshot
+  /// Set by the trusted transport at creation, never decoded from wire metadata.
+  /// Older records without provenance remain unavailable to App mutations.
+  package let appOwned: Bool?
   package let createdAtUTC: String
   package var updatedAtUTC: String
   package var generation: Int
@@ -125,8 +128,8 @@ package final class RuntimeImportStore: @unchecked Sendable {
   }
   private func decode(_ url: URL) throws -> RuntimeImportRecord {
     let data = try read(url, maximum: maximumRecordBytes)
-    let object = try ControlProtocolNegotiation.decodeObject(data, maximumBytes: maximumRecordBytes)
-    guard Set(object.keys).isSubset(of: ["schemaVersion", "importID", "intent", "intentFingerprint", "binding", "createdAtUTC", "updatedAtUTC", "generation", "state", "nextOffset", "chunks", "receipt", "validation", "releaseReceipt"]) else {
+    let object = try ControlFrameJSON.decodeObject(data, maximumBytes: maximumRecordBytes)
+    guard Set(object.keys).isSubset(of: ["schemaVersion", "importID", "intent", "intentFingerprint", "binding", "appOwned", "createdAtUTC", "updatedAtUTC", "generation", "state", "nextOffset", "chunks", "receipt", "validation", "releaseReceipt"]) else {
       throw Self.error("recordUnreadable", "Import record has unknown fields")
     }
     let record = try JSONDecoder().decode(RuntimeImportRecord.self, from: data)
@@ -210,7 +213,7 @@ package final class RuntimeImportStore: @unchecked Sendable {
     try validateDirectories()
     let url = try identityURL(id)
     if try exists(url) {
-      let fields = try ControlProtocolNegotiation.decodeObject(read(url, maximum: 1024), maximumBytes: 1024)
+      let fields = try ControlFrameJSON.decodeObject(read(url, maximum: 1024), maximumBytes: 1024)
       guard Set(fields.keys) == ["importRequestId"], case .string(let request)? = fields["importRequestId"],
         let record = try byRequest(request), record.importID == id else { throw Self.error("recordUnreadable", "Import identity mapping is unreadable") }
       return record
@@ -220,9 +223,10 @@ package final class RuntimeImportStore: @unchecked Sendable {
     guard let record = recovered else { throw Self.error("resourceNotFound", "Import does not exist") }
     try index(record); try recover(record); return record
   }
-  package func begin(_ intent: ArtifactImportIntent, binding: ArtifactBindingSnapshot, now: String) throws -> RuntimeImportRecord {
+  package func begin(_ intent: ArtifactImportIntent, binding: ArtifactBindingSnapshot, now: String, appOwned: Bool = false) throws -> RuntimeImportRecord {
     if let existing = try byRequest(intent.importRequestID) {
       guard existing.intent == intent else { throw Self.error("idempotencyConflict", "Import request identity already names different metadata") }
+      guard !appOwned || existing.appOwned == true else { throw Self.error("admissionDenied", "Import was not created by the App transport") }
       return existing
     }
     var count = 0; var staged = 0
@@ -234,7 +238,7 @@ package final class RuntimeImportStore: @unchecked Sendable {
       throw Self.error("quotaExceeded", "Import staging capacity is exhausted")
     }
     let record = RuntimeImportRecord(schemaVersion: "arkdeck.runtime-import/1", importID: "imp-" + UUID().uuidString.lowercased(),
-      intent: intent, intentFingerprint: try intent.fingerprint, binding: binding, createdAtUTC: now, updatedAtUTC: now,
+      intent: intent, intentFingerprint: try intent.fingerprint, binding: binding, appOwned: appOwned, createdAtUTC: now, updatedAtUTC: now,
       generation: 1, state: "inProgress", nextOffset: 0, chunks: [], receipt: nil, validation: nil)
     try save(record); try index(record); try recover(record)
     return record

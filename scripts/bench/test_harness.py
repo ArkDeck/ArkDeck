@@ -160,7 +160,7 @@ class ResourceSampleTests(unittest.TestCase):
 
 
 class ControlClientTests(unittest.TestCase):
-    def test_a_call_before_negotiation_is_refused(self) -> None:
+    def test_a_call_before_contract_verification_is_refused(self) -> None:
         client = control.ControlClient("/nonexistent.sock")
         with self.assertRaises(control.ControlError):
             client.call("health")
@@ -171,10 +171,25 @@ class ControlClientTests(unittest.TestCase):
             client.connect()
         self.assertIn("agentd.sock", str(raised.exception))
 
-    def test_the_supported_versions_match_the_generated_contract(self) -> None:
-        self.assertEqual(control.SUPPORTED_EXACT_VERSIONS, ("2.0.0", "1.0.0"))
-        self.assertEqual(control.BOOTSTRAP_METHOD, "protocol.negotiate")
-        self.assertEqual(control.BOOTSTRAP_VERSION, "arkdeck.control.negotiation/1")
+    def test_current_contract_is_loaded_from_the_generated_registry(self) -> None:
+        self.assertEqual(control.CURRENT_VERSION, "1.0.0")
+        self.assertEqual(len(control.CONTRACT_IDENTITY), 64)
+        self.assertNotIn("protocol.negotiate", control._REGISTRY["methods"])
+
+    def test_same_version_old_health_cannot_enable_business_requests(self) -> None:
+        class OldClient(control.ControlClient):
+            def _exchange(self, frame):
+                self.seen = frame
+                return {"id": frame["id"], "ok": True,
+                        "result": {"status": "ok", "protocolVersion": "1.0.0",
+                                   "catalogDigest": "a" * 64, "providers": []}}
+        client = OldClient("fixture")
+        with self.assertRaises(control.ControlError):
+            client.verify_contract()
+        self.assertEqual(client.seen["method"], "health")
+        with self.assertRaises(control.ControlError):
+            client.call("job.list")
+        self.assertEqual(client.seen["method"], "health")
 
 
 class MetricTableTests(unittest.TestCase):

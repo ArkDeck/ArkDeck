@@ -233,7 +233,7 @@ package final class RuntimeToolSelectionControlActionStore: @unchecked Sendable 
       guard total <= maximumStoreBytes else {
         throw Self.unreadable("control-action store exceeds its byte bound")
       }
-      let fields = try ControlProtocolNegotiation.decodeObject(
+      let fields = try ControlFrameJSON.decodeObject(
         bytes, maximumBytes: maximumRecordBytes)
       let record = try RuntimeToolSelectionControlActionRecord(value: fields)
       guard name == filename(record.intent.actionRequestID),

@@ -284,7 +284,7 @@ public actor RuntimeAgentExecutionCoordinator {
       clientContext: context)
     let bytes = try RuntimeOperationCodec.encodeRequest(request)
     guard let digest = record.intent.reviewedPlanDigest else { return bytes }
-    var object = try ControlProtocolNegotiation.decodeObject(bytes, maximumBytes: 4 * 1024 * 1024)
+    var object = try ControlFrameJSON.decodeObject(bytes, maximumBytes: 4 * 1024 * 1024)
     object["reviewedPlanDigest"] = .string(digest)
     return try CanonicalJSONEncoders.canonical().encode(JSONValue.object(object))
   }
