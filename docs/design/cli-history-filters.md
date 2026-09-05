@@ -43,11 +43,10 @@ or an excessive document. This resource changes no Job, Artifact, target
 identity, binding, capability, provider fact, admission decision, host tool or
 device state.
 
-The macOS App loads, saves and deletes through the same owner. On first load it
-can migrate the former `history.savedFilter.*` App preferences, including the
-historical `toolkit` activity value as `device`; it removes those legacy keys
-only after Runtime confirms publication. UI-test mode uses an in-memory
+The macOS App loads, saves and deletes through the same owner, and reads no
+App-local preference: a record left by an earlier build is ignored and the
+screen shows the owner's own first-run state. UI-test mode uses an in-memory
 implementation of the same typed protocol rather than AppStorage. Failed App
-loads expose a read-only reload action. Migration and user mutations keep the
-resource controls locked through their reconciliation read so a superseded
-reply cannot replace newer state.
+loads expose a read-only reload action. User mutations keep the resource
+controls locked through their reconciliation read so a superseded reply cannot
+replace newer state.

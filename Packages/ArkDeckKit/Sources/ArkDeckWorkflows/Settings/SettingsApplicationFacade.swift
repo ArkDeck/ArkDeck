@@ -96,7 +96,7 @@ public struct SettingsStoragePresentation: Equatable, Sendable {
   public let retentionDays: UInt64
   /// `nil` when the Runtime did not report its artifact usage.
   public let runtimeArtifacts: SettingsRuntimeArtifactUsage?
-  /// `nil` only on the legacy injected test seam when the root could not be measured.
+  /// `nil` when the Runtime did not report the Session root measurement.
   public let sessionRoot: SettingsSessionRootUsage?
 
   public init(
@@ -182,9 +182,9 @@ public protocol SettingsApplicationProviding: Sendable {
 public enum SettingsApplicationFacade {
   /// The production provider — or, for a launch that declares the Runtime a
   /// fixture, the same provider answered by `SettingsStorageUIFixture` in
-  /// place of the daemon. Validation, the migration guard and the presentation
-  /// mapping are shared; only the transport differs. A launch without that
-  /// argument never reaches the fixture.
+  /// place of the daemon. Validation and the presentation mapping are shared;
+  /// only the transport differs. A launch without that argument never reaches
+  /// the fixture.
   public static func make(
     arguments: [String] = ProcessInfo.processInfo.arguments
   ) -> any SettingsApplicationProviding {
@@ -203,57 +203,31 @@ public enum SettingsApplicationFacade {
         runtimeRequest: { method, params in
           guard await owner.isReachable() else { return .failure(.unavailable("fixture")) }
           return .success(await owner.reply(method, params))
-        },
-        migratesLegacyPreferences: false)
+        })
     }
     return ProductionSettingsApplicationProvider()
   }
 
-  /// Test seam. The artifact figure comes from the Runtime over the read-only
-  /// control plane, which a contract test cannot stand up; everything else is
-  /// the production path, including the Session root scan.
+  /// Test seam: the production provider over a caller-supplied transport.
+  ///
+  /// Everything above the transport is the shipped path — the same requests,
+  /// the same exact-shape validation, the same presentation mapping — so a
+  /// reply the daemon can actually send (a refusal code, a truncated
+  /// envelope, a generation that lost a race) is exercised against the real
+  /// reader rather than a second copy of it.
+  /// `nil` stands for the transport not answering at all, which is the one
+  /// distinction above the framed reply that the pane has to make.
   package static func make(
-    storageRuntime: SessionStorageApplicationRuntime,
-    runtimeArtifactUsage: @escaping @Sendable () async -> SettingsRuntimeArtifactUsage?
+    reply: @escaping @Sendable (
+      _ method: String, _ params: [String: JSONValue]?
+    ) async -> Data?
   ) -> any SettingsApplicationProviding {
-    ProductionSettingsApplicationProvider(
-      storageRuntime: storageRuntime, runtimeArtifactUsage: runtimeArtifactUsage)
-  }
-}
-
-package struct SettingsLegacyStorageMigrationPlan: Equatable, Sendable {
-  package let rootPath: String?
-  package let policy: RuntimeSessionStoragePolicy?
-
-  package init?(
-    legacy: SessionSettingsSnapshot,
-    current: SettingsStoragePresentation
-  ) {
-    // Generation 1 is the daemon's unpublished initial state. Once any App or
-    // CLI caller has changed it, old process-local preferences lose the race
-    // and can never overwrite the Runtime owner.
-    guard current.generation == 1, !current.usesCustomRoot, legacy.generation > 0 else {
-      return nil
-    }
-    if legacy.rootSource == .userBookmark {
-      let canonical = legacy.sessionsRoot.resolvingSymlinksInPath().standardizedFileURL.path
-      rootPath = canonical == current.rootPath ? nil : canonical
-    } else {
-      rootPath = nil
-    }
-    let candidate = RuntimeSessionStoragePolicy(
-      totalQuotaBytes: legacy.totalQuotaBytes,
-      safetyMarginBytes: legacy.safetyMarginBytes,
-      retentionDays: legacy.retentionDays)
-    if candidate.totalQuotaBytes == current.totalQuotaBytes,
-      candidate.safetyMarginBytes == current.safetyMarginBytes,
-      candidate.retentionDays == current.retentionDays
-    {
-      policy = nil
-    } else {
-      policy = candidate
-    }
-    if rootPath == nil, policy == nil { return nil }
+    ProductionSettingsApplicationProvider(runtimeRequest: { method, params in
+      guard let framed = await reply(method, params) else {
+        return .failure(.unavailable("test transport"))
+      }
+      return .success(framed)
+    })
   }
 }
 
@@ -265,97 +239,27 @@ private actor ProductionSettingsApplicationProvider: SettingsApplicationProvidin
     _ method: String, _ params: [String: JSONValue]?
   ) async -> RuntimeXPCRequestTransport.ResultValue
 
-  private let legacyStorageRuntime: SessionStorageApplicationRuntime?
-  private let legacyRuntimeArtifactUsage: (@Sendable () async -> SettingsRuntimeArtifactUsage?)?
-  private let legacyMigrationStore: SessionSettingsStore?
   private let runtimeRequest: RuntimeRequest
   private let supportBundleProvider: any RuntimeSupportBundleProviding
   private let general: SettingsGeneralPresentation
-  private var legacyMigrationAssessed = false
 
   init(
-    storageRuntime: SessionStorageApplicationRuntime? = nil,
-    runtimeArtifactUsage: (@Sendable () async -> SettingsRuntimeArtifactUsage?)? = nil,
     runtimeRequest: @escaping RuntimeRequest = { method, params in
       await RuntimeXPCRequestTransport.request(
         method: method, params: params,
         protocolVersion: ArkDeckControlProtocol.currentVersion)
     },
-    migratesLegacyPreferences: Bool = true,
     bundle: Bundle = .main
   ) {
-    legacyStorageRuntime = storageRuntime
-    legacyRuntimeArtifactUsage = runtimeArtifactUsage
     self.runtimeRequest = runtimeRequest
-    // The one-time migration reads this process's own preferences. Under the
-    // UI fixture that would carry a developer's custom root or policy into the
-    // fixture owner and make the pane host-dependent again, so it stays off.
-    legacyMigrationStore =
-      storageRuntime == nil && migratesLegacyPreferences ? SessionSettingsStore() : nil
     supportBundleProvider = RuntimeSupportBundleApplicationFacade.make(bundle: bundle)
     general = Self.makeGeneralPresentation(bundle: bundle)
   }
 
   func refresh() async throws -> SettingsApplicationPresentation {
-    let storage: SettingsStoragePresentation
-    if let storageRuntime = legacyStorageRuntime {
-      let settings = try storageRuntime.settingsStore.load()
-      let retention = try? await storageRuntime.refresh()
-      let artifacts: SettingsRuntimeArtifactUsage?
-      if let legacyRuntimeArtifactUsage {
-        artifacts = await legacyRuntimeArtifactUsage()
-      } else {
-        artifacts = nil
-      }
-      storage = Self.makeStoragePresentation(
-        settings: settings, retention: retention, runtimeArtifacts: artifacts)
-    } else {
-      let current = try await runtimeStorage(method: "runtime.storage.status")
-      storage = try await migrateLegacyStorageIfNeeded(current)
-    }
-    return SettingsApplicationPresentation(
-      general: general, storage: storage)
-  }
-
-  private func migrateLegacyStorageIfNeeded(
-    _ current: SettingsStoragePresentation
-  ) async throws -> SettingsStoragePresentation {
-    guard !legacyMigrationAssessed else { return current }
-    legacyMigrationAssessed = true
-    guard let legacyMigrationStore,
-      let legacy = try? legacyMigrationStore.load(),
-      let plan = SettingsLegacyStorageMigrationPlan(legacy: legacy, current: current)
-    else { return current }
-
-    var migrated = current
-    do {
-      // Move the root first. A root that the daemon cannot validate leaves the
-      // policy untouched and asks the user to reselect instead of publishing a
-      // half-migrated configuration. Every mutation is generation-bound.
-      if let rootPath = plan.rootPath {
-        migrated = try await runtimeStorage(
-          method: "runtime.storage.root",
-          params: [
-            "expectedGeneration": .string(String(migrated.generation)),
-            "rootPath": .string(rootPath),
-          ])
-      }
-      if let policy = plan.policy {
-        migrated = try await runtimeStorage(
-          method: "runtime.storage.policy",
-          params: [
-            "expectedGeneration": .string(String(migrated.generation)),
-            "totalQuotaBytes": .string(String(policy.totalQuotaBytes)),
-            "safetyMarginBytes": .string(String(policy.safetyMarginBytes)),
-            "retentionDays": .string(String(policy.retentionDays)),
-          ])
-      }
-      return migrated
-    } catch SettingsApplicationError.runtimeStorageRejected("resourceConflict") {
-      // Another App/CLI writer published first. Read its result and never
-      // replay the obsolete process-local preference.
-      return try await runtimeStorage(method: "runtime.storage.status")
-    }
+    SettingsApplicationPresentation(
+      general: general,
+      storage: try await runtimeStorage(method: "runtime.storage.status"))
   }
 
   func updateStoragePolicy(
@@ -363,17 +267,8 @@ private actor ProductionSettingsApplicationProvider: SettingsApplicationProvidin
     safetyMarginBytes: UInt64,
     retentionDays: UInt64
   ) async throws -> SettingsApplicationPresentation {
-    if let storageRuntime = legacyStorageRuntime {
-      let current = try storageRuntime.settingsStore.load()
-      _ = try storageRuntime.settingsStore.savePolicy(
-        totalQuotaBytes: totalQuotaBytes,
-        safetyMarginBytes: safetyMarginBytes,
-        retentionDays: retentionDays,
-        expectedGeneration: current.generation)
-      return try await refresh()
-    }
     let current = try await runtimeStorage(method: "runtime.storage.status")
-    let storage = try await runtimeStorage(
+    let storage = try await publish(
       method: "runtime.storage.policy",
       params: [
         "expectedGeneration": .string(String(current.generation)),
@@ -385,14 +280,8 @@ private actor ProductionSettingsApplicationProvider: SettingsApplicationProvidin
   }
 
   func selectStorageRoot(_ url: URL) async throws -> SettingsApplicationPresentation {
-    if let storageRuntime = legacyStorageRuntime {
-      let current = try storageRuntime.settingsStore.load()
-      _ = try storageRuntime.settingsStore.selectCustomRoot(
-        url, expectedGeneration: current.generation)
-      return try await refresh()
-    }
     let current = try await runtimeStorage(method: "runtime.storage.status")
-    let storage = try await runtimeStorage(
+    let storage = try await publish(
       method: "runtime.storage.root",
       params: [
         "expectedGeneration": .string(String(current.generation)),
@@ -402,20 +291,31 @@ private actor ProductionSettingsApplicationProvider: SettingsApplicationProvidin
   }
 
   func resetStorageRoot() async throws -> SettingsApplicationPresentation {
-    if let storageRuntime = legacyStorageRuntime {
-      let current = try storageRuntime.settingsStore.load()
-      _ = try storageRuntime.settingsStore.resetRootToDefault(
-        expectedGeneration: current.generation)
-      return try await refresh()
-    }
     let current = try await runtimeStorage(method: "runtime.storage.status")
-    let storage = try await runtimeStorage(
+    let storage = try await publish(
       method: "runtime.storage.root",
       params: [
         "expectedGeneration": .string(String(current.generation)),
         "resetToDefault": .bool(true),
       ])
     return SettingsApplicationPresentation(general: general, storage: storage)
+  }
+
+  /// One generation-bound storage mutation, reconciled rather than retried.
+  ///
+  /// `resourceConflict` means another App or CLI writer published first: the
+  /// generation this request carried is no longer the owner's. Reading the
+  /// owner's state back is the only safe answer — it publishes what actually
+  /// won, and it can never re-send a mutation whose outcome is unknown.
+  private func publish(
+    method: String,
+    params: [String: JSONValue]
+  ) async throws -> SettingsStoragePresentation {
+    do {
+      return try await runtimeStorage(method: method, params: params)
+    } catch SettingsApplicationError.runtimeStorageRejected("resourceConflict") {
+      return try await runtimeStorage(method: "runtime.storage.status")
+    }
   }
 
   private func runtimeStorage(
@@ -551,34 +451,6 @@ private actor ProductionSettingsApplicationProvider: SettingsApplicationProvidin
     let receipt = try await supportBundleProvider.export(
       to: destination, approvedScopeSHA256: approvedPreview.scopeSHA256)
     return URL(filePath: receipt.destination, directoryHint: .isDirectory)
-  }
-
-  /// The retention preview also carries `blocksNewHeavyWriters`, and it is
-  /// deliberately not projected here. It is a verdict about admission into the
-  /// Session output root, decided from a scan of that root and enforced by a
-  /// coordinator no production writer consults. Shown next to a usage figure it
-  /// reads as "the product may keep working", which it was never about.
-  private static func makeStoragePresentation(
-    settings: SessionSettingsSnapshot,
-    retention: SessionRetentionPreview?,
-    runtimeArtifacts: SettingsRuntimeArtifactUsage?
-  ) -> SettingsStoragePresentation {
-    SettingsStoragePresentation(
-      generation: settings.generation,
-      rootPath: settings.expectedRootPath,
-      usesCustomRoot: settings.rootSource == .userBookmark,
-      totalQuotaBytes: settings.totalQuotaBytes,
-      safetyMarginBytes: settings.safetyMarginBytes,
-      retentionDays: settings.retentionDays,
-      runtimeArtifacts: runtimeArtifacts,
-      sessionRoot: retention.map {
-        SettingsSessionRootUsage(
-          measuredBytes: $0.currentBytes,
-          pinnedBytes: $0.pinnedBytes,
-          pinnedSessionCount: $0.entries.filter(\.isPinned).count,
-          unaccountedSessionCount: $0.unknownSessionIDs.count,
-          measurementIncomplete: $0.unknownPressure)
-      })
   }
 
   private static func makeGeneralPresentation(bundle: Bundle) -> SettingsGeneralPresentation {

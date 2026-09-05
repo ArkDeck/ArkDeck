@@ -17,11 +17,12 @@ write side effect. The Runtime continues to refuse Artifact work at its own
 quota and never treats a Session policy as authority to evict Artifacts.
 
 The macOS Settings screen uses the same XPC-allowlisted methods and validates the
-exact Runtime projection. Its former `UserDefaults` Session record is no longer
-a fact source. On first refresh only, a non-default legacy record may provide a
-bounded migration candidate while the Runtime owner is still at generation 1.
-The daemon revalidates every value, each write uses CAS, and any concurrent
-Runtime/App/CLI publication wins permanently over the legacy record.
+exact Runtime projection. The Runtime owner is its only fact source: a record in
+this process's own `UserDefaults` is neither read nor promoted, so no App-local
+preference can produce a Runtime configuration write. Each mutation carries the
+generation the screen last read; a `resourceConflict` means another Runtime,
+App or CLI writer published first, and the screen reads the owner back and
+publishes what won rather than re-sending its own write.
 
 Host contract coverage executes the real `arkdeck` process against an isolated
 daemon and verifies status, policy CAS, root CAS, durable reload, stale-CAS

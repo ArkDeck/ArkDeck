@@ -482,12 +482,11 @@ generic `agent run --operation capture.diagnostics@1 --inputs-file ...` 提交 d
 | `runtime tool` | `register`, `list`, `inspect`, `select`, `remove` | bounded 校验 host tool 后生成 typed tool reference；active selection 使用 lifecycle preview/control action；不是 executable passthrough |
 | `runtime bundle` | `register`, `list`, `inspect`, `remove` | bounded 校验 signed daemon bundle 后生成 typed bundle reference；service install/update 只消费 reference |
 | `runtime hdc` | `status`, `impact-preview`, `restart` | 展示 exact tool/server facts；preview 建立 control action，mutation 必须 generation-bound、typed、audited |
-| `runtime signing` | `install-sdk-release`, `install`, `normalize`, `migrate-deveco`, `status`, `remove` | 安装边界读取 bounded 本地材料并只发布 path-free `credential:sha256-*` resource；秘密由平台 credential adapter 持有，后续 workspace/Job 只传 credential ref |
+| `runtime signing` | `install-sdk-release`, `install`, `migrate-deveco`, `status`, `remove` | 安装边界读取 bounded 本地材料并只发布 path-free `credential:sha256-*` resource；秘密由平台 credential adapter 持有，后续 workspace/Job 只传 credential ref |
 | `runtime storage` | `status`, `policy`, `root` | 未来 typed storage surface；不能直接修改 App preference 文件。`status` 必须来自 Runtime 拥有的单一 store owner，并把 Session 输出域与 Runtime artifact 域分开报告（不同 root、不同 quota、不同保留策略），不得合并成一个数字；owner 化之前该 leaf 保持 `unavailable`，不得基于 per-process 偏好副本报告 status。这是有范围的延期而不是空白：Runtime artifact 域已有一等 leaf `artifact quota`（total/used/remaining），延期只扣住没有可信来源的 Session 输出域，caller 不必为此另建第二条路径 |
 | `runtime support-bundle` | `preview`, `export` | 先预览清单/隐私，再显式导出 |
 | `runtime update` | `check`, `download`, `handoff`, `status`, `cancel`, `cleanup` | 用户同意与验证边界一致；不得静默安装 |
 | `maintainer update-feed` | `prepare`, `assemble` | 发布维护工具；不接触 private key |
-| `legacy flash` | `status`, `reconcile` | macOS historical archive compatibility；仅解码/结算，不创建新 campaign/dispatch，Windows portable core 不要求 |
 
 平台扩展可以因当前 platform profile 不支持而返回 `unsupportedOnPlatform`，但同一 leaf 的输入、
 状态、错误和成功语义不能因平台而变化。Windows 不需要实现 macOS-only historical archive 工具
@@ -969,8 +968,8 @@ human 模式可以在 stderr 显示可复制的 resume 示例；JSON 模式不�
   durable dependency transaction 同时 pin exact toolchain ref 与 credential ref；update 先 acquire 新
   dependency set、发布 preset generation，再幂等释放旧 set；remove/restart 在服务任何读取前结算未完成
   release。任一 active preset 引用存在时，credential replace/remove 必须稳定拒绝。
-- `runtime signing normalize` 和 daemon identity refresh 只能执行保持 content ref 的维护；可能改变
-  key alias 的 `migrate-deveco` 属于 replace，必须遵守 active-reference gate 并返回新 ref。`status`、
+- daemon identity refresh 只能执行保持 content ref 的维护；可能改变 key alias 的
+  `migrate-deveco` 属于 replace，必须遵守 active-reference gate 并返回新 ref。`status`、
   maintenance 与 removal projection 不得回显 receipt path、材料 path、Keychain account 或秘密。
 - `workspace project list/show` 必须从 daemon 当前注册配置投影 stable `projectRef`、kind、
   availability、supported operation 与 preset refs，不暴露 host root、executable、argv 或秘密。
@@ -1434,7 +1433,6 @@ major 保留”只表示 explicit legacy compatibility，不能满足 target mac
 | `debug start/evaluate/status` | `recovery flash-invocation ... --invocation-request-id ...` | 当前 major 仅为 accepted legacy recovery compatibility，不计 target idempotency conformance；下一 major 为具名 tombstone，把 `debug` 还给正常 Debug 产品 |
 | `artifact import-hap/import-workspace-patch/import-flash-bundle/import-native-library` | `artifact import <kind> --import-request-id ...` | 当前 major 仅保留 legacy compatibility，不宣称 durable Import/lost-receipt contract；下一 major tombstone；内部 chunk 方法始终不公开 |
 | `flash install-binding` | 无直接重解释 | 保留 macOS compatibility leaf，待 current Loader binding 路径闭合后 tombstone |
-| `flash status/reconcile` | `legacy flash status/reconcile` | decode/export-only；不迁到新 executor |
 | operation ref `flash.dayu200` | 新 convenience command 只生成 `flash.full-restore@1` | generic caller 的显式 alias request 原样交 Runtime；CLI 不改字段，历史记录保持原 ref |
 | `flash plan` | `job plan --operation flash.full-restore@1 ...` | 当前 major 保持 tombstone 并显示 exact replacement；未来重用同名 convenience leaf 必须提高 CLI major |
 | `flash preview` | `flash lane-preview` | 当前 major 保持 historical-preview tombstone；新命令只读 Runtime lane projection |
@@ -1475,13 +1473,13 @@ stderr；`--output json/jsonl` target machine stdout 不写 warning，而在 env
 
 ### 13.1 已实现面
 
-- registry：33 个一级入口、219 个 leaf = 210 个 executable + 6 个 parse-only tombstone
+- registry：32 个一级入口、208 个 leaf = 199 个 executable + 6 个 parse-only tombstone
   （`agent chat`、`flash plan/preview/execute/continue/postflight`）+ 3 个永久拒绝桩
-  （`capability draft/install/revoke`）；lifecycle 182 `current`、16 `deprecated`、15 `legacy`、
+  （`capability draft/install/revoke`）；lifecycle 181 `current`、15 `deprecated`、6 `legacy`、
   6 `removed`，projection 对每个 leaf 都投影 `lifecycleStatus`/`replacementArgvPattern`。
   executable 中包含 §12 的 legacy/deprecated 兼容拼写
   （`device list/show/adopt`、`artifact import-*`、`flash install-binding/status/reconcile`、
-  `legacy flash *`、`debug start/evaluate/status`、`cleanup-debt *`、`agentd/signing/update-feed *`）；
+  `debug start/evaluate/status`、`cleanup-debt *`、`agentd/signing/update-feed *`）；
   它们运行时在 `meta.lifecycle` 报告 `legacy|deprecated` 与 replacement，但按 §12 不计 target
   conformance。
 - Catalog：29 个 canonical operation + `flash.dayu200` alias，digest
@@ -1514,11 +1512,11 @@ stderr；`--output json/jsonl` target machine stdout 不写 warning，而在 env
 - §14 机器契约产物已落地（`TASK-AIN-026`，实现见 `cli-machine-contracts.md`）：
   `arkdeck maintainer contracts export|check` 从 Swift 事实源生成全部十项
   `openspec/contracts/` 产物与 `Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI/**`
-  （219 个 argv fixture、envelope/page/`nextAction` 样本），`CLIMachineContractTests` 以零漂移、
+  （208 个 argv fixture、envelope/page/`nextAction` 样本），`CLIMachineContractTests` 以零漂移、
   fixture 回放与 schema 正反例把产物钉在 protected `main` 上；`--version` 的
   `pageSchemaVersion`/`nextActionSchemaVersion` 为 `arkdeck.cli.page/1`/`arkdeck.cli.next-action/1`。
-  `cli-feature-coverage.json` 共 279 条（daemon 119、Catalog 30、App 68、CLI 62）：
-  `direct` 131、`local` 94、`presentation` 21、`internal` 18、`refused` 10、`platformService` 4、
+  `cli-feature-coverage.json` 共 253 条（daemon 96、Catalog 30、App 68、CLI 59）：
+  `direct` 125、`local` 88、`presentation` 21、`internal` 4、`refused` 10、`platformService` 4、
   `generic` 1（`flash.dayu200` alias），`blocked` 0，`summary.fullFunction = true`。
 - Golden Journey headless 闭环：2026-09-02 在 digest `508783ac…` 上按 `cli-golden-journey-headless-runbook.md` headless 复跑：GJ-1/GJ-2/GJ-3/GJ-4/GJ-5 均 `REAL_DEVICE_PASS`（含 §2.1 HAR crash-resume 与 `debug.template@1` smoke）；2026-09-03 用最终候选补齐其余 17 个 operation 后，29 个 canonical operation 的真机覆盖矩阵为 29 `realDevicePass` / 0 `notExercised`，记录见 `references/v1.6-goal/gj-headless-rerun-2026-09-02.json` 与 `real-device-validation.md`。
 - 0.2 版 §13.2 列出的 12 个 daemon-ready 方法均已有一等 leaf。App 的 Debug Commands 与

@@ -46,7 +46,7 @@ struct DebugWorkspaceView: View {
   let onOpenHistory: () -> Void
   let historyContext: RuntimeHistoryWorkspaceContext?
 
-  @SceneStorage("debug.workspace.tab.v2")
+  @SceneStorage("debug.workspace.tab")
   private var storedTab = DebugWorkspaceTab.artifacts.rawValue
   @State private var selectedTargetID: String?
   @State private var showsTabKeyboardFocus = false

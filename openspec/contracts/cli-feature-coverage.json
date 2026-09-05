@@ -3504,22 +3504,6 @@
     },
     {
       "classification": "local",
-      "conformanceFixture": "argv/runtime.signing.normalize.json",
-      "equivalentCommands": [],
-      "feature": "runtime.signing.normalize",
-      "implementationStatusByPlatform": {
-        "macos": "implemented"
-      },
-      "lifecycle": "current",
-      "requiredPlatforms": [
-        "macos"
-      ],
-      "source": "cli:runtime.signing.normalize",
-      "targetClassification": "local",
-      "targetCommand": "arkdeck runtime signing normalize"
-    },
-    {
-      "classification": "local",
       "conformanceFixture": "argv/runtime.signing.remove.json",
       "equivalentCommands": [],
       "feature": "runtime.signing.remove",
@@ -3910,23 +3894,6 @@
       "source": "cli:signing.migrate-deveco",
       "targetClassification": "local",
       "targetCommand": "arkdeck signing migrate-deveco --build-profile <absolute-build-profile.json5> --daemon <absolute-agentd-path>"
-    },
-    {
-      "classification": "local",
-      "conformanceFixture": "argv/signing.normalize.json",
-      "equivalentCommands": [],
-      "feature": "signing.normalize",
-      "implementationStatusByPlatform": {
-        "macos": "implemented"
-      },
-      "lifecycle": "deprecated",
-      "note": "superseded by `arkdeck runtime signing normalize`",
-      "requiredPlatforms": [
-        "macos"
-      ],
-      "source": "cli:signing.normalize",
-      "targetClassification": "local",
-      "targetCommand": "arkdeck signing normalize"
     },
     {
       "classification": "local",
@@ -4644,7 +4611,7 @@
       "direct": 125,
       "generic": 1,
       "internal": 4,
-      "local": 90,
+      "local": 88,
       "platformService": 4,
       "presentation": 21,
       "refused": 10
@@ -4652,10 +4619,10 @@
     "bySource": {
       "app": 68,
       "catalog": 30,
-      "cli": 61,
+      "cli": 59,
       "daemon": 96
     },
-    "entries": 255,
+    "entries": 253,
     "fullFunction": true
   }
 }

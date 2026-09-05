@@ -79,6 +79,22 @@ package final class OpenHarmonySigningCredentialOwner: @unchecked Sendable {
     self.rootURL = store.credentialOwnerRootURL
   }
 
+  /// The installed receipt, or `nil` only when the preset root positively
+  /// holds none.
+  ///
+  /// A receipt this build cannot honour is an error here, never an absence.
+  /// Collapsing the two is what let an interrupted replace, or a missing
+  /// ledger beside an unsupported receipt, durably publish a stable owner
+  /// with no credential over material that was still on disk — after which
+  /// `replace` and `remove` were free to run against it.
+  private func installedReceipt() throws -> OpenHarmonySigningPresetReceipt? {
+    switch store.receiptState() {
+    case .absent: return nil
+    case .installed(let receipt): return receipt
+    case .unusable(let error): throw error
+    }
+  }
+
   package func current() throws -> OpenHarmonySigningCredentialResource {
     try withOwnerLock { rootFD in
       let (ledger, receipt) = try loadAndRecover(rootFD: rootFD)
@@ -164,8 +180,7 @@ package final class OpenHarmonySigningCredentialOwner: @unchecked Sendable {
     _ body: () throws -> T
   ) throws -> (T, OpenHarmonySigningCredentialResource) {
     try withOwnerLock { rootFD in
-      var (ledger, _) = try loadAndRecover(rootFD: rootFD)
-      try requireUnreferenced(ledger)
+      var ledger = try ledgerForMutation(rootFD: rootFD)
       ledger.state = "replacing"
       try save(ledger, rootFD: rootFD)
       do {
@@ -189,8 +204,7 @@ package final class OpenHarmonySigningCredentialOwner: @unchecked Sendable {
     let ownerLock = try lockOwner()
     defer { ownerLock.close() }
     let rootFD = ownerLock.directoryFD
-    var (ledger, _) = try loadAndRecover(rootFD: rootFD)
-    try requireUnreferenced(ledger)
+    var ledger = try ledgerForMutation(rootFD: rootFD)
     ledger.state = "replacing"
     try save(ledger, rootFD: rootFD)
     do {
@@ -214,7 +228,7 @@ package final class OpenHarmonySigningCredentialOwner: @unchecked Sendable {
       let before = try beforeReceipt.map(Self.reference(for:))
       let value = try body()
       try revalidateOwnerDirectory(rootFD)
-      let afterReceipt = try? store.loadValidated(requireSecrets: false)
+      let afterReceipt = try installedReceipt()
       try revalidateOwnerDirectory(rootFD)
       let after = try afterReceipt.map(Self.reference(for:))
       guard before == after, ledger.credentialRef == after else {
@@ -227,8 +241,7 @@ package final class OpenHarmonySigningCredentialOwner: @unchecked Sendable {
 
   package func remove<T>(_ body: () throws -> T) throws -> T {
     try withOwnerLock { rootFD in
-      var (ledger, _) = try loadAndRecover(rootFD: rootFD)
-      try requireUnreferenced(ledger)
+      var ledger = try ledgerForMutation(rootFD: rootFD)
       ledger.state = "removing"
       try save(ledger, rootFD: rootFD)
       do {
@@ -250,7 +263,7 @@ package final class OpenHarmonySigningCredentialOwner: @unchecked Sendable {
     if ledger.state != "stable" {
       ledger = try recoverMutation(rootFD: rootFD, ledger: ledger)
     }
-    let receipt = try? store.loadValidated(requireSecrets: false)
+    let receipt = try installedReceipt()
     try revalidateOwnerDirectory(rootFD)
     let actualReference = try receipt.map(Self.reference(for:))
     guard ledger.schemaVersion == "arkdeck.signing-credential-owner/1",
@@ -273,7 +286,13 @@ package final class OpenHarmonySigningCredentialOwner: @unchecked Sendable {
       throw OpenHarmonySigningError.receiptUnavailable(
         "signing credential mutation record is invalid")
     }
-    let receipt = try? store.loadValidated(requireSecrets: false)
+    // The interrupted mutation is settled by adopting whatever actually
+    // landed — but only once this build can say what that is. An unusable
+    // receipt throws instead: an installed credential that cannot be read is
+    // not an uninstalled one, and writing `stable` with no reference here
+    // would strand the user's material behind an owner claiming nothing is
+    // installed.
+    let receipt = try installedReceipt()
     let recovered = try Ledger(
       state: "stable", credentialRef: receipt.map(Self.reference(for:)),
       presetOwners: [])
@@ -281,11 +300,33 @@ package final class OpenHarmonySigningCredentialOwner: @unchecked Sendable {
     return recovered
   }
 
-  private func requireUnreferenced(_ ledger: Ledger) throws {
-    guard ledger.state == "stable", ledger.presetOwners.isEmpty else {
+  /// The ledger as it stands, for a mutation that is about to rewrite the
+  /// credential outright.
+  ///
+  /// Deliberately does not read the receipt. An explicit reinstall is the only
+  /// way out of a receipt this build cannot honour, and an interrupted
+  /// `replace` is settled by completing one — so gating either on re-reading
+  /// what the interruption left behind would lock the user out of the entry
+  /// the refusal tells them to use. What still gates the mutation is
+  /// ownership, which this ledger records by itself: a credential a workspace
+  /// preset pins is never replaced or removed underneath it.
+  private func ledgerForMutation(rootFD: Int32) throws -> Ledger {
+    let ledger = try readLedger(rootFD: rootFD, adoptingInstalledReceipt: false)
+    guard ledger.schemaVersion == "arkdeck.signing-credential-owner/1",
+      ["stable", "replacing", "removing"].contains(ledger.state),
+      ledger.presetOwners.count <= 4_096,
+      ledger.presetOwners == ledger.presetOwners.sorted(),
+      Set(ledger.presetOwners).count == ledger.presetOwners.count,
+      ledger.presetOwners.allSatisfy(AgentExecutionIntent.validIdentifier)
+    else {
+      throw OpenHarmonySigningError.receiptUnavailable(
+        "signing credential mutation record is invalid")
+    }
+    guard ledger.presetOwners.isEmpty else {
       throw OpenHarmonySigningError.invalidConfiguration(
         "signing credential is referenced by an active workspace preset")
     }
+    return ledger
   }
 
   private func validateOwner(_ presetRef: String) throws {
@@ -395,12 +436,22 @@ package final class OpenHarmonySigningCredentialOwner: @unchecked Sendable {
     }
   }
 
-  private func readLedger(rootFD directory: Int32) throws -> Ledger {
+  private func readLedger(
+    rootFD directory: Int32, adoptingInstalledReceipt: Bool = true
+  ) throws -> Ledger {
     try revalidateOwnerDirectory(directory)
     let fd = openat(
       directory, Self.ledgerName, O_RDONLY | O_NONBLOCK | O_NOFOLLOW | O_CLOEXEC)
     if fd < 0, errno == ENOENT {
-      let receipt = try? store.loadValidated(requireSecrets: false)
+      // A root with no ledger yet. A mutation takes the empty owner as read
+      // and writes its own marker next; nothing is published here.
+      guard adoptingInstalledReceipt else { return Ledger(credentialRef: nil) }
+      // Otherwise the ledger is adopted, and only from a receipt this build
+      // can account for: absent means a genuinely empty owner, an installed
+      // receipt means adopt its exact reference, and anything else refuses
+      // rather than writing an empty stable owner beside a credential it
+      // could not read.
+      let receipt = try installedReceipt()
       let ledger = try Ledger(
         credentialRef: receipt.map(Self.reference(for:)), presetOwners: [])
       try save(ledger, rootFD: directory)

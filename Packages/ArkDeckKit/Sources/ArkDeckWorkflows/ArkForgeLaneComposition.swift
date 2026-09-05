@@ -71,9 +71,12 @@ package enum ArkForgeLaneComposition {
   /// `ARKDECK_HDC_PATH`: absolute, operator-chosen, checked at startup.
   package enum EnvironmentKey {
     package static let bundlePath = "ARKDECK_ARKFORGE_BUNDLE_PATH"
-    package static let legacyDaemonPath = "ARKDECK_ARKFORGED_PATH"
-    package static let legacyDaemonSHA256 = "ARKDECK_ARKFORGED_SHA256"
-    package static let legacyDeviceProfilePath = "ARKDECK_ARKFORGE_PROFILE_PATH"
+    /// Retired lane names. This daemon has no reader for them; they exist here
+    /// only so an environment still carrying them is refused by name.
+    package static let retired = [
+      "ARKDECK_ARKFORGED_PATH", "ARKDECK_ARKFORGED_SHA256",
+      "ARKDECK_ARKFORGE_PROFILE_PATH",
+    ]
     /// The acceptance campaign this lane is authorized to run, if any.
     ///
     /// Deliberately outside the release-identity input above. The bundle
@@ -89,8 +92,7 @@ package enum ArkForgeLaneComposition {
   package enum Absence: Error, Equatable, CustomStringConvertible {
     case notConfigured
     case partiallyConfigured(missing: [String])
-    case legacyConfiguration
-    case mixedConfiguration
+    case retiredConfiguration(keys: [String])
     case daemonUnavailable(String)
 
     package var description: String {
@@ -104,13 +106,11 @@ package enum ArkForgeLaneComposition {
           "no ArkForge lane: \(missing.joined(separator: ", ")) missing. A partial "
           + "configuration is refused rather than half-applied — a lane composed from some "
           + "of its inputs is one nobody chose"
-      case .legacyConfiguration:
+      case .retiredConfiguration(let keys):
         return
-          "no ArkForge lane: legacy three-key configuration must be migrated by "
-          + "`runtime service update` "
-          + "to one validated \(EnvironmentKey.bundlePath)"
-      case .mixedConfiguration:
-        return "no ArkForge lane: current bundle and legacy three-key configuration are mixed"
+          "no ArkForge lane: \(keys.joined(separator: ", ")) is retired configuration. "
+          + "Reconfigure this installation with `runtime service update "
+          + "--arkforge-bundle` so one validated \(EnvironmentKey.bundlePath) is published"
       case .daemonUnavailable(let detail):
         return "no ArkForge lane: \(detail)"
       }
@@ -132,20 +132,19 @@ package enum ArkForgeLaneComposition {
     }
 
     /// Reads one bundle path and derives all release identity from its verified
-    /// manifest. Legacy keys are accepted only by the LaunchAgent migration
-    /// path; the daemon never assembles them directly.
+    /// manifest. A retired lane name present in the environment is refused
+    /// before anything is composed; the daemon never assembles three unrelated
+    /// values into a lane.
     package static func read(
       _ environment: [String: String]
     ) -> Result<Inputs, Absence> {
-      let legacyKeys = [
-        EnvironmentKey.legacyDaemonPath, EnvironmentKey.legacyDaemonSHA256,
-        EnvironmentKey.legacyDeviceProfilePath,
-      ]
-      let legacyPresent = legacyKeys.filter { environment[$0] != nil }
-      guard let configured = environment[EnvironmentKey.bundlePath] else {
-        return .failure(legacyPresent.isEmpty ? .notConfigured : .legacyConfiguration)
+      let retired = EnvironmentKey.retired.filter { environment[$0] != nil }
+      guard retired.isEmpty else {
+        return .failure(.retiredConfiguration(keys: retired))
       }
-      guard legacyPresent.isEmpty else { return .failure(.mixedConfiguration) }
+      guard let configured = environment[EnvironmentKey.bundlePath] else {
+        return .failure(.notConfigured)
+      }
       guard !configured.isEmpty else {
         return .failure(.partiallyConfigured(missing: [EnvironmentKey.bundlePath]))
       }
@@ -241,7 +240,7 @@ package enum ArkForgeLaneComposition {
   ///
   /// Native RockUSB is `arkforged`'s product default, so ArkDeck deliberately
   /// omits a backend-selection flag. That makes default drift observable in the
-  /// handshake instead of silently pinning an obsolete migration switch.
+  /// handshake instead of silently pinning an obsolete backend-selection flag.
   ///
   /// The pairing secret is absent by construction. It travels on stdin.
   package static func daemonArguments(

@@ -112,8 +112,9 @@ final class AgentdOptionCoverageContractTests: XCTestCase {
   func testTheLaneFlagsAreAllPresent() throws {
     // Named individually as well, because the scan above would also pass if
     // both lists were emptied. The bundle installs one release unit and the
-    // campaign separately authorizes it. Legacy names remain recognized only
-    // so callers receive the migration error rather than "unsupported".
+    // campaign separately authorizes it. The retired names remain recognized
+    // only so the command can name `--arkforge-bundle` as their replacement
+    // rather than answer "unsupported option"; they configure nothing.
     for flag in [
       "--arkforge-bundle", "--arkforge-campaign",
       "--arkforged", "--arkforged-sha256", "--arkforge-profile",

@@ -100,17 +100,28 @@ final class ArkForgeLaneInstallContractTests: XCTestCase {
     XCTAssertEqual(inputs.expectedToolchain.sha256, fixture.daemonSHA256)
   }
 
-  func testTheDaemonRefusesLegacyOrMixedConfiguration() {
-    let legacy = [
+  func testTheDaemonRefusesRetiredLaneConfigurationByName() {
+    let retired = [
       "ARKDECK_ARKFORGED_PATH": fixture.daemon.path,
       "ARKDECK_ARKFORGED_SHA256": fixture.daemonSHA256,
       "ARKDECK_ARKFORGE_PROFILE_PATH": fixture.profile.path,
     ]
+    let keys = [
+      "ARKDECK_ARKFORGED_PATH", "ARKDECK_ARKFORGED_SHA256",
+      "ARKDECK_ARKFORGE_PROFILE_PATH",
+    ]
     XCTAssertEqual(
-      ArkForgeLaneComposition.Inputs.read(legacy), .failure(.legacyConfiguration))
+      ArkForgeLaneComposition.Inputs.read(retired), .failure(.retiredConfiguration(keys: keys)))
+    // A retired name beside the current bundle is refused too: this build has
+    // no reader that could reconcile the two, so it never composes a lane
+    // from an environment it cannot fully account for.
     XCTAssertEqual(
-      ArkForgeLaneComposition.Inputs.read(legacy.merging(fixture.environment) { _, new in new }),
-      .failure(.mixedConfiguration))
+      ArkForgeLaneComposition.Inputs.read(retired.merging(fixture.environment) { _, new in new }),
+      .failure(.retiredConfiguration(keys: keys)))
+    guard case .failure(let why) = ArkForgeLaneComposition.Inputs.read(retired) else {
+      return XCTFail("a retired lane name cannot configure a lane")
+    }
+    XCTAssertTrue(why.description.contains("--arkforge-bundle"), why.description)
   }
 
   func testAnUndeclaredFileIsRefusedAsCrossReleaseAssembly() throws {

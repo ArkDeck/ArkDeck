@@ -202,9 +202,9 @@ public enum SettingsStorageUIFixture {
         ownerRoot: base.appending(path: "owner", directoryHint: .isDirectory),
         defaultSessionsRoot: base.appending(
           path: SettingsStorageUIFixture.sessionRootName, directoryHint: .isDirectory))
-      // One accepted write over the untouched owner. Generation 1 is also what
-      // the facade's one-time legacy migration keys on, so this closes that
-      // path by construction as well as by the provider's flag.
+      // One accepted write over the untouched owner, publishing a policy no
+      // product default matches (see `publishedPolicy`), so a launch that
+      // silently reached a real daemon fails loudly instead of passing.
       _ = try created.updatePolicy(
         SettingsStorageUIFixture.publishedPolicy, expectedGeneration: 1)
       store = created

@@ -41,8 +41,8 @@ enum RuntimeCLI {
     "--harness-cli", "--harness-cli-timeout-seconds",  // refused by name below
     "--arktrace-descriptor",
     "--arkforge-bundle", "--arkforge-campaign",
-    // Read only to return a precise migration error for one compatibility
-    // cycle; they can no longer construct a lane.
+    // Retired lane flags. Read only so the command names its replacement
+    // instead of answering "unsupported option"; they construct nothing.
     "--arkforged", "--arkforged-sha256", "--arkforge-profile",
   ]
 
@@ -412,12 +412,12 @@ enum RuntimeCLI {
       // The ArkForge lane is one release bundle. Its manifest binds the daemon
       // and profile bytes; callers no longer assemble three unrelated values.
       let arkForgeLane: LaunchAgentArkForgeLaneStatus?
-      let legacyLaneFlags = ["--arkforged", "--arkforged-sha256", "--arkforge-profile"]
-      if let legacy = legacyLaneFlags.first(where: { options.value($0) != nil }) {
+      let retiredLaneFlags = ["--arkforged", "--arkforged-sha256", "--arkforge-profile"]
+      if let retired = retiredLaneFlags.first(where: { options.value($0) != nil }) {
         throw CLIError(
           exitCode: EX_USAGE,
-          message: "\(legacy) was replaced by --arkforge-bundle; pass one validated "
-            + "ArkForge.bundle or run update without lane flags to migrate an existing plist")
+          message: "\(retired) is retired; pass one validated ArkForge.bundle to "
+            + "--arkforge-bundle")
       }
       if let bundle = options.value("--arkforge-bundle") {
         if bundle == "none" {
@@ -930,7 +930,7 @@ enum RuntimeCLI {
       throw CLIError(
         exitCode: EX_USAGE,
         message:
-          "missing signing subcommand (install-sdk-release|install|normalize|migrate-deveco|status|remove)"
+          "missing signing subcommand (install-sdk-release|install|migrate-deveco|status|remove)"
       )
     }
     var rest = Array(arguments.dropFirst())
@@ -1017,22 +1017,6 @@ enum RuntimeCLI {
       }
       session.emit(try encodedJSON(resource.projection))
 
-    case "normalize":
-      guard rest.isEmpty else {
-        throw CLIError(exitCode: EX_USAGE, message: "\(spelling) normalize accepts only --json")
-      }
-      let normalization = try credentialOwner.maintain {
-        try store.normalizeDevEcoSecrets()
-      }
-      let resource = try credentialOwner.current()
-      session.emit(try encodedJSON(JSONValue.object([
-        "schemaVersion": .string("arkdeck.signing-credential-maintenance/1"),
-        "operation": .string("normalize"),
-        "credential": resource.projection,
-        "normalizedKeystorePassword": .bool(normalization.normalizedKeystorePassword),
-        "normalizedKeyPassword": .bool(normalization.normalizedKeyPassword),
-      ])))
-
     case "migrate-deveco":
       let options = try CLIOptions(rest)
       try options.validateAllowed(["--build-profile", "--daemon", "--key-alias"])
@@ -1059,13 +1043,13 @@ enum RuntimeCLI {
           )
         }
       }
-      let migrationStore =
+      let rekeyStore =
         suppliedStore
         ?? OpenHarmonySigningPresetStore(
           secrets: LoginKeychainSigningSecretStore(
             agentDaemonURL: daemonURL,
             allowsUserInteraction: true))
-      let receipt = try migrationStore.loadValidated(requireSecrets: false)
+      let receipt = try rekeyStore.loadValidated(requireSecrets: false)
       var encrypted = try readDevEcoBuildProfileSigningMaterial(
         at: URL(filePath: buildProfilePath))
       defer {
@@ -1093,9 +1077,9 @@ enum RuntimeCLI {
       var keyPassword = try OpenHarmonyDevEcoPasswordDecoder.decodeIfNeeded(
         encrypted.key, keystore: materialAnchor)
       defer { keyPassword.resetBytes(in: 0..<keyPassword.count) }
-      let migrationOwner = OpenHarmonySigningCredentialOwner(store: migrationStore)
-      let (migration, resource) = try migrationOwner.replace {
-        try migrationStore.migrateToSecretEnvelope(
+      let rekeyOwner = OpenHarmonySigningCredentialOwner(store: rekeyStore)
+      let (replacement, resource) = try rekeyOwner.replace {
+        try rekeyStore.replaceSecretEnvelope(
           keystorePassword: keystorePassword, keyPassword: keyPassword,
           keyAlias: options.value("--key-alias"))
       }
@@ -1103,8 +1087,7 @@ enum RuntimeCLI {
         "schemaVersion": .string("arkdeck.signing-credential-maintenance/1"),
         "operation": .string("migrate-deveco"),
         "credential": resource.projection,
-        "migrated": .bool(migration.migrated),
-        "legacyAccountCount": .integer(Int64(migration.legacyAccountCount)),
+        "createdEnvelopeItem": .bool(replacement.createdEnvelopeItem),
       ])))
 
     case "status":

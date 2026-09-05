@@ -1731,34 +1731,8 @@ final class RuntimeHistoryViewModel {
         self.isSavedFilterMutationInFlight = false
         self.savedFilterFailure = reason
       case .loaded(let resource):
+        self.isSavedFilterMutationInFlight = false
         self.publishSavedFilter(resource)
-        guard resource.query == nil, let legacy = Self.legacySavedFilter() else {
-          self.isSavedFilterMutationInFlight = false
-          return
-        }
-        let migrated = await filterProvider.saveHistoryFilter(
-          legacy, expectedGeneration: resource.generation)
-        guard self.savedFilterRequestID == requestID, !Task.isCancelled else { return }
-        switch migrated {
-        case .completed(let migratedResource):
-          self.isSavedFilterMutationInFlight = false
-          self.publishSavedFilter(migratedResource)
-          Self.removeLegacySavedFilter()
-        case .failed(let reason):
-          let reconciliation = await filterProvider.loadHistoryFilter()
-          guard self.savedFilterRequestID == requestID, !Task.isCancelled else { return }
-          self.isSavedFilterMutationInFlight = false
-          switch reconciliation {
-          case .loaded(let current) where current.query == legacy:
-            self.publishSavedFilter(current)
-            Self.removeLegacySavedFilter()
-          case .loaded(let current):
-            self.publishSavedFilter(current)
-            self.savedFilterFailure = reason
-          case .failed:
-            self.savedFilterFailure = reason
-          }
-        }
       }
     }
   }
@@ -1796,7 +1770,6 @@ final class RuntimeHistoryViewModel {
       case .completed(let resource):
         self.isSavedFilterMutationInFlight = false
         self.publishSavedFilter(resource)
-        if desiredQuery != nil { Self.removeLegacySavedFilter() }
       case .failed(let reason):
         // A lost mutation reply is outcome-neutral. Read the owner before
         // showing failure so an already-published save/delete is reconciled
@@ -1807,7 +1780,6 @@ final class RuntimeHistoryViewModel {
         switch reconciliation {
         case .loaded(let current) where current.query == desiredQuery:
           self.publishSavedFilter(current)
-          if desiredQuery != nil { Self.removeLegacySavedFilter() }
         case .loaded(let current):
           self.publishSavedFilter(current)
           self.savedFilterFailure = reason
@@ -1823,50 +1795,6 @@ final class RuntimeHistoryViewModel {
     savedFilterQuery = resource.query
     isSavedFilterLoaded = true
     savedFilterFailure = nil
-  }
-
-  private static let legacySavedFilterKeys = [
-    "history.savedFilter.exists", "history.savedFilter.search", "history.savedFilter.status",
-    "history.savedFilter.mode", "history.savedFilter.session", "history.savedFilter.target",
-    "history.savedFilter.time", "history.savedFilter.activity",
-  ]
-
-  private static func legacySavedFilter(
-    defaults: UserDefaults = .standard
-  ) -> RuntimeHistoryFilterQuery? {
-    guard defaults.bool(forKey: legacySavedFilterKeys[0]) else { return nil }
-    func member(_ key: String, of allowed: Set<String>, fallback: String) -> String {
-      guard let value = defaults.string(forKey: key), allowed.contains(value) else {
-        return fallback
-      }
-      return value
-    }
-    let session = defaults.string(forKey: "history.savedFilter.session")
-    let target = defaults.string(forKey: "history.savedFilter.target")
-    let savedActivity = defaults.string(forKey: "history.savedFilter.activity")
-    let activity = savedActivity == "toolkit" ? "device" : member(
-      "history.savedFilter.activity",
-      of: ["all", "flash", "viewer", "trace", "diagnostics", "debug", "device", "other"],
-      fallback: "all")
-    return RuntimeHistoryFilterQuery(
-      search: defaults.string(forKey: "history.savedFilter.search") ?? "",
-      status: member(
-        "history.savedFilter.status",
-        of: ["all", "active", "needsAttention", "succeeded", "failed", "interrupted", "cancelled"],
-        fallback: "all"),
-      mode: member(
-        "history.savedFilter.mode",
-        of: ["all", "execute", "planned", "simulated", "unknown"], fallback: "all"),
-      sessionID: session == "__all_sessions__" ? nil : session,
-      targetID: target == "__all_targets__" ? nil : target,
-      timeRange: member(
-        "history.savedFilter.time",
-        of: ["anyTime", "lastHour", "lastDay", "lastWeek"], fallback: "anyTime"),
-      activity: activity)
-  }
-
-  private static func removeLegacySavedFilter(defaults: UserDefaults = .standard) {
-    legacySavedFilterKeys.forEach(defaults.removeObject(forKey:))
   }
 
   /// Whether any listed job is still in a non-terminal state. Settings uses

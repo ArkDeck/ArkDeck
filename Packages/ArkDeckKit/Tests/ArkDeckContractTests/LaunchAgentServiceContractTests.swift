@@ -54,16 +54,13 @@ final class LaunchAgentServiceContractTests: XCTestCase {
       ArkDeckAgentFilesystemLayout.socketFilename)
   }
 
-  func testPreservingUpdateMigratesLegacyThreeKeyLaneToOneBundle() throws {
+  func testPreservingUpdateCarriesTheCurrentBundleLaneForward() throws {
     let bundle = try makeArkForgeBundle(
       at: root.appending(path: "ArkForge.bundle", directoryHint: .isDirectory))
     try FileManager.default.createDirectory(
       at: paths.plist.deletingLastPathComponent(), withIntermediateDirectories: true)
     let environment = [
-      "ARKDECK_ARKFORGED_PATH": bundle.daemon.path,
-      "ARKDECK_ARKFORGED_SHA256": bundle.daemonSHA256,
-      "ARKDECK_ARKFORGE_PROFILE_PATH": bundle.profile.path,
-      "ARKDECK_RKDEVELOPTOOL_PATH": "/legacy/rkdeveloptool",
+      "ARKDECK_ARKFORGE_BUNDLE_PATH": bundle.root.path,
       "ARKDECK_ARKFORGE_CAMPAIGN": "AFA-AC-7",
     ]
     let data = try PropertyListSerialization.data(
@@ -71,18 +68,20 @@ final class LaunchAgentServiceContractTests: XCTestCase {
       format: .xml, options: 0)
     try data.write(to: paths.plist)
 
-    let migrated = try XCTUnwrap(service.arkForgeLaneForPreservingUpdate())
+    let preserved = try XCTUnwrap(service.arkForgeLaneForPreservingUpdate())
 
-    XCTAssertEqual(migrated.bundlePath, bundle.root.path)
-    XCTAssertEqual(migrated.manifestSHA256, bundle.manifestSHA256)
-    XCTAssertEqual(migrated.daemonPath, bundle.daemon.path)
-    XCTAssertEqual(migrated.campaign, "AFA-AC-7")
+    // Preservation remeasures rather than trusting the plist: an update that
+    // carried a stale digest forward would pin an executable nobody chose.
+    XCTAssertEqual(preserved.bundlePath, bundle.root.path)
+    XCTAssertEqual(preserved.manifestSHA256, bundle.manifestSHA256)
+    XCTAssertEqual(preserved.daemonPath, bundle.daemon.path)
+    XCTAssertEqual(preserved.daemonSHA256, bundle.daemonSHA256)
+    XCTAssertEqual(preserved.campaign, "AFA-AC-7")
     XCTAssertEqual(
-      Set(migrated.environment.keys),
+      Set(preserved.environment.keys),
       Set(ArkDeckLaunchAgent.arkForgeEnvironmentKeys + [
         ArkDeckLaunchAgent.arkForgeCampaignEnvironmentKey
       ]))
-    XCTAssertNil(migrated.environment["ARKDECK_RKDEVELOPTOOL_PATH"])
   }
 
   func testInstallReceiptAndPlistPinOneArkForgeBundle() throws {
@@ -98,13 +97,13 @@ final class LaunchAgentServiceContractTests: XCTestCase {
     let environment = try XCTUnwrap(
       (try plist(at: paths.plist))["EnvironmentVariables"] as? [String: String])
     XCTAssertEqual(environment["ARKDECK_ARKFORGE_BUNDLE_PATH"], bundle.root.path)
-    for key in ArkDeckLaunchAgent.legacyArkForgeEnvironmentKeys {
+    for key in ArkDeckLaunchAgent.retiredArkForgeEnvironmentKeys {
       XCTAssertNil(environment[key])
     }
     XCTAssertEqual(try service.status().arkForgeLane, lane)
   }
 
-  func testLegacyMigrationRefusesPartialOrCrossBundleInputs() throws {
+  func testPreservingUpdateRefusesARetiredThreeKeyPlistByName() throws {
     let first = try makeArkForgeBundle(
       at: root.appending(path: "First.bundle", directoryHint: .isDirectory))
     let second = try makeArkForgeBundle(
@@ -118,18 +117,86 @@ final class LaunchAgentServiceContractTests: XCTestCase {
       ).write(to: paths.plist)
     }
 
-    try writeEnvironment(["ARKDECK_ARKFORGED_PATH": first.daemon.path])
+    // Every shape the retired configuration could take is refused by name:
+    // one key, all three, three that never named one bundle, and three beside
+    // the current key. None of them is upgraded, and none installs a lane.
+    let shapes: [[String: String]] = [
+      ["ARKDECK_ARKFORGED_PATH": first.daemon.path],
+      [
+        "ARKDECK_ARKFORGED_PATH": first.daemon.path,
+        "ARKDECK_ARKFORGED_SHA256": first.daemonSHA256,
+        "ARKDECK_ARKFORGE_PROFILE_PATH": first.profile.path,
+      ],
+      [
+        "ARKDECK_ARKFORGED_PATH": first.daemon.path,
+        "ARKDECK_ARKFORGED_SHA256": first.daemonSHA256,
+        "ARKDECK_ARKFORGE_PROFILE_PATH": second.profile.path,
+      ],
+      [
+        "ARKDECK_ARKFORGE_BUNDLE_PATH": second.root.path,
+        "ARKDECK_ARKFORGED_PATH": first.daemon.path,
+      ],
+    ]
+    for shape in shapes {
+      try writeEnvironment(shape)
+      XCTAssertThrowsError(try service.arkForgeLaneForPreservingUpdate()) { error in
+        XCTAssertTrue("\(error)".contains("is retired"), "\(error)")
+        XCTAssertTrue("\(error)".contains("--arkforge-bundle"), "\(error)")
+      }
+    }
+  }
+
+  /// The refusal names `runtime service update --arkforge-bundle` as the fix,
+  /// so that command has to work on exactly the installations the refusal is
+  /// about. It used to be unreachable: the retired-key refusal was raised by
+  /// the shared plist reader, so preserving the ArkTrace descriptor — which
+  /// `update` does before it looks at any lane flag — failed first and left
+  /// the operator with no reconfiguration entry at all.
+  func testARetiredKeyRefusesTheLaneWithoutBlockingReconfiguration() throws {
+    let bundle = try makeArkForgeBundle(
+      at: root.appending(path: "ArkForge.bundle", directoryHint: .isDirectory))
+    let lane = try LaunchAgentArkForgeLaneStatus.measuring(bundlePath: bundle.root.path)
+    _ = try service.install(
+      daemonBundleSource: daemonBundle, hdcExecutable: hdc,
+      arkTraceDescriptor: nil, arkForgeLane: lane)
+
+    // The shape an installation that predates this build is left in.
+    var document = try plist(at: paths.plist)
+    var environment = try XCTUnwrap(document["EnvironmentVariables"] as? [String: String])
+    environment.removeValue(forKey: "ARKDECK_ARKFORGE_BUNDLE_PATH")
+    environment["ARKDECK_ARKFORGED_PATH"] = bundle.daemon.path
+    environment["ARKDECK_ARKFORGED_SHA256"] = bundle.daemonSHA256
+    environment["ARKDECK_ARKFORGE_PROFILE_PATH"] = bundle.profile.path
+    document["EnvironmentVariables"] = environment
+    try PropertyListSerialization.data(
+      fromPropertyList: document, format: .xml, options: 0
+    ).write(to: paths.plist)
+
+    // An update that restates nothing about the lane still fails loud: the
+    // retired names are refused by name, never upgraded.
     XCTAssertThrowsError(try service.arkForgeLaneForPreservingUpdate()) { error in
-      XCTAssertTrue("\(error)".contains("partial"), "\(error)")
+      XCTAssertTrue("\(error)".contains("is retired"), "\(error)")
     }
 
-    try writeEnvironment([
-      "ARKDECK_ARKFORGED_PATH": first.daemon.path,
-      "ARKDECK_ARKFORGED_SHA256": first.daemonSHA256,
-      "ARKDECK_ARKFORGE_PROFILE_PATH": second.profile.path,
-    ])
-    XCTAssertThrowsError(try service.arkForgeLaneForPreservingUpdate()) { error in
-      XCTAssertTrue("\(error)".contains("one validated"), "\(error)")
+    // Everything an explicit reconfiguration needs keeps working.
+    XCTAssertNil(try service.arkTraceDescriptorForPreservingUpdate())
+    let status = try service.status()
+    XCTAssertTrue(status.installed)
+    XCTAssertEqual(status.daemonPath, paths.installedDaemon.path)
+    XCTAssertNotNil(status.hdcPath)
+    XCTAssertNil(status.arkForgeLane)
+    XCTAssertTrue(
+      status.diagnostics.contains { $0.contains("is retired") }, "\(status.diagnostics)")
+
+    // And the named entry publishes the current single-bundle configuration.
+    _ = try service.install(
+      daemonBundleSource: daemonBundle, hdcExecutable: hdc,
+      arkTraceDescriptor: nil, arkForgeLane: lane)
+    XCTAssertEqual(try service.status().arkForgeLane, lane)
+    let reconfigured = try XCTUnwrap(
+      (try plist(at: paths.plist))["EnvironmentVariables"] as? [String: String])
+    for key in ArkDeckLaunchAgent.retiredArkForgeEnvironmentKeys {
+      XCTAssertNil(reconfigured[key])
     }
   }
 

@@ -144,6 +144,166 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
     }
   }
 
+  /// The two shapes an unsupported receipt can be found in, and the answer
+  /// both used to get.
+  ///
+  /// Every read the owner did collapsed "no credential is installed" and "a
+  /// credential is installed that this build cannot read" into one `nil`, and
+  /// two of those reads then *wrote* that answer down: the first read of a
+  /// root whose ledger is missing, and the recovery of an interrupted
+  /// `replace`. Either one published `state: stable` with no credential
+  /// reference over a receipt, a Keychain envelope and signing material that
+  /// were all still on disk — after which `replace` and `remove` were free to
+  /// run against them, and `current()` told the user nothing was installed.
+  func testAnUnreadableReceiptIsNeverPublishedAsAnEmptyStableOwner() throws {
+    let fixture = try makeFixture(mode: "success")
+    let owner = OpenHarmonySigningCredentialOwner(store: fixture.store)
+    let (receipt, installed) = try owner.replace {
+      try fixture.store.install(
+        configuration: fixture.configuration,
+        keystorePassword: Data("keystore-secret".utf8),
+        keyPassword: Data("key-secret".utf8))
+    }
+    let receiptURL = URL(filePath: fixture.store.receiptPath)
+    let ledgerURL = fixture.store.credentialOwnerRootURL.appending(
+      path: "credential-owner-v1.json")
+    let envelopeAccount = try XCTUnwrap(receipt.secretEnvelopeAccount)
+
+    // A receipt on a storage form this build retired. It is present, it is
+    // not usable, and it is not absent.
+    var retired = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: Data(contentsOf: receiptURL)) as? [String: Any])
+    retired["keychainAccessSchema"] = "trusted-applications-v3"
+    let retiredBytes = try JSONSerialization.data(
+      withJSONObject: retired, options: [.sortedKeys])
+    try retiredBytes.write(to: receiptURL, options: .atomic)
+    try FileManager.default.setAttributes(
+      [.posixPermissions: 0o600], ofItemAtPath: receiptURL.path)
+    guard case .unusable = fixture.store.receiptState() else {
+      return XCTFail("a present-but-unsupported receipt is not an absent one")
+    }
+
+    // Combination one: an unusable receipt with no owner ledger beside it.
+    try FileManager.default.removeItem(at: ledgerURL)
+    XCTAssertThrowsError(try owner.current()) { error in
+      XCTAssertNotEqual(
+        error as? OpenHarmonySigningError,
+        .receiptUnavailable("signing credential is not installed"),
+        "an unreadable credential must not be reported as an uninstalled one")
+    }
+    XCTAssertFalse(
+      FileManager.default.fileExists(atPath: ledgerURL.path),
+      "refusing to read must not durably publish an owner either")
+
+    // Combination two: an unusable receipt found mid-`replace`.
+    let interrupted: [String: Any] = [
+      "schemaVersion": "arkdeck.signing-credential-owner/1",
+      "state": "replacing",
+      "credentialRef": installed.credentialRef,
+      "presetOwners": [String](),
+    ]
+    try JSONSerialization.data(withJSONObject: interrupted, options: [.sortedKeys]).write(
+      to: ledgerURL, options: .atomic)
+    try FileManager.default.setAttributes(
+      [.posixPermissions: 0o600], ofItemAtPath: ledgerURL.path)
+    XCTAssertThrowsError(try owner.current())
+    let settled = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: Data(contentsOf: ledgerURL)) as? [String: Any])
+    XCTAssertEqual(
+      settled["state"] as? String, "replacing",
+      "an interrupted replace must not settle into a stable owner with no credential")
+    XCTAssertEqual(settled["credentialRef"] as? String, installed.credentialRef)
+
+    // Nothing was zeroed, replaced or deleted by any of it.
+    XCTAssertEqual(try Data(contentsOf: receiptURL), retiredBytes)
+    XCTAssertTrue(fixture.secrets.contains(account: envelopeAccount))
+    XCTAssertTrue(FileManager.default.fileExists(atPath: receipt.keystore.path))
+
+    // The way out stays open. An explicit reinstall is a mutation, so it is
+    // gated on ownership — which the ledger records by itself — and not on
+    // re-reading the credential it is about to replace.
+    let pinnedLedger: [String: Any] = [
+      "schemaVersion": "arkdeck.signing-credential-owner/1",
+      "state": "stable",
+      "credentialRef": installed.credentialRef,
+      "presetOwners": ["preset-signing-fixture"],
+    ]
+    try JSONSerialization.data(withJSONObject: pinnedLedger, options: [.sortedKeys]).write(
+      to: ledgerURL, options: .atomic)
+    try FileManager.default.setAttributes(
+      [.posixPermissions: 0o600], ofItemAtPath: ledgerURL.path)
+    var pinnedBodyRan = false
+    XCTAssertThrowsError(
+      try owner.replace { pinnedBodyRan = true } as (Void, OpenHarmonySigningCredentialResource))
+    XCTAssertFalse(pinnedBodyRan, "a pinned credential is never replaced underneath its preset")
+
+    try FileManager.default.removeItem(at: ledgerURL)
+    let (_, reinstalled) = try owner.replace {
+      try fixture.store.install(
+        configuration: fixture.configuration,
+        keystorePassword: Data("keystore-secret-2".utf8),
+        keyPassword: Data("key-secret-2".utf8))
+    }
+    // The reference is content-derived, so reinstalling the same material
+    // republishes the same identity — the point is that it is readable again.
+    XCTAssertEqual(reinstalled.credentialRef, installed.credentialRef)
+    XCTAssertEqual(try owner.current(), reinstalled)
+    guard case .installed = fixture.store.receiptState() else {
+      return XCTFail("an explicit reinstall must leave a receipt this build can honour")
+    }
+
+    // A genuinely empty root still adopts an empty owner: absence is the one
+    // state that licenses publishing one.
+    try FileManager.default.removeItem(at: receiptURL)
+    try FileManager.default.removeItem(at: ledgerURL)
+    guard case .absent = fixture.store.receiptState() else {
+      return XCTFail("a root with no receipt is absent")
+    }
+    XCTAssertThrowsError(try owner.current()) { error in
+      XCTAssertEqual(
+        error as? OpenHarmonySigningError,
+        .receiptUnavailable("signing credential is not installed"), "\(error)")
+    }
+  }
+
+  /// Uninstall has to clear every envelope this preset ever wrote, including
+  /// one a reinstall rotated away.
+  ///
+  /// A reinstall reuses the installed account only while the Keychain confirms
+  /// it is there, and that probe answers `false` both for "gone" and for "this
+  /// process may not look". So a reinstall during a moment the store cannot be
+  /// read mints a new account beside a live item that still holds the user's
+  /// passwords. The receipt records the account it rotated away so `remove`
+  /// can finish the job; nothing ever reads from it.
+  func testUninstallClearsAnEnvelopeThatAReinstallRotatedAway() throws {
+    let fixture = try makeFixture(mode: "success")
+    let first = try fixture.store.install(
+      configuration: fixture.configuration,
+      keystorePassword: Data("keystore-secret".utf8),
+      keyPassword: Data("key-secret".utf8))
+    let firstAccount = try XCTUnwrap(first.secretEnvelopeAccount)
+    XCTAssertNil(first.supersededEnvelopeAccounts)
+
+    // The store is momentarily unreadable, so reuse cannot be proven.
+    fixture.secrets.keychainUnreadable = true
+    let second = try fixture.store.install(
+      configuration: fixture.configuration,
+      keystorePassword: Data("keystore-secret-2".utf8),
+      keyPassword: Data("key-secret-2".utf8))
+    fixture.secrets.keychainUnreadable = false
+    let secondAccount = try XCTUnwrap(second.secretEnvelopeAccount)
+    XCTAssertNotEqual(secondAccount, firstAccount)
+    XCTAssertEqual(second.supersededEnvelopeAccounts, [firstAccount])
+    XCTAssertTrue(
+      fixture.secrets.contains(account: firstAccount),
+      "the rotated-away item is preserved, not deleted behind the user's back")
+
+    let removal = try fixture.store.remove()
+    XCTAssertTrue(removal.removedReceipt)
+    XCTAssertFalse(fixture.secrets.contains(account: firstAccount))
+    XCTAssertFalse(fixture.secrets.contains(account: secondAccount))
+  }
+
   func testWorkspaceSigningPresetResolvesOnlyItsPinnedCredentialReference() throws {
     let fixture = try makeFixture(mode: "success")
     let owner = OpenHarmonySigningCredentialOwner(store: fixture.store)
@@ -349,18 +509,33 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
       "ordinary Runtime readiness must not accept an obsolete ACL schema")
 
     fixture.secrets.trustedDaemonIdentity = "replacement-installed-daemon"
-    try fixture.store.refreshDaemonKeychainIdentity()
-    let rebound = try fixture.store.loadValidated()
-    let reboundAccount = try XCTUnwrap(rebound.secretEnvelopeAccount)
-    XCTAssertNotEqual(reboundAccount, firstAccount)
-    XCTAssertTrue(rebound.legacyPasswordAccounts?.contains(firstAccount) == true)
+    // A receipt on a storage form this build does not support is refused by
+    // name. It is not upgraded in place: no secret is read, the Keychain item
+    // is left exactly where it is, and the material on disk is untouched.
+    XCTAssertThrowsError(try fixture.store.refreshDaemonKeychainIdentity()) { error in
+      // The refusal names the entry that fixes it, so an operator is never
+      // told only that something is wrong.
+      XCTAssertTrue(
+        "\(error)".contains("arkdeck runtime signing install"), "\(error)")
+    }
     XCTAssertEqual(fixture.secrets.secretReadCount, 0)
+    XCTAssertTrue(fixture.secrets.contains(account: firstAccount))
+    XCTAssertTrue(FileManager.default.fileExists(atPath: firstMaterial.path))
 
+    // The way back is the current supported entry, stated explicitly.
     let second = try await installer.install(configuration: configuration)
-    XCTAssertEqual(second.secretEnvelopeAccount, reboundAccount)
-    XCTAssertFalse(FileManager.default.fileExists(atPath: firstMaterial.path))
+    let reboundAccount = try XCTUnwrap(second.secretEnvelopeAccount)
+    XCTAssertNotEqual(reboundAccount, firstAccount)
+    XCTAssertEqual(
+      second.keychainAccessSchema, OpenHarmonyLocalSigning.keychainAccessSchema)
     let secondMaterial = try XCTUnwrap(second.managedMaterialDirectory)
+    XCTAssertNotEqual(secondMaterial, firstMaterial.path)
     XCTAssertTrue(FileManager.default.fileExists(atPath: secondMaterial))
+    // The material the unusable receipt pointed at is left on disk. Reclaiming
+    // it would mean deleting installed material on the strength of a document
+    // this build could not read, which is the one thing reconfiguration is not
+    // allowed to do; the user removes it when they choose to.
+    XCTAssertTrue(FileManager.default.fileExists(atPath: firstMaterial.path))
 
     let removal = try fixture.store.remove()
     XCTAssertTrue(removal.removedReceipt)
@@ -378,7 +553,9 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
       "removing ArkDeck's preset must preserve the SDK source bundle")
   }
 
-  func testSDKReleaseInstallMigratesLegacyACLReceiptToOneNewEnvelope() async throws {
+  func testSDKReleaseInstallRepublishesOverARetiredACLReceiptWithoutMigratingIt()
+    async throws
+  {
     let fixture = try makeSDKReleaseFixture(mode: "success")
     fixture.secrets.trustedDaemonIdentity = "stable-installed-daemon"
     let installer = OpenHarmonySDKReleasePresetInstaller(
@@ -393,7 +570,7 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
     // carry an ACL that exposes attributes to the CLI but denies value reads
     // to the LaunchAgent. An explicit reinstall must not trust that markerless
     // item merely because the daemon's designated requirement is unchanged.
-    let legacy = OpenHarmonySigningPresetReceipt(
+    let retired = OpenHarmonySigningPresetReceipt(
       schemaVersion: first.schemaVersion, installedAtUTC: first.installedAtUTC,
       presetID: first.presetID, projectRef: first.projectRef,
       javaExecutable: first.javaExecutable, signerJAR: first.signerJAR,
@@ -403,18 +580,27 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
       keystorePasswordAccount: first.keystorePasswordAccount,
       keyPasswordAccount: first.keyPasswordAccount,
       secretEnvelopeAccount: first.secretEnvelopeAccount,
-      legacyPasswordAccounts: first.legacyPasswordAccounts,
       trustedDaemonApplicationSHA256: first.trustedDaemonApplicationSHA256,
       keychainAccessSchema: nil,
       managedMaterialDirectory: first.managedMaterialDirectory)
-    try JSONEncoder().encode(legacy).write(
+    try JSONEncoder().encode(retired).write(
       to: URL(filePath: fixture.store.receiptPath), options: .atomic)
 
-    let migrated = try await installer.install(configuration: configuration)
-    XCTAssertNotEqual(migrated.secretEnvelopeAccount, firstAccount)
+    // Nothing reads it and nothing repairs it: absent a marker this build
+    // supports, the preset is simply unusable until it is reinstalled.
+    XCTAssertFalse(fixture.store.status().ready)
+    XCTAssertThrowsError(try fixture.store.loadValidated(requireSecrets: false))
+    guard case .unusable = fixture.store.receiptState() else {
+      return XCTFail("a receipt that is present but unsupported is not an absent one")
+    }
+
+    let republished = try await installer.install(configuration: configuration)
+    XCTAssertNotEqual(republished.secretEnvelopeAccount, firstAccount)
     XCTAssertEqual(
-      migrated.keychainAccessSchema, OpenHarmonyLocalSigning.keychainAccessSchema)
-    XCTAssertTrue(migrated.legacyPasswordAccounts?.contains(firstAccount) == true)
+      republished.keychainAccessSchema, OpenHarmonyLocalSigning.keychainAccessSchema)
+    // The item the retired receipt named is left in place. Reconfiguration
+    // publishes a new credential; it never deletes material the user still has.
+    XCTAssertTrue(fixture.secrets.contains(account: firstAccount))
     XCTAssertTrue(fixture.store.status().ready)
   }
 
@@ -570,7 +756,6 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
     try fixture.store.refreshDaemonKeychainIdentity()
     let rebound = try fixture.store.loadValidated()
     XCTAssertEqual(rebound.secretEnvelopeAccount, envelopeAccount)
-    XCTAssertFalse(rebound.legacyPasswordAccounts?.contains(envelopeAccount) == true)
     XCTAssertEqual(fixture.secrets.secretReadCount, 0)
     XCTAssertEqual(rebound.trustedDaemonApplicationSHA256, "stable-daemon-v2")
     var reboundPair = try fixture.store.secretPair(for: rebound)
@@ -650,7 +835,7 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
     return (config, keystore, encrypted, expected)
   }
 
-  func testDevEcoEncryptedPasswordsDecodeOnlyAtInteractiveInstallBoundary() throws {
+  func testDevEcoEncryptedPasswordsDecodeOnlyAtTheInstallAndRekeyBoundaries() throws {
     let (config, keystore, encrypted, expected) = try makeDevEcoPasswordFixture()
     let ce = config.appending(path: "material", directoryHint: .isDirectory)
       .appending(path: "ce", directoryHint: .isDirectory)
@@ -690,19 +875,17 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
         signerJAR: jar, keystore: keystore,
         appCertificate: certificate, signedProfile: profile,
         keyAlias: "test-key"),
-      keystorePassword: Data(encrypted.utf8),
-      keyPassword: Data(encrypted.utf8))
-    let normalization = try store.normalizeDevEcoSecrets()
-    XCTAssertTrue(normalization.normalizedKeystorePassword)
-    XCTAssertTrue(normalization.normalizedKeyPassword)
-    var normalizedPair = try store.secretPair(for: store.loadValidated())
-    XCTAssertEqual(normalizedPair.keystore, expected)
-    XCTAssertEqual(normalizedPair.key, expected)
-    normalizedPair.keystore.resetBytes(in: 0..<normalizedPair.keystore.count)
-    normalizedPair.key.resetBytes(in: 0..<normalizedPair.key.count)
-    let repeated = try store.normalizeDevEcoSecrets()
-    XCTAssertFalse(repeated.normalizedKeystorePassword)
-    XCTAssertFalse(repeated.normalizedKeyPassword)
+      // Decoded at the boundary, exactly as the interactive and
+      // `--build-profile` install paths decode before they reach the store.
+      // There is no in-place repair entry behind them: what is stored is what
+      // the boundary produced.
+      keystorePassword: expected,
+      keyPassword: expected)
+    var installedPair = try store.secretPair(for: store.loadValidated())
+    XCTAssertEqual(installedPair.keystore, expected)
+    XCTAssertEqual(installedPair.key, expected)
+    installedPair.keystore.resetBytes(in: 0..<installedPair.keystore.count)
+    installedPair.key.resetBytes(in: 0..<installedPair.key.count)
 
     let buildProfile = config.appending(path: "build-profile.json5")
     try Data(
@@ -725,21 +908,22 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
         "--key-alias", "debugkey",
         "--json",
       ], store: store)
-    let migratedReceipt = try store.loadValidated()
-    XCTAssertEqual(migratedReceipt.keyAlias, "debugkey")
-    let envelopeAccount = try XCTUnwrap(migratedReceipt.secretEnvelopeAccount)
+    let rekeyedReceipt = try store.loadValidated()
+    XCTAssertEqual(rekeyedReceipt.keyAlias, "debugkey")
+    let envelopeAccount = try XCTUnwrap(rekeyedReceipt.secretEnvelopeAccount)
+    // Re-keying rewrites the value of the preset's one envelope item; it does
+    // not mint a second account or leave a retired one behind.
     XCTAssertEqual(envelopeAccount, receipt.secretEnvelopeAccount)
-    XCTAssertTrue((migratedReceipt.legacyPasswordAccounts ?? []).isEmpty)
     XCTAssertTrue(secrets.contains(account: envelopeAccount))
-    var migratedPair = try store.secretPair(for: migratedReceipt)
-    XCTAssertEqual(migratedPair.keystore, expected)
-    XCTAssertEqual(migratedPair.key, expected)
-    migratedPair.keystore.resetBytes(in: 0..<migratedPair.keystore.count)
-    migratedPair.key.resetBytes(in: 0..<migratedPair.key.count)
-    let migratedStatus = store.status()
-    XCTAssertTrue(migratedStatus.ready, migratedStatus.diagnostics.joined(separator: " | "))
-    XCTAssertTrue(migratedStatus.keystorePasswordPresent)
-    XCTAssertTrue(migratedStatus.keyPasswordPresent)
+    var rekeyedPair = try store.secretPair(for: rekeyedReceipt)
+    XCTAssertEqual(rekeyedPair.keystore, expected)
+    XCTAssertEqual(rekeyedPair.key, expected)
+    rekeyedPair.keystore.resetBytes(in: 0..<rekeyedPair.keystore.count)
+    rekeyedPair.key.resetBytes(in: 0..<rekeyedPair.key.count)
+    let rekeyedStatus = store.status()
+    XCTAssertTrue(rekeyedStatus.ready, rekeyedStatus.diagnostics.joined(separator: " | "))
+    XCTAssertTrue(rekeyedStatus.keystorePasswordPresent)
+    XCTAssertTrue(rekeyedStatus.keyPasswordPresent)
     try store.refreshDaemonKeychainIdentity()
     XCTAssertEqual(try store.loadValidated().secretEnvelopeAccount, envelopeAccount)
 
@@ -752,11 +936,11 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
     XCTAssertEqual(try store.loadValidated().secretEnvelopeAccount, envelopeAccount)
     XCTAssertEqual(try store.loadValidated().keyAlias, "debugkey")
 
-    let replacementMigration = try store.migrateToSecretEnvelope(
+    let replacement = try store.replaceSecretEnvelope(
       keystorePassword: Data("replacement-keystore-secret".utf8),
       keyPassword: Data("replacement-key-secret".utf8))
-    XCTAssertFalse(replacementMigration.migrated)
-    XCTAssertEqual(replacementMigration.envelopeAccount, envelopeAccount)
+    XCTAssertFalse(replacement.createdEnvelopeItem)
+    XCTAssertEqual(replacement.envelopeAccount, envelopeAccount)
     var replacementPair = try store.secretPair(for: store.loadValidated())
     XCTAssertEqual(replacementPair.keystore, Data("replacement-keystore-secret".utf8))
     XCTAssertEqual(replacementPair.key, Data("replacement-key-secret".utf8))
@@ -764,7 +948,7 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
     replacementPair.key.resetBytes(in: 0..<replacementPair.key.count)
 
     XCTAssertThrowsError(
-      try store.migrateToSecretEnvelope(
+      try store.replaceSecretEnvelope(
         keystorePassword: Data("replacement-keystore-secret".utf8),
         keyPassword: Data("replacement-key-secret".utf8),
         keyAlias: "invalid/alias"))
@@ -779,7 +963,6 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
       ], store: store)
     let reboundReceipt = try store.loadValidated()
     XCTAssertEqual(reboundReceipt.secretEnvelopeAccount, envelopeAccount)
-    XCTAssertFalse(reboundReceipt.legacyPasswordAccounts?.contains(envelopeAccount) == true)
     XCTAssertEqual(
       reboundReceipt.trustedDaemonApplicationSHA256, "installed-daemon-v2")
 

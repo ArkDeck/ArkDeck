@@ -116,9 +116,9 @@ re-keying path for a preset that is already installed with that keystore.
 receipt and Keychain envelope in `arkdeck.signing-credential/1`. Its
 content-derived `credential:sha256-*` reference contains no host path,
 Keychain account, or secret. The cross-process owner refuses replacement and
-removal while any workspace preset pins the reference; normalize and daemon
-identity refresh must preserve it, while `migrate-deveco` is treated as a
-replacement because it may change the key alias. Status, maintenance, and
+removal while any workspace preset pins the reference; daemon identity refresh
+must preserve it, while `migrate-deveco` is treated as a replacement because it
+may change the key alias. Status, maintenance, and
 removal projections remain path-free.
 
 At startup, a signing preset must resolve both its exact toolchain pin and its
