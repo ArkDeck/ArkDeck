@@ -30,6 +30,7 @@
   - `Packages/ArkDeckKit/Contracts/control-negotiation.json`
   - `Packages/ArkDeckKit/Contracts/control-protocol.json`
   - `Packages/ArkDeckKit/Scripts/generate-control-contract.py`
+  - `Packages/ArkDeckKit/APIBaseline/Sources/APIBaseline/APIBaseline.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckCore/ControlProtocol*.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckCore/ControlFrameJSON.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckCore/AgentXPCContract.swift`
@@ -41,6 +42,8 @@
   - `Packages/ArkDeckKit/Sources/ArkDeckRuntime/RuntimeOperationFailure.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/XPCConnectionBox.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceListApplicationFacade.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceControlFacade.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DiagnosticSessionUIFixture.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/HDCApplicationDiagnosticsFacade.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/FlashApplicationFacade.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DebugApplicationFacade.swift`
