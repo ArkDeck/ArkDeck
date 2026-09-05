@@ -1045,6 +1045,69 @@ final class AppShellUITests: XCTestCase {
     return FileManager.default.temporaryDirectory.appending(path: name)
   }
 
+  /// Both panes that render from the Runtime-backed presentation used to fall
+  /// back to a spinner that nothing would stop: the refresh ran once, when the
+  /// Settings scene appeared, so a Runtime unreachable at that moment stayed
+  /// unreachable until the window was closed and reopened. The design's error
+  /// row has always carried a Refresh action. This walks it from unreachable
+  /// to recovered without a relaunch, through the fixture's shared switch.
+  func testSettingsOfferRefreshWhileTheRuntimeIsUnreachableAndRecoverThroughIt() {
+    do {
+      try "--ui-test-runtime-history-unreachable".write(
+        to: fixtureStateFileURL, atomically: true, encoding: .utf8)
+    } catch {
+      return XCTFail("cannot write the fixture state: \(error)")
+    }
+    let app = launch(arguments: [
+      "--ui-test-runtime-history", "--ui-test-fixture-state", fixtureStateFileURL.path,
+      "-AppleLanguages", "(en)",
+    ])
+    openSettings(in: app)
+
+    // General renders its build facts from the same presentation: Refresh and
+    // the notice, no spinner.
+    settingsPane("General", in: app).click()
+    let generalRefresh = app.buttons["settings.general.refresh"]
+    XCTAssertTrue(
+      generalRefresh.waitForExistenceFast(timeout: 10),
+      "General must offer Refresh while the Runtime is unreachable")
+    XCTAssertTrue(element("settings.error.refresh", in: app).exists)
+
+    settingsPane("Storage", in: app).click()
+    let storageRefresh = app.buttons["settings.storage.refresh"]
+    XCTAssertTrue(
+      storageRefresh.waitForExistenceFast(timeout: 10),
+      "Storage must offer Refresh while the Runtime is unreachable")
+    XCTAssertTrue(element("settings.error.refresh", in: app).exists)
+    XCTAssertFalse(element("settings.storage.chooseRoot", in: app).exists)
+
+    // Refreshing while the Runtime is still unreachable reports again rather
+    // than resting on the spinner: the entry point stays open.
+    storageRefresh.click()
+    XCTAssertTrue(
+      storageRefresh.waitForExistenceFast(timeout: 10),
+      "a refresh that fails must leave the Refresh action in place")
+    XCTAssertFalse(element("settings.storage.chooseRoot", in: app).exists)
+
+    // The Runtime comes back. The same action recovers the pane in place.
+    writeFixtureState("", in: app)
+    storageRefresh.click()
+    XCTAssertTrue(
+      element("settings.storage.chooseRoot", in: app).waitForExistenceFast(timeout: 10),
+      "Refresh must recover the pane once the Runtime answers")
+    assertDisplayed(app.textFields["settings.storage.quota"], equals: "12")
+    XCTAssertFalse(storageRefresh.exists)
+    XCTAssertFalse(element("settings.error.refresh", in: app).exists)
+
+    // One presentation serves both panes, so General recovered with it.
+    settingsPane("General", in: app).click()
+    XCTAssertTrue(
+      element("settings.general.appIcon.keycap", in: app).waitForExistenceFast(timeout: 10))
+    XCTAssertFalse(generalRefresh.exists)
+    XCTAssertFalse(element("settings.error.refresh", in: app).exists)
+    app.terminate()
+  }
+
   func testDefaultWindowReportsNativeGeometryAndDoesNotOpenAtMinimumSize() {
     let app = launch(arguments: ["-AppleLanguages", "(en)"])
     assertDefaultWindowGeometry(in: app)

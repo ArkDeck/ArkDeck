@@ -24,18 +24,17 @@ final class SettingsStorageUIFixtureContractTests: XCTestCase {
   /// framing, the same exact-shape validation, the same presentation mapping.
   /// Only the transport is the fixture, and no daemon is needed for any of it.
   func testFixtureLaunchAnswersTheOwnerContractThroughTheProductionFacade() async throws {
-    let provider = SettingsApplicationFacade.make(arguments: ["--ui-test-runtime-history"])
-    defer {
-      try? FileManager.default.removeItem(
-        at: FileManager.default.temporaryDirectory.appending(
-          path: SettingsStorageUIFixture.directoryName, directoryHint: .isDirectory))
-    }
+    // Each test roots its own owner: the suite runs its methods in parallel
+    // processes, and two owners on the App's one fixed path would race.
+    let root = uniqueRoot("facade")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let provider = SettingsApplicationFacade.make(
+      arguments: ["--ui-test-runtime-history"], fixtureRoot: root)
     let initial = try await provider.refresh().storage
 
     XCTAssertTrue(
-      initial.rootPath.hasSuffix(
-        "/\(SettingsStorageUIFixture.directoryName)/\(SettingsStorageUIFixture.sessionRootName)"),
-      initial.rootPath)
+      initial.rootPath.hasSuffix("/\(SettingsStorageUIFixture.sessionRootName)"), initial.rootPath)
+    XCTAssertTrue(initial.rootPath.hasPrefix(root.resolvingSymlinksInPath().path), initial.rootPath)
     XCTAssertFalse(initial.usesCustomRoot)
     // One write over the untouched owner, and a policy no product default
     // matches: the pane cannot pass by showing a real owner's figures.
@@ -136,6 +135,54 @@ final class SettingsStorageUIFixtureContractTests: XCTestCase {
     // Every refusal above left the owner where the accepted write put it.
     let settled = try decode(await owner.reply("runtime.storage.status", nil))
     XCTAssertEqual(try generation(of: settled), "3")
+  }
+
+  /// The History fixture's unreachable switch reaches this owner too, at launch
+  /// or through the shared state file, so the App can be walked from an
+  /// unavailable Storage pane to a recovered one without a relaunch.
+  func testUnreachableSwitchFailsEveryRequestUntilItIsCleared() async throws {
+    let root = uniqueRoot("unreachable")
+    let stateFile = FileManager.default.temporaryDirectory.appending(
+      path: "arkdeck-settings-ui-fixture-state-\(UUID().uuidString).txt")
+    try SettingsStorageUIFixture.unreachableArgument.write(
+      to: stateFile, atomically: true, encoding: .utf8)
+    defer {
+      try? FileManager.default.removeItem(at: stateFile)
+      try? FileManager.default.removeItem(at: root)
+    }
+    let provider = SettingsApplicationFacade.make(
+      arguments: ["--ui-test-runtime-history", "--ui-test-fixture-state", stateFile.path],
+      fixtureRoot: root)
+    do {
+      _ = try await provider.refresh()
+      XCTFail("an unreachable Runtime must not produce a presentation")
+    } catch SettingsApplicationError.runtimeStorageUnavailable {
+      // The same error the production transport produces when no daemon answers.
+    }
+
+    // Cleared in the file, the same provider recovers on its next request.
+    try "".write(to: stateFile, atomically: true, encoding: .utf8)
+    let recovered = try await provider.refresh().storage
+    XCTAssertEqual(recovered.generation, 2)
+    XCTAssertEqual(
+      recovered.totalQuotaBytes, SettingsStorageUIFixture.publishedPolicy.totalQuotaBytes)
+
+    // At launch, with no state file, the argument alone is the switch. The
+    // owner is never composed, so this root is never created.
+    let atLaunch = SettingsApplicationFacade.make(
+      arguments: ["--ui-test-runtime-history", SettingsStorageUIFixture.unreachableArgument],
+      fixtureRoot: uniqueRoot("at-launch"))
+    do {
+      _ = try await atLaunch.refresh()
+      XCTFail("the launch argument alone must make the Runtime unreachable")
+    } catch SettingsApplicationError.runtimeStorageUnavailable {
+    }
+  }
+
+  private func uniqueRoot(_ label: String) -> URL {
+    FileManager.default.temporaryDirectory.appending(
+      path: "arkdeck-settings-ui-fixture-\(label)-\(UUID().uuidString)",
+      directoryHint: .isDirectory)
   }
 
   private func decode(_ data: Data) throws -> [String: Any] {

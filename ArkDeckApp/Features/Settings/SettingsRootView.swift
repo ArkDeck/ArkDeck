@@ -103,7 +103,7 @@ private struct GeneralSettingsPane: View {
           }
         }
       } else {
-        SettingsLoadingRow()
+        SettingsUnavailableRow(model: model, refreshIdentifier: "settings.general.refresh")
       }
       GroupBox(settingsText("settings.general.privacy")) {
         VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
@@ -874,12 +874,15 @@ private struct StorageSettingsPane: View {
           sessionRootUsage(storage)
         }
       } else {
-        SettingsLoadingRow()
+        SettingsUnavailableRow(model: model, refreshIdentifier: "settings.storage.refresh")
       }
       if let validationMessage {
         settingsErrorNotice(validationMessage)
       }
-      if let error = model.storageError {
+      // Save, root selection and reset report here, under the controls they
+      // belong to. A refresh that failed before there was anything to show is
+      // the unavailable row's to report, once.
+      if model.presentation?.storage != nil, let error = model.storageError {
         settingsErrorNotice(error)
       }
     }
@@ -1185,6 +1188,31 @@ private struct SettingsAssuranceRow: View {
   }
 }
 
+/// The shared "could not be loaded" row: the notice the design's
+/// `settings.error.refresh` row mirrors, with the Refresh action that row has
+/// always carried there. A pane that needs the Runtime-backed presentation
+/// and has none shows this rather than a spinner nothing will stop: the
+/// refresh runs once, when the Settings scene appears, so a Runtime that was
+/// unreachable at that moment used to stay unreachable until the window was
+/// closed and reopened. Until the first refresh has reported, and while one
+/// is in flight, the loading row stands in.
+private struct SettingsUnavailableRow: View {
+  var model: SettingsWorkspaceViewModel
+  let refreshIdentifier: String
+
+  var body: some View {
+    if let error = model.storageError, !model.isRefreshing {
+      VStack(alignment: .leading, spacing: WorkspaceMetrics.contentGap) {
+        settingsErrorNotice(error, identifier: "settings.error.refresh")
+        Button(settingsText("settings.common.refresh"), action: model.refresh)
+          .accessibilityIdentifier(refreshIdentifier)
+      }
+    } else {
+      SettingsLoadingRow()
+    }
+  }
+}
+
 private struct SettingsLoadingRow: View {
   var body: some View {
     HStack(spacing: WorkspaceMetrics.tightGap) {
@@ -1199,8 +1227,10 @@ private struct SettingsLoadingRow: View {
 /// Settings' failures are the App's warn notice, not a bordered line of orange
 /// text: the tone's symbol, border and wash carry the state together, so colour
 /// is never the only carrier (spec §2, §4.4).
-private func settingsErrorNotice(_ message: String) -> some View {
-  WorkspaceNotice(tone: .warning, symbol: "exclamationmark.triangle.fill") {
+private func settingsErrorNotice(_ message: String, identifier: String? = nil) -> some View {
+  WorkspaceNotice(
+    tone: .warning, symbol: "exclamationmark.triangle.fill", identifier: identifier
+  ) {
     Text(message)
   }
 }

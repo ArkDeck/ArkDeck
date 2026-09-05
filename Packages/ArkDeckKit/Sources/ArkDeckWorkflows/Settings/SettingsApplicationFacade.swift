@@ -188,9 +188,22 @@ public enum SettingsApplicationFacade {
   public static func make(
     arguments: [String] = ProcessInfo.processInfo.arguments
   ) -> any SettingsApplicationProviding {
-    if let owner = SettingsStorageUIFixture.owner(arguments: arguments) {
+    make(arguments: arguments, fixtureRoot: nil)
+  }
+
+  /// Test seam: the fixture launch with its owner rooted where the test says,
+  /// so contract tests running in parallel processes never share the App's
+  /// one fixed owner directory. Production is unreachable from here: without
+  /// the selecting argument the root is ignored and the XPC provider is made.
+  package static func make(
+    arguments: [String], fixtureRoot: URL?
+  ) -> any SettingsApplicationProviding {
+    if let owner = SettingsStorageUIFixture.owner(arguments: arguments, root: fixtureRoot) {
       return ProductionSettingsApplicationProvider(
-        runtimeRequest: { method, params in .success(await owner.reply(method, params)) },
+        runtimeRequest: { method, params in
+          guard await owner.isReachable() else { return .failure(.unavailable("fixture")) }
+          return .success(await owner.reply(method, params))
+        },
         migratesLegacyPreferences: false)
     }
     return ProductionSettingsApplicationProvider()

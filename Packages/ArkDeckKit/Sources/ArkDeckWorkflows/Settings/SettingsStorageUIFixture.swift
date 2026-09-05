@@ -23,6 +23,13 @@ import Foundation
 public enum SettingsStorageUIFixture {
   public static let selectingArgument = "--ui-test-runtime-history"
 
+  /// The History fixture's switch, read the same way: given at launch, or
+  /// written into the `--ui-test-fixture-state` file so one launched instance
+  /// can walk the unavailable Storage pane and its recovery without a
+  /// relaunch. While it is set every request fails as it does when no daemon
+  /// answers, and the owner is never composed.
+  public static let unreachableArgument = "--ui-test-runtime-history-unreachable"
+
   /// The fixture keeps its owner state and its Session root under
   /// `<temporary directory>/<directoryName>/`, the root being
   /// `<directoryName>/<sessionRootName>`.
@@ -54,12 +61,24 @@ public enum SettingsStorageUIFixture {
     arguments.contains(selectingArgument)
   }
 
-  /// The owner to install, or `nil` for every ordinary launch.
-  package static func owner(arguments: [String]) -> Owner? {
+  /// The owner to install, or `nil` for every ordinary launch. The App has
+  /// one owner per process at the fixed location; a test passes its own root
+  /// so that test processes running in parallel never share one owner.
+  package static func owner(arguments: [String], root: URL? = nil) -> Owner? {
     guard isSelected(arguments: arguments) else { return nil }
+    let stateFileURL: URL?
+    if let index = arguments.firstIndex(of: "--ui-test-fixture-state"),
+      arguments.indices.contains(index + 1)
+    {
+      stateFileURL = URL(filePath: arguments[index + 1])
+    } else {
+      stateFileURL = nil
+    }
     return Owner(
-      base: FileManager.default.temporaryDirectory.appending(
-        path: directoryName, directoryHint: .isDirectory))
+      base: root
+        ?? FileManager.default.temporaryDirectory.appending(
+          path: directoryName, directoryHint: .isDirectory),
+      launchArguments: arguments, stateFileURL: stateFileURL)
   }
 
   /// The in-process stand-in for the daemon's storage resource handler: the
@@ -71,10 +90,25 @@ public enum SettingsStorageUIFixture {
   /// generation 2, over the default root.
   package actor Owner {
     private let base: URL
+    private let launchArguments: [String]
+    private let stateFileURL: URL?
     private var store: RuntimeSessionStorageStore?
 
-    package init(base: URL) {
+    package init(base: URL, launchArguments: [String] = [], stateFileURL: URL? = nil) {
       self.base = base
+      self.launchArguments = launchArguments
+      self.stateFileURL = stateFileURL
+    }
+
+    /// Whether the Runtime this owner stands in for currently answers. The
+    /// state file wins when it exists, so a test can flip it either way after
+    /// the launch; otherwise the launch arguments decide.
+    package func isReachable() -> Bool {
+      let flag = SettingsStorageUIFixture.unreachableArgument
+      if let stateFileURL, let text = try? String(contentsOf: stateFileURL, encoding: .utf8) {
+        return !text.contains(flag)
+      }
+      return !launchArguments.contains(flag)
     }
 
     /// The framed reply for one request, as the bytes the transport would
