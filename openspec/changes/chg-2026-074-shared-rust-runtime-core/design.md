@@ -9,16 +9,17 @@ SLO and benchmark plan, task DAG, risk register, maintainer decisions) is:
 
 ```yaml pins
 - path: docs/design/cross-platform/rust-core-cross-platform-architecture.md
-  blob: 777e0d4f122d24bf2c5d8f36413de38f12770478
-  sha256: 87ccb16088a018a71ee9a2025717770907d7675cf2cee4a7abbd6a7b2d8b3594
+  blob: 41275e48293147f5dc343c12b1ea4474a93fe902
+  sha256: 245ad90fb70fed0abf3e77dc6221a82b2c398cc4fe7ad087421928ffaa9d3bd7
 ```
 
 Later revisions of the design must re-pin here in the same PR; the pinned blob is what the
 maintainer approved. Revision 2 re-pinned it for the section I.2 budget finalisation described in
 `proposal.md`. Revision 3 re-pins it for the design review repairs described there: sections A
 (item 5), F.2, G.2, G.4, G.5, J.2, J.4, J.5 and K changed; sections B–E, H, I and L are unchanged.
-Revision 4 re-pins it for the `TASK-XPA-001` Allowed-paths correction described there: only the
-section J.4 path line of that task changed.
+Revision 4 re-pinned it for the `TASK-XPA-001` Allowed-paths correction described there: only the
+section J.4 path line of that task changed. Revision 5 re-pins it for the second review round:
+sections F.2, G.1, G.4, G.5, J.2, J.4, J.5, K and L.1 (item 17) changed.
 
 ## Decision
 
@@ -33,7 +34,8 @@ document validation, offline decoding, Viewer indexing) with no authority, I/O o
 Human / external agent / App click
   → arkdeck-control (transport-free handler; UDS 0600 + peer euid, Mach service + peer
     code-signing requirement, named pipe + logon-SID DACL + client SID/elevation check +
-    client-side pipe-owner check; origin line from the façade during migration;
+    client-side pipe-owner check and, where the server PID is obtainable, daemon-instance
+    check; origin line from the façade during migration;
     4 MiB frames; closed method table; per-method typed schema)
   → arkdeck-runtime (published admission order: descriptor → provider registered → fresh
     target facts → full materialisation → lowering coverage → plan digest → capability)
@@ -71,19 +73,22 @@ materialisation.
 1. Rust contract kernel with byte-for-byte differential tests (Swift stays the oracle for legacy
    bytes until Rust proves equality per asset).
 2. Rust control-plane façade owns UDS/Mach service and forwards to the Swift daemon on a private
-   socket; peer hardening.
+   socket; peer hardening; the Swift daemon's Mach service speaks the same raw libxpc frames so
+   the App and daemon of one release roll back together.
 3. Read-only shadow validation, then durable stores move owner one at a time: host-only stores →
    artifact store → admission/job/capability/recovery, with the Swift engine reduced to an executor
    sidecar under per-step typed permits.
 4. Providers move family by family (analyzer/workspace → HDC → ArkForge lane); the Rust CLI
-   reaches full fixture parity and the App moves to `ArkDeckClientKit`; only then are the Swift
-   daemon, engine and storage targets retired (r3: nothing may still link a deleted target).
+   reaches full fixture parity, the App moves to `ArkDeckClientKit` and the performance lanes
+   measure the Rust daemon and a Rust soak fixture; only then are the Swift daemon, engine and
+   storage targets retired (r3/r5: nothing may still link or build a deleted target).
 5. Windows starts from the thinnest real GJ-1 walking skeleton and proceeds to GJ-2..5; the WinUI
    3 client follows the same daemon projections.
 
-Every macOS step is releasable and rolls back by pointing the LaunchAgent at the Swift daemon,
-which reads Rust-written bytes with its current strict decoders; cutover preflight refuses active
-jobs and pending intents; `outcomeUnknown` lanes are carried across owners unchanged.
+Every macOS step is releasable and rolls back by pointing the LaunchAgent at the Swift daemon of
+the same release, which reads Rust-written bytes with its current strict decoders; cutover
+preflight refuses in-flight jobs and pending intents while parked `waitingForRecovery` jobs and
+`outcomeUnknown` lanes are carried across owners unchanged.
 
 ## Alternatives rejected (design §C)
 
@@ -98,5 +103,5 @@ jobs and pending intents; `outcomeUnknown` lanes are carried across owners uncha
 
 Design §L.1 items 1–4, 9–11 and 13 (architecture reversal and `Core strategy` value, Rust
 dependency policy, control-plane peer hardening, Golden Journey re-pass rule on runtime
-replacement, Windows support tuple, packaging, daemon lifecycle, ADR-0009 open ruling). Items
-5–8, 12 and 14 may be decided during delivery.
+replacement, Windows support tuple, packaging, daemon lifecycle, ADR-0009 open ruling) and item
+17 (same-user trust boundary, r5). Items 5–8, 12 and 14 may be decided during delivery.

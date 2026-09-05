@@ -117,7 +117,7 @@ Conventions shared by every task:
 
 - Applicable failure patterns:AF-002, AF-003, AF-004, AF-007, AF-011
 - Production reachability:`arkdeck.exe doctor` / `device candidates` → user-private named pipe → `arkdeck-control` → `doctor` / `device.candidates` → `hdc.exe list targets -v` as an argument array with handle-bound hash verification → parser → projection; read-only, no durable write, no capability
-- Trusted fact sources:catalog digest from `Catalog/operations/*.json` via the generator; canonical JSON/CBOR/digest vectors from `openspec/contracts/cli-canonical-json-vectors.json` and the permit vectors; HDC output classification from the hash-pinned Golden/Probe fixtures; pipe peer identity from the logon SID DACL plus server-side SID/elevation check; pipe **server** identity from the pipe object's owner SID read by the client (design §F.2, r3)
+- Trusted fact sources:catalog digest from `Catalog/operations/*.json` via the generator; canonical JSON/CBOR/digest vectors from `openspec/contracts/cli-canonical-json-vectors.json` and the permit vectors; HDC output classification from the hash-pinned Golden/Probe fixtures; pipe peer identity from the logon SID DACL plus server-side SID/elevation check; pipe **server** identity from the pipe object's owner SID and, where the connection's server PID is obtainable, from the daemon instance's image and signature/package identity (design §F.2, r3/r5)
 - Allowed paths:
   - `rust/**`
   - `spec/**`
@@ -125,6 +125,7 @@ Conventions shared by every task:
   - `.github/workflows/swift-ci.yml`（wire the planner's `rust` output to a hosted job; no other edit）
   - `scripts/ci/plan.py`
   - `scripts/ci/test_plan.py`
+  - `scripts/test_agent_pr_workflow.py`（r5: the `swift` aggregate's `needs` list is pinned there verbatim）
   - `scripts/catalog_gen/**`
   - `openspec/architecture/core-portability.md`
   - `openspec/platforms/windows/**`（profile 0.2.0 and the skeleton of `conformance-cases.yaml`）
@@ -146,8 +147,8 @@ Conventions shared by every task:
 - Rust workspace (`arkdeck-contract`, `arkdeck-platform`, `arkdeck-control`, `arkdeck-provider-hdc` parsers, `arkdeck-client`, `arkdeck-cli`, `arkdeck-agentd`) with `cargo deny`/`cargo vet` in CI.
 - Catalog generator emits Rust alongside Swift; digest equality asserted.
 - Named pipe transport (`FILE_FLAG_FIRST_PIPE_INSTANCE`, `PIPE_REJECT_REMOTE_CLIENTS`, logon-SID DACL, client SQOS identification, server SID/elevation check) and UDS transport (0700/0600, peer euid check).
-- Client-side server authentication on the pipe (r3): after `CreateFileW` with `SECURITY_SQOS_PRESENT | SECURITY_IDENTIFICATION` the client reads the pipe object's owner SID (`GetSecurityInfo`, `OWNER_SECURITY_INFORMATION`) and sends no frame unless it equals its own token owner SID — the client-side semantics of .NET `PipeOptions.CurrentUserOnly` (`NamedPipeClientStream.ValidateRemotePipeUser`), which also covers elevation because an elevated token's owner is the Administrators group. `FILE_FLAG_FIRST_PIPE_INSTANCE` only makes the *second* instance fail (`ERROR_ACCESS_DENIED`); a squatted name therefore fails daemon start closed, and `doctor` names the holder instead of retrying.
-- CI planner lane (r3): `scripts/ci/plan.py` gains a `rust` lane selected by `rust/**`, `spec/**` and `.github/workflows/rust-ci.yml` and included in the planner/workflow self-validation branch; `--run-local` runs `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test --workspace` and `cargo deny check`; the hosted job keys off the same planner output. Today `classify_paths` selects no lane for a diff confined to `rust/**` (checked mechanically on 2026-09-05), so without this the local gate passes without compiling the new code.
+- Client-side server authentication on the pipe, in two layers (r3/r5). **Layer 1, account:** after `CreateFileW` with `SECURITY_SQOS_PRESENT | SECURITY_IDENTIFICATION` the client reads the pipe object's owner SID (`GetSecurityInfo`, `OWNER_SECURITY_INFORMATION`) and sends no frame unless it equals its own token owner SID — the client-side semantics of .NET `PipeOptions.CurrentUserOnly` (`NamedPipeClientStream.ValidateRemotePipeUser`), which also covers elevation because an elevated token's owner is the Administrators group. This layer cannot tell a same-user impostor apart: its pipe carries the same owner SID. **Layer 2, instance:** the client resolves the server PID of *this connection* (`GetNamedPipeServerProcessId`; its reference page says the handle "must be created by the `CreateNamedPipe` function", which contradicts the function's purpose, so SPK-3 must confirm it on a `CreateFileW` handle), opens it with `PROCESS_QUERY_LIMITED_INFORMATION`, requires the image path to equal the installed daemon path and its Authenticode publisher or MSIX package family to equal the product's, and keeps the process handle open for the life of the connection so the PID cannot be recycled underneath it. **Boundary:** a same-user, same-integrity process that *is* the product's own signed daemon binary is trusted by construction; same-user arbitrary code is outside the trust boundary on both platforms — ADR-0005 decision 1 says so for the UDS, and a same-uid process could equally replace the socket file in the 0700 directory on macOS. If SPK-3 shows that the server PID is not obtainable from a client handle, layer 2 is unavailable and a same-account squat is detected on the daemon side only: `FILE_FLAG_FIRST_PIPE_INSTANCE` makes the second instance fail with `ERROR_ACCESS_DENIED` and `doctor` reports the held name; the design then claims nothing for the client (r5 withdraws r3's "same-account squat → zero frames").
+- CI planner lane (r3): `scripts/ci/plan.py` gains a `rust` lane selected by `rust/**`, `spec/**` and `.github/workflows/rust-ci.yml` and included in the planner/workflow self-validation branch; `--run-local` runs `cargo fmt --check`, `cargo clippy -D warnings`, `cargo test --workspace` and `cargo deny check`; the hosted job keys off the same planner output. Today `classify_paths` selects no lane for a diff confined to `rust/**` (checked mechanically on 2026-09-05), so without this the local gate passes without compiling the new code. The hosted job is a `needs` entry of the `swift` aggregate with the same selected-or-skipped test the other lanes use, so its failure is carried by the check branch protection already requires; `scripts/test_agent_pr_workflow.py:412-421` pins that aggregate's `needs` list and result tests verbatim and is updated in the same PR (r5).
 - Windows `doctor`, `operation list`, `device candidates` with machine output byte-equal to the macOS fixtures.
 
 ### Verification
@@ -155,8 +156,9 @@ Conventions shared by every task:
 - XPA-AC-1 → vectors and fixtures replayed in Rust → all equal.
 - XPA-AC-3 → negotiation and frame-limit matrix against the Rust daemon → structural refusals, zero dispatch.
 - XPA-AC-6 → cross-account pipe connect → refused.
-- XPA-AC-6 → pipe name squatted before daemon start (foreign account, and same-account unelevated process) → daemon start refused with `ERROR_ACCESS_DENIED` and reported by `doctor`; the client sends zero frames and reports the untrusted server (r3).
-- Planner → `scripts/ci/test_plan.py` asserts that `rust/**` selects the rust lane, that the self-validation branch includes it, and that a `rust/**`-only diff selecting no lane fails (r3).
+- XPA-AC-6 → pipe name squatted before daemon start: by a foreign account → the client refuses on the owner SID and sends zero frames; by a same-account process with a different image, with layer 2 available → the client refuses on instance identity and sends zero frames; by a same-account process with layer 2 unavailable → daemon start refused with `ERROR_ACCESS_DENIED` and `doctor` reports the held name, and no client-side claim is made (r5).
+- SPK-3 → `GetNamedPipeServerProcessId` on a `CreateFileW` client handle returns the connection's server PID: recorded as pass or fail; a fail flips the boundary statement above and design §F.2 (r5).
+- Planner → `scripts/ci/test_plan.py` asserts that `rust/**` selects the rust lane, that the self-validation branch includes it, and that a `rust/**`-only diff selecting no lane fails (r3); `scripts/test_agent_pr_workflow.py` passes with the rust lane in the aggregate (r5).
 - Real device → `device candidates` lists the DAYU200 on a Windows 11 x64 host; recorded as Windows GJ-1 `IMPLEMENTING` in `docs/design/references/v1.6-goal/`.
 
 ### Notes / handoff
@@ -202,6 +204,7 @@ Conventions shared by every task:
 ### Deliverables
 
 - Façade daemon owning the public socket and the Mach service; `runtime service install/update` accepts the façade/Swift binary pair; black-box contract tests parameterised by `ARKDECK_DAEMON_UNDER_TEST`.
+- App transport pairing (r5): the Swift daemon's Mach service listener moves from `NSXPCListener` (`AgentXPCListener.swift:26`) to the raw libxpc frame listener the façade implements, and the App moves from `NSXPCConnection` (`XPCConnectionBox.swift`) to `xpc_connection`, **in the same PR**. The daemon is installed from the App bundle's nested helper (`ArkDeckRuntimeCommands.swift:1258` → `~/Library/Application Support/ArkDeck/Helpers/ArkDeckAgent.app`, receipt with `daemonSHA256`), so the rollback pair is always the updated App and the Swift daemon of the same release; a Swift daemon that still spoke NSXPC would leave that App unable to connect after `runtime service update --daemon <swift>`. A LaunchAgent pointing at a daemon of another release is detected by the receipt/executable identity check and reported as daemon-unavailable with the `runtime service update` remedy, never a silent hang.
 
 ### Verification
 
@@ -211,11 +214,12 @@ Conventions shared by every task:
 - Origin context (r3) → through the façade, a CLI on a foreground terminal gets the console challenge from `human-action.resume` (`interactionOrigin == interactiveConsole`) and a redirected-stdin or background CLI gets the HAR unchanged, with the same reason strings as today; a client frame carrying a forged `arkdeckOrigin` object is refused as an unknown field with zero dispatch; XPC clients keep `appXPC` (no console semantics exist for them today, `AgentDaemon.swift:22`).
 - XPA-AC-7, before forward (r3) → façade killed after accept or negotiation but before the frame is written to the private socket → structured transport error; provably zero dispatch: the Swift daemon received no bytes and the journal is unchanged.
 - XPA-AC-7, after forward (r3) → façade killed after the frame was written but before the reply is relayed, or the Swift daemon killed mid-request → structured interruption error **without** the `details.phase` / `newDispatchCount` proof (that proof is issued only by named owner refusals, `AgentDaemon.swift:4116-4125`, and the façade must never synthesise it); the durable state is whatever the Swift daemon wrote (journal intact and readable, possibly with intent and outcome); the façade never re-sends a forwarded frame; the client resolves the outcome by `job.status`/`job.list` read-back (a `job.submit` idempotency key makes re-submission safe). Test: no duplicate Job, no replay, journal consistent.
+- XPA-AC-9 (r5) → rollback drill = `runtime service update --daemon <swift>` followed by the **updated App** against the rolled-back Swift daemon of the same release: `AgentXPCTransportContractTests` black-box subset against the raw-xpc Swift listener, a live App smoke (Overview/History) under UI test, and the headless CLI drill; a daemon of another release → the App reports the mismatch and the remedy, no hang.
 - Real device → GJ-1..5 headless `REAL_DEVICE_PASS`; rollback drill (`runtime service update --daemon <swift>`) recorded.
 
 ### Notes / handoff
 
-- Stop condition: any authority or durable write in the façade; any entitlement widening; any reply that claims zero dispatch for a frame the façade had already forwarded.
+- Stop condition: any authority or durable write in the façade; any entitlement widening; any reply that claims zero dispatch for a frame the façade had already forwarded; an App build whose same-release Swift daemon cannot serve it.
 - Rejected alternative (r3): handing the accepted descriptor to the Swift daemon with `SCM_RIGHTS` keeps the kernel facts first-hand but hides every later frame from the façade, which TASK-XPA-012 needs in order to serve host-only methods locally.
 - Size: M.
 
@@ -377,6 +381,7 @@ Conventions shared by every task:
   - `.github/workflows/windows-*.yml`
   - `scripts/ci/plan.py`
   - `scripts/ci/test_plan.py`
+  - `scripts/test_agent_pr_workflow.py`（r5: the `swift` aggregate's `needs` list is pinned there verbatim）
   - `docs/design/**`
 - Forbidden paths:
   - `rust/**` runtime semantics、`Packages/**`、`openspec/specs/**`
@@ -387,7 +392,7 @@ Conventions shared by every task:
 ### Deliverables
 
 - MSIX project, UIA names, live region for Job state changes, keyboard paths, bilingual catalog generator (one source → `.resw` + `.xcstrings`).
-- CI planner lane (r3): `scripts/ci/plan.py` gains a `windows` lane selected by `windows/**` that builds and tests the WinUI/ClientKit solution on a Windows runner; on a non-Windows host `--run-local` reports the lane as not runnable and exits non-zero instead of passing silently.
+- CI planner lane (r3): `scripts/ci/plan.py` gains a `windows` lane selected by `windows/**` that builds and tests the WinUI/ClientKit solution on a Windows runner; on a non-Windows host `--run-local` reports the lane as not runnable and exits non-zero instead of passing silently. The hosted job is a `needs` entry of the `swift` aggregate with the selected-or-skipped test, and `scripts/test_agent_pr_workflow.py` is updated in the same PR (r5).
 
 ### Verification
 
@@ -423,7 +428,6 @@ Conventions shared by every task:
   - `openspec/platforms/windows/conformance-cases.yaml`（rows for the scenarios this Golden Journey exercises, r3）
   - `rust/**`
   - `spec/**`
-  - `windows/**`（Debug Apps/Logs tabs）
   - `docs/design/**`
 - Forbidden paths:
   - `Packages/**`、`Catalog/**`、`openspec/specs/**`
@@ -433,7 +437,7 @@ Conventions shared by every task:
 
 ### Deliverables
 
-- Capability store and ledger port; durable import; `debug.hap@1` lowering; WinUI Debug Apps/Logs surface.
+- Capability store and ledger port; durable import; `debug.hap@1` lowering. The WinUI Debug Apps/Logs surface is delivered by TASK-XPA-020 (r5: this task depends on TASK-XPA-006 only, so the TASK-XPA-007 skeleton it would build on need not exist yet).
 
 ### Verification
 
@@ -469,7 +473,6 @@ Conventions shared by every task:
   - `openspec/platforms/windows/conformance-cases.yaml`（rows for the scenarios this Golden Journey exercises, r3）
   - `rust/**`
   - `spec/**`
-  - `windows/**`（Debug Artifacts tab）
   - `docs/design/**`
 - Forbidden paths:
   - `Packages/**`、`Catalog/**`、`openspec/specs/**`
@@ -479,7 +482,7 @@ Conventions shared by every task:
 
 ### Deliverables
 
-- Native library provider leg on Windows; code-sign helper built for Windows or ported to Rust.
+- Native library provider leg on Windows; code-sign helper built for Windows or ported to Rust. The WinUI Debug Artifacts tab is delivered by TASK-XPA-020 (r5).
 
 ### Verification
 
@@ -512,7 +515,6 @@ Conventions shared by every task:
   - `openspec/platforms/windows/conformance-cases.yaml`（rows for the scenarios this Golden Journey exercises, r3）
   - `rust/**`
   - `spec/**`
-  - `windows/**`（Flash surface）
   - `docs/design/**`
 - Forbidden paths:
   - `Packages/**`、`Catalog/**`、`openspec/specs/**`、`openspec/constitution.md`
@@ -522,7 +524,7 @@ Conventions shared by every task:
 
 ### Deliverables
 
-- Rust ArkForge lane on Windows; WinUI Flash surface with the same single fully named primary button.
+- Rust ArkForge lane on Windows. The WinUI Flash surface with the same single fully named primary button is delivered by TASK-XPA-020 (r5).
 
 ### Verification
 
@@ -557,7 +559,6 @@ Conventions shared by every task:
   - `openspec/platforms/windows/conformance-cases.yaml`（rows for the scenarios this Golden Journey exercises, r3）
   - `rust/**`
   - `spec/**`
-  - `windows/**`
   - `docs/design/**`
 - Forbidden paths:
   - `Packages/**`、`Catalog/**`、`openspec/specs/**`
@@ -567,7 +568,7 @@ Conventions shared by every task:
 
 ### Deliverables
 
-- Workspace and analyzer providers on Windows; `analyzer.*trace*` reports `unavailable(reasonCode)` until TASK-XPA-021.
+- Workspace and analyzer providers on Windows; `analyzer.*trace*` reports `unavailable(reasonCode)` until TASK-XPA-021. The WinUI surface of the bounded loop is delivered by TASK-XPA-020 (r5).
 
 ### Verification
 
@@ -708,7 +709,7 @@ Conventions shared by every task:
 
 ### Deliverables
 
-- Rust authority; executor-sidecar protocol; cutover preflight (no active job, no pending intent, no running execution); state-directory snapshot before cutover; rollback drill.
+- Rust authority; executor-sidecar protocol; cutover preflight with the blocking/parked split of design §G.4 (r5) — blocking: any Job in `queued`, `preflight`, `running`, `waitingForDevice`, `awaitingRebindConfirmation`, `planning`, `cancelRequested`, `cancellingAtSafeBoundary`, `reconciling`, `recoveringByCompleteOverwrite`, `resumeAtConfirmedSafeBoundary`, `userAbandonRequested` or `finalizing`, any pending intent, any running agent execution, any reserved-but-unsettled capability use; parked and carried over unchanged: `waitingForRecovery` (the `outcomeUnknown` lane) and every terminal state; the predicate lives in the shared state table so both implementations agree; state-directory snapshot before cutover; rollback drill.
 
 ### Verification
 
@@ -795,7 +796,7 @@ Conventions shared by every task:
 - Platform:macos
 - Requirements:REQ-FLASH-007/015/016/017/018, POL-AGENT-002, POL-RECOVERY-001, `docs/ArchitectureRules.md` sections 1–4
 - Acceptance:AC-FLASH-014-01, XPA-AC-1, XPA-AC-4, XPA-AC-6, XPA-AC-9; macOS GJ-1..5 on the pure Rust daemon
-- Depends on:TASK-XPA-016, TASK-XPA-018, TASK-XPA-019（r3: both clients must be decoupled before anything is deleted）
+- Depends on:TASK-XPA-016, TASK-XPA-018, TASK-XPA-019（r3: both clients must be decoupled before anything is deleted）, TASK-XPA-025（r5: the performance lanes must already build and measure the Rust daemon and a Rust soak, because `rust-perf.yml` builds the SwiftPM products this task deletes and is outside this task's Allowed paths）
 - Readiness input pins（非载体示例）:
 
   ```yaml pin-example
@@ -902,7 +903,7 @@ Conventions shared by every task:
 - Platform:windows
 - Requirements:REQ-UX-001..007, REQ-DIAG-001/002, REQ-I18N-001, `ui-dump`, `debug-workbench`, `flashing` (presentation clauses)
 - Acceptance:XPA-AC-5, XPA-AC-8; design §H.3 gates per surface
-- Depends on:TASK-XPA-007 and the matching Windows GJ task per surface
+- Depends on:TASK-XPA-007 and, per surface, the matching Windows Golden Journey task: Debug Apps/Logs ← TASK-XPA-008, Debug Artifacts ← TASK-XPA-009, Flash ← TASK-XPA-010, the bounded AI debug loop surface ← TASK-XPA-011, Device/Diagnostics/Settings/Viewer ← TASK-XPA-006（r5: the Golden Journey tasks carry no WinUI deliverable any more, because none of them depends on the TASK-XPA-007 skeleton）
 - Readiness input pins（非载体示例）:
 
   ```yaml pin-example
@@ -1033,6 +1034,7 @@ Conventions shared by every task:
 ### Deliverables / Verification
 
 - PR micro-benchmarks with ratio-based noise control; nightly absolute budgets; 24 h soak weekly; committed baseline; regression thresholds +20% (PR) / +10% (nightly). Size: M.
+- Defect repairs after `done` ride under this task inside its Allowed paths, each with a run record under `evidence/runs/TASK-XPA-023/`; the first is the comparator's zero-reference and workload-scale rules plus the PR-lane trigger paths (`run-2026-09-05-comparator.md`, r5). Porting the lanes to the Rust daemon is TASK-XPA-025, not this task.
 
 ## TASK-XPA-024 — Optional FFI kernel for Viewer indexing and offline inspectors
 
@@ -1067,8 +1069,44 @@ Conventions shared by every task:
 
 - ABI version function, `catch_unwind` on every export, 24 h fuzz without crash, `unsafe` confined to one ClientKit file, C# `LibraryImport`; index results byte-equal on both platforms. Size: M.
 
+## TASK-XPA-025 — Port the performance lanes to the Rust daemon and a Rust soak fixture
+
+- Status:blocked（r5; awaits the Rust authority of TASK-XPA-014）
+- Platform:macos and windows
+- Requirements:design §I.2 budgets; `openspec/specs/workflow-journal-recovery/spec.md:296-298` clock contract
+- Acceptance:XPA-AC-5
+- Depends on:TASK-XPA-014, TASK-XPA-023
+- Readiness input pins（非载体示例）:
+
+  ```yaml pin-example
+  - path: .github/workflows/rust-perf.yml
+    blob: <40-hex git OID>
+  - path: scripts/bench/harness.py
+    blob: <40-hex git OID>
+  ```
+
+- Applicable failure patterns:AF-007, AF-010, AF-011
+- Production reachability:not applicable（measurement only; no runtime effect）. `rust-perf.yml` builds `arkdeck-agentd` and `ArkDeckRuntimeSoakFixture` with SwiftPM and the harness drives them; TASK-XPA-017 deletes both products but may not edit the workflow, so the lanes must be switched to the Rust daemon and a Rust soak fixture first, or the retirement either cannot close or breaks the lanes
+- Trusted fact sources:the same 13 metrics of design §I.2 measured on the reference hosts in release builds; the Swift baseline archived as the migration's before/after record
+- Allowed paths:
+  - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`
+  - `rust/**`（`arkdeck-soak` fixture and benchmark targets）
+  - `scripts/bench/**`
+  - `.github/workflows/rust-perf.yml`
+  - `docs/design/**`
+- Forbidden paths:
+  - `Packages/**`（deleting the Swift fixture and daemon belongs to TASK-XPA-017）
+  - `openspec/specs/**`
+- Risk:low
+- Hardware required:no（device-bound metrics run in the real-device lane）
+- Decision-Grade:D1（human-gated: needs a reference measurement host; not claimable by `scripts/host_loop`）
+
+### Deliverables / Verification
+
+- `arkdeck-soak` (Rust) reproducing the `ArkDeckRuntimeSoakFixture` semantics and the `arkdeck-runtime-soak/v1` metrics schema; `scripts/bench` captures against the Rust `arkdeck-agentd` (same binary name, built by cargo); `rust-perf.yml` builds no SwiftPM product; a committed baseline re-taken on the Rust daemon on the reference host with the two-level resident-set split; PR, nightly and soak lanes green on the Rust daemon before TASK-XPA-017 starts; the last Swift baseline kept beside it as the before/after record. Size: M.
+
 ## Critical path, parallel groups, first three
 
 - Critical path to "Windows/macOS supported": SPK-3 → XPA-001 → XPA-002 → XPA-004 → XPA-005 → XPA-006 → XPA-008 → XPA-010 (external: ArkForge AF-W1) → XPA-022 → gates G1–G10.
-- Parallel groups: (1) Windows GJ chain; (2) macOS store cutover chain XPA-003/012/013/014/015/016, then XPA-018 ∥ XPA-019, then XPA-017 (r3: clients decouple before the Swift targets are deleted); (3) client chain XPA-007/019/020; (4) infrastructure SPK-1, XPA-023, XPA-022.
+- Parallel groups: (1) Windows GJ chain; (2) macOS store cutover chain XPA-003/012/013/014/015/016, then XPA-018 ∥ XPA-019, then XPA-017 (r3: clients decouple before the Swift targets are deleted); (3) client chain XPA-007/019/020; (4) infrastructure SPK-1, XPA-023, XPA-025, XPA-022; XPA-017 also waits for XPA-025 (r5).
 - First three: SPK-1, TASK-XPA-001, TASK-XPA-002 (with SPK-2/SPK-3 in parallel).

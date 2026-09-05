@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-074-shared-rust-runtime-core
-revision: 4
+revision: 5
 status: approved # 维护者 review + merge 本 proposal PR 后才生效；合入前任何 TASK-XPA 不开工，第一个实现 PR 只能在合入后声明
 class: platform
 core_change_level: none
@@ -146,7 +146,8 @@ See section L.1 of the design document. The blocking ones for starting work are:
 change and the `Core strategy` value change; (2) Rust dependency policy (vetted allowlist vs
 zero-dependency); (3) control-plane peer hardening; (4) Golden Journey re-pass rule on runtime
 replacement; (9) Windows support tuple (Windows 11 x64 + ARM64); (10) MSIX packaged + self-contained
-Windows App SDK; (13) ADR-0009 open ruling before recovery is ported.
+Windows App SDK; (13) ADR-0009 open ruling before recovery is ported; (17) the same-user trust
+boundary statement (r5).
 
 ## Revision 2 — SPK-1 outcome and one Allowed-paths correction
 
@@ -291,6 +292,62 @@ started, of the same kind as the `TASK-XPA-023` correction in revision 2.
 
 No maintainer decision is added or removed by this revision. The pinned design blob in
 `design.md` is re-pinned; only the section J.4 path line of `TASK-XPA-001` changed.
+
+## Revision 5 — second design review round (2026-09-05)
+
+Revision 5 changes no scope, no Requirement, no Acceptance Scenario and no platform
+disposition. A second external review of r3/r4 raised nine findings; each was verified against
+the code, the checker, the comparator and the platform references before it was touched. Six are
+governance repairs made here; three are defects in delivered code and were fixed in PR #1723 under
+`TASK-XPA-023`. One maintainer decision is added (design §L.1 item 17).
+
+1. **Same-user impersonation on the Windows pipe (P1).** r3's owner-SID check cannot tell a
+   same-user impostor apart, so r3's "same-account squat → zero frames" was not true. §F.2 now
+   has two layers: the owner SID (account and elevation) and an instance check that resolves the
+   connection's server PID, pins it by an open handle and requires the installed daemon's image
+   and signature or package identity. The reference page for `GetNamedPipeServerProcessId`
+   contradicts itself about the handle it accepts, so SPK-3 must confirm it on a client handle;
+   if it fails, the boundary is stated honestly: same-user arbitrary code is outside the trust
+   boundary on both platforms (ADR-0005 decision 1; a same-uid process can replace the UDS
+   socket file on macOS). That statement is item 17 for the maintainer. `TASK-XPA-002` and
+   XPA-AC-6 carry the split expectations; risk R16 updated.
+2. **App transport rollback (P1).** The App moves from `NSXPCConnection` to `xpc_connection`
+   for the Rust façade, but rollback pointed the LaunchAgent at a Swift daemon that still
+   vends `NSXPCListener` (`AgentXPCListener.swift:26`), so the CLI would recover and the updated
+   App would not. The daemon is installed from the App bundle's nested helper
+   (`ArkDeckRuntimeCommands.swift:1258`), so the rollback pair is always one release:
+   `TASK-XPA-003` now converts the Swift daemon's listener to the raw libxpc frame protocol in
+   the same PR as the App switch, and its rollback acceptance includes the updated App against
+   the rolled-back Swift daemon by XPC contract tests and an App UI smoke (§G.1, §G.5, XPA-AC-9,
+   risk R17).
+3. **Cutover preflight contradicted the `outcomeUnknown` carry-over (P2).** "No non-terminal
+   Job" rejects `waitingForRecovery`, which `JobState.isTerminal` classes as non-terminal. §G.4
+   now names a blocking set (every in-flight, reconciling, recovering, human-waiting or
+   finalising state, pending intents, running executions, unsettled capability uses) and a
+   parked set (`waitingForRecovery` and the terminal states) that is carried over unchanged;
+   `TASK-XPA-014` and XPA-AC-7 follow.
+4. **Zero baseline bypassed the performance check (P2).** Fixed in PR #1723: a zero committed
+   reference is judged against the absolute budget in `compare.ABSOLUTE_BUDGETS` (idle CPU 0.5%,
+   design §I.2) in both modes and fails without one.
+5. **The comparator ignored the workload scale (P2).** Fixed in PR #1723: the workload fields of
+   the recorded `scale` are part of the metric's identity; a mismatch is incomparable and fails,
+   and the PR lane no longer seeds a different scale from the committed baseline.
+6. **The PR performance lane skipped the code it measures (P2).** Fixed in PR #1723: the
+   `pull_request` filter now includes the Swift daemon's sources and build inputs.
+7. **New CI lanes could not touch the pinned aggregate contract (P2).**
+   `scripts/test_agent_pr_workflow.py:412-421` pins the `swift` aggregate's `needs` verbatim.
+   `TASK-XPA-002` and `TASK-XPA-007` gained that file, and both lanes must be folded into the
+   aggregate with the contract test updated in the same PR.
+8. **A WinUI deliverable without its skeleton (P2).** `TASK-XPA-008/009/010/011` depend on
+   `TASK-XPA-006` only yet carried WinUI surfaces that need the `TASK-XPA-007` skeleton. Their
+   `windows/**` paths and surface deliverables moved to `TASK-XPA-020`, whose dependency line now
+   maps each surface to its Golden Journey task.
+9. **Retiring Swift would break the performance lanes (P2).** `rust-perf.yml` builds the SwiftPM
+   products `TASK-XPA-017` deletes, `TASK-XPA-017` may not edit the workflow and `TASK-XPA-023` is
+   done. New `TASK-XPA-025` ports the lanes to the Rust daemon and a Rust soak fixture (depends on
+   `TASK-XPA-014` and `TASK-XPA-023`), and `TASK-XPA-017` depends on it.
+
+The pinned design blob in `design.md` is re-pinned.
 
 ## Compatibility note
 
