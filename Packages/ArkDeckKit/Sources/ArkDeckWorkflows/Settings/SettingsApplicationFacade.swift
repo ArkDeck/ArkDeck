@@ -180,8 +180,20 @@ public protocol SettingsApplicationProviding: Sendable {
 }
 
 public enum SettingsApplicationFacade {
-  public static func make() -> any SettingsApplicationProviding {
-    ProductionSettingsApplicationProvider()
+  /// The production provider — or, for a launch that declares the Runtime a
+  /// fixture, the same provider answered by `SettingsStorageUIFixture` in
+  /// place of the daemon. Validation, the migration guard and the presentation
+  /// mapping are shared; only the transport differs. A launch without that
+  /// argument never reaches the fixture.
+  public static func make(
+    arguments: [String] = ProcessInfo.processInfo.arguments
+  ) -> any SettingsApplicationProviding {
+    if let owner = SettingsStorageUIFixture.owner(arguments: arguments) {
+      return ProductionSettingsApplicationProvider(
+        runtimeRequest: { method, params in .success(await owner.reply(method, params)) },
+        migratesLegacyPreferences: false)
+    }
+    return ProductionSettingsApplicationProvider()
   }
 
   /// Test seam. The artifact figure comes from the Runtime over the read-only
@@ -233,9 +245,17 @@ package struct SettingsLegacyStorageMigrationPlan: Equatable, Sendable {
 }
 
 private actor ProductionSettingsApplicationProvider: SettingsApplicationProviding {
+  /// One Runtime storage request: the method and its closed parameters in, the
+  /// daemon's framed reply out. Production sends it over XPC; the UI fixture
+  /// answers it in process from the same owner type the daemon composes.
+  typealias RuntimeRequest = @Sendable (
+    _ method: String, _ params: [String: JSONValue]?
+  ) async -> RuntimeXPCRequestTransport.ResultValue
+
   private let legacyStorageRuntime: SessionStorageApplicationRuntime?
   private let legacyRuntimeArtifactUsage: (@Sendable () async -> SettingsRuntimeArtifactUsage?)?
   private let legacyMigrationStore: SessionSettingsStore?
+  private let runtimeRequest: RuntimeRequest
   private let supportBundleProvider: any RuntimeSupportBundleProviding
   private let general: SettingsGeneralPresentation
   private var legacyMigrationAssessed = false
@@ -243,11 +263,22 @@ private actor ProductionSettingsApplicationProvider: SettingsApplicationProvidin
   init(
     storageRuntime: SessionStorageApplicationRuntime? = nil,
     runtimeArtifactUsage: (@Sendable () async -> SettingsRuntimeArtifactUsage?)? = nil,
+    runtimeRequest: @escaping RuntimeRequest = { method, params in
+      await RuntimeXPCRequestTransport.request(
+        method: method, params: params,
+        protocolVersion: ArkDeckControlProtocol.targetVersion)
+    },
+    migratesLegacyPreferences: Bool = true,
     bundle: Bundle = .main
   ) {
     legacyStorageRuntime = storageRuntime
     legacyRuntimeArtifactUsage = runtimeArtifactUsage
-    legacyMigrationStore = storageRuntime == nil ? SessionSettingsStore() : nil
+    self.runtimeRequest = runtimeRequest
+    // The one-time migration reads this process's own preferences. Under the
+    // UI fixture that would carry a developer's custom root or policy into the
+    // fixture owner and make the pane host-dependent again, so it stays off.
+    legacyMigrationStore =
+      storageRuntime == nil && migratesLegacyPreferences ? SessionSettingsStore() : nil
     supportBundleProvider = RuntimeSupportBundleApplicationFacade.make(bundle: bundle)
     general = Self.makeGeneralPresentation(bundle: bundle)
   }
@@ -378,9 +409,7 @@ private actor ProductionSettingsApplicationProvider: SettingsApplicationProvidin
     method: String,
     params: [String: JSONValue]? = nil
   ) async throws -> SettingsStoragePresentation {
-    let response = await RuntimeXPCRequestTransport.request(
-      method: method, params: params,
-      protocolVersion: ArkDeckControlProtocol.targetVersion)
+    let response = await runtimeRequest(method, params)
     let data: Data
     switch response {
     case .success(let value): data = value

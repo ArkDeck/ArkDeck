@@ -2240,6 +2240,17 @@ final class AppShellUITests: XCTestCase {
         element(identifier, in: app).waitForExistenceFast(timeout: 10),
         "\(identifier) missing", file: file, line: line)
     }
+    // The pane renders only once the Runtime storage owner has answered, and
+    // under this launch that owner must be the fixture. A developer machine's
+    // daemon answers the same request and would hide a fixture that was never
+    // installed - which is how the nightly runner, with no daemon, showed an
+    // empty pane after a green local run. The fixture publishes a policy no
+    // product default matches, and the editable fields carry it in GiB and
+    // days. The root path would be the natural witness, but a selectable fact
+    // row's text is not readable by UI automation on macOS.
+    assertDisplayed(app.textFields["settings.storage.quota"], equals: "12")
+    assertDisplayed(app.textFields["settings.storage.margin"], equals: "3")
+    assertDisplayed(app.textFields["settings.storage.retention"], equals: "45")
     settingsPane(workspaces.settingsPanes[5], in: app).click()
     XCTAssertTrue(
       app.buttons["settings.diagnostics.preview"].waitForExistenceFast(timeout: 10),
