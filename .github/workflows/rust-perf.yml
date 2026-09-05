@@ -96,6 +96,10 @@ jobs:
     timeout-minutes: 40
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      # Every run-swiftpm.sh call in the job, the --show-bin-path lookup
+      # included, must see the same cache root, or the capture step would look
+      # for the binaries in a build the restore never touched.
+      ARKDECK_SWIFTPM_CACHE_ROOT: ${{ runner.temp }}/arkdeck-swiftpm
     steps:
       - name: Checkout default branch with runner Git
         run: |
@@ -109,6 +113,20 @@ jobs:
         env:
           ARKFORGE_DEPLOY_KEY: ${{ secrets.ARKFORGE_DEPLOY_KEY }}
         run: sh scripts/ci/arkforge-package-auth.sh setup
+      - name: Restore the release SwiftPM cache
+        # Same shape as swift-ci.yml's trusted stable cache, under its own key:
+        # this lane builds release objects, the test lane builds debug ones,
+        # and neither should carry the other's. Restore-only off main; a cold
+        # build here was 9 to 11 of the job's 11 to 13 minutes.
+        id: perf-build-cache
+        continue-on-error: true
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
+        with:
+          path: ${{ runner.temp }}/arkdeck-swiftpm
+          key: arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
+          restore-keys: |
+            arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-
+            arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-
       - name: Build the measured executables
         run: |
           set -eu
@@ -119,6 +137,16 @@ jobs:
       - name: Remove ArkForge package credential
         if: always()
         run: sh scripts/ci/arkforge-package-auth.sh cleanup
+      - name: Save the release SwiftPM cache
+        if: >-
+          success() &&
+          github.ref == 'refs/heads/main' &&
+          steps.perf-build-cache.outputs.cache-hit != 'true'
+        continue-on-error: true
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
+        with:
+          path: ${{ runner.temp }}/arkdeck-swiftpm
+          key: arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
       - name: Capture a candidate baseline
         run: |
           set -eu
@@ -175,6 +203,10 @@ jobs:
     timeout-minutes: 60
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      # Every run-swiftpm.sh call in the job, the --show-bin-path lookup
+      # included, must see the same cache root, or the capture step would look
+      # for the binaries in a build the restore never touched.
+      ARKDECK_SWIFTPM_CACHE_ROOT: ${{ runner.temp }}/arkdeck-swiftpm
     steps:
       - name: Checkout default branch with runner Git
         run: |
@@ -188,6 +220,20 @@ jobs:
         env:
           ARKFORGE_DEPLOY_KEY: ${{ secrets.ARKFORGE_DEPLOY_KEY }}
         run: sh scripts/ci/arkforge-package-auth.sh setup
+      - name: Restore the release SwiftPM cache
+        # Same shape as swift-ci.yml's trusted stable cache, under its own key:
+        # this lane builds release objects, the test lane builds debug ones,
+        # and neither should carry the other's. Restore-only off main; a cold
+        # build here was 9 to 11 of the job's 11 to 13 minutes.
+        id: perf-build-cache
+        continue-on-error: true
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
+        with:
+          path: ${{ runner.temp }}/arkdeck-swiftpm
+          key: arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
+          restore-keys: |
+            arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-
+            arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-
       - name: Build the measured executables
         run: |
           set -eu
@@ -198,6 +244,16 @@ jobs:
       - name: Remove ArkForge package credential
         if: always()
         run: sh scripts/ci/arkforge-package-auth.sh cleanup
+      - name: Save the release SwiftPM cache
+        if: >-
+          success() &&
+          github.ref == 'refs/heads/main' &&
+          steps.perf-build-cache.outputs.cache-hit != 'true'
+        continue-on-error: true
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
+        with:
+          path: ${{ runner.temp }}/arkdeck-swiftpm
+          key: arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
       - name: Capture a candidate baseline
         run: |
           set -eu
@@ -246,6 +302,10 @@ jobs:
     timeout-minutes: 330
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      # Every run-swiftpm.sh call in the job, the --show-bin-path lookup
+      # included, must see the same cache root, or the capture step would look
+      # for the binaries in a build the restore never touched.
+      ARKDECK_SWIFTPM_CACHE_ROOT: ${{ runner.temp }}/arkdeck-swiftpm
     steps:
       - name: Checkout default branch with runner Git
         run: |
@@ -259,6 +319,18 @@ jobs:
         env:
           ARKFORGE_DEPLOY_KEY: ${{ secrets.ARKFORGE_DEPLOY_KEY }}
         run: sh scripts/ci/arkforge-package-auth.sh setup
+      - name: Restore the release SwiftPM cache
+        # Restore only: this job builds one product and must not publish a
+        # partial cache the other lanes would then prefer as the newest.
+        id: perf-build-cache
+        continue-on-error: true
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
+        with:
+          path: ${{ runner.temp }}/arkdeck-swiftpm
+          key: arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
+          restore-keys: |
+            arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-
+            arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-
       - name: Build the soak fixture
         run: |
           set -eu

@@ -35,6 +35,11 @@ already cover every touched file.
   Agent PR workflow's `GITHUB_TOKEN` waits in `action_required` for a manual
   approval (observed on #1716 and #1723), while a deploy-key push runs at once.
 - `scripts/bench/README.md`: the two rules are documented.
+- `.github/workflows/rust-perf.yml` (build time): the microbenchmarks, nightly
+  and soak jobs restore a release SwiftPM cache (`arkdeck-swiftpm-perf-v1-…`,
+  `${{ runner.temp }}/arkdeck-swiftpm`, the shape of `swift-ci.yml`'s trusted
+  stable cache); the first two save it from `main` only. Measured before the
+  change: the build step took 9–11 of the job's 11–13 minutes on every run.
 
 ## Verification
 
