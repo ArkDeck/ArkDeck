@@ -48,23 +48,23 @@ Conventions shared by every task:
 
 ## TASK-XPA-001 — Publish per-method typed schemas from the single v1 contract for Rust consumers
 
-- Status:in-progress（started on the maintainer's instruction after TASK-SVC-001 merged: the recording seam, the derivation and the per-method schemas of the single v1 control table are delivered against the post-SVC-001 tree, and every method's result shape is published by success-path contract tests, `evidence/runs/TASK-XPA-001/run.md`; the schemas are re-derived after each of TASK-SVC-002, TASK-SVC-003 and TASK-SVC-004 merges, the journal contract for Rust follows TASK-SVC-002, and the headless GJ-1..5 re-pass waits for a device window）
+- Status:in-progress（started on the maintainer's instruction after TASK-SVC-001 merged: the recording seam, the derivation and the per-method schemas of the single v1 control table are delivered, and every method's result shape is published by success-path contract tests, `evidence/runs/TASK-XPA-001/run.md`; the re-derivation covering the TASK-SVC-002, TASK-SVC-003 and TASK-SVC-004 merges is delivered against `main` `eac476cd` and changed no request, result or error shape, and the single current journal contract is verified against the post-SVC-002 Swift reader; only the headless GJ-1..5 re-pass remains, and it waits for a device window）
 - Platform:macos（contract is platform-neutral）
 - Requirements:CLI-REQ-013, CLI-REQ-014, CLI-REQ-025 as aligned by CHG-2026-075; no Core REQ edited by this task
 - Acceptance:XPA-AC-1, XPA-AC-3; the post-SVC single-v1 positive and negative frame corpus
 - Depends on:TASK-SVC-001, TASK-SVC-002, TASK-SVC-003, TASK-SVC-004
-- Readiness input pins（post-SVC-001; the SVC-002..004 merge commits are added here when they land, and the schemas are re-derived on each）:
+- Readiness input pins（post-SVC-004: all four SVC merges have landed and the schemas were re-derived on the result）:
 
   ```yaml pins
   - path: main
-    commit: 600e4b72a016b38e3289103484208668e6690984
+    commit: eac476cdca4da29bc0b2e705f4697beeeefe8227
   - path: Packages/ArkDeckKit/Contracts/control-protocol.json
     blob: f47372feb9034ba17560b59d5dbde91206cb9aae
   - path: Packages/ArkDeckKit/Sources/ArkDeckCore/ControlProtocolGenerated.swift
     blob: 6d3c1fb680d6a338ba59cb80af53aa46505196cb
   ```
 
-  The commit is `main` after TASK-SVC-001 (#1733); the registry's contract identity at that blob is `1054d17b598ce23003ebbdec4d42eb359b63016d6421709ba53c3f21f7c6558d`. The old r1–r5 protocol/journal blobs are historical inputs, not this task's baseline.
+  The commit is `main` after TASK-SVC-004 (#1742); the earlier pin was `main` after TASK-SVC-001 (#1733), `600e4b72a016b38e3289103484208668e6690984`. Both control blobs are unchanged across the SVC-002, SVC-003 and SVC-004 merges, so the registry's contract identity is still `1054d17b598ce23003ebbdec4d42eb359b63016d6421709ba53c3f21f7c6558d` over the same 96 methods. The old r1–r5 protocol/journal blobs are historical inputs, not this task's baseline.
 - Applicable failure patterns:AF-004, AF-006, AF-014
 - Production reachability:`arkdeck` CLI → UDS → `RuntimeControlPlaneHandler` → the single v1 method table → existing handlers; no new effect or dispatch point
 - Trusted fact sources:the method set and current document shapes come from the protected-main Swift implementation after SVC-001..004 and its canonical generators; per-method schemas are checked against actual request/result/error frames; callers cannot widen the method set

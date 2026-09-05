@@ -7,10 +7,11 @@ was contacted: the daemon under test runs inside the contract-test process on pr
 directories.
 
 Status after this PR: `in-progress`. The task was started on the maintainer's instruction once
-`TASK-SVC-001` merged; it still depends on `TASK-SVC-002..004`, whose merges change durable and
-evidence shapes that several methods carry in their results. Each of those merges is followed by
-one re-recording and re-derivation (the commands below), and the journal contract for Rust is
-published only after SVC-002 has consolidated the journal on its single v1.
+`TASK-SVC-001` merged. `TASK-SVC-002`, `TASK-SVC-003` and `TASK-SVC-004` have since merged; the
+third delivery below is their single re-recording and re-derivation, and it found that none of
+the three moved a control-plane request, result or error shape. The journal contract for Rust is
+verified against the post-SVC-002 reader in that section. Only the headless GJ-1..5 re-pass
+remains, and it waits for a device window.
 
 ## Environment
 
@@ -71,6 +72,8 @@ published only after SVC-002 has consolidated the journal on its single v1.
 | `Packages/ArkDeckKit/Tests/ArkDeckContractTests/ControlMethodSchemaContractTests.swift` | `e3a578a4ccc6ec533402dea864a54647d892eface1c7e99fb4bb48d61b472b87` |
 | `Packages/ArkDeckKit/Tests/ArkDeckContractTests/ControlMethodReachabilityContractTests.swift` | `58e5aa8281d713cbfdb12b765895fb6d120a6266df1a8600f66f3b061ba5a264` |
 | `spec/control/README.md` / `spec/README.md` | `ed4044427103436677ba4721ac9f2ff8d8d5c3e7dad5be9622e3f002b60625ad` / `3ef2245bb8baf325170925f853b471f76c99047669adaf47973b6ea8342a2f3b` |
+| third delivery (post-SVC-004): `spec/control/methods/` (96 files) / `Fixtures/ControlFrames/` (96 files, 368 frames, 427 KiB) | `b187495823a48c7f34ce6154b6fd8a18869c5488ed24e639acd6491b0ca35e61` / `fbbe5402857eb1e2751918ec9e8bf26e188572993bf20fa880743a165b3d19de` |
+| third delivery: `Packages/ArkDeckKit/Scripts/generate-control-contract.py` | unchanged, byte-identical to main's |
 
 ## Commands run, and their results
 
@@ -152,6 +155,102 @@ change updates the enum.
 - `TASK-XPA-001` stays `in-progress`: three re-derivations (after SVC-002, SVC-003, SVC-004), the
   journal contract (after SVC-002) and the device re-pass remain. Every method's result shape is
   published as of the second delivery.
+
+## Third delivery: the re-derivation covering SVC-002, SVC-003 and SVC-004
+
+The three re-derivations this task still owed are one run: the last schema
+publication (#1737) predates all three SVC merges, so a single derivation on
+`main` `eac476cdca4da29bc0b2e705f4697beeeefe8227` (after TASK-SVC-004, #1742)
+covers them.
+
+### Result: no control-plane shape moved
+
+| Fact | Value |
+| --- | --- |
+| Base | `main` `eac476cd` (SVC-001..004 all merged and `done`) |
+| Control registry | `control-protocol.json` blob `f47372fe…` and `ControlProtocolGenerated.swift` blob `6d3c1fb6…` — **both unchanged since the post-SVC-001 pin**; contract identity still `1054d17b…`, 96 methods |
+| Recording | one full contract-test run with `ARKDECK_CONTROL_FRAME_LOG` set: 158 per-process files, 1,234 lines, 2 torn tail lines skipped, 1,233 frames used; the run itself was green (2,444 cases, exit 0), so no schema was stale enough to fail its own test |
+| Derived | `derived 96 method schemas from 1233 frames; corpus written`; `--check` exit 0 |
+| Schema delta vs the committed baseline | **2 of 96 files, 4 lines, all inside `x-arkdeck-sampleCounts`** (`agent.status` request 5→4 / result 4→3; `job.events` request 19→20 / result 16→17). No `$defs.request`, `$defs.result`, `$defs.errorCode` or `$defs.errorDetails` changed anywhere |
+| Corpus delta vs the committed baseline | 51 of 96 files, 112 lines. Classified mechanically by comparing the recursive key/type shape multiset of every frame: **50 files are value-only** (a `generation` counter, an id, a sampled row), and the 51st (`artifact.list`) differs only because a different test's frame was sampled, one whose nullable `observationWindow` is `null` — which is why its schema did not change |
+| `arkdeck maintainer contracts export` | `runtime-control-plane.schema.json` unchanged; the bundle is already in sync |
+| Pinned suites | `ControlMethodSchemaContractTests`, `CLIMachineContractTests`, `ControlMethodReachabilityContractTests`: 28 tests, 0 failures, both without recording and with a fresh recording (the live test validated the 96 frames the run itself recorded) |
+| `python3 scripts/ci/plan.py --run-local` | exit 0 on the committed tree: full-parallel 2,438 cases (66 s), process-identity race 1, Viewer scale 5, all exit 0; `check_sdd` 0 errors / 0 warnings / 121 acceptance IDs; the design-system lane green. The App build-for-testing lane was not selected — this diff touches no `ArkDeckApp/` path — and the one-minute load average was 3.25 on 8 cores throughout, so no lane result is load-suspect |
+| `python3 scripts/check_pr_paths.py --preflight` | `TASK-XPA-001`, exit 0 over 56 changed paths, all inside this task's Allowed paths (`spec/**`, `Tests/ArkDeckContractTests/**`, `docs/design/**`, this change directory) |
+
+So SVC-002 (durable records and recovery), SVC-003 (evidence, debug and internal
+Provider formats) and SVC-004 (preferences and configuration) changed durable,
+evidence and configuration shapes without moving a single control-plane request,
+result or error shape. That is consistent with those tasks' own records — SVC-003
+states "this Task changes no wire shape" — and it is now measured rather than
+assumed.
+
+### Finding: the corpus is a sample of a nondeterministic system, not a function of the contract
+
+Measured, not inferred. Two independent recordings of the **same, unchanged**
+tree were derived under identical conditions (each derivation from a clean
+`git checkout` of the two output directories, so no run could inherit the
+previous one's files):
+
+| Comparison | Corpus files differing | Schema files differing |
+| --- | --- | --- |
+| same script, same frames, twice (control) | 0 | 0 |
+| same script, two recordings of the same tree | **50 of 96** | 2 of 96 (sample counts) |
+
+The deriver is deterministic given its input. The recording is not: frames carry
+values a run produces — `agent.status` recorded `"generation":"9"` in one run and
+`"generation":"6"` in the other, same length, same shape. `select the smallest
+frame of each shape` then keeps whichever arrived first.
+
+An ordering tie-break does not fix this, and I measured that too rather than
+assuming it: making the corpus tie-break total (`(len, bytes)` instead of
+first-seen) left the churn at 50 of 96, because the two runs did not observe the
+same candidate values at all — the minimum of `{"9"}` and the minimum of `{"6"}`
+are still different frames. That attempt also introduced a variable-shadowing bug
+(`current` is already bound in the enclosing scope, so 95 of 96 schemas were
+written with a whole frame in `x-arkdeck-protocolVersion`), which the same
+measurement caught. Both the attempt and the bug were reverted; the generator in
+this delivery is byte-identical to main's.
+
+Consequence for this task's own deliverable — "the corpus used by every later XPA
+differential test": a baseline that changes in half its files on every recording
+cannot be read as a statement about the contract, and `TASK-XPA-002`'s Rust
+replay of it inherits that churn. The statement about the contract lives in the
+schemas, whose only delta here is a run-dependent sample counter.
+
+Not changed by this delivery, because it is a design decision for the task owner
+and this PR is a re-derivation: the options are (a) record with fixed counters and
+ids so the frames are reproducible, (b) canonicalise the volatile fields when the
+corpus is written, keeping the shape and dropping the sampled value, or (c) state
+that the per-method schemas — not the corpus — are the differential baseline, and
+let the corpus be an illustrative sample. `x-arkdeck-sampleCounts` has the same
+property and would go with (c).
+
+### Journal contract for Rust (was gated on SVC-002)
+
+Verified rather than published: `openspec/contracts/journal-event.schema.json` is
+already the single `1.0.0` contract (`$id` `journal-event-1.0.0.json`, no other
+version string in the file), and after SVC-002 the Swift reader agrees exactly —
+`JournalEvent.isSupportedSchemaVersion` is `value == "1.0.0"`
+(`JournalEvent.swift:39-42`), where the pre-SVC scan recorded five accepted
+generations. No file change was needed for this deliverable; the drift row that
+recorded the conflict is corrected below.
+
+### Baseline survey rows corrected
+
+`docs/design/cross-platform/rust-core-cross-platform-architecture.md` is the
+survey later XPA tasks consume. Three rows were falsified by the SVC merges and
+each was re-verified against this tree before editing — no row was rewritten from
+the assumption that a merge "must have" changed it:
+
+| Row | Was | Is, and where it was checked |
+| --- | --- | --- |
+| 27 persistence layout | `capabilities/` doc `2.0.0`; `runtime-jobs.sqlite3` schema v2 | doc `1.0.0` (`RuntimeCapabilityStore.swift:147`); schema v1 (`RuntimeJobRepository.swift:53`) |
+| 29 journal version drift | Swift accepts five generations; contract says `1.0.0` — classified `F（冲突）` | one generation on both sides, conflict resolved (`JournalEvent.swift:39-42`) |
+| 32 machine contracts | 219 argv fixtures | 208 (`ls Fixtures/CLI/argv/*.json`), after SVC-004 removed the `runtime signing normalize` leaf and its §12 alias |
+
+Only these three were checked; the rest of the survey is not re-verified by this
+delivery and is not claimed to be current.
 
 ## Golden Journey
 
