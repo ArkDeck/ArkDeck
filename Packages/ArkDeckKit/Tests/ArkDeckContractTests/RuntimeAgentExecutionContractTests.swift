@@ -254,6 +254,46 @@ final class RuntimeAgentExecutionContractTests: XCTestCase {
     XCTAssertEqual(dispatcher.dispatchCount, 0)
   }
 
+  /// `TASK-XPA-001`: `agent.list` and `agent.abandon` answer through the
+  /// control plane, so their result shapes enter the recorded corpus. The
+  /// owner-level tests above own the semantics; this one records the frames a
+  /// client reads back and checks that nothing else happened.
+  func testAgentListAndAbandonPublishTheirResultShapesThroughTheControlPlane() async throws {
+    port.setState("Unauthorized")
+    let owner = try owner()
+    let capturedClock = clock!
+    let handler = RuntimeControlPlaneHandler(
+      engine: engine, capabilityStore: try RuntimeCapabilityStore(directoryURL: directory.appending(path: "capabilities")),
+      providerIDs: ["hdc"], nowUTC: { RuntimeAgentTime.format(capturedClock.now()) },
+      targetStore: targets, agentExecutions: owner,
+      artifactStore: try RuntimeArtifactStore(rootURL: directory.appending(path: "artifacts"),
+        nowUTC: { RuntimeAgentTime.format(capturedClock.now()) }))
+    func send(_ method: String, _ params: [String: JSONValue]) async throws -> AgentWireProtocol.Response {
+      let frame = try JSONEncoder().encode(
+        AgentWireProtocol.Request(id: UUID().uuidString, method: method, params: params))
+      return await handler.handleFrame(frame)
+    }
+
+    let started = try await send("agent.run", request())
+    XCTAssertTrue(started.ok, started.error?.message ?? "-")
+    let listed = try await send("agent.list", [:])
+    XCTAssertTrue(listed.ok, listed.error?.message ?? "-")
+    let renderedList = String(decoding: try JSONEncoder().encode(listed.result ?? .null), as: UTF8.self)
+    XCTAssertTrue(renderedList.contains("execution-test"), "the pending execution is listed: \(renderedList)")
+    XCTAssertFalse(renderedList.contains("150100424a544e4600"), "no connect key crosses the control plane")
+
+    let current = try object(await owner.status("execution-test"))
+    guard case .string(let generation)? = current["generation"] else { return XCTFail("generation is absent") }
+    let abandoned = try await send(
+      "agent.abandon", ["executionId": .string("execution-test"), "expectedGeneration": .string(generation)])
+    XCTAssertTrue(abandoned.ok, abandoned.error?.message ?? "-")
+    guard case .object(let outcome)? = abandoned.result else { return XCTFail("agent.abandon must answer the execution") }
+    XCTAssertEqual(outcome["state"], .string("abandoned"))
+    let jobs = try await engine.listJobs()
+    XCTAssertTrue(jobs.isEmpty)
+    XCTAssertEqual(dispatcher.dispatchCount, 0)
+  }
+
   func testTrustResumeAfterRestartRequiresFreshSelectionInsteadOfFollowingAReusedKey() async throws {
     port.setState("Unauthorized")
     let first = try action(await owner().run(request()))

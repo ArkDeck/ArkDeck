@@ -1,5 +1,6 @@
 import XCTest
 
+@testable import ArkDeckAgentDaemon
 @testable import ArkDeckCore
 @testable import ArkDeckOpenHarmony
 @testable import ArkDeckStorage
@@ -3247,4 +3248,143 @@ extension DiagnosticsAndHAPContractTests {
     }
     XCTAssertTrue(dispatcher.dispatchedActions.isEmpty)
   }
+
+  // MARK: - TASK-XPA-001 success-path publication through the control plane
+
+  /// Builds the control-plane handler over one of this file's engines, so the
+  /// frames the schema corpus needs are recorded on the same fixtures the
+  /// engine-level tests already trust. The handler adds no semantics here.
+  private func controlPlane(
+    _ engine: RuntimeJobEngine, capabilities: RuntimeCapabilityStore,
+    artifacts: RuntimeArtifactStore
+  ) -> RuntimeControlPlaneHandler {
+    RuntimeControlPlaneHandler(
+      engine: engine, capabilityStore: capabilities, providerIDs: ["hdc"],
+      nowUTC: { "2026-07-29T00:00:00Z" }, artifactStore: artifacts,
+      traceRuntimeProbe: TraceProbe())
+  }
+
+  private func controlPlaneRequest(
+    _ handler: RuntimeControlPlaneHandler, method: String,
+    params: [String: JSONValue]? = nil
+  ) async throws -> AgentWireProtocol.Response {
+    let frame = try JSONEncoder().encode(
+      AgentWireProtocol.Request(id: UUID().uuidString, method: method, params: params))
+    return await handler.handleFrame(frame)
+  }
+
+  /// `cleanupDebt.continue`: the engine-level test above proves the
+  /// settlement; this records the frame a client reads back.
+  func testCleanupDebtContinuePublishesItsResultShapeThroughTheControlPlane() async throws {
+    let dispatcher = ScriptedDispatcher(script: .init(processRunning: false, cleanupExit: 1))
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let lease = try await publishHAPLease(artifacts)
+    try await installE1Capability(capabilities)
+    let acceptance = try await engine.submit(
+      hapRequest(lease: lease, key: "idem-cleanup-debt-control-plane"))
+    _ = try await engine.run(jobID: acceptance.jobID)
+    let debts = try await engine.listCleanupDebt()
+    let debt = try XCTUnwrap(debts.first)
+
+    let continuationDispatcher = ScriptedDispatcher()
+    let (recovered, recoveredCapabilities, recoveredArtifacts) =
+      try makeEngine(dispatcher: continuationDispatcher)
+    _ = try await recovered.recoverPersistedJobs()
+    let handler = controlPlane(recovered, capabilities: recoveredCapabilities, artifacts: recoveredArtifacts)
+    let listed = try await controlPlaneRequest(handler, method: "cleanupDebt.list")
+    XCTAssertTrue(listed.ok, listed.error?.message ?? "-")
+    var params: [String: JSONValue] = ["jobId": .string(debt.jobID)]
+    if let bundle = debt.bundleName {
+      params["bundleName"] = .string(bundle)
+    } else {
+      params["remotePath"] = .string(debt.remotePath)
+    }
+    let continued = try await controlPlaneRequest(handler, method: "cleanupDebt.continue", params: params)
+    XCTAssertTrue(continued.ok, continued.error?.message ?? "-")
+    guard case .object(let outcome)? = continued.result else {
+      return XCTFail("cleanupDebt.continue must answer the settlement")
+    }
+    XCTAssertEqual(outcome["jobId"], .string(debt.jobID))
+    XCTAssertEqual(outcome["identity"], .string(debt.identity))
+    XCTAssertEqual(outcome["state"], .string("settled"))
+    XCTAssertEqual(
+      continuationDispatcher.dispatchedActions, ["reconcileOwnedPathPresence", "cleanup"])
+    let remaining = try await controlPlaneRequest(handler, method: "cleanupDebt.list")
+    XCTAssertEqual(remaining.result, .array([]))
+  }
+
+  /// `job.reconcile`: the same durable intent the engine-level reconcile test
+  /// resolves, read back through the control plane.
+  func testJobReconcilePublishesItsResultShapeThroughTheControlPlane() async throws {
+    let dispatcher = ScriptedDispatcher(script: .init(sendOutcomeUnknown: true))
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let lease = try await publishHAPLease(artifacts)
+    try await installE1Capability(capabilities)
+    let acceptance = try await engine.submit(
+      hapRequest(lease: lease, key: "idem-hap-reconcile-control-plane"))
+    let parked = try await engine.run(jobID: acceptance.jobID)
+    XCTAssertEqual(parked.state, "waitingForRecovery")
+
+    let recoveryDispatcher = ScriptedDispatcher()
+    let (recoveredEngine, recoveredCapabilities, recoveredArtifacts) =
+      try makeEngine(dispatcher: recoveryDispatcher)
+    _ = try await recoveredEngine.recoverPersistedJobs()
+    let handler = controlPlane(recoveredEngine, capabilities: recoveredCapabilities, artifacts: recoveredArtifacts)
+    let reconciled = try await controlPlaneRequest(
+      handler, method: "job.reconcile", params: ["jobId": .string(acceptance.jobID)])
+    XCTAssertTrue(reconciled.ok, reconciled.error?.message ?? "-")
+    guard case .object(let status)? = reconciled.result else {
+      return XCTFail("job.reconcile must answer the job status")
+    }
+    XCTAssertEqual(status["jobId"], .string(acceptance.jobID))
+    XCTAssertEqual(status["outcomeUnknown"], .bool(false))
+    XCTAssertEqual(
+      recoveryDispatcher.dispatchedActions, ["reconcileOwnedPathPresence"],
+      "reconciliation dispatches only the dedicated readback, never resends the mutation")
+  }
+
+  /// `capability.inspect`: one installed E1 capability, read back by identity.
+  func testCapabilityInspectPublishesItsResultShapeThroughTheControlPlane() async throws {
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: ScriptedDispatcher())
+    try await installE1Capability(capabilities)
+    let handler = controlPlane(engine, capabilities: capabilities, artifacts: artifacts)
+    let listed = try await controlPlaneRequest(handler, method: "capability.list")
+    guard case .array(let rows)? = listed.result, case .object(let row)? = rows.first,
+      case .string(let capabilityID)? = row["capabilityId"]
+    else { return XCTFail("capability.list must publish the installed capability") }
+    let inspected = try await controlPlaneRequest(
+      handler, method: "capability.inspect", params: ["capabilityId": .string(capabilityID)])
+    XCTAssertTrue(inspected.ok, inspected.error?.message ?? "-")
+    guard case .object(let status)? = inspected.result,
+      case .object(let capability)? = status["capability"]
+    else { return XCTFail("capability.inspect must answer the full capability status") }
+    XCTAssertEqual(capability["capabilityID"], .string(capabilityID))
+    XCTAssertEqual(status["remainingUses"], row["remainingUses"])
+    XCTAssertEqual(status["lineageAllowsNewExecution"], .bool(true))
+    let unknown = try await controlPlaneRequest(
+      handler, method: "capability.inspect", params: ["capabilityId": .string("CAP-NOPE")])
+    XCTAssertEqual(unknown.error?.code, "notFound")
+  }
+
+  /// `trace.probe`: the probe this file already composes, read back through
+  /// the control plane.
+  func testTraceProbePublishesItsResultShapeThroughTheControlPlane() async throws {
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: ScriptedDispatcher())
+    let handler = controlPlane(engine, capabilities: capabilities, artifacts: artifacts)
+    let probed = try await controlPlaneRequest(
+      handler, method: "trace.probe", params: ["targetId": .string("target-a")])
+    XCTAssertTrue(probed.ok, probed.error?.message ?? "-")
+    guard case .object(let snapshot)? = probed.result else {
+      return XCTFail("trace.probe must answer the snapshot")
+    }
+    XCTAssertEqual(snapshot["targetId"], .string("target-a"))
+    XCTAssertEqual(snapshot["adapterDisposition"], .string("captureEligible"))
+    XCTAssertEqual(snapshot["tool"], .string("hitrace"))
+    XCTAssertEqual(snapshot["supportedTags"], .array([.string("ohos")]))
+    guard case .array(let parameters)? = snapshot["parameters"] else {
+      return XCTFail("the parameter catalog is published")
+    }
+    XCTAssertEqual(parameters.count, TraceDebugParameterCatalog.definitions.count)
+  }
 }
+

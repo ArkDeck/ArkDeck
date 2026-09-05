@@ -1,1 +1,2 @@
 {"method":"capability.list","ok":true,"protocolVersion":"1.0.0","result":[]}
+{"method":"capability.list","ok":true,"protocolVersion":"1.0.0","result":[{"capabilityId":"CAP-RT-HAP-001","consumptionCount":0,"effectCeiling":"deviceMutation","lineageAllowsNewExecution":true,"lineageBlocker":null,"maximumUses":5,"remainingUses":5}]}

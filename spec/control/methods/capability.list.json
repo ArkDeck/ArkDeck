@@ -25,6 +25,42 @@
       "type": "object"
     },
     "result": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "capabilityId": {
+            "type": "string"
+          },
+          "consumptionCount": {
+            "type": "integer"
+          },
+          "effectCeiling": {
+            "type": "string"
+          },
+          "lineageAllowsNewExecution": {
+            "type": "boolean"
+          },
+          "lineageBlocker": {
+            "type": "null"
+          },
+          "maximumUses": {
+            "type": "integer"
+          },
+          "remainingUses": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "capabilityId",
+          "consumptionCount",
+          "effectCeiling",
+          "lineageAllowsNewExecution",
+          "lineageBlocker",
+          "maximumUses",
+          "remainingUses"
+        ],
+        "type": "object"
+      },
       "type": "array"
     }
   },
@@ -37,7 +73,7 @@
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
     "error": 0,
-    "request": 2,
-    "result": 2
+    "request": 3,
+    "result": 3
   }
 }

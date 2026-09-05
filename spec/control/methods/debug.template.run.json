@@ -21,12 +21,78 @@
     },
     "request": {
       "additionalProperties": false,
-      "properties": {},
+      "properties": {
+        "targetId": {
+          "type": "string"
+        },
+        "templateId": {
+          "type": "string"
+        }
+      },
       "type": "object"
     },
     "result": {
-      "description": "no successful frame was recorded, so the result shape is not published yet; a contract test that exercises the success path through the control plane publishes it",
-      "x-arkdeck-unpublished": true
+      "additionalProperties": false,
+      "properties": {
+        "arguments": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "bindingRevision": {
+          "type": "integer"
+        },
+        "durationMilliseconds": {
+          "type": "integer"
+        },
+        "effect": {
+          "type": "string"
+        },
+        "executable": {
+          "type": "string"
+        },
+        "executableSha256": {
+          "type": "string"
+        },
+        "exitCode": {
+          "type": "integer"
+        },
+        "loweringSha256": {
+          "type": "string"
+        },
+        "outputTruncated": {
+          "type": "boolean"
+        },
+        "stderr": {
+          "type": "string"
+        },
+        "stdout": {
+          "type": "string"
+        },
+        "targetId": {
+          "type": "string"
+        },
+        "templateId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "arguments",
+        "bindingRevision",
+        "durationMilliseconds",
+        "effect",
+        "executable",
+        "executableSha256",
+        "exitCode",
+        "loweringSha256",
+        "outputTruncated",
+        "stderr",
+        "stdout",
+        "targetId",
+        "templateId"
+      ],
+      "type": "object"
     }
   },
   "$id": "https://arkdeck.dev/schemas/control/methods/debug.template.run.json",
@@ -38,7 +104,7 @@
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
     "error": 1,
-    "request": 1,
-    "result": 0
+    "request": 2,
+    "result": 1
   }
 }

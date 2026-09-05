@@ -48,7 +48,7 @@ Conventions shared by every task:
 
 ## TASK-XPA-001 — Publish per-method typed schemas from the single v1 contract for Rust consumers
 
-- Status:in-progress（started on the maintainer's instruction after TASK-SVC-001 merged: the recording seam, the derivation and the per-method schemas of the single v1 control table are delivered against the post-SVC-001 tree, `evidence/runs/TASK-XPA-001/run.md`; the schemas are re-derived after each of TASK-SVC-002, TASK-SVC-003 and TASK-SVC-004 merges, the journal contract for Rust follows TASK-SVC-002, and the headless GJ-1..5 re-pass waits for a device window）
+- Status:in-progress（started on the maintainer's instruction after TASK-SVC-001 merged: the recording seam, the derivation and the per-method schemas of the single v1 control table are delivered against the post-SVC-001 tree, and every method's result shape is published by success-path contract tests, `evidence/runs/TASK-XPA-001/run.md`; the schemas are re-derived after each of TASK-SVC-002, TASK-SVC-003 and TASK-SVC-004 merges, the journal contract for Rust follows TASK-SVC-002, and the headless GJ-1..5 re-pass waits for a device window）
 - Platform:macos（contract is platform-neutral）
 - Requirements:CLI-REQ-013, CLI-REQ-014, CLI-REQ-025 as aligned by CHG-2026-075; no Core REQ edited by this task
 - Acceptance:XPA-AC-1, XPA-AC-3; the post-SVC single-v1 positive and negative frame corpus

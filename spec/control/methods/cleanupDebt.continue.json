@@ -21,12 +21,39 @@
     },
     "request": {
       "additionalProperties": false,
-      "properties": {},
+      "properties": {
+        "jobId": {
+          "type": "string"
+        },
+        "remotePath": {
+          "type": "string"
+        }
+      },
       "type": "object"
     },
     "result": {
-      "description": "no successful frame was recorded, so the result shape is not published yet; a contract test that exercises the success path through the control plane publishes it",
-      "x-arkdeck-unpublished": true
+      "additionalProperties": false,
+      "properties": {
+        "detail": {
+          "type": "string"
+        },
+        "identity": {
+          "type": "string"
+        },
+        "jobId": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "detail",
+        "identity",
+        "jobId",
+        "state"
+      ],
+      "type": "object"
     }
   },
   "$id": "https://arkdeck.dev/schemas/control/methods/cleanupDebt.continue.json",
@@ -38,7 +65,7 @@
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
     "error": 1,
-    "request": 1,
-    "result": 0
+    "request": 2,
+    "result": 1
   }
 }

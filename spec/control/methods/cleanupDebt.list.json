@@ -25,6 +25,46 @@
       "type": "object"
     },
     "result": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "bundleName": {
+            "type": "null"
+          },
+          "identity": {
+            "type": "string"
+          },
+          "jobId": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "recordedAtUtc": {
+            "type": "string"
+          },
+          "remotePath": {
+            "type": "string"
+          },
+          "retryOutcomeUnknown": {
+            "type": "boolean"
+          },
+          "stepId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "bundleName",
+          "identity",
+          "jobId",
+          "reason",
+          "recordedAtUtc",
+          "remotePath",
+          "retryOutcomeUnknown",
+          "stepId"
+        ],
+        "type": "object"
+      },
       "type": "array"
     }
   },
@@ -37,7 +77,7 @@
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
     "error": 0,
-    "request": 1,
-    "result": 1
+    "request": 3,
+    "result": 3
   }
 }
