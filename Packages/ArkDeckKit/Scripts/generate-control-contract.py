@@ -1,14 +1,26 @@
 #!/usr/bin/env python3
-"""Generate the exact protocol vocabulary; --check is a read-only drift check."""
+"""Generate the exact protocol vocabulary; --check is a read-only drift check.
+
+`--derive-method-schemas <frames>` additionally rewrites the per-method typed
+contracts under spec/control/methods/ from control frames a debug daemon
+recorded (ARKDECK_CONTROL_FRAME_LOG), and selects the committed frame corpus.
+"""
 
 import argparse
 import hashlib
 import json
+import sys
 from pathlib import Path
 
 root = Path(__file__).resolve().parent.parent
+repository_root = root.parent.parent
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--check", action="store_true")
+parser.add_argument(
+    "--derive-method-schemas", metavar="FRAMES",
+    help="derive spec/control/methods/<method>.json from control frames recorded by "
+    "ARKDECK_CONTROL_FRAME_LOG (a directory of *.jsonl files or one file), and "
+    "select the committed frame corpus under Tests/ArkDeckContractTests/Fixtures/ControlFrames")
 args = parser.parse_args()
 contract = json.loads((root / "Contracts/control-protocol.json").read_text())
 
@@ -38,3 +50,189 @@ if args.check:
         raise SystemExit("control protocol generated source drifted; run generate-control-contract.py")
 else:
     destination.write_text(expected)
+
+
+# --- per-method typed schemas -------------------------------------------------
+#
+# `spec/control/methods/<method>.json` is derived from frames the daemon really
+# answered: the request parameters, the result and the error details of every
+# dispatched frame a contract-test run recorded. Results and error details are
+# closed to the fields the daemon emitted; request parameters are closed to the
+# fields a contract test exercised, so a parameter no test sends is not
+# published. `ControlMethodSchemaContractTests` holds the committed corpus to
+# the schemas; re-recording and re-deriving is how a new field enters.
+
+METHOD_SCHEMA_DIRECTORY = repository_root / "spec/control/methods"
+FRAME_CORPUS_DIRECTORY = repository_root / "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames"
+# Refusals every method can answer with, whether or not a recorded frame did.
+GENERIC_ERROR_CODES = [
+    "conflict", "internalError", "invalidParams", "malformedFrame", "notFound",
+    "recordUnreadable", "rejected", "unknownMethod", "unsupportedProtocolVersion",
+    "workspaceReferenceNotFound",
+]
+MAXIMUM_SIGNATURES_PER_METHOD = 24
+MAXIMUM_SAMPLE_BYTES = 65536
+
+
+def json_type(value):
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "boolean"
+    if isinstance(value, int):
+        return "integer"
+    if isinstance(value, float):
+        return "number"
+    if isinstance(value, str):
+        return "string"
+    if isinstance(value, list):
+        return "array"
+    return "object"
+
+
+def signature(value):
+    """A structural fingerprint: key set with member types, recursively."""
+    kind = json_type(value)
+    if kind == "object":
+        return "{" + ",".join(f"{key}:{signature(value[key])}" for key in sorted(value)) + "}"
+    if kind == "array":
+        return "[" + "|".join(sorted({signature(item) for item in value})) + "]"
+    return kind
+
+
+def infer(values, closed):
+    """The narrowest schema in the validator's vocabulary that admits every sample."""
+    kinds = sorted({json_type(value) for value in values})
+    if kinds == ["integer", "number"] or kinds == ["number"]:
+        return {"type": "number"}
+    if len(kinds) == 1 and kinds[0] not in ("object", "array"):
+        return {"type": kinds[0]}
+    branches = []
+    for kind in kinds:
+        members = [value for value in values if json_type(value) == kind]
+        if kind == "object":
+            keys = sorted({key for member in members for key in member})
+            schema = {"type": "object"}
+            if closed:
+                schema["additionalProperties"] = False
+            schema["properties"] = {
+                key: infer([member[key] for member in members if key in member], closed)
+                for key in keys
+            }
+            required = [key for key in keys if all(key in member for member in members)]
+            if required:
+                schema["required"] = required
+            branches.append(schema)
+        elif kind == "array":
+            items = [item for member in members for item in member]
+            schema = {"type": "array"}
+            if items:
+                schema["items"] = infer(items, closed)
+            branches.append(schema)
+        elif kind == "integer" and "number" in kinds:
+            continue
+        else:
+            branches.append({"type": kind})
+    if len(branches) == 1:
+        return branches[0]
+    scalar = [branch for branch in branches if set(branch) == {"type"}]
+    structured = [branch for branch in branches if set(branch) != {"type"}]
+    if not structured:
+        return {"type": [branch["type"] for branch in scalar]}
+    return {"anyOf": structured + ([{"type": [branch["type"] for branch in scalar]}] if scalar else [])}
+
+
+def load_frames(source):
+    path = Path(source)
+    files = sorted(path.glob("*.jsonl")) if path.is_dir() else [path]
+    frames = []
+    skipped = 0
+    for file in files:
+        for line in file.read_text().splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                frames.append((json.loads(line), line))
+            except json.JSONDecodeError:
+                # A test process killed mid-append leaves one torn tail line.
+                skipped += 1
+    if skipped:
+        print(f"skipped {skipped} undecodable line(s)", file=sys.stderr)
+    return frames
+
+
+def derive_method_schemas(source):
+    frames = load_frames(source)
+    published = set(contract["methods"])
+    current = contract["currentVersion"]
+    by_method = {}
+    for frame, line in frames:
+        method = frame["method"]
+        # The handler refuses every other version before dispatch, so a frame
+        # carrying one could only come from a foreign recording.
+        if method not in published or frame.get("protocolVersion") != current:
+            continue
+        by_method.setdefault(method, []).append((frame, line))
+    missing = sorted(published - set(by_method))
+    if missing:
+        print("no recorded frames for: " + ", ".join(missing), file=sys.stderr)
+    METHOD_SCHEMA_DIRECTORY.mkdir(parents=True, exist_ok=True)
+    FRAME_CORPUS_DIRECTORY.mkdir(parents=True, exist_ok=True)
+    for stale in list(METHOD_SCHEMA_DIRECTORY.glob("*.json")) + list(FRAME_CORPUS_DIRECTORY.glob("*.jsonl")):
+        if stale.stem not in published:
+            stale.unlink()
+    for method in sorted(by_method):
+        samples = by_method[method]
+        params = [frame.get("params", {}) for frame, _ in samples]
+        results = [frame["result"] for frame, _ in samples if frame["ok"] and "result" in frame]
+        errors = [frame["error"] for frame, _ in samples if not frame["ok"]]
+        details = [error["details"] for error in errors if "details" in error]
+        codes = sorted({error["code"] for error in errors} | set(GENERIC_ERROR_CODES))
+        schema = {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": f"https://arkdeck.dev/schemas/control/methods/{method}.json",
+            "title": f"arkdeck.control.method/{method}",
+            "description": (
+                f"Typed contract of the control-plane method `{method}` on the single current "
+                "protocol: the request parameters a caller may send, the result the Runtime "
+                "answers with, and the structured error details it attaches to a refusal. "
+                "Derived from frames recorded by a contract-test run; the committed corpus under "
+                "Tests/ArkDeckContractTests/Fixtures/ControlFrames is validated against it."),
+            "x-arkdeck-method": method,
+            "x-arkdeck-protocolVersion": current,
+            "x-arkdeck-contractIdentity": identity,
+            "x-arkdeck-sampleCounts": {
+                "request": len(params), "result": len(results), "error": len(errors),
+            },
+            "$defs": {
+                "request": infer(params, closed=True),
+                "result": infer(results, closed=True) if results else {
+                    "description": (
+                        "no successful frame was recorded, so the result shape is not published "
+                        "yet; a contract test that exercises the success path through the control "
+                        "plane publishes it"),
+                    "x-arkdeck-unpublished": True,
+                },
+                "errorCode": {"enum": codes},
+                "errorDetails": infer(details, closed=True) if details else {"type": "object", "additionalProperties": False, "properties": {}},
+            },
+        }
+        (METHOD_SCHEMA_DIRECTORY / f"{method}.json").write_text(
+            json.dumps(schema, indent=2, sort_keys=True, ensure_ascii=False) + "\n")
+        # The committed corpus: the smallest frame of every distinct request and
+        # response shape, bounded per method, in a deterministic order.
+        groups = {}
+        for frame, line in samples:
+            if len(line.encode()) > MAXIMUM_SAMPLE_BYTES:
+                continue
+            key = (signature(frame.get("params", {})), signature(frame.get("result", frame.get("error"))), frame["ok"])
+            if key not in groups or len(line) < len(groups[key]):
+                groups[key] = line
+        selected = [groups[key] for key in sorted(groups)[:MAXIMUM_SIGNATURES_PER_METHOD]]
+        (FRAME_CORPUS_DIRECTORY / f"{method}.jsonl").write_text("\n".join(selected) + "\n")
+    print(f"derived {len(by_method)} method schemas from {len(frames)} frames; corpus written")
+
+
+if args.derive_method_schemas:
+    derive_method_schemas(args.derive_method_schemas)

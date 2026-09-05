@@ -1,0 +1,2 @@
+{"method":"flash.bind-current-loader","ok":true,"params":{"expectedBindingRevision":2,"targetId":"TGT-SELECTED"},"protocolVersion":"1.0.0","result":{"bindingRevision":2,"previousBindingRevision":2,"selectionEvidenceSha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","settledJobId":null,"targetId":"TGT-SELECTED","updated":true}}
+{"error":{"code":"invalidParams","message":"targetId and expectedBindingRevision are required"},"method":"flash.bind-current-loader","ok":false,"params":{},"protocolVersion":"1.0.0"}

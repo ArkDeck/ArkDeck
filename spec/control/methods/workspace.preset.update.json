@@ -1,0 +1,158 @@
+{
+  "$defs": {
+    "errorCode": {
+      "enum": [
+        "conflict",
+        "internalError",
+        "invalidParams",
+        "malformedFrame",
+        "notFound",
+        "recordUnreadable",
+        "rejected",
+        "unknownMethod",
+        "unsupportedProtocolVersion",
+        "workspaceReferenceNotFound"
+      ]
+    },
+    "errorDetails": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+    },
+    "request": {
+      "additionalProperties": false,
+      "properties": {
+        "buildMode": {
+          "type": "string"
+        },
+        "expectedGeneration": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "module": {
+          "type": "string"
+        },
+        "mutationRequestId": {
+          "type": "string"
+        },
+        "presetRef": {
+          "type": "string"
+        },
+        "product": {
+          "type": "string"
+        },
+        "projectRef": {
+          "type": "string"
+        },
+        "templateRef": {
+          "type": "string"
+        },
+        "timeoutSeconds": {
+          "type": "string"
+        },
+        "toolchainGeneration": {
+          "type": "string"
+        },
+        "toolchainRef": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "result": {
+      "additionalProperties": false,
+      "properties": {
+        "configurationStatus": {
+          "type": "string"
+        },
+        "constraints": {
+          "additionalProperties": false,
+          "properties": {
+            "buildMode": {
+              "type": "string"
+            },
+            "module": {
+              "type": "string"
+            },
+            "product": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "buildMode",
+            "module",
+            "product"
+          ],
+          "type": "object"
+        },
+        "credentialRef": {
+          "type": "null"
+        },
+        "generation": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "presetRef": {
+          "type": "string"
+        },
+        "projectRef": {
+          "type": "string"
+        },
+        "registeredAtUtc": {
+          "type": "string"
+        },
+        "schemaVersion": {
+          "type": "string"
+        },
+        "templateRef": {
+          "type": "string"
+        },
+        "timeoutSeconds": {
+          "type": "integer"
+        },
+        "toolchainGeneration": {
+          "type": "string"
+        },
+        "toolchainRef": {
+          "type": "string"
+        },
+        "updatedAtUtc": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "configurationStatus",
+        "constraints",
+        "credentialRef",
+        "generation",
+        "kind",
+        "presetRef",
+        "projectRef",
+        "registeredAtUtc",
+        "schemaVersion",
+        "templateRef",
+        "timeoutSeconds",
+        "toolchainGeneration",
+        "toolchainRef",
+        "updatedAtUtc"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://arkdeck.dev/schemas/control/methods/workspace.preset.update.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Typed contract of the control-plane method `workspace.preset.update` on the single current protocol: the request parameters a caller may send, the result the Runtime answers with, and the structured error details it attaches to a refusal. Derived from frames recorded by a contract-test run; the committed corpus under Tests/ArkDeckContractTests/Fixtures/ControlFrames is validated against it.",
+  "title": "arkdeck.control.method/workspace.preset.update",
+  "x-arkdeck-contractIdentity": "1054d17b598ce23003ebbdec4d42eb359b63016d6421709ba53c3f21f7c6558d",
+  "x-arkdeck-method": "workspace.preset.update",
+  "x-arkdeck-protocolVersion": "1.0.0",
+  "x-arkdeck-sampleCounts": {
+    "error": 1,
+    "request": 2,
+    "result": 1
+  }
+}

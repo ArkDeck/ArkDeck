@@ -1,0 +1,360 @@
+{
+  "$defs": {
+    "errorCode": {
+      "enum": [
+        "conflict",
+        "internalError",
+        "invalidParams",
+        "malformedFrame",
+        "notFound",
+        "recordUnreadable",
+        "rejected",
+        "unknownMethod",
+        "unsupportedProtocolVersion",
+        "workspaceReferenceNotFound"
+      ]
+    },
+    "errorDetails": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+    },
+    "request": {
+      "additionalProperties": false,
+      "properties": {
+        "deep": {
+          "type": [
+            "boolean",
+            "string"
+          ]
+        },
+        "unknown": {
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "result": {
+      "additionalProperties": false,
+      "properties": {
+        "checks": {
+          "additionalProperties": false,
+          "properties": {
+            "catalog": {
+              "additionalProperties": false,
+              "properties": {
+                "availableOperationCount": {
+                  "type": "integer"
+                },
+                "digest": {
+                  "type": "string"
+                },
+                "operationCount": {
+                  "type": "integer"
+                },
+                "unavailableOperationCount": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "availableOperationCount",
+                "digest",
+                "operationCount",
+                "unavailableOperationCount"
+              ],
+              "type": "object"
+            },
+            "hdc": {
+              "additionalProperties": false,
+              "properties": {
+                "availability": {
+                  "type": "string"
+                },
+                "checked": {
+                  "type": "boolean"
+                },
+                "configured": {
+                  "type": "boolean"
+                },
+                "ownership": {
+                  "type": "string"
+                },
+                "reasonCode": {
+                  "type": "string"
+                },
+                "serverHealth": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "availability",
+                "checked",
+                "configured",
+                "ownership",
+                "reasonCode",
+                "serverHealth"
+              ],
+              "type": "object"
+            },
+            "providers": {
+              "additionalProperties": false,
+              "properties": {
+                "registered": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "registered"
+              ],
+              "type": "object"
+            },
+            "recovery": {
+              "additionalProperties": false,
+              "properties": {
+                "checked": {
+                  "type": "boolean"
+                },
+                "outstandingCleanupCount": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "checked",
+                "outstandingCleanupCount"
+              ],
+              "type": "object"
+            },
+            "runtime": {
+              "additionalProperties": false,
+              "properties": {
+                "protocolVersion": {
+                  "type": "string"
+                },
+                "runtimeRequestSchemaVersion": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "protocolVersion",
+                "runtimeRequestSchemaVersion"
+              ],
+              "type": "object"
+            },
+            "storage": {
+              "additionalProperties": false,
+              "properties": {
+                "runtimeArtifacts": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "checked": {
+                      "type": "boolean"
+                    },
+                    "configured": {
+                      "type": "boolean"
+                    },
+                    "remainingBytes": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "totalBytes": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    },
+                    "usedBytes": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "checked",
+                    "configured",
+                    "remainingBytes",
+                    "totalBytes",
+                    "usedBytes"
+                  ],
+                  "type": "object"
+                },
+                "sessionOutput": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "availability": {
+                      "type": "string"
+                    },
+                    "checked": {
+                      "type": "boolean"
+                    },
+                    "reasonCode": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "availability",
+                    "checked",
+                    "reasonCode"
+                  ],
+                  "type": "object"
+                }
+              },
+              "required": [
+                "runtimeArtifacts",
+                "sessionOutput"
+              ],
+              "type": "object"
+            },
+            "target": {
+              "additionalProperties": false,
+              "properties": {
+                "adoptedTargetCount": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "bootstrapConfigured": {
+                  "type": "boolean"
+                },
+                "configured": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "adoptedTargetCount",
+                "bootstrapConfigured",
+                "configured"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "catalog",
+            "hdc",
+            "providers",
+            "recovery",
+            "runtime",
+            "storage",
+            "target"
+          ],
+          "type": "object"
+        },
+        "findingCounts": {
+          "additionalProperties": false,
+          "properties": {
+            "blocker": {
+              "type": "integer"
+            },
+            "info": {
+              "type": "integer"
+            },
+            "warning": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "blocker",
+            "info",
+            "warning"
+          ],
+          "type": "object"
+        },
+        "findings": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "details": {
+                "additionalProperties": false,
+                "properties": {
+                  "adoptedTargetCount": {
+                    "type": "integer"
+                  },
+                  "availableOperationCount": {
+                    "type": "integer"
+                  },
+                  "outstandingCleanupCount": {
+                    "type": "integer"
+                  },
+                  "providerCount": {
+                    "type": "integer"
+                  },
+                  "unavailableOperationCount": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
+              "scope": {
+                "type": "string"
+              },
+              "severity": {
+                "type": "string"
+              },
+              "summary": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "scope",
+              "severity",
+              "summary"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "mode": {
+          "type": "string"
+        },
+        "observedAt": {
+          "type": "string"
+        },
+        "overall": {
+          "type": "string"
+        },
+        "ready": {
+          "type": "boolean"
+        },
+        "schemaVersion": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "checks",
+        "findingCounts",
+        "findings",
+        "mode",
+        "observedAt",
+        "overall",
+        "ready",
+        "schemaVersion"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://arkdeck.dev/schemas/control/methods/doctor.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Typed contract of the control-plane method `doctor` on the single current protocol: the request parameters a caller may send, the result the Runtime answers with, and the structured error details it attaches to a refusal. Derived from frames recorded by a contract-test run; the committed corpus under Tests/ArkDeckContractTests/Fixtures/ControlFrames is validated against it.",
+  "title": "arkdeck.control.method/doctor",
+  "x-arkdeck-contractIdentity": "1054d17b598ce23003ebbdec4d42eb359b63016d6421709ba53c3f21f7c6558d",
+  "x-arkdeck-method": "doctor",
+  "x-arkdeck-protocolVersion": "1.0.0",
+  "x-arkdeck-sampleCounts": {
+    "error": 2,
+    "request": 9,
+    "result": 7
+  }
+}

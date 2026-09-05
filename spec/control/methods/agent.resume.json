@@ -1,0 +1,322 @@
+{
+  "$defs": {
+    "errorCode": {
+      "enum": [
+        "admissionDenied",
+        "conflict",
+        "internalError",
+        "invalidParams",
+        "malformedFrame",
+        "notFound",
+        "operationUnavailable",
+        "recordUnreadable",
+        "rejected",
+        "unknownMethod",
+        "unsupportedProtocolVersion",
+        "workspaceReferenceNotFound"
+      ]
+    },
+    "errorDetails": {
+      "additionalProperties": false,
+      "properties": {
+        "humanAction": {
+          "additionalProperties": false,
+          "properties": {
+            "actionId": {
+              "type": "string"
+            },
+            "binding": {
+              "additionalProperties": false,
+              "properties": {
+                "controlActionId": {
+                  "type": "string"
+                },
+                "generation": {
+                  "type": "string"
+                },
+                "previewDigest": {
+                  "type": "string"
+                },
+                "previewId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "controlActionId",
+                "generation",
+                "previewDigest",
+                "previewId"
+              ],
+              "type": "object"
+            },
+            "category": {
+              "type": "string"
+            },
+            "choices": {
+              "type": "array"
+            },
+            "createdAt": {
+              "type": "string"
+            },
+            "expiresAt": {
+              "type": "string"
+            },
+            "minimumAction": {
+              "type": "string"
+            },
+            "newDispatchCount": {
+              "type": "integer"
+            },
+            "owner": {
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "kind"
+              ],
+              "type": "object"
+            },
+            "prohibitedAutomation": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "reasonCode": {
+              "type": "string"
+            },
+            "resumeReference": {
+              "type": "string"
+            },
+            "schemaVersion": {
+              "type": "string"
+            },
+            "selectionSchema": {
+              "type": "null"
+            },
+            "status": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "actionId",
+            "binding",
+            "category",
+            "choices",
+            "createdAt",
+            "expiresAt",
+            "minimumAction",
+            "newDispatchCount",
+            "owner",
+            "prohibitedAutomation",
+            "reasonCode",
+            "resumeReference",
+            "schemaVersion",
+            "selectionSchema",
+            "status"
+          ],
+          "type": "object"
+        },
+        "newDispatchCount": {
+          "type": "integer"
+        },
+        "phase": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "newDispatchCount",
+        "phase"
+      ],
+      "type": "object"
+    },
+    "request": {
+      "additionalProperties": false,
+      "properties": {
+        "resumeReference": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "result": {
+      "additionalProperties": false,
+      "properties": {
+        "bindingRevision": {
+          "type": "integer"
+        },
+        "catalogDigest": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "string"
+        },
+        "deadline": {
+          "type": "string"
+        },
+        "executionId": {
+          "type": "string"
+        },
+        "failureCode": {
+          "type": "null"
+        },
+        "generation": {
+          "type": "string"
+        },
+        "humanAction": {
+          "type": "null"
+        },
+        "job": {
+          "additionalProperties": false,
+          "properties": {
+            "jobId": {
+              "type": "string"
+            },
+            "outcome": {
+              "type": "string"
+            },
+            "outcomeUnknown": {
+              "type": "boolean"
+            },
+            "outstandingResidueCount": {
+              "type": "null"
+            },
+            "state": {
+              "type": "string"
+            },
+            "waitingForHuman": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "jobId",
+            "outcome",
+            "outcomeUnknown",
+            "outstandingResidueCount",
+            "state",
+            "waitingForHuman"
+          ],
+          "type": "object"
+        },
+        "jobId": {
+          "type": "string"
+        },
+        "jobState": {
+          "type": "string"
+        },
+        "lastObservedAt": {
+          "type": "string"
+        },
+        "nextAction": {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "type": "string"
+            },
+            "owner": {
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "kind"
+              ],
+              "type": "object"
+            },
+            "reasonCode": {
+              "type": "string"
+            },
+            "resource": {
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "kind"
+              ],
+              "type": "object"
+            },
+            "retryAfter": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "owner",
+            "reasonCode",
+            "resource",
+            "retryAfter"
+          ],
+          "type": "object"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "outcomeUnknown": {
+          "type": "boolean"
+        },
+        "schemaVersion": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "targetId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "bindingRevision",
+        "catalogDigest",
+        "createdAt",
+        "deadline",
+        "executionId",
+        "failureCode",
+        "generation",
+        "humanAction",
+        "job",
+        "jobId",
+        "jobState",
+        "lastObservedAt",
+        "nextAction",
+        "operation",
+        "outcomeUnknown",
+        "schemaVersion",
+        "state",
+        "targetId"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://arkdeck.dev/schemas/control/methods/agent.resume.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Typed contract of the control-plane method `agent.resume` on the single current protocol: the request parameters a caller may send, the result the Runtime answers with, and the structured error details it attaches to a refusal. Derived from frames recorded by a contract-test run; the committed corpus under Tests/ArkDeckContractTests/Fixtures/ControlFrames is validated against it.",
+  "title": "arkdeck.control.method/agent.resume",
+  "x-arkdeck-contractIdentity": "1054d17b598ce23003ebbdec4d42eb359b63016d6421709ba53c3f21f7c6558d",
+  "x-arkdeck-method": "agent.resume",
+  "x-arkdeck-protocolVersion": "1.0.0",
+  "x-arkdeck-sampleCounts": {
+    "error": 2,
+    "request": 3,
+    "result": 1
+  }
+}

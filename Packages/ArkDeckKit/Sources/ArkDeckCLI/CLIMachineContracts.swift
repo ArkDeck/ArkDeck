@@ -28,6 +28,9 @@ enum CLIMachineContracts {
   /// The closed `nextAction` union shared by `job status` and `agent status` (§7.3).
   static let nextActionSchemaVersion = "arkdeck.cli.next-action/1"
   static let controlPlaneSchemaVersion = "arkdeck.runtime-control-plane/1"
+  /// Repository-relative home of the per-method typed schemas the control-plane
+  /// schema's method table points at (`TASK-XPA-001`).
+  static let controlMethodSchemaDirectory = "spec/control/methods"
   static let featureCoverageSchemaVersion = "arkdeck.cli.feature-coverage/1"
   static let canonicalVectorsSchemaVersion = "arkdeck.cli.canonical-json-vectors/1"
   static let argvFixtureSchemaVersion = "arkdeck.cli.argv-fixture/1"
@@ -1593,10 +1596,14 @@ enum CLIMachineContracts {
         controlPlaneSchemaVersion,
         description: "The local control-plane request and response frames the CLI exchanges with the Runtime, and the closed method set it may name.")
       let methods = ArkDeckControlProtocol.methods.sorted()
+      // One row per published method; `schema` points at the per-method typed
+      // contract (request, result, error details) `spec/control/methods/`
+      // carries for it, derived from recorded frames under the same identity.
       let methodTable: [JSONValue] = methods.map { method in
         .object([
           "method": .string(method),
           "published": .bool(true),
+          "schema": .string("\(controlMethodSchemaDirectory)/\(method).json"),
         ])
       }
       fields["oneOf"] = .array([
@@ -1605,6 +1612,7 @@ enum CLIMachineContracts {
       ])
       fields["x-arkdeck-currentProtocolVersion"] = .string(ArkDeckControlProtocol.currentVersion)
       fields["x-arkdeck-contractIdentity"] = .string(ArkDeckControlProtocol.contractIdentity)
+      fields["x-arkdeck-methodSchemaDirectory"] = .string(controlMethodSchemaDirectory)
       fields["x-arkdeck-methods"] = .array(methodTable)
       fields["$defs"] = .object([
         "request": .object([

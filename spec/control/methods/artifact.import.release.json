@@ -1,0 +1,142 @@
+{
+  "$defs": {
+    "errorCode": {
+      "enum": [
+        "conflict",
+        "internalError",
+        "invalidInput",
+        "invalidParams",
+        "malformedFrame",
+        "notFound",
+        "recordUnreadable",
+        "rejected",
+        "resourceConflict",
+        "unknownMethod",
+        "unsupportedProtocolVersion",
+        "workspaceReferenceNotFound"
+      ]
+    },
+    "errorDetails": {
+      "additionalProperties": false,
+      "properties": {
+        "newDispatchCount": {
+          "type": "integer"
+        },
+        "phase": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "newDispatchCount",
+        "phase"
+      ],
+      "type": "object"
+    },
+    "request": {
+      "additionalProperties": false,
+      "properties": {
+        "generation": {
+          "type": "string"
+        },
+        "importId": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "result": {
+      "additionalProperties": false,
+      "properties": {
+        "artifactId": {
+          "type": "string"
+        },
+        "generation": {
+          "type": "string"
+        },
+        "importId": {
+          "type": "string"
+        },
+        "importRequestId": {
+          "type": "string"
+        },
+        "lease": {
+          "type": "string"
+        },
+        "owner": {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "kind"
+          ],
+          "type": "object"
+        },
+        "releasedAtUtc": {
+          "type": "string"
+        },
+        "releasedGeneration": {
+          "type": "string"
+        },
+        "retention": {
+          "additionalProperties": false,
+          "properties": {
+            "class": {
+              "type": "string"
+            },
+            "deadlineUtc": {
+              "type": "string"
+            },
+            "pinned": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "class",
+            "deadlineUtc",
+            "pinned"
+          ],
+          "type": "object"
+        },
+        "schemaVersion": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "artifactId",
+        "generation",
+        "importId",
+        "importRequestId",
+        "lease",
+        "owner",
+        "releasedAtUtc",
+        "releasedGeneration",
+        "retention",
+        "schemaVersion",
+        "state"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://arkdeck.dev/schemas/control/methods/artifact.import.release.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Typed contract of the control-plane method `artifact.import.release` on the single current protocol: the request parameters a caller may send, the result the Runtime answers with, and the structured error details it attaches to a refusal. Derived from frames recorded by a contract-test run; the committed corpus under Tests/ArkDeckContractTests/Fixtures/ControlFrames is validated against it.",
+  "title": "arkdeck.control.method/artifact.import.release",
+  "x-arkdeck-contractIdentity": "1054d17b598ce23003ebbdec4d42eb359b63016d6421709ba53c3f21f7c6558d",
+  "x-arkdeck-method": "artifact.import.release",
+  "x-arkdeck-protocolVersion": "1.0.0",
+  "x-arkdeck-sampleCounts": {
+    "error": 2,
+    "request": 4,
+    "result": 2
+  }
+}

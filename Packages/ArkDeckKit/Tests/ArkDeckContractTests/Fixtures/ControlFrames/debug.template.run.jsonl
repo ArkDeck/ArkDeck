@@ -1,0 +1,1 @@
+{"error":{"code":"invalidParams","message":"targetId and a closed templateId are required"},"method":"debug.template.run","ok":false,"params":{},"protocolVersion":"1.0.0"}

@@ -1,0 +1,210 @@
+{
+  "$defs": {
+    "errorCode": {
+      "enum": [
+        "conflict",
+        "internalError",
+        "invalidInput",
+        "invalidParams",
+        "malformedFrame",
+        "notFound",
+        "recordUnreadable",
+        "rejected",
+        "resourceConflict",
+        "unknownMethod",
+        "unsupportedProtocolVersion",
+        "workspaceReferenceNotFound"
+      ]
+    },
+    "errorDetails": {
+      "additionalProperties": false,
+      "properties": {
+        "candidate": {
+          "type": "string"
+        },
+        "newDispatchCount": {
+          "type": "integer"
+        },
+        "observationGeneration": {
+          "type": "string"
+        },
+        "observationId": {
+          "type": "string"
+        },
+        "phase": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "newDispatchCount",
+        "phase"
+      ],
+      "type": "object"
+    },
+    "request": {
+      "additionalProperties": false,
+      "properties": {
+        "candidateKey": {
+          "type": "string"
+        },
+        "following": {
+          "additionalProperties": false,
+          "properties": {
+            "candidate": {
+              "type": "string"
+            },
+            "observationGeneration": {
+              "type": "string"
+            },
+            "observationId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "candidate",
+            "observationGeneration",
+            "observationId"
+          ],
+          "type": "object"
+        },
+        "observationId": {
+          "type": "string"
+        },
+        "snapshotGeneration": {
+          "type": "integer"
+        },
+        "useWarmSnapshot": {
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "result": {
+      "additionalProperties": false,
+      "properties": {
+        "health": {
+          "type": "string"
+        },
+        "observations": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "adoptedTargetId": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "authorizationState": {
+                "type": "string"
+              },
+              "bindingRevision": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "candidateKey": {
+                "type": "string"
+              },
+              "deviceInformation": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "observedAtUtc": {
+                        "type": "string"
+                      },
+                      "systemVersion": {
+                        "type": "string"
+                      },
+                      "transport": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "observedAtUtc",
+                      "systemVersion",
+                      "transport"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "type": [
+                      "null"
+                    ]
+                  }
+                ]
+              },
+              "displayName": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "displayNameGeneration": {
+                "type": "string"
+              },
+              "observationContinuity": {
+                "type": "string"
+              },
+              "observationId": {
+                "type": "string"
+              },
+              "observedFacts": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "adoptedTargetId",
+              "authorizationState",
+              "bindingRevision",
+              "candidateKey",
+              "deviceInformation",
+              "displayName",
+              "displayNameGeneration",
+              "observationContinuity",
+              "observationId",
+              "observedFacts"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "observedAtUtc": {
+          "type": "string"
+        },
+        "schemaVersion": {
+          "type": "string"
+        },
+        "snapshotGeneration": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "health",
+        "observations",
+        "observedAtUtc",
+        "schemaVersion",
+        "snapshotGeneration"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://arkdeck.dev/schemas/control/methods/device.observations.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Typed contract of the control-plane method `device.observations` on the single current protocol: the request parameters a caller may send, the result the Runtime answers with, and the structured error details it attaches to a refusal. Derived from frames recorded by a contract-test run; the committed corpus under Tests/ArkDeckContractTests/Fixtures/ControlFrames is validated against it.",
+  "title": "arkdeck.control.method/device.observations",
+  "x-arkdeck-contractIdentity": "1054d17b598ce23003ebbdec4d42eb359b63016d6421709ba53c3f21f7c6558d",
+  "x-arkdeck-method": "device.observations",
+  "x-arkdeck-protocolVersion": "1.0.0",
+  "x-arkdeck-sampleCounts": {
+    "error": 8,
+    "request": 47,
+    "result": 39
+  }
+}

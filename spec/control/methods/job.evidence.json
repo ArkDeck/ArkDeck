@@ -1,0 +1,410 @@
+{
+  "$defs": {
+    "errorCode": {
+      "enum": [
+        "conflict",
+        "internalError",
+        "invalidInput",
+        "invalidParams",
+        "malformedFrame",
+        "notFound",
+        "recordUnreadable",
+        "rejected",
+        "unknownMethod",
+        "unsupportedProtocolVersion",
+        "workspaceReferenceNotFound"
+      ]
+    },
+    "errorDetails": {
+      "additionalProperties": false,
+      "properties": {
+        "newDispatchCount": {
+          "type": "integer"
+        },
+        "phase": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "newDispatchCount",
+        "phase"
+      ],
+      "type": "object"
+    },
+    "request": {
+      "additionalProperties": false,
+      "properties": {
+        "jobId": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "result": {
+      "additionalProperties": false,
+      "properties": {
+        "actualEffect": {
+          "type": "string"
+        },
+        "actualStepKinds": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "artifacts": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "bindingRevision": {
+                "type": "integer"
+              },
+              "byteCount": {
+                "type": "string"
+              },
+              "bytesVerified": {
+                "type": "boolean"
+              },
+              "jobId": {
+                "type": "string"
+              },
+              "providerId": {
+                "type": "string"
+              },
+              "reference": {
+                "type": "string"
+              },
+              "sha256": {
+                "type": "string"
+              },
+              "stableIdentitySha256": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "targetId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "bindingRevision",
+              "byteCount",
+              "bytesVerified",
+              "jobId",
+              "providerId",
+              "reference",
+              "sha256",
+              "stableIdentitySha256",
+              "targetId"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "authority": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "admittedAtUtc": {
+                  "type": "string"
+                },
+                "artifactDigest": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "consumptionFingerprintSha256": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "planDigest": {
+                  "type": "string"
+                },
+                "recoveryEpoch": {
+                  "type": "null"
+                },
+                "reference": {
+                  "type": "string"
+                },
+                "reservationId": {
+                  "type": "string"
+                },
+                "stepSetDigest": {
+                  "type": "string"
+                },
+                "targetBindingDigest": {
+                  "type": "string"
+                },
+                "useOrdinal": {
+                  "type": "integer"
+                },
+                "validUntilUtc": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                }
+              },
+              "required": [
+                "admittedAtUtc",
+                "consumptionFingerprintSha256",
+                "kind",
+                "recoveryEpoch",
+                "reference",
+                "validUntilUtc"
+              ],
+              "type": "object"
+            },
+            {
+              "type": [
+                "null"
+              ]
+            }
+          ]
+        },
+        "bindingRevision": {
+          "type": "integer"
+        },
+        "blockers": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "catalogDigest": {
+          "type": "string"
+        },
+        "executionMode": {
+          "type": "string"
+        },
+        "finishedAtUtc": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "firstEvidenceStepAtUtc": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "inventoryAvailable": {
+          "type": "boolean"
+        },
+        "jobId": {
+          "type": "string"
+        },
+        "missingRequiredArtifacts": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "observation": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "bindingRevision": {
+                  "type": "integer"
+                },
+                "confirmationMethod": {
+                  "type": "string"
+                },
+                "confirmedAtUtc": {
+                  "type": "string"
+                },
+                "firmware": {
+                  "type": "string"
+                },
+                "model": {
+                  "type": "string"
+                },
+                "preflightSteps": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "outcomeAtUtc": {
+                        "type": "string"
+                      },
+                      "stepId": {
+                        "type": "string"
+                      },
+                      "stepKind": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "outcomeAtUtc",
+                      "stepId",
+                      "stepKind"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "providerId": {
+                  "type": "string"
+                },
+                "stableIdentitySha256": {
+                  "type": "string"
+                },
+                "targetId": {
+                  "type": "string"
+                },
+                "toolSha256": {
+                  "type": "string"
+                },
+                "toolVersion": {
+                  "type": "string"
+                },
+                "transport": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "bindingRevision",
+                "confirmationMethod",
+                "confirmedAtUtc",
+                "firmware",
+                "model",
+                "preflightSteps",
+                "providerId",
+                "stableIdentitySha256",
+                "targetId",
+                "toolSha256",
+                "toolVersion",
+                "transport"
+              ],
+              "type": "object"
+            },
+            {
+              "type": [
+                "null"
+              ]
+            }
+          ]
+        },
+        "operationReference": {
+          "type": "string"
+        },
+        "outcomeUnknown": {
+          "type": "boolean"
+        },
+        "parameters": {
+          "additionalProperties": false,
+          "properties": {
+            "abilityName": {
+              "type": "string"
+            },
+            "bundleName": {
+              "type": "string"
+            },
+            "displayHeight": {
+              "type": "integer"
+            },
+            "displayWidth": {
+              "type": "integer"
+            },
+            "durationSeconds": {
+              "type": "integer"
+            },
+            "hapArtifactLease": {
+              "type": "string"
+            },
+            "privateInput": {
+              "type": "string"
+            },
+            "x": {
+              "type": "integer"
+            },
+            "y": {
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        },
+        "providerId": {
+          "type": "string"
+        },
+        "recoveryEpoch": {
+          "type": "null"
+        },
+        "schemaVersion": {
+          "type": "string"
+        },
+        "startedAtUtc": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "status": {
+          "type": "string"
+        },
+        "targetId": {
+          "type": "string"
+        },
+        "terminalState": {
+          "type": "string"
+        },
+        "traceProbeAfter": {
+          "type": "null"
+        },
+        "traceProbeBefore": {
+          "type": "null"
+        }
+      },
+      "required": [
+        "actualEffect",
+        "actualStepKinds",
+        "artifacts",
+        "authority",
+        "bindingRevision",
+        "blockers",
+        "catalogDigest",
+        "executionMode",
+        "finishedAtUtc",
+        "firstEvidenceStepAtUtc",
+        "inventoryAvailable",
+        "jobId",
+        "missingRequiredArtifacts",
+        "observation",
+        "operationReference",
+        "outcomeUnknown",
+        "parameters",
+        "providerId",
+        "recoveryEpoch",
+        "schemaVersion",
+        "startedAtUtc",
+        "status",
+        "targetId",
+        "terminalState",
+        "traceProbeAfter",
+        "traceProbeBefore"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://arkdeck.dev/schemas/control/methods/job.evidence.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Typed contract of the control-plane method `job.evidence` on the single current protocol: the request parameters a caller may send, the result the Runtime answers with, and the structured error details it attaches to a refusal. Derived from frames recorded by a contract-test run; the committed corpus under Tests/ArkDeckContractTests/Fixtures/ControlFrames is validated against it.",
+  "title": "arkdeck.control.method/job.evidence",
+  "x-arkdeck-contractIdentity": "1054d17b598ce23003ebbdec4d42eb359b63016d6421709ba53c3f21f7c6558d",
+  "x-arkdeck-method": "job.evidence",
+  "x-arkdeck-protocolVersion": "1.0.0",
+  "x-arkdeck-sampleCounts": {
+    "error": 1,
+    "request": 19,
+    "result": 18
+  }
+}

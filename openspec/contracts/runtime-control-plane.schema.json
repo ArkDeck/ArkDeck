@@ -215,390 +215,487 @@
   "x-arkdeck-cliVersion": "0.1.0",
   "x-arkdeck-contractIdentity": "1054d17b598ce23003ebbdec4d42eb359b63016d6421709ba53c3f21f7c6558d",
   "x-arkdeck-currentProtocolVersion": "1.0.0",
+  "x-arkdeck-methodSchemaDirectory": "spec/control/methods",
   "x-arkdeck-methods": [
     {
       "method": "agent.abandon",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/agent.abandon.json"
     },
     {
       "method": "agent.list",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/agent.list.json"
     },
     {
       "method": "agent.resume",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/agent.resume.json"
     },
     {
       "method": "agent.run",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/agent.run.json"
     },
     {
       "method": "agent.status",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/agent.status.json"
     },
     {
       "method": "artifact.export",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/artifact.export.json"
     },
     {
       "method": "artifact.import.abort",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/artifact.import.abort.json"
     },
     {
       "method": "artifact.import.append",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/artifact.import.append.json"
     },
     {
       "method": "artifact.import.begin",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/artifact.import.begin.json"
     },
     {
       "method": "artifact.import.commit",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/artifact.import.commit.json"
     },
     {
       "method": "artifact.import.inspect",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/artifact.import.inspect.json"
     },
     {
       "method": "artifact.import.inspection",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/artifact.import.inspection.json"
     },
     {
       "method": "artifact.import.list",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/artifact.import.list.json"
     },
     {
       "method": "artifact.import.release",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/artifact.import.release.json"
     },
     {
       "method": "artifact.inspect",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/artifact.inspect.json"
     },
     {
       "method": "artifact.list",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/artifact.list.json"
     },
     {
       "method": "artifact.quota",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/artifact.quota.json"
     },
     {
       "method": "artifact.read",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/artifact.read.json"
     },
     {
       "method": "capability.inspect",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/capability.inspect.json"
     },
     {
       "method": "capability.list",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/capability.list.json"
     },
     {
       "method": "cleanupDebt.continue",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/cleanupDebt.continue.json"
     },
     {
       "method": "cleanupDebt.list",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/cleanupDebt.list.json"
     },
     {
       "method": "control-action.list",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/control-action.list.json"
     },
     {
       "method": "control-action.reconcile",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/control-action.reconcile.json"
     },
     {
       "method": "control-action.show",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/control-action.show.json"
     },
     {
       "method": "debug.evaluate",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/debug.evaluate.json"
     },
     {
       "method": "debug.probe",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/debug.probe.json"
     },
     {
       "method": "debug.start",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/debug.start.json"
     },
     {
       "method": "debug.status",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/debug.status.json"
     },
     {
       "method": "debug.template.run",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/debug.template.run.json"
     },
     {
       "method": "device.display-name.clear",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/device.display-name.clear.json"
     },
     {
       "method": "device.display-name.set",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/device.display-name.set.json"
     },
     {
       "method": "device.observations",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/device.observations.json"
     },
     {
       "method": "doctor",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/doctor.json"
     },
     {
       "method": "flash.bind-current-loader",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/flash.bind-current-loader.json"
     },
     {
       "method": "flash.bootloader-status",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/flash.bootloader-status.json"
     },
     {
       "method": "flash.device-access",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/flash.device-access.json"
     },
     {
       "method": "flash.lanePlanPreview",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/flash.lanePlanPreview.json"
     },
     {
       "method": "flash.prerequisites",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/flash.prerequisites.json"
     },
     {
       "method": "health",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/health.json"
     },
     {
       "method": "history.filter.delete",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/history.filter.delete.json"
     },
     {
       "method": "history.filter.list",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/history.filter.list.json"
     },
     {
       "method": "history.filter.save",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/history.filter.save.json"
     },
     {
       "method": "human-action.list",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/human-action.list.json"
     },
     {
       "method": "human-action.resume",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/human-action.resume.json"
     },
     {
       "method": "human-action.show",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/human-action.show.json"
     },
     {
       "method": "job.cancel",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/job.cancel.json"
     },
     {
       "method": "job.events",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/job.events.json"
     },
     {
       "method": "job.evidence",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/job.evidence.json"
     },
     {
       "method": "job.list",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/job.list.json"
     },
     {
       "method": "job.plan",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/job.plan.json"
     },
     {
       "method": "job.reconcile",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/job.reconcile.json"
     },
     {
       "method": "job.result",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/job.result.json"
     },
     {
       "method": "job.run",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/job.run.json"
     },
     {
       "method": "job.show",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/job.show.json"
     },
     {
       "method": "job.status",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/job.status.json"
     },
     {
       "method": "job.submit",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/job.submit.json"
     },
     {
       "method": "job.timeline",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/job.timeline.json"
     },
     {
       "method": "operation.describe",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/operation.describe.json"
     },
     {
       "method": "operation.list",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/operation.list.json"
     },
     {
       "method": "recovery.flash-invocation.list",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/recovery.flash-invocation.list.json"
     },
     {
       "method": "runtime.hdc.impact-preview",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/runtime.hdc.impact-preview.json"
     },
     {
       "method": "runtime.hdc.restart",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/runtime.hdc.restart.json"
     },
     {
       "method": "runtime.hdc.status",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/runtime.hdc.status.json"
     },
     {
       "method": "runtime.storage.policy",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/runtime.storage.policy.json"
     },
     {
       "method": "runtime.storage.root",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/runtime.storage.root.json"
     },
     {
       "method": "runtime.storage.status",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/runtime.storage.status.json"
     },
     {
       "method": "runtime.tool.select",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/runtime.tool.select.json"
     },
     {
       "method": "session.cleanup.apply",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/session.cleanup.apply.json"
     },
     {
       "method": "session.cleanup.preview",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/session.cleanup.preview.json"
     },
     {
       "method": "session.export.apply",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/session.export.apply.json"
     },
     {
       "method": "session.export.preview",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/session.export.preview.json"
     },
     {
       "method": "session.list",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/session.list.json"
     },
     {
       "method": "session.pin",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/session.pin.json"
     },
     {
       "method": "session.show",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/session.show.json"
     },
     {
       "method": "session.unpin",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/session.unpin.json"
     },
     {
       "method": "target.adopt",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/target.adopt.json"
     },
     {
       "method": "target.availability",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/target.availability.json"
     },
     {
       "method": "target.display-name.clear",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/target.display-name.clear.json"
     },
     {
       "method": "target.display-name.set",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/target.display-name.set.json"
     },
     {
       "method": "target.list",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/target.list.json"
     },
     {
       "method": "target.show",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/target.show.json"
     },
     {
       "method": "trace.cache.purge",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/trace.cache.purge.json"
     },
     {
       "method": "trace.cache.status",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/trace.cache.status.json"
     },
     {
       "method": "trace.inspect",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/trace.inspect.json"
     },
     {
       "method": "trace.probe",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/trace.probe.json"
     },
     {
       "method": "workspace.preset.list",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/workspace.preset.list.json"
     },
     {
       "method": "workspace.preset.register",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/workspace.preset.register.json"
     },
     {
       "method": "workspace.preset.remove",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/workspace.preset.remove.json"
     },
     {
       "method": "workspace.preset.show",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/workspace.preset.show.json"
     },
     {
       "method": "workspace.preset.update",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/workspace.preset.update.json"
     },
     {
       "method": "workspace.project.list",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/workspace.project.list.json"
     },
     {
       "method": "workspace.project.register",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/workspace.project.register.json"
     },
     {
       "method": "workspace.project.remove",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/workspace.project.remove.json"
     },
     {
       "method": "workspace.project.show",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/workspace.project.show.json"
     },
     {
       "method": "workspace.project.update",
-      "published": true
+      "published": true,
+      "schema": "spec/control/methods/workspace.project.update.json"
     }
   ]
 }

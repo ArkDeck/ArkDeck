@@ -1,0 +1,647 @@
+{
+  "$defs": {
+    "errorCode": {
+      "enum": [
+        "conflict",
+        "internalError",
+        "invalidParams",
+        "malformedFrame",
+        "notFound",
+        "recordUnreadable",
+        "rejected",
+        "unknownMethod",
+        "unsupportedProtocolVersion",
+        "workspaceReferenceNotFound"
+      ]
+    },
+    "errorDetails": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+    },
+    "request": {
+      "additionalProperties": false,
+      "properties": {
+        "reference": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "result": {
+      "additionalProperties": false,
+      "properties": {
+        "aliasFor": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "artifacts": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "mediaType": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "privacy": {
+                "type": "string"
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "retentionClass": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "mediaType",
+              "name",
+              "privacy",
+              "required",
+              "retentionClass",
+              "role"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "authorization": {
+          "additionalProperties": false,
+          "properties": {
+            "destructive": {
+              "type": "string"
+            },
+            "deviceMutation": {
+              "type": "string"
+            },
+            "hostOnly": {
+              "type": "string"
+            },
+            "readOnly": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "availability": {
+          "type": "string"
+        },
+        "availabilityReasonCodes": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "availabilityReasonOrigins": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "availabilityReasons": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "binding": {
+          "type": "string"
+        },
+        "completeOverwriteRecovery": {
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "contractVersion": {
+                  "type": "string"
+                },
+                "overwriteStepId": {
+                  "type": "string"
+                },
+                "profiles": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "coveredEffects": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
+                      "reference": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "coveredEffects",
+                      "reference"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "verificationStepIds": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "required": [
+                "contractVersion",
+                "overwriteStepId",
+                "profiles",
+                "verificationStepIds"
+              ],
+              "type": "object"
+            },
+            {
+              "type": [
+                "null"
+              ]
+            }
+          ]
+        },
+        "concurrencyKey": {
+          "type": "string"
+        },
+        "defaultPolicyIssuanceEnabled": {
+          "type": "boolean"
+        },
+        "exampleRequest": {
+          "additionalProperties": false,
+          "properties": {
+            "documentType": {
+              "type": "string"
+            },
+            "idempotencyKey": {
+              "type": "string"
+            },
+            "inputs": {
+              "additionalProperties": false,
+              "properties": {
+                "abilityName": {
+                  "type": "string"
+                },
+                "allowedFileGlobs": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "artifactLease": {
+                  "type": "string"
+                },
+                "baseRevision": {
+                  "type": "string"
+                },
+                "buildPresetRef": {
+                  "type": "string"
+                },
+                "bundleName": {
+                  "type": "string"
+                },
+                "deviceProfile": {
+                  "type": "string"
+                },
+                "deviceProfileRef": {
+                  "type": "string"
+                },
+                "direction": {
+                  "type": "string"
+                },
+                "displayHeight": {
+                  "type": "integer"
+                },
+                "displayWidth": {
+                  "type": "integer"
+                },
+                "dryRun": {
+                  "type": "boolean"
+                },
+                "dumpArtifactRef": {
+                  "type": "string"
+                },
+                "durationMs": {
+                  "type": "integer"
+                },
+                "durationSeconds": {
+                  "type": "integer"
+                },
+                "expectedABI": {
+                  "type": "string"
+                },
+                "expectedWorkspaceRevision": {
+                  "type": "string"
+                },
+                "filePath": {
+                  "type": "string"
+                },
+                "fileScope": {
+                  "type": "string"
+                },
+                "frameCount": {
+                  "type": "integer"
+                },
+                "fromX": {
+                  "type": "integer"
+                },
+                "fromY": {
+                  "type": "integer"
+                },
+                "hapArtifactLease": {
+                  "type": "string"
+                },
+                "imageBundleLease": {
+                  "type": "string"
+                },
+                "intent": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "libraryArtifactLease": {
+                  "type": "string"
+                },
+                "libraryLogicalName": {
+                  "type": "string"
+                },
+                "lineEnd": {
+                  "type": "integer"
+                },
+                "lineStart": {
+                  "type": "integer"
+                },
+                "localPort": {
+                  "type": "integer"
+                },
+                "maxEvents": {
+                  "type": "integer"
+                },
+                "maxOutputBytes": {
+                  "type": "integer"
+                },
+                "maxRows": {
+                  "type": "integer"
+                },
+                "minimumQuiescentSeconds": {
+                  "type": "integer"
+                },
+                "partitionPlan": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "patchArtifactRef": {
+                  "type": "string"
+                },
+                "patchAttemptRef": {
+                  "type": "string"
+                },
+                "pathScope": {
+                  "type": "string"
+                },
+                "projectRef": {
+                  "type": "string"
+                },
+                "remotePort": {
+                  "type": "integer"
+                },
+                "retainLatestCount": {
+                  "type": "integer"
+                },
+                "signingPresetRef": {
+                  "type": "string"
+                },
+                "sourceArtifactRef": {
+                  "type": "string"
+                },
+                "symbol": {
+                  "type": "string"
+                },
+                "symbolPresetRef": {
+                  "type": "string"
+                },
+                "targetBundle": {
+                  "type": "string"
+                },
+                "templateId": {
+                  "type": "string"
+                },
+                "testPresetRef": {
+                  "type": "string"
+                },
+                "timeoutMs": {
+                  "type": "integer"
+                },
+                "toX": {
+                  "type": "integer"
+                },
+                "toY": {
+                  "type": "integer"
+                },
+                "unsignedHapArtifactLease": {
+                  "type": "string"
+                },
+                "x": {
+                  "type": "integer"
+                },
+                "y": {
+                  "type": "integer"
+                }
+              },
+              "type": "object"
+            },
+            "operation": {
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "version": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "type": "object"
+            },
+            "requestId": {
+              "type": "string"
+            },
+            "requestedOutputs": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "schemaVersion": {
+              "type": "string"
+            },
+            "target": {
+              "additionalProperties": false,
+              "properties": {
+                "expectedBindingRevision": {
+                  "type": "integer"
+                },
+                "targetId": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "targetId"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "documentType",
+            "idempotencyKey",
+            "inputs",
+            "operation",
+            "requestId",
+            "requestedOutputs",
+            "schemaVersion",
+            "target"
+          ],
+          "type": "object"
+        },
+        "inputs": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "default": {
+                "type": [
+                  "boolean",
+                  "integer",
+                  "string"
+                ]
+              },
+              "description": {
+                "type": "string"
+              },
+              "enum": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "maxItems": {
+                "type": "integer"
+              },
+              "maxLength": {
+                "type": "integer"
+              },
+              "maximum": {
+                "type": "integer"
+              },
+              "minimum": {
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              },
+              "pattern": {
+                "type": "string"
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "type": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "description",
+              "name",
+              "required",
+              "type"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "minimumEffect": {
+          "type": "string"
+        },
+        "outputByteBudget": {
+          "type": "integer"
+        },
+        "outputs": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "description": {
+                "type": "string"
+              },
+              "maxLength": {
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "type": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "required",
+              "type"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "permittedEffects": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "preflightAttempts": {
+          "type": "integer"
+        },
+        "profiles": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "reference": {
+          "type": "string"
+        },
+        "stepCount": {
+          "type": "integer"
+        },
+        "steps": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "action": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "actionId": {
+                        "type": "string"
+                      },
+                      "catalogId": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "actionId",
+                      "catalogId"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "type": [
+                      "null"
+                    ]
+                  }
+                ]
+              },
+              "binding": {
+                "type": "string"
+              },
+              "cancellation": {
+                "type": "string"
+              },
+              "compensation": {
+                "type": "string"
+              },
+              "effect": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "optional": {
+                "type": "boolean"
+              },
+              "stepId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "action",
+              "binding",
+              "cancellation",
+              "compensation",
+              "effect",
+              "kind",
+              "optional",
+              "stepId"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "timeoutSeconds": {
+          "type": "integer"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "aliasFor",
+        "artifacts",
+        "authorization",
+        "availability",
+        "availabilityReasonCodes",
+        "availabilityReasonOrigins",
+        "availabilityReasons",
+        "binding",
+        "completeOverwriteRecovery",
+        "concurrencyKey",
+        "defaultPolicyIssuanceEnabled",
+        "exampleRequest",
+        "inputs",
+        "minimumEffect",
+        "outputByteBudget",
+        "outputs",
+        "permittedEffects",
+        "preflightAttempts",
+        "profiles",
+        "provider",
+        "reference",
+        "stepCount",
+        "steps",
+        "timeoutSeconds",
+        "title"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://arkdeck.dev/schemas/control/methods/operation.describe.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Typed contract of the control-plane method `operation.describe` on the single current protocol: the request parameters a caller may send, the result the Runtime answers with, and the structured error details it attaches to a refusal. Derived from frames recorded by a contract-test run; the committed corpus under Tests/ArkDeckContractTests/Fixtures/ControlFrames is validated against it.",
+  "title": "arkdeck.control.method/operation.describe",
+  "x-arkdeck-contractIdentity": "1054d17b598ce23003ebbdec4d42eb359b63016d6421709ba53c3f21f7c6558d",
+  "x-arkdeck-method": "operation.describe",
+  "x-arkdeck-protocolVersion": "1.0.0",
+  "x-arkdeck-sampleCounts": {
+    "error": 2,
+    "request": 57,
+    "result": 55
+  }
+}

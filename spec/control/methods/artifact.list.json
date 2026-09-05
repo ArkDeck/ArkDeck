@@ -1,0 +1,273 @@
+{
+  "$defs": {
+    "errorCode": {
+      "enum": [
+        "artifactIntegrityFailed",
+        "conflict",
+        "internalError",
+        "invalidInput",
+        "invalidParams",
+        "malformedFrame",
+        "notFound",
+        "operationUnavailable",
+        "recordUnreadable",
+        "rejected",
+        "unknownMethod",
+        "unsupportedProtocolVersion",
+        "workspaceReferenceNotFound"
+      ]
+    },
+    "errorDetails": {
+      "additionalProperties": false,
+      "properties": {
+        "newDispatchCount": {
+          "type": "integer"
+        },
+        "phase": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "newDispatchCount",
+        "phase"
+      ],
+      "type": "object"
+    },
+    "request": {
+      "additionalProperties": false,
+      "properties": {
+        "artifactId": {
+          "type": "string"
+        },
+        "jobId": {
+          "type": "string"
+        },
+        "owner": {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "kind"
+          ],
+          "type": "object"
+        },
+        "pageSize": {
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "result": {
+      "additionalProperties": false,
+      "properties": {
+        "hasMore": {
+          "type": "boolean"
+        },
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "artifactDigest": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "artifactId": {
+                "type": "string"
+              },
+              "binding": {
+                "additionalProperties": false,
+                "properties": {
+                  "bindingRevision": {
+                    "type": "integer"
+                  },
+                  "stableIdentitySha256": {
+                    "type": [
+                      "null",
+                      "string"
+                    ]
+                  },
+                  "targetId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "bindingRevision",
+                  "stableIdentitySha256",
+                  "targetId"
+                ],
+                "type": "object"
+              },
+              "byteCount": {
+                "type": "integer"
+              },
+              "createdAtUtc": {
+                "type": "string"
+              },
+              "lease": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "mediaType": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "observationWindow": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "endUtc": {
+                        "type": "string"
+                      },
+                      "startUtc": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "endUtc",
+                      "startUtc"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "type": [
+                      "null"
+                    ]
+                  }
+                ]
+              },
+              "owner": {
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "kind"
+                ],
+                "type": "object"
+              },
+              "privacy": {
+                "type": "string"
+              },
+              "providerId": {
+                "type": "string"
+              },
+              "redactionApplied": {
+                "type": "boolean"
+              },
+              "retention": {
+                "additionalProperties": false,
+                "properties": {
+                  "class": {
+                    "type": "string"
+                  },
+                  "deadlineUtc": {
+                    "type": [
+                      "null",
+                      "string"
+                    ]
+                  },
+                  "pinned": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "class",
+                  "deadlineUtc",
+                  "pinned"
+                ],
+                "type": "object"
+              },
+              "schemaVersion": {
+                "type": "string"
+              },
+              "sourceOperation": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "artifactDigest",
+              "artifactId",
+              "binding",
+              "byteCount",
+              "createdAtUtc",
+              "lease",
+              "mediaType",
+              "name",
+              "observationWindow",
+              "owner",
+              "privacy",
+              "providerId",
+              "redactionApplied",
+              "retention",
+              "schemaVersion",
+              "sourceOperation",
+              "status"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "nextCursor": {
+          "type": "null"
+        },
+        "order": {
+          "type": "string"
+        },
+        "pageKind": {
+          "type": "string"
+        },
+        "schemaVersion": {
+          "type": "string"
+        },
+        "snapshotRevision": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "hasMore",
+        "items",
+        "nextCursor",
+        "order",
+        "pageKind",
+        "schemaVersion",
+        "snapshotRevision"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://arkdeck.dev/schemas/control/methods/artifact.list.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Typed contract of the control-plane method `artifact.list` on the single current protocol: the request parameters a caller may send, the result the Runtime answers with, and the structured error details it attaches to a refusal. Derived from frames recorded by a contract-test run; the committed corpus under Tests/ArkDeckContractTests/Fixtures/ControlFrames is validated against it.",
+  "title": "arkdeck.control.method/artifact.list",
+  "x-arkdeck-contractIdentity": "1054d17b598ce23003ebbdec4d42eb359b63016d6421709ba53c3f21f7c6558d",
+  "x-arkdeck-method": "artifact.list",
+  "x-arkdeck-protocolVersion": "1.0.0",
+  "x-arkdeck-sampleCounts": {
+    "error": 5,
+    "request": 31,
+    "result": 26
+  }
+}

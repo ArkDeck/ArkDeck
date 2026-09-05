@@ -1,0 +1,3 @@
+{"method":"trace.cache.status","ok":true,"params":{},"protocolVersion":"1.0.0","result":{"activeEntryCount":1,"entryCount":3,"inactiveEntryCount":2,"purgeScope":"inactiveDerivedDatabases","schemaVersion":"arkdeck.trace-cache-status/1","totalByteCount":"4096"}}
+{"error":{"code":"recordUnreadable","details":{"newDispatchCount":0,"phase":"traceCacheOwner","purgeScope":"inactiveDerivedDatabases"},"message":"Trace cache inventory is unavailable"},"method":"trace.cache.status","ok":false,"params":{},"protocolVersion":"1.0.0"}
+{"error":{"code":"internalError","message":"Trace cache maintenance is not configured"},"method":"trace.cache.status","ok":false,"params":{},"protocolVersion":"1.0.0"}

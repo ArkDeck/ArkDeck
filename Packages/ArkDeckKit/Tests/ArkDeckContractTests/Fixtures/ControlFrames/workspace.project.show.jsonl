@@ -1,0 +1,2 @@
+{"error":{"code":"workspaceReferenceNotFound","details":{"newDispatchCount":0,"phase":"workspaceProjectOwner"},"message":"workspace project is not registered"},"method":"workspace.project.show","ok":false,"params":{"projectRef":"nope"},"protocolVersion":"1.0.0"}
+{"error":{"code":"invalidParams","message":"projectRef is required"},"method":"workspace.project.show","ok":false,"params":{},"protocolVersion":"1.0.0"}

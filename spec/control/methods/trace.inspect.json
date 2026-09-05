@@ -1,0 +1,314 @@
+{
+  "$defs": {
+    "errorCode": {
+      "enum": [
+        "artifactIntegrityFailed",
+        "conflict",
+        "internalError",
+        "invalidInput",
+        "invalidParams",
+        "malformedFrame",
+        "notFound",
+        "operationFailed",
+        "operationUnavailable",
+        "recordUnreadable",
+        "rejected",
+        "unknownMethod",
+        "unsupportedProtocolVersion",
+        "workspaceReferenceNotFound"
+      ]
+    },
+    "errorDetails": {
+      "additionalProperties": false,
+      "properties": {
+        "deviceEvidenceCreated": {
+          "type": "boolean"
+        },
+        "newDispatchCount": {
+          "type": "integer"
+        },
+        "phase": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "deviceEvidenceCreated",
+        "newDispatchCount",
+        "phase"
+      ],
+      "type": "object"
+    },
+    "request": {
+      "additionalProperties": false,
+      "properties": {
+        "allowSensitive": {
+          "type": "boolean"
+        },
+        "artifactId": {
+          "type": "string"
+        },
+        "owner": {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "kind"
+          ],
+          "type": "object"
+        },
+        "timeoutMs": {
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "result": {
+      "additionalProperties": false,
+      "properties": {
+        "dataQuality": {
+          "additionalProperties": false,
+          "properties": {
+            "issues": {
+              "type": "array"
+            },
+            "status": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "issues",
+            "status"
+          ],
+          "type": "object"
+        },
+        "deviceEvidenceCreated": {
+          "type": "boolean"
+        },
+        "engine": {
+          "additionalProperties": false,
+          "properties": {
+            "build": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "sourceRevision": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "build",
+            "name",
+            "sourceRevision",
+            "version"
+          ],
+          "type": "object"
+        },
+        "owner": {
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "kind"
+          ],
+          "type": "object"
+        },
+        "parser": {
+          "additionalProperties": false,
+          "properties": {
+            "adapterVersion": {
+              "type": "string"
+            },
+            "binarySha256": {
+              "type": "string"
+            },
+            "buildRecipeVersion": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "upstreamRevision": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "adapterVersion",
+            "binarySha256",
+            "buildRecipeVersion",
+            "name",
+            "upstreamRevision",
+            "version"
+          ],
+          "type": "object"
+        },
+        "schema": {
+          "additionalProperties": false,
+          "properties": {
+            "fingerprint": {
+              "type": "string"
+            },
+            "provenance": {
+              "additionalProperties": false,
+              "properties": {
+                "adapterVersion": {
+                  "type": "string"
+                },
+                "indexVersion": {
+                  "type": "integer"
+                },
+                "upstreamDatabaseByteCount": {
+                  "type": "string"
+                },
+                "upstreamDatabaseSha256": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "adapterVersion",
+                "indexVersion",
+                "upstreamDatabaseByteCount",
+                "upstreamDatabaseSha256"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "fingerprint",
+            "provenance"
+          ],
+          "type": "object"
+        },
+        "schemaVersion": {
+          "type": "string"
+        },
+        "source": {
+          "additionalProperties": false,
+          "properties": {
+            "artifactDigest": {
+              "type": "string"
+            },
+            "artifactId": {
+              "type": "string"
+            },
+            "byteCount": {
+              "type": "string"
+            },
+            "mediaType": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "privacy": {
+              "type": "string"
+            },
+            "sourceOperation": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "artifactDigest",
+            "artifactId",
+            "byteCount",
+            "mediaType",
+            "name",
+            "privacy",
+            "sourceOperation"
+          ],
+          "type": "object"
+        },
+        "storageMode": {
+          "type": "string"
+        },
+        "trace": {
+          "additionalProperties": false,
+          "properties": {
+            "capabilities": {
+              "additionalProperties": false,
+              "properties": {
+                "cpuCounters": {
+                  "type": "boolean"
+                },
+                "cpuScheduling": {
+                  "type": "boolean"
+                },
+                "namedSlices": {
+                  "type": "boolean"
+                },
+                "processCounters": {
+                  "type": "boolean"
+                },
+                "threadStates": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "cpuCounters",
+                "cpuScheduling",
+                "namedSlices",
+                "processCounters",
+                "threadStates"
+              ],
+              "type": "object"
+            },
+            "durationNs": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "capabilities",
+            "durationNs"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "dataQuality",
+        "deviceEvidenceCreated",
+        "engine",
+        "owner",
+        "parser",
+        "schema",
+        "schemaVersion",
+        "source",
+        "storageMode",
+        "trace"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://arkdeck.dev/schemas/control/methods/trace.inspect.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Typed contract of the control-plane method `trace.inspect` on the single current protocol: the request parameters a caller may send, the result the Runtime answers with, and the structured error details it attaches to a refusal. Derived from frames recorded by a contract-test run; the committed corpus under Tests/ArkDeckContractTests/Fixtures/ControlFrames is validated against it.",
+  "title": "arkdeck.control.method/trace.inspect",
+  "x-arkdeck-contractIdentity": "1054d17b598ce23003ebbdec4d42eb359b63016d6421709ba53c3f21f7c6558d",
+  "x-arkdeck-method": "trace.inspect",
+  "x-arkdeck-protocolVersion": "1.0.0",
+  "x-arkdeck-sampleCounts": {
+    "error": 4,
+    "request": 5,
+    "result": 1
+  }
+}
