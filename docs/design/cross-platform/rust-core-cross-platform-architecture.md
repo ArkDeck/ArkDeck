@@ -750,7 +750,7 @@ flowchart TD
 - 根因：44 个方法只在 1.x（`ControlProtocolGenerated.swift:11`），`params` 无 schema（B.1 #14/#15）。
 - 依赖/并行：依赖 SPK-1 无（可并行）；与 XPA-002 并行开发但 XPA-002 依赖其契约。
 - Production reachability：`arkdeck` CLI → UDS → `RuntimeControlPlaneHandler`（`AgentDaemon.swift:293-341`）→ 2.1.0 方法表 → 既有 handler；不新增 effect。
-- 模块/路径：Allowed `Packages/ArkDeckKit/Contracts/**`、`Packages/ArkDeckKit/Scripts/generate-control-contract.py`、`Packages/ArkDeckKit/Sources/ArkDeckCore/**`、`Sources/ArkDeckAgentDaemon/**`、`Sources/ArkDeckCLI/**`、`Tests/ArkDeckContractTests/**`、`openspec/contracts/runtime-control-plane.schema.json` 及新 `spec/control/**`；Forbidden `openspec/specs/**`、`openspec/constitution.md`、`Catalog/**`。
+- 模块/路径：Allowed `Packages/ArkDeckKit/Contracts/**`、`Packages/ArkDeckKit/Scripts/generate-control-contract.py`、`Packages/ArkDeckKit/Sources/ArkDeckCore/**`、`Sources/ArkDeckAgentDaemon/**`、`Sources/ArkDeckAgentClient/**`（r4：仅目标 major 的版本谓词——协商到 `2.1.0` 与 `2.0.0` 都必须走 target 分支；不新增方法、传输或 effect）、`Sources/ArkDeckCLI/**`、`Tests/ArkDeckContractTests/**`、`openspec/contracts/runtime-control-plane.schema.json` 及新 `spec/control/**`；Forbidden `openspec/specs/**`、`openspec/constitution.md`、`Catalog/**`。
 - 交付物：`supportedExactVersions=["2.1.0","2.0.0","1.0.0"]`；2.1.0 additive 方法集；`spec/control/methods/*.json`；契约补记 journal 2.0.0–3.0.0 等世代；CLI target leaf 迁到 2.x。
 - AC：每个录制帧（现有契约测试）对 schema 校验通过；1.x 表字节不变（CLI-REQ-025）；`arkdeck --version` 列出三版本；headless runbook 在 2.x-only 下 GJ-1～5 `REAL_DEVICE_PASS`。
 - 验证：contract（schema 正反例、negotiation 矩阵）、differential（2.0 与 2.1 对同一请求结果相等）、fault-injection（未知 method/major）、真机 headless 复跑。

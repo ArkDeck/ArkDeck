@@ -9,14 +9,16 @@ SLO and benchmark plan, task DAG, risk register, maintainer decisions) is:
 
 ```yaml pins
 - path: docs/design/cross-platform/rust-core-cross-platform-architecture.md
-  blob: 27961bc489dfe1079e093779279159d41d86e052
-  sha256: 638b919f97043a55eea38934544f7cf1a76578475b81e8caa4dfa793148fda3c
+  blob: 777e0d4f122d24bf2c5d8f36413de38f12770478
+  sha256: 87ccb16088a018a71ee9a2025717770907d7675cf2cee4a7abbd6a7b2d8b3594
 ```
 
 Later revisions of the design must re-pin here in the same PR; the pinned blob is what the
 maintainer approved. Revision 2 re-pinned it for the section I.2 budget finalisation described in
 `proposal.md`. Revision 3 re-pins it for the design review repairs described there: sections A
 (item 5), F.2, G.2, G.4, G.5, J.2, J.4, J.5 and K changed; sections B–E, H, I and L are unchanged.
+Revision 4 re-pins it for the `TASK-XPA-001` Allowed-paths correction described there: only the
+section J.4 path line of that task changed.
 
 ## Decision
 

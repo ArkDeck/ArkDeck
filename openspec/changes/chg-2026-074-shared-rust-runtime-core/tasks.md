@@ -66,6 +66,7 @@ Conventions shared by every task:
   - `Packages/ArkDeckKit/Scripts/generate-control-contract.py`
   - `Packages/ArkDeckKit/Sources/ArkDeckCore/**`
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckAgentClient/**`（r4: the target-major version predicate in the transport library only — the negotiated `2.1.0` and `2.0.0` must both select the target branches; no new method, transport or effect）
   - `Packages/ArkDeckKit/Sources/ArkDeckCLI/**`
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/**`
   - `openspec/contracts/runtime-control-plane.schema.json`

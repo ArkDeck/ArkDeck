@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-074-shared-rust-runtime-core
-revision: 3
+revision: 4
 status: approved # 维护者 review + merge 本 proposal PR 后才生效；合入前任何 TASK-XPA 不开工，第一个实现 PR 只能在合入后声明
 class: platform
 core_change_level: none
@@ -262,6 +262,35 @@ repaired here. Seven are repaired in this revision; the eighth belongs to an ope
 
 No maintainer decision is added or removed by this revision; item 16 of design §L.1 and the
 provisional budgets stand as in r2. The pinned design blob in `design.md` is re-pinned.
+
+## Revision 4 — one Allowed-paths correction for `TASK-XPA-001` (2026-09-05)
+
+Revision 4 changes no scope, no Requirement, no Acceptance Scenario and no platform
+disposition. It repairs one defect in the task table that surfaced when `TASK-XPA-001`
+started, of the same kind as the `TASK-XPA-023` correction in revision 2.
+
+1. **`TASK-XPA-001` Allowed paths gained `Packages/ArkDeckKit/Sources/ArkDeckAgentClient/**`.**
+   The task publishes protocol `2.1.0` and requires the CLI's target leaves to negotiate it, with
+   rollback "daemon binary revert; clients negotiate back to `2.0.0`". The client library decides
+   target-protocol behaviour by comparing the negotiated exact version with the single constant
+   `ArkDeckControlProtocol.targetVersion` (`AgentClient.swift:114` strict response-shape
+   validation, `:136` structured admission errors with `details.phase`/`newDispatchCount`,
+   `AgentRuntimeExecutor.swift:492` rethrow of a submit refusal instead of flattening it into a
+   receipt). With two target exact versions that comparison is wrong in one direction whichever
+   value the constant holds: a client that negotiates `2.1.0` would fall into the legacy branches
+   and lose the §8.4 zero-dispatch evidence, or, if the constant moved to `2.1.0`, the same client
+   would degrade the moment it negotiated `2.0.0` against a rolled-back daemon. The client library
+   therefore has to learn the target-major predicate the daemon learns, and its directory was not
+   in the task's Allowed paths (design §J.4 listed the daemon, the CLI and the contract tests, not
+   the transport library between them). `scripts/check_pr_paths.py` reads Allowed paths from the
+   base tree (r3 finding 6), so the implementation PR cannot supply the line itself. The widening
+   is annotated on the Allowed-paths line as in revision 2: the version predicate only, no new
+   method, transport or effect. The App's XPC facades in `ArkDeckWorkflows` keep sending the base
+   target version without negotiation and are not widened; `targetVersion` itself stays `2.0.0`
+   so that a newer App still reaches an older daemon's storage and trace-cache resources.
+
+No maintainer decision is added or removed by this revision. The pinned design blob in
+`design.md` is re-pinned; only the section J.4 path line of `TASK-XPA-001` changed.
 
 ## Compatibility note
 
