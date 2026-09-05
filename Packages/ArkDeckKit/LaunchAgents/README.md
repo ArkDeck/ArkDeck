@@ -175,7 +175,7 @@ arkdeck operation list --json
 ```
 
 DevEco Studio 写入 `build-profile.json5` 的 `storePassword`/`keyPassword` 可能是 76 字符的
-加密值。LaunchAgent 安装完成后，可让 ArkDeck 从受限的 build-profile 一次性迁移；它严格使用
+加密值。LaunchAgent 安装完成后，可让 ArkDeck 从受限的 build-profile 重新配钥；它严格使用
 profile 自己的 `storeFile` 同级 `material/` 做认证解密，把两个明文合并进一个 Data Protection
 Keychain 信封。该 `storeFile`
 必须存在、保持 owner-private，且内容身份与 ArkDeck preset 中已安装的 keystore 完全一致；
@@ -194,17 +194,17 @@ PKCS#12 私钥 alias 已由只读诊断确认时提供。ArkDeck 会校验其闭
 复用已有 Keychain 信封与 access group；错误 alias 仍会在签名时 fail closed 为 `keyAliasRejected`。
 
 Runtime Job 此后不再读取 DevEco material，也禁止唤起 Keychain UI；Keychain 锁定或可信应用
-身份漂移会立即 fail closed。私有 signing preset 继续只使用 Keychain。首次从旧版 file-based
-Keychain 升级时，`agentd update` 会在显式维护边界读取旧信封并迁入 Data Protection Keychain，
-最多可能要求一次 macOS Keychain 授权；之后 daemon 更新不再搬迁秘密。status 和 Runtime Job
-永不弹框。若旧版 ArkDeck 已把密文原样存入两项 Keychain，可用上述命令迁移为单信封；`signing normalize` 仅保留给同一
-keystore/material 布局的旧安装修复。两条命令都只报告迁移状态，不返回密码。
+身份漂移会立即 fail closed。私有 signing preset 继续只使用 Data Protection Keychain：
+唯一受支持的秘密形态是该 access group 下的单个 secret envelope。`agentd update` 只在显式
+维护边界重记已安装 daemon 的身份，不读取、不搬迁、不删除任何秘密。status 和 Runtime Job
+永不弹框。用其他存储形态写下的 preset 会被按名拒绝而不是自动升级：材料与 Keychain 项
+原样保留，用 `runtime signing install` 显式重配即可；上述 `migrate-deveco` 是同一 keystore
+的重新配钥入口。两条命令都只报告结果，不返回密码。
 
-登录 Keychain 通常随用户登录自动解锁；若私有 preset 迁移返回 Keychain `-60008`，只在自己的
+登录 Keychain 通常随用户登录自动解锁；若配钥返回 Keychain `-60008`，只在自己的
 Terminal 执行一次 `security unlock-keychain "$HOME/Library/Keychains/login.keychain-db"`，不要把
-密码放进 argv、配置或日志。SDK 默认 preset 的 daemon 更新不读取旧信封；私有 preset 只有在
-旧式 access schema 存在时才进入一次显式维护读取。Runtime/status 始终使用禁止 UI 的
-Data Protection Keychain 查询。未包装、未 provision 的 SwiftPM build 二进制不能访问生产信封。
+密码放进 argv、配置或日志。daemon 更新只重记已安装 helper 的身份，不读取任何信封。
+Runtime/status 始终使用禁止 UI 的 Data Protection Keychain 查询。未包装、未 provision 的 SwiftPM build 二进制不能访问生产信封。
 
 `status` 显示非秘密路径、SHA-256、Keychain item 是否存在及漂移诊断，不返回也不解密密码，
 因此健康检查不会触发 Keychain 授权。私有 preset 只在真实签名 Job 的 signer 启动前执行一次
@@ -256,7 +256,7 @@ code signing），非零退出只发布闭合的无秘密诊断码，并要求 t
 arkdeck runtime signing remove --json
 ```
 
-该命令删除 ArkDeck receipt、当前单一 Keychain 信封及 receipt 记录的旧版 secret。SDK release
+该命令删除 ArkDeck receipt 与该 preset 账号下的 Keychain 项。SDK release
 默认方式还会删除 ArkDeck 的 owner-private 托管副本，但保留官方 SDK source；兼容手工安装则
 保留操作者提供的原始 keystore/certificate/profile。
 签名 lane 不调用 HDC；产物文件名、fake/simulation 或 `sign-app` exit 0 都不构成真机通过证明。
@@ -264,6 +264,24 @@ arkdeck runtime signing remove --json
 HarmonyOS 商用设备仍应使用其账号/UDID Provision 流程；OpenHarmony release profile 不是
 绕过 HarmonyOS 授权的通用方案。无论哪一种签名来源，设备信任、签名身份和 profile 漂移都
 必须 fail closed。
+
+## ArkForge lane(Rockchip 写入)
+
+ArkForge lane 由一个 release bundle 决定，安装时给出它的绝对路径即可；daemon、DAYU200
+profile 与摘要都从该 bundle 已校验的 manifest 派生,不再由操作者分别给出:
+
+```text
+arkdeck runtime service update --arkforge-bundle /absolute/ArkForge.bundle --json
+```
+
+`--arkforge-campaign` 是独立的授权，只能与显式 `--arkforge-bundle` 同时给出；未授权
+campaign 时 `arkforged` 发布 `hardwareGated`，只 materialize assessment,不触达设备。
+`--arkforge-bundle none` 清除 lane。未重述这两个参数的 `update` 会保留已安装 lane 并
+重新实测其摘要——陈旧摘要不会被顺延。
+
+plist 里仍带 `ARKDECK_ARKFORGED_PATH`、`ARKDECK_ARKFORGED_SHA256` 或
+`ARKDECK_ARKFORGE_PROFILE_PATH` 的旧安装按名拒绝，不会被自动升级：`status` 给出该拒绝
+诊断,不重述 lane 的 `update` 直接失败,显式传入 `--arkforge-bundle` 重配即可。
 
 ## CHG-2026-064:进程内决策平面已移除(操作者迁移注记)
 

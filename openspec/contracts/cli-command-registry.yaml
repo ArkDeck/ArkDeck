@@ -670,7 +670,7 @@
         "published": false
         "required": false
         "stability": "refusedByName"
-        "summary": "retired ArkForge lane configuration; answered with migration guidance"
+        "summary": "retired ArkForge lane configuration; answered by name"
       - "form": "value"
         "grammar":
           "kind": "opaque"
@@ -679,7 +679,7 @@
         "published": false
         "required": false
         "stability": "refusedByName"
-        "summary": "retired ArkForge lane configuration; answered with migration guidance"
+        "summary": "retired ArkForge lane configuration; answered by name"
       - "form": "value"
         "grammar":
           "kind": "opaque"
@@ -688,7 +688,7 @@
         "published": false
         "required": false
         "stability": "refusedByName"
-        "summary": "retired ArkForge lane configuration; answered with migration guidance"
+        "summary": "retired ArkForge lane configuration; answered by name"
       - "form": "value"
         "grammar":
           "kind": "enumeration"
@@ -1117,45 +1117,6 @@
     "requiresExactlyOneOf": []
     "summary": "install a signing preset from explicit credential references"
   - "catalogOperation": null
-    "command": "runtime.signing.normalize"
-    "connectsToRuntime": false
-    "kind": "executable"
-    "lifecycleStatus": "current"
-    "mutuallyExclusive":
-      - - "--output"
-        - "--json"
-    "options":
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "human"
-            - "json"
-            - "jsonl"
-        "name": "--output"
-        "placeholder": "human|json"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "output mode; machine modes emit one arkdeck.cli.result/1 document"
-      - "form": "flag"
-        "name": "--json"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "legacy: print the raw reply as JSON, without the result envelope"
-    "outputModes":
-      - "human"
-      - "json"
-    "path":
-      - "runtime"
-      - "signing"
-      - "normalize"
-    "positionals": []
-    "replacementArgvPattern": null
-    "requiresExactlyOneOf": []
-    "summary": "normalize an installed preset in place"
-  - "catalogOperation": null
     "command": "runtime.signing.migrate-deveco"
     "connectsToRuntime": false
     "kind": "executable"
@@ -1220,7 +1181,7 @@
     "positionals": []
     "replacementArgvPattern": null
     "requiresExactlyOneOf": []
-    "summary": "migrate a DevEco build profile into a typed preset"
+    "summary": "re-key the installed preset from a DevEco build profile"
   - "catalogOperation": null
     "command": "runtime.signing.status"
     "connectsToRuntime": false
@@ -15697,7 +15658,7 @@
         "published": false
         "required": false
         "stability": "refusedByName"
-        "summary": "retired ArkForge lane configuration; answered with migration guidance"
+        "summary": "retired ArkForge lane configuration; answered by name"
       - "form": "value"
         "grammar":
           "kind": "opaque"
@@ -15706,7 +15667,7 @@
         "published": false
         "required": false
         "stability": "refusedByName"
-        "summary": "retired ArkForge lane configuration; answered with migration guidance"
+        "summary": "retired ArkForge lane configuration; answered by name"
       - "form": "value"
         "grammar":
           "kind": "opaque"
@@ -15715,7 +15676,7 @@
         "published": false
         "required": false
         "stability": "refusedByName"
-        "summary": "retired ArkForge lane configuration; answered with migration guidance"
+        "summary": "retired ArkForge lane configuration; answered by name"
       - "form": "value"
         "grammar":
           "kind": "enumeration"
@@ -15870,7 +15831,7 @@
         "published": false
         "required": false
         "stability": "refusedByName"
-        "summary": "retired ArkForge lane configuration; answered with migration guidance"
+        "summary": "retired ArkForge lane configuration; answered by name"
       - "form": "value"
         "grammar":
           "kind": "opaque"
@@ -15879,7 +15840,7 @@
         "published": false
         "required": false
         "stability": "refusedByName"
-        "summary": "retired ArkForge lane configuration; answered with migration guidance"
+        "summary": "retired ArkForge lane configuration; answered by name"
       - "form": "value"
         "grammar":
           "kind": "opaque"
@@ -15888,7 +15849,7 @@
         "published": false
         "required": false
         "stability": "refusedByName"
-        "summary": "retired ArkForge lane configuration; answered with migration guidance"
+        "summary": "retired ArkForge lane configuration; answered by name"
       - "form": "value"
         "grammar":
           "kind": "enumeration"
@@ -16310,44 +16271,6 @@
     "requiresExactlyOneOf": []
     "summary": "install a signing preset from explicit credential references"
   - "catalogOperation": null
-    "command": "signing.normalize"
-    "connectsToRuntime": false
-    "kind": "executable"
-    "lifecycleStatus": "deprecated"
-    "mutuallyExclusive":
-      - - "--output"
-        - "--json"
-    "options":
-      - "form": "value"
-        "grammar":
-          "kind": "enumeration"
-          "values":
-            - "human"
-            - "json"
-            - "jsonl"
-        "name": "--output"
-        "placeholder": "human|json"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "output mode; machine modes emit one arkdeck.cli.result/1 document"
-      - "form": "flag"
-        "name": "--json"
-        "published": true
-        "required": false
-        "stability": "standard"
-        "summary": "legacy: print the raw reply as JSON, without the result envelope"
-    "outputModes":
-      - "human"
-      - "json"
-    "path":
-      - "signing"
-      - "normalize"
-    "positionals": []
-    "replacementArgvPattern": "arkdeck runtime signing normalize"
-    "requiresExactlyOneOf": []
-    "summary": "normalize an installed preset in place"
-  - "catalogOperation": null
     "command": "signing.migrate-deveco"
     "connectsToRuntime": false
     "kind": "executable"
@@ -16411,7 +16334,7 @@
     "positionals": []
     "replacementArgvPattern": "arkdeck runtime signing migrate-deveco"
     "requiresExactlyOneOf": []
-    "summary": "migrate a DevEco build profile into a typed preset"
+    "summary": "re-key the installed preset from a DevEco build profile"
   - "catalogOperation": null
     "command": "signing.status"
     "connectsToRuntime": false

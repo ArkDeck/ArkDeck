@@ -2605,17 +2605,17 @@ enum CLICommandRegistry {
     CLIOptionSpec(
       name: "--arkforged",
       form: .value(placeholder: "retired", grammar: .opaque),
-      summary: "retired ArkForge lane configuration; answered with migration guidance",
+      summary: "retired ArkForge lane configuration; answered by name",
       stability: .refusedByName),
     CLIOptionSpec(
       name: "--arkforged-sha256",
       form: .value(placeholder: "retired", grammar: .opaque),
-      summary: "retired ArkForge lane configuration; answered with migration guidance",
+      summary: "retired ArkForge lane configuration; answered by name",
       stability: .refusedByName),
     CLIOptionSpec(
       name: "--arkforge-profile",
       form: .value(placeholder: "retired", grammar: .opaque),
-      summary: "retired ArkForge lane configuration; answered with migration guidance",
+      summary: "retired ArkForge lane configuration; answered by name",
       stability: .refusedByName),
   ]
 
@@ -2773,14 +2773,9 @@ enum CLICommandRegistry {
           projectRefOption, outputOption, jsonOption,
         ]),
       CLILeafSpec(
-        token: "normalize",
-        canonicalCommand: "runtime.signing.normalize",
-        summary: "normalize an installed preset in place",
-        options: [outputOption, jsonOption]),
-      CLILeafSpec(
         token: "migrate-deveco",
         canonicalCommand: "runtime.signing.migrate-deveco",
-        summary: "migrate a DevEco build profile into a typed preset",
+        summary: "re-key the installed preset from a DevEco build profile",
         options: [
           CLIOptionSpec(
             name: "--build-profile",

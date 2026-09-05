@@ -513,7 +513,7 @@ enum ApplicationIconChoice: String, CaseIterable, Hashable, Identifiable {
   case keycap
   case waveform
 
-  static let persistenceKey = "ArkDeck.applicationIcon.v1"
+  static let persistenceKey = "ArkDeck.applicationIcon"
   static let defaultChoice = ApplicationIconChoice.waveform
 
   var id: String { rawValue }

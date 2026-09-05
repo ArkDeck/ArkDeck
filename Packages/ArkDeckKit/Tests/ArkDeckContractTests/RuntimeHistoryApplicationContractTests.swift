@@ -1284,14 +1284,22 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
     XCTAssertTrue(view.contains("RuntimeHistoryFilterQuery("))
     XCTAssertTrue(view.contains("onSaveFilter?(currentFilterQuery)"))
     XCTAssertTrue(view.contains("history.filter.reloadSaved"))
-    XCTAssertTrue(view.contains("expectedGeneration: resource.generation"))
+    XCTAssertTrue(
+      view.contains("let generation = savedFilterGeneration"),
+      "a mutation must carry the generation the view last read from the owner")
+    XCTAssertTrue(view.contains("expectedGeneration: generation"))
+    XCTAssertTrue(view.contains("savedFilterGeneration = resource.generation"))
     XCTAssertGreaterThanOrEqual(
       view.components(separatedBy: "self.savedFilterRequestID == requestID").count - 1,
-      4,
-      "loads, migration reconciliation and mutations must all reject superseded replies")
-    XCTAssertTrue(
-      view.contains("savedActivity == \"toolkit\" ? \"device\""),
-      "saved filters from before the rename must migrate to Device")
+      3,
+      "the load and both mutation legs must reject superseded replies")
+    XCTAssertFalse(
+      view.contains("UserDefaults"),
+      "the saved filter has one owner: reading it from this process's preferences is the "
+        + "shape that let an old App-local value republish itself into the Runtime")
+    XCTAssertFalse(
+      view.contains("history.savedFilter"),
+      "the retired App-local filter keys must not be read, written or removed here")
     XCTAssertTrue(
       view.contains("HistoryActivityFilter(rawValue: savedFilterQuery.activity) ?? .all"),
       "Runtime filters must restore normally and unknown values must fail to all")

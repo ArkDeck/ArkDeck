@@ -279,7 +279,7 @@ final class CLIArgumentParserContractTests: XCTestCase {
         ["status"], ["restart", "--maximum-wait-seconds", "30"], ["verify", "--job", "J-1"],
         ["uninstall"],
       ]),
-      (["runtime", "signing"], ["signing"], [["status"], ["normalize"]]),
+      (["runtime", "signing"], ["signing"], [["status"], ["remove"]]),
       (["maintainer", "update-feed"], ["update-feed"], [
         ["assemble", "--payload", "p", "--signature", "s", "--out", "o"]
       ]),
@@ -300,7 +300,7 @@ final class CLIArgumentParserContractTests: XCTestCase {
   func testTheRenamedAliasesNameTheirReplacementAndTheTargetsDoNot() {
     let expected = [
       "agentd.status": "arkdeck runtime service status",
-      "signing.normalize": "arkdeck runtime signing normalize",
+      "signing.remove": "arkdeck runtime signing remove",
       "update-feed.prepare": "arkdeck maintainer update-feed prepare",
     ]
     for (command, replacement) in expected {
@@ -309,7 +309,7 @@ final class CLIArgumentParserContractTests: XCTestCase {
       XCTAssertNotEqual(leaf?.lifecycle, .current, command)
     }
     for command in [
-      "runtime.service.status", "runtime.signing.normalize",
+      "runtime.service.status", "runtime.signing.remove",
       "maintainer.update-feed.prepare",
     ] {
       let leaf = CLICommandRegistry.allLeaves().first { $0.leaf.canonicalCommand == command }?.leaf
@@ -1448,7 +1448,7 @@ final class CLIArgumentParserContractTests: XCTestCase {
       ["flash", "install-binding", "--rebind"],
       ["agentd", "status"], ["agentd", "restart", "--maximum-wait-seconds", "30"],
       ["agentd", "verify", "--job", "J-1"], ["agentd", "uninstall"],
-      ["signing", "status"], ["signing", "normalize"], ["signing", "remove"],
+      ["signing", "status"], ["signing", "remove"],
     ]
     for argv in previouslyExecutable {
       guard case .dispatch? = success(argv) else {

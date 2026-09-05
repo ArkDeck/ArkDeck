@@ -12,15 +12,16 @@ package enum OpenHarmonyLocalSigning {
   package static let defaultProjectRef = "demo-app"
   static let keychainService = "dev.arkdeck.openharmony-local-signing"
   /// Both production helpers carry this access group in an Apple-authorized
-  /// provisioning profile. The Data Protection Keychain uses that signed
-  /// identity rather than the deprecated per-executable `SecAccess` ACL.
+  /// provisioning profile. Authorization is that signed identity: the one
+  /// supported store is the Data Protection Keychain, and no item is ever
+  /// bound to a particular executable.
   static let keychainAccessGroup = ArkDeckHelperIdentity.keychainAccessGroup
   static let keychainAccessSchema = "data-protection-access-group-v1"
 
   /// Public password shipped with the official OpenHarmony SDK release
   /// keystore. Runtime verifies the Data Protection Keychain envelope as the
-  /// reversible installation fact; maintenance may recreate that envelope
-  /// without asking the user to authorize an obsolete per-binary ACL.
+  /// reversible installation fact; maintenance recreates that envelope from
+  /// this published value and never has to decrypt anything to do it.
   static func publicSDKReleasePassword() -> Data {
     Data([49, 50, 51, 52, 53, 54])
   }
@@ -124,7 +125,17 @@ package struct OpenHarmonySigningPresetReceipt: Codable, Sendable, Equatable {
   package let keystorePasswordAccount: String
   package let keyPasswordAccount: String
   package let secretEnvelopeAccount: String?
-  package let legacyPasswordAccounts: [String]?
+  /// Envelope items this preset published before the current one.
+  ///
+  /// Not a compatibility reader: nothing is ever read from these accounts.
+  /// They exist so an explicit uninstall clears every item this preset ever
+  /// wrote. A reinstall reuses the current account whenever the Keychain
+  /// confirms it is there, and `contains` answers `false` both for "gone" and
+  /// for "this process may not look" — so a reinstall during a moment the
+  /// Keychain cannot be read mints a new account beside a live item holding
+  /// the user's passwords. Recording it here is what keeps `remove` able to
+  /// finish the job later.
+  package let supersededEnvelopeAccounts: [String]?
   package let trustedDaemonApplicationSHA256: String?
   package let keychainAccessSchema: String?
   package let managedMaterialDirectory: String?
@@ -137,7 +148,7 @@ package struct OpenHarmonySigningPresetReceipt: Codable, Sendable, Equatable {
     signedProfile: OpenHarmonySigningFileIdentity, keyAlias: String,
     signingAlgorithm: String, keystorePasswordAccount: String,
     keyPasswordAccount: String, secretEnvelopeAccount: String? = nil,
-    legacyPasswordAccounts: [String]? = nil,
+    supersededEnvelopeAccounts: [String]? = nil,
     trustedDaemonApplicationSHA256: String? = nil,
     keychainAccessSchema: String? = nil,
     managedMaterialDirectory: String? = nil
@@ -156,7 +167,7 @@ package struct OpenHarmonySigningPresetReceipt: Codable, Sendable, Equatable {
     self.keystorePasswordAccount = keystorePasswordAccount
     self.keyPasswordAccount = keyPasswordAccount
     self.secretEnvelopeAccount = secretEnvelopeAccount
-    self.legacyPasswordAccounts = legacyPasswordAccounts
+    self.supersededEnvelopeAccounts = supersededEnvelopeAccounts
     self.trustedDaemonApplicationSHA256 = trustedDaemonApplicationSHA256
     self.keychainAccessSchema = keychainAccessSchema
     self.managedMaterialDirectory = managedMaterialDirectory
@@ -192,17 +203,30 @@ package struct OpenHarmonySigningPresetRemoval: Codable, Sendable, Equatable {
   package let preservedSourcePaths: [String]
 }
 
-package struct OpenHarmonySigningSecretNormalization: Codable, Sendable, Equatable {
-  package let presetID: String
-  package let normalizedKeystorePassword: Bool
-  package let normalizedKeyPassword: Bool
+/// What the preset root actually holds.
+///
+/// Three-way on purpose, for the same reason `OpenHarmonySigningSecretPresence`
+/// is: "there is nothing installed here" and "there is something installed
+/// here that this build cannot honour" license opposite actions. The first
+/// permits publishing a fresh owner over an empty root; the second is a
+/// refusal, because the user's receipt, material and Keychain item are all
+/// still there and must survive untouched until they reconfigure explicitly.
+package enum OpenHarmonySigningReceiptState: Sendable {
+  /// The preset root holds no receipt at all.
+  case absent
+  /// A receipt this build validated end to end.
+  case installed(OpenHarmonySigningPresetReceipt)
+  /// A receipt is present and unusable: an unsupported storage form, an
+  /// undeclared or corrupt document, or material that no longer measures.
+  case unusable(OpenHarmonySigningError)
 }
 
-package struct OpenHarmonySigningEnvelopeMigration: Codable, Sendable, Equatable {
+package struct OpenHarmonySigningEnvelopeReplacement: Codable, Sendable, Equatable {
   package let presetID: String
-  package let migrated: Bool
+  /// `true` when the preset's envelope item had to be created rather than
+  /// rewritten in place, which is what happens when the previous item is gone.
+  package let createdEnvelopeItem: Bool
   package let envelopeAccount: String
-  package let legacyAccountCount: Int
 }
 
 private struct OpenHarmonySigningSecretEnvelope: Codable {
@@ -228,19 +252,23 @@ package enum OpenHarmonySigningSecretPresence: Sendable, Equatable {
 package protocol OpenHarmonySigningSecretStoring: Sendable {
   func set(_ data: Data, account: String) throws
   func read(account: String) throws -> Data
-  func readLegacy(account: String) throws -> Data
   func contains(account: String) -> Bool
   func presence(of account: String) -> OpenHarmonySigningSecretPresence
   func trustedDaemonApplicationSHA256() throws -> String?
   @discardableResult func remove(account: String) throws -> Bool
-  @discardableResult func removeLegacy(account: String) throws -> Bool
+  /// Explicit uninstall only. The one supported store is the Data Protection
+  /// Keychain; this clears an item an earlier build of ArkDeck may have left
+  /// outside it, so `remove` finishes what it says it finishes. It is never a
+  /// read path, and nothing calls it on its own.
+  @discardableResult func removeOutsideDataProtection(account: String) throws -> Bool
 }
 
 extension OpenHarmonySigningSecretStoring {
   package func trustedDaemonApplicationSHA256() throws -> String? { nil }
-  package func readLegacy(account: String) throws -> Data { try read(account: account) }
   @discardableResult
-  package func removeLegacy(account: String) throws -> Bool { try remove(account: account) }
+  package func removeOutsideDataProtection(account: String) throws -> Bool {
+    try remove(account: account)
+  }
   /// A store that cannot tell the two apart says so by never reporting
   /// `unreadable`; an in-memory store genuinely knows what it holds.
   package func presence(of account: String) -> OpenHarmonySigningSecretPresence {
@@ -279,22 +307,14 @@ package struct LoginKeychainSigningSecretStore: OpenHarmonySigningSecretStoring 
   }
 
   static func existingItemValueUpdate(_ data: Data) -> [String: Any] {
-    // Updating the protected value does not change ACL ownership. Replacing
-    // kSecAttrAccess here would force a macOS password prompt for every
-    // normalization or reinstall, even when the daemon identity is stable.
+    // The value only. The item's access group is its authorization, so a
+    // reinstall that rewrites the protected bytes keeps the same item and
+    // needs no user interaction while the helper identity is stable.
     [kSecValueData as String: data]
   }
 
   public func read(account: String) throws -> Data {
-    try read(account: account, dataProtection: true)
-  }
-
-  package func readLegacy(account: String) throws -> Data {
-    try read(account: account, dataProtection: false)
-  }
-
-  private func read(account: String, dataProtection: Bool) throws -> Data {
-    var request = query(account: account, dataProtection: dataProtection)
+    var request = query(account: account, dataProtection: true)
     request[kSecReturnData as String] = true
     request[kSecMatchLimit as String] = kSecMatchLimitOne
     if !allowsUserInteraction {
@@ -326,9 +346,9 @@ package struct LoginKeychainSigningSecretStore: OpenHarmonySigningSecretStoring 
   public func contains(account: String) -> Bool {
     // Provider availability, health and status are read-only control-plane
     // queries. Asking Keychain for kSecValueData here made every such query a
-    // secret decryption attempt; legacy ACL evaluation can wait on
-    // SecurityAgent even when authentication UI is explicitly forbidden,
-    // which in turn occupied the daemon actor and made the UDS look dead.
+    // secret decryption attempt, and a decryption can wait on SecurityAgent
+    // even when authentication UI is explicitly forbidden, which in turn
+    // occupied the daemon actor and made the UDS look dead.
     // Query attributes only. Dispatch still validates exact daemon identity
     // and private presets still perform the non-interactive value read before
     // the signer is launched, so an unavailable secret remains fail-closed.
@@ -341,7 +361,8 @@ package struct LoginKeychainSigningSecretStore: OpenHarmonySigningSecretStoring 
   /// `errSecItemNotFound` is the Keychain answering; every other failure —
   /// `errSecMissingEntitlement` from a maintenance binary without the shared
   /// access group, `errSecInteractionNotAllowed` from a non-interactive
-  /// session — means this process could not look.
+  /// session — means this process could not look. Nothing may read the two
+  /// apart as one "absent".
   public func presence(of account: String) -> OpenHarmonySigningSecretPresence {
     var value: CFTypeRef?
     let status = SecItemCopyMatching(
@@ -453,7 +474,7 @@ package struct LoginKeychainSigningSecretStore: OpenHarmonySigningSecretStoring 
     try remove(account: account, dataProtection: true)
   }
 
-  package func removeLegacy(account: String) throws -> Bool {
+  package func removeOutsideDataProtection(account: String) throws -> Bool {
     try remove(account: account, dataProtection: false)
   }
 
@@ -596,26 +617,19 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
       let envelopeAccount =
         reusableEnvelope
         ?? envelopePrefix + UUID().uuidString.lowercased()
-      var legacyAccounts: [String] = []
-      if let previousReceipt, previousReceipt.presetID == configuration.presetID {
-        if let previousEnvelope = previousReceipt.secretEnvelopeAccount,
-          previousEnvelope != envelopeAccount
-        {
-          legacyAccounts.append(previousEnvelope)
-        } else if previousReceipt.secretEnvelopeAccount == nil {
-          legacyAccounts.append(previousReceipt.keystorePasswordAccount)
-          legacyAccounts.append(previousReceipt.keyPasswordAccount)
-        }
-        legacyAccounts.append(contentsOf: previousReceipt.legacyPasswordAccounts ?? [])
+      // Every envelope this preset published that the new receipt does not
+      // name. Nothing reads them; uninstall clears them.
+      var superseded = Set(previousReceipt?.supersededEnvelopeAccounts ?? [])
+      if let previousEnvelope = previousReceipt?.secretEnvelopeAccount,
+        previousReceipt?.presetID == configuration.presetID,
+        previousEnvelope != envelopeAccount
+      {
+        superseded.insert(previousEnvelope)
       }
-      legacyAccounts = Array(
-        Set(
-          legacyAccounts.filter {
-            $0 == accountPrefix + "|keystore" || $0 == accountPrefix + "|key"
-              || ($0.hasPrefix(envelopePrefix)
-                && UUID(uuidString: String($0.dropFirst(envelopePrefix.count))) != nil)
-          })
-      ).sorted()
+      let supersededAccounts = superseded.filter {
+        $0.hasPrefix(envelopePrefix)
+          && UUID(uuidString: String($0.dropFirst(envelopePrefix.count))) != nil
+      }.sorted()
       let receipt = OpenHarmonySigningPresetReceipt(
         schemaVersion: "arkdeck-openharmony-signing/v1",
         installedAtUTC: nowUTC(), presetID: configuration.presetID,
@@ -626,7 +640,7 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
         keystorePasswordAccount: accountPrefix + "|keystore",
         keyPasswordAccount: accountPrefix + "|key",
         secretEnvelopeAccount: envelopeAccount,
-        legacyPasswordAccounts: legacyAccounts.isEmpty ? nil : legacyAccounts,
+        supersededEnvelopeAccounts: supersededAccounts.isEmpty ? nil : supersededAccounts,
         trustedDaemonApplicationSHA256: daemonIdentity,
         keychainAccessSchema: OpenHarmonyLocalSigning.keychainAccessSchema,
         managedMaterialDirectory: managedMaterialDirectory?.path)
@@ -664,90 +678,39 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
     }
   }
 
-  /// Converts DevEco-encrypted password strings that were stored by an older
-  /// ArkDeck install into the plaintext expected by hapsigner. This is an
-  /// explicit local maintenance boundary: Runtime Jobs never call it and
-  /// never read the mutable DevEco material directory.
-  package func normalizeDevEcoSecrets(
-    presetID: String = OpenHarmonyLocalSigning.defaultPresetID
-  ) throws -> OpenHarmonySigningSecretNormalization {
-    try lock.withLock {
-      let receipt = try loadValidatedUnlocked(
-        presetID: presetID, requireSecrets: true)
-      if let envelopeAccount = receipt.secretEnvelopeAccount {
-        var envelopeData = try secrets.read(account: envelopeAccount)
-        defer { envelopeData.resetBytes(in: 0..<envelopeData.count) }
-        var envelope = try Self.decodeEnvelope(envelopeData)
-        defer {
-          envelope.keystorePassword.resetBytes(
-            in: 0..<envelope.keystorePassword.count)
-          envelope.keyPassword.resetBytes(in: 0..<envelope.keyPassword.count)
-        }
-        let keystoreURL = URL(filePath: receipt.keystore.path)
-        var normalizedKeystore = try OpenHarmonyDevEcoPasswordDecoder.decodeIfNeeded(
-          envelope.keystorePassword, keystore: keystoreURL, fileManager: fileManager)
-        defer { normalizedKeystore.resetBytes(in: 0..<normalizedKeystore.count) }
-        var normalizedKey = try OpenHarmonyDevEcoPasswordDecoder.decodeIfNeeded(
-          envelope.keyPassword, keystore: keystoreURL, fileManager: fileManager)
-        defer { normalizedKey.resetBytes(in: 0..<normalizedKey.count) }
-        let changedKeystore = normalizedKeystore != envelope.keystorePassword
-        let changedKey = normalizedKey != envelope.keyPassword
-        if changedKeystore || changedKey {
-          var updatedEnvelope = try Self.encodeEnvelope(
-            keystorePassword: normalizedKeystore, keyPassword: normalizedKey)
-          defer { updatedEnvelope.resetBytes(in: 0..<updatedEnvelope.count) }
-          try secrets.set(updatedEnvelope, account: envelopeAccount)
-        }
-        return OpenHarmonySigningSecretNormalization(
-          presetID: receipt.presetID,
-          normalizedKeystorePassword: changedKeystore,
-          normalizedKeyPassword: changedKey)
-      }
-      var previousKeystore = try secrets.read(account: receipt.keystorePasswordAccount)
-      defer { previousKeystore.resetBytes(in: 0..<previousKeystore.count) }
-      var previousKey = try secrets.read(account: receipt.keyPasswordAccount)
-      defer { previousKey.resetBytes(in: 0..<previousKey.count) }
-      let keystoreURL = URL(filePath: receipt.keystore.path)
-      var normalizedKeystore = try OpenHarmonyDevEcoPasswordDecoder.decodeIfNeeded(
-        previousKeystore, keystore: keystoreURL, fileManager: fileManager)
-      defer { normalizedKeystore.resetBytes(in: 0..<normalizedKeystore.count) }
-      var normalizedKey = try OpenHarmonyDevEcoPasswordDecoder.decodeIfNeeded(
-        previousKey, keystore: keystoreURL, fileManager: fileManager)
-      defer { normalizedKey.resetBytes(in: 0..<normalizedKey.count) }
-      try Self.validateSecret(normalizedKeystore)
-      try Self.validateSecret(normalizedKey)
-
-      let changedKeystore = normalizedKeystore != previousKeystore
-      let changedKey = normalizedKey != previousKey
+  /// The same validation, reporting absence and unusability apart.
+  ///
+  /// `loadValidated` throws for both, so a caller that collapses its failure
+  /// into `nil` cannot tell an empty root from an installed credential it
+  /// merely failed to read — and a caller that then publishes state on that
+  /// answer overwrites the second. This is the read for anything that decides
+  /// what to write.
+  package func receiptState(
+    presetID: String = OpenHarmonyLocalSigning.defaultPresetID,
+    requireSecrets: Bool = false
+  ) -> OpenHarmonySigningReceiptState {
+    lock.withLock {
+      guard fileManager.fileExists(atPath: receiptURL.path) else { return .absent }
       do {
-        if changedKeystore {
-          try secrets.set(normalizedKeystore, account: receipt.keystorePasswordAccount)
-        }
-        if changedKey {
-          try secrets.set(normalizedKey, account: receipt.keyPasswordAccount)
-        }
+        return .installed(
+          try loadValidatedUnlocked(presetID: presetID, requireSecrets: requireSecrets))
+      } catch let error as OpenHarmonySigningError {
+        return .unusable(error)
       } catch {
-        do {
-          try secrets.set(previousKeystore, account: receipt.keystorePasswordAccount)
-          try secrets.set(previousKey, account: receipt.keyPasswordAccount)
-        } catch {
-          throw OpenHarmonySigningError.secretUnavailable(
-            "DevEco password normalization failed and Keychain rollback was incomplete")
-        }
-        throw error
+        return .unusable(.receiptUnavailable(String(describing: error)))
       }
-      return OpenHarmonySigningSecretNormalization(
-        presetID: receipt.presetID,
-        normalizedKeystorePassword: changedKeystore,
-        normalizedKeyPassword: changedKey)
     }
   }
 
-  package func migrateToSecretEnvelope(
+  /// Re-keys the installed preset: the supplied passwords replace the contents
+  /// of its Data Protection Keychain envelope, and the key alias may change
+  /// with them. Nothing here reads or retires an older storage form — a receipt
+  /// this build does not support is refused before this point.
+  package func replaceSecretEnvelope(
     keystorePassword: Data, keyPassword: Data,
     keyAlias: String? = nil,
     presetID: String = OpenHarmonyLocalSigning.defaultPresetID
-  ) throws -> OpenHarmonySigningEnvelopeMigration {
+  ) throws -> OpenHarmonySigningEnvelopeReplacement {
     try lock.withLock {
       let receipt = try loadValidatedUnlocked(
         presetID: presetID, requireSecrets: false)
@@ -756,10 +719,9 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
       if let keyAlias {
         try Self.validateKeyAlias(keyAlias)
       }
-      let migratedKeyAlias = keyAlias ?? receipt.keyAlias
+      let replacementKeyAlias = keyAlias ?? receipt.keyAlias
       let daemonIdentity = try secrets.trustedDaemonApplicationSHA256()
       if let existing = receipt.secretEnvelopeAccount,
-        receipt.keychainAccessSchema == OpenHarmonyLocalSigning.keychainAccessSchema,
         secrets.contains(account: existing)
       {
         // The access group is stable across signed helper updates, so a
@@ -772,145 +734,103 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
         defer { previous.resetBytes(in: 0..<previous.count) }
         do {
           try secrets.set(replacement, account: existing)
-          if migratedKeyAlias != receipt.keyAlias
+          if replacementKeyAlias != receipt.keyAlias
             || receipt.trustedDaemonApplicationSHA256 != daemonIdentity
           {
             try write(
               Self.copyReceipt(
                 receipt, secretEnvelopeAccount: existing,
-                legacyPasswordAccounts: receipt.legacyPasswordAccounts,
+                supersededEnvelopeAccounts: receipt.supersededEnvelopeAccounts,
                 trustedDaemonApplicationSHA256: daemonIdentity,
                 keychainAccessSchema: OpenHarmonyLocalSigning.keychainAccessSchema,
-                keyAlias: migratedKeyAlias))
+                keyAlias: replacementKeyAlias))
           }
         } catch {
           do {
             try secrets.set(previous, account: existing)
           } catch {
             throw OpenHarmonySigningError.secretUnavailable(
-              "signing metadata migration failed and Keychain rollback was incomplete")
+              "signing metadata update failed and Keychain rollback was incomplete")
           }
           throw error
         }
-        return OpenHarmonySigningEnvelopeMigration(
-          presetID: receipt.presetID, migrated: false,
-          envelopeAccount: existing,
-          legacyAccountCount: receipt.legacyPasswordAccounts?.count ?? 0)
+        return OpenHarmonySigningEnvelopeReplacement(
+          presetID: receipt.presetID, createdEnvelopeItem: false,
+          envelopeAccount: existing)
       }
+      // The receipt names an envelope the Keychain no longer holds. Publish a
+      // new item from the supplied material rather than signing with secrets
+      // nobody can produce; the stale account name is dropped with the write.
       let token = UUID().uuidString.lowercased()
       let envelopeAccount = receipt.presetID + "|secret-envelope-" + token
-      var legacy = receipt.legacyPasswordAccounts ?? []
+      var superseded = Set(receipt.supersededEnvelopeAccounts ?? [])
       if let previousEnvelope = receipt.secretEnvelopeAccount {
-        legacy.append(previousEnvelope)
-      } else {
-        legacy.append(receipt.keystorePasswordAccount)
-        legacy.append(receipt.keyPasswordAccount)
+        superseded.insert(previousEnvelope)
       }
-      legacy = Array(Set(legacy)).sorted()
       var envelope = try Self.encodeEnvelope(
         keystorePassword: keystorePassword, keyPassword: keyPassword)
       defer { envelope.resetBytes(in: 0..<envelope.count) }
       try secrets.set(envelope, account: envelopeAccount)
       do {
-        let migrated = Self.copyReceipt(
-          receipt, secretEnvelopeAccount: envelopeAccount,
-          legacyPasswordAccounts: legacy,
-          trustedDaemonApplicationSHA256: daemonIdentity,
-          keychainAccessSchema: OpenHarmonyLocalSigning.keychainAccessSchema,
-          keyAlias: migratedKeyAlias)
-        try write(migrated)
+        try write(
+          Self.copyReceipt(
+            receipt, secretEnvelopeAccount: envelopeAccount,
+            supersededEnvelopeAccounts: superseded.sorted(),
+            trustedDaemonApplicationSHA256: daemonIdentity,
+            keychainAccessSchema: OpenHarmonyLocalSigning.keychainAccessSchema,
+            keyAlias: replacementKeyAlias))
       } catch {
         _ = try? secrets.remove(account: envelopeAccount)
         throw error
       }
-      return OpenHarmonySigningEnvelopeMigration(
-        presetID: receipt.presetID, migrated: true,
-        envelopeAccount: envelopeAccount, legacyAccountCount: legacy.count)
+      return OpenHarmonySigningEnvelopeReplacement(
+        presetID: receipt.presetID, createdEnvelopeItem: true,
+        envelopeAccount: envelopeAccount)
     }
   }
 
-  /// Migrates an older file-based Keychain envelope into the Data Protection
-  /// Keychain. Once the receipt is current, a daemon update changes only the
-  /// independently verified executable identity in the receipt: access-group
-  /// authorization remains stable and the secret is neither read nor copied.
+  /// Re-records the independently verified identity of the installed daemon
+  /// after a helper update. Access-group authorization is unchanged by an
+  /// update, so this is a receipt-file write: the envelope is neither read nor
+  /// rewritten, and the credential's public identity stays byte-identical.
+  ///
+  /// A receipt written by an unsupported storage form is refused by name. It
+  /// is not upgraded and nothing it points at is deleted: the material and the
+  /// Keychain item stay exactly as the user left them, and the preset is
+  /// reconfigured explicitly through `arkdeck runtime signing install`.
   package func refreshDaemonKeychainIdentity(
     presetID: String = OpenHarmonyLocalSigning.defaultPresetID
   ) throws {
     try lock.withLock {
-      let receipt = try loadValidatedUnlocked(
-        presetID: presetID, requireSecrets: false, allowLegacyAccessSchema: true)
+      let receipt = try loadValidatedUnlocked(presetID: presetID, requireSecrets: false)
       let daemonIdentity = try secrets.trustedDaemonApplicationSHA256()
-      if receipt.keychainAccessSchema == OpenHarmonyLocalSigning.keychainAccessSchema {
-        guard let envelope = receipt.secretEnvelopeAccount else {
-          throw OpenHarmonySigningError.secretUnavailable(
-            "Data Protection Keychain envelope is absent")
-        }
-        // Re-recording the trusted daemon identity below is a receipt-file
-        // write; it neither reads nor rewrites the envelope. So the only
-        // question this probe may answer is whether the preset is *known* to
-        // be broken. A caller that cannot read the Keychain at all — the
-        // maintenance CLI runs without the shared access group — used to land
-        // in the same branch as a genuinely missing envelope and abort here,
-        // which is why replacing the daemon left the preset permanently
-        // drifted: the one write that could repair it was gated behind a read
-        // the repairing process is not allowed to perform.
-        //
-        // Signing still fails closed later: `loadValidated(requireSecrets:)`
-        // reads the envelope for real before any signer is launched.
-        if secrets.presence(of: envelope) == .absent {
-          throw OpenHarmonySigningError.secretUnavailable(
-            "Data Protection Keychain envelope is absent")
-        }
-        guard receipt.trustedDaemonApplicationSHA256 != daemonIdentity else { return }
-        try write(
-          Self.copyReceipt(
-            receipt, secretEnvelopeAccount: envelope,
-            legacyPasswordAccounts: receipt.legacyPasswordAccounts,
-            trustedDaemonApplicationSHA256: daemonIdentity,
-            keychainAccessSchema: OpenHarmonyLocalSigning.keychainAccessSchema))
-        return
+      guard let envelope = receipt.secretEnvelopeAccount else {
+        throw OpenHarmonySigningError.secretUnavailable(
+          "Data Protection Keychain envelope is absent")
       }
-      var pair: (keystore: Data, key: Data)
-      if Self.isManagedSDKReleasePreset(receipt) {
-        // The SDK password is public, so migration does not need to ask the
-        // legacy file-based Keychain to decrypt its obsolete item.
-        pair = (
-          OpenHarmonyLocalSigning.publicSDKReleasePassword(),
-          OpenHarmonyLocalSigning.publicSDKReleasePassword()
-        )
-      } else {
-        pair = try legacySecretPair(for: receipt)
+      // Re-recording the trusted daemon identity below is a receipt-file
+      // write; it neither reads nor rewrites the envelope. So the only
+      // question this probe may answer is whether the preset is *known* to
+      // be broken. A caller that cannot read the Keychain at all — the
+      // maintenance CLI runs without the shared access group — used to land
+      // in the same branch as a genuinely missing envelope and abort here,
+      // which is why replacing the daemon left the preset permanently
+      // drifted: the one write that could repair it was gated behind a read
+      // the repairing process is not allowed to perform.
+      //
+      // Signing still fails closed later: `loadValidated(requireSecrets:)`
+      // reads the envelope for real before any signer is launched.
+      if secrets.presence(of: envelope) == .absent {
+        throw OpenHarmonySigningError.secretUnavailable(
+          "Data Protection Keychain envelope is absent")
       }
-      defer {
-        pair.keystore.resetBytes(in: 0..<pair.keystore.count)
-        pair.key.resetBytes(in: 0..<pair.key.count)
-      }
-      var encoded = try Self.encodeEnvelope(
-        keystorePassword: pair.keystore, keyPassword: pair.key)
-      defer { encoded.resetBytes(in: 0..<encoded.count) }
-      let envelopeAccount =
-        receipt.presetID + "|secret-envelope-"
-        + UUID().uuidString.lowercased()
-      var legacy = receipt.legacyPasswordAccounts ?? []
-      if let previousEnvelope = receipt.secretEnvelopeAccount {
-        legacy.append(previousEnvelope)
-      } else {
-        legacy.append(receipt.keystorePasswordAccount)
-        legacy.append(receipt.keyPasswordAccount)
-      }
-      legacy = Array(Set(legacy)).sorted()
-      try secrets.set(encoded, account: envelopeAccount)
-      do {
-        try write(
-          Self.copyReceipt(
-            receipt, secretEnvelopeAccount: envelopeAccount,
-            legacyPasswordAccounts: legacy,
-            trustedDaemonApplicationSHA256: daemonIdentity,
-            keychainAccessSchema: OpenHarmonyLocalSigning.keychainAccessSchema))
-      } catch {
-        _ = try? secrets.remove(account: envelopeAccount)
-        throw error
-      }
+      guard receipt.trustedDaemonApplicationSHA256 != daemonIdentity else { return }
+      try write(
+        Self.copyReceipt(
+          receipt, secretEnvelopeAccount: envelope,
+          supersededEnvelopeAccounts: receipt.supersededEnvelopeAccounts,
+          trustedDaemonApplicationSHA256: daemonIdentity,
+          keychainAccessSchema: OpenHarmonyLocalSigning.keychainAccessSchema))
     }
   }
 
@@ -935,11 +855,12 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
         OpenHarmonyLocalSigning.publicSDKReleasePassword()
       )
     }
-    guard receipt.keychainAccessSchema == OpenHarmonyLocalSigning.keychainAccessSchema else {
+    guard let envelopeAccount = receipt.secretEnvelopeAccount else {
       throw OpenHarmonySigningError.secretUnavailable(
-        "signing secrets require Data Protection Keychain migration")
+        "signing preset has no Data Protection Keychain envelope; reconfigure it with "
+          + "`arkdeck runtime signing install`")
     }
-    if let envelopeAccount = receipt.secretEnvelopeAccount {
+    do {
       var encoded = try secrets.read(account: envelopeAccount)
       defer { encoded.resetBytes(in: 0..<encoded.count) }
       var envelope = try Self.decodeEnvelope(encoded)
@@ -954,42 +875,6 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
         Data(envelope.keystorePassword.map { $0 }),
         Data(envelope.keyPassword.map { $0 })
       )
-    }
-    let keystore = try secrets.read(account: receipt.keystorePasswordAccount)
-    do {
-      return (keystore, try secrets.read(account: receipt.keyPasswordAccount))
-    } catch {
-      var mutable = keystore
-      mutable.resetBytes(in: 0..<mutable.count)
-      throw error
-    }
-  }
-
-  private func legacySecretPair(
-    for receipt: OpenHarmonySigningPresetReceipt
-  ) throws -> (keystore: Data, key: Data) {
-    if let envelopeAccount = receipt.secretEnvelopeAccount {
-      var encoded = try secrets.readLegacy(account: envelopeAccount)
-      defer { encoded.resetBytes(in: 0..<encoded.count) }
-      var envelope = try Self.decodeEnvelope(encoded)
-      defer {
-        envelope.keystorePassword.resetBytes(in: 0..<envelope.keystorePassword.count)
-        envelope.keyPassword.resetBytes(in: 0..<envelope.keyPassword.count)
-      }
-      try Self.validateSecret(envelope.keystorePassword)
-      try Self.validateSecret(envelope.keyPassword)
-      return (Data(envelope.keystorePassword), Data(envelope.keyPassword))
-    }
-    let keystore = try secrets.readLegacy(account: receipt.keystorePasswordAccount)
-    do {
-      return (
-        keystore,
-        try secrets.readLegacy(account: receipt.keyPasswordAccount)
-      )
-    } catch {
-      var mutable = keystore
-      mutable.resetBytes(in: 0..<mutable.count)
-      throw error
     }
   }
 
@@ -1059,12 +944,15 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
       let accountPrefix = OpenHarmonyLocalSigning.defaultPresetID
       var accounts = [accountPrefix + "|keystore", accountPrefix + "|key"]
       if let envelope = receipt?.secretEnvelopeAccount { accounts.append(envelope) }
-      accounts.append(contentsOf: receipt?.legacyPasswordAccounts ?? [])
+      accounts.append(contentsOf: receipt?.supersededEnvelopeAccounts ?? [])
       var removedAccounts: Set<String> = []
       for account in Set(accounts) {
+        // Uninstall is explicit and must finish: clear the item in the one
+        // supported store, and also any item an earlier build of ArkDeck left
+        // for this account outside it.
         let removedCurrent = try secrets.remove(account: account)
-        let removedLegacy = try secrets.removeLegacy(account: account)
-        if removedCurrent || removedLegacy { removedAccounts.insert(account) }
+        let removedOutside = try secrets.removeOutsideDataProtection(account: account)
+        if removedCurrent || removedOutside { removedAccounts.insert(account) }
       }
       let removedEnvelope = receipt?.secretEnvelopeAccount.map {
         removedAccounts.contains($0)
@@ -1112,8 +1000,7 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
   }
 
   private func loadValidatedUnlocked(
-    presetID: String, requireSecrets: Bool,
-    allowLegacyAccessSchema: Bool = false
+    presetID: String, requireSecrets: Bool
   ) throws -> OpenHarmonySigningPresetReceipt {
     let receipt: OpenHarmonySigningPresetReceipt
     do {
@@ -1122,36 +1009,41 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
     } catch {
       throw OpenHarmonySigningError.receiptUnavailable("\(error)")
     }
-    let legacyAccessSchemas: Set<String?> = [
-      nil, "trusted-applications-v2", "trusted-applications-v3",
-    ]
     guard receipt.schemaVersion == "arkdeck-openharmony-signing/v1",
-      receipt.presetID == presetID,
-      receipt.keychainAccessSchema == OpenHarmonyLocalSigning.keychainAccessSchema
-        || (allowLegacyAccessSchema && legacyAccessSchemas.contains(receipt.keychainAccessSchema))
+      receipt.presetID == presetID
     else {
       throw OpenHarmonySigningError.receiptUnavailable("schema or preset mismatch")
+    }
+    // One supported storage form. A receipt written under any other marker is
+    // refused by name rather than upgraded: its material and Keychain item are
+    // left exactly as they are, and the way forward is stated.
+    guard receipt.keychainAccessSchema == OpenHarmonyLocalSigning.keychainAccessSchema
+    else {
+      throw OpenHarmonySigningError.receiptUnavailable(
+        "signing preset uses an unsupported credential storage form; reconfigure it with "
+          + "`arkdeck runtime signing install`")
     }
     try Self.validateIdentifier(receipt.projectRef, name: "projectRef")
     let expectedAccountPrefix = receipt.presetID
     let expectedKeystoreAccount = expectedAccountPrefix + "|keystore"
     let expectedKeyAccount = expectedAccountPrefix + "|key"
     let envelopePrefix = expectedAccountPrefix + "|secret-envelope-"
-    let envelopeIsValid =
-      receipt.secretEnvelopeAccount.map {
-        $0.hasPrefix(envelopePrefix)
-          && UUID(uuidString: String($0.dropFirst(envelopePrefix.count))) != nil
-      } ?? true
-    let legacyAccountsAreValid = (receipt.legacyPasswordAccounts ?? []).allSatisfy {
-      $0 == expectedKeystoreAccount || $0 == expectedKeyAccount
-        || ($0.hasPrefix(envelopePrefix)
-          && UUID(uuidString: String($0.dropFirst(envelopePrefix.count))) != nil)
+    // The envelope is the only supported secret form, so its account is
+    // required and must carry the preset's own grammar; so must every account
+    // the receipt still asks uninstall to clear.
+    func isEnvelopeAccount(_ account: String) -> Bool {
+      account.hasPrefix(envelopePrefix)
+        && UUID(uuidString: String(account.dropFirst(envelopePrefix.count))) != nil
+    }
+    let envelopeIsValid = receipt.secretEnvelopeAccount.map(isEnvelopeAccount) ?? false
+    let supersededAreValid = (receipt.supersededEnvelopeAccounts ?? []).allSatisfy {
+      isEnvelopeAccount($0) && $0 != receipt.secretEnvelopeAccount
     }
     guard receipt.signingAlgorithm == "SHA256withECDSA",
       Self.isValidKeyAlias(receipt.keyAlias),
       receipt.keystorePasswordAccount == expectedKeystoreAccount,
       receipt.keyPasswordAccount == expectedKeyAccount,
-      envelopeIsValid, legacyAccountsAreValid,
+      envelopeIsValid, supersededAreValid,
       receipt.signerJAR.path.hasSuffix(".jar"),
       receipt.keystore.path.hasSuffix(".p12") || receipt.keystore.path.hasSuffix(".jks"),
       receipt.appCertificate.path.hasSuffix(".pem")
@@ -1181,15 +1073,9 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
     try Self.remeasure(receipt.signedProfile, role: "signed profile")
     if requireSecrets {
       try validateTrustedDaemonIdentity(receipt)
-      let secretsPresent: Bool
-      if let envelope = receipt.secretEnvelopeAccount {
-        secretsPresent = secrets.contains(account: envelope)
-      } else {
-        secretsPresent =
-          secrets.contains(account: receipt.keystorePasswordAccount)
-          && secrets.contains(account: receipt.keyPasswordAccount)
-      }
-      guard secretsPresent else {
+      guard let envelope = receipt.secretEnvelopeAccount,
+        secrets.contains(account: envelope)
+      else {
         throw OpenHarmonySigningError.secretUnavailable("required Keychain item is absent")
       }
     }
@@ -1234,7 +1120,8 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
 
   private static func copyReceipt(
     _ receipt: OpenHarmonySigningPresetReceipt,
-    secretEnvelopeAccount: String?, legacyPasswordAccounts: [String]?,
+    secretEnvelopeAccount: String?,
+    supersededEnvelopeAccounts: [String]?,
     trustedDaemonApplicationSHA256: String?,
     keychainAccessSchema: String? = nil,
     keyAlias: String? = nil
@@ -1250,7 +1137,7 @@ package final class OpenHarmonySigningPresetStore: @unchecked Sendable {
       keystorePasswordAccount: receipt.keystorePasswordAccount,
       keyPasswordAccount: receipt.keyPasswordAccount,
       secretEnvelopeAccount: secretEnvelopeAccount,
-      legacyPasswordAccounts: legacyPasswordAccounts,
+      supersededEnvelopeAccounts: supersededEnvelopeAccounts,
       trustedDaemonApplicationSHA256: trustedDaemonApplicationSHA256,
       keychainAccessSchema: keychainAccessSchema ?? receipt.keychainAccessSchema,
       managedMaterialDirectory: receipt.managedMaterialDirectory)

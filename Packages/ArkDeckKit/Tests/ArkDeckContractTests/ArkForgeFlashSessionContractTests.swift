@@ -1845,14 +1845,19 @@ final class ArkForgeLaneCompositionContractTests: XCTestCase {
       why.description.contains("canonical ArkForge Flash refuses"), why.description)
   }
 
-  func testLegacyConfigurationIsRefusedUntilTheInstallerMigratesIt() {
-    let legacy = [
+  func testRetiredLaneConfigurationIsRefusedByName() {
+    let retired = [
       "ARKDECK_ARKFORGED_PATH": fixture.daemon.path,
       "ARKDECK_ARKFORGED_SHA256": fixture.daemonSHA256,
       "ARKDECK_ARKFORGE_PROFILE_PATH": fixture.profile.path,
     ]
     XCTAssertEqual(
-      ArkForgeLaneComposition.Inputs.read(legacy), .failure(.legacyConfiguration))
+      ArkForgeLaneComposition.Inputs.read(retired),
+      .failure(
+        .retiredConfiguration(keys: [
+          "ARKDECK_ARKFORGED_PATH", "ARKDECK_ARKFORGED_SHA256",
+          "ARKDECK_ARKFORGE_PROFILE_PATH",
+        ])))
   }
 
   func testAnEmptyValueCountsAsMissing() {
