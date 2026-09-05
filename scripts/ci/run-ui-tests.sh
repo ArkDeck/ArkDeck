@@ -29,6 +29,11 @@
 # has answered a prompt for yet. Running the same command again succeeds. If it
 # persists across a reboot, `pkill -f testmanagerd` resets the daemon that
 # brokers automation mode; launchd restarts it on demand.
+#
+# Keyboard isolation must start before xcodebuild launches testmanagerd. The
+# host helper selects an enabled plain layout and temporarily turns off
+# per-document input-source switching, then restores the user's settings after
+# xcodebuild exits. A test-class setUp is too late to protect automation startup.
 
 set -eu
 
@@ -51,6 +56,13 @@ then run without building:
 
 `--no-build` also skips the stale-runner removal: nothing relinks, so the
 "can't write output file" failure that removal works around cannot happen.
+
+Test runs temporarily use an enabled U.S./ABC (or other ASCII keyboard) layout
+and turn off automatic switching to a document's input source. The wrapper
+restores the previous settings when the run ends or is interrupted; an input
+source that is no longer enabled is not re-enabled. `--build-once` does not
+change input settings. Use this entry point for every suite, including a
+single case; direct Xcode runs do not have the host-level protection.
 
 Default DerivedData:
   ~/Library/Caches/com.arkdeck.ArkDeck/Xcode/UITests
@@ -101,6 +113,18 @@ repo_root=$(git rev-parse --show-toplevel 2>/dev/null) ||
   fail 'not inside a Git checkout'
 [ -d "$repo_root/ArkDeck.xcodeproj" ] ||
   fail "no ArkDeck.xcodeproj under $repo_root"
+
+# Own the host keyboard before any cleanup, including when another invocation
+# uses this same DerivedData. The helper serializes test runs and re-enters
+# here with the flag set; its child ultimately execs xcodebuild below.
+if [ "$action" != build-for-testing ] &&
+   [ "${ARKDECK_UI_TEST_INPUT_SOURCE_GUARDED:-}" != 1 ]; then
+  if [ "$action" = test-without-building ]; then
+    set -- --no-build "$@"
+  fi
+  exec python3 "$repo_root/scripts/ci/ui_test_input_source.py" \
+    /bin/sh "$repo_root/scripts/ci/run-ui-tests.sh" "$@"
+fi
 
 xcodebuild_executable=${ARKDECK_XCODEBUILD_EXECUTABLE:-}
 if [ -z "$xcodebuild_executable" ]; then
@@ -165,7 +189,7 @@ fi
 printf 'ArkDeck UI tests: DerivedData %s\n' "$derived_data" >&2
 printf 'ArkDeck UI tests: these drive the real App and are not a merge gate\n' >&2
 
-exec "$xcodebuild_executable" \
+set -- "$xcodebuild_executable" \
   -project "$repo_root/ArkDeck.xcodeproj" \
   -scheme ArkDeck \
   -configuration Debug \
@@ -178,3 +202,5 @@ exec "$xcodebuild_executable" \
   CODE_SIGNING_ALLOWED=YES \
   "$@" \
   "$action"
+
+exec "$@"
