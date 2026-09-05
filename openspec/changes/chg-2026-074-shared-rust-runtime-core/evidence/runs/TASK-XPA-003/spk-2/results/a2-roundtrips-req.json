@@ -1,0 +1,68 @@
+{
+  "client" : {
+    "bundleIdentifier" : "com.arkdeck.spk2-client2",
+    "euid" : 501,
+    "executable" : "\/private\/tmp\/claude-501\/-Users-fuhanfeng-Dropbox-Code-Github-ArkDeck--claude-worktrees-arkdeck-cross-platform-6ffddd\/b66749e2-614e-46c1-a350-caca4c23a2cb\/scratchpad\/spk2\/build\/SPK2Client2.app\/Contents\/MacOS\/spk2-client",
+    "pid" : 45712,
+    "sandboxContainer" : "com.arkdeck.spk2-client2",
+    "signing" : {
+      "appSandbox" : true,
+      "certificateChain" : [
+        "Developer ID Application: Hanfeng Fu (8AQTYW5FKR)",
+        "Developer ID Certification Authority",
+        "Apple Root CA"
+      ],
+      "entitlementKeys" : [
+        "com.apple.security.app-sandbox",
+        "com.apple.security.device.serial",
+        "com.apple.security.device.usb",
+        "com.apple.security.files.bookmarks.app-scope",
+        "com.apple.security.files.user-selected.read-write",
+        "com.apple.security.network.client",
+        "com.apple.security.temporary-exception.files.home-relative-path.read-only",
+        "com.apple.security.temporary-exception.mach-lookup.global-name"
+      ],
+      "flags" : 65536,
+      "identifier" : "com.arkdeck.spk2-client2",
+      "machLookupGlobalNames" : [
+        "com.arkdeck.agentd"
+      ],
+      "teamIdentifier" : "8AQTYW5FKR"
+    }
+  },
+  "connectionEvents" : [
+    {
+      "description" : "Connection invalid",
+      "error" : "XPC_ERROR_CONNECTION_INVALID",
+      "tMs" : 522537578.76462501
+    }
+  ],
+  "count" : 1000,
+  "errors" : [
+
+  ],
+  "host" : {
+    "cpuCount" : 8,
+    "kernel" : "Version 26.6.2 (Build 25G83)"
+  },
+  "idMismatches" : 0,
+  "latency" : {
+    "max" : 0.27016699999999999,
+    "mean" : 0.013757513999999974,
+    "min" : 0.0087910000000000002,
+    "n" : 1000,
+    "p50" : 0.013540999999999999,
+    "p95" : 0.016542000000000001,
+    "p99" : 0.023583,
+    "unit" : "milliseconds"
+  },
+  "method" : "runtime.storage.status",
+  "mode" : "roundtrips",
+  "pad" : 0,
+  "protocolVersion" : "1.0.0",
+  "replyBytes" : 112,
+  "replySample" : "{\"id\":\"88964493-7CB2-471E-B443-47CB6F63788D\",\"ok\":true,\"result\":{\"listener\":\"spk2-rust-libxpc\",\"echoBytes\":119}}",
+  "requestBytes" : 119,
+  "service" : "com.arkdeck.agentd",
+  "warmup" : 100
+}

@@ -1,0 +1,15 @@
+[package]
+name = "spk2-listener"
+version = "0.1.0"
+edition = "2021"
+description = "SPK-2: a Rust process vends the launchd Mach service com.arkdeck.agentd through the libxpc C API"
+publish = false
+
+# No third-party crate. Blocks are laid out by hand per the public Block ABI
+# (clang "Block Implementation Specification"), every libxpc symbol comes from
+# libSystem, which Rust links on macOS anyway.
+[dependencies]
+
+[profile.release]
+opt-level = 2
+debug = false

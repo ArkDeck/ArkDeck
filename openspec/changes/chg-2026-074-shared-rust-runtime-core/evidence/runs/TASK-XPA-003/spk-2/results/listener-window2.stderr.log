@@ -1,0 +1,18 @@
+{"t_ms":0.099,"event":"listener.starting","pid":43964,"euid":501,"service":"com.arkdeck.agentd","requirement":"anchor apple generic and certificate leaf[subject.OU] = 8AQTYW5FKR and (identifier com.arkdeck.spk2-client or identifier com.arkdeck.spk2-adhoc or identifier com.arkdeck.spk2-devcert or identifier com.arkdeck.spk2-nolookup or identifier com.arkdeck.desktop)","replyMode":"respond","launchdVended":"com.arkdeck.agentd"}
+{"t_ms":0.518,"event":"listener.activated","service":"com.arkdeck.agentd"}
+{"t_ms":1462.311,"event":"peer.accepted","peer":1,"pid":43978,"euid":501,"egid":20,"asid":100025,"requirement":"set","requirementSet":22,"requirementSetMicros":4203}
+{"t_ms":1462.328,"event":"peer.requirementRejected","peer":1,"rc":22}
+{"t_ms":3907.356,"event":"peer.accepted","peer":2,"pid":43982,"euid":501,"egid":20,"asid":100025,"requirement":"set","requirementSet":22,"requirementSetMicros":82}
+{"t_ms":3907.371,"event":"peer.requirementRejected","peer":2,"rc":22}
+{"t_ms":29962.258,"event":"peer.accepted","peer":3,"pid":44100,"euid":501,"egid":20,"asid":100025,"requirement":"set","requirementSet":22,"requirementSetMicros":151}
+{"t_ms":29982.441,"event":"peer.requirementRejected","peer":3,"rc":22}
+{"t_ms":30419.000,"event":"peer.accepted","peer":4,"pid":44100,"euid":501,"egid":20,"asid":100025,"requirement":"set","requirementSet":22,"requirementSetMicros":88}
+{"t_ms":30419.027,"event":"peer.requirementRejected","peer":4,"rc":22}
+{"t_ms":30419.113,"event":"peer.accepted","peer":5,"pid":44100,"euid":501,"egid":20,"asid":100025,"requirement":"set","requirementSet":22,"requirementSetMicros":48}
+{"t_ms":30419.121,"event":"peer.requirementRejected","peer":5,"rc":22}
+{"t_ms":30419.243,"event":"peer.accepted","peer":6,"pid":44100,"euid":501,"egid":20,"asid":100025,"requirement":"set","requirementSet":22,"requirementSetMicros":96}
+{"t_ms":30419.256,"event":"peer.requirementRejected","peer":6,"rc":22}
+{"t_ms":30419.397,"event":"peer.accepted","peer":7,"pid":44100,"euid":501,"egid":20,"asid":100025,"requirement":"set","requirementSet":22,"requirementSetMicros":109}
+{"t_ms":30419.404,"event":"peer.requirementRejected","peer":7,"rc":22}
+{"t_ms":30419.496,"event":"peer.accepted","peer":8,"pid":44100,"euid":501,"egid":20,"asid":100025,"requirement":"set","requirementSet":22,"requirementSetMicros":67}
+{"t_ms":30419.505,"event":"peer.requirementRejected","peer":8,"rc":22}

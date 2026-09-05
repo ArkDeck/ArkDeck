@@ -1,6 +1,6 @@
 # Verification — CHG-2026-074
 
-> Change:CHG-2026-074-shared-rust-runtime-core@r6
+> Change:CHG-2026-074-shared-rust-runtime-core@r7
 > Status:planned; nothing in this file approves the change, and no host, fixture or simulation
 > result counts as platform or hardware support (POL-VERIFY-001, POL-MODE-001).
 
@@ -9,6 +9,10 @@ field-set and rollback expectations below refer to the pinned Swift baseline aft
 [TASK-SVC-001..004](../chg-2026-075-single-v1-contracts/tasks.md). They do not retain pre-SVC
 protocol versions, historical durable readers or old authority. XPA-001 records the actual
 post-SVC commit and corpus; SVC-005 remains CHG-2026-075's release acceptance task.
+
+Revision 7 records the SPK-2 spike result (`evidence/runs/TASK-XPA-003/spk-2-run.md`) and
+changes no acceptance row: the wrongly signed XPC peer refusal of XPA-AC-6 now has host
+evidence from the spike, and the row's acceptance stays with `TASK-XPA-003`.
 
 ## Environment
 

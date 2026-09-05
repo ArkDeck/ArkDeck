@@ -1,0 +1,55 @@
+{
+  "client" : {
+    "bundleIdentifier" : "com.arkdeck.spk2-adhoc",
+    "euid" : 501,
+    "executable" : "\/private\/tmp\/claude-501\/-Users-fuhanfeng-Dropbox-Code-Github-ArkDeck--claude-worktrees-arkdeck-cross-platform-6ffddd\/b66749e2-614e-46c1-a350-caca4c23a2cb\/scratchpad\/spk2\/build\/SPK2ClientAdhoc.app\/Contents\/MacOS\/spk2-client",
+    "pid" : 45690,
+    "sandboxContainer" : "com.arkdeck.spk2-adhoc",
+    "signing" : {
+      "appSandbox" : true,
+      "certificateChain" : [
+
+      ],
+      "entitlementKeys" : [
+        "com.apple.security.app-sandbox",
+        "com.apple.security.device.serial",
+        "com.apple.security.device.usb",
+        "com.apple.security.files.bookmarks.app-scope",
+        "com.apple.security.files.user-selected.read-write",
+        "com.apple.security.network.client",
+        "com.apple.security.temporary-exception.files.home-relative-path.read-only",
+        "com.apple.security.temporary-exception.mach-lookup.global-name"
+      ],
+      "flags" : 65538,
+      "identifier" : "com.arkdeck.spk2-adhoc",
+      "machLookupGlobalNames" : [
+        "com.arkdeck.agentd"
+      ],
+      "teamIdentifier" : null
+    }
+  },
+  "connectionEvents" : [
+    {
+      "description" : "Connection invalid",
+      "error" : "XPC_ERROR_CONNECTION_INVALID",
+      "tMs" : 522534045.80933303
+    }
+  ],
+  "host" : {
+    "cpuCount" : 8,
+    "kernel" : "Version 26.6.2 (Build 25G83)"
+  },
+  "mode" : "probe",
+  "probe" : {
+    "detail" : {
+      "description" : "Connection interrupted",
+      "error" : "XPC_ERROR_CONNECTION_INTERRUPTED",
+      "tMs" : 522533745.592583
+    },
+    "elapsedMs" : 6.0986250000000002,
+    "outcome" : "error"
+  },
+  "protocolVersion" : "1.0.0",
+  "requestID" : "5B237CC2-FDDC-4EB9-990C-E7C14E9C8AFF",
+  "service" : "com.arkdeck.agentd"
+}

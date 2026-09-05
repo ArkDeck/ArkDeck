@@ -1,0 +1,78 @@
+2026-09-05T05:22:13Z phase baseline: production daemon state: 	state = running;	program = ~/Library/Application Support/ArkDeck/Helpers/ArkDeckAgent.app/Contents/MacOS/arkdeck-agentd;	pid = 71411;		state = active;		state = active;
+UDS health ok=True status=ok rtt=0.905 ms
+2026-09-05T05:22:13Z nsxpc round trips against the production Swift daemon (sandboxed client, Developer ID)
+persistent {'max': 0.6216, 'mean': 0.0887, 'min': 0.0822, 'n': 1000, 'p50': 0.0858, 'p95': 0.0977, 'p99': 0.1063, 'unit': 'milliseconds'}
+per-request {'max': 0.168, 'mean': 0.1345, 'min': 0.1258, 'n': 200, 'p50': 0.1335, 'p95': 0.1417, 'p99': 0.1458, 'unit': 'milliseconds'}
+replyBytes 201 errors [] refusals []
+2026-09-05T05:23:05Z phase baseline: production daemon state: 	state = running;	program = ~/Library/Application Support/ArkDeck/Helpers/ArkDeckAgent.app/Contents/MacOS/arkdeck-agentd;	pid = 71411;		state = active;		state = active;
+UDS health ok=True status=ok rtt=1.106 ms
+2026-09-05T05:23:05Z nsxpc round trips against the production Swift daemon (sandboxed client, Developer ID)
+persistent {'max': 32.5514, 'mean': 0.1444, 'min': 0.0858, 'n': 1000, 'p50': 0.095, 'p95': 0.1273, 'p99': 0.3091, 'unit': 'milliseconds'}
+per-request {'max': 0.1617, 'mean': 0.1386, 'min': 0.1325, 'n': 200, 'p50': 0.1376, 'p95': 0.1467, 'p99': 0.1502, 'unit': 'milliseconds'}
+replyBytes 201 errors [] refusals []
+2026-09-05T05:23:51Z phase baseline: production daemon state: 	state = running;	program = ~/Library/Application Support/ArkDeck/Helpers/ArkDeckAgent.app/Contents/MacOS/arkdeck-agentd;	pid = 71411;		state = active;		state = active;
+UDS health ok=True status=ok rtt=0.939 ms
+2026-09-05T05:23:51Z nsxpc round trips against the production Swift daemon: runtime.storage.status @ 2.0.0 (sandboxed client, Developer ID)
+persistent {'max': 2.4244, 'mean': 0.6398, 'min': 0.5525, 'n': 1000, 'p50': 0.5733, 'p95': 0.7968, 'p99': 1.867, 'unit': 'milliseconds'}
+per-request {'max': 1.9615, 'mean': 0.6698, 'min': 0.6038, 'n': 200, 'p50': 0.633, 'p95': 0.7887, 'p99': 0.8247, 'unit': 'milliseconds'}
+replyBytes 803 errors [] refusals []
+replySample {"id":"9B591452-A39D-4F00-8AA7-9D77FAEA469C","ok":true,"result":{"artifactDomain":{"policy":"refuseNewWorkNeverEvict","remainingBytes":"5303128953","rootReferen
+2026-09-05T05:23:53Z nsxpc round trips against the production Swift daemon: target.list @ 1.0.0 (sandboxed client, Developer ID)
+persistent {'max': 0.8947, 'mean': 0.2339, 'min': 0.2241, 'n': 1000, 'p50': 0.23, 'p95': 0.2434, 'p99': 0.274, 'unit': 'milliseconds'}
+per-request {'max': 0.7147, 'mean': 0.3118, 'min': 0.2699, 'n': 200, 'p50': 0.29, 'p95': 0.4355, 'p99': 0.6311, 'unit': 'milliseconds'}
+replyBytes 387 errors [] refusals []
+replySample {"id":"38833F53-608F-4A23-922A-E81E7774C9A4","ok":true,"result":[{"adoptedAtUtc":"2026-07-31T02:43:19Z","bindingRevision":4,"displayName":null,"displayNameGener
+2026-09-05T05:24:48Z phase swap-in: booting out the production job
+2026-09-05T05:24:48Z before: 	state = running;	program = ~/Library/Application Support/ArkDeck/Helpers/ArkDeckAgent.app/Contents/MacOS/arkdeck-agentd;	pid = 71411;		state = active;		state = active;
+2026-09-05T05:24:49Z after bootout: 
+2026-09-05T05:24:50Z after bootstrap of the spike plist: 	state = running;	program = __SPK2_ROOT__/build/spk2-listener;	pid = 38265;		state = active;		state = active;
+2026-09-05T05:24:50Z phase measure: raw libxpc against the Rust listener
+2026-09-05T05:24:50Z   a-client-roundtrips: __SPK2_ROOT__/build/SPK2Client.app/Contents/MacOS/spk2-client roundtrips --count 1000 --warmup 100
+2026-09-05T05:24:50Z   a-client-roundtrips: exit 0
+2026-09-05T05:24:50Z   a-client-fresh: __SPK2_ROOT__/build/SPK2Client.app/Contents/MacOS/spk2-client fresh --count 200 --warmup 10
+2026-09-05T05:24:50Z   a-client-fresh: exit 0
+2026-09-05T05:24:50Z   a-client-sizes: __SPK2_ROOT__/build/SPK2Client.app/Contents/MacOS/spk2-client sizes --count 100
+2026-09-05T05:24:51Z   a-client-sizes: exit 0
+2026-09-05T05:24:51Z   a-client-pin-right: __SPK2_ROOT__/build/SPK2Client.app/Contents/MacOS/spk2-client probe --pin-server anchor apple generic and certificate leaf[subject.OU] = "8AQTYW5FKR" and identifier "com.arkdeck.spk2-listener"
+2026-09-05T05:24:51Z   a-client-pin-right: exit 0
+2026-09-05T05:24:51Z   a-client-pin-wrong: __SPK2_ROOT__/build/SPK2Client.app/Contents/MacOS/spk2-client probe --pin-server anchor apple generic and certificate leaf[subject.OU] = "8AQTYW5FKR" and identifier "com.arkdeck.agentd"
+2026-09-05T05:24:52Z   a-client-pin-wrong: exit 0
+2026-09-05T05:24:52Z   b-adhoc-probe: __SPK2_ROOT__/build/SPK2ClientAdhoc.app/Contents/MacOS/spk2-client probe --timeout 5
+2026-09-05T05:41:16Z phase swap-out: booting out the spike job, bootstrapping the production plist
+2026-09-05T05:41:21Z after restore: 	state = running;	program = ~/Library/Application Support/ArkDeck/Helpers/ArkDeckAgent.app/Contents/MacOS/arkdeck-agentd;	pid = 41970;		state = active;		state = active;
+2026-09-05T05:41:21Z phase verify: production daemon reachable again
+2026-09-05T05:41:21Z state: 	state = running;	program = ~/Library/Application Support/ArkDeck/Helpers/ArkDeckAgent.app/Contents/MacOS/arkdeck-agentd;	pid = 41970;		state = active;		state = active;
+UDS connect failed: [Errno 2] No such file or directory
+	path = ~/Library/LaunchAgents/com.arkdeck.agentd.plist
+	state = running
+	program = ~/Library/Application Support/ArkDeck/Helpers/ArkDeckAgent.app/Contents/MacOS/arkdeck-agentd
+2026-09-05T05:44:16Z phase verify: production daemon reachable again
+2026-09-05T05:44:16Z state: 	state = running;	program = ~/Library/Application Support/ArkDeck/Helpers/ArkDeckAgent.app/Contents/MacOS/arkdeck-agentd;	pid = 41970;		state = active;		state = active;
+UDS health ok=True status=ok rtt=2.193 ms
+	path = ~/Library/LaunchAgents/com.arkdeck.agentd.plist
+	state = running
+	program = ~/Library/Application Support/ArkDeck/Helpers/ArkDeckAgent.app/Contents/MacOS/arkdeck-agentd
+2026-09-05T05:48:16Z phase swap-in: booting out the production job
+2026-09-05T05:48:16Z before: 	state = running;	program = ~/Library/Application Support/ArkDeck/Helpers/ArkDeckAgent.app/Contents/MacOS/arkdeck-agentd;	pid = 41970;		state = active;		state = active;
+2026-09-05T05:48:17Z after bootout: 
+2026-09-05T05:48:18Z after bootstrap of the spike plist: 	state = running;	program = __SPK2_ROOT__/build/spk2-listener;	pid = 43964;		state = active;		state = active;
+2026-09-05T05:49:50Z phase swap-out: booting out the spike job, bootstrapping the production plist
+2026-09-05T05:49:54Z after restore: 	state = running;	program = ~/Library/Application Support/ArkDeck/Helpers/ArkDeckAgent.app/Contents/MacOS/arkdeck-agentd;	pid = 44285;		state = active;		state = active;
+2026-09-05T05:49:54Z phase verify: production daemon reachable again
+2026-09-05T05:49:54Z state: 	state = running;	program = ~/Library/Application Support/ArkDeck/Helpers/ArkDeckAgent.app/Contents/MacOS/arkdeck-agentd;	pid = 44285;		state = active;		state = active;
+UDS health ok=True status=ok rtt=0.508 ms
+	path = ~/Library/LaunchAgents/com.arkdeck.agentd.plist
+	state = running
+	program = ~/Library/Application Support/ArkDeck/Helpers/ArkDeckAgent.app/Contents/MacOS/arkdeck-agentd
+2026-09-05T05:54:55Z phase swap-in: booting out the production job
+2026-09-05T05:54:55Z before: 	state = running;	program = ~/Library/Application Support/ArkDeck/Helpers/ArkDeckAgent.app/Contents/MacOS/arkdeck-agentd;	pid = 44285;		state = active;		state = active;
+2026-09-05T05:54:56Z after bootout: 
+2026-09-05T05:54:57Z after bootstrap of the spike plist: 	state = running;	program = __SPK2_ROOT__/build/spk2-listener;	pid = 45670;		state = active;		state = active;
+2026-09-05T05:55:16Z phase swap-out: booting out the spike job, bootstrapping the production plist
+2026-09-05T05:55:20Z after restore: 	state = running;	program = ~/Library/Application Support/ArkDeck/Helpers/ArkDeckAgent.app/Contents/MacOS/arkdeck-agentd;	pid = 45773;		state = active;		state = active;
+2026-09-05T05:55:20Z phase verify: production daemon reachable again
+2026-09-05T05:55:20Z state: 	state = running;	program = ~/Library/Application Support/ArkDeck/Helpers/ArkDeckAgent.app/Contents/MacOS/arkdeck-agentd;	pid = 45773;		state = active;		state = active;
+UDS health ok=True status=ok rtt=1.832 ms
+	path = ~/Library/LaunchAgents/com.arkdeck.agentd.plist
+	state = running
+	program = ~/Library/Application Support/ArkDeck/Helpers/ArkDeckAgent.app/Contents/MacOS/arkdeck-agentd

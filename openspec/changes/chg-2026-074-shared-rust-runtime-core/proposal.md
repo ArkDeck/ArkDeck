@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-074-shared-rust-runtime-core
-revision: 6
+revision: 7
 status: approved # 维护者 review + merge 本 proposal PR 后才生效；合入前任何 TASK-XPA 不开工，第一个实现 PR 只能在合入后声明
 class: platform
 core_change_level: none
@@ -41,6 +41,45 @@ contract. All later Swift/Rust parity and rollback targets are that post-SVC Swi
 Earlier scan facts and revision notes below describe pre-SVC history, not an obligation to
 restore old protocol/document generations. SVC-005 owns the single-v1 release acceptance;
 XPA tasks retain their separate hardware parity and migration acceptance.
+
+## Revision 7 — SPK-2 outcome (2026-09-05)
+
+Revision 7 changes no scope, no Requirement, no Acceptance Scenario and no platform
+disposition, and it does not approve r6 or itself. It records the SPK-2 spike, which the design
+lists as the feasibility gate of `TASK-XPA-003` (section J.3) and as an open item of section L
+(availability and behaviour of `xpc_connection_set_peer_code_signing_requirement`).
+
+1. **SPK-2 passed on the macOS reference host.** A Rust process held the launchd Mach service
+   `com.arkdeck.agentd` through the libxpc C API; a sandboxed client signed with the App's
+   Developer ID and the byte-identical `ArkDeckApp/ArkDeckApp.entitlements` completed 1,000
+   round trips at p95 0.013 ms (budget 8 ms) with zero errors; the same client without the one
+   `mach-lookup` exception never reached the listener; an ad-hoc peer, a same-team peer with
+   another identifier and a bare unsandboxed tool were refused by libxpc before their first
+   frame reached the handler; the unmodified production `ArkDeck.app` connected and satisfied
+   the requirement. Record: `evidence/runs/TASK-XPA-003/spk-2-run.md`; report:
+   `docs/design/cross-platform/spk-2-macos-libxpc-mach-service.md`; sources, LaunchAgent
+   templates, raw results and listener logs under `evidence/runs/TASK-XPA-003/spk-2/`.
+2. **`TASK-XPA-003` now waits on `TASK-XPA-002` and maintainer review only.** Its status line
+   and the spike table say so; nothing else in the task changes, and it stays `blocked`.
+3. **Facts for maintainer decisions 3 and 6 (design section L.1)**, written into the design's
+   section F.2 identity row, section K risk R3 and the section L open-items table:
+   (a) the API exists on macOS 12+, returns `EINVAL` for an invalid requirement, and refuses
+   inside libxpc at the peer's first message — zero dispatch is a transport property;
+   (b) the production-shaped requirement (`anchor apple generic` + `subject.OU` + `identifier`)
+   admits same-team Apple Development signatures, so whether release builds add the Developer
+   ID intermediate clause is decision 3's to make;
+   (c) the same API pins the daemon from the client side (a wrong identifier yields
+   `XPC_ERROR_PEER_CODE_SIGNING_REQUIREMENT` instead of the reply), the macOS counterpart of the
+   Windows two-layer server check, and the pinned identity must cover the façade and the
+   same-release Swift daemon;
+   (d) the requirement costs about 1 ms per connection and nothing per message, so the App's
+   connection-per-request pattern should not survive the move to `xpc_connection`;
+   (e) an NSXPC client is recognisable on a raw listener by its message keys, so the mismatched
+   App/daemon pair of XPA-AC-9 can be answered with a structured error rather than a hang.
+
+The pinned design blob in `design.md` is re-pinned in this revision: the section F.2 identity
+row, the section J.3 SPK-2 row, risk R3 in section K, one section L open-items row and the
+notes on items 3 and 6 of section L.1 changed; nothing else.
 
 ## Governance loop
 

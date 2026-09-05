@@ -1,0 +1,55 @@
+{
+  "client" : {
+    "bundleIdentifier" : "com.arkdeck.spk2-devcert",
+    "euid" : 501,
+    "executable" : "\/private\/tmp\/claude-501\/-Users-fuhanfeng-Dropbox-Code-Github-ArkDeck--claude-worktrees-arkdeck-cross-platform-6ffddd\/b66749e2-614e-46c1-a350-caca4c23a2cb\/scratchpad\/spk2\/build\/SPK2ClientDevCert.app\/Contents\/MacOS\/spk2-client",
+    "pid" : 45708,
+    "sandboxContainer" : "com.arkdeck.spk2-devcert",
+    "signing" : {
+      "appSandbox" : true,
+      "certificateChain" : [
+        "Apple Development: Hanfeng Fu (ZUP86546UG)",
+        "Apple Worldwide Developer Relations Certification Authority",
+        "Apple Root CA"
+      ],
+      "entitlementKeys" : [
+        "com.apple.security.app-sandbox",
+        "com.apple.security.device.serial",
+        "com.apple.security.device.usb",
+        "com.apple.security.files.bookmarks.app-scope",
+        "com.apple.security.files.user-selected.read-write",
+        "com.apple.security.network.client",
+        "com.apple.security.temporary-exception.files.home-relative-path.read-only",
+        "com.apple.security.temporary-exception.mach-lookup.global-name"
+      ],
+      "flags" : 65536,
+      "identifier" : "com.arkdeck.spk2-devcert",
+      "machLookupGlobalNames" : [
+        "com.arkdeck.agentd"
+      ],
+      "teamIdentifier" : "8AQTYW5FKR"
+    }
+  },
+  "connectionEvents" : [
+    {
+      "description" : "Connection invalid",
+      "error" : "XPC_ERROR_CONNECTION_INVALID",
+      "tMs" : 522536456.75825
+    }
+  ],
+  "host" : {
+    "cpuCount" : 8,
+    "kernel" : "Version 26.6.2 (Build 25G83)"
+  },
+  "mode" : "probe",
+  "probe" : {
+    "elapsedMs" : 2.1071249999999999,
+    "outcome" : "reply",
+    "replyBytes" : 112,
+    "replyID" : "BA240EAB-6A9A-44FD-873A-C85C92280FAA",
+    "replySample" : "{\"id\":\"BA240EAB-6A9A-44FD-873A-C85C92280FAA\",\"ok\":true,\"result\":{\"listener\":\"spk2-rust-libxpc\",\"echoBytes\":119}}"
+  },
+  "protocolVersion" : "1.0.0",
+  "requestID" : "BA240EAB-6A9A-44FD-873A-C85C92280FAA",
+  "service" : "com.arkdeck.agentd"
+}

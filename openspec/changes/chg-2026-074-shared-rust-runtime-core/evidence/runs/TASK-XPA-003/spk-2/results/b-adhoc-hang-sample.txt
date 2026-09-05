@@ -1,0 +1,54 @@
+Analysis of sampling spk2-client (pid 38336) every 1 millisecond
+Process:         spk2-client [38336]
+Path:            /private/tmp/*/SPK2ClientAdhoc.app/Contents/MacOS/spk2-client
+Load Address:    0x104ba4000
+Identifier:      spk2-client
+Version:         ???
+Code Type:       ARM64
+Platform:        macOS
+Parent Process:  bash [38279]
+Target Type:     live task
+
+Date/Time:       2026-09-05 13:31:28.093 +0800
+Launch Time:     2026-09-05 13:24:52.116 +0800
+OS Version:      macOS 26.6.2 (25G83)
+Report Version:  7
+Analysis Tool:   /usr/bin/sample
+
+Physical footprint:         1296K
+Physical footprint (peak):  1328K
+Idle exit:                  untracked
+----
+
+Call graph:
+    758 Thread_20387645   DispatchQueue_1: com.apple.main-thread  (serial)
+      758 start  (in dyld) + 6904  [0x18d55848c]
+        758 dyld4::start(dyld4::KernelArgs*, void*, void*, unsigned long long)::$_1::operator()() const  (in dyld) + 320  [0x18d558b30]
+          758 dyld4::prepare(dyld4::APIs&, mach_o::UnsafeHeader const*)  (in dyld) + 4184  [0x18d559ba4]
+            758 dyld4::APIs::runAllInitializersForMain()  (in dyld) + 100  [0x18d54c870]
+              758 dyld4::PrebuiltLoader::runInitializers(dyld4::RuntimeState&) const  (in dyld) + 44  [0x18d5abd44]
+                758 dyld4::Loader::findAndRunAllInitializers(dyld4::RuntimeState&) const  (in dyld) + 528  [0x18d581394]
+                  758 dyld3::MachOAnalyzer::forEachInitializer(Diagnostics&, dyld3::MachOAnalyzer::VMAddrConverter const&, void (unsigned int) block_pointer, void const*) const  (in dyld) + 516  [0x18d591580]
+                    758 mach_o::UnsafeHeader::forEachSection(void (mach_o::UnsafeHeader::SectionInfo const&, bool&) block_pointer) const  (in dyld) + 124  [0x18d5d024c]
+                      758 mach_o::UnsafeHeader::forEachLoadCommand(void (load_command const*, bool&) block_pointer) const  (in dyld) + 208  [0x18d5ce9a4]
+                        758 invocation function for block in mach_o::UnsafeHeader::forEachSection(void (mach_o::UnsafeHeader::SectionInfo const&, bool&) block_pointer) const  (in dyld) + 312  [0x18d5d1fac]
+                          758 invocation function for block in dyld3::MachOAnalyzer::forEachInitializer(Diagnostics&, dyld3::MachOAnalyzer::VMAddrConverter const&, void (unsigned int) block_pointer, void const*) const  (in dyld) + 320  [0x18d591a8c]
+                            758 invocation function for block in dyld4::Loader::findAndRunAllInitializers(dyld4::RuntimeState&) const::$_0::operator()() const  (in dyld) + 180  [0x18d586a28]
+                              758 libSystem_initializer  (in libSystem.B.dylib) + 280  [0x19d77f374]
+                                758 _libsecinit_initializer  (in libsystem_secinit.dylib) + 196  [0x19d767b24]
+                                  758 _os_activity_initiate_impl  (in libsystem_trace.dylib) + 64  [0x18d64cfb0]
+                                    758 _libsecinit_appsandbox  (in libsystem_secinit.dylib) + 696  [0x19d767f28]
+                                      758 _xpc_pipe_routine  (in libxpc.dylib) + 384  [0x18d623bd8]
+                                        758 _xpc_pipe_mach_msg  (in libxpc.dylib) + 56  [0x18d6244ec]
+                                          758 mach_msg  (in libsystem_kernel.dylib) + 24  [0x18d8dffc0]
+                                            758 mach_msg_overwrite  (in libsystem_kernel.dylib) + 480  [0x18d8e89c0]
+                                              758 mach_msg2_internal  (in libsystem_kernel.dylib) + 76  [0x18d8f25a4]
+                                                758 mach_msg2_trap  (in libsystem_kernel.dylib) + 8  [0x18d8dfc34]
+
+Total number in stack (recursive counted multiple, when >=5):
+
+Sort by top of stack, same collapsed (when >= 5):
+        mach_msg2_trap  (in libsystem_kernel.dylib)        758
+
+Binary images description not available
+
