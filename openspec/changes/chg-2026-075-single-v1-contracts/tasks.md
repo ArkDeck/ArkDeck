@@ -64,6 +64,7 @@
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AgentExecutionCoordinator.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AgentExecutionStore.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Artifacts/RuntimeImportStore.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Artifacts/RuntimeArtifactStore.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeSessionCleanupRecordStore.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeSessionExportRecordStore.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeSnapshotPager.swift`
