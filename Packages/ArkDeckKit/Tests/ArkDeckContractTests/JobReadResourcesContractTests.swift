@@ -137,30 +137,15 @@ final class JobReadResourcesContractTests: XCTestCase {
     return values
   }
 
-  func testLegacyImporterRowsStayVerifiableInDurableHistory() async throws {
-    // The retired legacy idempotency importer wrote its rows with the
-    // `legacy` creation sentinel while the record it copied carries the real
-    // timestamp. Those rows are terminal durable history: every scan that
-    // verifies a row against its record must excuse exactly that one column,
-    // and only for that sentinel — a row whose creation column disagrees
-    // with its record for any other reason stays unreadable.
+  func testCurrentHistoryRejectsRetiredCreationSentinelAndTimestampDrift() async throws {
     try admitVerifiedRow("job-current", createdAtColumn: date)
-    try admitVerifiedRow(
-      "job-legacy", recordCreatedAtUTC: "2026-08-03T16:11:54Z",
-      createdAtColumn: RuntimePersistedJob.legacyCreatedAtUTC)
-
+    XCTAssertThrowsError(try admitVerifiedRow("job-legacy", createdAtColumn: "legacy"))
     let listed = try rows(await page()).compactMap { row -> String? in
       guard case .string(let id)? = row["jobId"] else { return nil }
       return id
     }
-    XCTAssertEqual(Set(listed), ["job-current", "job-legacy"])
-    let read = try await engine.jobReadSnapshot(jobID: "job-legacy")
-    XCTAssertEqual(read.record.createdAtUTC, "2026-08-03T16:11:54Z")
+    XCTAssertEqual(listed, ["job-current"])
     let admission = try RuntimeAdmissionService(stateDirectory: state)
-    XCTAssertNoThrow(try admission.requireNoActiveWorkspacePresetReference("preset-fixture"))
-    XCTAssertNoThrow(try admission.requireNoActiveWorkspaceProjectReference("demo-app"))
-    XCTAssertNoThrow(try admission.requireNoActiveImportReference("imp-fixture"))
-
     // Any other disagreement between the column and the record is still a
     // corrupt row, not history.
     try admitVerifiedRow("job-drifted", createdAtColumn: "2026-01-01T00:00:00Z")

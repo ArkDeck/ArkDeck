@@ -27,3 +27,9 @@ data. None of these methods creates a Job or dispatches to a device.
 The host-only contract fixtures exercise parsing, immutable pagination,
 compare-and-swap transitions, stale refusal, XPC admission, and a real
 `arkdeck` subprocess. They do not claim real-device acceptance.
+
+The current v1 Session Manifest uses a closed confirmation actor object
+`{"kind":"interactiveUser"}`. The actor records a UI decision; it does not grant
+Runtime authority. Retired actor strings, authority unions and versioned
+Rockchip toolchain snapshots are refused. Export preserves source Artifact
+bytes and their lineage, while new manifests use only the current shape.

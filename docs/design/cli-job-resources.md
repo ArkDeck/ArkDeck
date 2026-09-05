@@ -70,3 +70,10 @@ large-file verification, symlink refusal, corrupt cleanup/index records and
 lossless long Unicode timeline pages. These are host contract checks, not
 `REAL_DEVICE_PASS`. Real-device GJ-1–GJ-5 acceptance still requires the reviewed
 protected-main Runtime and current Catalog digest through Agent/CLI.
+
+Durable Job readers validate the current request and record at every decode
+boundary. Retired authority/campaign fields are errors, including null-valued
+fields. A Runtime capability admission requires its current use correlation;
+readers never reconstruct a missing original submission by stripping authority.
+The SQLite creation timestamp must match its record exactly: the retired
+`legacy` sentinel and insertion-order pagination are unsupported.

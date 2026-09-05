@@ -3194,18 +3194,6 @@ public struct RuntimeControlPlaneHandler: Sendable {
         "consumptionFingerprintSha256": optionalString(
           value.consumptionFingerprintSHA256),
       ]
-      if let campaign = value.campaignCorrelation {
-        fields["campaignId"] = .string(campaign.campaignID)
-        fields["attemptId"] = .string(campaign.attemptID)
-        fields["attemptOrdinal"] = .integer(Int64(campaign.attemptOrdinal))
-        fields["planDigest"] = .string(campaign.planDigestSHA256)
-        fields["targetBindingDigest"] = .string(campaign.targetBindingDigestSHA256)
-        fields["candidateDigest"] = .string(campaign.candidateDigestSHA256)
-        if let reviewDigest = campaign.reviewDigestSHA256 {
-          fields["reviewDigest"] = .string(reviewDigest)
-        }
-        fields["brokerDigest"] = .string(campaign.brokerDigestSHA256)
-      }
       if let runtime = value.runtimeCapabilityCorrelation {
         fields["reservationId"] = .string(runtime.reservationID)
         fields["useOrdinal"] = .integer(Int64(runtime.useOrdinal))

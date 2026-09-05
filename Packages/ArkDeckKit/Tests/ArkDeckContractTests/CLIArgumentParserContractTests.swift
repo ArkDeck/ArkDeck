@@ -159,9 +159,6 @@ final class CLIArgumentParserContractTests: XCTestCase {
   /// leaves that open the local control connection.
   func testTheLocalEndpointAliasIsRefusedByLeavesThatNeverConnect() {
     XCTAssertEqual(
-      failure(["flash", "status", "--campaign-id", "E-1", "--socket", "/tmp/s"])?.code,
-      .invalidOption)
-    XCTAssertEqual(
       failure([
         "update-feed", "assemble", "--payload", "p", "--signature", "s", "--out", "o",
         "--socket", "/tmp/s",
@@ -222,11 +219,6 @@ final class CLIArgumentParserContractTests: XCTestCase {
     XCTAssertNotNil(success(["doctor", "--output", "json"]))
     XCTAssertNotNil(success(["job", "list", "--output", "json"]))
     XCTAssertNotNil(success(["agentd", "status", "--output", "json"]))
-
-    // The legacy archive leaves gained structured results, so they answer too.
-    XCTAssertNotNil(
-      success(["flash", "status", "--campaign-id", "E-1", "--output", "json"]))
-    XCTAssertNotNil(success(["flash", "reconcile", "--output", "json"]))
 
     // The maintainer feed tooling was the last family without a structured
     // result. It answers under both spellings, because §12 keeps the alias's
@@ -291,9 +283,6 @@ final class CLIArgumentParserContractTests: XCTestCase {
       (["maintainer", "update-feed"], ["update-feed"], [
         ["assemble", "--payload", "p", "--signature", "s", "--out", "o"]
       ]),
-      (["legacy", "flash"], ["flash"], [
-        ["status", "--campaign-id", "E-1"], ["reconcile"],
-      ]),
     ]
     for family in renamed {
       for leaf in family.leaves {
@@ -313,7 +302,6 @@ final class CLIArgumentParserContractTests: XCTestCase {
       "agentd.status": "arkdeck runtime service status",
       "signing.normalize": "arkdeck runtime signing normalize",
       "update-feed.prepare": "arkdeck maintainer update-feed prepare",
-      "flash.reconcile": "arkdeck legacy flash reconcile",
     ]
     for (command, replacement) in expected {
       let leaf = CLICommandRegistry.allLeaves().first { $0.leaf.canonicalCommand == command }?.leaf
@@ -328,11 +316,15 @@ final class CLIArgumentParserContractTests: XCTestCase {
       XCTAssertEqual(leaf?.lifecycle, .current, command)
       XCTAssertNil(leaf?.replacementArgvPattern, command)
     }
-    // The archive keeps its `legacy` lifecycle across the rename: §12 forbids
-    // counting it as target conformance, and a rename is not a promotion.
-    for command in ["legacy.flash.status", "legacy.flash.reconcile"] {
-      let leaf = CLICommandRegistry.allLeaves().first { $0.leaf.canonicalCommand == command }?.leaf
-      XCTAssertEqual(leaf?.lifecycle, .legacy, command)
+  }
+
+  func testRetiredFlashArchiveCommandsAreRefused() {
+    for path in [
+      ["flash", "status"], ["flash", "reconcile"],
+      ["legacy", "flash", "status"], ["legacy", "flash", "reconcile"],
+    ] {
+      XCTAssertEqual(failure(path)?.code, .invalidCommand, path.joined(separator: " "))
+      XCTAssertNil(CLICommandRegistry.allLeaves().first { $0.path == path })
     }
   }
 
@@ -352,13 +344,12 @@ final class CLIArgumentParserContractTests: XCTestCase {
     XCTAssertNil(target?.replacementArgvPattern)
   }
 
-  /// §5.2 names these four families explicitly: they never open the control
+  /// These local families never open the control
   /// connection, so they refuse the endpoint alias rather than drop it.
   func testTheRenamedFamiliesRefuseTheEndpointAliasUnderBothSpellings() {
     let vectors = [
       ["runtime", "signing", "status"], ["signing", "status"],
       ["maintainer", "update-feed", "prepare"], ["update-feed", "prepare"],
-      ["legacy", "flash", "reconcile"], ["flash", "reconcile"],
       ["runtime", "service", "status"], ["agentd", "status"],
     ]
     for vector in vectors {
@@ -1455,7 +1446,6 @@ final class CLIArgumentParserContractTests: XCTestCase {
       ["debug", "start", "--request-file", "r.json"],
       ["debug", "status", "--invocation", "I-1"],
       ["flash", "install-binding", "--rebind"],
-      ["flash", "status", "--campaign-id", "E-1"], ["flash", "reconcile"],
       ["agentd", "status"], ["agentd", "restart", "--maximum-wait-seconds", "30"],
       ["agentd", "verify", "--job", "J-1"], ["agentd", "uninstall"],
       ["signing", "status"], ["signing", "normalize"], ["signing", "remove"],

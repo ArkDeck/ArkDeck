@@ -102,7 +102,7 @@ package enum ArkForgeRuntimeJobStateError: Error, Equatable {
 }
 
 /// Atomically persisted ArkForge-only projection under the owning Runtime job.
-/// A missing file is the legacy/no-lane state; malformed or future bytes fail
+/// A missing file is the not-yet-prepared/no-lane state; malformed or future bytes fail
 /// recovery closed rather than discarding the exact daemon correlation.
 package struct ArkForgeRuntimeJobState: Codable, Sendable, Equatable {
   private static let currentSchemaVersion = "arkdeck-arkforge-runtime-state/v1"
@@ -131,7 +131,7 @@ package struct ArkForgeRuntimeJobState: Codable, Sendable, Equatable {
   package static func load(from directory: URL) throws -> Self {
     let url = directory.appending(path: fileName)
     guard FileManager.default.fileExists(atPath: url.path) else { return Self() }
-    let state = try JSONDecoder().decode(Self.self, from: Data(contentsOf: url))
+    let state = try CurrentDurableJSON.decode(Self.self, from: Data(contentsOf: url))
     guard state.schemaVersion == currentSchemaVersion else {
       throw ArkForgeRuntimeJobStateError.unsupportedSchemaVersion(state.schemaVersion)
     }

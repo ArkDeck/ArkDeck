@@ -2617,40 +2617,6 @@
       "targetCommand": "arkdeck flash preview"
     },
     {
-      "classification": "local",
-      "conformanceFixture": "argv/flash.reconcile.json",
-      "equivalentCommands": [],
-      "feature": "flash.reconcile",
-      "implementationStatusByPlatform": {
-        "macos": "implemented"
-      },
-      "lifecycle": "legacy",
-      "note": "superseded by `arkdeck legacy flash reconcile`",
-      "requiredPlatforms": [
-        "macos"
-      ],
-      "source": "cli:flash.reconcile",
-      "targetClassification": "local",
-      "targetCommand": "arkdeck flash reconcile"
-    },
-    {
-      "classification": "local",
-      "conformanceFixture": "argv/flash.status.json",
-      "equivalentCommands": [],
-      "feature": "flash.status",
-      "implementationStatusByPlatform": {
-        "macos": "implemented"
-      },
-      "lifecycle": "legacy",
-      "note": "superseded by `arkdeck legacy flash status`",
-      "requiredPlatforms": [
-        "macos"
-      ],
-      "source": "cli:flash.status",
-      "targetClassification": "local",
-      "targetCommand": "arkdeck flash status --campaign-id <ECAMP-id>"
-    },
-    {
       "classification": "direct",
       "conformanceFixture": "argv/runtime.health.json",
       "equivalentCommands": [],
@@ -3081,38 +3047,6 @@
       "source": "cli:job.wait",
       "targetClassification": "direct",
       "targetCommand": "arkdeck job wait --job <job-id>"
-    },
-    {
-      "classification": "local",
-      "conformanceFixture": "argv/legacy.flash.reconcile.json",
-      "equivalentCommands": [],
-      "feature": "legacy.flash.reconcile",
-      "implementationStatusByPlatform": {
-        "macos": "implemented"
-      },
-      "lifecycle": "legacy",
-      "requiredPlatforms": [
-        "macos"
-      ],
-      "source": "cli:legacy.flash.reconcile",
-      "targetClassification": "local",
-      "targetCommand": "arkdeck legacy flash reconcile"
-    },
-    {
-      "classification": "local",
-      "conformanceFixture": "argv/legacy.flash.status.json",
-      "equivalentCommands": [],
-      "feature": "legacy.flash.status",
-      "implementationStatusByPlatform": {
-        "macos": "implemented"
-      },
-      "lifecycle": "legacy",
-      "requiredPlatforms": [
-        "macos"
-      ],
-      "source": "cli:legacy.flash.status",
-      "targetClassification": "local",
-      "targetCommand": "arkdeck legacy flash status --campaign-id <ECAMP-id>"
     },
     {
       "classification": "local",
@@ -4710,7 +4644,7 @@
       "direct": 125,
       "generic": 1,
       "internal": 4,
-      "local": 94,
+      "local": 90,
       "platformService": 4,
       "presentation": 21,
       "refused": 10
@@ -4718,10 +4652,10 @@
     "bySource": {
       "app": 68,
       "catalog": 30,
-      "cli": 65,
+      "cli": 61,
       "daemon": 96
     },
-    "entries": 259,
+    "entries": 255,
     "fullFunction": true
   }
 }

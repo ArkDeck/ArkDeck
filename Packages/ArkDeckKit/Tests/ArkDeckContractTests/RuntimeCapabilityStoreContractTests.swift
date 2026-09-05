@@ -893,7 +893,7 @@ final class RuntimeCapabilityStoreContractTests: XCTestCase {
     let external = directoryURL.deletingLastPathComponent()
       .appending(path: "external-\(UUID().uuidString).json")
     defer { try? FileManager.default.removeItem(at: external) }
-    let externalDocument = Data(#"{"records":[],"schemaVersion":"2.0.0"}"#.utf8)
+    let externalDocument = Data(#"{"records":[],"schemaVersion":"1.0.0"}"#.utf8)
     try externalDocument.write(to: external)
     let documentURL = directoryURL.appending(path: "runtime-capabilities.json")
     try FileManager.default.createSymbolicLink(at: documentURL, withDestinationURL: external)
@@ -975,9 +975,74 @@ final class RuntimeCapabilityStoreContractTests: XCTestCase {
     }
   }
 
-  func testUnsupportedV1SchemaVersionFailsLoud() async throws {
+  func testOldV1ShapeAndUnknownNestedFieldsCannotResetCapabilityUses() async throws {
+    let store = try makeStore()
+    try await store.install(try e1Capability(maximumUses: 3))
+    _ = try await store.consume(
+      capabilityID: "CAP-RT-STORE-001", reservationID: "res-current",
+      query: query(), nowUTC: "2026-07-15T00:00:00Z")
+    let checkpointURL = directoryURL.appending(path: "runtime-capabilities.json")
+    let ledgerURL = directoryURL.appending(path: "runtime-capabilities.ledger")
+    let originalCheckpoint = try Data(contentsOf: checkpointURL)
+    let originalLedger = try Data(contentsOf: ledgerURL)
+    let current = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: originalCheckpoint) as? [String: Any])
+    XCTAssertEqual(current["schemaVersion"] as? String, "1.0.0")
+    var retired = current
+    retired["standingAuthorization"] = NSNull()
+    let collision = try JSONSerialization.data(withJSONObject: retired)
+    try collision.write(to: checkpointURL)
+    do {
+      _ = try await makeStore().list()
+      XCTFail("old v1 shape must be refused")
+    } catch is RuntimeCapabilityStoreError {}
+    XCTAssertEqual(try Data(contentsOf: checkpointURL), collision)
+    XCTAssertEqual(try Data(contentsOf: ledgerURL), originalLedger)
+    try originalCheckpoint.write(to: checkpointURL)
+
+    let line = try XCTUnwrap(originalLedger.split(separator: 0x0A).first)
+    let event = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(line)) as? [String: Any])
+    for key in ["authorizationScopeFingerprintSHA256", "outcomes"] {
+      var changed = event
+      var consumption = try XCTUnwrap(changed["consumption"] as? [String: Any])
+      consumption.removeValue(forKey: key)
+      changed["consumption"] = consumption
+      var bytes = try JSONSerialization.data(withJSONObject: changed)
+      bytes.append(0x0A)
+      try bytes.write(to: ledgerURL)
+      do {
+        _ = try await makeStore().list()
+        XCTFail("missing current lineage field \(key)")
+      } catch is RuntimeCapabilityStoreError {}
+      XCTAssertEqual(try Data(contentsOf: ledgerURL), bytes)
+    }
+    try originalLedger.write(to: ledgerURL)
+    let unchanged = try await makeStore().inspect(capabilityID: "CAP-RT-STORE-001")
+    XCTAssertEqual(unchanged?.remainingUses, 2)
+    XCTAssertEqual(unchanged?.lineage.first?.outcome, .pending)
+  }
+
+  func testMissingCheckpointBesideLedgerCannotBecomeEmptyAuthority() async throws {
+    let store = try makeStore()
+    try await store.install(try e1Capability(maximumUses: 3))
+    _ = try await store.consume(
+      capabilityID: "CAP-RT-STORE-001", reservationID: "res-current",
+      query: query(), nowUTC: "2026-07-15T00:00:00Z")
+    let checkpoint = directoryURL.appending(path: "runtime-capabilities.json")
+    let ledger = directoryURL.appending(path: "runtime-capabilities.ledger")
+    let bytes = try Data(contentsOf: ledger)
+    try FileManager.default.removeItem(at: checkpoint)
+    do {
+      _ = try await makeStore().list()
+      XCTFail("missing checkpoint must block")
+    } catch is RuntimeCapabilityStoreError {}
+    XCTAssertFalse(FileManager.default.fileExists(atPath: checkpoint.path))
+    XCTAssertEqual(try Data(contentsOf: ledger), bytes)
+  }
+
+  func testRetiredV2SchemaVersionFailsLoud() async throws {
     let legacy = """
-      {"schemaVersion":"1.0.0","records":[]}
+      {"schemaVersion":"2.0.0","records":[]}
       """
     try FileManager.default.createDirectory(
       at: directoryURL, withIntermediateDirectories: true)
@@ -985,12 +1050,12 @@ final class RuntimeCapabilityStoreContractTests: XCTestCase {
       to: directoryURL.appending(path: "runtime-capabilities.json"))
     do {
       _ = try await makeStore().list()
-      XCTFail("a v1 store document must be refused, not migrated")
+      XCTFail("a retired store document must be refused, not migrated")
     } catch let error as RuntimeCapabilityStoreError {
       guard case .storeCorrupted(let detail) = error else {
         return XCTFail("expected storeCorrupted, got \(error)")
       }
-      XCTAssertTrue(detail.contains("unsupported schema version 1.0.0"), detail)
+      XCTAssertTrue(detail.contains("unsupported schema version 2.0.0"), detail)
     }
   }
 

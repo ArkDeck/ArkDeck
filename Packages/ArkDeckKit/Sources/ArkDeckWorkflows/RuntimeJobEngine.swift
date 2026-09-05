@@ -294,67 +294,10 @@ public struct RuntimeJobStatusPage: Sendable, Equatable {
 public enum RuntimeEvidenceAuthorityKind: String, Sendable, Equatable, Codable {
   case defaultReadOnlyPolicy
   case runtimeCapability
-  /// Historical evidence only. New Runtime admission never produces this
-  /// kind, but old Job records remain decodable and exportable.
-  case standingAuthorization
-  /// Historical campaign evidence only. New Runtime admission rejects the
-  /// corresponding reservation before any Job or dispatch is created.
-  case evolutionCampaignConfirmation
 }
 
-/// Campaign correlation copied only from the broker-owned durable reservation
-/// after its fresh pre-mutation verification. It is evidence provenance and
-/// cannot be converted into a live campaign capability.
-public struct RuntimeCampaignEvidenceCorrelation: Sendable, Equatable, Codable {
-  public let campaignID: String
-  public let attemptID: String
-  public let attemptOrdinal: Int
-  public let planDigestSHA256: String
-  public let targetBindingDigestSHA256: String
-  public let candidateDigestSHA256: String
-  /// Present only when projecting a historical review-bearing campaign.
-  public let reviewDigestSHA256: String?
-  public let brokerDigestSHA256: String
-
-  public init(
-    campaignID: String,
-    attemptID: String,
-    attemptOrdinal: Int,
-    planDigestSHA256: String,
-    targetBindingDigestSHA256: String,
-    candidateDigestSHA256: String,
-    brokerDigestSHA256: String
-  ) {
-    self.init(
-      campaignID: campaignID, attemptID: attemptID, attemptOrdinal: attemptOrdinal,
-      planDigestSHA256: planDigestSHA256, targetBindingDigestSHA256: targetBindingDigestSHA256,
-      candidateDigestSHA256: candidateDigestSHA256, historicalReviewDigestSHA256: nil,
-      brokerDigestSHA256: brokerDigestSHA256)
-  }
-
-  public init(
-    campaignID: String,
-    attemptID: String,
-    attemptOrdinal: Int,
-    planDigestSHA256: String,
-    targetBindingDigestSHA256: String,
-    candidateDigestSHA256: String,
-    historicalReviewDigestSHA256: String?,
-    brokerDigestSHA256: String
-  ) {
-    self.campaignID = campaignID
-    self.attemptID = attemptID
-    self.attemptOrdinal = attemptOrdinal
-    self.planDigestSHA256 = planDigestSHA256
-    self.targetBindingDigestSHA256 = targetBindingDigestSHA256
-    self.candidateDigestSHA256 = candidateDigestSHA256
-    self.reviewDigestSHA256 = historicalReviewDigestSHA256
-    self.brokerDigestSHA256 = brokerDigestSHA256
-  }
-}
-
-/// Durable correlation for a Runtime-owned capability use. Optional on the
-/// admission envelope only so pre-V5 Job records remain decodable.
+/// Durable correlation for a Runtime-owned capability use. Required whenever
+/// the admission kind is runtimeCapability; absent for the bounded read-only policy.
 public struct RuntimeCapabilityEvidenceCorrelation: Sendable, Equatable, Codable {
   public let reservationID: String
   public let useOrdinal: Int
@@ -395,13 +338,9 @@ public struct RuntimeAdmissionEvidence: Sendable, Equatable, Codable {
   public let admittedAtUTC: String
   public let validUntilUTC: String?
   public let consumptionFingerprintSHA256: String?
-  /// Optional only for old persisted jobs. New campaign admissions fill this
-  /// exclusively from the protected broker reservation.
-  public let campaignCorrelation: RuntimeCampaignEvidenceCorrelation?
   public let runtimeCapabilityCorrelation: RuntimeCapabilityEvidenceCorrelation?
   /// Runtime-internal recovery proof captured at the last safe boundary.
-  /// It remains inside the persisted admission envelope so old Job record
-  /// schema stays frozen and a process restart cannot lose recovery identity.
+  /// The persisted admission envelope preserves recovery identity across restart.
   var completeOverwriteRecovery: RuntimeCompleteOverwriteRecoveryContext?
   var recoveryProviderExecutableSHA256: String?
 
@@ -411,7 +350,6 @@ public struct RuntimeAdmissionEvidence: Sendable, Equatable, Codable {
     admittedAtUTC: String,
     validUntilUTC: String?,
     consumptionFingerprintSHA256: String?,
-    campaignCorrelation: RuntimeCampaignEvidenceCorrelation? = nil,
     runtimeCapabilityCorrelation: RuntimeCapabilityEvidenceCorrelation? = nil
   ) {
     self.kind = kind
@@ -419,7 +357,6 @@ public struct RuntimeAdmissionEvidence: Sendable, Equatable, Codable {
     self.admittedAtUTC = admittedAtUTC
     self.validUntilUTC = validUntilUTC
     self.consumptionFingerprintSHA256 = consumptionFingerprintSHA256
-    self.campaignCorrelation = campaignCorrelation
     self.runtimeCapabilityCorrelation = runtimeCapabilityCorrelation
     self.completeOverwriteRecovery = nil
     self.recoveryProviderExecutableSHA256 = nil
@@ -1157,10 +1094,7 @@ public actor RuntimeJobEngine {
   /// executing real Job and prevents idle *system* sleep; display sleep,
   /// screen lock, lid closure and explicit sleep remain unaffected.
   private let powerActivityController: PowerActivityController?
-  /// Campaign-lane E2 authority ledger, shared (file plus flock) with the
-  /// campaign admission service that mints reservations. Absent means this
-  /// runtime cannot honor campaign-reservation requests and refuses them.
-  private let agentUsageLedger: AgentAuthorityUsageLedger?
+  private let validateMutationState: @Sendable () throws -> Void
   private let mutationLane = DeviceMutationLaneCoordinator()
   private let admissionService: RuntimeAdmissionService
   private let nowUTC: @Sendable () -> String
@@ -1187,7 +1121,7 @@ public actor RuntimeJobEngine {
     workspaceProjectStore: RuntimeWorkspaceProjectStore? = nil,
     traceRuntimeProbe: (any TraceRuntimeProbing)? = nil,
     powerActivityController: PowerActivityController? = nil,
-    agentUsageLedger: AgentAuthorityUsageLedger? = nil,
+    validateMutationState: @escaping @Sendable () throws -> Void = {},
     nowUTC: @escaping @Sendable () -> String,
     nowPreciseUTC: (@Sendable () -> String)? = nil
   ) throws {
@@ -1199,8 +1133,8 @@ public actor RuntimeJobEngine {
     self.workspaceProjectStore = workspaceProjectStore
     self.traceRuntimeProbe = traceRuntimeProbe
     self.powerActivityController = powerActivityController
-    self.agentUsageLedger = agentUsageLedger
     self.nowUTC = nowUTC
+    self.validateMutationState = validateMutationState
     self.nowPreciseUTC = nowPreciseUTC ?? nowUTC
     try FileManager.default.createDirectory(
       at: configuration.stateDirectory.appending(path: "jobs", directoryHint: .isDirectory),
@@ -1808,12 +1742,12 @@ public actor RuntimeJobEngine {
         JournalEvent.jobCreated(
           eventID: "job-created", sequence: 0, sessionID: record.sessionID, jobID: jobID,
           timestamp: timestamp, executionMode: "execute",
-          schemaVersion: Self.journalSchemaVersion(of: record)))
+          schemaVersion: JournalEvent.schemaVersion))
       try journal.appendAndSynchronize(
         JournalEvent.stateTransition(
           eventID: "to-preflight", sequence: 1, sessionID: record.sessionID, jobID: jobID,
           timestamp: timestamp, from: .queued, to: .preflight, reason: "admitted",
-          schemaVersion: Self.journalSchemaVersion(of: record)))
+          schemaVersion: JournalEvent.schemaVersion))
       try configuration.admissionFaultInjector.check(.afterJournalAppend)
       try configuration.admissionFaultInjector.check(.beforeRecordPersist)
       try persistRuntimeRecord(record)
@@ -3562,7 +3496,7 @@ public actor RuntimeJobEngine {
         attempt: 1,
         bindingRevision: isDeviceBound
           ? (current.record.request.target.expectedBindingRevision ?? 1) : nil,
-        schemaVersion: Self.journalSchemaVersion(of: current.record)))
+        schemaVersion: JournalEvent.schemaVersion))
     current.nextSequence += 1
     current.record.recoveryStepID = step.stepID
     current.record.recoveryIntentEventID = intentEventID
@@ -3607,7 +3541,7 @@ public actor RuntimeJobEngine {
             result: "failed", outcomeCertainty: .confirmed,
             semanticCode: confirmedNotExecuted
               ? Self.confirmedNotExecutedSemanticCode : nil,
-            schemaVersion: Self.journalSchemaVersion(of: failed.record)))
+            schemaVersion: JournalEvent.schemaVersion))
         failed.nextSequence += 1
         failed.record.recoveryStepID = nil
         failed.record.recoveryIntentEventID = nil
@@ -3653,7 +3587,7 @@ public actor RuntimeJobEngine {
         result: "succeeded", outcomeCertainty: .confirmed,
         semanticCode: Self.arkForgePlanCompletionSemanticCode,
         summary: Self.arkForgePlanCompletionSummary(durableReceipt),
-        schemaVersion: Self.journalSchemaVersion(of: current.record)))
+        schemaVersion: JournalEvent.schemaVersion))
     current.nextSequence += 1
     current.record.recoveryStepID = nil
     current.record.recoveryIntentEventID = nil
@@ -3709,7 +3643,7 @@ public actor RuntimeJobEngine {
           connectKey: "sha256:\(stableIdentity)",
           identitySnapshotHash: stableIdentity),
         attempt: 1, bindingRevision: bindingRevision,
-        schemaVersion: Self.journalSchemaVersion(of: current.record)))
+        schemaVersion: JournalEvent.schemaVersion))
     current.nextSequence += 1
     current.record.recoveryStepID = step.stepID
     current.record.recoveryIntentEventID = intentEventID
@@ -3723,7 +3657,7 @@ public actor RuntimeJobEngine {
         result: "succeeded", outcomeCertainty: .confirmed,
         semanticCode: Self.arkForgePlanCompletionSemanticCode,
         summary: Self.arkForgePlanCompletionSummary(receipt),
-        schemaVersion: Self.journalSchemaVersion(of: current.record)))
+        schemaVersion: JournalEvent.schemaVersion))
     current.nextSequence += 1
     jobs[jobID] = current
   }
@@ -3868,7 +3802,7 @@ public actor RuntimeJobEngine {
       attempt: 1,
       bindingRevision: isDeviceBound
         ? (runtime.record.request.target.expectedBindingRevision ?? 1) : nil,
-      schemaVersion: Self.journalSchemaVersion(of: runtime.record))
+      schemaVersion: JournalEvent.schemaVersion)
     runtime.record.recoveryStepID = step.stepID
     runtime.record.recoveryIntentEventID = intentEventID
     runtime.record.recoveryAction = try PersistedTypedProviderAction(action)
@@ -4010,7 +3944,7 @@ public actor RuntimeJobEngine {
           outcomeCertainty: .confirmed,
           semanticCode: confirmedNotExecuted
             ? Self.confirmedNotExecutedSemanticCode : nil,
-          schemaVersion: Self.journalSchemaVersion(of: current.record)))
+          schemaVersion: JournalEvent.schemaVersion))
       current.nextSequence += 1
       if confirmedNotExecuted {
         let suffix = diagnostic.map { " [diagnostic=\($0.rawValue)]" } ?? ""
@@ -4089,7 +4023,7 @@ public actor RuntimeJobEngine {
           stepID: step.stepID, attempt: 1,
           correlatesToIntentEventID: intentEventID,
           result: "succeeded", outcomeCertainty: .confirmed,
-          schemaVersion: Self.journalSchemaVersion(of: current.record)))
+          schemaVersion: JournalEvent.schemaVersion))
       current.nextSequence += 1
       current.record.timeline.append("verified \(step.stepID) \(summary.keys.sorted())")
       if let anchor = summary["coverageAnchor"], let held = summary["ringHeldCoverageAnchor"] {
@@ -4127,7 +4061,7 @@ public actor RuntimeJobEngine {
           stepID: step.stepID, attempt: 1,
           correlatesToIntentEventID: intentEventID,
           result: "failed", outcomeCertainty: .confirmed,
-          schemaVersion: Self.journalSchemaVersion(of: current.record)))
+          schemaVersion: JournalEvent.schemaVersion))
       current.nextSequence += 1
       current.record.recoveryStepID = nil
       current.record.recoveryIntentEventID = nil
@@ -4159,7 +4093,7 @@ public actor RuntimeJobEngine {
             stepID: step.stepID, attempt: 1,
             correlatesToIntentEventID: intentEventID,
             result: "succeeded", outcomeCertainty: .confirmed,
-            schemaVersion: Self.journalSchemaVersion(of: current.record)))
+            schemaVersion: JournalEvent.schemaVersion))
         current.nextSequence += 1
         current.record.timeline.append("dispatched \(step.stepID); awaiting readback")
         current.record.recoveryStepID = nil
@@ -4200,7 +4134,7 @@ public actor RuntimeJobEngine {
           correlatesToIntentEventID: intentEventID,
           result: "failed", outcomeCertainty: .confirmed,
           semanticCode: "cancelled",
-          schemaVersion: Self.journalSchemaVersion(of: current.record)))
+          schemaVersion: JournalEvent.schemaVersion))
       current.nextSequence += 1
       current.record.timeline.append(
         "cancelled \(step.stepID); dispatch reached a confirmed safe boundary before publication")
@@ -5243,17 +5177,6 @@ public actor RuntimeJobEngine {
     return try statusPage(page, indexes: indexes)
   }
 
-  /// Frozen protocol-1 insertion order. Its durable sequence is a compatibility
-  /// projection only; current CLI resources use the logical compound order.
-  package func listLegacyJobs(
-    pageSize: Int, cursor: String? = nil, newestFirst: Bool = false
-  ) async throws -> RuntimeJobStatusPage {
-    let indexes = await recoveryEpochIndexes()
-    let page = try admissionService.listLegacyJobs(
-      pageSize: pageSize, cursor: cursor, newestFirst: newestFirst)
-    return try statusPage(page, indexes: indexes)
-  }
-
   private func statusPage(
     _ page: RuntimeJobRepositoryPage,
     indexes: RecoveryEpochIndexes
@@ -5640,7 +5563,7 @@ public actor RuntimeJobEngine {
         sourceState: .waitingForRecovery,
         lastDurableSequence: pending.inspection.lastDurableSequence ?? 0,
         trigger: "deviceReturned",
-        schemaVersion: Self.journalSchemaVersion(of: runtime.record)))
+        schemaVersion: JournalEvent.schemaVersion))
     runtime.nextSequence += 1
     try runtime.journal.appendAndSynchronize(
       JournalEvent.stepOutcome(
@@ -5655,10 +5578,7 @@ public actor RuntimeJobEngine {
         result: "succeeded",
         outcomeCertainty: .confirmed,
         summary: "unique Loader observed and bound to the selected Runtime target",
-        schemaVersion: Self.journalSchemaVersion(of: runtime.record),
-        authorizationRef: pending.intent.authorizationReference,
-        agentAuthorizationRef: pending.intent.agentExecutionAuthorityReference,
-        usageReservationID: pending.intent.usageReservationID))
+        schemaVersion: JournalEvent.schemaVersion))
     runtime.nextSequence += 1
     let reconcileOutcome = try JournalEvent.reconcileOutcome(
       eventID: "reconcile-outcome-\(runtime.nextSequence)",
@@ -5676,7 +5596,7 @@ public actor RuntimeJobEngine {
         "runtime-loader-binding-sha256=\(selectionEvidenceSHA256)",
         "binding-revision=\(previousBindingRevision)->\(currentBindingRevision)",
       ],
-      schemaVersion: Self.journalSchemaVersion(of: runtime.record))
+      schemaVersion: JournalEvent.schemaVersion)
     try runtime.journal.appendAndSynchronize(reconcileOutcome)
     runtime.nextSequence += 1
     try transition(
@@ -5933,7 +5853,7 @@ public actor RuntimeJobEngine {
           sourceState: .waitingForRecovery,
           lastDurableSequence: inspection.lastDurableSequence ?? 0,
           trigger: "manual",
-          schemaVersion: Self.journalSchemaVersion(of: runtime.record)))
+          schemaVersion: JournalEvent.schemaVersion))
       runtime.nextSequence += 1
       runtime.record.timeline.append("reconcile started \(stepID)")
       jobs[jobID] = runtime
@@ -6104,7 +6024,7 @@ public actor RuntimeJobEngine {
             outcomeCertainty: .confirmed,
             semanticCode: successSemanticCode,
             summary: successSummary,
-            schemaVersion: Self.journalSchemaVersion(of: runtime.record)))
+            schemaVersion: JournalEvent.schemaVersion))
         runtime.nextSequence += 1
       }
       nextState = .resumeAtConfirmedSafeBoundary
@@ -6130,15 +6050,10 @@ public actor RuntimeJobEngine {
             correlatesToIntentEventID: intentEventID,
             result: "failed",
             outcomeCertainty: .confirmed,
-            // The semantic code is what makes this a *proof* rather than just
-            // a failure: `mutationIntentEvidence` recognizes a proven
-            // non-execution by this code alone. Without it the dedicated
-            // readback established that a destructive step never ran, but a
-            // historical usage terminal could not carry that proof and stayed
-            // `unsafePartial` — the product throwing away the strongest
-            // evidence it owns (TASK-AIN-020).
+            // Preserve confirmed non-execution as explicit semantic proof;
+            // an ordinary failed outcome cannot establish that no effect ran.
             semanticCode: Self.confirmedNotExecutedSemanticCode,
-            schemaVersion: Self.journalSchemaVersion(of: runtime.record)))
+            schemaVersion: JournalEvent.schemaVersion))
 
         runtime.nextSequence += 1
       }
@@ -6175,7 +6090,7 @@ public actor RuntimeJobEngine {
       outcomeCertainty: certainty,
       safeBoundaryConfirmed: safeBoundary,
       evidence: [detail],
-      schemaVersion: Self.journalSchemaVersion(of: runtime.record))
+      schemaVersion: JournalEvent.schemaVersion)
     try runtime.journal.appendAndSynchronize(reconcileOutcome)
     runtime.nextSequence += 1
     try transition(
@@ -6344,7 +6259,7 @@ public actor RuntimeJobEngine {
           sourceState: .waitingForRecovery,
           lastDurableSequence: inspection.lastDurableSequence ?? 0,
           trigger: "manual",
-          schemaVersion: Self.journalSchemaVersion(of: runtime.record)))
+          schemaVersion: JournalEvent.schemaVersion))
       runtime.nextSequence += 1
       runtime.record.timeline.append(
         "reconcile observed exact daemon job \(execution.daemonJobID)")
@@ -6454,7 +6369,7 @@ public actor RuntimeJobEngine {
           sourceState: .waitingForRecovery,
           lastDurableSequence: inspection.lastDurableSequence ?? 0,
           trigger: "manual",
-          schemaVersion: Self.journalSchemaVersion(of: runtime.record)))
+          schemaVersion: JournalEvent.schemaVersion))
       runtime.nextSequence += 1
       runtime.record.timeline.append(
         "reconcile started rebind-and-verify-build (lane postflight)")
@@ -6538,7 +6453,7 @@ public actor RuntimeJobEngine {
       outcomeCertainty: verified ? .confirmed : .outcomeUnknown,
       safeBoundaryConfirmed: verified,
       evidence: [detail],
-      schemaVersion: Self.journalSchemaVersion(of: runtime.record))
+      schemaVersion: JournalEvent.schemaVersion)
     try runtime.journal.appendAndSynchronize(reconcileOutcome)
     runtime.nextSequence += 1
     try transition(
@@ -6592,7 +6507,7 @@ public actor RuntimeJobEngine {
     guard !record.outcomeUnknown,
       record.state == JobState.cancelled.rawValue,
       let evidence = record.admissionEvidence,
-      evidence.kind == .runtimeCapability || evidence.kind == .standingAuthorization,
+      evidence.kind == .runtimeCapability,
       let status = try await capabilityStore.inspect(capabilityID: evidence.reference),
       status.lineage.contains(where: {
         $0.jobID == record.jobID && $0.outcome == .pending
@@ -6613,7 +6528,6 @@ public actor RuntimeJobEngine {
     guard !record.outcomeUnknown,
       record.state == JobState.failed.rawValue,
       record.admissionEvidence?.kind == .runtimeCapability
-        || record.admissionEvidence?.kind == .standingAuthorization
     else { return }
 
     let replay = try DurableJournalRecovery.inspect(
@@ -6702,11 +6616,6 @@ public actor RuntimeJobEngine {
     // The typed request operation ID is the stable identity for recovery and journal compatibility.
     ArkForgeFlashOperation.containsDurableRecordReference(
       record.request.operation.reference)
-  }
-
-  static func journalSchemaVersion(of record: RuntimeJobRecord) -> String {
-    isDayu200Flash(record)
-      ? JournalEvent.completeOverwriteRecoverySchemaVersion : JournalEvent.schemaVersion
   }
 
   private func establishSupersedingRecoveryEpoch(
@@ -7631,6 +7540,7 @@ public actor RuntimeJobEngine {
     effect: WorkflowEffect,
     materialized: MaterializedAdmission
   ) async throws -> PreparedAuthorization {
+    if effect >= .deviceMutation { try validateMutationState() }
     let admittedAt = nowUTC()
     // Before anything is authorized: is somebody else already working this
     // device? A refusal here is the whole point of the check - queueing the
@@ -8124,6 +8034,7 @@ public actor RuntimeJobEngine {
     effect: WorkflowEffect,
     validatedFacts: ProviderFacts?
   ) async throws {
+    try validateMutationState()
     var runtime = try refreshedRuntimeAtCancellationSafeBoundary(
       jobID: jobID,
       reason: "client-cancel before capability verification")
@@ -8251,6 +8162,7 @@ public actor RuntimeJobEngine {
       runtime = try refreshedRuntimeAtCancellationSafeBoundary(
         jobID: jobID,
         reason: "client-cancel after complete-overwrite proof")
+      try validateMutationState()
       if let evidence = persistedEvidence {
         guard evidence.completeOverwriteRecovery == liveRecovery.context else {
           throw RuntimeDispatchFailure.failed(
@@ -8322,6 +8234,7 @@ public actor RuntimeJobEngine {
       runtime = try refreshedRuntimeAtCancellationSafeBoundary(
         jobID: jobID,
         reason: "client-cancel at final capability-consumption boundary")
+      try validateMutationState()
       let consumption = try await capabilityStore.consume(
         capabilityID: authorization.capabilityID,
         reservationID: runtime.record.request.idempotencyKey,
@@ -8392,122 +8305,13 @@ public actor RuntimeJobEngine {
     }
   }
 
-  /// Completes terminal bookkeeping for a campaign reservation persisted by
-  /// an older release. New requests carrying these references are rejected
-  /// before admission and cannot reach dispatch. Write-once with racer grace:
-  /// an existing terminal from recovery or a concurrent closer stands.
-  private func closeHistoricalCampaignReservation(
-    for record: RuntimeJobRecord,
-    outcome: RuntimeCapabilityUseOutcome,
-    state: String
-  ) async throws {
-    guard let evidence = record.admissionEvidence,
-      evidence.kind == .evolutionCampaignConfirmation,
-      let ledger = agentUsageLedger
-    else { return }
-    let status: AuthorizationUsageTerminalStatus
-    switch outcome {
-    case .confirmed:
-      status = state == JobState.succeeded.rawValue ? .succeeded : .failed
-    case .safeToReflash:
-      status = .failed
-    case .outcomeUnknown:
-      status = .outcomeUnknown
-    case .pending:
-      return
-    }
-    let intents = try mutationIntentEvidence(
-      for: record.jobID, operationReference: record.operationReference)
-    do {
-      _ = try ledger.close(
-        reservationID: evidence.reference,
-        terminal: try AgentAuthorityUsageTerminal(
-          status: status, closedAt: nowUTC(),
-          externalIntentEventIDs: intents.all,
-          confirmedNotExecutedIntentEventIDs: intents.confirmedNotExecuted,
-          completedIntentEventIDs: intents.completed))
-    } catch AuthorizationUsageLedgerError.reservationConflict {
-      let existing = try? ledger.load().reservations.first {
-        $0.reservationID == evidence.reference
-      }
-      guard existing?.terminal != nil else {
-        throw RuntimeJobEngineError.internalFailure(
-          "historical reservation race left no terminal on \(evidence.reference)")
-      }
-    } catch let error as AuthorizationUsageLedgerError {
-      throw RuntimeJobEngineError.internalFailure(
-        "historical reservation lineage could not become durable: \(error)")
-    }
-  }
-
-  /// The mutating intents this job durably journaled — what a historical
-  /// reservation terminal must carry.
-  ///
-  /// Three resolutions per intent: journaled at all (`all`), proven not to
-  /// have happened (`confirmedNotExecuted`), and completed with its own
-  /// verified outcome (`completed`). A step whose truth is delegated to a
-  /// paired readback journals a succeeded outcome at dispatch, before
-  /// anything proved the effect — so those steps are excluded from
-  /// `completed` no matter what their outcome row says: their completion is
-  /// only as good as the readback, and the readback may legitimately have
-  /// been skipped.
-  private func mutationIntentEvidence(
-    for jobID: String, operationReference: String
-  ) throws -> (all: [String], confirmedNotExecuted: [String], completed: [String]) {
-    let journalURL = jobDirectory(for: jobID).appending(path: "journal.jsonl")
-    let replay: JournalReplay
-    do {
-      replay = try DurableJournalRecovery.inspect(url: journalURL)
-    } catch {
-      throw RuntimeJobEngineError.internalFailure(
-        "historical reservation journal is unavailable for \(jobID): \(error)")
-    }
-    var identifiers: [String] = []
-    var stepIDByIntent: [String: String] = [:]
-    for event in replay.events where event.kind == .stepIntent {
-      guard let step = event.workflowStep, step.effect >= .deviceMutation else { continue }
-      identifiers.append(event.eventID)
-      if let stepID = event.stepID {
-        stepIDByIntent[event.eventID] = stepID
-      }
-    }
-    let confirmed = Set(
-      replay.events.compactMap { event -> String? in
-        guard event.kind == .stepOutcome,
-          event.payload["semanticCode"]
-            == .string(Self.confirmedNotExecutedSemanticCode)
-        else { return nil }
-        return event.correlatedIntentEventID
-      })
-    let succeeded = Set(
-      replay.events.compactMap { event -> String? in
-        guard event.kind == .stepOutcome,
-          event.payload["result"] == .string("succeeded")
-        else { return nil }
-        return event.correlatedIntentEventID
-      })
-    let readbackDelegated = Set((Self.readbackPairs[operationReference] ?? [:]).keys)
-    let completed = identifiers.filter { intentID in
-      guard succeeded.contains(intentID), !confirmed.contains(intentID),
-        let stepID = stepIDByIntent[intentID]
-      else { return false }
-      return !readbackDelegated.contains(stepID)
-    }
-    return (identifiers, identifiers.filter(confirmed.contains), completed)
-  }
-
   private func recordCapabilityOutcome(
     for record: RuntimeJobRecord,
     outcome: RuntimeCapabilityUseOutcome,
     state: String
   ) async throws {
-    if record.admissionEvidence?.kind == .evolutionCampaignConfirmation {
-      try await closeHistoricalCampaignReservation(
-        for: record, outcome: outcome, state: state)
-      return
-    }
     guard let evidence = record.admissionEvidence,
-      evidence.kind == .runtimeCapability || evidence.kind == .standingAuthorization
+      evidence.kind == .runtimeCapability
     else {
       return
     }
@@ -8640,7 +8444,7 @@ public actor RuntimeJobEngine {
         sessionID: runtime.record.sessionID, jobID: runtime.record.jobID,
         timestamp: nowUTC(), from: from, to: to, reason: reason,
         triggerEventID: triggerEventID,
-        schemaVersion: Self.journalSchemaVersion(of: runtime.record)))
+        schemaVersion: JournalEvent.schemaVersion))
     runtime.nextSequence += 1
     runtime.record.state = to.rawValue
     runtime.record.timeline.append("\(from.rawValue)->\(to.rawValue)")

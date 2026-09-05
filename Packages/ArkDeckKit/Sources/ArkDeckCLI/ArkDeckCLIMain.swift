@@ -9,7 +9,7 @@ import Foundation
 // TASK-RF-002. `arkdeck flash` — the product face of the RockUSB Provider.
 //
 // Real Flash execution is submitted by the App or the generic typed Runtime Job API.
-// Historical campaign and standing-authority records remain status/export inputs only;
+// Retired authority state is preserved on disk and rejected by current Runtime readers;
 // this CLI exposes no authority writer, capability administration, or second execution stack.
 
 @main
@@ -162,26 +162,6 @@ struct ArkDeckCommandLine {
         default:
           throw CLIError(
             exitCode: EX_USAGE, message: "missing maintainer subcommand (update-feed|contracts)")
-        }
-      case "legacy":
-        // §6.3's explicit compatibility namespace. It holds the historical
-        // flash archive and nothing else: these decode and settle records that
-        // already exist and dispatch nothing, which is why §12 keeps them out
-        // of the surface a caller reaches a device through.
-        guard arguments.first == "flash" else {
-          throw CLIError(exitCode: EX_USAGE, message: "missing legacy subcommand (flash)")
-        }
-        let archiveArguments = Array(arguments.dropFirst())
-        switch archiveArguments.first {
-        case "status":
-          try runCampaignStatus(
-            Array(archiveArguments.dropFirst()), spelledAs: "legacy.flash.status")
-        case "reconcile":
-          try runFlashReconcile(
-            Array(archiveArguments.dropFirst()), spelledAs: "legacy.flash.reconcile")
-        default:
-          throw CLIError(
-            exitCode: EX_USAGE, message: "missing legacy flash subcommand (status|reconcile)")
         }
       case "doctor":
         try RuntimeCLI.runDoctor(arguments)
@@ -340,10 +320,6 @@ struct ArkDeckCommandLine {
     switch subcommand {
     case "install-binding":
       try runInstallBinding(Array(arguments.dropFirst()))
-    case "status":
-      try runCampaignStatus(Array(arguments.dropFirst()), spelledAs: "flash.status")
-    case "reconcile":
-      try runFlashReconcile(Array(arguments.dropFirst()), spelledAs: "flash.reconcile")
     case "run":
       try await RuntimeCLI.runDomainOperation(
         path: ["flash", "run"], Array(arguments.dropFirst()))
@@ -357,215 +333,6 @@ struct ArkDeckCommandLine {
       throw CLIError(
         exitCode: EX_USAGE,
         message: "no handler is wired for the registered flash subcommand \(subcommand)")
-    }
-  }
-
-  // MARK: reconcile
-
-  /// Host-side recovery report for interrupted flash sessions. Read-only and
-  /// zero device dispatch: it decodes session journals and the campaign usage
-  /// ledger and prints what is still unresolved. Legacy records never admit
-  /// or dispatch a new operation.
-  ///
-  /// It no longer writes terminals. `--mode close` existed to close orphaned
-  /// standing-authorization reservations; that lane and its ledger are
-  /// decode/export-only. A close verb that can no longer close anything would
-  /// report work it never did, so it is gone rather than kept as a no-op.
-  /// Exit 4 while anything stays unresolved, so scripts still observe the debt.
-  static func runFlashReconcile(
-    _ arguments: [String], spelledAs canonicalCommand: String = "legacy.flash.reconcile"
-  ) throws {
-    var rest = arguments
-    let session = RuntimeCLI.runtimeSession(&rest, command: canonicalCommand)
-    session.warnIfLegacy()
-    let options = try CLIOptions(rest)
-    try options.validateAllowed(["--session"])
-    let reconciler = try RockchipLegacyFlashJournalReconciler.production()
-
-    if let sessionID = options.value("--session") {
-      let finding = try reconciler.inspect(sessionID: sessionID)
-      if session.rendering == .human {
-        printFlashFinding(finding)
-      } else {
-        session.emit(
-          .object([
-            "findings": .array([flashFindingJSON(finding)]),
-            "orphanedReservations": .array([]),
-            "requiresAttention": .bool(finding.requiresAttention),
-          ]))
-      }
-      guard !finding.requiresAttention else {
-        throw CLIError(exitCode: 4, message: "unresolved flash session \(sessionID)")
-      }
-      return
-    }
-
-    let findings = try reconciler.scan()
-    let orphans = try reconciler.orphanedReservations()
-    let unresolved = findings.count + orphans.count
-    if session.rendering != .human {
-      // Always the same shape, including when there is nothing to report: a
-      // caller that has to branch on "did it print the empty sentence" is
-      // parsing prose again.
-      session.emit(
-        .object([
-          "findings": .array(findings.map(flashFindingJSON)),
-          "orphanedReservations": .array(orphans.map(flashOrphanJSON)),
-          "requiresAttention": .bool(unresolved > 0),
-        ]))
-      guard unresolved == 0 else {
-        throw CLIError(exitCode: 4, message: "\(unresolved) unresolved flash item(s)")
-      }
-      return
-    }
-    guard unresolved > 0 else {
-      print("no unresolved flash sessions")
-      return
-    }
-    for finding in findings { printFlashFinding(finding) }
-    for orphan in orphans { printFlashOrphan(orphan) }
-    throw CLIError(exitCode: 4, message: "\(unresolved) unresolved flash item(s)")
-  }
-
-  /// The machine form of what `printFlashFinding` lays out for a person.
-  ///
-  /// One projection, not a second description: every field here is the same
-  /// fact the human line carries, which is what stops the two from drifting
-  /// into disagreeing about the same session.
-  static func flashFindingJSON(_ finding: RockchipFlashSessionFinding) -> JSONValue {
-    var fields: [String: JSONValue] = [
-      "sessionId": .string(finding.sessionID),
-      "jobId": finding.jobID.map(JSONValue.string) ?? .null,
-      "state": finding.currentState.map { .string($0.rawValue) } ?? .null,
-      "finalized": .bool(finding.finalized),
-      "hasTornTail": .bool(finding.hasTornTail),
-      "live": .bool(finding.isLive),
-      "requiresAttention": .bool(finding.requiresAttention),
-      "journalError": finding.journalError.map { .string("\($0)") } ?? .null,
-      "lastConfirmedStepId": finding.lastConfirmedStepID.map(JSONValue.string) ?? .null,
-      "campaignId": finding.campaignID.map(JSONValue.string) ?? .null,
-    ]
-    fields["outstandingIntents"] = .array(
-      finding.outstandingIntents.map {
-        .object([
-          "eventId": .string($0.eventID),
-          "stepId": .string($0.stepID),
-          "attempt": .integer(Int64($0.attempt)),
-          "effect": .string($0.effect.rawValue),
-        ])
-      })
-    fields["unknownOutcomes"] = .array(
-      finding.unknownOutcomes.map {
-        .object([
-          "correlatedIntentEventId": .string($0.correlatedIntentEventID),
-          "stepId": .string($0.stepID),
-          "effect": .string($0.effect.rawValue),
-        ])
-      })
-    switch finding.ledgerState {
-    case .openAgentReservation(let reservationID):
-      fields["authority"] = .object([
-        "reservationId": .string(reservationID), "state": .string("open"),
-      ])
-    case .closed(let reservationID):
-      fields["authority"] = .object([
-        "reservationId": .string(reservationID), "state": .string("closed"),
-      ])
-    case .missing(let reservationID):
-      fields["authority"] = .object([
-        "reservationId": .string(reservationID), "state": .string("missingFromLedger"),
-      ])
-    case .none:
-      fields["authority"] = .null
-    }
-    return .object(fields)
-  }
-
-  static func flashOrphanJSON(_ orphan: RockchipFlashOrphanedReservation) -> JSONValue {
-    .object([
-      "reservationId": .string(orphan.reservationID),
-      "jobId": .string(orphan.jobID),
-      "reservedAt": .string(orphan.reservedAt),
-      "campaignId": orphan.campaignID.map(JSONValue.string) ?? .null,
-    ])
-  }
-
-  /// The machine form of a historical campaign document. Decode-only, like the
-  /// human rendering: nothing here can admit or dispatch anything.
-  static func campaignStatusJSON(_ document: HistoricalEvolutionCampaignDocument) -> JSONValue {
-    .object([
-      "campaignId": .string(document.campaignID),
-      "terminal": .bool(document.isTerminal),
-      "reservedAttemptCount": .integer(Int64(document.reservedAttemptCount)),
-      "maximumAttempts": .integer(Int64(document.assertion.maxAttempts)),
-      "events": .array(
-        document.events.map { event in
-          .object([
-            "sequence": .integer(Int64(event.sequence)),
-            "kind": .string(event.kind.rawValue),
-            "at": .string(event.at),
-            "ordinal": event.ordinal.map { .integer(Int64($0)) } ?? .null,
-            "candidateId": event.candidate.map { .string($0.candidateID) } ?? .null,
-            "reviewId": event.review.map { .string($0.reviewID) } ?? .null,
-            "disposition": event.disposition.map { .string($0.rawValue) } ?? .null,
-            "reasonCode": event.reasonCode.map(JSONValue.string) ?? .null,
-            "detail": event.detail.map(JSONValue.string) ?? .null,
-          ])
-        }),
-    ])
-  }
-
-  private static func printFlashOrphan(_ orphan: RockchipFlashOrphanedReservation) {
-    print(
-      "orphaned reservation: \(orphan.reservationID) job=\(orphan.jobID) "
-        + "reservedAt=\(orphan.reservedAt)")
-    print("  no session directory accounts for this open reservation")
-    if let campaignID = orphan.campaignID {
-      print("  historical campaign: \(campaignID) (decode/export only)")
-    }
-  }
-
-  private static func printFlashFinding(_ finding: RockchipFlashSessionFinding) {
-    var header = ["session: \(finding.sessionID)"]
-    if let jobID = finding.jobID { header.append("job: \(jobID)") }
-    header.append("state: \(finding.currentState?.rawValue ?? "unknown")")
-    header.append("finalized: \(finding.finalized)")
-    if finding.hasTornTail { header.append("tornTail: true") }
-    if finding.isLive { header.append("live: true") }
-    print(header.joined(separator: " "))
-    if finding.isLive {
-      print("  a live run owns this session; its own terminal is authoritative")
-    }
-    if let journalError = finding.journalError {
-      print("  journal unreadable: \(journalError)")
-    }
-    for intent in finding.outstandingIntents {
-      print(
-        "  outstanding intent: \(intent.eventID) step=\(intent.stepID) "
-          + "attempt=\(intent.attempt) effect=\(intent.effect.rawValue)")
-    }
-    for outcome in finding.unknownOutcomes {
-      print(
-        "  unknown outcome: \(outcome.correlatedIntentEventID) step=\(outcome.stepID) "
-          + "effect=\(outcome.effect.rawValue)")
-    }
-    if let lastConfirmed = finding.lastConfirmedStepID {
-      print("  last confirmed step: \(lastConfirmed)")
-    }
-    switch finding.ledgerState {
-    case .openAgentReservation(let reservationID):
-      print("  authority: campaign reservation=\(reservationID) (open)")
-      if let campaignID = finding.campaignID {
-        // The target spelling: a hint that sends a caller into a deprecation
-        // warning teaches them to ignore the next one.
-        print("  inspect: arkdeck legacy flash status --campaign-id \(campaignID)")
-      }
-    case .closed(let reservationID):
-      print("  authority: reservation=\(reservationID) (closed)")
-    case .missing(let reservationID):
-      print("  authority: reservation=\(reservationID) missing from ledger")
-    case .none:
-      print("  authority: no usage reservation recorded")
     }
   }
 
@@ -601,58 +368,6 @@ struct ArkDeckCommandLine {
     print("USB topology: \(receipt.usbTopology)")
     print("serial sha256: \(receipt.serialDigestSHA256)")
     print("device mutation dispatch: 0")
-  }
-
-  static func runCampaignStatus(
-    _ arguments: [String], spelledAs canonicalCommand: String = "legacy.flash.status"
-  ) throws {
-    var rest = arguments
-    let session = RuntimeCLI.runtimeSession(&rest, command: canonicalCommand)
-    session.warnIfLegacy()
-    let options = try CLIOptions(rest)
-    try options.validateAllowed(["--campaign-id"])
-    guard let campaignID = options.value("--campaign-id") else {
-      throw CLIError(exitCode: EX_USAGE, message: "status requires --campaign-id")
-    }
-    // Mapped exhaustively, not partially: the archive publishes exactly three
-    // failures, so each gets its §8.4 code and a caller that asked for JSON
-    // gets the failure in JSON too. A half-mapped enum would answer some
-    // failures in the caller's shape and others in prose on stderr, which is
-    // worse than answering none of them.
-    let document: HistoricalEvolutionCampaignDocument
-    do {
-      document = try HistoricalEvolutionCampaignArchive.production().load(campaignID)
-    } catch HistoricalEvolutionCampaignArchiveError.campaignNotFound(let missing) {
-      throw session.fail(
-        .resourceNotFound, "no historical campaign \(missing)",
-        details: ["campaignId": .string(missing)])
-    } catch HistoricalEvolutionCampaignArchiveError.invalidRoot {
-      throw session.fail(.recordUnreadable, "the historical campaign archive root is invalid")
-    } catch HistoricalEvolutionCampaignArchiveError.unreadable(let reason) {
-      throw session.fail(.recordUnreadable, "the historical campaign record is unreadable: \(reason)")
-    }
-    guard session.rendering == .human else {
-      session.emit(campaignStatusJSON(document))
-      return
-    }
-    print("campaign: \(document.campaignID)")
-    print("terminal: \(document.isTerminal)")
-    print("reserved attempts: \(document.reservedAttemptCount)/\(document.assertion.maxAttempts)")
-    for event in document.events {
-      var fields = ["#\(event.sequence)", event.kind.rawValue, event.at]
-      if let ordinal = event.ordinal { fields.append("ordinal=\(ordinal)") }
-      if let candidate = event.candidate { fields.append("candidate=\(candidate.candidateID)") }
-      if let review = event.review { fields.append("review=\(review.reviewID)") }
-      if let disposition = event.disposition {
-        fields.append("disposition=\(disposition.rawValue)")
-      }
-      if let reason = event.reasonCode { fields.append("reason=\(reason)") }
-      print(fields.joined(separator: " "))
-      // The root cause, printed on its own line: it is the one field here that
-      // is prose rather than an identifier, and folding it into the columns
-      // above would make the stop event unreadable.
-      if let detail = event.detail { print("  detail: \(detail)") }
-    }
   }
 
   // MARK: update-feed

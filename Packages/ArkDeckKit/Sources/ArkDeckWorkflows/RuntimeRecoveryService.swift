@@ -788,13 +788,13 @@ struct RuntimeRecoveryService {
       JournalEvent.jobCreated(
         eventID: "job-created", sequence: 0, sessionID: record.sessionID,
         jobID: record.jobID, timestamp: record.createdAtUTC, executionMode: "execute",
-        schemaVersion: journalSchemaVersion(of: record)))
+        schemaVersion: JournalEvent.schemaVersion))
     try journal.appendAndSynchronize(
       JournalEvent.stateTransition(
         eventID: "to-preflight", sequence: 1, sessionID: record.sessionID,
         jobID: record.jobID, timestamp: record.createdAtUTC,
         from: .queued, to: .preflight, reason: "recovered committed admission",
-        schemaVersion: journalSchemaVersion(of: record)))
+        schemaVersion: JournalEvent.schemaVersion))
   }
 
   private func appendTransition(
@@ -807,14 +807,8 @@ struct RuntimeRecoveryService {
         eventID: "recovery-t-\(sequence)", sequence: sequence,
         sessionID: record.sessionID, jobID: record.jobID, timestamp: nowUTC(),
         from: from, to: to, reason: reason, triggerEventID: triggerEventID,
-        schemaVersion: journalSchemaVersion(of: record)))
+        schemaVersion: JournalEvent.schemaVersion))
     sequence += 1
-  }
-
-  private func journalSchemaVersion(of record: RuntimeJobRecord) -> String {
-    ArkForgeFlashOperation.containsDurableRecordReference(
-      record.operationReference)
-      ? JournalEvent.completeOverwriteRecoverySchemaVersion : JournalEvent.schemaVersion
   }
 
   private func confirmedSucceededStepIDs(in replay: JournalReplay) -> Set<String> {

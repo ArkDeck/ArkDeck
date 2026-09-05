@@ -402,65 +402,14 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
         "runtimePostflight:typed steps, evidence or Artifact closure is incomplete"))
   }
 
-  func testDaemonPreservesHistoricalCampaignCorrelationForDecodeOnlyExport() throws {
-    let digest = String(repeating: "a", count: 64)
-    let currentCorrelation = RuntimeCampaignEvidenceCorrelation(
-      campaignID: "ECAMP-0123456789ABCDEF01234567",
-      attemptID: "ain019-campaign-attempt-001",
-      attemptOrdinal: 1,
-      planDigestSHA256: digest,
-      targetBindingDigestSHA256: String(repeating: "b", count: 64),
-      candidateDigestSHA256: String(repeating: "c", count: 64),
-      brokerDigestSHA256: String(repeating: "e", count: 64))
-    var historicalJSON = try XCTUnwrap(
-      JSONSerialization.jsonObject(with: JSONEncoder().encode(currentCorrelation))
-        as? [String: Any])
-    historicalJSON["reviewDigestSHA256"] = String(repeating: "d", count: 64)
-    let correlation = try JSONDecoder().decode(
-      RuntimeCampaignEvidenceCorrelation.self,
-      from: JSONSerialization.data(withJSONObject: historicalJSON))
-    let snapshot = RuntimeJobEvidenceSnapshot(
-      jobID: "job-campaign-evidence-001",
-      operationReference: "flash.dayu200",
-      catalogDigest: String(repeating: "f", count: 64),
-      targetID: "TGT-CAMPAIGN-EVIDENCE-001",
-      bindingRevision: 7,
-      providerID: "rockchip",
-      actualEffect: "destructive",
-      authority: RuntimeAdmissionEvidence(
-        kind: .evolutionCampaignConfirmation,
-        reference: "ain019-campaign-attempt-001",
-        admittedAtUTC: "2026-08-03T00:00:00Z",
-        validUntilUTC: "2026-08-03T04:00:00Z",
-        consumptionFingerprintSHA256: digest,
-        campaignCorrelation: correlation),
-      observation: nil,
-      actualStepKinds: ["flashPartition"],
-      executionMode: "execute",
-      terminalState: "failed",
-      outcomeUnknown: false,
-      startedAtUTC: "2026-08-03T00:00:01Z",
-      firstEvidenceStepAtUTC: "2026-08-03T00:00:01Z",
-      finishedAtUTC: "2026-08-03T00:00:02Z",
-      recoveryEpoch: nil,
-      inputs: ["userdataPolicy": .string("preserve")])
-    let encoded = RuntimeControlPlaneHandler.encodeEvidence(
-      snapshot: snapshot, artifacts: [], blockers: [])
-    guard case .object(let encodedFields) = encoded,
-      case .object(let parameterFields)? = encodedFields["parameters"]
-    else { return XCTFail("job.evidence must project typed parameters") }
-    XCTAssertEqual(parameterFields["userdataPolicy"], .string("preserve"))
-    let bytes = try JSONEncoder().encode(encoded)
-    let trusted = try JSONDecoder().decode(RuntimeHardwareEvidenceTrustedFacts.self, from: bytes)
-
-    XCTAssertEqual(trusted.authority?.campaignID, correlation.campaignID)
-    XCTAssertEqual(trusted.authority?.attemptID, correlation.attemptID)
-    XCTAssertEqual(trusted.authority?.attemptOrdinal, correlation.attemptOrdinal)
-    XCTAssertEqual(trusted.authority?.planDigest, correlation.planDigestSHA256)
-    XCTAssertEqual(trusted.authority?.targetBindingDigest, correlation.targetBindingDigestSHA256)
-    XCTAssertEqual(trusted.authority?.candidateDigest, correlation.candidateDigestSHA256)
-    XCTAssertEqual(trusted.authority?.reviewDigest, correlation.reviewDigestSHA256)
-    XCTAssertEqual(trusted.authority?.brokerDigest, correlation.brokerDigestSHA256)
+  func testRetiredRuntimeAuthorityCannotDecodeAsCurrentAdmission() throws {
+    for kind in ["standingAuthorization", "evolutionCampaignConfirmation", "chatConfirmation"] {
+      let data = try JSONSerialization.data(withJSONObject: [
+        "kind": kind, "reference": "retired-authority", "admittedAtUTC": "2026-08-03T00:00:00Z",
+      ])
+      XCTAssertThrowsError(
+        try JSONDecoder().decode(RuntimeAdmissionEvidence.self, from: data), kind)
+    }
   }
 
   func testUnselectedOptionalTraceDoesNotBlockPublishedCaptureEvidence() throws {

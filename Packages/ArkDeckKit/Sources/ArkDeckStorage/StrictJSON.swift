@@ -35,3 +35,21 @@ struct StrictJSONDuplicateValidator {
     }
   }
 }
+
+/// Reads only the shape emitted by the current durable model, including nested
+/// closed records. Unknown fields and historical optional-field substitutions
+/// cannot disappear through Codable's default permissive decoding.
+package enum CurrentDurableJSON {
+  package static func decode<Value: Codable>(_ type: Value.Type, from data: Data) throws -> Value {
+    var duplicateValidator = StrictJSONDuplicateValidator(data: data)
+    try duplicateValidator.validate()
+    let decoder = JSONDecoder()
+    let value = try decoder.decode(type, from: data)
+    let supplied = try decoder.decode(JSONValue.self, from: data)
+    let current = try decoder.decode(JSONValue.self, from: JSONEncoder().encode(value))
+    guard supplied == current else {
+      throw StrictJSONError.malformed("record does not match the current durable field shape")
+    }
+    return value
+  }
+}

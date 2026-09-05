@@ -133,7 +133,7 @@ enum SessionStorageFixtures {
       "kind": .string("serverLifecycle"),
       "scopeHash": .string(scopeHash),
       "decision": .string("accepted"),
-      "actor": .string("user"),
+      "actor": .object(["kind": .string("interactiveUser")]),
       "decidedAt": .string(timestamp),
       "relatedStepIds": .array([.string("step-lifecycle-1")]),
     ])

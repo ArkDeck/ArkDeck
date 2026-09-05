@@ -26,19 +26,8 @@ package struct RuntimePersistedJob: Sendable, Equatable {
   public let version: Int
   package let initialRecordData: Data?
 
-  /// The creation column of a row the retired legacy idempotency importer
-  /// wrote (TASK-DHA-001, #1029): it copied the entry without a timestamp and
-  /// stamped this sentinel instead. The importer is gone (#1259) but its rows
-  /// are durable history, and their initial record carries the real
-  /// timestamp, so the column cannot be asked to agree with the record.
-  package static let legacyCreatedAtUTC = "legacy"
-
-  /// Whether this row's creation column verifies the record's own creation
-  /// timestamp: equal, or the legacy sentinel above. Every other identity
-  /// fact (job id, state, idempotency key, fingerprint, version) still has to
-  /// agree; only the one column the importer never had is excused.
   package func createdAtMatches(_ recordCreatedAtUTC: String) -> Bool {
-    createdAtUTC == recordCreatedAtUTC || createdAtUTC == Self.legacyCreatedAtUTC
+    createdAtUTC == recordCreatedAtUTC
   }
 }
 
@@ -61,7 +50,7 @@ package enum RuntimeJobRepositoryError: Error, Equatable, Sendable {
 /// a committed admission transaction.
 package final class RuntimeJobRepository: @unchecked Sendable {
   package static let filename = "runtime-jobs.sqlite3"
-  private static let schemaVersion = 2
+  private static let schemaVersion: Int64 = 1
   private static let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
   private static let listCursorPrefix = "rjh1."
   private static let oldestFirstOrder = "oldestFirst"
@@ -83,6 +72,20 @@ package final class RuntimeJobRepository: @unchecked Sendable {
     try DurableFilePrimitives.createDirectoryIfNeeded(stateDirectory)
     url = stateDirectory.appending(path: Self.filename)
 
+    try Self.refuseRetiredState(stateDirectory: stateDirectory)
+    try DurableFilePrimitives.rejectSymbolicLink(url)
+    let isNew = !FileManager.default.fileExists(atPath: url.path)
+    if isNew {
+      let jobs = stateDirectory.appending(path: "jobs")
+      try DurableFilePrimitives.rejectSymbolicLink(jobs)
+      if FileManager.default.fileExists(atPath: jobs.path),
+        !(try FileManager.default.contentsOfDirectory(atPath: jobs.path)).isEmpty
+      {
+        throw RuntimeJobRepositoryError.corrupt(
+          "Runtime job history exists without its admission index; preserved at \(stateDirectory.path)"
+        )
+      }
+    }
     var opened: OpaquePointer?
     let flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX
     guard sqlite3_open_v2(url.path, &opened, flags, nil) == SQLITE_OK, let opened else {
@@ -92,12 +95,15 @@ package final class RuntimeJobRepository: @unchecked Sendable {
     }
     handle = opened
     do {
+      guard sqlite3_busy_timeout(opened, 5_000) == SQLITE_OK else {
+        throw failure("cannot set Runtime SQLite busy timeout")
+      }
       guard chmod(url.path, 0o600) == 0 else {
         throw RuntimeJobRepositoryError.ioFailure("cannot restrict Runtime job repository")
       }
+      // Validate existing bytes before any journal-mode change or schema write.
+      try bootstrapSchemaIfNeeded(isNew: isNew)
       try configure()
-      try bootstrapSchemaIfNeeded()
-      try refuseUnconsumedLegacyLedger(stateDirectory: stateDirectory)
     } catch {
       sqlite3_close_v2(opened)
       handle = nil
@@ -105,39 +111,12 @@ package final class RuntimeJobRepository: @unchecked Sendable {
     }
   }
 
-  /// The pre-SQLite idempotency ledger generation is retired, and its importer
-  /// never deleted the file after consuming it — a surviving `idempotency.json`
-  /// on an upgraded store is normal residue. It stays acceptable exactly while
-  /// every key it names is represented in the SQLite admission table. A key
-  /// this table has never seen means unconsumed history (or a restored
-  /// backup): admitting requests past it could replay a used key as a fresh
-  /// device mutation, so the repository refuses to open instead.
-  private func refuseUnconsumedLegacyLedger(stateDirectory: URL) throws {
-    let ledgerURL = stateDirectory.appending(path: "idempotency.json")
-    guard FileManager.default.fileExists(atPath: ledgerURL.path) else { return }
-    struct LegacyLedger: Decodable {
-      struct Entry: Decodable { let idempotencyKey: String }
-      let entries: [Entry]
-    }
-    let ledger: LegacyLedger
-    do {
-      ledger = try JSONDecoder().decode(LegacyLedger.self, from: Data(contentsOf: ledgerURL))
-    } catch {
+  private static func refuseRetiredState(stateDirectory: URL) throws {
+    let ledger = stateDirectory.appending(path: "idempotency.json")
+    try DurableFilePrimitives.rejectSymbolicLink(ledger)
+    guard !FileManager.default.fileExists(atPath: ledger.path) else {
       throw RuntimeJobRepositoryError.corrupt(
-        "retired ledger \(ledgerURL.path) is undecodable, so its keys cannot be "
-          + "proven consumed: \(error). Verify and remove the file to restore admission")
-    }
-    for entry in ledger.entries {
-      let known = try query(
-        "SELECT 1 AS present FROM runtime_job WHERE idempotency_key = ? LIMIT 1",
-        [.text(entry.idempotencyKey)])
-      guard !known.isEmpty else {
-        throw RuntimeJobRepositoryError.corrupt(
-          "retired ledger \(ledgerURL.path) names key \(entry.idempotencyKey) "
-            + "that \(Self.filename) has never admitted; this generation can no "
-            + "longer be imported and admitting past it could replay a used key. "
-            + "Verify the ledger's jobs, then remove the file to restore admission")
-      }
+        "retired idempotency ledger is unsupported; original state is preserved at \(ledger.path)")
     }
   }
 
@@ -197,8 +176,9 @@ package final class RuntimeJobRepository: @unchecked Sendable {
         [
           .text(jobID), .text(idempotencyKey), .text(requestHash), .text(initialState),
           .integer(admissionSequence), .text(createdAtUTC),
-          .text(try Self.creationOrderKey(
-            createdAtUTC: createdAtUTC, initialRecordData: initialRecordData)),
+          .text(
+            try Self.creationOrderKey(
+              createdAtUTC: createdAtUTC)),
           .text(createdAtUTC), .blob(initialRecordData),
         ])
       return .admitted
@@ -399,52 +379,6 @@ package final class RuntimeJobRepository: @unchecked Sendable {
     return RuntimeJobRepositoryPage(jobs: jobs, nextCursor: nextCursor)
   }
 
-  /// Protocol-1 compatibility preserves its insertion-order page and decimal
-  /// cursor without consulting SQLite's physical row identity. New product
-  /// surfaces must use `listJobs`, whose logical compound order is portable.
-  package func listLegacyJobs(
-    pageSize: Int, cursor: String?, newestFirst: Bool = false
-  ) throws -> RuntimeJobRepositoryPage {
-    guard (1...1_000).contains(pageSize) else {
-      throw RuntimeJobRepositoryError.corrupt("pageSize must be between 1 and 1000")
-    }
-    let cursorSequence: Int64?
-    if let cursor {
-      guard let parsed = Int64(cursor), parsed >= 0 else {
-        throw RuntimeJobRepositoryError.corrupt("malformed legacy Runtime job history cursor")
-      }
-      cursorSequence = parsed
-    } else {
-      cursorSequence = nil
-    }
-    lock.lock()
-    defer { lock.unlock() }
-    let comparison = newestFirst ? "<" : ">"
-    let direction = newestFirst ? "DESC" : "ASC"
-    let rows = try query(
-      """
-      SELECT admission_sequence, job_id, idempotency_key, request_hash, state,
-             created_at_utc, updated_at_utc, version, initial_record_json
-      FROM runtime_job
-      WHERE ? = 1 OR admission_sequence \(comparison) ?
-      ORDER BY admission_sequence \(direction)
-      LIMIT ?
-      """,
-      [
-        .integer(cursorSequence == nil ? 1 : 0), .integer(cursorSequence ?? 0),
-        .integer(Int64(pageSize + 1)),
-      ])
-    let pageRows = rows.prefix(pageSize)
-    let jobs = try pageRows.map(persistedJob)
-    let nextCursor: String?
-    if rows.count > pageSize, let sequence = pageRows.last?.integer("admission_sequence") {
-      nextCursor = String(sequence)
-    } else {
-      nextCursor = nil
-    }
-    return RuntimeJobRepositoryPage(jobs: jobs, nextCursor: nextCursor)
-  }
-
   private static func encodeListCursor(
     createdAtOrderKey: String, jobID: String, newestFirst: Bool
   ) throws -> String {
@@ -490,23 +424,9 @@ package final class RuntimeJobRepository: @unchecked Sendable {
   /// as a fixed-width ASCII key, including timestamps whose different RFC
   /// 3339 spellings would sort incorrectly as raw text.
   private static func creationOrderKey(
-    createdAtUTC: String, initialRecordData: Data?
+    createdAtUTC: String
   ) throws -> String {
-    let timestamp: String
-    if createdAtUTC == RuntimePersistedJob.legacyCreatedAtUTC {
-      guard let initialRecordData,
-        let object = try? JSONSerialization.jsonObject(with: initialRecordData),
-        let fields = object as? [String: Any],
-        let recordCreatedAtUTC = fields["createdAtUTC"] as? String
-      else {
-        throw RuntimeJobRepositoryError.corrupt(
-          "legacy Runtime job row lacks its authoritative creation timestamp")
-      }
-      timestamp = recordCreatedAtUTC
-    } else {
-      timestamp = createdAtUTC
-    }
-    guard let date = ISO8601Timestamps.parse(timestamp) else {
+    guard let date = ISO8601Timestamps.parse(createdAtUTC) else {
       throw RuntimeJobRepositoryError.corrupt(
         "Runtime job row has an invalid creation timestamp")
     }
@@ -534,12 +454,34 @@ package final class RuntimeJobRepository: @unchecked Sendable {
       }
   }
 
-  // MARK: - Setup and one-time migration
+  // The sole current layout. Checking sqlite_schema includes the table's
+  // constraints, every index (including ordering/collation), and any extra
+  // trigger/view. A reused user_version alone never identifies a store.
+  private static let schemaStatements: [String] = [
+    """
+    CREATE TABLE runtime_job(
+      job_id TEXT PRIMARY KEY,
+      idempotency_key TEXT NOT NULL UNIQUE,
+      request_hash TEXT NOT NULL,
+      state TEXT NOT NULL,
+      admission_sequence INTEGER NOT NULL,
+      created_at_utc TEXT NOT NULL,
+      created_at_order_key TEXT NOT NULL,
+      updated_at_utc TEXT NOT NULL,
+      version INTEGER NOT NULL CHECK(version >= 1),
+      initial_record_json BLOB
+    )
+    """,
+    "CREATE INDEX runtime_job_updated_idx ON runtime_job(updated_at_utc DESC, job_id)",
+    "CREATE INDEX runtime_job_created_idx ON runtime_job(created_at_order_key, job_id COLLATE BINARY)",
+    "CREATE UNIQUE INDEX runtime_job_admission_sequence_idx ON runtime_job(admission_sequence)",
+  ]
+
+  private static func normalizedSchemaSQL(_ value: String) -> String {
+    value.filter { !$0.isWhitespace }.lowercased()
+  }
 
   private func configure() throws {
-    guard sqlite3_busy_timeout(requiredHandle(), 5_000) == SQLITE_OK else {
-      throw failure("cannot set Runtime SQLite busy timeout")
-    }
     let mode = try query("PRAGMA journal_mode=WAL").first?.text("journal_mode")
     guard mode?.lowercased() == "wal" else {
       throw RuntimeJobRepositoryError.ioFailure("Runtime SQLite WAL mode unavailable")
@@ -547,99 +489,56 @@ package final class RuntimeJobRepository: @unchecked Sendable {
     try execute("PRAGMA synchronous=FULL")
   }
 
-  private func bootstrapSchemaIfNeeded() throws {
-    let version = Int(try query("PRAGMA user_version").first?.integer("user_version") ?? 0)
-    guard version <= Self.schemaVersion else {
-      throw RuntimeJobRepositoryError.corrupt(
-        "Runtime job repository schema \(version) is newer than supported \(Self.schemaVersion)")
-    }
-    guard version < Self.schemaVersion else { return }
-    if version == 0 {
-      try transaction {
-        try execute(
-          """
-          CREATE TABLE runtime_job(
-            job_id TEXT PRIMARY KEY,
-            idempotency_key TEXT NOT NULL UNIQUE,
-            request_hash TEXT NOT NULL,
-            state TEXT NOT NULL,
-            admission_sequence INTEGER NOT NULL,
-            created_at_utc TEXT NOT NULL,
-            created_at_order_key TEXT NOT NULL,
-            updated_at_utc TEXT NOT NULL,
-            version INTEGER NOT NULL CHECK(version >= 1),
-            initial_record_json BLOB
-          );
-          CREATE INDEX runtime_job_updated_idx
-            ON runtime_job(updated_at_utc DESC, job_id);
-          CREATE INDEX runtime_job_created_idx
-            ON runtime_job(created_at_order_key, job_id COLLATE BINARY);
-          CREATE UNIQUE INDEX runtime_job_admission_sequence_idx
-            ON runtime_job(admission_sequence);
-          """
+  private func bootstrapSchemaIfNeeded(isNew: Bool) throws {
+    // One transaction prevents a competing opener from observing partial DDL.
+    try transaction {
+      let version = try query("PRAGMA user_version").first?.integer("user_version")
+      let objects = try query("SELECT name, sql FROM sqlite_schema ORDER BY name")
+      if isNew && version == 0 && objects.isEmpty {
+        for statement in Self.schemaStatements { try execute(statement) }
+        try execute("PRAGMA user_version=\(Self.schemaVersion)")
+      } else {
+        guard version == Self.schemaVersion else {
+          throw RuntimeJobRepositoryError.corrupt(
+            "unsupported Runtime job repository schema; original state is preserved at \(url.path)")
+        }
+      }
+      let currentObjects = try query("SELECT name, sql FROM sqlite_schema ORDER BY name")
+      let definitions = currentObjects.compactMap { $0.text("sql") }
+      let automaticIndexes = currentObjects.filter { $0.text("sql") == nil }.compactMap {
+        $0.text("name")
+      }
+      guard definitions.count == Self.schemaStatements.count,
+        Set(definitions.map(Self.normalizedSchemaSQL))
+          == Set(Self.schemaStatements.map(Self.normalizedSchemaSQL)),
+        Set(automaticIndexes) == [
+          "sqlite_autoindex_runtime_job_1", "sqlite_autoindex_runtime_job_2",
+        ]
+      else {
+        throw RuntimeJobRepositoryError.corrupt(
+          "Runtime job repository does not match the current v1 layout; original state is preserved at \(url.path)"
         )
-        try execute("PRAGMA user_version=\(Self.schemaVersion)")
       }
-      return
-    }
-    if version == 1 {
-      try transaction {
-        try execute("ALTER TABLE runtime_job ADD COLUMN admission_sequence INTEGER")
-        // Copy the historical protocol-1 position exactly once. Runtime reads
-        // never consult the physical identity after this migration.
-        try execute("UPDATE runtime_job SET admission_sequence = rowid")
-        try execute("ALTER TABLE runtime_job ADD COLUMN created_at_order_key TEXT")
-        try migrateCreationOrderKeys()
-        try execute(
-          "CREATE INDEX runtime_job_created_idx "
-            + "ON runtime_job(created_at_order_key, job_id COLLATE BINARY)")
-        try execute(
-          "CREATE UNIQUE INDEX runtime_job_admission_sequence_idx "
-            + "ON runtime_job(admission_sequence)")
-        try execute("PRAGMA user_version=\(Self.schemaVersion)")
-      }
-    }
-  }
-
-  /// Upgrade v1 history in bounded Job-ID batches. The retired importer is
-  /// the only source of a `legacy` column value; its record bytes carry the
-  /// timestamp that the old table omitted.
-  private func migrateCreationOrderKeys() throws {
-    var afterJobID = ""
-    while true {
-      let rows = try query(
-        """
-        SELECT job_id, created_at_utc
-        FROM runtime_job
-        WHERE job_id COLLATE BINARY > ?
-        ORDER BY job_id COLLATE BINARY ASC
-        LIMIT 256
-        """,
-        [.text(afterJobID)])
-      guard !rows.isEmpty else { return }
-      for row in rows {
-        guard let jobID = row.text("job_id"), let createdAtUTC = row.text("created_at_utc") else {
-          throw RuntimeJobRepositoryError.corrupt(
-            "Runtime job row has missing creation-order columns")
+      // Logical ordering is part of the durable contract, not a migration.
+      var afterJobID = ""
+      while true {
+        let rows = try query(
+          "SELECT job_id, created_at_utc, created_at_order_key, admission_sequence, version "
+            + "FROM runtime_job WHERE job_id COLLATE BINARY > ? "
+            + "ORDER BY job_id COLLATE BINARY LIMIT 256", [.text(afterJobID)])
+        guard !rows.isEmpty else { break }
+        for row in rows {
+          guard let jobID = row.text("job_id"), Self.validJobID(jobID),
+            let created = row.text("created_at_utc"),
+            row.text("created_at_order_key") == (try Self.creationOrderKey(createdAtUTC: created)),
+            let sequence = row.integer("admission_sequence"), sequence > 0,
+            let rowVersion = row.integer("version"), rowVersion > 0
+          else {
+            throw RuntimeJobRepositoryError.corrupt(
+              "invalid current Runtime job ordering or row version")
+          }
+          afterJobID = jobID
         }
-        let initialRecordData: Data?
-        if createdAtUTC == RuntimePersistedJob.legacyCreatedAtUTC {
-          initialRecordData = try query(
-            "SELECT initial_record_json FROM runtime_job WHERE job_id = ? LIMIT 1",
-            [.text(jobID)]).first?.blob("initial_record_json")
-        } else {
-          initialRecordData = nil
-        }
-        let key = try Self.creationOrderKey(
-          createdAtUTC: createdAtUTC, initialRecordData: initialRecordData)
-        guard try run(
-          "UPDATE runtime_job SET created_at_order_key = ? WHERE job_id = ?",
-          [.text(key), .text(jobID)]) == 1
-        else {
-          throw RuntimeJobRepositoryError.corrupt(
-            "cannot migrate Runtime job creation order for \(jobID)")
-        }
-        afterJobID = jobID
       }
     }
   }

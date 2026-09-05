@@ -9,121 +9,22 @@ package struct SessionManifestConfirmation: Equatable, Sendable {
   public let scopeHash: String
   public let decision: String
   public let actor: String
-  package let actorAgentExecutionAuthorityReference: AgentExecutionAuthorityReference?
-  package let actorAuthorizationReference: AuthorizationReference?
   package let decidedAt: String
   package let relatedStepIDs: [String]
 
-  fileprivate init(object: [String: JSONValue], schemaVersion: String) throws {
+  fileprivate init(object: [String: JSONValue]) throws {
     confirmationID = try object.manifestString("confirmationId")
     kind = try object.manifestString("kind")
     scopeHash = try object.manifestString("scopeHash")
     decision = try object.manifestString("decision")
-    if schemaVersion == "1.0.0" {
-      actor = try object.manifestString("actor")
-      actorAgentExecutionAuthorityReference = nil
-      actorAuthorizationReference = nil
-    } else {
-      guard case .object(let actorObject)? = object["actor"],
-        case .string(let kind)? = actorObject["kind"]
-      else { throw SessionStorageError.invalidManifest("confirmation actor must be object") }
-      actor = kind == "interactiveUser" ? "user" : kind
-      if let value = actorObject["authorizationRef"] {
-        if schemaVersion == JournalEvent.agentAuthoritySchemaVersion {
-          do {
-            actorAgentExecutionAuthorityReference = try AgentExecutionAuthorityReference(
-              jsonValue: value, context: "confirmation.actor.authorizationRef")
-            actorAuthorizationReference =
-              actorAgentExecutionAuthorityReference?.legacyStandingAuthorizationReference
-          } catch {
-            throw SessionStorageError.invalidManifest(
-              "confirmation actor authorizationRef is malformed")
-          }
-        } else {
-          actorAgentExecutionAuthorityReference = nil
-          do {
-            actorAuthorizationReference = try AuthorizationReference(
-              jsonValue: value, context: "confirmation.actor.authorizationRef")
-          } catch {
-            throw SessionStorageError.invalidManifest(
-              "confirmation actor authorizationRef is malformed")
-          }
-        }
-      } else {
-        actorAgentExecutionAuthorityReference = nil
-        actorAuthorizationReference = nil
-      }
+    let actorObject = try object.manifestObject("actor")
+    try actorObject.manifestRequireKeys(["kind"])
+    guard try actorObject.manifestString("kind") == "interactiveUser" else {
+      throw SessionStorageError.invalidManifest("confirmation actor must be interactiveUser")
     }
+    actor = "user"
     decidedAt = try object.manifestString("decidedAt")
     relatedStepIDs = try object.manifestStringArray("relatedStepIds")
-  }
-}
-
-package struct SessionManifestAuthorization: Equatable, Sendable {
-  package let agentExecutionAuthorityReference: AgentExecutionAuthorityReference?
-  package let authorizationReference: AuthorizationReference?
-  package let usageReservationID: String?
-  package let externalIntentEventIDs: [String]
-  public let destructiveIntentEventIDs: [String]
-
-  fileprivate init(object: [String: JSONValue], schemaVersion: String) throws {
-    if schemaVersion == JournalEvent.agentAuthoritySchemaVersion {
-      try object.manifestRequireKeys([
-        "authorizationRef", "usageReservationId", "externalIntentEventIds",
-      ])
-      do {
-        agentExecutionAuthorityReference = try AgentExecutionAuthorityReference(
-          jsonValue: object["authorizationRef"]!,
-          context: "manifest.authorization.authorizationRef")
-      } catch {
-        throw SessionStorageError.invalidManifest("manifest authorizationRef is malformed")
-      }
-      authorizationReference =
-        agentExecutionAuthorityReference?.legacyStandingAuthorizationReference
-      switch agentExecutionAuthorityReference?.kind {
-      case .readyTask:
-        guard object["usageReservationId"] == .null else {
-          throw SessionStorageError.invalidManifest(
-            "readyTask authorization requires null usageReservationId")
-        }
-        usageReservationID = nil
-      case .deviceCapability, .standingAuthorization, .chatConfirmation,
-        .evolutionCampaignConfirmation:
-        let identifier = try object.manifestString("usageReservationId")
-        try SessionStorageValidation.identifier(
-          identifier, field: "authorization.usageReservationId")
-        usageReservationID = identifier
-      case nil:
-        throw SessionStorageError.invalidManifest("manifest authorizationRef is malformed")
-      }
-      externalIntentEventIDs = try object.manifestStringArray("externalIntentEventIds")
-      destructiveIntentEventIDs = []
-    } else {
-      try object.manifestRequireKeys([
-        "authorizationRef", "usageReservationId", "destructiveIntentEventIds",
-      ])
-      agentExecutionAuthorityReference = nil
-      do {
-        authorizationReference = try AuthorizationReference(
-          jsonValue: object["authorizationRef"]!,
-          context: "manifest.authorization.authorizationRef")
-      } catch {
-        throw SessionStorageError.invalidManifest("manifest authorizationRef is malformed")
-      }
-      let identifier = try object.manifestString("usageReservationId")
-      try SessionStorageValidation.identifier(
-        identifier, field: "authorization.usageReservationId")
-      usageReservationID = identifier
-      destructiveIntentEventIDs = try object.manifestStringArray("destructiveIntentEventIds")
-      externalIntentEventIDs = destructiveIntentEventIDs
-    }
-    guard Set(externalIntentEventIDs).count == externalIntentEventIDs.count else {
-      throw SessionStorageError.invalidManifest("duplicate external intent event IDs")
-    }
-    for eventID in externalIntentEventIDs {
-      try SessionStorageValidation.identifier(
-        eventID, field: "authorization.externalIntentEventIds")
-    }
   }
 }
 
@@ -138,7 +39,6 @@ package struct SessionManifestDocument: Equatable, Sendable {
   public let executionMode: String
   package let executionAuthority: String
   package let completedAt: Date
-  public let authorization: SessionManifestAuthorization?
   public let artifacts: [ArtifactRecord]
   package let confirmations: [SessionManifestConfirmation]
 
@@ -166,12 +66,6 @@ package struct SessionManifestDocument: Equatable, Sendable {
     executionAuthority = try object.manifestString("executionAuthority")
     completedAt = try Self.lockedTimestampDate(
       try object.manifestString("completedAt"), field: "completedAt")
-    if case .object(let authorizationObject)? = object["authorization"] {
-      authorization = try SessionManifestAuthorization(
-        object: authorizationObject, schemaVersion: decodedSchemaVersion)
-    } else {
-      authorization = nil
-    }
     artifacts = try object.manifestArray("artifacts").map { value in
       try JSONDecoder().decode(
         ArtifactRecord.self, from: SessionStorageValidation.canonicalData(value))
@@ -181,7 +75,7 @@ package struct SessionManifestDocument: Equatable, Sendable {
         throw SessionStorageError.invalidManifest("confirmation must be object")
       }
       return try SessionManifestConfirmation(
-        object: confirmation, schemaVersion: decodedSchemaVersion)
+        object: confirmation)
     }
   }
 
@@ -615,26 +509,6 @@ private enum SessionManifestJournalValidator {
         )
       }
     }
-    if let authorization = manifest.authorization {
-      if manifest.schemaVersion == JournalEvent.agentAuthoritySchemaVersion {
-        guard
-          replay.agentExecutionAuthorityReference
-            == authorization.agentExecutionAuthorityReference,
-          replay.usageReservationID == authorization.usageReservationID
-        else { throw failure("Manifest authorization does not match journal jobCreated") }
-      } else {
-        guard replay.authorizationReference == authorization.authorizationReference,
-          replay.usageReservationID == authorization.usageReservationID
-        else { throw failure("Manifest authorization does not match journal jobCreated") }
-      }
-    } else {
-      guard replay.agentExecutionAuthorityReference == nil,
-        replay.authorizationReference == nil, replay.usageReservationID == nil
-      else {
-        throw failure("journal authorization has no Manifest authorization")
-      }
-    }
-
     for event in replay.events {
       guard event.sessionID == manifest.sessionID, event.jobID == manifest.jobID else {
         throw failure("journal event identity does not match Manifest: \(event.eventID)")
@@ -706,34 +580,6 @@ private enum SessionManifestJournalValidator {
           event.payload.string("compensationOfStepId") == reference.sourceStepID
         else {
           throw failure("ghost or mismatched compensation journalEventId: \(eventID)")
-        }
-      }
-    }
-    if let authorization = manifest.authorization {
-      let externalIntents: [JournalEvent]
-      if manifest.schemaVersion == JournalEvent.agentAuthoritySchemaVersion {
-        externalIntents = replay.events.filter {
-          ($0.kind == .stepIntent || $0.kind == .compensationIntent)
-            && $0.externalEffect.map { $0 >= .readOnly } == true
-        }
-      } else {
-        externalIntents = replay.events.filter {
-          $0.kind == .stepIntent && $0.stepEffect == .destructive
-        }
-      }
-      let durableIDs = externalIntents.map(\.eventID)
-      guard Set(durableIDs).count == durableIDs.count,
-        Set(durableIDs) == Set(authorization.externalIntentEventIDs)
-      else {
-        throw failure(
-          "Manifest external intent IDs contain ghost, duplicate, or missing journal refs")
-      }
-      for event in externalIntents where event.kind == .stepIntent {
-        guard let stepID = event.stepID, let step = stepsByID[stepID],
-          ["executed", "outcomeUnknown"].contains(try step.manifestString("disposition"))
-        else {
-          throw failure(
-            "authorized destructive intent does not map to an executed Manifest Step")
         }
       }
     }
@@ -857,18 +703,6 @@ private func sameManifestJournalSnapshot(_ lhs: stat, _ rhs: stat) -> Bool {
 }
 
 private enum LockedSessionManifestValidator {
-  // Read-only compatibility for already durable pre-ArkForge manifests. These
-  // constants are accepted only while decoding history and cannot participate
-  // in current discovery, admission, materialization or dispatch.
-  private static let legacyRockchipProfileIdentifier = "ROCKCHIP-ROCKUSB-DISCOVERY@1.0.0"
-  private static let legacyRockchipReportedVersion = "rkdeveloptool ver 1.32"
-  private static let legacyRockchipExecutableSHA256 =
-    "038a8a0ea26ef7eb77451789f310c0c9fbeaf43a78af1d6146e02311a9c23611"
-  private static let legacyRockchipPathSources: Set<String> = [
-    "userSelectedSecurityScopedBookmark",
-    "installedOrdinaryBookmark",
-  ]
-
   private static let topLevelKeys: Set<String> = [
     "schemaVersion", "appVersion", "coreSpecBaseline", "platformProfile", "sessionId",
     "jobId", "status", "executionMode", "executionAuthority", "outcomeCertainty",
@@ -879,17 +713,8 @@ private enum LockedSessionManifestValidator {
 
   static func validate(_ object: [String: JSONValue]) throws {
     let schemaVersion = try object.manifestString("schemaVersion")
-    guard
-      ["1.0.0", "2.0.0", "2.1.0", JournalEvent.agentAuthoritySchemaVersion]
-        .contains(schemaVersion)
-    else {
-      throw failure("unsupported schemaVersion")
-    }
-    if schemaVersion == "1.0.0" {
-      try object.manifestRequireKeys(topLevelKeys)
-    } else {
-      try object.manifestRequireKeys(topLevelKeys.union(["authorization"]))
-    }
+    guard schemaVersion == "1.0.0" else { throw failure("unsupported schemaVersion") }
+    try object.manifestRequireKeys(topLevelKeys)
     for key in ["appVersion", "platformProfile"] {
       guard !(try object.manifestString(key)).isEmpty else { throw failure("empty \(key)") }
     }
@@ -903,18 +728,8 @@ private enum LockedSessionManifestValidator {
     let status = try enumValue(
       object, "status", ["planned", "succeeded", "failed", "cancelled", "interrupted"])
     let mode = try enumValue(object, "executionMode", ["execute", "planOnly", "simulated"])
-    let authorities =
-      schemaVersion != "1.0.0"
-      ? ["interactiveUser", "standardAgent", "controlledHardwareLab", "authorizedAgent"]
-      : ["interactiveUser", "standardAgent", "controlledHardwareLab"]
-    let authority = try enumValue(object, "executionAuthority", authorities)
-    if schemaVersion == JournalEvent.agentAuthoritySchemaVersion,
-      authority == "authorizedAgent", mode != JobExecutionMode.execute.rawValue
-    {
-      throw failure("schemaVersion 2.2.0 authorizedAgent requires execute mode")
-    }
-    let authorization = try validateAuthorization(
-      object["authorization"], schemaVersion: schemaVersion, authority: authority)
+    let authority = try enumValue(
+      object, "executionAuthority", ["interactiveUser", "standardAgent", "controlledHardwareLab"])
     let certainty = try enumValue(
       object, "outcomeCertainty", ["confirmed", "outcomeUnknown", "mixed"])
     let disposition = try enumValue(object, "sessionDisposition", ["finalized", "archived"])
@@ -935,7 +750,7 @@ private enum LockedSessionManifestValidator {
       try validateBinding(binding, simulated: mode == "simulated")
     }
     try validateToolchain(
-      try object.manifestObject("toolchain"), schemaVersion: schemaVersion,
+      try object.manifestObject("toolchain"),
       simulated: mode == "simulated")
     try validateWorkflow(try object.manifestObject("workflow"), simulated: mode == "simulated")
 
@@ -947,10 +762,7 @@ private enum LockedSessionManifestValidator {
     try compensations.forEach(validateCompensation)
     let confirmations = try object.manifestArray("confirmations")
     for confirmation in confirmations {
-      try validateConfirmation(
-        confirmation, schemaVersion: schemaVersion, authority: authority,
-        agentAuthorizationReference: authorization?.agentExecutionAuthorityReference,
-        authorizationReference: authorization?.authorizationReference)
+      try validateConfirmation(confirmation)
     }
     let artifacts = try object.manifestArray("artifacts")
     try artifacts.forEach(validateArtifact)
@@ -970,7 +782,7 @@ private enum LockedSessionManifestValidator {
     try validateConditionals(
       object: object, status: status, mode: mode, authority: authority, certainty: certainty,
       steps: steps, parameters: parameters, compensations: compensations)
-    if schemaVersion != "1.0.0", mode == "simulated" {
+    if mode == "simulated" {
       for value in steps {
         guard case .object(let step) = value,
           try step.manifestString("effect") == "destructive"
@@ -980,70 +792,9 @@ private enum LockedSessionManifestValidator {
             try step.manifestString("disposition")),
           try step.manifestString("outcomeCertainty") == "notApplicable",
           try step.manifestString("semanticResult") == "notRun"
-        else { throw failure("v2 simulated destructive step executed") }
+        else { throw failure("simulated destructive step executed") }
       }
     }
-    if let authorization {
-      let authorizedExternalSteps = try steps.filter { value in
-        guard case .object(let step) = value,
-          try step.manifestString("effect") != WorkflowEffect.hostOnly.rawValue
-        else { return false }
-        return ["executed", "outcomeUnknown"].contains(
-          try step.manifestString("disposition"))
-      }
-      if schemaVersion != JournalEvent.agentAuthoritySchemaVersion {
-        let expectedCount = try authorizedExternalSteps.filter { value in
-          guard case .object(let step) = value else { return false }
-          return try step.manifestString("effect") == WorkflowEffect.destructive.rawValue
-        }.count
-        guard authorization.externalIntentEventIDs.count == expectedCount else {
-          throw failure(
-            "authorized destructive Steps must map one-to-one to destructive intent event IDs")
-        }
-      } else {
-        var resolvedEffects = try steps.compactMap { value -> WorkflowEffect? in
-          guard case .object(let step) = value,
-            let effect = WorkflowEffect(rawValue: try step.manifestString("effect"))
-          else { throw failure("authorized Step has an invalid effect") }
-          return effect >= .readOnly ? effect : nil
-        }
-        resolvedEffects.append(
-          contentsOf: try compensations.compactMap { value -> WorkflowEffect? in
-            guard case .object(let compensation) = value,
-              case .object(let descriptor)? = compensation["descriptor"],
-              let effect = WorkflowEffect(
-                rawValue: try descriptor.manifestString("effect")),
-              effect >= .readOnly
-            else { return nil }
-            return effect
-          })
-        guard let reference = authorization.agentExecutionAuthorityReference,
-          let maximumEffect = resolvedEffects.max(),
-          reference.effect == maximumEffect
-        else {
-          throw failure(
-            "schemaVersion 2.2.0 authorization kind does not match the resolved effect")
-        }
-      }
-    }
-  }
-
-  private static func validateAuthorization(
-    _ value: JSONValue?,
-    schemaVersion: String,
-    authority: String
-  ) throws -> SessionManifestAuthorization? {
-    if schemaVersion == "1.0.0" { return nil }
-    if authority != "authorizedAgent" {
-      guard value == .null else {
-        throw failure("non-authorized authority must use null authorization")
-      }
-      return nil
-    }
-    guard case .object(let object)? = value else {
-      throw failure("authorizedAgent requires authorization object")
-    }
-    return try SessionManifestAuthorization(object: object, schemaVersion: schemaVersion)
   }
 
   private static func validateTarget(_ object: [String: JSONValue], simulated: Bool) throws {
@@ -1095,32 +846,8 @@ private enum LockedSessionManifestValidator {
   }
 
   private static func validateToolchain(
-    _ object: [String: JSONValue], schemaVersion: String, simulated: Bool
+    _ object: [String: JSONValue], simulated: Bool
   ) throws {
-    if object["kind"] == .string("rockchip") {
-      guard ["2.1.0", JournalEvent.agentAuthoritySchemaVersion].contains(schemaVersion),
-        !simulated
-      else {
-        throw failure("rockchip toolchain requires a supported non-simulated schemaVersion")
-      }
-      try object.manifestRequireKeys([
-        "kind", "profileIdentifier", "reportedVersion", "sha256", "pathSource",
-        "descriptorIdentity",
-      ])
-      guard try object.manifestString("profileIdentifier") == legacyRockchipProfileIdentifier,
-        try object.manifestString("reportedVersion") == legacyRockchipReportedVersion,
-        try object.manifestString("sha256") == legacyRockchipExecutableSHA256,
-        legacyRockchipPathSources.contains(try object.manifestString("pathSource"))
-      else { throw failure("rockchip toolchain does not match the pinned integration profile") }
-      let identity = try object.manifestObject("descriptorIdentity")
-      try identity.manifestRequireKeys(["device", "inode", "fileSize", "mode"])
-      guard try identity.manifestUnsignedInteger("device") > 0,
-        try identity.manifestUnsignedInteger("inode") > 0,
-        try identity.manifestInteger("fileSize") > 0,
-        let mode = UInt32(exactly: try identity.manifestUnsignedInteger("mode")), mode > 0
-      else { throw failure("rockchip descriptor identity contains a non-positive field") }
-      return
-    }
     let allowed: Set<String> = [
       "kind", "source", "path", "sha256", "clientVersion", "serverVersion", "daemonVersion",
       "endpoint", "serverGeneration", "serverOwnership",
@@ -1357,13 +1084,7 @@ private enum LockedSessionManifestValidator {
     }
   }
 
-  private static func validateConfirmation(
-    _ value: JSONValue,
-    schemaVersion: String,
-    authority: String,
-    agentAuthorizationReference: AgentExecutionAuthorityReference?,
-    authorizationReference: AuthorizationReference?
-  ) throws {
+  private static func validateConfirmation(_ value: JSONValue) throws {
     guard case .object(let object) = value else { throw failure("confirmation must be object") }
     try object.manifestRequireKeys([
       "confirmationId", "kind", "scopeHash", "decision", "actor", "decidedAt", "relatedStepIds",
@@ -1374,48 +1095,10 @@ private enum LockedSessionManifestValidator {
       ["deviceMutation", "destructive", "serverLifecycle", "recoveryAbandon", "securityBoundary"])
     try SessionStorageValidation.sha256(try object.manifestString("scopeHash"), field: "scopeHash")
     _ = try enumValue(object, "decision", ["accepted", "rejected"])
-    if schemaVersion == "1.0.0" {
-      guard try object.manifestString("actor") == "user" else {
-        throw failure("confirmation actor")
-      }
-    } else {
-      guard case .object(let actor)? = object["actor"],
-        case .string(let kind)? = actor["kind"]
-      else { throw failure("confirmation actor must be a closed object") }
-      switch kind {
-      case "interactiveUser":
-        try actor.manifestRequireKeys(["kind"])
-      case "authorizedAgent":
-        try actor.manifestRequireKeys(["kind", "authorizationRef"])
-        if schemaVersion == JournalEvent.agentAuthoritySchemaVersion {
-          let actorReference: AgentExecutionAuthorityReference
-          do {
-            actorReference = try AgentExecutionAuthorityReference(
-              jsonValue: actor["authorizationRef"]!,
-              context: "confirmation.actor.authorizationRef")
-          } catch {
-            throw failure("confirmation actor authorizationRef is malformed")
-          }
-          guard authority == "authorizedAgent", let agentAuthorizationReference,
-            actorReference == agentAuthorizationReference,
-            try object.manifestString("kind") != "recoveryAbandon"
-          else { throw failure("confirmation actor authorizationRef drifted or is human-only") }
-        } else {
-          let actorReference: AuthorizationReference
-          do {
-            actorReference = try AuthorizationReference(
-              jsonValue: actor["authorizationRef"]!,
-              context: "confirmation.actor.authorizationRef")
-          } catch {
-            throw failure("confirmation actor authorizationRef is malformed")
-          }
-          guard authority == "authorizedAgent", let authorizationReference,
-            actorReference == authorizationReference
-          else { throw failure("confirmation actor authorizationRef drifted") }
-        }
-      default:
-        throw failure("unknown confirmation actor kind")
-      }
+    let actor = try object.manifestObject("actor")
+    try actor.manifestRequireKeys(["kind"])
+    guard try actor.manifestString("kind") == "interactiveUser" else {
+      throw failure("unsupported confirmation actor")
     }
     try timestamp(object, "decidedAt")
     for stepID in try object.manifestStringArray("relatedStepIds") {

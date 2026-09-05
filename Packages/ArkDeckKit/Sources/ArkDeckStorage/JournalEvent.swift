@@ -35,78 +35,11 @@ package enum JournalEventValidationError: Error, Equatable, Sendable {
   case canonicalArgumentsHashMismatch(stepID: String)
 }
 
-enum JournalAuthorizationCorrelationShape: Sendable {
-  case none
-  case authorizationReference
-  case agentAuthorityReference
-}
-
-struct JournalSchemaCapabilities: Sendable {
-  let requiresAuthorizationCorrelation: Bool
-  let authorizationCorrelationShape: JournalAuthorizationCorrelationShape
-  let supportsCompleteOverwriteRecoveryStates: Bool
-
-  init(
-    requiresAuthorizationCorrelation: Bool,
-    authorizationCorrelationShape: JournalAuthorizationCorrelationShape,
-    supportsCompleteOverwriteRecoveryStates: Bool = false
-  ) {
-    precondition(
-      requiresAuthorizationCorrelation
-        == (authorizationCorrelationShape != .none),
-      "authorization correlation capability and shape must agree")
-    self.requiresAuthorizationCorrelation = requiresAuthorizationCorrelation
-    self.authorizationCorrelationShape = authorizationCorrelationShape
-    self.supportsCompleteOverwriteRecoveryStates = supportsCompleteOverwriteRecoveryStates
-  }
-}
-
 public struct JournalEvent: Equatable, Sendable {
   public static let schemaVersion = "1.0.0"
-  package static let authorizedAgentSchemaVersion = "2.0.0"
-  package static let rockchipAuthorizedAgentSchemaVersion = "2.1.0"
-  package static let agentAuthoritySchemaVersion = "2.2.0"
-  package static let completeOverwriteRecoverySchemaVersion = "3.0.0"
-
-  /// Every accepted schema generation declares its security semantics here. Adding a version
-  /// therefore requires an explicit decision about authorization correlation instead of falling
-  /// through a version-name predicate. Versions without journal correlation remain readable, but
-  /// gain no execution authority from that absence; current Flash execution is admitted by the
-  /// RuntimeCapability store before its 3.0.0 journal is created.
-  private static let capabilitiesBySchemaVersion: [String: JournalSchemaCapabilities] = [
-    schemaVersion: JournalSchemaCapabilities(
-      requiresAuthorizationCorrelation: false,
-      authorizationCorrelationShape: .none),
-    authorizedAgentSchemaVersion: JournalSchemaCapabilities(
-      requiresAuthorizationCorrelation: true,
-      authorizationCorrelationShape: .authorizationReference),
-    rockchipAuthorizedAgentSchemaVersion: JournalSchemaCapabilities(
-      requiresAuthorizationCorrelation: true,
-      authorizationCorrelationShape: .authorizationReference),
-    agentAuthoritySchemaVersion: JournalSchemaCapabilities(
-      requiresAuthorizationCorrelation: true,
-      authorizationCorrelationShape: .agentAuthorityReference),
-    completeOverwriteRecoverySchemaVersion: JournalSchemaCapabilities(
-      requiresAuthorizationCorrelation: false,
-      authorizationCorrelationShape: .none,
-      supportsCompleteOverwriteRecoveryStates: true),
-  ]
-
-  static func capabilities(forSchemaVersion value: String) -> JournalSchemaCapabilities? {
-    capabilitiesBySchemaVersion[value]
-  }
 
   static func isSupportedSchemaVersion(_ value: String) -> Bool {
-    capabilities(forSchemaVersion: value) != nil
-  }
-
-  static func supportsAuthorizationCorrelation(_ value: String) -> Bool {
-    capabilities(forSchemaVersion: value)?.requiresAuthorizationCorrelation == true
-  }
-
-  static func usesAgentAuthorityUnion(_ value: String) -> Bool {
-    capabilities(forSchemaVersion: value)?.authorizationCorrelationShape
-      == .agentAuthorityReference
+    value == schemaVersion
   }
 
   public let schemaVersion: String
@@ -192,24 +125,6 @@ public struct JournalEvent: Equatable, Sendable {
     }
   }
 
-  package var authorizationReference: AuthorizationReference? {
-    if let reference = agentExecutionAuthorityReference {
-      return reference.legacyStandingAuthorizationReference
-    }
-    guard let value = payload["authorizationRef"] else { return nil }
-    return try? AuthorizationReference(jsonValue: value, context: "journal.authorizationRef")
-  }
-
-  package var agentExecutionAuthorityReference: AgentExecutionAuthorityReference? {
-    guard Self.usesAgentAuthorityUnion(schemaVersion),
-      let value = payload["authorizationRef"]
-    else { return nil }
-    return try? AgentExecutionAuthorityReference(
-      jsonValue: value, context: "journal.authorizationRef")
-  }
-
-  package var usageReservationID: String? { payload.string("usageReservationId") }
-
   package var stateTransition: JobStateTransition? {
     guard kind == .stateTransition,
       let fromRaw = payload.string("from"), let from = JobState(rawValue: fromRaw),
@@ -227,21 +142,14 @@ public struct JournalEvent: Equatable, Sendable {
     executionMode: String,
     executionAuthority: String = "standardAgent",
     coreBaseline: String = "CORE-2.0.0",
-    schemaVersion: String = Self.schemaVersion,
-    authorizationRef: AuthorizationReference? = nil,
-    agentAuthorizationRef: AgentExecutionAuthorityReference? = nil,
-    usageReservationID: String? = nil
+    schemaVersion: String = Self.schemaVersion
   ) throws -> JournalEvent {
-    var payload: [String: JSONValue] = [
+    let payload: [String: JSONValue] = [
       "executionMode": .string(executionMode),
       "executionAuthority": .string(executionAuthority),
       "initialState": .string("queued"),
       "coreBaseline": .string(coreBaseline),
     ]
-    try appendAuthorization(
-      schemaVersion: schemaVersion, legacy: authorizationRef, agent: agentAuthorizationRef,
-      to: &payload)
-    if let usageReservationID { payload["usageReservationId"] = .string(usageReservationID) }
     return try JournalEvent(
       schemaVersion: schemaVersion,
       eventID: eventID, sequence: sequence, sessionID: sessionID, jobID: jobID,
@@ -280,20 +188,13 @@ public struct JournalEvent: Equatable, Sendable {
     target: JournalTarget,
     attempt: Int,
     bindingRevision: Int?,
-    schemaVersion: String = Self.schemaVersion,
-    authorizationRef: AuthorizationReference? = nil,
-    agentAuthorizationRef: AgentExecutionAuthorityReference? = nil,
-    usageReservationID: String? = nil
+    schemaVersion: String = Self.schemaVersion
   ) throws -> JournalEvent {
     let argumentsHash = try JournalCanonicalJSON.argumentsHash(step.arguments)
     var payload: [String: JSONValue] = [
       "step": try JournalCanonicalJSON.value(step),
       "target": target.jsonValue,
     ]
-    try appendAuthorization(
-      schemaVersion: schemaVersion, legacy: authorizationRef, agent: agentAuthorizationRef,
-      to: &payload)
-    if let usageReservationID { payload["usageReservationId"] = .string(usageReservationID) }
     return try JournalEvent(
       schemaVersion: schemaVersion,
       eventID: eventID, sequence: sequence, sessionID: sessionID, jobID: jobID,
@@ -315,10 +216,7 @@ public struct JournalEvent: Equatable, Sendable {
     outcomeCertainty: JournalOutcomeCertainty,
     semanticCode: String? = nil,
     summary: String? = nil,
-    schemaVersion: String = Self.schemaVersion,
-    authorizationRef: AuthorizationReference? = nil,
-    agentAuthorizationRef: AgentExecutionAuthorityReference? = nil,
-    usageReservationID: String? = nil
+    schemaVersion: String = Self.schemaVersion
   ) throws -> JournalEvent {
     var payload: [String: JSONValue] = [
       "correlatesToIntentEventId": .string(correlatesToIntentEventID),
@@ -327,10 +225,6 @@ public struct JournalEvent: Equatable, Sendable {
     ]
     if let semanticCode { payload["semanticCode"] = .string(semanticCode) }
     if let summary { payload["summary"] = .string(summary) }
-    try appendAuthorization(
-      schemaVersion: schemaVersion, legacy: authorizationRef, agent: agentAuthorizationRef,
-      to: &payload)
-    if let usageReservationID { payload["usageReservationId"] = .string(usageReservationID) }
     return try JournalEvent(
       schemaVersion: schemaVersion,
       eventID: eventID, sequence: sequence, sessionID: sessionID, jobID: jobID,
@@ -349,20 +243,13 @@ public struct JournalEvent: Equatable, Sendable {
     target: JournalTarget,
     attempt: Int,
     bindingRevision: Int?,
-    schemaVersion: String = Self.schemaVersion,
-    authorizationRef: AuthorizationReference? = nil,
-    agentAuthorizationRef: AgentExecutionAuthorityReference? = nil,
-    usageReservationID: String? = nil
+    schemaVersion: String = Self.schemaVersion
   ) throws -> JournalEvent {
     var payload: [String: JSONValue] = [
       "compensationOfStepId": .string(compensationOfStepID),
       "descriptor": try JournalCanonicalJSON.value(descriptor),
       "target": target.jsonValue,
     ]
-    try appendAuthorization(
-      schemaVersion: schemaVersion, legacy: authorizationRef, agent: agentAuthorizationRef,
-      to: &payload)
-    if let usageReservationID { payload["usageReservationId"] = .string(usageReservationID) }
     return try JournalEvent(
       schemaVersion: schemaVersion,
       eventID: eventID, sequence: sequence, sessionID: sessionID, jobID: jobID,
@@ -385,10 +272,7 @@ public struct JournalEvent: Equatable, Sendable {
     outcomeCertainty: JournalOutcomeCertainty,
     semanticCode: String? = nil,
     summary: String? = nil,
-    schemaVersion: String = Self.schemaVersion,
-    authorizationRef: AuthorizationReference? = nil,
-    agentAuthorizationRef: AgentExecutionAuthorityReference? = nil,
-    usageReservationID: String? = nil
+    schemaVersion: String = Self.schemaVersion
   ) throws -> JournalEvent {
     var payload: [String: JSONValue] = [
       "compensationOfStepId": .string(compensationOfStepID),
@@ -399,46 +283,11 @@ public struct JournalEvent: Equatable, Sendable {
     ]
     if let semanticCode { payload["semanticCode"] = .string(semanticCode) }
     if let summary { payload["summary"] = .string(summary) }
-    try appendAuthorization(
-      schemaVersion: schemaVersion, legacy: authorizationRef, agent: agentAuthorizationRef,
-      to: &payload)
-    if let usageReservationID { payload["usageReservationId"] = .string(usageReservationID) }
     return try JournalEvent(
       schemaVersion: schemaVersion,
       eventID: eventID, sequence: sequence, sessionID: sessionID, jobID: jobID,
       timestamp: timestamp, kind: .compensationOutcome, stepID: descriptorID, attempt: attempt,
       payload: payload)
-  }
-
-  private static func appendAuthorization(
-    schemaVersion: String,
-    legacy: AuthorizationReference?,
-    agent: AgentExecutionAuthorityReference?,
-    to payload: inout [String: JSONValue]
-  ) throws {
-    guard legacy == nil || agent == nil else {
-      throw JournalEventValidationError.malformedEnvelope(
-        "legacy and agent authorizationRef cannot both be supplied")
-    }
-    if usesAgentAuthorityUnion(schemaVersion) {
-      if let agent {
-        payload["authorizationRef"] = agent.jsonValue
-      } else if let legacy {
-        payload["authorizationRef"] =
-          AgentExecutionAuthorityReference.standingAuthorization(
-            authorizationID: legacy.authorizationID,
-            mainCommitOID: legacy.mainCommitOID,
-            authorizationBlobOID: legacy.authorizationBlobOID,
-            approvalPRNumber: legacy.approvalPRNumber
-          ).jsonValue
-      }
-    } else {
-      guard agent == nil else {
-        throw JournalEventValidationError.malformedEnvelope(
-          "agent authority union requires schemaVersion 2.2.0")
-      }
-      if let legacy { payload["authorizationRef"] = legacy.jsonValue }
-    }
   }
 
   package static func reconcileStarted(

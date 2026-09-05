@@ -76,10 +76,4 @@ struct RuntimeAdmissionService: Sendable {
       pageSize: pageSize, cursor: cursor, newestFirst: newestFirst)
   }
 
-  func listLegacyJobs(
-    pageSize: Int, cursor: String?, newestFirst: Bool = false
-  ) throws -> RuntimeJobRepositoryPage {
-    try repository.listLegacyJobs(
-      pageSize: pageSize, cursor: cursor, newestFirst: newestFirst)
-  }
 }

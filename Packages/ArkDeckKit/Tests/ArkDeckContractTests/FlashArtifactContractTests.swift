@@ -35,8 +35,8 @@ final class FlashArtifactContractTests: XCTestCase {
       createdAtUTC: "2026-07-31T00:00:00Z",
       actualEffect: "destructive",
       admissionEvidence: RuntimeAdmissionEvidence(
-        kind: .standingAuthorization,
-        reference: "merged-pr:gj4-exact-plan",
+        kind: .runtimeCapability,
+        reference: "CAP-RT-GJ4-ARTIFACTS",
         admittedAtUTC: "2026-07-31T00:00:00Z",
         validUntilUTC: "2026-08-01T00:00:00Z",
         consumptionFingerprintSHA256: String(repeating: "f", count: 64)),
@@ -135,8 +135,8 @@ final class FlashArtifactContractTests: XCTestCase {
       document["materializedPlanDigest"] as? String,
       String(repeating: "d", count: 64))
     let authority = try XCTUnwrap(document["authority"] as? [String: Any])
-    XCTAssertEqual(authority["kind"] as? String, "standingAuthorization")
-    XCTAssertEqual(authority["reference"] as? String, "merged-pr:gj4-exact-plan")
+    XCTAssertEqual(authority["kind"] as? String, "runtimeCapability")
+    XCTAssertEqual(authority["reference"] as? String, "CAP-RT-GJ4-ARTIFACTS")
 
     XCTAssertEqual(
       RuntimeArtifactService.artifactContents(

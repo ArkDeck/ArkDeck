@@ -572,7 +572,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     let journal = try FileDurableJournal(url: journalURL)
     _ = try appendRunningPrefix(
       journal: journal, record: record,
-      schemaVersion: JournalEvent.completeOverwriteRecoverySchemaVersion)
+      schemaVersion: JournalEvent.schemaVersion)
 
     let recovered = try await recoveryService().replay(
       RuntimePersistedJob(
@@ -659,6 +659,8 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
   }
 
   func testDistinctRecoveryRunsThroughRuntimeOwnedCapabilityAndTypedProvider() async throws {
+    // A current Runtime creates its admission index before any durable intent.
+    _ = try RuntimeJobRepository(stateDirectory: stateDirectory)
     let old = try writeUnknownJob(
       jobID: "job-original-unknown", timestamp: "2026-08-08T00:00:00Z",
       correlatedUnknownOutcome: false)
@@ -743,10 +745,10 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     let recoveryJournalURL = recoveryDirectory.appending(path: "journal.jsonl")
     let recoveryReplay = try DurableJournalRecovery.inspect(url: recoveryJournalURL)
     XCTAssertEqual(
-      recoveryReplay.schemaVersion, JournalEvent.completeOverwriteRecoverySchemaVersion)
+      recoveryReplay.schemaVersion, JournalEvent.schemaVersion)
     XCTAssertTrue(
       recoveryReplay.events.allSatisfy {
-        $0.schemaVersion == JournalEvent.completeOverwriteRecoverySchemaVersion
+        $0.schemaVersion == JournalEvent.schemaVersion
       })
     let requiredRecoverySteps = [
       "flash-partitions", "verify-flash-readback", "reboot-device", "wait-for-hdc",
@@ -769,8 +771,8 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
         sessionID: "session-legacy", jobID: "job-legacy",
         timestamp: "2026-08-08T01:00:00Z",
         from: .running, to: .recoveringByCompleteOverwrite,
-        reason: "legacy writer must not emit recovery state",
-        schemaVersion: JournalEvent.schemaVersion))
+        reason: "retired format must be refused",
+        schemaVersion: "3.0.0"))
 
     let dispatches = await dispatchLog.snapshot()
     XCTAssertEqual(dispatches.filter { $0 == "flash-partitions" }.count, 0)
@@ -851,6 +853,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
   }
 
   func testRestartReconcilesTheExactDaemonTerminalWithoutStartingOrUsingActorCache() async throws {
+    _ = try RuntimeJobRepository(stateDirectory: stateDirectory)
     _ = try writeUnknownJob(
       jobID: "job-original-for-daemon-restart", timestamp: "2026-08-08T00:00:00Z",
       correlatedUnknownOutcome: false)
@@ -1116,6 +1119,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
 
   private func flashRequest(
     id: String,
+    capabilityID: String? = nil,
     lease: String = "lease-v1:recovery:ART-0123456789abcdef0123456789abcdef"
   ) throws -> RuntimeOperationRequest {
     let partitions = try XCTUnwrap(
@@ -1131,7 +1135,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
         "deviceProfile": .string("dayu200"),
         "partitionPlan": .array(partitions.map(JSONValue.string)),
         "postFlashVerification": .string("full"),
-      ])
+      ], authorization: capabilityID.map { RuntimeCapabilityReference(capabilityID: $0) })
   }
 
   private func writeUnknownJob(
@@ -1263,18 +1267,20 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     omitSemanticReceiptStepID: String?
   ) throws {
     var record = try makeRecord(
-      jobID: jobID, createdAtUTC: createdAtUTC, finishedAtUTC: finishedAtUTC)
+      jobID: jobID, createdAtUTC: createdAtUTC, finishedAtUTC: finishedAtUTC,
+      capabilityID: "CAP-RT-HISTORICAL-FLASH")
+    record.originalSubmissionRequest = record.request
     record.state = JobState.succeeded.rawValue
     record.outcomeUnknown = false
     var admission = RuntimeAdmissionEvidence(
       kind: .runtimeCapability, reference: "CAP-RT-HISTORICAL-FLASH",
-      admittedAtUTC: createdAtUTC, validUntilUTC: nil,
+      admittedAtUTC: createdAtUTC, validUntilUTC: "2026-12-31T00:00:00Z",
       consumptionFingerprintSHA256: String(repeating: "a", count: 64),
       runtimeCapabilityCorrelation: RuntimeCapabilityEvidenceCorrelation(
-        reservationID: "reservation-historical-flash", useOrdinal: 1,
+        reservationID: record.request.idempotencyKey, useOrdinal: 1,
         planDigestSHA256: String(repeating: "2", count: 64),
         stepSetDigestSHA256: String(repeating: "3", count: 64),
-        targetBindingDigestSHA256: String(repeating: "5", count: 64),
+        targetBindingDigestSHA256: RuntimeJobRecord.sha256Hex(Data("\(identity)\n2".utf8)),
         artifactSHA256: artifactSHA256))
     admission.recoveryProviderExecutableSHA256 = providerSHA256
     record.admissionEvidence = admission
@@ -1324,10 +1330,10 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
   }
 
   private func makeRecord(
-    jobID: String, createdAtUTC: String, finishedAtUTC: String
+    jobID: String, createdAtUTC: String, finishedAtUTC: String, capabilityID: String? = nil
   ) throws -> RuntimeJobRecord {
     var record = RuntimeJobRecord(
-      jobID: jobID, request: try flashRequest(id: jobID),
+      jobID: jobID, request: try flashRequest(id: jobID, capabilityID: capabilityID),
       operationReference: "flash.dayu200",
       catalogDigest: RuntimeOperationCatalog.catalogDigest,
       providerID: "rockchip", createdAtUTC: createdAtUTC,

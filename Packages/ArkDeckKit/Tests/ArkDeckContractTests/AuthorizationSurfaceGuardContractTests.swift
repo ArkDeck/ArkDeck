@@ -47,8 +47,8 @@ final class AuthorizationSurfaceGuardContractTests: XCTestCase {
     let manifest = try String(
       contentsOf: packageRoot.appending(
         path: "Sources/ArkDeckStorage/SessionManifest.swift"), encoding: .utf8)
-    XCTAssertTrue(manifest.contains("Read-only compatibility for already durable pre-ArkForge"))
-    XCTAssertTrue(manifest.contains("legacyRockchipReportedVersion"))
+    XCTAssertFalse(manifest.contains("Read-only compatibility for already durable pre-ArkForge"))
+    XCTAssertFalse(manifest.contains("legacyRockchipReportedVersion"))
     XCTAssertFalse(manifest.contains("RockchipProductTool"))
   }
 
