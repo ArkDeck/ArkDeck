@@ -96,10 +96,6 @@ jobs:
     timeout-minutes: 40
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
-      # Every run-swiftpm.sh call in the job, the --show-bin-path lookup
-      # included, must see the same cache root, or the capture step would look
-      # for the binaries in a build the restore never touched.
-      ARKDECK_SWIFTPM_CACHE_ROOT: ${{ runner.temp }}/arkdeck-swiftpm
     steps:
       - name: Checkout default branch with runner Git
         run: |
@@ -128,6 +124,11 @@ jobs:
             arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-
             arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-
       - name: Build the measured executables
+        # Every run-swiftpm.sh call, the --show-bin-path lookup included, must
+        # see the cache root the restore populated. Step level, because the
+        # runner context is not available in a job-level env.
+        env:
+          ARKDECK_SWIFTPM_CACHE_ROOT: ${{ runner.temp }}/arkdeck-swiftpm
         run: |
           set -eu
           sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh build -c release \
@@ -148,6 +149,11 @@ jobs:
           path: ${{ runner.temp }}/arkdeck-swiftpm
           key: arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
       - name: Capture a candidate baseline
+        # Every run-swiftpm.sh call, the --show-bin-path lookup included, must
+        # see the cache root the restore populated. Step level, because the
+        # runner context is not available in a job-level env.
+        env:
+          ARKDECK_SWIFTPM_CACHE_ROOT: ${{ runner.temp }}/arkdeck-swiftpm
         run: |
           set -eu
           BIN="$(sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh build -c release \
@@ -203,10 +209,6 @@ jobs:
     timeout-minutes: 60
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
-      # Every run-swiftpm.sh call in the job, the --show-bin-path lookup
-      # included, must see the same cache root, or the capture step would look
-      # for the binaries in a build the restore never touched.
-      ARKDECK_SWIFTPM_CACHE_ROOT: ${{ runner.temp }}/arkdeck-swiftpm
     steps:
       - name: Checkout default branch with runner Git
         run: |
@@ -235,6 +237,11 @@ jobs:
             arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-
             arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-
       - name: Build the measured executables
+        # Every run-swiftpm.sh call, the --show-bin-path lookup included, must
+        # see the cache root the restore populated. Step level, because the
+        # runner context is not available in a job-level env.
+        env:
+          ARKDECK_SWIFTPM_CACHE_ROOT: ${{ runner.temp }}/arkdeck-swiftpm
         run: |
           set -eu
           sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh build -c release \
@@ -255,6 +262,11 @@ jobs:
           path: ${{ runner.temp }}/arkdeck-swiftpm
           key: arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
       - name: Capture a candidate baseline
+        # Every run-swiftpm.sh call, the --show-bin-path lookup included, must
+        # see the cache root the restore populated. Step level, because the
+        # runner context is not available in a job-level env.
+        env:
+          ARKDECK_SWIFTPM_CACHE_ROOT: ${{ runner.temp }}/arkdeck-swiftpm
         run: |
           set -eu
           BIN="$(sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh build -c release \
@@ -302,10 +314,6 @@ jobs:
     timeout-minutes: 330
     env:
       DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
-      # Every run-swiftpm.sh call in the job, the --show-bin-path lookup
-      # included, must see the same cache root, or the capture step would look
-      # for the binaries in a build the restore never touched.
-      ARKDECK_SWIFTPM_CACHE_ROOT: ${{ runner.temp }}/arkdeck-swiftpm
     steps:
       - name: Checkout default branch with runner Git
         run: |
@@ -332,6 +340,11 @@ jobs:
             arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-
             arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-
       - name: Build the soak fixture
+        # Every run-swiftpm.sh call, the --show-bin-path lookup included, must
+        # see the cache root the restore populated. Step level, because the
+        # runner context is not available in a job-level env.
+        env:
+          ARKDECK_SWIFTPM_CACHE_ROOT: ${{ runner.temp }}/arkdeck-swiftpm
         run: |
           set -eu
           sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh build -c release \
@@ -357,6 +370,9 @@ jobs:
       - name: Run the Runtime soak
         env:
           SOAK_HOURS: ${{ github.event.inputs.soak-hours || '4' }}
+          # The --show-bin-path lookup must see the cache root the restore
+          # populated; the runner context is step-level only.
+          ARKDECK_SWIFTPM_CACHE_ROOT: ${{ runner.temp }}/arkdeck-swiftpm
         run: |
           set -eu
           BIN="$(sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh build -c release \
