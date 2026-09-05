@@ -155,8 +155,36 @@ change updates the enum.
 
 ## Golden Journey
 
-Not executed: no DAYU200 was attached during delivery. The headless GJ-1..5 re-pass on the
-current digest is recorded here when a device window exists; this task advances no hop.
+### Real-device window 2026-09-05 (DAYU200 attached): `BLOCKED_BY_PRODUCT_DEFECT`
+
+The maintainer attached the DAYU200 and approved the two prerequisites the runbook needs (update
+the installed Runtime to a build of `main`; run GJ-4 with the HardwareCampaign enabled). The
+window never reached GJ-1: **the post-SVC-001 daemon cannot start on this host's store.**
+
+| Fact | Value |
+| --- | --- |
+| Device | one DAYU200 visible to the pinned HDC (`hdc list targets -v`: USB, Connected), connect key redacted |
+| Installed Runtime before | helper built 2026-09-03 (pre-SVC-001), daemon SHA-256 `b5931c7a144011222ea7934de48371e01cbe624cb1a31301bcd04e62fd24a4d6`; the current CLI reports it `daemonHealth: unreachable, malformedResponse("contractMismatch")` and refuses every business request with `protocolVersionUnsupported`, so the runbook's §1 update was mandatory |
+| Helper built | `Distribution/macOS/build-local-helpers.sh` on `main` `e8c4f1df` (#1737), Developer ID 8AQTYW5FKR, hardened runtime; daemon SHA-256 `7dcffb14901a9c8c9d4e64c998b5b39c4340b0d9e44b5fad23e4f7b0dd3b42e5`, CLI `buildIdentity` `sha256:6735aa5b4572abddd09cb932ae18a873f8b0b76f89cf11cc3999c4b04488cd1f` |
+| Update | `arkdeck runtime service update --daemon <helper>/ArkDeckCLI.app/Contents/Helpers/ArkDeckAgent.app --hdc <pinned hdc> --arkforge-bundle <registered bundle> --arktrace-descriptor <registered descriptor> --output json` → `ok`, receipt `daemonSHA256` `7dcffb14…`, campaign `""` |
+| Failure | the daemon exits within a second of every launch; launchd (`KeepAlive`, 5 s throttle) restarted it 248 times before the job was booted out. `~/Library/Logs/ArkDeck/agentd.error.log`: `arkdeck-agentd failed to start: internalFailure("admitted job job-be448cb20f06aae340e1ccfe5275be81 has no readable durable record after recovery projection")`; the socket never appeared (`daemonHealth: socket_absent`), `doctor`, `operation list`, `target list`, `workspace project list` all `runtimeUnavailable` (`connect failed: errno 2`) |
+| Root cause | `RuntimeRecoveryService.replay` (`RuntimeRecoveryService.swift:589-592`) throws when `RuntimeJobRecord.load` cannot decode `jobs/<id>/job-record.json`. The record passes the new `StrictJSONDuplicateValidator` (checked standalone: no duplicate keys, valid document) and its Codable field set is unchanged by SVC-001; what changed is `RuntimeOperationRequest.schemaVersion` — `"2.0.0"` → `"1.0.0"` in #1733 (`RuntimeOperationModelsV2.swift` → `RuntimeOperationModels.swift`) with an exact-match decoder (`schemaVersion must be exactly "1.0.0"`). Every durable job record on this host embeds its submission request with `"schemaVersion":"2.0.0"`: **2,041 of 2,041 records** (read-only scan), including the four non-terminal `waitingForRecovery` flash jobs of 2026-08-04, 08-04, 08-09 and 08-20 that start-up recovery must project. The first of them stops the daemon |
+| Consequence | a host that ran any pre-SVC-001 Runtime cannot upgrade: with a parked job the daemon does not start; without one it would start but every historical `job show` / `job result` / `history` read of the 2,041 records would be `recordUnreadable`. This is the durable-record generation gap `TASK-SVC-002` ("Consolidate durable records and recovery on the current v1") owns; SVC-001's own acceptance never ran against a populated production store |
+| Not attempted | terminating or editing the four parked jobs by hand so the new daemon can start — the runbook forbids rewriting historical unknown records, and the 2,037 terminal records would stay unreadable anyway |
+| Rollback | the crash loop was booted out (`launchctl bootout gui/501/com.arkdeck.agentd`, after 248 attempts); no copy of the 2026-09-03 helper existed on disk, so a pre-SVC-001 helper was built from `main` `7955e745` (#1732, the last commit before #1733) with the same `build-local-helpers.sh`, daemon SHA-256 `65cb1083bc100d159724c4cf0ecfcf996b60e3bb57406beedf0d00de0ec2672b`, and installed with `runtime service update --daemon …` (`ok`). That daemon first refused to start too — `serverDidNotBecomeReady("managed HDC launch identity was not retained")` — because the crash-looping post-SVC-001 daemon had left an orphaned managed HDC server (`hdc -s 127.0.0.1:8710 -m`, pid 4563, parent launchd) holding the port; after that process was killed and the LaunchAgent bootstrapped again, the socket appeared within 6 s: `runtime service status` `daemonHealth.status: ok` (digest `508783ac…`, providers analyzer/arkforge/hdc/workspace), `doctor --deep --require-healthy` exit 0, `target list` shows `TGT-958780b2ffb7` r4, `runtime hdc status` available (3.2.0f). The host runs a pre-SVC-001 local helper now, not the 2026-09-03 notarised build; no durable record was edited |
+| GJ-1..5, §2.1, §6a | not started; no Job was created under the new daemon (it never accepted a connection) |
+
+Reproduction (any host with a pre-SVC-001 store): `arkdeck runtime service update --daemon
+<post-#1733 helper>`; watch `agentd.error.log`. The exact failing line above is the daemon's own
+message; the CLI's view is `runtime service status` → `daemonHealth.status: socket_absent`.
+
+Routing: one product defect = one vertical task. The fix belongs to CHG-2026-075 `TASK-SVC-002`
+(durable-record consolidation must read or migrate the `2.0.0` request documents before the
+strict single-v1 decoder meets a populated store); until it lands, the XPA-001 device re-pass
+and `TASK-SVC-005` cannot run on this host, and no host that ran the 2.x Runtime can take a
+post-SVC-001 build. The maintainer decides whether SVC-002 or a dedicated task carries it.
+
+The device re-pass stays open; this task advances no hop.
 
 ## Stop condition
 
