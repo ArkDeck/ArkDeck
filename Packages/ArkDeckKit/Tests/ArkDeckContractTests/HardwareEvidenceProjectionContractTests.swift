@@ -2,6 +2,7 @@ import CryptoKit
 import XCTest
 
 @testable import ArkDeckAgentClient
+@testable import ArkDeckCore
 
 final class HardwareEvidenceProjectionContractTests: XCTestCase {
   private let identity = String(repeating: "b", count: 64)
@@ -178,12 +179,13 @@ final class HardwareEvidenceProjectionContractTests: XCTestCase {
       notes: "contract fixture; no hardware dispatch")
   }
 
-  func testAgentReadOnlyProjectsCanonicalV6AndRoundTrips() throws {
+  func testAgentReadOnlyProjectsTheCurrentRecordAndRoundTrips() throws {
     let result = HardwareEvidenceProjector.project(receipt: receipt(), claims: claims())
     guard case .published(let record) = result else {
       return XCTFail("complete Agent read-only facts must publish: \(result)")
     }
-    XCTAssertEqual(record.schemaVersion, "6.0.0")
+    XCTAssertEqual(record.schemaVersion, HardwareEvidenceRecord.schemaVersion)
+    XCTAssertEqual(record.schemaVersion, "1.0.0")
     XCTAssertEqual(record.executor.kind, .agent)
     XCTAssertEqual(record.executor.authority?.kind, .defaultReadOnlyPolicy)
     XCTAssertEqual(record.effectLevel, .readOnly)
@@ -196,7 +198,8 @@ final class HardwareEvidenceProjectionContractTests: XCTestCase {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
     let encoded = try encoder.encode(record)
-    XCTAssertEqual(try JSONDecoder().decode(HardwareEvidenceV6Record.self, from: encoded), record)
+    XCTAssertEqual(try JSONDecoder().decode(HardwareEvidenceRecord.self, from: encoded), record)
+    XCTAssertEqual(try HardwareEvidenceRecord.decode(encoded), record)
     let text = String(decoding: encoded, as: UTF8.self)
     XCTAssertFalse(text.contains("150100424A544E4600"), "raw serial must never be encoded")
     XCTAssertFalse(text.contains("connectKey"), "addressing data must never be encoded")
@@ -274,12 +277,12 @@ final class HardwareEvidenceProjectionContractTests: XCTestCase {
     }
   }
 
-  func testDestructiveV6RetainsRuntimeUseCorrelationAndRejectsLegacyAuthority() {
+  func testDestructiveRecordRetainsRuntimeUseCorrelationAndRejectsRetiredAuthority() {
     guard case .published(let record) = HardwareEvidenceProjector.project(
       receipt: receipt(effect: .destructive, authorityKind: .runtimeCapability),
       claims: claims())
     else {
-      return XCTFail("complete Runtime correlation must project V6 evidence")
+      return XCTFail("complete Runtime correlation must project the current evidence record")
     }
     let authority = record.executor.authority
     XCTAssertEqual(authority?.kind, .runtimeCapability)
@@ -290,20 +293,25 @@ final class HardwareEvidenceProjectionContractTests: XCTestCase {
     XCTAssertEqual(authority?.targetBindingDigest, String(repeating: "e", count: 64))
     XCTAssertEqual(authority?.artifactDigest, artifactDigest)
 
-    let legacy = HardwareEvidenceProjector.project(
-      receipt: receipt(
-        effect: .destructive, authorityKind: .evolutionCampaignConfirmation),
-      claims: claims())
-    guard case .evidenceIncomplete(let incomplete) = legacy else {
-      return XCTFail("legacy campaign authority must not publish V6")
+    for retired in [
+      RuntimeHardwareEvidenceAuthorityKind.evolutionCampaignConfirmation, .standingAuthorization,
+    ] {
+      let result = HardwareEvidenceProjector.project(
+        receipt: receipt(effect: .destructive, authorityKind: retired), claims: claims())
+      guard case .evidenceIncomplete(let incomplete) = result else {
+        return XCTFail("retired authority \(retired) must not publish current evidence")
+      }
+      XCTAssertEqual(incomplete.publicationCount, 0)
+      XCTAssertTrue(
+        incomplete.reasons.contains("actual effect and admission authority do not match"),
+        "\(incomplete.reasons)")
+      XCTAssertTrue(
+        incomplete.reasons.contains("retired authority kind cannot be emitted as hardware evidence"),
+        "\(incomplete.reasons)")
     }
-    XCTAssertEqual(incomplete.publicationCount, 0)
-    XCTAssertTrue(
-      incomplete.reasons.contains("actual effect and admission authority do not match")
-        || incomplete.reasons.contains("legacy authority kind cannot be emitted as V6 evidence"))
   }
 
-  func testDistinctRecoveryProjectsClosedV6Lineage() throws {
+  func testDistinctRecoveryProjectsClosedLineage() throws {
     let result = HardwareEvidenceProjector.project(
       receipt: receipt(
         providerID: "rockchip", operationReference: "flash.dayu200",
@@ -389,7 +397,7 @@ final class HardwareEvidenceProjectionContractTests: XCTestCase {
     dispatchCount += 0
   }
 
-  func testClaimAcceptanceIDValidationMatchesTheV6SchemaPattern() {
+  func testClaimAcceptanceIDValidationMatchesTheCurrentSchemaPattern() {
     let malformed = HardwareEvidenceClaimMetadata(
       evidenceID: "EVD-AHE-CLAIM-NEGATIVE",
       acceptanceIDs: ["A-"])
@@ -402,32 +410,194 @@ final class HardwareEvidenceProjectionContractTests: XCTestCase {
     XCTAssertTrue(blocker.reasons.contains("claim acceptanceIds are empty, duplicated, or malformed"))
   }
 
-  func testHistoricalAndCurrentEvidenceVersionsAreDetectedWithoutMigrationOrReencoding() throws {
-    let v1 = Data("{\"schemaVersion\":\"1.0.0\"}".utf8)
-    let v2 = Data(
-      """
-      {"schemaVersion":"2.0.0","operator":"lvye","opaqueHistoricalBytes":"unchanged"}
-      """.utf8)
-    let v3 = Data("{\"schemaVersion\":\"3.0.0\"}".utf8)
-    let v4 = Data("{\"schemaVersion\":\"4.0.0\",\"opaqueHistoricalBytes\":\"unchanged\"}".utf8)
-    let historicalV5 = Data(
-      "{\"schemaVersion\":\"5.0.0\",\"opaqueHistoricalBytes\":\"unchanged\"}".utf8)
-    guard case .published(let v6Record) = HardwareEvidenceProjector.project(
-      receipt: receipt(), claims: claims())
+  private func currentRecord(
+    _ receipt: RuntimeAgentExecutionReceipt, file: StaticString = #filePath, line: UInt = #line
+  ) throws -> HardwareEvidenceRecord {
+    guard case .published(let record) = HardwareEvidenceProjector.project(
+      receipt: receipt, claims: claims())
     else {
-      return XCTFail("complete V6 fixture must publish")
+      XCTFail("complete fixture must publish", file: file, line: line)
+      throw XCTSkip("no record")
     }
-    let v6 = try JSONEncoder().encode(v6Record)
+    return record
+  }
 
-    XCTAssertEqual(HardwareEvidenceDocumentReader.version(of: v1), .legacyV1)
-    XCTAssertEqual(HardwareEvidenceDocumentReader.version(of: v2), .legacyV2)
-    XCTAssertEqual(HardwareEvidenceDocumentReader.version(of: v3), .legacyV3)
-    XCTAssertEqual(HardwareEvidenceDocumentReader.version(of: v4), .legacyV4)
-    XCTAssertEqual(HardwareEvidenceDocumentReader.version(of: historicalV5), .legacyV5)
-    XCTAssertEqual(HardwareEvidenceDocumentReader.version(of: v6), .currentV6)
-    XCTAssertEqual(v2, Data(
+  private func canonical(_ record: HardwareEvidenceRecord) throws -> Data {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+    return try encoder.encode(record)
+  }
+
+  /// The current reader accepts exactly the record the current writer
+  /// produces. Other labels are refused by version; the same label over a
+  /// different layout, an extra member, or a duplicated member is refused by
+  /// shape. Refusal never rewrites the bytes it was given.
+  func testStrictReaderAcceptsOnlyTheCurrentCompleteRecord() throws {
+    let readOnly = try canonical(try currentRecord(receipt()))
+    let recovered = try canonical(
+      try currentRecord(
+        receipt(
+          providerID: "rockchip", operationReference: "flash.dayu200",
+          effect: .destructive, authorityKind: .runtimeCapability,
+          terminalState: "recovered", recoveryEpoch: recoveryEpoch())))
+    XCTAssertEqual(try HardwareEvidenceRecord.decode(readOnly).schemaVersion, "1.0.0")
+    XCTAssertNotNil(try HardwareEvidenceRecord.decode(recovered).recovery)
+
+    // Writer labels that preceded the single v1 are not current, whatever
+    // else they carry.
+    for label in ["6.0.0", "5.0.0", "4.0.0", "3.0.0", "2.0.0", "1.0.1", "1.0"] {
+      let relabelled = Data(
+        String(decoding: readOnly, as: UTF8.self)
+          .replacingOccurrences(of: "\"schemaVersion\":\"1.0.0\"", with: "\"schemaVersion\":\"\(label)\"")
+          .utf8)
+      XCTAssertNotEqual(relabelled, readOnly, label)
+      XCTAssertThrowsError(try HardwareEvidenceRecord.decode(relabelled), label) { error in
+        XCTAssertEqual(
+          error as? HardwareEvidenceRecordError, .unsupportedSchemaVersion(label), label)
+      }
+    }
+
+    // The historical human-operator record also spelled `1.0.0`. Same label,
+    // different layout: it is not the current record and is not read as one.
+    let historicalHumanRecord = Data(
       """
-      {"schemaVersion":"2.0.0","operator":"lvye","opaqueHistoricalBytes":"unchanged"}
-      """.utf8), "the compatibility reader must not rewrite V2 bytes")
+      {"schemaVersion":"1.0.0","operator":"lvye","physicalConfirmation":"serial label",\
+      "artifacts":[{"path":"flash.log","sha256":"\(artifactDigest)"}]}
+      """.utf8)
+    XCTAssertThrowsError(try HardwareEvidenceRecord.decode(historicalHumanRecord)) { error in
+      guard case .malformed? = error as? HardwareEvidenceRecordError else {
+        return XCTFail("a same-label historical layout must be refused by shape, got \(error)")
+      }
+    }
+    XCTAssertEqual(
+      historicalHumanRecord,
+      Data(
+        """
+        {"schemaVersion":"1.0.0","operator":"lvye","physicalConfirmation":"serial label",\
+        "artifacts":[{"path":"flash.log","sha256":"\(artifactDigest)"}]}
+        """.utf8), "the reader must not rewrite refused bytes")
+
+    // A current record with one member the schema does not declare.
+    let widened = Data(
+      String(decoding: readOnly, as: UTF8.self)
+        .replacingOccurrences(of: "\"schemaVersion\":\"1.0.0\"", with: "\"schemaVersion\":\"1.0.0\",\"standingAuthorization\":\"SA-1\"")
+        .utf8)
+    XCTAssertThrowsError(try HardwareEvidenceRecord.decode(widened)) { error in
+      guard case .malformed? = error as? HardwareEvidenceRecordError else {
+        return XCTFail("an undeclared member must be refused, got \(error)")
+      }
+    }
+
+    // A duplicated member cannot be resolved by "last one wins".
+    let duplicated = Data(
+      String(decoding: readOnly, as: UTF8.self)
+        .replacingOccurrences(of: "\"schemaVersion\":\"1.0.0\"", with: "\"schemaVersion\":\"1.0.0\",\"schemaVersion\":\"1.0.0\"")
+        .utf8)
+    XCTAssertThrowsError(try HardwareEvidenceRecord.decode(duplicated)) { error in
+      guard case .malformed? = error as? HardwareEvidenceRecordError else {
+        return XCTFail("a duplicated member must be refused, got \(error)")
+      }
+    }
+
+    // Not an object at all.
+    XCTAssertThrowsError(try HardwareEvidenceRecord.decode(Data("[]".utf8)))
+    XCTAssertThrowsError(try HardwareEvidenceRecord.decode(Data("{}".utf8))) { error in
+      XCTAssertEqual(
+        error as? HardwareEvidenceRecordError, .malformed("evidence document has no schemaVersion"))
+    }
+  }
+
+  /// `openspec/contracts/hardware-evidence.schema.json` and the Swift record
+  /// describe the same single layout: the same label, every encoded member
+  /// declared by a closed schema object, every required member present in a
+  /// complete record, and every enum/const/pattern satisfied by what the
+  /// writer emits.
+  func testCurrentSchemaAndSwiftRecordDescribeTheSameLayout() throws {
+    var repository = URL(filePath: #filePath)
+    for _ in 0..<5 { repository.deleteLastPathComponent() }
+    let schemaData = try Data(
+      contentsOf: repository.appending(path: "openspec/contracts/hardware-evidence.schema.json"))
+    guard case .object(let schema) = try JSONDecoder().decode(JSONValue.self, from: schemaData) else {
+      return XCTFail("schema is not an object")
+    }
+    XCTAssertEqual(schema["$id"], .string("arkdeck://contracts/hardware-evidence/1.0.0"))
+    XCTAssertEqual(schema["title"], .string("ArkDeck real-hardware evidence record (current v1)"))
+    guard case .object(let properties)? = schema["properties"],
+      case .object(let versionProperty)? = properties["schemaVersion"]
+    else { return XCTFail("schema has no schemaVersion property") }
+    XCTAssertEqual(versionProperty["const"], .string(HardwareEvidenceRecord.schemaVersion))
+
+    let vectors: [(String, RuntimeAgentExecutionReceipt)] = [
+      ("read-only agent", receipt()),
+      ("destructive capability", receipt(effect: .destructive, authorityKind: .runtimeCapability)),
+      (
+        "distinct recovery",
+        receipt(
+          providerID: "rockchip", operationReference: "flash.dayu200",
+          effect: .destructive, authorityKind: .runtimeCapability,
+          terminalState: "recovered", recoveryEpoch: recoveryEpoch())
+      ),
+      (
+        "historical recognition",
+        receipt(
+          providerID: "rockchip", operationReference: "flash.dayu200",
+          effect: .destructive, authorityKind: .runtimeCapability,
+          recoveryEpoch: recoveryEpoch(
+            source: "historicalRecognition", recoveryJobID: "job-later-complete"))
+      ),
+      ("human", receipt(executor: .human)),
+    ]
+    for (name, vector) in vectors {
+      let record = try currentRecord(vector)
+      let encoded = try JSONDecoder().decode(JSONValue.self, from: canonical(record))
+      assertValue(encoded, matches: .object(schema), at: name)
+    }
+  }
+
+  private func assertValue(_ value: JSONValue, matches schema: JSONValue, at path: String) {
+    guard case .object(let node) = schema else {
+      return XCTFail("\(path): schema node is not an object")
+    }
+    if case .array(let allowed)? = node["enum"] {
+      XCTAssertTrue(allowed.contains(value), "\(path): \(value) is not in \(allowed)")
+    }
+    if let constant = node["const"] {
+      XCTAssertEqual(value, constant, path)
+    }
+    switch value {
+    case .object(let fields):
+      XCTAssertEqual(node["additionalProperties"], .bool(false), "\(path) must be a closed object")
+      guard case .object(let properties)? = node["properties"] else {
+        return XCTFail("\(path): schema declares no properties")
+      }
+      for key in fields.keys.sorted() where properties[key] == nil {
+        XCTFail("\(path).\(key) is written by Swift but not declared by the schema")
+      }
+      if case .array(let required)? = node["required"] {
+        for case .string(let key) in required where fields[key] == nil {
+          XCTFail("\(path).\(key) is required by the schema but absent from a complete record")
+        }
+      }
+      for (key, child) in fields.sorted(by: { $0.key < $1.key }) {
+        if let property = properties[key] {
+          assertValue(child, matches: property, at: "\(path).\(key)")
+        }
+      }
+    case .array(let items):
+      guard let itemSchema = node["items"] else {
+        return XCTFail("\(path): schema declares no items")
+      }
+      for (index, item) in items.enumerated() {
+        assertValue(item, matches: itemSchema, at: "\(path)[\(index)]")
+      }
+    case .string(let text):
+      if case .string(let pattern)? = node["pattern"] {
+        XCTAssertNotNil(
+          text.range(of: pattern, options: .regularExpression),
+          "\(path): \(text) does not match \(pattern)")
+      }
+    default:
+      break
+    }
   }
 }

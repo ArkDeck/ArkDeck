@@ -1,6 +1,6 @@
 {
   "documentType": "manual-ui-flash-candidate-program",
-  "schemaVersion": "2.0.0",
+  "schemaVersion": "1.0.0",
   "applicationActivation": "activateAndRaise",
   "activationSettleMilliseconds": 100,
   "controlTimeoutSeconds": 20,

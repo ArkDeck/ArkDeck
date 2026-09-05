@@ -2021,6 +2021,95 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       capability.exactPlanDigest, String(repeating: "b", count: 64))
   }
 
+  // MARK: - Host-managed descriptor identifiers
+
+  /// Every host-managed Rockchip descriptor carries the single current `.v1`
+  /// label; the bound reconnect and build verification no longer spell `.v2`.
+  /// The validating host derives the expected identifier from the same table
+  /// materialization uses, so a descriptor carrying the retired `.v2` label is
+  /// refused before any provider process, and the bound identity keeps its
+  /// own name rather than degrading into the retired unbound verification.
+  func testHostManagedDescriptorIdentifiersAreTheCurrentV1AndRetiredLabelsAreRefused()
+    async throws
+  {
+    let identity = String(repeating: "a", count: 64)
+    let expectation = RockchipHDCReconnectExpectation(
+      previousConnectKey: "device-1",
+      previousIdentitySHA256: SHA256.hash(data: Data("device-1".utf8))
+        .map { String(format: "%02x", $0) }.joined(),
+      usbTopology: "42")
+    let verify = RockchipProviderAction.verifyBoundBuild(
+      expectation: expectation,
+      expectedProductModel: RockchipFlashProfile.dayu200.runtimeProductModel,
+      expectedBuildVersion: RockchipFlashProfile.dayu200.runtimeBuildVersion)
+    let table: [(RockchipProviderAction, String)] = [
+      (.enterLoader(connectKey: "device-1"), "rockchip.hdc.enter-loader.v1"),
+      (.observeHDCNormalUSB(connectKey: "device-1"), "rockchip.iokit.observe-hdc-normal.v1"),
+      (.waitForHDCDisconnect(connectKey: "device-1"), "rockchip.hdc.wait-disconnect.v1"),
+      (.waitForLoader(stableIdentitySHA256: identity), "rockchip.rockusb.wait-loader.v1"),
+      (.rebindLoader(stableIdentitySHA256: identity), "rockchip.rockusb.rebind-loader.v1"),
+      (.rebootToNormal(stableIdentitySHA256: identity), "rockchip.rockusb.reboot-normal.v1"),
+      (.waitForHDCReconnect(connectKey: "device-1"), "rockchip.hdc.wait-reconnect.v1"),
+      (.waitForBoundHDCReconnect(expectation: expectation), "rockchip.hdc.wait-bound-reconnect.v1"),
+      (verify, "rockchip.hdc.verify-bound-build.v1"),
+      (
+        .capturePostFlashDiagnostics(
+          connectKey: "device-1", request: try HDCHilogCaptureRequest(durationSeconds: 5)),
+        "rockchip.hdc.capture-post-flash-hilog.v1"
+      ),
+    ]
+    for (action, expected) in table {
+      XCTAssertEqual(RockchipHostManagedActionCatalog.identifier(for: action), expected)
+      XCTAssertTrue(expected.hasSuffix(".v1"), expected)
+    }
+    XCTAssertEqual(Set(table.map(\.1)).count, table.count, "identifiers must stay distinct")
+
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let component = ResolvedExecutable(
+      path: "/product/arkforged", sha256: String(repeating: "c", count: 64))
+    let plan = try rockchipPlan(
+      action: verify, stepID: "rebind-and-verify-build", toolSHA256: component.sha256)
+    let current = hostDescriptor(plan)
+    XCTAssertEqual(current.identifier, "rockchip.hdc.verify-bound-build.v1")
+    XCTAssertEqual(
+      current.actionSHA256,
+      try RockchipHostManagedActionCatalog.actionSHA256(of: .rockchip(verify)))
+
+    let log = ActionLog()
+    let host = DurableRockchipRuntimeActionHost(
+      executor: SuccessfulActionExecutor(log: log),
+      records: RockchipRuntimeActionRecordStore(
+        rootURL: root.appending(path: "records", directoryHint: .isDirectory)))
+
+    // The retired label is refused by the identity check, before preparation
+    // records an intent and before the executor is reached.
+    let retired = HostManagedProcessDescriptor(
+      identifier: "rockchip.hdc.verify-bound-build.v2",
+      jobID: current.jobID, stepID: current.stepID, targetID: current.targetID,
+      bindingRevision: current.bindingRevision, connectKey: current.connectKey,
+      expectedIdentitySHA256: current.expectedIdentitySHA256,
+      providerExecutableSHA256: current.providerExecutableSHA256,
+      actionSHA256: current.actionSHA256)
+    do {
+      _ = try await host.execute(
+        action: verify, descriptor: retired, providerExecutable: component)
+      XCTFail("a descriptor carrying the retired .v2 label must not execute")
+    } catch let error as RuntimeDispatchFailure {
+      XCTAssertEqual(
+        error, .failed("host-managed typed action does not match its target/descriptor"))
+    }
+    let (refusedActions, _) = await log.snapshot()
+    XCTAssertTrue(refusedActions.isEmpty, "refusal must happen before the executor runs")
+
+    // The same action under its current descriptor executes exactly once.
+    let accepted = try await host.execute(
+      action: verify, descriptor: current, providerExecutable: component)
+    XCTAssertEqual(accepted.summary["semantic"], "verified")
+    let (executed, _) = await log.snapshot()
+    XCTAssertEqual(executed, [verify])
+  }
+
   func testDurableHostIsUnavailableBeforeAdmissionWhenRecordRootCannotMaterialize()
     throws
   {

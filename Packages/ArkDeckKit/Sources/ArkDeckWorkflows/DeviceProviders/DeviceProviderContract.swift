@@ -488,7 +488,8 @@ struct PersistedTypedProviderAction: Sendable, Equatable, Codable {
     ("rockchip.flashPartitions", "rockchip.verifyFlashReadback")
 
   /// The retired unbound post-flash verification. A journal written before the
-  /// bound (`.v2`) verification can still hold it; it is never written again.
+  /// bound verification can still hold it; it is never written again, and the
+  /// current bound identity cannot degrade back into it.
   static let retiredUnboundBuildVerificationKind = "rockchip.verifyBuild"
 
   let kind: String

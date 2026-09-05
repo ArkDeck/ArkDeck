@@ -260,6 +260,47 @@ final class ManualUIFlashDriverContractTests: XCTestCase {
   // source-distribution-manifest.json — left the repository along with the
   // component build pipeline it kept honest.
 
+  /// The candidate program and the debug-session record the manual driver
+  /// writes are the single current v1. The published candidate carries that
+  /// label, a copy carrying the retired `2.0.0` label is refused before any
+  /// UI action is interpreted, and the driver source pins no other label for
+  /// either document.
+  func testCandidateAndDebugSessionDocumentsAreTheCurrentV1() throws {
+    let candidateURL = repositoryRoot()
+      .appending(path: "scripts/manual_ui_flash/manual_ui_flash_candidate.json")
+    let object = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: Data(contentsOf: candidateURL)) as? [String: Any])
+    XCTAssertEqual(object["schemaVersion"] as? String, "1.0.0")
+    XCTAssertEqual(object["documentType"] as? String, "manual-ui-flash-candidate-program")
+
+    var retired = object
+    retired["schemaVersion"] = "2.0.0"
+    let retiredURL = FileManager.default.temporaryDirectory
+      .appending(path: "manual-ui-retired-\(UUID().uuidString).json")
+    try JSONSerialization.data(withJSONObject: retired, options: [.sortedKeys])
+      .write(to: retiredURL, options: .atomic)
+    defer { try? FileManager.default.removeItem(at: retiredURL) }
+    let rejected = try runCandidateValidator(retiredURL)
+    XCTAssertEqual(rejected.status, 2, rejected.stderr)
+    XCTAssertTrue(
+      rejected.stderr.contains("candidate UI program is outside the invariant bounds"),
+      rejected.stderr)
+    XCTAssertFalse(rejected.stdout.contains("CANDIDATE_VALID:"))
+
+    let source = try driverSource()
+    let labels = source.components(separatedBy: "\n")
+      .filter { $0.contains("static let schemaVersion = ") }
+      .map { $0.trimmingCharacters(in: .whitespaces) }
+    XCTAssertEqual(
+      labels, ["static let schemaVersion = \"1.0.0\"", "static let schemaVersion = \"1.0.0\""],
+      "the candidate program and the debug session must each pin exactly the current v1")
+    XCTAssertTrue(source.contains("static let documentType = \"manual-ui-flash-candidate-program\""))
+    XCTAssertTrue(source.contains("static let documentType = \"manual-ui-flash-debug-session\""))
+    XCTAssertTrue(
+      source.contains("document.schemaVersion == ManualUIDebugSessionDocument.schemaVersion"),
+      "a resumed debug session must be checked against the one current label")
+  }
+
   func testCandidateProgramCannotNameTargetArchivePlanValueOrSubmit() throws {
     let data = try Data(
       contentsOf: repositoryRoot()

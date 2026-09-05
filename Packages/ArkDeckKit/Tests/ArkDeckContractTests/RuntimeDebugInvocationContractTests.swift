@@ -461,6 +461,114 @@ final class RuntimeDebugInvocationContractTests: XCTestCase {
     XCTAssertEqual(boundedRequests.count, 16)
   }
 
+  /// The invocation document and the attempt permit are the single current v1.
+  /// A stored record with the retired `2.0.0` label, the `1.0.0` label over
+  /// the retired tuning layout, or one undeclared member is refused; nothing
+  /// migrates or relabels it, and the bytes stay as written.
+  func testInvocationDocumentAndPermitAreTheCurrentV1AndRefuseOtherLabelsOrShapes() async throws {
+    let root = temporaryRoot()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let controller = try RuntimeDebugInvocationController(
+      stateDirectory: root, driver: ScriptedDriver(outcomes: []),
+      nowUTC: { "2026-08-09T00:00:00Z" })
+    let started = try await controller.start(seedRequestData: encode(seedRequest()))
+    let documentURL = root.appending(
+      path: "runtime-debug-invocations/\(started.invocationID).json")
+    let written = try Data(contentsOf: documentURL)
+    let document = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: written) as? [String: Any])
+    XCTAssertEqual(document["schemaVersion"] as? String, "1.0.0")
+    let initialState = try await controller.status(invocationID: started.invocationID).state
+    XCTAssertEqual(initialState, "active")
+
+    func overwrite(_ data: Data) throws {
+      // In place, so the owner-private mode and single link the reader
+      // demands stay exactly as the Runtime wrote them.
+      try data.write(to: documentURL)
+    }
+    let text = String(decoding: written, as: UTF8.self)
+    // The canonical writer sorts keys, so the document's own label is the one
+    // immediately before `seedRequest`; the nested request carries its own
+    // `schemaVersion` and must stay untouched so the refusal below is the
+    // document's, not the request decoder's.
+    let documentLabel = "\"schemaVersion\":\"1.0.0\",\"seedRequest\""
+    XCTAssertEqual(text.components(separatedBy: documentLabel).count, 2, text)
+    func relabelled(_ replacement: String) -> Data {
+      Data(text.replacingOccurrences(of: documentLabel, with: replacement).utf8)
+    }
+
+    try overwrite(relabelled("\"schemaVersion\":\"2.0.0\",\"seedRequest\""))
+    do {
+      _ = try await controller.status(invocationID: started.invocationID)
+      XCTFail("a retired document label must not be read as the current invocation")
+    } catch let error as RuntimeDebugInvocationError {
+      XCTAssertEqual(error, .persistenceFailure("invalid invocation document"))
+    }
+
+    let widened = relabelled("\"schemaVersion\":\"1.0.0\",\"tuning\":{},\"seedRequest\"")
+    try overwrite(widened)
+    do {
+      _ = try await controller.status(invocationID: started.invocationID)
+      XCTFail("an undeclared member must not decode permissively")
+    } catch let error as RuntimeDebugInvocationError {
+      guard case .invocationNotFound = error else { return XCTFail("unexpected \(error)") }
+    }
+    XCTAssertEqual(
+      try Data(contentsOf: documentURL), widened, "refusal must not rewrite the stored document")
+
+    try overwrite(written)
+    let restoredState = try await controller.status(invocationID: started.invocationID).state
+    XCTAssertEqual(restoredState, "active")
+
+    // The attempt permit follows the same rule.
+    let request = try seedRequest()
+    try RuntimeDebugAttemptPermitStore.persist(
+      stateDirectory: root, invocationID: started.invocationID,
+      request: request, candidateActionSHA256: String(repeating: "a", count: 64))
+    let permitURL = root.appending(path: "runtime-debug-attempts/\(request.idempotencyKey).json")
+    let permit = try Data(contentsOf: permitURL)
+    let permitText = String(decoding: permit, as: UTF8.self)
+    XCTAssertTrue(permitText.contains("\"schemaVersion\":\"1.0.0\""))
+    XCTAssertNotNil(try RuntimeDebugAttemptPermitStore.loadExact(stateDirectory: root, request: request))
+
+    let retiredLabel = Data(permitText.replacingOccurrences(of: "\"schemaVersion\":\"1.0.0\"", with: "\"schemaVersion\":\"2.0.0\"").utf8)
+    try retiredLabel.write(to: permitURL)
+    XCTAssertThrowsError(
+      try RuntimeDebugAttemptPermitStore.loadExact(stateDirectory: root, request: request)
+    ) { error in
+      XCTAssertEqual(
+        error as? RuntimeDebugInvocationError,
+        .persistenceFailure("Runtime debug attempt provenance does not match the typed request"))
+    }
+
+    // The retired tuning record also spelled `1.0.0`; same label, other layout.
+    let retiredTuningLayout = Data(
+      """
+      {"schemaVersion":"1.0.0","invocationId":"\(started.invocationID)",\
+      "idempotencyKey":"\(request.idempotencyKey)","requestFingerprintSha256":"\(String(repeating: "b", count: 64))",\
+      "decisionSha256":"\(String(repeating: "c", count: 64))","tuning":{"retryBudget":3}}
+      """.utf8)
+    try retiredTuningLayout.write(to: permitURL)
+    XCTAssertThrowsError(
+      try RuntimeDebugAttemptPermitStore.loadExact(stateDirectory: root, request: request)
+    ) { error in
+      XCTAssertEqual(
+        error as? RuntimeDebugInvocationError,
+        .persistenceFailure("Runtime debug attempt provenance is not the current permit record"))
+    }
+    XCTAssertEqual(try Data(contentsOf: permitURL), retiredTuningLayout, "refusal must not rewrite the permit")
+
+    let widenedPermit = Data(permitText.replacingOccurrences(of: "\"schemaVersion\":\"1.0.0\"", with: "\"schemaVersion\":\"1.0.0\",\"tuning\":{}").utf8)
+    try widenedPermit.write(to: permitURL)
+    XCTAssertThrowsError(
+      try RuntimeDebugAttemptPermitStore.loadExact(stateDirectory: root, request: request)
+    ) { error in
+      XCTAssertEqual(
+        error as? RuntimeDebugInvocationError,
+        .persistenceFailure("Runtime debug attempt provenance is not the current permit record"))
+    }
+  }
+
   func testRuntimePermitPinsExactRequestWithoutCandidateTuning() throws {
     let root = temporaryRoot()
     defer { try? FileManager.default.removeItem(at: root) }

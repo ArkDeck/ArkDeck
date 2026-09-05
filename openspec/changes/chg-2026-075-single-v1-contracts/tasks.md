@@ -279,7 +279,7 @@ methods.md无未处置生产caller；所有保留方法只走一个protocol/shap
 
 ## TASK-SVC-003 — Normalize evidence, debug and internal Provider formats
 
-- Status:ready
+- Status:done
 - Platform:macos（契约供Windows/Rust复用，本Task不实现新平台）
 - Decision grade:D1
 - Requirements/AC:SVC-AC-07, SVC-AC-08; POL-SAFETY-001, POL-TARGET-001, POL-RECOVERY-001, POL-AGENT-002

@@ -4,8 +4,9 @@ public enum JobExecutionMode: String, CaseIterable, Codable, Sendable {
 }
 
 public enum JobState: String, CaseIterable, Codable, Sendable {
-  /// Version 1.0.0 remains the frozen agent-device-operation enum. Recovery
-  /// dispositions are emitted only by the versioned recovery journal writer.
+  /// The one current Job state vocabulary, labelled 1.0.0. Recovery states
+  /// are ordinary members of it; the single Journal writer emits them when the
+  /// Runtime's mechanical proof allows, not because a version enabled them.
   public static let schemaVersion = "1.0.0"
 
   case queued
