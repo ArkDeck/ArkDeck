@@ -177,6 +177,58 @@ final class RuntimeDebugInvocationContractTests: XCTestCase {
     XCTAssertEqual(reopenedStatus, completed)
   }
 
+  /// `TASK-XPA-001`: `debug.start`, `debug.evaluate` and `debug.status` answer
+  /// through the control plane so their result shapes enter the recorded
+  /// corpus. The controller-level tests own the semantics.
+  func testDebugStartEvaluateAndStatusPublishTheirResultShapesThroughTheControlPlane() async throws {
+    let root = temporaryRoot()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let driver = ScriptedDriver(outcomes: [.safeToReflash], permitStateDirectory: root)
+    let controller = try RuntimeDebugInvocationController(
+      stateDirectory: root, driver: driver, nowUTC: { "2026-08-09T00:00:00Z" })
+    let capabilities = try RuntimeCapabilityStore(directoryURL: root.appending(path: "capabilities"))
+    let engine = try RuntimeJobEngine(
+      configuration: .init(stateDirectory: root.appending(path: "engine")),
+      providers: DeviceProviderRegistry(providers: []),
+      dispatcher: RuntimeAgentExecutionContractTests.Dispatcher(),
+      capabilityStore: capabilities, nowUTC: { "2026-08-09T00:00:00Z" })
+    let handler = RuntimeControlPlaneHandler(
+      engine: engine, capabilityStore: capabilities, providerIDs: [],
+      nowUTC: { "2026-08-09T00:00:00Z" }, debugInvocationController: controller)
+    func send(_ method: String, _ params: [String: JSONValue]) async throws -> AgentWireProtocol.Response {
+      let frame = try JSONEncoder().encode(
+        AgentWireProtocol.Request(id: UUID().uuidString, method: method, params: params))
+      return await handler.handleFrame(frame)
+    }
+
+    let seed = String(decoding: try encode(seedRequest()), as: UTF8.self)
+    let started = try await send("debug.start", ["requestJson": .string(seed)])
+    XCTAssertTrue(started.ok, started.error?.message ?? "-")
+    guard case .object(let invocation)? = started.result,
+      case .string(let invocationID)? = invocation["invocationID"]
+    else { return XCTFail("debug.start must answer the invocation: \(String(describing: started.result))") }
+
+    let evaluated = try await send(
+      "debug.evaluate",
+      [
+        "invocationId": .string(invocationID),
+        "actionJson": .string(String(decoding: observeAction, as: UTF8.self)),
+        "sourceSha256": .string(String(format: "%064x", 1)),
+        "buildSha256": .string(String(format: "%064x", 101)),
+      ])
+    XCTAssertTrue(evaluated.ok, evaluated.error?.message ?? "-")
+    guard case .object(let afterObserve)? = evaluated.result else {
+      return XCTFail("debug.evaluate must answer the invocation status")
+    }
+    XCTAssertEqual(afterObserve["destructiveEpochsUsed"], .integer(0))
+
+    let status = try await send("debug.status", ["invocationId": .string(invocationID)])
+    XCTAssertTrue(status.ok, status.error?.message ?? "-")
+    XCTAssertEqual(status.result, evaluated.result, "status reads back exactly what evaluate answered")
+    let executed = await driver.requests()
+    XCTAssertEqual(executed.count, 0, "an observe candidate executes nothing")
+  }
+
   func testInvocationDiscoveryUsesAnImmutableBoundedSnapshot() async throws {
     let root = temporaryRoot()
     defer { try? FileManager.default.removeItem(at: root) }

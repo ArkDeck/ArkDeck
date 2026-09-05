@@ -40,8 +40,111 @@
       "type": "object"
     },
     "result": {
-      "description": "no successful frame was recorded, so the result shape is not published yet; a contract test that exercises the success path through the control plane publishes it",
-      "x-arkdeck-unpublished": true
+      "additionalProperties": false,
+      "properties": {
+        "allowedFileGlobs": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "availability": {
+          "type": "string"
+        },
+        "configurationStatus": {
+          "type": "string"
+        },
+        "generation": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "operations": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "availability": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "null"
+              },
+              "reasonCode": {
+                "type": "null"
+              },
+              "reference": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "availability",
+              "reason",
+              "reasonCode",
+              "reference"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "presetRefs": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "type": "string"
+              },
+              "presetRef": {
+                "type": "string"
+              },
+              "timeoutSeconds": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "kind",
+              "presetRef",
+              "timeoutSeconds"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "projectRef": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "null"
+        },
+        "reasonCode": {
+          "type": "null"
+        },
+        "registeredAtUtc": {
+          "type": "string"
+        },
+        "schemaVersion": {
+          "type": "string"
+        },
+        "updatedAtUtc": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "allowedFileGlobs",
+        "availability",
+        "configurationStatus",
+        "generation",
+        "kind",
+        "operations",
+        "presetRefs",
+        "projectRef",
+        "reason",
+        "reasonCode",
+        "registeredAtUtc",
+        "schemaVersion",
+        "updatedAtUtc"
+      ],
+      "type": "object"
     }
   },
   "$id": "https://arkdeck.dev/schemas/control/methods/workspace.project.show.json",
@@ -53,7 +156,7 @@
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
     "error": 2,
-    "request": 2,
-    "result": 0
+    "request": 3,
+    "result": 1
   }
 }

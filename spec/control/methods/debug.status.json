@@ -21,12 +21,141 @@
     },
     "request": {
       "additionalProperties": false,
-      "properties": {},
+      "properties": {
+        "invocationId": {
+          "type": "string"
+        }
+      },
       "type": "object"
     },
     "result": {
-      "description": "no successful frame was recorded, so the result shape is not published yet; a contract test that exercises the success path through the control plane publishes it",
-      "x-arkdeck-unpublished": true
+      "additionalProperties": false,
+      "properties": {
+        "baselineMaterializedPlanDigest": {
+          "type": "string"
+        },
+        "bindingRevision": {
+          "type": "integer"
+        },
+        "createdAtUTC": {
+          "type": "string"
+        },
+        "destructiveEpochsUsed": {
+          "type": "integer"
+        },
+        "evaluations": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "candidateAction": {
+                "type": "string"
+              },
+              "candidateActionSHA256": {
+                "type": "string"
+              },
+              "candidateBuildSHA256": {
+                "type": "string"
+              },
+              "candidateSourceSHA256": {
+                "type": "string"
+              },
+              "detail": {
+                "type": "string"
+              },
+              "disposition": {
+                "type": "string"
+              },
+              "evaluatedAtUTC": {
+                "type": "string"
+              },
+              "observation": {
+                "additionalProperties": false,
+                "properties": {
+                  "bindingRevision": {
+                    "type": "integer"
+                  },
+                  "dispatchDisposition": {
+                    "type": "string"
+                  },
+                  "materializedPlanDigest": {
+                    "type": "string"
+                  },
+                  "observationID": {
+                    "type": "string"
+                  },
+                  "stableIdentitySHA256": {
+                    "type": "string"
+                  },
+                  "targetID": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "bindingRevision",
+                  "dispatchDisposition",
+                  "materializedPlanDigest",
+                  "observationID",
+                  "stableIdentitySHA256",
+                  "targetID"
+                ],
+                "type": "object"
+              },
+              "ordinal": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "candidateAction",
+              "candidateActionSHA256",
+              "candidateBuildSHA256",
+              "candidateSourceSHA256",
+              "detail",
+              "disposition",
+              "evaluatedAtUTC",
+              "observation",
+              "ordinal"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "expiresAtUTC": {
+          "type": "string"
+        },
+        "invocationID": {
+          "type": "string"
+        },
+        "maximumDestructiveEpochs": {
+          "type": "integer"
+        },
+        "operationReference": {
+          "type": "string"
+        },
+        "seedRequestFingerprintSHA256": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "targetID": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "baselineMaterializedPlanDigest",
+        "bindingRevision",
+        "createdAtUTC",
+        "destructiveEpochsUsed",
+        "evaluations",
+        "expiresAtUTC",
+        "invocationID",
+        "maximumDestructiveEpochs",
+        "operationReference",
+        "seedRequestFingerprintSHA256",
+        "state",
+        "targetID"
+      ],
+      "type": "object"
     }
   },
   "$id": "https://arkdeck.dev/schemas/control/methods/debug.status.json",
@@ -38,7 +167,7 @@
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
     "error": 1,
-    "request": 1,
-    "result": 0
+    "request": 2,
+    "result": 1
   }
 }

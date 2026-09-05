@@ -874,6 +874,32 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertEqual(unavailable.first?["reasonCode"], .string("workspace_preset_unavailable"))
   }
 
+  /// `TASK-XPA-001`: a registered project's `show` answers through the control
+  /// plane so its result shape enters the recorded corpus, and it keeps the
+  /// same §7.9 promise as discovery: the host root never crosses.
+  func testARegisteredWorkspaceProjectShowsThroughTheControlPlane() async throws {
+    let (handler, _) = try makeStack(workspaceProjects: [
+      WorkspaceProjectPublication(
+        projectRef: "demo-app", kind: "primary", available: true, reasonCode: nil, reason: nil,
+        allowedFileGlobs: ["entry/src/**"],
+        presets: [.init(presetRef: "debug", kind: "build", timeoutSeconds: 900)],
+        operations: [
+          .init(reference: "workspace.build-openharmony@1", available: true, reasonCode: nil, reason: nil)
+        ])
+    ])
+    let shown = try await request(
+      handler, method: "workspace.project.show", params: ["projectRef": .string("demo-app")])
+    XCTAssertTrue(shown.ok, shown.error?.message ?? "-")
+    guard case .object(let project)? = shown.result else {
+      return XCTFail("workspace.project.show must answer the project")
+    }
+    XCTAssertEqual(project["projectRef"], .string("demo-app"))
+    let rendered = String(
+      data: try JSONEncoder().encode(shown.result ?? .null), encoding: .utf8) ?? ""
+    XCTAssertTrue(rendered.contains("debug"), "preset refs are published")
+    XCTAssertFalse(rendered.contains("private-demo-app"), "the host root never crosses the control plane")
+  }
+
   /// §7.9: an unknown reference is `workspaceReferenceNotFound`, which is not
   /// `notFound`. The two send a caller somewhere different — one to a
   /// different identity, the other to `workspace project list`.

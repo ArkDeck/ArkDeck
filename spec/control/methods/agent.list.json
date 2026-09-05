@@ -37,8 +37,167 @@
       "type": "object"
     },
     "result": {
-      "description": "no successful frame was recorded, so the result shape is not published yet; a contract test that exercises the success path through the control plane publishes it",
-      "x-arkdeck-unpublished": true
+      "additionalProperties": false,
+      "properties": {
+        "hasMore": {
+          "type": "boolean"
+        },
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "bindingRevision": {
+                "type": "null"
+              },
+              "catalogDigest": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "deadline": {
+                "type": "string"
+              },
+              "executionId": {
+                "type": "string"
+              },
+              "failureCode": {
+                "type": "null"
+              },
+              "generation": {
+                "type": "string"
+              },
+              "jobId": {
+                "type": "null"
+              },
+              "jobState": {
+                "type": "null"
+              },
+              "lastObservedAt": {
+                "type": "string"
+              },
+              "nextAction": {
+                "additionalProperties": false,
+                "properties": {
+                  "expiresAt": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string"
+                  },
+                  "owner": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "kind"
+                    ],
+                    "type": "object"
+                  },
+                  "reasonCode": {
+                    "type": "string"
+                  },
+                  "resource": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "kind"
+                    ],
+                    "type": "object"
+                  },
+                  "resumeReference": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "expiresAt",
+                  "kind",
+                  "owner",
+                  "reasonCode",
+                  "resource",
+                  "resumeReference"
+                ],
+                "type": "object"
+              },
+              "operation": {
+                "type": "string"
+              },
+              "outcomeUnknown": {
+                "type": "boolean"
+              },
+              "schemaVersion": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string"
+              },
+              "targetId": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "bindingRevision",
+              "catalogDigest",
+              "createdAt",
+              "deadline",
+              "executionId",
+              "failureCode",
+              "generation",
+              "jobId",
+              "jobState",
+              "lastObservedAt",
+              "nextAction",
+              "operation",
+              "outcomeUnknown",
+              "schemaVersion",
+              "state",
+              "targetId"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "nextCursor": {
+          "type": "null"
+        },
+        "order": {
+          "type": "string"
+        },
+        "pageKind": {
+          "type": "string"
+        },
+        "schemaVersion": {
+          "type": "string"
+        },
+        "snapshotRevision": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "hasMore",
+        "items",
+        "nextCursor",
+        "order",
+        "pageKind",
+        "schemaVersion",
+        "snapshotRevision"
+      ],
+      "type": "object"
     }
   },
   "$id": "https://arkdeck.dev/schemas/control/methods/agent.list.json",
@@ -50,7 +209,7 @@
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
     "error": 1,
-    "request": 1,
-    "result": 0
+    "request": 2,
+    "result": 1
   }
 }

@@ -1,1 +1,2 @@
-{"method":"cleanupDebt.list","ok":true,"params":{},"protocolVersion":"1.0.0","result":[]}
+{"method":"cleanupDebt.list","ok":true,"protocolVersion":"1.0.0","result":[]}
+{"method":"cleanupDebt.list","ok":true,"protocolVersion":"1.0.0","result":[{"bundleName":null,"identity":"/data/local/tmp/arkdeck-job-944da72d4fc68aaaded64cc996f43348-send-hap-owned.hap","jobId":"job-944da72d4fc68aaaded64cc996f43348","reason":"failed(\"cleanupDebt: remote cleanup failed for /data/local/tmp/arkdeck-job-944da72d4fc68aaaded64cc996f43348-send-hap-owned.hap\")","recordedAtUtc":"2026-07-29T00:00:00Z","remotePath":"/data/local/tmp/arkdeck-job-944da72d4fc68aaaded64cc996f43348-send-hap-owned.hap","retryOutcomeUnknown":false,"stepId":"cleanup-remote-staging"}]}

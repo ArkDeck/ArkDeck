@@ -43,6 +43,58 @@ final class CLIDebugProbeContractTests: XCTestCase {
     func corruptNextSnapshot() { corruptNext = true }
   }
 
+  /// A probe that answers one closed template with a bounded result, so the
+  /// success path of `debug.template.run` can be recorded without a device.
+  private actor TemplateProbe: DebugRuntimeProbing {
+    func probeDebugRuntime(targetID: String) async throws -> DebugRuntimeProbeSnapshot {
+      throw FixtureError.unexpectedTemplate
+    }
+
+    func runDebugTemplate(
+      targetID: String, template: DebugRuntimeCommandTemplate
+    ) async throws -> DebugRuntimeCommandResult {
+      DebugRuntimeCommandResult(
+        targetID: targetID, bindingRevision: 7, templateID: template.rawValue,
+        effect: "readOnly", executable: "/opt/hdc/hdc",
+        executableSHA256: String(repeating: "a", count: 64),
+        argumentDisclosure: ["shell", "uptime"],
+        loweringSHA256: String(repeating: "b", count: 64),
+        exitCode: 0, durationMilliseconds: 12,
+        stdout: "up 1 day\n", stderr: "", outputTruncated: false)
+    }
+  }
+
+  /// `TASK-XPA-001`: `debug.template.run` answers through the control plane so
+  /// its result shape enters the recorded corpus.
+  func testDebugTemplateRunPublishesItsResultShapeThroughTheControlPlane() async throws {
+    let root = URL(filePath: "/private/tmp/dbgt-\(UUID().uuidString.prefix(8).lowercased())")
+    try FileManager.default.createDirectory(
+      at: root, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+    defer { try? FileManager.default.removeItem(at: root) }
+    let capabilities = try RuntimeCapabilityStore(directoryURL: root.appending(path: "capabilities"))
+    let engine = try RuntimeJobEngine(
+      configuration: .init(stateDirectory: root.appending(path: "engine")),
+      providers: DeviceProviderRegistry(providers: []),
+      dispatcher: RuntimeAgentExecutionContractTests.Dispatcher(),
+      capabilityStore: capabilities, nowUTC: { "2026-09-01T00:00:00Z" })
+    let handler = RuntimeControlPlaneHandler(
+      engine: engine, capabilityStore: capabilities, providerIDs: [],
+      nowUTC: { "2026-09-01T00:00:00Z" }, debugRuntimeProbe: TemplateProbe())
+    let frame = try JSONEncoder().encode(
+      AgentWireProtocol.Request(
+        id: "template", method: "debug.template.run",
+        params: ["targetId": .string("target-one"), "templateId": .string("device.uptime")]))
+    let response = await handler.handleFrame(frame)
+    XCTAssertTrue(response.ok, response.error?.message ?? "-")
+    guard case .object(let result)? = response.result else {
+      return XCTFail("debug.template.run must answer the command result")
+    }
+    XCTAssertEqual(result["targetId"], .string("target-one"))
+    XCTAssertEqual(result["templateId"], .string("device.uptime"))
+    XCTAssertEqual(result["exitCode"], .integer(0))
+    XCTAssertEqual(result["arguments"], .array([.string("shell"), .string("uptime")]))
+  }
+
   func testRealCLIProcessUsesTheBoundedTargetProtocolProbe() async throws {
     let root = URL(filePath: "/private/tmp/dbgp-\(UUID().uuidString.prefix(8).lowercased())")
     try FileManager.default.createDirectory(

@@ -21,12 +21,134 @@
     },
     "request": {
       "additionalProperties": false,
-      "properties": {},
+      "properties": {
+        "capabilityId": {
+          "type": "string"
+        }
+      },
       "type": "object"
     },
     "result": {
-      "description": "no successful frame was recorded, so the result shape is not published yet; a contract test that exercises the success path through the control plane publishes it",
-      "x-arkdeck-unpublished": true
+      "additionalProperties": false,
+      "properties": {
+        "capability": {
+          "additionalProperties": false,
+          "properties": {
+            "capabilityID": {
+              "type": "string"
+            },
+            "effectCeiling": {
+              "type": "string"
+            },
+            "expiresAtUTC": {
+              "type": "string"
+            },
+            "inputConstraints": {
+              "additionalProperties": false,
+              "properties": {},
+              "type": "object"
+            },
+            "issuedAtUTC": {
+              "type": "string"
+            },
+            "issuer": {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "type": "string"
+                },
+                "reference": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "reference"
+              ],
+              "type": "object"
+            },
+            "maximumUses": {
+              "type": "integer"
+            },
+            "operationScope": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "operationID": {
+                    "type": "string"
+                  },
+                  "version": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "operationID",
+                  "version"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "revocation": {
+              "additionalProperties": false,
+              "properties": {
+                "state": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "state"
+              ],
+              "type": "object"
+            },
+            "targetScope": {
+              "additionalProperties": false,
+              "properties": {
+                "kind": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "capabilityID",
+            "effectCeiling",
+            "expiresAtUTC",
+            "inputConstraints",
+            "issuedAtUTC",
+            "issuer",
+            "maximumUses",
+            "operationScope",
+            "revocation",
+            "targetScope"
+          ],
+          "type": "object"
+        },
+        "consumptionCount": {
+          "type": "integer"
+        },
+        "lineage": {
+          "type": "array"
+        },
+        "lineageAllowsNewExecution": {
+          "type": "boolean"
+        },
+        "remainingUses": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "capability",
+        "consumptionCount",
+        "lineage",
+        "lineageAllowsNewExecution",
+        "remainingUses"
+      ],
+      "type": "object"
     }
   },
   "$id": "https://arkdeck.dev/schemas/control/methods/capability.inspect.json",
@@ -37,8 +159,8 @@
   "x-arkdeck-method": "capability.inspect",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 1,
-    "request": 1,
-    "result": 0
+    "error": 2,
+    "request": 3,
+    "result": 1
   }
 }
