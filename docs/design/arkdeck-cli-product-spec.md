@@ -582,7 +582,7 @@ Windows validator 必须运行同一 canonical vectors。
 - list 的 JSON shape 不得因是否传 cursor 而从 array 变成 object；始终返回 page envelope。
 - `job events` 是按 opaque cursor 读取的 unary page RPC；`job watch` 只负责重复读页、
   按 stable event ID 去重并渲染。旧 timeline string array 不是 event store。
-- target `job plan`、`job submit`、`job run` 默认协商 control protocol 2.x，并共享一个有界的
+- target `job plan`、`job submit`、`job run` 使用当前唯一 v1 control contract，并共享一个有界的
   client wait deadline；`--timeout` 只限制 CLI 等待，不取消或延长 Runtime Job。plan 返回闭合的
   `arkdeck.job-plan/1`，submit 返回闭合的 `arkdeck.job-acceptance/1`（含 `jobId`、
   `deduplicated`、`newDispatchCount: 0`），run 返回与 `job status` 相同的
@@ -982,7 +982,7 @@ human 模式可以在 stderr 显示可复制的 resume 示例；JSON 模式不�
   availability，不使用 host path 作为临时逃生参数。
 - workspace continuation 必须从原 Job 建立新 typed request/identity/Job，重新核对 target、
   binding、Catalog 与 read-only/effect gate。它不 replay 原 authority，不直接调用 App view model。
-- `workspace continuation inspect|submit|run --source-job <job-id>` 必须协商 control protocol 2.x，
+- `workspace continuation inspect|submit|run --source-job <job-id>` 必须验证当前唯一 v1 control contract，
   并让 health、source/target readback、submit、run 与 accepted-Job readback 共享同一个有界 deadline
   （默认 30 秒）。source 必须 terminal、outcome known、无 human wait/residue/superseding recovery，
   且 source/Runtime/CLI Catalog digest、当前 provider、device binding revision 与 stable physical identity
@@ -1059,7 +1059,7 @@ output mode 时，bootstrap 仍可按下述规则返回 machine parse error，�
   "meta": {
     "controlRequestId": "ctl-...",
     "cliVersion": "...",
-    "controlProtocolVersion": "2.0.0",
+    "controlProtocolVersion": "1.0.0",
     "runtimeCatalogDigest": "..."
   }
 }
@@ -1090,7 +1090,7 @@ output mode 时，bootstrap 仍可按下述规则返回 machine parse error，�
 
 - `schemaVersion`、`command`、`ok`、`meta.controlRequestId` 必须存在。
 - `controlRequestId` 只关联一次 CLI invocation/envelope/JSONL stream，不是 Runtime idempotency key，
-  也不等于 daemon frame `request.id`。`job watch`、negotiation 或其他复合 leaf 发出的每个 unary wire
+  也不等于 daemon frame `request.id`。`job watch`、health identity check 或其他复合 leaf 发出的每个 unary wire
   request 必须使用本次连接内唯一的 bounded child request ID，并只接受 exact matching response；
   Runtime audit 可以另带 validated parent `controlRequestId`。不得为多页读取复用一个 wire request ID，
   也不得从该 correlation ID 派生 Job/Import/execution identity。
@@ -1218,7 +1218,7 @@ protocol 的兼容规则发布。任何未来 server-push、同请求多响应 f
 | `operationFailed` | 1 | 没有可返回 stable Job result projection 的 execution/validator 明确失败；已有 terminal Job 按 §8.2 返回 `ok:true` result + exit 1 |
 | `artifactIntegrityFailed`, `recordUnreadable` | 2 | immutable/local record 完整性失败 |
 | `ioFailure` | 74 | bounded local I/O 失败 |
-| `protocolMalformed` | 70 | local control frame 违反已协商 schema/framing；不将原始 frame 写入诊断 |
+| `protocolMalformed` | 70 | local control frame 违反当前 schema/framing；不将原始 frame 写入诊断 |
 | `internalError` | 70 | 已证明没有任何不确定 resource/lifecycle/device/external mutation 或 effect 的未预期内部错误；details 不泄露 exception/path |
 | `clientInterrupted` | 130 | 客户中断；不表示 Job 已取消 |
 
@@ -1384,83 +1384,33 @@ CLI 同时存在四个独立版本：
 升级一个版本不能暗中改变另一个。破坏 command/option、machine field、exit code 或状态语义时，
 必须提高相应 major，并提供 migration/tombstone。
 
-`arkdeck --version --output json` 必须在一个 result 中分别输出 `cliProductVersion`、
-`commandRegistrySchemaVersion`、`preferredControlProtocolVersion`、
-`supportedControlProtocolExactVersions`、`resultSchemaVersion`、
-`machineContractVersion`、`pageSchemaVersion`、`eventSchemaVersion`、`nextActionSchemaVersion`、
-`errorRegistryVersion`、`canonicalJsonVersion` 与 `buildIdentity`；human 模式也必须列全，不只打印
-App/CLI build。它们是本地 client capability，不声称已连接 daemon；普通 Runtime-backed response 的
-`meta.controlProtocolVersion` 才是本次实际协商的 exact version，且必须属于上述 supported set。
-`supportedControlProtocolExactVersions` 与 bootstrap 使用同一 numeric-descending canonical list；
-`preferredControlProtocolVersion` 是其中最高 2.x exact version，且必须存在于该 list。
+`arkdeck --version --output json` 分别输出 `cliProductVersion`、
+`commandRegistrySchemaVersion`、`controlProtocolVersion`、`controlContractIdentity`、
+`resultSchemaVersion`、`machineContractVersion`、`pageSchemaVersion`、`eventSchemaVersion`、
+`nextActionSchemaVersion`、`errorRegistryVersion`、`canonicalJsonVersion` 与 `buildIdentity`。
+本地版本查询不连接 Runtime；Runtime response 的 `meta.controlProtocolVersion` 表示当前固定版本。
 
-control protocol 1.x 已发布的 method token 按字节冻结，包括 camelCase
-`flash.lanePlanPreview` 与 `cleanupDebt.list`/`cleanupDebt.continue`。CLI 继续使用
-kebab-case `flash lane-preview`/`recovery cleanup ...` 做 registry mapping；Windows handler 不得自行
-“统一” wire 拼写。更改 token 或同一 token 的语义必须提高 control protocol major。
+CHG-075 将发布前自有控制格式统一为唯一严格 `1.0.0`。单一
+`Packages/ArkDeckKit/Contracts/control-protocol.json` 固定 method 集、版本和帧限制；
+canonical registry SHA-256 形成 `contractIdentity`。不存在协议选择、major 交集、
+`protocol.negotiate`、`--require-protocol`、旧 handler 或 fallback。
 
-本规格的盘点基线仍是当前 `1.0.0`，但完整 target Runtime surface 的最低协议代际是协商后的
-control protocol `2.x`。本文不追溯重定义 1.x：1.x request/response/effect shape 必须保持原样，
-2.x 才能在相同 token 下发布下表的破坏性目标语义。exact released minor/patch 由单一 generated
-control registry 声明；示例中的 `2.0.0` 仅表示该 major 的初始 contract。新 method token 和仍保持
-旧字段/语义的 optional field 可以 additive 发布，但不能借“JSON 可忽略未知字段”替换 required
-field、array/object shape、ordering、idempotency 或 effect。
+每个 request 带准确 `protocolVersion`、`contractIdentity`、`id`、`method` 及可选 object
+`params`。CLI、App/XPC 和 Executor 在同一实际连接先验证 current health，再发送业务请求；
+重连必须重新验证。health 的闭合字段为 `status`、`protocolVersion`、`contractIdentity`、
+`publishedMethods`、`catalogDigest` 和 `providers`。只自报旧 `1.0.0` 不能通过当前身份校验。
+身份检查只辨识格式，不授予 capability 或设备 authority。
 
-| 现有 1.x wire surface | target 2.x 语义 | 兼容决定 |
-|---|---|---|
-| `device.candidates` 返回无 snapshot generation/observation ID 的 array | lifecycle observation + exact generation 的 snapshot/page projection | 破坏 response/identity；只在 2.x 发布 |
-| `target.adopt` 可省 candidate，并返回 `needsSelection`/`waitingForHuman` | 必填 candidate + observation ID/generation 的 reobserve/CAS；standalone 不创建 HAR | 破坏 request/effect/result；只在 2.x 发布 |
-| `job.list`/`job.list-page` 的 array/object、隐式 rowid tie-break | 固定 page schema、snapshot revision、完整 total order/cursor | 破坏 page/order；只在 2.x 发布 |
-| `job.status` 的 legacy snapshot | versioned compact status + closed `nextAction` union | 若不能纯 additive 保留全部 1.x 语义，则只在 2.x 发布；target coverage 以 2.x fixture 为准 |
-| `artifact.read` 只接受 Job owner、clamp `maxBytes`、缺 digest | tagged Job/Import owner、strict bounds、digest-bound range | 破坏 validation/request/result；只在 2.x 发布 |
-| kind-specific `artifact.import*.begin/append/commit/abort` transient upload | caller-stable request identity、durable Import owner、atomic resumable append 与 list/inspect/release | 旧 token/shape 留在 1.x compatibility；2.x target contract 使用 generated durable-import method set |
-| legacy `artifact.list/inspect/export` Job-only projection | tagged Job/Import owner 与 fixed page/privacy contract | 不能由 1.x 忠实合成的部分只在 2.x 发布 |
-| 无 `job.events`、AgentExecution/HAR/control-action/import discovery method | 本规格新增的 unary/resource methods | additive method 本身不要求 major；随 target 2.x registry 一起 pin，不得改成 server-push |
+保留 method token 的准确拼写，包括 `flash.lanePlanPreview`、`cleanupDebt.list/continue`。
+Device 使用 `device.observations` 与 exact observation adoption；Job 使用固定 page/status/
+detail/result；Artifact 使用 tagged Job/Import owner、strict bounds 和 digest；四组专用
+upload 统一为 durable `artifact.import.*`；HDC 使用 live `runtime.hdc.status`。
+这些同名资源在 CLI/App 所有显示模式下只有当前一种形态。
 
-精确版本选择使用独立于 1.x/2.x domain schema 的 bootstrap unary method，不能解析 human error
-message 或在各平台自选策略：
-
-- target 2.x daemon 必须在 normal protocol decode/dispatch 前识别 version-neutral
-  `protocol.negotiate`。request 是单个 LF-delimited JSON object，只允许
-  `bootstrapVersion: "arkdeck.control.negotiation/1"`、本连接唯一的 `id`、
-  `method: "protocol.negotiate"`、非空 `supportedExactVersions` 和 `requiredMajor`；不得含
-  domain `protocolVersion`、command request、credentials 或 idempotency key。request/response 各自
-  最多 65,536 bytes，并沿用 duplicate-key、Unicode scalar 与 UTF-8/LF strict decode；
-- exact version 只接受无 leading-zero/prerelease/build metadata 的 ASCII SemVer `major.minor.patch`。
-  两端列表必须 unique，并按 numeric `(major, minor, patch)` descending canonical order；daemon 在
-  双方列表且 major 等于 `requiredMajor` 的交集中选择最高 exact version。success response 只允许同一
-  `bootstrapVersion`/`id`、`ok: true`、`selectedExactVersion` 和完整
-  `daemonSupportedExactVersions`；无交集时返回 `ok: false`、
-  `error: {"code":"protocolVersionUnsupported"}` 与同一 daemon list，且不得含 selected。client
-  必须验证 selected 确在交集中；
-- negotiation 永远是 bounded read-only，必须在 method lookup/admission/resource mutation/dispatch 前
-  完成，失败有 `newDispatchCount: 0`。每个后续 domain request 仍携 selected exact
-  `protocolVersion`，daemon 在任何 effect 前 exact compare；selection 不是 authority 或 mutation
-  idempotency；
-- canonical target leaf 固定 `requiredMajor: 2`；显式 legacy compatibility leaf 固定
-  `requiredMajor: 1`。无共同版本时绝不尝试另一 major。只有连接到尚不认识 bootstrap frame 的当前
-  1.x daemon 时，legacy leaf 才可在 version-neutral negotiation 无 effect 地失败后发送一次 generated
-  compatibility registry 唯一允许的 direct `1.0.0` request；target leaf 此时直接
-  `protocolVersionUnsupported`、dispatch 0，不 probe 1.x domain method；
-- 2.x daemon 在当前 CLI product 仍发布 legacy leaf 的期间，必须同时保留冻结的 1.0.0 handler table
-  与 target 2.x table；何时移除 1.x 由 CLI/control compatibility lifecycle 同车提高 major，不能由
-  platform 单独决定。除上述 pre-bootstrap 1.0.0 例外外，任何新 supported exact version 都必须实现
-  negotiation，不能靠顺序试发多个 domain request；
-- selected version 可按 endpoint identity + daemon build identity 缓存在一次 CLI invocation 内；每个
-  request 仍由 daemon 重验。收到结构化 version mismatch 且证明 request 在 effect 前以
-  `newDispatchCount: 0` 拒绝时，client 才可在同一 required major 重新协商；mutation request 已发送而
-  phase/effect 不明时遵守 §8.4，返回 `outcomeUnknown`，不得以 renegotiation 自动 replay。
-
-`protocol.negotiate` 在 coverage 中分类为 `internal`，没有 public CLI leaf；`--version` 只投影 client
-列表，不能触发连接。bootstrap registry/schema/vector 与 domain control registry 必须同车生成并由
-macOS/Windows 共用。
-
-2.x CLI 必须在任何 mutation 或 target machine output 前完成 protocol negotiation。daemon 只支持
-1.x 时，target leaf 返回 `protocolVersionUnsupported`/exit 69/dispatch 0；不得静默降级到 1.x 的
-auto-adopt、clamp、array shape 或 transient import。显式 legacy compatibility leaf 可以调用 1.x，
-但其 machine lifecycle 必须标记 `legacy`，coverage 不能记为 target `implemented`。macOS 与 Windows
-必须运行同一 1.x-preservation、1.x↔2.x negotiation 和 2.x target fixture；client/daemon version
-都只能从 generated shared contract 读取，禁止硬编码第二真相源。
+daemon 在 dispatch 前拒绝缺身份、其他版本、重复 key、非法帧和未知 method。身份检查失败
+可报告零业务派发；业务 mutation 已发送后发生传输不确定时，按 §8.4 返回 unknown outcome，
+不能通过重连或重验身份重放。一个 unary request 只有一个 LF-terminated response，
+request/response 上限分别为 4 MiB/8 MiB。
 
 同理，新增必填 option、改变 argv 语义或 legacy command 的 effect 必须进入下一 CLI product/command
 registry major；不能因 control protocol 已升 major 就在当前 CLI major 静默改 argv。下表所称“当前
@@ -2110,17 +2060,13 @@ fraction/compound、RFC 8785 string/number/order/rejection 和 NFC/NFD distinct 
 
 ### CLI-REQ-025：Control protocol 保真
 
-control protocol 1.x 必须保持已发布 method token、request/response/effect shape 与“每个 request 恰好
-一个 response”语义。本规格对 existing token 的破坏性 target shape/effect 只在协商后的 2.x 发布；
-CLI 可在 unary event page 之上实现 watch，但不得把新增 method 当成在 1.x 改写旧 method，或在任一
-major 暗中改为 server-push/multi-frame。exact version 必须经 §12 version-neutral bootstrap 按
-required major 的 highest-common 规则选择；target/legacy 不得互相 fallback。
+control protocol 固定唯一严格 `1.0.0` 与当前 registry identity，保留每个 unary request
+恰好一个 response。CLI 可在 event page 之上实现 watch，不引入 server-push 或 multi-frame。
 
-**Acceptance：** macOS/Windows 对 `flash.lanePlanPreview`、`cleanupDebt.list/continue` 的字节级
-method fixture 一致；1.x legacy shape/effect 保持不变；2.x client 与 1.x daemon 的 target leaf 在
-dispatch 前稳定拒绝；bootstrap malformed/no-common/cross-major/old-1.0.0 matrix 与 2.x negotiated
-fixture 对 §12 breaking matrix 完全一致。wire rename、同 token
-破坏性变化或同一 request 的第二响应 frame 在未升 major 时 conformance fail closed。
+**Acceptance：** macOS/Windows 使用相同 method token、current shape 与 registry identity。
+旧同名 v1 health、1.7.3、2.0.0、缺失/漂移 identity、重复 key、超限和错 response ID 被拒绝；
+每个新连接在业务 dispatch 前重验，未知 mutation 结果不 replay。所有生产 caller 使用
+同一 current shape，输出模式不选择协议；fixture 不能代表真机验收。
 
 ## 18. 设计完成定义
 

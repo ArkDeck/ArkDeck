@@ -110,10 +110,10 @@ final class ArtifactResourcesContractTests: XCTestCase {
   private func owner(_ kind: String, _ id: String) throws -> ArtifactOwnerReference {
     try .init(.object(["kind": .string(kind), "id": .string(id)]))
   }
-  private func seedJob(_ id: String = "job-fixture") throws -> ArtifactOwnerReference {
+  private func seedJob(_ id: String = "job-fixture", operation: String = "observe.device") throws -> ArtifactOwnerReference {
     let request = try RuntimeOperationRequest(requestID: "req-" + id, idempotencyKey: "idem-" + id,
-      target: .init(targetID: "TGT-fixture", expectedBindingRevision: 1), operation: .init(id: "observe.device", version: 1), inputs: [:])
-    var record = RuntimeJobRecord(jobID: id, request: request, operationReference: "observe.device@1",
+      target: .init(targetID: "TGT-fixture", expectedBindingRevision: 1), operation: .init(id: operation, version: 1), inputs: [:])
+    var record = RuntimeJobRecord(jobID: id, request: request, operationReference: operation + "@1",
       catalogDigest: RuntimeOperationCatalog.catalogDigest, providerID: "hdc", createdAtUTC: now, actualEffect: "readOnly",
       admissionEvidence: nil, materializedPlanDigest: String(repeating: "a", count: 64),
       materializedStableTargetIdentitySHA256: nil, materializedBindingRevision: 1)
@@ -191,8 +191,8 @@ final class ArtifactResourcesContractTests: XCTestCase {
     XCTAssertNotEqual(response.0, 0)
     return try text(object(XCTUnwrap(object(CLIStrictJSON.decode(response.1))["error"]))["code"])
   }
-  private func wire(_ method: String, _ fields: [String: JSONValue], version: String = "2.0.0") async throws -> (AgentWireProtocol.Response, Data) {
-    let request: JSONValue = .object(["protocolVersion": .string(version), "id": .string("fixture"), "method": .string(method), "params": .object(fields)])
+  private func wire(_ method: String, _ fields: [String: JSONValue], version: String = ArkDeckControlProtocol.currentVersion) async throws -> (AgentWireProtocol.Response, Data) {
+    let request: JSONValue = .object(["protocolVersion": .string(version), "contractIdentity": .string(ArkDeckControlProtocol.contractIdentity), "id": .string("fixture"), "method": .string(method), "params": .object(fields)])
     let reply = try await handler.handleLine(CanonicalJSONEncoders.canonical().encode(request))
     return (try JSONDecoder().decode(AgentWireProtocol.Response.self, from: reply), reply)
   }
@@ -352,15 +352,48 @@ final class ArtifactResourcesContractTests: XCTestCase {
       try code(cli(["ui-dump", "inspect", "--job", corrupted.id])),
       "artifactIntegrityFailed")
   }
+  func testDeviceProductionReaderAndCLIReadTheSameDaemonScreenshot() async throws {
+    let job = try seedJob("job-device-screen", operation: "capture.diagnostics")
+    // More than one App range: the production reader must retain its owner,
+    // digest and offset across chunks. This is a host fixture, not device evidence.
+    let bytes = png(width: 1280, height: 2832) + Data(repeating: 0x7f, count: 1_100_000)
+    let product = try await publish(job, name: "screenshot.png", mediaType: "image/png",
+      bytes: bytes, sourceOperation: "capture.diagnostics@1")
+    let client = AgentClient(socketPath: try XCTUnwrap(server).socketURL.path)
+    let provider = DeviceProductionProvider { method, params in
+      try CanonicalJSONEncoders.canonical().encode(JSONValue.object([
+        "id": .string("device-app"), "ok": .bool(true),
+        "result": client.request(method: method, params: params),
+      ]))
+    }
+    guard case .captured(let frame) = await provider.loadHistoricalScreen(
+      jobID: job.id, targetID: "TGT-fixture") else {
+      return XCTFail("the production Device reader could not read the daemon screenshot")
+    }
+    XCTAssertEqual(frame.imageData, bytes)
+    XCTAssertEqual(frame.width, 1280)
+    XCTAssertEqual(frame.height, 2832)
+    let cliRange = try ArtifactReadProjection(result(cli([
+      "artifact", "read", "--job", job.id, "--artifact", product.artifactID,
+      "--max-bytes", "4194304", "--allow-sensitive",
+    ])))
+    XCTAssertEqual(cliRange.bytes, frame.imageData)
+    guard case .failed = await provider.loadHistoricalScreen(
+      jobID: job.id, targetID: "TGT-foreign") else {
+      return XCTFail("a foreign target must not supply the Device frame")
+    }
+    XCTAssertEqual(dispatcher.dispatchCount, 0)
+  }
+
   func testCLIJobAndImportOwnersAreDistinctAndReleasedInputRemainsReadable() async throws {
     let job = try seedJob(); let product = try await publish(job)
-    let metadata = try ArtifactResourceProjection(result(cli(["artifact", "inspect", "--job", job.id, "--artifact", product.artifactID, "--require-protocol", "2"])))
+    let metadata = try ArtifactResourceProjection(result(cli(["artifact", "inspect", "--job", job.id, "--artifact", product.artifactID])))
     XCTAssertEqual(metadata.owner, job)
     let bytes = Data([0x50,0x4b,3,4]) + Data("imported-input".utf8)
     let (input, id) = try await imported(bytes: bytes)
     let listed = try result(cli(["artifact", "list", "--import", input.id]))
     try ArtifactResourceProjection.validatePage(listed, owner: input, pageSize: 100)
-    let invalid = try cli(["artifact", "inspect", "--job", input.id, "--artifact", id, "--require-protocol", "2"])
+    let invalid = try cli(["artifact", "inspect", "--job", input.id, "--artifact", id])
     XCTAssertEqual(try code(invalid), "invalidInput")
     _ = try await engine.releaseImport(id: input.id, generation: 2)
     let read = try ArtifactReadProjection(result(cli(["artifact", "read", "--import", input.id, "--artifact", id])))
@@ -397,7 +430,7 @@ final class ArtifactResourcesContractTests: XCTestCase {
   func testSensitiveReadAndOverwriteBothNeedTheirOwnExplicitPermission() async throws {
     let job = try seedJob(); let bytes = Data("private fixture content".utf8)
     let product = try await publish(job, bytes: bytes, privacy: .sensitive)
-    let selector = ["--job",job.id,"--artifact",product.artifactID,"--require-protocol","2"]
+    let selector = ["--job",job.id,"--artifact",product.artifactID]
     XCTAssertEqual(try code(cli(["artifact","read"] + selector)), "sensitiveAccessDenied")
     let range = try ArtifactReadProjection(result(cli(["artifact","read"] + selector + ["--allow-sensitive"])))
     XCTAssertEqual(range.bytes, bytes)
@@ -479,11 +512,10 @@ final class ArtifactResourcesContractTests: XCTestCase {
     XCTAssertEqual(try ArtifactResourceProjection(metadata).digest, SHA256Hex.string(of: bytes))
   }
 
-  func testSourceMutationFailsClosedAndLegacyWireKeepsItsOriginalShape() async throws {
+  func testSourceMutationAndRetiredJobOnlyWireFailClosed() async throws {
     let job = try seedJob(); let bytes = Data("immutable".utf8); let product = try await publish(job, bytes: bytes)
-    let legacy = try await wire("artifact.list", ["jobId": .string(job.id)], version: "1.0.0")
-    guard case .array(let old)? = legacy.0.result else { return XCTFail("legacy inventory shape changed") }
-    XCTAssertEqual(old.count, 1); XCTAssertEqual(try object(old[0])["jobId"], .string(job.id))
+    let retired = try await wire("artifact.list", ["owner": job.value], version: "2.0.0")
+    XCTAssertEqual(retired.0.error?.code, "unsupportedProtocolVersion")
     let invalid = try await wire("artifact.list", ["jobId": .string(job.id)])
     XCTAssertEqual(invalid.0.error?.code, "invalidInput")
     let both = try cli(["artifact", "list", "--job", job.id, "--import", "imp-00000000-0000-0000-0000-000000000000"])
@@ -510,8 +542,7 @@ final class ArtifactResourcesContractTests: XCTestCase {
       nowUTC: { "2026-09-01T00:00:00Z" })
     _ = try server?.start()
     let directory = try exportDirectory()
-    let command = ["artifact", "export", "--job", job.id, "--artifact", product.artifactID,
-      "--require-protocol", "2", "--destination", directory.path]
+    let command = ["artifact", "export", "--job", job.id, "--artifact", product.artifactID, "--destination", directory.path]
     XCTAssertEqual(try code(cli(command)), "outcomeUnknown")
     XCTAssertEqual(try Data(contentsOf: directory.appending(path: product.artifactID + "-" + product.name)), bytes)
     XCTAssertEqual(try code(cli(command)), "resourceConflict", "a retry still requires explicit overwrite")

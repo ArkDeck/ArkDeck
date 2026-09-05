@@ -482,7 +482,7 @@ final class RuntimeJobEngineContractTests: XCTestCase {
       """
       {
         "documentType": "runtime-operation-request",
-        "schemaVersion": "2.0.0",
+        "schemaVersion": "1.0.0",
         "requestId": "\(requestID)",
         "idempotencyKey": "\(idempotencyKey)",
         "target": { "targetId": "TGT-DAYU200-01", "expectedBindingRevision": 7 },
@@ -525,7 +525,7 @@ final class RuntimeJobEngineContractTests: XCTestCase {
       """
       {
         "documentType": "runtime-operation-request",
-        "schemaVersion": "2.0.0",
+        "schemaVersion": "1.0.0",
         "requestId": "\(requestID)",
         "idempotencyKey": "\(idempotencyKey)",
         "target": {
@@ -1293,7 +1293,7 @@ final class RuntimeJobEngineContractTests: XCTestCase {
       """
       {
         "documentType": "runtime-operation-request",
-        "schemaVersion": "2.0.0",
+        "schemaVersion": "1.0.0",
         "requestId": "req-hap",
         "idempotencyKey": "idem-hap-0001",
         "target": {
@@ -1471,7 +1471,7 @@ final class RuntimeJobEngineContractTests: XCTestCase {
           """
           {
             "documentType": "runtime-operation-request",
-            "schemaVersion": "2.0.0",
+            "schemaVersion": "1.0.0",
             "requestId": "req-plan-effect",
             "idempotencyKey": "idem-plan-effect-01",
             "target": { "targetId": "TGT-DAYU200-01", "expectedBindingRevision": 7 },
@@ -1515,7 +1515,7 @@ final class RuntimeJobEngineContractTests: XCTestCase {
       """
       {
         "documentType": "runtime-operation-request",
-        "schemaVersion": "2.0.0",
+        "schemaVersion": "1.0.0",
         "requestId": "req-bad",
         "idempotencyKey": "idem-bad-0001",
         "target": { "targetId": "TGT-1" },

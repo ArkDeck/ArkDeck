@@ -179,7 +179,7 @@ private actor HDCProductionApplicationDiagnostics: HDCApplicationDiagnosticsProv
     // Only the managed-server status is asked for here. Whether a device is
     // authorized is the App's shared observation, and re-probing HDC for it
     // bought a second answer to a question already being asked once.
-    let status = await DeviceListXPCReadTransport.request(method: "runtime.hdc-status")
+    let status = await DeviceListXPCReadTransport.request(method: "runtime.hdc.status")
     return HDCRuntimeDiagnosticsResponseDecoding.overlay(
       presentation: presentation,
       statusResponse: status,
@@ -351,19 +351,19 @@ enum HDCRuntimeDiagnosticsResponseDecoding {
   ) -> HDCDiagnosticsPresentation {
     guard case .success(let statusData) = statusResponse,
       let status = resultObject(statusData),
-      status["availability"] as? String == "ready",
-      status["source"] as? String == "runtimeManaged",
-      status["serverHealth"] as? String == HDCServerHealth.healthy.rawValue,
-      status["ownership"] as? String == HDCServerOwnership.arkDeckManaged.rawValue,
-      let executableSHA256 = status["toolSha256"] as? String,
+      status["schemaVersion"] as? String == "arkdeck.runtime-hdc-status/1",
+      status["availability"] as? String == "available",
+      let ownershipText = status["ownership"] as? String,
+      let ownership = HDCServerOwnership(rawValue: ownershipText),
+      let executableSHA256 = status["executableSHA256"] as? String,
       isSHA256(executableSHA256),
-      let clientVersion = nonempty(status["clientVersion"] as? String),
-      let serverVersion = nonempty(status["serverVersion"] as? String),
-      clientVersion == serverVersion,
       let endpoint = loopbackEndpoint(status["endpoint"] as? String),
       let endpointSourceRaw = status["endpointSource"] as? String,
       let endpointSource = HDCServerEndpointSource(rawValue: endpointSourceRaw),
-      let protocolVersion = nonempty(status["protocolVersion"] as? String)
+      let generation = status["generation"] as? String,
+      let parsedGeneration = UInt64(generation), parsedGeneration > 0, String(parsedGeneration) == generation,
+      let healthText = status["serverHealth"] as? String,
+      let health = HDCServerHealth(rawValue: healthText)
     else { return presentation }
 
     return HDCDiagnosticsPresentation(
@@ -371,13 +371,13 @@ enum HDCRuntimeDiagnosticsResponseDecoding {
       source: sourceLabel,
       hash: executableSHA256,
       platformTrust: "descriptor-bound SHA-256 verified by Runtime",
-      clientVersion: clientVersion,
-      serverVersion: serverVersion,
-      daemonVersion: "Runtime protocol \(protocolVersion)",
+      clientVersion: nonempty(status["clientVersion"] as? String) ?? "not currently observed",
+      serverVersion: nonempty(status["serverVersion"] as? String) ?? "not currently observed",
+      daemonVersion: nonempty(status["daemonVersion"] as? String) ?? "Runtime protocol \(ArkDeckControlProtocol.currentVersion)",
       endpoint: endpoint,
-      serverHealth: .healthy,
-      generation: "Runtime-owned process lifetime",
-      ownership: .arkDeckManaged,
+      serverHealth: health,
+      generation: generation,
+      ownership: ownership,
       authorization: authorization(from: deviceObservation),
       channelProtection: .unverifiedAssumeUnprotected,
       tcpUnprotectedWarning: nil,

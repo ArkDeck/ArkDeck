@@ -1,7 +1,7 @@
 # Bounded Debug Runtime probe
 
 `arkdeck debug probe --target <target-id>` exposes the Runtime-owned Debug
-portrait already used by the App. The CLI negotiates control protocol v2 and
+portrait already used by the App. The CLI verifies the current v1 control identity and
 sends exactly one `debug.probe` request containing only the durable target ID.
 It accepts no executable, argv, shell, raw HDC command, connect key, remote
 path, capability, or caller-provided observation.
@@ -20,7 +20,6 @@ or device mutation. A successful result means only that the bounded live probe
 completed. It is not a real-device acceptance record, and warnings remain
 explicit rather than being converted into invented empty facts.
 
-The target protocol rejects extra request fields and bounds the target identity
-before invoking the probe owner. Legacy protocol behavior remains available to
-existing App clients; the new CLI leaf always requires protocol v2 and never
-downgrades silently.
+The current control contract rejects extra request fields and bounds the target
+identity before invoking the probe owner. App and CLI use the same bounded
+projection after verifying the connected Runtime contract identity.

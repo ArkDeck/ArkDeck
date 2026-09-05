@@ -279,7 +279,7 @@ private actor ProductionSettingsApplicationProvider: SettingsApplicationProvidin
     runtimeRequest: @escaping RuntimeRequest = { method, params in
       await RuntimeXPCRequestTransport.request(
         method: method, params: params,
-        protocolVersion: ArkDeckControlProtocol.targetVersion)
+        protocolVersion: ArkDeckControlProtocol.currentVersion)
     },
     migratesLegacyPreferences: Bool = true,
     bundle: Bundle = .main

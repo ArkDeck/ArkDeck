@@ -166,7 +166,7 @@ package final class RuntimeHDCControlActionStore: @unchecked Sendable {
       let bytes = try read(name)
       total += bytes.count
       guard total <= maximumStoreBytes else { throw Self.unreadable("control-action store exceeds its byte bound") }
-      let fields = try ControlProtocolNegotiation.decodeObject(bytes, maximumBytes: maximumRecordBytes)
+      let fields = try ControlFrameJSON.decodeObject(bytes, maximumBytes: maximumRecordBytes)
       let record = try HDCControlActionRecord(value: fields)
       guard name == filename(record.intent.actionRequestID), identities.insert(record.actionID).inserted else { throw Self.unreadable("control-action record name or identity is inconsistent") }
       records.append(record)

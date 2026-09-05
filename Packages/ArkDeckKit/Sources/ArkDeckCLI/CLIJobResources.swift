@@ -4,10 +4,7 @@ import Foundation
 
 extension RuntimeCLI {
   static func usesJobReadResource(_ verb: String, rest: [String]) -> Bool {
-    if ["show", "timeline"].contains(verb) { return true }
-    guard ["list", "status", "evidence", "result"].contains(verb) else { return false }
-    return rest.contains { ["--require-protocol", "--timeout", "--state", "--operation", "--target", "--thread",
-      "createdAtDescJobIdAsc", "createdAtAscJobIdAsc"].contains($0) }
+    ["show", "timeline", "list", "status", "evidence", "result"].contains(verb)
   }
 
   static func emitJobReadResource(_ verb: String, rest: [String], session original: CLIRuntimeSession) throws {
@@ -38,7 +35,7 @@ extension RuntimeCLI {
     }
     session.client = session.client.bounded(by: try AgentClientWaitDeadline(milliseconds: duration.milliseconds))
     do {
-      try session.negotiate(requiredMajor: 2, forMethod: method)
+
       let result = try session.request(method, fields)
       let exit = try CLIJobReadValidation.validate(result, verb: verb,
         jobID: CLIJobEventPage.string(fields["jobId"]), options: fields, session: session)
@@ -210,7 +207,7 @@ enum CLIJobReadValidation {
     guard case .object(let fields) = value, fields["schemaVersion"] == .string("arkdeck.job-evidence/1"),
       Set(fields.keys) == ["schemaVersion", "jobId", "operationReference", "catalogDigest", "targetId", "bindingRevision", "providerId",
         "actualEffect", "authority", "observation", "actualStepKinds", "executionMode", "terminalState", "outcomeUnknown", "startedAtUtc",
-        "firstEvidenceStepAtUtc", "finishedAtUtc", "recoveryEpoch", "artifacts", "blockers", "status", "inventoryAvailable", "missingRequiredArtifacts"],
+        "firstEvidenceStepAtUtc", "finishedAtUtc", "recoveryEpoch", "parameters", "traceProbeBefore", "traceProbeAfter", "artifacts", "blockers", "status", "inventoryAvailable", "missingRequiredArtifacts"],
       jobID == nil || fields["jobId"] == .string(jobID!),
       let digest = CLIJobEventPage.string(fields["catalogDigest"]), SHA256Hex.isLowercaseSHA256(digest),
       let status = CLIJobEventPage.string(fields["status"]),

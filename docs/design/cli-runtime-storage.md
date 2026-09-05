@@ -2,7 +2,7 @@
 
 Task: TASK-AIN-021
 
-`arkdeck runtime storage status|policy|root` is the protocol-2 surface for one
+`arkdeck runtime storage status|policy|root` is the current v1 surface for one
 daemon-owned Session storage resource. `status` reports the Session output domain
 and immutable Runtime Artifact domain as separate typed objects. Their roots,
 quotas, usage, and retention policies are never added together; the Artifact

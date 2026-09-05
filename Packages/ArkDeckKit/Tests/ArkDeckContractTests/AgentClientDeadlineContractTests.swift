@@ -85,6 +85,16 @@ final class AgentClientDeadlineContractTests: XCTestCase {
     }
   }
 
+  func testDirectHealthRetainsItsBoundWithoutAnExplicitWaitDeadline() throws {
+    try withPeer(reply: { _, connection, _ in Self.awaitClientClose(connection) }) { client in
+      let started = ContinuousClock.now
+      XCTAssertThrowsError(try client.request(method: "health", timeoutSeconds: 1)) {
+        XCTAssertEqual($0 as? AgentClientError, .deadlineExceeded)
+      }
+      XCTAssertLessThan(started.duration(to: .now), .seconds(2))
+    }
+  }
+
   func testInterruptClosesAStalledUnaryReadWithoutWaitingForItsDeadline() throws {
     let cancellation = AgentClientWaitCancellation()
     try withPeer(reply: { _, connection, _ in
@@ -120,36 +130,36 @@ final class AgentClientDeadlineContractTests: XCTestCase {
     }
   }
 
-  func testNegotiationAndDomainRequestConsumeTheSameDeadline() throws {
-    try withPeer(
-      connections: 2,
-      reply: { index, connection, request in
-        if index == 0 {
-          Thread.sleep(forTimeInterval: 0.3)
-          guard
-            var response = ControlProtocolNegotiation.responseIfBootstrap(Data(request.dropLast()))
-          else {
-            return XCTFail("first request must be neutral negotiation")
-          }
-          response.append(0x0A)
-          _ = response.withUnsafeBytes { write(connection, $0.baseAddress!, $0.count) }
-        } else {
-          Self.awaitClientClose(connection)
-        }
+  func testHealthAndBusinessRequestShareTheConnectionAndTotalDeadline() throws {
+    try withPeer(reply: { _, connection, request in
+      Thread.sleep(forTimeInterval: 0.3)
+      guard let fields = try? ControlProtocolContract.requestFields(Data(request.dropLast())),
+        let id = fields["id"] else { return XCTFail("first request must be current health") }
+      XCTAssertEqual(fields["method"], .string("health"))
+      let response = JSONValue.object(["id": id, "ok": .bool(true), "result": .object([
+        "status": .string("ok"), "protocolVersion": .string(ArkDeckControlProtocol.currentVersion),
+        "contractIdentity": .string(ArkDeckControlProtocol.contractIdentity),
+        "publishedMethods": .array(ArkDeckControlProtocol.methods.sorted().map(JSONValue.string)),
+        "catalogDigest": .string(String(repeating: "a", count: 64)), "providers": .array([]),
+      ])])
+      var bytes = try! CanonicalJSONEncoders.canonical().encode(response); bytes.append(0x0A)
+      _ = bytes.withUnsafeBytes { write(connection, $0.baseAddress!, $0.count) }
+      var business = Data()
+      var byte: UInt8 = 0
+      while read(connection, &byte, 1) == 1 {
+        business.append(byte)
+        if byte == 0x0A { break }
       }
-    ) { client in
+      let sent = try? ControlProtocolContract.requestFields(Data(business.dropLast()))
+      XCTAssertEqual(sent?["method"], .string("job.events"))
+      Self.awaitClientClose(connection)
+    }) { client in
       let deadline = try AgentClientWaitDeadline(milliseconds: 700)
-      let selected = try client.bounded(by: deadline).negotiated(
-        requiredMajor: 2, forMethod: "health")
-      XCTAssertEqual(selected.selectedProtocolVersion, ArkDeckControlProtocol.targetVersion)
-      XCTAssertLessThan(deadline.remainingMilliseconds, 450)
-      let requestStarted = ContinuousClock.now
-      XCTAssertThrowsError(try selected.request(method: "health")) {
+      let started = ContinuousClock.now
+      XCTAssertThrowsError(try client.bounded(by: deadline).request(method: "job.events")) {
         XCTAssertEqual($0 as? AgentClientError, .deadlineExceeded)
       }
-      XCTAssertLessThan(
-        requestStarted.duration(to: .now), .milliseconds(650),
-        "negotiation cannot renew the 700ms budget")
+      XCTAssertLessThan(started.duration(to: .now), .milliseconds(950))
       XCTAssertEqual(deadline.remainingMilliseconds, 0)
     }
   }
@@ -202,5 +212,22 @@ final class AgentClientDeadlineContractTests: XCTestCase {
       XCTAssertEqual(
         $0 as? AgentClientError, .deadlineExceeded, "a new connection would fail differently")
     }
+  }
+
+  func testNestedResourceReadsCannotRenewTheCallerDeadlineOrDropCancellation() throws {
+    let deadline = try AgentClientWaitDeadline(milliseconds: 1)
+    let client = AgentClient(socketPath: "/nonexistent/fixture.sock").bounded(by: deadline)
+    Thread.sleep(forTimeInterval: 0.01)
+    XCTAssertThrowsError(
+      try client.bounded(by: AgentClientWaitDeadline(milliseconds: 30_000)).request(method: "health")
+    ) { XCTAssertEqual($0 as? AgentClientError, .deadlineExceeded) }
+
+    let cancellation = AgentClientWaitCancellation()
+    let cancellable = AgentClient(socketPath: "/nonexistent/fixture.sock").bounded(
+      by: try AgentClientWaitDeadline(milliseconds: 30_000, cancellation: cancellation))
+    cancellation.cancel()
+    XCTAssertThrowsError(
+      try cancellable.bounded(by: AgentClientWaitDeadline(milliseconds: 10_000)).request(method: "health")
+    ) { XCTAssertTrue($0 is AgentClientWaitInterrupted) }
   }
 }

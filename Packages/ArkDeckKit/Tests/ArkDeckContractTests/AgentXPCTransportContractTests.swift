@@ -40,14 +40,13 @@ final class AgentXPCTransportContractTests: XCTestCase {
   }
 
   private func frame(method: String) -> Data {
-    Data(
-      #"{"protocolVersion":"1.0.0","id":"contract","method":"\#(method)"}"#.utf8)
+    try! ArkDeckAgentXPC.requestFrame(method: method, requestID: "contract")
   }
 
   private func targetFrame(method: String) throws -> Data {
     try ArkDeckAgentXPC.requestFrame(
       method: method, requestID: "contract-target",
-      protocolVersion: ArkDeckControlProtocol.targetVersion)
+      protocolVersion: ArkDeckControlProtocol.currentVersion)
   }
 
   private func submitFrame(
@@ -60,7 +59,7 @@ final class AgentXPCTransportContractTests: XCTestCase {
         #"{"id":"\#(operationID)","version":\#($0)}"#
       } ?? #"{"id":"\#(operationID)"}"#
     let typedRequest = """
-      {"documentType":"runtime-operation-request","schemaVersion":"2.0.0",\
+      {"documentType":"runtime-operation-request","schemaVersion":"1.0.0",\
       "requestId":"ui-request","idempotencyKey":"ui-request-123",\
       "target":{"targetId":"target-1","expectedBindingRevision":2},\
       "operation":\(operationJSON),"inputs":{},\
@@ -89,7 +88,7 @@ final class AgentXPCTransportContractTests: XCTestCase {
     XCTAssertEqual(
       AgentXPCEndpoint.admission(of: try targetFrame(method: "trace.cache.purge")),
       .direct(method: "trace.cache.purge"))
-    XCTAssertNil(AgentXPCEndpoint.admission(of: try targetFrame(method: "trace.probe")))
+    XCTAssertEqual(AgentXPCEndpoint.admission(of: try targetFrame(method: "trace.probe")), .direct(method: "trace.probe"))
     XCTAssertNil(AgentXPCEndpoint.admission(of: try targetFrame(method: "not.published")))
   }
 
@@ -97,9 +96,6 @@ final class AgentXPCTransportContractTests: XCTestCase {
   // only as gated vocabulary and never pass from a method-only frame.
   func testTheAllowlistForwardsExactlyTheAppControlPlane() {
     for method in ArkDeckAgentXPC.forwardableReadOnlyMethods
-      .union(ArkDeckAgentXPC.forwardableFlashBundleMethods)
-      .union(ArkDeckAgentXPC.forwardableHAPImportMethods)
-      .union(ArkDeckAgentXPC.forwardableNativeLibraryImportMethods)
       .union(ArkDeckAgentXPC.forwardableRockchipBindingMethods)
       .union(ArkDeckAgentXPC.forwardableHistoryFilterMethods)
       .union(ArkDeckAgentXPC.forwardableTraceCacheMethods)
@@ -128,35 +124,17 @@ final class AgentXPCTransportContractTests: XCTestCase {
         // flash.lanePlanPreview is read-only by contract (CHG-2026-068
         // LPP-AC-1): exactly inspect/discover/materialize on the daemon,
         // no import, no permit, nothing durable.
-        "device.candidates", "flash.bootloader-status", "flash.device-access", "flash.lanePlanPreview",
+        "health", "device.observations", "flash.bootloader-status", "flash.device-access", "flash.lanePlanPreview",
         "flash.prerequisites",
         "history.filter.list",
-        "job.evidence", "job.list", "job.list-page", "job.status", "operation.list",
-        "runtime.hdc-status", "runtime.storage.status", "target.list", "trace.probe",
+        "job.evidence", "job.list", "job.status", "job.show", "job.timeline", "operation.list",
+        "runtime.hdc.status", "runtime.storage.status", "target.list", "trace.probe",
         "trace.cache.status",
       ],
       "read-only surface drift is a control-plane decision")
-    XCTAssertEqual(
-      ArkDeckAgentXPC.forwardableFlashBundleMethods,
-      [
-        "artifact.importFlashBundle.abort", "artifact.importFlashBundle.append",
-        "artifact.importFlashBundle.begin", "artifact.importFlashBundle.commit",
-      ],
-      "widening the Flash artifact surface is forbidden")
-    XCTAssertEqual(
-      ArkDeckAgentXPC.forwardableHAPImportMethods,
-      [
-        "artifact.importHap.abort", "artifact.importHap.append",
-        "artifact.importHap.begin", "artifact.importHap.commit",
-      ],
-      "HAP upload must remain the four closed ID-and-chunk methods")
-    XCTAssertEqual(
-      ArkDeckAgentXPC.forwardableNativeLibraryImportMethods,
-      [
-        "artifact.importNativeLibrary.abort", "artifact.importNativeLibrary.append",
-        "artifact.importNativeLibrary.begin", "artifact.importNativeLibrary.commit",
-      ],
-      "native-library upload must remain the four closed ID-and-chunk methods")
+    XCTAssertEqual(ArkDeckAgentXPC.forwardableImportMethods,
+      ["artifact.import.begin", "artifact.import.append", "artifact.import.commit", "artifact.import.abort"])
+    XCTAssertNil(AgentXPCEndpoint.admission(of: frame(method: "artifact.import.begin")))
     XCTAssertEqual(
       ArkDeckAgentXPC.forwardableRockchipBindingMethods,
       ["flash.bind-current-loader"],
@@ -196,7 +174,7 @@ final class AgentXPCTransportContractTests: XCTestCase {
       AgentXPCEndpoint.admission(
         of: try ArkDeckAgentXPC.requestFrame(
           method: method, params: params, requestID: "storage-contract",
-          protocolVersion: ArkDeckControlProtocol.targetVersion))
+          protocolVersion: ArkDeckControlProtocol.currentVersion))
     }
 
     XCTAssertEqual(
@@ -245,7 +223,7 @@ final class AgentXPCTransportContractTests: XCTestCase {
       AgentXPCEndpoint.admission(
         of: try ArkDeckAgentXPC.requestFrame(
           method: method, params: params, requestID: "session-contract",
-          protocolVersion: ArkDeckControlProtocol.targetVersion))
+          protocolVersion: ArkDeckControlProtocol.currentVersion))
     }
 
     XCTAssertEqual(

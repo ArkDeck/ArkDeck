@@ -1223,6 +1223,16 @@ public actor DeviceBootstrapMachine {
   /// Startup consumes completed, bounded-age decoration while the daemon
   /// refreshes it independently. Explicit re-checks still await a property
   /// read. Neither path changes target identity, binding or admission facts.
+  /// Decorate the current Runtime observation directly. Its authorized routes
+  /// come from the owner snapshot, independently of the startup display cache.
+  /// Information is presentation only and cannot establish a target binding.
+  package func deviceInformationSnapshotForPresentation(
+    observation snapshot: TargetObservationSnapshot
+  ) async -> BootstrapDeviceInformationSnapshot {
+    let routes = Set(snapshot.observations.map(\.candidate).filter(\.isAuthorized).map(\.connectKey))
+    return await Self.readDeviceInformation(routes: routes, observation: observation, nowUTC: nowUTC)
+  }
+
   public func deviceInformationSnapshotForPresentation(
     candidates: [BootstrapCandidate], useWarmSnapshot: Bool = false
   ) async -> BootstrapDeviceInformationSnapshot {

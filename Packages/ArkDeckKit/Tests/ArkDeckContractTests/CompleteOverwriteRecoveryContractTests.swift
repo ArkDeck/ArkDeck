@@ -1062,15 +1062,11 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
 
   func testSupersededUnknownPresentationIsTruthfulButNoLongerNeedsAttention() throws {
     let epochID = "recovery-epoch-0123456789abcdef0123456789abcdef"
-    let data = Data(
-      """
-      {"ok":true,"result":[
-        {"jobId":"job-old","operation":"flash.dayu200","targetId":"target-1",
-         "state":"waitingForRecovery","waitingForHuman":false,"outcomeUnknown":true,
-         "outstandingResidueCount":0,"timeline":[],
-         "supersededByRecoveryEpochId":"\(epochID)"}
-      ]}
-      """.utf8)
+    let data = try currentJobPageResponse([[
+      "jobId": "job-old", "operation": "flash.dayu200", "targetId": "target-1",
+      "state": "waitingForRecovery", "waitingForHuman": false, "outcomeUnknown": true,
+      "outstandingResidueCount": 0, "timeline": [], "supersededByRecoveryEpochId": epochID,
+    ]])
     let presentation = RuntimeHistoryResponseDecoding.presentation(from: data)
     let job = try XCTUnwrap(presentation.jobs.only)
     XCTAssertTrue(job.outcomeUnknown)

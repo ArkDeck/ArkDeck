@@ -1,21 +1,17 @@
 # Runtime-owned CLI Job read resources
 
 This vertical slice implements the Job discovery/detail/result portion of
-`arkdeck-cli-product-spec.md` for control protocol 2. It advances GJ-1–GJ-5
+`arkdeck-cli-product-spec.md` for the current v1 control contract. It advances GJ-1–GJ-5
 result inspection without changing operation admission, dispatch or recovery.
 The Catalog digest and published typed operations are unchanged.
 
-During the staged protocol migration, use `--require-protocol 2` for `job list`,
-`status`, `evidence` and `result`. `job show` and `job timeline` always negotiate
-2. New list filters/orders and a read `--timeout` also require 2; there is no
-fallback after negotiation. Existing protocol-1 requests and default legacy
-leaves retain their prior shapes. Moving all default leaves to 2 remains work
-in the full CLI delivery.
+All Job commands use the current versioned resource projections. Output format,
+filters and waiting options do not select another wire shape.
 
 ```sh
-arkdeck job list --require-protocol 2 --state succeeded --page-size 20 --output json
+arkdeck job list --state succeeded --page-size 20 --output json
 arkdeck job show --job JOB_ID --output json
-arkdeck job result --job JOB_ID --require-protocol 2 --output json
+arkdeck job result --job JOB_ID --output json
 arkdeck job timeline --job JOB_ID --page-size 20 --output json
 ```
 

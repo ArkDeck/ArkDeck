@@ -82,75 +82,29 @@ final class ControlProtocolVersionContractTests: XCTestCase {
       """)
   }
 
-  /// The derived values really are derived. If `wireProtocolVersion` moves to
-  /// `2.0.0`, every one of these moves with it and this test needs no edit —
-  /// which is the property being asserted.
-  func testEveryPublishedProtocolFactIsDerivedFromTheOneDefinition() {
-    let version = ArkDeckAgentXPC.wireProtocolVersion
-    XCTAssertEqual(AgentWireProtocol.version, version)
-    XCTAssertEqual(
-      CLIProductVersion.supportedControlProtocolExactVersions,
-      ArkDeckControlProtocol.supportedExactVersions,
-      "`--version` must publish what the client will actually send")
-    XCTAssertEqual(CLIProductVersion.preferredControlProtocol, ArkDeckControlProtocol.targetVersion)
-
-    let major = Int(version.split(separator: ".").first.map(String.init) ?? "") ?? -1
-    XCTAssertEqual(ArkDeckAgentXPC.wireProtocolMajor, major)
-    XCTAssertEqual(
-      AgentWireProtocol.requiredMajor, major,
-      "the daemon admits on the major of the version it says it speaks")
+  func testEveryPublishedProtocolFactUsesTheOneDefinition() throws {
+    XCTAssertEqual(ArkDeckControlProtocol.currentVersion, "1.0.0")
+    XCTAssertEqual(ArkDeckAgentXPC.wireProtocolVersion, ArkDeckControlProtocol.currentVersion)
+    XCTAssertEqual(AgentWireProtocol.version, ArkDeckControlProtocol.currentVersion)
+    XCTAssertEqual(CLIProductVersion.controlProtocolVersion, ArkDeckControlProtocol.currentVersion)
+    let fields = try ControlProtocolContract.requestFields(
+      ArkDeckAgentXPC.requestFrame(method: "health", requestID: "req-1"))
+    XCTAssertEqual(fields["contractIdentity"], .string(ArkDeckControlProtocol.contractIdentity))
+    XCTAssertTrue(["health", "job.plan", "job.submit", "job.run"].allSatisfy(ArkDeckControlProtocol.methods.contains))
+    XCTAssertFalse(ArkDeckControlProtocol.methods.contains("protocol.negotiate"))
+    XCTAssertFalse(ArkDeckControlProtocol.methods.contains("capability.install"))
   }
 
-  /// The frame the client actually builds carries that version — the assertion
-  /// the three-literal arrangement could not make, because each constant only
-  /// ever proved itself.
-  func testTheRequestFrameTheClientBuildsCarriesTheOneVersion() throws {
-    let frame = try ArkDeckAgentXPC.requestFrame(method: "health", requestID: "req-1")
-    let decoded = try XCTUnwrap(
-      try JSONSerialization.jsonObject(with: frame) as? [String: Any])
-    XCTAssertEqual(decoded["protocolVersion"] as? String, ArkDeckAgentXPC.wireProtocolVersion)
-
-    // And the daemon admits exactly that major, so client and daemon cannot be
-    // built from the same tree and still refuse each other.
-    let admitted = Int(
-      (decoded["protocolVersion"] as? String)?.split(separator: ".").first.map(String.init) ?? "")
-    XCTAssertEqual(admitted, AgentWireProtocol.requiredMajor)
-  }
-
-  /// Every advertised version must survive the actual bootstrap selection.
-  /// A v2 selection only publishes the methods that have a complete v2 handler.
-  func testThePublishedListClaimsOnlyWhatThisBuildCanSpeak() {
-    for version in ArkDeckAgentXPC.supportedWireProtocolExactVersions {
-      let major = Int(version.split(separator: ".")[0])!
-      XCTAssertEqual(
-        try ControlProtocolNegotiation.select(
-          client: [version], daemon: ArkDeckControlProtocol.supportedExactVersions,
-          requiredMajor: major), version)
-    }
-    XCTAssertTrue(ArkDeckControlProtocol.targetMethods.contains("health"))
-    XCTAssertTrue(
-      ["job.plan", "job.submit", "job.run"].allSatisfy(
-        ArkDeckControlProtocol.targetMethods.contains))
-    XCTAssertFalse(ArkDeckControlProtocol.targetMethods.contains("capability.install"))
-  }
-
-  func testGeneratedProtocolVocabularyMatchesTheLanguageNeutralContract() throws {
+  func testGeneratedProtocolMatchesTheLanguageNeutralRegistry() throws {
     let root = sourceRoot().deletingLastPathComponent()
-    let data = try Data(contentsOf: root.appending(path: "Contracts/control-negotiation.json"))
-    let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
-    XCTAssertEqual(object["legacyVersion"] as? String, ArkDeckControlProtocol.legacyVersion)
-    XCTAssertEqual(object["targetVersion"] as? String, ArkDeckControlProtocol.targetVersion)
-    XCTAssertEqual(
-      object["supportedExactVersions"] as? [String], ArkDeckControlProtocol.supportedExactVersions)
-    XCTAssertEqual(object["bootstrapVersion"] as? String, ArkDeckControlProtocol.bootstrapVersion)
-    XCTAssertEqual(object["bootstrapMethod"] as? String, ArkDeckControlProtocol.bootstrapMethod)
-    XCTAssertEqual(
-      object["maximumBootstrapFrameBytes"] as? Int,
-      ArkDeckControlProtocol.maximumBootstrapFrameBytes)
-    XCTAssertEqual(
-      Set(object["targetMethods"] as? [String] ?? []), ArkDeckControlProtocol.targetMethods)
-    XCTAssertEqual(
-      Set(object["preBootstrapLegacyMethods"] as? [String] ?? []),
-      ArkDeckControlProtocol.preBootstrapLegacyMethods)
+    let bytes = try Data(contentsOf: root.appending(path: "Contracts/control-protocol.json"))
+    let object = try XCTUnwrap(JSONSerialization.jsonObject(with: bytes) as? [String: Any])
+    XCTAssertEqual(object["currentVersion"] as? String, ArkDeckControlProtocol.currentVersion)
+    XCTAssertEqual(Set(object["methods"] as? [String] ?? []), ArkDeckControlProtocol.methods)
+    XCTAssertEqual(object["maximumRequestFrameBytes"] as? Int, ArkDeckControlProtocol.maximumRequestFrameBytes)
+    XCTAssertEqual(object["maximumResponseFrameBytes"] as? Int, ArkDeckControlProtocol.maximumResponseFrameBytes)
+    for retired in ["legacyVersion", "targetVersion", "supportedExactVersions", "bootstrapMethod", "preBootstrapLegacyMethods"] {
+      XCTAssertNil(object[retired])
+    }
   }
 }

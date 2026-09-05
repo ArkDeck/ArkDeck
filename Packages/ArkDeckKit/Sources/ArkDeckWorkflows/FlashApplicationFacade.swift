@@ -813,65 +813,15 @@ private actor FlashProductionApplicationProvider: FlashApplicationProviding {
       archiveSizeBytes: plan.archiveSizeBytes)
     if let cached = importedArtifacts[key] { return cached }
 
-    let begin = try await FlashXPCResponseDecoding.resultObject(
-      await FlashXPCTransport.request(
-        method: "artifact.importFlashBundle.begin",
-        params: [
-          "targetId": .string(target.id),
-          "name": .string(archiveURL.lastPathComponent),
-          "byteCount": .integer(plan.archiveSizeBytes),
-          "sha256": .string(plan.archiveSHA256),
-        ]))
-    guard let uploadID = begin["uploadId"] as? String,
-      let maximumChunkBytes = begin["maximumChunkBytes"] as? Int,
-      maximumChunkBytes > 0
-    else {
-      throw FlashResponseFailure(message: "Runtime returned incomplete Flash import facts")
-    }
-    do {
-      let handle = try FileHandle(forReadingFrom: archiveURL)
-      defer { try? handle.close() }
-      var offset = 0
-      while true {
-        guard !Task.isCancelled else { throw CancellationError() }
-        let chunk = try handle.read(upToCount: maximumChunkBytes) ?? Data()
-        if chunk.isEmpty { break }
-        let appended = try await FlashXPCResponseDecoding.resultObject(
-          await FlashXPCTransport.request(
-            method: "artifact.importFlashBundle.append",
-            params: [
-              "uploadId": .string(uploadID),
-              "offset": .integer(Int64(offset)),
-              "base64": .string(chunk.base64EncodedString()),
-            ]))
-        guard let nextOffset = appended["nextOffset"] as? Int,
-          nextOffset == offset + chunk.count
-        else {
-          throw FlashResponseFailure(message: "Runtime Flash import offset drifted")
-        }
-        offset = nextOffset
-      }
-      guard Int64(offset) == plan.archiveSizeBytes else {
-        throw FlashResponseFailure(message: "Selected archive changed while it was imported")
-      }
-    } catch {
-      _ = await FlashXPCTransport.request(
-        method: "artifact.importFlashBundle.abort",
-        params: ["uploadId": .string(uploadID)])
-      throw error
-    }
-
-    let result = try await FlashXPCResponseDecoding.resultObject(
-      await FlashXPCTransport.request(
-        method: "artifact.importFlashBundle.commit",
-        params: ["uploadId": .string(uploadID)]))
-    guard let lease = result["lease"] as? String,
-      result["targetId"] as? String == target.id,
-      result["bindingRevision"] as? Int == target.bindingRevision,
-      result["sha256"] as? String == plan.archiveSHA256
-    else {
-      throw FlashResponseFailure(
-        message: "Runtime import facts no longer match the reviewed target and archive")
+    let receipt = try await RuntimeAppArtifactUpload.upload(
+      fileURL: archiveURL, kind: "flash-bundle", targetID: target.id,
+      bindingRevision: target.bindingRevision, name: "images.tar.gz",
+      byteCount: Int(plan.archiveSizeBytes), sha256: plan.archiveSHA256,
+      send: { method, params in
+        try await FlashXPCTransport.request(method: method, params: params).get()
+      })
+    guard case .string(let lease)? = receipt["lease"] else {
+      throw FlashResponseFailure(message: "Runtime returned no Flash Import lease")
     }
     let imported = FlashImportedArtifact(
       lease: lease,
@@ -981,9 +931,12 @@ private actor FlashProductionApplicationProvider: FlashApplicationProviding {
 
   func run(jobID: String) async -> FlashRunResult {
     do {
-      let terminal = try await FlashXPCResponseDecoding.resultObject(
+      _ = try await FlashXPCResponseDecoding.resultObject(
         await FlashXPCTransport.request(
           method: "job.run", params: ["jobId": .string(jobID)]))
+      let terminal = try await RuntimeAppReadResources.statusPresentation(jobID: jobID) { method, params in
+        try await FlashXPCTransport.request(method: method, params: params).get()
+      }
       guard
         let presentation = FlashJobStatusResponseDecoding.presentation(
           terminal, expectedJobID: jobID)
@@ -1000,9 +953,9 @@ private actor FlashProductionApplicationProvider: FlashApplicationProviding {
 
   func status(jobID: String) async -> FlashJobStatusResult {
     do {
-      let current = try await FlashXPCResponseDecoding.resultObject(
-        await FlashXPCTransport.request(
-          method: "job.status", params: ["jobId": .string(jobID)]))
+      let current = try await RuntimeAppReadResources.statusPresentation(jobID: jobID) { method, params in
+        try await FlashXPCTransport.request(method: method, params: params).get()
+      }
       guard
         let presentation = FlashJobStatusResponseDecoding.presentation(
           current, expectedJobID: jobID)

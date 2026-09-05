@@ -12,7 +12,7 @@ The required source roles are exact:
 - optional `ui-dump.json` with media type `application/json`.
 
 An arbitrary PNG cannot stand in for `screenshot.png`. Duplicate or malformed Runtime inventory
-rows are refused by the CLI before reading. The CLI negotiates control protocol 2 and pages the
+rows are refused by the CLI before reading. The CLI verifies the current v1 control identity and pages the
 tagged Job-owned Artifact inventory; every range stays bound to the selected owner, Artifact ID,
 total byte count, and digest. Each complete byte sequence must match the published byte count and
 lowercase SHA-256 digest before parsing, and the complete in-memory capture is bounded to 64 MiB.

@@ -100,7 +100,7 @@ package final class RuntimeSessionCleanupRecordStore: @unchecked Sendable {
     }
     do {
       let payload = data.last == 0x0A ? Data(data.dropLast()) : data
-      let object = try ControlProtocolNegotiation.decodeObject(
+      let object = try ControlFrameJSON.decodeObject(
         payload, maximumBytes: Self.maximumRecordBytes)
       guard Set(object.keys) == [
         "schemaVersion", "previewID", "previewDigest", "expiresAtUTC", "state",

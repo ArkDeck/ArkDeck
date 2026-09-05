@@ -140,11 +140,10 @@ final class CLIWorkspaceContinuationContractTests: XCTestCase {
   ) -> JSONValue {
     .object([
       "status": .string("ok"),
-      "protocolVersion": .string(ArkDeckControlProtocol.targetVersion),
-      "supportedExactVersions": .array(
-        ArkDeckControlProtocol.supportedExactVersions.map(JSONValue.string)),
+      "protocolVersion": .string(ArkDeckControlProtocol.currentVersion),
+      "contractIdentity": .string(ArkDeckControlProtocol.contractIdentity),
       "publishedMethods": .array(
-        ArkDeckControlProtocol.targetMethods.sorted().map(JSONValue.string)),
+        ArkDeckControlProtocol.methods.sorted().map(JSONValue.string)),
       "catalogDigest": .string(digest),
       "providers": .array(providers.map(JSONValue.string)),
     ])
@@ -213,7 +212,7 @@ final class CLIWorkspaceContinuationContractTests: XCTestCase {
     XCTAssertEqual(fresh.clientContext?.threadID, "thread-continuation")
     XCTAssertEqual(fresh.clientContext?.provenance?["arkdeck.continuedFromJob"], sourceJobID)
     XCTAssertNil(fresh.authorization)
-    XCTAssertNil(fresh.campaignReservation)
+    XCTAssertFalse(String(decoding: try RuntimeOperationCodec.encodeRequest(fresh), as: UTF8.self).contains("campaignReservation"))
     let document = try XCTUnwrap(
       JSONSerialization.jsonObject(with: CanonicalJSONEncoders.canonical().encode(fresh))
         as? [String: Any])

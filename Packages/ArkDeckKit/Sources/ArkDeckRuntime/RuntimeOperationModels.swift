@@ -1,16 +1,5 @@
-// Runtime API v2 wire models (CHG-2026-046, T02).
-//
-// The runtime request carries exactly what device execution needs - target,
-// operation, typed inputs, idempotency, optional capability - and
-// structurally excludes repository governance identity. Where the v1 model
-// made changeId/taskId mandatory, v2 rejects their very presence with a
-// stable error code: an old caller keeps a loud, actionable failure instead
-// of a silently ignored field. Repository provenance survives only as the
-// optional build-source block of PublishedOperationBundleManifest.
-//
-// Versioning: major 2 is required (unknown majors fail closed); unknown
-// top-level keys under major 2 are tolerated for forward compatibility,
-// while duplicate JSON keys stay rejected.
+// Current strict Runtime request contract. Format identity is exact; operation
+// versions and binding revisions retain their independent business meaning.
 
 import ArkDeckCore
 import Foundation
@@ -112,31 +101,6 @@ public enum RuntimeRequestedOutput: String, Codable, Sendable, CaseIterable {
   case derivedArtifacts
   case analysisReport
   case hardwareEvidence
-}
-
-/// Historical wire field retained only so persisted requests can be decoded
-/// and exported. Runtime rejects any new request that contains it.
-public struct RuntimeCampaignReservationReference: Equatable, Sendable, Codable {
-  public let reservationID: String
-
-  enum CodingKeys: String, CodingKey {
-    case reservationID = "reservationId"
-  }
-
-  init(reservationID: String) {
-    self.reservationID = reservationID
-  }
-
-  func validate() throws {
-    guard !reservationID.isEmpty, reservationID.count <= 128,
-      reservationID.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-") })
-    else {
-      throw RuntimeOperationRequestRejection(
-        code: .authorizationRequired,
-        path: "$.campaignReservation.reservationId",
-        message: "campaign reservation must name a ledger reservation identifier")
-    }
-  }
 }
 
 public struct RuntimeCapabilityReference: Equatable, Sendable, Codable {
@@ -244,8 +208,7 @@ public struct RuntimeClientContext: Equatable, Sendable, Codable {
 
 public struct RuntimeOperationRequest: Equatable, Sendable, Codable {
   public static let documentType = "runtime-operation-request"
-  public static let schemaVersion = "2.0.0"
-  public static let requiredMajorVersion = 2
+  public static let schemaVersion = "1.0.0"
 
   public let requestID: String
   public let idempotencyKey: String
@@ -254,10 +217,6 @@ public struct RuntimeOperationRequest: Equatable, Sendable, Codable {
   public let inputs: [String: JSONValue]
   public let requestedOutputs: [RuntimeRequestedOutput]
   public let authorization: RuntimeCapabilityReference?
-  /// Decode/export-only schema 2.x field. New callers cannot construct it
-  /// through the typed initializer, and Runtime refuses decoded requests that
-  /// carry it before default read-only or capability admission.
-  public let campaignReservation: RuntimeCampaignReservationReference?
   public let clientContext: RuntimeClientContext?
 
   enum CodingKeys: String, CodingKey {
@@ -270,7 +229,6 @@ public struct RuntimeOperationRequest: Equatable, Sendable, Codable {
     case inputs
     case requestedOutputs
     case authorization
-    case campaignReservation
     case clientContext
   }
 
@@ -291,7 +249,6 @@ public struct RuntimeOperationRequest: Equatable, Sendable, Codable {
     self.inputs = inputs
     self.requestedOutputs = requestedOutputs
     self.authorization = authorization
-    self.campaignReservation = nil
     self.clientContext = clientContext
     try validate()
   }
@@ -316,7 +273,7 @@ public struct RuntimeOperationRequest: Equatable, Sendable, Codable {
   /// `inputs` is the parameter that makes this usable for more than the two
   /// operations that take none. Without it the flag form could express only
   /// target and operation, so anything with typed inputs — which is nearly
-  /// everything — had to be submitted as a full v2 document, and the envelope
+  /// everything — had to be submitted as a current document, and the envelope
   /// around those inputs was the caller's problem to get right.
   public static func operatorFlagForm(
     targetID: String,
@@ -353,14 +310,10 @@ public struct RuntimeOperationRequest: Equatable, Sendable, Codable {
   }
 
   public init(from decoder: Decoder) throws {
+    // All entry points, including direct Codable and a nested durable Job,
+    // apply the same key and version validation before decoding any authority.
+    try RuntimeWireValidation.requestFields([String: JSONValue](from: decoder))
     let container = try decoder.container(keyedBy: CodingKeys.self)
-    let documentType = try container.decodeIfPresent(String.self, forKey: .documentType)
-    if let documentType, documentType != Self.documentType {
-      throw RuntimeOperationRequestRejection(
-        code: .invalidRequest,
-        path: "$.documentType",
-        message: "expected \(Self.documentType)")
-    }
     // A missing or wrong-typed required key used to escape as a Swift
     // `DecodingError`, which the codec reported at `path: "$"` with the
     // reflected description as its message. A caller reading `path` to learn
@@ -405,8 +358,6 @@ public struct RuntimeOperationRequest: Equatable, Sendable, Codable {
       ?? [.derivedArtifacts]
     self.authorization = try container.decodeIfPresent(
       RuntimeCapabilityReference.self, forKey: .authorization)
-    self.campaignReservation = try container.decodeIfPresent(
-      RuntimeCampaignReservationReference.self, forKey: .campaignReservation)
     self.clientContext = try container.decodeIfPresent(
       RuntimeClientContext.self, forKey: .clientContext)
     try validate()
@@ -423,7 +374,6 @@ public struct RuntimeOperationRequest: Equatable, Sendable, Codable {
     try container.encode(inputs, forKey: .inputs)
     try container.encode(requestedOutputs, forKey: .requestedOutputs)
     try container.encodeIfPresent(authorization, forKey: .authorization)
-    try container.encodeIfPresent(campaignReservation, forKey: .campaignReservation)
     try container.encodeIfPresent(clientContext, forKey: .clientContext)
   }
 
@@ -439,13 +389,6 @@ public struct RuntimeOperationRequest: Equatable, Sendable, Codable {
     try target.validate()
     try operation.validate()
     try authorization?.validate()
-    try campaignReservation?.validate()
-    if authorization != nil, campaignReservation != nil {
-      throw RuntimeOperationRequestRejection(
-        code: .authorizationRequired,
-        path: "$.campaignReservation",
-        message: "a request carries exactly one E2 authority kind, not both")
-    }
     try clientContext?.validate()
     guard requestedOutputs.count <= 8,
       Set(requestedOutputs).count == requestedOutputs.count
@@ -568,7 +511,7 @@ enum RuntimeWireValidation {
     "argv", "shell", "exec", "command", "runhdc", "rawcommand", "executable",
   ]
 
-  /// Governance keys whose very presence at the top level of a v2 request is
+  /// Governance keys whose very presence at the top level of a Runtime request is
   /// rejected. Normalized: lowercased, underscores removed - so change_id,
   /// changeId and ChangeID are all the same forbidden key.
   static let forbiddenGovernanceKeys: Set<String> = [
@@ -576,6 +519,70 @@ enum RuntimeWireValidation {
     "authorizationbloboid", "prnumber", "pullrequestnumber", "sourcetaskid",
     "sourcechangeid",
   ]
+
+  static let retiredAuthorityKeys: Set<String> = [
+    "standingauthorization", "evolutioncampaignconfirmation", "chatconfirmation",
+    "campaignreservation",
+  ]
+
+  static func requestFields(_ fields: [String: JSONValue]) throws {
+    for key in fields.keys.sorted() {
+      let normalized = normalizedKey(key)
+      if forbiddenGovernanceKeys.contains(normalized) {
+        throw RuntimeOperationRequestRejection(
+          code: .governanceFieldRejected, path: "$.\(key)",
+          message: "repository governance fields are not runtime fields; use PublishedOperationBundleManifest for build provenance")
+      }
+      if retiredAuthorityKeys.contains(normalized) {
+        throw RuntimeOperationRequestRejection(
+          code: .authorizationRequired, path: "$.\(key)",
+          message: "retired authority fields cannot enter the current Runtime contract")
+      }
+    }
+    guard fields["schemaVersion"] == .string(RuntimeOperationRequest.schemaVersion) else {
+      throw RuntimeOperationRequestRejection(
+        code: .unsupportedVersion, path: "$.schemaVersion",
+        message: "schemaVersion must be exactly \"\(RuntimeOperationRequest.schemaVersion)\"")
+    }
+    if let documentType = fields["documentType"], documentType != .string(RuntimeOperationRequest.documentType) {
+      throw RuntimeOperationRequestRejection(
+        code: .invalidRequest, path: "$.documentType",
+        message: "expected \(RuntimeOperationRequest.documentType)")
+    }
+    try keys(fields, allowed: [
+      "documentType", "schemaVersion", "requestId", "idempotencyKey", "target",
+      "operation", "inputs", "requestedOutputs", "authorization", "clientContext",
+      "reviewedPlanDigest",
+    ], path: "$")
+    for (key, allowed) in [
+      ("target", Set(["targetId", "expectedBindingRevision"])),
+      ("operation", Set(["id", "version"])),
+      ("authorization", Set(["capabilityId"])),
+      ("clientContext", Set(["clientName", "provenance"])),
+    ] {
+      if case .object(let nested)? = fields[key] {
+        try keys(nested, allowed: allowed, path: "$.\(key)")
+      }
+    }
+    // This is an explicit envelope precondition checked against the fresh
+    // materialized plan by RuntimeJobEngine. It grants no authority and stays
+    // outside the canonical operation fingerprint, as in the current contract.
+    if let value = fields["reviewedPlanDigest"] {
+      guard case .string(let digest) = value, SHA256Hex.isLowercaseSHA256(digest) else {
+        throw RuntimeOperationRequestRejection(
+          code: .invalidRequest, path: "$.reviewedPlanDigest",
+          message: "reviewedPlanDigest must be a lowercase SHA-256 precondition")
+      }
+    }
+  }
+
+  static func keys(_ fields: [String: JSONValue], allowed: Set<String>, path: String) throws {
+    if let key = Set(fields.keys).subtracting(allowed).sorted().first {
+      throw RuntimeOperationRequestRejection(
+        code: .invalidRequest, path: "\(path).\(key)",
+        message: "unknown field in the current Runtime contract")
+    }
+  }
 
   static func identifier(_ value: String, path: String) throws {
     guard
@@ -618,60 +625,7 @@ package enum RuntimeOperationCodec {
         path: "$",
         message: "malformed or duplicate-key JSON")
     }
-    let topLevel: [String: JSONValue]
     do {
-      topLevel = try JSONDecoder().decode([String: JSONValue].self, from: data)
-    } catch {
-      throw RuntimeOperationRequestRejection(
-        code: .invalidRequest,
-        path: "$",
-        message: "request document must be a JSON object")
-    }
-    // Governance identity is rejected before anything else: an old caller
-    // must learn the contract changed, not have its fields silently eaten.
-    for key in topLevel.keys {
-      if RuntimeWireValidation.forbiddenGovernanceKeys.contains(
-        RuntimeWireValidation.normalizedKey(key))
-      {
-        throw RuntimeOperationRequestRejection(
-          code: .governanceFieldRejected,
-          path: "$.\(key)",
-          message:
-            "repository governance fields are not runtime fields; "
-            + "use PublishedOperationBundleManifest for build provenance")
-      }
-    }
-    guard case .string(let version)? = topLevel["schemaVersion"] else {
-      // Naming the accepted value here is the whole point. Answering only
-      // "required" sends the caller back to guess one, and the obvious guess
-      // is "1.0.0", which then costs a second round trip to learn that major
-      // 2 is the one. Interpolated rather than spelled so this cannot drift
-      // from the value the gate below enforces.
-      throw RuntimeOperationRequestRejection(
-        code: .unsupportedVersion,
-        path: "$.schemaVersion",
-        message: "schemaVersion is required; this runtime accepts "
-          + "\"\(RuntimeOperationRequest.schemaVersion)\"")
-    }
-    let majorText = version.split(separator: ".", maxSplits: 1).first.map(String.init) ?? ""
-    guard let major = Int(majorText) else {
-      throw RuntimeOperationRequestRejection(
-        code: .unsupportedVersion,
-        path: "$.schemaVersion",
-        message: "malformed schemaVersion \(version); this runtime accepts "
-          + "\"\(RuntimeOperationRequest.schemaVersion)\"")
-    }
-    guard major == RuntimeOperationRequest.requiredMajorVersion else {
-      throw RuntimeOperationRequestRejection(
-        code: .unsupportedVersion,
-        path: "$.schemaVersion",
-        message: "unsupported major version \(major); this runtime accepts major "
-          + "\(RuntimeOperationRequest.requiredMajorVersion), for example "
-          + "\"\(RuntimeOperationRequest.schemaVersion)\"")
-    }
-    do {
-      // JSONDecoder ignores unknown keys: minor-version additions stay
-      // forward compatible under the major-2 gate above.
       return try JSONDecoder().decode(RuntimeOperationRequest.self, from: data)
     } catch let rejection as RuntimeOperationRequestRejection {
       throw rejection
@@ -679,7 +633,7 @@ package enum RuntimeOperationCodec {
       throw RuntimeOperationRequestRejection(
         code: .invalidRequest,
         path: "$",
-        message: "undecodable v2 request: \(error)")
+        message: "undecodable current request: \(error)")
     }
   }
 

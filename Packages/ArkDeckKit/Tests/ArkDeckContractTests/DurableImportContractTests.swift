@@ -105,6 +105,202 @@ final class DurableImportContractTests: XCTestCase {
     return (process.terminationStatus, try object(CLIStrictJSON.decode(Data(contentsOf: output))))
   }
 
+  func testAppAndCLIUseTheSameTypedImportWithoutSharingUploadOwnership() async throws {
+    try startServer()
+    let endpoint = AgentXPCEndpoint(handler: try XCTUnwrap(handler), appJobs: AgentXPCAppJobGate())
+    let file = root.appending(path: "shared.hap")
+    try hap.write(to: file)
+    let cliReply = try cli(["artifact", "import", "hap", "--import-request-id", "cli-owner",
+      "--target", target.targetID, "--file", file.path])
+    XCTAssertEqual(cliReply.0, 0)
+    let cliImport = try ArtifactImportProjection(XCTUnwrap(cliReply.1["result"]))
+    let send: RuntimeAppArtifactUpload.Send = { method, params in
+      let id = UUID().uuidString
+      let frame = try ArkDeckAgentXPC.requestFrame(method: method, params: params, requestID: id)
+      let current = try ControlProtocolContract.requestFields(frame)
+      XCTAssertEqual(current["protocolVersion"], .string("1.0.0"))
+      return try await withCheckedThrowingContinuation { continuation in
+        endpoint.sendRequestFrame(frame) { bytes, refusal in
+          if let bytes { continuation.resume(returning: bytes) }
+          else { continuation.resume(throwing: AgentExecutionControlFailure("admissionDenied", refusal ?? "no reply")) }
+        }
+      }
+    }
+    let appReceipt = try await RuntimeAppArtifactUpload.upload(
+      fileURL: file, kind: "hap", targetID: target.targetID, bindingRevision: target.bindingRevision,
+      name: "shared.hap", byteCount: hap.count, sha256: SHA256Hex.string(of: hap), send: send)
+    guard case .object(let cliReceipt)? = try object(cliImport.value)["receipt"] else { return XCTFail("CLI receipt missing") }
+    XCTAssertEqual(appReceipt["sha256"], cliReceipt["sha256"])
+    XCTAssertEqual(appReceipt["byteCount"], cliReceipt["byteCount"])
+    XCTAssertNotEqual(appReceipt["lease"], cliReceipt["lease"], "each caller retains its own immutable owner")
+    guard case .object(let cliIntent) = cliImport.intent.projection else { return XCTFail("intent missing") }
+    let foreignBytes = try await send("artifact.import.begin", cliIntent)
+    let foreign = try JSONDecoder().decode([String: JSONValue].self, from: foreignBytes)
+    XCTAssertEqual(foreign["ok"], .bool(false))
+    if case .object(let error)? = foreign["error"] { XCTAssertEqual(error["code"], .string("admissionDenied")) }
+    else { XCTFail("ownership refusal is missing") }
+    var patch = cliIntent
+    patch["kind"] = .string("workspace-patch"); patch["name"] = .string("change.patch")
+    XCTAssertNil(AgentXPCEndpoint.admission(of: try ArkDeckAgentXPC.requestFrame(method: "artifact.import.begin", params: patch)))
+    let jobs = try await engine.listJobs()
+    XCTAssertTrue(jobs.isEmpty)
+    XCTAssertEqual(dispatcher.dispatchCount, 0)
+  }
+
+  private func appSend(_ method: String, _ params: [String: JSONValue]) async throws -> Data {
+    let endpoint = AgentXPCEndpoint(handler: try XCTUnwrap(handler), appJobs: AgentXPCAppJobGate())
+    let frame = try ArkDeckAgentXPC.requestFrame(method: method, params: params)
+    return try await withCheckedThrowingContinuation { continuation in
+      endpoint.sendRequestFrame(frame) { bytes, refusal in
+        if let bytes { continuation.resume(returning: bytes) }
+        else { continuation.resume(throwing: AgentExecutionControlFailure("admissionDenied", refusal ?? "no reply")) }
+      }
+    }
+  }
+
+  private func restartImportDaemon() throws {
+    server?.stop()
+    server = nil
+    handler = nil
+    artifacts = try RuntimeArtifactStore(rootURL: root.appending(path: "artifacts"), nowUTC: { "2026-09-01T00:00:00Z" })
+    try startServer()
+  }
+
+  func testAppUploadOwnershipSurvivesRestartForRetryAppendCommitAndAbort() async throws {
+    try startServer()
+    let fields = try object(intent("app-resume").projection)
+    let began = try ArtifactImportProjection(RuntimeAppReadResources.result(await appSend("artifact.import.begin", fields)))
+    let abortFields = try object(intent("app-abort").projection)
+    let aborting = try ArtifactImportProjection(RuntimeAppReadResources.result(await appSend("artifact.import.begin", abortFields)))
+    try restartImportDaemon()
+
+    let same = try ArtifactImportProjection(RuntimeAppReadResources.result(await appSend("artifact.import.begin", fields)))
+    XCTAssertEqual(same.id, began.id)
+    let selector: [String: JSONValue] = ["importId": .string(began.id), "generation": .string("1")]
+    var append = selector
+    append.merge(["offset": .string("0"), "byteCount": .string(String(hap.count)),
+      "sha256": .string(SHA256Hex.string(of: hap)), "base64": .string(hap.base64EncodedString())]) { _, new in new }
+    let advanced = try ArtifactImportProjection(RuntimeAppReadResources.result(await appSend("artifact.import.append", append)))
+    XCTAssertEqual(advanced.nextOffset, hap.count)
+    let committed = try ArtifactImportProjection(RuntimeAppReadResources.result(await appSend("artifact.import.commit", selector)))
+    XCTAssertEqual(committed.state, "committed")
+    let aborted = try ArtifactImportProjection(RuntimeAppReadResources.result(await appSend("artifact.import.abort", [
+      "importRequestId": .string(aborting.intent.importRequestID), "generation": .string("1")])))
+    XCTAssertEqual(aborted.state, "aborted")
+    XCTAssertFalse(FileManager.default.fileExists(atPath: root.appending(path: "artifacts/.imports-v1/payloads/\(aborting.id).stage").path))
+    XCTAssertEqual(dispatcher.dispatchCount, 0)
+    let jobs = try await engine.listJobs()
+    XCTAssertTrue(jobs.isEmpty)
+  }
+
+  func testRestartDoesNotGiveAppOwnershipOfCLIOrUnmarkedImports() async throws {
+    try startServer()
+    let cli = try await begin("cli-owned")
+    let unmarked = try await begin("old-unmarked")
+    let recordURL = root.appending(path: "artifacts/.imports-v1/records/\(SHA256Hex.string(of: Data("old-unmarked".utf8))).json")
+    var oldRecord = try ControlFrameJSON.decodeObject(Data(contentsOf: recordURL), maximumBytes: 4 * 1024 * 1024)
+    oldRecord.removeValue(forKey: "appOwned")
+    try DurableFileWriter.createOrReplaceAtomically(destination: recordURL, data: CanonicalJSONEncoders.canonical().encode(oldRecord))
+    try restartImportDaemon()
+    for record in [cli, unmarked] {
+      let attempts: [(String, [String: JSONValue])] = [
+        ("artifact.import.begin", try object(record.intent.projection)),
+        ("artifact.import.append", ["importId": .string(record.id), "generation": .string("1"),
+          "offset": .string("0"), "byteCount": .string(String(hap.count)),
+          "sha256": .string(SHA256Hex.string(of: hap)), "base64": .string(hap.base64EncodedString())]),
+        ("artifact.import.commit", ["importId": .string(record.id), "generation": .string("1")]),
+        ("artifact.import.abort", ["importRequestId": .string(record.intent.importRequestID), "generation": .string("1")]),
+      ]
+      for (method, params) in attempts {
+        let reply = try JSONDecoder().decode([String: JSONValue].self, from: await appSend(method, params))
+        XCTAssertEqual(reply["ok"], .bool(false), method)
+        XCTAssertEqual(try object(XCTUnwrap(reply["error"]))["code"], .string("admissionDenied"), method)
+      }
+      let unchanged = try await artifacts.inspectImport(id: record.id)
+      XCTAssertEqual(unchanged.state, "inProgress")
+      XCTAssertEqual(unchanged.nextOffset, 0)
+    }
+    XCTAssertEqual(dispatcher.dispatchCount, 0)
+  }
+
+  private actor RestartingAppSender {
+    let makeEndpoint: @Sendable () throws -> AgentXPCEndpoint
+    let lostMethod: String
+    var endpoint: AgentXPCEndpoint
+    var restarted = false
+    var methods: [String] = []
+
+    init(lostMethod: String, makeEndpoint: @escaping @Sendable () throws -> AgentXPCEndpoint) throws {
+      self.lostMethod = lostMethod
+      self.makeEndpoint = makeEndpoint
+      endpoint = try makeEndpoint()
+    }
+
+    func send(_ method: String, _ params: [String: JSONValue]) async throws -> Data {
+      methods.append(method)
+      let frame = try ArkDeckAgentXPC.requestFrame(method: method, params: params)
+      let current = endpoint
+      let response: Data = try await withCheckedThrowingContinuation { continuation in
+        current.sendRequestFrame(frame) { bytes, refusal in
+          if let bytes { continuation.resume(returning: bytes) }
+          else { continuation.resume(throwing: AgentExecutionControlFailure("admissionDenied", refusal ?? "no reply")) }
+        }
+      }
+      if method == lostMethod, !restarted {
+        restarted = true
+        endpoint = try makeEndpoint()
+        throw FixtureError.injected
+      }
+      return response
+    }
+  }
+
+  func testAppLostReplyAfterRestartCleansStagingWithoutReplayingCommit() async throws {
+    try startServer()
+    let file = root.appending(path: "restart.hap")
+    try hap.write(to: file)
+    let rootURL = root!
+    let targetStore = targets!
+    let recordingDispatcher = dispatcher!
+    let makeEndpoint: @Sendable () throws -> AgentXPCEndpoint = {
+      let artifacts = try RuntimeArtifactStore(rootURL: rootURL.appending(path: "artifacts"), nowUTC: { "2026-09-01T00:00:00Z" })
+      let capabilities = try RuntimeCapabilityStore(directoryURL: rootURL.appending(path: "capabilities"))
+      let engine = try RuntimeJobEngine(configuration: .init(stateDirectory: rootURL.appending(path: "engine")),
+        providers: DeviceProviderRegistry(providers: []), dispatcher: recordingDispatcher,
+        capabilityStore: capabilities, artifactStore: artifacts, nowUTC: { "2026-09-01T00:00:00Z" })
+      let handler = RuntimeControlPlaneHandler(engine: engine, capabilityStore: capabilities, providerIDs: [],
+        nowUTC: { "2026-09-01T00:00:00Z" }, targetStore: targetStore, artifactStore: artifacts)
+      return AgentXPCEndpoint(handler: handler, appJobs: AgentXPCAppJobGate())
+    }
+    for lostMethod in ["artifact.import.begin", "artifact.import.append", "artifact.import.commit"] {
+      let sender = try RestartingAppSender(lostMethod: lostMethod, makeEndpoint: makeEndpoint)
+      let send: RuntimeAppArtifactUpload.Send = { method, params in
+        try await sender.send(method, params)
+      }
+      do {
+        _ = try await RuntimeAppArtifactUpload.upload(fileURL: file, kind: "hap", targetID: target.targetID,
+          bindingRevision: target.bindingRevision, name: "restart.hap", byteCount: hap.count,
+          sha256: SHA256Hex.string(of: hap), send: send)
+        XCTFail("lost reply must remain a failure")
+      } catch FixtureError.injected { }
+      let methods = await sender.methods
+      XCTAssertEqual(methods.filter { $0 == "artifact.import.begin" }.count, 1)
+      XCTAssertEqual(methods.filter { $0 == "artifact.import.abort" }.count, lostMethod == "artifact.import.commit" ? 0 : 1)
+      XCTAssertEqual(methods.filter { $0 == "artifact.import.commit" }.count, lostMethod == "artifact.import.commit" ? 1 : 0)
+    }
+    let page = try object(await artifacts.listImports([:]))
+    guard case .array(let rows)? = page["items"] else { return XCTFail("Import page missing") }
+    XCTAssertEqual(rows.count, 3)
+    let states = try rows.map { try ArtifactImportProjection($0).state }
+    XCTAssertEqual(states.filter { $0 == "aborted" }.count, 2)
+    XCTAssertEqual(states.filter { $0 == "committed" }.count, 1)
+    for row in rows {
+      let record = try ArtifactImportProjection(row)
+      XCTAssertFalse(FileManager.default.fileExists(atPath: root.appending(path: "artifacts/.imports-v1/payloads/\(record.id).stage").path))
+    }
+    XCTAssertEqual(dispatcher.dispatchCount, 0)
+  }
+
   func testStableRequestOwnerExactRetryAndConflictingChunksAcrossRestart() async throws {
     let begun = try await begin()
     let first = Data(hap.prefix(100))
@@ -303,7 +499,7 @@ final class DurableImportContractTests: XCTestCase {
     let otherInspection = try ArtifactImportInspectionProjection(XCTUnwrap(unrelated.1["result"]))
     XCTAssertEqual(otherInspection.imported.id, other.id); XCTAssertEqual(otherInspection.activeJobIDs, [])
     let recovery = try AgentClient(socketPath: XCTUnwrap(server).socketURL.path)
-      .negotiated(requiredMajor: 2, forMethod: "artifact.import.inspect")
+
       .request(method: "artifact.import.inspect", params: ["importId": .string(imported.id)])
     XCTAssertEqual(try ArtifactImportProjection(recovery).value, imported.value)
     try await engine.requestCancel(jobID: accepted.jobID)
@@ -370,8 +566,8 @@ final class DurableImportContractTests: XCTestCase {
     DispatchQueue.global().async {
       defer { served.fulfill() }
       var dropped = Set<String>()
-      // negotiate, inspect, target, begin, inspect, append, inspect, commit, inspect
-      for _ in 0..<9 {
+      // Each of the eight business requests verifies health on the same connection.
+      for _ in 0..<8 {
         var ready = pollfd(fd: listener, events: Int16(POLLIN), revents: 0)
         guard poll(&ready, 1, 5000) > 0 else { return XCTFail("missing recovery request") }
         let connection = accept(listener, nil, nil)
@@ -381,6 +577,7 @@ final class DurableImportContractTests: XCTestCase {
         _ = setsockopt(connection, SOL_SOCKET, SO_NOSIGPIPE, &noSignal, socklen_t(MemoryLayout.size(ofValue: noSignal)))
         var timeout = timeval(tv_sec: 5, tv_usec: 0)
         _ = setsockopt(connection, SOL_SOCKET, SO_RCVTIMEO, &timeout, socklen_t(MemoryLayout.size(ofValue: timeout)))
+        for _ in 0..<2 {
         var frame = Data(); var buffer = [UInt8](repeating: 0, count: 8192)
         while !frame.contains(10) && frame.count < 4 * 1024 * 1024 {
           let count = read(connection, &buffer, buffer.count)
@@ -407,6 +604,7 @@ final class DurableImportContractTests: XCTestCase {
           }
         }
         guard done.wait(timeout: .now() + 5) == .success else { return XCTFail("fixture owner stalled") }
+        }
       }
       XCTAssertEqual(dropped.count, 3)
     }

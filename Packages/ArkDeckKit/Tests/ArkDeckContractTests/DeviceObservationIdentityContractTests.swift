@@ -5,7 +5,8 @@ import XCTest
 @testable import ArkDeckCore
 @testable import ArkDeckWorkflows
 
-/// §8.5's observation identity, and the rule that decides its lifetime.
+/// Presentation-cache observation identity remains separate from the current
+/// Runtime owner, whose continuity requires independent USB proof.
 ///
 /// The section permits an observation ID to persist across generations only
 /// while the Runtime can prove the same candidate relation, and *requires* a
@@ -98,45 +99,32 @@ final class DeviceObservationIdentityContractTests: XCTestCase {
     XCTAssertFalse(id?.contains("5555") ?? true)
   }
 
-  // MARK: the published projection
-
-  func testTheProjectionPublishesItsContinuityRatherThanLeavingItToBeDiscovered() throws {
-    let stamped = registry().stamp(snapshot(["dev-a"]))
-    let rows = stamped.candidates.map {
-      RuntimeControlPlaneHandler.encodeDeviceObservation(candidate: $0, adoptedTarget: nil)
-    }
-    guard case .object(let fields) = RuntimeControlPlaneHandler.encodeDeviceObservations(
-      stamped, rows: rows)
-    else { return XCTFail("the projection must be an object") }
-
-    XCTAssertEqual(fields["snapshotGeneration"], .integer(1))
-    XCTAssertEqual(fields["observationContinuity"], .string("generationScoped"))
-    XCTAssertNotNil(
-      fields["observationContinuityReason"],
-      "a caller told an ID went stale needs the reason in the same document")
-    guard case .array(let observations)? = fields["observations"],
-      case .object(let row)? = observations.first
-    else { return XCTFail("the observations must be a list of objects") }
-    XCTAssertEqual(row["candidateKey"], .string("dev-a"))
-    XCTAssertEqual(row["authorizationState"], .string("Connected"))
-    XCTAssertEqual(row["adoptedTargetId"], .null)
+  func testPresentationCacheIdentitiesCannotAdoptThroughTheCurrentOwner() async throws {
+    let root = FileManager.default.temporaryDirectory.appending(path: "observation-owner-\(UUID())")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let targets = try RuntimeTargetStore(directoryURL: root)
+    let port = TargetObservationCoordinatorContractTests.Port()
+    let owner = TargetObservationCoordinator(observation: port, targetStore: targets,
+      usbRelations: { try port.relations() }, nowUTC: { "2026-08-31T00:00:00Z" })
+    let cache = registry().stamp(snapshot(["150100424a544e4600"]))
+    let current = try await owner.snapshot()
+    let row = try XCTUnwrap(current.observations.first)
+    XCTAssertEqual(row.continuity, "relationProven")
+    XCTAssertNotEqual(row.observationID, cache.candidates.first?.observationID)
+    do {
+      _ = try await owner.adopt(TargetObservationReference(candidate: row.candidate.connectKey,
+        observationID: try XCTUnwrap(cache.candidates.first?.observationID), generation: current.generation))
+      XCTFail("a presentation cache identity cannot select a current Runtime observation")
+    } catch let error as TargetObservationFailure { XCTAssertEqual(error.code, "resourceConflict") }
+    XCTAssertTrue(try targets.list().isEmpty)
+    _ = try await owner.adopt(TargetObservationReference(candidate: row.candidate.connectKey,
+      observationID: row.observationID, generation: current.generation))
+    XCTAssertEqual(try targets.list().count, 1)
   }
 
-  /// An unstamped snapshot reports a null generation, never `0`. A caller
-  /// passing a generation to `target adopt --observation-generation` must be
-  /// passing one the Runtime issued, and `0` would look like one.
-  func testAnUnstampedSnapshotReportsNullRatherThanAPlausibleGeneration() throws {
+  func testAnUnstampedPresentationSnapshotHasNoRuntimeIdentity() throws {
     let raw = snapshot(["dev-a"])
-    guard case .object(let fields) = RuntimeControlPlaneHandler.encodeDeviceObservations(
-      raw, rows: [])
-    else { return XCTFail("the projection must be an object") }
-    XCTAssertEqual(fields["snapshotGeneration"], .null)
-
-    guard case .object(let row) = RuntimeControlPlaneHandler.encodeDeviceObservation(
-      candidate: raw.candidates[0], adoptedTarget: nil)
-    else { return XCTFail("the observation must be an object") }
-    XCTAssertEqual(
-      row["observationId"], .null,
-      "an ID a caller could pass back has to have been minted by the Runtime")
+    XCTAssertNil(raw.generation)
+    XCTAssertNil(raw.candidates.first?.observationID)
   }
 }

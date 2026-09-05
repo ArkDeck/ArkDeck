@@ -4,13 +4,13 @@ import XCTest
 @testable import ArkDeckRuntime
 @testable import ArkDeckWorkflows
 
-final class RuntimeOperationV2ContractTests: XCTestCase {
+final class RuntimeOperationContractTests: XCTestCase {
   private func minimalJSON(extra: String = "") -> Data {
     Data(
       """
       {
         "documentType": "runtime-operation-request",
-        "schemaVersion": "2.0.0",
+        "schemaVersion": "1.0.0",
         "requestId": "req-001",
         "idempotencyKey": "idem-0001",
         "target": { "targetId": "TGT-DAYU200-01" },
@@ -67,6 +67,68 @@ final class RuntimeOperationV2ContractTests: XCTestCase {
     XCTAssertEqual(encodedOnce, encodedTwice)
   }
 
+  func testCodecDirectDecoderAndDurableJobUseTheSameCurrentContract() throws {
+    let request = try RuntimeOperationCodec.decodeRequest(minimalJSON())
+    let record = RuntimeJobRecord(
+      jobID: "job-strict-request", request: request, operationReference: "observe.device@1",
+      catalogDigest: RuntimeOperationCatalog.catalogDigest, providerID: "hdc",
+      createdAtUTC: "2026-09-05T00:00:00Z", actualEffect: "readOnly",
+      materializedPlanDigest: nil, materializedStableTargetIdentitySHA256: nil,
+      materializedBindingRevision: nil)
+    let directory = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: directory) }
+    try record.persist(into: directory)
+    XCTAssertEqual(try RuntimeJobRecord.load(from: directory).request, request)
+    XCTAssertEqual(try JSONDecoder().decode(RuntimeOperationRequest.self, from: minimalJSON()), request)
+
+    let valid = try JSONDecoder().decode([String: JSONValue].self, from: minimalJSON())
+    var negatives: [[String: JSONValue]] = []
+    for version in [JSONValue.null, .integer(1), .string("1.7.3"), .string("2.0.0")] {
+      var fields = valid
+      fields["schemaVersion"] = version
+      negatives.append(fields)
+    }
+    var missing = valid
+    missing.removeValue(forKey: "schemaVersion")
+    negatives.append(missing)
+    for key in ["campaignReservation", "standingAuthorization", "evolutionCampaignConfirmation",
+                "chatConfirmation", "campaign_reservation", "futureMinorField", "changeId"] {
+      var fields = valid
+      fields[key] = .null // Presence, even null, must never fall through to default admission.
+      negatives.append(fields)
+    }
+    for key in ["target", "operation", "authorization", "clientContext"] {
+      var fields = valid
+      var nested: [String: JSONValue] = [:]
+      if case .object(let existing)? = fields[key] { nested = existing }
+      nested["standingAuthorization"] = .object([:])
+      fields[key] = .object(nested)
+      negatives.append(fields)
+    }
+    for fields in negatives {
+      let bytes = try CanonicalJSONEncoders.canonical().encode(fields)
+      XCTAssertThrowsError(try RuntimeOperationCodec.decodeRequest(bytes))
+      XCTAssertThrowsError(try JSONDecoder().decode(RuntimeOperationRequest.self, from: bytes))
+      for field in ["request", "originalSubmissionRequest"] {
+        var job = try JSONDecoder().decode([String: JSONValue].self, from: record.durableData())
+        job[field] = .object(fields)
+        try CanonicalJSONEncoders.canonical().encode(job).write(
+          to: directory.appending(path: "job-record.json"))
+        XCTAssertThrowsError(try RuntimeJobRecord.load(from: directory), field)
+      }
+    }
+  }
+
+  func testReviewedPlanPreconditionRemainsExplicitAndDoesNotAlterOperationFingerprint() throws {
+    let fields = ",\n  \"reviewedPlanDigest\": \"\(String(repeating: "a", count: 64))\""
+    XCTAssertEqual(
+      try RuntimeOperationCodec.decodeRequest(minimalJSON(extra: fields)),
+      try RuntimeOperationCodec.decodeRequest(minimalJSON()))
+    assertRejected(minimalJSON(extra: ",\n  \"reviewedPlanDigest\": null"), code: .invalidRequest)
+    assertRejected(minimalJSON(extra: ",\n  \"reviewedPlanDigest\": \"bad\""), code: .invalidRequest)
+  }
+
   func testOperationFailureRoundTripUsesClosedMachineReadableFacts() throws {
     let failure = RuntimeOperationFailure(
       code: .outcomeUnknown,
@@ -116,28 +178,24 @@ final class RuntimeOperationV2ContractTests: XCTestCase {
     }
   }
 
-  func testUnknownMajorVersionFailsClosed() {
-    for version in ["1.0.0", "3.0.0", "10.2.1", "x.0.0", ""] {
+  func testOnlyExactCurrentVersionIsAccepted() {
+    for version in ["1.7.3", "2.0.0", "3.0.0", "10.2.1", "x.0.0", "1", "1.0", ""] {
       let data = Data(
         String(decoding: minimalJSON(), as: UTF8.self)
-          .replacingOccurrences(of: "\"2.0.0\"", with: "\"\(version)\"").utf8)
+          .replacingOccurrences(of: "\"1.0.0\"", with: "\"\(version)\"").utf8)
       assertRejected(data, code: .unsupportedVersion)
     }
   }
 
-  func testMinorVersionUnknownTopLevelKeyIsForwardCompatible() throws {
-    let data = Data(
-      String(decoding: minimalJSON(extra: ",\n  \"futureMinorField\": {\"x\": 1}"), as: UTF8.self)
-        .replacingOccurrences(of: "\"2.0.0\"", with: "\"2.9.0\"").utf8)
-    let request = try RuntimeOperationCodec.decodeRequest(data)
-    XCTAssertEqual(request.requestID, "req-001")
+  func testUnknownTopLevelKeyIsRejected() {
+    assertRejected(minimalJSON(extra: ",\n  \"futureMinorField\": {\"x\": 1}"), code: .invalidRequest)
   }
 
   func testDuplicateJSONKeysAreRejected() {
     let data = Data(
       """
       {
-        "schemaVersion": "2.0.0",
+        "schemaVersion": "1.0.0",
         "requestId": "req-001",
         "requestId": "req-002",
         "idempotencyKey": "idem-0001",
@@ -151,7 +209,7 @@ final class RuntimeOperationV2ContractTests: XCTestCase {
   func testMissingSchemaVersionIsRejected() {
     let data = Data(
       String(decoding: minimalJSON(), as: UTF8.self)
-        .replacingOccurrences(of: "\"schemaVersion\": \"2.0.0\",", with: "").utf8)
+        .replacingOccurrences(of: "\"schemaVersion\": \"1.0.0\",", with: "").utf8)
     assertRejected(data, code: .unsupportedVersion)
   }
 
@@ -161,7 +219,7 @@ final class RuntimeOperationV2ContractTests: XCTestCase {
   /// carrying a reflected Swift `DecodingError` satisfies just as well. These
   /// assert the two halves a caller actually reads.
   ///
-  /// The version half is deliberately not "the message contains 2.0.0" and not
+  /// The version half is deliberately not "the message contains 1.0.0" and not
   /// "the message contains the constant the code read" — both pass while the
   /// advertised value is one admission rejects. It takes the version out of
   /// the refusal, builds a request with it, and requires that request to
@@ -169,13 +227,13 @@ final class RuntimeOperationV2ContractTests: XCTestCase {
   func testAVersionRefusalNamesAVersionThatThenWorks() throws {
     let withoutVersion = Data(
       String(decoding: minimalJSON(), as: UTF8.self)
-        .replacingOccurrences(of: "\"schemaVersion\": \"2.0.0\",", with: "").utf8)
+        .replacingOccurrences(of: "\"schemaVersion\": \"1.0.0\",", with: "").utf8)
     let wrongMajor = Data(
       String(decoding: minimalJSON(), as: UTF8.self)
-        .replacingOccurrences(of: "\"2.0.0\"", with: "\"1.0.0\"").utf8)
+        .replacingOccurrences(of: "\"1.0.0\"", with: "\"2.0.0\"").utf8)
     let malformed = Data(
       String(decoding: minimalJSON(), as: UTF8.self)
-        .replacingOccurrences(of: "\"2.0.0\"", with: "\"not-a-version\"").utf8)
+        .replacingOccurrences(of: "\"1.0.0\"", with: "\"not-a-version\"").utf8)
 
     for (label, data) in [
       ("missing", withoutVersion), ("wrong major", wrongMajor), ("malformed", malformed),
@@ -193,7 +251,7 @@ final class RuntimeOperationV2ContractTests: XCTestCase {
         reported, "\(label): the refusal names no version the caller could use")
       let repaired = Data(
         String(decoding: minimalJSON(), as: UTF8.self)
-          .replacingOccurrences(of: "\"2.0.0\"", with: "\"\(suggested)\"").utf8)
+          .replacingOccurrences(of: "\"1.0.0\"", with: "\"\(suggested)\"").utf8)
       XCTAssertNoThrow(
         try RuntimeOperationCodec.decodeRequest(repaired),
         "\(label): the version the refusal named is itself refused")
@@ -294,7 +352,7 @@ final class RuntimeOperationV2ContractTests: XCTestCase {
 
   /// The flag form used to express only target and operation, so any
   /// operation with typed inputs — nearly all of them — forced the caller to
-  /// hand-write the whole v2 document. The envelope around those inputs then
+  /// hand-write the whole current document. The envelope around those inputs then
   /// cost one refusal per field to learn.
   ///
   /// Asserted as byte equality against the hand-written document rather than
@@ -306,7 +364,7 @@ final class RuntimeOperationV2ContractTests: XCTestCase {
         """
         {
           "documentType": "runtime-operation-request",
-          "schemaVersion": "2.0.0",
+          "schemaVersion": "1.0.0",
           "requestId": "req-envelope",
           "idempotencyKey": "idem-envelope-01",
           "target": { "targetId": "TGT-DAYU200-01", "expectedBindingRevision": 7 },

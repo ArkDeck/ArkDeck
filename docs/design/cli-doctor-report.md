@@ -1,6 +1,6 @@
 # CLI doctor report
 
-`arkdeck doctor` is the read-only entry check for the headless product loop. It negotiates control protocol 2 and requests the Runtime-owned `doctor` method. The command does not create a Job, Artifact, evidence, capability, control action, or device dispatch.
+`arkdeck doctor` is the read-only entry check for the headless product loop. It verifies the current v1 control identity and requests the Runtime-owned `doctor` method. The command does not create a Job, Artifact, evidence, capability, control action, or device dispatch.
 
 The Runtime returns `arkdeck.doctor-report/1` with these invariant fields:
 
@@ -16,4 +16,4 @@ Storage remains split into `runtimeArtifacts` and `sessionOutput`. The Runtime c
 
 Without `--require-healthy`, a completed report exits zero even when it describes unavailable components. With `--require-healthy`, `ready: false` becomes `healthRequirementFailed` and exit 69; the full report is retained in error details. The CLI does not classify finding prose or keep a second blocker list.
 
-Control protocol 1 keeps the historical flat doctor projection for compatibility. The CLI target command always negotiates protocol 2.
+CLI and App consume the same versioned doctor report, including its nested runtime and Catalog checks.

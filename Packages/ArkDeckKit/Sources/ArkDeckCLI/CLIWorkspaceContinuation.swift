@@ -80,15 +80,14 @@ struct CLIWorkspaceContinuationDraft: Equatable {
       SHA256Hex.isLowercaseSHA256(sourceDigest),
       case .object(let healthFields) = health,
       Set(healthFields.keys) == [
-        "status", "protocolVersion", "supportedExactVersions", "publishedMethods",
+        "status", "protocolVersion", "contractIdentity", "publishedMethods",
         "catalogDigest", "providers",
       ],
       healthFields["status"] == .string("ok"),
-      healthFields["protocolVersion"] == .string(ArkDeckControlProtocol.targetVersion),
-      healthFields["supportedExactVersions"] == .array(
-        ArkDeckControlProtocol.supportedExactVersions.map(JSONValue.string)),
+      healthFields["protocolVersion"] == .string(ArkDeckControlProtocol.currentVersion),
+      healthFields["contractIdentity"] == .string(ArkDeckControlProtocol.contractIdentity),
       healthFields["publishedMethods"] == .array(
-        ArkDeckControlProtocol.targetMethods.sorted().map(JSONValue.string)),
+        ArkDeckControlProtocol.methods.sorted().map(JSONValue.string)),
       case .array(let providerValues)? = healthFields["providers"],
       providerValues.allSatisfy({ CLIJobEventPage.string($0)?.isEmpty == false }),
       Set(providerValues.compactMap(CLIJobEventPage.string)).count == providerValues.count,
@@ -122,7 +121,7 @@ struct CLIWorkspaceContinuationDraft: Equatable {
     } catch {
       throw session.fail(.recordUnreadable, "the source Job request is not a valid typed request")
     }
-    guard sourceRequest.authorization == nil, sourceRequest.campaignReservation == nil else {
+    guard sourceRequest.authorization == nil else {
       throw session.fail(.admissionDenied, "workspace continuation never copies Runtime authority")
     }
     guard job["jobId"] == .string(sourceJobID),
@@ -345,11 +344,8 @@ extension RuntimeCLI {
     var session = runtimeSession(&rest, command: "workspace.continuation.\(verb)")
     let options = try CLIOptions(rest)
     try options.validateAllowed([
-      "--source-job", "--continuation-request-id", "--timeout", "--require-protocol",
+      "--source-job", "--continuation-request-id", "--timeout",
     ])
-    guard options.value("--require-protocol").map({ $0 == "2" }) ?? true else {
-      throw session.fail(.invalidInput, "workspace continuation requires control protocol v2")
-    }
     guard let timeout = CLIDuration.parse(
       options.value("--timeout") ?? "30s", maximumMilliseconds: 86_400_000)
     else {
@@ -371,7 +367,7 @@ extension RuntimeCLI {
     }
 
     do {
-      try session.negotiate(requiredMajor: 2, forMethod: "job.show")
+
       let health = try session.request("health")
       let sourceShow = try session.request("job.show", ["jobId": .string(sourceJobID)])
       let targetShow: JSONValue?

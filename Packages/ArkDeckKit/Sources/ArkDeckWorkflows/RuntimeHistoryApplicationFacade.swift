@@ -448,7 +448,7 @@ actor RuntimeHistoryXPCProvider: RuntimeHistoryApplicationProviding {
 
   init(
     request: @escaping @Sendable ([String: JSONValue]) async -> RuntimeHistoryTransportResult = {
-      await RuntimeHistoryXPCReadTransport.request(method: "job.list-page", params: $0)
+      await RuntimeHistoryXPCReadTransport.request(method: "job.list", params: $0)
     }
   ) {
     self.request = request
@@ -472,13 +472,12 @@ actor RuntimeHistoryXPCProvider: RuntimeHistoryApplicationProviding {
     self.requestID = requestID
     var params: [String: JSONValue] = [
       "pageSize": .integer(Int64(Self.pageSize)),
-      "order": .string("newestFirst"),
+      "order": .string("createdAtDescJobIdAsc"),
       "includeTimeline": .bool(false),
+      "includeCurrent": .bool(true),
     ]
     if let cursor {
       params["cursor"] = .string(cursor)
-    } else {
-      params["includeCurrent"] = .bool(true)
     }
     let response = await request(params)
     // Actor isolation does not span the transport await. A refreshed first
@@ -525,15 +524,38 @@ actor RuntimeJobDetailXPCProvider: RuntimeJobDetailApplicationProviding {
     jobID: String,
     operationReference: String
   ) async -> RuntimeJobDetailPresentation {
-    async let status = request("job.status", ["jobId": .string(jobID)])
+    async let status = readDetail(jobID: jobID)
     async let evidence = request("job.evidence", ["jobId": .string(jobID)])
-    async let artifacts = request("artifact.list", ["jobId": .string(jobID)])
+    async let artifacts = readInventory(jobID: jobID)
     return await RuntimeJobDetailResponseDecoding.presentation(
       jobID: jobID,
       operationReference: operationReference,
       statusResponse: await status,
       evidenceResponse: evidence,
       artifactResponse: artifacts)
+  }
+
+  private func readDetail(jobID: String) async -> RuntimeHistoryTransportResult {
+    do {
+      let value = try await RuntimeAppReadResources.jobDetail(jobID: jobID, send: sendRead)
+      return .success(try RuntimeAppReadResources.presentationData(value))
+    } catch { return .failure(String(describing: error)) }
+  }
+
+  private func readInventory(jobID: String) async -> RuntimeHistoryTransportResult {
+    do {
+      let rows = try await RuntimeAppReadResources.artifactInventory(jobID: jobID, send: sendRead)
+      return .success(try RuntimeAppReadResources.presentationData(.object([
+        "schemaVersion": .string("arkdeck.cli.page/1"), "hasMore": .bool(false), "items": .array(rows),
+      ])))
+    } catch { return .failure(String(describing: error)) }
+  }
+
+  private func sendRead(_ method: String, _ params: [String: JSONValue]) async throws -> Data {
+    switch await request(method, params) {
+    case .success(let data): return data
+    case .failure(let reason): throw AgentExecutionControlFailure("recordUnreadable", reason)
+    }
   }
 
   func readArtifact(
@@ -557,7 +579,7 @@ actor RuntimeJobDetailXPCProvider: RuntimeJobDetailApplicationProviding {
       while offset < artifact.byteCount {
         try Task.checkCancellation()
         let response = await request("artifact.read", [
-          "jobId": .string(jobID), "artifactId": .string(artifact.id),
+          "owner": .object(["kind": .string("job"), "id": .string(jobID)]), "artifactId": .string(artifact.id),
           "offset": .integer(offset), "maxBytes": .integer(256 * 1_024),
           "allowSensitive": .bool(allowSensitive),
         ])
@@ -618,7 +640,7 @@ actor RuntimeJobDetailXPCProvider: RuntimeJobDetailApplicationProviding {
         let response = await RuntimeHistoryXPCReadTransport.request(
           method: "artifact.read",
           params: [
-            "jobId": .string(jobID),
+            "owner": .object(["kind": .string("job"), "id": .string(jobID)]),
             "artifactId": .string(artifact.id),
             "offset": .integer(offset),
             "maxBytes": .integer(256 * 1_024),
@@ -694,32 +716,17 @@ private enum RuntimeArtifactChunkResponseDecoding {
     case .success(let value): data = value
     case .failure(let reason): throw RuntimeArtifactExportFailure(message: reason)
     }
-    guard let envelope = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-    else {
-      throw RuntimeArtifactExportFailure(message: "Runtime returned an unreadable Artifact chunk")
+    let line = data.last == 0x0A ? Data(data.dropLast()) : data
+    let envelope = try ControlFrameJSON.decodeObject(line, maximumBytes: ArkDeckControlProtocol.maximumResponseFrameBytes)
+    guard envelope["ok"] == .bool(true), let result = envelope["result"] else {
+      throw RuntimeArtifactExportFailure(message: "Runtime refused Artifact access")
     }
-    if let error = envelope["error"] as? [String: Any] {
-      let code = error["code"] as? String ?? "unknown"
-      let message = error["message"] as? String ?? "no message"
-      throw RuntimeArtifactExportFailure(
-        message: "Runtime refused Artifact export: \(code) — \(message)")
+    let chunk = try ArtifactReadProjection(result)
+    guard chunk.artifactID == artifact.id, chunk.digest == artifact.sha256,
+      chunk.offset == expectedOffset, chunk.totalByteCount == artifact.byteCount else {
+      throw RuntimeArtifactExportFailure(message: "Runtime Artifact identity, digest or range changed")
     }
-    guard envelope["ok"] as? Bool == true,
-      let result = envelope["result"] as? [String: Any],
-      result["artifactId"] as? String == artifact.id,
-      let offset = int64(result["offset"]), offset == expectedOffset,
-      let nextOffset = int64(result["nextOffset"]), nextOffset > offset,
-      let total = int64(result["totalByteCount"]), total == artifact.byteCount,
-      let byteCount = int64(result["byteCount"]), byteCount == nextOffset - offset,
-      let encoded = result["base64"] as? String,
-      let bytes = Data(base64Encoded: encoded), Int64(bytes.count) == byteCount,
-      let eof = result["eof"] as? Bool,
-      nextOffset <= artifact.byteCount
-    else {
-      throw RuntimeArtifactExportFailure(
-        message: "Runtime returned incomplete or drifting Artifact chunk facts")
-    }
-    return Chunk(data: bytes, nextOffset: nextOffset, eof: eof)
+    return Chunk(data: chunk.bytes, nextOffset: Int64(chunk.nextOffset), eof: chunk.nextOffset == chunk.totalByteCount)
   }
 
   private static func int64(_ value: Any?) -> Int64? {
@@ -762,18 +769,11 @@ enum RuntimeHistoryResponseDecoding {
   /// empty history: "no jobs" and "could not read jobs" must never render the
   /// same way.
   static func presentation(from data: Data) -> RuntimeHistoryPresentation {
-    guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-      return .unavailable("ArkDeck Runtime returned an unreadable response")
+    switch page(from: data) {
+    case .available(let jobs, let cursor):
+      return RuntimeHistoryPresentation(availability: .available, jobs: jobs, hasOlderJobs: cursor != nil)
+    case .unavailable(let reason): return .unavailable(reason)
     }
-    if let error = object["error"] as? [String: Any] {
-      let code = error["code"] as? String ?? "unknown"
-      let message = error["message"] as? String ?? "no message"
-      return .unavailable("ArkDeck Runtime refused the request: \(code) — \(message)")
-    }
-    guard object["ok"] as? Bool == true, let result = object["result"] as? [[String: Any]] else {
-      return .unavailable("ArkDeck Runtime returned no job list")
-    }
-    return presentation(entries: result)
   }
 
   static func page(from data: Data) -> PageResult {
@@ -787,27 +787,14 @@ enum RuntimeHistoryResponseDecoding {
     }
     guard object["ok"] as? Bool == true,
       let result = object["result"] as? [String: Any],
-      let entries = result["jobs"] as? [[String: Any]]
+      result["schemaVersion"] as? String == "arkdeck.cli.page/1",
+      result["order"] as? String == "createdAtDescJobIdAsc",
+      let entries = result["items"] as? [[String: Any]],
+      let hasMore = result["hasMore"] as? Bool
     else {
       return .unavailable("ArkDeck Runtime returned no paged job list")
     }
-    let currentEntries: [[String: Any]]
-    if let supplied = result["currentJobs"] {
-      guard let values = supplied as? [[String: Any]] else {
-        return .unavailable("ArkDeck Runtime returned an invalid current Job list")
-      }
-      currentEntries = values
-    } else {
-      currentEntries = []
-    }
-    var combinedEntries = currentEntries
-    var knownIDs = Set(currentEntries.compactMap { $0["jobId"] as? String })
-    combinedEntries.append(
-      contentsOf: entries.filter { entry in
-        guard let jobID = entry["jobId"] as? String else { return true }
-        return knownIDs.insert(jobID).inserted
-      })
-    let presentation = presentation(entries: combinedEntries)
+    let presentation = presentation(entries: entries)
     guard case .available = presentation.availability else {
       if case .unavailable(let reason) = presentation.availability {
         return .unavailable(reason)
@@ -815,9 +802,9 @@ enum RuntimeHistoryResponseDecoding {
       return .unavailable("ArkDeck Runtime returned an unreadable history page")
     }
     let nextCursor: String?
-    if result["nextCursor"] is NSNull || result["nextCursor"] == nil {
+    if !hasMore, result["nextCursor"] is NSNull {
       nextCursor = nil
-    } else if let value = result["nextCursor"] as? String {
+    } else if hasMore, let value = result["nextCursor"] as? String, !value.isEmpty {
       nextCursor = value
     } else {
       return .unavailable("ArkDeck Runtime returned an invalid history cursor")
@@ -847,7 +834,7 @@ enum RuntimeHistoryResponseDecoding {
           waitingForHuman: entry["waitingForHuman"] as? Bool ?? false,
           outcomeUnknown: entry["outcomeUnknown"] as? Bool ?? false,
           outstandingResidueCount: entry["outstandingResidueCount"] as? Int ?? 0,
-          timeline: entry["timeline"] as? [String] ?? [],
+          timeline: (entry["timeline"] as? [String: Any])?["entries"] as? [String] ?? [],
           executionMode: entry["executionMode"] as? String,
           sessionID: entry["sessionId"] as? String,
           threadID: entry["threadId"] as? String,
@@ -988,18 +975,17 @@ enum RuntimeJobDetailResponseDecoding {
       case .unavailable(let reason): return .unavailable(reason)
       }
     }
-    guard value["jobId"] as? String == jobID,
-      value["operation"] as? String == operationReference,
-      let targetID = value["targetId"] as? String,
-      let timeline = value["timeline"] as? [String]
-    else {
-      return .unavailable("Job status did not match the selected Job")
+    guard value["schemaVersion"] as? String == "arkdeck.job/1",
+      let job = value["job"] as? [String: Any],
+      job["jobId"] as? String == jobID,
+      job["operation"] as? String == operationReference,
+      let targetID = job["targetId"] as? String,
+      let timelineProjection = value["timeline"] as? [String: Any],
+      timelineProjection["kind"] as? String == "inline",
+      let timeline = timelineProjection["entries"] as? [String] else {
+      return .unavailable("Job detail did not include the selected Job timeline")
     }
-    return .available(
-      StatusFacts(
-        targetID: targetID,
-        sessionID: value["sessionId"] as? String,
-        timeline: timeline))
+    return .available(StatusFacts(targetID: targetID, sessionID: job["sessionId"] as? String, timeline: timeline))
   }
 
   private static func decodeEvidence(
@@ -1113,8 +1099,14 @@ enum RuntimeJobDetailResponseDecoding {
     switch response {
     case .failure(let reason): return .unavailable(reason)
     case .success(let data):
-      switch resultArray(from: data, label: "Artifact metadata") {
-      case .available(let value): values = value
+      switch resultObject(from: data, label: "Artifact metadata") {
+      case .available(let page):
+        guard page["schemaVersion"] as? String == "arkdeck.cli.page/1",
+          page["hasMore"] as? Bool == false,
+          let rows = page["items"] as? [[String: Any]] else {
+          return .unavailable("Artifact inventory is incomplete")
+        }
+        values = rows
       case .unavailable(let reason): return .unavailable(reason)
       }
     }
@@ -1123,12 +1115,12 @@ enum RuntimeJobDetailResponseDecoding {
     var artifacts: [RuntimeArtifactPresentation] = []
     for value in values {
       guard
-        value["jobId"] as? String == jobID,
+        value["schemaVersion"] as? String == "arkdeck.artifact/1",
+        let owner = value["owner"] as? [String: Any], owner["kind"] as? String == "job", owner["id"] as? String == jobID,
         let artifactID = value["artifactId"] as? String,
         let name = value["name"] as? String,
         let mediaType = value["mediaType"] as? String,
         let byteCount = int64(value["byteCount"]),
-        let sha256 = value["sha256"] as? String,
         let privacy = value["privacy"] as? String,
         let status = value["status"] as? String,
         let sourceOperation = value["sourceOperation"] as? String,
@@ -1144,7 +1136,7 @@ enum RuntimeJobDetailResponseDecoding {
           role: descriptor?.artifacts.first(where: { $0.name == name })?.role.rawValue,
           mediaType: mediaType,
           byteCount: byteCount,
-          sha256: sha256,
+          sha256: value["artifactDigest"] as? String ?? "",
           privacy: privacy,
           status: status,
           statusDetail: statusDetail(value["statusDetail"]),

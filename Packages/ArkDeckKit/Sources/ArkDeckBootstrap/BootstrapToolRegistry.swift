@@ -617,9 +617,9 @@ package final class BootstrapToolRegistry {
       }
       let data = try Files.read(fd, maximum: Files.maximumMetadataBytes)
       guard Files.Identity(try Files.status(fd)) == Files.Identity(before) else { throw Files.failure("tool index changed while reading") }
-      let raw = try ControlProtocolNegotiation.decodeObject(data, maximumBytes: Files.maximumMetadataBytes)
+      let raw = try ControlFrameJSON.decodeObject(data, maximumBytes: Files.maximumMetadataBytes)
       let index = try JSONDecoder().decode(Index.self, from: data)
-      let roundtrip = try ControlProtocolNegotiation.decodeObject(CanonicalJSONEncoders.canonical().encode(index), maximumBytes: Files.maximumMetadataBytes)
+      let roundtrip = try ControlFrameJSON.decodeObject(CanonicalJSONEncoders.canonical().encode(index), maximumBytes: Files.maximumMetadataBytes)
       guard raw == roundtrip, ["arkdeck.bootstrap-tools/1", "arkdeck.bootstrap-tools/2"].contains(index.schemaVersion), index.records.count <= 128,
         index.records.map(\.reference) == index.records.map(\.reference).sorted(), Set(index.records.map(\.reference)).count == index.records.count else {
         throw Files.failure("tool index schema is invalid")

@@ -98,6 +98,7 @@ final class RuntimeToolSelectionControlActionContractTests: XCTestCase {
   }
 
   private struct TargetRequest: Encodable {
+    let contractIdentity = ArkDeckControlProtocol.contractIdentity
     let protocolVersion: String
     let id: String
     let method: String
@@ -318,7 +319,7 @@ final class RuntimeToolSelectionControlActionContractTests: XCTestCase {
     func request(_ params: [String: JSONValue]) async throws -> AgentWireProtocol.Response {
       let frame = try JSONEncoder().encode(
         TargetRequest(
-          protocolVersion: ArkDeckControlProtocol.targetVersion,
+          protocolVersion: ArkDeckControlProtocol.currentVersion,
           id: UUID().uuidString.lowercased(), method: "runtime.tool.select",
           params: params))
       return await handler.handleFrame(frame)

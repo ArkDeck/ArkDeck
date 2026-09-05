@@ -12,7 +12,7 @@ arkdeck target display-name clear \
   --target <id> --expected-generation <n> --output json
 ```
 
-Both commands require control protocol 2 and return
+Both commands use the current v1 control contract and return
 `arkdeck.target-display-name/1` with the exact target ID, the next generation,
 the name or `null`, and the update time. The initial resource has generation
 `1`, no name, and no update time. Names must already be Unicode NFC, must not

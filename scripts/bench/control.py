@@ -3,8 +3,8 @@
 The daemon speaks newline-delimited JSON over a Unix domain socket: one request
 object per line, one response object per line
 (`Packages/ArkDeckKit/Sources/ArkDeckAgentClient/AgentClient.swift`).  A session
-opens with the bootstrap negotiation frame and then carries the selected exact
-version on every domain frame.
+verifies the current health contract on the same connection before any measured
+request. Every frame carries the one current version and contract identity.
 
 This client exists so that an IPC latency sample measures the IPC, not a CLI
 process launch.  It is a measurement instrument: it submits nothing, mutates
@@ -14,16 +14,20 @@ nothing and calls only read-only methods.  It deliberately does not reimplement
 
 from __future__ import annotations
 
+import hashlib
 import json
+from pathlib import Path
 import socket
 import uuid
 
 from . import clocks
 
-BOOTSTRAP_VERSION = "arkdeck.control.negotiation/1"
-BOOTSTRAP_METHOD = "protocol.negotiate"
-SUPPORTED_EXACT_VERSIONS = ("2.0.0", "1.0.0")
-MAXIMUM_FRAME_BYTES = 4 * 1024 * 1024
+_REGISTRY_PATH = Path(__file__).resolve().parents[2] / "Packages/ArkDeckKit/Contracts/control-protocol.json"
+_REGISTRY = json.loads(_REGISTRY_PATH.read_text())
+CURRENT_VERSION = _REGISTRY["currentVersion"]
+CONTRACT_IDENTITY = hashlib.sha256(json.dumps(_REGISTRY, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+MAXIMUM_FRAME_BYTES = _REGISTRY["maximumRequestFrameBytes"]
+MAXIMUM_RESPONSE_BYTES = _REGISTRY["maximumResponseFrameBytes"]
 
 
 class ControlError(RuntimeError):
@@ -38,11 +42,11 @@ class ControlClient:
         self.timeout_seconds = timeout_seconds
         self._socket: socket.socket | None = None
         self._buffer = b""
-        self.selected_version: str | None = None
+        self._verified = False
 
     def __enter__(self) -> "ControlClient":
         self.connect()
-        self.negotiate()
+        self.verify_contract()
         return self
 
     def __exit__(self, *_exception: object) -> None:
@@ -57,12 +61,14 @@ class ControlClient:
             connection.close()
             raise ControlError(f"connect {self.socket_path}: {error}") from error
         self._socket = connection
+        self._verified = False
 
     def close(self) -> None:
         if self._socket is not None:
             self._socket.close()
             self._socket = None
         self._buffer = b""
+        self._verified = False
 
     def _exchange(self, frame: dict[str, object]) -> dict[str, object]:
         if self._socket is None:
@@ -76,26 +82,43 @@ class ControlClient:
             if not chunk:
                 raise ControlError("daemon closed the connection")
             self._buffer += chunk
+            if len(self._buffer) > MAXIMUM_RESPONSE_BYTES:
+                raise ControlError("response frame exceeds its transport limit")
         line, _, self._buffer = self._buffer.partition(b"\n")
-        return json.loads(line)
+        def unique(pairs):
+            result = {}
+            for key, value in pairs:
+                if key in result:
+                    raise ControlError("duplicate response key")
+                result[key] = value
+            return result
+        if self._buffer or b"\r" in line:
+            raise ControlError("unexpected extra response frame")
+        response = json.loads(line, object_pairs_hook=unique)
+        if not isinstance(response, dict) or response.get("id") != frame["id"]:
+            raise ControlError("response identity mismatch")
+        expected = {"id", "ok", "result"} if response.get("ok") is True else {"id", "ok", "error"}
+        if set(response) != expected or type(response.get("ok")) is not bool:
+            raise ControlError("response shape mismatch")
+        return response
 
-    def negotiate(self, required_major: int = 2) -> str:
-        response = self._exchange(
-            {
-                "bootstrapVersion": BOOTSTRAP_VERSION,
-                "id": f"bench-{uuid.uuid4()}",
-                "method": BOOTSTRAP_METHOD,
-                "supportedExactVersions": list(SUPPORTED_EXACT_VERSIONS),
-                "requiredMajor": required_major,
-            }
-        )
-        if not response.get("ok"):
-            raise ControlError(f"negotiation refused: {response}")
-        version = response.get("selectedExactVersion")
-        if not isinstance(version, str):
-            raise ControlError(f"negotiation returned no exact version: {response}")
-        self.selected_version = version
-        return version
+    def verify_contract(self) -> None:
+        response = self._exchange({
+            "protocolVersion": CURRENT_VERSION, "contractIdentity": CONTRACT_IDENTITY,
+            "id": f"bench-{uuid.uuid4()}", "method": "health",
+        })
+        health = response.get("result")
+        if (response.get("ok") is not True or not isinstance(health, dict)
+            or set(health) != {"status", "protocolVersion", "contractIdentity", "publishedMethods", "catalogDigest", "providers"}
+            or health["status"] != "ok" or health["protocolVersion"] != CURRENT_VERSION
+            or health["contractIdentity"] != CONTRACT_IDENTITY
+            or health["publishedMethods"] != _REGISTRY["methods"]
+            or not isinstance(health["catalogDigest"], str) or len(health["catalogDigest"]) != 64
+            or any(c not in "0123456789abcdef" for c in health["catalogDigest"])
+            or not isinstance(health["providers"], list)
+            or any(not isinstance(p, str) or not p for p in health["providers"])):
+            raise ControlError("connected daemon does not prove the current control contract")
+        self._verified = True
 
     def call(self, method: str, params: dict[str, object] | None = None) -> object:
         """Issue one request and return its result, raising on a refusal."""
@@ -112,10 +135,11 @@ class ControlClient:
         machine that sleeps mid-sample does not inflate the reading.
         """
 
-        if self.selected_version is None:
-            raise ControlError("call before negotiation")
+        if not self._verified:
+            raise ControlError("call before current contract verification")
         frame = {
-            "protocolVersion": self.selected_version,
+            "protocolVersion": CURRENT_VERSION,
+            "contractIdentity": CONTRACT_IDENTITY,
             "id": f"bench-{uuid.uuid4()}",
             "method": method,
             "params": params or {},

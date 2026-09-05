@@ -12,8 +12,7 @@ arkdeck trace inspect \
   --artifact <artifact-id> \
   --allow-sensitive \
   [--timeout 2m] \
-  [--require-protocol 2] \
-  [--output json]
+    [--output json]
 ```
 
 `--allow-sensitive` 必须显式提供。`--timeout` 是 Runtime parser 的执行预算，默认 `2m`，
@@ -34,7 +33,7 @@ arkdeck trace inspect \
 
 ## Runtime owner
 
-`trace.inspect` 只接受 control protocol v2。Runtime 在调用 parser 前依次证明：
+`trace.inspect` 只接受当前 control protocol 1.0.0 与精确契约身份。Runtime 在调用 parser 前依次证明：
 
 1. Job record 存在且可读；
 2. Artifact 属于该 Job，并且状态为 `published`；

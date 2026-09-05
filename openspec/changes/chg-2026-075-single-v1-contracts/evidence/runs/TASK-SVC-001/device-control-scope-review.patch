@@ -1,0 +1,237 @@
+--- a/Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceControlFacade.swift
++++ b/Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceControlFacade.swift
+@@ -270,7 +270,18 @@
+   }
+ }
+
+-private actor DeviceProductionProvider: DeviceControlProviding {
++actor DeviceProductionProvider: DeviceControlProviding {
++  private let send: RuntimeAppReadResources.Send
++
++  init(send: @escaping RuntimeAppReadResources.Send = { method, params in
++    switch await RuntimeXPCRequestTransport.request(method: method, params: params) {
++    case .success(let data): return data
++    case .failure(let error): throw DeviceFailure(message: error.message)
++    }
++  }) {
++    self.send = send
++  }
++
+   private static let artifactChunkBytes = 1 << 20
+
+   func captureScreen(target: DeviceTargetPresentation) async -> DeviceScreenshotResult {
+@@ -385,8 +396,9 @@
+     guard let jobID = submitted["jobId"] as? String, !jobID.isEmpty else {
+       throw DeviceFailure(message: "the runtime accepted no job for this request")
+     }
+-    let terminal = try await requestObject(
++    _ = try await requestObject(
+       method: "job.run", params: ["jobId": .string(jobID)], label: "Device run")
++    let terminal = try await RuntimeAppReadResources.statusPresentation(jobID: jobID, send: send)
+     let state = terminal["state"] as? String ?? "unknown"
+     let residue = terminal["outstandingResidueCount"] as? Int ?? 0
+     let waitingForHuman = terminal["waitingForHuman"] as? Bool ?? false
+@@ -420,11 +432,7 @@
+       guard terminal.state == "succeeded" else {
+         return .failed(terminal.failure ?? "the recording did not succeed")
+       }
+-      let label = "Device recording artifacts"
+-      let entries = try DeviceArtifactIndex.entries(
+-        inEnvelope: try await requestEnvelope(
+-          method: "artifact.list", params: ["jobId": .string(jobID)], label: label),
+-        label: label)
++      let entries = try await artifactEntries(jobID: jobID)
+       guard let archive = DeviceArtifactIndex.published(named: "frames.tar", in: entries) else {
+         return .failed("the recording published no verified frame archive")
+       }
+@@ -475,21 +483,20 @@
+     var data = Data()
+     var offset = 0
+     while offset < entry.byteCount {
+-      let chunk = try await requestObject(
+-        method: "artifact.read",
+-        params: [
+-          "jobId": .string(jobID),
+-          "artifactId": .string(entry.artifactID),
+-          "offset": .integer(Int64(offset)),
+-          "maxBytes": .integer(Int64(Self.artifactChunkBytes)),
+-          "allowSensitive": .bool(true),
+-        ], label: label)
+-      guard let base64 = chunk["base64"] as? String, let part = Data(base64Encoded: base64)
+-      else { throw DeviceFailure(message: "\(label): a chunk was not readable") }
+-      data.append(part)
+-      guard let next = chunk["nextOffset"] as? Int, next > offset else { break }
+-      offset = next
+-      if chunk["eof"] as? Bool == true { break }
++      try Task.checkCancellation()
++      let chunk = try ArtifactReadProjection(RuntimeAppReadResources.result(await send(
++        "artifact.read", [
++          "owner": .object(["kind": .string("job"), "id": .string(jobID)]),
++          "artifactId": .string(entry.artifactID), "offset": .integer(Int64(offset)),
++          "maxBytes": .integer(Int64(Self.artifactChunkBytes)), "allowSensitive": .bool(true),
++        ])))
++      guard chunk.artifactID == entry.artifactID, chunk.digest == entry.sha256,
++        chunk.offset == offset, chunk.totalByteCount == entry.byteCount,
++        chunk.bytes.count <= Self.artifactChunkBytes else {
++        throw DeviceFailure(message: "\(label): Artifact range identity or bounds changed")
++      }
++      data.append(chunk.bytes)
++      offset = chunk.nextOffset
+     }
+     guard data.count == entry.byteCount else {
+       throw DeviceFailure(
+@@ -504,88 +511,37 @@
+   private func readScreenshot(jobID: String) async throws -> (
+     data: Data, width: Int, height: Int
+   ) {
+-    let label = "Device artifacts"
+-    let entries = try DeviceArtifactIndex.entries(
+-      inEnvelope: try await requestEnvelope(
+-        method: "artifact.list", params: ["jobId": .string(jobID)], label: label),
+-      label: label)
++    let entries = try await artifactEntries(jobID: jobID)
+     guard let entry = DeviceArtifactIndex.screenshot(in: entries) else {
+       throw DeviceFailure(message: "the capture published no verified screenshot")
+     }
+-    let artifactID = entry.artifactID
+-    let expectedSHA = entry.sha256
+-    let byteCount = entry.byteCount
+-    var data = Data()
+-    var offset = 0
+-    while offset < byteCount {
+-      let chunk = try await requestObject(
+-        method: "artifact.read",
+-        params: [
+-          // The runtime scopes every artifact read to the job that published
+-          // it, so the job id travels with the artifact id on every chunk.
+-          "jobId": .string(jobID),
+-          "artifactId": .string(artifactID),
+-          "offset": .integer(Int64(offset)),
+-          "maxBytes": .integer(Int64(Self.artifactChunkBytes)),
+-          "allowSensitive": .bool(true),
+-        ], label: "Device screenshot read")
+-      guard let base64 = chunk["base64"] as? String, let part = Data(base64Encoded: base64)
+-      else {
+-        throw DeviceFailure(message: "the screenshot chunk was not readable")
+-      }
+-      data.append(part)
+-      guard let next = chunk["nextOffset"] as? Int, next > offset else { break }
+-      offset = next
+-      if chunk["eof"] as? Bool == true { break }
+-    }
+-    guard data.count == byteCount else {
+-      throw DeviceFailure(
+-        message: "the screenshot is \(data.count) bytes but the runtime published \(byteCount)")
+-    }
+-    guard DeviceScreenshotIntegrity.sha256Hex(data) == expectedSHA.lowercased() else {
+-      throw DeviceFailure(message: "the screenshot did not match its published digest")
+-    }
++    let data = try await readArtifact(jobID: jobID, entry: entry, label: "Device screenshot")
+     guard let size = DeviceScreenshotIntegrity.pixelSize(data) else {
+       throw DeviceFailure(message: "the screenshot is not a readable picture")
+     }
+     return (data, size.width, size.height)
+   }
+
+-  /// The raw reply bytes. Parsing lives in `DeviceArtifactIndex` so a test
+-  /// can drive it with what the daemon actually sends.
+-  private func requestEnvelope(
+-    method: String, params: [String: JSONValue], label: String
+-  ) async throws -> Data {
+-    switch await RuntimeXPCRequestTransport.request(method: method, params: params) {
+-    case .failure(let error):
+-      throw DeviceFailure(message: "\(label) failed: \(error.message)")
+-    case .success(let data):
+-      return data
+-    }
++  private func artifactEntries(jobID: String) async throws -> [[String: Any]] {
++    let rows = try await RuntimeAppReadResources.artifactInventory(jobID: jobID, send: send)
++    guard let entries = try JSONSerialization.jsonObject(
++      with: CanonicalJSONEncoders.canonical().encode(rows)) as? [[String: Any]] else {
++      throw DeviceFailure(message: "Device Artifact inventory was unreadable")
++    }
++    return entries
+   }
+
+   private func requestObject(
+     method: String, params: [String: JSONValue], label: String
+   ) async throws -> [String: Any] {
+-    switch await RuntimeXPCRequestTransport.request(method: method, params: params) {
+-    case .failure(let error):
+-      throw DeviceFailure(message: "\(label) failed: \(error.message)")
+-    case .success(let data):
+-      guard
+-        let envelope = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+-      else {
+-        throw DeviceFailure(message: "\(label) returned an unreadable response")
+-      }
+-      if let error = envelope["error"] as? [String: Any] {
+-        let message = error["message"] as? String ?? "\(error)"
+-        throw DeviceFailure(message: "\(label) was refused: \(message)")
+-      }
+-      guard let result = envelope["result"] as? [String: Any] else {
+-        throw DeviceFailure(message: "\(label) returned no result")
+-      }
+-      return result
+-    }
+-  }
++    let value = try RuntimeAppReadResources.result(await send(method, params))
++    guard let result = try JSONSerialization.jsonObject(
++      with: CanonicalJSONEncoders.canonical().encode(value)) as? [String: Any] else {
++      throw DeviceFailure(message: "\(label) returned no result")
++    }
++    return result
++  }
++
+ }
+
+ /// Screenshot checks that do not need an image framework, so they can run in
+@@ -658,17 +614,8 @@
+   }
+ }
+
+-/// The timeline reader, kept outside the actor so it can be exercised
+-/// directly rather than through a hole opened in the actor for tests.
+-/// How the workspace reads the runtime's artifact index.
+-///
+-/// Split out from the transport so a test can drive it with the daemon's own
+-/// reply bytes. Both halves of this were wrong and neither was caught: the
+-/// runtime answers `artifact.list` with a bare array, and the workspace read
+-/// it as an object; and every chunk of `artifact.read` is scoped to the job
+-/// that published it, and the workspace sent only the artifact id. Each
+-/// mistake alone makes every capture fail, which is what the workspace showed
+-/// on hardware while the runtime job succeeded and the screenshot existed.
++/// Current immutable Artifact metadata used by the Device workspace.
++/// Production inventory reads collect and validate every bounded snapshot page.
+ public enum DeviceArtifactIndex {
+   public struct IndexUnreadable: Error, Equatable { public let message: String }
+
+@@ -687,8 +634,17 @@
+       let message = error["message"] as? String ?? "\(error)"
+       throw IndexUnreadable(message: "\(label) was refused: \(message)")
+     }
+-    guard let result = envelope["result"] as? [[String: Any]] else {
+-      throw IndexUnreadable(message: "\(label) returned no list")
++    guard envelope["ok"] as? Bool == true,
++      let page = envelope["result"] as? [String: Any],
++      page["schemaVersion"] as? String == "arkdeck.cli.page/1",
++      page["hasMore"] as? Bool == false,
++      let result = page["items"] as? [[String: Any]] else {
++      throw IndexUnreadable(message: "\(label) returned no complete Artifact page")
++    }
++    for row in result {
++      let value = try JSONDecoder().decode(JSONValue.self,
++        from: JSONSerialization.data(withJSONObject: row))
++      _ = try ArtifactResourceProjection(value)
+     }
+     return result
+   }
+@@ -703,7 +659,7 @@
+       let entry = entries.first(where: { $0["name"] as? String == name }),
+       let artifactID = entry["artifactId"] as? String,
+       entry["status"] as? String == "published",
+-      let sha256 = entry["sha256"] as? String,
++      let sha256 = entry["artifactDigest"] as? String,
+       let byteCount = entry["byteCount"] as? Int
+     else { return nil }
+     return PublishedEntry(artifactID: artifactID, sha256: sha256, byteCount: byteCount)

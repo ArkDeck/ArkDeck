@@ -481,16 +481,16 @@ private struct SessionFixture {
     if defect == "traceCategoriesType" { parameters["traceCategories"] = [1] }
     let detail = RuntimeJobDetailResponseDecoding.presentation(
       jobID: jobID, operationReference: operation,
-      statusResponse: try response([
+      statusResponse: .success(try currentJobDetailResponse([
         "jobId": jobID, "operation": operation, "targetId": defect == "target" ? "other-target" : "target-1",
         "sessionId": "session-1", "timeline": ["queued", "running", "succeeded"],
-      ]),
+      ])),
       evidenceResponse: try response([
         "jobId": jobID, "operationReference": operation, "catalogDigest": String(repeating: "a", count: 64),
         "providerId": "hdc", "executionMode": "execute", "terminalState": "succeeded",
         "parameters": parameters,
       ]),
-      artifactResponse: try response(inventory))
+      artifactResponse: .success(try currentArtifactPageResponse(inventory)))
     let job = RuntimeJobSummaryPresentation(
       id: jobID, operationReference: operation, targetID: "target-1", state: "succeeded",
       waitingForHuman: false, outcomeUnknown: false, outstandingResidueCount: 0, timeline: [],

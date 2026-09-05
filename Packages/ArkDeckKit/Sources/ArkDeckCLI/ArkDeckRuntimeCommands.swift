@@ -201,7 +201,7 @@ enum RuntimeCLI {
     var session = runtimeSession(&rest, command: "doctor")
     let deep = rest.contains("--deep")
     let requireHealthy = rest.contains("--require-healthy")
-    try session.negotiate(requiredMajor: 2, forMethod: "doctor")
+
     let report = try session.request("doctor", ["deep": .bool(deep)])
     guard let ready = doctorReadiness(report) else {
       throw session.fail(
@@ -725,20 +725,38 @@ enum RuntimeCLI {
   private static func agentdRestartJobPreflight(_ client: AgentClient) throws
     -> AgentdRestartJobPreflight
   {
-    let listed = try client.request(
-      method: "job.list-page",
-      params: [
-        "pageSize": .integer(1),
-        "order": .string("newestFirst"),
-        "includeTimeline": .bool(false),
-        "includeCurrent": .bool(true),
-      ])
-    guard case .object(let fields) = listed,
-      case .array(let current)? = fields["currentJobs"]
-    else {
-      throw CLIError(
-        exitCode: 69, message: "daemon did not return its current Runtime Job set")
-    }
+    var cursor: String?
+    var snapshot: JSONValue?
+    var seen = Set<String>()
+    var current: [JSONValue] = []
+    repeat {
+      var params: [String: JSONValue] = ["pageSize": .integer(1000),
+        "order": .string("createdAtDescJobIdAsc"), "includeTimeline": .bool(false), "includeCurrent": .bool(true)]
+      if let cursor { params["cursor"] = .string(cursor) }
+      let page = try client.request(method: "job.list", params: params)
+      guard case .object(let fields) = page, fields["schemaVersion"] == .string("arkdeck.cli.page/1"),
+        case .array(let rows)? = fields["items"], rows.count <= 1000,
+        case .bool(let more)? = fields["hasMore"],
+        snapshot == nil || snapshot == fields["snapshotRevision"] else {
+        throw CLIError(exitCode: 69, message: "daemon did not return its complete current Job snapshot")
+      }
+      snapshot = fields["snapshotRevision"]
+      for row in rows {
+        guard case .object(let job) = row, case .bool(let isCurrent)? = job["current"] else {
+          throw CLIError(exitCode: 69, message: "daemon returned an incomplete Job summary")
+        }
+        if isCurrent { current.append(row) }
+      }
+      if more {
+        guard !rows.isEmpty, case .string(let next)? = fields["nextCursor"], seen.insert(next).inserted else {
+          throw CLIError(exitCode: 69, message: "daemon repeated a Job snapshot page")
+        }
+        cursor = next
+      } else {
+        guard fields["nextCursor"] == .null else { throw CLIError(exitCode: 69, message: "daemon returned an invalid final Job page") }
+        cursor = nil
+      }
+    } while cursor != nil
     return try classifyAgentdRestartCurrentJobs(current)
   }
 
@@ -1519,13 +1537,7 @@ enum RuntimeCLI {
   static func deviceCandidatesRequest(_ arguments: [String]) -> (
     method: String, params: [String: JSONValue]?
   ) {
-    // The published array remains the default in every rendering mode.
-    // A new option opts into the additive snapshot method; merely upgrading
-    // the CLI must not change existing scripts' response shape (§12).
-    let method = arguments.contains("--snapshot") ? "device.observations" : "device.candidates"
-    let params: [String: JSONValue]? =
-      arguments.contains("--use-warm-snapshot") ? ["useWarmSnapshot": .bool(true)] : nil
-    return (method, params)
+    ("device.observations", nil)
   }
 
   static func runDevice(_ arguments: [String]) throws {
@@ -1543,11 +1555,6 @@ enum RuntimeCLI {
     case "wait":
       try emitDeviceWait(rest, session: session)
     case "candidates":
-      if rest.contains("--require-protocol") {
-        try session.negotiate(requiredMajor: 2, forMethod: "device.observations")
-        session.emit(try session.request("device.observations"))
-        return
-      }
       // The one read an external Agent starts from: what is plugged in, whether
       // it is authorized, and whether it is already adopted. It observes and
       // never adopts — the Runtime's adopt path is a separate, explicit call.
@@ -1555,12 +1562,6 @@ enum RuntimeCLI {
       session.emit(try session.request(request.method, request.params))
     case "list", "show":
       session.emit(try session.request("target.list"))
-    case "adopt":
-      var params: [String: JSONValue] = [:]
-      if let index = rest.firstIndex(of: "--candidate"), index + 1 < rest.count {
-        params["candidate"] = .string(rest[index + 1])
-      }
-      session.emit(try session.request("target.adopt", params))
     default:
       throw CLIError(exitCode: EX_USAGE, message: "unsupported device subcommand")
     }
@@ -1595,7 +1596,7 @@ enum RuntimeCLI {
       params["name"] = .string(name)
     }
     let method = "device.display-name.\(verb)"
-    try session.negotiate(requiredMajor: 2, forMethod: method)
+
     session.emit(try session.request(method, params))
   }
 
@@ -1611,7 +1612,7 @@ enum RuntimeCLI {
     var rest = Array(arguments.dropFirst(2))
     var session = runtimeSession(&rest, command: "history.filter.\(verb)")
     let method = "history.filter.\(verb)"
-    try session.negotiate(requiredMajor: 2, forMethod: method)
+
     if verb == "list" {
       session.emit(try session.request(method))
       return
@@ -1730,11 +1731,10 @@ enum RuntimeCLI {
       }
       var params: [String: JSONValue] = ["pageSize": .integer(Int64(pageSize))]
       if let cursor = options.value("--cursor") { params["cursor"] = .string(cursor) }
-      var negotiatedSession = session
-      try negotiatedSession.negotiate(
-        requiredMajor: 2, forMethod: "recovery.flash-invocation.list")
-      negotiatedSession.emit(
-        try negotiatedSession.request("recovery.flash-invocation.list", params))
+      var resourceSession = session
+
+      resourceSession.emit(
+        try resourceSession.request("recovery.flash-invocation.list", params))
     case "start":
       session.emit(
         try session.request(
@@ -1876,11 +1876,6 @@ enum RuntimeCLI {
       try runRuntimeStorage(rest)
     case "health":
       var session = runtimeSession(&rest, command: "runtime.health")
-      if let index = rest.firstIndex(of: "--require-protocol"), index + 1 < rest.count,
-        let major = Int(rest[index + 1])
-      {
-        try session.negotiate(requiredMajor: major, forMethod: "health")
-      }
       session.emit(try session.request("health"))
     case "hdc":
       if ["impact-preview", "restart"].contains(rest.first ?? "") {
@@ -1892,10 +1887,8 @@ enum RuntimeCLI {
       }
       var hdcRest = Array(rest.dropFirst())
       var session = runtimeSession(&hdcRest, command: "runtime.hdc.status")
-      let options = try CLIOptions(hdcRest)
-      let major = Int(options.value("--require-protocol") ?? "2") ?? 0
-      let method = major == 1 ? "runtime.hdc-status" : "runtime.hdc.status"
-      try session.negotiate(requiredMajor: major, forMethod: method)
+      let method = "runtime.hdc.status"
+
       session.emit(try session.request(method))
     default:
       throw CLIError(exitCode: EX_USAGE, message: "unsupported runtime subcommand")
@@ -1985,7 +1978,7 @@ enum RuntimeCLI {
     var session = runtimeSession(&rest, command: "runtime.storage.\(verb)")
     let options = try CLIOptions(rest)
     let method = "runtime.storage.\(verb)"
-    try session.negotiate(requiredMajor: 2, forMethod: method)
+
     var fields: [String: JSONValue] = [:]
     if verb != "status" {
       guard let generation = options.value("--expected-generation") else {
@@ -2113,7 +2106,7 @@ enum RuntimeCLI {
       else {
         throw session.fail(.invalidOption, "target adopt requires an exact observation reference")
       }
-      try session.negotiate(requiredMajor: 2, forMethod: "target.adopt")
+
       let result = try session.request("target.adopt", [
         "candidate": .string(candidate), "observationId": .string(observation),
         "observationGeneration": .string(generation),
@@ -2177,7 +2170,7 @@ enum RuntimeCLI {
       params["name"] = .string(name)
     }
     let method = "target.display-name.\(verb)"
-    try session.negotiate(requiredMajor: 2, forMethod: method)
+
     session.emit(try session.request(method, params))
   }
 
@@ -2219,7 +2212,7 @@ enum RuntimeCLI {
       } catch let failure as AgentExecutionControlFailure {
         throw session.fail(.invalidInput, failure.message)
       }
-      try session.negotiate(requiredMajor: 2, forMethod: "trace.inspect")
+
       let value = try session.request(
         "trace.inspect",
         [
@@ -2249,7 +2242,7 @@ enum RuntimeCLI {
       let method = "trace.cache.\(arguments[1])"
       var rest = Array(arguments.dropFirst(2))
       var session = runtimeSession(&rest, command: method)
-      try session.negotiate(requiredMajor: 2, forMethod: method)
+
       session.emit(try session.request(method))
       return
     }
@@ -2390,10 +2383,9 @@ enum RuntimeCLI {
     // executor still consumes several frozen 1.x read projections. Preserve
     // those reads, but cross the Job admission boundary through the target
     // owner so a refusal publishes its exact reason and zero-dispatch proof.
-    let legacyReadClient = session.client
-    try session.negotiate(requiredMajor: 2, forMethod: "job.submit")
+
     let executor = AgentRuntimeExecutor(
-      client: legacyReadClient, jobSubmissionClient: session.client,
+      client: session.client,
       nowUTC: RuntimeCLI.utcNow)
     let outcome: RuntimeAgentExecutionOutcome
     do {
@@ -2633,665 +2625,18 @@ enum RuntimeCLI {
   }
 
   static func runArtifact(_ arguments: [String]) throws {
-    if let verb = arguments.first, usesArtifactResource(verb, rest: Array(arguments.dropFirst())) {
+    guard let verb = arguments.first else { throw CLIError(exitCode: EX_USAGE, message: "artifact subcommand is required") }
+    if usesArtifactResource(verb, rest: Array(arguments.dropFirst())) {
       try runArtifactResource(verb, rest: Array(arguments.dropFirst()))
-      return
-    }
-    if arguments.first == "import" {
+    } else if verb == "import" {
       try runDurableImport(Array(arguments.dropFirst()))
-      return
-    }
-    guard let subcommand = arguments.first else {
-      throw CLIError(
-        exitCode: EX_USAGE,
-        message:
-          "missing artifact subcommand "
-          + "(import-hap|import-workspace-patch|import-flash-bundle|"
-          + "import-native-library|list|inspect|read|export)")
-    }
-    var rest = Array(arguments.dropFirst())
-    let session = runtimeSession(&rest, command: "artifact.\(subcommand)")
-    session.warnIfLegacy()
-    let client = session.client
-    if subcommand == "import-flash-bundle" {
-      try importFlashBundle(rest, session: session)
-      return
-    }
-    if subcommand == "import-hap" {
-      guard let targetIndex = rest.firstIndex(of: "--target"), targetIndex + 1 < rest.count,
-        let fileIndex = rest.firstIndex(of: "--file"), fileIndex + 1 < rest.count
-      else {
-        throw CLIError(
-          exitCode: EX_USAGE,
-          message:
-            "artifact import-hap requires --target <id> --file <package.hap|package.hsp>")
-      }
-      let targetID = rest[targetIndex + 1]
-      let payload = try readHAPImportPayload(path: rest[fileIndex + 1])
-      let begin = try session.request("artifact.importHap.begin",
-[
-          "targetId": .string(targetID),
-          "name": .string(payload.name),
-          "byteCount": .integer(Int64(payload.contents.count)),
-          "sha256": .string(payload.sha256),
-        ])
-      guard case .object(let beginFields) = begin,
-        case .string(let uploadID)? = beginFields["uploadId"],
-        case .integer(let maximumChunkValue)? = beginFields["maximumChunkBytes"],
-        maximumChunkValue > 0, maximumChunkValue <= Int64(Int.max)
-      else {
-        throw AgentClientError.malformedResponse(
-          "artifact.importHap.begin returned no bounded upload identity")
-      }
-      var committed = false
-      defer {
-        if !committed {
-          _ = try? session.request("artifact.importHap.abort",
-["uploadId": .string(uploadID)])
-        }
-      }
-      let maximumChunk = Int(maximumChunkValue)
-      var offset = 0
-      while offset < payload.contents.count {
-        let end = min(payload.contents.count, offset + maximumChunk)
-        let chunk = payload.contents.subdata(in: offset..<end)
-        let appended = try session.request("artifact.importHap.append",
-[
-            "uploadId": .string(uploadID),
-            "offset": .integer(Int64(offset)),
-            "base64": .string(chunk.base64EncodedString()),
-          ])
-        guard case .object(let fields) = appended,
-          case .integer(let nextOffset)? = fields["nextOffset"],
-          nextOffset == Int64(end)
-        else {
-          throw AgentClientError.malformedResponse(
-            "artifact.importHap.append returned a mismatched offset")
-        }
-        offset = end
-      }
-      let result = try session.request("artifact.importHap.commit",
-["uploadId": .string(uploadID)])
-      committed = true
-      session.emit(result)
-      return
-    }
-    if subcommand == "import-workspace-patch" {
-      guard let targetIndex = rest.firstIndex(of: "--target"),
-        targetIndex + 1 < rest.count,
-        let fileIndex = rest.firstIndex(of: "--file"),
-        fileIndex + 1 < rest.count
-      else {
-        throw CLIError(
-          exitCode: EX_USAGE,
-          message:
-            "artifact import-workspace-patch requires --target <id> --file <change.patch>")
-      }
-      let targetID = rest[targetIndex + 1]
-      let payload = try readWorkspacePatchImportPayload(path: rest[fileIndex + 1])
-      let begin = try session.request("artifact.importWorkspacePatch.begin",
-[
-          "targetId": .string(targetID),
-          "name": .string(payload.name),
-          "byteCount": .integer(Int64(payload.contents.count)),
-          "sha256": .string(payload.sha256),
-        ])
-      guard case .object(let beginFields) = begin,
-        case .string(let uploadID)? = beginFields["uploadId"],
-        case .integer(let maximumChunkValue)? = beginFields["maximumChunkBytes"],
-        maximumChunkValue > 0, maximumChunkValue <= Int64(Int.max)
-      else {
-        throw AgentClientError.malformedResponse(
-          "artifact.importWorkspacePatch.begin returned no bounded upload identity")
-      }
-      var committed = false
-      defer {
-        if !committed {
-          _ = try? session.request("artifact.importWorkspacePatch.abort",
-["uploadId": .string(uploadID)])
-        }
-      }
-      let maximumChunk = Int(maximumChunkValue)
-      var offset = 0
-      while offset < payload.contents.count {
-        let end = min(payload.contents.count, offset + maximumChunk)
-        let chunk = payload.contents.subdata(in: offset..<end)
-        let appended = try session.request("artifact.importWorkspacePatch.append",
-[
-            "uploadId": .string(uploadID),
-            "offset": .integer(Int64(offset)),
-            "base64": .string(chunk.base64EncodedString()),
-          ])
-        guard case .object(let fields) = appended,
-          case .integer(let nextOffset)? = fields["nextOffset"],
-          nextOffset == Int64(end)
-        else {
-          throw AgentClientError.malformedResponse(
-            "artifact.importWorkspacePatch.append returned a mismatched offset")
-        }
-        offset = end
-      }
-      let result = try session.request("artifact.importWorkspacePatch.commit",
-["uploadId": .string(uploadID)])
-      committed = true
-      session.emit(result)
-      return
-    }
-    if subcommand == "import-native-library" {
-      guard let targetIndex = rest.firstIndex(of: "--target"),
-        targetIndex + 1 < rest.count,
-        let fileIndex = rest.firstIndex(of: "--file"),
-        fileIndex + 1 < rest.count
-      else {
-        throw CLIError(
-          exitCode: EX_USAGE,
-          message:
-            "artifact import-native-library requires "
-            + "--target <id> --file <libname.so>")
-      }
-      let targetID = rest[targetIndex + 1]
-      let payload = try readNativeLibraryImportPayload(
-        path: rest[fileIndex + 1])
-      let begin = try session.request("artifact.importNativeLibrary.begin",
-[
-          "targetId": .string(targetID),
-          "name": .string(payload.name),
-          "byteCount": .integer(Int64(payload.contents.count)),
-          "sha256": .string(payload.sha256),
-        ])
-      guard case .object(let beginFields) = begin,
-        case .string(let uploadID)? = beginFields["uploadId"],
-        case .integer(let maximumChunkValue)? =
-          beginFields["maximumChunkBytes"],
-        maximumChunkValue > 0, maximumChunkValue <= Int64(Int.max)
-      else {
-        throw AgentClientError.malformedResponse(
-          "artifact.importNativeLibrary.begin returned no bounded upload identity")
-      }
-      var committed = false
-      defer {
-        if !committed {
-          _ = try? session.request("artifact.importNativeLibrary.abort",
-["uploadId": .string(uploadID)])
-        }
-      }
-      let maximumChunk = Int(maximumChunkValue)
-      var offset = 0
-      while offset < payload.contents.count {
-        let end = min(payload.contents.count, offset + maximumChunk)
-        let chunk = payload.contents.subdata(in: offset..<end)
-        let appended = try session.request("artifact.importNativeLibrary.append",
-[
-            "uploadId": .string(uploadID),
-            "offset": .integer(Int64(offset)),
-            "base64": .string(chunk.base64EncodedString()),
-          ])
-        guard case .object(let fields) = appended,
-          case .integer(let nextOffset)? = fields["nextOffset"],
-          nextOffset == Int64(end)
-        else {
-          throw AgentClientError.malformedResponse(
-            "artifact.importNativeLibrary.append returned a mismatched offset")
-        }
-        offset = end
-      }
-      let result = try session.request("artifact.importNativeLibrary.commit",
-["uploadId": .string(uploadID)])
-      committed = true
-      session.emit(result)
-      return
-    }
-    if subcommand == "quota" {
-      // Store headroom belongs to the store, not to a job: a caller asks it
-      // before it starts work, when it has no job to name yet.
+    } else if verb == "quota" {
+      var rest = Array(arguments.dropFirst())
+      let session = runtimeSession(&rest, command: "artifact.quota")
       session.emit(try session.request("artifact.quota"))
-      return
-    }
-    guard let jobIndex = rest.firstIndex(of: "--job"), jobIndex + 1 < rest.count else {
-      throw CLIError(exitCode: EX_USAGE, message: "artifact commands require --job <id>")
-    }
-    var params: [String: JSONValue] = ["jobId": .string(rest[jobIndex + 1])]
-    if let index = rest.firstIndex(of: "--artifact"), index + 1 < rest.count {
-      params["artifactId"] = .string(rest[index + 1])
-    }
-    if rest.contains("--allow-sensitive") { params["allowSensitive"] = .bool(true) }
-    switch subcommand {
-    case "list":
-      session.emit(try session.request("artifact.list", params))
-    case "inspect":
-      guard params["artifactId"] != nil else {
-        throw CLIError(exitCode: EX_USAGE, message: "artifact inspect requires --artifact <id>")
-      }
-      session.emit(try session.request("artifact.inspect", params))
-    case "read":
-      guard params["artifactId"] != nil else {
-        throw CLIError(exitCode: EX_USAGE, message: "artifact read requires --artifact <id>")
-      }
-      // The registry has already refused an out-of-range `--max-bytes`, so the
-      // daemon's silent clamp cannot rewrite this caller's intent into a short
-      // read they would be unable to tell from the end of the artifact.
-      if let index = rest.firstIndex(of: "--offset"), index + 1 < rest.count,
-        let offset = Int64(rest[index + 1])
-      {
-        params["offset"] = .integer(offset)
-      }
-      if let index = rest.firstIndex(of: "--max-bytes"), index + 1 < rest.count,
-        let maximum = Int64(rest[index + 1])
-      {
-        params["maxBytes"] = .integer(maximum)
-      }
-      let read = try session.request("artifact.read", params)
-      guard rest.contains("--raw") else {
-        session.emit(read)
-        return
-      }
-      // §8.1: raw is bytes and nothing else — no envelope, and no trailing
-      // newline that would corrupt a binary artifact reassembled from several
-      // range reads.
-      guard case .object(let fields) = read, case .string(let base64)? = fields["base64"],
-        let bytes = Data(base64Encoded: base64)
-      else {
-        throw session.fail(
-          .recordUnreadable, "the Runtime returned no readable bytes for this range")
-      }
-      FileHandle.standardOutput.write(bytes)
-    case "export":
-      guard params["artifactId"] != nil else {
-        throw CLIError(exitCode: EX_USAGE, message: "artifact export requires --artifact <id>")
-      }
-      guard let index = rest.firstIndex(of: "--destination"), index + 1 < rest.count else {
-        throw CLIError(
-          exitCode: EX_USAGE, message: "artifact export requires --destination <directory>")
-      }
-      params["destinationDirectory"] = .string(rest[index + 1])
-      session.emit(try session.request("artifact.export",
-params))
-    default:
-      throw CLIError(exitCode: EX_USAGE, message: "unsupported artifact subcommand")
-    }
+    } else { throw CLIError(exitCode: EX_USAGE, message: "unsupported artifact subcommand") }
   }
 
-  private static func importFlashBundle(
-    _ arguments: [String],
-    session: CLIRuntimeSession
-  ) throws {
-    let client = session.client
-    guard let targetIndex = arguments.firstIndex(of: "--target"),
-      targetIndex + 1 < arguments.count,
-      let fileIndex = arguments.firstIndex(of: "--file"),
-      fileIndex + 1 < arguments.count
-    else {
-      throw CLIError(
-        exitCode: EX_USAGE,
-        message:
-          "artifact import-flash-bundle requires "
-          + "--target <id> --file <images.tar.gz> "
-          + "[--device-profile <dayu200>]")
-    }
-    let targetID = arguments[targetIndex + 1]
-    let url = URL(filePath: arguments[fileIndex + 1]).standardizedFileURL
-    // The vendor publishes `version-Daily_Version-OpenHarmony_7.0.0.37-…-\
-    // dayu200_img.tar.gz`. Requiring a rename before the product would look at
-    // the file was never a safety check — the archive is judged by reading it.
-    let profileReference: String
-    if let profileIndex = arguments.firstIndex(of: "--device-profile"),
-      profileIndex + 1 < arguments.count
-    {
-      profileReference = arguments[profileIndex + 1]
-    } else {
-      profileReference = "dayu200"
-    }
-    guard RockchipFlashProfile.profile(reference: profileReference) != nil else {
-      throw CLIError(
-        exitCode: EX_USAGE,
-        message: "unsupported DAYU200 device profile \(profileReference)")
-    }
-    session.emit(
-      try importFlashBundleResult(
-        session: session, targetID: targetID, url: url, expectedProfile: nil))
-  }
-
-  /// Streams the archive to the daemon and returns the commit response. The
-  /// wire name is the published member name the daemon pins; the on-disk
-  /// basename is not what identifies these bytes. A campaign supplies its
-  /// admission-derived profile and must match its exact size/SHA before the
-  /// first RPC. The generic import lane accepts a structurally valid new daily
-  /// and lets daemon validation derive its identity. Both lanes re-hash the
-  /// same descriptor while uploading and reject source-file drift.
-  private static func importFlashBundleResult(
-    session: CLIRuntimeSession,
-    targetID: String,
-    url: URL,
-    expectedProfile: RockchipFlashProfile?
-  ) throws -> JSONValue {
-    let descriptor = Darwin.open(url.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
-    guard descriptor >= 0 else {
-      throw CLIError(
-        exitCode: EX_USAGE,
-        message: "cannot open flash bundle file (errno \(errno))")
-    }
-    defer { Darwin.close(descriptor) }
-    var before = stat()
-    guard fstat(descriptor, &before) == 0,
-      before.st_mode & S_IFMT == S_IFREG,
-      before.st_size > 0
-    else {
-      throw CLIError(
-        exitCode: EX_DATAERR,
-        message: "flash bundle must be a non-empty regular file")
-    }
-    // What the daemon is told the upload will be. It reads the archive itself
-    // and refuses one that does not arrive as declared, or does not fit the
-    // board; the CLI states facts about the file it holds, and pins nothing.
-    let declaredByteCount = Int64(before.st_size)
-    let declaredSHA256 = try Self.streamedDigest(ofDescriptor: descriptor)
-    if let expectedProfile {
-      guard declaredByteCount == expectedProfile.archiveSizeBytes,
-        declaredSHA256 == expectedProfile.archiveSHA256
-      else {
-        throw CLIError(
-          exitCode: EX_DATAERR,
-          message:
-            "flash bundle size or SHA-256 does not match the profile materialized by admission")
-      }
-    }
-
-    let begin = try session.request("artifact.importFlashBundle.begin",
-[
-        "targetId": .string(targetID),
-        "name": .string("images.tar.gz"),
-        "byteCount": .integer(declaredByteCount),
-        "sha256": .string(declaredSHA256),
-      ])
-    guard case .object(let beginFields) = begin,
-      case .string(let uploadID)? = beginFields["uploadId"],
-      case .integer(let maximumChunkValue)? = beginFields["maximumChunkBytes"],
-      maximumChunkValue > 0, maximumChunkValue <= Int64(Int.max)
-    else {
-      throw AgentClientError.malformedResponse(
-        "artifact.importFlashBundle.begin returned no bounded upload identity")
-    }
-    var committed = false
-    defer {
-      if !committed {
-        _ = try? session.request("artifact.importFlashBundle.abort",
-["uploadId": .string(uploadID)])
-      }
-    }
-
-    let maximumChunk = Int(maximumChunkValue)
-    var buffer = [UInt8](repeating: 0, count: maximumChunk)
-    var hasher = SHA256()
-    var offset = 0
-    while true {
-      let count = Darwin.read(descriptor, &buffer, buffer.count)
-      if count < 0, errno == EINTR { continue }
-      guard count >= 0 else {
-        throw CLIError(
-          exitCode: EX_IOERR,
-          message: "flash bundle read failed (errno \(errno))")
-      }
-      if count == 0 { break }
-      let chunk = Data(buffer[0..<count])
-      hasher.update(data: chunk)
-      let appended = try session.request("artifact.importFlashBundle.append",
-[
-          "uploadId": .string(uploadID),
-          "offset": .integer(Int64(offset)),
-          "base64": .string(chunk.base64EncodedString()),
-        ])
-      let expectedNextOffset = offset + count
-      guard case .object(let fields) = appended,
-        case .integer(let nextOffset)? = fields["nextOffset"],
-        nextOffset == Int64(expectedNextOffset)
-      else {
-        throw AgentClientError.malformedResponse(
-          "artifact.importFlashBundle.append returned a mismatched offset")
-      }
-      offset = expectedNextOffset
-    }
-    var after = stat()
-    let digest =
-      SHA256Hex.hexString(hasher.finalize())
-    guard offset == Int(declaredByteCount),
-      digest == declaredSHA256,
-      fstat(descriptor, &after) == 0,
-      after.st_dev == before.st_dev,
-      after.st_ino == before.st_ino,
-      after.st_size == before.st_size,
-      after.st_mtimespec.tv_sec == before.st_mtimespec.tv_sec,
-      after.st_mtimespec.tv_nsec == before.st_mtimespec.tv_nsec,
-      after.st_ctimespec.tv_sec == before.st_ctimespec.tv_sec,
-      after.st_ctimespec.tv_nsec == before.st_ctimespec.tv_nsec
-    else {
-      throw CLIError(
-        exitCode: EX_DATAERR,
-        message:
-          "flash bundle changed during import or does not match the pinned DAYU200 SHA-256")
-    }
-    let result = try session.request("artifact.importFlashBundle.commit",
-["uploadId": .string(uploadID)])
-    committed = true
-    return result
-  }
-
-  private struct HAPImportPayload {
-    let name: String
-    let contents: Data
-    let sha256: String
-  }
-
-  private static func readHAPImportPayload(path: String) throws -> HAPImportPayload {
-    let url = URL(filePath: path).standardizedFileURL
-    let name = url.lastPathComponent
-    guard DebugHAPPackageSelection.isSafeName(name, allowsHSP: true)
-    else {
-      throw CLIError(
-        exitCode: EX_USAGE, message: "Package file must have a safe .hap or .hsp basename")
-    }
-    let descriptor = Darwin.open(url.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
-    guard descriptor >= 0 else {
-      throw CLIError(
-        exitCode: EX_USAGE, message: "cannot open HAP file (errno \(errno))")
-    }
-    defer { Darwin.close(descriptor) }
-    var before = stat()
-    let maximumBytes = 64 * 1_024 * 1_024
-    guard fstat(descriptor, &before) == 0,
-      before.st_mode & S_IFMT == S_IFREG,
-      before.st_size > 0,
-      before.st_size <= maximumBytes
-    else {
-      throw CLIError(
-        exitCode: EX_USAGE,
-        message: "HAP must be a non-empty regular file no larger than \(maximumBytes) bytes")
-    }
-    var contents = Data()
-    contents.reserveCapacity(Int(before.st_size))
-    var buffer = [UInt8](repeating: 0, count: 1_024 * 1_024)
-    while true {
-      let count = Darwin.read(descriptor, &buffer, buffer.count)
-      if count < 0, errno == EINTR { continue }
-      guard count >= 0 else {
-        throw CLIError(
-          exitCode: EX_USAGE, message: "HAP read failed (errno \(errno))")
-      }
-      if count == 0 { break }
-      contents.append(contentsOf: buffer[0..<count])
-    }
-    var after = stat()
-    guard fstat(descriptor, &after) == 0,
-      contents.count == Int(before.st_size),
-      after.st_dev == before.st_dev,
-      after.st_ino == before.st_ino,
-      after.st_size == before.st_size,
-      after.st_mtimespec.tv_sec == before.st_mtimespec.tv_sec,
-      after.st_mtimespec.tv_nsec == before.st_mtimespec.tv_nsec,
-      after.st_ctimespec.tv_sec == before.st_ctimespec.tv_sec,
-      after.st_ctimespec.tv_nsec == before.st_ctimespec.tv_nsec
-    else {
-      throw CLIError(
-        exitCode: EX_USAGE, message: "HAP changed while it was being imported")
-    }
-    guard contents.starts(with: [0x50, 0x4b, 0x03, 0x04]) else {
-      throw CLIError(
-        exitCode: EX_USAGE, message: "HAP is not a ZIP-based .hap container")
-    }
-    let digest = SHA256Hex.string(of: contents)
-    return HAPImportPayload(name: name, contents: contents, sha256: digest)
-  }
-
-  private static func readWorkspacePatchImportPayload(path: String) throws -> HAPImportPayload {
-    let url = URL(filePath: path).standardizedFileURL
-    let name = url.lastPathComponent
-    guard name.count <= 128,
-      name.range(
-        of: #"^[A-Za-z0-9][A-Za-z0-9._-]*\.(patch|diff)$"#,
-        options: .regularExpression) != nil
-    else {
-      throw CLIError(
-        exitCode: EX_USAGE,
-        message: "workspace patch file must have a safe .patch or .diff basename")
-    }
-    let descriptor = Darwin.open(url.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
-    guard descriptor >= 0 else {
-      throw CLIError(
-        exitCode: EX_USAGE, message: "cannot open workspace patch file (errno \(errno))")
-    }
-    defer { Darwin.close(descriptor) }
-    var before = stat()
-    let maximumBytes = 512 * 1_024
-    guard fstat(descriptor, &before) == 0,
-      before.st_mode & S_IFMT == S_IFREG,
-      before.st_size > 0,
-      before.st_size <= maximumBytes
-    else {
-      throw CLIError(
-        exitCode: EX_USAGE,
-        message:
-          "workspace patch must be a non-empty regular file no larger than "
-          + "\(maximumBytes) bytes")
-    }
-    var contents = Data()
-    contents.reserveCapacity(Int(before.st_size))
-    var buffer = [UInt8](repeating: 0, count: 128 * 1_024)
-    while contents.count < Int(before.st_size) {
-      let remaining = Int(before.st_size) - contents.count
-      let count = Darwin.read(descriptor, &buffer, min(buffer.count, remaining))
-      if count < 0, errno == EINTR { continue }
-      guard count > 0 else {
-        throw CLIError(
-          exitCode: EX_USAGE, message: "workspace patch changed while it was being imported")
-      }
-      contents.append(contentsOf: buffer[0..<count])
-    }
-    var extra: UInt8 = 0
-    let extraCount = Darwin.read(descriptor, &extra, 1)
-    var after = stat()
-    guard extraCount == 0,
-      fstat(descriptor, &after) == 0,
-      contents.count == Int(before.st_size),
-      after.st_dev == before.st_dev,
-      after.st_ino == before.st_ino,
-      after.st_size == before.st_size,
-      after.st_mtimespec.tv_sec == before.st_mtimespec.tv_sec,
-      after.st_mtimespec.tv_nsec == before.st_mtimespec.tv_nsec,
-      after.st_ctimespec.tv_sec == before.st_ctimespec.tv_sec,
-      after.st_ctimespec.tv_nsec == before.st_ctimespec.tv_nsec
-    else {
-      throw CLIError(
-        exitCode: EX_USAGE, message: "workspace patch changed while it was being imported")
-    }
-    do {
-      _ = try WorkspaceProviderSupport.patchPaths(from: contents)
-    } catch {
-      throw CLIError(
-        exitCode: EX_DATAERR,
-        message: "workspace patch is not a safe bounded UTF-8 unified diff")
-    }
-    return HAPImportPayload(
-      name: name,
-      contents: contents,
-      sha256: SHA256Hex.string(of: contents))
-  }
-
-  private static func readNativeLibraryImportPayload(
-    path: String
-  ) throws -> HAPImportPayload {
-    let url = URL(filePath: path).standardizedFileURL
-    let name = try canonicalNativeLibraryImportName(url.lastPathComponent)
-    let descriptor = Darwin.open(url.path, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
-    guard descriptor >= 0 else {
-      throw CLIError(
-        exitCode: EX_USAGE,
-        message: "cannot open native library file (errno \(errno))")
-    }
-    defer { Darwin.close(descriptor) }
-    var before = stat()
-    let maximumBytes = NativeLibraryArtifactValidator.maximumBytes
-    guard fstat(descriptor, &before) == 0,
-      before.st_mode & S_IFMT == S_IFREG,
-      before.st_size >= 64,
-      before.st_size <= maximumBytes
-    else {
-      throw CLIError(
-        exitCode: EX_USAGE,
-        message:
-          "native library must be a regular file of 64...\(maximumBytes) bytes")
-    }
-    var contents = Data()
-    contents.reserveCapacity(Int(before.st_size))
-    var buffer = [UInt8](repeating: 0, count: 1_024 * 1_024)
-    while true {
-      let count = Darwin.read(descriptor, &buffer, buffer.count)
-      if count < 0, errno == EINTR { continue }
-      guard count >= 0 else {
-        throw CLIError(
-          exitCode: EX_USAGE,
-          message: "native library read failed (errno \(errno))")
-      }
-      if count == 0 { break }
-      contents.append(contentsOf: buffer[0..<count])
-    }
-    var after = stat()
-    guard fstat(descriptor, &after) == 0,
-      contents.count == Int(before.st_size),
-      after.st_dev == before.st_dev,
-      after.st_ino == before.st_ino,
-      after.st_size == before.st_size,
-      after.st_mtimespec.tv_sec == before.st_mtimespec.tv_sec,
-      after.st_mtimespec.tv_nsec == before.st_mtimespec.tv_nsec,
-      after.st_ctimespec.tv_sec == before.st_ctimespec.tv_sec,
-      after.st_ctimespec.tv_nsec == before.st_ctimespec.tv_nsec
-    else {
-      throw CLIError(
-        exitCode: EX_USAGE,
-        message: "native library changed while it was being imported")
-    }
-    do {
-      _ = try NativeLibraryArtifactValidator.validate(
-        contents, requireOpenHarmonyCodeSignature: true)
-    } catch {
-      throw CLIError(
-        exitCode: EX_DATAERR,
-        message: "native library failed ELF validation: \(error)")
-    }
-    let digest = SHA256Hex.string(of: contents)
-    return HAPImportPayload(name: name, contents: contents, sha256: digest)
-  }
-
-  /// Restores the recorded logical name from an `artifact export` file.
-  ///
-  /// Export deliberately prefixes every file with its collision-resistant
-  /// Artifact ID. Native import deliberately accepts only a `lib*.so`
-  /// logical name. Without this exact bridge, the two published CLI commands
-  /// cannot be composed: a caller must rename Runtime-owned output by hand
-  /// before it can bind the same bytes to a fresh target revision.
-  ///
-  /// Only the exact Artifact ID shape emitted by `RuntimeArtifactStore.export`
-  /// is stripped. Near-matches stay invalid, and the canonical suffix still
-  /// passes the original length and safe-name checks before any bytes are
-  /// opened or uploaded.
   static func canonicalNativeLibraryImportName(_ basename: String) throws -> String {
     let exportPrefixLength = 4 + 32 + 1  // `ART-` + lowercase identity + `-`
     let canonical: String
@@ -3452,7 +2797,7 @@ params))
     } catch let failure as AgentExecutionControlFailure {
       throw session.fail(.invalidInput, failure.message)
     }
-    try session.negotiate(requiredMajor: 2, forMethod: "artifact.list")
+
 
     var entries: [JSONValue] = []
     var cursor: String?
@@ -3718,7 +3063,7 @@ params))
     var session = runtimeSession(&rest, command: "workspace.\(group).\(verb)")
     let options = try CLIOptions(rest)
     if group == "project" || group == "preset" {
-      try session.negotiate(requiredMajor: 2, forMethod: "workspace.\(group).\(verb)")
+
     }
     var params: [String: JSONValue] = [:]
     if let projectRef = options.value("--project") {
@@ -3846,92 +3191,6 @@ params))
     }
   }
 
-  static func emitJobResult(jobID: String, session: CLIRuntimeSession) throws {
-    let status = try session.request("job.status", ["jobId": .string(jobID)])
-    guard case .object(let statusFields) = status else {
-      throw session.fail(.recordUnreadable, "job \(jobID) returned no readable status")
-    }
-    guard case .string(let rawState)? = statusFields["state"],
-      let state = JobState(rawValue: rawState)
-    else {
-      throw session.fail(
-        .recordUnreadable, "job \(jobID) reported no state this build understands")
-    }
-    // §6.1: a non-terminal job is not a failure of the query, it is a result
-    // that does not exist yet. `job status` stays a successful read of the same
-    // job; only `result` refuses, because a caller asking for a result would
-    // otherwise get a half-finished one.
-    guard state.isTerminal else {
-      throw session.fail(
-        .resultNotReady, "job \(jobID) is \(rawState) and has no result yet",
-        details: ["jobId": .string(jobID), "state": .string(rawState)])
-    }
-
-    let evidence = try session.request("job.evidence", ["jobId": .string(jobID)])
-    let artifacts = try session.request("artifact.list", ["jobId": .string(jobID)])
-    let cleanup = cleanupResidue(for: jobID, session: session)
-    let outcomeUnknown = statusFields["outcomeUnknown"] == .bool(true)
-    let integrityFailure = evidenceIntegrityExit(evidence)
-
-    session.emit(
-      .object([
-        "job": status,
-        "terminal": .bool(true),
-        "outcomeUnknown": .bool(outcomeUnknown),
-        "evidence": annotatedEvidence(evidence, blocked: integrityFailure != nil),
-        "artifacts": artifacts,
-        "cleanup": cleanup,
-        // The typed next-action union is not published by this build, so the
-        // field is present and null rather than guessed at.
-        "nextAction": .null,
-      ]))
-
-    // The result is already on stdout, so everything below reports its outcome
-    // through the exit status and a stderr diagnostic — §8.2 is explicit that
-    // these cases stay `ok: true` with a full result, and the session enforces
-    // the one-document rule rather than leaving it to be remembered.
-    //
-    // An unknown outcome outranks a failed state: the job may have reached a
-    // terminal state while the effect it dispatched stays undetermined, and
-    // POL-RECOVERY-001 forbids replaying it either way.
-    if outcomeUnknown {
-      throw session.fail(
-        .outcomeUnknown,
-        "job \(jobID) outcome is unknown: reconcile it; the original effect is never replayed")
-    }
-    if let integrityFailure {
-      throw session.fail(.artifactIntegrityFailed, integrityFailure)
-    }
-    if let terminal = terminalJobExit(status) {
-      throw CLIError(exitCode: terminal.code, message: terminal.reason)
-    }
-  }
-
-  /// The cleanup residue recorded for one job.
-  ///
-  /// Residue is decoration on a result: a store that cannot answer must not
-  /// hide the terminal status the caller came for, so this reports an empty
-  /// list rather than failing the whole read.
-  private static func cleanupResidue(for jobID: String, session: CLIRuntimeSession) -> JSONValue {
-    guard case .array(let rows)? = try? session.request("cleanupDebt.list") else {
-      return .array([])
-    }
-    return .array(
-      rows.filter { row in
-        guard case .object(let fields) = row else { return false }
-        return fields["jobId"] == .string(jobID)
-      })
-  }
-
-  /// §8.2 asks for a stable reason on the evidence projection itself, not only
-  /// in the exit status.
-  private static func annotatedEvidence(_ evidence: JSONValue, blocked: Bool) -> JSONValue {
-    guard case .object(var fields) = evidence else { return evidence }
-    fields["status"] = .string(blocked ? "blocked" : "verified")
-    return .object(fields)
-  }
-
-  /// A non-empty blocker list means required evidence could not be verified.
   static func evidenceIntegrityExit(_ evidence: JSONValue) -> String? {
     guard case .object(let fields) = evidence,
       case .array(let blockers)? = fields["blockers"], !blockers.isEmpty
@@ -3943,7 +3202,7 @@ params))
     return "required evidence could not be verified: " + named.joined(separator: ", ")
   }
 
-  /// Builds the typed v2 request document `job plan` and `job submit` send.
+  /// Builds the current v1 request document `job plan` and `job submit` send.
   ///
   /// Both used to demand a hand-written document the moment an operation had
   /// typed inputs, which is nearly all of them: the flag form could express
@@ -4083,51 +3342,12 @@ params))
     switch subcommand {
     case "plan":
       let planJSON = try operationRequestJSON(rest, subcommand: "job plan")
-      let legacy = session.rendering == .legacyJSON
-      if legacy {
-        try prepareLegacyJobSession(&session, rest: rest, method: "job.plan")
-      } else {
-        try prepareTargetJobSession(&session, rest: rest, method: "job.plan")
-      }
+      try prepareJobSession(&session, rest: rest)
       let result = try session.request("job.plan", ["requestJson": .string(planJSON)])
-      if !legacy { try CLIJobLifecycleValidation.validatePlan(result, session: session) }
+      try CLIJobLifecycleValidation.validatePlan(result, session: session)
       session.emit(result)
-    case "list":
-      // One shape, always. This used to call `job.list` (a bare array) when no
-      // flags were given and `job.list-page` (a page object) when any were, so
-      // the reply a script had to parse changed with the arguments it happened
-      // to pass — §13.2 records it as a defect, and a caller cannot write one
-      // parser against two shapes.
-      var params: [String: JSONValue] = [:]
-      if let index = rest.firstIndex(of: "--page-size"), index + 1 < rest.count,
-        let pageSize = Int64(rest[index + 1])
-      {
-        params["pageSize"] = .integer(pageSize)
-      }
-      if let index = rest.firstIndex(of: "--cursor"), index + 1 < rest.count {
-        params["cursor"] = .string(rest[index + 1])
-      }
-      if let index = rest.firstIndex(of: "--order"), index + 1 < rest.count {
-        params["order"] = .string(rest[index + 1])
-      }
-      if rest.contains("--include-current") { params["includeCurrent"] = .bool(true) }
-      if rest.contains("--include-timeline") { params["includeTimeline"] = .bool(true) }
-      session.emit(try session.request("job.list-page", params))
-    case "status":
-      guard let index = rest.firstIndex(of: "--job"), index + 1 < rest.count else {
-        throw CLIError(exitCode: EX_USAGE, message: "job status requires --job <id>")
-      }
-      if let major = try CLIOptions(rest).value("--require-protocol").flatMap(Int.init) {
-        try session.negotiate(requiredMajor: major, forMethod: "job.status")
-      }
-      let statusResponse = try session.request(
-        "job.status", ["jobId": .string(rest[index + 1])])
-      session.emit(statusResponse)
-      if let terminal = terminalJobExit(statusResponse) {
-        throw CLIError(exitCode: terminal.code, message: terminal.reason)
-      }
     case "wait":
-      if session.rendering == .jsonlStream || rest.contains("--require-protocol")
+      if session.rendering == .jsonlStream
         || rest.contains("--after-cursor") || rest.contains("--page-size") {
         try emitJobEventObservation(subcommand, rest: rest, session: session)
       } else { try emitJobWait(rest, session: session) }
@@ -4144,17 +3364,10 @@ params))
       guard let index = rest.firstIndex(of: "--job"), index + 1 < rest.count else {
         throw CLIError(exitCode: EX_USAGE, message: "job run requires --job <id>")
       }
-      let legacy = session.rendering == .legacyJSON
-      if legacy {
-        try prepareLegacyJobSession(&session, rest: rest, method: "job.run")
-      } else {
-        try prepareTargetJobSession(&session, rest: rest, method: "job.run")
-      }
+      try prepareJobSession(&session, rest: rest)
       let runResponse = try session.request("job.run", ["jobId": .string(rest[index + 1])])
-      if !legacy {
-        _ = try CLIJobReadValidation.validate(
-          runResponse, verb: "status", jobID: rest[index + 1], options: [:], session: session)
-      }
+      _ = try CLIJobReadValidation.validate(
+        runResponse, verb: "status", jobID: rest[index + 1], options: [:], session: session)
       session.emit(runResponse)
       if let terminal = terminalJobExit(runResponse) {
         throw CLIError(exitCode: terminal.code, message: terminal.reason)
@@ -4164,28 +3377,6 @@ params))
         throw CLIError(exitCode: EX_USAGE, message: "job cancel requires --job <id>")
       }
       session.emit(try session.request("job.cancel", ["jobId": .string(rest[index + 1])]))
-    case "evidence":
-      guard let index = rest.firstIndex(of: "--job"), index + 1 < rest.count else {
-        throw CLIError(exitCode: EX_USAGE, message: "job evidence requires --job <id>")
-      }
-      let evidence = try session.request(
-        "job.evidence", ["jobId": .string(rest[index + 1])])
-      session.emit(evidence)
-      // §9: an evidence integrity failure keeps the projection and changes the
-      // exit status. Rewriting it into an error would drop the very evidence
-      // the caller needs to see why it could not be trusted. The session has
-      // already emitted, so `fail` reports through the exit status and stderr
-      // rather than a second stdout document.
-      if let blocked = evidenceIntegrityExit(evidence) {
-        throw session.fail(.artifactIntegrityFailed, blocked)
-      }
-
-    case "result":
-      guard let index = rest.firstIndex(of: "--job"), index + 1 < rest.count else {
-        throw CLIError(exitCode: EX_USAGE, message: "job result requires --job <id>")
-      }
-      try emitJobResult(jobID: rest[index + 1], session: session)
-
     case "reconcile":
       // The daemon has owned `job.reconcile` since MU-4; the CLI did not
       // expose it, so a job left in `waitingForRecovery` had no operator
@@ -4204,22 +3395,9 @@ params))
             + "retried safely; pass one to make a repeat return the same job")
       }
       let requestJSON = try operationRequestJSON(rest, subcommand: "job submit")
-      let legacy = rest.contains("--wait") || session.rendering == .legacyJSON
-      if legacy {
-        try prepareLegacyJobSession(&session, rest: rest, method: "job.submit")
-      }
-      if rest.contains("--wait") {
-        session.lifecycle = .deprecated
-        session.replacementArgvPattern =
-          "job submit ...; job run --job <id>; job wait --job <id>"
-        session.warnIfLegacy()
-      } else if !legacy {
-        try prepareTargetJobSession(&session, rest: rest, method: "job.submit")
-      }
+      try prepareJobSession(&session, rest: rest)
       let submitted = try session.request("job.submit", ["requestJson": .string(requestJSON)])
-      if !legacy {
-        try CLIJobLifecycleValidation.validateAcceptance(submitted, session: session)
-      }
+      try CLIJobLifecycleValidation.validateAcceptance(submitted, session: session)
       // §8.1 allows exactly one document on machine stdout. This compound used
       // to print the acceptance and then the wait result, so a caller parsing
       // stdout got two JSON documents back to back and, in practice, read the
@@ -4240,24 +3418,12 @@ params))
     }
   }
 
-  private static func prepareTargetJobSession(
-    _ session: inout CLIRuntimeSession, rest: [String], method: String
+  private static func prepareJobSession(
+    _ session: inout CLIRuntimeSession, rest: [String]
   ) throws {
-    try applyJobClientDeadline(&session, rest: rest, defaultTimeout: "30s")
-    try session.negotiate(requiredMajor: 2, forMethod: method)
-  }
-
-  private static func prepareLegacyJobSession(
-    _ session: inout CLIRuntimeSession, rest: [String], method: String
-  ) throws {
-    guard !rest.contains("--require-protocol") else {
-      let suffix = rest.contains("--wait")
-        ? "; submit, run and wait explicitly" : "; use --output json for the target shape"
-      throw session.fail(
-        .invalidOption,
-        "\(method) legacy compatibility cannot be combined with --require-protocol 2\(suffix)")
-    }
-    try applyJobClientDeadline(&session, rest: rest, defaultTimeout: nil)
+    // --wait remains a single compound call with the same explicit total
+    // deadline. Without --timeout it retains the Runtime's bounded run budget.
+    try applyJobClientDeadline(&session, rest: rest, defaultTimeout: rest.contains("--wait") ? nil : "30s")
   }
 
   private static func applyJobClientDeadline(
@@ -4296,7 +3462,7 @@ params))
       guard let targetID = options.value("--target") else {
         throw session.fail(.invalidInput, "debug probe requires --target <id>")
       }
-      try session.negotiate(requiredMajor: 2, forMethod: "debug.probe")
+
       session.emit(
         try session.request("debug.probe", ["targetId": .string(targetID)]))
       return

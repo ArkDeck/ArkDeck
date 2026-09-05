@@ -313,7 +313,7 @@ final class DeviceRecordingContractTests: XCTestCase {
 
 /// A tar writer, so the reader is exercised against the format rather than
 /// against a mirror of its own parsing.
-private enum TarFixture {
+enum TarFixture {
   static func archive(entries: [(String, Data)], directories: Set<String> = []) -> Data {
     var out = Data()
     for (name, payload) in entries {

@@ -146,9 +146,10 @@ public struct RuntimeJobRecord: Codable, Sendable, Equatable {
   }
 
   static func load(from directory: URL) throws -> RuntimeJobRecord {
-    try JSONDecoder().decode(
-      RuntimeJobRecord.self,
-      from: Data(contentsOf: directory.appending(path: "job-record.json")))
+    let bytes = try Data(contentsOf: directory.appending(path: "job-record.json"))
+    var validator = StrictJSONDuplicateValidator(data: bytes)
+    try validator.validate()
+    return try JSONDecoder().decode(RuntimeJobRecord.self, from: bytes)
   }
 
   static func sha256Hex(_ data: Data) -> String {

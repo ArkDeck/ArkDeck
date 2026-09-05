@@ -67,10 +67,10 @@ final class HDCRuntimeDiagnosticsProjectionContractTests: XCTestCase {
     let base = basePresentation()
     for mutation in [
       ["endpoint": "192.0.2.10:8710"],
-      ["serverVersion": "3.2.0d"],
-      ["toolSha256": "short"],
+      ["generation": "01"],
+      ["executableSHA256": "short"],
       ["availability": "unavailable"],
-      ["ownership": "external"],
+      ["ownership": "unknown-owner"],
     ] {
       var status = validStatus()
       for (key, value) in mutation { status[key] = value }
@@ -140,16 +140,16 @@ final class HDCRuntimeDiagnosticsProjectionContractTests: XCTestCase {
 
   private func validStatus() -> [String: Any] {
     [
-      "availability": "ready",
-      "source": "runtimeManaged",
-      "toolSha256": String(repeating: "a", count: 64),
+      "schemaVersion": "arkdeck.runtime-hdc-status/1",
+      "availability": "available",
+      "generation": "1",
+      "executableSHA256": String(repeating: "a", count: 64),
       "clientVersion": "3.2.0f",
       "serverVersion": "3.2.0f",
       "endpoint": "127.0.0.1:8710",
       "endpointSource": "default",
       "serverHealth": "healthy",
       "ownership": "arkDeckManaged",
-      "protocolVersion": "1.0.0",
     ]
   }
 

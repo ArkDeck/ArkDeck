@@ -22,7 +22,7 @@ extension RuntimeCLI {
     var session = runtimeSession(&rest, command: "session.\(verb)")
     let options = try CLIOptions(rest)
     let method = "session.\(verb)"
-    try session.negotiate(requiredMajor: 2, forMethod: method)
+
 
     var fields: [String: JSONValue] = [:]
     var requestedPageSize = 100
@@ -73,7 +73,7 @@ extension RuntimeCLI {
     var session = runtimeSession(&rest, command: "session.cleanup.\(verb)")
     let options = try CLIOptions(rest)
     let method = "session.cleanup.\(verb)"
-    try session.negotiate(requiredMajor: 2, forMethod: method)
+
     var fields: [String: JSONValue] = [:]
     if verb == "apply" {
       guard let previewID = options.value("--preview-id"),
@@ -258,7 +258,7 @@ extension RuntimeCLI {
     let allowSensitive = verb == "preview" && rest.contains("--allow-sensitive")
     let options = try CLIOptions(rest.filter { $0 != "--allow-sensitive" })
     let method = "session.export.\(verb)"
-    try session.negotiate(requiredMajor: 2, forMethod: method)
+
     var fields: [String: JSONValue] = [:]
     if verb == "preview" {
       guard let sessionID = options.value("--session"),

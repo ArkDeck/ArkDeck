@@ -334,7 +334,7 @@ final class HDCControlActionContractTests: XCTestCase {
     XCTAssertEqual(humanPage["items"], .array([.object(action)]))
     func wire(_ method: String, _ fields: [String: JSONValue]) async throws -> AgentWireProtocol.Response {
       let request = try PortableCanonicalJSON.canonicalBytes(.object([
-        "protocolVersion": .string("2.0.0"), "id": .string("wire-" + UUID().uuidString.lowercased()),
+        "protocolVersion": .string(ArkDeckControlProtocol.currentVersion), "contractIdentity": .string(ArkDeckControlProtocol.contractIdentity), "id": .string("wire-" + UUID().uuidString.lowercased()),
         "method": .string(method), "params": .object(fields),
       ]))
       return try JSONDecoder().decode(AgentWireProtocol.Response.self, from: await handler.handleLine(request))
@@ -348,7 +348,7 @@ final class HDCControlActionContractTests: XCTestCase {
     XCTAssertTrue(rawHumanResume.ok)
     XCTAssertEqual(rawHumanResume.result, .object(action), "transport-free RPC must return the same HAR")
     let challengeFrame = try PortableCanonicalJSON.canonicalBytes(.object([
-      "protocolVersion": .string("2.0.0"), "id": .string("interactive-challenge"),
+      "protocolVersion": .string(ArkDeckControlProtocol.currentVersion), "contractIdentity": .string(ArkDeckControlProtocol.contractIdentity), "id": .string("interactive-challenge"),
       "method": .string("human-action.resume"), "params": .object([
         "humanAction": .string(actionID), "resumeReference": .string(resume),
       ]),
@@ -373,7 +373,7 @@ final class HDCControlActionContractTests: XCTestCase {
       from: await handler.handleLine(challengeFrame, context: .appXPC))
     XCTAssertEqual(xpcResponse.result, .object(action), "XPC caller presence is not explicit UI confirmation")
     let preseededFrame = try PortableCanonicalJSON.canonicalBytes(.object([
-      "protocolVersion": .string("2.0.0"), "id": .string("preseeded-response"),
+      "protocolVersion": .string(ArkDeckControlProtocol.currentVersion), "contractIdentity": .string(ArkDeckControlProtocol.contractIdentity), "id": .string("preseeded-response"),
       "method": .string("human-action.resume"), "params": .object([
         "humanAction": .string(actionID), "resumeReference": .string(resume),
         "challengeResponse": .string(challengeText),
@@ -393,9 +393,9 @@ final class HDCControlActionContractTests: XCTestCase {
     let afterPreseededResponses = try object(await owner.show(id))
     XCTAssertEqual(
       afterPreseededResponses["state"], .string("awaitingImpactApproval"))
-    for (version, fields, code) in [("2.0.0", ["controlAction": JSONValue.string(id), "executable": .string("/usr/bin/false")], "invalidInput"),
-      ("1.0.0", ["controlAction": JSONValue.string(id)], "unsupportedProtocolVersion")] {
-      let request = try PortableCanonicalJSON.canonicalBytes(.object(["protocolVersion": .string(version), "id": .string("read-control"),
+    for (version, fields, code) in [(ArkDeckControlProtocol.currentVersion, ["controlAction": JSONValue.string(id), "executable": .string("/usr/bin/false")], "invalidInput"),
+      ("2.0.0", ["controlAction": JSONValue.string(id)], "unsupportedProtocolVersion")] {
+      let request = try PortableCanonicalJSON.canonicalBytes(.object(["protocolVersion": .string(version), "contractIdentity": .string(ArkDeckControlProtocol.contractIdentity), "id": .string("read-control"),
         "method": .string("control-action.show"), "params": .object(fields)]))
       let response = try JSONDecoder().decode(AgentWireProtocol.Response.self, from: await handler.handleLine(request))
       XCTAssertEqual(response.error?.code, code)
@@ -443,7 +443,7 @@ final class HDCControlActionContractTests: XCTestCase {
       import json, socket, sys
       s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
       s.connect(sys.argv[1])
-      request = {"protocolVersion":"2.0.0","id":"peer-check","method":"human-action.resume","params":{"humanAction":sys.argv[2],"resumeReference":sys.argv[3]}}
+      request = {"protocolVersion":"1.0.0","contractIdentity":"\(ArkDeckControlProtocol.contractIdentity)","id":"peer-check","method":"human-action.resume","params":{"humanAction":sys.argv[2],"resumeReference":sys.argv[3]}}
       s.sendall((json.dumps(request, separators=(',', ':')) + '\\n').encode())
       data = b''
       while not data.endswith(b'\\n'):

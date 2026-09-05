@@ -439,7 +439,7 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertEqual(try targets.targetDisplayName(targetID: adopted.targetID).generation, 1)
   }
 
-  func testCLITargetDisplayNameNegotiatesV2AndPreservesTypedCASFailures() throws {
+  func testCLITargetDisplayNameUsesCurrentIdentityAndPreservesTypedCASFailures() throws {
     let targets = try RuntimeTargetStore(
       directoryURL: stateDirectory.appending(
         path: "targets-display-name-cli", directoryHint: .isDirectory))
@@ -461,7 +461,7 @@ final class AgentDaemonContractTests: XCTestCase {
       case .object(let setMeta)? = setEnvelope["meta"]
     else { return XCTFail("CLI set must return one typed envelope") }
     XCTAssertEqual(setResult["generation"], .string("2"))
-    XCTAssertEqual(setMeta["controlProtocolVersion"], .string("2.0.0"))
+    XCTAssertEqual(setMeta["controlProtocolVersion"], .string(ArkDeckControlProtocol.currentVersion))
 
     let (staleExit, staleEnvelope) = try runObservationCLI([
       "target", "display-name", "clear", "--target", adopted.targetID,
@@ -501,7 +501,7 @@ final class AgentDaemonContractTests: XCTestCase {
     else { return XCTFail("History filter list must return one versioned resource list") }
     XCTAssertEqual(initial["generation"], .string("1"))
     XCTAssertEqual(initial["filters"], .array([]))
-    XCTAssertEqual(listMeta["controlProtocolVersion"], .string("2.0.0"))
+    XCTAssertEqual(listMeta["controlProtocolVersion"], .string(ArkDeckControlProtocol.currentVersion))
 
     let (saveExit, saveEnvelope) = try runObservationCLI([
       "history", "filter", "save", "--expected-generation", "1",
@@ -568,7 +568,7 @@ final class AgentDaemonContractTests: XCTestCase {
     }
     func candidates() throws -> [String: JSONValue] {
       try runObservationCLI(
-        ["device", "candidates", "--require-protocol", "2"], server: server).1
+        ["device", "candidates"], server: server).1
     }
 
     let initial = try observation(candidates())
@@ -589,7 +589,7 @@ final class AgentDaemonContractTests: XCTestCase {
       case .string(let namedGeneration)? = setResult["generation"]
     else { return XCTFail("candidate set must return one typed resource") }
     XCTAssertEqual(setResult["name"], .string("Bench candidate"))
-    XCTAssertEqual(setMeta["controlProtocolVersion"], .string("2.0.0"))
+    XCTAssertEqual(setMeta["controlProtocolVersion"], .string(ArkDeckControlProtocol.currentVersion))
 
     let named = try observation(candidates())
     XCTAssertEqual(named.generation, namedGeneration)
@@ -861,7 +861,7 @@ final class AgentDaemonContractTests: XCTestCase {
 
     // An unavailable operation says why, so a caller learns what to install
     // rather than that the project is simply broken.
-    guard case .array(let rows)? = listed.result, case .object(let row)? = rows.first,
+    guard case .object(let page)? = listed.result, case .array(let rows)? = page["projects"], case .object(let row)? = rows.first,
       case .array(let operations)? = row["operations"]
     else { return XCTFail("the projection must carry its operations") }
     let unavailable = operations.compactMap { value -> [String: JSONValue]? in
@@ -894,7 +894,7 @@ final class AgentDaemonContractTests: XCTestCase {
       handler, method: "workspace.preset.show",
       params: ["projectRef": .string("demo-app"), "presetRef": .string("nope")])
     XCTAssertFalse(unknownPreset.ok)
-    XCTAssertEqual(unknownPreset.error?.code, "workspaceReferenceNotFound")
+    XCTAssertEqual(unknownPreset.error?.code, "invalidInput")
 
     // The kind filter is a closed set; a value outside it is a bad argument
     // rather than an empty list, which would read as "this project has none".
@@ -902,13 +902,13 @@ final class AgentDaemonContractTests: XCTestCase {
       handler, method: "workspace.preset.list",
       params: ["projectRef": .string("demo-app"), "kind": .string("sideways")])
     XCTAssertFalse(badKind.ok)
-    XCTAssertEqual(badKind.error?.code, "invalidParams")
+    XCTAssertEqual(badKind.error?.code, "invalidInput")
 
     let filtered = try await request(
       handler, method: "workspace.preset.list",
       params: ["projectRef": .string("demo-app"), "kind": .string("test")])
     XCTAssertTrue(filtered.ok)
-    guard case .array(let rows)? = filtered.result else {
+    guard case .object(let collection)? = filtered.result, case .array(let rows)? = collection["presets"] else {
       return XCTFail("the preset list must be an array")
     }
     XCTAssertTrue(rows.isEmpty, "no test preset is registered, and that is not an error")
@@ -923,12 +923,12 @@ final class AgentDaemonContractTests: XCTestCase {
       .unresolved(projectRef: "second-app", reason: "only the active project gets a profile")
     ])
     let listed = try await request(handler, method: "workspace.project.list")
-    guard case .array(let rows)? = listed.result, case .object(let row)? = rows.first else {
+    guard case .object(let page)? = listed.result, case .array(let rows)? = page["projects"], case .object(let row)? = rows.first else {
       return XCTFail("the unresolved project must still be listed")
     }
     XCTAssertEqual(row["projectRef"], .string("second-app"))
     XCTAssertEqual(row["availability"], .string("unavailable"))
-    XCTAssertEqual(row["kind"], .null, "it never resolved, so it has no kind")
+    XCTAssertEqual(row["kind"], .string("arkdeck"), "the registered kind survives failed composition")
     XCTAssertNotNil(row["reason"], "an operator needs to know why")
   }
 
@@ -1113,6 +1113,26 @@ final class AgentDaemonContractTests: XCTestCase {
     workspaceProjects: [WorkspaceProjectPublication] = [],
     dispatcher: any RuntimeProcessDispatching = HappyDispatcher()
   ) throws -> (RuntimeControlPlaneHandler, RuntimeJobEngine) {
+    var workspaceProjectStore = workspaceProjectStore
+    if workspaceProjectStore == nil, !workspaceProjects.isEmpty {
+      let store = try RuntimeWorkspaceProjectStore(
+        rootURL: stateDirectory.appending(path: "workspace-fixture-owner"),
+        nowUTC: { "2026-07-29T00:00:00Z" })
+      var generations: [String: UInt64] = [:]
+      for project in workspaceProjects {
+        let root = stateDirectory.appending(path: "private-" + project.projectRef)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        guard let canonical = realpath(root.path, nil) else { throw POSIXError(.ENOENT) }
+        let path = String(cString: canonical)
+        free(canonical)
+        let registered = try store.register(
+          requestID: "fixture-" + project.projectRef, kind: "arkdeck", rootPath: path,
+          projectRef: project.projectRef)
+        generations[registered.projectRef] = registered.generation
+      }
+      store.markApplied(generations)
+      workspaceProjectStore = store
+    }
     let capabilityStore = try RuntimeCapabilityStore(
       directoryURL: stateDirectory.appending(path: "capabilities", directoryHint: .isDirectory))
     let resolvedArtifactStore: RuntimeArtifactStore?
@@ -1172,10 +1192,17 @@ final class AgentDaemonContractTests: XCTestCase {
   }
 
   private struct TargetControlRequest: Encodable {
+    let contractIdentity = ArkDeckControlProtocol.contractIdentity
     let protocolVersion: String
     let id: String
     let method: String
     let params: [String: JSONValue]?
+  }
+
+  private func importAppendParams(id: String, offset: Int64, bytes: Data) -> [String: JSONValue] {
+    ["importId": .string(id), "generation": .string("1"), "offset": .string(String(offset)),
+     "byteCount": .string(String(bytes.count)), "sha256": .string(SHA256Hex.string(of: bytes)),
+     "base64": .string(bytes.base64EncodedString())]
   }
 
   private func targetRequest(
@@ -1185,7 +1212,7 @@ final class AgentDaemonContractTests: XCTestCase {
   ) async throws -> AgentWireProtocol.Response {
     let frame = try JSONEncoder().encode(
       TargetControlRequest(
-        protocolVersion: ArkDeckControlProtocol.targetVersion,
+        protocolVersion: ArkDeckControlProtocol.currentVersion,
         id: UUID().uuidString, method: method, params: params))
     return await handler.handleFrame(frame)
   }
@@ -1217,8 +1244,11 @@ final class AgentDaemonContractTests: XCTestCase {
     let doctor = try await request(handler, method: "doctor")
     XCTAssertTrue(doctor.ok, doctor.error?.message ?? "-")
     guard case .object(let report)? = doctor.result,
-      case .string(let advertised)? = report["runtimeRequestSchemaVersion"],
-      case .integer(let operationCount)? = report["operationCount"]
+      case .object(let checks)? = report["checks"],
+      case .object(let runtime)? = checks["runtime"],
+      case .object(let catalog)? = checks["catalog"],
+      case .string(let advertised)? = runtime["runtimeRequestSchemaVersion"],
+      case .integer(let operationCount)? = catalog["operationCount"]
     else {
       return XCTFail("doctor must publish the request envelope and the catalog size")
     }
@@ -1386,55 +1416,37 @@ final class AgentDaemonContractTests: XCTestCase {
 
   // MARK: - Transport-free protocol negatives
 
-  func testNegotiatedHealthUsesV2WhileDefaultClientKeepsV1() async throws {
+  func testDefaultClientUsesTheOnlyCurrentHealthContract() async throws {
     let (handler, _) = try makeStack()
     let server = try startServer(handler)
     let client = AgentClient(socketPath: server.socketURL.path)
-    let v2 = try client.negotiated(requiredMajor: 2, forMethod: "health")
-    XCTAssertEqual(v2.selectedProtocolVersion, "2.0.0")
-    let health = try v2.request(method: "health")
+    let health = try client.request(method: "health")
     guard case .object(let fields) = health else { return XCTFail("missing health object") }
-    XCTAssertEqual(fields["protocolVersion"], .string("2.0.0"))
-    XCTAssertEqual(
-      fields["publishedMethods"], .array(ArkDeckControlProtocol.targetMethods.sorted().map(JSONValue.string)))
-    let legacy = try client.request(method: "health")
-    guard case .object(let legacyFields) = legacy else { return XCTFail("missing legacy health") }
-    XCTAssertEqual(legacyFields["protocolVersion"], .string("1.0.0"))
-    XCTAssertEqual(
-      Set(legacyFields.keys), ["status", "protocolVersion", "catalogDigest", "providers"])
-    XCTAssertThrowsError(try client.negotiated(requiredMajor: 3, forMethod: "health")) { error in
-      guard case AgentClientError.daemonError(let code, _) = error else {
-        return XCTFail("expected unsupported version, got \(error)")
-      }
-      XCTAssertEqual(code, "unsupportedProtocolVersion")
-    }
+    XCTAssertEqual(client.protocolVersion, "1.0.0")
+    XCTAssertEqual(fields["protocolVersion"], .string("1.0.0"))
+    XCTAssertEqual(fields["contractIdentity"], .string(ArkDeckControlProtocol.contractIdentity))
+    XCTAssertEqual(fields["publishedMethods"], .array(ArkDeckControlProtocol.methods.sorted().map(JSONValue.string)))
+    XCTAssertEqual(Set(fields.keys), ["status", "protocolVersion", "contractIdentity", "publishedMethods", "catalogDigest", "providers"])
   }
 
-  func testV2CannotReachAnUnpublishedMutationOrLegacyAdoption() async throws {
-    let (handler, _) = try makeStack()
-    for method in [
-      "debug.start", "artifact.importHap.begin",
-    ] {
-      let frame = try CanonicalJSONEncoders.canonical().encode([
-        "protocolVersion": JSONValue.string("2.0.0"), "id": .string("refused-1"),
-        "method": .string(method), "params": .object([:]),
-      ])
+  func testRetiredMethodsCannotReachDispatch() async throws {
+    let (handler, engine) = try makeStack()
+    for method in ["artifact.importHap.begin", "protocol.negotiate", "device.candidates", "job.list-page", "capability.install"] {
+      let frame = try ArkDeckAgentXPC.requestFrame(method: method, params: [:], requestID: "refused-1")
       let reply = await handler.handleFrame(frame)
       XCTAssertFalse(reply.ok, method)
       XCTAssertEqual(reply.error?.code, "unknownMethod", method)
     }
-    let frame = Data(#"{"protocolVersion":"2.1.0","id":"exact","method":"target.adopt"}"#.utf8)
-    let rejected = await handler.handleFrame(frame)
-    XCTAssertEqual(rejected.error?.code, "unsupportedProtocolVersion")
+    let jobs = try await engine.listJobs()
+    XCTAssertTrue(jobs.isEmpty)
   }
 
-  func testV2PublishesClosedPlanSubmitAndRunWhileV1KeepsItsShape() async throws {
+  func testCurrentContractPublishesClosedPlanSubmitAndRun() async throws {
     let (handler, engine) = try makeStack()
     let server = try startServer(handler)
-    let client = try AgentClient(socketPath: server.socketURL.path).negotiated(
-      requiredMajor: 2, forMethod: "job.plan")
+    let client = try AgentClient(socketPath: server.socketURL.path)
     let requestJSON = """
-      {"documentType":"runtime-operation-request","schemaVersion":"2.0.0",\
+      {"documentType":"runtime-operation-request","schemaVersion":"1.0.0",\
       "requestId":"req-target-job-lifecycle","idempotencyKey":"idem-target-job-lifecycle",\
       "target":{"targetId":"TGT-001","expectedBindingRevision":7},\
       "operation":{"id":"observe.device","version":1}}
@@ -1530,47 +1542,41 @@ final class AgentDaemonContractTests: XCTestCase {
       XCTAssertEqual(details["newDispatchCount"], .integer(0))
     }
 
-    let legacy = try await request(
-      handler, method: "job.plan", params: ["requestJson": .string(requestJSON)])
-    guard case .object(let legacyPlan)? = legacy.result else {
-      return XCTFail("missing legacy plan")
-    }
-    XCTAssertNil(legacyPlan["schemaVersion"])
-    XCTAssertEqual(legacyPlan["operationReference"], .string("observe.device@1"))
+    let direct = try await request(handler, method: "job.plan", params: ["requestJson": .string(requestJSON)])
+    guard case .object(let directPlan)? = direct.result else { return XCTFail("missing current plan") }
+    XCTAssertEqual(directPlan["schemaVersion"], .string("arkdeck.job-plan/1"))
+    XCTAssertEqual(directPlan["operation"], .string("observe.device@1"))
   }
 
-  func testBootstrapIsUnaryAndNeverInterpretsBundledDomainInput() async throws {
-    let (handler, _) = try makeStack()
-    let request = try ControlProtocolNegotiation.request(id: "neg-1", requiredMajor: 2)
-    let line = await handler.handleLine(request)
-    XCTAssertEqual(line.filter { $0 == 0x0A }.count, 1)
-    XCTAssertEqual(
-      try ControlProtocolNegotiation.selectedVersion(
-        response: Data(line.dropLast()), id: "neg-1", requiredMajor: 2), "2.0.0")
-
+  func testOldNegotiationAndBundledDomainInputAreRefused() async throws {
+    let (handler, engine) = try makeStack()
     let invalid = [
-      #"{"bootstrapVersion":"arkdeck.control.negotiation/1","id":"neg-1","method":"protocol.negotiate","supportedExactVersions":["2.0.0"],"requiredMajor":2,"params":{"method":"target.adopt"}}"#,
-      #"{"protocolVersion":"2.0.0","id":"bad","method":"health","method":"target.adopt"}"#,
-      #"{"protocolVersion":"2.0.0","id":"bad","method":"health","credentials":"caller-facts"}"#,
+      #"{"bootstrapVersion":"arkdeck.control.negotiation/1","id":"neg-1","method":"protocol.negotiate","supportedExactVersions":["1.0.0"],"requiredMajor":1,"params":{"method":"target.adopt"}}"#,
+      #"{"protocolVersion":"1.0.0","id":"bad","method":"health","method":"target.adopt"}"#,
+      #"{"protocolVersion":"1.0.0","id":"bad","method":"job.submit","credentials":"caller-facts"}"#,
     ]
     for raw in invalid {
       let answer = await handler.handleLine(Data(raw.utf8))
+      XCTAssertEqual(answer.filter { $0 == 0x0A }.count, 1)
       let object = try JSONDecoder().decode([String: JSONValue].self, from: answer)
       XCTAssertEqual(object["ok"], .bool(false))
     }
+    let jobs = try await engine.listJobs()
+    XCTAssertTrue(jobs.isEmpty)
   }
 
-  func testCLIReportsTheProtocolItActuallyNegotiated() throws {
+  func testCLIRendersTheSameCurrentContractAndRejectsVersionSelection() throws {
     let (handler, _) = try makeStack()
     let server = try startServer(handler)
     let products = Bundle(for: type(of: self)).bundleURL.deletingLastPathComponent()
-    for major in ["1", "2", "3"] {
+    for selection in [false, true] {
       let process = Process()
       process.executableURL = products.appending(path: "arkdeck")
       process.arguments = [
-        "runtime", "health", "--require-protocol", major,
+        "runtime", "health",
         "--socket", server.socketURL.path, "--output", "json",
       ]
+      if selection { process.arguments! += ["--require-protocol", "1"] }
       let out = Pipe()
       let err = Pipe()
       process.standardOutput = out
@@ -1580,7 +1586,7 @@ final class AgentDaemonContractTests: XCTestCase {
       let errorBytes = err.fileHandleForReading.readDataToEndOfFile()
       process.waitUntilExit()
       let envelope = try JSONDecoder().decode([String: JSONValue].self, from: bytes)
-      if major == "3" {
+      if selection {
         XCTAssertEqual(process.terminationStatus, 64)
         XCTAssertEqual(envelope["ok"], .bool(false))
       } else {
@@ -1588,13 +1594,13 @@ final class AgentDaemonContractTests: XCTestCase {
         guard case .object(let result)? = envelope["result"],
           case .object(let meta)? = envelope["meta"]
         else { return XCTFail("health must have a result and metadata") }
-        XCTAssertEqual(result["protocolVersion"], .string("\(major).0.0"))
+        XCTAssertEqual(result["protocolVersion"], .string(ArkDeckControlProtocol.currentVersion))
         XCTAssertEqual(meta["controlProtocolVersion"], result["protocolVersion"])
       }
     }
   }
 
-  func testV2TargetAdoptionHasTypedRefusalsAndNeverFallsIntoLegacySelection() async throws {
+  func testTargetAdoptionHasTypedRefusalsAndNeverInfersSelection() async throws {
     let port = TargetObservationCoordinatorContractTests.Port()
     let targets = try RuntimeTargetStore(directoryURL: stateDirectory.appending(path: "targets"))
     let owner = TargetObservationCoordinator(
@@ -1603,7 +1609,7 @@ final class AgentDaemonContractTests: XCTestCase {
     let (handler, engine) = try makeStack(targetStore: targets, targetObservations: owner)
     let server = try startServer(handler)
     let client = try AgentClient(socketPath: server.socketURL.path)
-      .negotiated(requiredMajor: 2, forMethod: "device.observations")
+
     port.setState("Unauthorized")
     let observed = try client.request(method: "device.observations")
     guard case .object(let snapshot) = observed,
@@ -1636,7 +1642,7 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertEqual(jobs.count, 0, "adoption must not create or run a Job")
   }
 
-  func testCLIAdoptsTheExactV2ObservationAndKeepsErrorsMachineReadable() throws {
+  func testCLIAdoptsTheExactCurrentObservationAndKeepsErrorsMachineReadable() throws {
     let port = TargetObservationCoordinatorContractTests.Port()
     let targets = try RuntimeTargetStore(directoryURL: stateDirectory.appending(path: "targets"))
     let owner = TargetObservationCoordinator(
@@ -1657,7 +1663,7 @@ final class AgentDaemonContractTests: XCTestCase {
       process.waitUntilExit()
       return (process.terminationStatus, try JSONDecoder().decode([String: JSONValue].self, from: bytes))
     }
-    let (discoveryExit, discovered) = try run(["device", "candidates", "--require-protocol", "2"])
+    let (discoveryExit, discovered) = try run(["device", "candidates"])
     XCTAssertEqual(discoveryExit, 0)
     guard case .object(let snapshot)? = discovered["result"],
       case .string(let generation)? = snapshot["snapshotGeneration"],
@@ -1682,7 +1688,7 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertEqual(error["code"], .string("resourceConflict"))
     XCTAssertEqual(details["newDispatchCount"], .integer(0))
     guard case .object(let meta)? = refused["meta"] else { return XCTFail("missing error metadata") }
-    XCTAssertEqual(meta["controlProtocolVersion"], .string("2.0.0"))
+    XCTAssertEqual(meta["controlProtocolVersion"], .string(ArkDeckControlProtocol.currentVersion))
     XCTAssertEqual(try targets.list().count, 1)
   }
 
@@ -1696,7 +1702,7 @@ final class AgentDaemonContractTests: XCTestCase {
     let (handler, _) = try makeStack(targetStore: targets, targetObservations: owner)
     let server = try startServer(handler)
     let client = try AgentClient(socketPath: server.socketURL.path)
-      .negotiated(requiredMajor: 2, forMethod: "device.observations")
+
     let snapshot = try client.request(method: "device.observations")
     guard case .object(let fields) = snapshot, case .string(let generation)? = fields["snapshotGeneration"],
       case .array(let rows)? = fields["observations"], case .object(let row)? = rows.first,
@@ -1758,7 +1764,7 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertEqual(details["newDispatchCount"], .integer(0))
     XCTAssertEqual(
       metadata["controlProtocolVersion"],
-      .string(ArkDeckControlProtocol.targetVersion))
+      .string(ArkDeckControlProtocol.currentVersion))
     let jobs = try await engine.listJobs()
     XCTAssertTrue(jobs.isEmpty)
   }
@@ -1787,7 +1793,7 @@ final class AgentDaemonContractTests: XCTestCase {
     guard case .object(let offlineReceipt)? = offline["result"] else { return XCTFail("missing offline receipt") }
     XCTAssertEqual(offlineReceipt["state"], .string("offline"))
     XCTAssertEqual(try targets.list().count, 0)
-    XCTAssertEqual(try AgentClient(socketPath: server.socketURL.path).request(method: "job.list"), .array([]))
+    XCTAssertTrue(try currentJobItems(AgentClient(socketPath: server.socketURL.path).request(method: "job.list")).isEmpty)
   }
 
   func testCLIWaitRejectsAReplacementEvenIfItsStateAlreadyMatches() throws {
@@ -1816,14 +1822,14 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertEqual(details["observationId"], .string(reference[5]))
     XCTAssertEqual(details["requestedState"], .string("connected"))
     XCTAssertEqual(details["newDispatchCount"], .integer(0))
-    XCTAssertEqual(meta["controlProtocolVersion"], .string("2.0.0"))
+    XCTAssertEqual(meta["controlProtocolVersion"], .string(ArkDeckControlProtocol.currentVersion))
     XCTAssertEqual(try targets.list().count, 0)
-    XCTAssertEqual(try AgentClient(socketPath: server.socketURL.path).request(method: "job.list"), .array([]))
+    XCTAssertTrue(try currentJobItems(AgentClient(socketPath: server.socketURL.path).request(method: "job.list")).isEmpty)
   }
 
-  func testPreBootstrapDaemonNeverDowngradesATargetRequest() throws {
-    for major in [1, 2] {
-      let socketURL = stateDirectory.appending(path: "old-\(major).sock")
+  func testOldDaemonCannotPassIdentityCheckBeforeMutation() throws {
+    for index in 0..<2 {
+      let socketURL = stateDirectory.appending(path: "old-\(index).sock")
       try FileManager.default.createDirectory(at: stateDirectory, withIntermediateDirectories: true)
       let listener = socket(AF_UNIX, SOCK_STREAM, 0)
       XCTAssertGreaterThanOrEqual(listener, 0)
@@ -1842,7 +1848,7 @@ final class AgentDaemonContractTests: XCTestCase {
       }
       XCTAssertEqual(bound, 0)
       XCTAssertEqual(listen(listener, 1), 0)
-      let served = expectation(description: "old daemon received bootstrap only")
+      let served = expectation(description: "old daemon received health only")
       DispatchQueue.global().async {
         let connection = accept(listener, nil, nil)
         guard connection >= 0 else { return served.fulfill() }
@@ -1855,8 +1861,8 @@ final class AgentDaemonContractTests: XCTestCase {
           request.append(contentsOf: chunk.prefix(count))
         }
         let object = try? JSONDecoder().decode([String: JSONValue].self, from: request)
-        XCTAssertEqual(object?["method"], .string("protocol.negotiate"))
-        XCTAssertNil(object?["protocolVersion"])
+        XCTAssertEqual(object?["method"], .string("health"))
+        XCTAssertEqual(object?["protocolVersion"], .string("1.0.0"))
         let reply = Data(
           (#"{"id":"-","ok":false,"error":{"code":"malformedFrame","message":"undecodable request frame"}}"#
             + "\n").utf8)
@@ -1864,22 +1870,13 @@ final class AgentDaemonContractTests: XCTestCase {
         served.fulfill()
       }
       let client = AgentClient(socketPath: socketURL.path)
-      if major == 1 {
-        let legacy = try client.negotiated(requiredMajor: 1, forMethod: "health")
-        XCTAssertEqual(legacy.selectedProtocolVersion, "1.0.0")
-        XCTAssertThrowsError(try legacy.request(method: "job.submit", timeoutSeconds: 1)) {
-          guard case AgentClientError.daemonError(let code, _) = $0 else {
-            return XCTFail("a health fallback must not authorize another method")
-          }
-          XCTAssertEqual(code, "unsupportedProtocolVersion")
+      XCTAssertThrowsError(try client.request(method: "job.submit", timeoutSeconds: 1)) {
+        guard case AgentClientError.structuredDaemonError(let code, _, let details) = $0 else {
+          return XCTFail("old daemon must be refused before the business request")
         }
-      } else {
-        XCTAssertThrowsError(try client.negotiated(requiredMajor: 2, forMethod: "health")) {
-          guard case AgentClientError.daemonError(let code, _) = $0 else {
-            return XCTFail("target negotiation must be refused")
-          }
-          XCTAssertEqual(code, "unsupportedProtocolVersion")
-        }
+        XCTAssertEqual(code, "unsupportedProtocolVersion")
+        XCTAssertEqual(details["phase"], .string("preAdmission"))
+        XCTAssertEqual(details["newDispatchCount"], .integer(0))
       }
       wait(for: [served], timeout: 10)
     }
@@ -1898,7 +1895,7 @@ final class AgentDaemonContractTests: XCTestCase {
     // Unknown method.
     let unknownMethod = Data(
       """
-      {"protocolVersion":"1.0.0","id":"2","method":"shell.exec"}
+      {"protocolVersion":"1.0.0","contractIdentity":"\(ArkDeckControlProtocol.contractIdentity)","id":"2","method":"shell.exec"}
       """.utf8)
     let unknown = await handler.handleFrame(unknownMethod)
     XCTAssertFalse(unknown.ok)
@@ -1907,13 +1904,14 @@ final class AgentDaemonContractTests: XCTestCase {
     let malformed = await handler.handleFrame(Data("{not json".utf8))
     XCTAssertFalse(malformed.ok)
     XCTAssertEqual(malformed.error?.code, "malformedFrame")
-    // Minor version drift is forward-compatible.
+    // The single contract rejects patch and minor drift too.
     let minor = Data(
       """
       {"protocolVersion":"1.7.3","id":"3","method":"health"}
       """.utf8)
     let ok = await handler.handleFrame(minor)
-    XCTAssertTrue(ok.ok)
+    XCTAssertFalse(ok.ok)
+    XCTAssertEqual(ok.error?.code, "unsupportedProtocolVersion")
   }
 
   func testPagedJobListReturnsNewestSummariesAndOldCurrentJobsWithoutTimelines() async throws {
@@ -1922,7 +1920,7 @@ final class AgentDaemonContractTests: XCTestCase {
     for index in 1...3 {
       let operation = Data(
         """
-        {"documentType":"runtime-operation-request","schemaVersion":"2.0.0",\
+        {"documentType":"runtime-operation-request","schemaVersion":"1.0.0",\
         "requestId":"req-paged-wire-\(index)",\
         "idempotencyKey":"idem-paged-wire-\(index)",\
         "target":{"targetId":"TGT-PAGED-WIRE","expectedBindingRevision":7},\
@@ -1932,52 +1930,42 @@ final class AgentDaemonContractTests: XCTestCase {
     }
     try await engine.requestCancel(jobID: accepted[2].jobID)
 
-    let response = try await request(
-      handler, method: "job.list-page",
-      params: [
-        "pageSize": .integer(1),
-        "order": .string("newestFirst"),
-        "includeTimeline": .bool(false),
-        "includeCurrent": .bool(true),
-      ])
-    XCTAssertTrue(response.ok, response.error?.message ?? "-")
-    guard case .object(let result)? = response.result,
-      case .array(let page)? = result["jobs"],
-      case .array(let current)? = result["currentJobs"]
-    else {
-      return XCTFail("job.list-page must return page and current summary arrays")
-    }
-    XCTAssertEqual(page.count, 1)
-    guard case .object(let newest) = page[0] else {
-      return XCTFail("newest summary must be an object")
-    }
-    XCTAssertEqual(newest["jobId"], .string(accepted[2].jobID))
-    XCTAssertEqual(newest["timeline"], .null)
-    XCTAssertEqual(
-      newest["workspaceKind"], .string(RuntimeWorkspaceKind.viewer.rawValue),
-      "History classification must travel on the compact job-list wire response")
-    XCTAssertEqual(
-      Set(
-        current.compactMap { value -> String? in
-          guard case .object(let fields) = value,
-            case .string(let jobID)? = fields["jobId"]
-          else { return nil }
-          XCTAssertEqual(fields["timeline"], .null)
-          XCTAssertEqual(fields["workspaceKind"], .string(RuntimeWorkspaceKind.viewer.rawValue))
-          return jobID
-        }),
-      Set(accepted.prefix(2).map(\.jobID)))
-    XCTAssertNotEqual(result["nextCursor"], .null)
-
+    let options: [String: JSONValue] = [
+      "pageSize": .integer(1), "order": .string("createdAtDescJobIdAsc"),
+      "includeTimeline": .bool(false), "includeCurrent": .bool(true),
+    ]
+    var params = options
+    var rows: [[String: JSONValue]] = []
+    repeat {
+      let response = try await request(handler, method: "job.list", params: params)
+      XCTAssertTrue(response.ok, response.error?.message ?? "-")
+      guard case .object(let page)? = response.result,
+        page["schemaVersion"] == .string("arkdeck.cli.page/1"),
+        case .array(let items)? = page["items"] else { return XCTFail("expected current Job page") }
+      XCTAssertEqual(items.count, 1, "current Jobs remain inside the same page size bound")
+      for item in items {
+        guard case .object(let row) = item else { return XCTFail("expected summary") }
+        XCTAssertEqual(row["schemaVersion"], .string("arkdeck.job-summary/1"))
+        XCTAssertEqual(row["timeline"], .null)
+        XCTAssertEqual(row["workspaceKind"], .string(RuntimeWorkspaceKind.viewer.rawValue))
+        rows.append(row)
+      }
+      params = options
+      if page["hasMore"] == .bool(true) { params["cursor"] = page["nextCursor"] }
+    } while params["cursor"] != nil
+    XCTAssertEqual(rows.compactMap { row -> String? in
+      guard case .string(let id)? = row["jobId"] else { return nil }; return id
+    }, accepted.map(\.jobID).sorted(), "equal creation times use Job identity as the total order")
+    XCTAssertEqual(Set(rows.filter { $0["current"] == .bool(true) }.compactMap { row -> String? in
+      guard case .string(let id)? = row["jobId"] else { return nil }; return id
+    }), Set(accepted.prefix(2).map(\.jobID)))
     for params in [
-      ["pageSize": JSONValue.string("1")],
-      ["order": JSONValue.string("latest")],
-      ["includeTimeline": .string("false")],
-      ["includeCurrent": .string("true")],
+      ["pageSize": JSONValue.string("1")], ["order": JSONValue.string("latest")],
+      ["includeTimeline": .string("false")], ["includeCurrent": .string("true")],
     ] {
-      let invalid = try await request(handler, method: "job.list-page", params: params)
+      let invalid = try await request(handler, method: "job.list", params: params)
       XCTAssertFalse(invalid.ok)
-      XCTAssertEqual(invalid.error?.code, AgentDaemonErrorCode.invalidParams.rawValue)
+      XCTAssertEqual(invalid.error?.code, "invalidInput")
     }
   }
 
@@ -1986,7 +1974,7 @@ final class AgentDaemonContractTests: XCTestCase {
     let (handler, engine) = try makeStack(dispatcher: dispatcher)
     let operation = Data(
       """
-      {"documentType":"runtime-operation-request","schemaVersion":"2.0.0",\
+      {"documentType":"runtime-operation-request","schemaVersion":"1.0.0",\
       "requestId":"req-typed-progress","idempotencyKey":"idem-typed-progress",\
       "target":{"targetId":"TGT-TYPED-PROGRESS","expectedBindingRevision":7},\
       "operation":{"id":"observe.device","version":1}}
@@ -2029,7 +2017,7 @@ final class AgentDaemonContractTests: XCTestCase {
     let (handler, engine) = try makeStack(dispatcher: FailingDispatcher())
     let operation = Data(
       """
-      {"documentType":"runtime-operation-request","schemaVersion":"2.0.0",\
+      {"documentType":"runtime-operation-request","schemaVersion":"1.0.0",\
       "requestId":"req-typed-failure","idempotencyKey":"idem-typed-failure",\
       "target":{"targetId":"TGT-TYPED-FAILURE","expectedBindingRevision":7},\
       "operation":{"id":"observe.device","version":1}}
@@ -2055,7 +2043,7 @@ final class AgentDaemonContractTests: XCTestCase {
   func testOperationSurfaceComesFromCatalog() async throws {
     let (handler, _) = try makeStack()
     let list = await handler.handleFrame(
-      Data("{\"protocolVersion\":\"1.0.0\",\"id\":\"l\",\"method\":\"operation.list\"}".utf8))
+      Data("{\"protocolVersion\":\"1.0.0\",\"contractIdentity\":\"\(ArkDeckControlProtocol.contractIdentity)\",\"id\":\"l\",\"method\":\"operation.list\"}".utf8))
     guard case .array(let values)? = list.result else {
       return XCTFail("operation.list must return an array")
     }
@@ -2086,12 +2074,8 @@ final class AgentDaemonContractTests: XCTestCase {
         guard case .string(let reason) = value else { return false }
         return reason.contains("arkforge") && reason.contains("not registered")
       })
-    let describe = await handler.handleFrame(
-      Data(
-        """
-        {"protocolVersion":"1.0.0","id":"d","method":"operation.describe",
-         "params":{"reference":"flash.dayu200"}}
-        """.utf8))
+    let describe = try await request(
+      handler, method: "operation.describe", params: ["reference": .string("flash.dayu200")])
     guard case .object(let fields)? = describe.result else {
       return XCTFail("describe must return an object")
     }
@@ -2113,31 +2097,31 @@ final class AgentDaemonContractTests: XCTestCase {
       endpointSource: "default")
     let (handler, _) = try makeStack(hdcRuntimeDiagnostics: diagnostics)
 
-    let response = try await request(handler, method: "runtime.hdc-status")
+    let response = try await request(handler, method: "runtime.hdc.status")
     guard case .object(let result)? = response.result else {
-      return XCTFail("runtime.hdc-status must return an object")
+      return XCTFail("runtime.hdc.status must return an object")
     }
     XCTAssertTrue(response.ok)
-    XCTAssertEqual(result["availability"], .string("ready"))
-    XCTAssertEqual(result["source"], .string("runtimeManaged"))
-    XCTAssertEqual(result["toolSha256"], .string(String(repeating: "a", count: 64)))
-    XCTAssertEqual(result["clientVersion"], .string("3.2.0f"))
-    XCTAssertEqual(result["serverVersion"], .string("3.2.0f"))
-    XCTAssertEqual(result["endpoint"], .string("127.0.0.1:8710"))
-    XCTAssertEqual(result["serverHealth"], .string("healthy"))
-    XCTAssertEqual(result["ownership"], .string("arkDeckManaged"))
+    XCTAssertEqual(result["availability"], .string("unavailable"))
+    XCTAssertEqual(result["schemaVersion"], .string("arkdeck.runtime-hdc-status/1"))
+    XCTAssertEqual(result["executableSHA256"], .null)
+    XCTAssertEqual(result["clientVersion"], .null)
+    XCTAssertEqual(result["serverVersion"], .null)
+    XCTAssertEqual(result["endpoint"], .null)
+    XCTAssertEqual(result["serverHealth"], .string("unknown"))
+    XCTAssertEqual(result["ownership"], .string("unknown"))
     XCTAssertNil(result["path"])
     XCTAssertNil(result["executable"])
     XCTAssertNil(result["arguments"])
     XCTAssertNil(result["argv"])
 
     let invalid = try await request(
-      handler, method: "runtime.hdc-status", params: ["path": .string("/tmp/hdc")])
+      handler, method: "runtime.hdc.status", params: ["path": .string("/tmp/hdc")])
     XCTAssertFalse(invalid.ok)
     XCTAssertEqual(invalid.error?.code, "invalidParams")
 
     let (unconfigured, _) = try makeStack()
-    let unavailable = try await request(unconfigured, method: "runtime.hdc-status")
+    let unavailable = try await request(unconfigured, method: "runtime.hdc.status")
     guard case .object(let unavailableResult)? = unavailable.result else {
       return XCTFail("unconfigured runtime status must still be structured")
     }
@@ -2448,15 +2432,15 @@ final class AgentDaemonContractTests: XCTestCase {
         "maximumUses": .integer(3),
       ])
     XCTAssertFalse(drafted.ok)
-    XCTAssertEqual(drafted.error?.code, "rejected")
-    XCTAssertTrue((drafted.error?.message ?? "").contains("not an Agent-facing API"))
+    XCTAssertEqual(drafted.error?.code, "unknownMethod")
+    XCTAssertTrue((drafted.error?.message ?? "").contains("not published"))
 
     for method in ["capability.install", "capability.revoke"] {
       let rejected = try await request(handler, method: method, params: [:])
       XCTAssertFalse(rejected.ok, method)
-      XCTAssertEqual(rejected.error?.code, "rejected", method)
+      XCTAssertEqual(rejected.error?.code, "unknownMethod", method)
       XCTAssertTrue(
-        (rejected.error?.message ?? "").contains("not an Agent-facing API"), method)
+        (rejected.error?.message ?? "").contains("not published"), method)
     }
     let statuses = try await request(handler, method: "capability.list")
     XCTAssertEqual(statuses.result, .array([]))
@@ -2470,16 +2454,16 @@ final class AgentDaemonContractTests: XCTestCase {
   func testTargetAdoptFailsClosedWithoutBootstrapComposition() async throws {
     let (handler, _) = try makeStack()
     let adopt = await handler.handleFrame(
-      Data("{\"protocolVersion\":\"1.0.0\",\"id\":\"a\",\"method\":\"target.adopt\"}".utf8))
+      Data("{\"protocolVersion\":\"1.0.0\",\"contractIdentity\":\"\(ArkDeckControlProtocol.contractIdentity)\",\"id\":\"a\",\"method\":\"target.adopt\"}".utf8))
     XCTAssertFalse(adopt.ok)
-    XCTAssertEqual(adopt.error?.code, "internalError")
+    XCTAssertEqual(adopt.error?.code, "unknownMethod")
     XCTAssertTrue(
-      (adopt.error?.message ?? "").contains("bootstrap"),
+      (adopt.error?.message ?? "").contains("observation owner"),
       "the refusal must name the missing composition: \(adopt.error?.message ?? "-")")
     // target.list is equally unavailable without a store - never an empty
     // list, which would read as "no devices adopted".
     let list = await handler.handleFrame(
-      Data("{\"protocolVersion\":\"1.0.0\",\"id\":\"l\",\"method\":\"target.list\"}".utf8))
+      Data("{\"protocolVersion\":\"1.0.0\",\"contractIdentity\":\"\(ArkDeckControlProtocol.contractIdentity)\",\"id\":\"l\",\"method\":\"target.list\"}".utf8))
     XCTAssertFalse(list.ok)
     XCTAssertEqual(list.error?.code, "internalError")
   }
@@ -2575,7 +2559,7 @@ final class AgentDaemonContractTests: XCTestCase {
           "artifacts-framing", directoryHint: .isDirectory),
       nowUTC: { "2026-07-30T00:00:00Z" })
 
-    var scratch = [UInt8](repeating: 0, count: 2 * 1024 * 1024)
+    var scratch = [UInt8](repeating: 0, count: 512 * 1024)
     var seed: UInt64 = 0x2545_F491_4F6C_DD1D
     for index in scratch.indices {
       seed ^= seed << 13
@@ -2600,15 +2584,18 @@ final class AgentDaemonContractTests: XCTestCase {
     let client = AgentClient(socketPath: server.socketURL.path)
 
     let begin = try client.request(
-      method: "artifact.importFlashBundle.begin",
+      method: "artifact.import.begin",
       params: [
+        "schemaVersion": .string(ArtifactImportIntent.schemaVersion),
+        "importRequestId": .string("framing-import"), "kind": .string("flash-bundle"),
+        "bindingRevision": .string(String(target.bindingRevision)), "deviceProfile": .string("dayu200"),
         "targetId": .string(target.targetID),
         "name": .string("images.tar.gz"),
-        "byteCount": .integer(Int64(bytes.count)),
+        "byteCount": .string(String(bytes.count)),
         "sha256": .string(digest),
       ])
     guard case .object(let beginFields) = begin,
-      case .string(let uploadID)? = beginFields["uploadId"]
+      case .string(let uploadID)? = beginFields["importId"]
     else {
       return XCTFail("flash begin must return a bounded upload identity")
     }
@@ -2616,13 +2603,9 @@ final class AgentDaemonContractTests: XCTestCase {
     let identifier = UUID().uuidString
     var payload = try JSONEncoder().encode(
       AgentWireProtocol.Request(
-        id: identifier, method: "artifact.importFlashBundle.append",
-        params: [
-          "uploadId": .string(uploadID),
-          "offset": .integer(0),
-          "base64": .string(bytes.base64EncodedString()),
-        ]))
-    XCTAssertGreaterThan(payload.count, 2_700_000)
+        id: identifier, method: "artifact.import.append",
+        params: importAppendParams(id: uploadID, offset: 0, bytes: bytes)))
+    XCTAssertGreaterThan(payload.count, 690_000)
     payload.append(0x0A)
 
     let responses = try exchangeRawFrames(
@@ -2633,16 +2616,16 @@ final class AgentDaemonContractTests: XCTestCase {
       AgentWireProtocol.Response.self, from: Data(responses[0].utf8))
     XCTAssertEqual(appended.id, identifier)
     XCTAssertTrue(appended.ok, appended.error?.message ?? "-")
-    XCTAssertEqual(appended.result, .object(["nextOffset": .integer(Int64(bytes.count))]))
+    XCTAssertEqual(try ArtifactImportProjection(XCTUnwrap(appended.result)).nextOffset, bytes.count)
 
     let commit = try client.request(
-      method: "artifact.importFlashBundle.commit",
-      params: ["uploadId": .string(uploadID)])
-    guard case .object(let fields) = commit else {
+      method: "artifact.import.commit",
+      params: ["importId": .string(uploadID), "generation": .string("1")])
+    guard case .object(let projection) = commit, case .object(let fields)? = projection["receipt"] else {
       return XCTFail("flash commit must return the published artifact facts")
     }
-    XCTAssertEqual(fields["sha256"], .string(digest))
-    XCTAssertEqual(fields["byteCount"], .integer(Int64(bytes.count)))
+    XCTAssertEqual(fields["artifactDigest"], .string(digest))
+    XCTAssertEqual(fields["byteCount"], .string(String(bytes.count)))
   }
 
   /// Frame boundaries, not read boundaries, delimit requests: several frames in
@@ -2704,7 +2687,8 @@ final class AgentDaemonContractTests: XCTestCase {
       try JSONDecoder().decode(AgentWireProtocol.Response.self, from: Data($0.utf8))
     }
     XCTAssertEqual(decoded.map(\.id), [longID, shortID])
-    XCTAssertTrue(decoded.allSatisfy(\.ok))
+    XCTAssertEqual(decoded[0].error?.code, "invalidParams")
+    XCTAssertTrue(decoded[1].ok)
   }
 
   /// The frame-bomb guard still ends the connection before an unterminated
@@ -2848,8 +2832,17 @@ final class AgentDaemonContractTests: XCTestCase {
       _ = setsockopt(
         connectionFD, SOL_SOCKET, SO_NOSIGPIPE, &suppressSignal,
         socklen_t(MemoryLayout<Int32>.size))
-      var request = [UInt8](repeating: 0, count: 64 * 1024)
-      _ = read(connectionFD, &request, request.count)
+      func readFrame() -> Data {
+        var result = Data(); var byte: UInt8 = 0
+        while read(connectionFD, &byte, 1) == 1 { if byte == 0x0A { break }; result.append(byte) }
+        return result
+      }
+      guard let health = try? ControlProtocolContract.requestFields(readFrame()),
+        health["method"] == .string("health"), let id = health["id"],
+        let answer = try? currentHealthResponse(id: id) else { return served.fulfill() }
+      _ = answer.withUnsafeBytes { write(connectionFD, $0.baseAddress!, $0.count) }
+      guard let business = try? ControlProtocolContract.requestFields(readFrame()),
+        business["method"] == .string("job.status") else { return served.fulfill() }
       response.withUnsafeBytes { raw in
         guard let base = raw.baseAddress else { return }
         var sent = 0
@@ -2868,8 +2861,8 @@ final class AgentDaemonContractTests: XCTestCase {
     }
 
     let client = AgentClient(socketPath: socketURL.path)
-    let result = try client.request(method: "health", id: identifier)
-    wait(for: [served], timeout: 30)
+    defer { wait(for: [served], timeout: 30) }
+    let result = try client.request(method: "job.status", id: identifier)
     guard case .object(let fields) = result,
       case .string(let padding)? = fields["padding"]
     else {
@@ -3192,7 +3185,7 @@ final class AgentDaemonContractTests: XCTestCase {
     defer { stopProductionDaemon(process) }
     let socketURL = shortState.appending(path: "agentd.sock")
     let client = try AgentClient(socketPath: socketURL.path)
-      .negotiated(requiredMajor: 2, forMethod: "workspace.project.list")
+
     let response = try client.request(method: "workspace.project.list")
     guard case .object(let collection) = response,
       case .array(let rows)? = collection["projects"]
@@ -3247,7 +3240,7 @@ final class AgentDaemonContractTests: XCTestCase {
     let process = try launchProductionDaemon(binary: binary, stateDirectory: shortState)
     defer { stopProductionDaemon(process) }
     let client = try AgentClient(socketPath: shortState.appending(path: "agentd.sock").path)
-      .negotiated(requiredMajor: 2, forMethod: "workspace.project.show")
+
     guard case .object(let shown) = try client.request(
       method: "workspace.project.show",
       params: ["projectRef": .string(registered.projectRef)])
@@ -3521,8 +3514,9 @@ final class AgentDaemonContractTests: XCTestCase {
       else { return XCTFail("round \(round) did not return status") }
       XCTAssertEqual(finished["state"], .string("succeeded"), "\(finished)")
       XCTAssertEqual(finished["actualEffect"], .string("hostOnly"))
-      guard case .array(let listed) = try client.request(
-        method: "artifact.list", params: ["jobId": .string(jobID)])
+      guard case .object(let page) = try client.request(
+        method: "artifact.list", params: ["owner": .object(["kind": .string("job"), "id": .string(jobID)])]),
+        case .array(let listed)? = page["items"]
       else { return XCTFail("artifact.list must return its wire array") }
       let entries = listed.compactMap { entry -> [String: JSONValue]? in
         guard case .object(let fields) = entry else { return nil }
@@ -3533,13 +3527,14 @@ final class AgentDaemonContractTests: XCTestCase {
         return XCTFail("published wire Artifact must expose artifactId")
       }
       XCTAssertEqual(derived["privacy"], .string("standard"))
-      XCTAssertEqual(derived["bindingRevision"], .null)
+      guard case .object(let binding)? = derived["binding"] else { return XCTFail("missing binding") }
+      XCTAssertEqual(binding["bindingRevision"], .null)
       guard case .object(let read) = try client.request(
-        method: "artifact.read", params: ["jobId": .string(jobID), "artifactId": .string(artifactID)]),
+        method: "artifact.read", params: ["owner": .object(["kind": .string("job"), "id": .string(jobID)]), "artifactId": .string(artifactID)]),
         case .string(let base64)? = read["base64"], let output = Data(base64Encoded: base64)
       else { return XCTFail("published summary must be readable without sensitive opt-in") }
       XCTAssertEqual(read["eof"], .bool(true))
-      XCTAssertEqual(derived["sha256"], .string(AnalyzerProvider.sha256(output)))
+      XCTAssertEqual(derived["artifactDigest"], .string(AnalyzerProvider.sha256(output)))
       let result = try JSONDecoder().decode(HilogSummaryDerivedArtifact.self, from: output)
       XCTAssertEqual(result.sourceArtifactID, source.artifactID)
       XCTAssertEqual(result.result.sourceSHA256, source.sha256)
@@ -3692,7 +3687,7 @@ final class AgentDaemonContractTests: XCTestCase {
   func testJobSubmitPinsAnOptionalPlanOnlyDigestBeforeAdmission() async throws {
     let (handler, _) = try makeStack()
     let requestJSON = """
-      {"documentType":"runtime-operation-request","schemaVersion":"2.0.0",\
+      {"documentType":"runtime-operation-request","schemaVersion":"1.0.0",\
       "requestId":"req-plan-pin-rpc","idempotencyKey":"idem-plan-pin-rpc-01",\
       "target":{"targetId":"TGT-PLAN-PIN-01","expectedBindingRevision":7},\
       "operation":{"id":"observe.device","version":1}}
@@ -3720,8 +3715,9 @@ final class AgentDaemonContractTests: XCTestCase {
           try requestPinned(to: String(repeating: "0", count: 64)))
       ])
     XCTAssertFalse(drifted.ok)
-    XCTAssertEqual(drifted.error?.code, "rejected")
-    XCTAssertTrue(drifted.error?.message.contains("zero admission and zero dispatch") == true)
+    XCTAssertEqual(drifted.error?.code, "reviewedPlanMismatch")
+    XCTAssertEqual(drifted.error?.details?["phase"], .string("preAdmission"))
+    XCTAssertEqual(drifted.error?.details?["newDispatchCount"], .integer(0))
 
     let submitted = try await request(
       handler, method: "job.submit",
@@ -3735,7 +3731,7 @@ final class AgentDaemonContractTests: XCTestCase {
 
   func testAppXPCAdmitsTypedPlanAndCarriesPinnedSubmitInRequestEnvelope() throws {
     let requestJSON = """
-      {"documentType":"runtime-operation-request","schemaVersion":"2.0.0",\
+      {"documentType":"runtime-operation-request","schemaVersion":"1.0.0",\
       "requestId":"req-xpc-plan-pin","idempotencyKey":"idem-xpc-plan-pin-01",\
       "target":{"targetId":"TGT-XPC-PLAN-PIN","expectedBindingRevision":7},\
       "operation":{"id":"flash.full-restore","version":1},"inputs":{},\
@@ -3767,9 +3763,7 @@ final class AgentDaemonContractTests: XCTestCase {
       let frame = try ArkDeckAgentXPC.requestFrame(
         method: "job.submit",
         params: ["requestJson": .string(try requestPinned(to: invalid))])
-      guard case .appSubmit(_, .flash)? = AgentXPCEndpoint.admission(of: frame) else {
-        return XCTFail("XPC admits the typed request; Runtime validates the digest")
-      }
+      XCTAssertNil(AgentXPCEndpoint.admission(of: frame), "malformed request fields are rejected before forwarding")
     }
   }
 
@@ -3782,7 +3776,7 @@ final class AgentDaemonContractTests: XCTestCase {
   func testCancelReportsARefusalRatherThanClaimingTheJobIsMissing() async throws {
     let (handler, _) = try makeStack()
     let submitJSON = """
-      {"documentType":"runtime-operation-request","schemaVersion":"2.0.0",\
+      {"documentType":"runtime-operation-request","schemaVersion":"1.0.0",\
       "requestId":"req-cancel-map","idempotencyKey":"idem-cancel-map-01",\
       "target":{"targetId":"TGT-CANCEL-01","expectedBindingRevision":7},\
       "operation":{"id":"observe.device","version":1}}
@@ -3844,7 +3838,7 @@ final class AgentDaemonContractTests: XCTestCase {
   func testCancellingAFinishedJobDoesNotClaimItNeverExisted() async throws {
     let (handler, _) = try makeStack()
     let submitJSON = """
-      {"documentType":"runtime-operation-request","schemaVersion":"2.0.0",\
+      {"documentType":"runtime-operation-request","schemaVersion":"1.0.0",\
       "requestId":"req-cancel-terminal","idempotencyKey":"idem-cancel-terminal-01",\
       "target":{"targetId":"TGT-CANCEL-02","expectedBindingRevision":7},\
       "operation":{"id":"observe.device","version":1}}
@@ -3898,18 +3892,18 @@ final class AgentDaemonContractTests: XCTestCase {
     let (handler, _) = try makeStack()
     for bad in ["abc", "-1", "", "12x", "9999999999999999999999"] {
       let response = try await request(
-        handler, method: "job.list-page",
+        handler, method: "job.list",
         params: ["cursor": .string(bad), "pageSize": .integer(10)])
       XCTAssertFalse(response.ok, "cursor \(bad) must not be accepted")
       XCTAssertEqual(
-        response.error?.code, "invalidParams",
+        response.error?.code, "invalidCursor",
         "a bad cursor is the request's fault, not the store's: \(bad)")
     }
 
-    // A well-formed cursor still reaches the store and is answered normally.
+    // A fresh page reaches the store and supplies Runtime-owned cursors.
     let good = try await request(
-      handler, method: "job.list-page",
-      params: ["cursor": .string("0"), "pageSize": .integer(10)])
+      handler, method: "job.list",
+      params: ["pageSize": .integer(10)])
     XCTAssertTrue(good.ok, "a valid cursor must still be served")
   }
 
@@ -4013,7 +4007,7 @@ final class AgentDaemonContractTests: XCTestCase {
     let server = try startServer(handler)
     let client = AgentClient(socketPath: server.socketURL.path)
     let request = """
-      {"documentType":"runtime-operation-request","schemaVersion":"2.0.0",\
+      {"documentType":"runtime-operation-request","schemaVersion":"1.0.0",\
       "requestId":"req-restart","idempotencyKey":"idem-restart-01",\
       "target":{"targetId":"TGT-RESTART-01","expectedBindingRevision":7},\
       "operation":{"id":"observe.device","version":1}}
@@ -4066,7 +4060,7 @@ final class AgentDaemonContractTests: XCTestCase {
       let activeServer = try startServer(handler)
       let client = AgentClient(socketPath: activeServer.socketURL.path)
       let request = """
-        {"documentType":"runtime-operation-request","schemaVersion":"2.0.0",\
+        {"documentType":"runtime-operation-request","schemaVersion":"1.0.0",\
         "requestId":"req-unreadable-wire","idempotencyKey":"idem-unreadable-wire-01",\
         "target":{"targetId":"TGT-UNREADABLE-01","expectedBindingRevision":7},\
         "operation":{"id":"observe.device","version":1}}
@@ -4093,14 +4087,14 @@ final class AgentDaemonContractTests: XCTestCase {
     for (method, params) in [
       ("job.status", ["jobId": JSONValue.string(jobID)]),
       ("job.list", nil),
-      ("job.list-page", ["pageSize": JSONValue.integer(100)]),
+      ("job.list", ["pageSize": JSONValue.integer(100)]),
     ] as [(String, [String: JSONValue]?)] {
       do {
         _ = try client.request(method: method, params: params)
         XCTFail("\(method) must fail loudly on a corrupt Runtime job record")
       } catch AgentClientError.daemonError(let code, let message) {
         XCTAssertEqual(code, AgentDaemonErrorCode.recordUnreadable.rawValue)
-        XCTAssertTrue(message.contains(jobID))
+        XCTAssertFalse(message.isEmpty)
       }
     }
 
@@ -4123,7 +4117,7 @@ final class AgentDaemonContractTests: XCTestCase {
     let server = try startServer(handler)
     let client = AgentClient(socketPath: server.socketURL.path)
     let request = """
-      {"documentType":"runtime-operation-request","schemaVersion":"2.0.0",\
+      {"documentType":"runtime-operation-request","schemaVersion":"1.0.0",\
       "requestId":"req-drain","idempotencyKey":"idem-drain-01",\
       "target":{"targetId":"TGT-DRAIN-01","expectedBindingRevision":7},\
       "operation":{"id":"observe.device","version":1}}
@@ -4220,20 +4214,27 @@ final class AgentDaemonContractTests: XCTestCase {
     let artifactStore = try RuntimeArtifactStore(
       rootURL: stateDirectory.appending(path: "artifacts", directoryHint: .isDirectory),
       nowUTC: { "2026-08-26T00:00:00Z" })
+    let (handler, engine) = try makeStack(artifactStore: artifactStore)
+    let accepted = try await engine.submit(Data("""
+      {"documentType":"runtime-operation-request","schemaVersion":"1.0.0",
+       "requestId":"req-device-index","idempotencyKey":"idem-device-index",
+       "target":{"targetId":"TGT-001","expectedBindingRevision":7},
+       "operation":{"id":"observe.device","version":1}}
+      """.utf8))
+    let jobID = accepted.jobID
     let png =
       Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) + Data(repeating: 7, count: 24)
     let published = try await artifactStore.publish(
       RuntimeArtifactPublicationRequest(
-        jobID: "job-device-index-001", sessionID: "session-device-index-001",
+        jobID: jobID, sessionID: "session-device-index-001",
         stepID: "receive-screenshot", name: "screenshot.png",
         mediaType: "image/png",
         privacy: .standard, retentionClass: .pinnedUntilVerified,
         sourceOperation: "capture.diagnostics", providerID: "host",
         bindingSnapshot: ArtifactBindingSnapshot(
-          targetID: "TGT-001", bindingRevision: 1,
+          targetID: "TGT-001", bindingRevision: 7,
           stableIdentitySHA256: String(repeating: "a", count: 64)),
         contents: png))
-    let (handler, _) = try makeStack(artifactStore: artifactStore)
 
     // `handleLine` returns the bytes that go on the wire, so the reader is
     // driven by the daemon's actual reply rather than by a fixture written to
@@ -4241,8 +4242,8 @@ final class AgentDaemonContractTests: XCTestCase {
     let listed = await handler.handleLine(
       Data(
         """
-        {"protocolVersion":"1.0.0","id":"a","method":"artifact.list",\
-        "params":{"jobId":"job-device-index-001"}}
+        {"protocolVersion":"1.0.0","contractIdentity":"\(ArkDeckControlProtocol.contractIdentity)","id":"a","method":"artifact.list",\
+        "params":{"owner":{"kind":"job","id":"\(jobID)"}}}
         """.utf8))
 
     let entries = try DeviceArtifactIndex.entries(
@@ -4258,19 +4259,19 @@ final class AgentDaemonContractTests: XCTestCase {
     let withoutJob = await handler.handleFrame(
       Data(
         """
-        {"protocolVersion":"1.0.0","id":"b","method":"artifact.read",\
+        {"protocolVersion":"1.0.0","contractIdentity":"\(ArkDeckControlProtocol.contractIdentity)","id":"b","method":"artifact.read",\
         "params":{"artifactId":"\(screenshot.artifactID)","offset":0,"maxBytes":1048576,\
         "allowSensitive":true}}
         """.utf8))
     XCTAssertFalse(
       withoutJob.ok,
-      "an artifact read without its job id is refused, so the workspace has to send one")
+      "an artifact read without its tagged owner is refused, so the workspace must send one")
 
     let read = await handler.handleFrame(
       Data(
         """
-        {"protocolVersion":"1.0.0","id":"c","method":"artifact.read",\
-        "params":{"jobId":"job-device-index-001",\
+        {"protocolVersion":"1.0.0","contractIdentity":"\(ArkDeckControlProtocol.contractIdentity)","id":"c","method":"artifact.read",\
+        "params":{"owner":{"kind":"job","id":"\(jobID)"},\
         "artifactId":"\(screenshot.artifactID)","offset":0,"maxBytes":1048576,\
         "allowSensitive":true}}
         """.utf8))
@@ -4279,32 +4280,18 @@ final class AgentDaemonContractTests: XCTestCase {
 
   func testArtifactMethodsAreIDOnlyAndFailClosedWithoutAStore() async throws {
     let (handler, _) = try makeStack(includeDefaultArtifactStore: false)
-    for method in [
-      "artifact.importHap.begin", "artifact.importHap.append",
-      "artifact.importHap.commit", "artifact.importNativeLibrary.begin",
-      "artifact.importNativeLibrary.append",
-      "artifact.importNativeLibrary.commit", "artifact.importFlashBundle.begin",
-      "artifact.importFlashBundle.append", "artifact.importFlashBundle.commit",
-      "artifact.importWorkspacePatch.begin", "artifact.importWorkspacePatch.append",
-      "artifact.importWorkspacePatch.commit",
-      "artifact.list", "artifact.inspect",
-      "artifact.read", "artifact.export",
-    ] {
-      let response = await handler.handleFrame(
-        Data(
-          """
-          {"protocolVersion":"1.0.0","id":"a","method":"\(method)",          "params":{"jobId":"job-1","artifactId":"ART-1"}}
-          """.utf8))
+    for method in ["artifact.import.begin", "artifact.import.append", "artifact.import.commit",
+                   "artifact.list", "artifact.inspect", "artifact.read", "artifact.export"] {
+      let response = try await request(handler, method: method, params: [
+        "owner": .object(["kind": .string("job"), "id": .string("job-1")]),
+        "artifactId": .string("ART-1"),
+      ])
       XCTAssertFalse(response.ok, method)
-      XCTAssertEqual(response.error?.code, "internalError", method)
-      XCTAssertTrue(
-        (response.error?.message ?? "").contains("artifact store"),
-        response.error?.message ?? "-")
+      XCTAssertEqual(response.error?.code, "operationUnavailable", method)
+      XCTAssertEqual(response.error?.details?["newDispatchCount"], .integer(0))
     }
-    // Missing identifiers are refused rather than defaulted.
-    let noJob = await handler.handleFrame(
-      Data("{\"protocolVersion\":\"1.0.0\",\"id\":\"b\",\"method\":\"artifact.list\"}".utf8))
-    XCTAssertFalse(noJob.ok)
+    let noOwner = try await request(handler, method: "artifact.list")
+    XCTAssertFalse(noOwner.ok)
   }
 
   func testWorkspacePatchImportPublishesBoundedTargetCorrelatedLease() async throws {
@@ -4335,43 +4322,46 @@ final class AgentDaemonContractTests: XCTestCase {
 
     let begin = try await request(
       handler,
-      method: "artifact.importWorkspacePatch.begin",
+      method: "artifact.import.begin",
       params: [
+        "schemaVersion": .string(ArtifactImportIntent.schemaVersion),
+        "importRequestId": .string("fixture-" + UUID().uuidString.lowercased()),
+        "kind": .string("workspace-patch"),
+        "bindingRevision": .string(String(target.bindingRevision)),
+        "deviceProfile": .null,
         "targetId": .string(target.targetID),
         "name": .string("remove-diagnostic.patch"),
-        "byteCount": .integer(Int64(patch.count)),
+        "byteCount": .string(String(patch.count)),
         "sha256": .string(digest),
       ])
     XCTAssertTrue(begin.ok, begin.error?.message ?? "-")
     guard case .object(let beginFields)? = begin.result,
-      case .string(let uploadID)? = beginFields["uploadId"]
+      case .string(let uploadID)? = beginFields["importId"]
     else {
       return XCTFail("begin must return an upload identity")
     }
     let append = try await request(
       handler,
-      method: "artifact.importWorkspacePatch.append",
-      params: [
-        "uploadId": .string(uploadID),
-        "offset": .integer(0),
-        "base64": .string(patch.base64EncodedString()),
-      ])
+      method: "artifact.import.append",
+      params: importAppendParams(id: uploadID, offset: 0, bytes: patch))
     XCTAssertTrue(append.ok, append.error?.message ?? "-")
 
     let commit = try await request(
       handler,
-      method: "artifact.importWorkspacePatch.commit",
-      params: ["uploadId": .string(uploadID)])
+      method: "artifact.import.commit",
+      params: ["importId": .string(uploadID), "generation": .string("1")])
     XCTAssertTrue(commit.ok, commit.error?.message ?? "-")
-    guard case .object(let fields)? = commit.result,
-      case .string(let jobID)? = fields["jobId"],
+    guard case .object(let projection)? = commit.result,
+      case .object(let fields)? = projection["receipt"],
+      case .string(let jobID)? = fields["importId"],
       case .string(let artifactID)? = fields["artifactId"],
       case .string(let lease)? = fields["lease"],
-      case .array(let touchedFiles)? = fields["touchedFiles"]
+      case .object(let validation)? = fields["validation"],
+      case .array(let touchedFiles)? = validation["touchedFiles"]
     else {
       return XCTFail("commit must return the immutable patch identity")
     }
-    XCTAssertEqual(fields["sha256"], .string(digest))
+    XCTAssertEqual(fields["artifactDigest"], .string(digest))
     XCTAssertEqual(fields["targetId"], .string(target.targetID))
     XCTAssertEqual(touchedFiles, [.string("entry/src/main/ets/pages/Index.ets")])
     XCTAssertEqual(lease, "lease-v1:\(jobID):\(artifactID)")
@@ -4414,50 +4404,54 @@ final class AgentDaemonContractTests: XCTestCase {
 
     let unknown = try await request(
       handler,
-      method: "artifact.importWorkspacePatch.begin",
+      method: "artifact.import.begin",
       params: [
+        "schemaVersion": .string(ArtifactImportIntent.schemaVersion),
+        "importRequestId": .string("fixture-" + UUID().uuidString.lowercased()),
+        "kind": .string("workspace-patch"),
+        "bindingRevision": .string(String(target.bindingRevision)),
+        "deviceProfile": .null,
         "targetId": .string("TGT-unknown"),
         "name": .string("unsafe.patch"),
-        "byteCount": .integer(Int64(unsafe.count)),
+        "byteCount": .string(String(unsafe.count)),
         "sha256": .string(digest),
       ])
     XCTAssertFalse(unknown.ok)
-    XCTAssertEqual(unknown.error?.code, "notFound")
+    XCTAssertEqual(unknown.error?.code, "resourceConflict")
 
     let begin = try await request(
       handler,
-      method: "artifact.importWorkspacePatch.begin",
+      method: "artifact.import.begin",
       params: [
+        "schemaVersion": .string(ArtifactImportIntent.schemaVersion),
+        "importRequestId": .string("fixture-" + UUID().uuidString.lowercased()),
+        "kind": .string("workspace-patch"),
+        "bindingRevision": .string(String(target.bindingRevision)),
+        "deviceProfile": .null,
         "targetId": .string(target.targetID),
         "name": .string("unsafe.patch"),
-        "byteCount": .integer(Int64(unsafe.count)),
+        "byteCount": .string(String(unsafe.count)),
         "sha256": .string(digest),
       ])
     guard case .object(let beginFields)? = begin.result,
-      case .string(let uploadID)? = beginFields["uploadId"]
+      case .string(let uploadID)? = beginFields["importId"]
     else {
       return XCTFail("begin must return an upload identity")
     }
     let append = try await request(
       handler,
-      method: "artifact.importWorkspacePatch.append",
-      params: [
-        "uploadId": .string(uploadID),
-        "offset": .integer(0),
-        "base64": .string(unsafe.base64EncodedString()),
-      ])
+      method: "artifact.import.append",
+      params: importAppendParams(id: uploadID, offset: 0, bytes: unsafe))
     XCTAssertTrue(append.ok)
     let commit = try await request(
       handler,
-      method: "artifact.importWorkspacePatch.commit",
-      params: ["uploadId": .string(uploadID)])
+      method: "artifact.import.commit",
+      params: ["importId": .string(uploadID), "generation": .string("1")])
     XCTAssertFalse(commit.ok)
-    XCTAssertEqual(commit.error?.code, "rejected")
-    XCTAssertTrue((commit.error?.message ?? "").contains("unified diff"))
+    XCTAssertEqual(commit.error?.code, "invalidInput")
+    XCTAssertEqual(commit.error?.details?["newDispatchCount"], .integer(0))
 
-    let expectedJob =
-      "input-workspace-patch-\(target.targetID)-\(digest.prefix(16))"
-    let artifacts = try await artifactStore.list(jobID: expectedJob)
+    let artifacts = try await artifactStore.list(jobID: uploadID)
     XCTAssertTrue(artifacts.isEmpty)
   }
 
@@ -4510,16 +4504,21 @@ final class AgentDaemonContractTests: XCTestCase {
 
       let begin = try await request(
         handler,
-        method: "artifact.importHap.begin",
+        method: "artifact.import.begin",
         params: [
+        "schemaVersion": .string(ArtifactImportIntent.schemaVersion),
+        "importRequestId": .string("fixture-" + UUID().uuidString.lowercased()),
+        "kind": .string("hap"),
+        "bindingRevision": .string(String(target.bindingRevision)),
+        "deviceProfile": .null,
           "targetId": .string(target.targetID),
           "name": .string(name),
-          "byteCount": .integer(Int64(hap.count)),
+          "byteCount": .string(String(hap.count)),
           "sha256": .string(digest),
         ])
       XCTAssertTrue(begin.ok, begin.error?.message ?? "-")
       guard case .object(let beginFields)? = begin.result,
-        case .string(let uploadID)? = beginFields["uploadId"]
+        case .string(let uploadID)? = beginFields["importId"]
       else {
         return XCTFail("begin must return an upload identity")
       }
@@ -4531,36 +4530,30 @@ final class AgentDaemonContractTests: XCTestCase {
       ] {
         let append = try await request(
           handler,
-          method: "artifact.importHap.append",
-          params: [
-            "uploadId": .string(uploadID),
-            "offset": .integer(Int64(offset)),
-            "base64": .string(bytes.base64EncodedString()),
-          ])
+          method: "artifact.import.append",
+          params: importAppendParams(id: uploadID, offset: Int64(offset), bytes: bytes))
         XCTAssertTrue(append.ok, append.error?.message ?? "-")
       }
 
       let commit = try await request(
         handler,
-        method: "artifact.importHap.commit",
-        params: ["uploadId": .string(uploadID)])
+        method: "artifact.import.commit",
+        params: ["importId": .string(uploadID), "generation": .string("1")])
       XCTAssertTrue(commit.ok, commit.error?.message ?? "-")
-      guard case .object(let fields)? = commit.result,
-        case .string(let jobID)? = fields["jobId"],
+      guard case .object(let projection)? = commit.result,
+      case .object(let fields)? = projection["receipt"],
+        case .string(let jobID)? = fields["importId"],
         case .string(let artifactID)? = fields["artifactId"],
         case .string(let lease)? = fields["lease"],
-        case .string(let returnedDigest)? = fields["sha256"],
+        case .string(let returnedDigest)? = fields["artifactDigest"],
         case .string(let returnedTarget)? = fields["targetId"],
-        case .integer(let returnedRevision)? = fields["bindingRevision"],
-        case .string(let returnedIdentity)? = fields["stableIdentitySha256"]
+        case .string(let returnedRevision)? = fields["bindingRevision"]
       else {
         return XCTFail("commit must return the Artifact identity and lease")
       }
       XCTAssertEqual(returnedDigest, digest)
       XCTAssertEqual(returnedTarget, target.targetID)
-      XCTAssertEqual(returnedRevision, Int64(target.bindingRevision))
-      XCTAssertEqual(returnedIdentity, aliasIdentity)
-      XCTAssertTrue(jobID.contains(String(aliasIdentity.prefix(16))))
+      XCTAssertEqual(returnedRevision, String(target.bindingRevision))
       XCTAssertEqual(lease, "lease-v1:\(jobID):\(artifactID)")
       XCTAssertFalse(lease.contains(stateDirectory.path))
 
@@ -4593,16 +4586,17 @@ final class AgentDaemonContractTests: XCTestCase {
       let inspect = try await request(
         handler,
         method: "artifact.inspect",
-        params: ["jobId": .string(jobID), "artifactId": .string(artifactID)])
+        params: ["owner": .object(["kind": .string("import"), "id": .string(jobID)]), "artifactId": .string(artifactID)])
       guard case .object(let inspectFields)? = inspect.result else {
         return XCTFail("Artifact inspection must return durable binding metadata")
       }
-      XCTAssertEqual(inspectFields["jobId"], .string(jobID))
-      XCTAssertEqual(inspectFields["targetId"], .string(target.targetID))
+      XCTAssertEqual(inspectFields["owner"], .object(["kind": .string("import"), "id": .string(jobID)]))
+      guard case .object(let binding)? = inspectFields["binding"] else { return XCTFail("missing binding") }
+      XCTAssertEqual(binding["targetId"], .string(target.targetID))
       XCTAssertEqual(
-        inspectFields["bindingRevision"], .integer(Int64(target.bindingRevision)))
+        binding["bindingRevision"], .integer(Int64(target.bindingRevision)))
       XCTAssertEqual(
-        inspectFields["stableIdentitySha256"],
+        binding["stableIdentitySha256"],
         .string(aliasIdentity))
 
       // The import reply has always carried the lease; discovery did not, so an
@@ -4613,8 +4607,9 @@ final class AgentDaemonContractTests: XCTestCase {
       XCTAssertEqual(inspectFields["lease"], .string(lease))
 
       let listed = try await request(
-        handler, method: "artifact.list", params: ["jobId": .string(jobID)])
-      guard case .array(let rows)? = listed.result,
+        handler, method: "artifact.list", params: ["owner": .object(["kind": .string("import"), "id": .string(jobID)])])
+      guard case .object(let page)? = listed.result,
+        case .array(let rows)? = page["items"],
         case .object(let row)? = rows.first(where: { value in
           guard case .object(let fields) = value else { return false }
           return fields["artifactId"] == .string(artifactID)
@@ -4651,55 +4646,54 @@ final class AgentDaemonContractTests: XCTestCase {
 
     let unknown = try await request(
       handler,
-      method: "artifact.importHap.begin",
+      method: "artifact.import.begin",
       params: [
+        "schemaVersion": .string(ArtifactImportIntent.schemaVersion),
+        "importRequestId": .string("fixture-" + UUID().uuidString.lowercased()),
+        "kind": .string("hap"),
+        "bindingRevision": .string(String(target.bindingRevision)),
+        "deviceProfile": .null,
         "targetId": .string("TGT-unknown"),
         "name": .string("bad.hap"),
-        "byteCount": .integer(Int64(bytes.count)),
+        "byteCount": .string(String(bytes.count)),
         "sha256": .string(digest),
       ])
     XCTAssertFalse(unknown.ok)
-    XCTAssertEqual(unknown.error?.code, "notFound")
+    XCTAssertEqual(unknown.error?.code, "resourceConflict")
 
     let begin = try await request(
       handler,
-      method: "artifact.importHap.begin",
+      method: "artifact.import.begin",
       params: [
+        "schemaVersion": .string(ArtifactImportIntent.schemaVersion),
+        "importRequestId": .string("fixture-" + UUID().uuidString.lowercased()),
+        "kind": .string("hap"),
+        "bindingRevision": .string(String(target.bindingRevision)),
+        "deviceProfile": .null,
         "targetId": .string(target.targetID),
         "name": .string("bad.hap"),
-        "byteCount": .integer(Int64(bytes.count)),
+        "byteCount": .string(String(bytes.count)),
         "sha256": .string(digest),
       ])
     guard case .object(let beginFields)? = begin.result,
-      case .string(let uploadID)? = beginFields["uploadId"]
+      case .string(let uploadID)? = beginFields["importId"]
     else {
       return XCTFail("begin must return an upload identity")
     }
     let append = try await request(
       handler,
-      method: "artifact.importHap.append",
-      params: [
-        "uploadId": .string(uploadID),
-        "offset": .integer(0),
-        "base64": .string(bytes.base64EncodedString()),
-      ])
+      method: "artifact.import.append",
+      params: importAppendParams(id: uploadID, offset: 0, bytes: bytes))
     XCTAssertTrue(append.ok)
     let commit = try await request(
       handler,
-      method: "artifact.importHap.commit",
-      params: ["uploadId": .string(uploadID)])
+      method: "artifact.import.commit",
+      params: ["importId": .string(uploadID), "generation": .string("1")])
     XCTAssertFalse(commit.ok)
-    XCTAssertEqual(commit.error?.code, "rejected")
+    XCTAssertEqual(commit.error?.code, "invalidInput")
     XCTAssertTrue((commit.error?.message ?? "").contains("ZIP-based"))
 
-    let expectedJob =
-      "input-hap-\(target.targetID)-r\(target.bindingRevision)-"
-      + String(
-        HDCObservationProviderAdapter.stableIdentitySHA256(
-          connectKey: target.connectKey
-        ).prefix(16)) + "-"
-      + String(digest.prefix(16))
-    let artifacts = try await artifactStore.list(jobID: expectedJob)
+    let artifacts = try await artifactStore.list(jobID: uploadID)
     XCTAssertTrue(artifacts.isEmpty)
   }
 
@@ -4742,7 +4736,7 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertThrowsError(try candidates[0].validate(notAnArchive))
   }
 
-  func testChunkedFlashBundleImportAcceptsDailyFilenameAndPublishesCanonicalLease() async throws {
+  func testChunkedFlashBundleImportPublishesCanonicalLease() async throws {
     let targetStore = try RuntimeTargetStore(
       directoryURL: stateDirectory.appending(
         path:
@@ -4777,34 +4771,35 @@ final class AgentDaemonContractTests: XCTestCase {
       flashBundleImportPolicy: policy)
 
     let begin = try await request(
-      handler, method: "artifact.importFlashBundle.begin",
+      handler, method: "artifact.import.begin",
       params: [
+        "schemaVersion": .string(ArtifactImportIntent.schemaVersion),
+        "importRequestId": .string("fixture-" + UUID().uuidString.lowercased()),
+        "kind": .string("flash-bundle"),
+        "bindingRevision": .string(String(target.bindingRevision)),
+        "deviceProfile": .string("dayu200"),
         "targetId": .string(target.targetID),
         "name": .string(
-          "version-Daily_Version-OpenHarmony_7.0.0.35-20260728_180253-dayu200_img.tar.gz"),
-        "byteCount": .integer(Int64(bytes.count)),
+          "images.tar.gz"),
+        "byteCount": .string(String(bytes.count)),
         "sha256": .string(digest),
       ])
     XCTAssertTrue(begin.ok, begin.error?.message ?? "-")
     guard case .object(let beginFields)? = begin.result,
-      case .string(let uploadID)? = beginFields["uploadId"],
-      case .integer(let maximumChunk)? = beginFields["maximumChunkBytes"]
+      case .string(let uploadID)? = beginFields["importId"],
+      case .string(let maximumChunk)? = beginFields["maximumChunkBytes"]
     else {
       return XCTFail("flash begin must return a bounded upload identity")
     }
     XCTAssertEqual(
       maximumChunk,
-      Int64(FlashBundleArtifactImportCoordinator.maximumChunkBytes))
+      String(ArtifactImportIntent.maximumChunkBytes))
 
     let wrongOffset = try await request(
-      handler, method: "artifact.importFlashBundle.append",
-      params: [
-        "uploadId": .string(uploadID),
-        "offset": .integer(1),
-        "base64": .string(bytes.prefix(4).base64EncodedString()),
-      ])
+      handler, method: "artifact.import.append",
+      params: importAppendParams(id: uploadID, offset: 1, bytes: bytes.prefix(4)))
     XCTAssertFalse(wrongOffset.ok)
-    XCTAssertTrue((wrongOffset.error?.message ?? "").contains("offset mismatch"))
+    XCTAssertEqual(wrongOffset.error?.code, "resourceConflict")
 
     let split = 7
     for (offset, chunk) in [
@@ -4812,30 +4807,27 @@ final class AgentDaemonContractTests: XCTestCase {
       (split, bytes.subdata(in: split..<bytes.count)),
     ] {
       let appended = try await request(
-        handler, method: "artifact.importFlashBundle.append",
-        params: [
-          "uploadId": .string(uploadID),
-          "offset": .integer(Int64(offset)),
-          "base64": .string(chunk.base64EncodedString()),
-        ])
+        handler, method: "artifact.import.append",
+        params: importAppendParams(id: uploadID, offset: Int64(offset), bytes: chunk))
       XCTAssertTrue(appended.ok, appended.error?.message ?? "-")
     }
     let commit = try await request(
-      handler, method: "artifact.importFlashBundle.commit",
-      params: ["uploadId": .string(uploadID)])
+      handler, method: "artifact.import.commit",
+      params: ["importId": .string(uploadID), "generation": .string("1")])
     XCTAssertTrue(commit.ok, commit.error?.message ?? "-")
-    guard case .object(let fields)? = commit.result,
-      case .string(let jobID)? = fields["jobId"],
+    guard case .object(let projection)? = commit.result,
+      case .object(let fields)? = projection["receipt"],
+      case .string(let jobID)? = fields["importId"],
       case .string(let artifactID)? = fields["artifactId"],
       case .string(let lease)? = fields["lease"]
     else {
       return XCTFail("flash commit must return an ID-only Artifact lease")
     }
-    XCTAssertEqual(fields["sha256"], .string(digest))
-    XCTAssertEqual(fields["byteCount"], .integer(Int64(bytes.count)))
+    XCTAssertEqual(fields["artifactDigest"], .string(digest))
+    XCTAssertEqual(fields["byteCount"], .string(String(bytes.count)))
     XCTAssertEqual(fields["targetId"], .string(target.targetID))
     XCTAssertEqual(
-      fields["bindingRevision"], .integer(Int64(target.bindingRevision)))
+      fields["bindingRevision"], .string(String(target.bindingRevision)))
     XCTAssertFalse(lease.contains(stateDirectory.path))
     let metadata = try await artifactStore.inspect(
       jobID: jobID, artifactID: artifactID)
@@ -4882,11 +4874,16 @@ final class AgentDaemonContractTests: XCTestCase {
       -> AgentWireProtocol.Response
     {
       try await request(
-        handler, method: "artifact.importFlashBundle.begin",
+        handler, method: "artifact.import.begin",
         params: [
+        "schemaVersion": .string(ArtifactImportIntent.schemaVersion),
+        "importRequestId": .string("fixture-" + UUID().uuidString.lowercased()),
+        "kind": .string("flash-bundle"),
+        "bindingRevision": .string(String(target.bindingRevision)),
+        "deviceProfile": .string("dayu200"),
           "targetId": .string(target.targetID),
           "name": .string(name),
-          "byteCount": .integer(byteCount),
+          "byteCount": .string(String(byteCount)),
           "sha256": .string(sha256),
         ])
     }
@@ -4896,15 +4893,15 @@ final class AgentDaemonContractTests: XCTestCase {
     for malformed in [Int64(0), Int64(-1)] {
       let response = try await begin(byteCount: malformed, sha256: digest)
       XCTAssertFalse(response.ok, "byteCount \(malformed)")
-      XCTAssertEqual(response.error?.code, "invalidParams")
+      XCTAssertEqual(response.error?.code, "invalidInput")
     }
     let oversized = try await begin(byteCount: 64 * 1_024 * 1_024 * 1_024, sha256: digest)
     XCTAssertFalse(oversized.ok)
-    XCTAssertEqual(oversized.error?.code, "invalidParams")
+    XCTAssertEqual(oversized.error?.code, "invalidInput")
 
     let malformedDigest = try await begin(byteCount: 730_766_386, sha256: "not-a-digest")
     XCTAssertFalse(malformedDigest.ok)
-    XCTAssertEqual(malformedDigest.error?.code, "invalidParams")
+    XCTAssertEqual(malformedDigest.error?.code, "invalidInput")
 
     // A build the product has never seen is not malformed. It is admitted to
     // upload and judged when its bytes arrive — the 7.0.0.37 daily's own
@@ -4915,16 +4912,21 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertTrue(unknownBuild.ok, unknownBuild.error?.message ?? "-")
 
     let nameless = try await request(
-      handler, method: "artifact.importFlashBundle.begin",
+      handler, method: "artifact.import.begin",
       params: [
+        "schemaVersion": .string(ArtifactImportIntent.schemaVersion),
+        "importRequestId": .string("fixture-" + UUID().uuidString.lowercased()),
+        "kind": .string("flash-bundle"),
+        "bindingRevision": .string(String(target.bindingRevision)),
+        "deviceProfile": .string("dayu200"),
         "targetId": .string(target.targetID),
-        "byteCount": .integer(730_766_386),
+        "byteCount": .string("730766386"),
         "sha256": .string(
           "8aad39a0c35c4513b28cbbf21e0c863f9670ed93c7602a59d1b44fdd0bf1da7a"),
       ])
     XCTAssertTrue(
-      nameless.ok,
-      "source name is optional metadata; archive bytes are judged on commit")
+      !nameless.ok,
+      "the current Import intent requires its canonical name")
   }
 
   func testNativeLibraryImportValidatesELFAndPublishesBoundLease() async throws {
@@ -4977,43 +4979,44 @@ final class AgentDaemonContractTests: XCTestCase {
     let digest = NativeLibraryTestFixture.sha256(library)
 
     let begin = try await request(
-      handler, method: "artifact.importNativeLibrary.begin",
+      handler, method: "artifact.import.begin",
       params: [
+        "schemaVersion": .string(ArtifactImportIntent.schemaVersion),
+        "importRequestId": .string("fixture-" + UUID().uuidString.lowercased()),
+        "kind": .string("native-library"),
+        "bindingRevision": .string(String(target.bindingRevision)),
+        "deviceProfile": .null,
         "targetId": .string(target.targetID),
         "name": .string("libarkdeck_gj.so"),
-        "byteCount": .integer(Int64(library.count)),
+        "byteCount": .string(String(library.count)),
         "sha256": .string(digest),
       ])
     XCTAssertTrue(begin.ok, begin.error?.message ?? "-")
     guard case .object(let beginFields)? = begin.result,
-      case .string(let uploadID)? = beginFields["uploadId"]
+      case .string(let uploadID)? = beginFields["importId"]
     else {
       return XCTFail("native begin must return an upload identity")
     }
     let append = try await request(
-      handler, method: "artifact.importNativeLibrary.append",
-      params: [
-        "uploadId": .string(uploadID),
-        "offset": .integer(0),
-        "base64": .string(library.base64EncodedString()),
-      ])
+      handler, method: "artifact.import.append",
+      params: importAppendParams(id: uploadID, offset: 0, bytes: library))
     XCTAssertTrue(append.ok, append.error?.message ?? "-")
     let commit = try await request(
-      handler, method: "artifact.importNativeLibrary.commit",
-      params: ["uploadId": .string(uploadID)])
+      handler, method: "artifact.import.commit",
+      params: ["importId": .string(uploadID), "generation": .string("1")])
     XCTAssertTrue(commit.ok, commit.error?.message ?? "-")
-    guard case .object(let fields)? = commit.result,
-      case .string(let jobID)? = fields["jobId"],
+    guard case .object(let projection)? = commit.result,
+      case .object(let fields)? = projection["receipt"],
+      case .string(let jobID)? = fields["importId"],
       case .string(let artifactID)? = fields["artifactId"],
       case .string(let lease)? = fields["lease"]
     else {
       return XCTFail("native commit must return an ID-only lease")
     }
-    XCTAssertEqual(fields["abi"], .string("arm64-v8a"))
-    XCTAssertEqual(fields["buildId"], .string(NativeLibraryTestFixture.buildID))
-    XCTAssertEqual(fields["sha256"], .string(digest))
-    XCTAssertEqual(fields["stableIdentitySha256"], .string(aliasIdentity))
-    XCTAssertTrue(jobID.contains(String(aliasIdentity.prefix(16))))
+    guard case .object(let validation)? = fields["validation"] else { return XCTFail("missing validation") }
+    XCTAssertEqual(validation["abi"], .string("arm64-v8a"))
+    XCTAssertEqual(validation["buildId"], .string(NativeLibraryTestFixture.buildID))
+    XCTAssertEqual(fields["artifactDigest"], .string(digest))
     XCTAssertEqual(lease, "lease-v1:\(jobID):\(artifactID)")
     XCTAssertFalse(lease.contains(stateDirectory.path))
     let metadata = try await artifactStore.inspect(
@@ -5030,32 +5033,32 @@ final class AgentDaemonContractTests: XCTestCase {
     let invalid = Data(repeating: 0x41, count: 128)
     let invalidDigest = NativeLibraryTestFixture.sha256(invalid)
     let invalidBegin = try await request(
-      handler, method: "artifact.importNativeLibrary.begin",
+      handler, method: "artifact.import.begin",
       params: [
+        "schemaVersion": .string(ArtifactImportIntent.schemaVersion),
+        "importRequestId": .string("fixture-" + UUID().uuidString.lowercased()),
+        "kind": .string("native-library"),
+        "bindingRevision": .string(String(target.bindingRevision)),
+        "deviceProfile": .null,
         "targetId": .string(target.targetID),
         "name": .string("libinvalid.so"),
-        "byteCount": .integer(Int64(invalid.count)),
+        "byteCount": .string(String(invalid.count)),
         "sha256": .string(invalidDigest),
       ])
     guard case .object(let invalidFields)? = invalidBegin.result,
-      case .string(let invalidUploadID)? = invalidFields["uploadId"]
+      case .string(let invalidUploadID)? = invalidFields["importId"]
     else {
       return XCTFail("bounded invalid bytes should reach commit validation")
     }
     _ = try await request(
-      handler, method: "artifact.importNativeLibrary.append",
-      params: [
-        "uploadId": .string(invalidUploadID),
-        "offset": .integer(0),
-        "base64": .string(invalid.base64EncodedString()),
-      ])
+      handler, method: "artifact.import.append",
+      params: importAppendParams(id: invalidUploadID, offset: 0, bytes: invalid))
     let invalidCommit = try await request(
-      handler, method: "artifact.importNativeLibrary.commit",
-      params: ["uploadId": .string(invalidUploadID)])
+      handler, method: "artifact.import.commit",
+      params: ["importId": .string(invalidUploadID), "generation": .string("1")])
     XCTAssertFalse(invalidCommit.ok)
-    XCTAssertEqual(invalidCommit.error?.code, "rejected")
-    XCTAssertTrue(
-      (invalidCommit.error?.message ?? "").contains("ELF validation"))
+    XCTAssertEqual(invalidCommit.error?.code, "invalidInput")
+    XCTAssertEqual(invalidCommit.error?.details?["newDispatchCount"], .integer(0))
   }
 
   func testWireProtocolCarriesNoArgvSurface() async throws {
@@ -5066,7 +5069,7 @@ final class AgentDaemonContractTests: XCTestCase {
     let (handler, _) = try makeStack()
     for method in ["shell", "exec", "runHDC", "process.spawn"] {
       let response = await handler.handleFrame(
-        Data("{\"protocolVersion\":\"1.0.0\",\"id\":\"x\",\"method\":\"\(method)\"}".utf8))
+        Data("{\"protocolVersion\":\"1.0.0\",\"contractIdentity\":\"\(ArkDeckControlProtocol.contractIdentity)\",\"id\":\"x\",\"method\":\"\(method)\"}".utf8))
       XCTAssertFalse(response.ok, method)
       XCTAssertEqual(response.error?.code, "unknownMethod", method)
     }

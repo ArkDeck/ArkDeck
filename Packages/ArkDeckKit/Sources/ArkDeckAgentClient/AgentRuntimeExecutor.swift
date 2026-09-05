@@ -160,6 +160,8 @@ package struct AgentRuntimeExecutor: Sendable {
   private struct CandidateBinding: Sendable, Equatable {
     let connectKey: String
     let state: String
+    let observationID: String
+    let generation: String
     let target: Target?
   }
 
@@ -179,25 +181,15 @@ package struct AgentRuntimeExecutor: Sendable {
   }
 
   private let client: AgentClient
-  /// The target-protocol owner for the admission boundary.
-  ///
-  /// The one-shot runner still reads the frozen 1.x projections it was built
-  /// around, but a current domain leaf must submit through the negotiated 2.x
-  /// lifecycle so a pre-admission refusal can carry its exact domain code and
-  /// the two-part zero-dispatch proof. Keeping this client separate avoids
-  /// pretending the legacy read projections have the target response shape.
-  private let jobSubmissionClient: AgentClient
   private let stateDirectory: URL
   private let nowUTC: @Sendable () -> String
 
   public init(
     client: AgentClient,
-    jobSubmissionClient: AgentClient? = nil,
     stateDirectory: URL? = nil,
     nowUTC: @escaping @Sendable () -> String
   ) {
     self.client = client
-    self.jobSubmissionClient = jobSubmissionClient ?? client
     self.stateDirectory =
       stateDirectory
       ?? URL(filePath: client.socketPath).deletingLastPathComponent()
@@ -413,7 +405,7 @@ package struct AgentRuntimeExecutor: Sendable {
           throw RuntimeAgentExecutorError.malformedResponse(
             "connected candidate lost its durable target ownership")
         }
-        // `device.candidates` just joined one live transport face to the
+        // `device.observations` just joined one live transport face to the
         // daemon-owned durable binding. Re-running `target.adopt` here would
         // duplicate tool/list/identity bootstrap reads and can consume the
         // entire Agent deadline before the typed Job exists. Runtime
@@ -454,7 +446,7 @@ package struct AgentRuntimeExecutor: Sendable {
     }
     var payload: [String: JSONValue] = [
       "documentType": .string("runtime-operation-request"),
-      "schemaVersion": .string("2.0.0"),
+      "schemaVersion": .string("1.0.0"),
       "requestId": .string("agent-request-\(request.executionID)"),
       "idempotencyKey": .string("agent-execution-\(request.executionID)"),
       "operation": .object(operation),
@@ -480,26 +472,11 @@ package struct AgentRuntimeExecutor: Sendable {
     let submitted: JSONValue
     do {
       submitted = try call(
-        client: jobSubmissionClient,
         method: "job.submit", params: ["requestJson": .string(requestText)],
         deadline: deadline)
     } catch let error as AgentClientError {
-      // A target-protocol failure carries the Runtime owner's structured
-      // admission evidence. The CLI session must map it; flattening it into a
-      // terminal receipt would incorrectly report a Job that was never born.
-      // Transport failures from the mutation-capable submit likewise have to
-      // retain their unknown-outcome semantics.
-      if jobSubmissionClient.selectedProtocolVersion == ArkDeckControlProtocol.targetVersion {
-        throw error
-      }
-      if case .daemonError(_, let message) = error {
-        return .failed(
-          reason: message,
-          receipt: receipt(
-            request: request, digest: catalogDigest, startedAtUTC: startedAtUTC,
-            actions: humanActions, jobID: nil, target: target, state: "rejected"))
-      }
-      throw RuntimeAgentExecutorError.daemonUnavailable("\(error)")
+      // Preserve structured refusal and unknown-outcome transport semantics.
+      throw error
     }
     guard case .object(let submitFields) = submitted,
       case .string(let jobID)? = submitFields["jobId"],
@@ -529,7 +506,7 @@ package struct AgentRuntimeExecutor: Sendable {
     else {
       throw RuntimeAgentExecutorError.malformedResponse("run returned no state")
     }
-    let terminalStates: Set<String> = ["succeeded", "failed", "cancelled", "waitingForRecovery"]
+    let terminalStates: Set<String> = ["succeeded", "recovered", "failed", "cancelled", "waitingForRecovery"]
     guard terminalStates.contains(state) else {
       _ = try? call(
         method: "job.cancel", params: ["jobId": .string(jobID)],
@@ -547,10 +524,7 @@ package struct AgentRuntimeExecutor: Sendable {
       let evidence = try call(
         method: "job.evidence", params: ["jobId": .string(jobID)],
         deadline: deadline)
-      let encoder = CanonicalJSONEncoders.canonical()
-      let data = try encoder.encode(evidence)
-      trustedFacts = try JSONDecoder().decode(
-        RuntimeHardwareEvidenceTrustedFacts.self, from: data)
+      trustedFacts = try CurrentRuntimeResourceReads.evidence(evidence)
     } catch {
       evidenceBlockers.append("trustedEvidenceQuery:\(error)")
     }
@@ -561,8 +535,8 @@ package struct AgentRuntimeExecutor: Sendable {
       request: request, digest: catalogDigest, startedAtUTC: startedAtUTC,
       actions: humanActions, jobID: jobID, target: target, state: state,
       trustedFacts: trustedFacts, blockers: evidenceBlockers)
-    if state == "succeeded" { return .completed(final) }
-    let terminalReason = Self.lastTimelineReason(statusFields) ?? "job ended in \(state)"
+    if state == "succeeded" || state == "recovered" { return .completed(final) }
+    let terminalReason = Self.failureReason(statusFields) ?? "job ended in \(state)"
     if state == "waitingForRecovery" {
       return .failed(
         reason: "job requires typed reconcile: \(terminalReason)", receipt: final)
@@ -578,24 +552,42 @@ package struct AgentRuntimeExecutor: Sendable {
     humanActions: [RuntimeHumanActionReceipt],
     deadline: ExecutionDeadline
   ) throws -> AdoptionResult {
-    var params: [String: JSONValue] = [:]
-    if let candidate { params["candidate"] = .string(candidate) }
+    let visible = try listCandidateBindings(deadline: deadline)
+    let matches = candidate.map { key in visible.filter { $0.connectKey == key } } ?? visible
+    guard matches.count == 1, let selected = matches.first else {
+      let options = matches.map(\.connectKey)
+      return .paused(try pause(
+        request: request, kind: options.isEmpty ? .physicalReconnect : .selectTarget,
+        prompt: options.isEmpty ? "Connect the selected device, then resume this execution."
+          : "Select one visible device candidate.",
+        mode: options.isEmpty ? .retryAdoption : .bootstrapCandidate,
+        catalogDigest: catalogDigest, startedAtUTC: startedAtUTC,
+        humanActions: humanActions, selectionOptions: options))
+    }
+    guard selected.state == "Connected" else {
+      return .paused(try pause(
+        request: request, kind: selected.state == "Unauthorized" ? .trustDevice : .physicalReconnect,
+        prompt: selected.state == "Unauthorized"
+          ? "Confirm the selected device debugging trust prompt, then resume."
+          : "Reconnect the selected device, then resume.",
+        mode: .retryAdoption, catalogDigest: catalogDigest,
+        startedAtUTC: startedAtUTC, humanActions: humanActions))
+    }
+    let params: [String: JSONValue] = [
+      "candidate": .string(selected.connectKey), "observationId": .string(selected.observationID),
+      "observationGeneration": .string(selected.generation),
+    ]
     let adopted: JSONValue
     do {
       adopted = try call(
         method: "target.adopt", params: params,
         deadline: deadline)
     } catch let error as AgentClientError {
-      guard case .daemonError(_, let message) = error else {
-        throw RuntimeAgentExecutorError.daemonUnavailable("\(error)")
-      }
-      return .paused(
-        .failed(
-          reason: message,
-          receipt: receipt(
-            request: request, digest: catalogDigest, startedAtUTC: startedAtUTC,
-            actions: humanActions, jobID: nil, target: nil, state: "adoptRefused")))
+      // Exact-observation refusals carry phase and zero-dispatch proof; keep
+      // those fields intact for callers, including races after the snapshot.
+      throw error
     }
+
     guard case .object(let fields) = adopted,
       case .string(let outcome)? = fields["outcome"]
     else {
@@ -611,50 +603,6 @@ package struct AgentRuntimeExecutor: Sendable {
           "adopt returned malformed target binding")
       }
       return .target(Target(targetID: targetID, bindingRevision: revision))
-    case "waitingForHuman":
-      let prompt: String
-      if case .string(let value)? = fields["prompt"] {
-        prompt = value
-      } else {
-        prompt = "Complete the requested physical device action, then resume this execution."
-      }
-      guard case .string(let kindRaw)? = fields["humanActionKind"],
-        let kind = RuntimeHumanActionKind(rawValue: kindRaw)
-      else {
-        throw RuntimeAgentExecutorError.malformedResponse(
-          "adopt returned no recognized human action kind")
-      }
-      return .paused(
-        try pause(
-          request: request, kind: kind, prompt: prompt,
-          mode: .retryAdoption, catalogDigest: catalogDigest,
-          startedAtUTC: startedAtUTC, humanActions: humanActions))
-    case "needsSelection":
-      let selectionOptions: [String]
-      if case .array(let candidates)? = fields["candidates"] {
-        selectionOptions = candidates.compactMap { candidate in
-          guard case .object(let values) = candidate,
-            case .string(let value)? = values["candidate"],
-            Self.isSafeSelection(value)
-          else {
-            return nil
-          }
-          return value
-        }
-      } else {
-        selectionOptions = []
-      }
-      guard !selectionOptions.isEmpty else {
-        throw RuntimeAgentExecutorError.malformedResponse(
-          "adopt returned no safe candidate selection values")
-      }
-      return .paused(
-        try pause(
-          request: request, kind: .selectTarget,
-          prompt: "Select one of \(selectionOptions.count) visible device candidates.",
-          mode: .bootstrapCandidate, catalogDigest: catalogDigest,
-          startedAtUTC: startedAtUTC, humanActions: humanActions,
-          selectionOptions: selectionOptions))
     default:
       throw RuntimeAgentExecutorError.malformedResponse(
         "adopt returned unknown outcome \(outcome)")
@@ -731,10 +679,7 @@ package struct AgentRuntimeExecutor: Sendable {
         params: ["reference": .string(request.reference)],
         deadline: deadline)
     } catch let error as AgentClientError {
-      if case .daemonError(_, let message) = error {
-        throw RuntimeAgentExecutorError.operationRejected(message)
-      }
-      throw RuntimeAgentExecutorError.daemonUnavailable("\(error)")
+      throw error
     }
     guard case .object(let fields) = described,
       case .string(let binding)? = fields["binding"],
@@ -769,20 +714,25 @@ package struct AgentRuntimeExecutor: Sendable {
   private func listCandidateBindings(deadline: ExecutionDeadline) throws
     -> [CandidateBinding]
   {
-    let listed = try call(method: "device.candidates", deadline: deadline)
-    guard case .array(let rows) = listed else {
-      throw RuntimeAgentExecutorError.malformedResponse(
-        "device.candidates is not an array")
+    let listed = try call(method: "device.observations", deadline: deadline)
+    guard case .object(let snapshot) = listed,
+      snapshot["schemaVersion"] == .string("arkdeck.device-observations/1"),
+      snapshot["health"] == .string("current"),
+      case .string(let generation)? = snapshot["snapshotGeneration"],
+      let generationValue = Int64(generation), generationValue > 0, String(generationValue) == generation,
+      case .array(let rows)? = snapshot["observations"] else {
+      throw RuntimeAgentExecutorError.malformedResponse("device observations is not a current snapshot")
     }
     return try rows.map { row in
       guard case .object(let fields) = row,
-        case .string(let connectKey)? = fields["connectKey"],
+        case .string(let connectKey)? = fields["candidateKey"],
         Self.isSafeSelection(connectKey),
-        case .string(let state)? = fields["state"],
-        Self.isSafeSelection(state)
+        case .string(let state)? = fields["authorizationState"],
+        Self.isSafeSelection(state),
+        case .string(let observationID)? = fields["observationId"], Self.isSafeIdentifier(observationID)
       else {
         throw RuntimeAgentExecutorError.malformedResponse(
-          "device.candidates contains malformed transport facts")
+          "device.observations contains malformed transport facts")
       }
 
       switch (fields["adoptedTargetId"], fields["bindingRevision"]) {
@@ -791,37 +741,25 @@ package struct AgentRuntimeExecutor: Sendable {
           let revision = Self.exactInt(revisionValue), revision > 0
         else {
           throw RuntimeAgentExecutorError.malformedResponse(
-            "device.candidates contains malformed target ownership")
+            "device.observations contains malformed target ownership")
         }
         return CandidateBinding(
-          connectKey: connectKey, state: state,
+          connectKey: connectKey, state: state, observationID: observationID, generation: generation,
           target: Target(targetID: targetID, bindingRevision: revision))
       case (.null?, .null?):
-        return CandidateBinding(connectKey: connectKey, state: state, target: nil)
+        return CandidateBinding(connectKey: connectKey, state: state, observationID: observationID, generation: generation, target: nil)
       default:
         throw RuntimeAgentExecutorError.malformedResponse(
-          "device.candidates contains incomplete target ownership")
+          "device.observations contains incomplete target ownership")
       }
     }
   }
 
   private func listArtifactIDs(jobID: String, deadline: ExecutionDeadline) throws -> [String] {
-    let listed = try call(
-      method: "artifact.list", params: ["jobId": .string(jobID)],
-      deadline: deadline)
-    guard case .array(let rows) = listed else {
-      throw RuntimeAgentExecutorError.malformedResponse("artifact.list is not an array")
-    }
-    return try rows.map { row in
-      guard case .object(let fields) = row,
-        case .string(let artifactID)? = fields["artifactId"],
-        Self.isSafeIdentifier(artifactID)
-      else {
-        throw RuntimeAgentExecutorError.malformedResponse(
-          "artifact.list contains an unsafe artifact id")
-      }
-      return artifactID
-    }.sorted()
+    try CurrentRuntimeResourceReads.artifactInventory(
+      client: client, jobID: jobID, timeoutSeconds: deadline.remainingSeconds()).map {
+        try ArtifactResourceProjection($0).id
+      }.sorted()
   }
 
   private func call(
@@ -942,14 +880,10 @@ package struct AgentRuntimeExecutor: Sendable {
     }
   }
 
-  private static func lastTimelineReason(_ statusFields: [String: JSONValue]) -> String? {
-    guard case .array(let timeline)? = statusFields["timeline"] else { return nil }
-    return timeline.reversed().compactMap { item -> String? in
-      guard case .string(let entry) = item, entry.hasPrefix("reason: ") else {
-        return nil
-      }
-      return String(entry.dropFirst("reason: ".count))
-    }.first
+  private static func failureReason(_ status: [String: JSONValue]) -> String? {
+    guard case .object(let failure)? = status["failure"],
+      case .string(let code)? = failure["code"] else { return nil }
+    return code
   }
 
   private static func isSafeIdentifier(_ value: String) -> Bool {

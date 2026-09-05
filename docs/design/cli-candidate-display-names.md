@@ -19,7 +19,7 @@ arkdeck device display-name clear \
   --output json
 ```
 
-Both commands require control protocol 2. A successful mutation returns
+Both commands use the current v1 control contract. A successful mutation returns
 `arkdeck.candidate-display-name/1` with the exact candidate key, observation
 ID, next observation generation, name or `null`, and update time. Names must
 already be Unicode NFC, have no leading or trailing whitespace or control

@@ -383,13 +383,8 @@ enum CLICommandRegistry {
   /// definition, and the two machine-output spellings exclude each other by
   /// definition; writing both out per leaf is how one of them gets forgotten.
   /// §12's migration table names these as explicit legacy-compatibility
-  /// leaves for the current major: they keep the frozen 1.x request, response
-  /// and effect, and the target spellings (`target list/show/adopt`,
-  /// `recovery flash-invocation ...`, `artifact import <kind>`) arrive on the
-  /// negotiated 2.x control protocol. `legacy flash ...` is the exception that
-  /// proves the rule: it is published, and it is still `legacy`, because
-  /// moving a decode-only archive surface to a clearer name does not turn it
-  /// into a target one.
+  /// leaves. Their lifecycle describes command spelling and local archive
+  /// behavior; every Runtime request uses the same current control contract.
   ///
   /// Marking them is not cosmetic: §12 forbids counting a legacy leaf as
   /// target conformance, and a machine caller has to be able to see which
@@ -420,10 +415,8 @@ enum CLICommandRegistry {
   ]
 
   private static let legacyCompatibilityCommands: Set<String> = [
-    "device.list", "device.show", "device.adopt",
+    "device.list", "device.show",
     "debug.start", "debug.evaluate", "debug.status",
-    "artifact.import-hap", "artifact.import-workspace-patch",
-    "artifact.import-flash-bundle", "artifact.import-native-library",
     "flash.install-binding", "flash.status", "flash.reconcile",
     "legacy.flash.status", "legacy.flash.reconcile",
   ]
@@ -571,7 +564,7 @@ enum CLICommandRegistry {
         canonicalCommand: "diagnostics.inspect",
         summary: "validate one published diagnostic session and report its completeness",
         options: runtimeClientOptions([
-          jobIDOption, waitTimeoutOption, targetProtocolOption,
+          jobIDOption, waitTimeoutOption,
         ]),
         connectsToRuntime: true),
       CLILeafSpec(
@@ -586,7 +579,7 @@ enum CLICommandRegistry {
               placeholder: "1...120000",
               grammar: .positiveInteger(1...120_000)),
             summary: "maximum Unicode characters in the local preview"),
-          waitTimeoutOption, targetProtocolOption,
+          waitTimeoutOption,
         ]),
         connectsToRuntime: true),
       CLILeafSpec(
@@ -604,7 +597,7 @@ enum CLICommandRegistry {
             name: "--overwrite",
             form: .flag,
             summary: "replace only this exact exported file"),
-          waitTimeoutOption, targetProtocolOption,
+          waitTimeoutOption,
         ]),
         connectsToRuntime: true),
     ])
@@ -679,13 +672,13 @@ enum CLICommandRegistry {
             token: "list",
             canonicalCommand: "workspace.project.list",
             summary: "every project this Runtime has registered, with availability",
-            options: runtimeClientOptions([targetProtocolOption]),
+            options: runtimeClientOptions([]),
             connectsToRuntime: true),
           CLILeafSpec(
             token: "show",
             canonicalCommand: "workspace.project.show",
             summary: "one project: kind, availability, preset refs and supported operations",
-            options: runtimeClientOptions([workspaceProjectRefOption, targetProtocolOption]),
+            options: runtimeClientOptions([workspaceProjectRefOption]),
             connectsToRuntime: true),
           CLILeafSpec(
             token: "register",
@@ -709,7 +702,7 @@ enum CLICommandRegistry {
                 form: .value(placeholder: "absolute-path", grammar: .opaque),
                 summary: "host root accepted only by the registration owner",
                 isRequired: true),
-              targetProtocolOption,
+
             ]),
             connectsToRuntime: true),
           CLILeafSpec(
@@ -731,7 +724,7 @@ enum CLICommandRegistry {
                 form: .value(placeholder: "absolute-path", grammar: .opaque),
                 summary: "replacement root accepted only by the registration owner",
                 isRequired: true),
-              targetProtocolOption,
+
             ]),
             connectsToRuntime: true),
           CLILeafSpec(
@@ -739,7 +732,7 @@ enum CLICommandRegistry {
             canonicalCommand: "workspace.project.remove",
             summary: "remove an unused exact private root grant without deleting source",
             options: runtimeClientOptions([
-              workspaceProjectRefOption, generationOption, targetProtocolOption,
+              workspaceProjectRefOption, generationOption,
             ]),
             connectsToRuntime: true),
         ]),
@@ -759,7 +752,7 @@ enum CLICommandRegistry {
                   placeholder: "build|test|signing|symbol",
                   grammar: .enumeration(["build", "test", "signing", "symbol"])),
                 summary: "narrow to one preset kind"),
-              targetProtocolOption,
+
             ]),
             connectsToRuntime: true),
           CLILeafSpec(
@@ -773,7 +766,7 @@ enum CLICommandRegistry {
                 form: .value(placeholder: "preset-ref", grammar: .opaque),
                 summary: "preset reference from `workspace preset list`",
                 isRequired: true),
-              targetProtocolOption,
+
             ]),
             connectsToRuntime: true),
           CLILeafSpec(
@@ -782,7 +775,7 @@ enum CLICommandRegistry {
             summary: "register one typed preset against a project and exact toolchain generation",
             options: runtimeClientOptions(
               [workspacePresetRegistrationRequestOption, workspaceProjectRefOption]
-                + workspacePresetDefinitionOptions + [targetProtocolOption]),
+                + workspacePresetDefinitionOptions + []),
             connectsToRuntime: true),
           CLILeafSpec(
             token: "update",
@@ -791,7 +784,7 @@ enum CLICommandRegistry {
             options: runtimeClientOptions(
               [workspacePresetMutationRequestOption, workspaceProjectRefOption,
                 workspacePresetRefOption, generationOption]
-                + workspacePresetDefinitionOptions + [targetProtocolOption]),
+                + workspacePresetDefinitionOptions + []),
             connectsToRuntime: true),
           CLILeafSpec(
             token: "remove",
@@ -799,7 +792,7 @@ enum CLICommandRegistry {
             summary: "remove one unused exact preset generation",
             options: runtimeClientOptions([
               workspacePresetMutationRequestOption, workspaceProjectRefOption,
-              workspacePresetRefOption, generationOption, targetProtocolOption,
+              workspacePresetRefOption, generationOption,
             ]),
             connectsToRuntime: true),
         ]),
@@ -812,7 +805,7 @@ enum CLICommandRegistry {
             canonicalCommand: "workspace.continuation.inspect",
             summary: "recheck a source Job, current Catalog and target without creating a Job",
             options: runtimeClientOptions([
-              workspaceContinuationSourceOption, waitTimeoutOption, targetProtocolOption,
+              workspaceContinuationSourceOption, waitTimeoutOption,
             ]),
             connectsToRuntime: true),
           CLILeafSpec(
@@ -821,7 +814,7 @@ enum CLICommandRegistry {
             summary: "submit one fresh typed Job under a caller-stable continuation identity",
             options: runtimeClientOptions([
               workspaceContinuationSourceOption, workspaceContinuationRequestOption,
-              waitTimeoutOption, targetProtocolOption,
+              waitTimeoutOption,
             ]),
             connectsToRuntime: true),
           CLILeafSpec(
@@ -830,7 +823,7 @@ enum CLICommandRegistry {
             summary: "rediscover and run the exact fresh Job without replaying old authority",
             options: runtimeClientOptions([
               workspaceContinuationSourceOption, workspaceContinuationRequestOption,
-              waitTimeoutOption, targetProtocolOption,
+              waitTimeoutOption,
             ]),
             connectsToRuntime: true),
         ]),
@@ -964,7 +957,7 @@ enum CLICommandRegistry {
             token: "list",
             canonicalCommand: "recovery.flash-invocation.list",
             summary: "rediscover protected Flash recovery invocations from a fixed snapshot",
-            options: runtimeClientOptions(snapshotPageOptions + [targetProtocolOption]),
+            options: runtimeClientOptions(snapshotPageOptions + []),
             connectsToRuntime: true),
           CLILeafSpec(
             token: "start",
@@ -1029,10 +1022,7 @@ enum CLICommandRegistry {
         canonicalCommand: "runtime.health",
         summary: "control protocol, catalog digest and provider health",
         options: runtimeClientOptions([
-          CLIOptionSpec(
-            name: "--require-protocol",
-            form: .value(placeholder: "1|2", grammar: .enumeration(["1", "2"])),
-            summary: "negotiate this exact protocol major before reading health; never downgrade")
+
         ]),
         connectsToRuntime: true)
     ],
@@ -1046,13 +1036,12 @@ enum CLICommandRegistry {
             canonicalCommand: "runtime.hdc.status",
             summary: "exact tool and server facts for the managed HDC runtime",
             options: runtimeClientOptions([
-              CLIOptionSpec(name: "--require-protocol", form: .value(placeholder: "1|2", grammar: .enumeration(["1", "2"])),
-                summary: "default 2 reads fresh facts; explicit 1 reads the frozen startup projection")
+
             ]),
             connectsToRuntime: true),
           CLILeafSpec(token: "impact-preview", canonicalCommand: "runtime.hdc.impact-preview",
             summary: "persist an exact HDC restart impact preview; no lifecycle dispatch",
-            options: runtimeClientOptions([targetProtocolOption, waitTimeoutOption,
+            options: runtimeClientOptions([waitTimeoutOption,
               CLIOptionSpec(name: "--action", form: .value(placeholder: "restart", grammar: .enumeration(["restart"])), summary: "typed lifecycle action", isRequired: true),
               CLIOptionSpec(name: "--server-endpoint-ref", form: .value(placeholder: "ref", grammar: .opaque), summary: "exact reference returned by HDC status", isRequired: true),
               CLIOptionSpec(name: "--expected-server-generation", form: .value(placeholder: "n", grammar: .positiveInteger(1...Int.max)), summary: "exact observed server generation", isRequired: true),
@@ -1060,7 +1049,7 @@ enum CLICommandRegistry {
             ]), connectsToRuntime: true),
           CLILeafSpec(token: "restart", canonicalCommand: "runtime.hdc.restart",
             summary: "request exact impact approval; dispatch remains zero until explicit resume",
-            options: runtimeClientOptions([targetProtocolOption, waitTimeoutOption,
+            options: runtimeClientOptions([waitTimeoutOption,
               CLIOptionSpec(name: "--control-action", form: .value(placeholder: "id", grammar: .opaque), summary: "exact durable control-action identity", isRequired: true),
               CLIOptionSpec(name: "--preview-id", form: .value(placeholder: "id", grammar: .opaque), summary: "exact immutable preview identity", isRequired: true),
               CLIOptionSpec(name: "--preview-digest", form: .value(placeholder: "sha256", grammar: .hexDigest(length: 64)), summary: "exact canonical preview digest", isRequired: true),
@@ -1157,7 +1146,7 @@ enum CLICommandRegistry {
         token: "status",
         canonicalCommand: "runtime.storage.status",
         summary: "report Session and Artifact storage domains without combining their quotas",
-        options: runtimeClientOptions([targetProtocolOption]),
+        options: runtimeClientOptions([]),
         connectsToRuntime: true),
       CLILeafSpec(
         token: "policy",
@@ -1180,7 +1169,7 @@ enum CLICommandRegistry {
             form: .value(placeholder: "days", grammar: .positiveInteger(1...Int.max)),
             summary: "Session retention duration in days",
             isRequired: true),
-          targetProtocolOption,
+
         ]),
         connectsToRuntime: true),
       CLILeafSpec(
@@ -1197,7 +1186,7 @@ enum CLICommandRegistry {
             name: "--default",
             form: .flag,
             summary: "restore the Runtime's fixed default Session directory"),
-          targetProtocolOption,
+
         ]),
         requiresExactlyOneOf: [["--root", "--default"]],
         connectsToRuntime: true),
@@ -1255,7 +1244,7 @@ enum CLICommandRegistry {
           outputOption, jsonOption, controlRequestIDOption]),
       CLILeafSpec(token: "select", canonicalCommand: "runtime.tool.select",
         summary: "preview and request approval for one durable active HDC tool transition",
-        options: runtimeClientOptions([targetProtocolOption, waitTimeoutOption,
+        options: runtimeClientOptions([waitTimeoutOption,
           bootstrapToolRefOption,
           CLIOptionSpec(name: "--expected-active-generation",
             form: .value(placeholder: "generation", grammar: .positiveInteger(1...Int.max)),
@@ -1283,20 +1272,20 @@ enum CLICommandRegistry {
             name: "--name", form: .value(placeholder: "text", grammar: .opaque),
             summary: "normalized nonblank display text, at most 256 UTF-8 bytes",
             isRequired: true),
-          targetProtocolOption,
+
         ]),
         connectsToRuntime: true),
       CLILeafSpec(
         token: "clear", canonicalCommand: "target.display-name.clear",
         summary: "compare-and-swap removal of one durable target display name",
         options: runtimeClientOptions([
-          targetIDOption, generationOption, targetProtocolOption,
+          targetIDOption, generationOption,
         ]),
         connectsToRuntime: true),
     ])
 
   /// §6.1's durable target surface. `device list/show/adopt` stay as the
-  /// frozen 1.x legacy spellings beside it (§12).
+  /// legacy command spellings beside it (§12).
   private static let targetNode = CLINodeSpec(
     token: "target",
     summary: "durable device targets and their bindings",
@@ -1462,7 +1451,7 @@ enum CLICommandRegistry {
           CLIOptionSpec(
             name: "--timeout",
             form: .value(placeholder: "30s", grammar: .duration(maximumMilliseconds: 86_400_000)),
-            summary: "total client wait including negotiation and IO; default 30s, maximum 24h"),
+            summary: "total client wait including contract verification and IO; default 30s, maximum 24h"),
         ]),
         connectsToRuntime: true),
       CLILeafSpec(
@@ -1474,40 +1463,14 @@ enum CLICommandRegistry {
       CLILeafSpec(
         token: "show",
         canonicalCommand: "device.show",
-        summary: "show the frozen legacy target-list projection",
+        summary: "show the current target-list projection",
         options: runtimeClientOptions([]),
         connectsToRuntime: true),
       CLILeafSpec(
         token: "candidates",
         canonicalCommand: "device.candidates",
         summary: "live HDC candidates, their authorization state and any adopted target",
-        options: runtimeClientOptions([
-          CLIOptionSpec(
-            name: "--require-protocol",
-            form: .value(placeholder: "2", grammar: .enumeration(["2"])),
-            summary: "read v2 physical observation references for target adopt; never downgrade"),
-          CLIOptionSpec(
-            name: "--snapshot",
-            form: .flag,
-            summary:
-              "return a snapshot object with generation and observation IDs instead of an array"),
-          CLIOptionSpec(
-            name: "--use-warm-snapshot",
-            form: .flag,
-            summary: "read the Runtime's warm snapshot instead of forcing a fresh device read"),
-        ]),
-        mutuallyExclusive: [["--require-protocol", "--snapshot"], ["--require-protocol", "--use-warm-snapshot"]],
-        connectsToRuntime: true),
-      CLILeafSpec(
-        token: "adopt",
-        canonicalCommand: "device.adopt",
-        summary: "establish or update a durable binding from an observed candidate",
-        options: runtimeClientOptions([
-          CLIOptionSpec(
-            name: "--candidate",
-            form: .value(placeholder: "connect-key", grammar: .opaque),
-            summary: "exact observed candidate key")
-        ]),
+        options: runtimeClientOptions([]),
         connectsToRuntime: true),
     ],
     groups: [deviceDisplayNameNode])
@@ -1560,7 +1523,7 @@ enum CLICommandRegistry {
             form: .value(
               placeholder: "2m", grammar: .duration(maximumMilliseconds: 600_000)),
             summary: "bounded Runtime inspection budget; default 2m, maximum 10m"),
-          targetProtocolOption,
+
         ]),
         connectsToRuntime: true),
       CLILeafSpec(
@@ -1578,7 +1541,7 @@ enum CLICommandRegistry {
             name: "--overwrite",
             form: .flag,
             summary: "replace only this exact exported trace file"),
-          waitTimeoutOption, targetProtocolOption,
+          waitTimeoutOption,
         ]),
         connectsToRuntime: true)
     ],
@@ -1668,7 +1631,7 @@ enum CLICommandRegistry {
         token: "list",
         canonicalCommand: "session.list",
         summary: "read one immutable page of Sessions from the Runtime-selected root",
-        options: runtimeClientOptions(snapshotPageOptions + [targetProtocolOption]),
+        options: runtimeClientOptions(snapshotPageOptions + []),
         connectsToRuntime: true),
       CLILeafSpec(
         token: "show",
@@ -1678,7 +1641,7 @@ enum CLICommandRegistry {
           CLIOptionSpec(
             name: "--session", form: .value(placeholder: "session-id", grammar: .opaque),
             summary: "exact Session identity", isRequired: true),
-          targetProtocolOption,
+
         ]),
         connectsToRuntime: true),
       CLILeafSpec(
@@ -1690,7 +1653,7 @@ enum CLICommandRegistry {
             name: "--session", form: .value(placeholder: "session-id", grammar: .opaque),
             summary: "exact Session identity", isRequired: true),
           sessionCatalogGenerationOption,
-          targetProtocolOption,
+
         ]),
         connectsToRuntime: true),
       CLILeafSpec(
@@ -1702,7 +1665,7 @@ enum CLICommandRegistry {
             name: "--session", form: .value(placeholder: "session-id", grammar: .opaque),
             summary: "exact Session identity", isRequired: true),
           sessionCatalogGenerationOption,
-          targetProtocolOption,
+
         ]),
         connectsToRuntime: true),
     ],
@@ -1715,7 +1678,7 @@ enum CLICommandRegistry {
             token: "preview",
             canonicalCommand: "session.cleanup.preview",
             summary: "persist the exact Sessions and Artifacts eligible for retention cleanup",
-            options: runtimeClientOptions([targetProtocolOption]),
+            options: runtimeClientOptions([]),
             connectsToRuntime: true),
           CLILeafSpec(
             token: "apply",
@@ -1732,7 +1695,7 @@ enum CLICommandRegistry {
                 form: .value(placeholder: "sha256", grammar: .hexDigest(length: 64)),
                 summary: "exact canonical cleanup preview digest",
                 isRequired: true),
-              targetProtocolOption,
+
             ]),
             connectsToRuntime: true),
         ]),
@@ -1755,7 +1718,7 @@ enum CLICommandRegistry {
                 summary: "absent host directory the export will create; its parent must exist",
                 isRequired: true),
               allowSensitiveOption,
-              targetProtocolOption,
+
             ]),
             connectsToRuntime: true),
           CLILeafSpec(
@@ -1773,7 +1736,7 @@ enum CLICommandRegistry {
                 form: .value(placeholder: "sha256", grammar: .hexDigest(length: 64)),
                 summary: "exact canonical export preview digest",
                 isRequired: true),
-              targetProtocolOption,
+
             ]),
             connectsToRuntime: true),
         ]),
@@ -1857,7 +1820,7 @@ enum CLICommandRegistry {
         canonicalCommand: "job.plan",
         summary: "materialize the exact plan without dispatching it",
         options: runtimeClientOptions(
-          jobRequestOptions + [targetProtocolOption, waitTimeoutOption]),
+          jobRequestOptions + [waitTimeoutOption]),
         mutuallyExclusive: requestFileExclusions,
         connectsToRuntime: true),
       CLILeafSpec(
@@ -1870,7 +1833,7 @@ enum CLICommandRegistry {
               name: "--wait",
               form: .flag,
               summary: "deprecated 1.x compound; submit then run and wait explicitly"),
-            targetProtocolOption, waitTimeoutOption,
+            waitTimeoutOption,
           ]),
         mutuallyExclusive: requestFileExclusions,
         connectsToRuntime: true),
@@ -1878,19 +1841,19 @@ enum CLICommandRegistry {
         token: "status",
         canonicalCommand: "job.status",
         summary: "compact job state, progress and unknown-outcome flag",
-        options: runtimeClientOptions([jobIDOption, targetProtocolOption, waitTimeoutOption]),
+        options: runtimeClientOptions([jobIDOption, waitTimeoutOption]),
         connectsToRuntime: true),
       CLILeafSpec(
         token: "show",
         canonicalCommand: "job.show",
         summary: "read the complete typed Job snapshot without running it",
-        options: runtimeClientOptions([jobIDOption, targetProtocolOption, waitTimeoutOption]),
+        options: runtimeClientOptions([jobIDOption, waitTimeoutOption]),
         connectsToRuntime: true),
       CLILeafSpec(
         token: "timeline",
         canonicalCommand: "job.timeline",
         summary: "read a bounded fixed snapshot of Job timeline entries",
-        options: runtimeClientOptions([jobIDOption, targetProtocolOption, waitTimeoutOption,
+        options: runtimeClientOptions([jobIDOption, waitTimeoutOption,
           eventPageSizeOption, CLIOptionSpec(name: "--cursor", form: .value(placeholder: "token", grammar: .opaque),
             summary: "opaque continuation cursor from this timeline query")]),
         connectsToRuntime: true),
@@ -1898,20 +1861,20 @@ enum CLICommandRegistry {
         token: "wait",
         canonicalCommand: "job.wait",
         summary: "wait for terminal, human action or unknown outcome; never cancels",
-        options: runtimeClientOptions([jobIDOption, waitTimeoutOption, targetProtocolOption, eventCursorOption, eventPageSizeOption]),
+        options: runtimeClientOptions([jobIDOption, waitTimeoutOption, eventCursorOption, eventPageSizeOption]),
         connectsToRuntime: true,
         outputModes: [.human, .json, .jsonl]),
       CLILeafSpec(
         token: "events",
         canonicalCommand: "job.events",
         summary: "read one page of retained durable Job events",
-        options: runtimeClientOptions([jobIDOption, targetProtocolOption, eventCursorOption, eventPageSizeOption, waitTimeoutOption]),
+        options: runtimeClientOptions([jobIDOption, eventCursorOption, eventPageSizeOption, waitTimeoutOption]),
         connectsToRuntime: true),
       CLILeafSpec(
         token: "watch",
         canonicalCommand: "job.watch",
         summary: "follow durable Job events until timeout or interruption; never runs or cancels",
-        options: runtimeClientOptions([jobIDOption, targetProtocolOption, eventCursorOption, eventPageSizeOption, waitTimeoutOption]),
+        options: runtimeClientOptions([jobIDOption, eventCursorOption, eventPageSizeOption, waitTimeoutOption]),
         connectsToRuntime: true,
         outputModes: [.human, .jsonl]),
       CLILeafSpec(
@@ -1932,7 +1895,7 @@ enum CLICommandRegistry {
             form: .value(
               placeholder: "createdAtDescJobIdAsc|createdAtAscJobIdAsc",
               grammar: .enumeration(["oldestFirst", "newestFirst", "createdAtDescJobIdAsc", "createdAtAscJobIdAsc"])),
-            summary: "v2 defaults to createdAtDescJobIdAsc; legacy order tokens require v1"),
+            summary: "current order: createdAtDescJobIdAsc"),
           CLIOptionSpec(
             name: "--include-current",
             form: .flag,
@@ -1941,7 +1904,7 @@ enum CLICommandRegistry {
             name: "--include-timeline",
             form: .flag,
             summary: "include each job's timeline entries"),
-          targetProtocolOption, waitTimeoutOption,
+          waitTimeoutOption,
           CLIOptionSpec(name: "--state", form: .value(placeholder: "state", grammar: .opaque),
             summary: "filter by exact Job state"),
           CLIOptionSpec(name: "--operation", form: .value(placeholder: "id@version", grammar: .opaque),
@@ -1956,7 +1919,7 @@ enum CLICommandRegistry {
         token: "run",
         canonicalCommand: "job.run",
         summary: "run a fresh job, or resume one from a Runtime-proven safe boundary",
-        options: runtimeClientOptions([jobIDOption, targetProtocolOption, waitTimeoutOption]),
+        options: runtimeClientOptions([jobIDOption, waitTimeoutOption]),
         connectsToRuntime: true),
       CLILeafSpec(
         token: "cancel",
@@ -1968,13 +1931,13 @@ enum CLICommandRegistry {
         token: "evidence",
         canonicalCommand: "job.evidence",
         summary: "verify and return trusted result evidence; creates no new facts",
-        options: runtimeClientOptions([jobIDOption, targetProtocolOption, waitTimeoutOption]),
+        options: runtimeClientOptions([jobIDOption, waitTimeoutOption]),
         connectsToRuntime: true),
       CLILeafSpec(
         token: "result",
         canonicalCommand: "job.result",
         summary: "terminal status, verified evidence, artifact inventory and cleanup residue",
-        options: runtimeClientOptions([jobIDOption, targetProtocolOption, waitTimeoutOption]),
+        options: runtimeClientOptions([jobIDOption, waitTimeoutOption]),
         connectsToRuntime: true),
       CLILeafSpec(
         token: "reconcile",
@@ -2036,36 +1999,6 @@ enum CLICommandRegistry {
     token: "artifact",
     summary: "immutable Runtime-managed content",
     leaves: [
-      CLILeafSpec(
-        token: "import-hap",
-        canonicalCommand: "artifact.import-hap",
-        summary: "import a .hap/.hsp package as a typed input artifact",
-        options: runtimeClientOptions(artifactImportOptions),
-        connectsToRuntime: true),
-      CLILeafSpec(
-        token: "import-workspace-patch",
-        canonicalCommand: "artifact.import-workspace-patch",
-        summary: "import a workspace patch as a typed input artifact",
-        options: runtimeClientOptions(artifactImportOptions),
-        connectsToRuntime: true),
-      CLILeafSpec(
-        token: "import-flash-bundle",
-        canonicalCommand: "artifact.import-flash-bundle",
-        summary: "import a firmware image archive as a typed input artifact",
-        options: runtimeClientOptions(
-          artifactImportOptions + [
-            CLIOptionSpec(
-              name: "--device-profile",
-              form: .value(placeholder: "dayu200", grammar: .opaque),
-              summary: "published device profile reference")
-          ]),
-        connectsToRuntime: true),
-      CLILeafSpec(
-        token: "import-native-library",
-        canonicalCommand: "artifact.import-native-library",
-        summary: "import a native library as a typed input artifact",
-        options: runtimeClientOptions(artifactImportOptions),
-        connectsToRuntime: true),
       CLILeafSpec(
         token: "quota",
         canonicalCommand: "artifact.quota",
@@ -2129,7 +2062,7 @@ enum CLICommandRegistry {
   private static let artifactOwnerOptions: [CLIOptionSpec] = [
     CLIOptionSpec(name: "--job", form: .value(placeholder: "id", grammar: .opaque), summary: "exact durable Job owner"),
     CLIOptionSpec(name: "--import", form: .value(placeholder: "id", grammar: .opaque), summary: "exact durable Import owner"),
-    waitTimeoutOption, targetProtocolOption,
+    waitTimeoutOption,
   ]
 
   private static let importRequestOption = CLIOptionSpec(
@@ -2147,33 +2080,33 @@ enum CLICommandRegistry {
           targetIDOption,
           CLIOptionSpec(name: "--file", form: .value(placeholder: "path", grammar: .opaque),
             summary: "stable local regular file", isRequired: true),
-          waitTimeoutOption, targetProtocolOption,
+          waitTimeoutOption,
         ] + (kind == "flash-bundle" ? [CLIOptionSpec(name: "--device-profile",
           form: .value(placeholder: "dayu200", grammar: .enumeration(["dayu200"])),
           summary: "registered archive validator; defaults to dayu200")] : [])),
         connectsToRuntime: true)
     } + [
       CLILeafSpec(token: "list", canonicalCommand: "artifact.import.list", summary: "fixed snapshot of durable Imports",
-        options: runtimeClientOptions(snapshotPageOptions + [waitTimeoutOption, targetProtocolOption,
+        options: runtimeClientOptions(snapshotPageOptions + [waitTimeoutOption,
           CLIOptionSpec(name: "--target", form: .value(placeholder: "id", grammar: .opaque), summary: "filter target identity"),
           CLIOptionSpec(name: "--state", form: .value(placeholder: "state", grammar: .enumeration(["inProgress", "committing", "committed", "aborted", "released"])), summary: "filter Import state")]),
         connectsToRuntime: true),
       CLILeafSpec(token: "inspect", canonicalCommand: "artifact.import.inspect", summary: "recover an Import, its receipt and active Job or plan references",
         options: runtimeClientOptions([importRequestOption,
           CLIOptionSpec(name: "--import", form: .value(placeholder: "id", grammar: .opaque), summary: "Runtime-assigned Import identity"),
-          waitTimeoutOption, targetProtocolOption]), requiresExactlyOneOf: [["--import", "--import-request-id"]],
+          waitTimeoutOption]), requiresExactlyOneOf: [["--import", "--import-request-id"]],
         connectsToRuntime: true),
       CLILeafSpec(token: "release", canonicalCommand: "artifact.import.release", summary: "release an unused Import lease under its original generation",
         options: runtimeClientOptions([
           CLIOptionSpec(name: "--import", form: .value(placeholder: "id", grammar: .opaque),
             summary: "exact committed Import owner", isRequired: true),
           CLIOptionSpec(name: "--generation", form: .value(placeholder: "generation", grammar: .positiveInteger(1...9_007_199_254_740_991)),
-            summary: "original committed generation to release", isRequired: true), waitTimeoutOption, targetProtocolOption]),
+            summary: "original committed generation to release", isRequired: true), waitTimeoutOption]),
         connectsToRuntime: true),
       CLILeafSpec(token: "abort", canonicalCommand: "artifact.import.abort", summary: "discard staging and retain an irreversible request tombstone",
         options: runtimeClientOptions([
           CLIOptionSpec(name: "--import-request-id", form: .value(placeholder: "id", grammar: .controlRequestID),
-            summary: "exact request identity to abort", isRequired: true), generationOption, waitTimeoutOption, targetProtocolOption]),
+            summary: "exact request identity to abort", isRequired: true), generationOption, waitTimeoutOption]),
         connectsToRuntime: true),
     ])
 
@@ -2198,10 +2131,6 @@ enum CLICommandRegistry {
   private static let executionIDOption = CLIOptionSpec(
     name: "--execution-id", form: .value(placeholder: "id", grammar: .opaque),
     summary: "caller-stable durable execution identity")
-
-  private static let targetProtocolOption = CLIOptionSpec(
-    name: "--require-protocol", form: .value(placeholder: "2", grammar: .enumeration(["2"])),
-    summary: "use Runtime-owned v2 resources; never downgrade")
 
   private static let generationOption = CLIOptionSpec(
     name: "--expected-generation", form: .value(placeholder: "n", grammar: .positiveInteger(1...Int.max)),
@@ -2230,7 +2159,7 @@ enum CLICommandRegistry {
         canonicalCommand: "agent.run",
         summary: "discovery, binding, submit, run, evidence and artifact inventory",
         options: runtimeClientOptions(jobRequestOptions + [
-          executionIDOption, targetProtocolOption, waitTimeoutOption,
+          executionIDOption, waitTimeoutOption,
           CLIOptionSpec(name: "--maximum-wait",
             form: .value(placeholder: "5m", grammar: .duration(maximumMilliseconds: 86_400_000)),
             summary: "durable orchestration deadline, including HAR and restart; default 5m"),
@@ -2246,10 +2175,10 @@ enum CLICommandRegistry {
         connectsToRuntime: true),
       CLILeafSpec(token: "status", canonicalCommand: "agent.status",
         summary: "read a Runtime execution, including its pre-Job human action",
-        options: runtimeClientOptions([executionIDOption, waitTimeoutOption, targetProtocolOption]),
+        options: runtimeClientOptions([executionIDOption, waitTimeoutOption]),
         requiresExactlyOneOf: [["--execution-id"]], connectsToRuntime: true),
       CLILeafSpec(token: "list", canonicalCommand: "agent.list", summary: "rediscover durable executions without disclosing inputs or selection",
-        options: runtimeClientOptions(snapshotPageOptions + [waitTimeoutOption, targetProtocolOption,
+        options: runtimeClientOptions(snapshotPageOptions + [waitTimeoutOption,
           CLIOptionSpec(name: "--state", form: .value(placeholder: "state", grammar: .enumeration([
             "orchestrating", "waitingForHuman", "creatingJob", "jobOwned", "completed", "failed", "abandoned", "budgetExpired", "clockUntrusted"])),
             summary: "filter persisted execution state"),
@@ -2257,17 +2186,17 @@ enum CLICommandRegistry {
           CLIOptionSpec(name: "--target", form: .value(placeholder: "id", grammar: .opaque), summary: "filter resolved durable target"),
         ]), connectsToRuntime: true),
       CLILeafSpec(token: "abandon", canonicalCommand: "agent.abandon", summary: "abandon pre-Job orchestration; never cancel a Job",
-        options: runtimeClientOptions([executionIDOption, generationOption, waitTimeoutOption, targetProtocolOption]),
+        options: runtimeClientOptions([executionIDOption, generationOption, waitTimeoutOption]),
         requiresExactlyOneOf: [["--execution-id"]], connectsToRuntime: true),
       CLILeafSpec(
         token: "resume",
         canonicalCommand: "agent.resume",
         summary: "resume an execution paused for typed physical assistance",
-        options: runtimeClientOptions(physicalSelectionOptions + [targetProtocolOption, waitTimeoutOption,
+        options: runtimeClientOptions(physicalSelectionOptions + [waitTimeoutOption,
           CLIOptionSpec(
             name: "--resume-token",
             form: .value(placeholder: "token", grammar: .opaque),
-            summary: "legacy token; with protocol 2, an exact-value alias of resume-reference"),
+            summary: "existing resume token spelling; Runtime executions require an exact resume reference"),
           CLIOptionSpec(name: "--resume-reference", form: .value(placeholder: "ref", grammar: .opaque),
             summary: "exact Runtime-owned physical-assistance reference"),
         ]),
@@ -2289,15 +2218,15 @@ enum CLICommandRegistry {
     token: "human-action", summary: "Runtime-owned physical assistance and explicit impact approval",
     leaves: [
       CLILeafSpec(token: "list", canonicalCommand: "human-action.list", summary: "list persisted actions across their exact Runtime owners",
-        options: runtimeClientOptions(snapshotPageOptions + [waitTimeoutOption, targetProtocolOption,
+        options: runtimeClientOptions(snapshotPageOptions + [waitTimeoutOption,
           CLIOptionSpec(name: "--owner-kind", form: .value(placeholder: "kind", grammar: .enumeration(["agentExecution", "controlAction"])),
             summary: "published owner kind; must be paired with --owner"),
           CLIOptionSpec(name: "--owner", form: .value(placeholder: "id", grammar: .opaque), summary: "exact owner identity"),
         ]), connectsToRuntime: true),
       CLILeafSpec(token: "show", canonicalCommand: "human-action.show", summary: "read exact action, selection schema, expiry and resume reference",
-        options: runtimeClientOptions([humanActionIDOption, waitTimeoutOption, targetProtocolOption]), connectsToRuntime: true),
+        options: runtimeClientOptions([humanActionIDOption, waitTimeoutOption]), connectsToRuntime: true),
       CLILeafSpec(token: "resume", canonicalCommand: "human-action.resume", summary: "probe physical assistance or explicitly confirm one exact impact preview",
-        options: runtimeClientOptions(physicalSelectionOptions + [humanActionIDOption, waitTimeoutOption, targetProtocolOption,
+        options: runtimeClientOptions(physicalSelectionOptions + [humanActionIDOption, waitTimeoutOption,
           CLIOptionSpec(name: "--resume-reference", form: .value(placeholder: "ref", grammar: .opaque),
             summary: "exact reference returned by this action", isRequired: true),
         ]), mutuallyExclusive: [["--selection", "--selection-file"]], connectsToRuntime: true),
@@ -2309,14 +2238,14 @@ enum CLICommandRegistry {
   private static let controlActionNode = CLINodeSpec(token: "control-action", summary: "durable host lifecycle previews and readback",
     leaves: [
       CLILeafSpec(token: "list", canonicalCommand: "control-action.list", summary: "rediscover control actions with immutable snapshot pagination",
-        options: runtimeClientOptions(snapshotPageOptions + [targetProtocolOption, waitTimeoutOption,
+        options: runtimeClientOptions(snapshotPageOptions + [waitTimeoutOption,
           CLIOptionSpec(name: "--kind", form: .value(placeholder: "hdcLifecycle", grammar: .enumeration(["hdcLifecycle"])), summary: "filter the published control-action kind"),
           CLIOptionSpec(name: "--state", form: .value(placeholder: "state", grammar: .enumeration(["observing", "previewReady", "awaitingImpactApproval", "approvalRecorded", "dispatchPrepared", "dispatching", "succeeded", "failed", "outcomeUnknown", "blocked", "expired", "previewDrifted"])), summary: "filter persisted control-action state"),
         ]), connectsToRuntime: true),
       CLILeafSpec(token: "show", canonicalCommand: "control-action.show", summary: "read the exact immutable preview, generation and next action",
-        options: runtimeClientOptions([controlActionIDOption, targetProtocolOption, waitTimeoutOption]), connectsToRuntime: true),
+        options: runtimeClientOptions([controlActionIDOption, waitTimeoutOption]), connectsToRuntime: true),
       CLILeafSpec(token: "reconcile", canonicalCommand: "control-action.reconcile", summary: "read back exact impact facts; never replay lifecycle intent",
-        options: runtimeClientOptions([controlActionIDOption, targetProtocolOption, waitTimeoutOption]), connectsToRuntime: true),
+        options: runtimeClientOptions([controlActionIDOption, waitTimeoutOption]), connectsToRuntime: true),
     ])
 
   private static let capabilityNode = CLINodeSpec(
@@ -2395,7 +2324,7 @@ enum CLICommandRegistry {
         token: "probe",
         canonicalCommand: "debug.probe",
         summary: "observe target-bound package and port-forward facts without creating a Job",
-        options: runtimeClientOptions([targetIDOption, targetProtocolOption]),
+        options: runtimeClientOptions([targetIDOption]),
         connectsToRuntime: true),
       domainLeaf("hap", "debug.hap", "debug.hap@1", "install, launch and observe a HAP"),
       domainLeaf(
@@ -3101,7 +3030,7 @@ enum CLICommandRegistry {
 
   /// The Golden Journey order root help leads with (§10).
   static let rootHelpHighlights: [String] = [
-    "doctor", "device adopt", "operation describe", "agent run", "job status",
+    "doctor", "target adopt", "operation describe", "agent run", "job status",
     "artifact export",
   ]
 

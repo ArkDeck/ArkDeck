@@ -19,7 +19,7 @@
 
 ## TASK-SVC-001 — Unify control-plane, Runtime requests, CLI and App on one v1
 
-- Status:ready
+- Status:done
 - Platform:macos（契约供Windows/Rust复用，本Task不实现新平台）
 - Decision grade:D1
 - Requirements/AC:SVC-AC-01, SVC-AC-02, SVC-AC-03, SVC-AC-04; POL-SAFETY-001, POL-TARGET-001, POL-RECOVERY-001, POL-AGENT-002

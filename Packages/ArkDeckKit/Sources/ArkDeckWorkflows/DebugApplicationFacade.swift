@@ -696,82 +696,15 @@ enum DebugHAPSubmission {
   private static func importPackage(
     target: DebugTargetPresentation, fileURL: URL, local: DebugHAPLocalArtifact, send: Request
   ) async throws -> String {
-    var uploadID: String?
-    do {
-      let begin = try DebugRuntimeResponseDecoding.resultObject(
-        await send(
-          "artifact.importHap.begin",
-          [
-            "targetId": .string(target.id),
-            "name": .string(local.name),
-            "byteCount": .integer(local.byteCount),
-            "sha256": .string(local.sha256),
-          ]))
-      guard let startedUploadID = begin["uploadId"] as? String else {
-        throw DebugXPCReadFailure.transport("Runtime returned no HAP upload identity")
-      }
-      uploadID = startedUploadID
-      guard let maximumChunkBytes = begin["maximumChunkBytes"] as? Int,
-        maximumChunkBytes > 0,
-        maximumChunkBytes <= DebugHAPLocalArtifactInspector.readChunkBytes,
-        begin["targetId"] as? String == target.id,
-        begin["bindingRevision"] as? Int == target.bindingRevision
-      else { throw DebugXPCReadFailure.transport("Runtime returned incomplete HAP import facts") }
-
-      let handle = try FileHandle(forReadingFrom: fileURL)
-      defer { try? handle.close() }
-      var offset = 0
-      while Int64(offset) < local.byteCount {
-        guard !Task.isCancelled else { throw CancellationError() }
-        let chunk = try handle.read(upToCount: maximumChunkBytes) ?? Data()
-        guard !chunk.isEmpty else {
-          throw DebugXPCReadFailure.transport("Selected HAP changed while it was imported")
-        }
-        let appended = try DebugRuntimeResponseDecoding.resultObject(
-          await send(
-            "artifact.importHap.append",
-            [
-              "uploadId": .string(startedUploadID),
-              "offset": .integer(Int64(offset)),
-              "base64": .string(chunk.base64EncodedString()),
-            ]))
-        guard let nextOffset = appended["nextOffset"] as? Int,
-          nextOffset == offset + chunk.count
-        else { throw DebugXPCReadFailure.transport("Runtime HAP import offset drifted") }
-        offset = nextOffset
-      }
-      guard Int64(offset) == local.byteCount else {
-        throw DebugXPCReadFailure.transport("Selected HAP changed while it was imported")
-      }
-      guard (try handle.read(upToCount: 1) ?? Data()).isEmpty else {
-        throw DebugXPCReadFailure.transport("Selected HAP changed while it was imported")
-      }
-
-      let imported = try DebugRuntimeResponseDecoding.resultObject(
-        await send(
-          "artifact.importHap.commit",
-          ["uploadId": .string(startedUploadID)]))
-      uploadID = nil
-      guard let lease = imported["lease"] as? String,
-        imported["targetId"] as? String == target.id,
-        imported["bindingRevision"] as? Int == target.bindingRevision,
-        imported["name"] as? String == local.name,
-        imported["byteCount"] as? Int == Int(local.byteCount),
-        imported["sha256"] as? String == local.sha256
-      else {
-        throw DebugXPCReadFailure.transport(
-          "Runtime import facts no longer match the selected target and package")
-      }
-
-      return lease
-    } catch {
-      // Abort only the current uncommitted upload. Completed immutable leases
-      // remain in Runtime storage; failure never submits a partial package set.
-      if let uploadID {
-        _ = await send("artifact.importHap.abort", ["uploadId": .string(uploadID)])
-      }
-      throw error
+    let receipt = try await RuntimeAppArtifactUpload.upload(
+      fileURL: fileURL, kind: "hap", targetID: target.id, bindingRevision: target.bindingRevision,
+      name: local.name, byteCount: Int(local.byteCount), sha256: local.sha256,
+      send: { method, params in try await send(method, params).get() })
+    guard case .string(let lease)? = receipt["lease"] else {
+      throw DebugXPCReadFailure.transport("Runtime returned no HAP Import lease")
     }
+    return lease
+
   }
 }
 
@@ -1059,7 +992,7 @@ private actor DebugProductionApplicationProvider: DebugApplicationProviding {
     async let operations = DebugXPCReadTransport.request(method: "operation.list")
     async let targets = DebugXPCReadTransport.request(method: "target.list")
     async let jobs = DebugXPCReadTransport.request(
-      method: "job.list", params: RuntimeAppJobListPolicy.recentSummaryParams)
+      method: "job.list", params: RuntimeAppReadResources.recentSummaryParams)
     let base = DebugWorkspaceResponseDecoding.presentation(
       operationResponse: await operations,
       targetResponse: await targets,
@@ -1166,74 +1099,25 @@ private actor DebugProductionApplicationProvider: DebugApplicationProviding {
     defer {
       if gainedScope { fileURL.stopAccessingSecurityScopedResource() }
     }
-    var uploadID: String?
     do {
       let local = try await Task.detached(priority: .userInitiated) {
         try DebugNativeLibraryLocalArtifactInspector.inspect(fileURL)
       }.value
 
-      let begin = try DebugRuntimeResponseDecoding.resultObject(
-        await DebugXPCReadTransport.request(
-          method: "artifact.importNativeLibrary.begin",
-          params: [
-            "targetId": .string(target.id),
-            "name": .string(local.name),
-            "byteCount": .integer(Int64(local.contents.count)),
-            "sha256": .string(local.sha256),
-          ]))
-      guard let startedUploadID = begin["uploadId"] as? String else {
-        throw DebugXPCReadFailure.transport(
-          "Runtime returned no native-library upload identity")
-      }
-      uploadID = startedUploadID
-      guard let maximumChunkBytes = begin["maximumChunkBytes"] as? Int,
-        maximumChunkBytes > 0,
-        maximumChunkBytes <= 512 * 1_024,
-        begin["targetId"] as? String == target.id,
-        begin["bindingRevision"] as? Int == target.bindingRevision
-      else {
-        throw DebugXPCReadFailure.transport(
-          "Runtime returned incomplete native-library import facts")
-      }
-
-      var offset = 0
-      while offset < local.contents.count {
-        guard !Task.isCancelled else { throw CancellationError() }
-        let end = min(local.contents.count, offset + maximumChunkBytes)
-        let chunk = local.contents.subdata(in: offset..<end)
-        let appended = try DebugRuntimeResponseDecoding.resultObject(
-          await DebugXPCReadTransport.request(
-            method: "artifact.importNativeLibrary.append",
-            params: [
-              "uploadId": .string(startedUploadID),
-              "offset": .integer(Int64(offset)),
-              "base64": .string(chunk.base64EncodedString()),
-            ]))
-        guard appended["nextOffset"] as? Int == end else {
-          throw DebugXPCReadFailure.transport(
-            "Runtime native-library import offset drifted")
-        }
-        offset = end
-      }
-
-      let imported = try DebugRuntimeResponseDecoding.resultObject(
-        await DebugXPCReadTransport.request(
-          method: "artifact.importNativeLibrary.commit",
-          params: ["uploadId": .string(startedUploadID)]))
-      uploadID = nil
-      guard let lease = imported["lease"] as? String,
-        imported["targetId"] as? String == target.id,
-        imported["bindingRevision"] as? Int == target.bindingRevision,
-        imported["name"] as? String == local.name,
-        imported["byteCount"] as? Int == local.contents.count,
-        imported["sha256"] as? String == local.sha256,
-        imported["abi"] as? String == local.abi,
-        imported["elfClassBits"] as? Int == local.elfClassBits,
-        imported["machine"] as? Int == local.machine,
-        imported["buildId"] as? String == local.buildID
-      else {
-        throw DebugXPCReadFailure.transport(
-          "Runtime import facts no longer match the selected target and library")
+      let receipt = try await RuntimeAppArtifactUpload.upload(
+        fileURL: fileURL, kind: "native-library", targetID: target.id,
+        bindingRevision: target.bindingRevision, name: local.name,
+        byteCount: local.contents.count, sha256: local.sha256,
+        send: { method, params in
+          try await DebugXPCReadTransport.request(method: method, params: params).get()
+        })
+      guard case .string(let lease)? = receipt["lease"],
+        case .object(let validation)? = receipt["validation"],
+        validation["abi"] == .string(local.abi),
+        validation["elfClassBits"] == .integer(Int64(local.elfClassBits)),
+        validation["machine"] == .integer(Int64(local.machine)),
+        validation["buildId"] == .string(local.buildID) else {
+        throw DebugXPCReadFailure.transport("Runtime Import differs from the selected native library")
       }
 
       let request = try DebugNativeLibraryRequestBuilder.request(
@@ -1335,18 +1219,8 @@ private actor DebugProductionApplicationProvider: DebugApplicationProviding {
           steps: steps,
           requestJSON: reviewedJSON))
     } catch let failure as DebugXPCReadFailure {
-      if let uploadID {
-        _ = await DebugXPCReadTransport.request(
-          method: "artifact.importNativeLibrary.abort",
-          params: ["uploadId": .string(uploadID)])
-      }
       return .failed(failure.message)
     } catch {
-      if let uploadID {
-        _ = await DebugXPCReadTransport.request(
-          method: "artifact.importNativeLibrary.abort",
-          params: ["uploadId": .string(uploadID)])
-      }
       return .failed(String(describing: error))
     }
   }
@@ -1416,9 +1290,12 @@ private actor DebugProductionApplicationProvider: DebugApplicationProviding {
 
   func run(jobID: String) async -> DebugLogJobRunResult {
     do {
-      let result = try DebugRuntimeResponseDecoding.resultObject(
+      _ = try DebugRuntimeResponseDecoding.resultObject(
         await DebugXPCReadTransport.request(
           method: "job.run", params: ["jobId": .string(jobID)]))
+      let result = try await RuntimeAppReadResources.statusPresentation(jobID: jobID) { method, params in
+        try await DebugXPCReadTransport.request(method: method, params: params).get()
+      }
       return .completed(try DebugRuntimeResponseDecoding.terminal(result, jobID: jobID))
     } catch let failure as DebugXPCReadFailure {
       return .failed(failure.message)
@@ -1584,7 +1461,7 @@ enum DebugWorkspaceResponseDecoding {
     switch response {
     case .failure(let failure): return DecodedList(failure: failure.message)
     case .success(let data):
-      switch decodeResultArray(data) {
+      switch Result(catching: { try RuntimeAppReadResources.recentJobSummaries(data) }).mapError({ DebugResponseFailure(message: String(describing: $0)) }) {
       case .failure(let failure): return DecodedList(failure: failure.message)
       case .success(let entries):
         var values: [DebugJobPresentation] = []

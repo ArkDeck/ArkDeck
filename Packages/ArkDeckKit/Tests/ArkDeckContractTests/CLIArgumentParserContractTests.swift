@@ -512,35 +512,15 @@ final class CLIArgumentParserContractTests: XCTestCase {
       ])?.code, .invalidOption)
   }
 
-  func testProtocolNegotiationIsScopedToHealthAndPublishedTargetLeaves() {
-    for major in ["1", "2"] {
-      XCTAssertNotNil(
-        success(["runtime", "health", "--require-protocol", major, "--output", "json"]))
+  func testProtocolSelectionIsRejectedForEveryCurrentLeaf() {
+    let commands = [["runtime", "health"], ["job", "list"], ["job", "status", "--job", "J-1"],
+      ["job", "run", "--job", "J-1"], ["job", "submit", "--target", "T-1", "--operation", "observe.device@1"]]
+    for command in commands {
+      XCTAssertNotNil(success(command))
+      for version in ["1", "2", "1.0.0"] {
+        XCTAssertEqual(failure(command + ["--require-protocol", version])?.code, .invalidOption)
+      }
     }
-    for major in ["0", "3", "02", "2.0.0", "-1"] {
-      XCTAssertEqual(
-        failure(["runtime", "health", "--require-protocol", major])?.code, .invalidOption)
-    }
-    XCTAssertNotNil(success(["job", "list", "--require-protocol", "2"]))
-    for verb in ["status", "show", "evidence", "result", "timeline"] {
-      XCTAssertNotNil(success(["job", verb, "--job", "J-1", "--require-protocol", "2"]))
-      XCTAssertEqual(failure(["job", verb, "--job", "J-1", "--require-protocol", "1"])?.code, .invalidOption)
-    }
-    XCTAssertNotNil(success(["job", "run", "--job", "J-1", "--require-protocol", "2"]))
-    for verb in ["plan", "submit"] {
-      XCTAssertNotNil(success([
-        "job", verb, "--target", "T-1", "--operation", "observe.device@1",
-        "--require-protocol", "2",
-      ]))
-      XCTAssertEqual(
-        failure([
-          "job", verb, "--target", "T-1", "--operation", "observe.device@1",
-          "--require-protocol", "1",
-        ])?.code, .invalidOption)
-    }
-    XCTAssertEqual(
-      failure(["runtime", "health", "--require-protocol", "2", "--require-protocol", "1"])?.code,
-      .invalidOption)
   }
 
   func testTargetAdoptionRequiresAnExactReferenceAndDiscoveryMigrationIsExplicit() {
@@ -551,11 +531,11 @@ final class CLIArgumentParserContractTests: XCTestCase {
     for generation in ["0", "01", "+1", "-1", "1.0", "18446744073709551616"] {
       XCTAssertEqual(failure(prefix + ["--observation-generation", generation])?.code, .invalidOption)
     }
-    XCTAssertNotNil(success(["device", "adopt"]), "legacy selection behavior remains explicit")
-    XCTAssertNotNil(success(["device", "candidates", "--require-protocol", "2"]))
+    XCTAssertEqual(failure(["device", "adopt"])?.code, .invalidCommand)
+    XCTAssertNotNil(success(["device", "candidates"]))
     for incompatible in ["--snapshot", "--use-warm-snapshot"] {
       XCTAssertEqual(
-        failure(["device", "candidates", "--require-protocol", "2", incompatible])?.code, .invalidOption)
+        failure(["device", "candidates", incompatible])?.code, .invalidOption)
     }
   }
 
@@ -633,7 +613,7 @@ final class CLIArgumentParserContractTests: XCTestCase {
   /// output, because the caller cannot otherwise tell it is driving the frozen
   /// 1.x surface rather than the target one.
   func testLegacyLeavesAreMarkedInTheRegistryAndInTheEnvelope() {
-    for path in [["device", "list"], ["debug", "status"], ["artifact", "import-hap"]] {
+    for path in [["device", "list"], ["debug", "status"]] {
       let leaf = CLICommandRegistry.allLeaves()
         .first { $0.path == path }?.leaf
       XCTAssertEqual(leaf?.lifecycle, .legacy, path.joined(separator: " "))
@@ -776,8 +756,8 @@ final class CLIArgumentParserContractTests: XCTestCase {
       return XCTFail("the version result must be an object")
     }
     for key in [
-      "cliProductVersion", "commandRegistrySchemaVersion", "preferredControlProtocolVersion",
-      "supportedControlProtocolExactVersions", "machineContractVersion", "resultSchemaVersion",
+      "cliProductVersion", "commandRegistrySchemaVersion", "controlProtocolVersion",
+      "controlContractIdentity", "machineContractVersion", "resultSchemaVersion",
       "pageSchemaVersion", "eventSchemaVersion", "nextActionSchemaVersion",
       "errorRegistryVersion", "canonicalJsonVersion", "buildIdentity",
     ] {
@@ -798,16 +778,12 @@ final class CLIArgumentParserContractTests: XCTestCase {
     // `controlMethodUnavailable`, not by pretending the client cannot produce
     // the schema.
     XCTAssertEqual(fields["eventSchemaVersion"], .string(CLIEventEnvelope.schemaVersion))
-    guard case .array(let supported)? = fields["supportedControlProtocolExactVersions"] else {
-      return XCTFail("the supported set must be a list")
-    }
-    XCTAssertTrue(
-      supported.contains(fields["preferredControlProtocolVersion"] ?? .null),
-      "§12 requires the preferred version to be one of the supported ones")
+    XCTAssertEqual(fields["controlProtocolVersion"], .string(ArkDeckControlProtocol.currentVersion))
+    XCTAssertEqual(fields["controlContractIdentity"], .string(ArkDeckControlProtocol.contractIdentity))
 
     // Human mode lists the same set rather than a build banner.
     let human = CLIHelpRenderer.versionHuman()
-    for name in ["command registry schema", "control protocol supported", "build identity"] {
+    for name in ["command registry schema", "control protocol", "build identity"] {
       XCTAssertTrue(human.contains(name), "human --version must list \(name)")
     }
   }
@@ -1016,7 +992,6 @@ final class CLIArgumentParserContractTests: XCTestCase {
       ["runtime", "health"],
       ["runtime", "hdc", "status"],
       ["device", "candidates"],
-      ["device", "candidates", "--use-warm-snapshot"],
       ["target", "list"],
       ["target", "show", "--target", "T-1"],
     ] {
@@ -1038,13 +1013,13 @@ final class CLIArgumentParserContractTests: XCTestCase {
     XCTAssertEqual(leaves.first { $0.path == ["device", "show"] }?.leaf.lifecycle, .legacy)
     XCTAssertEqual(
       leaves.first { $0.path == ["device", "show"] }?.leaf.summary,
-      "show the frozen legacy target-list projection")
+      "show the current target-list projection")
     guard let deviceNode = CLICommandRegistry.node("device") else {
       return XCTFail("device node must remain registered")
     }
     XCTAssertTrue(
       CLIHelpRenderer.node(deviceNode).contains(
-        "show                      show the frozen legacy target-list projection"))
+        "show                      show the current target-list projection"))
     // `device candidates` is the target spelling (§6.1), so it is `current`
     // even though its 1.x response still lacks the snapshot generation the
     // target contract wants. Lifecycle answers "is there a newer spelling?";
@@ -1056,24 +1031,16 @@ final class CLIArgumentParserContractTests: XCTestCase {
 
   // MARK: Evidence, result and bounded reads (§6.1, §7.6, §9)
 
-  func testCandidateSnapshotIsExplicitAndPreservesExistingRequests() {
+  func testCandidateRenderingAlwaysUsesTheCurrentObservationSnapshot() {
     for output in [[], ["--json"], ["--output", "json"]] {
-      for warm in [[], ["--use-warm-snapshot"]] {
-        for snapshot in [[], ["--snapshot"]] {
-          let options = snapshot + warm + output
-          guard case .dispatch? = success(["device", "candidates"] + options) else {
-            return XCTFail("candidate options must dispatch")
-          }
-          let request = RuntimeCLI.deviceCandidatesRequest(options)
-          XCTAssertEqual(
-            request.method, snapshot.isEmpty ? "device.candidates" : "device.observations")
-          XCTAssertEqual(request.params, warm.isEmpty ? nil : ["useWarmSnapshot": .bool(true)])
-        }
-      }
+      XCTAssertNotNil(success(["device", "candidates"] + output))
+      let request = RuntimeCLI.deviceCandidatesRequest(output)
+      XCTAssertEqual(request.method, "device.observations")
+      XCTAssertNil(request.params)
     }
-    XCTAssertEqual(
-      failure(["device", "candidates", "--snapshot", "--snapshot"])?.code, .invalidOption)
-    XCTAssertEqual(failure(["target", "list", "--snapshot"])?.code, .invalidOption)
+    for retired in ["--snapshot", "--use-warm-snapshot"] {
+      XCTAssertEqual(failure(["device", "candidates", retired])?.code, .invalidOption)
+    }
     XCTAssertEqual(CLIControlMethodRegistry.effect(of: "device.observations"), .boundedReadOnly)
   }
 
@@ -1239,9 +1206,9 @@ final class CLIArgumentParserContractTests: XCTestCase {
     for argv in [
       ["job", "list"],
       ["job", "list", "--page-size", "10"],
-      ["job", "list", "--order", "newestFirst"],
+      ["job", "list", "--order", "createdAtDescJobIdAsc"],
       ["job", "list", "--include-current", "--include-timeline"],
-      ["job", "list", "--cursor", "12", "--order", "oldestFirst"],
+      ["job", "list", "--cursor", "12", "--order", "createdAtAscJobIdAsc"],
     ] {
       guard case .dispatch? = success(argv) else {
         return XCTFail("`\(argv.joined(separator: " "))` must dispatch")
@@ -1464,7 +1431,7 @@ final class CLIArgumentParserContractTests: XCTestCase {
     let previouslyExecutable: [[String]] = [
       ["doctor"],
       ["operation", "list"], ["operation", "describe", "--operation", "observe.device@1"],
-      ["device", "list"], ["device", "show"], ["device", "adopt", "--candidate", "K"],
+      ["device", "list"], ["device", "show"],
       ["trace", "probe", "--target", "T-1"],
       ["trace", "cache", "status"], ["trace", "cache", "purge"],
       ["job", "plan", "--request-file", "r.json"],
@@ -1481,10 +1448,10 @@ final class CLIArgumentParserContractTests: XCTestCase {
       ["artifact", "inspect", "--job", "J-1", "--artifact", "A-1"],
       ["artifact", "read", "--job", "J-1", "--artifact", "A-1", "--allow-sensitive"],
       ["artifact", "export", "--job", "J-1", "--artifact", "A-1", "--destination", "/tmp"],
-      ["artifact", "import-hap", "--target", "T-1", "--file", "a.hap"],
-      ["artifact", "import-workspace-patch", "--target", "T-1", "--file", "a.patch"],
-      ["artifact", "import-flash-bundle", "--target", "T-1", "--file", "a.tar.gz"],
-      ["artifact", "import-native-library", "--target", "T-1", "--file", "libx.so"],
+      ["artifact", "import", "hap", "--target", "T-1", "--import-request-id", "fixture", "--file", "a.hap"],
+      ["artifact", "import", "workspace-patch", "--import-request-id", "fixture", "--target", "T-1", "--file", "a.patch"],
+      ["artifact", "import", "flash-bundle", "--import-request-id", "fixture", "--target", "T-1", "--file", "a.tar.gz"],
+      ["artifact", "import", "native-library", "--import-request-id", "fixture", "--target", "T-1", "--file", "libx.so"],
       ["debug", "start", "--request-file", "r.json"],
       ["debug", "status", "--invocation", "I-1"],
       ["flash", "install-binding", "--rebind"],

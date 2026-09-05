@@ -14,7 +14,7 @@ final class RuntimeHistoryPagingContractTests: XCTestCase {
     XCTAssertEqual(initial.jobs.map(\.id), ["head"])
     let firstParams = await transport.params(at: 0)
     XCTAssertEqual(firstParams["pageSize"], .integer(200))
-    XCTAssertEqual(firstParams["order"], .string("newestFirst"))
+    XCTAssertEqual(firstParams["order"], .string("createdAtDescJobIdAsc"))
     XCTAssertEqual(firstParams["includeTimeline"], .bool(false))
     XCTAssertEqual(firstParams["includeCurrent"], .bool(true))
 
@@ -28,7 +28,7 @@ final class RuntimeHistoryPagingContractTests: XCTestCase {
     let retry = await startRead(provider.loadOlderHistory, through: transport, index: 2)
     let retryParams = await transport.params(at: 2)
     XCTAssertEqual(retryParams["cursor"], .string("older"))
-    XCTAssertNil(retryParams["includeCurrent"])
+    XCTAssertEqual(retryParams["includeCurrent"], .bool(true))
     await transport.complete(2, with: try page(["head", "tail"]))
     let completed = await retry.value
     XCTAssertEqual(completed.jobs.map(\.id), ["head", "tail"])
@@ -135,9 +135,7 @@ final class RuntimeHistoryPagingContractTests: XCTestCase {
     let jobs = ids.map {
       ["jobId": $0, "operation": "observe.device@1", "targetId": "fixture", "state": "succeeded"]
     }
-    var result: [String: Any] = ["jobs": jobs]
-    if let cursor { result["nextCursor"] = cursor }
-    return .success(try JSONSerialization.data(withJSONObject: ["ok": true, "result": result]))
+    return .success(try currentJobPageResponse(jobs, cursor: cursor))
   }
 }
 

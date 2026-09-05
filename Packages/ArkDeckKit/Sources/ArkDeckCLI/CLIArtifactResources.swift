@@ -5,7 +5,6 @@ import Foundation
 extension RuntimeCLI {
   static func usesArtifactResource(_ verb: String, rest: [String]) -> Bool {
     ["list", "inspect", "read", "export"].contains(verb)
-      && rest.contains { ["--import", "--require-protocol", "--page-size", "--cursor", "--timeout", "--overwrite"].contains($0) }
   }
 
   static func runArtifactResource(
@@ -39,7 +38,7 @@ extension RuntimeCLI {
         throw session.fail(.invalidInput, "Artifact metadata queries do not accept content-access or item-filter options")
       }
       let method = "artifact.\(verb)"
-      try session.negotiate(requiredMajor: 2, forMethod: method)
+
       var fields: [String: JSONValue] = ["owner": owner.value]
       if verb == "list" {
         let size = Int(options.value("--page-size") ?? "100") ?? 100

@@ -445,9 +445,6 @@ enum CLIMachineContracts {
       case plumbing(behind: String, note: String)
       /// Kept so the name answers with a stable refusal (§18 `refused`).
       case refused(leaf: String, note: String)
-      /// The protocol bootstrap every connecting leaf performs; a feature of
-      /// no leaf in particular (§18 `internal`).
-      case bootstrap(note: String)
     }
 
     /// The authored half of the table: every classified control method and
@@ -455,8 +452,6 @@ enum CLIMachineContracts {
     /// so a new daemon method cannot enter the registry without a coverage
     /// ruling.
     static let daemonMethodCoverage: [String: DaemonCoverage] = [
-      "protocol.negotiate": .bootstrap(
-        note: "protocol bootstrap performed by every connecting leaf; never a feature of its own"),
       "agent.abandon": .leaf("agent.abandon"),
       "agent.list": .leaf("agent.list"),
       "agent.resume": .leaf("agent.resume"),
@@ -479,46 +474,12 @@ enum CLIMachineContracts {
         note: "idempotent re-entry probe behind `artifact import <kind>`"),
       "artifact.import.list": .leaf("artifact.import.list"),
       "artifact.import.release": .leaf("artifact.import.release"),
-      "artifact.importFlashBundle.begin": .leaf("artifact.import-flash-bundle"),
-      "artifact.importFlashBundle.append": .plumbing(
-        behind: "artifact.import-flash-bundle", note: "1.x chunk frame"),
-      "artifact.importFlashBundle.commit": .plumbing(
-        behind: "artifact.import-flash-bundle", note: "1.x commit frame"),
-      "artifact.importFlashBundle.abort": .plumbing(
-        behind: "artifact.import-flash-bundle", note: "1.x abort frame"),
-      "artifact.importHap.begin": .leaf("artifact.import-hap"),
-      "artifact.importHap.append": .plumbing(behind: "artifact.import-hap", note: "1.x chunk frame"),
-      "artifact.importHap.commit": .plumbing(behind: "artifact.import-hap", note: "1.x commit frame"),
-      "artifact.importHap.abort": .plumbing(behind: "artifact.import-hap", note: "1.x abort frame"),
-      "artifact.importNativeLibrary.begin": .leaf("artifact.import-native-library"),
-      "artifact.importNativeLibrary.append": .plumbing(
-        behind: "artifact.import-native-library", note: "1.x chunk frame"),
-      "artifact.importNativeLibrary.commit": .plumbing(
-        behind: "artifact.import-native-library", note: "1.x commit frame"),
-      "artifact.importNativeLibrary.abort": .plumbing(
-        behind: "artifact.import-native-library", note: "1.x abort frame"),
-      "artifact.importWorkspacePatch.begin": .leaf("artifact.import-workspace-patch"),
-      "artifact.importWorkspacePatch.append": .plumbing(
-        behind: "artifact.import-workspace-patch", note: "1.x chunk frame"),
-      "artifact.importWorkspacePatch.commit": .plumbing(
-        behind: "artifact.import-workspace-patch", note: "1.x commit frame"),
-      "artifact.importWorkspacePatch.abort": .plumbing(
-        behind: "artifact.import-workspace-patch", note: "1.x abort frame"),
       "artifact.inspect": .leaf("artifact.inspect"),
       "artifact.list": .leaf("artifact.list"),
       "artifact.quota": .leaf("artifact.quota"),
       "artifact.read": .leaf("artifact.read"),
-      "capability.draft": .refused(
-        leaf: "capability.draft",
-        note: "capability authoring is Runtime-owned; the CLI names the method only to refuse it"),
       "capability.inspect": .leaf("capability.inspect"),
-      "capability.install": .refused(
-        leaf: "capability.install",
-        note: "capability installation is Runtime-owned; the CLI names the method only to refuse it"),
       "capability.list": .leaf("capability.list"),
-      "capability.revoke": .refused(
-        leaf: "capability.revoke",
-        note: "capability revocation is Runtime-owned; the CLI names the method only to refuse it"),
       "cleanupDebt.continue": .leaf("recovery.cleanup.continue", also: ["cleanup-debt.continue"]),
       "cleanupDebt.list": .leaf("recovery.cleanup.list", also: ["cleanup-debt.list"]),
       "control-action.list": .leaf("control-action.list"),
@@ -532,7 +493,6 @@ enum CLIMachineContracts {
         "debug.template.run", lifecycle: "deprecated",
         note:
           "App direct path; the CLI reaches the same closed template set through Catalog operation debug.template@1"),
-      "device.candidates": .leaf("device.candidates"),
       "device.display-name.clear": .leaf("device.display-name.clear"),
       "device.display-name.set": .leaf("device.display-name.set"),
       "device.observations": .leaf(
@@ -555,8 +515,6 @@ enum CLIMachineContracts {
       "job.events": .leaf("job.events"),
       "job.evidence": .leaf("job.evidence"),
       "job.list": .leaf("job.list"),
-      "job.list-page": .plumbing(
-        behind: "job.list", note: "cursor page form of job.list used by `job list`"),
       "job.plan": .leaf("job.plan"),
       "job.reconcile": .leaf("job.reconcile"),
       "job.result": .leaf("job.result"),
@@ -568,9 +526,6 @@ enum CLIMachineContracts {
       "operation.describe": .leaf("operation.describe"),
       "operation.list": .leaf("operation.list"),
       "recovery.flash-invocation.list": .leaf("recovery.flash-invocation.list"),
-      "runtime.hdc-status": .leaf(
-        "runtime.hdc.status", lifecycle: "legacy",
-        note: "1.x spelling that `runtime hdc status` falls back to on a legacy Runtime"),
       "runtime.hdc.impact-preview": .leaf("runtime.hdc.impact-preview"),
       "runtime.hdc.restart": .leaf("runtime.hdc.restart"),
       "runtime.hdc.status": .leaf("runtime.hdc.status"),
@@ -586,7 +541,7 @@ enum CLIMachineContracts {
       "session.pin": .leaf("session.pin"),
       "session.show": .leaf("session.show"),
       "session.unpin": .leaf("session.unpin"),
-      "target.adopt": .leaf("target.adopt", also: ["device.adopt"]),
+      "target.adopt": .leaf("target.adopt"),
       "target.availability": .leaf("target.availability"),
       "target.display-name.clear": .leaf("target.display-name.clear"),
       "target.display-name.set": .leaf("target.display-name.set"),
@@ -903,20 +858,6 @@ enum CLIMachineContracts {
           requiredPlatforms: requiredPlatforms(path: found.path, leaf: found.leaf),
           note: note,
           referencedLeaves: [behind])
-      case .bootstrap(let note):
-        guard method == ArkDeckControlProtocol.bootstrapMethod else {
-          throw Failure("daemon method \(method) is not the protocol bootstrap")
-        }
-        return Entry(
-          feature: method,
-          source: "daemon:\(method)",
-          classification: ProductCoverageClassification.internal.rawValue,
-          targetClassification: ProductCoverageClassification.internal.rawValue,
-          lifecycle: "current",
-          targetCommand: nil,
-          requiredPlatforms: platformVocabulary,
-          note: note,
-          referencedLeaves: [])
       case .refused(let command, let note):
         let found = try index.leaf(command)
         guard case .refused = found.leaf.kind else {
@@ -1404,7 +1345,7 @@ enum CLIMachineContracts {
             ]),
             "cliVersion": .object(["type": .string("string")]),
             "controlProtocolVersion": .object([
-              "enum": strings(CLIProductVersion.supportedControlProtocolExactVersions)
+              "const": .string(CLIProductVersion.controlProtocolVersion)
             ]),
             "lifecycle": .object(["$ref": .string("#/$defs/lifecycle")]),
           ]),
@@ -1651,29 +1592,27 @@ enum CLIMachineContracts {
       var fields = header(
         controlPlaneSchemaVersion,
         description: "The local control-plane request and response frames the CLI exchanges with the Runtime, and the closed method set it may name.")
-      let methods = CLIControlMethodRegistry.classifiedMethods
-        .union([ArkDeckControlProtocol.bootstrapMethod]).sorted()
+      let methods = ArkDeckControlProtocol.methods.sorted()
       let methodTable: [JSONValue] = methods.map { method in
         .object([
           "method": .string(method),
-          "publishedOnTargetProtocol": .bool(ArkDeckControlProtocol.targetMethods.contains(method)),
-          "bootstrap": .bool(method == ArkDeckControlProtocol.bootstrapMethod),
+          "published": .bool(true),
         ])
       }
       fields["oneOf"] = .array([
         .object(["$ref": .string("#/$defs/request")]),
         .object(["$ref": .string("#/$defs/response")]),
       ])
-      fields["x-arkdeck-targetProtocolVersion"] = .string(ArkDeckControlProtocol.targetVersion)
-      fields["x-arkdeck-legacyProtocolVersion"] = .string(ArkDeckControlProtocol.legacyVersion)
-      fields["x-arkdeck-bootstrapMethod"] = .string(ArkDeckControlProtocol.bootstrapMethod)
+      fields["x-arkdeck-currentProtocolVersion"] = .string(ArkDeckControlProtocol.currentVersion)
+      fields["x-arkdeck-contractIdentity"] = .string(ArkDeckControlProtocol.contractIdentity)
       fields["x-arkdeck-methods"] = .array(methodTable)
       fields["$defs"] = .object([
         "request": .object([
           "type": .string("object"),
-          "required": strings(["protocolVersion", "id", "method"]),
+          "required": strings(["protocolVersion", "contractIdentity", "id", "method"]),
           "properties": .object([
-            "protocolVersion": .object(["enum": strings(ArkDeckControlProtocol.supportedExactVersions)]),
+            "protocolVersion": .object(["const": .string(ArkDeckControlProtocol.currentVersion)]),
+            "contractIdentity": .object(["const": .string(ArkDeckControlProtocol.contractIdentity)]),
             "id": .object(["type": .string("string"), "minLength": .integer(1)]),
             "method": .object(["enum": strings(methods)]),
             "params": .object(["type": .string("object")]),
@@ -1693,11 +1632,13 @@ enum CLIMachineContracts {
           "oneOf": .array([
             .object([
               "properties": .object(["ok": .object(["const": .bool(true)])]),
+              "required": strings(["result"]),
               "not": .object(["required": strings(["error"])]),
             ]),
             .object([
               "properties": .object(["ok": .object(["const": .bool(false)])]),
               "required": strings(["error"]),
+              "not": .object(["required": strings(["result"])]),
             ]),
           ]),
         ]),

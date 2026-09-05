@@ -177,14 +177,8 @@ enum CLIProductVersion {
   /// The local control protocol versions this client can speak, in the
   /// numeric-descending canonical order §12 requires.
   ///
-  /// Read from the wire contract rather than restated: this is what the
-  /// client will actually put in a request frame, so a caller reading
-  /// `--version` to decide whether to talk to this build is reading the
-  /// truth. It gains a 2.x entry when the client can negotiate one, not
-  /// before.
-  static let supportedControlProtocolExactVersions =
-    ArkDeckAgentXPC.supportedWireProtocolExactVersions
-  static var preferredControlProtocol: String { supportedControlProtocolExactVersions[0] }
+  /// The exact control contract emitted by this build.
+  static let controlProtocolVersion = ArkDeckControlProtocol.currentVersion
 
   /// The bundle version. Its components are pinned separately below.
   static let machineContract = "arkdeck.cli.contracts/1"

@@ -1,5 +1,10 @@
 # `scripts/bench` — performance baseline and regression harness
 
+The control harness uses the current registry in
+`Packages/ArkDeckKit/Contracts/control-protocol.json`. It verifies the exact
+health/contract identity on the same connection before each business request;
+old peers are refused without fallback or replay.
+
 Offline, host-only measurement tooling; Python 3 stdlib only (repository-pinned
 CPython, see `.python-version`).  Delivered by `TASK-XPA-023` of
 `CHG-2026-074-shared-rust-runtime-core`; the metric table, budget rule and
