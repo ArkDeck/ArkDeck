@@ -17,6 +17,70 @@ import unittest
 SCRIPT = Path(__file__).with_name("run-xcodebuild.sh")
 
 
+def load_tests(loader, tests, pattern):
+    # Keep host keyboard lifecycle regressions in the existing App CI entry.
+    tests.addTests(loader.discover(str(SCRIPT.parent), "test_ui_test_input_source.py"))
+    return tests
+
+
+class RunUITestsTests(unittest.TestCase):
+    def test_only_execution_modes_use_the_host_keyboard_guard(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            (root / "ArkDeck.xcodeproj").mkdir()
+            scripts = root / "scripts/ci"
+            scripts.mkdir(parents=True)
+            wrapper = scripts / "run-ui-tests.sh"
+            shutil.copy2(SCRIPT.with_name("run-ui-tests.sh"), wrapper)
+            (scripts / "ui_test_input_source.py").write_text(
+                "import os, subprocess, sys\n"
+                "print('keyboard-guard', flush=True)\n"
+                "if os.environ.get('GUARD_FAILURE'): sys.exit(42)\n"
+                "os.environ['ARKDECK_UI_TEST_INPUT_SOURCE_GUARDED'] = '1'\n"
+                "sys.exit(subprocess.call(sys.argv[1:]))\n"
+            )
+            binaries = root / "bin"
+            binaries.mkdir()
+            for name in ("pkill", "pgrep"):
+                executable = binaries / name
+                executable.write_text("#!/bin/sh\nprintf 'cleanup\\n' >&2\nexit 1\n")
+                executable.chmod(0o700)
+            xcodebuild = binaries / "xcodebuild"
+            xcodebuild.write_text("#!/bin/sh\nprintf 'ARG:%s\\n' \"$@\"\nexit 7\n")
+            xcodebuild.chmod(0o700)
+            environment = os.environ | {
+                "PATH": f"{binaries}:{os.environ['PATH']}",
+                "ARKDECK_UI_TEST_DERIVED_DATA": str(root / "Derived Data"),
+                "ARKDECK_XCODEBUILD_EXECUTABLE": str(xcodebuild),
+            }
+            for mode, action in (([], "test"), (["--no-build"], "test-without-building"),
+                                 (["--build-once"], "build-for-testing")):
+                with self.subTest(action=action):
+                    result = subprocess.run(
+                        ["sh", str(wrapper), *mode,
+                         "-only-testing:ArkDeckHDCUITests/ViewerUITests"],
+                        cwd=root, env=environment, text=True, capture_output=True,
+                    )
+                    self.assertEqual(result.returncode, 7, result.stderr)
+                    self.assertEqual("keyboard-guard" in result.stdout,
+                                     action != "build-for-testing")
+                    self.assertEqual(result.stdout.count("keyboard-guard"),
+                                     int(action != "build-for-testing"))
+                    self.assertEqual(result.stdout.splitlines()[-1], f"ARG:{action}")
+                    self.assertIn("ARG:-only-testing:ArkDeckHDCUITests/ViewerUITests",
+                                  result.stdout.splitlines())
+                    self.assertNotIn("ARG:-only-testing:ArkDeckHDCUITests",
+                                     result.stdout.splitlines())
+            refused = subprocess.run(
+                ["sh", str(wrapper), "--no-build"], cwd=root,
+                env=environment | {"GUARD_FAILURE": "1"}, text=True, capture_output=True,
+            )
+            self.assertEqual(refused.returncode, 42, refused.stderr)
+            self.assertNotIn("cleanup", refused.stderr)
+            self.assertNotIn("ARG:", refused.stdout)
+
+
 class RunXcodebuildTests(unittest.TestCase):
     def make_fake_xcodebuild(self, directory: Path) -> Path:
         executable = directory / "xcodebuild"
