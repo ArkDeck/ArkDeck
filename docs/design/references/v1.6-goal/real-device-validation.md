@@ -307,3 +307,17 @@ Artifact 均 published 且 bytesVerified。真实界面同步显示 exact Job、
 构建哈希、签名结果、完整脱敏 Job/Artifact 元数据、发现阶段和截图哈希见
 [App Debug template 验证记录](app-debug-template-job-verification-2026-09-02.json)。结合上节的
 17 个 operation 补跑与 USB HAR 修复合约，这一 App 投影不再是 `TASK-AIN-021` 的未覆盖项。
+
+## 2026-09-05 单 v1 Runtime 真机复跑窗口：`BLOCKED_BY_PRODUCT_DEFECT`
+
+DAYU200 已接、维护者已批准更新本机 Runtime 并执行 GJ-4；窗口在 runbook §1 的 Runtime 更新处停止：
+按 `main e8c4f1df`（TASK-SVC-001 #1733 之后）用 `build-local-helpers.sh` 构建并 `runtime service
+update` 安装的 daemon 无法启动——`admitted job job-be448cb20f06aae340e1ccfe5275be81 has no
+readable durable record after recovery projection`，launchd 循环重启 248 次，socket 始终不存在。
+根因：#1733 把 `RuntimeOperationRequest.schemaVersion` 从 `2.0.0` 改为 `1.0.0` 并精确拒绝其他值，而本机
+2,041 条 `job-record.json` 内嵌的提交请求全部是 `2.0.0`；启动恢复投影到第一条非终态（`waitingForRecovery`）
+的 2026-08-04 刷机 Job 即失败。没有手工改动任何历史记录；已回滚到 SVC-001 之前的构建，五条 Journey 均未开始，
+digest `508783ac` 上的 `REAL_DEVICE_PASS` 仍以 2026-09-02 记录为准。完整事实、复现步骤与归属见
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-001/run.md`
+（「Real-device window 2026-09-05」）；修复归 CHG-2026-075 `TASK-SVC-002`（durable 记录整合），在它落地前
+任何跑过 2.x Runtime 的主机都不能升级到 SVC-001 之后的构建。
