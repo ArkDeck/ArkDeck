@@ -246,6 +246,21 @@ jobs:
       - name: Remove ArkForge package credential
         if: always()
         run: sh scripts/ci/arkforge-package-auth.sh cleanup
+      # The state directory is chosen in its own step so that the archive below
+      # can address it without depending on anything in the soak step having
+      # run to completion. The fixture persists its metrics after every cycle
+      # and only then enforces its resident-set and descriptor gates
+      # (`main.swift` persistMetrics -> verifySteadyStateResources), so the
+      # document exists precisely when a gate fails — and, on a four-hour soak,
+      # also when the job's own timeout kills the step mid-run. Copying the file
+      # at the end of the soak step would lose it on both of those paths.
+      - name: Prepare the soak state directory
+        run: |
+          set -eu
+          # <state-dir>/d/agentd.sock must fit Darwin's 104-byte sun_path, so
+          # the directory has to be short; the fixture says so in its own
+          # start-up error.
+          echo "SOAK_STATE=$(mktemp -d /tmp/adksoak.XXXX)" >> "$GITHUB_ENV"
       - name: Run the Runtime soak
         env:
           SOAK_HOURS: ${{ github.event.inputs.soak-hours || '4' }}
@@ -253,35 +268,18 @@ jobs:
           set -eu
           BIN="$(sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh build -c release \
             --show-bin-path | tail -1)"
-          # The fixture's daemon socket is <state-dir>/d/agentd.sock and
-          # Darwin's sun_path is 104 bytes, so the state directory must be
-          # short; the fixture says so in its own start-up error.
-          STATE="$(mktemp -d /tmp/adksoak.XXXX)"
           echo "soak hours: $SOAK_HOURS"
-          # The fixture writes its metrics snapshot after every cycle and
-          # enforces its gates from them, so the document exists — and matters
-          # most — precisely when the run fails. Copying it under `set -e`
-          # after the fixture would skip the copy on exactly that path and
-          # archive nothing. Capture the status, keep the evidence, then
-          # propagate.
-          status=0
           "$BIN/ArkDeckRuntimeSoakFixture" \
-            --state-directory "$STATE" \
+            --state-directory "$SOAK_STATE" \
             --duration-seconds "$((SOAK_HOURS * 3600))" \
             --restart-interval-seconds 300 \
-            --jobs-per-cycle 10 || status=$?
-          if [ -f "$STATE/runtime-soak-metrics.json" ]; then
-            cp "$STATE/runtime-soak-metrics.json" "$RUNNER_TEMP/"
-          else
-            echo "soak produced no metrics document" >&2
-          fi
-          exit "$status"
+            --jobs-per-cycle 10
       - name: Archive the soak metrics
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1 (Node 24)
         with:
           name: runtime-soak-${{ github.run_id }}
-          path: ${{ runner.temp }}/runtime-soak-metrics.json
+          path: ${{ env.SOAK_STATE }}/runtime-soak-metrics.json
           if-no-files-found: warn
           retention-days: 90
       - name: Summary
