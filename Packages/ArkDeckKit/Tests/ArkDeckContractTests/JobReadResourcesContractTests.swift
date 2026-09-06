@@ -190,18 +190,92 @@ final class JobReadResourcesContractTests: XCTestCase {
     }
 
     let counted = try await doctor(deep: true)
-    guard let finding = counted.first, case .object(let details)? = finding["details"] else {
+    guard let finding = counted.first else {
       return XCTFail("deep doctor must count the whole ledger, not only the active set")
     }
     XCTAssertEqual(finding["severity"], .string("blocker"))
-    XCTAssertEqual(details["count"], .integer(1))
-    guard case .array(let sample)? = details["sample"], case .object(let first)? = sample.first
-    else { return XCTFail("the finding must name a bounded sample") }
-    XCTAssertEqual(first["jobId"], .string(broken.jobID))
+    // The count and the named record live in the summary, not in `details`:
+    // `spec/control/methods/doctor.json` publishes finding details as a closed
+    // set of five counters, so a finding that needs to say more says it in the
+    // one published free-form field rather than widening the wire contract.
+    guard case .string(let summary)? = finding["summary"] else {
+      return XCTFail("a finding must carry its summary")
+    }
+    XCTAssertTrue(summary.hasPrefix("1 durable Job records"), summary)
+    XCTAssertTrue(summary.contains(broken.jobID), summary)
+    XCTAssertNil(finding["details"])
 
     // The whole-ledger scan is a deep probe; a shallow report is unchanged.
     let shallow = try await doctor(deep: false)
     XCTAssertTrue(shallow.isEmpty)
+  }
+
+  /// The guard that would have caught this class earlier only runs when a
+  /// contract-test run is recording frames, so a finding that emits a field the
+  /// method never published reaches `main` unremarked. This one always runs:
+  /// `spec/control/methods/doctor.json` publishes finding `details` as a closed
+  /// object, and everything the daemon can put there has to be inside it.
+  func testEveryDoctorFindingStaysInsideThePublishedDetailContract() async throws {
+    let broken = try seed("job-detail-contract", at: "2026-08-31T11:30:00Z")
+    try RuntimeJobRepository(stateDirectory: state).updateJobState(
+      jobID: broken.jobID, state: broken.state, updatedAtUTC: date,
+      recordData: Data("not-json".utf8))
+
+    var repository = URL(filePath: #filePath)
+    for _ in 0..<5 { repository.deleteLastPathComponent() }
+    let document = try JSONSerialization.jsonObject(
+      with: Data(contentsOf: repository.appending(path: "spec/control/methods/doctor.json")))
+    guard let published = Self.publishedDetailKeys(document) else {
+      return XCTFail("doctor.json must publish a closed finding detail object")
+    }
+
+    let handler = RuntimeControlPlaneHandler(
+      engine: engine, capabilityStore: capabilities, providerIDs: ["hdc"],
+      nowUTC: { "2026-08-31T12:00:00Z" }, targetStore: targets, artifactStore: artifacts)
+    for deep in [false, true] {
+      let response = await handler.handleFrame(
+        try PortableCanonicalJSON.canonicalBytes(
+          .object([
+            "protocolVersion": .string(ArkDeckControlProtocol.currentVersion),
+            "contractIdentity": .string(ArkDeckControlProtocol.contractIdentity),
+            "id": .string("doctor-details"), "method": .string("doctor"),
+            "params": .object(["deep": .bool(deep)]),
+          ])))
+      guard case .object(let report)? = response.result,
+        case .array(let findings)? = report["findings"]
+      else { return XCTFail("doctor must answer with its versioned report") }
+      for finding in findings {
+        guard case .object(let fields) = finding else { continue }
+        guard case .object(let details)? = fields["details"] else { continue }
+        let unpublished = Set(details.keys).subtracting(published)
+        XCTAssertTrue(
+          unpublished.isEmpty,
+          "finding \(fields["code"] ?? .null) publishes detail keys doctor.json forbids: "
+            + "\(unpublished.sorted())")
+      }
+    }
+  }
+
+  /// Reads the one closed `details` object out of the published doctor schema
+  /// without a full JSON Schema walk: the document has exactly one.
+  private static func publishedDetailKeys(_ document: Any) -> Set<String>? {
+    if let object = document as? [String: Any] {
+      if let details = object["details"] as? [String: Any],
+        details["additionalProperties"] as? Bool == false,
+        let properties = details["properties"] as? [String: Any]
+      {
+        return Set(properties.keys)
+      }
+      for value in object.values {
+        if let found = publishedDetailKeys(value) { return found }
+      }
+    }
+    if let array = document as? [Any] {
+      for value in array {
+        if let found = publishedDetailKeys(value) { return found }
+      }
+    }
+    return nil
   }
 
   func testCurrentHistoryRejectsRetiredCreationSentinelAndTimestampDrift() async throws {

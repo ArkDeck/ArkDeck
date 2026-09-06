@@ -504,3 +504,69 @@ every CLI command answers `runtimeUnavailable` with no indication of the cause �
 `runtime.durableRecordsUnreadable` census would otherwise be read. design.md §4 requires that
 "现有未决状态不可读时，原 target lane/整个相关 Runtime mutation 面 fail closed"; it requires the
 mutation surface to fail closed, not the process to exit. That gap is tracked separately.
+## Third follow-up fix (2026-09-06): doctor findings published fields the method never published
+
+Submitted under this Task's ID and Allowed paths. TASK-SVC-002 stays `done`.
+
+### A claim in the section above was wrong
+
+The `Verification of this delivery` table under "Correction and escalation (2026-09-06)" says
+this delivery "alters no published shape, so nothing was re-derived", citing
+`generate-control-contract.py --check` exiting 0. That inference
+is invalid, and this section corrects it. `--check` verifies the generated Swift vocabulary. It
+does not validate emitted frames against `spec/control/methods/*.json`. "No schema was re-derived"
+only means the derivation corpus never observed the change; it is not evidence that no shape
+changed. The two are different, and the defect below lives exactly in that difference.
+
+### What was wrong
+
+`spec/control/methods/doctor.json` publishes a finding's `details` as a closed object —
+`additionalProperties: false` over exactly `adoptedTargetCount`, `availableOperationCount`,
+`outstandingCleanupCount`, `providerCount`, `unavailableOperationCount`. Three findings emitted
+keys outside it:
+
+| Finding | Unpublished keys | Introduced by |
+| --- | --- | --- |
+| `runtime.jobRecordUnreadable` | `jobId`, `reason`, `effect` | #1744, this Task |
+| `runtime.durableRecordsUnreadable` | `count`, `sample`, `effect` | #1746, this Task |
+| `hdc.identityUnavailable` | `reasonCode` | predates both |
+
+Measured, not inferred: recording a run with `ARKDECK_CONTROL_FRAME_LOG` set and reading the
+`doctor` frame it wrote shows
+
+    VIOLATION runtime.durableRecordsUnreadable -> details keys ['count', 'effect', 'sample']
+
+against eight sibling findings whose keys are all published.
+
+`ControlMethodSchemaContractTests.testFramesRecordedByThisRunValidate` exists to catch precisely
+this — its own comment says "a handler that starts emitting an unpublished field fails here
+before a Rust reader generated from the schema meets it" — but it validates only what the current
+run recorded, so it is dormant unless `ARKDECK_CONTROL_FRAME_LOG` is set. Neither #1744 nor #1746
+recorded, so neither met it.
+
+### What changed
+
+`Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/AgentDaemon.swift`: all three findings now carry
+their facts in `summary`, the report's one published free-form field, and emit no `details`. The
+Job id, the reason, the count, the bounded sample and the HDC reason code are all still reported;
+they are prose rather than typed fields.
+
+The alternative was to re-derive `doctor.json` so it admits the keys. That is the sanctioned route
+for publishing a new shape, but it is the wrong one here: `--derive-method-schemas` rewrites every
+method present in the recording directory wholly from that corpus, so it needs a full recording
+run and carries the sampling churn #1743 measured, and it would still not publish `reasonCode`
+unless the recording happens to exercise an unavailable HDC identity. Widening a published
+contract to match an accident is also the wrong direction; the daemon should honour what it
+published. If a machine consumer later needs these as typed fields, re-derivation is the route,
+and it is a cross-lane change because the Rust readers are generated from these schemas.
+
+### Verification
+
+- `JobReadResourcesContractTests.testEveryDoctorFindingStaysInsideThePublishedDetailContract`
+  reads the closed detail object out of `spec/control/methods/doctor.json` and asserts every
+  finding of both a shallow and a deep report stays inside it. Unlike the recording-lane guard it
+  runs unconditionally. **Verified to be a real regression test**: restoring the #1746 emitter
+  fails it with `publishes detail keys doctor.json forbids: ["count", "effect", "sample"]`.
+- `testAnUnreadableRecordIsNamedByTheWireErrorAndCountedByDeepDoctor` keeps its meaning; its
+  assertions moved from `details["count"]` / `details["sample"]` to the summary text and a check
+  that `details` is absent.
