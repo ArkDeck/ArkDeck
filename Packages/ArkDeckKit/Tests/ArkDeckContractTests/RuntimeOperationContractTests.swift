@@ -449,6 +449,43 @@ final class RuntimeOperationContractTests: XCTestCase {
     XCTAssertEqual(fullDecoded, full)
   }
 
+  /// The manifest stamped `documentType` and `schemaVersion` on every encode and
+  /// read neither back, so it accepted a retired generation and, worse, a
+  /// different document family whose payload happened to fit. Both are now
+  /// refused, with the same codes the request envelope uses.
+  func testBundleManifestRefusesARetiredVersionOrAForeignDocumentType() throws {
+    let manifest = try PublishedOperationBundleManifest(
+      operation: RuntimeOperationReference(id: "observe.device", version: 1),
+      catalogDigest: String(repeating: "a", count: 64))
+    let encoded = try RuntimeOperationCodec.encodeBundleManifest(manifest)
+    guard var fields = try JSONSerialization.jsonObject(with: encoded) as? [String: Any] else {
+      return XCTFail("the manifest must encode as an object")
+    }
+    XCTAssertEqual(fields["schemaVersion"] as? String, "1.0.0")
+    XCTAssertEqual(fields["documentType"] as? String, "published-operation-bundle-manifest")
+
+    func decoding(_ mutate: (inout [String: Any]) -> Void) throws -> Data {
+      var copy = fields
+      mutate(&copy)
+      return try JSONSerialization.data(withJSONObject: copy)
+    }
+
+    for (label, mutation) in [
+      ("the retired 2.0.0 generation", { (o: inout [String: Any]) in o["schemaVersion"] = "2.0.0" }),
+      ("an absent version", { (o: inout [String: Any]) in o["schemaVersion"] = nil }),
+      ("a foreign document family", { (o: inout [String: Any]) in o["documentType"] = "runtime-operation-request" }),
+    ] {
+      XCTAssertThrowsError(
+        try RuntimeOperationCodec.decodeBundleManifest(try decoding(mutation)), label)
+    }
+
+    // The unchanged document still round-trips.
+    fields["sourceRevision"] = "7125cda"
+    XCTAssertEqual(
+      try RuntimeOperationCodec.decodeBundleManifest(try decoding { _ in }).sourceRevision,
+      "7125cda")
+  }
+
   func testBundleManifestRejectsMalformedDigest() {
     XCTAssertThrowsError(
       try PublishedOperationBundleManifest(
