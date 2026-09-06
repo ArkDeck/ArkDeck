@@ -17,6 +17,22 @@ import CryptoKit
 import Dispatch
 import Foundation
 
+/// A Job whose durable record this build cannot decode.
+///
+/// It is not live and never becomes live: nothing dispatches it, nothing
+/// rewrites its bytes, and it is still counted as active so its evidence is
+/// not reclaimed underneath it. The operator is told which Job and why; only
+/// an explicit action of theirs can change it.
+public struct RuntimeQuarantinedJobRecord: Sendable, Equatable {
+  public let jobID: String
+  public let reason: String
+
+  public init(jobID: String, reason: String) {
+    self.jobID = jobID
+    self.reason = reason
+  }
+}
+
 public enum RuntimeJobEngineError: Error, Equatable, Sendable {
   case rejected(RuntimeOperationErrorCode, String)
   case idempotencyConflict(String)
@@ -1111,6 +1127,14 @@ public actor RuntimeJobEngine {
   private var activeProcessProgressKeys: Set<ProcessProgressKey> = []
   private var latestProcessProgress: [ProcessProgressKey: RuntimeProcessProgress] = [:]
   private var latestSucceededDeviceObservationCache: [String: RuntimeEvidenceObservation]?
+
+  /// Jobs the last recovery could not read. Empty on every ordinary store.
+  ///
+  /// Published so the daemon can name them at startup and keep counting them
+  /// as active: a Job that is merely unreadable is not a Job that ended, and
+  /// dropping it from the active set is what would let the retention sweep
+  /// reclaim the very evidence an operator needs to diagnose it.
+  public private(set) var quarantinedJobRecords: [RuntimeQuarantinedJobRecord] = []
 
   public init(
     configuration: Configuration,
@@ -5460,6 +5484,30 @@ public actor RuntimeJobEngine {
   {
     let recoveryService = RuntimeRecoveryService(
       stateDirectory: configuration.stateDirectory, nowUTC: nowUTC)
+    // A record this build cannot decode is set aside before anything reads it.
+    //
+    // It used to travel through both loops below and throw out of the second,
+    // which aborted the whole set: on a host whose store predates the current
+    // durable shape, one such record stopped every other Job from recovering
+    // and stopped the daemon before it ever listened, so nothing could report
+    // what was wrong. Quarantine keeps the refusal — the Job never becomes
+    // live, its bytes are never rewritten, and it stays in the active set so
+    // its evidence is not reclaimed — while the rest of the store recovers and
+    // the daemon comes up to say so.
+    var admissible: [RuntimePersistedJob] = []
+    var quarantined: [RuntimeQuarantinedJobRecord] = []
+    for persisted in persistedJobs {
+      if case .unreadable(let reason) = RuntimeJobRecord.state(
+        in: jobDirectory(for: persisted.jobID))
+      {
+        quarantined.append(
+          RuntimeQuarantinedJobRecord(jobID: persisted.jobID, reason: reason))
+        continue
+      }
+      admissible.append(persisted)
+    }
+    quarantinedJobRecords = quarantined
+    let persistedJobs = admissible
     for persisted in persistedJobs {
       try recoveryService.restoreInitialAdmissionProjectionIfNeeded(persisted)
     }

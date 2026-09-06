@@ -1106,6 +1106,62 @@ final class RuntimeJobEngineContractTests: XCTestCase {
       ["job-history-00003", "job-history-00004", "job-history-00005"])
   }
 
+  /// A durable record written by an earlier build must not take the daemon
+  /// down, and must not be walked past either.
+  ///
+  /// TASK-SVC-001 pinned the embedded request to exactly `1.0.0`, so every
+  /// record a 2.x Runtime wrote is undecodable to this build. Recovery read it
+  /// with an optional-try, could not tell "no record" from "a record I cannot
+  /// read", reported the second as `internalFailure`, and threw out of a plain
+  /// loop — so one such record aborted recovery for every other Job and the
+  /// daemon exited before it ever bound its socket. launchd then restarted it
+  /// every five seconds, which is why the operator saw no diagnosis at all: the
+  /// process that would have produced one never got that far.
+  ///
+  /// The refusal itself is not relaxed here. The Job stays out of the live set,
+  /// its bytes stay exactly as written, and it stays in the active set so the
+  /// retention sweep cannot reclaim the evidence that explains it.
+  func testARecordThisBuildCannotReadIsQuarantinedRatherThanTakingRecoveryDown()
+    async throws
+  {
+    let (engine, _) = try makeEngine(dispatcher: ScriptedDispatcher(script: .observationHappy))
+    let readable = try await engine.submit(
+      observeRequest(idempotencyKey: "idem-readable", requestID: "req-readable"))
+    let unreadable = try await engine.submit(
+      observeRequest(idempotencyKey: "idem-unreadable", requestID: "req-unreadable"))
+
+    // Exactly what a 2.x Runtime left behind: the record's own shape is intact
+    // and its embedded request carries the retired label this build refuses.
+    let recordURL = stateDirectory
+      .appending(path: "jobs", directoryHint: .isDirectory)
+      .appending(path: unreadable.jobID, directoryHint: .isDirectory)
+      .appending(path: "job-record.json")
+    let original = try Data(contentsOf: recordURL)
+    let retired = String(decoding: original, as: UTF8.self)
+      .replacingOccurrences(of: "\"schemaVersion\" : \"1.0.0\"", with: "\"schemaVersion\" : \"2.0.0\"")
+    XCTAssertNotEqual(retired, String(decoding: original, as: UTF8.self), "the fixture must change the label")
+    try Data(retired.utf8).write(to: recordURL, options: .atomic)
+    let retiredBytes = try Data(contentsOf: recordURL)
+
+    let (reopened, _) = try makeEngine(dispatcher: ScriptedDispatcher(script: .observationHappy))
+    let recovered = try await reopened.recoverActiveJobs()
+
+    // The rest of the store recovered; the daemon has something to serve.
+    XCTAssertEqual(recovered.map(\.jobID), [readable.jobID])
+    let quarantined = await reopened.quarantinedJobRecords
+    XCTAssertEqual(quarantined.map(\.jobID), [unreadable.jobID])
+    XCTAssertTrue(
+      quarantined.first?.reason.contains("cannot read") == true,
+      "the operator is told why: \(quarantined.first?.reason ?? "")")
+    // Refused, not repaired: no byte of the record was rewritten.
+    XCTAssertEqual(try Data(contentsOf: recordURL), retiredBytes)
+    // And not live: it cannot be run.
+    do {
+      _ = try await reopened.run(jobID: unreadable.jobID)
+      XCTFail("a quarantined Job must not be runnable")
+    } catch {}
+  }
+
   func testAdmissionCrashMatrixRecoversCommittedJobWithoutDuplicateExecution() async throws {
     struct SimulatedProcessLoss: Error {}
     let root = stateDirectory!

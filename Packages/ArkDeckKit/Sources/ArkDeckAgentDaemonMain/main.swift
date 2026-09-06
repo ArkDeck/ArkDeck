@@ -1307,6 +1307,26 @@ Task.detached {
       print("recovered \(recovered.count) active job(s); unknown outcomes parked")
       fflush(stdout)
     }
+    // A record this build cannot decode is the operator's durable state, so it
+    // is named rather than swallowed — and the daemon still starts, because a
+    // store it cannot fully read is exactly when they need it to answer.
+    // Nothing here is dispatchable: quarantined Jobs are not live, no byte of
+    // theirs is rewritten, and they are counted as active below so the
+    // retention sweep cannot reclaim the evidence that explains them.
+    let quarantined = await engine.quarantinedJobRecords
+    for entry in quarantined {
+      FileHandle.standardError.write(
+        Data(
+          ("arkdeck-agentd: job \(entry.jobID) is quarantined: \(entry.reason); "
+            + "it will not run and its record was not modified\n").utf8))
+    }
+    if !quarantined.isEmpty {
+      FileHandle.standardError.write(
+        Data(
+          ("arkdeck-agentd: \(quarantined.count) Job record(s) this build cannot read; "
+            + "`arkdeck doctor` lists them and every mutation they could affect stays refused\n")
+            .utf8))
+    }
     // `collectGarbage` had no production caller at all, so expired Artifacts
     // were never reclaimed and the store grew monotonically into its quota with
     // no in-product way back. Startup is where the active set is known exactly:
@@ -1320,7 +1340,8 @@ Task.detached {
     // exists to make visible before the quota wall is hit.
     do {
       let reclaimed = try await artifactStore.collectGarbage(
-        activeJobIDs: Set(recovered.map(\.jobID)), nowUTC: utcNow())
+        activeJobIDs: Set(recovered.map(\.jobID)).union(quarantined.map(\.jobID)),
+        nowUTC: utcNow())
       if !reclaimed.isEmpty {
         print("reclaimed \(reclaimed.count) expired artifact(s)")
         fflush(stdout)
