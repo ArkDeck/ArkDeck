@@ -429,7 +429,7 @@ public struct RuntimeOperationRequest: Equatable, Sendable, Codable {
 /// plane, every field is optional, and nothing in execution reads it.
 package struct PublishedOperationBundleManifest: Equatable, Sendable, Codable {
   public static let documentType = "published-operation-bundle-manifest"
-  public static let schemaVersion = "2.0.0"
+  public static let schemaVersion = "1.0.0"
 
   public let operation: RuntimeOperationReference
   public let catalogDigest: String
@@ -464,6 +464,23 @@ package struct PublishedOperationBundleManifest: Equatable, Sendable, Codable {
 
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)
+    // `encode(to:)` stamps both identity fields, and until now nothing read
+    // either of them back, so this reader accepted any version and any document
+    // family whose payload happened to fit. A marker no reader checks is a
+    // stamp, not a contract. Same gate as `RuntimeOperationRequest` below.
+    guard try container.decodeIfPresent(String.self, forKey: .schemaVersion) == Self.schemaVersion
+    else {
+      throw RuntimeOperationRequestRejection(
+        code: .unsupportedVersion, path: "$.schemaVersion",
+        message: "schemaVersion must be exactly \"\(Self.schemaVersion)\"")
+    }
+    if let documentType = try container.decodeIfPresent(String.self, forKey: .documentType),
+      documentType != Self.documentType
+    {
+      throw RuntimeOperationRequestRejection(
+        code: .invalidRequest, path: "$.documentType",
+        message: "expected \(Self.documentType)")
+    }
     self.operation = try container.decode(RuntimeOperationReference.self, forKey: .operation)
     self.catalogDigest = try container.decode(String.self, forKey: .catalogDigest)
     self.sourceRevision = try container.decodeIfPresent(String.self, forKey: .sourceRevision)

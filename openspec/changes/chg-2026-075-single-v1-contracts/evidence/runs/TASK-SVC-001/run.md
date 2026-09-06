@@ -76,3 +76,57 @@ Because `agent-pr.yml` stops before PR creation on this unchanged preflight, the
 SVC-002 can start only after the SVC-001 implementation is reviewed and merged into protected main, as required by the series execution contract.
 
 No UI assertion or real-device operation was run: this Task changes host contracts and readers. Published-operation hardware acceptance belongs to SVC-005; no `REAL_DEVICE_PASS` is claimed.
+
+## Follow-up (2026-09-06): the last own-format 2.0.0, closed
+
+Submitted under this Task's ID and Allowed paths. TASK-SVC-001 stays `done`; this adds no scope.
+It closes a row this change already recorded against itself:
+`evidence/runs/TASK-SVC-004/residual-audit.md:97` —
+"`PublishedOperationBundleManifest.schemaVersion = \"2.0.0\"` and a stale `\"2.0.0\"` comment |
+TASK-SVC-001 (control plane / published surface). Reported from the baseline scan; not re-verified
+on the delivered tree by this Task."
+
+Re-verified on the delivered tree at `3fe7a6b1`: both halves were still there.
+
+### What was wrong
+
+1. `RuntimeOperationModels.swift:432` still read `schemaVersion = "2.0.0"`, 221 lines below the
+   request schema TASK-SVC-001 pinned to `"1.0.0"` at `:211`. A repo-wide sweep of own-format
+   version literals in `Packages/ArkDeckKit/Sources` and `ArkDeckApp` returns this one and nothing
+   else outside `"1.0.0"` and external/product versions, so it was the last own-format `2.0.0`
+   constant in the Swift sources. `proposal.md:44` fixes format markers at 1 or 1.0.0.
+2. `RuntimeJobEngine.swift:73-75` justified `RuntimeRequestEnvelope` by saying that spelling
+   `"2.0.0"` a second time in the daemon would put the envelope contract in two places. The value
+   it describes, at `:77`, is `RuntimeOperationRequest.schemaVersion` — `"1.0.0"`. The forwarding
+   rationale was right; the literal had outlived the value.
+3. Found while fixing those two, and not in the recorded row: the manifest was a stamp, not a
+   contract. `encode(to:)` writes both `documentType` and `schemaVersion` (`:477-478`) and
+   `init(from:)` (`:465-472`) read back neither, so the reader accepted any version and any
+   document family whose payload happened to fit. `design.md` §4's "版本字符串相同不是兼容证明"
+   is about exactly this class, and the sibling `RuntimeOperationRequest` in the same file already
+   gates both (`:542-551`).
+
+### What changed
+
+- `schemaVersion` is `"1.0.0"`, and `init(from:)` now requires it exactly and rejects a foreign
+  `documentType` when one is present — the same two checks, codes and messages the request
+  envelope uses (`unsupportedVersion` on `$.schemaVersion`, `invalidRequest` on `$.documentType`).
+- The comment no longer names a literal at all, so it cannot go stale a second time.
+
+Safe to pin rather than to keep two generations: the type has no production caller.
+`encodeBundleManifest` / `decodeBundleManifest` are called only from
+`RuntimeOperationContractTests.swift:431-455`, and no committed `.json`/`.jsonl` anywhere in the
+repository carries `published-operation-bundle-manifest`, so there is no existing document that
+the new exact check could refuse. Deleting the type instead was considered and rejected: a live
+refusal at `:534` names it as where build provenance belongs, and `proposal.md:44` asks for the
+marker to be fixed, not for the surface to go.
+
+### Verification
+
+- `RuntimeOperationContractTests.testBundleManifestRefusesARetiredVersionOrAForeignDocumentType`
+  encodes a manifest, asserts the stamp now reads `1.0.0`, and then refuses three mutations of it:
+  the retired `2.0.0`, an absent version, and a `documentType` of `runtime-operation-request`.
+  **Verified to be a real regression test**: with the decode gate removed all three assertions
+  fail with "did not throw an error", including the foreign document family.
+- `testBundleManifestSourceFieldsAreAllOptional` and `testBundleManifestRejectsMalformedDigest`
+  pass unchanged, so the round trip and the digest gate are unaffected.

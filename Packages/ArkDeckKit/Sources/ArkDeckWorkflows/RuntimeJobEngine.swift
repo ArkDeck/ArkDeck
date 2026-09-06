@@ -70,9 +70,10 @@ package enum RuntimeCallerAuthorityBoundary {
 /// `ArkDeckAgentDaemon` publishes this on `doctor` but may not import
 /// `ArkDeckRuntime` (docs/ArchitectureRules.md §2: it sees Core, Storage and
 /// Workflows only). Forwarding here runs with the dependency arrows rather
-/// than against them, and keeps one definition: spelling `"2.0.0"` a second
+/// than against them, and keeps one definition: spelling the version a second
 /// time in the daemon would put the envelope contract in two places that
-/// nothing compares.
+/// nothing compares. The literal is deliberately not repeated here either —
+/// it was written down as `"2.0.0"` and outlived the value it described.
 public enum RuntimeRequestEnvelope {
   public static let schemaVersion = RuntimeOperationRequest.schemaVersion
 
