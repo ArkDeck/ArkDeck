@@ -425,6 +425,30 @@ opens, executes and closes — and that close checkpoints. By the time the test 
 there is no log left to checkpoint, so the assertion cannot fail. The invariant was pinned against
 a fixture that structurally cannot exhibit the condition.
 
+### The first attempt at this was wrong, and CI caught it
+
+The first version of this change inspected every existing store over a read-only connection.
+That is wrong, and the swift-tests lane on PR #1747 failed with
+`ioFailure("Runtime SQLite query [14]: unable to open database file")` across
+`AgentDaemonContractTests`. Measured cause, reproduced locally and then reduced to `sqlite3`:
+
+    sqlite3 a.db "PRAGMA journal_mode=WAL; CREATE TABLE t(x); INSERT INTO t VALUES(1);"
+    rm -f a.db-shm a.db-wal
+    sqlite3 "file:a.db?mode=ro" "SELECT count(*) FROM t;"
+    Error: in prepare, unable to open database file (14)
+
+A read-only connection cannot create the shared-memory index a write-ahead log is read through,
+and a clean close removes that index. So the first version refused to open every store that had
+been shut down cleanly — which is the ordinary case, and strictly worse than the defect it fixed.
+`PRAGMA locking_mode=EXCLUSIVE` does not lift it (`disk I/O error (10)`), and neither of the two
+SQLite controls that would suppress the checkpoint is usable here: `sqlite3_db_config` with
+`SQLITE_DBCONFIG_NO_CKPT_ON_CLOSE` is `unavailable: Variadic function is unavailable` in Swift,
+and `sqlite3_file_control` with `SQLITE_FCNTL_PERSIST_WAL` only prevents the log's deletion —
+measured, the checkpoint still ran (4,096 → 8,192 bytes, log truncated).
+
+This was avoidable: the storage suite was run before pushing but the full suite was not, because
+the host was under load. The failing cases are deterministic and would have been caught.
+
 ### What changed
 
 `Packages/ArkDeckKit/Sources/ArkDeckStorage/RuntimeJobRepository.swift`:
@@ -434,6 +458,13 @@ a fixture that structurally cannot exhibit the condition.
   cannot checkpoint, so a store this build ends up refusing is left exactly as found. It uses
   `BEGIN DEFERRED`: an inspection needs a snapshot, and `BEGIN IMMEDIATE` would ask a connection
   that must not write for a write lock.
+- That inspection runs only when the shared-memory index is already on disk. The index is what
+  decides, because it is present exactly when a log is pending: a clean close removes the log and
+  the index together. When it is absent there is nothing to checkpoint, and the ordinary
+  read-write open closes leaving the database byte-identical anyway — measured separately, a
+  read-write open and close of a WAL-mode database with no pending log leaves its sha256
+  unchanged. So the two branches cover the two states between them, and neither writes to a store
+  that has not been accepted.
 - The requirements a store must meet are stated once, in `requireCurrentLayout()`, and called from
   both the read-only inspection and the existing write-side `bootstrapSchemaIfNeeded(isNew:)`. The
   version guard, the `sqlite_schema` comparison and the row-ordering scan are unchanged; they
@@ -456,6 +487,9 @@ preserved-path fact are the same.
   at 41,232 → 0 bytes; with the change it passes.
 - The same measurement repeated against a fresh copy of the host's real 1891-record store: same
   refusal, `f3d9e6a0…c1f84ba` and the 16,512-byte log both unchanged afterwards.
+- `CurrentDurableStorageContractTests.testAStoreReopenedWithoutASharedMemoryIndexIsStillAccepted`
+  pins the case CI caught: admit a Job, close the repository, delete the log and the index, and
+  reopen. It fails against the first version of this change and passes against the delivered one.
 - `arkdeck-agentd --state-dir` against an empty directory still starts and stays up, so the
   accepted path is unaffected; `testNewV1RetainsIdempotencyRowVersionsAndLogicalOrderAfterRestart`
   and the other eleven cases in the file pass unchanged.

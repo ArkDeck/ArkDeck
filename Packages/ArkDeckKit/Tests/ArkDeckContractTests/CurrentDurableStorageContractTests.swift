@@ -184,6 +184,30 @@ final class CurrentDurableStorageContractTests: XCTestCase {
     XCTAssertEqual(try Data(contentsOf: log), originalLog, "the refused write-ahead log was rewritten")
   }
 
+  /// The other side of the inspection above. A clean close removes both the
+  /// write-ahead log and its shared-memory index, and a read-only connection
+  /// cannot recreate that index, so a store reopened after an orderly shutdown
+  /// must still be opened the ordinary way rather than refused.
+  func testAStoreReopenedWithoutASharedMemoryIndexIsStillAccepted() throws {
+    do {
+      let repository = try RuntimeJobRepository(stateDirectory: root)
+      XCTAssertEqual(
+        try repository.admit(
+          jobID: "job-a", idempotencyKey: "idem-a", requestHash: "hash-a", initialState: "queued",
+          createdAtUTC: "2026-09-05T00:00:00Z", initialRecordData: Data("{}".utf8)), .admitted)
+    }
+    for suffix in ["-wal", "-shm"] {
+      try? FileManager.default.removeItem(
+        at: root.appending(path: RuntimeJobRepository.filename + suffix))
+    }
+    XCTAssertFalse(
+      FileManager.default.fileExists(
+        atPath: root.appending(path: RuntimeJobRepository.filename + "-shm").path))
+
+    let reopened = try RuntimeJobRepository(stateDirectory: root)
+    XCTAssertEqual(try reopened.job(jobID: "job-a")?.version, 1)
+  }
+
   func testExistingUninitializedDatabaseIsNeverRebuilt() throws {
     let url = root.appending(path: RuntimeJobRepository.filename)
     try Data().write(to: url)

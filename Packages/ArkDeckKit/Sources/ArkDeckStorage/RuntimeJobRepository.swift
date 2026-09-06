@@ -50,6 +50,7 @@ package enum RuntimeJobRepositoryError: Error, Equatable, Sendable {
 /// a committed admission transaction.
 package final class RuntimeJobRepository: @unchecked Sendable {
   package static let filename = "runtime-jobs.sqlite3"
+  private static let sharedMemoryIndexSuffix = "-shm"
   private static let schemaVersion: Int64 = 1
   private static let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
   private static let listCursorPrefix = "rjh1."
@@ -86,13 +87,21 @@ package final class RuntimeJobRepository: @unchecked Sendable {
         )
       }
     }
-    if !isNew {
-      // Nothing has yet established that this build understands these bytes,
-      // and a read-write connection is not a passive reader: opening one
-      // recovers a live write-ahead log and closing the last one checkpoints it
-      // back into the database. A store this build ends up refusing would be
-      // rewritten before the refusal was even reported, so the layout is
-      // established over a connection that cannot write.
+    // Nothing has yet established that this build understands these bytes, and
+    // a read-write connection is not a passive reader: opening one recovers a
+    // pending write-ahead log and closing the last one checkpoints it back into
+    // the database, so a store this build goes on to refuse would be rewritten
+    // before the refusal was reported.
+    //
+    // A read-only connection cannot do that, but it also cannot create the
+    // shared-memory index a write-ahead log is read through. That index is
+    // exactly what decides which connection to use: it is present whenever a
+    // log is pending, because a clean close removes both together. When it is
+    // absent there is no pending log, and the write connection below closes
+    // without a checkpoint and leaves the database byte-identical too.
+    if !isNew,
+      FileManager.default.fileExists(atPath: url.path + Self.sharedMemoryIndexSuffix)
+    {
       try inspectingReadOnly { try requireCurrentLayout() }
     }
     var opened: OpaquePointer?
