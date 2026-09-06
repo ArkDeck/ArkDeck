@@ -377,3 +377,130 @@ proof fix, or not at all. Both halves cannot ship under one Task today.
 
 No device was contacted. Whether the recorded host can run a device window is
 unchanged by this delivery and is stated above as still open.
+
+## Second follow-up fix (2026-09-06): refusing a store must not rewrite it
+
+Submitted under this Task's ID and Allowed paths, per TASK-SVC-005's rule for a product defect
+found after the implementation merged. TASK-SVC-002 stays `done`; this adds no scope to it.
+
+### How it surfaced
+
+Measuring what the merged single-v1 build actually does to the Golden Journey host's real state,
+rather than to a fixture. That host's store is
+`~/Library/Application Support/ArkDeck/Agentd`: 1891 job directories, a 14.6 MB
+`runtime-jobs.sqlite3` at `PRAGMA user_version = 2`, and a live 16,512-byte write-ahead log. The
+`runtime_job` table there carries `admission_sequence` and `created_at_order_key` as trailing
+nullable columns, because a build between `70f22170` (#1709, which moved the repository to
+schema 2) and `a4cdda44` (#1739, this Task, which moved it back to 1 and deleted the migration)
+added them with `ALTER TABLE`. Current `main` declares both inline and `NOT NULL`, so the store is
+refused. That refusal is intended: Deliverable 4 and design.md §4 both require the single layout
+with `user_version=1` and the removal of the upgrade path.
+
+What was not intended is what the refusal does on the way out. Copying that store to a scratch
+directory and running `arkdeck-agentd --state-dir <copy>` built from `64cd8144`:
+
+| | `runtime-jobs.sqlite3` sha256 | `-wal` |
+| --- | --- | --- |
+| the copy, untouched | `f3d9e6a0…c1f84ba` | 16,512 bytes |
+| after one refusing start | `f06be0db…7687965b` | 0 bytes |
+| after a second refusing start | `f06be0db…7687965b` | 0 bytes |
+
+The refusal rewrote 14.6 MB of database and emptied the log, then reported
+`original state is preserved at …`. The second run being stable identifies the cause exactly: the
+first open recovered the write-ahead log and the close checkpointed it back into the database.
+
+### Why the existing tests could not see it
+
+`RuntimeJobRepository.init` already ordered this correctly for the hazard it knew about —
+`// Validate existing bytes before any journal-mode change or schema write.` at the call to
+`bootstrapSchemaIfNeeded`, ahead of `configure()`. That guard stops this build from issuing
+`PRAGMA journal_mode`. It cannot stop SQLite's own behaviour: opening a WAL database read-write
+recovers the log, and closing the last read-write connection checkpoints it, neither of which is
+a statement this code executes.
+
+`CurrentDurableStorageContractTests.testSameVersionWrongColumnsIndexesOrConstraintsAreRefusedWithoutRewriting`
+asserts byte equality across a refusal, including for the `PRAGMA user_version=2` case, and it
+passes. It passes because its fixture is built through the file-local `sql(_:at:)` helper, which
+opens, executes and closes — and that close checkpoints. By the time the test captures `original`
+there is no log left to checkpoint, so the assertion cannot fail. The invariant was pinned against
+a fixture that structurally cannot exhibit the condition.
+
+### The first attempt at this was wrong, and CI caught it
+
+The first version of this change inspected every existing store over a read-only connection.
+That is wrong, and the swift-tests lane on PR #1747 failed with
+`ioFailure("Runtime SQLite query [14]: unable to open database file")` across
+`AgentDaemonContractTests`. Measured cause, reproduced locally and then reduced to `sqlite3`:
+
+    sqlite3 a.db "PRAGMA journal_mode=WAL; CREATE TABLE t(x); INSERT INTO t VALUES(1);"
+    rm -f a.db-shm a.db-wal
+    sqlite3 "file:a.db?mode=ro" "SELECT count(*) FROM t;"
+    Error: in prepare, unable to open database file (14)
+
+A read-only connection cannot create the shared-memory index a write-ahead log is read through,
+and a clean close removes that index. So the first version refused to open every store that had
+been shut down cleanly — which is the ordinary case, and strictly worse than the defect it fixed.
+`PRAGMA locking_mode=EXCLUSIVE` does not lift it (`disk I/O error (10)`), and neither of the two
+SQLite controls that would suppress the checkpoint is usable here: `sqlite3_db_config` with
+`SQLITE_DBCONFIG_NO_CKPT_ON_CLOSE` is `unavailable: Variadic function is unavailable` in Swift,
+and `sqlite3_file_control` with `SQLITE_FCNTL_PERSIST_WAL` only prevents the log's deletion —
+measured, the checkpoint still ran (4,096 → 8,192 bytes, log truncated).
+
+This was avoidable: the storage suite was run before pushing but the full suite was not, because
+the host was under load. The failing cases are deterministic and would have been caught.
+
+### What changed
+
+`Packages/ArkDeckKit/Sources/ArkDeckStorage/RuntimeJobRepository.swift`:
+
+- `init(stateDirectory:)` establishes the layout of an existing file over a read-only connection
+  before opening one that can write, added as `inspectingReadOnly(_:)`. A read-only connection
+  cannot checkpoint, so a store this build ends up refusing is left exactly as found. It uses
+  `BEGIN DEFERRED`: an inspection needs a snapshot, and `BEGIN IMMEDIATE` would ask a connection
+  that must not write for a write lock.
+- That inspection runs only when the shared-memory index is already on disk. The index is what
+  decides, because it is present exactly when a log is pending: a clean close removes the log and
+  the index together. When it is absent there is nothing to checkpoint, and the ordinary
+  read-write open closes leaving the database byte-identical anyway — measured separately, a
+  read-write open and close of a WAL-mode database with no pending log leaves its sha256
+  unchanged. So the two branches cover the two states between them, and neither writes to a store
+  that has not been accepted.
+- The requirements a store must meet are stated once, in `requireCurrentLayout()`, and called from
+  both the read-only inspection and the existing write-side `bootstrapSchemaIfNeeded(isNew:)`. The
+  version guard, the `sqlite_schema` comparison and the row-ordering scan are unchanged; they
+  moved. Two copies of that contract would be free to drift, which is the failure this change
+  exists to remove.
+- `chmod(url.path, 0o600)` now runs only after an existing store has been accepted, so a refused
+  store is not touched at all.
+
+Nothing about which stores are accepted changed. The refusal text, its error case and the
+preserved-path fact are the same.
+
+### Verification
+
+- `CurrentDurableStorageContractTests.testARefusedStoreWithALiveWriteAheadLogIsNotRewrittenByTheRefusal`
+  builds the previous build's layout — `user_version=2` with both newest columns added by
+  `ALTER TABLE` — copies the database, log and shared-memory files while the writer still holds
+  them, so the copy carries a live log exactly as a running daemon's directory does, and asserts
+  the database and the log are byte-identical after the refusal. **Verified to be a real
+  regression test**: on `64cd8144` it fails with the database at 4,096 → 16,384 bytes and the log
+  at 41,232 → 0 bytes; with the change it passes.
+- The same measurement repeated against a fresh copy of the host's real 1891-record store: same
+  refusal, `f3d9e6a0…c1f84ba` and the 16,512-byte log both unchanged afterwards.
+- `CurrentDurableStorageContractTests.testAStoreReopenedWithoutASharedMemoryIndexIsStillAccepted`
+  pins the case CI caught: admit a Job, close the repository, delete the log and the index, and
+  reopen. It fails against the first version of this change and passes against the delivered one.
+- `arkdeck-agentd --state-dir` against an empty directory still starts and stays up, so the
+  accepted path is unaffected; `testNewV1RetainsIdempotencyRowVersionsAndLogicalOrderAfterRestart`
+  and the other eleven cases in the file pass unchanged.
+
+### Still open after this change, and separate from it
+
+This fix makes the refusal honest. It does not make it survivable. On that same host the daemon
+still exits during composition, `com.arkdeck.agentd.plist` carries `KeepAlive` with
+`ThrottleInterval 5`, so launchd restarts it every five seconds, the socket is never bound, and
+every CLI command answers `runtimeUnavailable` with no indication of the cause — including
+`doctor`, which is where #1744's `runtime.jobRecordUnreadable` findings and #1746's
+`runtime.durableRecordsUnreadable` census would otherwise be read. design.md §4 requires that
+"现有未决状态不可读时，原 target lane/整个相关 Runtime mutation 面 fail closed"; it requires the
+mutation surface to fail closed, not the process to exit. That gap is tracked separately.
