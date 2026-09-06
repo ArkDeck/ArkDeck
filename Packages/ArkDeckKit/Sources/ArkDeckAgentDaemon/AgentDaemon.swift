@@ -1856,13 +1856,9 @@ public struct RuntimeControlPlaneHandler: Sendable {
     for entry in await engine.quarantinedJobRecords {
       addFinding(
         code: "runtime.jobRecordUnreadable", severity: "blocker", scope: "runtime",
-        summary: "a Job record in this store was written in a shape this build cannot read",
-        details: [
-          "jobId": .string(entry.jobID),
-          "reason": .string(entry.reason),
-          "effect": .string(
-            "the Job is not live, its record was not modified, and it still counts as active"),
-        ])
+        summary: "a Job record in this store was written in a shape this build cannot read: "
+          + "\(entry.jobID) — \(entry.reason). The Job is not live, its record was not "
+          + "modified, and it still counts as active")
     }
     // The findings above come from start-up recovery, whose query excludes
     // terminal states, so on a store an earlier build wrote they name only the
@@ -1874,19 +1870,14 @@ public struct RuntimeControlPlaneHandler: Sendable {
     if deep {
       let unreadable = await engine.unreadableDurableRecords()
       if unreadable.total > 0 {
+        let named = unreadable.sample.map(\.jobID).joined(separator: ", ")
         addFinding(
           code: "runtime.durableRecordsUnreadable", severity: "blocker", scope: "runtime",
-          summary: "durable Job records in this store were written in a shape this build cannot read",
-          details: [
-            "count": .integer(Int64(unreadable.total)),
-            "sample": .array(
-              unreadable.sample.map {
-                .object(["jobId": .string($0.jobID), "reason": .string($0.reason)])
-              }),
-            "effect": .string(
-              "no byte of these records is modified; every History page that would include one "
-                + "is refused, and every mutation face they could affect stays refused"),
-          ])
+          summary: "\(unreadable.total) durable Job records in this store were written in a "
+            + "shape this build cannot read"
+            + (named.isEmpty ? "" : ", among them \(named)")
+            + ". No byte of these records is modified; every History page that would include "
+            + "one is refused, and every mutation face they could affect stays refused")
       }
     }
 
@@ -1947,10 +1938,12 @@ public struct RuntimeControlPlaneHandler: Sendable {
               code: "hdc.identityReady", severity: "info", scope: "hdc",
               summary: "the selected HDC server has a live Runtime-managed identity")
           } else {
+            var reason = ""
+            if case .string(let code) = reasonCode, !code.isEmpty { reason = ": \(code)" }
             addFinding(
               code: "hdc.identityUnavailable", severity: "blocker", scope: "hdc",
-              summary: "the selected HDC server identity is unavailable or not Runtime-managed",
-              details: ["reasonCode": reasonCode])
+              summary: "the selected HDC server identity is unavailable or not "
+                + "Runtime-managed\(reason)")
           }
         } else {
           addFinding(
