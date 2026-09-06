@@ -9,8 +9,8 @@ SLO and benchmark plan, task DAG, risk register, maintainer decisions) is:
 
 ```yaml pins
 - path: docs/design/cross-platform/rust-core-cross-platform-architecture.md
-  blob: 6294cfc3def9eabe13fe879779cf6817b167fd98
-  sha256: 65d56982fcd47fea1029ff41a4be13bb97dd3a765d60853bf1c13d44cec40b58
+  blob: 070aa0984ca741b344220e15c32447e74d02254a
+  sha256: 833675cd0e67e0d93d161e7ff2bd5c7a24499a0f75c8598bcc5d901598189746
 ```
 
 Later revisions of the design must re-pin here in the same PR; the pinned blob is what the
@@ -29,6 +29,17 @@ Revision 7 re-pins it for the SPK-2 outcome: the section F.2 identity row, the s
 row, risk R3 in section K, one section L open-items row and the notes on items 3 and 6 of section
 L.1 changed; nothing else.
 
+The 2026-09-06 design refresh is re-pinned for review against checkout
+`d3d5c32c60cf60c96c64c50f8f1ab52b4d444cfa`. It updates current single-v1 facts,
+the schema/corpus handoff and task progress, corrects the performance discussion
+to the committed SPK-1 JSON and actual capture/compare/soak implementation, and
+adds sections H.5/H.6 (reproducible Windows native development and UI automation)
+and I.4 (proposed whole-product resource measurements). Those sections guide the
+existing client and packaging tasks; they do not install tooling, add a Runtime
+method, change Task status or Allowed paths, approve a new budget, or establish
+Windows support. Historical measurements remain historical. This refresh does
+not change the proposal's approval status or its existing acceptance criteria.
+
 ## Single-v1 prerequisite
 
 [CHG-2026-075](../chg-2026-075-single-v1-contracts/proposal.md) owns removal of the pre-release
@@ -37,6 +48,16 @@ TASK-SVC-001..004 and records their final Swift commit, schemas and corpus. Ever
 freeze, strict-decoder oracle and same-release rollback below starts from that single-v1
 baseline. No XPA task restores legacy negotiation/readers/authority. SVC-005 remains the
 single-v1 release acceptance; XPA tasks add their separate cross-platform/migration evidence.
+
+Current implementation: SVC-001..004 are recorded as done; the registry contains
+96 methods at `1.0.0`, with matching per-method schemas and 96 recorded corpus files.
+The [SVC-005 baseline](../chg-2026-075-single-v1-contracts/evidence/runs/TASK-SVC-005/single-v1-baseline.md)
+provides the complete commit/blob/directory-digest handoff at `371cd9d2`; those
+contract assets are unchanged at this refresh's checkout. XPA-001 remains
+in-progress pending its headless re-pass and SVC-005 remains ready. The corpus
+only covers recorded paths; it is not an exhaustive failure-state specification.
+Clients preserve the current `contractIdentity` field and same-connection health
+verification, with revalidation after reconnect and no replay of a lost reply.
 
 ## Decision
 
