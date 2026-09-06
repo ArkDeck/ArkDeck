@@ -1847,6 +1847,24 @@ public struct RuntimeControlPlaneHandler: Sendable {
       code: "runtime.controlReady", severity: "info", scope: "runtime",
       summary: "the target control protocol is serving bounded diagnostic requests")
 
+    // Jobs whose durable record this build cannot decode. They are the reason
+    // the daemon may be serving with part of its own store unreadable, so they
+    // are a blocker rather than a note: every mutation they could affect stays
+    // refused until the operator resolves them, and this is where they can see
+    // which Job and why. Naming them costs no read of the records themselves —
+    // recovery already answered.
+    for entry in await engine.quarantinedJobRecords {
+      addFinding(
+        code: "runtime.jobRecordUnreadable", severity: "blocker", scope: "runtime",
+        summary: "a Job record in this store was written in a shape this build cannot read",
+        details: [
+          "jobId": .string(entry.jobID),
+          "reason": .string(entry.reason),
+          "effect": .string(
+            "the Job is not live, its record was not modified, and it still counts as active"),
+        ])
+    }
+
     let operationAvailability = await engine.operationAvailability()
     let availableOperationCount = operationAvailability.filter { $0.state == .available }.count
     let unavailableOperationCount = operationAvailability.count - availableOperationCount

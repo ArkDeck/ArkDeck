@@ -144,9 +144,58 @@ public struct RuntimeJobRecord: Codable, Sendable, Equatable {
     return try JSONDecoder().decode(RuntimeJobRecord.self, from: bytes)
   }
 
+  /// What the Job directory actually holds.
+  ///
+  /// Three-way on purpose, and for the same reason every other durable probe
+  /// in this Runtime is: `load` throws both for "no record was ever written
+  /// here" and for "a record is here that this build cannot decode", and those
+  /// license opposite actions. A caller that collapses them either destroys
+  /// something on the strength of a document it could not read, or proceeds as
+  /// if the record did not exist — which is how a record written by an earlier
+  /// build became an `internalFailure` that stopped the daemon from starting
+  /// at all, and how an unreadable record could be walked past in a scan whose
+  /// whole job is to prove nothing was left outstanding.
+  ///
+  /// Never throws: deciding what to do is the caller's, and every outcome here
+  /// is an answer.
+  static func state(in directory: URL) -> RuntimeJobRecordState {
+    let url = directory.appending(path: "job-record.json")
+    let bytes: Data
+    do {
+      bytes = try Data(contentsOf: url)
+    } catch let error as NSError
+      where error.domain == NSCocoaErrorDomain
+        && (error.code == NSFileNoSuchFileError || error.code == NSFileReadNoSuchFileError)
+    {
+      return .absent
+    } catch {
+      // The file is there and this process cannot read it — a permission or
+      // I/O condition. That is not an absence.
+      return .unreadable("job record cannot be read: \(error)")
+    }
+    var validator = StrictJSONDuplicateValidator(data: bytes)
+    do { try validator.validate() } catch {
+      return .unreadable("job record failed strict JSON validation: \(error)")
+    }
+    do {
+      return .readable(try JSONDecoder().decode(RuntimeJobRecord.self, from: bytes))
+    } catch {
+      return .unreadable("job record was written in a shape this build cannot read: \(error)")
+    }
+  }
+
   static func sha256Hex(_ data: Data) -> String {
     SHA256Hex.string(of: data)
   }
+}
+
+/// The three answers `RuntimeJobRecord.state(in:)` can give. `unreadable`
+/// carries the reason because the operator has to act on it: the record stays
+/// exactly as written, and only an explicit action of theirs can change it.
+package enum RuntimeJobRecordState: Sendable {
+  case absent
+  case readable(RuntimeJobRecord)
+  case unreadable(String)
 }
 
 extension RuntimeJobRecord {

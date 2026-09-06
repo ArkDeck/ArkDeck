@@ -163,7 +163,21 @@ struct RuntimeRecoveryService {
     var unresolved: [SupersededRecoveryIntent] = []
     var journalDestructiveJobIDs: Set<String> = []
     for directory in directories.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
-      guard let record = try? RuntimeJobRecord.load(from: directory),
+      // This scan exists to enumerate every outstanding destructive intent on
+      // the target before a complete-overwrite recovery is allowed to claim
+      // there are none. A record it cannot read is one it cannot clear: the
+      // binding it names is unknown, so it can be neither matched to this
+      // target nor ruled out. Walking past it in silence would let the proof
+      // be assembled with a hole in it, so it refuses instead. (The capability
+      // lineage scan below independently refuses the same record whenever it
+      // carries a ledger entry; this closes the case where it carries none.)
+      let recordState = RuntimeJobRecord.state(in: directory)
+      if case .unreadable(let reason) = recordState {
+        throw RuntimeCompleteOverwriteRecoveryError.blocked(
+          "completeOverwriteRecovery.unreadableHistoricalRecord: "
+            + "\(directory.lastPathComponent): \(reason)")
+      }
+      guard case .readable(let record) = recordState,
         record.materializedStableTargetIdentitySHA256 == stableIdentitySHA256,
         record.materializedBindingRevision == bindingRevision
       else { continue }
@@ -586,9 +600,23 @@ struct RuntimeRecoveryService {
   func replay(_ persisted: RuntimePersistedJob) async throws -> RuntimeRecoveredJob {
     let jobID = persisted.jobID
     let directory = jobDirectory(for: jobID)
-    guard var record = try? RuntimeJobRecord.load(from: directory) else {
+    var record: RuntimeJobRecord
+    switch RuntimeJobRecord.state(in: directory) {
+    case .readable(let loaded):
+      record = loaded
+    case .absent:
+      // Admission wrote the row and the projection repair above did not find a
+      // record to restore: the store is inconsistent with itself, which is a
+      // defect in this Runtime rather than a state the operator wrote.
       throw RuntimeJobEngineError.internalFailure(
-        "admitted job \(jobID) has no readable durable record after recovery projection")
+        "admitted job \(jobID) has no durable record after recovery projection")
+    case .unreadable(let reason):
+      // A record this build cannot decode is the operator's durable state, not
+      // a bug: it was written by a build they ran. Refusing it by name lets the
+      // caller quarantine this one Job and keep serving, where the bug-class
+      // code used to take the whole daemon down before it ever listened.
+      throw RuntimeJobEngineError.jobRecordUnreadable(
+        "\(jobID): \(reason)")
     }
     let journalURL = directory.appending(path: "journal.jsonl")
     let journal = try FileDurableJournal(url: journalURL)
