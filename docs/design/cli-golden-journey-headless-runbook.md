@@ -403,11 +403,85 @@ arkdeck job result --job <job-id> --output json
 判据：`template list` 的四个 `templateId` 与 `operation describe --operation debug.template@1`
 的 enum 一致；Job `succeeded`、effect `readOnly`、Artifact 可读且非空。结果只进 §7 的覆盖矩阵。
 
+## 6b. App 呈现（约 10 分钟，不产生任何 Job）
+
+Deliverable 3 要的是「App呈现用现有UI assertions封装验证设备/导入/任务/History/Settings
+**结果**」。这一节只验证**呈现**，不执行操作：TASK-SVC-005 的 Production reachability 写着
+「App检查仅验证呈现，不替代headless运行」，套件自己也把这条钉死在
+`ArkDeckAppUITests/AppShell/AppShellUITests.swift:17-18`——`No test submits an operation.`
+所以本节的输入是前面 §2–§6 已经跑出来的结果，App 只负责把它们显示对。
+
+**目标名不是目录名。** 源码在 `ArkDeckAppUITests/`，但 XCUITest target 叫
+`ArkDeckHDCUITests`（`ArkDeck.xcodeproj/project.pbxproj:485`），`-only-testing:` 只认后者。
+
+**必须走 `scripts/ci/run-ui-tests.sh`**，它负责 ad-hoc 签名、独立 DerivedData 和键盘布局守卫；
+裸 `xcodebuild` 的失败形态看起来像机器坏了。UI 栈是**全机唯一**的（一个 testmanagerd、一个前台，
+`scripts/ci/run-ui-tests.sh:152-155`），窗口期间不要与任何其他 UI 跑道并行。
+
+**开关必须带 `TEST_RUNNER_` 前缀，否则测试静默跳过。** 这不是理论：
+`docs/design/references/v1.5/real-device-validation.md:53` 记着上一轮「首轮未向 runner 传入真机
+开关而跳过」。已验证可用的调用形态（落点必须按当前画面重新确认，不能照抄）：
+
+```sh
+TEST_RUNNER_ARKDECK_UI_TEST_DEVICE_REAL_DEVICE=1 TEST_RUNNER_ARKDECK_UI_TEST_DEVICE_TAP_UNIT_X=<observed> TEST_RUNNER_ARKDECK_UI_TEST_DEVICE_TAP_UNIT_Y=<observed> sh scripts/ci/run-ui-tests.sh   -only-testing:ArkDeckHDCUITests/DeviceStaleFrameUITests
+```
+
+### 可用作真机证据的六条 opt-in
+
+只有这六条会在真机/活 Runtime 上运行；每条都由自己的环境开关把守，不给开关就 `XCTSkip`。
+
+| 开关（记得加 `TEST_RUNNER_` 前缀） | 测试 | 覆盖面 |
+| --- | --- | --- |
+| `ARKDECK_REAL_DEVICE_STARTUP_ACCEPTANCE=1` | `ArkDeckHDCUITests/AppShellUITests/testRealDeviceColdStartShowsConnectedDeviceWithinTwoSeconds` | 设备（冷启动 ≤ 2 s） |
+| `ARKDECK_UI_TEST_DEVICE_REAL_DEVICE=1` + `..._TAP_UNIT_X/Y` | `ArkDeckHDCUITests/DeviceStaleFrameUITests/testASecondPressOnASpentPictureIsRefusedAndNotSent` | 设备（stale 拒绝，零新 Job） |
+| `ARKDECK_UI_TEST_DEVICE_REAL_DEVICE=1` | `ArkDeckHDCUITests/DeviceRecordingUITests/testRealDeviceRecordingCapturesFortyFramesAndOffersALocalMovie` | 设备（录屏呈现） |
+| `ARKDECK_REAL_DEVICE_VIEWER_JOB_ID=<jobId>` | `ArkDeckHDCUITests/AppShellUITests/testRealDeviceHistoryReopensExactViewerCapture` | History（重开精确 capture） |
+| `ARKDECK_REAL_DEVICE_DIAGNOSTICS_JOB_ID=<jobId>` | `ArkDeckHDCUITests/AppShellUITests/testRealDeviceDiagnosticsReopensExactCaptureAndItsTraceInBothLanguages` | History + 任务（双语） |
+| `ARKDECK_REAL_DEVICE_HILOG_EXPECTATIONS=<path>` | `ArkDeckHDCUITests/AppShellUITests/testRealDeviceHilogSummariesReopenInOneSessionPerLanguage` | History（hilog 摘要） |
+
+三个 `<jobId>` 来自 §2–§6 已完成的 Job，不要为 App 另起 Job。
+
+### 同一 target 里有 19 条根本不启动 App
+
+`SettingsStorageStateTests`、`RemoteBuildSourceStateTests`、`TraceFlagTagEditorTests`、
+`HistoryFilterDependenciesTests` 编译进同一个 runner，但它们**从不构造 `XCUIApplication`**——
+是编译进 UI runner 的 view-model headless 测试（`SettingsStorageStateTests.swift:6-7`：
+「The controlled provider never reaches the Runtime, a device or the Keychain」）。它们绿了**不构成
+任何 App 呈现证据**，不要把它们的通过写进本节结果。真正驱动 App 的是另外六个文件里的 42 条。
+
+### 本节覆盖不到的两项
+
+- **导入**：没有任何真机 opt-in。这是设计如此而非缺口——import 本身是 §3/§4/§5 的 headless CLI 步骤，
+  App 不提交操作。缺的是「对一次 headless 导入结果的呈现断言」，不是导入流程本身。
+- **Settings**：现有断言是 fixture 驱动的，无法证明真实 Runtime 的读数。
+
+两项都按 `未执行` 记录，原因写「无可用真机 opt-in assertion」，不要用 fixture 绿充当真机结果。
+
+### 记录
+
+App 呈现不套用 §0 的四态——四态属于 Journey。按测试逐条记 `pass` / `fail` / `未执行`，
+附完整调用命令与 `xcresult` 路径。任何 App 侧失败按 §0 的产品缺陷规则处理：报
+`BLOCKED_BY_PRODUCT_DEFECT`，用**原实现 Task 的 ID 与 Allowed paths** 提修复 PR，
+合入后再验，不把代码修复塞进 TASK-SVC-005 的文档/evidence 权限。
+
 ## 7. 记录模板与落点
 
-每条 Journey 一个对象，合并写入
-`docs/design/references/v1.6-goal/gj-headless-rerun-<date>.json`（脱敏：只留 SHA-256、
-jobId、executionId、计数与 UTC 时间，不留 connectKey、序列号、原始输出）：
+每条 Journey 一个对象（脱敏：只留 SHA-256、jobId、executionId、计数与 UTC 时间，不留
+connectKey、序列号、原始输出）。
+
+**落点由执行本轮的 Task 决定，不是固定路径。** 记录必须写进该验收 PR 所声明 Task 的
+Allowed paths 之内，否则 `scripts/check_pr_paths.py` 推断不出 Task，PR 开不出来——这一点是实测的：
+在 `docs/design/references/v1.6-goal/` 下放一个记录再跑 `--preflight --infer-task`，返回 `none`；
+去掉它，同一棵树返回 `TASK-SVC-005`。而全部 active change 的 Allowed paths 里，
+`docs/design/references/**` 只有一条 `docs/design/references/single-v1/**`
+（`chg-2026-075-single-v1-contracts/tasks.md:455`），没有任何 Task 持有 `v1.6-goal/`。
+
+- 本轮（TASK-SVC-005）落在 `docs/design/references/single-v1/gj-headless-rerun-<date>.json`。
+- 历史记录留在原处不动：`docs/design/references/v1.6-goal/gj-headless-rerun-2026-09-02.json`
+  是 TASK-AIN-021 落的（#1701、#1707），不要为了统一路径去搬它。
+- 换成别的 Task 执行时，先按同样方法确认落点在那个 Task 的 Allowed paths 内，再开跑。
+
+对象形状不变：
 
 ```json
 {
