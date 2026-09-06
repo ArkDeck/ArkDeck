@@ -125,6 +125,65 @@ final class CurrentDurableStorageContractTests: XCTestCase {
     }
   }
 
+  /// A store this build refuses is a store it has just said it cannot read, so
+  /// it must not write to it. Opening SQLite read-write recovers a live
+  /// write-ahead log and checkpoints it back into the database on close, which
+  /// rewrites the file before the refusal is even reported. The refusal tests
+  /// above cannot see this: their fixtures are closed cleanly first, so no log
+  /// survives to be checkpointed.
+  func testARefusedStoreWithALiveWriteAheadLogIsNotRewrittenByTheRefusal() throws {
+    let live = root.appending(path: "live")
+    let refused = root.appending(path: "refused")
+    for directory in [live, refused] {
+      try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    }
+
+    // The layout a build before this one left behind: user_version 2, with the
+    // two newest columns added by ALTER TABLE and therefore nullable.
+    var handle: OpaquePointer?
+    XCTAssertEqual(
+      sqlite3_open(live.appending(path: RuntimeJobRepository.filename).path, &handle), SQLITE_OK)
+    let database = try XCTUnwrap(handle)
+    for statement in [
+      "PRAGMA journal_mode=WAL",
+      "PRAGMA user_version=2",
+      """
+      CREATE TABLE runtime_job(
+        job_id TEXT PRIMARY KEY, idempotency_key TEXT NOT NULL UNIQUE,
+        request_hash TEXT NOT NULL, state TEXT NOT NULL, created_at_utc TEXT NOT NULL,
+        updated_at_utc TEXT NOT NULL, version INTEGER NOT NULL CHECK(version >= 1),
+        initial_record_json BLOB)
+      """,
+      "ALTER TABLE runtime_job ADD COLUMN admission_sequence INTEGER",
+      "ALTER TABLE runtime_job ADD COLUMN created_at_order_key TEXT",
+      "INSERT INTO runtime_job VALUES('job-a','idem-a','hash-a','succeeded',"
+        + "'2026-09-05T00:00:00Z','2026-09-05T00:00:01Z',1,x'7b7d',1,'key-a')",
+    ] {
+      XCTAssertEqual(sqlite3_exec(database, statement, nil, nil, nil), SQLITE_OK, statement)
+    }
+
+    // Copy while the writer still holds the database, which is the state a
+    // running daemon's directory is always in: the log is live and nothing has
+    // checkpointed it.
+    for suffix in ["", "-wal", "-shm"] {
+      let name = RuntimeJobRepository.filename + suffix
+      let source = live.appending(path: name)
+      guard FileManager.default.fileExists(atPath: source.path) else { continue }
+      try FileManager.default.copyItem(at: source, to: refused.appending(path: name))
+    }
+    sqlite3_close_v2(database)
+
+    let url = refused.appending(path: RuntimeJobRepository.filename)
+    let log = refused.appending(path: RuntimeJobRepository.filename + "-wal")
+    let originalDatabase = try Data(contentsOf: url)
+    let originalLog = try Data(contentsOf: log)
+    XCTAssertFalse(originalLog.isEmpty, "the fixture must carry a live write-ahead log")
+
+    XCTAssertThrowsError(try RuntimeJobRepository(stateDirectory: refused))
+    XCTAssertEqual(try Data(contentsOf: url), originalDatabase, "the refused database was rewritten")
+    XCTAssertEqual(try Data(contentsOf: log), originalLog, "the refused write-ahead log was rewritten")
+  }
+
   func testExistingUninitializedDatabaseIsNeverRebuilt() throws {
     let url = root.appending(path: RuntimeJobRepository.filename)
     try Data().write(to: url)

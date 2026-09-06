@@ -86,6 +86,15 @@ package final class RuntimeJobRepository: @unchecked Sendable {
         )
       }
     }
+    if !isNew {
+      // Nothing has yet established that this build understands these bytes,
+      // and a read-write connection is not a passive reader: opening one
+      // recovers a live write-ahead log and closing the last one checkpoints it
+      // back into the database. A store this build ends up refusing would be
+      // rewritten before the refusal was even reported, so the layout is
+      // established over a connection that cannot write.
+      try inspectingReadOnly { try requireCurrentLayout() }
+    }
     var opened: OpaquePointer?
     let flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX
     guard sqlite3_open_v2(url.path, &opened, flags, nil) == SQLITE_OK, let opened else {
@@ -497,48 +506,55 @@ package final class RuntimeJobRepository: @unchecked Sendable {
       if isNew && version == 0 && objects.isEmpty {
         for statement in Self.schemaStatements { try execute(statement) }
         try execute("PRAGMA user_version=\(Self.schemaVersion)")
-      } else {
-        guard version == Self.schemaVersion else {
+      }
+      try requireCurrentLayout()
+    }
+  }
+
+  /// Everything this build requires of a store it did not just create, stated
+  /// once so the read-only inspection above and the write connection below
+  /// cannot drift apart.
+  private func requireCurrentLayout() throws {
+    let version = try query("PRAGMA user_version").first?.integer("user_version")
+    guard version == Self.schemaVersion else {
+      throw RuntimeJobRepositoryError.corrupt(
+        "unsupported Runtime job repository schema; original state is preserved at \(url.path)")
+    }
+    let currentObjects = try query("SELECT name, sql FROM sqlite_schema ORDER BY name")
+    let definitions = currentObjects.compactMap { $0.text("sql") }
+    let automaticIndexes = currentObjects.filter { $0.text("sql") == nil }.compactMap {
+      $0.text("name")
+    }
+    guard definitions.count == Self.schemaStatements.count,
+      Set(definitions.map(Self.normalizedSchemaSQL))
+        == Set(Self.schemaStatements.map(Self.normalizedSchemaSQL)),
+      Set(automaticIndexes) == [
+        "sqlite_autoindex_runtime_job_1", "sqlite_autoindex_runtime_job_2",
+      ]
+    else {
+      throw RuntimeJobRepositoryError.corrupt(
+        "Runtime job repository does not match the current v1 layout; original state is preserved at \(url.path)"
+      )
+    }
+    // Logical ordering is part of the durable contract, not a migration.
+    var afterJobID = ""
+    while true {
+      let rows = try query(
+        "SELECT job_id, created_at_utc, created_at_order_key, admission_sequence, version "
+          + "FROM runtime_job WHERE job_id COLLATE BINARY > ? "
+          + "ORDER BY job_id COLLATE BINARY LIMIT 256", [.text(afterJobID)])
+      guard !rows.isEmpty else { break }
+      for row in rows {
+        guard let jobID = row.text("job_id"), Self.validJobID(jobID),
+          let created = row.text("created_at_utc"),
+          row.text("created_at_order_key") == (try Self.creationOrderKey(createdAtUTC: created)),
+          let sequence = row.integer("admission_sequence"), sequence > 0,
+          let rowVersion = row.integer("version"), rowVersion > 0
+        else {
           throw RuntimeJobRepositoryError.corrupt(
-            "unsupported Runtime job repository schema; original state is preserved at \(url.path)")
+            "invalid current Runtime job ordering or row version")
         }
-      }
-      let currentObjects = try query("SELECT name, sql FROM sqlite_schema ORDER BY name")
-      let definitions = currentObjects.compactMap { $0.text("sql") }
-      let automaticIndexes = currentObjects.filter { $0.text("sql") == nil }.compactMap {
-        $0.text("name")
-      }
-      guard definitions.count == Self.schemaStatements.count,
-        Set(definitions.map(Self.normalizedSchemaSQL))
-          == Set(Self.schemaStatements.map(Self.normalizedSchemaSQL)),
-        Set(automaticIndexes) == [
-          "sqlite_autoindex_runtime_job_1", "sqlite_autoindex_runtime_job_2",
-        ]
-      else {
-        throw RuntimeJobRepositoryError.corrupt(
-          "Runtime job repository does not match the current v1 layout; original state is preserved at \(url.path)"
-        )
-      }
-      // Logical ordering is part of the durable contract, not a migration.
-      var afterJobID = ""
-      while true {
-        let rows = try query(
-          "SELECT job_id, created_at_utc, created_at_order_key, admission_sequence, version "
-            + "FROM runtime_job WHERE job_id COLLATE BINARY > ? "
-            + "ORDER BY job_id COLLATE BINARY LIMIT 256", [.text(afterJobID)])
-        guard !rows.isEmpty else { break }
-        for row in rows {
-          guard let jobID = row.text("job_id"), Self.validJobID(jobID),
-            let created = row.text("created_at_utc"),
-            row.text("created_at_order_key") == (try Self.creationOrderKey(createdAtUTC: created)),
-            let sequence = row.integer("admission_sequence"), sequence > 0,
-            let rowVersion = row.integer("version"), rowVersion > 0
-          else {
-            throw RuntimeJobRepositoryError.corrupt(
-              "invalid current Runtime job ordering or row version")
-          }
-          afterJobID = jobID
-        }
+        afterJobID = jobID
       }
     }
   }
@@ -631,6 +647,44 @@ package final class RuntimeJobRepository: @unchecked Sendable {
       rows.append(Row(values: values))
     }
     return rows
+  }
+
+  /// Runs `body` against a connection that cannot write this database, so a
+  /// store this build turns out not to understand is left exactly as it was
+  /// found. The connection is read-only rather than merely unused: closing the
+  /// last read-write connection to a WAL database checkpoints it, which is a
+  /// write to a file this build has just declared it cannot read.
+  private func inspectingReadOnly<T>(_ body: () throws -> T) throws -> T {
+    var inspecting: OpaquePointer?
+    let code = sqlite3_open_v2(
+      url.path, &inspecting, SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX, nil)
+    guard code == SQLITE_OK, let inspecting else {
+      let message = inspecting.map { String(cString: sqlite3_errmsg($0)) } ?? "unknown"
+      if let inspecting { sqlite3_close_v2(inspecting) }
+      throw RuntimeJobRepositoryError.ioFailure(
+        "cannot read Runtime job repository [\(code)]: \(message)")
+    }
+    let previous = handle
+    handle = inspecting
+    defer {
+      sqlite3_close_v2(inspecting)
+      handle = previous
+    }
+    guard sqlite3_busy_timeout(inspecting, 5_000) == SQLITE_OK else {
+      throw failure("cannot set Runtime SQLite busy timeout")
+    }
+    // Deferred rather than immediate: a snapshot is all an inspection needs,
+    // and BEGIN IMMEDIATE would ask this connection for a write lock it must
+    // not have.
+    try execute("BEGIN DEFERRED")
+    do {
+      let result = try body()
+      try execute("COMMIT")
+      return result
+    } catch {
+      try? execute("ROLLBACK")
+      throw error
+    }
   }
 
   private func transaction<T>(_ body: () throws -> T) throws -> T {
