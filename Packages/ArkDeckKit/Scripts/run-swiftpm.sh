@@ -104,6 +104,23 @@ case $swift_executable in
 esac
 [ -x "$swift_executable" ] || fail "Swift executable is not executable: $swift_executable" 69
 
+# Keeps the cache root private: it holds build products for every worktree on
+# this machine and is created here rather than by the caller.
+#
+# It also reaches the test processes, and there it hides one class of fixture
+# defect. A test that creates a directory or file without an explicit mode
+# inherits this 077 and lands private by accident, so a production check that
+# requires privacy passes both here and in CI, which runs the suite through
+# this runner. The same fixture under a developer's default 022 lands 0755 or
+# 0644 and the check fails. Two AgentDaemonContractTests daemon tests shipped
+# that way: they built the daemon state directory with an implicit
+# withIntermediateDirectories create, and the daemon - which requires
+# `st_mode & 0o077 == 0` of its state root - refused to bind its socket, which
+# reached the test only as `connect failed: errno 2`.
+#
+# So this line is not a verification boundary. Reproduce that class with a
+# direct `swift test` under the ambient umask, and fix it by giving the fixture
+# an explicit mode, never by relaxing the production requirement.
 umask 077
 cache_root_created=0
 if [ ! -d "$cache_root" ]; then
