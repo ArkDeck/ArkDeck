@@ -1864,6 +1864,31 @@ public struct RuntimeControlPlaneHandler: Sendable {
             "the Job is not live, its record was not modified, and it still counts as active"),
         ])
     }
+    // The findings above come from start-up recovery, whose query excludes
+    // terminal states, so on a store an earlier build wrote they name only the
+    // still-active Jobs. The terminal ones are just as unreadable and are what
+    // an operator actually meets first — any one of them fails a History page —
+    // so `--deep` counts the whole ledger and names a bounded sample. One
+    // finding, not one per row: a report with two thousand entries is not a
+    // report.
+    if deep {
+      let unreadable = await engine.unreadableDurableRecords()
+      if unreadable.total > 0 {
+        addFinding(
+          code: "runtime.durableRecordsUnreadable", severity: "blocker", scope: "runtime",
+          summary: "durable Job records in this store were written in a shape this build cannot read",
+          details: [
+            "count": .integer(Int64(unreadable.total)),
+            "sample": .array(
+              unreadable.sample.map {
+                .object(["jobId": .string($0.jobID), "reason": .string($0.reason)])
+              }),
+            "effect": .string(
+              "no byte of these records is modified; every History page that would include one "
+                + "is refused, and every mutation face they could affect stays refused"),
+          ])
+      }
+    }
 
     let operationAvailability = await engine.operationAvailability()
     let availableOperationCount = operationAvailability.filter { $0.state == .available }.count

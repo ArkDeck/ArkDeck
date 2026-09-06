@@ -1136,6 +1136,44 @@ public actor RuntimeJobEngine {
   /// reclaim the very evidence an operator needs to diagnose it.
   public private(set) var quarantinedJobRecords: [RuntimeQuarantinedJobRecord] = []
 
+  /// Every durable ledger row whose record this build cannot decode, not only
+  /// the ones start-up recovery walked.
+  ///
+  /// `quarantinedJobRecords` comes from `recoverActiveJobs()`, whose query
+  /// excludes terminal states, so on a store an earlier build wrote it names
+  /// the handful of still-active Jobs and says nothing about the terminal ones
+  /// — which are the overwhelming majority and are equally unreadable. This is
+  /// the bounded whole-store answer `doctor --deep` reports.
+  ///
+  /// Never throws and never dispatches: it reads the ledger it is describing,
+  /// and a row it cannot decode is the finding rather than an error.
+  public func unreadableDurableRecords(
+    sampleLimit: Int = 16
+  ) async -> (total: Int, sample: [RuntimeQuarantinedJobRecord]) {
+    var total = 0
+    var sample: [RuntimeQuarantinedJobRecord] = []
+    var cursor: String?
+    repeat {
+      guard let page = try? admissionService.listJobs(pageSize: 250, cursor: cursor) else { break }
+      for persisted in page.jobs {
+        do { _ = try decodePersistedRecord(persisted) } catch {
+          total += 1
+          guard sample.count < sampleLimit else { continue }
+          let reason: String
+          if case RuntimeJobEngineError.jobRecordUnreadable(let detail) = error {
+            reason = detail
+          } else {
+            reason = String(describing: error)
+          }
+          sample.append(
+            RuntimeQuarantinedJobRecord(jobID: persisted.jobID, reason: reason))
+        }
+      }
+      cursor = page.nextCursor
+    } while cursor != nil
+    return (total, sample)
+  }
+
   public init(
     configuration: Configuration,
     providers: DeviceProviderRegistry,

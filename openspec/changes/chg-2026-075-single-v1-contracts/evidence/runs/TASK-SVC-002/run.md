@@ -238,7 +238,7 @@ this Task, and neither is assumed in any delivered code.
 
 ### 1. The read surface needs one path this Task does not hold
 
-`RuntimeJobEngine.statusPage` still maps a page with `try decodePersistedRecord`,
+`RuntimeJobEngine.jobListSnapshot` still decodes every ledger row with `try decodePersistedRecord`,
 so one record this build cannot decode still fails a whole `job list` / History
 page. On a host whose store predates the current durable shape that is every
 page, which is why the follow-up fix above lets the daemon start but does not yet
@@ -282,3 +282,98 @@ migration, creation sentinel or legacy pager"), or a fresh state directory, whic
 discards the history the 2026-09-02 coverage matrix depends on. Both are scope
 decisions for the maintainer. TASK-XPA-001's owner is raising the same question
 from the device side.
+
+## Correction and escalation (2026-09-06)
+
+### A factual error in the section above, corrected
+
+Two sentences above said `job.list` routes through `RuntimeJobEngine.statusPage`.
+It does not. `job.list` routes through `jobListSnapshot`
+(`RuntimeJobResourceReader.swift:16`); `statusPage` is reachable only from
+`RuntimeJobEngine.listJobs(pageSize:cursor:)`, and **that method has no
+production caller at all** (verified across every Swift source). An implementer
+following the record literally would have patched a dead surface. The sentences
+are corrected in place; this note records that they were wrong when published.
+
+### The read-surface repair was attempted, measured against the code, and withdrawn
+
+It was implemented — unreadable rows listed as a distinct minimal shape, the page
+returning — and it failed the suite against three tests that deliberately pin the
+opposite:
+
+| Test | What it pins |
+| --- | --- |
+| `AgentDaemonContractTests.testUnreadableJobRecordHasDistinctWireErrorFromMissingJob` | `job.status` **and** `job.list`, paged and unpaged, fail with `recordUnreadable`; a genuinely missing Job stays `notFound` |
+| `RuntimeJobEngineContractTests.testUnreadablePersistedRecordIsDistinctFromMissingAcrossHistoryReads` | the same at the engine level, with the exact payload `jobRecordUnreadable(jobID)`; its XCTFail texts read "the unpaged history surface must fail loudly on a corrupt record" and "the paged history surface must use the same corrupt-record error" |
+| `JobReadResourcesContractTests.testCurrentHistoryRejectsRetiredCreationSentinelAndTimestampDrift` | a row whose creation column drifts from its record stays unreadable |
+
+The change was reverted rather than the assertions rewritten. Three further facts
+came out of measuring it, and each is why this is a maintainer decision rather
+than an implementer's:
+
+1. **`job.list` is not a pure read.** `agentdRestartJobPreflight`
+   (`ArkDeckRuntimeCommands.swift:725-760`) classifies only rows in `items` and
+   requires each to carry `current`; on success the restart writes a durable
+   proof with a hardcoded `"blockingJobCountBefore": .integer(0)`
+   (`:551`). A page-level sidecar the preflight does not read converts "I could
+   not read these records" into a written claim that nothing blocked the
+   restart — exactly the manufactured recovery proof design.md §4 forbids.
+2. **Marked rows inside `items` are rejected client-side anyway.**
+   `CLIJobResources.swift:54` requires the envelope to have exactly seven keys
+   and every item to be a full `arkdeck.job-summary/1`, so `arkdeck job list`
+   would refuse the whole page before the operator saw it. The attempted
+   implementation's tests covered the engine and the daemon handler and would
+   not have caught this.
+3. **The blast radius is six paths wider than #1745 assumed.** A sidecar needs
+   `RuntimeSnapshotPager.swift` (or it appears on page 1 and vanishes on page 2,
+   because the cursor branch returns `items: { [] }` without rescanning),
+   `XPCConnectionBox.swift` (two exact seven-key gates feeding the App's Debug,
+   Trace and UIDump panes), `ArkDeckCLI/**`, the headless runbook's §0 criterion,
+   and `openspec/contracts/cli-page.schema.json` — a `additionalProperties:false`
+   envelope shared by at least ten paged methods and owned by no task in this
+   change. #1745 stated it adds "exactly `spec/control/methods/**` … and nothing
+   else"; that assessment was short by those paths.
+
+It is also not true that the read repair unblocks a device window on its own:
+`doctor --require-healthy` exits 69 on such a host regardless, because every
+unreadable record is a blocker finding and `ready = blockerCount == 0`.
+
+### What this delivery does instead
+
+Two things that improve the same operator's position without reversing any
+pinned contract:
+
+- The refusal names the Job. `RuntimeJobResourceReader` answers
+  `recordUnreadable` with the Job id in the message instead of discarding the id
+  the engine already had. It goes in the message rather than in `details`
+  deliberately: a details object is a change to the published error shape, and
+  it also makes `AgentClient` raise `structuredDaemonError` instead of
+  `daemonError` — which the pinned wire test catches, so the first attempt at
+  this failed against it. The published shape is unchanged, no schema is
+  re-derived, and none of the three pinned tests changes.
+- `doctor --deep` counts the whole ledger. The findings published in #1744 come
+  from `recoverActiveJobs()`, whose query excludes terminal states, so on a
+  store an earlier build wrote it named the few still-active Jobs and nothing
+  about the terminal majority — which is what an operator meets first. `--deep`
+  now reports one `runtime.durableRecordsUnreadable` blocker carrying the total
+  and a bounded sample. One finding, not one per row.
+
+### The decision still open
+
+Whether the History listing keeps failing loudly on an unreadable row, or returns
+the page with those rows reported, given (1) above. Recommended shape if it
+returns: page-level, and shipped in the same PR as the restart-preflight and
+proof fix, or not at all. Both halves cannot ship under one Task today.
+
+### Verification of this delivery
+
+| Command / check | Result |
+| --- | --- |
+| `sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --parallel` | PASS, exit 0, 2,446 cases, zero failures — including the three pinned tests, none of which was modified |
+| `JobReadResourcesContractTests.testAnUnreadableRecordIsNamedByTheWireErrorAndCountedByDeepDoctor` | PASS: the read still refuses with `recordUnreadable`, the message now names the Job, `details` stays absent, `doctor --deep` publishes one `runtime.durableRecordsUnreadable` blocker with the total and a bounded sample, and a shallow report does not |
+| `python3 Packages/ArkDeckKit/Scripts/generate-control-contract.py --check` | exit 0, and no per-method schema changed: this delivery alters no published shape, so nothing was re-derived |
+| `python3 scripts/ci/plan.py --run-local` | **PASS**, exit 0: full-parallel 2,440 cases (95 s), process-identity race 1, Viewer scale 5, all exit 0; App lane `TEST BUILD SUCCEEDED`; `check_sdd` 0 errors / 0 warnings / 121 acceptance IDs |
+| `python3 scripts/check_pr_paths.py --preflight` | **PASS**: resolves exactly `TASK-SVC-002`, exit 0, over 5 changed paths — `RuntimeJobResourceReader.swift`, `AgentDaemon.swift`, `RuntimeJobEngine.swift`, `JobReadResourcesContractTests.swift` and this run record — all inside this Task's Allowed paths. |
+
+No device was contacted. Whether the recorded host can run a device window is
+unchanged by this delivery and is stated above as still open.
