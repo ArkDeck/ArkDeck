@@ -84,6 +84,23 @@ struct RuntimeJobResourceReader {
     } catch RuntimeJobEngineError.jobNotFound {
       return .init(id: request.id, ok: false, result: nil,
         error: .init(code: "notFound", message: "the referenced Job does not exist"))
+    } catch RuntimeJobEngineError.jobRecordUnreadable(let jobID) {
+      // The engine knows which Job it could not read. The catch-all below
+      // discarded that, so an operator whose store holds one unreadable record
+      // learned only that "the Job read resource" was unreadable — the same
+      // amount of information for one rotted row as for a whole store written
+      // by an earlier build. The refusal itself is unchanged: this still fails
+      // the read, and a Job that genuinely does not exist is still `notFound`.
+      //
+      // The id goes in the message, not in `details`. A details object would be
+      // a change to the published error shape — it also makes the client raise
+      // a different error case — for something an operator reads, while the
+      // machine-readable answer for a whole store already exists as the
+      // `doctor` finding below.
+      return .init(id: request.id, ok: false, result: nil,
+        error: .init(
+          code: "recordUnreadable",
+          message: "the referenced Job record is unreadable: \(jobID)"))
     } catch {
       return .init(id: request.id, ok: false, result: nil,
         error: .init(code: "recordUnreadable", message: "the Job read resource is unreadable"))

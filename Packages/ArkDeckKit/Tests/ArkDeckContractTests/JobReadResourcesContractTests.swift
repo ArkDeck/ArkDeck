@@ -137,6 +137,73 @@ final class JobReadResourcesContractTests: XCTestCase {
     return values
   }
 
+  /// A refusal has to say which Job, and a store has to be enumerable.
+  ///
+  /// The read surface keeps failing on a record this build cannot decode — that
+  /// contract is pinned by three tests and is not touched here. What it failed
+  /// with was a bare `recordUnreadable` and "the Job read resource is
+  /// unreadable": the same amount of information for one rotted row as for a
+  /// whole store an earlier build wrote. The engine knew the Job id; the wire
+  /// discarded it.
+  ///
+  /// `doctor` named only what start-up recovery walked, and that query excludes
+  /// terminal states — so the terminal majority, which is what an operator
+  /// meets first because any one of them refuses a History page, was named
+  /// nowhere. `--deep` now counts the whole ledger and names a bounded sample.
+  func testAnUnreadableRecordIsNamedByTheWireErrorAndCountedByDeepDoctor() async throws {
+    let broken = try seed("job-unreadable-named", at: "2026-08-31T11:30:00Z")
+    try RuntimeJobRepository(stateDirectory: state).updateJobState(
+      jobID: broken.jobID, state: broken.state, updatedAtUTC: date,
+      recordData: Data("not-json".utf8))
+
+    let refused = try await read("job.status", id: broken.jobID)
+    XCTAssertFalse(refused.ok, "the read still fails; only its message improves")
+    XCTAssertEqual(refused.error?.code, "recordUnreadable")
+    XCTAssertTrue(
+      refused.error?.message.contains(broken.jobID) == true,
+      "the refusal must name the Job: \(refused.error?.message ?? "")")
+    XCTAssertNil(
+      refused.error?.details,
+      "the id goes in the message; the published error shape is unchanged")
+
+    let handler = RuntimeControlPlaneHandler(
+      engine: engine, capabilityStore: capabilities, providerIDs: ["hdc"],
+      nowUTC: { "2026-08-31T12:00:00Z" }, targetStore: targets, artifactStore: artifacts)
+    func doctor(deep: Bool) async throws -> [[String: JSONValue]] {
+      let response = await handler.handleFrame(
+        try PortableCanonicalJSON.canonicalBytes(
+          .object([
+            "protocolVersion": .string(ArkDeckControlProtocol.currentVersion),
+            "contractIdentity": .string(ArkDeckControlProtocol.contractIdentity),
+            "id": .string("doctor-fixture"), "method": .string("doctor"),
+            "params": .object(["deep": .bool(deep)]),
+          ])))
+      guard case .object(let report)? = response.result,
+        case .array(let findings)? = report["findings"]
+      else { throw FixtureError.missing }
+      return findings.compactMap {
+        guard case .object(let fields) = $0,
+          fields["code"] == .string("runtime.durableRecordsUnreadable")
+        else { return nil }
+        return fields
+      }
+    }
+
+    let counted = try await doctor(deep: true)
+    guard let finding = counted.first, case .object(let details)? = finding["details"] else {
+      return XCTFail("deep doctor must count the whole ledger, not only the active set")
+    }
+    XCTAssertEqual(finding["severity"], .string("blocker"))
+    XCTAssertEqual(details["count"], .integer(1))
+    guard case .array(let sample)? = details["sample"], case .object(let first)? = sample.first
+    else { return XCTFail("the finding must name a bounded sample") }
+    XCTAssertEqual(first["jobId"], .string(broken.jobID))
+
+    // The whole-ledger scan is a deep probe; a shallow report is unchanged.
+    let shallow = try await doctor(deep: false)
+    XCTAssertTrue(shallow.isEmpty)
+  }
+
   func testCurrentHistoryRejectsRetiredCreationSentinelAndTimestampDrift() async throws {
     try admitVerifiedRow("job-current", createdAtColumn: date)
     XCTAssertThrowsError(try admitVerifiedRow("job-legacy", createdAtColumn: "legacy"))
