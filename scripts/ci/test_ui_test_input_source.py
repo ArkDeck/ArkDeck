@@ -226,7 +226,11 @@ class InputSourceGuardTests(unittest.TestCase):
 
     def test_host_lock_rejects_nonprivate_file(self) -> None:
         lock = Path(self.lock_path)
-        lock.touch(mode=0o644)
+        lock.touch()
+        # touch()'s mode is masked by the ambient umask, so asking it for 0o644
+        # under umask 077 would create the fixture 0600 - private, the exact
+        # opposite of what this test rejects. chmod is not masked.
+        lock.chmod(0o644)
         with self.assertRaisesRegex(guard.InputSourceError, "not a private regular file"):
             self.run_guard()
         self.assertEqual(self.events, [])
