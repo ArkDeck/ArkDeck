@@ -207,6 +207,7 @@ methods.md无未处置生产caller；所有保留方法只走一个protocol/shap
   - `openspec/contracts/runtime-control-plane.schema.json`
   - `openspec/contracts/hardware-evidence.schema.json`
   - `Packages/ArkDeckKit/Contracts/**`
+  - `spec/control/methods/**`
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/**`
   - `Packages/ArkDeckKit/Tests/ArkDeckCoreTests/**`
   - `Packages/ArkDeckKit/Tests/ArkDeckEngineCrashFixture/**`

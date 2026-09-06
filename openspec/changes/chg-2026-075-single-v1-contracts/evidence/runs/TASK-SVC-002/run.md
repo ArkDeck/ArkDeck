@@ -230,3 +230,55 @@ The refusal is not relaxed; only its blast radius is.
 No device was contacted and no daemon was installed: this is host contract
 evidence. Whether the recorded host can now take a post-SVC build is not claimed
 here — it needs the read-surface fix above and then an actual run on that host.
+
+## Open: two decisions this Task cannot take for itself
+
+Recorded here so they are not lost between sessions. Neither is answered by
+this Task, and neither is assumed in any delivered code.
+
+### 1. The read surface needs one path this Task does not hold
+
+`RuntimeJobEngine.statusPage` still maps a page with `try decodePersistedRecord`,
+so one record this build cannot decode still fails a whole `job list` / History
+page. On a host whose store predates the current durable shape that is every
+page, which is why the follow-up fix above lets the daemon start but does not yet
+let it be used: the headless runbook's §0 ledger criterion
+(`arkdeck job list --page-size 1000`, `docs/design/cli-golden-journey-headless-runbook.md:26-27`)
+is the first thing a device window runs.
+
+The honest repair returns the page and names what it could not project. It cannot
+mark the row: `RuntimeJobStatus.operationReference` and `.targetID` are required
+and exist only inside the record, so a marked row would have to invent them — the
+exact failure this whole change is removing. The shape that does not invent
+anything is page-level: `job.list` gains `unreadable: [{ jobId, reason }]`
+alongside `items`, one entry per record the page could not project, matching the
+`runtime.jobRecordUnreadable` `doctor` findings the fix above already publishes.
+
+That is a change to a published result shape, so the per-method schema must be
+re-derived in the same PR — `Packages/ArkDeckKit/Scripts/generate-control-contract.py --derive-method-schemas`
+writes `spec/control/methods/*.json`. This Task holds
+`openspec/contracts/runtime-control-plane.schema.json`, `Packages/ArkDeckKit/Contracts/**`
+and `Packages/ArkDeckKit/Tests/ArkDeckContractTests/**` (which covers the frame
+corpus the same command rewrites) but not `spec/control/methods/**`, and
+TASK-XPA-001 holds `spec/**` but not `RuntimeJobEngine.swift`. Splitting the work
+across the two Tasks would land a wire change whose published schema is stale
+until the second PR merges — the destructive intermediate state this change's
+execution contract forbids ("不先提交仅版本号/仅删handler的破坏性中间态").
+
+The revision this record travels with adds exactly `spec/control/methods/**` to
+this Task's Allowed paths. Nothing else is requested, and no code is delivered on
+the assumption that it is granted.
+
+### 2. Complete-overwrite recovery on a host that ran a 2.x Runtime
+
+With the follow-up fix above the daemon starts on such a host, but
+complete-overwrite recovery admission now refuses its historical records by name
+(`completeOverwriteRecovery.unreadableHistoricalRecord`) — correctly: a record it
+cannot read is one whose outstanding destructive intent it cannot rule out. The
+consequence is that GJ-4 cannot be admitted on any host that ever ran a 2.x
+Runtime. The two ways out are a read or migration path for `2.0.0` request
+documents, which this Task's own record states it does not provide ("There is no
+migration, creation sentinel or legacy pager"), or a fresh state directory, which
+discards the history the 2026-09-02 coverage matrix depends on. Both are scope
+decisions for the maintainer. TASK-XPA-001's owner is raising the same question
+from the device side.
