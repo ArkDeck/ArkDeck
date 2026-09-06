@@ -3174,6 +3174,7 @@ final class AgentDaemonContractTests: XCTestCase {
       path: ".arkdeck-workspace-project-test-\(UInt32.random(in: 0..<100_000))",
       directoryHint: .isDirectory)
     defer { try? FileManager.default.removeItem(at: shortState) }
+    try makePrivateDaemonStateDirectory(shortState)
     let firstRoot = shortState.appending(path: "project-a", directoryHint: .isDirectory)
     let secondRoot = shortState.appending(path: "project-b", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(
@@ -3245,6 +3246,7 @@ final class AgentDaemonContractTests: XCTestCase {
       path: ".arkdeck-workspace-drift-test-\(UInt32.random(in: 0..<100_000))",
       directoryHint: .isDirectory)
     defer { try? FileManager.default.removeItem(at: shortState) }
+    try makePrivateDaemonStateDirectory(shortState)
     let root = shortState.appending(path: "project", directoryHint: .isDirectory)
     try FileManager.default.createDirectory(
       at: root.appending(path: "Packages/ArkDeckKit", directoryHint: .isDirectory),
@@ -3649,6 +3651,22 @@ final class AgentDaemonContractTests: XCTestCase {
           return text
         })
     }
+  }
+
+  /// The daemon refuses to start unless its state directory is private:
+  /// `RuntimeSessionStorageStore.validateOwnedDirectory` requires
+  /// `st_mode & 0o077 == 0` of its owner root, and that refusal reaches a test
+  /// as a bare `connect failed: errno 2`, because the control socket is never
+  /// bound. Every daemon store creates its own directories with an explicit
+  /// 0o700, so a test that lets the daemon materialize the state directory is
+  /// safe; a test that materializes it first must ask for 0o700 itself. An
+  /// implicit `withIntermediateDirectories` create takes the ambient umask
+  /// instead, which under the default 022 lands at 0755, and the daemon's own
+  /// 0o700 creates do not repair a directory that already exists.
+  private func makePrivateDaemonStateDirectory(_ url: URL) throws {
+    try FileManager.default.createDirectory(
+      at: url, withIntermediateDirectories: true,
+      attributes: [.posixPermissions: 0o700])
   }
 
   /// Spawns the real daemon with a *declared* environment. `Process` inherits
