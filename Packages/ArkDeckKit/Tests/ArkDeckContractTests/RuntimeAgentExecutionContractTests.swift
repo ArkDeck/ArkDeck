@@ -258,6 +258,113 @@ final class RuntimeAgentExecutionContractTests: XCTestCase {
   /// control plane, so their result shapes enter the recorded corpus. The
   /// owner-level tests above own the semantics; this one records the frames a
   /// client reads back and checks that nothing else happened.
+  /// `agent.run`, `agent.resume` and `agent.status` embed the same evidence
+  /// object as `job.result`, and their published schemas declared
+  /// `evidence.actualStepKinds` as a non-nullable array. The daemon has
+  /// answered null there since the Runtime learned to say "unknown", so the
+  /// declaration was false; #1762 fixed the behaviour on this path but could
+  /// not publish the shape, because no recorded frame carried it. This test is
+  /// the frame.
+  func testAgentStatusPublishesUnknownStepsAsNullAndRefusesToCallItVerified() async throws {
+    let jobID = "job-agent-unprovable"
+    let executionID = "execution-unprovable"
+
+    // A terminal Flash Job whose journal is gone. A terminal Job cannot carry
+    // an unresolved intent — the journal refuses to finalize one — so a lost
+    // journal is the reachable way for durable state to be unable to prove the
+    // typed steps of a Job that has already ended.
+    // The store checks that a stored submission is exactly the request the
+    // coordinator would have prepared from the intent, so the identifiers are
+    // derived the same way it derives them.
+    let seed = RuntimeAgentExecutionStore.fingerprint(Data(executionID.utf8))
+    let request = try RuntimeOperationRequest(
+      requestID: "agent-request-\(seed)", idempotencyKey: "agent-execution-\(seed)",
+      target: DurableTargetReference(targetID: "TGT-fixture", expectedBindingRevision: 2),
+      operation: RuntimeOperationReference(id: "flash.full-restore", version: 1))
+    var record = RuntimeJobRecord(
+      jobID: jobID, request: request, operationReference: ArkForgeFlashOperation.canonicalReference,
+      catalogDigest: RuntimeOperationCatalog.catalogDigest, providerID: "arkforge",
+      createdAtUTC: RuntimeAgentTime.format(clock.now()), actualEffect: "destructive",
+      admissionEvidence: nil, materializedPlanDigest: String(repeating: "a", count: 64),
+      materializedStableTargetIdentitySHA256: nil, materializedBindingRevision: 2)
+    record.state = "failed"
+    _ = try RuntimeJobRepository(stateDirectory: directory.appending(path: "engine")).admit(
+      jobID: jobID, idempotencyKey: request.idempotencyKey,
+      requestHash: String(repeating: "b", count: 64), initialState: record.state,
+      createdAtUTC: record.createdAtUTC, initialRecordData: record.durableData())
+
+    // An execution that owns that Job. `agent.status` reads the record and
+    // hands the Job to the daemon's own result projection, which is the code
+    // under test.
+    let intent = try AgentExecutionIntent([
+      "schemaVersion": .string(AgentExecutionIntent.schemaVersion),
+      "executionId": .string(executionID),
+      "operation": .string(ArkForgeFlashOperation.canonicalReference),
+      "inputs": .object([:]),
+      "maximumWaitMilliseconds": .string("30000"),
+    ])
+    let now = RuntimeAgentTime.format(clock.now())
+    let store = try RuntimeAgentExecutionStore(directory: directory.appending(path: "executions"))
+    try store.save(
+      RuntimeAgentExecutionRecord(
+        schemaVersion: "arkdeck.runtime-agent-execution/1", intent: intent,
+        intentFingerprintSHA256: RuntimeAgentExecutionStore.fingerprint(try intent.canonicalIntent),
+        catalogDigest: RuntimeOperationCatalog.catalogDigest, createdAt: now,
+        // The store's own invariants: the deadline is exactly the intent's
+        // wait budget past creation, and a record that owns a Job carries the
+        // request it submitted.
+        deadline: RuntimeAgentTime.format(clock.now().addingTimeInterval(30)),
+        lastObservedAt: now, generation: 1, state: .completed,
+        target: AgentResolvedTarget(targetID: "TGT-fixture", bindingRevision: 2),
+        submissionRequest: try CanonicalJSONEncoders.canonical().encode(request),
+        jobID: jobID, jobState: "failed", outcomeUnknown: false,
+        failureCode: nil, actions: []),
+      expectedGeneration: nil)
+
+    let capturedClock = clock!
+    let handler = RuntimeControlPlaneHandler(
+      engine: engine,
+      capabilityStore: try RuntimeCapabilityStore(directoryURL: directory.appending(path: "capabilities")),
+      providerIDs: ["hdc"], nowUTC: { RuntimeAgentTime.format(capturedClock.now()) },
+      targetStore: targets, agentExecutions: try owner(),
+      artifactStore: try RuntimeArtifactStore(
+        rootURL: directory.appending(path: "artifacts"),
+        nowUTC: { RuntimeAgentTime.format(capturedClock.now()) }))
+    let response = await handler.handleFrame(
+      try JSONEncoder().encode(
+        AgentWireProtocol.Request(
+          id: UUID().uuidString, method: "agent.status",
+          params: ["executionId": .string(executionID)])))
+
+    XCTAssertTrue(response.ok, response.error?.message ?? "-")
+    let fields = try object(XCTUnwrap(response.result))
+    let evidence = try object(XCTUnwrap(fields["evidence"]))
+    XCTAssertEqual(evidence["actualStepKinds"], .null)
+    XCTAssertNotEqual(evidence["status"], .string("verified"))
+    guard case .array(let blockers)? = evidence["blockers"] else {
+      return XCTFail("evidence must publish its blockers")
+    }
+    XCTAssertTrue(blockers.contains(.string(RuntimeJobResourceReader.stepKindsUnprovable)))
+
+    // `agent.run` re-offered with the same immutable intent answers the
+    // existing execution through the same projection, so it publishes the
+    // shape too.
+    let reRun = await handler.handleFrame(
+      try JSONEncoder().encode(
+        AgentWireProtocol.Request(
+          id: UUID().uuidString, method: "agent.run",
+          params: [
+            "schemaVersion": .string(AgentExecutionIntent.schemaVersion),
+            "executionId": .string(executionID),
+            "operation": .string(ArkForgeFlashOperation.canonicalReference),
+            "inputs": .object([:]),
+            "maximumWaitMilliseconds": .string("30000"),
+          ])))
+    XCTAssertTrue(reRun.ok, reRun.error?.message ?? "-")
+    let runEvidence = try object(XCTUnwrap(try object(XCTUnwrap(reRun.result))["evidence"]))
+    XCTAssertEqual(runEvidence["actualStepKinds"], .null)
+  }
+
   func testAgentListAndAbandonPublishTheirResultShapesThroughTheControlPlane() async throws {
     port.setState("Unauthorized")
     let owner = try owner()
