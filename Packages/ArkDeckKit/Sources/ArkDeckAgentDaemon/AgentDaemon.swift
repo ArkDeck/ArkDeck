@@ -2943,6 +2943,9 @@ public struct RuntimeControlPlaneHandler: Sendable {
         }
       } catch { blockers.append("artifactIntegrityFailed") }
     } else if !declaresNoArtifacts { blockers.append("artifactStoreUnavailable") }
+    // An Agent result that cannot say which typed steps ran is not a verified
+    // result. Same fact, same blocker as the Job read surface.
+    if snapshot.actualStepKinds == nil { blockers.append(RuntimeJobResourceReader.stepKindsUnprovable) }
     if case .object(var evidence) = Self.encodeEvidence(snapshot: snapshot, artifacts: artifacts, blockers: blockers) {
       // Automatic Agent results disclose evidence identities, never original
       // inputs or unbounded probe detail. Sensitive bytes still require export.

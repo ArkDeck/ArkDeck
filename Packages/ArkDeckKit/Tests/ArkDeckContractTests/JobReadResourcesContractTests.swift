@@ -648,7 +648,7 @@ final class JobReadResourcesContractTests: XCTestCase {
   }
 
   @discardableResult
-  private func seedUnprovableFlash(_ id: String) throws -> RuntimeJobRecord {
+  private func seedUnprovableFlash(_ id: String, jobState: String = "waitingForRecovery") throws -> RuntimeJobRecord {
     // A Flash Job parked in `waitingForRecovery`: its journal is by definition
     // not closed, so the typed step kinds cannot be derived from durable state.
     // Everything else about the Job is on disk and readable.
@@ -662,12 +662,18 @@ final class JobReadResourcesContractTests: XCTestCase {
       createdAtUTC: date, actualEffect: "destructive", admissionEvidence: nil,
       materializedPlanDigest: String(repeating: "a", count: 64),
       materializedStableTargetIdentitySHA256: nil, materializedBindingRevision: 2)
-    record.state = "waitingForRecovery"
-    record.outcomeUnknown = true
+    record.state = jobState
+    record.outcomeUnknown = jobState == "waitingForRecovery"
     _ = try RuntimeJobRepository(stateDirectory: state).admit(
       jobID: id, idempotencyKey: request.idempotencyKey,
       requestHash: String(repeating: "b", count: 64), initialState: record.state,
       createdAtUTC: record.createdAtUTC, initialRecordData: record.durableData())
+
+    // A terminal Flash Job cannot carry an unresolved intent — the journal
+    // refuses to finalize one ("unresolved intent cannot enter finalization or
+    // terminal state"). So the terminal route to unprovable steps is a journal
+    // that is gone, and the fixture leaves none.
+    guard jobState == "waitingForRecovery" else { return record }
 
     // A real journal with a destructive intent and no outcome behind it: the
     // shape a Flash Job that stopped mid-write actually leaves on disk.
@@ -788,6 +794,47 @@ final class JobReadResourcesContractTests: XCTestCase {
     let restored = try object(XCTUnwrap(restoredResponse.result))
     XCTAssertFalse(Self.strings(restored["blockers"]).contains("recordUnreadable"))
     XCTAssertEqual(restored["actualStepKinds"], .array([]))
+  }
+
+  /// `job.result` and the Agent execution projection embed the same evidence
+  /// object, and their published schemas declared `actualStepKinds` as a
+  /// non-nullable array. Since the Runtime learned to say "unknown" the daemon
+  /// has answered null there, so the declaration was false — and worse, an
+  /// unprovable step list contributed no blocker, so a destructive Job whose
+  /// write cannot be proven came back `status: "verified"` with `blockers: []`
+  /// and passed every gate that reads only `blockers`.
+  func testAJobWhoseTypedStepsAreUnprovableIsNotAVerifiedResult() async throws {
+    // Terminal, and its journal is gone, so durable state cannot prove which
+    // typed steps ran. `job.result` refuses a non-terminal Job outright, so
+    // this is the reachable shape for the Agent-facing evidence surfaces.
+    try seedUnprovableFlash("job-unprovable-terminal", jobState: "failed")
+
+    let response = try await read("job.result", id: "job-unprovable-terminal")
+    XCTAssertTrue(response.ok, response.error?.message ?? "-")
+    let fields = try object(XCTUnwrap(response.result))
+    let evidence = try object(XCTUnwrap(fields["evidence"]))
+
+    XCTAssertEqual(evidence["actualStepKinds"], .null)
+    XCTAssertTrue(Self.strings(evidence["blockers"]).contains("stepKindsUnprovable"))
+    XCTAssertNotEqual(evidence["status"], .string("verified"))
+    // The CLI's own integrity gate reads only `blockers`, so this is what
+    // turns an unprovable destructive Job into a non-zero exit.
+    XCTAssertNotNil(RuntimeCLI.evidenceIntegrityExit(.object(evidence)))
+
+    // Negative control: an ordinary Job whose steps the record does prove is
+    // still verified, still an array, and still exits clean.
+    let ordinary = try seed("job-provable-terminal")
+    var proven = ordinary
+    proven.actualStepKinds = ["readDeviceFacts"]
+    try save(proven)
+    _ = try await publishRequired("job-provable-terminal")
+    let controlResponse = try await read("job.result", id: "job-provable-terminal")
+    let control = try object(XCTUnwrap(controlResponse.result))
+    let controlEvidence = try object(XCTUnwrap(control["evidence"]))
+    XCTAssertEqual(controlEvidence["actualStepKinds"], .array([.string("readDeviceFacts")]))
+    XCTAssertFalse(Self.strings(controlEvidence["blockers"]).contains("stepKindsUnprovable"))
+    XCTAssertEqual(controlEvidence["status"], .string("verified"))
+    XCTAssertNil(RuntimeCLI.evidenceIntegrityExit(.object(controlEvidence)))
   }
 
   func testMissingRequiredIndexEntryAndWrongArtifactOwnerCannotVerify() async throws {
