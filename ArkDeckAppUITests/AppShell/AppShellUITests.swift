@@ -579,9 +579,12 @@ final class AppShellUITests: XCTestCase {
           let rowSettled = NSPredicate { _, _ in
             table.frame.contains(row.frame) && row.isHittable
           }
-          _ = XCTWaiter.wait(
+          let revealResult = XCTWaiter.wait(
             for: [XCTNSPredicateExpectation(predicate: rowSettled, object: nil)], timeout: 5)
-          let rowIsVisible = table.frame.contains(row.frame) && row.isHittable
+          // Use the observation that fulfilled the expectation. Re-querying
+          // AX after a successful wait races subsequent List layout passes
+          // and can turn an observed, hittable reveal into a false failure.
+          let rowIsVisible = revealResult == .completed
           if !rowIsVisible {
             let failure = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
             failure.name = "Requested History row missing \(jobID)"
