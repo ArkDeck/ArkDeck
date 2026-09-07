@@ -837,6 +837,41 @@ final class JobReadResourcesContractTests: XCTestCase {
     XCTAssertNil(RuntimeCLI.evidenceIntegrityExit(.object(controlEvidence)))
   }
 
+  /// `job.show` echoes the durable record. Its five neighbouring optional
+  /// fields all publish `.null` when the record is silent; this one published
+  /// an empty array, which reads as "no typed step ran".
+  ///
+  /// The Runtime never stores an empty list — the only writer
+  /// (`RuntimeJobEngine`, the step-intent path) appends at least one element —
+  /// so a published `[]` could only ever be that collapse. Measured on this
+  /// host's 1,897 durable records on 2026-09-07: 38 have the key absent, 0
+  /// hold an empty array, and 7 of the 38 are `recovered` Flash Jobs, whose
+  /// steps ran inside the ArkForge lane and never reached the record.
+  func testJobShowSaysNothingRatherThanClaimingNoStepRan() async throws {
+    let silent = try seed("job-silent-steps")
+    var record = silent
+    record.actualStepKinds = nil
+    try save(record)
+
+    let response = try await read("job.show", id: "job-silent-steps")
+    XCTAssertTrue(response.ok, response.error?.message ?? "-")
+    let fields = try object(XCTUnwrap(response.result))
+    XCTAssertEqual(fields["actualStepKinds"], .null)
+    // The CLI validates `job.show` by exact key set and never inspects this
+    // value (CLIJobResources.swift, `case "show"`), so a null keeps the key and
+    // leaves that check untouched.
+    XCTAssertTrue(fields.keys.contains("actualStepKinds"))
+
+    // Negative control: a record that does list its steps still publishes them.
+    var proven = silent
+    proven.actualStepKinds = ["readDeviceFacts"]
+    try save(proven)
+    let provenResponse = try await read("job.show", id: "job-silent-steps")
+    let provenFields = try object(XCTUnwrap(provenResponse.result))
+    XCTAssertEqual(provenFields["actualStepKinds"], .array([.string("readDeviceFacts")]))
+    XCTAssertEqual(Set(provenFields.keys), Set(fields.keys))
+  }
+
   func testMissingRequiredIndexEntryAndWrongArtifactOwnerCannotVerify() async throws {
     try seed("job-missing"); try seed("job-foreign")
     let metadata = try await publishRequired("job-missing")
