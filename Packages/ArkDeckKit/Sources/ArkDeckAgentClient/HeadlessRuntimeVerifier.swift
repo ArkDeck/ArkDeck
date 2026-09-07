@@ -463,15 +463,19 @@ package struct RuntimeHeadlessVerifier: Sendable {
       blockers.append("artifacts:required immutable inventory is incomplete or drifted")
     }
 
+    // Unknown steps are not verified steps: a null `actualStepKinds` fails
+    // this check exactly as an incomplete one does.
+    let reportedStepKinds = trustedFacts.actualStepKinds
     let runtimePostflightVerified =
       terminalStatusVerified
       && trustedEvidenceVerified
       && artifactsVerified
-      && !trustedFacts.actualStepKinds.isEmpty
-      && Set(trustedFacts.actualStepKinds).count == trustedFacts.actualStepKinds.count
-      && !trustedFacts.actualStepKinds.contains(where: \.isEmpty)
-      && Set(trustedFacts.actualStepKinds).isSuperset(
-        of: profile?.requiredStepKinds ?? [])
+      && reportedStepKinds.map { kinds in
+        !kinds.isEmpty
+          && Set(kinds).count == kinds.count
+          && !kinds.contains(where: \.isEmpty)
+          && Set(kinds).isSuperset(of: profile?.requiredStepKinds ?? [])
+      } == true
     if !runtimePostflightVerified {
       blockers.append("runtimePostflight:typed steps, evidence or Artifact closure is incomplete")
     }

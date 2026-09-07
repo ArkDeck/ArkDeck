@@ -359,7 +359,7 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
       executionMode: "execute", actualEffect: "destructive",
       startedAtUTC: "2026-08-24T00:00:00Z",
       finishedAtUTC: "2026-08-24T00:03:00Z")
-    func trustedFacts(stepKinds: [String]) -> RuntimeHardwareEvidenceTrustedFacts {
+    func trustedFacts(stepKinds: [String]?) -> RuntimeHardwareEvidenceTrustedFacts {
       RuntimeHardwareEvidenceTrustedFacts(
         jobID: jobID, operationReference: "flash.full-restore@1",
         catalogDigest: catalogDigest, targetID: targetID,
@@ -397,6 +397,15 @@ final class AgentRuntimeExecutorContractTests: XCTestCase {
       inventory: inventory, additionalBlockers: [])
     XCTAssertFalse(missingWriteProof.runtimeVerified)
     XCTAssertFalse(missingWriteProof.checks.runtimePostflightVerified)
+
+    // Steps the Runtime could not prove are not steps this verifier may treat
+    // as proven: unknown fails exactly as an incomplete set does.
+    let unknownSteps = verifier.reopenReport(
+      daemonCatalogDigest: catalogDigest, status: status,
+      trustedFacts: trustedFacts(stepKinds: nil),
+      inventory: inventory, additionalBlockers: [])
+    XCTAssertFalse(unknownSteps.runtimeVerified)
+    XCTAssertFalse(unknownSteps.checks.runtimePostflightVerified)
     XCTAssertTrue(
       missingWriteProof.blockers.contains(
         "runtimePostflight:typed steps, evidence or Artifact closure is incomplete"))

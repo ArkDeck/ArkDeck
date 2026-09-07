@@ -3318,7 +3318,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
       "actualEffect": optionalString(effectLevel),
       "authority": authority,
       "observation": observation,
-      "actualStepKinds": .array(snapshot.actualStepKinds.map(JSONValue.string)),
+      "actualStepKinds": snapshot.actualStepKinds
+        .map { .array($0.map(JSONValue.string)) } ?? JSONValue.null,
       "executionMode": .string(snapshot.executionMode),
       "terminalState": .string(snapshot.terminalState),
       "outcomeUnknown": .bool(snapshot.outcomeUnknown),

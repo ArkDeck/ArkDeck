@@ -482,7 +482,11 @@ public struct RuntimeJobEvidenceSnapshot: Sendable, Equatable, Codable {
   public let actualEffect: String?
   public let authority: RuntimeAdmissionEvidence?
   public let observation: RuntimeEvidenceObservation?
-  public let actualStepKinds: [String]
+  /// The typed step kinds durable state proves, or `nil` when durable state
+  /// cannot prove them. An unclosed Flash journal is the case that matters:
+  /// the steps are unknown, not absent, and an empty array would read as a
+  /// claim that nothing ran.
+  public let actualStepKinds: [String]?
   public let executionMode: String
   public let terminalState: String
   public let outcomeUnknown: Bool
@@ -496,6 +500,11 @@ public struct RuntimeJobEvidenceSnapshot: Sendable, Equatable, Codable {
   /// They remain structured JSON values; no executable or argv can be
   /// reconstructed from this projection.
   public var inputs: [String: JSONValue]? = nil
+
+  /// Runtime persists execute Jobs only: a plan-only preview is deliberately
+  /// never a Job. The full snapshot and the degraded read both publish the
+  /// mode from here so the two cannot drift into disagreeing about it.
+  public static let persistedExecutionMode = "execute"
 }
 
 public struct RuntimeJobAcceptance: Sendable, Equatable {
@@ -4999,7 +5008,7 @@ public actor RuntimeJobEngine {
           path:
             "rockchip-runtime", directoryHint: .isDirectory)
       ).flashPostflightObservation(for: record)
-    let actualStepKinds = try durableActualStepKinds(for: record)
+    let actualStepKinds = durableActualStepKinds(for: record)
     return RuntimeJobEvidenceSnapshot(
       jobID: record.jobID,
       operationReference: record.operationReference,
@@ -5011,7 +5020,7 @@ public actor RuntimeJobEngine {
       authority: record.admissionEvidence,
       observation: observation,
       actualStepKinds: actualStepKinds,
-      executionMode: "execute",
+      executionMode: RuntimeJobEvidenceSnapshot.persistedExecutionMode,
       terminalState: record.outcomeUnknown ? "outcomeUnknown" : record.state,
       outcomeUnknown: record.outcomeUnknown,
       startedAtUTC: record.startedAtUTC,
@@ -5033,7 +5042,14 @@ public actor RuntimeJobEngine {
   /// it must never mutate the record or ask the provider to run again. Scope
   /// this compatibility projection to the reviewed ArkForge operation so an
   /// unrelated historical Job cannot acquire step claims from catalog text.
-  private func durableActualStepKinds(for record: RuntimeJobRecord) throws -> [String] {
+  /// Returns `nil`, never a partial answer, when durable state cannot prove
+  /// the Flash step kinds. Refusing this one derivation used to throw, which
+  /// took the whole evidence snapshot with it: an operator inspecting an
+  /// `outcomeUnknown` Flash Job — the state where the journal is by
+  /// definition not closed — got every readable fact published as null and
+  /// the actual failure reason nowhere on any published surface. The steps
+  /// stay unknown; everything durable state does prove is still published.
+  private func durableActualStepKinds(for record: RuntimeJobRecord) -> [String]? {
     let storedKinds = record.actualStepKinds ?? []
     guard ArkForgeFlashOperation.contains(record.operationReference) else {
       return storedKinds
@@ -5041,14 +5057,17 @@ public actor RuntimeJobEngine {
     guard let descriptor = RuntimeOperationCatalog.descriptor(
       reference: record.operationReference)
     else {
-      throw RuntimeJobEngineError.internalFailure(
-        "persisted Flash operation \(record.operationReference) is unavailable")
+      return nil
     }
-    let replay = try DurableJournalRecovery.inspect(
+    guard let replay = try? DurableJournalRecovery.inspect(
       url: jobDirectory(for: record.jobID).appending(path: "journal.jsonl"))
+    else {
+      return nil
+    }
     guard replay.outstandingIntents.isEmpty, replay.unknownOutcomes.isEmpty else {
-      throw RuntimeJobEngineError.internalFailure(
-        "persisted Flash journal is not closed for \(record.jobID)")
+      // `storedKinds` alone would be a partial answer wearing the shape of a
+      // complete one, so it is withheld rather than published.
+      return nil
     }
     let confirmedStepIDs = Self.confirmedSucceededStepIDs(in: replay)
     let provenKinds = Set(storedKinds).union(

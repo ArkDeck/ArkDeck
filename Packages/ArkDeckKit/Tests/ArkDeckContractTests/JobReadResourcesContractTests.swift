@@ -642,6 +642,154 @@ final class JobReadResourcesContractTests: XCTestCase {
     XCTAssertEqual(dispatcher.dispatchCount, 0)
   }
 
+  private static func strings(_ value: JSONValue?) -> [String] {
+    guard case .array(let values)? = value else { return [] }
+    return values.compactMap { if case .string(let text) = $0 { return text } else { return nil } }
+  }
+
+  @discardableResult
+  private func seedUnprovableFlash(_ id: String) throws -> RuntimeJobRecord {
+    // A Flash Job parked in `waitingForRecovery`: its journal is by definition
+    // not closed, so the typed step kinds cannot be derived from durable state.
+    // Everything else about the Job is on disk and readable.
+    let request = try RuntimeOperationRequest(
+      requestID: "req-\(id)", idempotencyKey: "idem-\(id)",
+      target: DurableTargetReference(targetID: "TGT-fixture", expectedBindingRevision: 2),
+      operation: RuntimeOperationReference(id: "flash.full-restore", version: 1))
+    var record = RuntimeJobRecord(
+      jobID: id, request: request, operationReference: ArkForgeFlashOperation.canonicalReference,
+      catalogDigest: RuntimeOperationCatalog.catalogDigest, providerID: "arkforge",
+      createdAtUTC: date, actualEffect: "destructive", admissionEvidence: nil,
+      materializedPlanDigest: String(repeating: "a", count: 64),
+      materializedStableTargetIdentitySHA256: nil, materializedBindingRevision: 2)
+    record.state = "waitingForRecovery"
+    record.outcomeUnknown = true
+    _ = try RuntimeJobRepository(stateDirectory: state).admit(
+      jobID: id, idempotencyKey: request.idempotencyKey,
+      requestHash: String(repeating: "b", count: 64), initialState: record.state,
+      createdAtUTC: record.createdAtUTC, initialRecordData: record.durableData())
+
+    // A real journal with a destructive intent and no outcome behind it: the
+    // shape a Flash Job that stopped mid-write actually leaves on disk.
+    let directory = state.appending(path: "jobs/\(id)")
+    try FileManager.default.createDirectory(
+      at: directory, withIntermediateDirectories: true,
+      attributes: [.posixPermissions: 0o700])
+    let journal = try FileDurableJournal(url: directory.appending(path: "journal.jsonl"))
+    try journal.appendAndSynchronize(
+      try JournalEvent.jobCreated(
+        eventID: "job-created", sequence: 0, sessionID: "session-\(id)", jobID: id,
+        timestamp: date, executionMode: "execute"))
+    try journal.appendAndSynchronize(
+      try JournalEvent.stateTransition(
+        eventID: "preflight", sequence: 1, sessionID: "session-\(id)", jobID: id,
+        timestamp: date, from: .queued, to: .preflight, reason: "fixture"))
+    try journal.appendAndSynchronize(
+      try JournalEvent.stateTransition(
+        eventID: "running", sequence: 2, sessionID: "session-\(id)", jobID: id,
+        timestamp: date, from: .preflight, to: .running, reason: "fixture"))
+    try journal.appendAndSynchronize(
+      try JournalEvent.stepIntent(
+        eventID: "intent-flash-partitions", sequence: 3, sessionID: "session-\(id)",
+        jobID: id, timestamp: date,
+        step: try WorkflowStep(
+          id: "flash-partitions", kind: .flashPartition, declaredEffect: .destructive,
+          declaredCancellation: .criticalNonInterruptible,
+          declaredBindingRequirement: .confirmedDevice,
+          arguments: [
+            "providerOperationId": .string("flashPartitions"),
+            "partition": .string("userdata"), "imageArtifactId": .string("image-bundle"),
+            "imageSha256": .string(String(repeating: "c", count: 64)), "imageSize": .integer(1),
+            "confirmationId": .string("runtime-capability"),
+            "safeBoundaryId": .string("complete-overwrite"),
+          ]),
+        target: JournalTarget(
+          scope: "device", targetID: "TGT-fixture", connectKey: "fixture-only",
+          identitySnapshotHash: String(repeating: "d", count: 64)),
+        attempt: 1, bindingRevision: 2))
+    try journal.appendAndSynchronize(
+      try JournalEvent.stateTransition(
+        eventID: "waiting", sequence: 4, sessionID: "session-\(id)", jobID: id,
+        timestamp: date, from: .running, to: .waitingForRecovery,
+        reason: "outcome unknown"))
+    XCTAssertFalse(
+      try DurableJournalRecovery.inspect(url: directory.appending(path: "journal.jsonl"))
+        .outstandingIntents.isEmpty,
+      "the fixture must leave the journal genuinely unclosed")
+    return record
+  }
+
+  /// Measured on the 2026-09-07 GJ-4 window: `job.evidence` for the flash Job
+  /// that had stopped in `waitingForRecovery` answered with every field null,
+  /// which no client could decode, so the terminal reason the Runtime had
+  /// actually recorded reached no published surface at all. One underivable
+  /// fact — the typed step kinds of an unclosed Flash journal — was throwing,
+  /// and the throw took the whole readable snapshot with it. The unknown fact
+  /// stays unknown; the facts durable state does hold get published.
+  func testAFlashJobWithAnUnprovableJournalStillPublishesTheFactsItHolds() async throws {
+    try seedUnprovableFlash("job-unprovable-flash")
+
+    let response = try await read("job.evidence", id: "job-unprovable-flash")
+    XCTAssertTrue(response.ok)
+    let fields = try object(XCTUnwrap(response.result))
+
+    XCTAssertEqual(fields["providerId"], .string("arkforge"))
+    XCTAssertEqual(fields["executionMode"], .string("execute"))
+    XCTAssertEqual(fields["terminalState"], .string("outcomeUnknown"))
+    XCTAssertEqual(fields["outcomeUnknown"], .bool(true))
+    XCTAssertEqual(fields["targetId"], .string("TGT-fixture"))
+    // The one fact durable state cannot prove says so, rather than claiming
+    // an empty step list that would read as "nothing ran".
+    XCTAssertEqual(fields["actualStepKinds"], .null)
+
+    // The client decoder is the surface that failed in the field, so it is
+    // the one that has to accept this answer.
+    XCTAssertNoThrow(try CurrentRuntimeResourceReads.evidence(.object(fields)))
+    let facts = try CurrentRuntimeResourceReads.evidence(.object(fields))
+    XCTAssertEqual(facts.providerID, "arkforge")
+    XCTAssertEqual(facts.executionMode, "execute")
+    XCTAssertNil(facts.actualStepKinds)
+
+    // Negative control: nothing else started reporting its steps as unknown.
+    try seed("job-provable-steps")
+    let controlResponse = try await read("job.evidence", id: "job-provable-steps")
+    let control = try object(XCTUnwrap(controlResponse.result))
+    XCTAssertEqual(control["actualStepKinds"], .array([]))
+    XCTAssertEqual(try CurrentRuntimeResourceReads.evidence(.object(control)).actualStepKinds, [])
+  }
+
+  /// The degraded read that runs when the evidence snapshot itself fails. It
+  /// is built from the very record the caller already holds, so publishing
+  /// that record's provider and execution mode as null claimed they were
+  /// unknown while they were in hand — and made the answer undecodable for
+  /// exactly the same reason.
+  func testTheDegradedEvidenceReadPublishesWhatTheRecordAlreadyProves() async throws {
+    try seed("job-degraded-read")
+    // Corrupting the recovery epoch document is what fails the snapshot: the
+    // Job record beside it stays readable.
+    try Data("{not-a-document}".utf8).write(
+      to: state.appending(path: "superseding-recovery-epochs.json"))
+
+    let degraded = try await read("job.evidence", id: "job-degraded-read")
+    let fields = try object(XCTUnwrap(degraded.result))
+    XCTAssertTrue(Self.strings(fields["blockers"]).contains("recordUnreadable"))
+    XCTAssertEqual(fields["providerId"], .string("hdc"))
+    XCTAssertEqual(fields["executionMode"], .string("execute"))
+    XCTAssertEqual(fields["actualStepKinds"], .null)
+    let facts = try CurrentRuntimeResourceReads.evidence(.object(fields))
+    XCTAssertEqual(facts.providerID, "hdc")
+    XCTAssertNil(facts.actualStepKinds)
+
+    // Negative control: with the document readable again the full snapshot is
+    // what answers, so the degraded shape is not what this fixture always gets.
+    try FileManager.default.removeItem(
+      at: state.appending(path: "superseding-recovery-epochs.json"))
+    let restoredResponse = try await read("job.evidence", id: "job-degraded-read")
+    let restored = try object(XCTUnwrap(restoredResponse.result))
+    XCTAssertFalse(Self.strings(restored["blockers"]).contains("recordUnreadable"))
+    XCTAssertEqual(restored["actualStepKinds"], .array([]))
+  }
+
   func testMissingRequiredIndexEntryAndWrongArtifactOwnerCannotVerify() async throws {
     try seed("job-missing"); try seed("job-foreign")
     let metadata = try await publishRequired("job-missing")

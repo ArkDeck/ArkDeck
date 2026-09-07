@@ -656,7 +656,7 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     XCTAssertEqual(evidence.observation?.bindingRevision, 7)
     XCTAssertEqual(evidence.observation?.model, "OpenHarmony Reference Device")
     XCTAssertEqual(evidence.observation?.firmware, "OpenHarmony-4.1-release")
-    XCTAssertTrue(evidence.actualStepKinds.contains("probeDevice"))
+    XCTAssertTrue(try XCTUnwrap(evidence.actualStepKinds).contains("probeDevice"))
     XCTAssertNotNil(evidence.startedAtUTC)
     XCTAssertNotNil(evidence.finishedAtUTC)
     // The journal itself carries the intents: replay sees a clean history.

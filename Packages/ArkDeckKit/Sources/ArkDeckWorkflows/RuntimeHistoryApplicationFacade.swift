@@ -245,6 +245,10 @@ public struct RuntimeJobEvidencePresentation: Sendable, Equatable {
   /// prepare a new request from these values but never from formatted text.
   public let typedParameters: [String: JSONValue]?
   public let actualStepKinds: [String]
+  /// False when the Runtime published the steps as unknown. Without it an
+  /// empty list reads as a claim that no step ran, which is the opposite of
+  /// what an unprovable Flash journal means.
+  public let actualStepKindsWereReported: Bool
   public let authorityKind: String?
   public let authorityReference: String?
   public let observedModel: String?
@@ -1004,13 +1008,19 @@ enum RuntimeJobDetailResponseDecoding {
     }
     guard
       envelope["jobId"] as? String == jobID,
-      envelope["operationReference"] as? String == operationReference,
+      envelope["operationReference"] as? String == operationReference
+    else {
+      return .unavailable("Job evidence did not match the selected Job")
+    }
+    // A field the Runtime could not publish is not an identity mismatch, and
+    // saying so sent an operator looking for the wrong problem.
+    guard
       let catalogDigest = envelope["catalogDigest"] as? String,
       let providerID = envelope["providerId"] as? String,
       let executionMode = envelope["executionMode"] as? String,
       let terminalState = envelope["terminalState"] as? String
     else {
-      return .unavailable("Job evidence did not match the selected Job")
+      return .unavailable("Job evidence is missing facts the Runtime must publish")
     }
 
     let parameterObject = envelope["parameters"] as? [String: Any]
@@ -1040,6 +1050,7 @@ enum RuntimeJobDetailResponseDecoding {
           return try? JSONDecoder().decode([String: JSONValue].self, from: bytes)
         },
         actualStepKinds: envelope["actualStepKinds"] as? [String] ?? [],
+        actualStepKindsWereReported: envelope["actualStepKinds"] as? [String] != nil,
         authorityKind: authority?["kind"] as? String,
         authorityReference: authority?["reference"] as? String,
         observedModel: observation?["model"] as? String,
@@ -1281,6 +1292,7 @@ private actor RuntimeJobDetailFixtureProvider: RuntimeJobDetailApplicationProvid
         parametersWereReported: true,
         typedParameters: ["fixture": .string("presentation-only")],
         actualStepKinds: isFlash ? ["flashPartition"] : ["readDeviceFacts"],
+        actualStepKindsWereReported: true,
         authorityKind: isFlash ? "runtimeCapability" : "defaultReadOnlyPolicy",
         authorityReference: "fixture-read-only",
         observedModel: "DAYU200",

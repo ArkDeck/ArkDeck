@@ -151,16 +151,21 @@ struct RuntimeJobResourceReader {
     if let snapshot, case .object(let value) = RuntimeControlPlaneHandler.encodeEvidence(
       snapshot: snapshot, artifacts: verified, blockers: blockers.sorted()) { fields = value }
     else {
+      // The record this degraded shape is built from is the same record the
+      // full snapshot reads these two facts out of, so publishing them as
+      // null claimed they were unknown when they were in hand.
       fields = ["jobId": .string(jobID), "operationReference": .string(record.operationReference),
         "catalogDigest": .string(record.catalogDigest), "targetId": .string(record.request.target.targetID),
+        "providerId": .string(record.providerID),
+        "executionMode": .string(RuntimeJobEvidenceSnapshot.persistedExecutionMode),
         "terminalState": .string(record.outcomeUnknown ? "outcomeUnknown" : record.state),
         "outcomeUnknown": .bool(record.outcomeUnknown), "artifacts": .array([]),
         "blockers": .array(blockers.sorted().map(JSONValue.string))]
     }
     // A failed evidence read retains the same closed shape. Unknown facts are
     // explicit nulls, not invented defaults or an alternate success schema.
-    for name in ["bindingRevision", "providerId", "actualEffect", "authority", "observation", "actualStepKinds",
-      "executionMode", "startedAtUtc", "firstEvidenceStepAtUtc", "finishedAtUtc", "recoveryEpoch",
+    for name in ["bindingRevision", "actualEffect", "authority", "observation", "actualStepKinds",
+      "startedAtUtc", "firstEvidenceStepAtUtc", "finishedAtUtc", "recoveryEpoch",
       "parameters", "traceProbeBefore", "traceProbeAfter"] where fields[name] == nil {
       fields[name] = .null
     }

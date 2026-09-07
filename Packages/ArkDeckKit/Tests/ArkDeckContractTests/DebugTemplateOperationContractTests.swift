@@ -126,7 +126,7 @@ final class DebugTemplateOperationContractTests: XCTestCase {
 
     let evidence = try await engine.evidenceSnapshot(jobID: acceptance.jobID)
     XCTAssertEqual(evidence.actualEffect, "readOnly")
-    XCTAssertTrue(evidence.actualStepKinds.contains("probeDevice"))
+    XCTAssertTrue(try XCTUnwrap(evidence.actualStepKinds).contains("probeDevice"))
   }
 
   func testAnIdentityOutsideTheClosedSetIsRefusedBeforeAnyDispatch() async throws {
