@@ -243,6 +243,12 @@ package protocol RockchipBindingReactivationProving: Sendable {
 package struct ProductRockchipLoaderBindingCoordinator:
   RockchipLoaderBindingCoordinating, Sendable
 {
+  /// The readback this product writes when it has seen the board answer in its
+  /// hdc-normal personality. Named once: the cross-mode alias below decides on
+  /// it, and a second spelling would let that decision drift from what the
+  /// evidence writers actually record.
+  static let hdcNormalReadbackEvidence = "product:e0-iokit-single-dayu200-readback"
+
   private let targetStore: RuntimeTargetStore
   private let bindingStore: RockchipProductBindingStore
   private let usbProbe: RockchipProductUSBProbe
@@ -359,7 +365,7 @@ package struct ProductRockchipLoaderBindingCoordinator:
         serial: identity.serial,
         usbTopology: identity.topology,
         evidence: [
-          "product:e0-iokit-single-dayu200-readback",
+          Self.hdcNormalReadbackEvidence,
           "usb:vendor=\(RockchipProbeEvidence.rockUSBVendorID),profile=dayu200-cross-mode",
           "identity:serial-sha256=\(currentIdentity)",
           "binding:selected-target-id=\(targetID)",
@@ -580,21 +586,40 @@ package struct ProductRockchipLoaderBindingCoordinator:
       }
       hdcAlias = priorAlias
     } else {
-      // First cross-mode binding for this target. The alias is the target's
-      // own connect key — the address the device answers on in hdc-normal —
-      // and the topology is the port it was just observed at. Both are read,
-      // neither is assumed.
+      // First cross-mode binding for this target. Both halves of the alias
+      // describe the board's hdc-normal personality, so both must be read from
+      // an hdc-normal observation: the identity from the target's own connect
+      // key — the address the device answers on in hdc-normal — and the
+      // topology from the binding this call is replacing, which recorded the
+      // port while the board was in hdc-normal.
+      //
+      // `identity.topology` is the wrong source here even though it is the
+      // freshest reading, because `identity` is the Loader that is attached
+      // right now and a DAYU200 changes both its serial and its IOKit topology
+      // between the two personalities (see `RockchipDeviceBinding`). Measured
+      // on the bench board 2026-09-07 while it sat in Loader: hdc-normal
+      // 150100424a544434520325874bbf4900 at port 2097152, Loader
+      // 1160102311220451 at port 1179648. Writing the Loader port under
+      // `binding:hdc-normal-alias-usb-topology=` makes it the post-flash
+      // hdc-normal reconnect expectation, so the restore would look for the
+      // board at a port it only ever occupies while in Loader.
+      //
+      // A binding that never saw this board in hdc-normal has no such port to
+      // offer and is refused rather than guessed at, which keeps a Loader-only
+      // board blocked before any write instead of after the reboot.
       guard target.bindingRevision == expectedBindingRevision,
         !target.connectKey.isEmpty,
-        !identity.topology.isEmpty,
-        identity.topology.utf8.allSatisfy({ (48...57).contains($0) })
+        existing.evidence.contains(Self.hdcNormalReadbackEvidence),
+        !existing.usbTopology.isEmpty,
+        existing.usbTopology.utf8.allSatisfy({ (48...57).contains($0) })
       else {
         throw RockchipFlashExecutionError.admissionRejected(
-          "first cross-mode binding needs a matching binding revision and an observed port")
+          "first cross-mode binding needs a matching binding revision and an hdc-normal port "
+            + "observed under this binding")
       }
       hdcAlias = (
         identitySHA256: SHA256Hex.string(of: Data(target.connectKey.utf8)),
-        usbTopology: identity.topology
+        usbTopology: existing.usbTopology
       )
     }
     let targetConnectIdentity = SHA256Hex.string(of: Data(target.connectKey.utf8))
@@ -727,7 +752,7 @@ package struct ProductRockchipLoaderBindingCoordinator:
     let mode = identity.isLoader ? "loader" : "hdc-normal"
     let candidateID = "dayu200-\(mode)-\(currentIdentity.prefix(12))"
     let candidateEvidence = [
-      "product:e0-iokit-single-dayu200-readback",
+      Self.hdcNormalReadbackEvidence,
       "identity:serial-sha256=\(currentIdentity)",
       "binding:usb-topology=\(identity.topology)",
       "mode:\(mode)",

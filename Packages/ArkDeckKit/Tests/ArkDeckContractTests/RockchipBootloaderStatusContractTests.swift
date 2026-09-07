@@ -204,6 +204,100 @@ final class RockchipBootloaderStatusContractTests: XCTestCase {
     }
   }
 
+  /// The hdc-normal alias must describe the board's hdc-normal personality on
+  /// both halves. A DAYU200 changes its serial and its IOKit topology between
+  /// personalities, so the port the Loader is attached at right now is the one
+  /// port the alias must not carry: it becomes the post-flash hdc-normal
+  /// reconnect expectation, and a restore would then look for the board where
+  /// it only ever sits while in Loader.
+  ///
+  /// The two ports are the ones measured on the bench board on 2026-09-07,
+  /// with the board sitting in Loader after a refused restore.
+  func testFirstCrossModeAliasCarriesTheHDCNormalPortNotTheAttachedLoaderPort() throws {
+    let hdcNormalPort = "2097152"
+    let loaderPort = "1179648"
+    let targets = try RuntimeTargetStore(
+      directoryURL: root.appending(path: "targets-cross-mode", directoryHint: .isDirectory))
+    let bindings = RockchipProductBindingStore(
+      rootURL: root.appending(path: "binding-cross-mode", directoryHint: .isDirectory))
+
+    // The board as it was bound while answering in hdc-normal.
+    let hdcSerial = "150100424a544434520325874bbf4900"
+    let target = try targets.adopt(
+      stableIdentitySHA256: digest(hdcSerial),
+      connectKey: hdcSerial,
+      toolVersion: "3.2.0f",
+      nowUTC: "2026-09-07T00:00:00Z"
+    ).record
+    _ = try bindings.install(
+      RockchipProductBindingSnapshot(
+        revision: 1,
+        serial: hdcSerial,
+        usbTopology: hdcNormalPort,
+        evidence: [
+          "product:e0-iokit-single-dayu200-readback",
+          "identity:serial-sha256=\(digest(hdcSerial))",
+        ]))
+
+    // The same board, now in Loader: a different serial on a different port.
+    let loader = loaderIdentity(serial: "1160102311220451", topology: loaderPort)
+    let coordinator = ProductRockchipLoaderBindingCoordinator(
+      targetStore: targets,
+      bindingStore: bindings,
+      usbProbe: RockchipProductUSBProbe(identitySource: { [loader] }),
+      loaderObserver: AcceptingArkForgeLoaderObserver())
+    let receipt = try coordinator.bindCurrentLoader(
+      targetID: target.targetID, expectedBindingRevision: target.bindingRevision)
+    XCTAssertTrue(receipt.updated)
+
+    let stored = try bindings.loadExisting()
+    XCTAssertTrue(
+      stored.evidence.contains("binding:hdc-normal-alias-usb-topology=\(hdcNormalPort)"),
+      "the alias must carry the hdc-normal port: \(stored.evidence)")
+    XCTAssertFalse(
+      stored.evidence.contains("binding:hdc-normal-alias-usb-topology=\(loaderPort)"),
+      "the alias must not carry the attached Loader's port: \(stored.evidence)")
+    XCTAssertTrue(
+      stored.evidence.contains(
+        "identity:hdc-normal-alias-sha256=\(digest(hdcSerial))"),
+      "the alias identity must stay the hdc-normal connect key: \(stored.evidence)")
+  }
+
+  /// A binding that never observed this board in hdc-normal has no hdc-normal
+  /// port to offer, so the cross-mode bind refuses instead of substituting the
+  /// Loader's port. This is what keeps a Loader-only board blocked before any
+  /// write rather than after the reboot.
+  func testFirstCrossModeBindRefusesWhenNoHDCNormalReadbackBacksTheBinding() throws {
+    let targets = try RuntimeTargetStore(
+      directoryURL: root.appending(path: "targets-loader-only", directoryHint: .isDirectory))
+    let bindings = RockchipProductBindingStore(
+      rootURL: root.appending(path: "binding-loader-only", directoryHint: .isDirectory))
+    let serial = "loader-only-board"
+    let target = try targets.adopt(
+      stableIdentitySHA256: digest(serial),
+      connectKey: serial,
+      toolVersion: "3.2.0f",
+      nowUTC: "2026-09-07T00:00:00Z"
+    ).record
+    _ = try bindings.install(
+      RockchipProductBindingSnapshot(
+        revision: 1,
+        serial: serial,
+        usbTopology: "1179648",
+        evidence: ["identity:serial-sha256=\(digest(serial))"]))
+
+    let loader = loaderIdentity(serial: "1160102311220451", topology: "1179648")
+    let coordinator = ProductRockchipLoaderBindingCoordinator(
+      targetStore: targets,
+      bindingStore: bindings,
+      usbProbe: RockchipProductUSBProbe(identitySource: { [loader] }),
+      loaderObserver: AcceptingArkForgeLoaderObserver())
+    XCTAssertThrowsError(
+      try coordinator.bindCurrentLoader(
+        targetID: target.targetID, expectedBindingRevision: target.bindingRevision))
+    XCTAssertEqual(try bindings.loadExisting().evidence.count, 1, "the binding is not rewritten")
+  }
+
   func testRuntimeReactivatesExactAdvancedTargetFromCompleteTypedHistory() throws {
     let fixture = try makeDisplacedAdvancedFixture("reactivation")
     let proof = RockchipBindingReactivationProof(
