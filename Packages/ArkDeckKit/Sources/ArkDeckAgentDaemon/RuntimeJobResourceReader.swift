@@ -8,6 +8,12 @@ struct RuntimeJobResourceReader {
   let engine: RuntimeJobEngine
   let artifactStore: RuntimeArtifactStore?
 
+  /// The one blocker every evidence surface uses when durable state cannot
+  /// prove which typed steps ran. It is published on `blockers`, which is an
+  /// open list of strings, so naming it here keeps the two producers of this
+  /// fact from drifting apart.
+  static let stepKindsUnprovable = "stepKindsUnprovable"
+
   func response(_ request: AgentWireProtocol.Request) async -> AgentWireProtocol.Response {
     do {
       let fields = request.params ?? [:]
@@ -141,11 +147,19 @@ struct RuntimeJobResourceReader {
     let snapshot: RuntimeJobEvidenceSnapshot?
     do { snapshot = try await engine.evidenceSnapshot(jobID: jobID) }
     catch { snapshot = nil; blockers.insert("recordUnreadable") }
+    // Typed steps the Runtime could not prove are a reason to withhold
+    // `verified`, not a detail beside it. Without this a destructive Job whose
+    // write cannot be proven answered `status: "verified"` with an empty
+    // blocker list, and every gate that reads only `blockers` let it through.
+    if snapshot?.actualStepKinds == nil, snapshot != nil {
+      blockers.insert(Self.stepKindsUnprovable)
+    }
     let reason: String
     if !terminal { reason = "resultNotReady" }
     else if blockers.contains("recordUnreadable") { reason = "recordUnreadable" }
     else if blockers.contains("artifactIntegrityFailed") || blockers.contains("artifactStoreUnavailable") { reason = "artifactIntegrityFailed" }
     else if blockers.contains("operationUnavailable") { reason = "operationUnavailable" }
+    else if blockers.contains(Self.stepKindsUnprovable) { reason = Self.stepKindsUnprovable }
     else { reason = "verified" }
     var fields: [String: JSONValue]
     if let snapshot, case .object(let value) = RuntimeControlPlaneHandler.encodeEvidence(

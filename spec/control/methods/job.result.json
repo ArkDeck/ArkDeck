@@ -206,10 +206,19 @@
               "type": "string"
             },
             "actualStepKinds": {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": [
+                    "null"
+                  ]
+                }
+              ]
             },
             "artifacts": {
               "items": {
@@ -780,7 +789,7 @@
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
     "error": 3,
-    "request": 8,
-    "result": 5
+    "request": 10,
+    "result": 7
   }
 }
