@@ -44,13 +44,25 @@
       "additionalProperties": false,
       "properties": {
         "actualEffect": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "actualStepKinds": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": [
+                "null"
+              ]
+            }
+          ]
         },
         "artifacts": {
           "items": {
@@ -171,7 +183,10 @@
           ]
         },
         "bindingRevision": {
-          "type": "integer"
+          "type": [
+            "integer",
+            "null"
+          ]
         },
         "blockers": {
           "items": {
@@ -301,37 +316,46 @@
           "type": "boolean"
         },
         "parameters": {
-          "additionalProperties": false,
-          "properties": {
-            "abilityName": {
-              "type": "string"
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "abilityName": {
+                  "type": "string"
+                },
+                "bundleName": {
+                  "type": "string"
+                },
+                "displayHeight": {
+                  "type": "integer"
+                },
+                "displayWidth": {
+                  "type": "integer"
+                },
+                "durationSeconds": {
+                  "type": "integer"
+                },
+                "hapArtifactLease": {
+                  "type": "string"
+                },
+                "privateInput": {
+                  "type": "string"
+                },
+                "x": {
+                  "type": "integer"
+                },
+                "y": {
+                  "type": "integer"
+                }
+              },
+              "type": "object"
             },
-            "bundleName": {
-              "type": "string"
-            },
-            "displayHeight": {
-              "type": "integer"
-            },
-            "displayWidth": {
-              "type": "integer"
-            },
-            "durationSeconds": {
-              "type": "integer"
-            },
-            "hapArtifactLease": {
-              "type": "string"
-            },
-            "privateInput": {
-              "type": "string"
-            },
-            "x": {
-              "type": "integer"
-            },
-            "y": {
-              "type": "integer"
+            {
+              "type": [
+                "null"
+              ]
             }
-          },
-          "type": "object"
+          ]
         },
         "providerId": {
           "type": "string"
@@ -404,7 +428,7 @@
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
     "error": 1,
-    "request": 19,
-    "result": 18
+    "request": 23,
+    "result": 22
   }
 }
