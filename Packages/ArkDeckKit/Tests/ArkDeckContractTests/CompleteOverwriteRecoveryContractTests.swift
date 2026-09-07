@@ -732,7 +732,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     XCTAssertEqual(observation.confirmationMethod, "machineReadback")
     XCTAssertEqual(evidence.firstEvidenceStepAtUTC, observation.confirmedAtUTC)
     XCTAssertTrue(
-      Set(evidence.actualStepKinds).isSuperset(of: [
+      Set(try XCTUnwrap(evidence.actualStepKinds)).isSuperset(of: [
         "flashPartition", "verifyRemoteState", "rebootDevice", "waitForReconnect",
         "probeDevice",
       ]),

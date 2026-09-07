@@ -240,7 +240,10 @@ package struct RuntimeHardwareEvidenceTrustedFacts: Codable, Sendable, Equatable
   public let actualEffect: RuntimeHardwareEvidenceEffectLevel?
   public let authority: RuntimeHardwareEvidenceAuthority?
   public let observation: RuntimeHardwareEvidenceObservation?
-  public let actualStepKinds: [String]
+  /// Null when the daemon could not prove the typed steps out of durable
+  /// state. Required here until now, which made every such Job undecodable
+  /// and hid its real terminal reason behind a decoding error.
+  public let actualStepKinds: [String]?
   public let executionMode: String
   public let terminalState: String
   public let outcomeUnknown: Bool

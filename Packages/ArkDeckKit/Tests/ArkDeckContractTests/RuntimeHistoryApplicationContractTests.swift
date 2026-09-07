@@ -971,6 +971,63 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
     XCTAssertEqual(detail.correlation?.artifacts.map(\.id), ["artifact-1"])
   }
 
+  /// Two separate things used to be reported as one: an envelope for a
+  /// different Job, and an envelope for the right Job that is missing a fact
+  /// the Runtime must publish. Both said "did not match the selected Job",
+  /// which sent an operator looking for an identity problem that was not
+  /// there — measured on the 2026-09-07 GJ-4 window, where the missing fact
+  /// was the whole story.
+  func testMissingPublishedFactsAreNotReportedAsAJobIdentityMismatch() throws {
+    func detail(_ evidence: [String: Any]) throws -> RuntimeJobDetailPresentation {
+      RuntimeJobDetailResponseDecoding.presentation(
+        jobID: "job-1", operationReference: "flash.full-restore@1",
+        statusResponse: .success(try currentJobDetailResponse([
+          "jobId": "job-1", "operation": "flash.full-restore@1",
+          "targetId": "target-dayu200-a", "sessionId": "session-job-1",
+          "timeline": ["queued", "running", "waitingForRecovery"],
+        ])),
+        evidenceResponse: try response(evidence),
+        artifactResponse: .success(try currentArtifactPageResponse([])))
+    }
+    var complete: [String: Any] = [
+      "jobId": "job-1",
+      "operationReference": "flash.full-restore@1",
+      "catalogDigest": String(repeating: "a", count: 64),
+      "providerId": "arkforge",
+      "executionMode": "execute",
+      "terminalState": "outcomeUnknown",
+      "actualStepKinds": NSNull(),
+      "blockers": ["outcomeUnknown"],
+    ]
+
+    // The Runtime could not prove the steps. That is a readable answer, and
+    // an empty list is not the same claim as "unknown".
+    let unknownSteps = try detail(complete)
+    XCTAssertEqual(unknownSteps.evidenceAvailability, .available)
+    XCTAssertEqual(unknownSteps.evidence?.actualStepKinds, [])
+    XCTAssertEqual(unknownSteps.evidence?.actualStepKindsWereReported, false)
+    XCTAssertEqual(unknownSteps.evidence?.providerID, "arkforge")
+
+    complete["actualStepKinds"] = ["flashPartition"]
+    let reportedSteps = try detail(complete)
+    XCTAssertEqual(reportedSteps.evidence?.actualStepKinds, ["flashPartition"])
+    XCTAssertEqual(reportedSteps.evidence?.actualStepKindsWereReported, true)
+
+    var missingProvider = complete
+    missingProvider["providerId"] = NSNull()
+    guard case .unavailable(let missingReason) = try detail(missingProvider).evidenceAvailability
+    else { return XCTFail("an unpublishable fact must not read as available evidence") }
+    XCTAssertTrue(missingReason.contains("missing facts"), missingReason)
+    XCTAssertFalse(missingReason.contains("did not match"), missingReason)
+
+    // Negative control: a genuine identity mismatch still says so.
+    var foreign = complete
+    foreign["jobId"] = "job-somebody-else"
+    guard case .unavailable(let foreignReason) = try detail(foreign).evidenceAvailability
+    else { return XCTFail("evidence for another Job must not be shown for this one") }
+    XCTAssertTrue(foreignReason.contains("did not match"), foreignReason)
+  }
+
   func testCorrelationFailsIndependentlyWhenAnOlderStatusHasNoSessionIdentity() throws {
     let detail = RuntimeJobDetailResponseDecoding.presentation(
       jobID: "job-old",
