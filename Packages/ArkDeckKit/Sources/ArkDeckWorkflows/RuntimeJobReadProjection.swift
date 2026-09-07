@@ -137,7 +137,11 @@ package enum RuntimeJobReadProjection {
       "materializedPlanDigest": record.materializedPlanDigest.map(JSONValue.string) ?? .null,
       "materializedBindingRevision": record.materializedBindingRevision.map { .integer(Int64($0)) } ?? .null,
       "materializedStableIdentitySha256": record.materializedStableTargetIdentitySHA256.map(JSONValue.string) ?? .null,
-      "actualStepKinds": .array((record.actualStepKinds ?? []).map(JSONValue.string)),
+      // The record either lists the typed steps it recorded or says nothing.
+      // An empty array is not a value the Runtime ever stores — the only
+      // writer appends at least one element — so publishing one here could
+      // only ever be this collapse, read as a claim that no step ran.
+      "actualStepKinds": record.actualStepKinds.map { .array($0.map(JSONValue.string)) } ?? .null,
       "timeline": try timeline(record.timeline, jobID: record.jobID),
       "events": .object(["method": .string("job.events"), "jobId": .string(record.jobID)]),
       "evidence": .object(["method": .string("job.evidence"), "jobId": .string(record.jobID)]),
