@@ -109,10 +109,19 @@
               "type": "string"
             },
             "actualStepKinds": {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": [
+                    "null"
+                  ]
+                }
+              ]
             },
             "artifacts": {
               "items": {
@@ -162,41 +171,53 @@
               "type": "array"
             },
             "authority": {
-              "additionalProperties": false,
-              "properties": {
-                "admittedAtUtc": {
-                  "type": "string"
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "admittedAtUtc": {
+                      "type": "string"
+                    },
+                    "consumptionFingerprintSha256": {
+                      "type": "null"
+                    },
+                    "kind": {
+                      "type": "string"
+                    },
+                    "recoveryEpoch": {
+                      "type": "null"
+                    },
+                    "reference": {
+                      "type": "string"
+                    },
+                    "validUntilUtc": {
+                      "type": "null"
+                    }
+                  },
+                  "required": [
+                    "admittedAtUtc",
+                    "consumptionFingerprintSha256",
+                    "kind",
+                    "recoveryEpoch",
+                    "reference",
+                    "validUntilUtc"
+                  ],
+                  "type": "object"
                 },
-                "consumptionFingerprintSha256": {
-                  "type": "null"
-                },
-                "kind": {
-                  "type": "string"
-                },
-                "recoveryEpoch": {
-                  "type": "null"
-                },
-                "reference": {
-                  "type": "string"
-                },
-                "validUntilUtc": {
-                  "type": "null"
+                {
+                  "type": [
+                    "null"
+                  ]
                 }
-              },
-              "required": [
-                "admittedAtUtc",
-                "consumptionFingerprintSha256",
-                "kind",
-                "recoveryEpoch",
-                "reference",
-                "validUntilUtc"
-              ],
-              "type": "object"
+              ]
             },
             "bindingRevision": {
               "type": "integer"
             },
             "blockers": {
+              "items": {
+                "type": "string"
+              },
               "type": "array"
             },
             "catalogDigest": {
@@ -206,89 +227,104 @@
               "type": "string"
             },
             "finishedAtUtc": {
-              "type": "string"
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "firstEvidenceStepAtUtc": {
-              "type": "string"
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "jobId": {
               "type": "string"
             },
             "observation": {
-              "additionalProperties": false,
-              "properties": {
-                "bindingRevision": {
-                  "type": "integer"
-                },
-                "confirmationMethod": {
-                  "type": "string"
-                },
-                "confirmedAtUtc": {
-                  "type": "string"
-                },
-                "firmware": {
-                  "type": "string"
-                },
-                "model": {
-                  "type": "string"
-                },
-                "preflightSteps": {
-                  "items": {
-                    "additionalProperties": false,
-                    "properties": {
-                      "outcomeAtUtc": {
-                        "type": "string"
-                      },
-                      "stepId": {
-                        "type": "string"
-                      },
-                      "stepKind": {
-                        "type": "string"
-                      }
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "bindingRevision": {
+                      "type": "integer"
                     },
-                    "required": [
-                      "outcomeAtUtc",
-                      "stepId",
-                      "stepKind"
-                    ],
-                    "type": "object"
+                    "confirmationMethod": {
+                      "type": "string"
+                    },
+                    "confirmedAtUtc": {
+                      "type": "string"
+                    },
+                    "firmware": {
+                      "type": "string"
+                    },
+                    "model": {
+                      "type": "string"
+                    },
+                    "preflightSteps": {
+                      "items": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "outcomeAtUtc": {
+                            "type": "string"
+                          },
+                          "stepId": {
+                            "type": "string"
+                          },
+                          "stepKind": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "outcomeAtUtc",
+                          "stepId",
+                          "stepKind"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "providerId": {
+                      "type": "string"
+                    },
+                    "stableIdentitySha256": {
+                      "type": "string"
+                    },
+                    "targetId": {
+                      "type": "string"
+                    },
+                    "toolSha256": {
+                      "type": "string"
+                    },
+                    "toolVersion": {
+                      "type": "string"
+                    },
+                    "transport": {
+                      "type": "string"
+                    }
                   },
-                  "type": "array"
+                  "required": [
+                    "bindingRevision",
+                    "confirmationMethod",
+                    "confirmedAtUtc",
+                    "firmware",
+                    "model",
+                    "preflightSteps",
+                    "providerId",
+                    "stableIdentitySha256",
+                    "targetId",
+                    "toolSha256",
+                    "toolVersion",
+                    "transport"
+                  ],
+                  "type": "object"
                 },
-                "providerId": {
-                  "type": "string"
-                },
-                "stableIdentitySha256": {
-                  "type": "string"
-                },
-                "targetId": {
-                  "type": "string"
-                },
-                "toolSha256": {
-                  "type": "string"
-                },
-                "toolVersion": {
-                  "type": "string"
-                },
-                "transport": {
-                  "type": "string"
+                {
+                  "type": [
+                    "null"
+                  ]
                 }
-              },
-              "required": [
-                "bindingRevision",
-                "confirmationMethod",
-                "confirmedAtUtc",
-                "firmware",
-                "model",
-                "preflightSteps",
-                "providerId",
-                "stableIdentitySha256",
-                "targetId",
-                "toolSha256",
-                "toolVersion",
-                "transport"
-              ],
-              "type": "object"
+              ]
             },
             "operationReference": {
               "type": "string"
@@ -303,7 +339,10 @@
               "type": "null"
             },
             "startedAtUtc": {
-              "type": "string"
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "status": {
               "type": "string"
@@ -493,7 +532,7 @@
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
     "error": 1,
-    "request": 4,
-    "result": 3
+    "request": 5,
+    "result": 4
   }
 }
