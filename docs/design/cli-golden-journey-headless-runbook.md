@@ -229,12 +229,26 @@ arkdeck job evidence --job <job-id> --output json
 arkdeck flash device-access --output json
 arkdeck flash bootloader-status --output json
 arkdeck flash prerequisites --target <TGT> --device-profile dayu200 --output json
+arkdeck flash install-binding --output json
 arkdeck artifact import flash-bundle --import-request-id gj4-<date> --target <TGT> \
   --file inputs/OpenHarmony-7.0.0.37.tar.gz --device-profile dayu200 --output json
 arkdeck flash lane-preview --target <TGT> --device-profile dayu200 \
   --archive-sha256 4fd35765fa75b9e2ce7c11f614144804f72efdc955a197e657014df1349ac674 --output json
 arkdeck flash bind-loader --target <TGT> --expected-binding-revision <n> --output json
 ```
+
+`flash install-binding` 是这条序列 2026-09-07 之前缺的一步，不是可选项。它建立 durable
+cross-mode binding；没有它，全新 state 目录上的 `flash run` 会停在 `waitingForRecovery`、
+`outcomeUnknown`，daemon 侧的原话是
+`Rockchip binding requires Runtime Loader onboarding: storeFailure("previous target binding
+lineage is missing or ambiguous")`，而 job 一条 step kind 都不会记录。
+
+它必须在板子处于 **hdc-normal** 时执行：cross-mode 别名的两半都描述 hdc-normal 人格，而
+DAYU200 在两种模式下 serial 与 IOKit topology 都不同（2026-09-07 实测同一块板：hdc-normal
+`…874bbf4900` @ `2097152`，Loader `1160102311220451` @ `1179648`）。板子若已在 Loader，
+`install-binding` 会拒绝并报 `durable binding differs from the only connected Loader;
+explicit rebind is required`——**此时不要凭手感加 `--rebind`**：那是"人来说是"的授权口，会用当前
+观测替换每次破坏性准入的比对基准，先确认是同一块板再说。
 
 `gj4.json`：
 
