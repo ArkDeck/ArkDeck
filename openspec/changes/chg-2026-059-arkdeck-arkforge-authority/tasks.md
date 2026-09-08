@@ -44,10 +44,35 @@ review/merge 进入 protected `main` 后生效；合入前不得开始实现 PR�
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/**`
   - `Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckCLIMain.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckRuntimeCommands.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckCLI/CLICommandRegistry.swift`
+  - `openspec/contracts/cli-command-registry.yaml`
+  - `openspec/contracts/cli-feature-coverage.json`
   - `Packages/ArkDeckKit/LaunchAgents/LaunchAgentService.swift`
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/**`
   - `docs/design/rockchip-read-domain.md`
   - `openspec/changes/chg-2026-059-arkdeck-arkforge-authority/**`
+
+### Scope supplement — the alias reconciliation entry point
+
+补入三条精确路径，只为一个新叶子 `flash reconcile-alias`。它是 #1779 已合入的
+`RockchipPostFlashHDCBindingStore.reconcileReissuedLineage` 的唯一入口；机制、
+机械证明与测试已在 base 上，现在缺的只是把它接到已发布控制面。诊断、判据与
+被否决的三个候选入口见
+[alias lineage reissue](evidence/runs/TASK-AFA-001/alias-lineage-reissue-20260908.md)。
+
+叶子形态：control-plane，`--target <id> --expected-binding-revision <n>`，
+没有 Catalog operation、没有 capability、不触碰设备，只在 Runtime 自有的
+post-flash alias store 上写。五项身份事实（target、Loader identity、HDC
+identity、connect key、build）必须与 fresh target/device facts 全等且存储
+revision 严格领先时才归档并按 live revision 重发同一条路由；任一不符沿用
+`flash.postFlashHDCBindingConflict` 原拒绝。`flash prerequisites` 的
+`flash.postFlashHDCAliasLineageReissued` 拒绝里点名这个叶子，使操作者有出路
+而不是死胡同。
+
+不新增 Catalog operation、capability 管理、Core requirement 或 Acceptance
+scope；不改任何既有叶子的语义；不提供覆盖缺失证明的开关。本补充不改变 Task
+状态；维护者 review 合入 base 后，实现才能通过路径检查。
+
 - Applicable failure patterns:
   - `AF-004`（producer 到真实 dispatcher/postflight 全链）——permit 必须真的到达
     `arkforged` 并真的驱动一次写入，不能以 mock 通过；
