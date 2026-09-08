@@ -714,7 +714,7 @@ final class AutoUpdateContractTests: XCTestCase {
       contentsOf: repository.appending(path: "Packages/ArkDeckKit/Package.swift"),
       encoding: .utf8)
     let arkForgeRevision = "3f5b48cd7247f7e4304bb4f9d8a158f4feda5a92"
-    let arkTraceRevision = "e98a753ef61f616c8f95693cc4c4201c6b1e3393"
+    let arkTraceRevision = "c85731b0f903261bd69cf789027774fde615c8de"
     XCTAssertEqual(
       package.components(separatedBy: ".package(").count - 1, 7,
       "the package's direct remote-source dependency set is closed")
