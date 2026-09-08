@@ -33,6 +33,57 @@ Requirements/Scenarios。非本表范围的语义继续受现行 Core 和 approv
   accepted Core AC不能因移除历史兼容测试而删掉或放宽；若实施发现本表外Core变化，
   只提出有具体文本/理由的scoped修订，不自行改安全规则。
 
+## GJ-2 confirmed-failure compensation: candidate scoped delta
+
+本节是针对真实 GJ-2 缺陷的窄修订候选，随 TASK-SVC-002 范围补充供维护者 review。
+它不修改 current Core spec、Task/change 状态、已发布 operation、Runtime authority 或
+历史 Runtime/evidence；本范围 PR 不包含下面描述的生产实现。来源、精确文件与
+正负/崩溃矩阵见[审查记录](evidence/runs/TASK-SVC-002/gj2-compensation-scope-review.md)。
+
+### Proposed addition to REQ-JOB-001
+
+在原 external-effect intent 由 Provider reconcile 确认为失败，且此前设备身份和全部
+external-effect outcome 均已确认后，execute Job 可在 `finalizing` 执行适用于该 failure
+path 的、已由成功 source Step 预先 durable 声明的 typed compensation。
+此路径 SHALL 使用既有 `compensationIntent` / `compensationOutcome`；它不是普通 Step
+派发窗口。`finalizing` 的普通 Step 仍只允许 `finalizeSession`，不得先伪造
+`running` / `planning`，也不得重放原 unknown intent。
+
+补偿前 SHALL 重新验证原完整 materialized plan、精确 RuntimeCapability、fresh
+target/identity/binding/tool facts 和必要 Artifact；只能执行该 plan 已声明的精确补偿。
+任一补偿的 identity 或 external-effect outcome 未知时，Job SHALL 由新增的 execute
+pair `finalizing → waitingForRecovery` 停车并保留 exact outstanding intent 和 capability
+lineage；不得进入 terminal 或以原 failure 的已知性掩盖补偿的未知结果。此 pair
+不授权任何新 operation、普通 Step、plan-only mutation 或未声明的补偿。
+
+该补偿的独立只读 reconcile 只有在其 outcome、identity 和 safe boundary 都已确认时，
+才可回到原 failure 的 `finalizing`；confirmed completion 和 confirmed non-execution
+都不得把 Job 转成普通 `running` 或把原 operation 改成 succeeded。若补偿仍 unknown，
+则保持 `waitingForRecovery` 且后续 mutation dispatch 为 0。原 intent 和任何已经有
+durable intent 的补偿都不自动重放。
+
+### Proposed clarification to REQ-JOB-004
+
+source Step 的 typed compensation descriptor SHALL 在该 source intent dispatch 前
+durable 保存，并与其 target、binding、argumentsHash 和 source identity 关联。
+`debug.hap@1` 的 failure path 只调度已确认成功 source 所声明的 stop、按 cleanupPolicy
+选择的 uninstall 和 job-owned staging cleanup。`uninstallPackage` 使用已有 typed kind
+与参数/effect/binding 约束；本修订仅将其加入既有 compensation descriptor vocabulary。
+
+原始 operation failure SHALL 在补偿、reconcile 和 restart 后保留；补偿 outcome 独立
+记录，不覆盖原失败。confirmed failed cleanup 的 residue SHALL 幂等记录，保存精确
+typed action，并按现行规则呈现 debt/needsAttention；持久化失败不得被吞掉后提前结算。
+已有 failed cleanup 的显式 debt continuation 语义保持，不能用 debt 代替 unknown
+compensation 的 journal/recovery 路径。
+
+restart 本身 SHALL 零 device dispatch。含尚未完成、预先声明补偿的 clean `finalizing`
+不得被自动终结而丢弃补偿职责；显式既有 continuation 只能执行剩余未派发补偿。
+intent/outcome、debt、terminal 和 capability outcome 各崩溃窗口均以 durable 事实恢复，
+不重复补偿、不重复记债、不提前释放 capability。只有所有 external-effect outcome
+已确认，且适用补偿已完成或其 confirmed failure 已单独保存，才可完成原 `failed`
+终态并结算 capability。缺少预声明或完整证明的历史 Job 不补造 descriptor，也不因
+升级自动产生新 dispatch。
+
 ## Acceptance ownership
 
 SVC-AC-01..10 是本 change 的局部验收，在 [verification.md](verification.md) 登记。
