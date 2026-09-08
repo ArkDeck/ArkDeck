@@ -45,6 +45,8 @@ review/merge 进入 protected `main` 后生效；合入前不得开始实现 PR�
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/**`
   - `Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckCLIMain.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckRuntimeCommands.swift`
+  - `Packages/ArkDeckKit/Contracts/control-protocol.json`
+  - `spec/control/methods/flash.reconcile-alias.json`
   - `Packages/ArkDeckKit/Sources/ArkDeckCLI/CLICommandRegistry.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckCLI/CLIControlMethodRegistry.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckCLI/CLIMachineContracts.swift`
@@ -91,6 +93,22 @@ scope；不改任何既有叶子的语义；不提供覆盖缺失证明的开关
 `flash.reconcile-alias` 一行：分类为 mutation-capable（它写 Runtime 自有的
 alias store，响应丢失无法自证是否已写，调用方应改读 `flash prerequisites`
 而不是重发），ruling 指向同名叶子。不改任何既有方法的分类或 ruling。
+
+第四次补充，起因是一个实测出来的缺陷：#1786 合入的 `flash reconcile-alias`
+**在线上不可达**。CLI 叶子、handler、注册表、契约产物、44 个测试全部就位并整闸
+通过，但 daemon 从不发布这个方法——`Packages/ArkDeckKit/Contracts/control-protocol.json`
+里那 96 个方法的清单没有它，所以真机上调用返回
+`controlMethodUnavailable / unknownMethod`。这是从 protected main 重建 helper
+后在真机上发现的，单元测试全绿。
+
+因此补两条：`control-protocol.json`（生成的 `ControlProtocolGenerated.swift`
+在已有的 `ArkDeckCore/**` 内）与该方法的 per-method schema。发布方法会改变
+contract identity，这是有意的已发布面变更。
+
+同时补上让这个缺陷得以发生的闸：现有
+`ControlMethodReachabilityContractTests` 只检查"已发布 → 有 dispatch"，没有反
+方向的检查，于是一个 `connectsToRuntime` 的 CLI 叶子指向未发布方法可以一路绿灯。
+实现 PR 会在 `Tests/ArkDeckContractTests/**`（已在范围内）补上该断言。
 
 考虑过的替代方案是把叶子做成 `flash install-binding` 那样纯 CLI 进程内的命令
 （`ArkDeckCLIMain.swift` 已在范围内，且那条命令今天就直接写同一个根目录下的
