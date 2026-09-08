@@ -46,6 +46,8 @@ review/merge 进入 protected `main` 后生效；合入前不得开始实现 PR�
   - `Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckCLIMain.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckRuntimeCommands.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckCLI/CLICommandRegistry.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckCLI/CLIControlMethodRegistry.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckCLI/CLIMachineContracts.swift`
   - `openspec/contracts/cli-command-registry.yaml`
   - `openspec/contracts/cli-feature-coverage.json`
   - `Packages/ArkDeckKit/LaunchAgents/LaunchAgentService.swift`
@@ -80,6 +82,15 @@ scope；不改任何既有叶子的语义；不提供覆盖缺失证明的开关
 这个叶子实现不了。这里只加 `flash.reconcile-alias` 一个 case、一个可选注入的
 协调者字段及其初始化参数；不动任何既有方法、`RuntimeJobResourceReader`、
 `RuntimeStorageResourceHandler` 或该模块其他文件。
+
+再补两条：`CLIControlMethodRegistry.swift` 与 `CLIMachineContracts.swift`。
+这不是新增能力，而是仓库自己的完备性闸要求每个已发布 daemon method 必须登记：
+`CLIControlFailureMappingContractTests.testEveryDaemonMethodIsClassified` 要求
+方法有 effect 分类（否则歧义失败只能靠猜），`CLIMachineContractTests` 的
+`testPublishedBundleMatchesThisBuild` 要求方法有 coverage ruling。两处都只加
+`flash.reconcile-alias` 一行：分类为 mutation-capable（它写 Runtime 自有的
+alias store，响应丢失无法自证是否已写，调用方应改读 `flash prerequisites`
+而不是重发），ruling 指向同名叶子。不改任何既有方法的分类或 ruling。
 
 考虑过的替代方案是把叶子做成 `flash install-binding` 那样纯 CLI 进程内的命令
 （`ArkDeckCLIMain.swift` 已在范围内，且那条命令今天就直接写同一个根目录下的
