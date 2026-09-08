@@ -91,6 +91,37 @@
           },
           "type": "array"
         },
+        "catalogStatus": {
+          "additionalProperties": false,
+          "properties": {
+            "blocker": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "complete": {
+              "type": "boolean"
+            },
+            "measurementIncomplete": {
+              "type": "boolean"
+            },
+            "unaccountedSessionCount": {
+              "type": "string"
+            },
+            "usedBytes": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "blocker",
+            "complete",
+            "measurementIncomplete",
+            "unaccountedSessionCount",
+            "usedBytes"
+          ],
+          "type": "object"
+        },
         "confirmationRequired": {
           "type": "boolean"
         },
@@ -160,11 +191,55 @@
         },
         "sessionId": {
           "type": "string"
+        },
+        "source": {
+          "additionalProperties": false,
+          "properties": {
+            "jobId": {
+              "type": "string"
+            },
+            "journalSha256": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "manifestSha256": {
+              "type": "string"
+            },
+            "rootDevice": {
+              "type": "string"
+            },
+            "rootInode": {
+              "type": "string"
+            },
+            "sessionDevice": {
+              "type": "string"
+            },
+            "sessionInode": {
+              "type": "string"
+            },
+            "volumeIdentity": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "jobId",
+            "journalSha256",
+            "manifestSha256",
+            "rootDevice",
+            "rootInode",
+            "sessionDevice",
+            "sessionInode",
+            "volumeIdentity"
+          ],
+          "type": "object"
         }
       },
       "required": [
         "allowSensitive",
         "artifacts",
+        "catalogStatus",
         "confirmationRequired",
         "createdAtUtc",
         "destination",
@@ -179,7 +254,8 @@
         "previewId",
         "schemaVersion",
         "sensitiveDefaultExcluded",
-        "sessionId"
+        "sessionId",
+        "source"
       ],
       "type": "object"
     }

@@ -80,6 +80,23 @@ final class SessionExportContractTests: XCTestCase {
     XCTAssertEqual(
       preview["estimatedBytes"],
       .string(String(UInt64(manifestBefore.count) + UInt64(Self.logBytes.count))))
+    // A fully accounted catalog discloses exactly that, with no blocker. The
+    // Session here carries no Journal, which is a knowable fact and therefore
+    // an explicit null — not a refusal and not a missing key.
+    XCTAssertEqual(
+      preview["catalogStatus"],
+      .object([
+        "complete": .bool(true),
+        "unaccountedSessionCount": .string("0"),
+        "measurementIncomplete": .bool(false),
+        "usedBytes": .string(String(try sessionBytes(source))),
+        "blocker": .null,
+      ]))
+    let sourceFacts = try object(preview["source"])
+    XCTAssertEqual(sourceFacts["jobId"], .string("job-session-export"))
+    XCTAssertEqual(sourceFacts["manifestSha256"], .string(SHA256Hex.string(of: manifestBefore)))
+    XCTAssertEqual(sourceFacts["journalSha256"], .null)
+    XCTAssertEqual(sourceFacts["sessionInode"], .string(String(try inode(of: source))))
     let destinationFacts = try object(preview["destination"])
     XCTAssertEqual(destinationFacts["expectedState"], .string("absent"))
     XCTAssertEqual(destinationFacts["path"], .string(destination.standardizedFileURL.path))
@@ -330,6 +347,45 @@ final class SessionExportContractTests: XCTestCase {
     XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: exportsRoot.path), [])
   }
 
+  /// An exact export discloses unknown content only when the scan placed every
+  /// unknown byte in a named leaf under `yyyy/mm/`. Content it could not place
+  /// at all, and an identity that resolves to two directories, leave nothing
+  /// honest to disclose, so both keep the global refusal.
+  func testUnplaceableAndAmbiguousContentStillRefuseAnExactExport() throws {
+    let storage = try store()
+    let session = try finalizedSession(id: "session-scoped", timestamp: "2026-08-08T00:00:00Z")
+    let destination = exportsRoot.appending(path: "scoped-copy", directoryHint: .isDirectory)
+    func previewCode() -> String? {
+      do {
+        _ = try storage.previewSessionExport(
+          sessionID: "session-scoped", destinationPath: destination.path, allowSensitive: false)
+        return nil
+      } catch {
+        return (error as? RuntimeSessionStorageFailure)?.code
+      }
+    }
+    XCTAssertNil(previewCode(), "a fully accounted catalog must still export")
+
+    // Content that does not sit at `yyyy/mm/<sessionId>` at all.
+    let rogue = sessionsRoot.appending(path: "not-a-year", directoryHint: .isDirectory)
+    try ownerDirectory(rogue)
+    try ownerFile(Data([0x01]), at: rogue.appending(path: "unknown.bin"))
+    XCTAssertEqual(previewCode(), "operationUnavailable")
+
+    try FileManager.default.removeItem(at: rogue)
+    XCTAssertNil(previewCode(), "removing the unplaceable content must restore the export")
+
+    // The same Session identity under two months.
+    let duplicate = sessionsRoot
+      .appending(path: "2026", directoryHint: .isDirectory)
+      .appending(path: "09", directoryHint: .isDirectory)
+      .appending(path: "session-scoped", directoryHint: .isDirectory)
+    try ownerDirectory(duplicate.deletingLastPathComponent())
+    try FileManager.default.copyItem(at: session, to: duplicate)
+    XCTAssertEqual(previewCode(), "operationUnavailable")
+    XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
+  }
+
   private func store(
     at currentTime: Date? = nil,
     faultInjector: SessionStorageFaultInjector = .none
@@ -396,6 +452,28 @@ final class SessionExportContractTests: XCTestCase {
   private func object(_ value: JSONValue?) throws -> [String: JSONValue] {
     guard case .object(let value)? = value else { throw FixtureFailure.malformed }
     return value
+  }
+
+  /// The same measurement the catalog makes: every regular file under the
+  /// Session directory. It is the only Session here, so it is also the whole
+  /// known content.
+  private func sessionBytes(_ session: URL) throws -> UInt64 {
+    var total: UInt64 = 0
+    guard let walker = FileManager.default.enumerator(
+      at: session, includingPropertiesForKeys: [.isRegularFileKey, .fileSizeKey])
+    else { throw FixtureFailure.io }
+    for case let url as URL in walker {
+      let values = try url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey])
+      guard values.isRegularFile == true, let size = values.fileSize else { continue }
+      total += UInt64(size)
+    }
+    return total
+  }
+
+  private func inode(of url: URL) throws -> UInt64 {
+    var metadata = stat()
+    guard lstat(url.path, &metadata) == 0 else { throw FixtureFailure.io }
+    return UInt64(metadata.st_ino)
   }
 
   private func artifactRows(_ preview: [String: JSONValue]) throws -> [[String: JSONValue]] {

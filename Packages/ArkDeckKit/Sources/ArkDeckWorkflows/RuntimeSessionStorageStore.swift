@@ -1,5 +1,6 @@
 import ArkDeckCore
 import ArkDeckStorage
+import CryptoKit
 import Darwin
 import Foundation
 
@@ -278,10 +279,12 @@ public final class RuntimeSessionStorageStore: @unchecked Sendable {
     }
     return try withLockedDocument { _, document in
       let snapshot = try sessionCatalog(document)
-      _ = try sessionRows(snapshot)
+      let catalogStatus = try exportCatalogStatus(snapshot, sessionID: sessionID)
       let root = try activeRoot(document, createDefaultIfMissing: true)
+      try requireCurrentExportRoot(root, snapshot: snapshot)
       let destination = try exportDestinationFacts(
         destinationPath, sourceRoot: root)
+      let source = try exportSourceFacts(snapshot, sessionID: sessionID)
       let createdAt = clock()
       guard createdAt.timeIntervalSince1970.isFinite else {
         throw RuntimeSessionStorageFailure(
@@ -292,7 +295,9 @@ public final class RuntimeSessionStorageStore: @unchecked Sendable {
       let projection = try exportPreviewProjection(
         previewID: previewID, createdAt: createdAt, expiresAt: expiresAt,
         sessionID: sessionID, allowSensitive: allowSensitive,
-        destination: destination, document: document, snapshot: snapshot)
+        destination: destination, source: source,
+        catalogStatus: catalogStatus.projection,
+        document: document, snapshot: snapshot)
       guard case .object(let fields) = projection,
         case .string(let digest)? = fields["previewDigest"],
         case .string(let expiry)? = fields["expiresAtUtc"]
@@ -345,14 +350,18 @@ public final class RuntimeSessionStorageStore: @unchecked Sendable {
           "resourceConflict", "Session export preview expired or is malformed")
       }
       let snapshot = try sessionCatalog(document)
-      _ = try sessionRows(snapshot)
+      let catalogStatus = try exportCatalogStatus(snapshot, sessionID: sessionID)
       let root = try activeRoot(document, createDefaultIfMissing: true)
+      try requireCurrentExportRoot(root, snapshot: snapshot)
       let destination = try exportDestinationFacts(
         destinationPath, sourceRoot: root)
+      let source = try exportSourceFacts(snapshot, sessionID: sessionID)
       let current = try exportPreviewProjection(
         previewID: previewID, createdAt: createdAt, expiresAt: expiresAt,
         sessionID: sessionID, allowSensitive: allowSensitive,
-        destination: destination, document: document, snapshot: snapshot)
+        destination: destination, source: source,
+        catalogStatus: catalogStatus.projection,
+        document: document, snapshot: snapshot)
       guard current == record.preview,
         let retained = snapshot.sessions.first(where: { $0.sessionID == sessionID }),
         let jobID = snapshot.jobIDBySession[sessionID],
@@ -403,6 +412,7 @@ public final class RuntimeSessionStorageStore: @unchecked Sendable {
           previewID: previewID, previewDigest: previewDigest,
           generation: generation, sessionID: sessionID,
           destinationPath: materialized.root.standardizedFileURL.path,
+          source: source, catalogStatus: catalogStatus.projection,
           snapshot: snapshot, allowSensitive: allowSensitive)
         _ = try store.markApplied(record, result: result)
         return result
@@ -580,6 +590,8 @@ public final class RuntimeSessionStorageStore: @unchecked Sendable {
     sessionID: String,
     allowSensitive: Bool,
     destination: JSONValue,
+    source: JSONValue,
+    catalogStatus: JSONValue,
     document: Document,
     snapshot: SessionRetentionCatalogSnapshot
   ) throws -> JSONValue {
@@ -633,6 +645,8 @@ public final class RuntimeSessionStorageStore: @unchecked Sendable {
       "deviceIdentifierPolicy": .string("redact"),
       "estimatedBytes": .string(String(estimatedBytes)),
       "destination": destination,
+      "source": source,
+      "catalogStatus": catalogStatus,
       "artifacts": .array(rows),
       "newDispatchCount": .integer(0),
     ]
@@ -741,6 +755,8 @@ public final class RuntimeSessionStorageStore: @unchecked Sendable {
     generation: UInt64,
     sessionID: String,
     destinationPath: String,
+    source: JSONValue,
+    catalogStatus: JSONValue,
     snapshot: SessionRetentionCatalogSnapshot,
     allowSensitive: Bool
   ) throws -> JSONValue {
@@ -763,12 +779,277 @@ public final class RuntimeSessionStorageStore: @unchecked Sendable {
       "resultGeneration": .string(String(generation)),
       "publishedAtUtc": .string(ISO8601Timestamps.string(from: clock())),
       "exportedPath": .string(destinationPath),
+      "source": source,
+      "catalogStatus": catalogStatus,
       "sourceArtifactIds": .array(included.map(JSONValue.string)),
       "excludedArtifactIds": .array(excluded.map(JSONValue.string)),
       "deviceIdentifierPolicy": .string("redact"),
       "evidenceClass": .string("derivedExport"),
       "newDispatchCount": .integer(0),
     ])
+  }
+
+  // MARK: - Exact export with a disclosed global accounting state
+
+  /// The reasons an unrelated leaf may carry while an exact export still
+  /// proceeds. Each one names a leaf the scan mechanically located at
+  /// `yyyy/mm/<name>`, so the export can say what it is not accounting for.
+  ///
+  /// The three excluded reasons are excluded because they make the disclosure
+  /// itself untrustworthy: `outsideSessionLayout` is content the scan could
+  /// not place inside the layout at all, `catalogMetadataCorrupt` means no
+  /// leaf under the root can be attributed, and `duplicateIdentity` means an
+  /// identity under this root resolves to more than one directory.
+  private static let exportScopedUnaccountedReasons: Set<UnaccountedSession.Reason> = [
+    .notRegistered, .unreadable, .invalidIdentifier,
+  ]
+
+  private struct ExportCatalogStatus {
+    let complete: Bool
+    let unaccountedSessionCount: Int
+    let usedBytes: UInt64
+
+    var projection: JSONValue {
+      .object([
+        "complete": .bool(complete),
+        "unaccountedSessionCount": .string(String(unaccountedSessionCount)),
+        "measurementIncomplete": .bool(!complete),
+        "usedBytes": .string(String(usedBytes)),
+        "blocker": complete ? .null : .string("unaccountedSessionContent"),
+      ])
+    }
+  }
+
+  /// The global `list`/`show`/`pin`/`unpin`/`cleanup` family refuses outright
+  /// while anything under the Sessions root is unaccounted, because each of
+  /// them answers *about the whole root* and a partial answer would be a lie.
+  ///
+  /// An exact export answers about one named Session. Refusing it because an
+  /// unrelated 2026-08 directory has no manifest made a healthy Session
+  /// unreachable and taught nobody anything. So this path proceeds and
+  /// discloses the state instead — but only when the scan actually located
+  /// every unknown byte in a named leaf that is not the selected Session.
+  /// Everything the scan could not place stays refused, with the same
+  /// sentence the global family gives.
+  private func exportCatalogStatus(
+    _ snapshot: SessionRetentionCatalogSnapshot,
+    sessionID: String
+  ) throws -> ExportCatalogStatus {
+    let complete = !snapshot.unknownPressure && snapshot.unknownSessionIDs.isEmpty
+    if !complete {
+      // The scan names a leaf either by its bare Session identifier or by its
+      // `yyyy/mm/<name>` position, depending on which fact it established.
+      // Both spellings have to be checked, or the selected Session could be
+      // exported while it is itself the content nobody can account for.
+      func namesSelectedSession(_ reference: String) -> Bool {
+        reference == sessionID || reference.hasSuffix("/" + sessionID)
+      }
+      guard !snapshot.unaccountedSessions.isEmpty,
+        snapshot.unaccountedSessions.allSatisfy({
+          Self.exportScopedUnaccountedReasons.contains($0.reason)
+            && !namesSelectedSession($0.reference)
+        })
+      else {
+        throw RuntimeSessionStorageFailure(
+          "operationUnavailable",
+          "Session catalog contains unaccounted content: "
+            + Self.unaccountedSummary(snapshot))
+      }
+    }
+    // Measured known content, never a total: the scan folds the bytes it
+    // measured for unaccounted leaves into `currentBytes`, and publishing that
+    // number here would claim the export owner accounted for them.
+    var usedBytes: UInt64 = 0
+    for session in snapshot.sessions {
+      let sum = usedBytes.addingReportingOverflow(session.sizeBytes)
+      guard !sum.overflow else {
+        throw RuntimeSessionStorageFailure(
+          "recordUnreadable", "Session catalog measurement overflowed")
+      }
+      usedBytes = sum.partialValue
+    }
+    guard usedBytes <= UInt64(Int64.max) else {
+      throw RuntimeSessionStorageFailure(
+        "recordUnreadable", "Session catalog measurement exceeds its published bound")
+    }
+    return ExportCatalogStatus(
+      complete: complete,
+      unaccountedSessionCount: snapshot.unaccountedSessions.count,
+      usedBytes: usedBytes)
+  }
+
+  /// The measured root must still be the exact directory the scan measured,
+  /// on the same volume. Root or volume uncertainty is refused rather than
+  /// disclosed: an export that cannot prove which tree it read has nothing to
+  /// disclose about.
+  private func requireCurrentExportRoot(
+    _ root: URL,
+    snapshot: SessionRetentionCatalogSnapshot
+  ) throws {
+    do {
+      try SessionRetentionCatalog(sessionsRoot: root).requireCurrentRoot(
+        identity: snapshot.rootIdentity, volumeIdentity: snapshot.volumeIdentity)
+    } catch {
+      throw RuntimeSessionStorageFailure(
+        "operationUnavailable", "Session root identity or volume cannot be confirmed")
+    }
+  }
+
+  /// The exact source this export names: the Job it came from, the digests of
+  /// the two documents that make it a Session, and the filesystem identity of
+  /// the root and the leaf. Read here, under the same lock the preview and the
+  /// apply take, so a preview and its apply disagree on any of them rather
+  /// than publishing.
+  ///
+  /// The global row builder proved catalog/measurement agreement for every
+  /// Session at once. This proves it for exactly the one about to be
+  /// published, which is what an exact export can honestly claim while the
+  /// rest of the root is incomplete.
+  private func exportSourceFacts(
+    _ snapshot: SessionRetentionCatalogSnapshot,
+    sessionID: String
+  ) throws -> JSONValue {
+    func unavailable() -> RuntimeSessionStorageFailure {
+      RuntimeSessionStorageFailure(
+        "resourceNotFound", "Session is not present in the Runtime export catalog")
+    }
+    let measured = snapshot.sessions.filter { $0.sessionID == sessionID }
+    let registered = snapshot.entries.filter { $0.sessionID == sessionID }
+    guard measured.count == 1, registered.count == 1,
+      let session = measured.first, let entry = registered.first,
+      entry.completedAt == session.completedAt,
+      entry.expiresAt == session.expiresAt,
+      entry.isPinned == session.isPinned,
+      let jobID = snapshot.jobIDBySession[sessionID],
+      snapshot.artifactRecordsBySession[sessionID] != nil
+    else { throw unavailable() }
+    let layout = try? SessionLayout(sessionID: sessionID, jobID: jobID, root: session.root)
+    guard let layout, layout.root.lastPathComponent == sessionID else { throw unavailable() }
+
+    let descriptor = Darwin.open(
+      layout.root.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
+    guard descriptor >= 0 else { throw unavailable() }
+    defer { Darwin.close(descriptor) }
+    var metadata = stat()
+    guard fstat(descriptor, &metadata) == 0,
+      metadata.st_mode & S_IFMT == S_IFDIR,
+      metadata.st_uid == geteuid(),
+      metadata.st_mode & (S_IWGRP | S_IWOTH) == 0,
+      UInt64(UInt32(bitPattern: metadata.st_dev)) == snapshot.rootIdentity.device
+    else {
+      throw RuntimeSessionStorageFailure(
+        "recordUnreadable", "Session directory identity cannot be confirmed")
+    }
+
+    let manifestBytes = try exportSourceFile(
+      parent: descriptor, name: SessionLayout.manifestFileName,
+      maximumBytes: SessionManifestDocument.maximumCanonicalBytes, required: true)
+    guard let manifestBytes,
+      let manifest = try? SessionManifestDocument(data: manifestBytes),
+      manifest.canonicalData == manifestBytes,
+      manifest.sessionID == sessionID, manifest.jobID == jobID
+    else {
+      throw RuntimeSessionStorageFailure(
+        "recordUnreadable", "Session Manifest is not the canonical document the catalog measured")
+    }
+    // A Session published by the current writer always carries the Job's own
+    // Journal. A Session that never had one is a different, knowable fact from
+    // one whose Journal cannot be read: the first is `null`, the second
+    // refuses.
+    let journalDigest = try exportSourceDigest(
+      parent: descriptor, name: layout.journalURL.lastPathComponent)
+
+    return .object([
+      "jobId": .string(jobID),
+      "manifestSha256": .string(manifest.sha256),
+      "journalSha256": journalDigest.map(JSONValue.string) ?? .null,
+      "rootDevice": .string(String(snapshot.rootIdentity.device)),
+      "rootInode": .string(String(snapshot.rootIdentity.inode)),
+      "volumeIdentity": .string(snapshot.volumeIdentity.value),
+      "sessionDevice": .string(String(UInt64(UInt32(bitPattern: metadata.st_dev)))),
+      "sessionInode": .string(String(UInt64(metadata.st_ino))),
+    ])
+  }
+
+  private static let maximumExportSourceJournalBytes = 1_024 * 1_024 * 1_024
+
+  /// Reads one owner-held regular file inside a Session directory. `nil` means
+  /// the entry is definitively absent; anything else that stops the read is a
+  /// refusal, never an empty answer.
+  private func exportSourceFile(
+    parent: Int32,
+    name: String,
+    maximumBytes: Int,
+    required: Bool
+  ) throws -> Data? {
+    let descriptor = Darwin.openat(
+      parent, name, O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOFOLLOW)
+    if descriptor < 0, errno == ENOENT, !required { return nil }
+    guard descriptor >= 0 else {
+      throw RuntimeSessionStorageFailure(
+        "recordUnreadable", "Session source document cannot be opened")
+    }
+    defer { Darwin.close(descriptor) }
+    var metadata = stat()
+    guard fstat(descriptor, &metadata) == 0,
+      metadata.st_mode & S_IFMT == S_IFREG,
+      metadata.st_uid == geteuid(), metadata.st_nlink == 1,
+      metadata.st_mode & (S_IWGRP | S_IWOTH) == 0,
+      metadata.st_size >= 0, metadata.st_size <= maximumBytes
+    else {
+      throw RuntimeSessionStorageFailure(
+        "recordUnreadable", "Session source document failed file validation")
+    }
+    var data = Data()
+    var buffer = [UInt8](repeating: 0, count: 64 * 1_024)
+    while data.count < Int(metadata.st_size) {
+      let count = Darwin.read(
+        descriptor, &buffer, min(buffer.count, Int(metadata.st_size) - data.count))
+      if count < 0, errno == EINTR { continue }
+      guard count > 0 else {
+        throw RuntimeSessionStorageFailure(
+          "recordUnreadable", "Session source document is truncated")
+      }
+      data.append(contentsOf: buffer.prefix(count))
+    }
+    return data
+  }
+
+  /// The Journal digest, hashed in bounded chunks so a large Journal does not
+  /// have to be resident to be named. `nil` means there is no Journal.
+  private func exportSourceDigest(parent: Int32, name: String) throws -> String? {
+    let descriptor = Darwin.openat(
+      parent, name, O_RDONLY | O_NONBLOCK | O_CLOEXEC | O_NOFOLLOW)
+    if descriptor < 0, errno == ENOENT { return nil }
+    guard descriptor >= 0 else {
+      throw RuntimeSessionStorageFailure(
+        "recordUnreadable", "Session Journal cannot be opened")
+    }
+    defer { Darwin.close(descriptor) }
+    var metadata = stat()
+    guard fstat(descriptor, &metadata) == 0,
+      metadata.st_mode & S_IFMT == S_IFREG,
+      metadata.st_uid == geteuid(), metadata.st_nlink == 1,
+      metadata.st_mode & (S_IWGRP | S_IWOTH) == 0,
+      metadata.st_size >= 0, metadata.st_size <= Self.maximumExportSourceJournalBytes
+    else {
+      throw RuntimeSessionStorageFailure(
+        "recordUnreadable", "Session Journal failed file validation")
+    }
+    var hasher = SHA256()
+    var remaining = Int(metadata.st_size)
+    var buffer = [UInt8](repeating: 0, count: 256 * 1_024)
+    while remaining > 0 {
+      let count = Darwin.read(descriptor, &buffer, min(buffer.count, remaining))
+      if count < 0, errno == EINTR { continue }
+      guard count > 0 else {
+        throw RuntimeSessionStorageFailure(
+          "recordUnreadable", "Session Journal is truncated")
+      }
+      hasher.update(data: buffer.prefix(count))
+      remaining -= count
+    }
+    return SHA256Hex.hexString(hasher.finalize())
   }
 
   private func exportRecordStore() throws -> RuntimeSessionExportRecordStore {
