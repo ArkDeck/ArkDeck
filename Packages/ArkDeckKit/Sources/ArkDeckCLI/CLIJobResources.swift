@@ -177,11 +177,20 @@ enum CLIJobReadValidation {
       Set(fields.keys) == ["schemaVersion", "jobId", "operation", "targetId", "state", "outcome", "waitingForHuman",
         "outcomeUnknown", "outstandingResidueCount", "executionMode", "sessionId", "threadId", "workspaceKind", "actualEffect",
         "createdAtUtc", "startedAtUtc", "finishedAtUtc", "supersededByRecoveryEpochId", "recoveryEpochId", "resolvedByTargetAliasResolutionId",
-        "nextAction", "failure", "processProgress"],
+        "sessionPublication", "nextAction", "failure", "processProgress"],
+      let publication = fields["sessionPublication"],
       let id = CLIJobEventPage.string(fields["jobId"]), AgentExecutionIntent.validIdentifier(id), expectedID == nil || expectedID == id,
       fields["outcome"] == (fields["outcomeUnknown"] == .bool(true) ? .string("outcomeUnknown") : fields["state"]),
       let created = CLIJobEventPage.string(fields["createdAtUtc"]), ISO8601Timestamps.parse(created) != nil
     else { throw session.fail(.recordUnreadable, "Job status does not match its closed read schema") }
+    // The Session publication is validated by the same closed contract the
+    // Runtime writes it with, so a forged receipt, a wrong null, an unknown
+    // reason or a state/reason pair the producer cannot emit is refused here
+    // rather than reported to the caller as a published Session.
+    guard (try? RuntimeSessionPublicationFact.validated(publication)) != nil else {
+      throw session.fail(
+        .recordUnreadable, "Job status carries an unreadable Session publication")
+    }
     do { _ = try RuntimeCLI.validatedObservedJobStatus(value, jobID: id, session: session) }
     catch let error as CLIRegistryError where error.code == .outcomeUnknown || error.code == .humanActionRequired {
       // Status/show query succeeds even when its next action needs attention.

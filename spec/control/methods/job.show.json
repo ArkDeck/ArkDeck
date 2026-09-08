@@ -231,6 +231,39 @@
             "sessionId": {
               "type": "string"
             },
+            "sessionPublication": {
+              "additionalProperties": false,
+              "properties": {
+                "catalogGeneration": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "manifestSha256": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "reasonCode": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "state": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "catalogGeneration",
+                "manifestSha256",
+                "reasonCode",
+                "state"
+              ],
+              "type": "object"
+            },
             "startedAtUtc": {
               "type": [
                 "null",
@@ -273,6 +306,7 @@
             "resolvedByTargetAliasResolutionId",
             "schemaVersion",
             "sessionId",
+            "sessionPublication",
             "startedAtUtc",
             "state",
             "supersededByRecoveryEpochId",
@@ -284,7 +318,10 @@
           "type": "object"
         },
         "materializedBindingRevision": {
-          "type": "integer"
+          "type": [
+            "integer",
+            "null"
+          ]
         },
         "materializedPlanDigest": {
           "type": "string"
@@ -386,6 +423,9 @@
                 "privateInput": {
                   "type": "string"
                 },
+                "sourceArtifactRef": {
+                  "type": "string"
+                },
                 "traceCategories": {
                   "type": "array"
                 },
@@ -434,7 +474,6 @@
                 }
               },
               "required": [
-                "expectedBindingRevision",
                 "targetId"
               ],
               "type": "object"
@@ -513,8 +552,8 @@
   "x-arkdeck-method": "job.show",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 2,
-    "request": 17,
-    "result": 15
+    "error": 4,
+    "request": 27,
+    "result": 23
   }
 }

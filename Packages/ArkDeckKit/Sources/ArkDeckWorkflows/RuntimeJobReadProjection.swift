@@ -102,6 +102,10 @@ package enum RuntimeJobReadProjection {
       "supersededByRecoveryEpochId": value.supersededByRecoveryEpochID.map(JSONValue.string) ?? .null,
       "recoveryEpochId": value.recoveryEpochID.map(JSONValue.string) ?? .null,
       "resolvedByTargetAliasResolutionId": value.resolvedByTargetAliasResolutionID.map(JSONValue.string) ?? .null,
+      // Required and never null. A Job whose Session nobody wrote says
+      // `unavailable` here; a reader that needs the Session must not have to
+      // tell "no publication" apart from "this daemon does not report it".
+      "sessionPublication": value.sessionPublication.json,
       "nextAction": try nextAction(value),
     ]
     if let failure = value.operationFailure {

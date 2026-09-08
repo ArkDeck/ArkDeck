@@ -166,6 +166,30 @@
         "sessionId": {
           "type": "string"
         },
+        "sessionPublication": {
+          "additionalProperties": false,
+          "properties": {
+            "catalogGeneration": {
+              "type": "null"
+            },
+            "manifestSha256": {
+              "type": "null"
+            },
+            "reasonCode": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "catalogGeneration",
+            "manifestSha256",
+            "reasonCode",
+            "state"
+          ],
+          "type": "object"
+        },
         "startedAtUtc": {
           "type": "string"
         },
@@ -205,6 +229,7 @@
         "resolvedByTargetAliasResolutionId",
         "schemaVersion",
         "sessionId",
+        "sessionPublication",
         "startedAtUtc",
         "state",
         "supersededByRecoveryEpochId",
@@ -225,7 +250,7 @@
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
     "error": 1,
-    "request": 5,
-    "result": 4
+    "request": 7,
+    "result": 6
   }
 }

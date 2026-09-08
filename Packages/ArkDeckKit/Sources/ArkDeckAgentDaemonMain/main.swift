@@ -1143,7 +1143,12 @@ Task.detached {
     let engine = try RuntimeJobEngine(
       configuration: .init(
         stateDirectory: resolvedStateDirectory, arkForgeLane: arkForgeLane,
-        arkForgeDeviceProfileID: arkForgeDeviceProfileID),
+        arkForgeDeviceProfileID: arkForgeDeviceProfileID,
+        // The production Session writer. It publishes through the same
+        // configured owner `session list/show/export` reads, so a Job that
+        // finishes here becomes a Session those commands can find.
+        sessionPublicationWriter: RuntimeSessionPublicationWriter(
+          owner: runtimeSessionStorage)),
       providers: providers,
       dispatcher: dispatcher,
       capabilityStore: capabilityStore,

@@ -255,6 +255,13 @@ public struct RuntimeJobStatus: Sendable, Equatable, Codable {
   /// HDC alias of the canonical Loader-bound target. The outcome remains
   /// unknown; this independent relation proves only the current target epoch.
   public let resolvedByTargetAliasResolutionID: String?
+  /// What the Runtime can currently say about this Job's Session.
+  ///
+  /// Always present. `unavailable` is the honest answer for a Job carrying no
+  /// publication ownership marker, and it is the default here so a status
+  /// built by anything that has not consulted the marker cannot accidentally
+  /// claim a Session was written.
+  package var sessionPublication: RuntimeSessionPublicationFact = .unavailable
 
   public init(
     jobID: String,
@@ -902,6 +909,13 @@ public actor RuntimeJobEngine {
     /// Exact backend digest selected by the composed ArkForge lane. `nil`
     /// means no delegated step can be materialized or dispatched.
     package let arkForgeToolchainSHA256: String?
+    /// The production writer that publishes a Session for every terminal Job.
+    ///
+    /// Absent in every build that has not composed one, and that absence is a
+    /// fact the Job read surfaces state rather than paper over: those Jobs
+    /// report `unavailable`. There is no fixture writer to fall back to and
+    /// no Session is written by anything but this seam.
+    package let sessionPublicationWriter: (any RuntimeSessionPublicationWriting)?
 
     public init(
       stateDirectory: URL,
@@ -915,6 +929,7 @@ public actor RuntimeJobEngine {
       self.arkForgeLane = nil
       self.arkForgeDeviceProfileID = nil
       self.arkForgeToolchainSHA256 = nil
+      self.sessionPublicationWriter = nil
     }
 
     package init(
@@ -923,7 +938,8 @@ public actor RuntimeJobEngine {
       admissionFaultInjector: RuntimeAdmissionFaultInjector = .none,
       testHooks: TestHooks = .none,
       arkForgeLane: (any ArkForgeLane)? = nil,
-      arkForgeDeviceProfileID: String? = nil
+      arkForgeDeviceProfileID: String? = nil,
+      sessionPublicationWriter: (any RuntimeSessionPublicationWriting)? = nil
     ) {
       self.stateDirectory = stateDirectory
       self.defaultReadOnlyPolicy = defaultReadOnlyPolicy
@@ -932,6 +948,7 @@ public actor RuntimeJobEngine {
       self.arkForgeLane = arkForgeLane
       self.arkForgeDeviceProfileID = arkForgeDeviceProfileID
       self.arkForgeToolchainSHA256 = arkForgeLane?.toolchainSHA256
+      self.sessionPublicationWriter = sessionPublicationWriter
     }
   }
 
@@ -2037,7 +2054,7 @@ public actor RuntimeJobEngine {
       try await recordCapabilityOutcome(
         for: current.record, outcome: .confirmed,
         state: JobState.cancelled.rawValue)
-      return statusAndReleaseTerminalRuntime(current.record, provider: provider)
+      return await statusAndReleaseTerminalRuntime(current.record, provider: provider)
     } catch let failure as RuntimeDispatchFailure {
       var current = jobs[jobID] ?? runtime
       let executionState = Self.executionState(of: current.record)
@@ -2057,7 +2074,7 @@ public actor RuntimeJobEngine {
         try await recordCapabilityOutcome(
           for: current.record, outcome: .outcomeUnknown,
           state: JobState.waitingForRecovery.rawValue)
-        return statusAndReleaseTerminalRuntime(current.record, provider: provider)
+        return await statusAndReleaseTerminalRuntime(current.record, provider: provider)
       case .confirmedNotExecuted(let reason),
         .confirmedNotExecutedWithDiagnostic(let reason, _):
         current.record.operationFailure = RuntimeOperationFailure(
@@ -2082,7 +2099,7 @@ public actor RuntimeJobEngine {
         try await recordCapabilityOutcome(
           for: current.record, outcome: .safeToReflash,
           state: JobState.failed.rawValue)
-        return statusAndReleaseTerminalRuntime(current.record, provider: provider)
+        return await statusAndReleaseTerminalRuntime(current.record, provider: provider)
       case .failed(let reason):
         current.record.operationFailure = RuntimeOperationFailure(
           code: .executionFailed, category: .execution,
@@ -2101,7 +2118,7 @@ public actor RuntimeJobEngine {
         try await recordCapabilityOutcome(
           for: current.record, outcome: .confirmed,
           state: JobState.failed.rawValue)
-        return statusAndReleaseTerminalRuntime(current.record, provider: provider)
+        return await statusAndReleaseTerminalRuntime(current.record, provider: provider)
       }
     } catch let failure as RuntimeArtifactPublicationFailure {
       var current = jobs[jobID] ?? runtime
@@ -2126,7 +2143,7 @@ public actor RuntimeJobEngine {
       try await recordCapabilityOutcome(
         for: current.record, outcome: .confirmed,
         state: JobState.failed.rawValue)
-      return statusAndReleaseTerminalRuntime(current.record, provider: provider)
+      return await statusAndReleaseTerminalRuntime(current.record, provider: provider)
     }
 
     var current = jobs[jobID] ?? runtime
@@ -2179,7 +2196,7 @@ public actor RuntimeJobEngine {
         try await recordCapabilityOutcome(
           for: current.record, outcome: .confirmed,
           state: JobState.failed.rawValue)
-        return statusAndReleaseTerminalRuntime(current.record, provider: provider)
+        return await statusAndReleaseTerminalRuntime(current.record, provider: provider)
       }
       current = jobs[jobID] ?? current
       current.record.operationFailure = nil
@@ -2205,7 +2222,7 @@ public actor RuntimeJobEngine {
     updateLatestSucceededDeviceObservationCache(from: current.record)
     try await recordCapabilityOutcome(
       for: current.record, outcome: .confirmed, state: current.record.state)
-    return statusAndReleaseTerminalRuntime(
+    return await statusAndReleaseTerminalRuntime(
       current.record, recoveryEpochID: establishedRecoveryEpochID, provider: provider)
   }
 
@@ -3325,7 +3342,7 @@ public actor RuntimeJobEngine {
     let outcome: RuntimeCapabilityUseOutcome = Self.hasCompleteMutationNonExecutionProof(terminalReplay)
       ? .safeToReflash : .confirmed
     try await recordCapabilityOutcome(for: current.record, outcome: outcome, state: current.record.state)
-    return statusAndReleaseTerminalRuntime(current.record, provider: provider)
+    return await statusAndReleaseTerminalRuntime(current.record, provider: provider)
   }
 
   private func parkDebugHAPCompensation(jobID: String, reason: String) async throws -> RuntimeJobStatus {
@@ -5093,7 +5110,7 @@ public actor RuntimeJobEngine {
 
   // MARK: Cancel / status / recovery
 
-  public func requestCancel(jobID: String) throws {
+  public func requestCancel(jobID: String) async throws {
     guard var runtime = jobs[jobID] else {
       // Absent from memory is not absent. A job whose outcome is known and
       // terminal is released from `jobs` and served from SQLite from then on,
@@ -5157,9 +5174,9 @@ public actor RuntimeJobEngine {
       // mutation. A preflight cancellation therefore has no lineage use to
       // settle and must not spend or fabricate one.
       if let provider = providers.provider(id: runtime.record.providerID) {
-        _ = statusAndReleaseTerminalRuntime(runtime.record, provider: provider)
+        _ = await statusAndReleaseTerminalRuntime(runtime.record, provider: provider)
       } else {
-        _ = statusAndReleaseTerminalRuntime(runtime.record)
+        _ = await statusAndReleaseTerminalRuntime(runtime.record)
       }
       return
     }
@@ -6082,7 +6099,7 @@ public actor RuntimeJobEngine {
       for: runtime.record,
       outcome: .confirmed,
       state: JobState.failed.rawValue)
-    return statusAndReleaseTerminalRuntime(runtime.record)
+    return await statusAndReleaseTerminalRuntime(runtime.record)
   }
 
   private func pendingLoaderTransition(
@@ -6194,11 +6211,11 @@ public actor RuntimeJobEngine {
       try persistRuntimeRecord(runtime.record)
       jobs[jobID] = runtime
       try await repairTerminalSafeToReflashLineageIfNeeded(for: runtime.record)
-      return statusAndReleaseTerminalRuntime(runtime.record, provider: provider)
+      return await statusAndReleaseTerminalRuntime(runtime.record, provider: provider)
     }
     guard runtime.record.outcomeUnknown else {
       try await repairTerminalSafeToReflashLineageIfNeeded(for: runtime.record)
-      return statusAndReleaseTerminalRuntime(runtime.record, provider: provider)
+      return await statusAndReleaseTerminalRuntime(runtime.record, provider: provider)
     }
     let journalURL = jobDirectory(for: jobID).appending(path: "journal.jsonl")
     var inspection = try DurableJournalRecovery.inspect(url: journalURL)
@@ -6256,7 +6273,7 @@ public actor RuntimeJobEngine {
       try await recordCapabilityOutcome(
         for: runtime.record, outcome: .safeToReflash,
         state: JobState.failed.rawValue)
-      return statusAndReleaseTerminalRuntime(runtime.record, provider: provider)
+      return await statusAndReleaseTerminalRuntime(runtime.record, provider: provider)
     }
     guard inspection.unknownOutcomes.isEmpty else {
       runtime.record.timeline.append(
@@ -6740,7 +6757,7 @@ public actor RuntimeJobEngine {
     case .confirmedCompleted:
       break
     }
-    return statusAndReleaseTerminalRuntime(runtime.record, provider: provider)
+    return await statusAndReleaseTerminalRuntime(runtime.record, provider: provider)
   }
 
   /// First recovery source for a delegated job: the exact daemon job Runtime
@@ -6988,7 +7005,7 @@ public actor RuntimeJobEngine {
     try await recordCapabilityOutcome(
       for: runtime.record, outcome: .outcomeUnknown,
       state: JobState.waitingForRecovery.rawValue)
-    return statusAndReleaseTerminalRuntime(runtime.record, provider: provider)
+    return await statusAndReleaseTerminalRuntime(runtime.record, provider: provider)
   }
 
   /// The twin of the repair below, for a Job that reached `cancelled` while its
@@ -9139,7 +9156,11 @@ public actor RuntimeJobEngine {
   private func statusAndReleaseTerminalRuntime(
     _ record: RuntimeJobRecord,
     recoveryEpochID: String? = nil
-  ) -> RuntimeJobStatus {
+  ) async -> RuntimeJobStatus {
+    var record = record
+    if !record.outcomeUnknown, JobState(rawValue: record.state)?.isTerminal == true {
+      await publishTerminalSession(&record)
+    }
     let jobStatus = status(of: record, recoveryEpochID: recoveryEpochID)
     if !record.outcomeUnknown, JobState(rawValue: record.state)?.isTerminal == true {
       jobs.removeValue(forKey: record.jobID)
@@ -9152,11 +9173,48 @@ public actor RuntimeJobEngine {
     _ record: RuntimeJobRecord,
     recoveryEpochID: String? = nil,
     provider: any DeviceProvider
-  ) -> RuntimeJobStatus {
+  ) async -> RuntimeJobStatus {
     if !record.outcomeUnknown, JobState(rawValue: record.state)?.isTerminal == true {
       provider.cleanupTerminalJob(jobID: record.jobID)
     }
-    return statusAndReleaseTerminalRuntime(record, recoveryEpochID: recoveryEpochID)
+    return await statusAndReleaseTerminalRuntime(record, recoveryEpochID: recoveryEpochID)
+  }
+
+  /// The single point at which a terminal Job becomes a formal Session.
+  ///
+  /// Every terminal return in this engine passes through
+  /// `statusAndReleaseTerminalRuntime`, so this runs exactly once per Job,
+  /// after its capability outcome is settled and before its runtime is
+  /// released. A Job that already holds a receipt is not republished; a build
+  /// with no composed writer leaves no marker at all, which the read surfaces
+  /// report as `unavailable` rather than as a Session nobody wrote.
+  private func publishTerminalSession(_ record: inout RuntimeJobRecord) async {
+    guard let writer = configuration.sessionPublicationWriter,
+      record.sessionPublicationRecord?.receipt == nil
+    else { return }
+    let directory = jobDirectory(for: record.jobID)
+    let outcome = await writer.publish(
+      RuntimeSessionPublicationRequest(
+        record: record, journalURL: directory.appending(path: "journal.jsonl"),
+        jobDirectory: directory, nowUTC: nowUTC()))
+    record.sessionPublicationRecord = outcome.record
+    if var runtime = jobs[record.jobID] {
+      runtime.record = record
+      if let sequence = outcome.appendedFinalizedSequence {
+        runtime.nextSequence = max(runtime.nextSequence, sequence + 1)
+      }
+      jobs[record.jobID] = runtime
+    }
+    do {
+      try persistRuntimeRecord(record)
+    } catch {
+      // The Session and its catalog entry, if any, are already durable; only
+      // this Runtime's own ownership marker was lost. The reader then sees
+      // `unavailable`, which understates what happened rather than claiming a
+      // receipt nothing can produce.
+      record.timeline.append(
+        "session publication marker could not be persisted: \(error)")
+    }
   }
 
   /// Terminal history is read from its durable SQLite projection after the
@@ -9205,7 +9263,7 @@ public actor RuntimeJobEngine {
     recoveryEpochID: String? = nil,
     resolvedByTargetAliasResolutionID: String? = nil
   ) -> RuntimeJobStatus {
-    RuntimeJobStatus(
+    var status = RuntimeJobStatus(
       jobID: record.jobID,
       operationReference: record.operationReference,
       targetID: record.request.target.targetID,
@@ -9233,6 +9291,8 @@ public actor RuntimeJobEngine {
       supersededByRecoveryEpochID: supersededByRecoveryEpochID,
       recoveryEpochID: recoveryEpochID,
       resolvedByTargetAliasResolutionID: resolvedByTargetAliasResolutionID)
+    status.sessionPublication = record.sessionPublicationRecord?.fact ?? .unavailable
+    return status
   }
 
   private static func projectedOperationFailure(

@@ -99,6 +99,15 @@ public struct RuntimeJobRecord: Codable, Sendable, Equatable {
   public var screenSequence: RuntimeScreenSequence?
   public var skipReasons: [String: String] = [:]
   public var outstandingResidueCount: Int?
+  /// This Job's Session ownership marker, written only by the production
+  /// publication writer.
+  ///
+  /// Absent means no publication was ever attempted for this Job — every Job
+  /// admitted before the writer existed, and every Job whose terminal path
+  /// never reached it. Absence is never repaired into ownership: `sessionID`
+  /// below is an identity the Runtime mints for every Job, not evidence that
+  /// a Session was written.
+  package var sessionPublicationRecord: RuntimeSessionPublicationRecord?
 
   public var sessionID: String { "session-\(jobID)" }
 
@@ -348,6 +357,8 @@ extension RuntimeJobRecord {
     self.skipReasons = try container.decode([String: String].self, forKey: .skipReasons)
     self.outstandingResidueCount = try container.decodeIfPresent(
       Int.self, forKey: .outstandingResidueCount)
+    self.sessionPublicationRecord = try container.decodeIfPresent(
+      RuntimeSessionPublicationRecord.self, forKey: .sessionPublicationRecord)
     let supplied = try JSONValue(from: decoder)
     let current = try JSONDecoder().decode(JSONValue.self, from: JSONEncoder().encode(self))
     guard supplied == current else {

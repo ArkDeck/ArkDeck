@@ -743,19 +743,39 @@ private enum LockedSessionManifestValidator {
 
     let target = try object.manifestObject("originalTarget")
     try validateTarget(target, simulated: mode == "simulated")
+    let isHostTarget = (try? enumValue(target, "kind", ["real", "synthetic", "host"])) == "host"
     let bindings = try object.manifestArray("bindingHistory")
-    guard !bindings.isEmpty else { throw failure("bindingHistory must not be empty") }
+    // A host Session has no device to bind, so an empty binding history is
+    // the honest record. Every other target still has to name the binding it
+    // executed under: an empty history there would hide one.
+    guard isHostTarget || !bindings.isEmpty else {
+      throw failure("bindingHistory must not be empty")
+    }
+    guard !isHostTarget || bindings.isEmpty else {
+      throw failure("host Session cannot declare a device binding history")
+    }
     for value in bindings {
       guard case .object(let binding) = value else { throw failure("binding must be object") }
       try validateBinding(binding, simulated: mode == "simulated")
     }
     try validateToolchain(
       try object.manifestObject("toolchain"),
-      simulated: mode == "simulated")
+      simulated: mode == "simulated", host: isHostTarget)
     try validateWorkflow(try object.manifestObject("workflow"), simulated: mode == "simulated")
 
     let steps = try object.manifestArray("steps")
     try steps.forEach(validateStep)
+    if isHostTarget {
+      // The host branch is only honest while nothing in it could have touched
+      // a device. One step declaring a device effect or a confirmed binding
+      // makes the absent target and empty binding history a concealment.
+      for value in steps {
+        guard case .object(let step) = value else { continue }
+        guard try step.manifestString("effect") == "hostOnly",
+          try step.manifestString("bindingRequirement") == "none"
+        else { throw failure("host Session contains a device-bound Step") }
+      }
+    }
     let parameters = try object.manifestArray("parameters")
     try parameters.forEach(validateParameter)
     let compensations = try object.manifestArray("compensations")
@@ -799,8 +819,9 @@ private enum LockedSessionManifestValidator {
 
   private static func validateTarget(_ object: [String: JSONValue], simulated: Bool) throws {
     try object.manifestRequireKeys(["kind", "connectKey", "transport", "identitySnapshot"])
-    let kind = try enumValue(object, "kind", ["real", "synthetic"])
-    let transport = try enumValue(object, "transport", ["usb", "tcp", "uart", "synthetic"])
+    let kind = try enumValue(object, "kind", ["real", "synthetic", "host"])
+    let transport = try enumValue(
+      object, "transport", ["usb", "tcp", "uart", "synthetic", "host"])
     let connectKey = try object.manifestNullableString("connectKey")
     guard !(try object.manifestObject("identitySnapshot")).isEmpty else {
       throw failure("identitySnapshot must not be empty")
@@ -808,6 +829,15 @@ private enum LockedSessionManifestValidator {
     if simulated {
       guard kind == "synthetic", transport == "synthetic", connectKey == nil else {
         throw failure("simulated target must be synthetic")
+      }
+    } else if kind == "host" {
+      // Work that ran entirely on this host has no device address and no
+      // binding, and saying so is the only honest record of it. Naming a
+      // device here would assert a connection the Session never made; the
+      // caller-side guards for that live in the step and binding rules,
+      // which a host Session must satisfy with no device effect at all.
+      guard transport == "host", connectKey == nil else {
+        throw failure("host target must have no device address")
       }
     } else {
       guard kind == "real", ["usb", "tcp", "uart"].contains(transport),
@@ -846,22 +876,41 @@ private enum LockedSessionManifestValidator {
   }
 
   private static func validateToolchain(
-    _ object: [String: JSONValue], simulated: Bool
+    _ object: [String: JSONValue], simulated: Bool, host: Bool
   ) throws {
     let allowed: Set<String> = [
       "kind", "source", "path", "sha256", "clientVersion", "serverVersion", "daemonVersion",
       "endpoint", "serverGeneration", "serverOwnership",
+      "providerIdentity", "profileIdentifier", "reportedVersion",
     ]
     guard Set(object.keys).isSubset(of: allowed), object["kind"] != nil else {
       throw failure("unknown or missing toolchain field")
     }
-    let kind = try enumValue(object, "kind", ["hdc", "none"])
+    let kind = try enumValue(object, "kind", ["hdc", "hostTool", "none"])
     if kind == "none" {
-      guard object.keys.count == 1, simulated else {
-        throw failure("toolchain none is simulated-only")
+      // Nothing external ran. That is true of a simulated Session, and of a
+      // host Session whose work happened inside this process; it is never
+      // true of a Session that spoke to a device.
+      guard object.keys.count == 1, simulated || host else {
+        throw failure("toolchain none requires a simulated or host Session")
       }
       return
     }
+    if kind == "hostTool" {
+      guard host, !simulated else { throw failure("hostTool toolchain requires a host Session") }
+      try object.manifestRequireKeys([
+        "kind", "providerIdentity", "profileIdentifier", "reportedVersion", "sha256",
+      ])
+      for key in ["providerIdentity", "profileIdentifier", "reportedVersion"] {
+        guard !(try object.manifestString(key)).isEmpty else {
+          throw failure("empty toolchain \(key)")
+        }
+      }
+      try SessionStorageValidation.sha256(
+        try object.manifestString("sha256"), field: "toolchain.sha256")
+      return
+    }
+    guard !host else { throw failure("host Session cannot declare a device toolchain") }
     let required: Set<String> = [
       "kind", "source", "path", "sha256", "clientVersion", "serverVersion", "endpoint",
       "serverGeneration", "serverOwnership",

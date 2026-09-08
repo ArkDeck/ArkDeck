@@ -570,3 +570,13 @@ and it is a cross-lane change because the Rust readers are generated from these 
 - `testAnUnreadableRecordIsNamedByTheWireErrorAndCountedByDeepDoctor` keeps its meaning; its
   assertions moved from `details["count"]` / `details["sample"]` to the summary text and a check
   that `details` is absent.
+
+## The Session producer, 2026-09-08
+
+The reviewed [Session publication slice](session-publication-scope-review.md) has a
+production writer: a terminal Job now publishes its Session through the existing
+`SessionStorageTerminalFinalizer` and the configured owner, and every Job read surface
+carries the resulting `sessionPublication` fact. It is a subset — host-only Jobs only,
+no Manifest `runtimeAuthority`, no export `source`/`catalogStatus`, no App History row.
+What was built, what was verified and every boundary is in
+[session-publication-run-2026-09-08.md](session-publication-run-2026-09-08.md).

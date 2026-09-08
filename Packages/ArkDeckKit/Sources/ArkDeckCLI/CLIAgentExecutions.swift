@@ -324,6 +324,13 @@ extension RuntimeCLI {
         job["jobId"] == .string(jobID), job["state"] == fields["jobState"], job["outcomeUnknown"] == fields["outcomeUnknown"],
         case .string(let raw)? = job["state"], let jobState = JobState(rawValue: raw),
         (state == "completed") == jobState.isTerminal,
+        Set(job.keys) == ["jobId", "state", "outcome", "outcomeUnknown", "waitingForHuman",
+          "outstandingResidueCount", "sessionPublication"],
+        // The Agent surface reads the same publication contract the Job read
+        // surface does, so it cannot report a Session this Runtime did not
+        // publish, and cannot quietly omit one it did.
+        let publication = job["sessionPublication"],
+        (try? RuntimeSessionPublicationFact.validated(publication)) != nil,
         job["outcome"] == .string(fields["outcomeUnknown"] == .bool(true) ? "outcomeUnknown" : raw) else { throw unreadable() }
       if jobState.isTerminal {
         guard case .object(let evidence)? = fields["evidence"], evidence["jobId"] == .string(jobID),
