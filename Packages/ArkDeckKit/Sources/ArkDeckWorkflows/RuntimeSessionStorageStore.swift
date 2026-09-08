@@ -416,9 +416,22 @@ public final class RuntimeSessionStorageStore: @unchecked Sendable {
           snapshot: snapshot, allowSensitive: allowSensitive)
         _ = try store.markApplied(record, result: result)
         return result
+      } catch let failure as RuntimeSessionStorageFailure {
+        // Already classified by the owner that raised it — including the
+        // catalog-drift case just above, whose own `outcomeUnknown` message
+        // says what actually changed. Rewriting it lost that.
+        throw failure
       } catch {
+        // Everything else genuinely cannot be told apart from a partial write
+        // here, because the exporter may already have created the destination.
+        // It still has to say what went wrong: the old blanket message turned
+        // every cause — a refused validation that wrote nothing included —
+        // into one sentence, so an operator could not tell a confirmed refusal
+        // from a possible partial publication, and had nothing to inspect the
+        // destination *for*.
         throw RuntimeSessionStorageFailure(
-          "outcomeUnknown", "Session export outcome requires destination inspection")
+          "outcomeUnknown",
+          "Session export outcome requires destination inspection: \(error)")
       }
     }
   }
