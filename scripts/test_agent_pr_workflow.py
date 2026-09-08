@@ -493,8 +493,13 @@ def validate_rust_ci_contract(text: str) -> None:
         # step either reads Git objects at the pinned Swift commit or builds a
         # separate candidate view, so dropping either one lets a workspace
         # that does not build, or whose tests fail, pass a green rust lane.
+        # The workspace tests run through a wrapper that keeps the pin's
+        # currency and the Rust code's correctness as separate questions;
+        # calling `cargo test --workspace` directly here fails every branch
+        # that legitimately changes a recorded frame.
         "run: cargo clippy --workspace --all-targets -- -D warnings\n",
-        "run: cargo test --workspace\n",
+        "        working-directory: .\n"
+        "        run: python rust/scripts/workspace-tests.py\n",
         "        working-directory: .\n"
         "        run: python rust/scripts/test_contract_checks.py\n",
         "        working-directory: .\n"
@@ -729,8 +734,11 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
             rust.replace(
                 "run: cargo clippy --workspace --all-targets -- -D warnings\n", "run: true\n"
             ),
-            rust.replace("run: cargo test --workspace\n", "run: cargo test -p arkdeck-contract\n"),
-            rust.replace("run: cargo test --workspace\n", "run: true\n"),
+            rust.replace(
+                "run: python rust/scripts/workspace-tests.py\n",
+                "run: cargo test -p arkdeck-contract\n",
+            ),
+            rust.replace("run: python rust/scripts/workspace-tests.py\n", "run: true\n"),
             rust.replace("run: python rust/scripts/check-contracts.py", "run: cargo test --workspace --locked"),
             rust.replace("run: python rust/scripts/check-contracts.py", "run: python rust/scripts/check-contracts.py --published-only"),
             rust.replace(
