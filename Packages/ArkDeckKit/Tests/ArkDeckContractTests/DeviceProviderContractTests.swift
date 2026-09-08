@@ -1446,4 +1446,85 @@ final class HDCCompatibilityProfileTests: XCTestCase {
       .unsupportedVersion("9.9.9z"))
   }
 
+  func testTargetFailureNamesThePhysicalLineAndEscapesItsRejectedBytes() throws {
+    let reason = try targetFailure("[I] ignored\n\nkey\tConnected\r\n")
+    XCTAssertEqual(
+      reason,
+      #"target output line 3: target line is not the registered 5-column family; saw 2 columns; preview "key\tConnected\r\n""#)
+    XCTAssertTrue(reason.utf8.allSatisfy { (0x20...0x7E).contains($0) })
+
+    let hostile = try targetFailure("key\t\u{1B}[2J\u{00}\u{7F}\u{202E}é\"\\\n")
+    for escaped in [#"\t"#, #"\x1B"#, #"\x00"#, #"\x7F"#, #"\xE2\x80\xAE"#,
+      #"\xC3\xA9"#, #"\""#, #"\\"#]
+    {
+      XCTAssertTrue(hostile.contains(escaped), "missing escaped bytes \(escaped): \(hostile)")
+    }
+    XCTAssertTrue(hostile.utf8.allSatisfy { (0x20...0x7E).contains($0) })
+  }
+
+  func testEveryMalformedTargetBranchHasABoundedPreview() throws {
+    let longState = String(repeating: "\u{1B}", count: 10_000)
+    for (row, expectedCause) in [
+      ("key\tnonempty\tUSB\tConnected\tlocalhost", "registered 5-column family"),
+      ("key\t\tUSB\tConnected\tunexpected-host", "registered 5-column family"),
+      (String(repeating: "a", count: 129) + "\t\tUSB\tConnected\tlocalhost", "connect key length"),
+      ("key\t\tunknown-transport\tConnected\tlocalhost", "unregistered target transport"),
+      ("key\t\tUSB\t" + longState + "\tlocalhost", "unregistered target state"),
+    ] {
+      let reason = try targetFailure(row + "\n")
+      XCTAssertTrue(reason.contains(expectedCause), reason)
+      XCTAssertTrue(reason.contains("saw 5 columns"), reason)
+      XCTAssertLessThanOrEqual(reason.utf8.count, 1_536)
+      XCTAssertTrue(reason.utf8.allSatisfy { (0x20...0x7E).contains($0) })
+      if row.utf8.count > 256 {
+        XCTAssertTrue(reason.contains("preview truncated to 256 of \(row.utf8.count) bytes"))
+        XCTAssertFalse(reason.contains(longState))
+      }
+    }
+  }
+
+  func testTargetPreviewOmitsApparentSecretsBeforeTheyEnterDurableReasons() throws {
+    for row in ["password=fixture-secret-value", "authorization: Bearer fixture-token-value",
+      "access_token=fixture-access-value", "client_secret=fixture-client-value",
+      #"{"access_token":"fixture-json-value"}"#, "clientSecret: fixture-camel-value",
+      "AWS_SECRET_ACCESS_KEY=fixture-value", "SecretAccessKey: fixture-value",
+      "API_KEY_ID=fixture-value", "refreshTokenMetadata: fixture-value",
+      "-----BEGIN PRIVATE KEY-----"]
+    {
+      let reason = try targetFailure(row)
+      XCTAssertTrue(reason.contains("<sensitive text omitted>"))
+      XCTAssertFalse(reason.contains(row))
+    }
+  }
+
+  func testTargetDiagnosticsDoNotChangeEncodingBudgetOrVersionRefusals() {
+    let invalid = Data([0xFF, 0xFE, 0x00])
+    XCTAssertEqual(
+      HDCObservationSemanticParser.parseTargetList(
+        stdout: invalid, profile: profile, toolVersion: "3.2.0f", truncated: false),
+      .invalidEncoding)
+    XCTAssertEqual(
+      HDCObservationSemanticParser.parseTargetList(
+        stdout: invalid, profile: profile, toolVersion: "3.2.0f", truncated: true),
+      .truncated)
+    XCTAssertEqual(
+      HDCObservationSemanticParser.parseTargetList(
+        stdout: invalid, profile: profile, toolVersion: "unregistered", truncated: false),
+      .unsupportedVersion("unregistered"))
+    XCTAssertEqual(
+      HDCObservationSemanticParser.parseTargetList(
+        stdout: Data("[W] ignored\n\n".utf8), profile: profile, toolVersion: "3.2.0f", truncated: false),
+      .empty)
+  }
+
+  private func targetFailure(_ output: String) throws -> String {
+    let outcome = HDCObservationSemanticParser.parseTargetList(
+      stdout: Data(output.utf8), profile: profile, toolVersion: "3.2.0f", truncated: false)
+    guard case .malformed(let reason) = outcome else {
+      XCTFail("malformed target output must stay rejected: \(outcome)")
+      throw BootstrapError.observationFailed("fixture was accepted")
+    }
+    return reason
+  }
+
 }

@@ -360,94 +360,6 @@ struct ProductTraceOfflineInspector: RuntimeTraceInspecting {
   }
 }
 
-/// Bootstrap observation over the descriptor-bound dispatcher: every action
-/// is closed, read-only and verified by the provider's semantic parser.
-struct ProviderBootstrapObservation: BootstrapObservationPort {
-  let provider: HDCObservationProviderAdapter
-  let dispatcher: any RuntimeProcessDispatching
-
-  private func run(
-    _ action: HDCProviderAction,
-    connectKey: String? = nil
-  ) async throws -> ProviderSemanticOutcome {
-    let context = ProviderExecutionContext(
-      jobID: "bootstrap", stepID: "observe", targetID: "-", bindingRevision: nil,
-      connectKey: connectKey,
-      nowUTC: utcNow())
-    let plan = try provider.lower(action: .hdc(action), context: context)
-    let receipt = try await dispatcher.dispatch(plan)
-    return try provider.verify(receipt: receipt, action: .hdc(action), context: context)
-  }
-
-  func observeToolVersion() async throws -> String {
-    guard case .verified(let summary) = try await run(.observeTool),
-      let version = summary["toolVersion"]
-    else {
-      throw BootstrapError.observationFailed("tool version could not be verified")
-    }
-    return version
-  }
-
-  func listCandidates() async throws -> [BootstrapCandidate] {
-    // Parsing stays inside the provider: the composition root only reads
-    // the verified summary it publishes.
-    guard case .verified(let summary) = try await run(.listDeviceCandidates) else {
-      throw BootstrapError.observationFailed("candidate list could not be verified")
-    }
-    guard let countText = summary["targetCount"], let count = Int(countText) else {
-      throw BootstrapError.observationFailed("candidate list summary is malformed")
-    }
-    guard count > 0 else { return [] }
-    guard let keys = summary["connectKeys"], !keys.isEmpty else {
-      throw BootstrapError.observationFailed(
-        "provider did not publish candidate connect keys; adoption needs the device window")
-    }
-    return keys.split(separator: ",").map { entry in
-      let parts = entry.split(separator: "=", maxSplits: 1)
-      return BootstrapCandidate(
-        connectKey: String(parts[0]),
-        state: parts.count == 2 ? String(parts[1]) : "Unknown")
-    }
-  }
-
-  func observeDeviceInformation(connectKey: String) async throws
-    -> BootstrapDeviceInformation?
-  {
-    async let name = property(.productName, connectKey: connectKey)
-    async let systemVersion = property(.fullBuildVersion, connectKey: connectKey)
-    let values = await (name, systemVersion)
-    return BootstrapDeviceInformation(
-      name: values.0,
-      systemVersion: values.1,
-      transport: connectKey.contains(":") ? "Network" : "USB")
-  }
-
-  private func property(
-    _ property: HDCAllowlistedProperty,
-    connectKey: String
-  ) async -> String? {
-    guard
-      case .verified(let summary) = try? await run(
-        .queryProperty(property), connectKey: connectKey)
-    else { return nil }
-    guard let value = summary["value"] else { return nil }
-    let normalized = value.lowercased()
-    guard !["default", "unknown", "none", "null", "[empty]"].contains(normalized),
-      !normalized.hasPrefix("[fail]")
-    else { return nil }
-    return value
-  }
-
-  func observeDeviceIdentity(connectKey: String) async throws -> [String: String] {
-    guard case .verified = try await run(.observeDevice(connectKey: connectKey)) else {
-      throw BootstrapError.observationFailed("device observation could not be verified")
-    }
-    // The connect key is the device's stable serial surface for USB
-    // targets; richer identity attributes arrive with the device window.
-    return ["serial": connectKey]
-  }
-}
-
 // Synchronous top level on purpose. With an async top level the Swift
 // concurrency runtime owns the main thread, and a signal arriving while
 // the main task is suspended traps the process before any handler runs
@@ -1254,7 +1166,7 @@ Task.detached {
       driver: RuntimeJobEngineDebugAttemptDriver(engine: engine),
       nowUTC: utcNow)
     let bootstrapObservation = ProviderBootstrapObservation(
-      provider: hdcProvider, dispatcher: hdcDispatcher)
+      provider: hdcProvider, dispatcher: hdcDispatcher, nowUTC: utcNow)
     let bootstrap = DeviceBootstrapMachine(
       observation: bootstrapObservation,
       targetStore: targetStore,

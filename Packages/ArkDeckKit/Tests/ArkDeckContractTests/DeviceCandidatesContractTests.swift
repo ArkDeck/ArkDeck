@@ -728,8 +728,15 @@ final class DeviceCandidatesContractTests: XCTestCase {
       contentsOf: repository.appending(
         path: "Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/main.swift"),
       encoding: .utf8)
-    XCTAssertTrue(composition.contains("property(.productName, connectKey: connectKey)"))
-    XCTAssertTrue(composition.contains("property(.fullBuildVersion, connectKey: connectKey)"))
-    XCTAssertTrue(composition.contains("connectKey: connectKey"))
+    XCTAssertTrue(composition.contains("bootstrapObservation = ProviderBootstrapObservation("))
+    let observation = try String(
+      contentsOf: repository.appending(
+        path: "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Bootstrap/ProviderBootstrapObservation.swift"),
+      encoding: .utf8)
+    XCTAssertTrue(observation.contains("property(.productName, connectKey: connectKey)"))
+    XCTAssertTrue(observation.contains("property(.fullBuildVersion, connectKey: connectKey)"))
+    XCTAssertTrue(observation.contains("connectKey: connectKey"))
+    XCTAssertTrue(observation.contains("async let name = property("))
+    XCTAssertTrue(observation.contains("async let systemVersion = property("))
   }
 }
