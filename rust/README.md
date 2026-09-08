@@ -23,9 +23,8 @@ python scripts/check-readonly.py
 The Python checks require Python 3.11+ with `PyYAML==6.0.3` and
 `jsonschema==4.26.0`. The repository's unified planner also runs these checks,
 `cargo deny` and `cargo vet`; see [dependency policy](supply-chain/README.md).
-The committed audit policy currently fails for nine dependencies and contains no
-publisher trust or exemptions. A passing source/license/advisory check is not a
-passing audit gate.
+The committed policy combines imported source audits with nine bounded publisher
+trust entries and no exemptions. Both dependency checks must pass.
 
 The black-box check starts only its own daemon with a unique endpoint and HDC
 configuration removed. It saves the actual outputs under `target/readonly-check/`

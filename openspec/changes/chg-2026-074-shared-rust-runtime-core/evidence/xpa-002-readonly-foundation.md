@@ -149,15 +149,24 @@ local macOS execution passed. Neither that probe nor the hosted transport tests
 establish signed installed-daemon, cross-account, package, Windows 11 or DAYU200
 acceptance. No platform Conformance row was advanced.
 
-`cargo vet --locked --no-registry-suggestions` currently refuses nine dependencies
-without complete imported audit coverage. The exact releases, publisher IDs,
-proposed one-day publication windows and residual risks are in the
-[inactive dependency-policy proposal](../../../../rust/supply-chain/README.md).
-Automatic approval review rejected writing the publisher-trust rules because
-the security admission change lacked specific user authorization. No trust
-entries, exemptions or locally certified source audits were added. This remains
-a gate failure until an authorized, reviewed policy or actual audit coverage
-resolves it; no passing cargo-vet result or dependency approval is claimed.
+The runs archived above predate the dependency-policy repair and retain their
+original cargo-vet failures. On 2026-09-08 the user explicitly authorized the
+nine [bounded publisher trust rules](../../../../rust/supply-chain/README.md).
+Each rule covers only its locked release's UTC publication day; the exact
+version allowlist and lockfile checksums remain enforced. There are no
+exemptions, locally certified source audits, future publication windows or
+automatic renewals. Enabling these rules establishes publisher-provenance
+coverage under that policy, not a full source audit or hardware acceptance.
+
+The repository's full unified gate was rerun after activation and passed on
+macOS 26.6.2 arm64: public checks, 2,464 Swift tests, App build-for-testing,
+69 Rust tests, native process self-test, generated-input checks, and schema
+validation of 111 completed control responses plus seven CLI envelopes.
+`cargo deny --locked check` passed all four categories, and
+`cargo vet --locked --no-registry-suggestions` passed for all 25 dependencies
+under the configured policy. Nine use the bounded publisher rules. `Cargo.lock`,
+the exact version allowlist, imported source audits, and the local binary hashes
+in `final-verification.json` remained unchanged; no exemptions were added.
 
 No Windows 11 x64 + DAYU200 run, trusted signed/package-identified installed
 daemon result, registered Windows HDC tuple, or actual Windows output sampling

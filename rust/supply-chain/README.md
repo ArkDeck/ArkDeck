@@ -26,24 +26,22 @@ URLs published in the [cargo-vet registry](https://github.com/mozilla/cargo-vet/
 registry publisher metadata consumed by CI.
 
 The locked `zmij 1.0.21` uses a complete imported source-audit chain: [Mozilla full audit of 1.0.20 and delta to 1.0.21](https://github.com/mozilla/supply-chain/blob/0541e4d34ad95189c2d628461183d818ba1d38eb/audits.toml#L11299).
-This compatible pin replaces 1.0.23 and reduces the audit gap from ten
-to nine without adding a trust rule or an exemption.
+This compatible pin replaces 1.0.23 and uses the imported source audits without
+requiring publisher trust or an exemption for `zmij`.
 
-This delivery proposes a bounded publisher trust policy for the nine dependencies
-without a complete imported `safe-to-deploy` audit chain. The proposal is inactive:
-adding these rules requires explicit user authorization and subsequent maintainer
-review of the PR. `audits.toml` contains no locally certified source audits or
-publisher trust entries, and there are no exemptions. Cargo-vet currently refuses
-these nine dependencies. Under the proposal, cargo-vet would use its standard
-`trusted` records; a successful check would validate the configured policy and
-would not establish maintainer approval or completion of a source audit.
+Nine locked dependencies without a complete imported `safe-to-deploy` source-audit
+chain use the bounded publisher trust rules in `audits.toml`. These rules were
+explicitly authorized for PR #1768 and are part of its reviewable diff. There are
+no exemptions or locally certified source audits. A successful cargo-vet check
+validates the configured policy; it does not establish maintainer approval or
+completion of a source audit for these nine releases.
 
 Each link below is the crates.io version API checked against the checksum in
 `Cargo.lock`. The numeric publisher ID and UTC publication day are registry facts;
-trusting them for this release is the policy decision. All nine proposed versions were
-reported as not yanked when checked on 2026-09-08.
+trusting them for this release is the policy decision. All nine versions were
+reported as not yanked when rechecked on 2026-09-08.
 
-| Locked release | Publisher / crates.io ID | Proposed UTC `[start, end)` | Use and review concern |
+| Locked release | Publisher / crates.io ID | Authorized UTC `[start, end)` | Use and review concern |
 | --- | --- | --- | --- |
 | [cpufeatures 0.2.17](https://crates.io/api/v1/crates/cpufeatures/0.2.17) | tarcieri / 267 | 2025-01-25 → 2025-01-26 | SHA-256 CPU feature selection; incorrect detection can select unsupported instructions. |
 | [digest 0.10.7](https://crates.io/api/v1/crates/digest/0.10.7) | tarcieri / 267 | 2023-05-19 → 2023-05-20 | SHA-256 and HMAC interfaces; incorrect behavior can affect digest integrity. |
@@ -55,9 +53,9 @@ reported as not yanked when checked on 2026-09-08.
 | [typenum 1.20.1](https://crates.io/api/v1/crates/typenum/1.20.1) | paholg / 243 | 2026-05-29 → 2026-05-30 | Type-level sizes in cryptographic buffers; compile-time size constraints. |
 | [windows-sys 0.61.2](https://crates.io/api/v1/crates/windows-sys/0.61.2) | kennykerr / 64539 | 2025-10-06 → 2025-10-07 | Windows IPC and identity bindings; incorrect ABI declarations or constants can affect peer authentication. |
 
-Each proposed `trusted` entry would begin on that publication day and end the following day.
+Each `trusted` entry begins on that publication day and ends the following day.
 Cargo-vet compares publication dates using `[start, end)`, so the entry covers
-one UTC day and would authorize no future publishing period. These are publication
+one UTC day and authorizes no future publishing period. These are publication
 windows, not expiration dates for the already locked release. The exact version
 allowlist and `Cargo.lock` checksum restrict acceptance further: another version,
 even from the same publisher on the same day, cannot pass the combined gate
