@@ -41,6 +41,7 @@ review/merge 进入 protected `main` 后生效；合入前不得开始实现 PR�
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeRecoveryService.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckStorage/JournalEventValidation.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckProcess/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/AgentDaemon.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/**`
   - `Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckCLIMain.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckRuntimeCommands.swift`
@@ -72,6 +73,18 @@ revision 严格领先时才归档并按 live revision 重发同一条路由；�
 不新增 Catalog operation、capability 管理、Core requirement 或 Acceptance
 scope；不改任何既有叶子的语义；不提供覆盖缺失证明的开关。本补充不改变 Task
 状态；维护者 review 合入 base 后，实现才能通过路径检查。
+
+补一条 #1782 漏掉的路径：`AgentDaemon.swift`。已发布控制面方法的 handler 只
+存在于该文件的 `RuntimeControlPlaneHandler` switch 里，`ArkDeckAgentDaemon`
+模块没有别的接入点，所以上一份补充给了 CLI 与两个生成契约却没给 handler 本身，
+这个叶子实现不了。这里只加 `flash.reconcile-alias` 一个 case、一个可选注入的
+协调者字段及其初始化参数；不动任何既有方法、`RuntimeJobResourceReader`、
+`RuntimeStorageResourceHandler` 或该模块其他文件。
+
+考虑过的替代方案是把叶子做成 `flash install-binding` 那样纯 CLI 进程内的命令
+（`ArkDeckCLIMain.swift` 已在范围内，且那条命令今天就直接写同一个根目录下的
+`rockchip-binding.json`）。不采纳：post-flash alias 是 Runtime 在准入时读的
+授权输入，应由 Runtime 自己取事实并写入；把它交给客户端进程会把所有权倒置。
 
 - Applicable failure patterns:
   - `AF-004`（producer 到真实 dispatcher/postflight 全链）——permit 必须真的到达
