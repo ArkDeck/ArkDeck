@@ -138,7 +138,7 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
   }
 
   func testArkTraceEngineIsPinnedAndNeverCopiedIntoArkDeckKit() throws {
-    let revision = "e98a753ef61f616c8f95693cc4c4201c6b1e3393"
+    let revision = "c85731b0f903261bd69cf789027774fde615c8de"
     let manifest = try String(
       contentsOf: packageRoot().appending(path: "Package.swift"), encoding: .utf8)
     XCTAssertTrue(manifest.contains("https://github.com/ArkDeck/ArkTrace.git"))

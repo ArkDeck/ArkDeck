@@ -107,7 +107,7 @@ duplicate candidate, `outcomeUnknown`, or unresolved cleanup residue as a failed
 Build the helper from ArkDeck's pinned ArkTrace revision and resolve its SwiftPM output directory:
 
 ```bash
-git -C <ArkTrace-checkout> checkout e98a753ef61f616c8f95693cc4c4201c6b1e3393
+git -C <ArkTrace-checkout> checkout c85731b0f903261bd69cf789027774fde615c8de
 swift build --package-path <ArkTrace-checkout> --product arktrace
 swift build --package-path <ArkTrace-checkout> --show-bin-path
 ```

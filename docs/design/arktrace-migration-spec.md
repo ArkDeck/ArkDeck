@@ -326,7 +326,7 @@ Trace range 时 MAY 标记完成。
 
 | 产物 | 仓库 / App 位置 |
 |---|---|
-| Shared Swift targets | ArkTrace commit `e98a753ef61f616c8f95693cc4c4201c6b1e3393` |
+| Shared Swift targets | ArkTrace commit `c85731b0f903261bd69cf789027774fde615c8de` |
 | ArkDeck adapter | `Packages/ArkDeckKit/Sources/ArkDeckTraceAdapter` |
 | CLI product | ArkTrace-owned `arktrace` distribution，ArkDeck 只消费 descriptor |
 | parser source lock / build scripts | pinned ArkTrace revision |

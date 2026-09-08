@@ -45,7 +45,7 @@ arkdeck trace inspect \
    固定 parser owner；解析后再次校验 descriptor identity。
 
 生产 parser 由 `trace-summary@1` AnalyzerProfile 固定。ArkDeck 使用 ArkTrace protected-main
-commit `e98a753ef61f616c8f95693cc4c4201c6b1e3393` 的
+commit `c85731b0f903261bd69cf789027774fde615c8de` 的
 `TraceOfflineInspectionService`，parser executable 与 manifest 来自同一可信 distribution bundle。
 ArkTrace session 固定为 `ephemeral`，不读写共享 derived cache。
 
