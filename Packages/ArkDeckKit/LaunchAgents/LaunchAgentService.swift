@@ -742,7 +742,21 @@ public final class LaunchAgentService: @unchecked Sendable {
     let sdk = environment[ArkDeckLaunchAgent.devecoSDKEnvironmentKey]
     let analyzer = environment[ArkDeckLaunchAgent.analyzerEnvironmentKey]
     let inspector = environment[ArkDeckLaunchAgent.workspaceInspectorEnvironmentKey]
-    let workspaceValues = [projectEntry, activeProject, sdk, analyzer, inspector]
+    // The analyzer and inspector are host facts about this installation, not
+    // part of the retired project/SDK trio, so their presence must not imply
+    // one. Each is still pinned exactly — the analyzer to this daemon, the
+    // inspector to the one system tool — whenever it is present; they simply
+    // no longer force a workspace to exist, and their absence no longer makes
+    // a workspace configuration look complete.
+    guard analyzer == nil || analyzer == daemon else {
+      throw LaunchAgentServiceError.configuration(
+        "the analyzer path must be this installation's own daemon")
+    }
+    guard inspector == nil || inspector == "/usr/bin/grep" else {
+      throw LaunchAgentServiceError.configuration(
+        "the workspace inspector must be the registered host tool")
+    }
+    let workspaceValues = [projectEntry, activeProject, sdk]
     let workspace: LaunchAgentWorkspaceConfiguration?
     if workspaceValues.allSatisfy({ $0 == nil }) {
       workspace = nil
@@ -825,14 +839,27 @@ public final class LaunchAgentService: @unchecked Sendable {
     }
     arguments[0] = daemonPath
     environment[ArkDeckLaunchAgent.hdcEnvironmentKey] = hdcPath
+    // The analyzer is this daemon in one-shot mode, and the inspector is a
+    // fixed host tool. Neither has anything to do with the retired
+    // project/SDK injection below, but both used to be written only when that
+    // pair was supplied. Once the product moved to Runtime-owned workspace
+    // registration — and the runbook started telling operators to omit the
+    // legacy paths — an ordinary `runtime service update` stopped writing
+    // them, and four published operations went dark on a correctly configured
+    // host: `analyzer.summarize-hilog@1` and
+    // `analyzer.extract-crash-signature@1` as `analyzer.profileUnavailable`,
+    // `workspace.symbolize-crash@1` as `workspace.symbolPresetUnavailable`
+    // even with its symbol preset `active` and carrying its source map, and
+    // `workspace.inspect-source@1` as `no_workspace_inspector_configured`.
+    // Each reason blamed a preset the operator had already registered.
+    environment[ArkDeckLaunchAgent.analyzerEnvironmentKey] = daemonPath
+    environment[ArkDeckLaunchAgent.workspaceInspectorEnvironmentKey] = "/usr/bin/grep"
     if let workspace {
       environment[ArkDeckLaunchAgent.workspaceProjectsEnvironmentKey] =
         ArkDeckLaunchAgent.waterFlowProjectRef + "=" + workspace.projectRoot.path
       environment[ArkDeckLaunchAgent.workspaceActiveProjectEnvironmentKey] =
         ArkDeckLaunchAgent.waterFlowProjectRef
       environment[ArkDeckLaunchAgent.devecoSDKEnvironmentKey] = workspace.devecoSDKRoot.path
-      environment[ArkDeckLaunchAgent.analyzerEnvironmentKey] = daemonPath
-      environment[ArkDeckLaunchAgent.workspaceInspectorEnvironmentKey] = "/usr/bin/grep"
     }
     if let arkTraceDescriptor {
       environment[ArkDeckLaunchAgent.arkTraceDescriptorEnvironmentKey] =
