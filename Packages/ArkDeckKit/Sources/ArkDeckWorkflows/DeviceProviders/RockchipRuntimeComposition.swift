@@ -104,21 +104,41 @@ package struct TargetStoreRockchipRuntimeFactsPort: RockchipRuntimeFactsPort {
         if covered {
           coveredBinding = binding
           var alias = try binding.confirmedHDCNormalAlias()
-          if let routed = try postFlashHDCBindingStore?.loadIfPresent(),
-            try routed.covers(target: target, binding: binding)
-          {
-            guard
-              try !targetStore.hasConflictingHDCAliasOwner(
-                canonicalTargetID: target.targetID,
-                connectKey: routed.hdcConnectKey,
-                identitySHA256: routed.hdcIdentitySHA256,
-                establishingFlashJobID: routed.jobID)
-            else {
+          if let routed = try postFlashHDCBindingStore?.loadIfPresent() {
+            // Publication uses a monotonic target epoch and same-epoch alias
+            // compare-and-swap. A route that cannot cover this target must
+            // not silently fall back to the older binding alias: that would
+            // admit every partition write before predictably failing at the
+            // final alias publication. A lower revision of the same target
+            // is the sole supersedable case, as in the publisher.
+            guard routed.targetID == target.targetID else {
               throw DeviceProviderError.factsUnavailable(
-                "verified post-flash HDC alias is owned by another adopted target")
+                "flash.postFlashHDCBindingConflict: the stored alias belongs to another target")
             }
-            executionConnectKey = routed.hdcConnectKey
-            alias = (routed.hdcIdentitySHA256, routed.usbTopology)
+            guard routed.bindingRevision <= target.bindingRevision else {
+              throw DeviceProviderError.factsUnavailable(
+                "flash.postFlashHDCBindingConflict: stored alias revision "
+                  + "\(routed.bindingRevision) is newer than target revision \(target.bindingRevision)")
+            }
+            if routed.bindingRevision == target.bindingRevision {
+              guard try routed.covers(target: target, binding: binding) else {
+                throw DeviceProviderError.factsUnavailable(
+                  "flash.postFlashHDCBindingConflict: the stored alias has a different "
+                    + "Loader identity at the current target revision")
+              }
+              guard
+                try !targetStore.hasConflictingHDCAliasOwner(
+                  canonicalTargetID: target.targetID,
+                  connectKey: routed.hdcConnectKey,
+                  identitySHA256: routed.hdcIdentitySHA256,
+                  establishingFlashJobID: routed.jobID)
+              else {
+                throw DeviceProviderError.factsUnavailable(
+                  "verified post-flash HDC alias is owned by another adopted target")
+              }
+              executionConnectKey = routed.hdcConnectKey
+              alias = (routed.hdcIdentitySHA256, routed.usbTopology)
+            }
           }
           if let alias {
             serverFacts[Self.hdcAliasIdentityServerFactKey] = alias.identitySHA256

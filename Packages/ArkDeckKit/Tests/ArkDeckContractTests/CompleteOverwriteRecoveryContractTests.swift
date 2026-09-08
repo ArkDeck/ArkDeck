@@ -164,13 +164,17 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
   /// only observe that persisted job and intentionally exposes no in-memory
   /// completed-receipt cache.
   private actor RestartingArkForgeLane: RuntimeJobEngine.ArkForgeLane {
-    enum Mode { case loseTerminal, observeCompletion }
+    enum Mode {
+      case loseTerminal, observeCompletion, observeWrongPlan, observeInvalidDigest
+      case observeFailed, observeUnknown
+    }
 
     nonisolated let toolchainSHA256: String
     private let mode: Mode
     private let stateDirectory: URL?
     private let receipt: ArkForgeActionReceiptSummary
     private var prepares = 0
+    private var performs = 0
     private var sawDurableJoinBeforePerform = false
 
     init(toolchainSHA256: String, mode: Mode, stateDirectory: URL? = nil) {
@@ -183,11 +187,15 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
         ArkForgeKeyValue(key: "usbTopology", value: "42"),
       ]
       self.receipt = ArkForgeActionReceiptSummary(
-        jobID: "JOB-RESTART-1", planID: "PLAN-RESTART-1", stepID: "STEP-023",
+        jobID: "JOB-RESTART-1",
+        planID: mode == .observeWrongPlan ? "PLAN-ANOTHER-JOB" : "PLAN-RESTART-1",
+        stepID: "STEP-023",
         actionID: "", attemptID: "", permitID: "PERMIT-RESTART-23",
         disposition: "semanticSuccess",
-        evidenceSHA256: ArkForgeManagedControlPort.canonicalFactsDigest(
-          Dictionary(uniqueKeysWithValues: facts.map { ($0.key, $0.value) })),
+        evidenceSHA256: mode == .observeInvalidDigest
+          ? [UInt8](repeating: 0, count: 32)
+          : ArkForgeManagedControlPort.canonicalFactsDigest(
+            Dictionary(uniqueKeysWithValues: facts.map { ($0.key, $0.value) })),
         verificationOutcome: "", verificationStrength: "",
         verifiedRangeStart: 0, verifiedRangeLength: 0,
         typedSkipReason: "", failureClassification: "", facts: facts)
@@ -223,6 +231,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
       stepID: String, execution: RuntimeArkForgeLaneExecution,
       artifact _: ArkForgeLaneArtifact, binding _: ArkForgeLaneDeviceBinding
     ) async throws -> ArkForgeActionReceiptSummary {
+      performs += 1
       if let stateDirectory {
         let directory = stateDirectory.appending(
           path: "jobs/\(execution.arkDeckJobID)", directoryHint: .isDirectory)
@@ -240,7 +249,16 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     func observeTerminal(
       execution _: RuntimeArkForgeLaneExecution
     ) async throws -> ArkForgeFlashSession.Outcome? {
-      mode == .observeCompletion ? .completed(receipts: [receipt]) : nil
+      switch mode {
+      case .loseTerminal:
+        nil
+      case .observeCompletion, .observeWrongPlan, .observeInvalidDigest:
+        .completed(receipts: [receipt])
+      case .observeFailed:
+        .confirmedFailed(reason: "fixture has no complete-plan proof", receipts: [])
+      case .observeUnknown:
+        .outcomeUnknown(reason: "fixture daemon still cannot prove the outcome", receipts: [])
+      }
     }
 
     func completedPlanReceipt(jobID _: String) async -> ArkForgeActionReceiptSummary? {
@@ -248,6 +266,7 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     }
 
     func prepareCount() -> Int { prepares }
+    func performCount() -> Int { performs }
     func observedDurableJoinBeforePerform() -> Bool { sawDurableJoinBeforePerform }
   }
 
@@ -1006,6 +1025,102 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
     XCTAssertTrue(dispatches.isEmpty)
   }
 
+  func testMissingOrInvalidDaemonProofNeverFallsBackToBuildReadbackAcrossRestarts() async throws {
+    let fixture = try await interruptedLaneFixture()
+    let journalURL = fixture.jobDirectory.appending(path: "journal.jsonl")
+    let originalJournal = try Data(contentsOf: journalURL)
+    let originalReplay = try DurableJournalRecovery.inspect(url: journalURL)
+    let intentID = try XCTUnwrap(originalReplay.outstandingIntents.only?.eventID)
+    let originalUnknownJournal = try Data(contentsOf: fixture.originalUnknownJournalURL)
+    let modes: [RestartingArkForgeLane.Mode?] = [
+      nil, .loseTerminal, .observeWrongPlan, .observeInvalidDigest, .observeFailed, .observeUnknown,
+    ]
+    let initialCapabilities = try await fixture.capabilities.list()
+    let initialDispatches = await fixture.dispatches.snapshot()
+
+    for mode in modes {
+      let lane = mode.map { RestartingArkForgeLane(toolchainSHA256: providerSHA256, mode: $0) }
+      let engine = try recoveryEngine(fixture: fixture, lane: lane)
+      _ = try await engine.recoverActiveJobs()
+      let reconciled = try await engine.reconcile(jobID: fixture.jobID)
+      XCTAssertEqual(reconciled.state, JobState.waitingForRecovery.rawValue)
+      XCTAssertTrue(reconciled.outcomeUnknown)
+      XCTAssertNil(reconciled.recoveryEpochID)
+      XCTAssertTrue(reconciled.timeline.contains { $0.contains("flash.recoveryProofMissing") })
+      let replay = try DurableJournalRecovery.inspect(url: journalURL)
+      XCTAssertEqual(replay.currentState, .waitingForRecovery)
+      XCTAssertEqual(replay.lastReconcileOutcomeCertainty, .outcomeUnknown)
+      XCTAssertEqual(replay.outstandingIntents.map(\.eventID), [intentID])
+      XCTAssertFalse(replay.events.contains { $0.kind == .stepOutcome })
+      XCTAssertEqual(
+        replay.events.filter { $0.kind == .stepIntent }.count,
+        originalReplay.events.filter { $0.kind == .stepIntent }.count)
+      XCTAssertTrue(
+        try Data(contentsOf: journalURL).starts(with: originalJournal),
+        "the original intent and uncertainty records must remain byte-for-byte intact")
+      XCTAssertEqual(try Data(contentsOf: fixture.originalUnknownJournalURL), originalUnknownJournal)
+      let persisted = try ArkForgeRuntimeJobState.load(from: fixture.jobDirectory)
+      XCTAssertNil(persisted.planCompletionReceipt, "an invalid receipt must never become durable proof")
+      let capabilities = try await fixture.capabilities.list()
+      XCTAssertEqual(capabilities.map { $0.capability.capabilityID }, initialCapabilities.map { $0.capability.capabilityID })
+      XCTAssertEqual(capabilities.map(\.consumptionCount), initialCapabilities.map(\.consumptionCount))
+      XCTAssertTrue(capabilities.allSatisfy { $0.lineage.last?.outcome == .outcomeUnknown })
+      let epochs = try await RuntimeSupersedingRecoveryStore(stateDirectory: stateDirectory).list()
+      XCTAssertTrue(epochs.isEmpty)
+      let dispatches = await fixture.dispatches.snapshot()
+      XCTAssertEqual(
+        dispatches, initialDispatches,
+        "even a dispatcher that would confirm the build must receive no recovery action")
+      if let lane {
+        let prepares = await lane.prepareCount()
+        let performs = await lane.performCount()
+        XCTAssertEqual(prepares, 0)
+        XCTAssertEqual(performs, 0)
+      }
+    }
+  }
+
+  func testUnprovenLaneRecoveryFinishesTheExistingReconcileAttemptAfterRestart() async throws {
+    let fixture = try await interruptedLaneFixture()
+    let journalURL = fixture.jobDirectory.appending(path: "journal.jsonl")
+    let initial = try DurableJournalRecovery.inspect(url: journalURL)
+    let originalBytes = try Data(contentsOf: journalURL)
+    let record = try RuntimeJobRecord.load(from: fixture.jobDirectory)
+    let attemptID = "lane-recovery-crash-window"
+    let journal = try FileDurableJournal(url: journalURL)
+    let sequence = try XCTUnwrap(initial.lastDurableSequence) + 1
+    try journal.appendAndSynchronize(
+      try JournalEvent.stateTransition(
+        eventID: "crash-enter-reconciling", sequence: sequence,
+        sessionID: record.sessionID, jobID: record.jobID,
+        timestamp: "2026-08-08T01:00:01Z", from: .waitingForRecovery, to: .reconciling,
+        reason: "fixture stopped after starting reconciliation"))
+    try journal.appendAndSynchronize(
+      JournalEvent.reconcileStarted(
+        eventID: "crash-reconcile-started", sequence: sequence + 1,
+        sessionID: record.sessionID, jobID: record.jobID,
+        timestamp: "2026-08-08T01:00:01Z", recoveryAttemptID: attemptID,
+        sourceState: .waitingForRecovery, lastDurableSequence: initial.lastDurableSequence ?? 0,
+        trigger: "manual", schemaVersion: JournalEvent.schemaVersion))
+
+    let engine = try recoveryEngine(fixture: fixture, lane: nil)
+    _ = try await engine.recoverActiveJobs()
+    let status = try await engine.reconcile(jobID: fixture.jobID)
+    XCTAssertEqual(status.state, JobState.waitingForRecovery.rawValue)
+    XCTAssertTrue(status.outcomeUnknown)
+    let replay = try DurableJournalRecovery.inspect(url: journalURL)
+    let starts = replay.events.filter { $0.kind == .reconcileStarted }
+    let outcomes = replay.events.filter { $0.kind == .reconcileOutcome }
+    XCTAssertEqual(starts.count, 1)
+    XCTAssertEqual(outcomes.count, 1)
+    XCTAssertEqual(outcomes.only?.payload["recoveryAttemptId"], .string(attemptID))
+    XCTAssertEqual(outcomes.only?.payload["safeBoundaryConfirmed"], .bool(false))
+    XCTAssertEqual(replay.outstandingIntents.map(\.eventID), initial.outstandingIntents.map(\.eventID))
+    XCTAssertTrue(try Data(contentsOf: journalURL).starts(with: originalBytes))
+    let dispatches = await fixture.dispatches.snapshot()
+    XCTAssertTrue(dispatches.isEmpty)
+  }
+
   func testPrewarmFailureIsConfirmedBeforeCapabilityConsumptionOrDeviceDispatch() async throws {
     let artifactStore = try RuntimeArtifactStore(
       rootURL: stateDirectory.appending(path: "artifacts", directoryHint: .isDirectory),
@@ -1104,6 +1219,77 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
       confirmedStepIDs: ["flash-partitions", "verify-flash-readback"],
       resultingTargetEpochSHA256: String(repeating: "7", count: 64),
       establishedAtUTC: "2026-08-08T00:20:00Z")
+  }
+
+  private struct InterruptedLaneFixture {
+    let jobID: String
+    let jobDirectory: URL
+    let originalUnknownJournalURL: URL
+    let artifacts: RuntimeArtifactStore
+    let capabilities: RuntimeCapabilityStore
+    let providers: DeviceProviderRegistry
+    let dispatches: DispatchLog
+  }
+
+  private func interruptedLaneFixture() async throws -> InterruptedLaneFixture {
+    _ = try RuntimeJobRepository(stateDirectory: stateDirectory)
+    let original = try writeUnknownJob(
+      jobID: "job-original-uncertain", timestamp: "2026-08-08T00:00:00Z",
+      correlatedUnknownOutcome: true)
+    let artifacts = try RuntimeArtifactStore(
+      rootURL: stateDirectory.appending(path: "artifacts", directoryHint: .isDirectory),
+      nowUTC: { "2026-08-08T01:00:00Z" })
+    let artifact = try await artifacts.publish(
+      RuntimeArtifactPublicationRequest(
+        jobID: "job-interrupted-input", sessionID: "session-interrupted-input",
+        stepID: "import-flash-bundle", name: "images.tar.gz",
+        mediaType: "application/gzip", privacy: .standard,
+        retentionClass: .pinnedUntilVerified,
+        sourceOperation: "artifact.import-flash-bundle", providerID: "host",
+        bindingSnapshot: ArtifactBindingSnapshot(
+          targetID: "TGT-DAYU200-RECOVERY", bindingRevision: 2,
+          stableIdentitySHA256: identity),
+        contents: try recoveryArchive()))
+    let lease = try await artifacts.leaseReference(jobID: artifact.jobID, artifactID: artifact.artifactID)
+    let capabilities = try RuntimeCapabilityStore(
+      directoryURL: stateDirectory.appending(path: "capabilities", directoryHint: .isDirectory))
+    let dispatches = DispatchLog()
+    let providers = DeviceProviderRegistry(providers: [
+      ArkForgeFlashProviderAdapter(
+        factsPort: RecoveryFactsPort(identity: identity, toolSHA256: providerSHA256),
+        availability: .available)
+    ])
+    let lane = RestartingArkForgeLane(
+      toolchainSHA256: providerSHA256, mode: .loseTerminal, stateDirectory: stateDirectory)
+    let engine = try RuntimeJobEngine(
+      configuration: .init(
+        stateDirectory: stateDirectory, arkForgeLane: lane,
+        arkForgeDeviceProfileID: "org.openharmony.dayu200@1.0.0"),
+      providers: providers, dispatcher: ConfirmingDispatcher(log: dispatches),
+      capabilityStore: capabilities, artifactStore: artifacts,
+      nowUTC: { "2026-08-08T01:00:00Z" })
+    let accepted = try await engine.submit(
+      CanonicalJSONEncoders.canonical().encode(try flashRequest(id: "unproven-lane", lease: lease)))
+    let unknown = try await engine.run(jobID: accepted.jobID)
+    XCTAssertEqual(unknown.state, JobState.waitingForRecovery.rawValue)
+    XCTAssertTrue(unknown.outcomeUnknown)
+    return InterruptedLaneFixture(
+      jobID: accepted.jobID,
+      jobDirectory: stateDirectory.appending(path: "jobs/\(accepted.jobID)", directoryHint: .isDirectory),
+      originalUnknownJournalURL: original.journalURL,
+      artifacts: artifacts, capabilities: capabilities, providers: providers, dispatches: dispatches)
+  }
+
+  private func recoveryEngine(
+    fixture: InterruptedLaneFixture, lane: RestartingArkForgeLane?
+  ) throws -> RuntimeJobEngine {
+    try RuntimeJobEngine(
+      configuration: .init(
+        stateDirectory: stateDirectory, arkForgeLane: lane,
+        arkForgeDeviceProfileID: "org.openharmony.dayu200@1.0.0"),
+      providers: fixture.providers, dispatcher: ConfirmingDispatcher(log: fixture.dispatches),
+      capabilityStore: fixture.capabilities, artifactStore: fixture.artifacts,
+      nowUTC: { "2026-08-08T01:00:02Z" })
   }
 
   private func recoveryService(

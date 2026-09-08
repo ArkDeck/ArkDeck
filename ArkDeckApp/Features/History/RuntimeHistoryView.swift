@@ -944,7 +944,11 @@ struct RuntimeHistoryView: View {
               formattedUTC(evidence.firstEvidenceStepAtUTC),
               id: "history.evidence.firstEvidence")
           }
-          if !evidence.actualStepKinds.isEmpty {
+          if !evidence.actualStepKindsWereReported {
+            Label(historyLocalized("history.value.notReported"), systemImage: "questionmark.diamond")
+              .foregroundStyle(.secondary)
+              .accessibilityIdentifier("history.evidence.steps.unreported")
+          } else if !evidence.actualStepKinds.isEmpty {
             Text(evidence.actualStepKinds.joined(separator: " · "))
               .font(WorkspaceFont.monospacedDense)
               .textSelection(.enabled)
