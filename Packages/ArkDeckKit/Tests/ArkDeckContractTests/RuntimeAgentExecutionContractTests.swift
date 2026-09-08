@@ -44,6 +44,7 @@ final class RuntimeAgentExecutionContractTests: XCTestCase {
   final class Dispatcher: RuntimeProcessDispatching, @unchecked Sendable {
     private let lock = NSLock()
     private var count = 0
+    private var actions: [TypedProviderAction] = []
     private var gate: Gate?
     private var targetOutput: Data?
     func hold(_ value: Gate) { lock.withLock { gate = value } }
@@ -51,8 +52,12 @@ final class RuntimeAgentExecutionContractTests: XCTestCase {
       lock.withLock { targetOutput = value.map { Data($0.utf8) } }
     }
     var dispatchCount: Int { lock.withLock { count } }
+    var dispatchedActions: [TypedProviderAction] { lock.withLock { actions } }
     func dispatch(_ plan: TypedProcessPlan) async throws -> ProviderProcessReceipt {
-      let paused = lock.withLock { count += 1; let value = gate; gate = nil; return value }
+      let paused = lock.withLock {
+        count += 1; actions.append(plan.action)
+        let value = gate; gate = nil; return value
+      }
       await paused?.enter()
       let output: String
       switch plan.action {
@@ -769,6 +774,102 @@ final class RuntimeAgentExecutionContractTests: XCTestCase {
         }
       }
     }
+  }
+
+  func testProductionCRLFEmptyTargetsKeepConnectHARWithoutStartingAJob() async throws {
+    let probes = try XCTUnwrap(Bundle.module.url(forResource: "Probes", withExtension: nil))
+    let marker = try Data(contentsOf: probes.appending(path: "DeviceObservation/1.0.0/vectors/empty-marker.bin"))
+    XCTAssertEqual(Array(marker), Array("[Empty]".utf8) + [0x0D, 0x0A])
+    dispatcher.setTargetOutput(String(decoding: marker, as: UTF8.self))
+    port.setRelations([])
+    let capturedClock = clock!
+    let capturedPort = port!
+    let observations = TargetObservationCoordinator(
+      observation: ProviderBootstrapObservation(
+        provider: HDCObservationProviderAdapter(factsPort: Facts(targets: targets, clock: clock)),
+        dispatcher: dispatcher, nowUTC: { RuntimeAgentTime.format(capturedClock.now()) }),
+      targetStore: targets, usbRelations: { try capturedPort.relations() },
+      nowUTC: { RuntimeAgentTime.format(capturedClock.now()) })
+    let owner = try owner(observations: observations)
+    let humanActions = try RuntimeHumanActionResourceCoordinator(
+      directory: directory.appending(path: "human-actions"), agents: owner, controlResources: nil)
+    let server = try startServer(owner, observations: observations, humanActions: humanActions)
+
+    let discovered = try cli(["device", "candidates"], server: server)
+    XCTAssertEqual(discovered.0, 0)
+    let snapshot = try object(XCTUnwrap(discovered.1["result"]))
+    XCTAssertEqual(snapshot["health"], .string("current"))
+    XCTAssertEqual(snapshot["observations"], .array([]))
+
+    func paused(_ arguments: [String]) throws -> (reference: String, fields: [String: JSONValue]) {
+      let before = dispatcher.dispatchCount
+      let reply = try cli(arguments, server: server)
+      XCTAssertEqual(reply.0, 75)
+      let error = try object(XCTUnwrap(reply.1["error"]))
+      XCTAssertEqual(error["code"], .string("humanActionRequired"))
+      let details = try object(XCTUnwrap(error["details"]))
+      let execution = try object(XCTUnwrap(details["execution"]))
+      XCTAssertEqual(execution["state"], .string("waitingForHuman"))
+      XCTAssertEqual(execution["targetId"], .null)
+      XCTAssertEqual(execution["bindingRevision"], .null)
+      XCTAssertEqual(execution["jobId"], .null)
+      let pending = try action(.object(execution))
+      XCTAssertEqual(pending.fields["category"], .string("physicalConnection"))
+      XCTAssertEqual(pending.fields["reasonCode"], .string("device.notObserved"))
+      XCTAssertEqual(pending.fields["minimumAction"], .string("human.connectOrPowerDevice"))
+      XCTAssertEqual(pending.fields["newDispatchCount"], .integer(0))
+      XCTAssertEqual(dispatcher.dispatchCount, before + 1, "one fresh enumeration is required, with no Job dispatch")
+      return pending
+    }
+
+    let pending = try paused(["agent", "run", "--execution-id", "execution-empty-targets",
+      "--operation", "observe.device@1"])
+    guard case .string(let actionID)? = pending.fields["actionId"] else {
+      return XCTFail("zero candidates must publish an owned connect-device action")
+    }
+    for arguments in [
+      ["agent", "resume", "--resume-reference", pending.reference],
+      ["human-action", "resume", "--human-action", actionID, "--resume-reference", pending.reference],
+    ] {
+      let resumed = try paused(arguments)
+      XCTAssertEqual(resumed.reference, pending.reference)
+      XCTAssertEqual(resumed.fields, pending.fields, "an absent target cannot consume or replace the physical action")
+    }
+
+    // The same text with literal backslashes is not the registered marker.
+    // A failed fresh probe preserves the pending action and never becomes an
+    // empty observation or evidence that physical assistance completed.
+    let literal = #"[Empty]\r\n"#
+    dispatcher.setTargetOutput(literal)
+    guard case .malformed(let reason) = HDCObservationSemanticParser.parseTargetList(
+      stdout: Data(literal.utf8), profile: .openHarmony320Family,
+      toolVersion: "3.2.0f", truncated: false)
+    else { return XCTFail("literal escape sequences must remain malformed") }
+    for (arguments, code, exitCode) in [
+      (["device", "candidates"], "internalError", Int32(70)),
+      (["agent", "resume", "--resume-reference", pending.reference], "outcomeUnknown", Int32(75)),
+    ] {
+      let before = dispatcher.dispatchCount
+      let refused = try cli(arguments, server: server)
+      XCTAssertEqual(refused.0, exitCode)
+      let error = try object(XCTUnwrap(refused.1["error"]))
+      XCTAssertEqual(error["code"], .string(code))
+      XCTAssertEqual(error["message"], .string(reason))
+      XCTAssertEqual(dispatcher.dispatchCount, before + 1)
+    }
+    let actionAfterRefusal = try await owner.humanAction(actionID)
+    XCTAssertEqual(actionAfterRefusal, .object(pending.fields))
+    dispatcher.setTargetOutput(String(decoding: marker, as: UTF8.self))
+    XCTAssertEqual(try paused(["agent", "resume", "--resume-reference", pending.reference]).fields, pending.fields)
+
+    let jobs = try await engine.listJobs()
+    XCTAssertTrue(jobs.isEmpty)
+    XCTAssertTrue(try targets.list().isEmpty)
+    let capabilities = try RuntimeCapabilityStore(directoryURL: directory.appending(path: "capabilities"))
+    let installed = try await capabilities.list()
+    XCTAssertTrue(installed.isEmpty)
+    XCTAssertEqual(dispatcher.dispatchedActions, Array(repeating: .hdc(.listDeviceCandidates), count: 7),
+      "only the seven explicitly requested enumeration probes may dispatch; no Job or device effect starts")
   }
 
   func testProductionTargetDiagnosticReachesDiscoveryAdoptionAndBothCLIResumePaths() async throws {

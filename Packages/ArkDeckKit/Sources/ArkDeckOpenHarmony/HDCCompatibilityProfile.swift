@@ -87,24 +87,46 @@ package enum HDCObservationSemanticParser {
     let normalized: String
   }
 
-  private static func outputLines(_ text: String) -> [OutputLine] {
+  private static func targetOutputLines(_ text: String) -> [OutputLine] {
+    var lines: [OutputLine] = []
+    var start = text.startIndex
     var number = 1
-    return text.split(separator: "\n", omittingEmptySubsequences: false).compactMap { source in
-      let lineNumber = number
-      // Keep the parser's existing Character-based splitting, including its
-      // refusal of unregistered CRLF shapes. Count physical LF bytes for the
-      // diagnostic even when a CRLF grapheme remains inside one parser line.
-      number += source.utf8.filter { $0 == 0x0A }.count + 1
+
+    func appendLine(contentEnd: String.Index, sourceEnd: String.Index) {
+      let content = text[start..<contentEnd]
+      let containsUnregisteredNewline = content.unicodeScalars.contains { CharacterSet.newlines.contains($0) }
+      let normalized = containsUnregisteredNewline
+        ? String(content) : content.trimmingCharacters(in: .whitespaces)
+      guard containsUnregisteredNewline
+        || (!normalized.isEmpty && !ignorableDiagnosticPrefixes.contains(where: { normalized.hasPrefix($0) }))
+      else { return }
+      lines.append(OutputLine(number: number, source: text[start..<sourceEnd], normalized: normalized))
+    }
+
+    // Swift treats CRLF as one Character, distinct from LF. The target-list
+    // family registers both.
+    // Bare CR and other newlines stay input, never extra delimiters. Keep the
+    // original terminator bytes in bounded failure previews.
+    for index in text.indices where text[index] == "\n" || text[index] == "\r\n" {
+      let end = text.index(after: index)
+      appendLine(contentEnd: index, sourceEnd: end)
+      start = end
+      number += 1
+    }
+    appendLine(contentEnd: text.endIndex, sourceEnd: text.endIndex)
+    return lines
+  }
+
+  private static func normalizedLines(_ text: String) -> [String] {
+    // Version probes retain their original Character-LF boundaries and
+    // diagnostic-prefix filtering independently of the target-list grammar.
+    text.split(separator: "\n", omittingEmptySubsequences: false).compactMap { source in
       let normalized = source.trimmingCharacters(in: .whitespaces)
       guard !normalized.isEmpty,
         !ignorableDiagnosticPrefixes.contains(where: { normalized.hasPrefix($0) })
       else { return nil }
-      return OutputLine(number: lineNumber, source: source, normalized: normalized)
+      return normalized
     }
-  }
-
-  private static func normalizedLines(_ text: String) -> [String] {
-    outputLines(text).map(\.normalized)
   }
 
   /// This is bounded failure prose, not a process receipt or raw Artifact.
@@ -235,7 +257,7 @@ package enum HDCObservationSemanticParser {
     guard let text = String(data: stdout, encoding: .utf8) else {
       return .invalidEncoding
     }
-    let lines = outputLines(text)
+    let lines = targetOutputLines(text)
     guard !lines.isEmpty else { return .empty }
     if lines.map(\.normalized) == ["[Empty]"] {
       return .parsed(HDCParsedTargetList(targets: []))
