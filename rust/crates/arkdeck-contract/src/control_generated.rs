@@ -4,7 +4,7 @@ pub const PROTOCOL_VERSION: &str = "1.0.0";
 pub const MAX_REQUEST_BYTES: usize = 4194304;
 pub const MAX_RESPONSE_BYTES: usize = 8388608;
 pub const CONTRACT_IDENTITY: &str =
-    "1054d17b598ce23003ebbdec4d42eb359b63016d6421709ba53c3f21f7c6558d";
+    "8a662759721a2081e974306399997801246de4022047365c050107de5dce2912";
 pub const SWIFT_BASELINE: &str = include_str!("../../../../spec/baselines/swift-single-v1.json");
 pub const CONTRACT_INPUTS: &str = SWIFT_BASELINE;
 pub const METHODS: &[&str] = &[
@@ -47,6 +47,7 @@ pub const METHODS: &[&str] = &[
     "flash.device-access",
     "flash.lanePlanPreview",
     "flash.prerequisites",
+    "flash.reconcile-alias",
     "health",
     "history.filter.delete",
     "history.filter.list",
@@ -262,6 +263,10 @@ pub const METHOD_SCHEMAS: &[(&str, &str)] = &[
     (
         "flash.prerequisites",
         include_str!("../../../../spec/control/methods/flash.prerequisites.json"),
+    ),
+    (
+        "flash.reconcile-alias",
+        include_str!("../../../../spec/control/methods/flash.reconcile-alias.json"),
     ),
     (
         "health",
