@@ -5,7 +5,7 @@ package enum ArkDeckControlProtocol {
   package static let currentVersion = "1.0.0"
   package static let maximumRequestFrameBytes = 4194304
   package static let maximumResponseFrameBytes = 8388608
-  package static let contractIdentity = "1054d17b598ce23003ebbdec4d42eb359b63016d6421709ba53c3f21f7c6558d"
+  package static let contractIdentity = "8a662759721a2081e974306399997801246de4022047365c050107de5dce2912"
   package static let methods: Set<String> = [
     "agent.abandon",
     "agent.list",
@@ -46,6 +46,7 @@ package enum ArkDeckControlProtocol {
     "flash.device-access",
     "flash.lanePlanPreview",
     "flash.prerequisites",
+    "flash.reconcile-alias",
     "health",
     "history.filter.delete",
     "history.filter.list",

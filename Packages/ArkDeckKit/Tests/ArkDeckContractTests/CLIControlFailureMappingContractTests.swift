@@ -51,6 +51,29 @@ final class CLIControlFailureMappingContractTests: XCTestCase {
   /// than fall through to a default. The fallback direction is safe
   /// (mutation-capable), but an unreviewed classification is still a claim
   /// nobody made.
+  /// A handler `case` that the control table does not list is unreachable: the
+  /// daemon refuses it before dispatch, so the CLI leaf in front of it answers
+  /// `controlMethodUnavailable` / `unknownMethod` forever.
+  ///
+  /// #1786 shipped exactly that. The leaf, the handler, the command registry,
+  /// the regenerated contract products and the whole unified gate were green,
+  /// and the method was missing from `Contracts/control-protocol.json`; it was
+  /// found by rebuilding a helper from protected main and calling it against a
+  /// real device. `ControlMethodReachabilityContractTests` asks the other
+  /// direction — every published method dispatches — and cannot see this one.
+  func testEveryDispatchedMethodIsPublishedByTheControlTable() throws {
+    let daemon = try daemonMethods()
+    XCTAssertGreaterThan(daemon.count, 40, "the method scrape found too little to be trusted")
+    let unpublished = daemon.subtracting(ArkDeckControlProtocol.methods).sorted()
+    XCTAssertEqual(
+      unpublished, [],
+      """
+      these methods have a handler but are not in Contracts/control-protocol.json, \
+      so the daemon refuses them before dispatch and nothing can call them: \
+      \(unpublished.joined(separator: ", "))
+      """)
+  }
+
   func testEveryDaemonMethodIsClassified() throws {
     let daemon = try daemonMethods()
     XCTAssertGreaterThan(daemon.count, 40, "the method scrape found too little to be trusted")
