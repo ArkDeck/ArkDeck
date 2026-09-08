@@ -3128,6 +3128,15 @@ enum RuntimeCLI {
         throw session.fail(
           .recordUnreadable, "job \(jobID) reported no state this build understands")
       }
+      if case .object(let next)? = fields["nextAction"],
+        next["reasonCode"] == .string("job.finalizationPending")
+      {
+        _ = try CLIJobReadValidation.validate(
+          status, verb: "status", jobID: jobID, options: [:], session: session)
+        throw session.fail(.resultNotReady,
+          "Job failure finalization requires reconciliation. Run: arkdeck job reconcile --job \(jobID)",
+          details: ["nextAction": .object(next)])
+      }
       let settled = JobState(rawValue: rawState)?.isTerminal == true
         || fields["outcomeUnknown"] == .bool(true)
 

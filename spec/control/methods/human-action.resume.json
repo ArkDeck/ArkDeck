@@ -3,6 +3,7 @@
     "errorCode": {
       "enum": [
         "conflict",
+        "humanActionExpired",
         "internalError",
         "invalidParams",
         "malformedFrame",
@@ -58,6 +59,53 @@
         "actionRequestId": {
           "type": "string"
         },
+        "artifacts": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "bindingRevision": {
+                "type": "integer"
+              },
+              "byteCount": {
+                "type": "integer"
+              },
+              "bytesVerified": {
+                "type": "boolean"
+              },
+              "jobId": {
+                "type": "string"
+              },
+              "providerId": {
+                "type": "string"
+              },
+              "reference": {
+                "type": "string"
+              },
+              "sha256": {
+                "type": "string"
+              },
+              "stableIdentitySha256": {
+                "type": "string"
+              },
+              "targetId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "bindingRevision",
+              "byteCount",
+              "bytesVerified",
+              "jobId",
+              "providerId",
+              "reference",
+              "sha256",
+              "stableIdentitySha256",
+              "targetId"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
         "binding": {
           "additionalProperties": false,
           "properties": {
@@ -84,6 +132,12 @@
             "previewId"
           ],
           "type": "object"
+        },
+        "bindingRevision": {
+          "type": [
+            "integer",
+            "null"
+          ]
         },
         "blockerReasonCode": {
           "type": "string"
@@ -557,11 +611,281 @@
         "createdAt": {
           "type": "string"
         },
+        "deadline": {
+          "type": "string"
+        },
         "dispatchCount": {
           "type": "integer"
         },
+        "evidence": {
+          "additionalProperties": false,
+          "properties": {
+            "actualEffect": {
+              "type": "string"
+            },
+            "actualStepKinds": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "artifacts": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "bindingRevision": {
+                    "type": "integer"
+                  },
+                  "byteCount": {
+                    "type": "integer"
+                  },
+                  "bytesVerified": {
+                    "type": "boolean"
+                  },
+                  "jobId": {
+                    "type": "string"
+                  },
+                  "providerId": {
+                    "type": "string"
+                  },
+                  "reference": {
+                    "type": "string"
+                  },
+                  "sha256": {
+                    "type": "string"
+                  },
+                  "stableIdentitySha256": {
+                    "type": "string"
+                  },
+                  "targetId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "bindingRevision",
+                  "byteCount",
+                  "bytesVerified",
+                  "jobId",
+                  "providerId",
+                  "reference",
+                  "sha256",
+                  "stableIdentitySha256",
+                  "targetId"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "authority": {
+              "additionalProperties": false,
+              "properties": {
+                "admittedAtUtc": {
+                  "type": "string"
+                },
+                "artifactDigest": {
+                  "type": "string"
+                },
+                "consumptionFingerprintSha256": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "planDigest": {
+                  "type": "string"
+                },
+                "recoveryEpoch": {
+                  "type": "null"
+                },
+                "reference": {
+                  "type": "string"
+                },
+                "reservationId": {
+                  "type": "string"
+                },
+                "stepSetDigest": {
+                  "type": "string"
+                },
+                "targetBindingDigest": {
+                  "type": "string"
+                },
+                "useOrdinal": {
+                  "type": "integer"
+                },
+                "validUntilUtc": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "admittedAtUtc",
+                "artifactDigest",
+                "consumptionFingerprintSha256",
+                "kind",
+                "planDigest",
+                "recoveryEpoch",
+                "reference",
+                "reservationId",
+                "stepSetDigest",
+                "targetBindingDigest",
+                "useOrdinal",
+                "validUntilUtc"
+              ],
+              "type": "object"
+            },
+            "bindingRevision": {
+              "type": "integer"
+            },
+            "blockers": {
+              "type": "array"
+            },
+            "catalogDigest": {
+              "type": "string"
+            },
+            "executionMode": {
+              "type": "string"
+            },
+            "finishedAtUtc": {
+              "type": "string"
+            },
+            "firstEvidenceStepAtUtc": {
+              "type": "string"
+            },
+            "jobId": {
+              "type": "string"
+            },
+            "observation": {
+              "additionalProperties": false,
+              "properties": {
+                "bindingRevision": {
+                  "type": "integer"
+                },
+                "confirmationMethod": {
+                  "type": "string"
+                },
+                "confirmedAtUtc": {
+                  "type": "string"
+                },
+                "firmware": {
+                  "type": "string"
+                },
+                "model": {
+                  "type": "string"
+                },
+                "preflightSteps": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "outcomeAtUtc": {
+                        "type": "string"
+                      },
+                      "stepId": {
+                        "type": "string"
+                      },
+                      "stepKind": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "outcomeAtUtc",
+                      "stepId",
+                      "stepKind"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "providerId": {
+                  "type": "string"
+                },
+                "stableIdentitySha256": {
+                  "type": "string"
+                },
+                "targetId": {
+                  "type": "string"
+                },
+                "toolSha256": {
+                  "type": "string"
+                },
+                "toolVersion": {
+                  "type": "string"
+                },
+                "transport": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "bindingRevision",
+                "confirmationMethod",
+                "confirmedAtUtc",
+                "firmware",
+                "model",
+                "preflightSteps",
+                "providerId",
+                "stableIdentitySha256",
+                "targetId",
+                "toolSha256",
+                "toolVersion",
+                "transport"
+              ],
+              "type": "object"
+            },
+            "operationReference": {
+              "type": "string"
+            },
+            "outcomeUnknown": {
+              "type": "boolean"
+            },
+            "providerId": {
+              "type": "string"
+            },
+            "recoveryEpoch": {
+              "type": "null"
+            },
+            "startedAtUtc": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "targetId": {
+              "type": "string"
+            },
+            "terminalState": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "actualEffect",
+            "actualStepKinds",
+            "artifacts",
+            "authority",
+            "bindingRevision",
+            "blockers",
+            "catalogDigest",
+            "executionMode",
+            "finishedAtUtc",
+            "firstEvidenceStepAtUtc",
+            "jobId",
+            "observation",
+            "operationReference",
+            "outcomeUnknown",
+            "providerId",
+            "recoveryEpoch",
+            "startedAtUtc",
+            "status",
+            "targetId",
+            "terminalState"
+          ],
+          "type": "object"
+        },
+        "executionId": {
+          "type": "string"
+        },
         "expiresAt": {
           "type": "string"
+        },
+        "failureCode": {
+          "type": "null"
         },
         "fingerprintAlgorithm": {
           "type": "string"
@@ -570,112 +894,166 @@
           "type": "string"
         },
         "humanAction": {
-          "additionalProperties": false,
-          "properties": {
-            "actionId": {
-              "type": "string"
-            },
-            "binding": {
+          "anyOf": [
+            {
               "additionalProperties": false,
               "properties": {
-                "controlActionId": {
+                "actionId": {
                   "type": "string"
                 },
-                "generation": {
+                "binding": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "controlActionId": {
+                      "type": "string"
+                    },
+                    "generation": {
+                      "type": "string"
+                    },
+                    "previewDigest": {
+                      "type": "string"
+                    },
+                    "previewId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "controlActionId",
+                    "generation",
+                    "previewDigest",
+                    "previewId"
+                  ],
+                  "type": "object"
+                },
+                "category": {
                   "type": "string"
                 },
-                "previewDigest": {
+                "choices": {
+                  "type": "array"
+                },
+                "createdAt": {
                   "type": "string"
                 },
-                "previewId": {
+                "expiresAt": {
+                  "type": "string"
+                },
+                "minimumAction": {
+                  "type": "string"
+                },
+                "newDispatchCount": {
+                  "type": "integer"
+                },
+                "owner": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind"
+                  ],
+                  "type": "object"
+                },
+                "prohibitedAutomation": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "reasonCode": {
+                  "type": "string"
+                },
+                "resumeReference": {
+                  "type": "string"
+                },
+                "schemaVersion": {
+                  "type": "string"
+                },
+                "selectionSchema": {
+                  "type": "null"
+                },
+                "status": {
                   "type": "string"
                 }
               },
               "required": [
-                "controlActionId",
-                "generation",
-                "previewDigest",
-                "previewId"
+                "actionId",
+                "category",
+                "choices",
+                "createdAt",
+                "expiresAt",
+                "minimumAction",
+                "newDispatchCount",
+                "owner",
+                "reasonCode",
+                "resumeReference",
+                "schemaVersion",
+                "selectionSchema",
+                "status"
               ],
               "type": "object"
             },
-            "category": {
-              "type": "string"
-            },
-            "choices": {
-              "type": "array"
-            },
-            "createdAt": {
-              "type": "string"
-            },
-            "expiresAt": {
-              "type": "string"
-            },
-            "minimumAction": {
-              "type": "string"
-            },
-            "newDispatchCount": {
-              "type": "integer"
-            },
-            "owner": {
-              "additionalProperties": false,
-              "properties": {
-                "id": {
-                  "type": "string"
-                },
-                "kind": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "id",
-                "kind"
-              ],
-              "type": "object"
-            },
-            "prohibitedAutomation": {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            },
-            "reasonCode": {
-              "type": "string"
-            },
-            "resumeReference": {
-              "type": "string"
-            },
-            "schemaVersion": {
-              "type": "string"
-            },
-            "selectionSchema": {
-              "type": "null"
-            },
-            "status": {
-              "type": "string"
+            {
+              "type": [
+                "null"
+              ]
             }
-          },
-          "required": [
-            "actionId",
-            "binding",
-            "category",
-            "choices",
-            "createdAt",
-            "expiresAt",
-            "minimumAction",
-            "newDispatchCount",
-            "owner",
-            "prohibitedAutomation",
-            "reasonCode",
-            "resumeReference",
-            "schemaVersion",
-            "selectionSchema",
-            "status"
-          ],
-          "type": "object"
+          ]
         },
         "interactionOrigin": {
           "type": "string"
+        },
+        "job": {
+          "additionalProperties": false,
+          "properties": {
+            "jobId": {
+              "type": "string"
+            },
+            "outcome": {
+              "type": "string"
+            },
+            "outcomeUnknown": {
+              "type": "boolean"
+            },
+            "outstandingResidueCount": {
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "state": {
+              "type": "string"
+            },
+            "waitingForHuman": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "jobId",
+            "outcome",
+            "outcomeUnknown",
+            "outstandingResidueCount",
+            "state",
+            "waitingForHuman"
+          ],
+          "type": "object"
+        },
+        "jobId": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "jobState": {
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "kind": {
           "type": "string"
@@ -692,6 +1070,9 @@
         "nextAction": {
           "additionalProperties": false,
           "properties": {
+            "expiresAt": {
+              "type": "string"
+            },
             "kind": {
               "type": "string"
             },
@@ -729,6 +1110,9 @@
                 "kind"
               ],
               "type": "object"
+            },
+            "resumeReference": {
+              "type": "string"
             }
           },
           "required": [
@@ -738,6 +1122,12 @@
             "resource"
           ],
           "type": "object"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "outcomeUnknown": {
+          "type": "boolean"
         },
         "owner": {
           "additionalProperties": false,
@@ -986,10 +1376,15 @@
         },
         "status": {
           "type": "string"
+        },
+        "targetId": {
+          "type": [
+            "null",
+            "string"
+          ]
         }
       },
       "required": [
-        "expiresAt",
         "schemaVersion"
       ],
       "type": "object"
@@ -1003,8 +1398,8 @@
   "x-arkdeck-method": "human-action.resume",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 1,
-    "request": 11,
+    "error": 2,
+    "request": 12,
     "result": 10
   }
 }

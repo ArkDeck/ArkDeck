@@ -864,6 +864,7 @@ public actor RuntimeJobEngine {
       package let afterAnalyzerCommitLinearization: (@Sendable (String, String) async -> Void)?
       package let afterAnalyzerArtifactPublication: (@Sendable (String, String) async -> Void)?
       package let beforeMutationCapabilityCommit: (@Sendable (String) async -> Void)?
+      package let debugHAPCheckpoint: (@Sendable (String, String) throws -> Void)?
 
       package init(
         beforeDispatchInstall: (@Sendable (String, String) async -> Void)? = nil,
@@ -871,12 +872,14 @@ public actor RuntimeJobEngine {
           (@Sendable (String, String) async -> Void)? = nil,
         afterAnalyzerArtifactPublication:
           (@Sendable (String, String) async -> Void)? = nil,
-        beforeMutationCapabilityCommit: (@Sendable (String) async -> Void)? = nil
+        beforeMutationCapabilityCommit: (@Sendable (String) async -> Void)? = nil,
+        debugHAPCheckpoint: (@Sendable (String, String) throws -> Void)? = nil
       ) {
         self.beforeDispatchInstall = beforeDispatchInstall
         self.afterAnalyzerCommitLinearization = afterAnalyzerCommitLinearization
         self.afterAnalyzerArtifactPublication = afterAnalyzerArtifactPublication
         self.beforeMutationCapabilityCommit = beforeMutationCapabilityCommit
+        self.debugHAPCheckpoint = debugHAPCheckpoint
       }
 
       package static let none = TestHooks()
@@ -948,6 +951,67 @@ public actor RuntimeJobEngine {
     /// must not run either - otherwise a failed capture could still
     /// "receive" a product and the run would look complete.
     var skippedStepIDs: Set<String> = []
+  }
+
+  /// Chooses between the two existing Journal envelopes. Dispatch, Provider
+  /// verification and the WAL gate remain shared; every outcome keeps the
+  /// kind and source correlation of its exact intent.
+  private enum RuntimeJournalDispatch {
+    case workflow(WorkflowStep)
+    case compensation(PlannedCompensation)
+
+    var stepID: String {
+      switch self {
+      case .workflow(let step): step.id
+      case .compensation(let planned): planned.descriptor.id
+      }
+    }
+
+    var isCompensation: Bool {
+      if case .compensation = self { return true }
+      return false
+    }
+
+    func intent(
+      eventID: String, sequence: Int, record: RuntimeJobRecord,
+      timestamp: String, target: JournalTarget, bindingRevision: Int?
+    ) throws -> JournalEvent {
+      switch self {
+      case .workflow(let step):
+        try JournalEvent.stepIntent(
+          eventID: eventID, sequence: sequence, sessionID: record.sessionID,
+          jobID: record.jobID, timestamp: timestamp, step: step, target: target,
+          attempt: 1, bindingRevision: bindingRevision)
+      case .compensation(let planned):
+        try JournalEvent.compensationIntent(
+          eventID: eventID, sequence: sequence, sessionID: record.sessionID,
+          jobID: record.jobID, timestamp: timestamp,
+          compensationOfStepID: planned.sourceStepId, descriptor: planned.descriptor,
+          target: target, attempt: 1, bindingRevision: bindingRevision)
+      }
+    }
+
+    func outcome(
+      eventID: String, sequence: Int, record: RuntimeJobRecord,
+      timestamp: String, intentEventID: String, result: String,
+      semanticCode: String? = nil, summary: String? = nil
+    ) throws -> JournalEvent {
+      switch self {
+      case .workflow:
+        try JournalEvent.stepOutcome(
+          eventID: eventID, sequence: sequence, sessionID: record.sessionID,
+          jobID: record.jobID, timestamp: timestamp, stepID: stepID, attempt: 1,
+          correlatesToIntentEventID: intentEventID, result: result,
+          outcomeCertainty: .confirmed, semanticCode: semanticCode, summary: summary)
+      case .compensation(let planned):
+        try JournalEvent.compensationOutcome(
+          eventID: eventID, sequence: sequence, sessionID: record.sessionID,
+          jobID: record.jobID, timestamp: timestamp,
+          compensationOfStepID: planned.sourceStepId, descriptorID: stepID,
+          attempt: 1, correlatesToIntentEventID: intentEventID, result: result,
+          outcomeCertainty: .confirmed, semanticCode: semanticCode, summary: summary)
+      }
+    }
   }
 
   private struct ProcessProgressKey: Hashable {
@@ -1129,6 +1193,8 @@ public actor RuntimeJobEngine {
   /// pinned - and therefore comparable - observation window.
   private let nowPreciseUTC: @Sendable () -> String
   private var jobs: [String: JobRuntime] = [:]
+  private var jobFailureFinalizations: [String: Task<RuntimeJobStatus, Error>] = [:]
+  private var jobReconciliations: [String: Task<RuntimeJobStatus, Error>] = [:]
   private var jobRuns: [String: Task<RuntimeJobStatus, Error>] = [:]
   private var hdcLifecycleInterlockID: UUID?
   private var cancellationRequests: Set<String> = []
@@ -1895,6 +1961,8 @@ public actor RuntimeJobEngine {
         || runtime.record.state == JobState.running.rawValue
         || runtime.record.state == JobState.recoveringByCompleteOverwrite.rawValue
         || runtime.record.state == JobState.resumeAtConfirmedSafeBoundary.rawValue
+        || (runtime.record.operationReference == "debug.hap@1"
+          && runtime.record.state == JobState.finalizing.rawValue)
     else {
       throw RuntimeJobEngineError.jobNotRunnable(
         "job \(jobID) is \(runtime.record.state), not runnable")
@@ -1909,6 +1977,9 @@ public actor RuntimeJobEngine {
     guard runtime.record.catalogDigest == RuntimeOperationCatalog.catalogDigest else {
       throw RuntimeJobEngineError.jobNotRunnable(
         "job \(jobID) was materialized against a different catalog digest")
+    }
+    if runtime.record.state == JobState.finalizing.rawValue {
+      return try await finalizeDebugHAPFailure(jobID: jobID)
     }
 
     // Acquire before the running transition or any external dispatch. If the
@@ -1993,9 +2064,15 @@ public actor RuntimeJobEngine {
           code: .executionConfirmedNotPerformed, category: .externalTool,
           retryability: .runtimeDecisionRequired,
           recovery: .submitNewTypedRequestAfterRuntimeProof)
+        try persistRuntimeRecord(current.record)
+        jobs[jobID] = current
         // The state graph routes every terminal outcome through
         // finalizing: a job always gets its wrap-up phase, success or not.
         try transition(&current, from: executionState, to: .finalizing, reason: reason)
+        if descriptor.reference == "debug.hap@1" {
+          jobs[jobID] = current
+          return try await finalizeDebugHAPFailure(jobID: jobID)
+        }
         // `executionState` distinguishes a new recovery epoch from an
         // ordinary workflow; neither branch reuses the predecessor intent.
         try transition(&current, from: .finalizing, to: .failed, reason: reason)
@@ -2010,7 +2087,13 @@ public actor RuntimeJobEngine {
         current.record.operationFailure = RuntimeOperationFailure(
           code: .executionFailed, category: .execution,
           retryability: .runtimeDecisionRequired, recovery: .inspectJob)
+        try persistRuntimeRecord(current.record)
+        jobs[jobID] = current
         try transition(&current, from: executionState, to: .finalizing, reason: reason)
+        if descriptor.reference == "debug.hap@1" {
+          jobs[jobID] = current
+          return try await finalizeDebugHAPFailure(jobID: jobID)
+        }
         try transition(&current, from: .finalizing, to: .failed, reason: reason)
         current.record.finishedAtUTC = nowUTC()
         try persistRuntimeRecord(current.record)
@@ -2025,9 +2108,15 @@ public actor RuntimeJobEngine {
       current.record.operationFailure = RuntimeOperationFailure(
         code: .artifactPublicationFailed, category: .storage,
         retryability: .notAutomatic, recovery: .inspectJob)
+      try persistRuntimeRecord(current.record)
+      jobs[jobID] = current
       try transition(
         &current, from: Self.executionState(of: current.record), to: .finalizing,
         reason: "artifact publication failed: \(failure.detail)")
+      if descriptor.reference == "debug.hap@1" {
+        jobs[jobID] = current
+        return try await finalizeDebugHAPFailure(jobID: jobID)
+      }
       try transition(
         &current, from: .finalizing, to: .failed,
         reason: "artifact publication failed: \(failure.detail)")
@@ -2356,6 +2445,11 @@ public actor RuntimeJobEngine {
         appendTimeline(
           jobID: jobID,
           entry: "resume skipped journal-confirmed step \(step.stepID)")
+        continue
+      }
+      if try await resumeConfirmedOptionalDebugHAPCleanupDebt(
+        jobID: jobID, step: step, descriptor: descriptor)
+      {
         continue
       }
       // Whoever owns the write owns the transition into Loader. With a lane
@@ -2695,6 +2789,14 @@ public actor RuntimeJobEngine {
         // continue past an effect whose result we do not know.
         if case .outcomeUnknown = failure { throw failure }
         if step.isOptional {
+          if descriptor.reference == "debug.hap@1", Self.cleanupResidue(for: action) != nil {
+            guard try await resumeConfirmedOptionalDebugHAPCleanupDebt(
+              jobID: jobID, step: step, descriptor: descriptor)
+            else {
+              throw RuntimeJobEngineError.jobNotRunnable("cleanup failure lacks its declared durable outcome")
+            }
+            continue
+          }
           try await recordSkippedOptionalStep(
             jobID: jobID, step: step, descriptor: descriptor, reason: "\(failure)")
           // The gate is what the step was trying to remove, not whether
@@ -2707,13 +2809,6 @@ public actor RuntimeJobEngine {
             await refreshResidueCount(jobID: jobID)
           }
           continue
-        }
-        if descriptor.reference == "debug.hap@1",
-          Self.debugHAPNeedsCompensation(completedStepIDs: completedStepIDs)
-        {
-          try await compensateDebugHAP(
-            jobID: jobID, descriptor: descriptor, provider: provider,
-            completedStepIDs: completedStepIDs, failedStepID: step.stepID)
         }
         if descriptor.reference == "deploy.native-library.app-owned@1",
           let deployment = Self.nativeDeployment(from: action)
@@ -3037,6 +3132,8 @@ public actor RuntimeJobEngine {
     switch action {
     case .hdc(.cleanupOwnedRemotePath(let path)):
       return .remotePath(path.remotePath)
+    case .hdc(.cleanupStagedPackageSet(let set)):
+      return .remotePath(set.directory.remotePath)
     case .hdc(.cleanupNativeLibrary(let deployment)):
       return .remotePath(deployment.stagingPath)
     case .hdc(.uninstallPackage(let bundle)):
@@ -3046,95 +3143,316 @@ public actor RuntimeJobEngine {
     }
   }
 
-  private func compensateDebugHAP(
-    jobID: String,
-    descriptor: CatalogOperationDescriptor,
-    provider: any DeviceProvider,
-    completedStepIDs: Set<String>,
-    failedStepID: String
-  ) async throws {
-    guard let runtime = jobs[jobID] else {
-      throw RuntimeJobEngineError.jobNotFound(jobID)
-    }
-    var compensationStepIDs: [String] = []
-    if completedStepIDs.contains("start-ability") {
-      compensationStepIDs.append("stop-ability")
-    }
-    // Which cleanup this job asked for, read the same way admission read it:
-    // the input if it gave one, otherwise the catalog's declared default.
-    // Restating "uninstall" here made compensation depend on a value the
-    // catalog also declares, with nothing comparing the two.
-    let cleanupPolicy =
-      CatalogOperationEffectResolver.resolvedInputValue(
-        "cleanupPolicy", descriptor: descriptor, inputs: runtime.record.request.inputs)
-    if cleanupPolicy == .string("uninstall"), completedStepIDs.contains("install-hap") {
-      compensationStepIDs.append("cleanup-uninstall")
-    }
-    if completedStepIDs.contains("send-hap") {
-      compensationStepIDs.append("cleanup-remote-staging")
-    }
-
-    for stepID in compensationStepIDs where stepID != failedStepID {
-      guard let step = descriptor.steps.first(where: { $0.stepID == stepID }) else {
-        throw RuntimeJobEngineError.internalFailure(
-          "debug.hap compensation step \(stepID) is absent from the catalog")
+  /// A single owner drives failure finalization. Joining this task is separate
+  /// from the normal runner, which can hand its confirmed failure here after
+  /// releasing the target mutation lane.
+  private func finalizeDebugHAPFailure(jobID: String) async throws -> RuntimeJobStatus {
+    if let existing = jobFailureFinalizations[jobID] { return try await existing.value }
+    let task = Task {
+      defer { jobFailureFinalizations.removeValue(forKey: jobID) }
+      guard let runtime = jobs[jobID] else {
+        throw RuntimeJobEngineError.jobNotFound(jobID)
       }
-      let facts = try await providers.resolveFacts(
-        providerID: descriptor.provider.rawValue,
-        targetID: runtime.record.request.target.targetID)
-      try Self.validateEvidenceFacts(
-        facts,
-        targetID: runtime.record.request.target.targetID,
-        bindingRevision: runtime.record.request.target.expectedBindingRevision,
-        providerID: descriptor.provider.rawValue)
+      let lease = try powerActivityController?.acquire(
+        reason: "ArkDeck Runtime failure finalization \(jobID)")
+      defer { lease?.end() }
+      return try await mutationLane.withMutationLane(
+        deviceID: runtime.record.request.target.targetID, requestID: jobID
+      ) { [weak self] in
+        guard let self else { throw RuntimeJobEngineError.internalFailure("engine gone") }
+        return try await self.performDebugHAPFailureFinalization(jobID: jobID)
+      }
+    }
+    jobFailureFinalizations[jobID] = task
+    return try await task.value
+  }
+
+  private func performDebugHAPFailureFinalization(jobID: String) async throws -> RuntimeJobStatus {
+    guard var runtime = jobs[jobID],
+      runtime.record.operationReference == "debug.hap@1",
+      runtime.record.state == JobState.finalizing.rawValue,
+      let descriptor = RuntimeOperationCatalog.descriptor(reference: runtime.record.operationReference),
+      let provider = providers.provider(id: runtime.record.providerID)
+    else { throw RuntimeJobEngineError.jobNotRunnable("missing debug.hap failure finalization") }
+    let journalURL = jobDirectory(for: jobID).appending(path: "journal.jsonl")
+    var replay = try DurableJournalRecovery.inspect(url: journalURL)
+    guard let failure = RuntimeDebugHAPFailureFinalization.originalFailure(
+      record: runtime.record, replay: replay)
+    else { throw RuntimeJobEngineError.jobNotRunnable("finalization has no durable original failure") }
+    runtime.record.operationFailure = failure
+    runtime.record.finishedAtUTC = nil
+    cancellationRequests.remove(jobID)
+    try persistRuntimeRecord(runtime.record)
+    jobs[jobID] = runtime
+    try configuration.testHooks.debugHAPCheckpoint?(jobID, "failureFinalizing")
+    guard !replay.hasTornTail, replay.unknownOutcomes.isEmpty,
+      replay.outstandingIntents.isEmpty
+    else {
+      return try await parkDebugHAPCompensation(jobID: jobID, reason: "unresolved durable intent")
+    }
+    // Historical records without source declarations retain their old facts.
+    // This release never invents a cleanup authorization for them.
+    let finalization = try RuntimeDebugHAPFailureFinalization.derive(
+      record: runtime.record, replay: replay)
+    for planned in finalization?.compensations ?? [] {
+      guard let stepID = RuntimeDebugHAPFailureFinalization.catalogStepID(
+        forDescriptorID: planned.descriptor.id),
+        let step = descriptor.steps.first(where: { $0.stepID == stepID }),
+        let source = finalization?.sourceIntents[planned.sourceStepId]
+      else { throw RuntimeJobEngineError.internalFailure("compensation lost its declared source") }
+      replay = try DurableJournalRecovery.inspect(url: journalURL)
+      // A normal cleanup already attempted before the failure is also final:
+      // neither envelope may become a second attempt at the same effect.
+      if let attempted = replay.events.last(where: {
+        ($0.kind == .compensationIntent && $0.stepID == planned.descriptor.id)
+          || ($0.kind == .stepIntent && $0.stepID == stepID)
+      }) {
+        guard let outcome = replay.events.last(where: {
+          ($0.kind == .stepOutcome || $0.kind == .compensationOutcome)
+            && $0.correlatedIntentEventID == attempted.eventID
+            && $0.payload["outcomeCertainty"] == .string("confirmed")
+        }) else {
+          return try await parkDebugHAPCompensation(
+            jobID: jobID, reason: "compensation already has an outstanding intent")
+        }
+        if outcome.payload["result"] != .string("succeeded") {
+          try await persistDebugHAPCompensationDebt(
+            jobID: jobID, planned: planned, step: step, intent: attempted, outcome: outcome)
+        }
+        continue
+      }
+
+      guard var current = jobs[jobID] else { throw RuntimeJobEngineError.jobNotFound(jobID) }
+      current.record.recoveryStepID = nil
+      current.record.recoveryIntentEventID = nil
+      current.record.recoveryAction = nil
+      try persistRuntimeRecord(current.record)
+      jobs[jobID] = current
+      let facts: ProviderFacts
+      do {
+        facts = try await providers.resolveFacts(
+          providerID: current.record.providerID,
+          targetID: current.record.request.target.targetID)
+        try Self.validateEvidenceFacts(
+          facts, targetID: current.record.request.target.targetID,
+          bindingRevision: current.record.request.target.expectedBindingRevision,
+          providerID: current.record.providerID)
+        guard facts.deviceIdentitySHA256 == current.record.materializedStableTargetIdentitySHA256,
+          facts.bindingRevision == current.record.materializedBindingRevision,
+          source.bindingRevision == facts.bindingRevision,
+          case .object(let target)? = source.payload["target"],
+          target["identitySnapshotHash"] == facts.deviceIdentitySHA256.map(JSONValue.string),
+          target["targetId"] == .string(current.record.request.target.targetID)
+        else { throw RuntimeDispatchFailure.outcomeUnknown("compensation source identity drifted") }
+      } catch {
+        return try await parkDebugHAPCompensation(
+          jobID: jobID, reason: "fresh compensation identity unavailable: \(error)")
+      }
+      let artifact = try await resolvedInputArtifact(jobID: jobID)
+      let additional = try await resolvedAdditionalInputArtifacts(jobID: jobID)
       let context = ProviderExecutionContext(
         jobID: jobID, stepID: step.stepID,
-        targetID: runtime.record.request.target.targetID,
-        bindingRevision: runtime.record.request.target.expectedBindingRevision,
+        targetID: current.record.request.target.targetID,
+        bindingRevision: current.record.request.target.expectedBindingRevision,
         connectKey: facts.executionConnectKey,
         expectedIdentitySHA256: facts.deviceIdentitySHA256,
-        toolVersion: facts.toolVersion,
-        toolSHA256: facts.toolSHA256,
-        serverFacts: facts.serverFacts,
-        nowUTC: nowUTC())
+        toolVersion: facts.toolVersion, toolSHA256: facts.toolSHA256,
+        serverFacts: facts.serverFacts, nowUTC: nowUTC(),
+        resolvedInputArtifact: artifact, additionalInputArtifacts: additional,
+        expectedRuntimeBuildVersion: declaredRuntimeBuildVersion(
+          for: descriptor, artifact: artifact,
+          artifactLeaseID: Self.flashArtifactLeaseID(
+            in: current.record.request.inputs)))
       let action = try provider.action(
-        for: step, operation: descriptor, inputs: runtime.record.request.inputs,
-        context: context)
+        for: step, operation: descriptor, inputs: current.record.request.inputs, context: context)
+      try Self.validateCompensationAction(planned, action: action, step: step, record: current.record)
       let plan = try provider.lower(action: action, context: context)
+      try await consumeCapabilityBeforeMutation(
+        jobID: jobID, descriptor: descriptor,
+        effect: Self.effectiveEffect(descriptor: descriptor, inputs: current.record.request.inputs),
+        validatedFacts: facts)
       do {
         try await dispatchWithWAL(
           jobID: jobID, step: step, action: action, plan: plan,
           provider: provider, context: context, descriptor: descriptor,
-          evidenceFacts: facts)
-        appendTimeline(jobID: jobID, entry: "compensated \(step.stepID)")
-      } catch let failure as RuntimeDispatchFailure {
-        if case .outcomeUnknown = failure { throw failure }
-        appendTimeline(
-          jobID: jobID,
-          entry: "compensation failed \(step.stepID): \(failure)")
-        // Same gate on the compensation path, which matters more: it runs
-        // precisely when something else already went wrong, and before r3
-        // a failed uninstall here left no record at all.
-        if let artifactStore, let residue = Self.cleanupResidue(for: action) {
-          try? await artifactStore.recordCleanupDebt(
-            jobID: jobID, stepID: step.stepID, residue: residue,
-            reason: "\(failure)", action: action)
-          await refreshResidueCount(jobID: jobID)
+          evidenceFacts: facts, compensation: planned)
+      } catch {
+        replay = try DurableJournalRecovery.inspect(url: journalURL)
+        if !replay.outstandingIntents.isEmpty || !replay.unknownOutcomes.isEmpty {
+          return try await parkDebugHAPCompensation(
+            jobID: jobID, reason: "compensation outcome unknown: \(error)")
         }
+        guard error is RuntimeDispatchFailure else { throw error }
+      }
+      replay = try DurableJournalRecovery.inspect(url: journalURL)
+      guard let intent = replay.events.last(where: {
+        $0.kind == .compensationIntent && $0.stepID == planned.descriptor.id
+      }), let outcome = replay.events.last(where: {
+        $0.kind == .compensationOutcome && $0.correlatedIntentEventID == intent.eventID
+          && $0.payload["outcomeCertainty"] == .string("confirmed")
+      }) else { throw RuntimeJobEngineError.internalFailure("compensation lacks a confirmed outcome") }
+      try configuration.testHooks.debugHAPCheckpoint?(jobID, "outcome-\(planned.descriptor.id)")
+      if outcome.payload["result"] != .string("succeeded") {
+        try await persistDebugHAPCompensationDebt(
+          jobID: jobID, planned: planned, step: step, intent: intent, outcome: outcome)
       }
     }
-    if Self.requiresEvidencePreflight(descriptor) {
-      try requireCompleteEvidencePreflight(
-        jobID: jobID, beforeStepID: "finish-operation")
-    }
+    replay = try DurableJournalRecovery.inspect(url: journalURL)
+    guard replay.outstandingIntents.isEmpty, replay.unknownOutcomes.isEmpty, !replay.hasTornTail,
+      var current = jobs[jobID]
+    else { throw RuntimeJobEngineError.jobNotRunnable("failure finalization remains unresolved") }
+    try await refreshDebugHAPResidueCount(jobID: jobID)
+    current = jobs[jobID] ?? current
+    current.record.operationFailure = failure
+    current.record.outcomeUnknown = false
+    current.record.recoveryStepID = nil
+    current.record.recoveryIntentEventID = nil
+    current.record.recoveryAction = nil
+    try persistRuntimeRecord(current.record)
+    jobs[jobID] = current
+    try configuration.testHooks.debugHAPCheckpoint?(jobID, "beforeFailureTerminal")
+    try transition(
+      &current, from: .finalizing, to: .failed,
+      reason: "original failure retained; declared compensations have confirmed outcomes")
+    current.record.finishedAtUTC = nowUTC()
+    try persistRuntimeRecord(current.record)
+    jobs[jobID] = current
+    try configuration.testHooks.debugHAPCheckpoint?(jobID, "terminalBeforeCapability")
+    // A first send proven not executed can retain its whole-use non-execution
+    // result. Once any mutation or compensation did execute, non-execution of
+    // a later diagnostic cannot describe this whole capability use.
+    let terminalReplay = try DurableJournalRecovery.inspect(url: journalURL)
+    let outcome: RuntimeCapabilityUseOutcome = Self.hasCompleteMutationNonExecutionProof(terminalReplay)
+      ? .safeToReflash : .confirmed
+    try await recordCapabilityOutcome(for: current.record, outcome: outcome, state: current.record.state)
+    return statusAndReleaseTerminalRuntime(current.record, provider: provider)
   }
 
-  private static func debugHAPNeedsCompensation(
-    completedStepIDs: Set<String>
-  ) -> Bool {
-    !completedStepIDs.isDisjoint(with: [
-      "send-hap", "install-hap", "start-ability",
-    ])
+  private func parkDebugHAPCompensation(jobID: String, reason: String) async throws -> RuntimeJobStatus {
+    guard var runtime = jobs[jobID] else { throw RuntimeJobEngineError.jobNotFound(jobID) }
+    if runtime.record.state == JobState.finalizing.rawValue {
+      try transition(&runtime, from: .finalizing, to: .waitingForRecovery, reason: reason)
+      try configuration.testHooks.debugHAPCheckpoint?(jobID, "compensationWaitingTransition")
+    }
+    runtime.record.outcomeUnknown = true
+    runtime.record.finishedAtUTC = nil
+    runtime.record.timeline.append("compensation needsAttention: \(reason)")
+    try persistRuntimeRecord(runtime.record)
+    jobs[jobID] = runtime
+    try await recordCapabilityOutcome(
+      for: runtime.record, outcome: .outcomeUnknown, state: JobState.waitingForRecovery.rawValue)
+    return status(of: runtime.record)
+  }
+
+  /// A normal optional cleanup may have a confirmed failed outcome while
+  /// its debt write is still pending. Reconstruct only that bookkeeping
+  /// from the declared source and exact attempted action, then keep the
+  /// published optional-step semantics without a second dispatch.
+  private func resumeConfirmedOptionalDebugHAPCleanupDebt(
+    jobID: String, step: CatalogStepDescriptor, descriptor: CatalogOperationDescriptor
+  ) async throws -> Bool {
+    guard descriptor.reference == "debug.hap@1", step.isOptional,
+      let sourceID = RuntimeDebugHAPFailureFinalization.sourceSteps.first(where: {
+        RuntimeDebugHAPFailureFinalization.catalogStepID(forSourceStepID: $0) == step.stepID
+      }), step.stepID != "stop-ability", let runtime = jobs[jobID]
+    else { return false }
+    let replay = try DurableJournalRecovery.inspect(
+      url: jobDirectory(for: jobID).appending(path: "journal.jsonl"))
+    guard let intent = replay.events.last(where: {
+      $0.kind == .stepIntent && $0.stepID == step.stepID
+    }), let outcome = replay.events.last(where: {
+      $0.kind == .stepOutcome && $0.correlatedIntentEventID == intent.eventID
+        && $0.payload["outcomeCertainty"] == .string("confirmed")
+        && $0.payload["result"] == .string("failed")
+    }) else { return false }
+    guard !replay.hasTornTail, replay.outstandingIntents.isEmpty, replay.unknownOutcomes.isEmpty,
+      let source = replay.events.last(where: { $0.kind == .stepIntent && $0.stepID == sourceID }),
+      replay.events.contains(where: {
+        $0.kind == .stepOutcome && $0.correlatedIntentEventID == source.eventID
+          && $0.payload["outcomeCertainty"] == .string("confirmed")
+          && $0.payload["result"] == .string("succeeded")
+      }), source.bindingRevision == intent.bindingRevision,
+      source.payload["target"] == intent.payload["target"],
+      let sourceValue = source.payload["step"], let attemptedValue = intent.payload["step"]
+    else {
+      throw RuntimeJobEngineError.jobNotRunnable("cleanup bookkeeping lacks its confirmed bound source")
+    }
+    let sourceStep = try JournalCanonicalJSON.decodeWorkflowStep(sourceValue)
+    let attemptedStep = try JournalCanonicalJSON.decodeWorkflowStep(attemptedValue)
+    guard let declared = sourceStep.compensationDescriptors.first(where: {
+      $0.id == RuntimeDebugHAPFailureFinalization.descriptorID(forCatalogStepID: step.stepID)
+    }), attemptedStep.kind == declared.kind, attemptedStep.effect == declared.effect,
+      try JournalCanonicalJSON.argumentsHash(attemptedStep.arguments) == declared.argumentsHash,
+      attemptedStep.arguments == declared.arguments,
+      attemptedStep.bindingRequirement == declared.bindingRequirement,
+      attemptedStep.cancellation == declared.cancellation
+    else {
+      throw RuntimeJobEngineError.jobNotRunnable("attempted cleanup differs from its original declaration")
+    }
+    let planned = PlannedCompensation(sourceStepId: sourceID, descriptor: declared)
+    try configuration.testHooks.debugHAPCheckpoint?(jobID, "beforeDebt-\(step.stepID)")
+    try await persistDebugHAPCompensationDebt(
+      jobID: jobID, planned: planned, step: step, intent: intent, outcome: outcome)
+    try await recordSkippedOptionalStep(
+      jobID: jobID, step: step, descriptor: descriptor,
+      reason: "journal-confirmed cleanup failure; debt retained")
+    var current = jobs[jobID] ?? runtime
+    if current.record.recoveryIntentEventID == intent.eventID {
+      current.record.recoveryStepID = nil
+      current.record.recoveryIntentEventID = nil
+      current.record.recoveryAction = nil
+    }
+    try persistRuntimeRecord(current.record)
+    jobs[jobID] = current
+    return true
+  }
+
+  private func persistDebugHAPCompensationDebt(
+    jobID: String, planned: PlannedCompensation, step: CatalogStepDescriptor,
+    intent: JournalEvent, outcome: JournalEvent
+  ) async throws {
+    guard let runtime = jobs[jobID] else { throw RuntimeJobEngineError.jobNotFound(jobID) }
+    let reason: String = {
+      if case .string(let detail)? = outcome.payload["summary"] { return detail }
+      return "confirmed compensation failure: \(step.stepID)"
+    }()
+    // Process stop failure has its own correlated journal outcome and remains
+    // needsAttention. The cleanup ledger's closed residue vocabulary is not
+    // expanded into an invented process or arbitrary path record.
+    if step.stepID == "stop-ability" {
+      appendTimeline(jobID: jobID, entry: "compensation needsAttention: \(reason)")
+      return
+    }
+    guard let artifactStore else {
+      throw RuntimeJobEngineError.internalFailure("cleanup debt storage is unavailable")
+    }
+    let existing = try await artifactStore.cleanupDebtRecord(jobID: jobID, stepID: intent.stepID ?? step.stepID)
+    let persisted = runtime.record.recoveryIntentEventID == intent.eventID
+      ? runtime.record.recoveryAction : existing?.persistedAction
+    guard let persisted else {
+      throw RuntimeJobEngineError.jobNotRunnable("confirmed cleanup lacks its exact durable typed action")
+    }
+    let action = try persisted.materialize()
+    try Self.validateCompensationAction(planned, action: action, step: step, record: runtime.record)
+    guard let residue = Self.cleanupResidue(for: action) else {
+      throw RuntimeJobEngineError.internalFailure("declared cleanup has no supported residue")
+    }
+    try await artifactStore.recordCompensationCleanupDebt(
+      jobID: jobID, stepID: intent.stepID ?? step.stepID,
+      residue: residue, reason: reason, action: action)
+    try configuration.testHooks.debugHAPCheckpoint?(jobID, "debt-\(planned.descriptor.id)")
+    try await refreshDebugHAPResidueCount(jobID: jobID)
+    appendTimeline(jobID: jobID, entry: "compensation needsAttention: \(reason)")
+  }
+
+  private func refreshDebugHAPResidueCount(jobID: String) async throws {
+    guard let artifactStore, var runtime = jobs[jobID] else {
+      throw RuntimeJobEngineError.internalFailure("failure finalization has no cleanup debt store")
+    }
+    let outstanding = try await artifactStore.outstandingCleanupDebt()
+    runtime.record.outstandingResidueCount = outstanding.filter { $0.jobID == jobID }.count
+    try persistRuntimeRecord(runtime.record)
+    jobs[jobID] = runtime
   }
 
   /// The effect this request will actually reach: the maximum effect over
@@ -3163,7 +3481,7 @@ public actor RuntimeJobEngine {
   /// running reported success. The contract test for that caught it. So the
   /// step stays mandatory and the input decides only whether it is requested.
   ///
-  /// Success path only: `compensateDebugHAP` still stops an ability it started
+  /// Success path only: failure finalization still stops an ability it started
   /// when the job then failed. A request may keep an application running when
   /// the run worked, never as the residue of a failure.
   static func stepIsRequested(
@@ -3821,7 +4139,8 @@ public actor RuntimeJobEngine {
     provider: any DeviceProvider,
     context: ProviderExecutionContext,
     descriptor: CatalogOperationDescriptor,
-    evidenceFacts: ProviderFacts?
+    evidenceFacts: ProviderFacts?,
+    compensation: PlannedCompensation? = nil
   ) async throws {
     guard var runtime = jobs[jobID] else {
       throw RuntimeJobEngineError.jobNotFound(jobID)
@@ -3853,29 +4172,52 @@ public actor RuntimeJobEngine {
           : "client-cancel before the next Catalog safe boundary")
       throw RuntimeHostDispatchCancellation()
     }
-    let workflowStep = try Self.journalStep(
-      for: step, jobID: jobID, inputs: runtime.record.request.inputs,
-      action: action, resolvedInputArtifact: context.resolvedInputArtifact,
-      operationReference: descriptor.reference)
-    let intentEventID = "intent-\(step.stepID)"
+    let journalDispatch: RuntimeJournalDispatch
+    if let compensation {
+      guard let state = JobState(rawValue: runtime.record.state),
+        JobStateMachine.permitsCompensationDispatch(from: state, mode: .execute),
+        RuntimeDebugHAPFailureFinalization.catalogStepID(
+          forDescriptorID: compensation.descriptor.id) == step.stepID
+      else {
+        throw RuntimeJobEngineError.jobNotRunnable("compensation is outside its finalization lane")
+      }
+      try Self.validateCompensationAction(
+        compensation, action: action, step: step, record: runtime.record)
+      journalDispatch = .compensation(compensation)
+    } else {
+      let declarations = try Self.debugHAPCompensationDeclaration(
+        for: step, descriptor: descriptor, inputs: runtime.record.request.inputs,
+        provider: provider, context: context)
+      journalDispatch = .workflow(try Self.journalStep(
+        for: step, jobID: jobID, inputs: runtime.record.request.inputs,
+        action: action, resolvedInputArtifact: context.resolvedInputArtifact,
+        operationReference: descriptor.reference, compensationDescriptors: declarations))
+    }
+    guard plan.action == action else {
+      throw RuntimeJobEngineError.internalFailure("lowering returned a different typed action")
+    }
+    let journalStepID = journalDispatch.stepID
+    // A HAP cleanup can fail on the ordinary path before failure
+    // finalization takes over. Keep its exact action until the durable debt
+    // records that already-attempted cleanup; finalization must never resend it.
+    let retainsActionOnConfirmedFailure = journalDispatch.isCompensation
+      || (descriptor.reference == "debug.hap@1" && Self.cleanupResidue(for: action) != nil)
+    let intentEventID = "intent-\(journalStepID)"
     // Journal target evidence mirrors the descriptor-bound facts without
     // persisting the raw connect key.
     let isDeviceBound = step.binding == .confirmedDevice
     let journalIdentity = context.expectedIdentitySHA256 ?? String(repeating: "0", count: 64)
-    let intent = try JournalEvent.stepIntent(
-      eventID: intentEventID, sequence: runtime.nextSequence,
-      sessionID: runtime.record.sessionID, jobID: jobID,
-      timestamp: nowUTC(), step: workflowStep,
+    let intent = try journalDispatch.intent(
+      eventID: intentEventID, sequence: runtime.nextSequence, record: runtime.record,
+      timestamp: nowUTC(),
       target: JournalTarget(
         scope: isDeviceBound ? "device" : "host",
         targetID: runtime.record.request.target.targetID,
         connectKey: isDeviceBound ? "sha256:\(journalIdentity)" : nil,
         identitySnapshotHash: isDeviceBound ? journalIdentity : nil),
-      attempt: 1,
       bindingRevision: isDeviceBound
-        ? (runtime.record.request.target.expectedBindingRevision ?? 1) : nil,
-      schemaVersion: JournalEvent.schemaVersion)
-    runtime.record.recoveryStepID = step.stepID
+        ? (runtime.record.request.target.expectedBindingRevision ?? 1) : nil)
+    runtime.record.recoveryStepID = journalStepID
     runtime.record.recoveryIntentEventID = intentEventID
     runtime.record.recoveryAction = try PersistedTypedProviderAction(action)
     // Persist the exact typed action before the write-ahead intent can
@@ -3898,7 +4240,10 @@ public actor RuntimeJobEngine {
       throw error
     }
     runtime.nextSequence += 1
-    runtime.record.timeline.append("intent \(step.stepID)")
+    runtime.record.timeline.append("intent \(journalStepID)")
+    if journalDispatch.isCompensation {
+      try configuration.testHooks.debugHAPCheckpoint?(jobID, "intent-\(journalStepID)")
+    }
     if runtime.record.actualStepKinds?.contains(step.kind.rawValue) != true {
       var kinds = runtime.record.actualStepKinds ?? []
       kinds.append(step.kind.rawValue)
@@ -3913,7 +4258,7 @@ public actor RuntimeJobEngine {
     jobs[jobID] = runtime
 
     let receipt: ProviderProcessReceipt
-    let progressKey = ProcessProgressKey(jobID: jobID, stepID: step.stepID)
+    let progressKey = ProcessProgressKey(jobID: jobID, stepID: journalStepID)
     activeProcessProgressKeys.insert(progressKey)
     defer {
       activeProcessProgressKeys.remove(progressKey)
@@ -3921,7 +4266,7 @@ public actor RuntimeJobEngine {
     }
     let progressHandler: RuntimeProcessProgressHandler = { [weak self] progress in
       await self?.recordProcessProgress(
-        progress, jobID: jobID, stepID: step.stepID)
+        progress, jobID: jobID, stepID: journalStepID)
     }
     // What the host can actually observe about when a step reached the
     // device: the interval it was dispatching in. A screenshot's shutter
@@ -3993,7 +4338,7 @@ public actor RuntimeJobEngine {
         // journal permanently non-resumable.
         current.record.timeline.append(
           "outcomeUnknown \(step.stepID); durable intent left outstanding")
-        current.record.recoveryStepID = step.stepID
+        current.record.recoveryStepID = journalStepID
         jobs[jobID] = current
         throw failure
       case .confirmedNotExecuted:
@@ -4007,16 +4352,13 @@ public actor RuntimeJobEngine {
         diagnostic = nil
       }
       try current.journal.appendAndSynchronize(
-        JournalEvent.stepOutcome(
-          eventID: "outcome-\(step.stepID)", sequence: current.nextSequence,
-          sessionID: current.record.sessionID, jobID: jobID, timestamp: nowUTC(),
-          stepID: step.stepID, attempt: 1,
-          correlatesToIntentEventID: intentEventID,
+        journalDispatch.outcome(
+          eventID: "outcome-\(journalStepID)", sequence: current.nextSequence,
+          record: current.record, timestamp: nowUTC(), intentEventID: intentEventID,
           result: "failed",
-          outcomeCertainty: .confirmed,
           semanticCode: confirmedNotExecuted
             ? Self.confirmedNotExecutedSemanticCode : nil,
-          schemaVersion: JournalEvent.schemaVersion))
+          summary: journalDispatch.isCompensation ? String(describing: failure) : nil))
       current.nextSequence += 1
       if confirmedNotExecuted {
         let suffix = diagnostic.map { " [diagnostic=\($0.rawValue)]" } ?? ""
@@ -4024,9 +4366,11 @@ public actor RuntimeJobEngine {
       } else {
         current.record.timeline.append("failed \(step.stepID)")
       }
-      current.record.recoveryStepID = nil
-      current.record.recoveryIntentEventID = nil
-      current.record.recoveryAction = nil
+      if !retainsActionOnConfirmedFailure {
+        current.record.recoveryStepID = nil
+        current.record.recoveryIntentEventID = nil
+        current.record.recoveryAction = nil
+      }
       jobs[jobID] = current
       throw failure
     }
@@ -4089,13 +4433,10 @@ public actor RuntimeJobEngine {
       }
       let outcomeAt = nowUTC()
       try current.journal.appendAndSynchronize(
-        JournalEvent.stepOutcome(
-          eventID: "outcome-\(step.stepID)", sequence: current.nextSequence,
-          sessionID: current.record.sessionID, jobID: jobID, timestamp: outcomeAt,
-          stepID: step.stepID, attempt: 1,
-          correlatesToIntentEventID: intentEventID,
-          result: "succeeded", outcomeCertainty: .confirmed,
-          schemaVersion: JournalEvent.schemaVersion))
+        journalDispatch.outcome(
+          eventID: "outcome-\(journalStepID)", sequence: current.nextSequence,
+          record: current.record, timestamp: outcomeAt, intentEventID: intentEventID,
+          result: "succeeded"))
       current.nextSequence += 1
       current.record.timeline.append("verified \(step.stepID) \(summary.keys.sorted())")
       if let anchor = summary["coverageAnchor"], let held = summary["ringHeldCoverageAnchor"] {
@@ -4113,31 +4454,32 @@ public actor RuntimeJobEngine {
           frameDurationsSeconds: (summary["frameDurationsSeconds"] ?? "")
             .split(separator: ",").compactMap { Double($0) })
       }
-      current.record.recoveryStepID = nil
-      current.record.recoveryIntentEventID = nil
-      current.record.recoveryAction = nil
+      if !journalDispatch.isCompensation {
+        current.record.recoveryStepID = nil
+        current.record.recoveryIntentEventID = nil
+        current.record.recoveryAction = nil
+      }
       jobs[jobID] = current
       try captureEvidencePreflightFragmentIfEligible(
         jobID: jobID, step: step, action: action, summary: summary,
         context: context, facts: evidenceFacts, outcomeAtUTC: outcomeAt,
         descriptor: descriptor)
-      if !publishesBeforeOutcome {
+      if !publishesBeforeOutcome, !journalDispatch.isCompensation {
         try await publishDeclaredArtifacts(
           jobID: jobID, step: step, summary: summary, receipt: receipt)
       }
     case .failed(let code, let detail):
       try current.journal.appendAndSynchronize(
-        JournalEvent.stepOutcome(
-          eventID: "outcome-\(step.stepID)", sequence: current.nextSequence,
-          sessionID: current.record.sessionID, jobID: jobID, timestamp: nowUTC(),
-          stepID: step.stepID, attempt: 1,
-          correlatesToIntentEventID: intentEventID,
-          result: "failed", outcomeCertainty: .confirmed,
-          schemaVersion: JournalEvent.schemaVersion))
+        journalDispatch.outcome(
+          eventID: "outcome-\(journalStepID)", sequence: current.nextSequence,
+          record: current.record, timestamp: nowUTC(), intentEventID: intentEventID,
+          result: "failed"))
       current.nextSequence += 1
-      current.record.recoveryStepID = nil
-      current.record.recoveryIntentEventID = nil
-      current.record.recoveryAction = nil
+      if !retainsActionOnConfirmedFailure {
+        current.record.recoveryStepID = nil
+        current.record.recoveryIntentEventID = nil
+        current.record.recoveryAction = nil
+      }
       current.record.timeline.append(
         "failed \(step.stepID): \(code): \(detail)")
       jobs[jobID] = current
@@ -4157,15 +4499,12 @@ public actor RuntimeJobEngine {
       // and the very next required step is about to determine which. The
       // job continues to that readback; if the readback fails, the job
       // fails. Any other unknown still halts with zero replay.
-      if Self.awaitsReadback(step: step, descriptor: descriptor) {
+      if !journalDispatch.isCompensation, Self.awaitsReadback(step: step, descriptor: descriptor) {
         try current.journal.appendAndSynchronize(
-          JournalEvent.stepOutcome(
-            eventID: "outcome-\(step.stepID)", sequence: current.nextSequence,
-            sessionID: current.record.sessionID, jobID: jobID, timestamp: nowUTC(),
-            stepID: step.stepID, attempt: 1,
-            correlatesToIntentEventID: intentEventID,
-            result: "succeeded", outcomeCertainty: .confirmed,
-            schemaVersion: JournalEvent.schemaVersion))
+          journalDispatch.outcome(
+            eventID: "outcome-\(journalStepID)", sequence: current.nextSequence,
+            record: current.record, timestamp: nowUTC(), intentEventID: intentEventID,
+            result: "succeeded"))
         current.nextSequence += 1
         current.record.timeline.append("dispatched \(step.stepID); awaiting readback")
         current.record.recoveryStepID = nil
@@ -4179,7 +4518,7 @@ public actor RuntimeJobEngine {
       // never creates a second intent or resends this action.
       current.record.timeline.append(
         "outcomeUnknown \(step.stepID); durable intent left outstanding")
-      current.record.recoveryStepID = step.stepID
+      current.record.recoveryStepID = journalStepID
       jobs[jobID] = current
       throw RuntimeDispatchFailure.outcomeUnknown(reason)
     }
@@ -5051,6 +5390,19 @@ public actor RuntimeJobEngine {
   /// stay unknown; everything durable state does prove is still published.
   private func durableActualStepKinds(for record: RuntimeJobRecord) -> [String]? {
     let storedKinds = record.actualStepKinds ?? []
+    if record.operationReference == "debug.hap@1" {
+      guard let replay = try? DurableJournalRecovery.inspect(
+        url: jobDirectory(for: record.jobID).appending(path: "journal.jsonl"))
+      else { return nil }
+      var kinds = storedKinds
+      for event in replay.events where event.kind == .stepIntent || event.kind == .compensationIntent {
+        let key = event.kind == .stepIntent ? "step" : "descriptor"
+        if case .object(let object)? = event.payload[key], case .string(let kind)? = object["kind"],
+          !kinds.contains(kind)
+        { kinds.append(kind) }
+      }
+      return kinds
+    }
     guard ArkForgeFlashOperation.contains(record.operationReference) else {
       return storedKinds
     }
@@ -5773,6 +6125,17 @@ public actor RuntimeJobEngine {
   }
 
   public func reconcile(jobID: String) async throws -> RuntimeJobStatus {
+    if let existing = jobReconciliations[jobID] { return try await existing.value }
+    let task = Task {
+      defer { jobReconciliations.removeValue(forKey: jobID) }
+      return try await reconcileOwned(jobID: jobID)
+    }
+    jobReconciliations[jobID] = task
+    return try await task.value
+  }
+
+  private func reconcileOwned(jobID: String) async throws -> RuntimeJobStatus {
+    if let existing = jobFailureFinalizations[jobID] { return try await existing.value }
     guard var runtime = jobs[jobID] else {
       let record = try recordForRead(jobID: jobID)
       try await repairTerminalSafeToReflashLineageIfNeeded(for: record)
@@ -5781,6 +6144,12 @@ public actor RuntimeJobEngine {
     }
     guard let provider = providers.provider(id: runtime.record.providerID) else {
       throw RuntimeJobEngineError.internalFailure("provider vanished for \(jobID)")
+    }
+    if runtime.record.operationReference == "debug.hap@1",
+      runtime.record.state == JobState.finalizing.rawValue,
+      !runtime.record.outcomeUnknown
+    {
+      return try await finalizeDebugHAPFailure(jobID: jobID)
     }
     // A cancellation whose executor no longer exists is settled here.
     //
@@ -5865,6 +6234,15 @@ public actor RuntimeJobEngine {
     if inspection.currentState == .finalizing,
       inspection.lastReconcileOutcomeCertainty == .confirmed
     {
+      if runtime.record.operationReference == "debug.hap@1" {
+        runtime.record.state = JobState.finalizing.rawValue
+        runtime.record.outcomeUnknown = false
+        runtime.record.operationFailure = RuntimeDebugHAPFailureFinalization.originalFailure(
+          record: runtime.record, replay: inspection)
+        try persistRuntimeRecord(runtime.record)
+        jobs[jobID] = runtime
+        return try await finalizeDebugHAPFailure(jobID: jobID)
+      }
       try transition(
         &runtime, from: .finalizing, to: .failed,
         reason: "reconciliation confirmed the original action did not complete")
@@ -5886,6 +6264,14 @@ public actor RuntimeJobEngine {
       try persistRuntimeRecord(runtime.record)
       jobs[jobID] = runtime
       return status(of: runtime.record)
+    }
+    if runtime.record.operationReference == "debug.hap@1",
+      inspection.outstandingIntents.isEmpty,
+      runtime.record.recoveryIntentEventID == nil,
+      try RuntimeDebugHAPFailureFinalization.derive(record: runtime.record, replay: inspection) != nil
+    {
+      return try await resumeDebugHAPCompensationAfterIdentityProof(
+        runtime: &runtime, inspection: inspection)
     }
     guard let stepID = runtime.record.recoveryStepID,
       let persistedAction = runtime.record.recoveryAction,
@@ -5980,15 +6366,26 @@ public actor RuntimeJobEngine {
     if descriptor.binding == .none {
       facts = nil
     } else {
-      let resolved = try await providers.resolveFacts(
-        providerID: runtime.record.providerID,
-        targetID: runtime.record.request.target.targetID)
-      try Self.validateEvidenceFacts(
-        resolved,
-        targetID: runtime.record.request.target.targetID,
-        bindingRevision: runtime.record.request.target.expectedBindingRevision,
-        providerID: runtime.record.providerID)
-      facts = resolved
+      do {
+        let resolved = try await providers.resolveFacts(
+          providerID: runtime.record.providerID,
+          targetID: runtime.record.request.target.targetID)
+        try Self.validateEvidenceFacts(
+          resolved,
+          targetID: runtime.record.request.target.targetID,
+          bindingRevision: runtime.record.request.target.expectedBindingRevision,
+          providerID: runtime.record.providerID)
+        facts = resolved
+      } catch {
+        guard inspection.events.first(where: { $0.eventID == intentEventID })?.kind == .compensationIntent else {
+          throw error
+        }
+        return try await finishReconcile(
+          runtime: &runtime, inspection: inspection, intentEventID: intentEventID,
+          stepID: stepID, recoveryAttemptID: recoveryAttemptID,
+          outcome: .stillUnknown(reason: "fresh compensation identity unavailable; original not resent"),
+          bindingRevision: nil, provider: provider)
+      }
     }
     let reconciledInputArtifact = try await resolvedInputArtifact(jobID: jobID)
     let context = ProviderExecutionContext(
@@ -6006,12 +6403,32 @@ public actor RuntimeJobEngine {
         artifactLeaseID: Self.flashArtifactLeaseID(
           in: runtime.record.request.inputs)))
     let action = try persistedAction.materialize()
+    guard let exactIntent = inspection.events.first(where: { $0.eventID == intentEventID }) else {
+      throw RuntimeJobEngineError.internalFailure("persisted reconciliation action has no matching intent")
+    }
+    if case .compensation(let planned) = try Self.journalDispatch(for: exactIntent) {
+      guard let stepID = RuntimeDebugHAPFailureFinalization.catalogStepID(
+        forDescriptorID: planned.descriptor.id),
+        let step = descriptor.steps.first(where: { $0.stepID == stepID }),
+        runtime.record.catalogDigest == RuntimeOperationCatalog.catalogDigest,
+        facts?.deviceIdentitySHA256 == runtime.record.materializedStableTargetIdentitySHA256,
+        facts?.bindingRevision == runtime.record.materializedBindingRevision
+      else {
+        return try await finishReconcile(
+          runtime: &runtime, inspection: inspection, intentEventID: intentEventID,
+          stepID: stepID, recoveryAttemptID: recoveryAttemptID,
+          outcome: .stillUnknown(reason: "compensation identity or Catalog drifted; no dispatch"),
+          bindingRevision: nil, provider: provider)
+      }
+      try Self.validateCompensationAction(planned, action: action, step: step, record: runtime.record)
+    }
     let reference = ProviderDurableIntentReference(
       jobID: jobID, stepID: stepID,
       intentEventID: intentEventID, action: action)
     var outcome: ProviderReconcileOutcome
     let durableResolution = inspection.events.last { event in
-      event.kind == .stepOutcome && event.correlatedIntentEventID == intentEventID
+      (event.kind == .stepOutcome || event.kind == .compensationOutcome)
+        && event.correlatedIntentEventID == intentEventID
         && event.payload["outcomeCertainty"] == .string(JournalOutcomeCertainty.confirmed.rawValue)
     }
     if let durableResolution {
@@ -6089,6 +6506,94 @@ public actor RuntimeJobEngine {
       bindingRevision: facts?.bindingRevision, provider: provider)
   }
 
+  /// Identity can become unavailable before a compensation intent exists.
+  /// Reconciliation proves the unchanged complete plan and owning use, then
+  /// returns to the failure lane without inventing an external Step outcome.
+  private func resumeDebugHAPCompensationAfterIdentityProof(
+    runtime: inout JobRuntime, inspection: JournalReplay
+  ) async throws -> RuntimeJobStatus {
+    let jobID = runtime.record.jobID
+    guard let descriptor = RuntimeOperationCatalog.descriptor(reference: runtime.record.operationReference),
+      runtime.record.admissionEvidence?.kind == .runtimeCapability,
+      inspection.currentState == .waitingForRecovery || inspection.currentState == .reconciling
+    else { throw RuntimeJobEngineError.jobNotRunnable("missing compensation identity recovery boundary") }
+    if inspection.currentState == .waitingForRecovery {
+      try transition(&runtime, from: .waitingForRecovery, to: .reconciling,
+        reason: "revalidate compensation identity before any new intent")
+    }
+    let completedAttempts = Set(inspection.events.compactMap { event -> String? in
+      guard event.kind == .reconcileOutcome,
+        case .string(let id)? = event.payload["recoveryAttemptId"] else { return nil }
+      return id
+    })
+    let unfinished = inspection.events.reversed().first { event in
+      guard event.kind == .reconcileStarted,
+        case .string(let id)? = event.payload["recoveryAttemptId"] else { return false }
+      return !completedAttempts.contains(id)
+    }
+    let attemptID: String
+    if let unfinished, case .string(let id)? = unfinished.payload["recoveryAttemptId"] {
+      attemptID = id
+    } else {
+      attemptID = "recovery-\(jobID)-\(runtime.nextSequence)"
+      try runtime.journal.appendAndSynchronize(JournalEvent.reconcileStarted(
+        eventID: "reconcile-start-\(runtime.nextSequence)", sequence: runtime.nextSequence,
+        sessionID: runtime.record.sessionID, jobID: jobID, timestamp: nowUTC(),
+        recoveryAttemptID: attemptID, sourceState: .waitingForRecovery,
+        lastDurableSequence: inspection.lastDurableSequence ?? 0, trigger: "manual"))
+      runtime.nextSequence += 1
+    }
+    jobs[jobID] = runtime
+    let proofFailure: String?
+    do {
+      let facts = try await providers.resolveFacts(
+        providerID: runtime.record.providerID, targetID: runtime.record.request.target.targetID)
+      try Self.validateEvidenceFacts(
+        facts, targetID: runtime.record.request.target.targetID,
+        bindingRevision: runtime.record.request.target.expectedBindingRevision,
+        providerID: runtime.record.providerID)
+      try await consumeCapabilityBeforeMutation(
+        jobID: jobID, descriptor: descriptor,
+        effect: Self.effectiveEffect(descriptor: descriptor, inputs: runtime.record.request.inputs),
+        validatedFacts: facts)
+      proofFailure = nil
+    } catch { proofFailure = "compensation proof remains unavailable: \(error)" }
+    runtime = jobs[jobID] ?? runtime
+    let nextState: JobState = proofFailure == nil ? .finalizing : .waitingForRecovery
+    let decision = try JournalEvent.reconcileOutcome(
+      eventID: "reconcile-outcome-\(runtime.nextSequence)", sequence: runtime.nextSequence,
+      sessionID: runtime.record.sessionID, jobID: jobID, timestamp: nowUTC(),
+      bindingRevision: proofFailure == nil ? runtime.record.materializedBindingRevision : nil,
+      recoveryAttemptID: attemptID,
+      result: proofFailure == nil ? "finalizeConfirmedFailure" : "waitingForRecovery",
+      nextState: nextState, outcomeCertainty: proofFailure == nil ? .confirmed : .outcomeUnknown,
+      safeBoundaryConfirmed: proofFailure == nil,
+      evidence: [proofFailure ?? "fresh identity and exact original plan/capability confirmed; zero dispatch"])
+    try runtime.journal.appendAndSynchronize(decision)
+    runtime.nextSequence += 1
+    try transition(&runtime, from: .reconciling, to: nextState,
+      reason: "compensation identity proof", triggerEventID: decision.eventID)
+    runtime.record.outcomeUnknown = proofFailure != nil
+    try persistRuntimeRecord(runtime.record)
+    jobs[jobID] = runtime
+    if proofFailure == nil { return try await finalizeDebugHAPFailure(jobID: jobID) }
+    return status(of: runtime.record)
+  }
+
+  private static func journalDispatch(for intent: JournalEvent) throws -> RuntimeJournalDispatch {
+    if intent.kind == .compensationIntent,
+      let descriptor = intent.payload["descriptor"],
+      case .string(let sourceID)? = intent.payload["compensationOfStepId"]
+    {
+      return .compensation(PlannedCompensation(
+        sourceStepId: sourceID, descriptor: try JournalCanonicalJSON.decodeCompensation(descriptor)))
+    }
+    guard intent.kind == .stepIntent, let step = intent.payload["step"] else {
+      throw RuntimeJobEngineError.internalFailure("reconciliation has no exact durable intent")
+    }
+    return .workflow(try JournalCanonicalJSON.decodeWorkflowStep(step))
+  }
+
   private func finishReconcile(
     runtime: inout JobRuntime,
     inspection: JournalReplay,
@@ -6102,9 +6607,32 @@ public actor RuntimeJobEngine {
     successSummary: String? = nil
   ) async throws -> RuntimeJobStatus {
     let jobID = runtime.record.jobID
+    guard let intent = inspection.events.first(where: { $0.eventID == intentEventID }) else {
+      throw RuntimeJobEngineError.internalFailure("reconcile intent disappeared")
+    }
+    let dispatch = try Self.journalDispatch(for: intent)
     let hasDurableResolution = inspection.events.contains { event in
-      event.kind == .stepOutcome && event.correlatedIntentEventID == intentEventID
+      (event.kind == .stepOutcome || event.kind == .compensationOutcome)
+        && event.correlatedIntentEventID == intentEventID
         && event.payload["outcomeCertainty"] == .string(JournalOutcomeCertainty.confirmed.rawValue)
+    }
+    let isHAP = runtime.record.operationReference == "debug.hap@1"
+    let preservesFailure = dispatch.isCompensation
+    if preservesFailure {
+      guard let original = RuntimeDebugHAPFailureFinalization.originalFailure(
+        record: runtime.record, replay: inspection)
+      else { throw RuntimeJobEngineError.internalFailure("compensation lost original operation failure") }
+      runtime.record.operationFailure = original
+    } else if isHAP, case .confirmedNotExecuted = outcome {
+      runtime.record.operationFailure = RuntimeOperationFailure(
+        code: .executionConfirmedNotPerformed, category: .externalTool,
+        retryability: .runtimeDecisionRequired, recovery: .submitNewTypedRequestAfterRuntimeProof)
+    }
+    // The original error precedes the outcome/decision/transition crash
+    // windows, so a compensation failure can never replace it after restart.
+    if preservesFailure || isHAP {
+      try persistRuntimeRecord(runtime.record)
+      jobs[jobID] = runtime
     }
     let nextState: JobState
     let reconcileResult: String
@@ -6112,64 +6640,33 @@ public actor RuntimeJobEngine {
     let safeBoundary: Bool
     let reconcileBindingRevision: Int?
     let detail: String
-
     switch outcome {
     case .confirmedCompleted(let summary):
       if !hasDurableResolution {
-        try runtime.journal.appendAndSynchronize(
-          JournalEvent.stepOutcome(
-            eventID: "reconciled-outcome-\(runtime.nextSequence)",
-            sequence: runtime.nextSequence,
-            sessionID: runtime.record.sessionID,
-            jobID: jobID,
-            timestamp: nowUTC(),
-            stepID: stepID,
-            attempt: 1,
-            correlatesToIntentEventID: intentEventID,
-            result: "succeeded",
-            outcomeCertainty: .confirmed,
-            semanticCode: successSemanticCode,
-            summary: successSummary,
-            schemaVersion: JournalEvent.schemaVersion))
+        try runtime.journal.appendAndSynchronize(dispatch.outcome(
+          eventID: "reconciled-outcome-\(runtime.nextSequence)", sequence: runtime.nextSequence,
+          record: runtime.record, timestamp: nowUTC(), intentEventID: intentEventID,
+          result: "succeeded", semanticCode: successSemanticCode, summary: successSummary))
         runtime.nextSequence += 1
       }
-      nextState = .resumeAtConfirmedSafeBoundary
-      reconcileResult =
-        bindingRevision == nil
-        ? "resumeHostOnlyAtConfirmedSafeBoundary"
-        : "resumeAtConfirmedSafeBoundary"
+      nextState = preservesFailure ? .finalizing : .resumeAtConfirmedSafeBoundary
+      reconcileResult = preservesFailure ? "finalizeConfirmedFailure"
+        : (bindingRevision == nil ? "resumeHostOnlyAtConfirmedSafeBoundary" : "resumeAtConfirmedSafeBoundary")
       certainty = .confirmed
       safeBoundary = true
       reconcileBindingRevision = bindingRevision
       detail = "confirmed completed \(summary.keys.sorted())"
     case .confirmedNotExecuted:
       if !hasDurableResolution {
-        try runtime.journal.appendAndSynchronize(
-          JournalEvent.stepOutcome(
-            eventID: "reconciled-outcome-\(runtime.nextSequence)",
-            sequence: runtime.nextSequence,
-            sessionID: runtime.record.sessionID,
-            jobID: jobID,
-            timestamp: nowUTC(),
-            stepID: stepID,
-            attempt: 1,
-            correlatesToIntentEventID: intentEventID,
-            result: "failed",
-            outcomeCertainty: .confirmed,
-            // Preserve confirmed non-execution as explicit semantic proof;
-            // an ordinary failed outcome cannot establish that no effect ran.
-            semanticCode: Self.confirmedNotExecutedSemanticCode,
-            schemaVersion: JournalEvent.schemaVersion))
-
+        try runtime.journal.appendAndSynchronize(dispatch.outcome(
+          eventID: "reconciled-outcome-\(runtime.nextSequence)", sequence: runtime.nextSequence,
+          record: runtime.record, timestamp: nowUTC(), intentEventID: intentEventID,
+          result: "failed", semanticCode: Self.confirmedNotExecutedSemanticCode,
+          summary: preservesFailure ? "compensation confirmed not executed" : nil))
         runtime.nextSequence += 1
       }
-      // An unknown action is never resent automatically, even when it was
-      // read-only. A confirmed non-execution is a definitive failed step.
       nextState = .finalizing
-      reconcileResult =
-        bindingRevision == nil
-        ? "finalizeHostOnlyConfirmedFailure"
-        : "finalizeConfirmedFailure"
+      reconcileResult = bindingRevision == nil ? "finalizeHostOnlyConfirmedFailure" : "finalizeConfirmedFailure"
       certainty = .confirmed
       safeBoundary = true
       reconcileBindingRevision = bindingRevision
@@ -6182,51 +6679,48 @@ public actor RuntimeJobEngine {
       reconcileBindingRevision = nil
       detail = reason
     }
-
+    if isHAP {
+      try configuration.testHooks.debugHAPCheckpoint?(jobID, "reconciledOutcome-\(stepID)")
+    }
     let reconcileOutcome = try JournalEvent.reconcileOutcome(
-      eventID: "reconcile-outcome-\(runtime.nextSequence)",
-      sequence: runtime.nextSequence,
-      sessionID: runtime.record.sessionID,
-      jobID: jobID,
-      timestamp: nowUTC(),
-      bindingRevision: reconcileBindingRevision,
-      recoveryAttemptID: recoveryAttemptID,
-      result: reconcileResult,
-      nextState: nextState,
-      outcomeCertainty: certainty,
-      safeBoundaryConfirmed: safeBoundary,
-      evidence: [detail],
-      schemaVersion: JournalEvent.schemaVersion)
+      eventID: "reconcile-outcome-\(runtime.nextSequence)", sequence: runtime.nextSequence,
+      sessionID: runtime.record.sessionID, jobID: jobID, timestamp: nowUTC(),
+      bindingRevision: reconcileBindingRevision, recoveryAttemptID: recoveryAttemptID,
+      result: reconcileResult, nextState: nextState, outcomeCertainty: certainty,
+      safeBoundaryConfirmed: safeBoundary, evidence: [detail], schemaVersion: JournalEvent.schemaVersion)
     try runtime.journal.appendAndSynchronize(reconcileOutcome)
     runtime.nextSequence += 1
     try transition(
       &runtime, from: .reconciling, to: nextState,
-      reason: "persist exact typed reconcile decision: \(detail)",
-      triggerEventID: reconcileOutcome.eventID)
+      reason: "persist exact typed reconcile decision: \(detail)", triggerEventID: reconcileOutcome.eventID)
 
     switch outcome {
     case .confirmedCompleted:
-      runtime.completedStepIDs.insert(stepID)
       runtime.record.outcomeUnknown = false
-      runtime.record.operationFailure = nil
-      runtime.record.recoveryStepID = nil
-      runtime.record.recoveryIntentEventID = nil
-      runtime.record.recoveryAction = nil
       runtime.record.finishedAtUTC = nil
+      if !preservesFailure {
+        runtime.completedStepIDs.insert(stepID)
+        runtime.record.operationFailure = nil
+        runtime.record.recoveryStepID = nil
+        runtime.record.recoveryIntentEventID = nil
+        runtime.record.recoveryAction = nil
+      }
       runtime.record.timeline.append("reconciled: confirmed completed \(stepID)")
     case .confirmedNotExecuted:
-      try transition(
-        &runtime, from: .finalizing, to: .failed,
-        reason: "reconciliation confirmed \(stepID) did not complete")
       runtime.record.outcomeUnknown = false
-      runtime.record.operationFailure = RuntimeOperationFailure(
-        code: .executionConfirmedNotPerformed, category: .externalTool,
-        retryability: .runtimeDecisionRequired,
-        recovery: .submitNewTypedRequestAfterRuntimeProof)
-      runtime.record.recoveryStepID = nil
-      runtime.record.recoveryIntentEventID = nil
-      runtime.record.recoveryAction = nil
-      runtime.record.finishedAtUTC = nowUTC()
+      if !preservesFailure {
+        runtime.record.operationFailure = RuntimeOperationFailure(
+          code: .executionConfirmedNotPerformed, category: .externalTool,
+          retryability: .runtimeDecisionRequired, recovery: .submitNewTypedRequestAfterRuntimeProof)
+      }
+      if !isHAP {
+        try transition(&runtime, from: .finalizing, to: .failed,
+          reason: "reconciliation confirmed \(stepID) did not complete")
+        runtime.record.recoveryStepID = nil
+        runtime.record.recoveryIntentEventID = nil
+        runtime.record.recoveryAction = nil
+        runtime.record.finishedAtUTC = nowUTC()
+      }
       runtime.record.timeline.append("reconciled: confirmed not executed \(stepID)")
     case .stillUnknown:
       runtime.record.outcomeUnknown = true
@@ -6234,18 +6728,16 @@ public actor RuntimeJobEngine {
     }
     try persistRuntimeRecord(runtime.record)
     jobs[jobID] = runtime
+    if isHAP, nextState == .finalizing {
+      return try await finalizeDebugHAPFailure(jobID: jobID)
+    }
     switch outcome {
     case .confirmedNotExecuted:
-      try await recordCapabilityOutcome(
-        for: runtime.record, outcome: .safeToReflash,
-        state: JobState.failed.rawValue)
+      try await recordCapabilityOutcome(for: runtime.record, outcome: .safeToReflash, state: JobState.failed.rawValue)
     case .stillUnknown:
       try await recordCapabilityOutcome(
-        for: runtime.record, outcome: .outcomeUnknown,
-        state: JobState.waitingForRecovery.rawValue)
+        for: runtime.record, outcome: .outcomeUnknown, state: JobState.waitingForRecovery.rawValue)
     case .confirmedCompleted:
-      // This Job still owns the same reservation and must finish the
-      // remaining plan before its lineage node can authorize another Job.
       break
     }
     return statusAndReleaseTerminalRuntime(runtime.record, provider: provider)
@@ -6544,6 +7036,44 @@ public actor RuntimeJobEngine {
 
     let replay = try DurableJournalRecovery.inspect(
       url: jobDirectory(for: record.jobID).appending(path: "journal.jsonl"))
+    if record.operationReference == "debug.hap@1" {
+      if replay.currentState == .failed, Self.hasCompleteMutationNonExecutionProof(replay) {
+        try await recordCapabilityOutcome(for: record, outcome: .safeToReflash, state: JobState.failed.rawValue)
+        return
+      }
+      // A historical HAP may have sent or installed earlier steps even when
+      // its last mutation was not executed. Missing source declarations are
+      // never permission to publish a new whole-use non-execution claim.
+      guard let finalization = try RuntimeDebugHAPFailureFinalization.derive(record: record, replay: replay),
+        replay.currentState == .failed, replay.outstandingIntents.isEmpty,
+        replay.unknownOutcomes.isEmpty, !replay.hasTornTail,
+        let descriptor = RuntimeOperationCatalog.descriptor(reference: record.operationReference)
+      else { return }
+      for planned in finalization.compensations {
+        guard let stepID = RuntimeDebugHAPFailureFinalization.catalogStepID(
+          forDescriptorID: planned.descriptor.id),
+          let step = descriptor.steps.first(where: { $0.stepID == stepID }),
+          let intent = replay.events.last(where: {
+            ($0.kind == .compensationIntent && $0.stepID == planned.descriptor.id)
+              || ($0.kind == .stepIntent && $0.stepID == stepID)
+          }), let outcome = replay.events.last(where: {
+            ($0.kind == .compensationOutcome || $0.kind == .stepOutcome)
+              && $0.correlatedIntentEventID == intent.eventID
+              && $0.payload["outcomeCertainty"] == .string("confirmed")
+          })
+        else { return }
+        if outcome.payload["result"] != .string("succeeded"), stepID != "stop-ability" {
+          guard let artifactStore, let debt = try await artifactStore.cleanupDebtRecord(
+            jobID: record.jobID, stepID: intent.stepID ?? stepID),
+            let persisted = debt.persistedAction
+          else { return }
+          try Self.validateCompensationAction(
+            planned, action: persisted.materialize(), step: step, record: record)
+        }
+      }
+      try await recordCapabilityOutcome(for: record, outcome: .confirmed, state: JobState.failed.rawValue)
+      return
+    }
     guard replay.currentState == .failed,
       let provenNonExecution = replay.events.last(where: {
         $0.kind == .stepOutcome
@@ -6555,11 +7085,12 @@ public actor RuntimeJobEngine {
       let intentID = provenNonExecution.correlatedIntentEventID,
       replay.events.contains(where: {
         $0.kind == .stepIntent && $0.eventID == intentID
-          && ($0.stepEffect ?? .hostOnly) >= .deviceMutation
+          && ($0.externalEffect ?? .destructive) >= .deviceMutation
       }),
       !replay.events.contains(where: {
-        $0.sequence > provenNonExecution.sequence && $0.kind == .stepIntent
-          && ($0.stepEffect ?? .hostOnly) >= .deviceMutation
+        $0.sequence > provenNonExecution.sequence
+          && ($0.kind == .stepIntent || $0.kind == .compensationIntent)
+          && ($0.externalEffect ?? .destructive) >= .deviceMutation
       })
     else { return }
 
@@ -6576,6 +7107,28 @@ public actor RuntimeJobEngine {
     try await recordCapabilityOutcome(
       for: record, outcome: .safeToReflash,
       state: JobState.failed.rawValue)
+  }
+
+  /// Proves the entire typed mutation set, including compensation, did not
+  /// execute. A failure message, one reconciled Step or an absent declaration
+  /// cannot stand in for this complete Journal proof.
+  private static func hasCompleteMutationNonExecutionProof(_ replay: JournalReplay) -> Bool {
+    guard !replay.hasTornTail, replay.outstandingIntents.isEmpty, replay.unknownOutcomes.isEmpty else {
+      return false
+    }
+    let intents = replay.events.filter { $0.kind == .stepIntent || $0.kind == .compensationIntent }
+    guard intents.allSatisfy({ $0.externalEffect != nil }) else { return false }
+    let mutations = intents.filter { $0.externalEffect! >= .deviceMutation }
+    guard !mutations.isEmpty else { return false }
+    return mutations.allSatisfy { intent in
+      guard let outcome = replay.events.last(where: {
+        ($0.kind == .stepOutcome || $0.kind == .compensationOutcome)
+          && $0.correlatedIntentEventID == intent.eventID
+      }) else { return false }
+      return outcome.payload["outcomeCertainty"] == .string("confirmed")
+        && outcome.payload["result"] == .string("failed")
+        && outcome.payload["semanticCode"] == .string(confirmedNotExecutedSemanticCode)
+    }
   }
 
   /// Repairs only lineage gaps whose owning Job already carries a complete,
@@ -7167,13 +7720,26 @@ public actor RuntimeJobEngine {
         stateDirectory: configuration.stateDirectory, request: request,
         nowUTC: nowUTC())
       var materializedSteps: [MaterializedPlanStep] = []
-      for step in selectedSteps {
+      var planSteps = selectedSteps.map { ($0, $0.stepID) }
+      // Failure-only actions belong to the same admitted complete plan,
+      // including stop when success intentionally leaves the ability running.
+      for sourceID in RuntimeDebugHAPFailureFinalization.sourceSteps.reversed() {
+        if let compensation = try Self.debugHAPCompensationStep(
+          forSourceStepID: sourceID, descriptor: descriptor, inputs: request.inputs)
+        {
+          planSteps.append((
+            compensation,
+            RuntimeDebugHAPFailureFinalization.descriptorID(
+              forCatalogStepID: compensation.stepID)))
+        }
+      }
+      for (step, materializedStepID) in planSteps {
         switch step.kind {
         case .preflightHostStorage, .postprocessArtifact, .finalizeSession, .hashFile,
           .verifyArtifact, .requestConfirmation:
           materializedSteps.append(
             MaterializedPlanStep(
-              stepID: step.stepID, kind: step.kind.rawValue,
+              stepID: materializedStepID, kind: step.kind.rawValue,
               effect: step.effect.rawValue, cancellation: step.cancellation.rawValue,
               binding: step.binding.rawValue, isOptional: step.isOptional,
               journalArguments: nil, processKind: "engine",
@@ -7217,7 +7783,7 @@ public actor RuntimeJobEngine {
             operationReference: implementationDescriptor.reference)
           materializedSteps.append(
             MaterializedPlanStep(
-              stepID: step.stepID, kind: step.kind.rawValue,
+              stepID: materializedStepID, kind: step.kind.rawValue,
               effect: step.effect.rawValue, cancellation: step.cancellation.rawValue,
               binding: step.binding.rawValue, isOptional: step.isOptional,
               journalArguments: workflowStep.arguments,
@@ -7253,7 +7819,7 @@ public actor RuntimeJobEngine {
         case .process(let executableSHA256, let argumentSummary, let timeoutSeconds):
           materializedSteps.append(
             MaterializedPlanStep(
-              stepID: step.stepID, kind: step.kind.rawValue,
+              stepID: materializedStepID, kind: step.kind.rawValue,
               effect: step.effect.rawValue, cancellation: step.cancellation.rawValue,
               binding: step.binding.rawValue, isOptional: step.isOptional,
               journalArguments: workflowStep.arguments, processKind: "process",
@@ -7266,7 +7832,7 @@ public actor RuntimeJobEngine {
         case .processSequence(let executableSHA256, let invocations):
           materializedSteps.append(
             MaterializedPlanStep(
-              stepID: step.stepID, kind: step.kind.rawValue,
+              stepID: materializedStepID, kind: step.kind.rawValue,
               effect: step.effect.rawValue, cancellation: step.cancellation.rawValue,
               binding: step.binding.rawValue, isOptional: step.isOptional,
               journalArguments: workflowStep.arguments, processKind: "processSequence",
@@ -7283,7 +7849,7 @@ public actor RuntimeJobEngine {
         case .hostManaged(let descriptor):
           materializedSteps.append(
             MaterializedPlanStep(
-              stepID: step.stepID, kind: step.kind.rawValue,
+              stepID: materializedStepID, kind: step.kind.rawValue,
               effect: step.effect.rawValue, cancellation: step.cancellation.rawValue,
               binding: step.binding.rawValue, isOptional: step.isOptional,
               journalArguments: workflowStep.arguments, processKind: "hostManaged",
@@ -7296,7 +7862,7 @@ public actor RuntimeJobEngine {
         case .hostWorkspace(let descriptor):
           materializedSteps.append(
             MaterializedPlanStep(
-              stepID: step.stepID, kind: step.kind.rawValue,
+              stepID: materializedStepID, kind: step.kind.rawValue,
               effect: step.effect.rawValue, cancellation: step.cancellation.rawValue,
               binding: step.binding.rawValue, isOptional: step.isOptional,
               journalArguments: workflowStep.arguments, processKind: "hostWorkspace",
@@ -8179,6 +8745,21 @@ public actor RuntimeJobEngine {
         guard evidence.completeOverwriteRecovery == liveRecovery.context else {
           throw RuntimeDispatchFailure.failed(
             "completeOverwriteRecovery.freshProofDrifted")
+        }
+        if descriptor.reference == "debug.hap@1",
+          runtime.record.state == JobState.finalizing.rawValue
+            || runtime.record.state == JobState.reconciling.rawValue
+        {
+          let receipt = try await capabilityStore.validateContinuation(
+            capabilityID: authorization.capabilityID,
+            reservationID: runtime.record.request.idempotencyKey, jobID: jobID,
+            query: query, nowUTC: nowUTC())
+          guard receipt.queryFingerprintSHA256 == evidence.consumptionFingerprintSHA256,
+            receipt.ordinal == evidence.runtimeCapabilityCorrelation?.useOrdinal,
+            receipt.reservationID == evidence.runtimeCapabilityCorrelation?.reservationID,
+            evidence.runtimeCapabilityCorrelation?.stepSetDigestSHA256 == Self.stepSetDigest(
+              descriptor: descriptor, inputs: runtime.record.request.inputs)
+          else { throw RuntimeDispatchFailure.failed("compensation capability correlation drifted") }
         }
         if let recovery = liveRecovery.context {
           guard
@@ -9109,12 +9690,22 @@ public actor RuntimeJobEngine {
     descriptor: CatalogOperationDescriptor,
     inputs: [String: JSONValue]
   ) -> String {
-    let lines = descriptor.steps
+    var lines = descriptor.steps
       .filter { stepIsRequested($0, descriptor: descriptor, inputs: inputs) }
       .map {
         "\($0.stepID)|\($0.kind.rawValue)|\($0.effect.rawValue)|"
           + "\($0.cancellation.rawValue)|\($0.binding.rawValue)"
       }
+    if descriptor.reference == "debug.hap@1" {
+      for sourceID in RuntimeDebugHAPFailureFinalization.sourceSteps.reversed() {
+        guard let step = try? debugHAPCompensationStep(
+          forSourceStepID: sourceID, descriptor: descriptor, inputs: inputs)
+        else { continue }
+        let id = RuntimeDebugHAPFailureFinalization.descriptorID(forCatalogStepID: step.stepID)
+        lines.append("\(id)|\(step.kind.rawValue)|\(step.effect.rawValue)|"
+          + "\(step.cancellation.rawValue)|\(step.binding.rawValue)")
+      }
+    }
     return RuntimeJobRecord.sha256Hex(Data(lines.joined(separator: "\n").utf8))
   }
 
@@ -9200,7 +9791,8 @@ public actor RuntimeJobEngine {
     action: TypedProviderAction? = nil,
     resolvedInputArtifact: ProviderResolvedInputArtifact? = nil,
     operationReference: String? = nil,
-    delegatedArkForgePlanCompletion: Bool = false
+    delegatedArkForgePlanCompletion: Bool = false,
+    compensationDescriptors: [CompensationDescriptor] = []
   ) throws -> WorkflowStep {
     var bundleName: String?
     if case .string(let value)? = inputs["bundleName"] { bundleName = value }
@@ -9451,6 +10043,8 @@ public actor RuntimeJobEngine {
         break
       } else if case .hdc(.cleanupOwnedRemotePath(let owned))? = action {
         path = owned.remotePath
+      } else if case .hdc(.cleanupStagedPackageSet(let set))? = action {
+        path = set.directory.remotePath
       } else if case .hdc(.cleanupNativeLibrary(let deployment))? = action {
         path = deployment.stagingPath
       } else {
@@ -9483,6 +10077,14 @@ public actor RuntimeJobEngine {
           "remotePath": .string(staged.path.remotePath),
           "sourceSha256": .string(resolvedInputArtifact.sha256),
         ]
+      } else if case .hdc(.sendPackageSetToStaging(let set))? = action,
+        let resolvedInputArtifact
+      {
+        arguments = [
+          "sourceArtifactId": .string(resolvedInputArtifact.artifactID),
+          "remotePath": .string(set.directory.remotePath),
+          "sourceSha256": .string(resolvedInputArtifact.sha256),
+        ]
       } else if case .hdc(.sendNativeLibraryToStaging(let deployment))? = action,
         let resolvedInputArtifact
       {
@@ -9504,6 +10106,11 @@ public actor RuntimeJobEngine {
         let identifier = staged.artifactLeaseID.split(separator: ":").last
       {
         packageArtifactID = String(identifier)
+      } else if case .hdc(.installPackageSet(let set, _))? = action,
+        let lease = set.packages.first?.artifactLeaseID,
+        let identifier = lease.split(separator: ":").last
+      {
+        packageArtifactID = String(identifier)
       } else {
         packageArtifactID = "hap-artifact"
       }
@@ -9513,7 +10120,11 @@ public actor RuntimeJobEngine {
         "replacePolicy": .string("allow"),
       ]
     case .uninstallPackage:
-      arguments = ["packageName": .string(bundleName ?? "com.example.app")]
+      if case .hdc(.uninstallPackage(let bundle))? = action {
+        arguments = ["packageName": .string(bundle.bundleName)]
+      } else {
+        arguments = ["packageName": .string(bundleName ?? "com.example.app")]
+      }
     case .startApplication, .stopApplication:
       if case .hdc(.startNativeTarget(let deployment))? = action {
         arguments = [
@@ -9524,6 +10135,16 @@ public actor RuntimeJobEngine {
         arguments = [
           "bundleName": .string(deployment.bundle.bundleName),
           "abilityName": .string(HDCAppOwnedNativeLibraryDeployment.entryAbility),
+        ]
+      } else if case .hdc(.stopAbility(let ability))? = action {
+        arguments = [
+          "bundleName": .string(ability.bundle.bundleName),
+          "abilityName": .string(ability.abilityName),
+        ]
+      } else if case .hdc(.startAbility(let ability))? = action {
+        arguments = [
+          "bundleName": .string(ability.bundle.bundleName),
+          "abilityName": .string(ability.abilityName),
         ]
       } else {
         arguments = [
@@ -9928,7 +10549,103 @@ public actor RuntimeJobEngine {
       declaredEffect: step.effect,
       declaredCancellation: step.cancellation,
       declaredBindingRequirement: step.binding,
-      arguments: arguments)
+      arguments: arguments, compensationDescriptors: compensationDescriptors)
+  }
+
+  private static func debugHAPCompensationStep(
+    forSourceStepID sourceStepID: String,
+    descriptor: CatalogOperationDescriptor, inputs: [String: JSONValue]
+  ) throws -> CatalogStepDescriptor? {
+    guard descriptor.reference == "debug.hap@1",
+      let stepID = RuntimeDebugHAPFailureFinalization.catalogStepID(forSourceStepID: sourceStepID)
+    else { return nil }
+    if sourceStepID == "install-hap",
+      CatalogOperationEffectResolver.resolvedInputValue(
+        "cleanupPolicy", descriptor: descriptor, inputs: inputs) != .string("uninstall")
+    {
+      return nil
+    }
+    guard let step = descriptor.steps.first(where: { $0.stepID == stepID }) else {
+      throw RuntimeJobEngineError.internalFailure(
+        "debug.hap compensation \(stepID) is absent from the Catalog")
+    }
+    return step
+  }
+
+  private static func providerContext(
+    _ context: ProviderExecutionContext, stepID: String
+  ) -> ProviderExecutionContext {
+    ProviderExecutionContext(
+      jobID: context.jobID, stepID: stepID, targetID: context.targetID,
+      bindingRevision: context.bindingRevision, connectKey: context.connectKey,
+      expectedIdentitySHA256: context.expectedIdentitySHA256,
+      toolVersion: context.toolVersion, toolSHA256: context.toolSHA256,
+      serverFacts: context.serverFacts, nowUTC: context.nowUTC,
+      resolvedInputArtifact: context.resolvedInputArtifact,
+      additionalInputArtifacts: context.additionalInputArtifacts,
+      expectedRuntimeBuildVersion: context.expectedRuntimeBuildVersion)
+  }
+
+  private static func debugHAPCompensationDeclaration(
+    for sourceStep: CatalogStepDescriptor, descriptor: CatalogOperationDescriptor,
+    inputs: [String: JSONValue], provider: any DeviceProvider,
+    context: ProviderExecutionContext
+  ) throws -> [CompensationDescriptor] {
+    guard let step = try debugHAPCompensationStep(
+      forSourceStepID: sourceStep.stepID, descriptor: descriptor, inputs: inputs)
+    else { return [] }
+    let action = try provider.action(
+      for: step, operation: descriptor, inputs: inputs,
+      context: providerContext(context, stepID: step.stepID))
+    guard action.effect == step.effect else {
+      throw RuntimeJobEngineError.internalFailure("compensation action differs from its Catalog effect")
+    }
+    let declaration = try journalStep(
+      for: step, jobID: context.jobID, inputs: inputs, action: action,
+      resolvedInputArtifact: context.resolvedInputArtifact,
+      operationReference: descriptor.reference)
+    return [try CompensationDescriptor(
+      id: RuntimeDebugHAPFailureFinalization.descriptorID(forCatalogStepID: step.stepID),
+      kind: declaration.kind, declaredEffect: declaration.effect,
+      declaredCancellation: declaration.cancellation,
+      declaredBindingRequirement: declaration.bindingRequirement,
+      trigger: .onFailure, arguments: declaration.arguments,
+      argumentsHash: JournalCanonicalJSON.argumentsHash(declaration.arguments))]
+  }
+
+  private static func validateCompensationAction(
+    _ compensation: PlannedCompensation, action: TypedProviderAction,
+    step: CatalogStepDescriptor, record: RuntimeJobRecord
+  ) throws {
+    let actionMatches: Bool
+    switch (step.stepID, action) {
+    case ("stop-ability", .hdc(.stopAbility)), ("cleanup-uninstall", .hdc(.uninstallPackage)):
+      actionMatches = true
+    case ("cleanup-remote-staging", .hdc(.cleanupOwnedRemotePath(let path))):
+      actionMatches = path.jobID == record.jobID && path.stepID == "send-hap"
+    case ("cleanup-remote-staging", .hdc(.cleanupStagedPackageSet(let set))):
+      actionMatches = set.directory.jobID == record.jobID && set.directory.stepID == "send-hap"
+    default:
+      actionMatches = false
+    }
+    let declaration = try journalStep(
+      for: step, jobID: record.jobID, inputs: record.request.inputs,
+      action: action, operationReference: record.operationReference)
+    let expected = try CompensationDescriptor(
+      id: RuntimeDebugHAPFailureFinalization.descriptorID(forCatalogStepID: step.stepID),
+      kind: declaration.kind, declaredEffect: declaration.effect,
+      declaredCancellation: declaration.cancellation,
+      declaredBindingRequirement: declaration.bindingRequirement,
+      trigger: .onFailure, arguments: declaration.arguments,
+      argumentsHash: JournalCanonicalJSON.argumentsHash(declaration.arguments))
+    guard record.operationReference == "debug.hap@1", actionMatches,
+      action.effect == expected.effect, compensation.descriptor == expected,
+      RuntimeDebugHAPFailureFinalization.catalogStepID(
+        forSourceStepID: compensation.sourceStepId) == step.stepID
+    else {
+      throw RuntimeJobEngineError.jobNotRunnable(
+        "compensation action does not match its predeclared source, arguments and Catalog step")
+    }
   }
 
   private static func flashArtifactLeaseID(

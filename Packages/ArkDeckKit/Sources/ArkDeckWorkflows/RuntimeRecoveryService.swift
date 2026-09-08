@@ -643,6 +643,22 @@ struct RuntimeRecoveryService {
       inspection.hasTornTail || !inspection.outstandingIntents.isEmpty
       || !inspection.unknownOutcomes.isEmpty
       || inspection.lastReconcileOutcomeCertainty == .outcomeUnknown
+    if let originalFailure = RuntimeDebugHAPFailureFinalization.originalFailure(
+      record: record, replay: inspection)
+    {
+      record.operationFailure = originalFailure
+    }
+    let declaredFailureFinalization = try RuntimeDebugHAPFailureFinalization.derive(
+      record: record, replay: inspection)
+    if !hasUnresolvedProviderIntent, declaredFailureFinalization != nil,
+      inspection.currentState == .running
+    {
+      try appendTransition(
+        to: journal, record: record, sequence: &nextSequence,
+        from: .running, to: .finalizing,
+        reason: "confirmed original failure has predeclared compensation; no redispatch")
+      inspection = try DurableJournalRecovery.inspect(url: journalURL)
+    }
     // An ArkForge Flash execution lives behind one delegated Runtime step.
     // Until `perform` returns, its daemon job id, receipts and completed-plan
     // projection exist only in the process-owned lane actor. A process loss
@@ -663,7 +679,17 @@ struct RuntimeRecoveryService {
         return false
       }
     }()
+    // Identity may have failed before a compensation intent existed. The
+    // waiting transition is durable before its record projection, so it
+    // must restore the explicit identity-proof route after a crash too.
+    let pendingDebugHAPIdentityProof = declaredFailureFinalization != nil
+      && inspection.outstandingIntents.isEmpty && inspection.unknownOutcomes.isEmpty
+      && (inspection.currentState == .waitingForRecovery || inspection.currentState == .reconciling)
+      && inspection.events.contains(where: {
+        $0.stateTransition?.from == .finalizing && $0.stateTransition?.to == .waitingForRecovery
+      })
     let mustParkWithoutRedispatch = hasUnresolvedProviderIntent || lostArkForgeExecutionState
+      || pendingDebugHAPIdentityProof
     if mustParkWithoutRedispatch,
       let currentState = inspection.currentState,
       currentState != .waitingForRecovery,
@@ -688,7 +714,11 @@ struct RuntimeRecoveryService {
           inspection.unknownOutcomes.last?.stepID
           ?? inspection.outstandingIntents.last?.stepID
       }
-      if lostArkForgeExecutionState {
+      if pendingDebugHAPIdentityProof {
+        record.finishedAtUTC = nil
+        appendRecoveryTimeline(
+          "recovered: declared compensation needs fresh identity proof; no redispatch", to: &record)
+      } else if lostArkForgeExecutionState {
         record.operationFailure = RuntimeOperationFailure(
           code: .outcomeUnknown, category: .unknownOutcome,
           retryability: .runtimeDecisionRequired,
@@ -740,6 +770,15 @@ struct RuntimeRecoveryService {
           "recovered: completed durable cancellation at journal-confirmed safe boundary; no redispatch",
           to: &record)
       case .finalizing:
+        if let declaredFailureFinalization {
+          record.operationFailure = declaredFailureFinalization.originalFailure
+          record.outcomeUnknown = false
+          record.finishedAtUTC = nil
+          appendRecoveryTimeline(
+            "recovered: pending declared failure compensation; explicit continuation required; no redispatch",
+            to: &record)
+          break
+        }
         let establishedRecoveryEpoch: SupersedingRecoveryEpoch?
         if record.admissionEvidence?.completeOverwriteRecovery != nil,
           let store = try? RuntimeSupersedingRecoveryStore(stateDirectory: stateDirectory)
@@ -787,6 +826,16 @@ struct RuntimeRecoveryService {
         record.recoveryIntentEventID = nil
         record.recoveryAction = nil
       }
+    }
+    if record.operationReference == "debug.hap@1" {
+      var kinds = record.actualStepKinds ?? []
+      for event in inspection.events where event.kind == .stepIntent || event.kind == .compensationIntent {
+        let value = event.payload[event.kind == .stepIntent ? "step" : "descriptor"]
+        if case .object(let object)? = value, case .string(let kind)? = object["kind"],
+          !kinds.contains(kind)
+        { kinds.append(kind) }
+      }
+      record.actualStepKinds = kinds
     }
     return RuntimeRecoveredJob(
       record: record, journal: journal, nextSequence: nextSequence,

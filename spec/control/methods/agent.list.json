@@ -47,7 +47,10 @@
             "additionalProperties": false,
             "properties": {
               "bindingRevision": {
-                "type": "null"
+                "type": [
+                  "integer",
+                  "null"
+                ]
               },
               "catalogDigest": {
                 "type": "string"
@@ -68,10 +71,16 @@
                 "type": "string"
               },
               "jobId": {
-                "type": "null"
+                "type": [
+                  "null",
+                  "string"
+                ]
               },
               "jobState": {
-                "type": "null"
+                "type": [
+                  "null",
+                  "string"
+                ]
               },
               "lastObservedAt": {
                 "type": "string"
@@ -125,12 +134,10 @@
                   }
                 },
                 "required": [
-                  "expiresAt",
                   "kind",
                   "owner",
                   "reasonCode",
-                  "resource",
-                  "resumeReference"
+                  "resource"
                 ],
                 "type": "object"
               },
@@ -147,7 +154,10 @@
                 "type": "string"
               },
               "targetId": {
-                "type": "null"
+                "type": [
+                  "null",
+                  "string"
+                ]
               }
             },
             "required": [
@@ -209,7 +219,7 @@
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
     "error": 1,
-    "request": 2,
-    "result": 1
+    "request": 6,
+    "result": 5
   }
 }

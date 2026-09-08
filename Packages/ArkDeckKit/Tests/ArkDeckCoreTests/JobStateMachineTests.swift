@@ -218,6 +218,45 @@ final class JobStateMachineTests: XCTestCase {
     XCTAssertEqual(planOnly.state, .queued)
   }
 
+  func testFailureCompensationHasASeparateFinalizationLaneAndRetainsOriginalFailure() throws {
+    let compensation = try CompensationDescriptor(
+      id: "compensation-uninstall", kind: .uninstallPackage,
+      declaredEffect: .deviceMutation, declaredCancellation: .atSafeBoundary,
+      declaredBindingRequirement: .confirmedDevice, trigger: .onFailure,
+      arguments: ["packageName": .string("com.example.demo")], argumentsHash: String(repeating: "a", count: 64))
+    let source = try WorkflowStep(
+      id: "install", kind: .installPackage,
+      declaredEffect: .deviceMutation, declaredCancellation: .atSafeBoundary,
+      declaredBindingRequirement: .confirmedDevice,
+      arguments: ["packageArtifactId": .string("fixture-hap"), "packageName": .string("com.example.demo"),
+        "replacePolicy": .string("allow")], compensationDescriptors: [compensation])
+    var machine = try makeFailedFinalizingMachine()
+    let original = machine.originalFailure
+    XCTAssertThrowsError(try machine.authorizeDispatch(of: source))
+    XCTAssertThrowsError(try machine.authorizeCompensation(compensation, declaredBy: source, sourceSucceeded: false))
+    _ = try machine.authorizeCompensation(compensation, declaredBy: source, sourceSucceeded: true)
+    XCTAssertThrowsError(try machine.handle(.finalizationCompleted))
+    try machine.handle(.externalOutcomeOrIdentityUnknown)
+    XCTAssertEqual(machine.state, .waitingForRecovery)
+    XCTAssertEqual(machine.originalFailure, original)
+    try machine.handle(.recoveryRequested)
+    let compensationFailure = WorkflowFailure(
+      classification: .compensation, code: "stop-failed", summary: "compensation failed")
+    try machine.handle(.recoveryEvaluated(.confirmedFailure(compensationFailure)))
+    XCTAssertEqual(machine.state, .finalizing)
+    XCTAssertEqual(machine.originalFailure, original)
+    try machine.handle(.finalizationCompleted)
+    XCTAssertEqual(machine.state, .failed)
+    XCTAssertThrowsError(try machine.authorizeCompensation(compensation, declaredBy: source, sourceSucceeded: true))
+    var successfulFinalization = try makeFinalizingMachine(mode: .execute)
+    XCTAssertThrowsError(try successfulFinalization.authorizeCompensation(
+      compensation, declaredBy: source, sourceSucceeded: true))
+    var planOnly = try makeFinalizingMachine(mode: .planOnly)
+    XCTAssertThrowsError(try planOnly.authorizeCompensation(compensation, declaredBy: source, sourceSucceeded: true))
+    XCTAssertFalse(JobStateMachine.isAllowedTransition(from: .finalizing, to: .waitingForRecovery, mode: .planOnly))
+    XCTAssertTrue(JobStateMachine.isAllowedTransition(from: .finalizing, to: .waitingForRecovery, mode: .execute))
+  }
+
   func testFinalizationRequiresMatchingFinalizeStepCompletionBeforeTerminal() throws {
     let finalizingMachines: [(machine: JobStateMachine, expectedTerminal: JobState)] = [
       (try makeFinalizingMachine(mode: .execute), .succeeded),

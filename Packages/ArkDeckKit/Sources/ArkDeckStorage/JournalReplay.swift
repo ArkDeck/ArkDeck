@@ -19,6 +19,109 @@ public struct UnknownJournalOutcome: Equatable, Sendable {
   public let isCompensation: Bool
 }
 
+/// The same linkage checks guard both a new append and a cold replay. A
+/// compensation is executable only because its successful source declared
+/// these exact bytes before that source was dispatched.
+private struct JournalCompensationValidationState {
+  private var sources: [String: JournalEvent] = [:]
+  private var descriptorSources: [String: String] = [:]
+  private var intents: [String: JournalEvent] = [:]
+  private var succeededSourceIntents: Set<String> = []
+  private var attemptedDescriptors: Set<String> = []
+
+  func validate(
+    _ event: JournalEvent, state: JobState?, executionMode: String?,
+    hasOutstandingIntents: Bool
+  ) throws {
+    switch event.kind {
+    case .stepIntent:
+      guard let value = event.payload["step"] else { return }
+      let step = try JournalCanonicalJSON.decodeWorkflowStep(value)
+      if state == .finalizing, step.kind != .finalizeSession {
+        throw DurableFileError.sequenceViolation(
+          "finalizing rejects ordinary Workflow dispatch other than finalizeSession")
+      }
+      var declared = Set<String>()
+      for descriptor in step.compensationDescriptors {
+        guard declared.insert(descriptor.id).inserted,
+          descriptorSources[descriptor.id].map({ $0 == step.id }) ?? true
+        else {
+          throw DurableFileError.sequenceViolation("ambiguous compensation source declaration")
+        }
+      }
+    case .compensationIntent:
+      guard executionMode != JobExecutionMode.planOnly.rawValue,
+        !hasOutstandingIntents,
+        let sourceID = event.payload.string("compensationOfStepId"),
+        let source = sources[sourceID], succeededSourceIntents.contains(source.eventID),
+        let descriptorID = event.stepID, event.attempt == 1,
+        !attemptedDescriptors.contains(descriptorID),
+        source.bindingRevision == event.bindingRevision,
+        source.payload["target"] == event.payload["target"],
+        case .object(let sourceStep)? = source.payload["step"],
+        case .array(let declarations)? = sourceStep["compensationDescriptors"],
+        let descriptor = event.payload["descriptor"], declarations.contains(descriptor)
+      else {
+        throw DurableFileError.sequenceViolation(
+          "compensation requires its confirmed source, exact declaration/target/binding and one unused attempt")
+      }
+      if state == .finalizing {
+        guard let mode = stateMachineMode(for: executionMode),
+          JobStateMachine.permitsCompensationDispatch(from: .finalizing, mode: mode)
+        else {
+          throw DurableFileError.sequenceViolation("finalizing compensation dispatch is unavailable")
+        }
+      }
+    case .stepOutcome, .compensationOutcome:
+      guard let correlation = event.correlatedIntentEventID,
+        let intent = intents[correlation]
+      else { return } // The ordinary correlation validator reports absence.
+      let compensating = intent.kind == .compensationIntent
+      guard compensating == (event.kind == .compensationOutcome) else {
+        throw DurableFileError.sequenceViolation("outcome event kind differs from its intent")
+      }
+      if compensating {
+        guard event.payload["compensationOfStepId"] == intent.payload["compensationOfStepId"],
+          event.payload.string("descriptorId") == intent.stepID
+        else {
+          throw DurableFileError.sequenceViolation("compensation outcome source differs from its intent")
+        }
+      }
+    default:
+      break
+    }
+  }
+
+  mutating func accept(_ event: JournalEvent) {
+    switch event.kind {
+    case .stepIntent:
+      intents[event.eventID] = event
+      if let stepID = event.stepID {
+        sources[stepID] = event
+        if case .object(let step)? = event.payload["step"],
+          case .array(let descriptors)? = step["compensationDescriptors"]
+        {
+          for case .object(let descriptor) in descriptors {
+            if let id = descriptor.string("id") { descriptorSources[id] = stepID }
+          }
+        }
+      }
+    case .compensationIntent:
+      intents[event.eventID] = event
+      if let id = event.stepID { attemptedDescriptors.insert(id) }
+    case .stepOutcome:
+      if event.payload.string("result") == "succeeded",
+        event.payload.string("outcomeCertainty") == JournalOutcomeCertainty.confirmed.rawValue,
+        let correlation = event.correlatedIntentEventID
+      {
+        succeededSourceIntents.insert(correlation)
+      }
+    default:
+      break
+    }
+  }
+}
+
 struct PendingReconcileTransition: Equatable, Sendable {
   let attemptID: String
   let outcomeEventID: String
@@ -194,6 +297,7 @@ package enum DurableJournalRecovery {
     var completedRecoveryAttemptIDs: Set<String> = []
     var pendingReconcileTransition: PendingReconcileTransition?
     var lastReconcileOutcomeCertainty: JournalOutcomeCertainty?
+    var compensationValidation = JournalCompensationValidationState()
 
     for event in events {
       if let schemaVersion, event.schemaVersion != schemaVersion {
@@ -250,6 +354,11 @@ package enum DurableJournalRecovery {
             "outcomeUnknown is not followed by waitingForRecovery")
         }
       }
+
+      try compensationValidation.validate(
+        event, state: state, executionMode: executionMode,
+        hasOutstandingIntents: intents.values.contains { !completedIntentIDs.contains($0.eventID) })
+      compensationValidation.accept(event)
 
       switch event.kind {
       case .jobCreated:
@@ -526,6 +635,7 @@ package enum DurableJournalRecovery {
 }
 
 struct JournalAppendValidationState {
+  private var compensationValidation: JournalCompensationValidationState
   private var lastSequence: Int?
   private var sessionID: String?
   private var jobID: String?
@@ -557,6 +667,8 @@ struct JournalAppendValidationState {
     guard !replay.hasTornTail else {
       throw DurableFileError.sequenceViolation("cannot append after a torn tail")
     }
+    compensationValidation = JournalCompensationValidationState()
+    for event in replay.events { compensationValidation.accept(event) }
     lastSequence = replay.lastDurableSequence
     sessionID = replay.events.last?.sessionID
     jobID = replay.events.last?.jobID
@@ -600,6 +712,9 @@ struct JournalAppendValidationState {
   }
 
   func validate(_ event: JournalEvent) throws {
+    try compensationValidation.validate(
+      event, state: currentState, executionMode: executionMode,
+      hasOutstandingIntents: !outstanding.isEmpty)
     if let lastSequence {
       guard event.sequence == lastSequence + 1 else {
         throw DurableFileError.sequenceViolation("append sequence is not contiguous")
@@ -809,6 +924,7 @@ struct JournalAppendValidationState {
   }
 
   mutating func accept(_ event: JournalEvent) {
+    compensationValidation.accept(event)
     lastSequence = event.sequence
     sessionID = event.sessionID
     jobID = event.jobID

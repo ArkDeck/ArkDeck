@@ -1,5 +1,6 @@
 import ArkDeckAgentClient
 import ArkDeckCore
+import ArkDeckRuntime
 import Darwin
 import Foundation
 
@@ -151,6 +152,13 @@ extension RuntimeCLI {
           }
           let status = try request("job.status", ["jobId": .string(jobID)])
           let state = try validatedObservedJobStatus(status, jobID: jobID, session: session)
+          if case .object(let fields) = status, case .object(let next)? = fields["nextAction"],
+            next["reasonCode"] == .string("job.finalizationPending")
+          {
+            throw session.fail(.resultNotReady,
+              "Job failure finalization requires reconciliation. Run: arkdeck job reconcile --job \(jobID)",
+              details: ["nextAction": .object(next)])
+          }
           if state.isTerminal {
             terminalStatus = status
             // Drain once after observing terminal, including durable events
@@ -195,9 +203,18 @@ extension RuntimeCLI {
     }
     guard !human, next["resource"] == next["owner"] else { throw unreadable() }
     let uncertain = unknown || [.waitingForRecovery, .reconciling].contains(state)
-    let expected = uncertain ? "reconcile" : state.isTerminal ? "readResult" : "wait"
+    let failureFinalization: Bool = {
+      guard !uncertain, state == .finalizing, fields["operation"] == .string("debug.hap@1"),
+        let value = fields["failure"],
+        let bytes = try? CanonicalJSONEncoders.canonical().encode(value),
+        let failure = try? JSONDecoder().decode(RuntimeOperationFailure.self, from: bytes)
+      else { return false }
+      return failure.code != .outcomeUnknown
+    }()
+    let expected = uncertain || failureFinalization ? "reconcile" : state.isTerminal ? "readResult" : "wait"
     guard kind == expected, Set(next.keys) == (kind == "wait" ? base.union(["retryAfter"]) : base),
-      next["reasonCode"] == .string(uncertain ? "recovery.outcomeUnknown" : state.isTerminal ? "job.resultAvailable" : "job.running")
+      next["reasonCode"] == .string(uncertain ? "recovery.outcomeUnknown" : failureFinalization
+        ? "job.finalizationPending" : state.isTerminal ? "job.resultAvailable" : "job.running")
     else { throw unreadable() }
     if kind == "wait" {
       guard let hint = CLIJobEventPage.string(next["retryAfter"]),

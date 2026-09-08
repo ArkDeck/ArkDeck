@@ -515,6 +515,7 @@ public struct CompensationDescriptor: Equatable, Sendable, Codable {
     .cleanupOwnedRemotePath,
     .removePortForward,
     .stopApplication,
+    .uninstallPackage,
   ]
 
   public let id: String

@@ -385,11 +385,13 @@ final class RuntimeAgentExecutionContractTests: XCTestCase {
   func testAgentListAndAbandonPublishTheirResultShapesThroughTheControlPlane() async throws {
     port.setState("Unauthorized")
     let owner = try owner()
+    let humanActions = try RuntimeHumanActionResourceCoordinator(
+      directory: directory.appending(path: "human-actions"), agents: owner, controlResources: nil)
     let capturedClock = clock!
     let handler = RuntimeControlPlaneHandler(
       engine: engine, capabilityStore: try RuntimeCapabilityStore(directoryURL: directory.appending(path: "capabilities")),
       providerIDs: ["hdc"], nowUTC: { RuntimeAgentTime.format(capturedClock.now()) },
-      targetStore: targets, agentExecutions: owner,
+      targetStore: targets, agentExecutions: owner, humanActionResources: humanActions,
       artifactStore: try RuntimeArtifactStore(rootURL: directory.appending(path: "artifacts"),
         nowUTC: { RuntimeAgentTime.format(capturedClock.now()) }))
     func send(_ method: String, _ params: [String: JSONValue]) async throws -> AgentWireProtocol.Response {
@@ -406,6 +408,42 @@ final class RuntimeAgentExecutionContractTests: XCTestCase {
     XCTAssertTrue(renderedList.contains("execution-test"), "the pending execution is listed: \(renderedList)")
     XCTAssertFalse(renderedList.contains("150100424a544e4600"), "no connect key crosses the control plane")
 
+    let waitingStatus = try await send("agent.status", ["executionId": .string("execution-test")])
+    XCTAssertTrue(waitingStatus.ok, waitingStatus.error?.message ?? "-")
+    let waitingFields = try object(XCTUnwrap(waitingStatus.result))
+    let initialAction = try action(XCTUnwrap(waitingStatus.result))
+    let waitingResume = try await send("agent.resume", ["resumeReference": .string(initialAction.reference)])
+    XCTAssertTrue(waitingResume.ok, waitingResume.error?.message ?? "-")
+    let resumedFields = try object(XCTUnwrap(waitingResume.result))
+    let resumedAction = try action(XCTUnwrap(waitingResume.result))
+    guard case .string(let resumedActionID)? = resumedAction.fields["actionId"] else {
+      return XCTFail("the actual pending human-action identity is absent")
+    }
+    let waitingHumanResume = try await send("human-action.resume", [
+      "humanAction": .string(resumedActionID), "resumeReference": .string(resumedAction.reference),
+    ])
+    XCTAssertTrue(waitingHumanResume.ok, waitingHumanResume.error?.message ?? "-")
+    let humanResumedFields = try object(XCTUnwrap(waitingHumanResume.result))
+    let pendingAction = try action(XCTUnwrap(waitingHumanResume.result))
+    guard case .string(let pendingActionID)? = pendingAction.fields["actionId"] else {
+      return XCTFail("the union owner did not retain its exact physical action")
+    }
+    for fields in [waitingFields, resumedFields, humanResumedFields] {
+      XCTAssertEqual(fields["state"], .string("waitingForHuman"))
+      for key in ["targetId", "bindingRevision", "jobId", "jobState", "failureCode"] {
+        XCTAssertEqual(fields[key], .null, key)
+      }
+      XCTAssertNil(fields["job"])
+      XCTAssertNil(fields["evidence"])
+      XCTAssertNil(fields["artifacts"])
+      guard case .object(let humanAction)? = fields["humanAction"],
+        case .object(let next)? = fields["nextAction"]
+      else { return XCTFail("a pending execution must retain its physical action") }
+      XCTAssertEqual(humanAction["status"], .string("waiting"))
+      XCTAssertEqual(next["kind"], .string("humanAction"))
+      XCTAssertNil(next["retryAfter"])
+    }
+
     let current = try object(await owner.status("execution-test"))
     guard case .string(let generation)? = current["generation"] else { return XCTFail("generation is absent") }
     let abandoned = try await send(
@@ -413,6 +451,27 @@ final class RuntimeAgentExecutionContractTests: XCTestCase {
     XCTAssertTrue(abandoned.ok, abandoned.error?.message ?? "-")
     guard case .object(let outcome)? = abandoned.result else { return XCTFail("agent.abandon must answer the execution") }
     XCTAssertEqual(outcome["state"], .string("abandoned"))
+    let abandonedStatus = try await send("agent.status", ["executionId": .string("execution-test")])
+    XCTAssertTrue(abandonedStatus.ok, abandonedStatus.error?.message ?? "-")
+    let abandonedFields = try object(XCTUnwrap(abandonedStatus.result))
+    XCTAssertEqual(abandonedFields["state"], .string("abandoned"))
+    for key in ["targetId", "bindingRevision", "jobId", "jobState", "failureCode", "humanAction", "nextAction"] {
+      XCTAssertEqual(abandonedFields[key], .null, key)
+    }
+    XCTAssertNil(abandonedFields["job"])
+    XCTAssertNil(abandonedFields["evidence"])
+    XCTAssertNil(abandonedFields["artifacts"])
+    let abandonedResume = try await send("agent.resume", ["resumeReference": .string(pendingAction.reference)])
+    XCTAssertFalse(abandonedResume.ok)
+    XCTAssertEqual(abandonedResume.error?.code, "humanActionExpired")
+    XCTAssertEqual(abandonedResume.error?.details?["newDispatchCount"], .integer(0))
+    let abandonedHumanResume = try await send("human-action.resume", [
+      "humanAction": .string(pendingActionID), "resumeReference": .string(pendingAction.reference),
+    ])
+    XCTAssertFalse(abandonedHumanResume.ok)
+    XCTAssertEqual(abandonedHumanResume.error?.code, "humanActionExpired")
+    XCTAssertEqual(abandonedHumanResume.error?.details?["newDispatchCount"], .integer(0))
+    XCTAssertEqual(abandonedHumanResume.error?.details?["phase"], .string("preAdmission"))
     let jobs = try await engine.listJobs()
     XCTAssertTrue(jobs.isEmpty)
     XCTAssertEqual(dispatcher.dispatchCount, 0)

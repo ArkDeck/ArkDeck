@@ -71,13 +71,15 @@ package enum RuntimeJobReadProjection {
       throw unreadable("Job status has no supported durable next action")
     }
     let uncertain = status.outcomeUnknown || [.waitingForRecovery, .reconciling].contains(state)
+    let failureFinalization = state == .finalizing && status.operationReference == "debug.hap@1"
+      && status.operationFailure != nil
     var fields: [String: JSONValue] = [
-      "kind": .string(uncertain ? "reconcile" : state.isTerminal ? "readResult" : "wait"),
+      "kind": .string(uncertain || failureFinalization ? "reconcile" : state.isTerminal ? "readResult" : "wait"),
       "owner": .object(["kind": .string("job"), "id": .string(status.jobID)]),
       "resource": .object(["kind": .string("job"), "id": .string(status.jobID)]),
-      "reasonCode": .string(uncertain ? "recovery.outcomeUnknown" : state.isTerminal ? "job.resultAvailable" : "job.running"),
+      "reasonCode": .string(uncertain ? "recovery.outcomeUnknown" : failureFinalization ? "job.finalizationPending" : state.isTerminal ? "job.resultAvailable" : "job.running"),
     ]
-    if !uncertain && !state.isTerminal { fields["retryAfter"] = .string("250ms") }
+    if !uncertain && !failureFinalization && !state.isTerminal { fields["retryAfter"] = .string("250ms") }
     return .object(fields)
   }
 

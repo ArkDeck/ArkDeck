@@ -323,8 +323,23 @@
                 "abilityName": {
                   "type": "string"
                 },
+                "additionalHapArtifactLeases": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
                 "bundleName": {
                   "type": "string"
+                },
+                "captureDiagnostics": {
+                  "type": "boolean"
+                },
+                "cleanupPolicy": {
+                  "type": "string"
+                },
+                "diagnosticsDurationSeconds": {
+                  "type": "integer"
                 },
                 "displayHeight": {
                   "type": "integer"
@@ -336,6 +351,15 @@
                   "type": "integer"
                 },
                 "hapArtifactLease": {
+                  "type": "string"
+                },
+                "installPolicy": {
+                  "type": "string"
+                },
+                "portForwardProfile": {
+                  "type": "string"
+                },
+                "postRunAbilityState": {
                   "type": "string"
                 },
                 "privateInput": {
@@ -428,7 +452,7 @@
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
     "error": 1,
-    "request": 23,
-    "result": 22
+    "request": 15,
+    "result": 14
   }
 }

@@ -1,8 +1,11 @@
 import XCTest
 
+@testable import ArkDeckAgentClient
 @testable import ArkDeckAgentDaemon
+@testable import ArkDeckCLI
 @testable import ArkDeckCore
 @testable import ArkDeckOpenHarmony
+@testable import ArkDeckRuntime
 @testable import ArkDeckStorage
 @testable import ArkDeckWorkflows
 
@@ -32,6 +35,20 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
         executionConnectKey: "150100424a544e4600",
         deviceMode: nil, buildFingerprint: nil,
         profileID: "openharmony-standard@1", collectedAtUTC: "2026-07-29T00:00:00Z")
+    }
+  }
+
+  private final class SwitchableHAPFactsPort: HDCObservationFactsPort, @unchecked Sendable {
+    private let lock = NSLock()
+    private var unavailable = false
+
+    func makeUnavailable() { lock.withLock { unavailable = true } }
+
+    func currentFacts(targetID: String) async throws -> ProviderFacts {
+      if lock.withLock({ unavailable }) {
+        throw RuntimeDispatchFailure.failed("fixture target facts are unavailable")
+      }
+      return try await FactsPort().currentFacts(targetID: targetID)
     }
   }
 
@@ -464,6 +481,7 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
       var processRunning = true
       var hilogEmpty = false
       var sendOutcomeUnknown = false
+      var installConfirmedNotExecuted = false
       var availableStorageKB = 1_047_552
       var installExit: Int32 = 0
       var startExit: Int32 = 0
@@ -476,6 +494,8 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
       var portForwardPresent = false
       var cleanupExit: Int32 = 0
       var cleanupOutcomeUnknown = false
+      var stopOutcomeUnknown = false
+      var uninstallOutcomeUnknown = false
       /// Bytes the simulated `file recv` leaves on the host. `nil` models
       /// the version whose transfer lands nowhere the caller named.
       var receivedTracePayload: Data? = Data("trace-bytes".utf8)
@@ -754,6 +774,9 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
         return receipt("FileTransfer finish")
       case .installPackage:
         note("installPackage")
+        if script.installConfirmedNotExecuted {
+          throw RuntimeDispatchFailure.confirmedNotExecuted("fixture install never executed")
+        }
         // Clean exit either way: the readback is what decides.
         return receipt("install bundle successfully.", exit: script.installExit)
       case .queryPackageReadback(let bundle):
@@ -775,6 +798,9 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
           exit: script.processReadbackExit)
       case .stopAbility(let ability):
         note("stopAbility")
+        if script.stopOutcomeUnknown {
+          throw RuntimeDispatchFailure.outcomeUnknown("stop completion is unobservable")
+        }
         // force-stop, then the `pidof` readback that decides the verdict.
         // `pidof` answers exit 1 with no output for a name it cannot find.
         func sub(_ stdout: String, exit: Int32 = 0) -> ProviderSubprocessReceipt {
@@ -794,6 +820,9 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
           ])
       case .uninstallPackage(let bundle):
         note("uninstallPackage")
+        if script.uninstallOutcomeUnknown {
+          throw RuntimeDispatchFailure.outcomeUnknown("uninstall completion is unobservable")
+        }
         func sub(_ stdout: String, exit: Int32 = 0) -> ProviderSubprocessReceipt {
           ProviderSubprocessReceipt(
             exitStatus: exit, stdout: Data(stdout.utf8), stderr: Data(),
@@ -851,7 +880,9 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
 
   private func makeEngine(
     dispatcher: ScriptedDispatcher,
-    artifactQuota: ArtifactQuota = ArtifactQuota()
+    artifactQuota: ArtifactQuota = ArtifactQuota(),
+    testHooks: RuntimeJobEngine.Configuration.TestHooks = .none,
+    factsPort: any HDCObservationFactsPort = FactsPort()
   ) throws -> (RuntimeJobEngine, RuntimeCapabilityStore, RuntimeArtifactStore) {
     let capabilityStore = try RuntimeCapabilityStore(
       directoryURL: stateDirectory.appending(path: "capabilities", directoryHint: .isDirectory))
@@ -860,9 +891,9 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
       quota: artifactQuota,
       nowUTC: { "2026-07-29T00:00:00Z" })
     let engine = try RuntimeJobEngine(
-      configuration: .init(stateDirectory: stateDirectory),
+      configuration: .init(stateDirectory: stateDirectory, testHooks: testHooks),
       providers: DeviceProviderRegistry(providers: [
-        HDCObservationProviderAdapter(factsPort: FactsPort())
+        HDCObservationProviderAdapter(factsPort: factsPort)
       ]),
       dispatcher: dispatcher,
       capabilityStore: capabilityStore,
@@ -1164,6 +1195,12 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     return try XCTUnwrap(
       JSONSerialization.jsonObject(with: data) as? [String: Any])
   }
+
+  private static let explicitHAPDefaultInputs = #"""
+    , "installPolicy": "installOrReplace", "cleanupPolicy": "uninstall",
+    "postRunAbilityState": "stopped", "captureDiagnostics": true,
+    "diagnosticsDurationSeconds": 30, "portForwardProfile": "none"
+    """#
 
   private func hapRequest(
     lease: String,
@@ -2557,7 +2594,7 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     XCTAssertTrue(dispatcher.dispatchedActions.contains("stopAbility"))
     XCTAssertTrue(dispatcher.dispatchedActions.contains("uninstallPackage"))
     XCTAssertTrue(dispatcher.dispatchedActions.contains("cleanup"))
-    XCTAssertTrue(status.timeline.contains { $0.contains("compensated cleanup-uninstall") })
+    XCTAssertTrue(status.timeline.contains { $0.contains("verified cleanup-uninstall") })
   }
 
   func testReconcileUsesTheOriginalUnknownMutationAction() async throws {
@@ -2637,6 +2674,861 @@ final class DiagnosticsAndHAPContractTests: XCTestCase {
     XCTAssertTrue(
       reconciled.timeline.contains { $0.contains("reconciled") },
       reconciled.timeline.joined(separator: " | "))
+  }
+
+  func testConfirmedDiagnosticNonExecutionFinalizesOnlyDeclaredCompensations() async throws {
+    let testRoot = stateDirectory!
+    defer { stateDirectory = testRoot }
+    for retained in [false, true] {
+      stateDirectory = testRoot.appending(path: retained ? "retain" : "uninstall")
+      let dispatcher = ScriptedDispatcher(script: .init(hilogEmpty: true))
+      let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+      let lease = try await publishHAPLease(artifacts)
+      try await installE1Capability(capabilities)
+      let acceptance = try await engine.submit(hapRequest(
+        lease: lease, key: "idem-hap-confirmed-failure-\(retained)",
+        extraInputs: retained ? #", "cleanupPolicy": "retain", "postRunAbilityState": "running""# : ""))
+      let parked = try await engine.run(jobID: acceptance.jobID)
+      XCTAssertEqual(parked.state, "waitingForRecovery")
+      let dispatchesBefore = dispatcher.dispatchedActions.count
+      let failed = try await engine.reconcile(jobID: acceptance.jobID)
+      XCTAssertEqual(failed.state, "failed", failed.timeline.joined(separator: " | "))
+      XCTAssertEqual(failed.operationFailure?.code, .executionConfirmedNotPerformed)
+      XCTAssertFalse(failed.outcomeUnknown)
+      XCTAssertEqual(Array(dispatcher.dispatchedActions.dropFirst(dispatchesBefore)),
+        retained ? ["stopAbility", "cleanup"] : ["stopAbility", "uninstallPackage", "cleanup"])
+      let replay = try hapReplay(acceptance.jobID)
+      let compensations = replay.events.filter { $0.kind == .compensationIntent }
+      XCTAssertEqual(compensations.map(\.stepID), retained
+        ? ["compensation-stop-ability", "compensation-cleanup-remote-staging"]
+        : ["compensation-stop-ability", "compensation-cleanup-uninstall", "compensation-cleanup-remote-staging"])
+      let finalizing = try XCTUnwrap(replay.events.first { $0.stateTransition?.to == .finalizing })
+      XCTAssertFalse(replay.events.contains {
+        $0.sequence > finalizing.sequence && $0.stateTransition?.to == .running
+      })
+      XCTAssertFalse(replay.events.contains {
+        $0.sequence > finalizing.sequence && $0.kind == .stepIntent
+      })
+      XCTAssertEqual(replay.events.filter { $0.kind == .compensationOutcome }.count, compensations.count)
+      XCTAssertTrue(replay.outstandingIntents.isEmpty)
+      let count = dispatcher.dispatchedActions.count
+      _ = try await engine.reconcile(jobID: acceptance.jobID)
+      XCTAssertEqual(dispatcher.dispatchedActions.count, count, "terminal reconcile is bookkeeping only")
+      let ledgerValue = try await capabilities.inspect(capabilityID: "CAP-RT-HAP-001")
+      let ledger = try XCTUnwrap(ledgerValue)
+      XCTAssertEqual(ledger.lineage.last?.outcome, .confirmed)
+    }
+  }
+
+  func testEachUnknownCompensationReconcilesWithoutResendingOrLosingOriginalFailure() async throws {
+    let testRoot = stateDirectory!
+    defer { stateDirectory = testRoot }
+    for unknownStep in ["stop-ability", "cleanup-uninstall", "cleanup-remote-staging"] {
+      for completed in [false, true] {
+        stateDirectory = testRoot.appending(path: "\(unknownStep)-\(completed)")
+        var script = ScriptedDispatcher.Script(hilogEmpty: true)
+        script.stopOutcomeUnknown = unknownStep == "stop-ability"
+        script.uninstallOutcomeUnknown = unknownStep == "cleanup-uninstall"
+        script.cleanupOutcomeUnknown = unknownStep == "cleanup-remote-staging"
+        let dispatcher = ScriptedDispatcher(script: script)
+        let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+        let lease = try await publishHAPLease(artifacts)
+        try await installE1Capability(capabilities)
+        let accepted = try await engine.submit(hapRequest(lease: lease))
+        _ = try await engine.run(jobID: accepted.jobID)
+        let parked = try await engine.reconcile(jobID: accepted.jobID)
+        XCTAssertEqual(parked.state, "waitingForRecovery", parked.timeline.joined(separator: " | "))
+        XCTAssertTrue(parked.outcomeUnknown)
+        XCTAssertEqual(parked.operationFailure?.code, .executionConfirmedNotPerformed)
+        let outstanding = try XCTUnwrap(try hapReplay(accepted.jobID).outstandingIntents.first)
+        XCTAssertEqual(try hapReplay(accepted.jobID).events.first { $0.eventID == outstanding.eventID }?.kind, .compensationIntent)
+        XCTAssertEqual(outstanding.stepID, "compensation-\(unknownStep)")
+        let heldValue = try await capabilities.inspect(capabilityID: "CAP-RT-HAP-001")
+        let held = try XCTUnwrap(heldValue)
+        XCTAssertEqual(held.lineage.last?.outcome, .outcomeUnknown)
+
+        var recoveryScript = ScriptedDispatcher.Script()
+        recoveryScript.processRunning = !completed
+        recoveryScript.packageInstalled = !completed
+        recoveryScript.ownedPathPresent = !completed
+        let recoveryDispatcher = ScriptedDispatcher(script: recoveryScript)
+        let (recovered, _, _) = try makeEngine(dispatcher: recoveryDispatcher)
+        _ = try await recovered.recoverPersistedJobs()
+        XCTAssertTrue(recoveryDispatcher.dispatchedActions.isEmpty, "restart itself never dispatches")
+        let failed = try await recovered.reconcile(jobID: accepted.jobID)
+        XCTAssertEqual(failed.state, "failed", failed.timeline.joined(separator: " | "))
+        XCTAssertFalse(failed.outcomeUnknown)
+        XCTAssertEqual(failed.operationFailure?.code, .executionConfirmedNotPerformed)
+        let expected: [String]
+        switch unknownStep {
+        case "stop-ability": expected = ["reconcileProcessPresence", "uninstallPackage", "cleanup"]
+        case "cleanup-uninstall": expected = ["reconcilePackagePresence", "cleanup"]
+        default: expected = ["reconcileOwnedPathPresence"]
+        }
+        XCTAssertEqual(recoveryDispatcher.dispatchedActions, expected)
+        let replay = try hapReplay(accepted.jobID)
+        XCTAssertEqual(replay.events.filter {
+          $0.kind == .compensationIntent && $0.stepID == "compensation-\(unknownStep)"
+        }.count, 1)
+        XCTAssertEqual(replay.events.filter {
+          $0.kind == .compensationOutcome && $0.correlatedIntentEventID == outstanding.eventID
+        }.count, 1)
+        let debts = try await recovered.listCleanupDebt()
+        XCTAssertEqual(debts.count, !completed && unknownStep != "stop-ability" ? 1 : 0)
+        let firstFinalizing = try XCTUnwrap(replay.events.first { $0.stateTransition?.to == .finalizing })
+        XCTAssertFalse(replay.events.contains {
+          $0.sequence > firstFinalizing.sequence
+            && ($0.stateTransition?.to == .running || $0.stateTransition?.to == .resumeAtConfirmedSafeBoundary)
+        })
+        let before = recoveryDispatcher.dispatchedActions
+        _ = try await recovered.reconcile(jobID: accepted.jobID)
+        XCTAssertEqual(recoveryDispatcher.dispatchedActions, before)
+      }
+    }
+  }
+
+  private func hapReplay(_ jobID: String) throws -> JournalReplay {
+    try DurableJournalRecovery.inspect(url: stateDirectory.appending(path: "jobs/\(jobID)/journal.jsonl"))
+  }
+
+  private final class HAPCheckpointCapture: @unchecked Sendable {
+    private let lock = NSLock()
+    private var didCapture = false
+    let source: URL
+    let destination: URL
+    let checkpoint: String
+    init(source: URL, destination: URL, checkpoint: String) {
+      self.source = source; self.destination = destination; self.checkpoint = checkpoint
+    }
+    func capture(_ jobID: String, at checkpoint: String) throws {
+      try lock.withLock {
+        guard checkpoint == self.checkpoint, !didCapture else { return }
+        try FileManager.default.copyItem(at: source, to: destination)
+        didCapture = true
+      }
+    }
+    var captured: Bool { lock.withLock { didCapture } }
+  }
+
+  func testRequiredNormalCleanupFailurePersistsDebtWithoutResendAcrossRestart() async throws {
+    let testRoot = stateDirectory!
+    defer { stateDirectory = testRoot }
+    for checkpoint in ["failureFinalizing", "debt-compensation-cleanup-remote-staging"] {
+      let live = testRoot.appending(path: "normal-cleanup-\(checkpoint)")
+      let snapshot = testRoot.appending(path: "normal-cleanup-snapshot-\(checkpoint)")
+      stateDirectory = live
+      let capture = HAPCheckpointCapture(source: live, destination: snapshot, checkpoint: checkpoint)
+      let dispatcher = ScriptedDispatcher(script: .init(cleanupExit: 1))
+      let (engine, capabilities, artifacts) = try makeEngine(
+        dispatcher: dispatcher,
+        testHooks: .init(debugHAPCheckpoint: { jobID, point in try capture.capture(jobID, at: point) }))
+      let lease = try await publishHAPLease(artifacts)
+      try await installE1Capability(capabilities)
+      let accepted = try await engine.submit(hapRequest(lease: lease))
+      let failed = try await engine.run(jobID: accepted.jobID)
+      XCTAssertEqual(failed.state, "failed", failed.timeline.joined(separator: " | "))
+      XCTAssertEqual(failed.operationFailure?.code, .executionFailed)
+      XCTAssertFalse(failed.outcomeUnknown)
+      XCTAssertEqual(failed.outstandingResidueCount, 1)
+      XCTAssertEqual(dispatcher.dispatchedActions.filter { $0 == "cleanup" }.count, 1)
+      let debts = try await engine.listCleanupDebt()
+      XCTAssertEqual(debts.count, 1)
+      let debt = try XCTUnwrap(debts.first)
+      XCTAssertEqual(debt.stepID, "cleanup-remote-staging")
+      XCTAssertNotNil(debt.persistedAction)
+      let replay = try hapReplay(accepted.jobID)
+      XCTAssertEqual(replay.events.filter {
+        $0.kind == .stepIntent && $0.stepID == "cleanup-remote-staging"
+      }.count, 1)
+      XCTAssertFalse(replay.events.contains { $0.kind == .compensationIntent })
+      XCTAssertTrue(capture.captured, checkpoint)
+
+      // Restore the exact durable bytes before/after debt commit at the
+      // original path, retaining the materialized Artifact identities.
+      try FileManager.default.removeItem(at: live)
+      try FileManager.default.copyItem(at: snapshot, to: live)
+      let recoveryDispatcher = ScriptedDispatcher()
+      let (recovered, recoveredCapabilities, _) = try makeEngine(dispatcher: recoveryDispatcher)
+      _ = try await recovered.recoverPersistedJobs()
+      XCTAssertTrue(recoveryDispatcher.dispatchedActions.isEmpty, checkpoint)
+      let resumed = try await recovered.reconcile(jobID: accepted.jobID)
+      XCTAssertEqual(resumed.state, "failed", "\(checkpoint): \(resumed.timeline)")
+      XCTAssertEqual(resumed.operationFailure?.code, .executionFailed)
+      XCTAssertFalse(resumed.outcomeUnknown)
+      XCTAssertEqual(resumed.outstandingResidueCount, 1)
+      XCTAssertTrue(recoveryDispatcher.dispatchedActions.isEmpty, "confirmed cleanup is never resent")
+      let recoveredDebts = try await recovered.listCleanupDebt()
+      XCTAssertEqual(recoveredDebts, debts, checkpoint)
+      let settledValue = try await recoveredCapabilities.inspect(capabilityID: "CAP-RT-HAP-001")
+      let settled = try XCTUnwrap(settledValue)
+      XCTAssertEqual(settled.consumptionCount, 1)
+      XCTAssertEqual(settled.lineage.last?.outcome, .confirmed)
+      _ = try await recovered.reconcile(jobID: accepted.jobID)
+      XCTAssertTrue(recoveryDispatcher.dispatchedActions.isEmpty)
+      let repeatedDebts = try await recovered.listCleanupDebt()
+      XCTAssertEqual(repeatedDebts, debts, "reconciliation cannot duplicate the original cleanup debt")
+    }
+  }
+
+  func testOptionalNormalCleanupCrashWindowsResumeDebtAndRetainOptionalSuccess() async throws {
+    let testRoot = stateDirectory!
+    defer { stateDirectory = testRoot }
+    for checkpoint in ["beforeDebt-cleanup-uninstall", "debt-compensation-cleanup-uninstall"] {
+      let live = testRoot.appending(path: "optional-cleanup-\(checkpoint)")
+      let snapshot = testRoot.appending(path: "optional-cleanup-snapshot-\(checkpoint)")
+      stateDirectory = live
+      let capture = HAPCheckpointCapture(source: live, destination: snapshot, checkpoint: checkpoint)
+      let dispatcher = ScriptedDispatcher(script: .init(packageInstalledAfterUninstall: true))
+      let (engine, capabilities, artifacts) = try makeEngine(
+        dispatcher: dispatcher,
+        testHooks: .init(debugHAPCheckpoint: { jobID, point in try capture.capture(jobID, at: point) }))
+      let lease = try await publishHAPLease(artifacts)
+      try await installE1Capability(capabilities)
+      let accepted = try await engine.submit(hapRequest(lease: lease))
+      let succeeded = try await engine.run(jobID: accepted.jobID)
+      XCTAssertEqual(succeeded.state, "succeeded", succeeded.timeline.joined(separator: " | "))
+      XCTAssertNil(succeeded.operationFailure)
+      XCTAssertEqual(succeeded.outstandingResidueCount, 1)
+      XCTAssertEqual(dispatcher.dispatchedActions.filter { $0 == "uninstallPackage" }.count, 1)
+      let debts = try await engine.listCleanupDebt()
+      XCTAssertEqual(debts.count, 1)
+      XCTAssertEqual(debts.first?.stepID, "cleanup-uninstall")
+      XCTAssertTrue(capture.captured, checkpoint)
+
+      try FileManager.default.removeItem(at: live)
+      try FileManager.default.copyItem(at: snapshot, to: live)
+      let recoveryDispatcher = ScriptedDispatcher()
+      let (recovered, recoveredCapabilities, _) = try makeEngine(dispatcher: recoveryDispatcher)
+      _ = try await recovered.recoverPersistedJobs()
+      XCTAssertTrue(recoveryDispatcher.dispatchedActions.isEmpty, checkpoint)
+      let before = try await recovered.status(jobID: accepted.jobID)
+      XCTAssertEqual(before.state, "running")
+      XCTAssertFalse(before.outcomeUnknown)
+      XCTAssertNil(before.operationFailure, "normal optional failure does not become the Job failure")
+      let resumed = try await recovered.run(jobID: accepted.jobID)
+      XCTAssertEqual(resumed.state, "succeeded", "\(checkpoint): \(resumed.timeline)")
+      XCTAssertNil(resumed.operationFailure)
+      XCTAssertEqual(resumed.outstandingResidueCount, 1)
+      XCTAssertEqual(recoveryDispatcher.dispatchedActions, ["cleanup"])
+      let recoveredDebts = try await recovered.listCleanupDebt()
+      XCTAssertEqual(recoveredDebts, debts, checkpoint)
+      let replay = try hapReplay(accepted.jobID)
+      XCTAssertEqual(replay.events.filter {
+        $0.kind == .stepIntent && $0.stepID == "cleanup-uninstall"
+      }.count, 1)
+      XCTAssertFalse(replay.events.contains { $0.kind == .compensationIntent })
+      let settledValue = try await recoveredCapabilities.inspect(capabilityID: "CAP-RT-HAP-001")
+      let settled = try XCTUnwrap(settledValue)
+      XCTAssertEqual(settled.consumptionCount, 1)
+      XCTAssertEqual(settled.lineage.last?.outcome, .confirmed)
+      _ = try await recovered.reconcile(jobID: accepted.jobID)
+      let repeatedDebts = try await recovered.listCleanupDebt()
+      XCTAssertEqual(repeatedDebts, debts)
+      XCTAssertEqual(recoveryDispatcher.dispatchedActions, ["cleanup"])
+    }
+  }
+
+  func testOptionalNormalCleanupDebtStorageFailureRemainsResumable() async throws {
+    let debtURL = stateDirectory.appending(path: "artifacts/cleanup-debt.json")
+    let dispatcher = ScriptedDispatcher(script: .init(packageInstalledAfterUninstall: true))
+    let (engine, capabilities, artifacts) = try makeEngine(
+      dispatcher: dispatcher,
+      testHooks: .init(debugHAPCheckpoint: { _, point in
+        if point == "beforeDebt-cleanup-uninstall" {
+          try FileManager.default.createDirectory(at: debtURL, withIntermediateDirectories: false)
+        }
+      }))
+    let lease = try await publishHAPLease(artifacts)
+    try await installE1Capability(capabilities)
+    let accepted = try await engine.submit(hapRequest(lease: lease))
+    do {
+      _ = try await engine.run(jobID: accepted.jobID)
+      XCTFail("the real cleanup ledger write/read failure must remain visible")
+    } catch is RuntimeArtifactError {}
+    XCTAssertEqual(dispatcher.dispatchedActions.filter { $0 == "uninstallPackage" }.count, 1)
+    XCTAssertFalse(dispatcher.dispatchedActions.contains("cleanup"))
+    let pendingValue = try await capabilities.inspect(capabilityID: "CAP-RT-HAP-001")
+    XCTAssertEqual(try XCTUnwrap(pendingValue).lineage.last?.outcome, .pending)
+    try FileManager.default.removeItem(at: debtURL)
+
+    let recoveryDispatcher = ScriptedDispatcher()
+    let (recovered, recoveredCapabilities, _) = try makeEngine(dispatcher: recoveryDispatcher)
+    _ = try await recovered.recoverPersistedJobs()
+    XCTAssertTrue(recoveryDispatcher.dispatchedActions.isEmpty)
+    let succeeded = try await recovered.run(jobID: accepted.jobID)
+    XCTAssertEqual(succeeded.state, "succeeded", succeeded.timeline.joined(separator: " | "))
+    XCTAssertNil(succeeded.operationFailure)
+    XCTAssertEqual(succeeded.outstandingResidueCount, 1)
+    XCTAssertEqual(recoveryDispatcher.dispatchedActions, ["cleanup"])
+    let debts = try await recovered.listCleanupDebt()
+    XCTAssertEqual(debts.count, 1)
+    XCTAssertEqual(debts.first?.stepID, "cleanup-uninstall")
+    let settledValue = try await recoveredCapabilities.inspect(capabilityID: "CAP-RT-HAP-001")
+    XCTAssertEqual(try XCTUnwrap(settledValue).lineage.last?.outcome, .confirmed)
+  }
+
+  func testCompensationIdentityWaitTransitionCrashRestoresExplicitReconciliation() async throws {
+    let testRoot = stateDirectory!
+    defer { stateDirectory = testRoot }
+    let live = testRoot.appending(path: "identity-wait-live")
+    let snapshot = testRoot.appending(path: "identity-wait-snapshot")
+    stateDirectory = live
+    let capture = HAPCheckpointCapture(
+      source: live, destination: snapshot, checkpoint: "compensationWaitingTransition")
+    let facts = SwitchableHAPFactsPort()
+    let dispatcher = ScriptedDispatcher(script: .init(hilogEmpty: true))
+    let (engine, capabilities, artifacts) = try makeEngine(
+      dispatcher: dispatcher,
+      testHooks: .init(debugHAPCheckpoint: { jobID, point in
+        if point == "failureFinalizing" { facts.makeUnavailable() }
+        try capture.capture(jobID, at: point)
+      }), factsPort: facts)
+    let lease = try await publishHAPLease(artifacts)
+    try await installE1Capability(capabilities)
+    let accepted = try await engine.submit(hapRequest(lease: lease))
+    _ = try await engine.run(jobID: accepted.jobID)
+    let parked = try await engine.reconcile(jobID: accepted.jobID)
+    XCTAssertEqual(parked.state, "waitingForRecovery")
+    XCTAssertTrue(parked.outcomeUnknown)
+    XCTAssertTrue(capture.captured)
+    let capturedRecord = try JSONDecoder().decode(RuntimeJobRecord.self, from: Data(
+      contentsOf: snapshot.appending(path: "jobs/\(accepted.jobID)/job-record.json")))
+    XCTAssertEqual(capturedRecord.state, "finalizing")
+    XCTAssertFalse(capturedRecord.outcomeUnknown)
+    XCTAssertNil(capturedRecord.recoveryIntentEventID)
+    try FileManager.default.removeItem(at: live)
+    try FileManager.default.copyItem(at: snapshot, to: live)
+    let before = try hapReplay(accepted.jobID)
+    XCTAssertEqual(before.currentState, .waitingForRecovery)
+    XCTAssertTrue(before.outstandingIntents.isEmpty)
+    XCTAssertTrue(before.unknownOutcomes.isEmpty)
+    XCTAssertFalse(before.events.contains { $0.kind == .compensationIntent })
+
+    let recoveryDispatcher = ScriptedDispatcher()
+    let (recovered, recoveredCapabilities, _) = try makeEngine(dispatcher: recoveryDispatcher)
+    _ = try await recovered.recoverPersistedJobs()
+    XCTAssertTrue(recoveryDispatcher.dispatchedActions.isEmpty)
+    let waiting = try await recovered.status(jobID: accepted.jobID)
+    XCTAssertEqual(waiting.state, "waitingForRecovery")
+    XCTAssertTrue(waiting.outcomeUnknown)
+    XCTAssertEqual(waiting.operationFailure?.code, .executionConfirmedNotPerformed)
+    let failed = try await recovered.reconcile(jobID: accepted.jobID)
+    XCTAssertEqual(failed.state, "failed", failed.timeline.joined(separator: " | "))
+    XCTAssertFalse(failed.outcomeUnknown)
+    XCTAssertEqual(failed.operationFailure?.code, .executionConfirmedNotPerformed)
+    XCTAssertEqual(recoveryDispatcher.dispatchedActions, ["stopAbility", "uninstallPackage", "cleanup"])
+    let after = try hapReplay(accepted.jobID)
+    XCTAssertEqual(after.events.filter { $0.kind == .stepOutcome }.count,
+      before.events.filter { $0.kind == .stepOutcome }.count, "identity proof invents no Provider outcome")
+    XCTAssertEqual(after.events.filter { $0.kind == .compensationIntent }.count, 3)
+    let settledValue = try await recoveredCapabilities.inspect(capabilityID: "CAP-RT-HAP-001")
+    let settled = try XCTUnwrap(settledValue)
+    XCTAssertEqual(settled.consumptionCount, 1)
+    XCTAssertEqual(settled.lineage.last?.outcome, .confirmed)
+  }
+
+  func testFailureCompensationCrashWindowsRetainProgressAndSettleExactlyOnce() async throws {
+    let testRoot = stateDirectory!
+    defer { stateDirectory = testRoot }
+    let checkpoints = [
+      "reconciledOutcome-capture-diagnostics", "failureFinalizing",
+      "intent-compensation-stop-ability", "outcome-compensation-stop-ability",
+      "intent-compensation-cleanup-uninstall", "outcome-compensation-cleanup-uninstall",
+      "debt-compensation-cleanup-uninstall", "intent-compensation-cleanup-remote-staging",
+      "outcome-compensation-cleanup-remote-staging", "debt-compensation-cleanup-remote-staging",
+      "beforeFailureTerminal", "terminalBeforeCapability",
+    ]
+    for checkpoint in checkpoints {
+      let live = testRoot.appending(path: "live-\(checkpoint)")
+      let recoveredDirectory = testRoot.appending(path: "snapshot-\(checkpoint)")
+      stateDirectory = live
+      let capture = HAPCheckpointCapture(source: live, destination: recoveredDirectory, checkpoint: checkpoint)
+      var script = ScriptedDispatcher.Script(hilogEmpty: true)
+      script.packageInstalledAfterUninstall = checkpoint == "debt-compensation-cleanup-uninstall"
+      script.cleanupExit = checkpoint == "debt-compensation-cleanup-remote-staging" ? 1 : 0
+      let (engine, capabilities, artifacts) = try makeEngine(
+        dispatcher: ScriptedDispatcher(script: script),
+        testHooks: .init(debugHAPCheckpoint: { jobID, point in try capture.capture(jobID, at: point) }))
+      let lease = try await publishHAPLease(artifacts)
+      try await installE1Capability(capabilities)
+      let accepted = try await engine.submit(hapRequest(lease: lease))
+      _ = try await engine.run(jobID: accepted.jobID)
+      _ = try await engine.reconcile(jobID: accepted.jobID)
+      XCTAssertTrue(capture.captured, checkpoint)
+      // Restore the captured fixture at the same path: absolute Artifact
+      // locations remain part of the exact materialized authorization.
+      try FileManager.default.removeItem(at: live)
+      try FileManager.default.copyItem(at: recoveredDirectory, to: live)
+      stateDirectory = live
+      let before = try hapReplay(accepted.jobID)
+      let existingCompensationIDs = Set(before.events.filter { $0.kind == .compensationIntent }.compactMap(\.stepID))
+      var recoveryScript = ScriptedDispatcher.Script()
+      recoveryScript.processRunning = false
+      recoveryScript.packageInstalled = false
+      recoveryScript.ownedPathPresent = false
+      let recoveryDispatcher = ScriptedDispatcher(script: recoveryScript)
+      let (recovered, recoveredCapabilities, _) = try makeEngine(dispatcher: recoveryDispatcher)
+      _ = try await recovered.recoverPersistedJobs()
+      XCTAssertTrue(recoveryDispatcher.dispatchedActions.isEmpty, checkpoint)
+      let failed = try await recovered.reconcile(jobID: accepted.jobID)
+      XCTAssertEqual(failed.state, "failed", "\(checkpoint): \(failed.timeline)")
+      XCTAssertEqual(failed.operationFailure?.code, .executionConfirmedNotPerformed, checkpoint)
+      let after = try hapReplay(accepted.jobID)
+      for id in existingCompensationIDs {
+        XCTAssertEqual(after.events.filter { $0.kind == .compensationIntent && $0.stepID == id }.count, 1, checkpoint)
+      }
+      XCTAssertEqual(after.events.filter { $0.kind == .compensationIntent }.count, 3, checkpoint)
+      XCTAssertTrue(after.outstandingIntents.isEmpty, checkpoint)
+      let debts = try await recovered.listCleanupDebt()
+      XCTAssertEqual(debts.count, checkpoint.hasPrefix("debt-") ? 1 : 0, checkpoint)
+      let settledValue = try await recoveredCapabilities.inspect(capabilityID: "CAP-RT-HAP-001")
+      let settled = try XCTUnwrap(settledValue)
+      XCTAssertEqual(settled.consumptionCount, 1, checkpoint)
+      XCTAssertEqual(settled.lineage.last?.outcome, .confirmed, checkpoint)
+      let dispatchCount = recoveryDispatcher.dispatchedActions.count
+      _ = try await recovered.reconcile(jobID: accepted.jobID)
+      XCTAssertEqual(recoveryDispatcher.dispatchedActions.count, dispatchCount, checkpoint)
+      let repeatedDebts = try await recovered.listCleanupDebt()
+      XCTAssertEqual(repeatedDebts.count, debts.count, checkpoint)
+    }
+  }
+
+  func testCompensationJournalRejectsUndeclaredDriftedAndRepeatedDispatchOnAppendAndReplay() async throws {
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: ScriptedDispatcher(script: .init(hilogEmpty: true)))
+    let lease = try await publishHAPLease(artifacts)
+    try await installE1Capability(capabilities)
+    let accepted = try await engine.submit(hapRequest(lease: lease))
+    _ = try await engine.run(jobID: accepted.jobID)
+    _ = try await engine.reconcile(jobID: accepted.jobID)
+    let events = try hapReplay(accepted.jobID).events
+    let index = try XCTUnwrap(events.firstIndex { $0.kind == .compensationIntent })
+    let valid = events[index]
+    let prefix = Array(events.prefix(index))
+    guard case .object(let root) = try JSONDecoder().decode(JSONValue.self, from: JournalEventCodec.encode(valid)),
+      case .object(let payload)? = root["payload"],
+      case .object(let descriptor)? = payload["descriptor"],
+      case .object(let arguments)? = descriptor["arguments"],
+      case .object(let target)? = payload["target"]
+    else { return XCTFail("missing generated compensation fixture") }
+    var variants: [[String: JSONValue]] = []
+    var sourceRoot = root; var sourcePayload = payload
+    sourcePayload["compensationOfStepId"] = .string("send-hap")
+    sourceRoot["payload"] = .object(sourcePayload); variants.append(sourceRoot)
+    var descriptorRoot = root; var descriptorPayload = payload; var changedDescriptor = descriptor
+    changedDescriptor["id"] = .string("undeclared-compensation")
+    descriptorPayload["descriptor"] = .object(changedDescriptor)
+    descriptorRoot["stepId"] = .string("undeclared-compensation")
+    descriptorRoot["payload"] = .object(descriptorPayload); variants.append(descriptorRoot)
+    var argumentRoot = root; var argumentPayload = payload; var argumentDescriptor = descriptor
+    var changedArguments = arguments; changedArguments["bundleName"] = .string("com.example.other")
+    let changedHash = try JournalCanonicalJSON.argumentsHash(changedArguments)
+    argumentDescriptor["arguments"] = .object(changedArguments)
+    argumentDescriptor["argumentsHash"] = .string(changedHash)
+    argumentPayload["descriptor"] = .object(argumentDescriptor)
+    argumentRoot["payload"] = .object(argumentPayload)
+    argumentRoot["argumentsHash"] = .string(changedHash); variants.append(argumentRoot)
+    var targetRoot = root; var targetPayload = payload; var changedTarget = target
+    changedTarget["targetId"] = .string("TGT-other")
+    targetPayload["target"] = .object(changedTarget); targetRoot["payload"] = .object(targetPayload)
+    variants.append(targetRoot)
+    var bindingRoot = root; bindingRoot["bindingRevision"] = .integer(8); variants.append(bindingRoot)
+    for (number, fields) in variants.enumerated() {
+      let invalid = try JournalEventCodec.decode(CanonicalJSONEncoders.canonical().encode(JSONValue.object(fields)))
+      try assertHAPJournalRejects(prefix: prefix, next: invalid, label: "forged-\(number)")
+    }
+    let sourceID = try XCTUnwrap(valid.payload["compensationOfStepId"])
+    XCTAssertEqual(sourceID, .string("start-ability"))
+    let normal = try JournalEvent.stepIntent(
+      eventID: "normal-finalizing-mutation", sequence: valid.sequence,
+      sessionID: valid.sessionID, jobID: valid.jobID, timestamp: valid.timestamp,
+      step: WorkflowStep(id: "illegal-stop", kind: .stopApplication,
+        declaredEffect: .deviceMutation, declaredCancellation: .atSafeBoundary,
+        declaredBindingRequirement: .confirmedDevice, arguments: arguments),
+      target: JournalTarget(scope: "device", targetID: "TGT-1", connectKey: "sha256:fixture",
+        identitySnapshotHash: String(repeating: "a", count: 64)),
+      attempt: 1, bindingRevision: 7)
+    try assertHAPJournalRejects(prefix: prefix, next: normal, label: "ordinary-finalizing")
+    let crossKind = try JournalEvent.stepOutcome(
+      eventID: "wrong-envelope", sequence: valid.sequence + 1,
+      sessionID: valid.sessionID, jobID: valid.jobID, timestamp: valid.timestamp,
+      stepID: try XCTUnwrap(valid.stepID), attempt: 1, correlatesToIntentEventID: valid.eventID,
+      result: "succeeded", outcomeCertainty: .confirmed)
+    try assertHAPJournalRejects(prefix: prefix + [valid], next: crossKind, label: "cross-kind")
+    let outcomeIndex = try XCTUnwrap(events.firstIndex { $0.correlatedIntentEventID == valid.eventID })
+    var duplicateRoot = root
+    duplicateRoot["eventId"] = .string("second-compensation-attempt")
+    duplicateRoot["sequence"] = .integer(Int64(events[outcomeIndex].sequence + 1))
+    let duplicate = try JournalEventCodec.decode(CanonicalJSONEncoders.canonical().encode(JSONValue.object(duplicateRoot)))
+    try assertHAPJournalRejects(prefix: Array(events.prefix(outcomeIndex + 1)), next: duplicate, label: "duplicate")
+  }
+
+  private func assertHAPJournalRejects(prefix: [JournalEvent], next: JournalEvent, label: String) throws {
+    let root = stateDirectory.appending(path: "journal-negative-\(label)")
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    let writer = try FileDurableJournal(url: root.appending(path: "append.jsonl"))
+    for event in prefix { try writer.appendAndSynchronize(event) }
+    XCTAssertThrowsError(try writer.appendAndSynchronize(next), label)
+    var bytes = Data()
+    for event in prefix + [next] {
+      bytes.append(try JournalEventCodec.encode(event)); bytes.append(0x0a)
+    }
+    let cold = root.appending(path: "cold.jsonl")
+    try bytes.write(to: cold)
+    XCTAssertThrowsError(try DurableJournalRecovery.inspect(url: cold), label)
+  }
+
+  func testHistoricalFinalizingJobWithoutDeclarationsNeverBackfillsCompensation() async throws {
+    let live = stateDirectory!
+    let snapshot = live.appendingPathExtension("historical-snapshot")
+    defer { try? FileManager.default.removeItem(at: snapshot) }
+    let capture = HAPCheckpointCapture(source: live, destination: snapshot, checkpoint: "failureFinalizing")
+    let (engine, capabilities, artifacts) = try makeEngine(
+      dispatcher: ScriptedDispatcher(script: .init(hilogEmpty: true)),
+      testHooks: .init(debugHAPCheckpoint: { jobID, point in try capture.capture(jobID, at: point) }))
+    let lease = try await publishHAPLease(artifacts)
+    try await installE1Capability(capabilities)
+    let accepted = try await engine.submit(hapRequest(lease: lease))
+    _ = try await engine.run(jobID: accepted.jobID)
+    _ = try await engine.reconcile(jobID: accepted.jobID)
+    XCTAssertTrue(capture.captured)
+    try FileManager.default.removeItem(at: live)
+    try FileManager.default.copyItem(at: snapshot, to: live)
+    let replay = try hapReplay(accepted.jobID)
+    var bytes = Data()
+    for event in replay.events {
+      guard case .object(var row) = try JSONDecoder().decode(JSONValue.self, from: JournalEventCodec.encode(event)) else {
+        return XCTFail("malformed historical fixture")
+      }
+      if event.kind == .stepIntent, case .object(var payload)? = row["payload"],
+        case .object(var step)? = payload["step"]
+      {
+        step["compensationDescriptors"] = .array([])
+        payload["step"] = .object(step); row["payload"] = .object(payload)
+      }
+      bytes.append(try CanonicalJSONEncoders.canonical().encode(JSONValue.object(row)))
+      bytes.append(0x0a)
+    }
+    try bytes.write(to: live.appending(path: "jobs/\(accepted.jobID)/journal.jsonl"))
+    let dispatcher = ScriptedDispatcher()
+    let (recovered, _, _) = try makeEngine(dispatcher: dispatcher)
+    _ = try await recovered.recoverPersistedJobs()
+    let failed = try await recovered.reconcile(jobID: accepted.jobID)
+    XCTAssertEqual(failed.state, "failed")
+    XCTAssertTrue(dispatcher.dispatchedActions.isEmpty)
+    XCTAssertFalse(try hapReplay(accepted.jobID).events.contains { $0.kind == .compensationIntent })
+  }
+
+  func testHistoricalHAPPartialMutationCannotAcquireAWholeUseSafeToReflashOutcome() async throws {
+    let live = stateDirectory!
+    let snapshot = live.appendingPathExtension("legacy-terminal")
+    defer { try? FileManager.default.removeItem(at: snapshot) }
+    let capture = HAPCheckpointCapture(source: live, destination: snapshot, checkpoint: "terminalBeforeCapability")
+    let (engine, capabilities, artifacts) = try makeEngine(
+      dispatcher: ScriptedDispatcher(script: .init(installConfirmedNotExecuted: true)),
+      testHooks: .init(debugHAPCheckpoint: { jobID, point in try capture.capture(jobID, at: point) }))
+    let lease = try await publishHAPLease(artifacts)
+    try await installE1Capability(capabilities)
+    let accepted = try await engine.submit(hapRequest(lease: lease))
+    _ = try await engine.run(jobID: accepted.jobID)
+    XCTAssertTrue(capture.captured)
+    try FileManager.default.removeItem(at: live)
+    try FileManager.default.copyItem(at: snapshot, to: live)
+    let replay = try hapReplay(accepted.jobID)
+    var bytes = Data(); var sequence = 0
+    for event in replay.events where event.kind != .compensationIntent && event.kind != .compensationOutcome {
+      guard case .object(var row) = try JSONDecoder().decode(JSONValue.self, from: JournalEventCodec.encode(event)) else {
+        return XCTFail("malformed legacy fixture")
+      }
+      row["sequence"] = .integer(Int64(sequence)); sequence += 1
+      if event.kind == .stepIntent, case .object(var payload)? = row["payload"],
+        case .object(var step)? = payload["step"]
+      {
+        step["compensationDescriptors"] = .array([])
+        payload["step"] = .object(step); row["payload"] = .object(payload)
+      }
+      bytes.append(try CanonicalJSONEncoders.canonical().encode(JSONValue.object(row))); bytes.append(0x0a)
+    }
+    try bytes.write(to: live.appending(path: "jobs/\(accepted.jobID)/journal.jsonl"))
+    let dispatcher = ScriptedDispatcher()
+    let (reader, storedCapabilities, _) = try makeEngine(dispatcher: dispatcher)
+    // Inspect the terminal record directly, without the general launch
+    // settlement path: this is the repair branch which formerly inferred a
+    // whole-use safeToReflash from just the last failed install.
+    let before = try await storedCapabilities.inspect(capabilityID: "CAP-RT-HAP-001")
+    XCTAssertEqual(before?.lineage.last?.outcome, .pending)
+    let failed = try await reader.reconcile(jobID: accepted.jobID)
+    XCTAssertEqual(failed.state, "failed")
+    let after = try await storedCapabilities.inspect(capabilityID: "CAP-RT-HAP-001")
+    XCTAssertEqual(after?.lineage.last?.outcome, .pending)
+    XCTAssertFalse(after?.lineage.last?.outcomeHistory.contains { $0.outcome == .safeToReflash } ?? true)
+    XCTAssertTrue(dispatcher.dispatchedActions.isEmpty)
+  }
+
+  func testPublicCleanupLedgerStillAcceptsDistinctResiduesFromTheSameStep() async throws {
+    let (_, _, artifacts) = try makeEngine(dispatcher: ScriptedDispatcher())
+    try await artifacts.recordCleanupDebt(jobID: "job-multi-residue", stepID: "cleanup-many",
+      residue: .remotePath("/data/local/tmp/arkdeck/one"), reason: "first owned residue")
+    try await artifacts.recordCleanupDebt(jobID: "job-multi-residue", stepID: "cleanup-many",
+      residue: .remotePath("/data/local/tmp/arkdeck/two"), reason: "second owned residue")
+    let debts = try await artifacts.outstandingCleanupDebt()
+    XCTAssertEqual(debts.count, 2, "compensation idempotence must not change the existing append API")
+  }
+
+  func testRevokedCompensationCapabilityKeepsFinalizationOpenWithZeroNewIntent() async throws {
+    let dispatcher = ScriptedDispatcher(script: .init(hilogEmpty: true))
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let lease = try await publishHAPLease(artifacts)
+    try await installE1Capability(capabilities)
+    let accepted = try await engine.submit(hapRequest(lease: lease))
+    _ = try await engine.run(jobID: accepted.jobID)
+    try await capabilities.revoke(capabilityID: "CAP-RT-HAP-001", atUTC: "2026-07-29T00:00:00Z", reason: "fixture revocation")
+    let dispatchCount = dispatcher.dispatchedActions.count
+    do {
+      _ = try await engine.reconcile(jobID: accepted.jobID)
+      XCTFail("a revoked use cannot dispatch a compensation")
+    } catch { }
+    let status = try await engine.status(jobID: accepted.jobID)
+    XCTAssertEqual(status.state, "finalizing")
+    XCTAssertEqual(status.operationFailure?.code, .executionConfirmedNotPerformed)
+    XCTAssertEqual(dispatcher.dispatchedActions.count, dispatchCount)
+    XCTAssertFalse(try hapReplay(accepted.jobID).events.contains { $0.kind == .compensationIntent })
+    guard case .object(let next) = try RuntimeJobReadProjection.nextAction(status) else {
+      return XCTFail("missing pending finalization next action")
+    }
+    XCTAssertEqual(next["kind"], .string("reconcile"))
+    XCTAssertNil(next["retryAfter"])
+  }
+
+  /// A revoked owning use can leave a confirmed failure in finalizing before
+  /// any compensation intent exists. Read and wait clients must consume that
+  /// actual Runtime response and return its reconciliation action promptly.
+  func testCLICanReadPendingFailureFinalizationAndStopsWaitingWithoutDispatch() async throws {
+    let dispatcher = ScriptedDispatcher(script: .init(hilogEmpty: true))
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let lease = try await publishHAPLease(artifacts)
+    try await installE1Capability(capabilities)
+    let request = try RuntimeOperationCodec.decodeRequest(
+      hapRequest(lease: lease, key: "idem-hap-finalization-cli",
+        extraInputs: Self.explicitHAPDefaultInputs))
+    let requestBytes = try RuntimeOperationCodec.encodeRequest(request)
+    let accepted = try await engine.submit(requestBytes)
+    _ = try await engine.run(jobID: accepted.jobID)
+    try await capabilities.revoke(capabilityID: "CAP-RT-HAP-001",
+      atUTC: "2026-07-29T00:00:00Z", reason: "fixture revocation before compensation")
+    let dispatchCount = dispatcher.dispatchedActions.count
+    do {
+      _ = try await engine.reconcile(jobID: accepted.jobID)
+      XCTFail("the revoked use must keep compensation undispatched")
+    } catch { }
+    let pending = try await engine.status(jobID: accepted.jobID)
+    XCTAssertEqual(pending.state, "finalizing")
+    XCTAssertFalse(pending.outcomeUnknown)
+    XCTAssertEqual(pending.operationFailure?.code, .executionConfirmedNotPerformed)
+    let capabilityBeforeReads = try await capabilities.inspect(capabilityID: "CAP-RT-HAP-001")
+
+    let inputsFile = stateDirectory.appending(path: "finalization-cli-inputs.json")
+    try PortableCanonicalJSON.canonicalBytes(.object(request.inputs)).write(to: inputsFile)
+    let intent = try AgentExecutionIntent([
+      "schemaVersion": .string(AgentExecutionIntent.schemaVersion),
+      "executionId": .string("execution-hap-finalization-cli"),
+      "operation": .string(request.operation.reference), "inputs": .object(request.inputs),
+      "requestId": .string(request.requestID), "idempotencyKey": .string(request.idempotencyKey),
+      "capabilityReference": .string("CAP-RT-HAP-001"), "maximumWaitMilliseconds": .string("30000"),
+    ])
+    let now = try XCTUnwrap(ISO8601Timestamps.parse("2026-07-29T00:00:00Z"))
+    let created = RuntimeAgentTime.format(now)
+    let deadline = RuntimeAgentTime.format(now.addingTimeInterval(30))
+    let executions = stateDirectory.appending(path: "agent-executions")
+    try RuntimeAgentExecutionStore(directory: executions).save(RuntimeAgentExecutionRecord(
+      schemaVersion: "arkdeck.runtime-agent-execution/1", intent: intent,
+      intentFingerprintSHA256: RuntimeAgentExecutionStore.fingerprint(try intent.canonicalIntent),
+      catalogDigest: RuntimeOperationCatalog.catalogDigest, createdAt: created, deadline: deadline,
+      lastObservedAt: created, generation: 1, state: .jobOwned,
+      target: AgentResolvedTarget(targetID: "TGT-1", bindingRevision: 7),
+      submissionRequest: requestBytes, jobID: accepted.jobID, jobState: pending.state,
+      outcomeUnknown: false, failureCode: nil, actions: [RuntimeAgentHumanAction(
+        actionID: "human-hap-finalization", executionID: intent.executionID,
+        resumeReference: "resume-hap-finalization", kind: .connectDevice,
+        createdAt: created, expiresAt: deadline, status: "resolvedByFreshProbe",
+        resolvedSelection: nil, observation: nil, selections: [])]), expectedGeneration: nil)
+    let targets = try RuntimeTargetStore(directoryURL: stateDirectory.appending(path: "targets"))
+    let port = TargetObservationCoordinatorContractTests.Port()
+    let observations = TargetObservationCoordinator(
+      observation: port, targetStore: targets, usbRelations: { try port.relations() }, nowUTC: { created })
+    let owner = try RuntimeAgentExecutionCoordinator(
+      directory: executions, engine: engine, targets: targets, observations: observations, now: { now })
+    let handler = RuntimeControlPlaneHandler(
+      engine: engine, capabilityStore: capabilities, providerIDs: ["hdc"], nowUTC: { created },
+      targetStore: targets, agentExecutions: owner, artifactStore: artifacts)
+    let controlDirectory = FileManager.default.temporaryDirectory
+      .appending(path: "hf-\(UUID().uuidString.prefix(8))")
+    let server = AgentDaemonServer(stateDirectory: controlDirectory, handler: handler, nowUTC: { created })
+    defer { server.stop(); try? FileManager.default.removeItem(at: controlDirectory) }
+    _ = try server.start()
+
+    func object(_ value: JSONValue?, file: StaticString = #filePath, line: UInt = #line) throws -> [String: JSONValue] {
+      let value = try XCTUnwrap(value, file: file, line: line)
+      guard case .object(let fields) = value else {
+        XCTFail("expected an object", file: file, line: line)
+        throw RuntimeJobEngineError.internalFailure("malformed CLI fixture response")
+      }
+      return fields
+    }
+    func assertNextAction(_ value: JSONValue?, file: StaticString = #filePath, line: UInt = #line) throws {
+      let next = try object(value, file: file, line: line)
+      XCTAssertEqual(Set(next.keys), ["kind", "owner", "resource", "reasonCode"], file: file, line: line)
+      XCTAssertEqual(next["kind"], .string("reconcile"), file: file, line: line)
+      XCTAssertEqual(next["reasonCode"], .string("job.finalizationPending"), file: file, line: line)
+      XCTAssertEqual(next["owner"], .object(["kind": .string("job"), "id": .string(accepted.jobID)]), file: file, line: line)
+      XCTAssertEqual(next["resource"], next["owner"], file: file, line: line)
+      XCTAssertNil(next["retryAfter"], file: file, line: line)
+    }
+    func cli(_ arguments: [String]) throws -> (exit: Int32, envelope: [String: JSONValue]) {
+      let process = Process()
+      process.executableURL = Bundle(for: Self.self).bundleURL.deletingLastPathComponent().appending(path: "arkdeck")
+      process.arguments = arguments + ["--timeout", "500ms", "--output", "json", "--socket", server.socketURL.path]
+      let output = controlDirectory.appending(path: "stdout-\(UUID().uuidString).json")
+      let errors = controlDirectory.appending(path: "stderr-\(UUID().uuidString).txt")
+      FileManager.default.createFile(atPath: output.path, contents: nil)
+      FileManager.default.createFile(atPath: errors.path, contents: nil)
+      let stdout = try FileHandle(forWritingTo: output)
+      let stderr = try FileHandle(forWritingTo: errors)
+      defer { try? stdout.close(); try? stderr.close() }
+      process.standardOutput = stdout; process.standardError = stderr
+      try process.run()
+      let limit = Date().addingTimeInterval(10)
+      while process.isRunning && Date() < limit { Thread.sleep(forTimeInterval: 0.01) }
+      guard !process.isRunning else {
+        process.terminate()
+        throw RuntimeJobEngineError.internalFailure("CLI failed to honor its bounded observation timeout")
+      }
+      do { return (process.terminationStatus, try object(CLIStrictJSON.decode(Data(contentsOf: output)))) }
+      catch {
+        XCTFail("CLI \(arguments.prefix(2)) exited \(process.terminationStatus): "
+          + String(decoding: try Data(contentsOf: errors), as: UTF8.self))
+        throw error
+      }
+    }
+
+    let statusResponse = try await controlPlaneRequest(handler, method: "job.status",
+      params: ["jobId": .string(accepted.jobID)])
+    XCTAssertTrue(statusResponse.ok, statusResponse.error?.message ?? "-")
+    let status = try object(statusResponse.result)
+    let failure = try object(status["failure"])
+    XCTAssertEqual(failure["code"], .string("executionConfirmedNotPerformed"))
+    try assertNextAction(status["nextAction"])
+    let next = try XCTUnwrap(status["nextAction"])
+    XCTAssertTrue(JSONSchemaSubset.validate(next, against: CLIMachineContracts.Schemas.nextAction),
+      "the generated CLI contract must accept the real finalization action")
+    var repository = URL(filePath: #filePath)
+    for _ in 0..<5 { repository = repository.deletingLastPathComponent() }
+    let committedSchema = try CLIStrictJSON.decode(Data(contentsOf:
+      repository.appending(path: "openspec/contracts/cli-next-action.schema.json")))
+    XCTAssertTrue(JSONSchemaSubset.validate(next, against: committedSchema),
+      "the committed CLI contract must accept the same real finalization action")
+    let session = CLIRuntimeSession(client: AgentClient(socketPath: server.socketURL.path), command: "job.status",
+      rendering: .envelope, controlRequestID: "ctl-finalization-cli", lifecycle: .current)
+    XCTAssertNoThrow(try CLIJobReadValidation.validate(.object(status), verb: "status",
+      jobID: accepted.jobID, options: [:], session: session),
+      "a known finalization failure is readable, not recordUnreadable")
+
+    // This continuation is specific to a confirmed HAP failure. Mutating the
+    // observed response tests the consumer boundary without recording a
+    // fabricated producer frame.
+    var invalidStatuses: [[String: JSONValue]] = []
+    for (key, value): (String, JSONValue) in [
+      ("operation", .string("device.observe@1")), ("state", .string("running")),
+      ("state", .string("waitingForRecovery")), ("outcomeUnknown", .bool(true)),
+      ("waitingForHuman", .bool(true)), ("failure", .null),
+    ] {
+      var invalid = status
+      invalid[key] = value
+      invalidStatuses.append(invalid)
+    }
+    var uncertainFailure = failure
+    uncertainFailure["code"] = .string("outcomeUnknown")
+    var invalidFailure = status
+    invalidFailure["failure"] = .object(uncertainFailure)
+    invalidStatuses.append(invalidFailure)
+    var invalidNext = try object(status["nextAction"])
+    invalidNext["retryAfter"] = .string("250ms")
+    var invalidHint = status
+    invalidHint["nextAction"] = .object(invalidNext)
+    invalidStatuses.append(invalidHint)
+    for invalid in invalidStatuses {
+      XCTAssertThrowsError(try CLIJobReadValidation.validate(.object(invalid), verb: "status",
+        jobID: accepted.jobID, options: [:], session: session),
+        "finalization continuation must reject inconsistent Job facts")
+    }
+
+    for verb in ["status", "show", "list"] {
+      let arguments = verb == "list" ? ["job", verb, "--include-current"] : ["job", verb, "--job", accepted.jobID]
+      let reply = try cli(arguments)
+      XCTAssertEqual(reply.exit, 0, "job \(verb) must remain a successful read")
+      XCTAssertEqual(reply.envelope["ok"], .bool(true), "job \(verb): \(reply.envelope)")
+      guard case .object(let result)? = reply.envelope["result"] else { continue }
+      let job: [String: JSONValue]
+      if verb == "show" { job = try object(result["job"]) }
+      else if verb == "list" {
+        guard case .array(let rows)? = result["items"], rows.count == 1 else {
+          XCTFail("the Job list must retain its pending finalization"); continue
+        }
+        job = try object(rows.first)
+      } else { job = result }
+      XCTAssertEqual(job["state"], .string("finalizing"))
+      XCTAssertEqual(job["outcomeUnknown"], .bool(false))
+      XCTAssertEqual(job["failure"], .object(failure))
+      try assertNextAction(job["nextAction"])
+    }
+    let agentStatus = try cli(["agent", "status", "--execution-id", intent.executionID])
+    XCTAssertEqual(agentStatus.exit, 0)
+    XCTAssertEqual(agentStatus.envelope["ok"], .bool(true))
+    if case .object(let execution)? = agentStatus.envelope["result"] {
+      XCTAssertEqual(execution["jobState"], .string("finalizing"))
+      XCTAssertEqual(execution["outcomeUnknown"], .bool(false))
+      try assertNextAction(execution["nextAction"])
+    }
+
+    let agentRun = ["agent", "run", "--execution-id", intent.executionID,
+      "--operation", request.operation.reference, "--inputs-file", inputsFile.path,
+      "--request-id", request.requestID, "--idempotency-key", request.idempotencyKey,
+      "--capability", "CAP-RT-HAP-001", "--maximum-wait", "30s"]
+    for arguments in [
+      ["job", "result", "--job", accepted.jobID], ["job", "wait", "--job", accepted.jobID], agentRun,
+      ["agent", "resume", "--resume-reference", "resume-hap-finalization"],
+      ["human-action", "resume", "--human-action", "human-hap-finalization",
+        "--resume-reference", "resume-hap-finalization"],
+    ] {
+      let reply = try cli(arguments)
+      let command = arguments.prefix(2).joined(separator: " ")
+      XCTAssertEqual(reply.exit, 75, command)
+      XCTAssertEqual(reply.envelope["ok"], .bool(false), command)
+      guard case .object(let error)? = reply.envelope["error"] else {
+        XCTFail("\(command) must explain why finalization needs attention"); continue
+      }
+      XCTAssertEqual(error["code"], .string("resultNotReady"),
+        "\(command) must request reconciliation, not reject the record or poll until clientTimeout")
+      if arguments[1] != "result", case .string(let message)? = error["message"] {
+        XCTAssertTrue(message.lowercased().contains("reconcil"), "\(command) must describe its explicit continuation")
+      }
+      guard case .object(let details)? = error["details"] else {
+        XCTFail("\(command) must retain its exact reconciliation action"); continue
+      }
+      if arguments[0] == "job" { try assertNextAction(details["nextAction"]) }
+      else if case .object(let execution)? = details["execution"] {
+        XCTAssertEqual(execution["jobState"], .string("finalizing"))
+        XCTAssertEqual(execution["outcomeUnknown"], .bool(false))
+        try assertNextAction(execution["nextAction"])
+      } else { XCTFail("\(command) must retain its exact execution and reconciliation action") }
+    }
+    let finalStatus = try await engine.status(jobID: accepted.jobID)
+    XCTAssertEqual(finalStatus.state, "finalizing")
+    XCTAssertEqual(finalStatus.operationFailure, pending.operationFailure)
+    XCTAssertEqual(dispatcher.dispatchedActions.count, dispatchCount)
+    XCTAssertFalse(try hapReplay(accepted.jobID).events.contains { $0.kind == .compensationIntent })
+    let capability = try await capabilities.inspect(capabilityID: "CAP-RT-HAP-001")
+    XCTAssertEqual(capability, capabilityBeforeReads,
+      "reads must retain the unsettled lineage, including the earlier unknown diagnostic outcome")
   }
 
   func testCleanupDebtCanBeQueriedAndExplicitlyContinued() async throws {
@@ -3008,6 +3900,142 @@ extension DiagnosticsAndHAPContractTests {
       dispatcher.dispatchedActions.contains("sendArtifact"),
       "the single-package leg must not also run")
   }
+
+  /// The same nonempty package-set fixture also crosses the failure lane.
+  /// Its admitted plan, source declaration and cleanup must keep the entire
+  /// set, and real readers must retain every published HAP input.
+  func testMultiPackageFailureFinalizationPublishesItsDeclaredCleanupAndTypedRequest() async throws {
+    let dispatcher = ScriptedDispatcher(script: .init(hilogEmpty: true))
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let entryLease = try await publishHAPLease(artifacts)
+    let feature = try await artifacts.publish(RuntimeArtifactPublicationRequest(
+      jobID: "job-input-hap", sessionID: "session-input-hap", stepID: "publish-hap",
+      name: "feature1.hap", mediaType: "application/octet-stream", privacy: .standard,
+      retentionClass: .pinnedUntilVerified, sourceOperation: "build.hap@1", providerID: "host",
+      bindingSnapshot: ArtifactBindingSnapshot(targetID: "TGT-1", bindingRevision: 7,
+        stableIdentitySHA256: "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1"),
+      contents: Data("feature-module".utf8)))
+    let featureLease = try await artifacts.leaseReference(jobID: feature.jobID, artifactID: feature.artifactID)
+    let inputs = Self.explicitHAPDefaultInputs
+      + ", \"additionalHapArtifactLeases\": [\"\(featureLease)\"]"
+    let request = try RuntimeOperationCodec.decodeRequest(hapRequest(
+      lease: entryLease, key: "idem-multi-failure", extraInputs: inputs))
+    let requestBytes = try RuntimeOperationCodec.encodeRequest(request)
+    let descriptor = try XCTUnwrap(RuntimeOperationCatalog.descriptor(reference: request.operation.reference))
+    XCTAssertEqual(Set(request.inputs.keys), Set(descriptor.inputs.map(\.name)),
+      "record a nonempty additional lease and all six published scalar defaults")
+    let singlePlan = try await engine.planOnly(hapRequest(
+      lease: entryLease, key: "idem-multi-failure", capability: nil,
+      extraInputs: Self.explicitHAPDefaultInputs))
+    let completePlan = try await engine.planOnly(hapRequest(
+      lease: entryLease, key: "idem-multi-failure", capability: nil, extraInputs: inputs))
+    XCTAssertNotEqual(singlePlan.materializedPlanDigest, completePlan.materializedPlanDigest,
+      "the additional Artifact and package-set lowering must change the complete plan")
+    XCTAssertTrue(dispatcher.dispatchedActions.isEmpty)
+    try await installE1Capability(capabilities)
+    let accepted = try await engine.submit(requestBytes)
+    let unknown = try await engine.run(jobID: accepted.jobID)
+    XCTAssertEqual(unknown.state, "waitingForRecovery")
+    let beforeFinalization = dispatcher.dispatchedActions.count
+    let failed = try await engine.reconcile(jobID: accepted.jobID)
+    XCTAssertEqual(failed.state, "failed")
+    XCTAssertEqual(failed.operationFailure?.code, .executionConfirmedNotPerformed)
+    XCTAssertFalse(failed.outcomeUnknown)
+    XCTAssertEqual(Array(dispatcher.dispatchedActions.dropFirst(beforeFinalization)),
+      ["stopAbility", "uninstallPackage", "cleanupPackageSet"])
+    for action in ["sendPackageSet", "installPackageSet", "cleanupPackageSet"] {
+      XCTAssertEqual(dispatcher.dispatchedActions.filter { $0 == action }.count, 1, action)
+    }
+    XCTAssertFalse(dispatcher.dispatchedActions.contains("sendArtifact"))
+    XCTAssertFalse(dispatcher.dispatchedActions.contains("cleanup"))
+
+    let replay = try hapReplay(accepted.jobID)
+    let source = try XCTUnwrap(replay.events.first { $0.kind == .stepIntent && $0.stepID == "send-hap" })
+    let sourceStep = try JournalCanonicalJSON.decodeWorkflowStep(XCTUnwrap(source.payload["step"]))
+    let declaration = try XCTUnwrap(sourceStep.compensationDescriptors.first {
+      $0.id == "compensation-cleanup-remote-staging"
+    })
+    XCTAssertEqual(declaration.kind, .cleanupOwnedRemotePath)
+    XCTAssertEqual(declaration.arguments["remotePath"], sourceStep.arguments["remotePath"])
+    guard case .string(let directory)? = declaration.arguments["remotePath"] else {
+      return XCTFail("package compensation must retain the owned staging directory")
+    }
+    XCTAssertTrue(directory.contains(accepted.jobID))
+    XCTAssertTrue(directory.hasSuffix("-packages"))
+    let cleanup = try XCTUnwrap(replay.events.first {
+      $0.kind == .compensationIntent && $0.stepID == declaration.id
+    })
+    XCTAssertEqual(cleanup.payload["compensationOfStepId"], .string("send-hap"))
+    XCTAssertEqual(try JournalCanonicalJSON.decodeCompensation(XCTUnwrap(cleanup.payload["descriptor"])), declaration)
+    XCTAssertEqual(cleanup.argumentsHash, declaration.argumentsHash)
+    XCTAssertEqual(cleanup.payload["target"], source.payload["target"])
+    XCTAssertEqual(cleanup.bindingRevision, source.bindingRevision)
+    let firstFinalizing = try XCTUnwrap(replay.events.first { $0.stateTransition?.to == .finalizing })
+    XCTAssertLessThan(source.sequence, firstFinalizing.sequence)
+    XCTAssertGreaterThan(cleanup.sequence, firstFinalizing.sequence)
+    XCTAssertFalse(replay.events.contains { $0.sequence > firstFinalizing.sequence && $0.kind == .stepIntent })
+    XCTAssertTrue(replay.outstandingIntents.isEmpty)
+    XCTAssertTrue(replay.unknownOutcomes.isEmpty)
+    let capability = try await capabilities.inspect(capabilityID: "CAP-RT-HAP-001")
+    XCTAssertEqual(capability?.lineage.last?.materializedPlanDigest, completePlan.materializedPlanDigest)
+    XCTAssertEqual(capability?.lineage.last?.outcome, .confirmed)
+
+    let intent = try AgentExecutionIntent([
+      "schemaVersion": .string(AgentExecutionIntent.schemaVersion),
+      "executionId": .string("execution-hap-multi-failure"), "operation": .string(request.operation.reference),
+      "inputs": .object(request.inputs), "requestId": .string(request.requestID),
+      "idempotencyKey": .string(request.idempotencyKey), "capabilityReference": .string("CAP-RT-HAP-001"),
+      "maximumWaitMilliseconds": .string("30000"),
+    ])
+    let now = try XCTUnwrap(ISO8601Timestamps.parse("2026-07-29T00:00:00Z"))
+    let created = RuntimeAgentTime.format(now)
+    let executions = stateDirectory.appending(path: "agent-executions")
+    try RuntimeAgentExecutionStore(directory: executions).save(RuntimeAgentExecutionRecord(
+      schemaVersion: "arkdeck.runtime-agent-execution/1", intent: intent,
+      intentFingerprintSHA256: RuntimeAgentExecutionStore.fingerprint(try intent.canonicalIntent),
+      catalogDigest: RuntimeOperationCatalog.catalogDigest, createdAt: created,
+      deadline: RuntimeAgentTime.format(now.addingTimeInterval(30)), lastObservedAt: created,
+      generation: 1, state: .completed, target: AgentResolvedTarget(targetID: "TGT-1", bindingRevision: 7),
+      submissionRequest: requestBytes, jobID: accepted.jobID, jobState: failed.state,
+      outcomeUnknown: false, failureCode: nil, actions: []), expectedGeneration: nil)
+    let targets = try RuntimeTargetStore(directoryURL: stateDirectory.appending(path: "targets"))
+    let port = TargetObservationCoordinatorContractTests.Port()
+    let observations = TargetObservationCoordinator(
+      observation: port, targetStore: targets, usbRelations: { try port.relations() }, nowUTC: { created })
+    let owner = try RuntimeAgentExecutionCoordinator(
+      directory: executions, engine: engine, targets: targets, observations: observations, now: { now })
+    let handler = RuntimeControlPlaneHandler(
+      engine: engine, capabilityStore: capabilities, providerIDs: ["hdc"], nowUTC: { created },
+      targetStore: targets, agentExecutions: owner, artifactStore: artifacts)
+    let dispatchCount = dispatcher.dispatchedActions.count
+    let shownResponse = try await controlPlaneRequest(handler, method: "job.show",
+      params: ["jobId": .string(accepted.jobID)])
+    XCTAssertTrue(shownResponse.ok, shownResponse.error?.message ?? "-")
+    guard case .object(let shown)? = shownResponse.result,
+      case .object(let shownRequest)? = shown["request"], case .object(let shownJob)? = shown["job"]
+    else { return XCTFail("the actual failed multi-package request must remain readable") }
+    XCTAssertEqual(shownRequest["inputs"], .object(request.inputs))
+    XCTAssertEqual(shown["materializedPlanDigest"], .string(completePlan.materializedPlanDigest))
+    XCTAssertEqual(shownJob["state"], .string("failed"))
+    let resumed = try await controlPlaneRequest(handler, method: "agent.run", params: intent.fields)
+    XCTAssertTrue(resumed.ok, resumed.error?.message ?? "-")
+    guard case .object(let execution)? = resumed.result else { return XCTFail("the existing multi-package Job must be read") }
+    XCTAssertEqual(execution["state"], .string("completed"))
+    XCTAssertEqual(execution["jobState"], .string("failed"))
+    for method in ["job.evidence", "job.result"] {
+      let response = try await controlPlaneRequest(handler, method: method,
+        params: ["jobId": .string(accepted.jobID)])
+      XCTAssertTrue(response.ok, "\(method): \(response.error?.message ?? "-")")
+      guard case .object(let fields)? = response.result else { return XCTFail("missing \(method) result") }
+      let evidence: [String: JSONValue]
+      if method == "job.result" {
+        guard case .object(let nested)? = fields["evidence"] else { return XCTFail("missing result evidence") }
+        evidence = nested
+      } else { evidence = fields }
+      XCTAssertEqual(evidence["parameters"], .object(request.inputs))
+    }
+    XCTAssertEqual(dispatcher.dispatchedActions.count, dispatchCount)
+  }
 }
 
 // MARK: - CHG-2026-049 r5: screenshot
@@ -3343,6 +4371,229 @@ extension DiagnosticsAndHAPContractTests {
       "reconciliation dispatches only the dedicated readback, never resends the mutation")
   }
 
+  /// A resolved physical-action reference remains a read of its exact owning
+  /// Job. Exercise real producer frames for compensation recovery and failed
+  /// completion, including nextAction's intentionally absent retryAfter.
+  func testAgentResumeReadsUnknownCompensationAndFailedResultWithoutNewDispatch() async throws {
+    let dispatcher = ScriptedDispatcher(script: .init(hilogEmpty: true, stopOutcomeUnknown: true))
+    let (engine, capabilities, artifacts) = try makeEngine(dispatcher: dispatcher)
+    let lease = try await publishHAPLease(artifacts)
+    try await installE1Capability(capabilities)
+    let request = try RuntimeOperationCodec.decodeRequest(
+      hapRequest(lease: lease, key: "idem-hap-agent-resume",
+        extraInputs: Self.explicitHAPDefaultInputs))
+    let requestBytes = try RuntimeOperationCodec.encodeRequest(request)
+    let accepted = try await engine.submit(requestBytes)
+    _ = try await engine.run(jobID: accepted.jobID)
+    let parked = try await engine.reconcile(jobID: accepted.jobID)
+    XCTAssertEqual(parked.state, "waitingForRecovery")
+    let intentFields: [String: JSONValue] = [
+      "schemaVersion": .string(AgentExecutionIntent.schemaVersion),
+      "executionId": .string("execution-hap-compensation"), "operation": .string("debug.hap@1"),
+      "inputs": .object(request.inputs), "requestId": .string(request.requestID),
+      "idempotencyKey": .string(request.idempotencyKey),
+      "capabilityReference": .string("CAP-RT-HAP-001"),
+      "maximumWaitMilliseconds": .string("30000"),
+    ]
+    let intent = try AgentExecutionIntent(intentFields)
+    let now = try XCTUnwrap(ISO8601Timestamps.parse("2026-07-29T00:00:00Z"))
+    let created = RuntimeAgentTime.format(now)
+    let deadline = RuntimeAgentTime.format(now.addingTimeInterval(30))
+    let executions = stateDirectory.appending(path: "agent-executions")
+    let store = try RuntimeAgentExecutionStore(directory: executions)
+    try store.save(RuntimeAgentExecutionRecord(
+      schemaVersion: "arkdeck.runtime-agent-execution/1", intent: intent,
+      intentFingerprintSHA256: RuntimeAgentExecutionStore.fingerprint(try intent.canonicalIntent),
+      catalogDigest: RuntimeOperationCatalog.catalogDigest, createdAt: created, deadline: deadline,
+      lastObservedAt: created, generation: 1, state: .jobOwned,
+      target: AgentResolvedTarget(targetID: "TGT-1", bindingRevision: 7),
+      submissionRequest: requestBytes, jobID: accepted.jobID, jobState: parked.state,
+      outcomeUnknown: true, failureCode: nil, actions: [RuntimeAgentHumanAction(
+        actionID: "human-hap-connected", executionID: intent.executionID,
+        resumeReference: "resume-hap-connected", kind: .connectDevice,
+        createdAt: created, expiresAt: deadline, status: "resolvedByFreshProbe",
+        resolvedSelection: nil, observation: nil, selections: [])]), expectedGeneration: nil)
+
+    func handler(_ selectedEngine: RuntimeJobEngine, _ capabilities: RuntimeCapabilityStore,
+      _ artifacts: RuntimeArtifactStore) throws -> RuntimeControlPlaneHandler
+    {
+      let targets = try RuntimeTargetStore(directoryURL: stateDirectory.appending(path: "targets"))
+      let port = TargetObservationCoordinatorContractTests.Port()
+      let observations = TargetObservationCoordinator(
+        observation: port, targetStore: targets, usbRelations: { try port.relations() }, nowUTC: { created })
+      let owner = try RuntimeAgentExecutionCoordinator(
+        directory: executions, engine: selectedEngine, targets: targets, observations: observations, now: { now })
+      return RuntimeControlPlaneHandler(
+        engine: selectedEngine, capabilityStore: capabilities, providerIDs: ["hdc"], nowUTC: { created },
+        targetStore: targets, agentExecutions: owner, artifactStore: artifacts)
+    }
+    let waitingHandler = try handler(engine, capabilities, artifacts)
+    let count = dispatcher.dispatchedActions.count
+    let waiting = try await controlPlaneRequest(waitingHandler, method: "agent.resume",
+      params: ["resumeReference": .string("resume-hap-connected")])
+    XCTAssertTrue(waiting.ok, waiting.error?.message ?? "-")
+    guard case .object(let waitingFields)? = waiting.result,
+      case .object(let waitingNext)? = waitingFields["nextAction"]
+    else { return XCTFail("agent.resume did not publish its Job recovery action") }
+    XCTAssertEqual(waitingFields["jobState"], .string("waitingForRecovery"))
+    XCTAssertEqual(waitingNext["kind"], .string("reconcile"))
+    XCTAssertNil(waitingNext["retryAfter"])
+    XCTAssertEqual(dispatcher.dispatchedActions.count, count)
+
+    for (method, params) in [
+      ("agent.status", ["executionId": JSONValue.string(intent.executionID)]),
+      ("agent.run", intentFields),
+      ("human-action.resume", ["humanAction": .string("human-hap-connected"),
+        "resumeReference": .string("resume-hap-connected")]),
+    ] {
+      let response = try await controlPlaneRequest(waitingHandler, method: method, params: params)
+      XCTAssertTrue(response.ok, "\(method): \(response.error?.message ?? "-")")
+      guard case .object(let fields)? = response.result,
+        case .object(let next)? = fields["nextAction"]
+      else { return XCTFail("\(method) did not expose its current Job") }
+      XCTAssertEqual(fields["jobState"], .string("waitingForRecovery"))
+      XCTAssertEqual(next["kind"], .string("reconcile"))
+      XCTAssertNil(next["retryAfter"])
+      XCTAssertNil(fields["evidence"], "nonterminal Agent reads do not invent final evidence")
+      XCTAssertNil(fields["artifacts"])
+    }
+    let listed = try await controlPlaneRequest(waitingHandler, method: "agent.list")
+    XCTAssertTrue(listed.ok, listed.error?.message ?? "-")
+    guard case .object(let page)? = listed.result, case .array(let items)? = page["items"],
+      case .object(let listedExecution)? = items.first,
+      case .object(let listedNext)? = listedExecution["nextAction"]
+    else { return XCTFail("agent.list did not expose the persisted execution row") }
+    XCTAssertEqual(listedExecution["executionId"], .string(intent.executionID))
+    XCTAssertEqual(listedExecution["state"], .string("jobOwned"))
+    XCTAssertEqual(listedNext["kind"], .string("reconcile"))
+    XCTAssertNil(listedNext["retryAfter"])
+
+    let waitingEvidenceResponse = try await controlPlaneRequest(waitingHandler, method: "job.evidence",
+      params: ["jobId": .string(accepted.jobID)])
+    XCTAssertTrue(waitingEvidenceResponse.ok, waitingEvidenceResponse.error?.message ?? "-")
+    guard case .object(let waitingEvidence)? = waitingEvidenceResponse.result,
+      case .object(let authority)? = waitingEvidence["authority"]
+    else { return XCTFail("mutating Job evidence lost its admission authority") }
+    XCTAssertEqual(authority["kind"], .string("runtimeCapability"))
+    XCTAssertEqual(authority["reference"], .string("CAP-RT-HAP-001"))
+    XCTAssertEqual(authority["useOrdinal"], .integer(1))
+    for key in ["reservationId", "planDigest", "stepSetDigest", "targetBindingDigest",
+      "artifactDigest", "consumptionFingerprintSha256"]
+    {
+      guard case .string(let value)? = authority[key] else {
+        return XCTFail("Runtime capability evidence lost \(key)")
+      }
+      XCTAssertFalse(value.isEmpty, key)
+    }
+    let waitingShow = try await controlPlaneRequest(waitingHandler, method: "job.show",
+      params: ["jobId": .string(accepted.jobID)])
+    XCTAssertTrue(waitingShow.ok, waitingShow.error?.message ?? "-")
+    guard case .object(let waitingShown)? = waitingShow.result,
+      case .object(let waitingShownJob)? = waitingShown["job"],
+      case .object(let shownRequest)? = waitingShown["request"],
+      case .object(let shownAuthorization)? = shownRequest["authorization"]
+    else { return XCTFail("job.show did not retain its typed authorized HAP request") }
+    XCTAssertEqual(waitingShownJob["state"], .string("waitingForRecovery"))
+    XCTAssertEqual(shownRequest["inputs"], .object(request.inputs))
+    XCTAssertEqual(shownAuthorization["capabilityId"], .string("CAP-RT-HAP-001"))
+    let notReady = try await controlPlaneRequest(waitingHandler, method: "job.result",
+      params: ["jobId": .string(accepted.jobID)])
+    XCTAssertFalse(notReady.ok)
+    XCTAssertEqual(notReady.error?.code, "resultNotReady")
+    guard case .object(let recoveryNext)? = notReady.error?.details?["nextAction"] else {
+      return XCTFail("nonterminal job.result must retain its recovery action")
+    }
+    XCTAssertEqual(recoveryNext["kind"], .string("reconcile"))
+    XCTAssertNil(recoveryNext["retryAfter"])
+    let abandon = try await controlPlaneRequest(waitingHandler, method: "agent.abandon",
+      params: ["executionId": .string(intent.executionID), "expectedGeneration": .string("1")])
+    XCTAssertFalse(abandon.ok)
+    XCTAssertEqual(abandon.error?.code, "resourceConflict")
+    XCTAssertEqual(abandon.error?.details?["jobId"], .string(accepted.jobID))
+    XCTAssertEqual(abandon.error?.details?["newDispatchCount"], .integer(0))
+    XCTAssertEqual(dispatcher.dispatchedActions.count, count)
+
+    let recoveryDispatcher = ScriptedDispatcher(script: .init(processRunning: false))
+    let (recovered, recoveredCapabilities, recoveredArtifacts) = try makeEngine(dispatcher: recoveryDispatcher)
+    _ = try await recovered.recoverPersistedJobs()
+    let terminalHandler = try handler(recovered, recoveredCapabilities, recoveredArtifacts)
+    let reconciled = try await controlPlaneRequest(terminalHandler, method: "job.reconcile",
+      params: ["jobId": .string(accepted.jobID)])
+    XCTAssertTrue(reconciled.ok, reconciled.error?.message ?? "-")
+    guard case .object(let status)? = reconciled.result,
+      case .object(let failure)? = status["failure"]
+    else { return XCTFail("failed reconciliation must retain the original structured failure") }
+    XCTAssertEqual(status["state"], .string("failed"))
+    XCTAssertEqual(failure["code"], .string("executionConfirmedNotPerformed"))
+    let dispatchCount = recoveryDispatcher.dispatchedActions.count
+    let terminal = try await controlPlaneRequest(terminalHandler, method: "agent.resume",
+      params: ["resumeReference": .string("resume-hap-connected")])
+    XCTAssertTrue(terminal.ok, terminal.error?.message ?? "-")
+    guard case .object(let terminalFields)? = terminal.result,
+      case .object(let next)? = terminalFields["nextAction"]
+    else { return XCTFail("terminal resume must read its exact failed Job") }
+    XCTAssertEqual(terminalFields["jobState"], .string("failed"))
+    XCTAssertEqual(next["kind"], .string("readResult"))
+    XCTAssertNil(next["retryAfter"])
+    let result = try await controlPlaneRequest(terminalHandler, method: "job.result",
+      params: ["jobId": .string(accepted.jobID)])
+    XCTAssertTrue(result.ok, result.error?.message ?? "-")
+    guard case .object(let resultFields)? = result.result,
+      case .object(let resultJob)? = resultFields["job"]
+    else { return XCTFail("a failed terminal Job still has a readable result") }
+    XCTAssertEqual(resultJob["state"], .string("failed"))
+    XCTAssertEqual(resultJob["failure"], .object(failure))
+    XCTAssertEqual(resultFields["terminal"], .bool(true))
+    XCTAssertEqual(resultFields["outcomeUnknown"], .bool(false))
+    XCTAssertEqual(resultFields["cleanup"], .array([]))
+    XCTAssertEqual(resultFields["nextAction"], .null)
+    guard case .object(let resultEvidence)? = resultFields["evidence"] else {
+      return XCTFail("terminal Job result did not expose its evidence")
+    }
+    XCTAssertEqual(resultEvidence["authority"], .object(authority))
+    guard case .object(let resumeEvidence)? = terminalFields["evidence"] else {
+      return XCTFail("terminal Agent resume did not expose its evidence")
+    }
+    XCTAssertEqual(resumeEvidence["authority"], .object(authority))
+    for (method, params) in [
+      ("agent.status", ["executionId": JSONValue.string(intent.executionID)]),
+      ("agent.run", intentFields),
+      ("human-action.resume", ["humanAction": .string("human-hap-connected"),
+        "resumeReference": .string("resume-hap-connected")]),
+    ] {
+      let response = try await controlPlaneRequest(terminalHandler, method: method, params: params)
+      XCTAssertTrue(response.ok, "\(method): \(response.error?.message ?? "-")")
+      guard case .object(let fields)? = response.result,
+        case .object(let evidence)? = fields["evidence"],
+        case .object(let next)? = fields["nextAction"]
+      else { return XCTFail("\(method) did not expose its terminal Job evidence") }
+      XCTAssertEqual(fields["jobState"], .string("failed"))
+      XCTAssertEqual(evidence["authority"], .object(authority))
+      XCTAssertEqual(next["kind"], .string("readResult"))
+      XCTAssertNil(next["retryAfter"])
+      guard case .array? = fields["artifacts"] else {
+        return XCTFail("\(method) did not expose its terminal Artifact inventory")
+      }
+    }
+    let terminalEvidenceResponse = try await controlPlaneRequest(terminalHandler, method: "job.evidence",
+      params: ["jobId": .string(accepted.jobID)])
+    XCTAssertTrue(terminalEvidenceResponse.ok, terminalEvidenceResponse.error?.message ?? "-")
+    guard case .object(let terminalEvidence)? = terminalEvidenceResponse.result else {
+      return XCTFail("job.evidence did not expose the terminal snapshot")
+    }
+    XCTAssertEqual(terminalEvidence["authority"], .object(authority))
+    let terminalShow = try await controlPlaneRequest(terminalHandler, method: "job.show",
+      params: ["jobId": .string(accepted.jobID)])
+    XCTAssertTrue(terminalShow.ok, terminalShow.error?.message ?? "-")
+    guard case .object(let terminalShown)? = terminalShow.result,
+      case .object(let terminalShownJob)? = terminalShown["job"]
+    else { return XCTFail("job.show did not expose the failed terminal Job") }
+    XCTAssertEqual(terminalShownJob["state"], .string("failed"))
+    XCTAssertEqual(terminalShownJob["failure"], .object(failure))
+    XCTAssertEqual(terminalShown["request"], .object(shownRequest))
+    XCTAssertEqual(recoveryDispatcher.dispatchedActions.count, dispatchCount)
+  }
+
   /// `capability.inspect`: one installed E1 capability, read back by identity.
   func testCapabilityInspectPublishesItsResultShapeThroughTheControlPlane() async throws {
     let (engine, capabilities, artifacts) = try makeEngine(dispatcher: ScriptedDispatcher())
@@ -3387,4 +4638,3 @@ extension DiagnosticsAndHAPContractTests {
     XCTAssertEqual(parameters.count, TraceDebugParameterCatalog.definitions.count)
   }
 }
-

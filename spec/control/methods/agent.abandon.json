@@ -10,6 +10,7 @@
         "operationUnavailable",
         "recordUnreadable",
         "rejected",
+        "resourceConflict",
         "unknownMethod",
         "unsupportedProtocolVersion",
         "workspaceReferenceNotFound"
@@ -18,6 +19,9 @@
     "errorDetails": {
       "additionalProperties": false,
       "properties": {
+        "jobId": {
+          "type": "string"
+        },
         "newDispatchCount": {
           "type": "integer"
         },
@@ -128,8 +132,8 @@
   "x-arkdeck-method": "agent.abandon",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 1,
-    "request": 2,
-    "result": 1
+    "error": 3,
+    "request": 6,
+    "result": 3
   }
 }

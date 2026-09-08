@@ -1807,6 +1807,25 @@ public actor RuntimeArtifactStore {
     try persistCleanupDebt(debts)
   }
 
+  /// Only the predeclared compensation bookkeeping path uses this guard.
+  /// Other cleanup callers retain the published append API above.
+  package func recordCompensationCleanupDebt(
+    jobID: String, stepID: String, residue: CleanupResidue, reason: String,
+    action: TypedProviderAction
+  ) throws {
+    let persistedAction = try PersistedTypedProviderAction(action)
+    if let existing = try loadCleanupDebt().first(where: { $0.jobID == jobID && $0.stepID == stepID }) {
+      guard existing.identity == residue.identity, existing.persistedAction == persistedAction else {
+        throw RuntimeArtifactError.ioFailure(
+          "compensation debt differs from its original residue or exact typed action")
+      }
+      // A settled record remains proof of the original bookkeeping; a
+      // restart must neither duplicate it nor resurrect it.
+      return
+    }
+    try recordCleanupDebt(jobID: jobID, stepID: stepID, residue: residue, reason: reason, action: action)
+  }
+
   public func recordCleanupDebt(
     jobID: String, stepID: String, remotePath: String, reason: String,
     action: TypedProviderAction? = nil
@@ -1818,6 +1837,12 @@ public actor RuntimeArtifactStore {
 
   public func outstandingCleanupDebt() throws -> [CleanupDebtRecord] {
     try loadCleanupDebt().filter { $0.settledAtUTC == nil }
+  }
+
+  /// Includes settled records so restart bookkeeping can prove that a
+  /// confirmed failed cleanup was already recorded without resurrecting it.
+  package func cleanupDebtRecord(jobID: String, stepID: String) throws -> CleanupDebtRecord? {
+    try loadCleanupDebt().first { $0.jobID == jobID && $0.stepID == stepID }
   }
 
   public func settleCleanupDebt(jobID: String, identity: String) throws {
