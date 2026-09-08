@@ -1338,6 +1338,45 @@ final class HDCCompatibilityProfileTests: XCTestCase {
     XCTAssertEqual(parsedClean, .parsed(HDCParsedClientVersion(version: "3.2.0f")))
   }
 
+  func testVersionProbesKeepDiagnosticFilteringAndLFBoundaries() {
+    let client = "Ver: 3.2.0f\n"
+    let server = "Client version:Ver: 3.2.0f, server version:Ver: 3.2.0f\n"
+    for noise in ["[I] starting\r\n", "  [W] warning\r", "[D] trace\u{0085}",
+      "* daemon starting\u{2028}", "Connect server failed\r\n"]
+    {
+      XCTAssertEqual(
+        HDCObservationSemanticParser.parseClientVersion(
+          stdout: Data(noise.utf8), profile: profile, truncated: false), .empty)
+      XCTAssertEqual(
+        HDCObservationSemanticParser.parseServerCheck(
+          stdout: Data(noise.utf8), profile: profile, truncated: false), .empty)
+      // Two LF characters leave a separate meaningful line even after bare CR.
+      XCTAssertEqual(
+        HDCObservationSemanticParser.parseClientVersion(
+          stdout: Data((noise + "\n\n" + client).utf8), profile: profile, truncated: false),
+        .parsed(HDCParsedClientVersion(version: "3.2.0f")))
+      XCTAssertEqual(
+        HDCObservationSemanticParser.parseServerCheck(
+          stdout: Data((noise + "\n\n" + server).utf8), profile: profile, truncated: false),
+        .parsed(HDCParsedServerCheck(clientVersion: "3.2.0f", serverVersion: "3.2.0f")))
+    }
+    for (output, isServer) in [("Ver: 3.2.0f\r\n", false),
+      ("Client version:Ver: 3.2.0f, server version:Ver: 3.2.0f\r\n", true)]
+    {
+      if isServer {
+        XCTAssertEqual(
+          HDCObservationSemanticParser.parseServerCheck(
+            stdout: Data(output.utf8), profile: profile, truncated: false),
+          .unsupportedVersion("3.2.0f\r\n"))
+      } else {
+        XCTAssertEqual(
+          HDCObservationSemanticParser.parseClientVersion(
+            stdout: Data(output.utf8), profile: profile, truncated: false),
+          .unsupportedVersion("3.2.0f\r\n"))
+      }
+    }
+  }
+
   func testBothRegisteredVersionsParse() {
     for version in ["3.2.0d", "3.2.0f"] {
       let outcome = HDCObservationSemanticParser.parseClientVersion(
@@ -1446,12 +1485,70 @@ final class HDCCompatibilityProfileTests: XCTestCase {
       .unsupportedVersion("9.9.9z"))
   }
 
+  func testTargetListConsumesRegisteredCRLFMarkerAndOrdinaryRows() throws {
+    let probes = try XCTUnwrap(Bundle.module.url(forResource: "Probes", withExtension: nil))
+    let vectors = probes.appending(path: "DeviceObservation/1.0.0/vectors")
+    let marker = try Data(contentsOf: vectors.appending(path: "empty-marker.bin"))
+    XCTAssertEqual(Array(marker), Array("[Empty]".utf8) + [0x0D, 0x0A])
+    XCTAssertEqual(
+      HDCObservationSemanticParser.parseTargetList(
+        stdout: marker, profile: profile, toolVersion: "3.2.0f", truncated: false),
+      .parsed(HDCParsedTargetList(targets: [])))
+
+    let connected = HDCParsedTargetLine(
+      connectKey: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1", transport: "usb", state: "Connected")
+    for name in ["single-connected.bin", "rows-crlf.bin"] {
+      XCTAssertEqual(
+        HDCObservationSemanticParser.parseTargetList(
+          stdout: try Data(contentsOf: vectors.appending(path: name)),
+          profile: profile, toolVersion: "3.2.0f", truncated: false),
+        .parsed(HDCParsedTargetList(targets: [connected])), name)
+    }
+
+    // Mixed terminators and multiple CRLF rows share the same physical-line
+    // parser as the marker; accepting only its exact byte string is insufficient.
+    let mixed = "[I] ignored\r\n\nfirst\t\tUSB\tConnected\tlocalhost\r\n"
+      + "second\t\tUSB\tOffline\tlocalhost\nthird\t\tUSB\tConnected\tlocalhost\r\n"
+    XCTAssertEqual(
+      HDCObservationSemanticParser.parseTargetList(
+        stdout: Data(mixed.utf8), profile: profile, toolVersion: "3.2.0f", truncated: false),
+      .parsed(HDCParsedTargetList(targets: [
+        .init(connectKey: "first", transport: "usb", state: "Connected"),
+        .init(connectKey: "second", transport: "usb", state: "Offline"),
+        .init(connectKey: "third", transport: "usb", state: "Connected"),
+      ])))
+  }
+
+  func testTargetListRejectsLiteralEscapesAndResidualCarriageReturns() throws {
+    for output in [
+      #"[Empty]\r\n"#, "[Empty]\r", "[Empty]\r\r\n", "[Empty]\u{0085}",
+      "[Empty]\r\nkey\t\tUSB\tConnected\tlocalhost\n",
+      "key\t\tUSB\tConnected\tlocalhost\r\r\n",
+      "[I] malformed\r\n[Empty]\r\n[W] residual\r",
+      "[Empty]\r\n[W] residual\u{0085}", "[Empty]\r\n\u{2028}",
+    ] {
+      _ = try targetFailure(output)
+    }
+    let literal = try targetFailure(#"[Empty]\r\n"#)
+    XCTAssertTrue(literal.contains(#"preview "[Empty]\\r\\n""#), literal)
+    XCTAssertEqual(
+      HDCObservationSemanticParser.parseTargetList(
+        stdout: Data(), profile: profile, toolVersion: "3.2.0f", truncated: false),
+      .empty, "zero-byte stdout must not become a verified zero-candidate list")
+  }
+
   func testTargetFailureNamesThePhysicalLineAndEscapesItsRejectedBytes() throws {
     let reason = try targetFailure("[I] ignored\n\nkey\tConnected\r\n")
     XCTAssertEqual(
       reason,
       #"target output line 3: target line is not the registered 5-column family; saw 2 columns; preview "key\tConnected\r\n""#)
     XCTAssertTrue(reason.utf8.allSatisfy { (0x20...0x7E).contains($0) })
+
+    let mixed = try targetFailure("[I] ignored\r\n\nvalid\t\tUSB\tConnected\tlocalhost\r\nbad\tConnected\n")
+    XCTAssertEqual(
+      mixed,
+      #"target output line 4: target line is not the registered 5-column family; saw 2 columns; preview "bad\tConnected\n""#,
+      "a valid CRLF row must not hide or renumber the following malformed row")
 
     let hostile = try targetFailure("key\t\u{1B}[2J\u{00}\u{7F}\u{202E}é\"\\\n")
     for escaped in [#"\t"#, #"\x1B"#, #"\x00"#, #"\x7F"#, #"\xE2\x80\xAE"#,
@@ -1471,13 +1568,14 @@ final class HDCCompatibilityProfileTests: XCTestCase {
       ("key\t\tunknown-transport\tConnected\tlocalhost", "unregistered target transport"),
       ("key\t\tUSB\t" + longState + "\tlocalhost", "unregistered target state"),
     ] {
-      let reason = try targetFailure(row + "\n")
+      let output = row + "\n"
+      let reason = try targetFailure(output)
       XCTAssertTrue(reason.contains(expectedCause), reason)
       XCTAssertTrue(reason.contains("saw 5 columns"), reason)
       XCTAssertLessThanOrEqual(reason.utf8.count, 1_536)
       XCTAssertTrue(reason.utf8.allSatisfy { (0x20...0x7E).contains($0) })
       if row.utf8.count > 256 {
-        XCTAssertTrue(reason.contains("preview truncated to 256 of \(row.utf8.count) bytes"))
+        XCTAssertTrue(reason.contains("preview truncated to 256 of \(output.utf8.count) bytes"))
         XCTAssertFalse(reason.contains(longState))
       }
     }
