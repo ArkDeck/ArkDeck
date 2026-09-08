@@ -342,6 +342,35 @@ final class LaunchAgentServiceContractTests: XCTestCase {
     XCTAssertEqual(status.hdcSHA256, receipt.hdcSHA256)
   }
 
+  /// The analyzer path and the workspace inspector are host facts — this
+  /// daemon in one-shot mode, and a fixed system tool. They used to be written
+  /// only when the retired project/SDK pair was supplied, and every test that
+  /// covered them supplied it. Once the product moved to Runtime-owned
+  /// workspace registration and the runbook told operators to omit those
+  /// paths, an ordinary install stopped writing either, and four published
+  /// operations went dark on a host whose presets were registered and active.
+  func testInstallAndUpdateWriteTheAnalyzerAndInspectorWithoutTheRetiredWorkspacePair() throws {
+    _ = try service.install(daemonBundleSource: daemonBundle, hdcExecutable: hdc)
+    var environment = try XCTUnwrap(
+      (try plist(at: paths.plist))["EnvironmentVariables"] as? [String: String])
+    XCTAssertEqual(environment["ARKDECK_ANALYZER_PATH"], paths.installedDaemon.path)
+    XCTAssertEqual(environment["ARKDECK_WORKSPACE_INSPECTOR"], "/usr/bin/grep")
+    // The retired pair stays absent: this is not a way to reintroduce it.
+    XCTAssertNil(environment["ARKDECK_WORKSPACE_PROJECTS"])
+    XCTAssertNil(environment["ARKDECK_WORKSPACE_ACTIVE_PROJECT"])
+    XCTAssertNil(environment["ARKDECK_DEVECO_SDK_HOME"])
+
+    // The same call is how the product updates an existing installation.
+    try makeExecutable(daemon, bytes: "daemon-v2")
+    _ = try service.install(daemonBundleSource: daemonBundle, hdcExecutable: hdc)
+    environment = try XCTUnwrap(
+      (try plist(at: paths.plist))["EnvironmentVariables"] as? [String: String])
+    XCTAssertEqual(environment["ARKDECK_ANALYZER_PATH"], paths.installedDaemon.path)
+    XCTAssertEqual(environment["ARKDECK_WORKSPACE_INSPECTOR"], "/usr/bin/grep")
+    XCTAssertNil(environment["ARKDECK_WORKSPACE_PROJECTS"])
+    XCTAssertNil(environment["ARKDECK_DEVECO_SDK_HOME"])
+  }
+
   func testUpdateBootsOutLoadedServiceRefreshesIdentitiesAndCLIUsesSameManager() throws {
     _ = try service.install(daemonBundleSource: daemonBundle, hdcExecutable: hdc)
     let oldReceipt = try JSONDecoder().decode(
@@ -765,15 +794,26 @@ final class LaunchAgentServiceContractTests: XCTestCase {
 
     let environment = try XCTUnwrap(
       (try plist(at: paths.plist))["EnvironmentVariables"] as? [String: String])
+    // The retired project/SDK injection is what this migration removes.
     for key in [
       ArkDeckLaunchAgent.workspaceProjectsEnvironmentKey,
       ArkDeckLaunchAgent.workspaceActiveProjectEnvironmentKey,
       ArkDeckLaunchAgent.devecoSDKEnvironmentKey,
-      ArkDeckLaunchAgent.analyzerEnvironmentKey,
-      ArkDeckLaunchAgent.workspaceInspectorEnvironmentKey,
     ] {
       XCTAssertNil(environment[key], key)
     }
+    // The analyzer and the inspector are not part of it, and this assertion
+    // used to require them to disappear with it. On the reference host that
+    // is exactly what happened: after the prescribed migration
+    // `analyzer.summarize-hilog@1`, `analyzer.extract-crash-signature@1`,
+    // `workspace.symbolize-crash@1` and `workspace.inspect-source@1` all read
+    // `unavailable`, each blaming a preset the operator had registered and
+    // which was `active`. They survive the migration now, still pinned to
+    // this installation's own daemon and the one registered host tool.
+    XCTAssertEqual(
+      environment[ArkDeckLaunchAgent.analyzerEnvironmentKey], paths.installedDaemon.path)
+    XCTAssertEqual(
+      environment[ArkDeckLaunchAgent.workspaceInspectorEnvironmentKey], "/usr/bin/grep")
     let receipt = try JSONDecoder().decode(
       LaunchAgentInstallReceipt.self, from: Data(contentsOf: paths.receipt))
     XCTAssertNil(receipt.workspaceProjectPath)
