@@ -188,8 +188,12 @@ def main() -> None:
     outputs = {BASELINE: json.dumps(info, indent=2, sort_keys=True) + "\n", GENERATED: generate(info)}
     for path, content in outputs.items():
         if path == GENERATED:
-            # rustfmt is part of the pinned toolchain, so --check is byte stable.
-            content = subprocess.check_output(["rustup", "run", "1.98.0", "rustfmt", "--edition", "2024"], input=content.encode()).decode()
+            # The rustup proxy discovers and installs rust/rust-toolchain.toml
+            # on a fresh host; `rustup run` would require a prior installation.
+            content = subprocess.check_output(
+                ["rustfmt", "--edition", "2024", "--config", "newline_style=Unix"],
+                input=content.encode("utf-8"), cwd=ROOT / "rust",
+            ).decode("utf-8")
         if args.write:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(content, encoding="utf-8", newline="\n")

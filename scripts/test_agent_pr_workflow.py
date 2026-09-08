@@ -485,8 +485,8 @@ def validate_rust_ci_contract(text: str) -> None:
         '          python-version: "3.14"\n',
         "run: python -m pip install PyYAML==6.0.3 jsonschema==4.26.0",
         "run: python rust/scripts/generate-contract.py --check",
+        "rustup toolchain install --profile minimal --component rustfmt,clippy --no-self-update",
         "rustup show active-toolchain",
-        "rustup component add rustfmt clippy",
         "run: cargo fmt --all --check",
         "run: cargo fetch --locked",
         "run: cargo clippy --workspace --all-targets --locked -- -D warnings",
@@ -520,6 +520,10 @@ def validate_rust_ci_contract(text: str) -> None:
             raise WorkflowContractError(f"Rust CI contains forbidden token: {token}")
     if text.index("run: cargo fetch --locked") > text.index("run: cargo vet --locked"):
         raise WorkflowContractError("Rust CI must fetch locked metadata before locked vet")
+    if text.index("rustup toolchain install") > text.index(
+        "run: python rust/scripts/generate-contract.py --check"
+    ):
+        raise WorkflowContractError("Rust CI must install rustfmt before checking generated inputs")
     if text.index("run: python rust/scripts/generate-contract.py --check") > text.index(
         "run: cargo clippy --workspace"
     ):
@@ -690,7 +694,14 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
 
     def test_rust_checks_reject_skipped_hosts_and_unlocked_or_bypassed_policy(self) -> None:
         rust = RUST_WORKFLOW_PATH.read_text(encoding="utf-8")
+        bootstrap = rust[
+            rust.index("      - name: Activate workspace toolchain"):
+            rust.index("      - name: Verify generated contract inputs")
+        ]
         mutations = (
+            rust.replace(bootstrap, "").replace(
+                "      - name: Format check", bootstrap + "      - name: Format check"
+            ),
             rust.replace("  workflow_call:\n", "  push:\n"),
             rust.replace(
                 "os: [ubuntu-latest, macos-26, windows-latest]",

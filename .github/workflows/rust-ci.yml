@@ -49,17 +49,17 @@ jobs:
       - name: Install pinned contract validation dependencies
         run: python -m pip install PyYAML==6.0.3 jsonschema==4.26.0
 
-      - name: Verify generated contract inputs against the pinned Swift commit
-        working-directory: .
-        run: python rust/scripts/generate-contract.py --check
-
       - name: Activate workspace toolchain and required components
         run: |
           set -eu
+          rustup toolchain install --profile minimal --component rustfmt,clippy --no-self-update
           rustup show active-toolchain
-          rustup component add rustfmt clippy
           rustc --version
           cargo --version
+
+      - name: Verify generated contract inputs against the pinned Swift commit
+        working-directory: .
+        run: python rust/scripts/generate-contract.py --check
 
       - name: Format check
         run: cargo fmt --all --check
