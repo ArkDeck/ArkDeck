@@ -34,6 +34,20 @@ verify their exact input hashes, directory membership and per-method counts.
 The pin at `8151907bee9919a0847edc9a9aeb1f0ff84f6d15` covers 96 methods and
 382 recorded shapes (217 successes and 165 errors).
 
+Method schema definitions are checked recursively before values are evaluated,
+including alternatives and absent properties. Unknown keywords, unsupported
+patterns and malformed constraints remain failures even under `oneOf` or `not`.
+The closed vocabulary includes `oneOf`, `const`, `not`, `minLength` and `pattern`:
+`oneOf` requires exactly one match; constants use structural JSON equality;
+`minLength` counts Unicode scalar values and accepts a nonnegative JSON integer
+bound through `u64::MAX`. These follow the relevant
+[JSON Schema assertions](https://json-schema.org/draft/2020-12/json-schema-validation)
+and [applicators](https://json-schema.org/draft/2020-12/json-schema-core#section-10.2.1).
+The only supported patterns are the two exact definitions in
+[`schema_patterns.json`](crates/arkdeck-contract/src/schema_patterns.json):
+lowercase SHA-256 and canonical ASCII decimal from zero through `i64::MAX`.
+They match the whole string, including its end; no general regex engine is used.
+
 The black-box check starts only its own daemon with a unique endpoint and HDC
 configuration removed. It saves the actual outputs, input manifests and provenance
 under `target/readonly-check/<run>/{published,candidate}/`

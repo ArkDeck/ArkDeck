@@ -12,6 +12,7 @@ import argparse
 from dataclasses import dataclass
 import hashlib
 import json
+import math
 from pathlib import Path
 import re
 import subprocess
@@ -46,7 +47,18 @@ INPUTS = [
     "Catalog/generated/effect-authorization-matrix.md",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC",
 ]
-KEYWORDS = {"type", "properties", "additionalProperties", "required", "items", "enum", "anyOf"}
+KEYWORDS = {"type", "properties", "additionalProperties", "required", "items", "enum", "anyOf",
+            "oneOf", "const", "pattern", "minLength", "not"}
+TYPES = {"null", "boolean", "object", "array", "number", "string", "integer"}
+# This is generator vocabulary, not a candidate Swift input. Resolve it from the
+# physical script so isolated input roots cannot replace the supported patterns.
+SCHEMA_PATTERNS = json.loads((Path(__file__).resolve().parents[1]
+                             / "crates/arkdeck-contract/src/schema_patterns.json").read_bytes())
+if (not isinstance(SCHEMA_PATTERNS, dict)
+        or SCHEMA_PATTERNS.keys() != {"lowercaseSha256", "nonnegativeInt64Decimal"}
+        or any(not isinstance(value, str) for value in SCHEMA_PATTERNS.values())
+        or len(set(SCHEMA_PATTERNS.values())) != 2):
+    raise ValueError("invalid shared schema pattern vocabulary")
 
 
 def git(*args: str) -> bytes:
@@ -180,16 +192,79 @@ def candidate(inputs: ContractInputs, published_commit: str, source_revision: st
             **describe_inputs(inputs)}
 
 
-def check_vocabulary(schema: dict) -> None:
+def check_json_value(value, location: str) -> None:
+    """Const and enum contain JSON data; their object keys are not keywords."""
+    if value is None or type(value) in (bool, int, str):
+        return
+    if type(value) is float and math.isfinite(value):
+        return
+    if type(value) is list:
+        for child in value:
+            check_json_value(child, location)
+        return
+    if type(value) is dict and all(isinstance(key, str) for key in value):
+        for child in value.values():
+            check_json_value(child, location)
+        return
+    raise ValueError(f"invalid schema value at {location}: expected JSON data")
+
+
+def check_vocabulary(schema: dict, location: str = "schema") -> None:
+    if not isinstance(schema, dict) or any(not isinstance(key, str) for key in schema):
+        raise ValueError(f"invalid schema value at {location}: expected an object schema")
     unknown = schema.keys() - KEYWORDS
     if unknown:
-        raise ValueError(f"unsupported schema vocabulary: {sorted(unknown)}")
-    for child in schema.get("properties", {}).values():
-        check_vocabulary(child)
-    for child in schema.get("anyOf", []):
-        check_vocabulary(child)
+        raise ValueError(f"unsupported schema vocabulary at {location}: {sorted(unknown)}")
+
+    def invalid(keyword: str, expected: str) -> None:
+        raise ValueError(f"invalid schema value at {location}.{keyword}: expected {expected}")
+
+    if "type" in schema:
+        kinds = schema["type"]
+        if isinstance(kinds, str):
+            kinds = [kinds]
+        if (not isinstance(kinds, list) or not kinds
+                or any(not isinstance(kind, str) or kind not in TYPES for kind in kinds)
+                or len(set(kinds)) != len(kinds)):
+            invalid("type", "a known type or a nonempty array of distinct known types")
+    if "properties" in schema:
+        properties = schema["properties"]
+        if not isinstance(properties, dict) or any(not isinstance(key, str) for key in properties):
+            invalid("properties", "an object of property schemas")
+        for key, child in properties.items():
+            check_vocabulary(child, f"{location}.properties.{key}")
+    if "required" in schema:
+        required = schema["required"]
+        if (not isinstance(required, list) or any(not isinstance(key, str) for key in required)
+                or len(set(required)) != len(required)):
+            invalid("required", "an array of distinct property names")
+    if "additionalProperties" in schema and type(schema["additionalProperties"]) is not bool:
+        invalid("additionalProperties", "a boolean")
     if "items" in schema:
-        check_vocabulary(schema["items"])
+        check_vocabulary(schema["items"], f"{location}.items")
+    for keyword in ("anyOf", "oneOf"):
+        if keyword in schema:
+            branches = schema[keyword]
+            if not isinstance(branches, list) or not branches:
+                invalid(keyword, "a nonempty array of object schemas")
+            for index, child in enumerate(branches):
+                check_vocabulary(child, f"{location}.{keyword}[{index}]")
+    if "not" in schema:
+        check_vocabulary(schema["not"], f"{location}.not")
+    if "enum" in schema:
+        variants = schema["enum"]
+        if not isinstance(variants, list) or not variants:
+            invalid("enum", "a nonempty array of JSON values")
+        check_json_value(variants, f"{location}.enum")
+    if "const" in schema:
+        check_json_value(schema["const"], f"{location}.const")
+    if "pattern" in schema and (not isinstance(schema["pattern"], str)
+                                or schema["pattern"] not in SCHEMA_PATTERNS.values()):
+        raise ValueError(f"unsupported schema pattern at {location}.pattern")
+    if "minLength" in schema:
+        length = schema["minLength"]
+        if type(length) is not int or not 0 <= length <= (1 << 64) - 1:
+            invalid("minLength", "a JSON nonnegative integer no greater than u64::MAX")
 
 
 def generate(info: dict, inputs: ContractInputs) -> str:
