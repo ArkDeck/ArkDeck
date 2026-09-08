@@ -230,6 +230,7 @@ methods.md无未处置生产caller；所有保留方法只走一个protocol/shap
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/**`
   - `Packages/ArkDeckKit/Tests/ArkDeckCoreTests/**`
   - `Packages/ArkDeckKit/Tests/ArkDeckEngineCrashFixture/**`
+  - `Packages/ArkDeckKit/Tests/ArkDeckRuntimeSoakFixture/main.swift`
   - `docs/design/cli-job-resources.md`
   - `docs/design/cli-session-resources.md`
   - `docs/design/cli-session-export.md`
