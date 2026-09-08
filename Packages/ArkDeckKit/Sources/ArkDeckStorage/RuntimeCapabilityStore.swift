@@ -298,6 +298,39 @@ public actor RuntimeCapabilityStore {
     }
   }
 
+  /// Checks the still-owned use for a declared continuation without reserving
+  /// a new use. The original receipt and full query must match; revocation,
+  /// expiry and envelope constraints remain live checks.
+  package func validateContinuation(
+    capabilityID: String, reservationID: String, jobID: String,
+    query: RuntimeCapabilityAuthorizationQuery, nowUTC: String
+  ) throws -> RuntimeCapabilityConsumptionReceipt {
+    try withExclusiveLock {
+      let document = try loadDocument()
+      guard let record = document.records.first(where: {
+        $0.capability.capabilityID == capabilityID
+      }) else {
+        throw RuntimeCapabilityStoreError.capabilityNotFound(capabilityID)
+      }
+      guard let use = record.consumptions.first(where: {
+        $0.reservationID == reservationID && $0.jobID == jobID
+      }), use.queryFingerprintSHA256 == Self.fingerprint(of: query),
+        use.currentOutcome == .pending || use.currentOutcome == .outcomeUnknown
+      else {
+        throw RuntimeCapabilityStoreError.reservationConflict(
+          "continuation has no exact unresolved owning use")
+      }
+      // This use has already been charged. Adding that one use only for the
+      // pure envelope check does not replenish or rewrite the durable budget.
+      if case .failure(let denial) = record.capability.authorizes(
+        query, nowUTC: nowUTC, remainingUses: use.remainingUsesAfter + 1)
+      {
+        throw RuntimeCapabilityStoreError.denied(denial)
+      }
+      return Self.receipt(capabilityID: capabilityID, consumption: use)
+    }
+  }
+
   public func revoke(capabilityID: String, atUTC: String, reason: String) throws {
     try withExclusiveLock {
       var document = try loadDocument()

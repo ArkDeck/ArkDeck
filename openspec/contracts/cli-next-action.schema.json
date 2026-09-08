@@ -268,7 +268,8 @@
         "reasonCode": {
           "enum": [
             "recovery.outcomeUnknown",
-            "lifecycle.outcomeUnknown"
+            "lifecycle.outcomeUnknown",
+            "job.finalizationPending"
           ]
         },
         "resource": {

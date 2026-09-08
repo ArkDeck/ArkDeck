@@ -432,11 +432,11 @@ package enum JournalCanonicalJSON {
     try JSONDecoder().decode(JSONValue.self, from: encoder.encode(value))
   }
 
-  static func decodeWorkflowStep(_ value: JSONValue) throws -> WorkflowStep {
+  package static func decodeWorkflowStep(_ value: JSONValue) throws -> WorkflowStep {
     try WorkflowStepDecoder.decodeCoreOrProviderStep(encoder.encode(value))
   }
 
-  static func decodeCompensation(_ value: JSONValue) throws -> CompensationDescriptor {
+  package static func decodeCompensation(_ value: JSONValue) throws -> CompensationDescriptor {
     try JSONDecoder().decode(CompensationDescriptor.self, from: encoder.encode(value))
   }
 

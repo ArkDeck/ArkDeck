@@ -198,6 +198,106 @@ package enum RuntimeJobRecordState: Sendable {
   case unreadable(String)
 }
 
+/// An in-memory view of existing source declarations and Journal outcomes.
+/// It has no persistence shape: a restart reads the same immutable events,
+/// and an older Job without declarations never acquires new compensation.
+package struct RuntimeDebugHAPFailureFinalization: Sendable {
+  package let originalFailure: RuntimeOperationFailure
+  package let compensations: [PlannedCompensation]
+  package let sourceIntents: [String: JournalEvent]
+
+  package static let sourceSteps = ["send-hap", "install-hap", "start-ability"]
+
+  package static func catalogStepID(forSourceStepID sourceStepID: String) -> String? {
+    switch sourceStepID {
+    case "send-hap": "cleanup-remote-staging"
+    case "install-hap": "cleanup-uninstall"
+    case "start-ability": "stop-ability"
+    default: nil
+    }
+  }
+
+  package static func descriptorID(forCatalogStepID stepID: String) -> String {
+    "compensation-\(stepID)"
+  }
+
+  package static func catalogStepID(forDescriptorID descriptorID: String) -> String? {
+    sourceSteps.compactMap(catalogStepID(forSourceStepID:)).first {
+      Self.descriptorID(forCatalogStepID: $0) == descriptorID
+    }
+  }
+
+  package static func originalFailure(
+    record: RuntimeJobRecord, replay: JournalReplay
+  ) -> RuntimeOperationFailure? {
+    guard record.operationReference == "debug.hap@1" else { return nil }
+    if let failure = record.operationFailure, failure.code != .outcomeUnknown {
+      return failure
+    }
+    // An optional confirmed diagnostic failure can be skipped on the normal
+    // path. Only its explicit failed reconciliation, or a required failed
+    // Step, establishes failure finalization when the record write was lost.
+    let confirmedFailureDecision = replay.events.contains { event in
+      event.kind == .reconcileOutcome
+        && event.payload["result"] == .string("finalizeConfirmedFailure")
+    }
+    let descriptor = RuntimeOperationCatalog.descriptor(reference: record.operationReference)
+    guard let failed = replay.events.last(where: { event in
+      guard event.kind == .stepOutcome,
+        event.payload["result"] == .string("failed"),
+        event.payload["outcomeCertainty"] == .string("confirmed")
+      else { return false }
+      return confirmedFailureDecision || descriptor?.steps.first(where: {
+        $0.stepID == event.stepID
+      })?.isOptional == false
+    }) else { return nil }
+    if failed.payload["semanticCode"] == .string("confirmedNotExecuted") {
+      return RuntimeOperationFailure(
+        code: .executionConfirmedNotPerformed, category: .externalTool,
+        retryability: .runtimeDecisionRequired,
+        recovery: .submitNewTypedRequestAfterRuntimeProof)
+    }
+    return RuntimeOperationFailure(
+      code: .executionFailed, category: .execution,
+      retryability: .runtimeDecisionRequired, recovery: .inspectJob)
+  }
+
+  package static func derive(
+    record: RuntimeJobRecord, replay: JournalReplay
+  ) throws -> Self? {
+    guard let failure = originalFailure(record: record, replay: replay) else { return nil }
+    let outcomes = Dictionary(uniqueKeysWithValues: replay.events.compactMap { event in
+      guard event.kind == .stepOutcome, let intentID = event.correlatedIntentEventID else {
+        return nil as (String, JournalEvent)?
+      }
+      return (intentID, event)
+    })
+    var completed: [CompletedStepCompensations] = []
+    var sources: [String: JournalEvent] = [:]
+    var hasDeclaration = false
+    for event in replay.events where event.kind == .stepIntent {
+      guard let stepID = event.stepID, sourceSteps.contains(stepID),
+        let value = event.payload["step"]
+      else { continue }
+      let step = try JournalCanonicalJSON.decodeWorkflowStep(value)
+      hasDeclaration = hasDeclaration || !step.compensationDescriptors.isEmpty
+      guard let outcome = outcomes[event.eventID],
+        outcome.payload["result"] == .string("succeeded"),
+        outcome.payload["outcomeCertainty"] == .string("confirmed")
+      else { continue }
+      sources[stepID] = event
+      completed.append(CompletedStepCompensations(
+        sourceStepId: stepID, descriptors: step.compensationDescriptors))
+    }
+    guard hasDeclaration else { return nil }
+    return Self(
+      originalFailure: failure,
+      compensations: CompensationPlanner.plan(
+        completedStepsInExecutionOrder: completed, terminalPath: .failure),
+      sourceIntents: sources)
+  }
+}
+
 extension RuntimeJobRecord {
   public init(from decoder: any Decoder) throws {
     let container = try decoder.container(keyedBy: CodingKeys.self)

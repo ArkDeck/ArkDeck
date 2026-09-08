@@ -91,7 +91,10 @@
           "type": "array"
         },
         "bindingRevision": {
-          "type": "integer"
+          "type": [
+            "integer",
+            "null"
+          ]
         },
         "catalogDigest": {
           "type": "string"
@@ -178,10 +181,19 @@
                     "admittedAtUtc": {
                       "type": "string"
                     },
+                    "artifactDigest": {
+                      "type": "string"
+                    },
                     "consumptionFingerprintSha256": {
-                      "type": "null"
+                      "type": [
+                        "null",
+                        "string"
+                      ]
                     },
                     "kind": {
+                      "type": "string"
+                    },
+                    "planDigest": {
                       "type": "string"
                     },
                     "recoveryEpoch": {
@@ -190,8 +202,23 @@
                     "reference": {
                       "type": "string"
                     },
+                    "reservationId": {
+                      "type": "string"
+                    },
+                    "stepSetDigest": {
+                      "type": "string"
+                    },
+                    "targetBindingDigest": {
+                      "type": "string"
+                    },
+                    "useOrdinal": {
+                      "type": "integer"
+                    },
                     "validUntilUtc": {
-                      "type": "null"
+                      "type": [
+                        "null",
+                        "string"
+                      ]
                     }
                   },
                   "required": [
@@ -388,7 +415,86 @@
           "type": "string"
         },
         "humanAction": {
-          "type": "null"
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "actionId": {
+                  "type": "string"
+                },
+                "category": {
+                  "type": "string"
+                },
+                "choices": {
+                  "type": "array"
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "expiresAt": {
+                  "type": "string"
+                },
+                "minimumAction": {
+                  "type": "string"
+                },
+                "newDispatchCount": {
+                  "type": "integer"
+                },
+                "owner": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind"
+                  ],
+                  "type": "object"
+                },
+                "reasonCode": {
+                  "type": "string"
+                },
+                "resumeReference": {
+                  "type": "string"
+                },
+                "schemaVersion": {
+                  "type": "string"
+                },
+                "selectionSchema": {
+                  "type": "null"
+                },
+                "status": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "actionId",
+                "category",
+                "choices",
+                "createdAt",
+                "expiresAt",
+                "minimumAction",
+                "newDispatchCount",
+                "owner",
+                "reasonCode",
+                "resumeReference",
+                "schemaVersion",
+                "selectionSchema",
+                "status"
+              ],
+              "type": "object"
+            },
+            {
+              "type": [
+                "null"
+              ]
+            }
+          ]
         },
         "job": {
           "additionalProperties": false,
@@ -403,7 +509,10 @@
               "type": "boolean"
             },
             "outstandingResidueCount": {
-              "type": "null"
+              "type": [
+                "integer",
+                "null"
+              ]
             },
             "state": {
               "type": "string"
@@ -423,66 +532,87 @@
           "type": "object"
         },
         "jobId": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "jobState": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "lastObservedAt": {
           "type": "string"
         },
         "nextAction": {
-          "additionalProperties": false,
-          "properties": {
-            "kind": {
-              "type": "string"
-            },
-            "owner": {
+          "anyOf": [
+            {
               "additionalProperties": false,
               "properties": {
-                "id": {
+                "expiresAt": {
                   "type": "string"
                 },
                 "kind": {
                   "type": "string"
-                }
-              },
-              "required": [
-                "id",
-                "kind"
-              ],
-              "type": "object"
-            },
-            "reasonCode": {
-              "type": "string"
-            },
-            "resource": {
-              "additionalProperties": false,
-              "properties": {
-                "id": {
+                },
+                "owner": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind"
+                  ],
+                  "type": "object"
+                },
+                "reasonCode": {
                   "type": "string"
                 },
-                "kind": {
+                "resource": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind"
+                  ],
+                  "type": "object"
+                },
+                "resumeReference": {
+                  "type": "string"
+                },
+                "retryAfter": {
                   "type": "string"
                 }
               },
               "required": [
-                "id",
-                "kind"
+                "kind",
+                "owner",
+                "reasonCode",
+                "resource"
               ],
               "type": "object"
             },
-            "retryAfter": {
-              "type": "string"
+            {
+              "type": [
+                "null"
+              ]
             }
-          },
-          "required": [
-            "kind",
-            "owner",
-            "reasonCode",
-            "resource"
-          ],
-          "type": "object"
+          ]
         },
         "operation": {
           "type": "string"
@@ -497,7 +627,10 @@
           "type": "string"
         },
         "targetId": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         }
       },
       "required": [
@@ -509,7 +642,6 @@
         "failureCode",
         "generation",
         "humanAction",
-        "job",
         "jobId",
         "jobState",
         "lastObservedAt",
@@ -532,7 +664,7 @@
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
     "error": 1,
-    "request": 5,
-    "result": 4
+    "request": 13,
+    "result": 12
   }
 }

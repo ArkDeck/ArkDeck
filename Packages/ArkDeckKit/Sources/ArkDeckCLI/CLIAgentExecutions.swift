@@ -362,6 +362,12 @@ extension RuntimeCLI {
         if kind == "wait" {
           guard case .string(let hint)? = action["retryAfter"], CLIDuration.parse(hint, maximumMilliseconds: 86_400_000) != nil,
             action["reasonCode"] == .string(fields["jobId"] == .null ? "agent.orchestrationPending" : "job.running") else { throw unreadable() }
+        } else if kind == "reconcile", action["reasonCode"] == .string("job.finalizationPending") {
+          guard state == "jobOwned", fields["jobId"] != .null,
+            fields["operation"] == .string("debug.hap@1"), fields["jobState"] == .string("finalizing"),
+            fields["outcomeUnknown"] == .bool(false), case .object(let job)? = fields["job"],
+            job["waitingForHuman"] == .bool(false)
+          else { throw unreadable() }
         } else {
           guard fields["jobId"] != .null,
             action["reasonCode"] == .string(kind == "reconcile" ? "recovery.outcomeUnknown" : "job.resultAvailable") else { throw unreadable() }
@@ -392,6 +398,14 @@ extension RuntimeCLI {
     if fields["outcomeUnknown"] == .bool(true) {
       session.emit(.object(fields))
       throw session.fail(.outcomeUnknown, "inspect and reconcile the existing Job; its intent must not be replayed")
+    }
+    if case .object(let next)? = fields["nextAction"],
+      next["kind"] == .string("reconcile"), next["reasonCode"] == .string("job.finalizationPending"),
+      case .string(let jobID)? = fields["jobId"]
+    {
+      throw session.fail(.resultNotReady,
+        "Job failure finalization requires reconciliation. Run: arkdeck job reconcile --job \(jobID)",
+        details: details)
     }
     if fields["state"] == .string("completed") {
       guard let job = fields["job"], let evidence = fields["evidence"] else {

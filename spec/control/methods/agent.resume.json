@@ -4,6 +4,7 @@
       "enum": [
         "admissionDenied",
         "conflict",
+        "humanActionExpired",
         "internalError",
         "invalidParams",
         "malformedFrame",
@@ -149,8 +150,58 @@
     "result": {
       "additionalProperties": false,
       "properties": {
+        "artifacts": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "bindingRevision": {
+                "type": "integer"
+              },
+              "byteCount": {
+                "type": "integer"
+              },
+              "bytesVerified": {
+                "type": "boolean"
+              },
+              "jobId": {
+                "type": "string"
+              },
+              "providerId": {
+                "type": "string"
+              },
+              "reference": {
+                "type": "string"
+              },
+              "sha256": {
+                "type": "string"
+              },
+              "stableIdentitySha256": {
+                "type": "string"
+              },
+              "targetId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "bindingRevision",
+              "byteCount",
+              "bytesVerified",
+              "jobId",
+              "providerId",
+              "reference",
+              "sha256",
+              "stableIdentitySha256",
+              "targetId"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
         "bindingRevision": {
-          "type": "integer"
+          "type": [
+            "integer",
+            "null"
+          ]
         },
         "catalogDigest": {
           "type": "string"
@@ -160,6 +211,267 @@
         },
         "deadline": {
           "type": "string"
+        },
+        "evidence": {
+          "additionalProperties": false,
+          "properties": {
+            "actualEffect": {
+              "type": "string"
+            },
+            "actualStepKinds": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "artifacts": {
+              "items": {
+                "additionalProperties": false,
+                "properties": {
+                  "bindingRevision": {
+                    "type": "integer"
+                  },
+                  "byteCount": {
+                    "type": "integer"
+                  },
+                  "bytesVerified": {
+                    "type": "boolean"
+                  },
+                  "jobId": {
+                    "type": "string"
+                  },
+                  "providerId": {
+                    "type": "string"
+                  },
+                  "reference": {
+                    "type": "string"
+                  },
+                  "sha256": {
+                    "type": "string"
+                  },
+                  "stableIdentitySha256": {
+                    "type": "string"
+                  },
+                  "targetId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "bindingRevision",
+                  "byteCount",
+                  "bytesVerified",
+                  "jobId",
+                  "providerId",
+                  "reference",
+                  "sha256",
+                  "stableIdentitySha256",
+                  "targetId"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "authority": {
+              "additionalProperties": false,
+              "properties": {
+                "admittedAtUtc": {
+                  "type": "string"
+                },
+                "artifactDigest": {
+                  "type": "string"
+                },
+                "consumptionFingerprintSha256": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "planDigest": {
+                  "type": "string"
+                },
+                "recoveryEpoch": {
+                  "type": "null"
+                },
+                "reference": {
+                  "type": "string"
+                },
+                "reservationId": {
+                  "type": "string"
+                },
+                "stepSetDigest": {
+                  "type": "string"
+                },
+                "targetBindingDigest": {
+                  "type": "string"
+                },
+                "useOrdinal": {
+                  "type": "integer"
+                },
+                "validUntilUtc": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "admittedAtUtc",
+                "artifactDigest",
+                "consumptionFingerprintSha256",
+                "kind",
+                "planDigest",
+                "recoveryEpoch",
+                "reference",
+                "reservationId",
+                "stepSetDigest",
+                "targetBindingDigest",
+                "useOrdinal",
+                "validUntilUtc"
+              ],
+              "type": "object"
+            },
+            "bindingRevision": {
+              "type": "integer"
+            },
+            "blockers": {
+              "type": "array"
+            },
+            "catalogDigest": {
+              "type": "string"
+            },
+            "executionMode": {
+              "type": "string"
+            },
+            "finishedAtUtc": {
+              "type": "string"
+            },
+            "firstEvidenceStepAtUtc": {
+              "type": "string"
+            },
+            "jobId": {
+              "type": "string"
+            },
+            "observation": {
+              "additionalProperties": false,
+              "properties": {
+                "bindingRevision": {
+                  "type": "integer"
+                },
+                "confirmationMethod": {
+                  "type": "string"
+                },
+                "confirmedAtUtc": {
+                  "type": "string"
+                },
+                "firmware": {
+                  "type": "string"
+                },
+                "model": {
+                  "type": "string"
+                },
+                "preflightSteps": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "outcomeAtUtc": {
+                        "type": "string"
+                      },
+                      "stepId": {
+                        "type": "string"
+                      },
+                      "stepKind": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "outcomeAtUtc",
+                      "stepId",
+                      "stepKind"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "providerId": {
+                  "type": "string"
+                },
+                "stableIdentitySha256": {
+                  "type": "string"
+                },
+                "targetId": {
+                  "type": "string"
+                },
+                "toolSha256": {
+                  "type": "string"
+                },
+                "toolVersion": {
+                  "type": "string"
+                },
+                "transport": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "bindingRevision",
+                "confirmationMethod",
+                "confirmedAtUtc",
+                "firmware",
+                "model",
+                "preflightSteps",
+                "providerId",
+                "stableIdentitySha256",
+                "targetId",
+                "toolSha256",
+                "toolVersion",
+                "transport"
+              ],
+              "type": "object"
+            },
+            "operationReference": {
+              "type": "string"
+            },
+            "outcomeUnknown": {
+              "type": "boolean"
+            },
+            "providerId": {
+              "type": "string"
+            },
+            "recoveryEpoch": {
+              "type": "null"
+            },
+            "startedAtUtc": {
+              "type": "string"
+            },
+            "status": {
+              "type": "string"
+            },
+            "targetId": {
+              "type": "string"
+            },
+            "terminalState": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "actualEffect",
+            "actualStepKinds",
+            "artifacts",
+            "authority",
+            "bindingRevision",
+            "blockers",
+            "catalogDigest",
+            "executionMode",
+            "finishedAtUtc",
+            "firstEvidenceStepAtUtc",
+            "jobId",
+            "observation",
+            "operationReference",
+            "outcomeUnknown",
+            "providerId",
+            "recoveryEpoch",
+            "startedAtUtc",
+            "status",
+            "targetId",
+            "terminalState"
+          ],
+          "type": "object"
         },
         "executionId": {
           "type": "string"
@@ -171,7 +483,86 @@
           "type": "string"
         },
         "humanAction": {
-          "type": "null"
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "actionId": {
+                  "type": "string"
+                },
+                "category": {
+                  "type": "string"
+                },
+                "choices": {
+                  "type": "array"
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "expiresAt": {
+                  "type": "string"
+                },
+                "minimumAction": {
+                  "type": "string"
+                },
+                "newDispatchCount": {
+                  "type": "integer"
+                },
+                "owner": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind"
+                  ],
+                  "type": "object"
+                },
+                "reasonCode": {
+                  "type": "string"
+                },
+                "resumeReference": {
+                  "type": "string"
+                },
+                "schemaVersion": {
+                  "type": "string"
+                },
+                "selectionSchema": {
+                  "type": "null"
+                },
+                "status": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "actionId",
+                "category",
+                "choices",
+                "createdAt",
+                "expiresAt",
+                "minimumAction",
+                "newDispatchCount",
+                "owner",
+                "reasonCode",
+                "resumeReference",
+                "schemaVersion",
+                "selectionSchema",
+                "status"
+              ],
+              "type": "object"
+            },
+            {
+              "type": [
+                "null"
+              ]
+            }
+          ]
         },
         "job": {
           "additionalProperties": false,
@@ -186,7 +577,10 @@
               "type": "boolean"
             },
             "outstandingResidueCount": {
-              "type": "null"
+              "type": [
+                "integer",
+                "null"
+              ]
             },
             "state": {
               "type": "string"
@@ -206,10 +600,16 @@
           "type": "object"
         },
         "jobId": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "jobState": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "lastObservedAt": {
           "type": "string"
@@ -217,6 +617,9 @@
         "nextAction": {
           "additionalProperties": false,
           "properties": {
+            "expiresAt": {
+              "type": "string"
+            },
             "kind": {
               "type": "string"
             },
@@ -255,6 +658,9 @@
               ],
               "type": "object"
             },
+            "resumeReference": {
+              "type": "string"
+            },
             "retryAfter": {
               "type": "string"
             }
@@ -263,8 +669,7 @@
             "kind",
             "owner",
             "reasonCode",
-            "resource",
-            "retryAfter"
+            "resource"
           ],
           "type": "object"
         },
@@ -281,7 +686,10 @@
           "type": "string"
         },
         "targetId": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         }
       },
       "required": [
@@ -293,7 +701,6 @@
         "failureCode",
         "generation",
         "humanAction",
-        "job",
         "jobId",
         "jobState",
         "lastObservedAt",
@@ -315,8 +722,8 @@
   "x-arkdeck-method": "agent.resume",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 2,
-    "request": 3,
-    "result": 1
+    "error": 4,
+    "request": 12,
+    "result": 8
   }
 }

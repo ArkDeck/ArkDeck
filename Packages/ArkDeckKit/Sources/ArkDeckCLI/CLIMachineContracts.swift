@@ -1577,7 +1577,7 @@ enum CLIMachineContracts {
           required: ["resumeReference", "expiresAt"], resourceMirrorsOwner: false),
         "reconcile": branch(
           kind: "reconcile", ownerKinds: ["job", "controlAction"], resourceKinds: ["job", "controlAction"],
-          reasonCodes: ["recovery.outcomeUnknown", "lifecycle.outcomeUnknown"],
+          reasonCodes: ["recovery.outcomeUnknown", "lifecycle.outcomeUnknown", "job.finalizationPending"],
           extra: [:], required: [], resourceMirrorsOwner: true),
         "cleanup": branch(
           kind: "cleanup", ownerKinds: ["job"], resourceKinds: ["cleanupDebt"],

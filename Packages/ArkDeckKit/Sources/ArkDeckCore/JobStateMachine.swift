@@ -283,6 +283,7 @@ public struct JobStateMachine: Sendable {
   public private(set) var activeStep: AuthorizedWorkflowStep?
 
   private var pendingFinalization: PendingFinalization?
+  private var activeCompensation = false
 
   public init(mode: JobExecutionMode) {
     self.mode = mode
@@ -402,6 +403,12 @@ public struct JobStateMachine: Sendable {
     case .recoveryEvaluated(let decision):
       switch decision {
       case .resume(let evidence) where evidence.permitsResume:
+        if activeCompensation {
+          let outcome = try transition(to: .finalizing)
+          activeStep = nil
+          activeCompensation = false
+          return outcome
+        }
         let outcome = try transition(to: .resumeAtConfirmedSafeBoundary)
         activeStep = nil
         return outcome
@@ -413,7 +420,8 @@ public struct JobStateMachine: Sendable {
       case .confirmedFailure(let failure):
         let outcome = try transition(to: .finalizing)
         activeStep = nil
-        originalFailure = failure
+        if !activeCompensation { originalFailure = failure }
+        activeCompensation = false
         pendingFinalization = .failure
         return outcome
       }
@@ -510,6 +518,45 @@ public struct JobStateMachine: Sendable {
       )
     }
     activeStep = nil
+    activeCompensation = false
+  }
+
+  /// Finalization has its own dispatch lane. A source declaration and a
+  /// confirmed successful source are required; ordinary Workflow steps do
+  /// not gain permission to mutate merely because the Job is finalizing.
+  public mutating func authorizeCompensation(
+    _ descriptor: CompensationDescriptor,
+    declaredBy sourceStep: WorkflowStep,
+    sourceSucceeded: Bool
+  ) throws -> WorkflowStepDispatchAuthorization {
+    guard Self.permitsCompensationDispatch(from: state, mode: mode),
+      case .failure? = pendingFinalization,
+      descriptor.trigger == .onFailure || descriptor.trigger == .onAnyTerminal,
+      sourceSucceeded, sourceStep.compensationDescriptors.contains(descriptor)
+    else {
+      try rejectDispatch(
+        kind: .dispatchNotAllowedInState,
+        detail: "compensation \(descriptor.id) requires finalization and its confirmed source")
+    }
+    if let activeStep {
+      try rejectDispatch(
+        kind: .activeStepAlreadyAuthorized,
+        detail: "step \(activeStep.id) must finish before compensation \(descriptor.id)")
+    }
+    let step = try WorkflowStep(
+      id: descriptor.id, kind: descriptor.kind,
+      declaredEffect: descriptor.effect, declaredCancellation: descriptor.cancellation,
+      declaredBindingRequirement: descriptor.bindingRequirement,
+      arguments: descriptor.arguments)
+    activeStep = AuthorizedWorkflowStep(step: step)
+    activeCompensation = true
+    return .permitted
+  }
+
+  public static func permitsCompensationDispatch(
+    from state: JobState, mode: JobExecutionMode
+  ) -> Bool {
+    mode == .execute && state == .finalizing
   }
 
   private func normalDispatchPhasePermits(_ step: WorkflowStep) -> Bool {
@@ -607,7 +654,7 @@ public struct JobStateMachine: Sendable {
     case (_, .userAbandonRequested):
       [.interrupted, .waitingForRecovery]
     case (.execute, .finalizing):
-      [.succeeded, .recovered, .failed]
+      [.succeeded, .recovered, .failed, .waitingForRecovery]
     case (.planOnly, .finalizing):
       [.planned, .failed]
     case (_, .planned), (_, .succeeded), (_, .recovered), (_, .failed), (_, .cancelled),

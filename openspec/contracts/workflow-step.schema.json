@@ -1427,7 +1427,8 @@
             "restoreParameter",
             "cleanupOwnedRemotePath",
             "removePortForward",
-            "stopApplication"
+            "stopApplication",
+            "uninstallPackage"
           ]
         },
         "effect": {

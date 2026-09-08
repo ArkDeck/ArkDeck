@@ -333,8 +333,8 @@
   "x-arkdeck-method": "job.list",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 11,
-    "request": 27,
-    "result": 16
+    "error": 7,
+    "request": 15,
+    "result": 8
   }
 }

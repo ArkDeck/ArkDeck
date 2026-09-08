@@ -123,7 +123,7 @@
         { "properties": { "from": { "const": "resumeAtConfirmedSafeBoundary" }, "to": { "enum": ["running", "planning", "finalizing", "waitingForRecovery"] } }, "required": ["from", "to"] },
         { "properties": { "from": { "const": "userAbandonRequested" }, "to": { "enum": ["interrupted", "waitingForRecovery"] } }, "required": ["from", "to"] },
         { "properties": { "from": { "const": "recoveringByCompleteOverwrite" }, "to": { "enum": ["cancelRequested", "finalizing", "waitingForRecovery"] } }, "required": ["from", "to"] },
-        { "properties": { "from": { "const": "finalizing" }, "to": { "enum": ["planned", "succeeded", "recovered", "failed"] } }, "required": ["from", "to"] }
+        { "properties": { "from": { "const": "finalizing" }, "to": { "enum": ["planned", "succeeded", "recovered", "failed", "waitingForRecovery"] } }, "required": ["from", "to"] }
       ]
     },
     "outcomeCertainty": {
