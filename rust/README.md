@@ -92,6 +92,11 @@ boundary. `arkdeck-client` owns same-connection health and refusal handling;
 `arkdeck-cli` presents the current CLI envelope; `arkdeck-agentd` composes them.
 The black-box check also verifies these dependency edges.
 
+The macOS cleanup path retains each signal error and the owned child PID while
+waiting for the existing terminal-child and complete process-group proof. It
+resolves a transient `EPERM` only within the cleanup budget and before reaping;
+unproven groups, other signal errors and lost child ownership remain failures.
+
 The full 96-method contract remains the current single-v1 registry; the other
 92 methods are structurally understood and refused before a host handler.
 There is no Runtime capability owner, recovery, journal, durable target store,

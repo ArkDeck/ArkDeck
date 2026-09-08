@@ -73,7 +73,7 @@ impl Drop for RunningChild {
     }
 }
 
-pub(super) fn only_retained_zombie_remains(pid: libc::pid_t, group: bool) -> bool {
+pub(super) fn only_retained_zombie_remains(pid: libc::pid_t, group: bool) -> io::Result<bool> {
     // SAFETY: zero is a valid empty siginfo_t; WNOWAIT retains the owned PID.
     let mut info: libc::siginfo_t = unsafe { std::mem::zeroed() };
     // SAFETY: only queries the exact unreaped child and never blocks or reaps it.
@@ -85,12 +85,14 @@ pub(super) fn only_retained_zombie_remains(pid: libc::pid_t, group: bool) -> boo
             libc::WEXITED | libc::WNOHANG | libc::WNOWAIT,
         )
     } != 0
-        || info.si_pid != pid
     {
-        return false;
+        return Err(io::Error::last_os_error());
+    }
+    if info.si_pid != pid {
+        return Ok(false);
     }
     if !group {
-        return true;
+        return Ok(true);
     }
     // PROC_PGRP_ONLY is 2 in the active macOS SDK's sys/proc_info.h. The query
     // includes live and zombie members; a full/truncated result proves nothing.
@@ -112,11 +114,13 @@ pub(super) fn only_retained_zombie_remains(pid: libc::pid_t, group: bool) -> boo
         || returned as usize >= std::mem::size_of_val(&members)
         || !(returned as usize).is_multiple_of(std::mem::size_of::<libc::pid_t>())
     {
-        return false;
+        return Ok(false);
     }
-    members[..returned as usize / std::mem::size_of::<libc::pid_t>()]
-        .iter()
-        .all(|member| *member == pid)
+    Ok(
+        members[..returned as usize / std::mem::size_of::<libc::pid_t>()]
+            .iter()
+            .all(|member| *member == pid),
+    )
 }
 
 struct SpawnSettings {
