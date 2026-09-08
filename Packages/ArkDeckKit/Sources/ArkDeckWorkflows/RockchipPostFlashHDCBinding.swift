@@ -228,11 +228,21 @@ package struct RockchipPostFlashHDCBindingStore: Sendable {
   /// here invents a revision, lowers one, edits a target, rewrites evidence or
   /// resolves an unknown Job outcome: the superseded entry is archived beside
   /// the store and the same route is republished under the live revision.
+  ///
+  /// The five facts are the target and Loader identity from the durable target
+  /// store, and the HDC identity, connect key and USB topology of whatever is
+  /// physically attached right now. Every one is observed by the Runtime; none
+  /// is supplied by the caller as an assertion, and none can be satisfied by
+  /// handing this function a value copied out of the record it is judging.
+  /// The record's `buildVersion` is deliberately **not** a precondition: it can
+  /// only be read back over HDC, this is a host-local repair that dispatches
+  /// nothing to the device, and comparing the stored value against itself would
+  /// be the same empty guard as the one documented on `publish`.
   package func reconcileReissuedLineage(
     target: RuntimeTargetRecord,
     observedHDCIdentitySHA256: String,
     observedHDCConnectKey: String,
-    observedBuildVersion: String,
+    observedUSBTopology: String,
     nowUTC: String
   ) throws -> ReissuedLineageReconciliation? {
     try prepareRoot()
@@ -257,7 +267,7 @@ package struct RockchipPostFlashHDCBindingStore: Sendable {
       existing.stableLoaderIdentitySHA256 == target.stablePhysicalIdentitySHA256,
       existing.hdcIdentitySHA256 == observedHDCIdentitySHA256,
       existing.hdcConnectKey == observedHDCConnectKey,
-      existing.buildVersion == observedBuildVersion,
+      existing.usbTopology == observedUSBTopology,
       Self.isSHA256(observedHDCIdentitySHA256),
       Self.sha256(observedHDCConnectKey) == observedHDCIdentitySHA256,
       ISO8601Timestamps.parse(nowUTC) != nil

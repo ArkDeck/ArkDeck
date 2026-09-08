@@ -2618,6 +2618,24 @@
     },
     {
       "classification": "direct",
+      "conformanceFixture": "argv/flash.reconcile-alias.json",
+      "equivalentCommands": [],
+      "feature": "flash.reconcile-alias",
+      "implementationStatusByPlatform": {
+        "macos": "implemented",
+        "windows": "notImplemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos",
+        "windows"
+      ],
+      "source": "daemon:flash.reconcile-alias",
+      "targetClassification": "direct",
+      "targetCommand": "arkdeck flash reconcile-alias --target <target-id> --expected-binding-revision <n>"
+    },
+    {
+      "classification": "direct",
       "conformanceFixture": "argv/runtime.health.json",
       "equivalentCommands": [],
       "feature": "health",
@@ -4608,7 +4626,7 @@
   "summary": {
     "blocked": [],
     "byClassification": {
-      "direct": 125,
+      "direct": 126,
       "generic": 1,
       "internal": 4,
       "local": 88,
@@ -4620,9 +4638,9 @@
       "app": 68,
       "catalog": 30,
       "cli": 59,
-      "daemon": 96
+      "daemon": 97
     },
-    "entries": 253,
+    "entries": 254,
     "fullFunction": true
   }
 }

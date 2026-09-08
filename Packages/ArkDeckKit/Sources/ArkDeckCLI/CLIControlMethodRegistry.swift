@@ -149,6 +149,10 @@ enum CLIControlMethodRegistry {
     "agent.abandon",
     "human-action.resume",
     "flash.bind-current-loader",
+    // Host-only, but durable: it archives and republishes the Runtime's own
+    // post-flash alias. A lost response cannot prove whether that happened, so
+    // the caller re-reads `flash prerequisites` rather than repeating it.
+    "flash.reconcile-alias",
     "debug.start",
     "debug.evaluate",
     "debug.template.run",

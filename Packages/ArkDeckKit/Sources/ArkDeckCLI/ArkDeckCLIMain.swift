@@ -323,7 +323,8 @@ struct ArkDeckCommandLine {
     case "run":
       try await RuntimeCLI.runDomainOperation(
         path: ["flash", "run"], Array(arguments.dropFirst()))
-    case "device-access", "bootloader-status", "prerequisites", "lane-preview", "bind-loader":
+    case "device-access", "bootloader-status", "prerequisites", "lane-preview", "bind-loader",
+      "reconcile-alias":
       try RuntimeCLI.runFlashObservation(subcommand, Array(arguments.dropFirst()))
     default:
       // The retired verbs (plan, preview, execute, continue, postflight) are

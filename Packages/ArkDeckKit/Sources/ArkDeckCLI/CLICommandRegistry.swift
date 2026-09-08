@@ -2504,6 +2504,19 @@ enum CLICommandRegistry {
         ]),
         connectsToRuntime: true),
       CLILeafSpec(
+        token: "reconcile-alias",
+        canonicalCommand: "flash.reconcile-alias",
+        summary: "reconcile a post-flash alias whose revision counter was reissued",
+        options: runtimeClientOptions([
+          targetIDOption,
+          CLIOptionSpec(
+            name: "--expected-binding-revision",
+            form: .value(placeholder: "n", grammar: .positiveInteger(1...Int.max)),
+            summary: "revision the caller expects; a drift fails closed",
+            isRequired: true),
+        ]),
+        connectsToRuntime: true),
+      CLILeafSpec(
         token: "bind-loader",
         canonicalCommand: "flash.bind-loader",
         summary: "bind the currently attached Loader to this target, CAS on its revision",

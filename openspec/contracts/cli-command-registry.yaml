@@ -14756,6 +14756,82 @@
     "requiresExactlyOneOf": []
     "summary": "read-only preview of the lane plan an archive would anchor"
   - "catalogOperation": null
+    "command": "flash.reconcile-alias"
+    "connectsToRuntime": true
+    "kind": "executable"
+    "lifecycleStatus": "current"
+    "mutuallyExclusive":
+      - - "--output"
+        - "--json"
+    "options":
+      - "form": "value"
+        "grammar":
+          "kind": "opaque"
+        "name": "--target"
+        "placeholder": "target-id"
+        "published": true
+        "required": true
+        "stability": "standard"
+        "summary": "durable target identity"
+      - "form": "value"
+        "grammar":
+          "kind": "positiveInteger"
+          "minimum": 1
+        "name": "--expected-binding-revision"
+        "placeholder": "n"
+        "published": true
+        "required": true
+        "stability": "standard"
+        "summary": "revision the caller expects; a drift fails closed"
+      - "form": "value"
+        "grammar":
+          "kind": "enumeration"
+          "values":
+            - "human"
+            - "json"
+            - "jsonl"
+        "name": "--output"
+        "placeholder": "human|json"
+        "published": true
+        "required": false
+        "stability": "standard"
+        "summary": "output mode; machine modes emit one arkdeck.cli.result/1 document"
+      - "form": "flag"
+        "name": "--json"
+        "published": true
+        "required": false
+        "stability": "standard"
+        "summary": "legacy: print the raw reply as JSON, without the result envelope"
+      - "form": "value"
+        "grammar":
+          "kind": "pattern"
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+        "name": "--control-request-id"
+        "placeholder": "id"
+        "published": true
+        "required": false
+        "stability": "standard"
+        "summary": "correlate this control-plane call; not a Job or request identity"
+      - "form": "value"
+        "grammar":
+          "kind": "opaque"
+        "name": "--socket"
+        "placeholder": "absolute-path"
+        "published": false
+        "required": false
+        "stability": "macosCompatibilityOnly"
+        "summary": "macOS-only compatibility alias for the local Runtime endpoint"
+    "outputModes":
+      - "human"
+      - "json"
+    "path":
+      - "flash"
+      - "reconcile-alias"
+    "positionals": []
+    "replacementArgvPattern": null
+    "requiresExactlyOneOf": []
+    "summary": "reconcile a post-flash alias whose revision counter was reissued"
+  - "catalogOperation": null
     "command": "flash.bind-loader"
     "connectsToRuntime": true
     "kind": "executable"

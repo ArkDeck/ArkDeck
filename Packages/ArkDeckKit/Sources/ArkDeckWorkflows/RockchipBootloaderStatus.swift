@@ -240,6 +240,120 @@ package protocol RockchipBindingReactivationProving: Sendable {
 /// identity/topology fact afresh, applies Core's manual USB rebind policy, and
 /// either activates an exact revision-1 target or advances the same target's
 /// HDC-to-Loader lineage.
+/// Host-local repair of a post-flash alias whose revision was issued by a
+/// target store that no longer exists. It dispatches nothing to the device: the
+/// only facts it uses are the durable target record and the USB identities the
+/// host can see right now.
+public protocol RockchipPostFlashAliasReconciling: Sendable {
+  func reconcileReissuedAlias(
+    targetID: String,
+    expectedBindingRevision: Int
+  ) throws -> RockchipPostFlashAliasReconciliationReceipt
+}
+
+/// What the Runtime did, and to which route. Never carries the raw connect key.
+public struct RockchipPostFlashAliasReconciliationReceipt: Sendable, Equatable {
+  public let targetID: String
+  public let reconciled: Bool
+  public let archivedBindingRevision: Int?
+  public let bindingRevision: Int
+  public let hdcIdentitySHA256: String
+
+  public init(
+    targetID: String, reconciled: Bool, archivedBindingRevision: Int?,
+    bindingRevision: Int, hdcIdentitySHA256: String
+  ) {
+    self.targetID = targetID
+    self.reconciled = reconciled
+    self.archivedBindingRevision = archivedBindingRevision
+    self.bindingRevision = bindingRevision
+    self.hdcIdentitySHA256 = hdcIdentitySHA256
+  }
+}
+
+package struct ProductRockchipPostFlashAliasReconciler:
+  RockchipPostFlashAliasReconciling, Sendable
+{
+  private let targetStore: RuntimeTargetStore
+  private let postFlashStore: RockchipPostFlashHDCBindingStore
+  private let usbProbe: RockchipProductUSBProbe
+  private let nowUTC: @Sendable () -> String
+
+  public init(
+    targetStore: RuntimeTargetStore,
+    applicationSupportRoot: URL,
+    nowUTC: @escaping @Sendable () -> String = {
+      let formatter = ISO8601DateFormatter()
+      formatter.formatOptions = [.withInternetDateTime]
+      return formatter.string(from: Date())
+    }
+  ) {
+    self.targetStore = targetStore
+    self.postFlashStore = RockchipPostFlashHDCBindingStore(rootURL: applicationSupportRoot)
+    self.usbProbe = RockchipProductUSBProbe()
+    self.nowUTC = nowUTC
+  }
+
+  init(
+    targetStore: RuntimeTargetStore,
+    postFlashStore: RockchipPostFlashHDCBindingStore,
+    usbProbe: RockchipProductUSBProbe,
+    nowUTC: @escaping @Sendable () -> String
+  ) {
+    self.targetStore = targetStore
+    self.postFlashStore = postFlashStore
+    self.usbProbe = usbProbe
+    self.nowUTC = nowUTC
+  }
+
+  public func reconcileReissuedAlias(
+    targetID: String,
+    expectedBindingRevision: Int
+  ) throws -> RockchipPostFlashAliasReconciliationReceipt {
+    // Compare-and-swap on the caller's view of the target, exactly as the
+    // Loader binding leaf does. A caller working from a stale revision must
+    // not reconcile anything.
+    guard !targetID.isEmpty, expectedBindingRevision > 0,
+      let target = try targetStore.find(targetID: targetID),
+      target.bindingRevision == expectedBindingRevision
+    else {
+      throw RockchipFlashExecutionError.admissionRejected(
+        "selected target or binding revision is stale")
+    }
+    // The board has to be here, in its hdc-normal personality, and be the only
+    // registered DAYU200 attached. A Loader-mode board cannot answer for the
+    // hdc-normal alias this store describes.
+    let identities = try usbProbe.registeredDAYU200Identities()
+    guard identities.count == 1, let identity = identities.first,
+      identity.isRegisteredDAYU200Mode, !identity.isLoader
+    else {
+      throw RockchipFlashExecutionError.admissionRejected(
+        "exactly one registered DAYU200 in hdc-normal mode is required to reconcile its alias")
+    }
+    guard
+      let outcome = try postFlashStore.reconcileReissuedLineage(
+        target: target,
+        observedHDCIdentitySHA256: SHA256Hex.string(of: Data(identity.serial.utf8)),
+        observedHDCConnectKey: identity.serial,
+        observedUSBTopology: identity.topology,
+        nowUTC: nowUTC())
+    else {
+      // Either there is nothing to reconcile, or the stored alias does not
+      // describe what is attached. Both keep the store exactly as it is; the
+      // original refusal continues to govern admission.
+      throw RockchipFlashExecutionError.admissionRejected(
+        "the stored post-flash alias is not a reissued lineage of the attached device; "
+          + "its target, Loader identity, HDC identity, connect key and USB topology must all "
+          + "match fresh facts and its revision must be ahead of the live target")
+    }
+    return RockchipPostFlashAliasReconciliationReceipt(
+      targetID: outcome.targetID, reconciled: true,
+      archivedBindingRevision: outcome.archivedRevision,
+      bindingRevision: outcome.publishedRevision,
+      hdcIdentitySHA256: outcome.hdcIdentitySHA256)
+  }
+}
+
 package struct ProductRockchipLoaderBindingCoordinator:
   RockchipLoaderBindingCoordinating, Sendable
 {

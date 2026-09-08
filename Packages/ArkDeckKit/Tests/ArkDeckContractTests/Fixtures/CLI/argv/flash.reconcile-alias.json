@@ -1,0 +1,148 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "flash",
+        "reconcile-alias",
+        "--target",
+        "sample",
+        "--expected-binding-revision",
+        "1"
+      ],
+      "expected": {
+        "command": "flash.reconcile-alias",
+        "handlerArguments": [
+          "flash",
+          "reconcile-alias",
+          "--target",
+          "sample",
+          "--expected-binding-revision",
+          "1"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "flash",
+        "reconcile-alias",
+        "--help"
+      ],
+      "expected": {
+        "command": "flash.reconcile-alias",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "flash",
+        "reconcile-alias",
+        "--target",
+        "sample",
+        "--expected-binding-revision",
+        "1",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "flash.reconcile-alias",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "flash",
+        "reconcile-alias",
+        "--target",
+        "sample",
+        "--expected-binding-revision",
+        "1",
+        "--target",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "flash.reconcile-alias",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "flash",
+        "reconcile-alias"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "flash.reconcile-alias",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "flash",
+        "reconcile-alias",
+        "--target",
+        "sample",
+        "--expected-binding-revision",
+        "1",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "flash.reconcile-alias",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "flash",
+        "reconcile-alias",
+        "--target",
+        "sample",
+        "--expected-binding-revision",
+        "1",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "flash.reconcile-alias",
+        "handlerArguments": [
+          "flash",
+          "reconcile-alias",
+          "--target",
+          "sample",
+          "--expected-binding-revision",
+          "1",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "flash.reconcile-alias",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "flash",
+    "reconcile-alias"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}
