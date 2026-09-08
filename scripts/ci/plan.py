@@ -493,6 +493,12 @@ def local_commands(repo_root: pathlib.Path, plan: CIPlan) -> tuple[tuple[str, ..
                 # vet --locked freezes cargo metadata too. Fetch the complete
                 # graph first, including dependencies for other host targets.
                 ("cargo", "fetch", "--locked"),
+                # Every other rust check reads Git objects at the pinned Swift
+                # commit or regenerates its own candidate view under
+                # rust/target, so none of them compiles the checkout. Clippy
+                # and the workspace tests are the only lane members that do.
+                ("cargo", "clippy", "--workspace", "--all-targets", "--", "-D", "warnings"),
+                ("cargo", "test", "--workspace"),
                 (sys.executable, "rust/scripts/test_contract_checks.py"),
                 (sys.executable, "rust/scripts/check-contracts.py"),
                 ("cargo", "deny", "--locked", "check"),
