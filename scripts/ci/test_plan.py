@@ -369,6 +369,7 @@ class CommandSelectionTests(unittest.TestCase):
             "cargo fetch --locked",
             "cargo clippy --workspace --all-targets --locked -- -D warnings",
             "cargo test --workspace --locked",
+            "cargo run --package arkdeck-platform --example windows_spk3 --locked -- process-selftest",
             "cargo build --workspace --bins --locked",
             "cargo deny --locked check",
             "cargo vet --locked --no-registry-suggestions",

@@ -5891,10 +5891,10 @@ public actor RuntimeJobEngine {
       let persistedAction = runtime.record.recoveryAction,
       let intentEventID = runtime.record.recoveryIntentEventID
     else {
-      // A lane-dispatched flash persists no exact typed action: its writes ran
-      // in `arkforged` under step permits, and their receipts live in that
-      // daemon's journal — not this engine's to parse. The device itself is
-      // the ground truth such a job reconciles against.
+      // A delegated plan has one durable intent and daemon correlation. Only
+      // that exact daemon's canonical complete-plan receipt can settle it.
+      // Reading the expected firmware cannot establish every partition write
+      // or readback, and cannot release an unresolved destructive effect.
       if ArkForgeFlashOperation.containsDurableRecordReference(
         runtime.record.operationReference)
       {
@@ -5906,7 +5906,7 @@ public actor RuntimeJobEngine {
         {
           return settled
         }
-        return try await reconcileLaneFlashAgainstDevice(
+        return try await recordUnprovenLaneRecovery(
           runtime: &runtime, inspection: inspection, provider: provider)
       }
       throw RuntimeJobEngineError.internalFailure(
@@ -6258,7 +6258,7 @@ public actor RuntimeJobEngine {
   /// receipt (the crash window between receipt persistence and step outcome)
   /// or a terminal event observed from that exact daemon job. It never starts
   /// execution or answers an admission. Inconclusive/failed daemon terminals
-  /// fall through to the independent read-only device reconciliation below.
+  /// retain uncertainty; a later device build read is not completion proof.
   private func reconcileLaneAgainstDaemonTerminal(
     runtime: inout JobRuntime,
     inspection initialInspection: JournalReplay,
@@ -6288,7 +6288,7 @@ public actor RuntimeJobEngine {
           cancelledSafe = true
         case .confirmedFailed(let reason, _):
           runtime.record.timeline.append(
-            "correlated arkforged terminal is confirmedFailed; device readback required: \(reason)")
+            "correlated arkforged terminal is confirmedFailed without complete-plan proof: \(reason)")
         case .outcomeUnknown(let reason, _):
           runtime.record.timeline.append(
             "correlated arkforged terminal remains unknown: \(reason)")
@@ -6308,7 +6308,7 @@ public actor RuntimeJobEngine {
           durableReceipt, jobID: jobID, execution: execution)
       } catch {
         runtime.record.timeline.append(
-          "correlated arkforged completion receipt is non-canonical; device readback required")
+          "correlated arkforged completion receipt is non-canonical; uncertainty retained")
         try persistRuntimeRecord(runtime.record)
         jobs[jobID] = runtime
         return nil
@@ -6398,28 +6398,12 @@ public actor RuntimeJobEngine {
       successSummary: Self.arkForgePlanCompletionSummary(receipt))
   }
 
-  /// Reconciles an unknown ArkForge-lane flash against the device itself.
-  ///
-  /// A lane job has no persisted exact typed action to re-verify: the writes
-  /// ran in `arkforged` under step permits, and their receipts live in that
-  /// daemon's journal — which is arkforged's private record, not this
-  /// engine's to parse. What this authority *can* establish on its own is the
-  /// device's post-flash truth, and it is the same fact the plan's postflight
-  /// asserts: exactly one bound HDC identity at the recorded alias topology
-  /// answering the exact product model and build the job's bundle declares.
-  ///
-  /// If the device answers, the flash as a whole demonstrably took effect —
-  /// the job settles `recovered` and its capability use closes `.confirmed`,
-  /// which lets the generation roll. If it does not answer, nothing is
-  /// invented: the job returns to `waitingForRecovery` with the reason on its
-  /// timeline, and the use stays unknown.
-  ///
-  /// Measured 2026-08-18 on job-fb3da3c21320542f4fe82e2e82c589d5: all nine
-  /// partitions carried semantic receipts in arkforged's journal and the
-  /// device answered `const.ohos.fullname=OpenHarmony-7.0.0.37` by hand,
-  /// while `reconcile` could only throw "no persisted exact typed action" and
-  /// the unknown use held the destructive lineage shut.
-  private func reconcileLaneFlashAgainstDevice(
+  /// Closes this reconciliation attempt without resolving its original
+  /// destructive intent. Missing or mismatched daemon proof cannot be replaced
+  /// by a successful build readback: it does not prove the complete effect set.
+  /// A future exact terminal receipt or independently proven complete-overwrite
+  /// recovery remains available through its existing Runtime-owned path.
+  private func recordUnprovenLaneRecovery(
     runtime: inout JobRuntime,
     inspection initialInspection: JournalReplay,
     provider: any DeviceProvider
@@ -6438,7 +6422,7 @@ public actor RuntimeJobEngine {
     if inspection.currentState == .waitingForRecovery {
       try transition(
         &runtime, from: .waitingForRecovery, to: .reconciling,
-        reason: "begin lane postflight reconciliation")
+        reason: "record missing delegated-plan recovery proof")
       inspection = try DurableJournalRecovery.inspect(url: journalURL)
     }
     // Attempt bookkeeping identical to the exact-typed path: an attempt that
@@ -6478,118 +6462,40 @@ public actor RuntimeJobEngine {
           schemaVersion: JournalEvent.schemaVersion))
       runtime.nextSequence += 1
       runtime.record.timeline.append(
-        "reconcile started rebind-and-verify-build (lane postflight)")
+        "reconcile requires a correlated complete-plan receipt")
       jobs[jobID] = runtime
-      inspection = try DurableJournalRecovery.inspect(url: journalURL)
     }
 
-    guard
-      let descriptor = RuntimeOperationCatalog.descriptor(
-        reference: runtime.record.request.operation.reference),
-      let verifyStep = descriptor.steps.first(where: {
-        $0.stepID == "rebind-and-verify-build"
-      })
-    else {
-      throw RuntimeJobEngineError.internalFailure(
-        "ArkForge Flash operation lost its rebind-and-verify-build step")
-    }
-
-    var verified = false
-    var detail = ""
-    do {
-      let facts = try await providers.resolveFacts(
-        providerID: runtime.record.providerID,
-        targetID: runtime.record.request.target.targetID)
-      try Self.validateEvidenceFacts(
-        facts,
-        targetID: runtime.record.request.target.targetID,
-        bindingRevision: runtime.record.request.target.expectedBindingRevision,
-        providerID: runtime.record.providerID)
-      let artifact = try await resolvedInputArtifact(jobID: jobID)
-      let context = ProviderExecutionContext(
-        jobID: jobID,
-        stepID: Self.reconciliationStepID(
-          originalStepID: "rebind-and-verify-build",
-          recoveryAttemptID: recoveryAttemptID),
-        targetID: runtime.record.request.target.targetID,
-        bindingRevision: runtime.record.request.target.expectedBindingRevision,
-        connectKey: facts.executionConnectKey,
-        expectedIdentitySHA256: facts.deviceIdentitySHA256,
-        toolVersion: facts.toolVersion,
-        toolSHA256: facts.toolSHA256,
-        serverFacts: facts.serverFacts,
-        nowUTC: nowUTC(),
-        resolvedInputArtifact: artifact,
-        expectedRuntimeBuildVersion: declaredRuntimeBuildVersion(
-          for: descriptor, artifact: artifact,
-          artifactLeaseID: Self.flashArtifactLeaseID(
-            in: runtime.record.request.inputs)))
-      let action = try provider.action(
-        for: verifyStep,
-        operation: ArkForgeFlashOperation.canonicalDescriptor(
-          for: descriptor.reference) ?? descriptor,
-        inputs: try ArkForgeFlashRequest.canonicalInputs(
-          submittedReference: descriptor.reference,
-          inputs: runtime.record.request.inputs),
-        context: context)
-      guard action.effect <= .readOnly else {
-        throw RuntimeJobEngineError.internalFailure(
-          "lane postflight reconciliation produced a non-read-only action")
-      }
-      let plan = try provider.lower(action: action, context: context)
-      _ = try await dispatcher.dispatch(plan)
-      verified = true
-      detail = "the bound device answers the declared build"
-    } catch {
-      verified = false
-      detail = "lane postflight did not verify: \(error)"
-    }
-
-    let nextState: JobState = verified ? .finalizing : .waitingForRecovery
+    let detail = "flash.recoveryProofMissing: no correlated complete-plan receipt; "
+      + "a model/build readback cannot prove all destructive effects"
     let reconcileOutcome = try JournalEvent.reconcileOutcome(
       eventID: "reconcile-outcome-\(runtime.nextSequence)",
       sequence: runtime.nextSequence,
       sessionID: runtime.record.sessionID,
       jobID: jobID,
       timestamp: nowUTC(),
-      bindingRevision: verified ? runtime.record.materializedBindingRevision : nil,
+      bindingRevision: nil,
       recoveryAttemptID: recoveryAttemptID,
-      result: verified ? "finalizeLanePostflightRecovered" : "waitingForRecovery",
-      nextState: nextState,
-      outcomeCertainty: verified ? .confirmed : .outcomeUnknown,
-      safeBoundaryConfirmed: verified,
+      result: "waitingForRecovery",
+      nextState: .waitingForRecovery,
+      outcomeCertainty: .outcomeUnknown,
+      safeBoundaryConfirmed: false,
       evidence: [detail],
       schemaVersion: JournalEvent.schemaVersion)
     try runtime.journal.appendAndSynchronize(reconcileOutcome)
     runtime.nextSequence += 1
     try transition(
-      &runtime, from: .reconciling, to: nextState,
-      reason: "persist lane postflight reconcile decision: \(detail)",
+      &runtime, from: .reconciling, to: .waitingForRecovery,
+      reason: "persist delegated-plan recovery refusal: \(detail)",
       triggerEventID: reconcileOutcome.eventID)
 
-    if verified {
-      try transition(
-        &runtime, from: .finalizing, to: .recovered,
-        reason: "lane postflight verified the flashed device")
-      runtime.record.outcomeUnknown = false
-      runtime.record.operationFailure = nil
-      runtime.record.finishedAtUTC = nowUTC()
-      runtime.record.timeline.append(
-        "reconciled: lane postflight verified the flashed device")
-      try persistRuntimeRecord(runtime.record)
-      jobs[jobID] = runtime
-      try await recordCapabilityOutcome(
-        for: runtime.record, outcome: .confirmed,
-        state: JobState.recovered.rawValue)
-    } else {
-      runtime.record.outcomeUnknown = true
-      runtime.record.timeline.append("reconcile inconclusive: \(detail)")
-      try persistRuntimeRecord(runtime.record)
-      jobs[jobID] = runtime
-      try await recordCapabilityOutcome(
-        for: runtime.record, outcome: .outcomeUnknown,
-        state: JobState.waitingForRecovery.rawValue)
-    }
+    runtime.record.outcomeUnknown = true
+    runtime.record.timeline.append("reconcile inconclusive: \(detail)")
+    try persistRuntimeRecord(runtime.record)
+    jobs[jobID] = runtime
+    try await recordCapabilityOutcome(
+      for: runtime.record, outcome: .outcomeUnknown,
+      state: JobState.waitingForRecovery.rawValue)
     return statusAndReleaseTerminalRuntime(runtime.record, provider: provider)
   }
 

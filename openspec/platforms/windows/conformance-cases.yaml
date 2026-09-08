@@ -12,7 +12,8 @@ support_cells:
 notes: >-
   This is a proposed case skeleton for maintainer PR review, not a run record,
   support declaration or replacement for the current Core conformance suite.
-  Every case below is NOT_RUN on Windows. A support cell is a planned test
+  Every case below remains NOT_RUN for the required Windows 11 support tuple.
+  Windows Server hosted test results are recorded separately. A support cell is a planned test
   input; exact OS build, installed binary identity, package and tool tuple must
   be recorded by an actual run. A cross-build, fixture or hosted run does not
   supply the DAYU200 acceptance result. Additional Windows Golden Journey

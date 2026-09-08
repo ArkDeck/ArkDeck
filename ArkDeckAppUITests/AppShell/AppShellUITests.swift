@@ -136,6 +136,104 @@ final class AppShellUITests: XCTestCase {
     add(evidence)
   }
 
+  /// Reads an existing production Flash record whose typed steps are unknown.
+  /// No reconcile, replay or device action is requested by this presentation test.
+  func testRealRuntimeHistoryKeepsUnknownFlashEvidenceInspectableInBothLanguages() throws {
+    guard let jobID = ProcessInfo.processInfo.environment["ARKDECK_REAL_RUNTIME_UNKNOWN_FLASH_JOB_ID"],
+      jobID.hasPrefix("job-"), jobID.count > 4
+    else { throw XCTSkip("Supply an existing unknown Flash Job with unreported typed steps") }
+
+    for (language, unreported) in [("(en)", "Not reported"), ("(zh-Hans)", "未报告")] {
+      let app = XCUIApplication()
+      app.launchArguments = [
+        "-ApplePersistenceIgnoreState", "YES", "-NSQuitAlwaysKeepsWindows", "NO",
+        "--ui-test-auto-update-idle", "--ui-test-reset-shell-selection",
+        "-AppleLanguages", language,
+      ]
+      app.launch()
+      app.activate()
+      defer { app.terminate() }
+      XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 15))
+      select("app.navigation.history", in: app)
+      XCTAssertTrue(element("history.table", in: app).waitForExistenceFast(timeout: 30))
+      let search = app.textFields["history.filter.search"]
+      XCTAssertTrue(search.waitForExistenceFast(timeout: 10))
+      search.click()
+      search.typeKey("a", modifierFlags: .command)
+      search.typeText(jobID)
+      assertDisplayed(element("history.detail.job", in: app), equals: jobID, timeout: 30)
+      assertDisplayed(
+        element("history.detail.operation", in: app), equals: "flash.full-restore@1", timeout: 30)
+      XCTAssertTrue(element("history.detail.outcomeUnknown", in: app).waitForExistenceFast(timeout: 10))
+      assertDisplayed(element("history.evidence.provider", in: app), equals: "arkforge", timeout: 30)
+      let unknownSteps = element("history.evidence.steps.unreported", in: app)
+      XCTAssertTrue(unknownSteps.waitForExistenceFast(timeout: 10))
+      scrollIntoView(unknownSteps, in: app)
+      assertDisplayed(unknownSteps, equals: unreported)
+      XCTAssertFalse(element("history.evidence.steps", in: app).exists)
+      let evidence = XCTAttachment(screenshot: app.windows.firstMatch.screenshot())
+      evidence.name = "Unknown Flash evidence retained in History \(language)"
+      evidence.lifetime = .keepAlways
+      add(evidence)
+    }
+  }
+
+  /// Compares the production Settings scene with a saved read-only CLI result.
+  /// Cancelling the folder picker must preserve the current Runtime settings.
+  func testRealRuntimeStorageSettingsMatchReadbackInBothLanguages() throws {
+    guard let path = ProcessInfo.processInfo.environment["ARKDECK_REAL_RUNTIME_STORAGE_STATUS"]
+    else { throw XCTSkip("Supply the current runtime storage status JSON result") }
+    let bytes = try Data(contentsOf: URL(fileURLWithPath: path))
+    XCTAssertLessThan(bytes.count, 32_768)
+    let envelope = try XCTUnwrap(JSONSerialization.jsonObject(with: bytes) as? [String: Any])
+    XCTAssertEqual(envelope["command"] as? String, "runtime.storage.status")
+    XCTAssertEqual(envelope["ok"] as? Bool, true)
+    let result = try XCTUnwrap(envelope["result"] as? [String: Any])
+    let session = try XCTUnwrap(result["sessionDomain"] as? [String: Any])
+    let rootPath = try XCTUnwrap(session["rootPath"] as? String)
+    let policy = try XCTUnwrap(session["policy"] as? [String: String])
+    let quota = try XCTUnwrap(policy["totalQuotaBytes"].flatMap(UInt64.init))
+    let margin = try XCTUnwrap(policy["safetyMarginBytes"].flatMap(UInt64.init))
+    let retention = try XCTUnwrap(policy["retentionDays"])
+
+    for (language, storageTitle, cancelTitle) in [
+      ("(en)", "Storage", "Cancel"), ("(zh-Hans)", "存储", "取消"),
+    ] {
+      let app = XCUIApplication()
+      app.launchArguments = [
+        "-ApplePersistenceIgnoreState", "YES", "-NSQuitAlwaysKeepsWindows", "NO",
+        "--ui-test-auto-update-idle", "--ui-test-reset-shell-selection",
+        "-AppleLanguages", language,
+      ]
+      app.launch()
+      app.activate()
+      defer { app.terminate() }
+      XCTAssertTrue(app.windows.firstMatch.waitForExistence(timeout: 15))
+      openSettings(in: app)
+      settingsPane(storageTitle, in: app).click()
+      let chooseRoot = app.buttons["settings.storage.chooseRoot"]
+      XCTAssertTrue(chooseRoot.waitForExistenceFast(timeout: 30))
+      XCTAssertTrue(app.staticTexts[rootPath].waitForExistenceFast(timeout: 10))
+      assertDisplayed(app.textFields["settings.storage.quota"], equals: String(quota / 1_073_741_824))
+      assertDisplayed(app.textFields["settings.storage.margin"], equals: String(margin / 1_073_741_824))
+      assertDisplayed(app.textFields["settings.storage.retention"], equals: retention)
+      XCTAssertFalse(element("settings.error.refresh", in: app).exists)
+
+      chooseRoot.click()
+      let cancel = app.sheets.buttons[cancelTitle].firstMatch
+      XCTAssertTrue(cancel.waitForExistenceFast(timeout: 10))
+      cancel.click()
+      XCTAssertTrue(cancel.waitForNonExistenceFast(timeout: 10))
+      XCTAssertTrue(app.staticTexts[rootPath].exists)
+      assertDisplayed(app.textFields["settings.storage.quota"], equals: String(quota / 1_073_741_824))
+      let evidence = XCTAttachment(
+        screenshot: app.windows["com_apple_SwiftUI_Settings_window"].screenshot())
+      evidence.name = "Production storage settings and cancelled folder selection \(language)"
+      evidence.lifetime = .keepAlways
+      add(evidence)
+    }
+  }
+
   /// One presentation-only App instance per language, with named activities
   /// instead of a fresh process for each History/recovery assertion group.
   /// Fixture state changes use the existing read-only provider and normal

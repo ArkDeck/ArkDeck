@@ -15,8 +15,9 @@ Windows 版是同一 ArkDeck 产品的另一个 Port。开发 Windows App 时只
 
 0.2.0 登记 [CHG-2026-074](../../changes/chg-2026-074-shared-rust-runtime-core/proposal.md)
 提出的共享 Rust Runtime 目标和 [Windows 验收骨架](conformance-cases.yaml)，本次 PR
-仍需维护者审查。W0/SPK-3 目前只有实现、脚本和用例准备；这里没有 Windows 原生执行
-或 DAYU200 结果，Conformance 保持 `notStarted`，不构成 `supported` 或 release 声明。
+仍需维护者审查。Windows Server 2025 hosted CI 已运行契约、平台拒绝测试和 CLI 录制；
+Windows 11 x64 上的完整 W0/SPK-3 与 DAYU200 验收仍未执行。Conformance 保持
+`notStarted`，不构成 `supported` 或 release 声明，具体结果见下文 XPA-002 实现记录。
 
 目标为 `arkdeck-agentd` 经用户私有 named pipe 服务原生客户端。当前基础仅有 `doctor`、
 `operation list`、`device candidates` 的 CLI/IPC 只读路径；Catalog operation 全部报告

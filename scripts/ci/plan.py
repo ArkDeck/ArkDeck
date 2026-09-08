@@ -460,6 +460,10 @@ def local_commands(repo_root: pathlib.Path, plan: CIPlan) -> tuple[tuple[str, ..
                     "--", "-D", "warnings",
                 ),
                 ("cargo", "test", "--workspace", "--locked"),
+                (
+                    "cargo", "run", "--package", "arkdeck-platform", "--example",
+                    "windows_spk3", "--locked", "--", "process-selftest",
+                ),
                 ("cargo", "build", "--workspace", "--bins", "--locked"),
                 (sys.executable, "rust/scripts/check-readonly.py"),
                 ("cargo", "deny", "--locked", "check"),

@@ -34,7 +34,7 @@ change_rule: >-
   verified is scoped to the exact OS/arch/build tuples actually evidenced.
   CHG-2026-074 proposes the shared Rust strategy in all three profiles for
   maintainer PR review. Windows profile 0.2.0 and its case manifest register
-  W0/XPA-002 preparation only; every native Windows case is NOT_RUN, and no
+  W0/XPA-002 preparation only; every required Windows 11 case is NOT_RUN, and no
   support cell or spike execution is approved by this lock entry. Linux L0
   remains unstarted. The delivery lists, conformance statuses and last_verified
   values above are unchanged; compilation and hosted CI do not advance them.

@@ -1119,6 +1119,152 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     }
   }
 
+  func testUnpublishablePostFlashAliasRefusesPlanAndSubmitBeforeCapabilityOrDeviceWork()
+    async throws
+  {
+    for conflict in ["newer-revision", "different-target", "different-loader"] {
+      let root = try temporaryDirectory()
+      defer { try? FileManager.default.removeItem(at: root) }
+      let fixture = try boundFactsFixture(root: root)
+      _ = try fixture.postFlashStore.publish(
+        fixture.alias(
+          targetID: conflict == "different-target" ? "TGT-OTHER" : fixture.target.targetID,
+          revision: conflict == "newer-revision" ? 4 : fixture.target.bindingRevision,
+          loaderIdentity: conflict == "different-loader"
+            ? String(repeating: "f", count: 64) : fixture.target.stablePhysicalIdentitySHA256),
+        expectedPreviousHDCIdentitySHA256: fixture.previousHDCDigest)
+      let protectedFiles = [
+        root.appending(path: "targets/targets.json"),
+        root.appending(path: "binding/rockchip-binding.json"),
+        root.appending(path: "binding/rockchip-post-flash-hdc-binding.json"),
+      ]
+      let bytesBefore = try protectedFiles.map { try Data(contentsOf: $0) }
+
+      do {
+        _ = try await fixture.port.currentFacts(targetID: fixture.target.targetID)
+        XCTFail("\(conflict) must not fall back to the binding's HDC alias")
+      } catch let DeviceProviderError.factsUnavailable(detail) {
+        XCTAssertTrue(detail.contains("flash.postFlashHDCBindingConflict"), detail)
+      }
+      do {
+        _ = try await fixture.port.observePrerequisites(targetID: fixture.target.targetID)
+        XCTFail("the App prerequisite reader must refuse the same conflict")
+      } catch let DeviceProviderError.factsUnavailable(detail) {
+        XCTAssertTrue(detail.contains("flash.postFlashHDCBindingConflict"), detail)
+      }
+
+      let state = root.appending(path: "Agentd", directoryHint: .isDirectory)
+      try FileManager.default.createDirectory(
+        at: state, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+      let artifacts = try RuntimeArtifactStore(
+        rootURL: state.appending(path: "artifacts", directoryHint: .isDirectory),
+        nowUTC: { "2026-09-07T08:00:00Z" })
+      let input = try await artifacts.publish(
+        RuntimeArtifactPublicationRequest(
+          jobID: "job-alias-input", sessionID: "session-alias-input",
+          stepID: "import-flash-bundle", name: "images.tar.gz",
+          mediaType: "application/gzip", privacy: .standard,
+          retentionClass: .pinnedUntilVerified,
+          sourceOperation: "artifact.import-flash-bundle", providerID: "host",
+          bindingSnapshot: ArtifactBindingSnapshot(
+            targetID: fixture.target.targetID, bindingRevision: fixture.target.bindingRevision,
+            stableIdentitySHA256: fixture.target.stablePhysicalIdentitySHA256),
+          contents: Data("the alias conflict must precede archive materialization".utf8)))
+      let lease = try await artifacts.leaseReference(jobID: input.jobID, artifactID: input.artifactID)
+      let capabilities = try RuntimeCapabilityStore(
+        directoryURL: state.appending(path: "capabilities", directoryHint: .isDirectory))
+      let dispatches = DispatchLog()
+      let engine = try RuntimeJobEngine(
+        configuration: .init(stateDirectory: state),
+        providers: DeviceProviderRegistry(providers: [
+          ArkForgeFlashProviderAdapter(factsPort: fixture.port, availability: .available)
+        ]),
+        dispatcher: RecordingDispatcher(provider: "arkforge", log: dispatches, reason: nil),
+        capabilityStore: capabilities, artifactStore: artifacts,
+        nowUTC: { "2026-09-07T08:00:00Z" })
+      let request = try RuntimeOperationRequest(
+        requestID: "alias-conflict-\(conflict)", idempotencyKey: "alias-conflict-\(conflict)",
+        target: DurableTargetReference(
+          targetID: fixture.target.targetID, expectedBindingRevision: fixture.target.bindingRevision),
+        operation: RuntimeOperationReference(id: "flash.full-restore", version: 1),
+        inputs: [
+          "artifactLease": .string(lease), "deviceProfileRef": .string("dayu200"),
+          "intent": .string("fullRestore"), "verification": .string("full"),
+        ])
+      let data = try CanonicalJSONEncoders.canonical().encode(request)
+      do {
+        _ = try await engine.planOnly(data)
+        XCTFail("the exact-plan preview must report \(conflict)")
+      } catch let RuntimeJobEngineError.rejected(code, detail) {
+        XCTAssertEqual(code, .invalidInput)
+        XCTAssertTrue(detail.contains("flash.postFlashHDCBindingConflict"), detail)
+      }
+      do {
+        _ = try await engine.submit(data)
+        XCTFail("\(conflict) must refuse before admitting a destructive Job")
+      } catch let RuntimeJobEngineError.rejected(code, detail) {
+        XCTAssertEqual(code, .invalidInput)
+        XCTAssertTrue(detail.contains("flash.postFlashHDCBindingConflict"), detail)
+      }
+      let observed = await fixture.probe.observedConnectKeys()
+      let dispatched = await dispatches.snapshot()
+      let issued = try await capabilities.list()
+      XCTAssertTrue(observed.isEmpty, conflict)
+      XCTAssertTrue(dispatched.isEmpty, conflict)
+      XCTAssertTrue(issued.isEmpty, conflict)
+      XCTAssertTrue(try RuntimeJobRepository(stateDirectory: state).allJobs().isEmpty, conflict)
+      XCTAssertEqual(try protectedFiles.map { try Data(contentsOf: $0) }, bytesBefore, conflict)
+    }
+  }
+
+  func testAbsentAndEarlierPostFlashAliasesKeepTheCurrentBindingUsable() async throws {
+    for earlierAlias in [false, true] {
+      let root = try temporaryDirectory()
+      defer { try? FileManager.default.removeItem(at: root) }
+      let fixture = try boundFactsFixture(root: root)
+      if earlierAlias {
+        _ = try fixture.postFlashStore.publish(
+          fixture.alias(
+            targetID: fixture.target.targetID, revision: 1,
+            loaderIdentity: String(repeating: "e", count: 64)),
+          expectedPreviousHDCIdentitySHA256: fixture.previousHDCDigest)
+      }
+      let facts = try await fixture.port.currentFacts(targetID: fixture.target.targetID)
+      XCTAssertEqual(facts.executionConnectKey, "hdc-before")
+      XCTAssertEqual(
+        facts.serverFacts[TargetStoreRockchipRuntimeFactsPort.hdcAliasIdentityServerFactKey],
+        fixture.previousHDCDigest)
+      let provider = ArkForgeFlashProviderAdapter(factsPort: fixture.port, availability: .available)
+      XCTAssertNil(
+        provider.executionAdmissionBlocker(
+          for: try XCTUnwrap(RuntimeOperationCatalog.descriptor(reference: "flash.full-restore@1")),
+          facts: facts))
+      let observed = await fixture.probe.observedConnectKeys()
+      XCTAssertEqual(observed, ["hdc-before"])
+      XCTAssertEqual(try fixture.postFlashStore.loadIfPresent()?.bindingRevision, earlierAlias ? 1 : nil)
+    }
+  }
+
+  func testAnUncoveredTargetCannotUseAStoredAliasToPassFlashAdmission() async throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let fixture = try boundFactsFixture(root: root, installBinding: false)
+    _ = try fixture.postFlashStore.publish(
+      fixture.alias(
+        targetID: fixture.target.targetID, revision: fixture.target.bindingRevision,
+        loaderIdentity: fixture.target.stablePhysicalIdentitySHA256),
+      expectedPreviousHDCIdentitySHA256: fixture.previousHDCDigest)
+    let facts = try await fixture.port.currentFacts(targetID: fixture.target.targetID)
+    let provider = ArkForgeFlashProviderAdapter(factsPort: fixture.port, availability: .available)
+    let reason = provider.executionAdmissionBlocker(
+      for: try XCTUnwrap(RuntimeOperationCatalog.descriptor(reference: "flash.full-restore@1")),
+      facts: facts)
+    XCTAssertTrue(try XCTUnwrap(reason).contains("flash.crossModeBindingUnprepared"))
+    XCTAssertNil(facts.serverFacts[TargetStoreRockchipRuntimeFactsPort.hdcAliasIdentityServerFactKey])
+    let prerequisites = try await fixture.port.observePrerequisites(targetID: fixture.target.targetID)
+    XCTAssertEqual(prerequisites.first { $0.identifier == .recoveryPath }?.status, .unsatisfied)
+  }
+
   func testFactsEncodeAnUnobservableTargetAsAbsentInsteadOfThrowing()
     async throws
   {
@@ -1323,6 +1469,71 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
         "expected RockchipLiveModeProbeFailure, got \(error)", file: file,
         line: line)
     }
+  }
+
+  private struct BoundFactsFixture {
+    let target: RuntimeTargetRecord
+    let previousHDCDigest: String
+    let postFlashStore: RockchipPostFlashHDCBindingStore
+    let port: TargetStoreRockchipRuntimeFactsPort
+    let probe: RecordingLiveModeProbe
+
+    func alias(targetID: String, revision: Int, loaderIdentity: String) -> RockchipPostFlashHDCBinding {
+      RockchipPostFlashHDCBinding(
+        targetID: targetID, bindingRevision: revision,
+        stableLoaderIdentitySHA256: loaderIdentity,
+        previousHDCIdentitySHA256: previousHDCDigest,
+        hdcIdentitySHA256: SHA256Hex.string(of: Data("hdc-after".utf8)),
+        hdcConnectKey: "hdc-after", usbTopology: "42",
+        productModel: RockchipFlashProfile.dayu200.runtimeProductModel,
+        buildVersion: RockchipFlashProfile.dayu200.runtimeBuildVersion,
+        jobID: "job-previous-flash", establishedAtUTC: "2026-09-02T07:00:00Z")
+    }
+  }
+
+  private func boundFactsFixture(root: URL, installBinding: Bool = true) throws -> BoundFactsFixture {
+    let targets = try RuntimeTargetStore(
+      directoryURL: root.appending(path: "targets", directoryHint: .isDirectory))
+    let hdcDigest = SHA256Hex.string(of: Data("hdc-before".utf8))
+    let loaderDigest = SHA256Hex.string(of: Data("loader-current".utf8))
+    let adopted = try targets.adopt(
+      stableIdentitySHA256: hdcDigest, connectKey: "hdc-before", toolVersion: "3.2.0f",
+      nowUTC: "2026-09-07T07:00:00Z").record
+    let target = try targets.advanceBindingLineage(
+      RuntimeTargetBindingLineageAdvance(
+        previousStableIdentitySHA256: hdcDigest, previousRevision: adopted.bindingRevision,
+        currentStableIdentitySHA256: loaderDigest, currentRevision: adopted.bindingRevision + 1)
+    ).record
+    let bindingRoot = root.appending(path: "binding", directoryHint: .isDirectory)
+    let bindings = RockchipProductBindingStore(rootURL: bindingRoot)
+    if installBinding {
+      _ = try bindings.install(
+        RockchipProductBindingSnapshot(
+          revision: target.bindingRevision, serial: "loader-current", usbTopology: "43",
+          evidence: [
+            "product:e0-iokit-single-loader-readback",
+            "identity:serial-sha256=\(loaderDigest)",
+            "identity:previous-serial-sha256=\(hdcDigest)",
+            "binding:previous-revision=1", "binding:previous-usb-topology=42",
+            "identity:hdc-normal-alias-sha256=\(hdcDigest)",
+            "binding:hdc-normal-alias-usb-topology=42",
+            "rebind:user-selection-sha256=\(String(repeating: "c", count: 64))",
+          ]))
+    }
+    let postFlash = RockchipPostFlashHDCBindingStore(rootURL: bindingRoot)
+    let probe = RecordingLiveModeProbe(
+      observation: RockchipLiveModeObservation(
+        deviceMode: "hdc", buildFingerprint: RockchipFlashProfile.dayu200.runtimeBuildVersion,
+        usbTopology: "42"))
+    let port = TargetStoreRockchipRuntimeFactsPort(
+      targetStore: targets,
+      resolver: FixedExecutableResolver(table: [
+        "rockchip": ResolvedExecutable(path: "/product/arkforged", sha256: Self.nativeProviderSHA256)
+      ]),
+      prober: probe, bindingStore: bindings, postFlashHDCBindingStore: postFlash,
+      nowUTC: { "2026-09-07T08:00:00Z" })
+    return BoundFactsFixture(
+      target: target, previousHDCDigest: hdcDigest, postFlashStore: postFlash, port: port, probe: probe)
   }
 
   private func probedFacts(

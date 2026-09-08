@@ -211,14 +211,16 @@ enum CLIJobReadValidation {
       jobID == nil || fields["jobId"] == .string(jobID!),
       let digest = CLIJobEventPage.string(fields["catalogDigest"]), SHA256Hex.isLowercaseSHA256(digest),
       let status = CLIJobEventPage.string(fields["status"]),
-      ["verified", "artifactIntegrityFailed", "recordUnreadable", "operationUnavailable", "resultNotReady"].contains(status),
       case .array(let blockers)? = fields["blockers"], blockers.allSatisfy({ value in
-        CLIJobEventPage.string(value).map(["artifactIntegrityFailed", "artifactStoreUnavailable", "recordUnreadable", "operationUnavailable", "resultNotReady"].contains) == true
+        CLIJobEventPage.string(value) != nil
       }),
       (status == "verified") == blockers.isEmpty, case .array? = fields["artifacts"],
       case .bool? = fields["inventoryAvailable"], case .array(let missing)? = fields["missingRequiredArtifacts"],
       missing.allSatisfy({ CLIJobEventPage.string($0)?.isEmpty == false })
     else { throw session.fail(.recordUnreadable, "Job evidence has no supported verification result") }
+    // The published status and blocker reasons are open strings. A new
+    // Runtime reason must remain readable and require attention; only an
+    // explicitly verified result with no blockers can exit successfully.
     return status == "verified" ? 0 : status == "resultNotReady" ? 75 : 2
   }
 }

@@ -73,6 +73,9 @@ jobs:
       - name: Workspace tests
         run: cargo test --workspace --locked
 
+      - name: Native verified-process argument, output and timeout checks
+        run: cargo run --package arkdeck-platform --example windows_spk3 --locked -- process-selftest
+
       - name: Build the read-only product binaries
         run: cargo build --workspace --bins --locked
 

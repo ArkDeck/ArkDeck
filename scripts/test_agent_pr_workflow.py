@@ -491,6 +491,7 @@ def validate_rust_ci_contract(text: str) -> None:
         "run: cargo fetch --locked",
         "run: cargo clippy --workspace --all-targets --locked -- -D warnings",
         "run: cargo test --workspace --locked",
+        "run: cargo run --package arkdeck-platform --example windows_spk3 --locked -- process-selftest",
         "run: cargo build --workspace --bins --locked",
         "run: python rust/scripts/check-readonly.py",
         "cargo install --locked --version 0.20.2 cargo-deny",

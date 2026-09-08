@@ -1,0 +1,114 @@
+{
+  "schemaVersion": "arkdeck.xpa002-hosted-verification/1",
+  "kind": "host-test",
+  "runId": 34173310437,
+  "runUrl": "https://github.com/ArkDeck/ArkDeck/actions/runs/34173310437",
+  "testedRevision": "2da3dfef276a4e97efc1648cf9f0a97dfab660bf",
+  "recordedBaseline": "a076ca31ef97ef4285981af053d07b7fe0f052bd",
+  "currentDevelopmentBaseline": "3940b87592bbd62342dbe7c757da16bfbca400af",
+  "pinnedInputBlobsAndDigestsUnchanged": true,
+  "deviceAcceptance": false,
+  "windowsInstalledDaemonAcceptance": false,
+  "conclusion": "FAIL: nine dependencies lack full cargo-vet audit coverage",
+  "platforms": {
+    "linux": {
+      "jobId": 101897735767,
+      "nativeTestsPassed": 63,
+      "cargoDeny": "PASS",
+      "cargoVet": "FAIL: nine dependencies lack safe-to-deploy coverage",
+      "rawRecordingsHashChecked": 238,
+      "recording": {
+        "schemaVersion": "arkdeck.rust-readonly-host-check/1",
+        "kind": "host-test",
+        "result": "PASS",
+        "platform": "Linux-6.17.0-1022-azure-x86_64-with-glibc2.39",
+        "deviceAcceptance": false,
+        "windowsInstalledDaemonAcceptance": false,
+        "allRecordingsCompletedBeforeValidation": true,
+        "baseline": "a076ca31ef97ef4285981af053d07b7fe0f052bd",
+        "counts": {
+          "controlResponses": 111,
+          "cliEnvelopes": 7,
+          "validRequests": 102
+        },
+        "binaries": {
+          "arkdeck": "97cc87e2cb767ae8e4d6f211e02a58dcac1c31a0bbd8aae6deab94037a59d800",
+          "arkdeck-agentd": "3827198d44b47dd003f6fb89cba5cf832f1358a1864bd83633343826d8dd260f"
+        }
+      },
+      "archive": {
+        "file": "hosted-linux-2da3dfef.zip",
+        "id": 10036480357,
+        "sha256": "e299fc4fb8eca161a563117a2eece4debb1f01e868466602f8f06875f6a4befc",
+        "bytes": 103036,
+        "url": "https://github.com/ArkDeck/ArkDeck/actions/runs/34173310437/artifacts/10036480357"
+      }
+    },
+    "macos": {
+      "jobId": 101897735778,
+      "nativeTestsPassed": 69,
+      "cargoDeny": "PASS",
+      "cargoVet": "FAIL: nine dependencies lack safe-to-deploy coverage",
+      "rawRecordingsHashChecked": 238,
+      "recording": {
+        "schemaVersion": "arkdeck.rust-readonly-host-check/1",
+        "kind": "host-test",
+        "result": "PASS",
+        "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+        "deviceAcceptance": false,
+        "windowsInstalledDaemonAcceptance": false,
+        "allRecordingsCompletedBeforeValidation": true,
+        "baseline": "a076ca31ef97ef4285981af053d07b7fe0f052bd",
+        "counts": {
+          "controlResponses": 111,
+          "cliEnvelopes": 7,
+          "validRequests": 102
+        },
+        "binaries": {
+          "arkdeck": "c820e585d54c6ac5e5b40f6bebd473c6a59f91a4d9cf63f725d458ca51b0bac5",
+          "arkdeck-agentd": "798d2201970bf31ca3a73a219f0db8ff340f878d9fef2832e87024e9c61c7991"
+        }
+      },
+      "archive": {
+        "file": "hosted-macos-2da3dfef.zip",
+        "id": 10036478620,
+        "sha256": "87283deebc59075a29f865317ee5e05b9c798433051d4e663d20f559a9b7f06c",
+        "bytes": 103026,
+        "url": "https://github.com/ArkDeck/ArkDeck/actions/runs/34173310437/artifacts/10036478620"
+      }
+    },
+    "windows": {
+      "jobId": 101897735836,
+      "nativeTestsPassed": 73,
+      "cargoDeny": "PASS",
+      "cargoVet": "FAIL: nine dependencies lack safe-to-deploy coverage",
+      "rawRecordingsHashChecked": 12,
+      "recording": {
+        "schemaVersion": "arkdeck.rust-readonly-host-check/1",
+        "kind": "host-test",
+        "result": "PASS",
+        "platform": "Windows-2025Server-10.0.26100-SP0",
+        "deviceAcceptance": false,
+        "windowsInstalledDaemonAcceptance": false,
+        "allRecordingsCompletedBeforeValidation": true,
+        "baseline": "a076ca31ef97ef4285981af053d07b7fe0f052bd",
+        "counts": {
+          "controlResponses": 0,
+          "cliEnvelopes": 5,
+          "validRequests": 0
+        },
+        "binaries": {
+          "arkdeck.exe": "60a641783b120ce042a5b646f1573587ee503c6566778ceda808a930efe4b84a",
+          "arkdeck-agentd.exe": "723aebd2b10dc1303d0f6c4ade090ed053bf7aa3257cc4a9d05b5ae404a8cb69"
+        }
+      },
+      "archive": {
+        "file": "hosted-windows-2da3dfef.zip",
+        "id": 10036554137,
+        "sha256": "f8efaaf7837a08998f448c09d513093d4c27d477bf8dab2050c85f8116aef1d4",
+        "bytes": 4923,
+        "url": "https://github.com/ArkDeck/ArkDeck/actions/runs/34173310437/artifacts/10036554137"
+      }
+    }
+  }
+}

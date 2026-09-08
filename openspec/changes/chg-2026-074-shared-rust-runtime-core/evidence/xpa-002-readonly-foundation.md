@@ -17,7 +17,7 @@ development pin, not a readiness approval or hardware certificate.
 
 | Input | Pin |
 | --- | --- |
-| Swift commit | `a076ca31ef97ef4285981af053d07b7fe0f052bd` |
+| Swift commit | `3940b87592bbd62342dbe7c757da16bfbca400af` |
 | Protocol | `1.0.0` |
 | Contract identity | `1054d17b598ce23003ebbdec4d42eb359b63016d6421709ba53c3f21f7c6558d` |
 | Catalog digest | `508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684` |
@@ -30,6 +30,14 @@ the generator's sorted Git tree-entry representation; they are not file-content
 hashes or a claim that the corpus covers every possible behavior. The existing
 [TASK-XPA-001 record](runs/TASK-XPA-001/run.md) describes how the Swift recording
 seam and method schemas were obtained.
+
+The first implementation and hosted recording used protected-main commit
+`a076ca31ef97ef4285981af053d07b7fe0f052bd`. Main then merged the SVC unknown-proof
+fix in #1766. The development pin and agent branch were synchronized to
+`3940b87592bbd62342dbe7c757da16bfbca400af`; every pinned input blob, file hash and
+directory digest is identical, and generated Rust did not change. Earlier raw
+recordings retain their original commit metadata. This update does not certify
+the [remaining SVC acceptance](../../../../docs/design/references/single-v1/svc-acceptance-2026-09-08.md).
 
 The minimum dependency clarification in `tasks.md` distinguishes two things:
 the published, pinned schemas and corpus are sufficient to start this bounded
@@ -77,7 +85,7 @@ tools, not evidence that the Windows-specific APIs passed on a supported host.
 
 The repository unified gate ran against the complete implementation diff on
 macOS 26.6.2 arm64. Its only failure was the final cargo-vet step below; it did
-not skip a preceding selected lane. The [machine-readable verification record](runs/TASK-XPA-002/local-verification.json)
+not skip a preceding selected lane. The [machine-readable verification record](runs/TASK-XPA-002/final-verification.json)
 contains counts, binary hashes, command, result and archive digest.
 
 | Check | Result |
@@ -85,15 +93,16 @@ contains counts, binary hashes, command, result and archive digest.
 | SDD consistency; planner/workflow tests | PASS; 27 planner and 11 workflow tests |
 | Catalog generation tests and drift check | PASS; 49 tests, unchanged Swift Catalog digest |
 | Design system | PASS; 83 tests |
-| Swift full lane | PASS; 2,458 tests, plus 12 wrapper tests |
+| Swift full lane | PASS; 2,464 tests, plus 12 wrapper tests |
 | App build-for-testing | PASS; plus 40 Xcode wrapper tests |
 | Rust fmt/clippy/workspace | PASS; 69 native macOS tests |
+| Native verified-process probe | PASS; actual argv/environment roundtrip, output cap and timeout refusal |
 | Current Swift parity | PASS for all 96 methods/378 recorded shapes, 33 native Swift number boundary vectors, three CBOR/HMAC vectors and 30 Catalog entries |
 | Actual output validation | PASS; all 111 control responses and 7 CLI envelopes recorded before schema validation |
 | cargo-deny | PASS; advisories, bans, licenses and sources |
 | cargo-vet | FAIL; nine dependencies without full imported audit coverage |
 
-The [raw host-test recording archive](runs/TASK-XPA-002/macos-readonly-recordings.zip)
+The [raw host-test recording archive](runs/TASK-XPA-002/macos-current-baseline-recordings.zip)
 retains all 240 recorded/summary files, including malformed request bytes. The
 archive and every frame were hash-checked after recording. No HDC tool was
 configured and no real device was accessed. This is a macOS host test, not a
@@ -101,18 +110,44 @@ Windows result or device acceptance. App UI assertions were not run because
 XPA-002 changes no App presentation.
 
 Platform-only clippy also passed for Windows x64 and Linux x64 cross targets.
-The Windows probe's PowerShell syntax and capture helpers were checked; Windows
-OS behavior, cancellation latency, Job cleanup and SPK-3 remain unexecuted on a
-Windows host. Source review closed the exit-code-259 liveness ambiguity,
-bounded output cleanup, variable-length buffer bounds and overlapped byte-count
-handling; it does not supply native acceptance evidence.
+Source review closed the exit-code-259 liveness ambiguity, bounded output
+cleanup, variable-length buffer bounds and overlapped byte-count handling.
+The Windows probe's PowerShell syntax and capture helpers were checked. Native
+hosted tests subsequently exercised the cases below; SPK-3 on the required
+Windows 11/account/package/device setup remains outstanding.
 
 [`rust-ci.yml`](../../../../.github/workflows/rust-ci.yml) and the local planner
-wire contract generation checks, formatting, clippy, Rust tests and binary
-builds, the read-only black-box check, cargo-deny and cargo-vet into the Rust lane.
+wire contract generation checks, formatting, clippy, Rust tests, the existing
+native process self-test, binary builds, the read-only black-box check,
+cargo-deny and cargo-vet into the Rust lane.
 The hosted matrix targets Windows, macOS and Linux, and the existing `swift`
 aggregate carries its selected-lane result. The workflow preserves actual raw
-recordings even after failure. No hosted result is claimed by this local record.
+recordings even after failure.
+
+The [completed hosted run](https://github.com/ArkDeck/ArkDeck/actions/runs/34173310437)
+tested commit `2da3dfef276a4e97efc1648cf9f0a97dfab660bf`. Its
+[derived verification record](runs/TASK-XPA-002/hosted-verification.json) links
+the original GitHub artifacts and the unchanged ZIP copies committed beside it;
+all ZIP digests and all recorded-file hashes were independently checked.
+
+| Hosted platform | Native tests | Actual output recorded and validated | Gate result |
+| --- | --- | --- | --- |
+| Linux x64 | 63 PASS | 111 control responses, 7 CLI envelopes | Only cargo-vet fails for the same nine dependencies |
+| macOS arm64 | 69 PASS | 111 control responses, 7 CLI envelopes | Only cargo-vet fails for the same nine dependencies |
+| Windows Server 2025 x64 | 73 PASS, including 18 platform tests | 5 CLI envelopes; no control frame sent | Only cargo-vet fails for the same nine dependencies |
+
+Windows recorded three actual `runtimeUnavailable` signing-identity refusals
+(exit 69) and two argument refusals (exit 64). The platform tests exercised pipe
+name preemption, wrong-image/unsigned zero-frame refusal, exact byte counts,
+fast disconnect, listener identity leases, timeout cancellation and close races.
+Cancellation stayed within the tests' five-second bound; successful libtest
+output did not retain individual millisecond samples, so none is asserted here.
+That hosted run did not execute the full `process-selftest` example. The example
+now also runs in the native gate and checks actual verified execution, literal
+arguments, clean child environment, output limits and timeout refusal; its
+local macOS execution passed. Neither that probe nor the hosted transport tests
+establish signed installed-daemon, cross-account, package, Windows 11 or DAYU200
+acceptance. No platform Conformance row was advanced.
 
 `cargo vet --locked --no-registry-suggestions` currently refuses nine dependencies
 without complete imported audit coverage. The exact releases, publisher IDs,
