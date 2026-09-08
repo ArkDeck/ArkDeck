@@ -106,7 +106,41 @@
               "type": "string"
             },
             "failure": {
-              "type": "null"
+              "anyOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "category": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    },
+                    "recovery": {
+                      "type": "string"
+                    },
+                    "retryability": {
+                      "type": "string"
+                    },
+                    "schemaVersion": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "category",
+                    "code",
+                    "recovery",
+                    "retryability",
+                    "schemaVersion"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "type": [
+                    "null"
+                  ]
+                }
+              ]
             },
             "finishedAtUtc": {
               "type": [
@@ -434,8 +468,8 @@
   "x-arkdeck-method": "job.show",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 4,
-    "request": 17,
+    "error": 2,
+    "request": 15,
     "result": 13
   }
 }

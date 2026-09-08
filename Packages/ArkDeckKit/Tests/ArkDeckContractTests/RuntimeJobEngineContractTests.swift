@@ -1,5 +1,6 @@
 import XCTest
 
+@testable import ArkDeckAgentDaemon
 @testable import ArkDeckCore
 @testable import ArkDeckOpenHarmony
 @testable import ArkDeckRuntime
@@ -140,6 +141,8 @@ final class RuntimeJobEngineContractTests: XCTestCase {
     enum Script {
       case observationHappy
       case knownFailureOnDeviceProbe
+      case providerUnknownOnDeviceProbe
+      case providerFailureOnDeviceProbe
       case outcomeUnknownOnDeviceProbe
       case outcomeUnknownOnHAPSend
     }
@@ -158,6 +161,14 @@ final class RuntimeJobEngineContractTests: XCTestCase {
       beforeDispatch?()
       lock.withLock { dispatchCount += 1 }
       switch (script, plan.action) {
+      case (.providerUnknownOnDeviceProbe, .hdc(.observeDevice)):
+        return ProviderProcessReceipt(
+          exitStatus: 0, stdout: Data("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\tConnected\n".utf8),
+          stderr: Data(), stdoutTruncated: false, durationSeconds: 0.01)
+      case (.providerFailureOnDeviceProbe, .hdc(.observeDevice)):
+        return ProviderProcessReceipt(
+          exitStatus: 0, stdout: Data([0xFF, 0xFE]), stderr: Data(),
+          stdoutTruncated: false, durationSeconds: 0.01)
       case (.knownFailureOnDeviceProbe, .hdc(.observeDevice)):
         throw RuntimeDispatchFailure.failed("new pre-effect product failure")
       case (.outcomeUnknownOnDeviceProbe, .hdc(.observeDevice)):
@@ -1607,6 +1618,123 @@ final class RuntimeJobEngineContractTests: XCTestCase {
   }
 
   // MARK: - Unknown outcome and reconcile
+
+  /// Records the current handler's structured failure branches, including
+  /// job.show and job.reconcile, from Jobs the production engine executed.
+  /// Schema derivation must see these responses instead of only null failures.
+  func testProductionJobFailureFramesAgreeAcrossReadbacksAndReconcile() async throws {
+    let scenarios: [(name: String, script: ScriptedDispatcher.Script,
+      unknown: Bool, failure: RuntimeOperationFailure)] = [
+      ("provider-unknown", .providerUnknownOnDeviceProbe, true,
+        RuntimeOperationFailure(
+          code: .outcomeUnknown, category: .unknownOutcome,
+          retryability: .runtimeDecisionRequired, recovery: .awaitRuntimeReconciliation)),
+      ("provider-failed", .providerFailureOnDeviceProbe, false,
+        RuntimeOperationFailure(
+          code: .executionFailed, category: .execution,
+          retryability: .runtimeDecisionRequired, recovery: .inspectJob)),
+    ]
+    for scenario in scenarios {
+      let stateRoot = stateDirectory.appending(path: scenario.name)
+      let dispatcher = ScriptedDispatcher(script: scenario.script)
+      let (engine, capabilityStore) = try makeEngine(dispatcher: dispatcher, stateRoot: stateRoot)
+      let accepted = try await engine.submit(observeRequest(
+        idempotencyKey: "idem-\(scenario.name)", requestID: "req-\(scenario.name)"))
+      let handler = RuntimeControlPlaneHandler(
+        engine: engine, capabilityStore: capabilityStore, providerIDs: ["hdc"],
+        nowUTC: { "2026-07-29T00:00:00Z" }, artifactStore: artifactStore)
+
+      func response(_ method: String) async throws -> AgentWireProtocol.Response {
+        let params: [String: JSONValue] = method == "job.list"
+          ? ["includeCurrent": .bool(true)] : ["jobId": .string(accepted.jobID)]
+        let request = AgentWireProtocol.Request(
+          id: "\(scenario.name)-\(method)", method: method, params: params)
+        return await handler.handleFrame(try CanonicalJSONEncoders.canonical().encode(request))
+      }
+      func object(_ value: JSONValue?) throws -> [String: JSONValue] {
+        guard case .object(let fields)? = value else {
+          throw RuntimeJobEngineError.internalFailure("fixture expected a production object response")
+        }
+        return fields
+      }
+      func result(_ method: String) async throws -> [String: JSONValue] {
+        let reply = try await response(method)
+        XCTAssertTrue(reply.ok, "\(method): \(String(describing: reply.error))")
+        XCTAssertNil(reply.error)
+        return try object(reply.result)
+      }
+      func failure(_ status: [String: JSONValue]) throws -> RuntimeOperationFailure {
+        let fields = try object(status["failure"])
+        XCTAssertEqual(Set(fields.keys), ["schemaVersion", "code", "category", "retryability", "recovery"])
+        return try JSONDecoder().decode(
+          RuntimeOperationFailure.self,
+          from: CanonicalJSONEncoders.canonical().encode(JSONValue.object(fields)))
+      }
+      func assertReadbacks(_ expected: [String: JSONValue], terminal: Bool) async throws {
+        let shown = try await result("job.show")
+        let showJob = try object(shown["job"])
+        XCTAssertEqual(showJob, expected, "job.show must retain the complete status and failure")
+        let status = try await result("job.status")
+        XCTAssertEqual(status, expected)
+        let page = try await result("job.list")
+        guard case .array(let items)? = page["items"] else {
+          throw RuntimeJobEngineError.internalFailure("fixture expected a production Job page")
+        }
+        XCTAssertEqual(items.count, 1)
+        let listed = try object(items.first)
+        XCTAssertEqual(listed["jobId"], expected["jobId"])
+        XCTAssertEqual(listed["state"], expected["state"])
+        XCTAssertEqual(listed["outcomeUnknown"], expected["outcomeUnknown"])
+        XCTAssertEqual(listed["failure"], expected["failure"])
+        XCTAssertEqual(try failure(listed), try failure(expected))
+
+        let reply = try await response("job.result")
+        if terminal {
+          XCTAssertTrue(reply.ok, String(describing: reply.error))
+          let resultFields = try object(reply.result)
+          XCTAssertEqual(resultFields["terminal"], .bool(true))
+          XCTAssertEqual(try object(resultFields["job"]), expected)
+        } else {
+          XCTAssertFalse(reply.ok, "an unknown, nonterminal Job must not acquire a terminal result")
+          XCTAssertNil(reply.result)
+          XCTAssertEqual(reply.error?.code, "resultNotReady")
+          XCTAssertEqual(reply.error?.details?["jobId"], expected["jobId"])
+          XCTAssertEqual(reply.error?.details?["state"], expected["state"])
+          XCTAssertEqual(reply.error?.details?["nextAction"], expected["nextAction"])
+        }
+      }
+
+      let ran = try await result("job.run")
+      XCTAssertEqual(ran["state"], .string(scenario.unknown ? "waitingForRecovery" : "failed"))
+      XCTAssertEqual(ran["outcomeUnknown"], .bool(scenario.unknown))
+      XCTAssertEqual(try failure(ran), scenario.failure)
+      XCTAssertEqual(dispatcher.dispatchCount, 3, "the engine stops at its target probe")
+      let journalURL = stateRoot.appending(path: "jobs/\(accepted.jobID)/journal.jsonl")
+      let before = try DurableJournalRecovery.inspect(url: journalURL)
+      XCTAssertEqual(before.outstandingIntents.count, scenario.unknown ? 1 : 0)
+      try await assertReadbacks(ran, terminal: !scenario.unknown)
+      XCTAssertEqual(dispatcher.dispatchCount, 3, "read resources cannot replay a failed probe")
+
+      let reconciled = try await result("job.reconcile")
+      XCTAssertEqual(reconciled["state"], .string("failed"))
+      XCTAssertEqual(reconciled["outcomeUnknown"], .bool(false))
+      if scenario.unknown {
+        XCTAssertEqual(try failure(reconciled), RuntimeOperationFailure(
+          code: .executionConfirmedNotPerformed, category: .externalTool,
+          retryability: .runtimeDecisionRequired, recovery: .submitNewTypedRequestAfterRuntimeProof))
+      } else {
+        XCTAssertEqual(reconciled, ran, "reconcile must preserve the original confirmed failure")
+      }
+      try await assertReadbacks(reconciled, terminal: true)
+      let repeated = try await result("job.reconcile")
+      XCTAssertEqual(repeated, reconciled, "terminal readback must not erase or rewrite the failure")
+      let after = try DurableJournalRecovery.inspect(url: journalURL)
+      XCTAssertTrue(after.outstandingIntents.isEmpty)
+      XCTAssertEqual(after.events.filter { $0.kind == .stepIntent }, before.events.filter { $0.kind == .stepIntent })
+      if !scenario.unknown { XCTAssertEqual(after.events, before.events) }
+      XCTAssertEqual(dispatcher.dispatchCount, 3, "reconcile does not repeat the original action")
+    }
+  }
 
   func testFlashSingletonPersistedAliasKeepsRecoveryJournalSchema() throws {
     for (index, operationReference) in ["flash.dayu200", "flash.dayu200@1"].enumerated() {
