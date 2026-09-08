@@ -1,0 +1,124 @@
+suite: PLATFORM-WINDOWS-CASES-0.2.0
+platform: windows
+version: 0.2.0
+status: planned
+scope: TASK-XPA-002 / SPK-3
+support_cells:
+  - id: windows-11-x64-planned
+    os_version_family: "11"
+    architecture: x64
+    package_format: pending-maintainer-decision
+    status: NOT_RUN
+notes: >-
+  This is a proposed case skeleton for maintainer PR review, not a run record,
+  support declaration or replacement for the current Core conformance suite.
+  Every case below remains NOT_RUN for the required Windows 11 support tuple.
+  Windows Server hosted test results are recorded separately. A support cell is a planned test
+  input; exact OS build, installed binary identity, package and tool tuple must
+  be recorded by an actual run. A cross-build, fixture or hosted run does not
+  supply the DAYU200 acceptance result. Additional Windows Golden Journey
+  tasks and TASK-XPA-022 retain the full unchanged Core acceptance obligation.
+shared_inputs:
+  development_baseline: spec/baselines/swift-single-v1.json
+  change_acceptance: openspec/changes/chg-2026-074-shared-rust-runtime-core/verification.md
+  task_definition: openspec/changes/chg-2026-074-shared-rust-runtime-core/tasks.md
+  platform_boundary: rust/crates/arkdeck-platform/README.md
+  native_probe: rust/scripts/windows-spk3.ps1
+cases:
+  - id: WIN-XPA002-PARITY-001
+    test_id: TEST-WIN-XPA002-PARITY-001
+    status: NOT_RUN
+    method: Replay the pinned current Swift canonical JSON/CBOR/digest, method schema/corpus, HDC parser and read-only CLI vectors on a native Windows build.
+    expected_result: Shared deterministic inputs and outputs are byte-equal with the pinned Swift baseline; Catalog and contract digests match; unavailable operations remain unavailable. This proves only the exercised foundation surface, not later durable/runtime parity.
+    expected_source: openspec/platforms/windows/conformance-cases.yaml#WIN-XPA002-PARITY-001
+    minimum_evidence: contract
+    preconditions: [Native Windows Rust binaries, Current development baseline and its exact pinned inputs]
+  - id: WIN-XPA002-FRAME-001
+    test_id: TEST-WIN-XPA002-FRAME-001
+    status: NOT_RUN
+    method: Send the current positive and malformed/version/method/identity/oversize negative frame matrix through an authenticated native pipe.
+    expected_result: Same-contract exchanges conform to the pinned single-v1 schema; structural refusals precede dispatch; no negotiation, downgrade or lost-reply replay occurs.
+    expected_source: openspec/platforms/windows/conformance-cases.yaml#WIN-XPA002-FRAME-001
+    minimum_evidence: platform
+    preconditions: [Native Windows host, Trusted installed daemon identity, Frame and dispatch counters]
+  - id: WIN-SPK3-PID-001
+    test_id: TEST-WIN-SPK3-PID-001
+    status: NOT_RUN
+    method: Call GetNamedPipeServerProcessId on the actual CreateFileW client handle and retain the resolved process handle throughout the connection.
+    expected_result: Record the native API result and compare a successful PID to this connection's daemon process. Failure leaves instance identity unproved and the current client sends zero frames; it is not a successful API test or an acceptance waiver.
+    expected_source: openspec/platforms/windows/conformance-cases.yaml#WIN-SPK3-PID-001
+    minimum_evidence: platform
+    preconditions: [Windows 11 x64 host with exact OS build recorded, Native probe and daemon binaries]
+  - id: WIN-SPK3-FIRST-INSTANCE-001
+    test_id: TEST-WIN-SPK3-FIRST-INSTANCE-001
+    status: NOT_RUN
+    method: Hold an isolated pipe name before daemon start with same-account and foreign-account probes, then attempt daemon startup.
+    expected_result: FILE_FLAG_FIRST_PIPE_INSTANCE refuses the second instance with ERROR_ACCESS_DENIED; doctor reports the held name. First-instance exclusion does not authenticate a server, and no handler or HDC dispatch follows the failed startup.
+    expected_source: openspec/platforms/windows/conformance-cases.yaml#WIN-SPK3-FIRST-INSTANCE-001
+    minimum_evidence: platform
+    preconditions: [Isolated test pipe, Second-account session for the foreign-owner row, Server-side handler counters]
+  - id: WIN-SPK3-CLIENT-SID-001
+    test_id: TEST-WIN-SPK3-CLIENT-SID-001
+    status: NOT_RUN
+    method: Connect from a second account to the current user's logon-SID-restricted pipe and observe server-side validation.
+    expected_result: Cross-account access is refused by the DACL or SID check before any frame consumer enters; caller-supplied identity never overrides the process token.
+    expected_source: openspec/platforms/windows/conformance-cases.yaml#WIN-SPK3-CLIENT-SID-001
+    minimum_evidence: platform
+    preconditions: [Existing second Windows account with an independent session, Server-side frame-consumer counters]
+  - id: WIN-SPK3-ELEVATION-001
+    test_id: TEST-WIN-SPK3-ELEVATION-001
+    status: NOT_RUN
+    method: Connect a separately elevated same-user client to the normal user's isolated guard server, and test the reverse owner/elevation mismatch.
+    expected_result: Token elevation or owner mismatch is refused before a handler runs. A successful OS pipe-open alone does not count as authenticated admission or prove zero handler entries.
+    expected_source: openspec/platforms/windows/conformance-cases.yaml#WIN-SPK3-ELEVATION-001
+    minimum_evidence: platform
+    preconditions: [Normal-user terminal, Separately elevated terminal, Server-side authentication and frame-consumer result]
+  - id: WIN-SPK3-REMOTE-001
+    test_id: TEST-WIN-SPK3-REMOTE-001
+    status: NOT_RUN
+    method: Attempt a connection to the isolated named pipe from a distinct Windows host using the same native probe.
+    expected_result: PIPE_REJECT_REMOTE_CLIENTS refuses the remote peer and no frame consumer enters; no TCP or HTTP control endpoint is introduced.
+    expected_source: openspec/platforms/windows/conformance-cases.yaml#WIN-SPK3-REMOTE-001
+    minimum_evidence: platform
+    preconditions: [Distinct Windows host and established remote test session, Matching probe hash, Server-side counters]
+  - id: WIN-SPK3-SERVER-IDENTITY-001
+    test_id: TEST-WIN-SPK3-SERVER-IDENTITY-001
+    status: NOT_RUN
+    method: Point the real client at isolated servers with foreign owner SID, same-user wrong image, unsigned or wrong signer, and wrong package identity.
+    expected_result: Identification SQOS and owner/instance checks refuse each invalid server before sending frames. A same-user name or path alone cannot establish the installed daemon's identity; retained process/image handles span the connection.
+    expected_source: openspec/platforms/windows/conformance-cases.yaml#WIN-SPK3-SERVER-IDENTITY-001
+    minimum_evidence: platform
+    preconditions: [Native client, Installed daemon path and trusted signer or package expectation, Isolated impostor probes, Second account for the foreign-owner row]
+  - id: WIN-SPK3-TRUSTED-CONNECTION-001
+    test_id: TEST-WIN-SPK3-TRUSTED-CONNECTION-001
+    status: NOT_RUN
+    method: Connect the actual CLI to its installed daemon using the installation's trusted Authenticode identity or registered MSIX package family; record binary hashes and MotW/signature state.
+    expected_result: Both peer checks pass and same-connection health followed by the read-only product exchange succeeds. Signing/package evidence is observed, not inferred from a filename or a fixture. No unblock, certificate installation or system policy change is performed by the probe.
+    expected_source: openspec/platforms/windows/conformance-cases.yaml#WIN-SPK3-TRUSTED-CONNECTION-001
+    minimum_evidence: platform
+    preconditions: [Actual trusted signed daemon installation or registered product package, Matching client and daemon contract, Installation identity selected through the reviewed distribution path]
+  - id: WIN-XPA002-PROCESS-001
+    test_id: TEST-WIN-XPA002-PROCESS-001
+    status: NOT_RUN
+    method: Run isolated host fixtures through verified-file handles with replacement races, output limits, timeout and child-tree cleanup.
+    expected_result: Identity mismatch refuses execution, argv remains an array with no shell interpolation, stdout/stderr stay bounded, and timeout or cancellation cleans up the retained job's process tree.
+    expected_source: openspec/platforms/windows/conformance-cases.yaml#WIN-XPA002-PROCESS-001
+    minimum_evidence: platform
+    preconditions: [Native Windows process fixtures, Isolated temporary files, No HDC or real-device invocation]
+  - id: WIN-XPA002-HDC-PRECONDITION-001
+    test_id: TEST-WIN-XPA002-HDC-PRECONDITION-001
+    status: NOT_RUN
+    method: Exercise existing-listener identity with missing, wildcard, ambiguous, wrong-image/user/elevation and changed process identity cases; test an unregistered Windows tool tuple.
+    expected_result: Missing registration or unproved lease prevents every HDC child dispatch. Commandless identity observation neither connects to nor starts a server; drift invalidates the whole snapshot and is never published as an observed-empty result.
+    expected_source: openspec/platforms/windows/conformance-cases.yaml#WIN-XPA002-HDC-PRECONDITION-001
+    minimum_evidence: platform
+    preconditions: [Native Windows kernel listener observation, Isolated listener fixtures, Dispatch counters]
+  - id: WIN-XPA002-DAYU200-001
+    test_id: TEST-WIN-XPA002-DAYU200-001
+    status: NOT_RUN
+    method: Run the real doctor, operation list and device candidates product path on Windows 11 x64 with the DAYU200 connected, through the authenticated daemon and registered read-only Provider.
+    expected_result: Doctor reports actual availability; Catalog operations retain their actual availability; candidates lists the real board using the reviewed Windows HDC tuple and stable pre/post server identity. No server lifecycle, device mutation or caller raw argv occurs. Record exact host/tool/Catalog identities and redacted board evidence; exit zero or an empty result alone never passes this row.
+    expected_source: openspec/platforms/windows/conformance-cases.yaml#WIN-XPA002-DAYU200-001
+    minimum_evidence: realHardware
+    hardware_capability: hdcConnectivity
+    preconditions: [Windows 11 x64 host, DAYU200 device window, Trusted installed daemon, Reviewed Windows HDC tuple and output-family registration, Actual sanitized Windows output samples, Already-existing authorized HDC server]

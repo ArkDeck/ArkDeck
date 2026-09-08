@@ -1,0 +1,200 @@
+{
+  "function" : "PortableCanonicalJSON.serialize(Double)",
+  "sourceCommit" : "a076ca31ef97ef4285981af053d07b7fe0f052bd",
+  "sourcePath" : "Packages/ArkDeckKit/Sources/ArkDeckCore/PortableCanonicalJSON.swift",
+  "sourceSHA256" : "beca3dbfb02c5705841ba273b868cbfd01d8bf31edbb25f6ab1100a967b8b779",
+  "validationClass" : "nativeSwiftPureEncoding",
+  "vectors" : [
+    {
+      "binary64Bits" : "0000000000000000",
+      "canonical" : "0",
+      "name" : "positiveZero",
+      "outcome" : "encoded"
+    },
+    {
+      "binary64Bits" : "8000000000000000",
+      "canonical" : "0",
+      "name" : "negativeZero",
+      "outcome" : "encoded"
+    },
+    {
+      "binary64Bits" : "3fb999999999999a",
+      "canonical" : "0.1",
+      "name" : "oneTenth",
+      "outcome" : "encoded"
+    },
+    {
+      "binary64Bits" : "3fe0000000000000",
+      "canonical" : "0.5",
+      "name" : "oneHalf",
+      "outcome" : "encoded"
+    },
+    {
+      "binary64Bits" : "bfe0000000000000",
+      "canonical" : "-0.5",
+      "name" : "negativeHalf",
+      "outcome" : "encoded"
+    },
+    {
+      "binary64Bits" : "3ff0000000000000",
+      "canonical" : "1",
+      "name" : "integralDouble",
+      "outcome" : "encoded"
+    },
+    {
+      "binary64Bits" : "3ff3c0ca4283de1b",
+      "canonical" : "1.23456789",
+      "name" : "noninteger",
+      "outcome" : "encoded"
+    },
+    {
+      "binary64Bits" : "3f50624dd2f1a9fc",
+      "canonical" : "0.001",
+      "name" : "oneEMinus3",
+      "outcome" : "encoded"
+    },
+    {
+      "binary64Bits" : "3f1a36e2eb1c432d",
+      "canonical" : "0.0001",
+      "name" : "oneEMinus4",
+      "outcome" : "encoded"
+    },
+    {
+      "binary64Bits" : "3ee4f8b588e368f1",
+      "canonical" : "1e-5",
+      "name" : "oneEMinus5",
+      "outcome" : "encoded"
+    },
+    {
+      "binary64Bits" : "3eb0c6f7a0b5ed8d",
+      "canonical" : "1e-6",
+      "name" : "oneEMinus6",
+      "outcome" : "encoded"
+    },
+    {
+      "binary64Bits" : "3e7ad7f29abcaf48",
+      "canonical" : "1e-7",
+      "name" : "oneEMinus7",
+      "outcome" : "encoded"
+    },
+    {
+      "binary64Bits" : "3ee9e409301b5a02",
+      "canonical" : "1.23456789e-5",
+      "name" : "smallNoninteger",
+      "outcome" : "encoded"
+    },
+    {
+      "binary64Bits" : "3bc79ca10c924223",
+      "canonical" : "1e-20",
+      "name" : "oneEMinus20",
+      "outcome" : "encoded"
+    },
+    {
+      "binary64Bits" : "430c6bf526340000",
+      "canonical" : "1000000000000000",
+      "name" : "oneE15",
+      "outcome" : "encoded"
+    },
+    {
+      "binary64Bits" : "433fffffffffffff",
+      "canonical" : "9007199254740991",
+      "name" : "exactIntegerLimit",
+      "outcome" : "encoded"
+    },
+    {
+      "binary64Bits" : "4340000000000000",
+      "name" : "aboveExactIntegerLimit",
+      "outcome" : "integerBeyondExactRange"
+    },
+    {
+      "binary64Bits" : "4340000000000001",
+      "name" : "nextRepresentableInteger",
+      "outcome" : "integerBeyondExactRange"
+    },
+    {
+      "binary64Bits" : "c33fffffffffffff",
+      "canonical" : "-9007199254740991",
+      "name" : "negativeExactIntegerLimit",
+      "outcome" : "encoded"
+    },
+    {
+      "binary64Bits" : "c340000000000000",
+      "name" : "negativeAboveExactIntegerLimit",
+      "outcome" : "integerBeyondExactRange"
+    },
+    {
+      "binary64Bits" : "43e158e460913d00",
+      "canonical" : "1e+19",
+      "name" : "oneE19",
+      "outcome" : "encoded"
+    },
+    {
+      "binary64Bits" : "4415af1d78b58c40",
+      "canonical" : "1e+20",
+      "name" : "oneE20",
+      "outcome" : "encoded"
+    },
+    {
+      "binary64Bits" : "444b1ae4d6e2ef50",
+      "canonical" : "1e+21",
+      "name" : "oneE21",
+      "outcome" : "encoded"
+    },
+    {
+      "binary64Bits" : "43e56a95319d63e1",
+      "canonical" : "1.2345678901234567e+19",
+      "name" : "largeNonPowerOfTen",
+      "outcome" : "encoded"
+    },
+    {
+      "binary64Bits" : "43e0000000000000",
+      "canonical" : "9.223372036854776e+18",
+      "name" : "positiveInt64Boundary",
+      "outcome" : "encoded"
+    },
+    {
+      "binary64Bits" : "c3e0000000000000",
+      "name" : "negativeInt64Boundary",
+      "outcome" : "integerBeyondExactRange"
+    },
+    {
+      "binary64Bits" : "c3e0000000000001",
+      "canonical" : "-9.223372036854778e+18",
+      "name" : "negativeBeyondInt64",
+      "outcome" : "encoded"
+    },
+    {
+      "binary64Bits" : "400921fb54442d18",
+      "canonical" : "3.141592653589793",
+      "name" : "pi",
+      "outcome" : "encoded"
+    },
+    {
+      "binary64Bits" : "0000000000000001",
+      "canonical" : "5e-324",
+      "name" : "leastPositiveDouble",
+      "outcome" : "encoded"
+    },
+    {
+      "binary64Bits" : "7fefffffffffffff",
+      "canonical" : "1.7976931348623157e+308",
+      "name" : "greatestFiniteDouble",
+      "outcome" : "encoded"
+    },
+    {
+      "binary64Bits" : "7ff0000000000000",
+      "name" : "positiveInfinity",
+      "outcome" : "nonFiniteNumber"
+    },
+    {
+      "binary64Bits" : "fff0000000000000",
+      "name" : "negativeInfinity",
+      "outcome" : "nonFiniteNumber"
+    },
+    {
+      "binary64Bits" : "7ff8000000000000",
+      "name" : "nan",
+      "outcome" : "nonFiniteNumber"
+    }
+  ]
+}

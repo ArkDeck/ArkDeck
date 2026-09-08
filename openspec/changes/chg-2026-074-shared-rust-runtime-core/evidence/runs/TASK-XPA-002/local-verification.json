@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "arkdeck.xpa002-local-verification/1",
+  "kind": "host-test",
+  "baseline": "a076ca31ef97ef4285981af053d07b7fe0f052bd",
+  "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "unifiedGate": {
+    "exitCode": 1,
+    "failure": "cargo-vet: nine dependencies lack safe-to-deploy coverage",
+    "command": "python3 scripts/ci/plan.py --repo-root . --base-revision origin/main --head-revision HEAD --merge-base --include-worktree --run-local",
+    "testedRevision": "2da3dfef276a4e97efc1648cf9f0a97dfab660bf"
+  },
+  "checks": {
+    "plannerTests": 27,
+    "workflowTests": 11,
+    "catalogGeneratorTests": 49,
+    "designSystemTests": 83,
+    "swiftWrapperTests": 12,
+    "swiftTests": 2458,
+    "xcodeWrapperTests": 40,
+    "appBuildForTesting": "PASS",
+    "rustTests": 69,
+    "rustFmt": "PASS",
+    "rustClippy": "PASS",
+    "contractGenerator": "PASS",
+    "cargoDeny": "PASS",
+    "cargoVet": "FAIL",
+    "sdd": "PASS",
+    "freshRustupHomeGenerator": "PASS"
+  },
+  "recording": {
+    "schemaVersion": "arkdeck.rust-readonly-host-check/1",
+    "kind": "host-test",
+    "result": "PASS",
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "deviceAcceptance": false,
+    "windowsInstalledDaemonAcceptance": false,
+    "allRecordingsCompletedBeforeValidation": true,
+    "baseline": "a076ca31ef97ef4285981af053d07b7fe0f052bd",
+    "counts": {
+      "controlResponses": 111,
+      "cliEnvelopes": 7,
+      "validRequests": 102
+    },
+    "binaries": {
+      "arkdeck": "acefcaf59fdd1ea08926814a6ccfb90972a27f2704bbdf5e0bc3a26c32e98a4e",
+      "arkdeck-agentd": "694dc9f358300696c385b3e53f7b97dd7e208bd936273fc45b810c2c28bde416"
+    }
+  },
+  "archive": {
+    "file": "macos-readonly-recordings.zip",
+    "sha256": "c7954b93b8d7576bde4ddd7c50e25d2ee5e7efa63775cbffc653424333523e46",
+    "bytes": 84011,
+    "fileCount": 240
+  },
+  "deviceAcceptance": false,
+  "windowsNativeAcceptance": false
+}

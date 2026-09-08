@@ -1,0 +1,75 @@
+{
+  "schemaVersion": "arkdeck.xpa002-local-verification/1",
+  "kind": "host-test",
+  "baseline": "3940b87592bbd62342dbe7c757da16bfbca400af",
+  "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "unifiedGate": {
+    "exitCode": 1,
+    "failure": "cargo-vet: nine dependencies lack safe-to-deploy coverage",
+    "command": "python3 scripts/ci/plan.py --repo-root . --base-revision origin/main --head-revision HEAD --merge-base --include-worktree --run-local",
+    "rustImplementationRevision": "2da3dfef276a4e97efc1648cf9f0a97dfab660bf",
+    "mergedProtectedMain": "3940b87592bbd62342dbe7c757da16bfbca400af",
+    "includedWorktree": true
+  },
+  "checks": {
+    "plannerTests": 27,
+    "workflowTests": 11,
+    "catalogGeneratorTests": 49,
+    "designSystemTests": 83,
+    "swiftWrapperTests": 12,
+    "swiftTests": 2464,
+    "xcodeWrapperTests": 40,
+    "appBuildForTesting": "PASS",
+    "rustTests": 69,
+    "rustFmt": "PASS",
+    "rustClippy": "PASS",
+    "contractGenerator": "PASS",
+    "cargoDeny": "PASS",
+    "cargoVet": "FAIL",
+    "sdd": "PASS",
+    "freshRustupHomeGenerator": "PASS",
+    "nativeProcessProbe": "PASS"
+  },
+  "recording": {
+    "schemaVersion": "arkdeck.rust-readonly-host-check/1",
+    "kind": "host-test",
+    "result": "PASS",
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "deviceAcceptance": false,
+    "windowsInstalledDaemonAcceptance": false,
+    "allRecordingsCompletedBeforeValidation": true,
+    "baseline": "3940b87592bbd62342dbe7c757da16bfbca400af",
+    "counts": {
+      "controlResponses": 111,
+      "cliEnvelopes": 7,
+      "validRequests": 102
+    },
+    "binaries": {
+      "arkdeck": "05a637b3ad0d4b38c21bbbfe5fd9a42b9849a9d4f4b472b30f11dd835ea66610",
+      "arkdeck-agentd": "df49c2ee742e7f892a244ae37359aa208e038c6a9d25dad81e445ba2b18039df"
+    }
+  },
+  "archive": {
+    "file": "macos-current-baseline-recordings.zip",
+    "sha256": "fefe0ee0732d33bf95b677249f559932984c9b2ed0bfc5ff586df3f7f8824299",
+    "bytes": 84018,
+    "fileCount": 240
+  },
+  "deviceAcceptance": false,
+  "windowsNativeAcceptance": false,
+  "nativeProcessProbe": {
+    "file": "macos-native-process-selftest.json",
+    "sha256": "f8125b93f5bf2073484b9097118d20e27ddc7b01d4a65e579cf820ac00ee6073",
+    "result": {
+      "argvRoundtrip": true,
+      "cleanChildEnvironment": true,
+      "deviceDispatchCount": 0,
+      "executableSha256": "3f689d8fada13a6e6775acafbf06eef9da99ad7fda9d1fb022f0fb5d10fbdeff",
+      "outputLimitRefused": true,
+      "platform": "macos",
+      "probe": "process-selftest",
+      "timeoutRefused": true
+    },
+    "executedBy": "unifiedGate"
+  }
+}

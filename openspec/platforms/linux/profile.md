@@ -4,16 +4,25 @@
 > Version：0.1.0  
 > Status：planned / future（not supported, not releasable）  
 > Core baseline：CORE-2.0.0  
-> Core strategy：native-conforming-shared-contract-vector-suite  
+> Core strategy：shared-rust-runtime-native-ui-shared-contract-vector-suite
+> Strategy status：proposed by CHG-2026-074; pending maintainer PR review
 > Shared inputs：由每个 Task 固定 accepted Integration lock、profile 与 Core conformance hash  
 > Conformance：notStarted
 
 Linux 是同一 ArkDeck 产品的 future Port，不是当前 macOS 交付范围。进入实现前必须先完成 L0 Spike；本 Profile 只锁定平台工程边界，不能构成“Linux 已支持”的声明。
 
+## Shared Runtime target（CHG-2026-074）
+
+策略值与[共享 Rust Runtime 架构](../../architecture/core-portability.md)同步，表示待维护者
+PR review 的未来目标：native Linux UI 经本地 IPC 消费共享 Runtime。CHG-2026-074
+不交付 Linux App、Provider、安装器或平台支持；Linux 保持 `planned/notStarted`，L0 未
+执行，工具链编译和 Linux hosted CI 不替代本 Profile 的 OS、device 或 release 验收。
+Core 的全部可观察语义、Requirement/AC 与共享 contract/vector suite 继续适用。
+
 ## Permitted platform decisions
 
 - UI/toolkit：GTK4/libadwaita、Qt 或其他可满足桌面可访问性与打包需求的方案；
-- language/runtime：Rust、C++、JVM/.NET 或满足 language-neutral Core contract 的组合；
+- 客户端 language/runtime：Rust、C++、JVM/.NET 或满足 language-neutral Core contract 的组合；Core Runtime 采用上文待审查的共享 Rust 目标；
 - distro baseline、Wayland/X11 集成、D-Bus 与 desktop portal 实现；
 - deb/rpm/AppImage/Flatpak/Snap 的取舍、签名、repository 与更新机制；
 - Linux 路径、桌面布局、系统日志和文件选择 UX。

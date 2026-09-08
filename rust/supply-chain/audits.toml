@@ -1,0 +1,67 @@
+
+# cargo-vet audits file
+
+[audits]
+
+[[trusted.cpufeatures]]
+criteria = "safe-to-deploy"
+user-id = 267 # Tony Arcieri (tarcieri)
+start = "2025-01-25"
+end = "2025-01-26"
+notes = "User-authorized bounded publisher trust for TASK-XPA-002 / PR #1768. Only the recorded UTC publication day is covered; deny.toml and Cargo.lock additionally require the exact reviewed version and checksum. This is publisher provenance, not a source audit; no future publishing window or automatic renewal."
+
+[[trusted.digest]]
+criteria = "safe-to-deploy"
+user-id = 267 # Tony Arcieri (tarcieri)
+start = "2023-05-19"
+end = "2023-05-20"
+notes = "User-authorized bounded publisher trust for TASK-XPA-002 / PR #1768. Only the recorded UTC publication day is covered; deny.toml and Cargo.lock additionally require the exact reviewed version and checksum. This is publisher provenance, not a source audit; no future publishing window or automatic renewal."
+
+[[trusted.generic-array]]
+criteria = "safe-to-deploy"
+user-id = 5704 # Nova (novacrazy)
+start = "2023-03-28"
+end = "2023-03-29"
+notes = "User-authorized bounded publisher trust for TASK-XPA-002 / PR #1768. Only the recorded UTC publication day is covered; deny.toml and Cargo.lock additionally require the exact reviewed version and checksum. This is publisher provenance, not a source audit; no future publishing window or automatic renewal."
+
+[[trusted.libc]]
+criteria = "safe-to-deploy"
+user-id = 55123 # rust-lang-owner
+start = "2026-07-21"
+end = "2026-07-22"
+notes = "User-authorized bounded publisher trust for TASK-XPA-002 / PR #1768. Only the recorded UTC publication day is covered; deny.toml and Cargo.lock additionally require the exact reviewed version and checksum. This is publisher provenance, not a source audit; no future publishing window or automatic renewal."
+
+[[trusted.memchr]]
+criteria = "safe-to-deploy"
+user-id = 189 # Andrew Gallant (BurntSushi)
+start = "2026-07-08"
+end = "2026-07-09"
+notes = "User-authorized bounded publisher trust for TASK-XPA-002 / PR #1768. Only the recorded UTC publication day is covered; deny.toml and Cargo.lock additionally require the exact reviewed version and checksum. This is publisher provenance, not a source audit; no future publishing window or automatic renewal."
+
+[[trusted.serde_json]]
+criteria = "safe-to-deploy"
+user-id = 3618 # David Tolnay (dtolnay)
+start = "2026-07-20"
+end = "2026-07-21"
+notes = "User-authorized bounded publisher trust for TASK-XPA-002 / PR #1768. Only the recorded UTC publication day is covered; deny.toml and Cargo.lock additionally require the exact reviewed version and checksum. This is publisher provenance, not a source audit; no future publishing window or automatic renewal."
+
+[[trusted.syn]]
+criteria = "safe-to-deploy"
+user-id = 3618 # David Tolnay (dtolnay)
+start = "2026-07-15"
+end = "2026-07-16"
+notes = "User-authorized bounded publisher trust for TASK-XPA-002 / PR #1768. Only the recorded UTC publication day is covered; deny.toml and Cargo.lock additionally require the exact reviewed version and checksum. This is publisher provenance, not a source audit; no future publishing window or automatic renewal."
+
+[[trusted.typenum]]
+criteria = "safe-to-deploy"
+user-id = 243 # Paho Lurie-Gregg (paholg)
+start = "2026-05-29"
+end = "2026-05-30"
+notes = "User-authorized bounded publisher trust for TASK-XPA-002 / PR #1768. Only the recorded UTC publication day is covered; deny.toml and Cargo.lock additionally require the exact reviewed version and checksum. This is publisher provenance, not a source audit; no future publishing window or automatic renewal."
+
+[[trusted.windows-sys]]
+criteria = "safe-to-deploy"
+user-id = 64539 # Kenny Kerr (kennykerr)
+start = "2025-10-06"
+end = "2025-10-07"
+notes = "User-authorized bounded publisher trust for TASK-XPA-002 / PR #1768. Only the recorded UTC publication day is covered; deny.toml and Cargo.lock additionally require the exact reviewed version and checksum. This is publisher provenance, not a source audit; no future publishing window or automatic renewal."

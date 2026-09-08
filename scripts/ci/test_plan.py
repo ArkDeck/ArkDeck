@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 
 SCRIPT = pathlib.Path(__file__).with_name("plan.py")
@@ -20,11 +21,12 @@ SPEC.loader.exec_module(PLAN)
 
 
 class PathClassificationTests(unittest.TestCase):
-    def assert_lanes(self, paths, *, swift: bool, app: bool, ds: bool):
+    def assert_lanes(self, paths, *, swift: bool, app: bool, ds: bool, rust: bool = False):
         selection = PLAN.classify_paths(paths)
         self.assertEqual(selection.swift, swift)
         self.assertEqual(selection.app, app)
         self.assertEqual(selection.ds, ds)
+        self.assertEqual(selection.rust, rust)
 
     def test_docs_and_previews_outside_design_select_no_lane(self):
         self.assert_lanes(
@@ -113,12 +115,29 @@ class PathClassificationTests(unittest.TestCase):
         )
 
     def test_planner_and_workflow_changes_cannot_self_skip(self):
-        self.assert_lanes(
-            ["scripts/ci/plan.py"], swift=True, app=True, ds=True
-        )
-        self.assert_lanes(
-            [".github/workflows/swift-ci.yml"], swift=True, app=True, ds=True
-        )
+        for path in (
+            "scripts/ci/plan.py",
+            "scripts/ci/test_plan.py",
+            "scripts/test_agent_pr_workflow.py",
+            ".github/workflows/swift-ci.yml",
+            ".github/workflows/rust-ci.yml",
+        ):
+            with self.subTest(path=path):
+                self.assert_lanes([path], swift=True, app=True, ds=True, rust=True)
+
+    def test_rust_and_contract_inputs_select_rust_without_unrelated_lanes(self):
+        for path in (
+            "rust/Cargo.toml",
+            "rust/Cargo.lock",
+            "rust/rust-toolchain.toml",
+            "rust/crates/arkdeck-contract/src/lib.rs",
+            "rust/deny.toml",
+            "rust/supply-chain/imports.lock",
+            "spec/control/methods/doctor.json",
+            r"rust\crates\arkdeck-control\src\lib.rs",
+        ):
+            with self.subTest(path=path):
+                self.assert_lanes([path], swift=False, app=False, ds=False, rust=True)
 
 
 class GitPlanTests(unittest.TestCase):
@@ -208,6 +227,7 @@ class GitPlanTests(unittest.TestCase):
         self.assertTrue(plan.lanes.app)
         self.assertTrue(plan.lanes.ds)
         self.assertEqual(plan.reason, "main-before-unavailable-fail-closed")
+        self.assertTrue(plan.lanes.rust)
 
     def test_missing_agent_main_runs_every_lane(self):
         self.git("update-ref", "-d", "refs/remotes/origin/main")
@@ -221,6 +241,35 @@ class GitPlanTests(unittest.TestCase):
         self.assertTrue(plan.lanes.app)
         self.assertTrue(plan.lanes.ds)
         self.assertEqual(plan.reason, "base-unavailable-fail-closed")
+        self.assertTrue(plan.lanes.rust)
+
+    def test_rust_only_agent_push_cannot_select_no_compiled_lane(self):
+        self.git("switch", "-qc", "agent/rust")
+        head = self.commit_file("rust/crates/arkdeck-contract/src/lib.rs", "// Rust\n")
+        plan = PLAN.plan_from_push_event(
+            self.root,
+            self.event(before=PLAN.ZERO_OID, after=head, ref="refs/heads/agent/rust"),
+        )
+        self.assertTrue(plan.lanes.rust)
+        self.assertFalse(plan.lanes.swift)
+        self.assertFalse(plan.lanes.app)
+        self.assertFalse(plan.lanes.ds)
+        output = self.root / "github-output"
+        PLAN._append_github_output(output, plan)
+        self.assertIn("rust=true\n", output.read_text(encoding="utf-8"))
+        self.assertIs(plan.as_dict()["rust"], True)
+
+    def test_removing_rust_source_still_selects_rust(self):
+        self.git("switch", "-qc", "agent/remove-rust")
+        source = "rust/crates/arkdeck-contract/src/lib.rs"
+        base = self.commit_file(source, "// Rust\n")
+        self.git("rm", source)
+        self.git("commit", "-qm", "remove Rust source")
+        plan = PLAN.plan_between(
+            self.root, base_revision=base, head_revision="HEAD", use_merge_base=False
+        )
+        self.assertIn(source, plan.changed_files)
+        self.assertTrue(plan.lanes.rust)
 
     def test_cross_surface_rename_reports_removed_swift_path(self):
         self.git("switch", "-qc", "agent/rename")
@@ -271,9 +320,9 @@ class GitPlanTests(unittest.TestCase):
 
 
 class CommandSelectionTests(unittest.TestCase):
-    def plan(self, *, swift: bool, app: bool, ds: bool = False):
+    def plan(self, *, swift: bool, app: bool, ds: bool = False, rust: bool = False):
         return PLAN.CIPlan(
-            lanes=PLAN.LaneSelection(swift=swift, app=app, ds=ds),
+            lanes=PLAN.LaneSelection(swift=swift, app=app, ds=ds, rust=rust),
             base_revision="0" * 40,
             head_revision="1" * 40,
             base_kind="test",
@@ -291,6 +340,7 @@ class CommandSelectionTests(unittest.TestCase):
         self.assertNotIn("run-test-lane.sh", flattened)
         self.assertNotIn("xcodebuild", flattened)
         self.assertNotIn("npm", flattened)
+        self.assertNotIn("cargo", flattened)
 
     def test_test_only_plan_runs_swift_but_not_app(self):
         flattened = "\n".join(self.commands(self.plan(swift=True, app=False)))
@@ -310,6 +360,57 @@ class CommandSelectionTests(unittest.TestCase):
         flattened = "\n".join(commands)
         self.assertNotIn("run-test-lane.sh", flattened)
         self.assertNotIn("xcodebuild", flattened)
+
+    def test_rust_plan_checks_locked_workspace_and_dependency_policy(self):
+        commands = self.commands(self.plan(swift=False, app=False, rust=True))
+        rust_commands = [command for command in commands if command.startswith("cargo ")]
+        self.assertEqual(rust_commands, [
+            "cargo fmt --all --check",
+            "cargo fetch --locked",
+            "cargo clippy --workspace --all-targets --locked -- -D warnings",
+            "cargo test --workspace --locked",
+            "cargo run --package arkdeck-platform --example windows_spk3 --locked -- process-selftest",
+            "cargo build --workspace --bins --locked",
+            "cargo deny --locked check",
+            "cargo vet --locked --no-registry-suggestions",
+        ])
+        generator = commands.index(
+            f"{sys.executable} rust/scripts/generate-contract.py --check"
+        )
+        self.assertLess(generator, commands.index("cargo fmt --all --check"))
+        black_box = commands.index(f"{sys.executable} rust/scripts/check-readonly.py")
+        self.assertLess(commands.index("cargo build --workspace --bins --locked"), black_box)
+        self.assertLess(black_box, commands.index("cargo deny --locked check"))
+        self.assertNotIn("xcodebuild", "\n".join(commands))
+
+    def test_rust_commands_use_workspace_toolchain_directory(self):
+        root = pathlib.Path("/example/ArkDeck")
+        commands = (("python3", "scripts/ci/test_plan.py"), ("cargo", "fmt", "--check"))
+        with mock.patch.object(PLAN, "local_commands", return_value=commands):
+            with mock.patch.object(PLAN.subprocess, "run") as run:
+                PLAN.run_local(root, self.plan(swift=False, app=False, rust=True))
+        self.assertEqual(
+            [call.kwargs["cwd"] for call in run.call_args_list], [root, root / "rust"]
+        )
+        self.assertTrue(all(call.kwargs["check"] for call in run.call_args_list))
+
+    def test_dependency_policy_failure_cannot_pass_local_gate(self):
+        for command in (
+            ("cargo", "deny", "--locked", "check"),
+            ("cargo", "vet", "--locked", "--no-registry-suggestions"),
+        ):
+            with self.subTest(command=command):
+                with mock.patch.object(PLAN, "local_commands", return_value=(command,)):
+                    with mock.patch.object(
+                        PLAN.subprocess,
+                        "run",
+                        side_effect=subprocess.CalledProcessError(1, command),
+                    ):
+                        with self.assertRaises(subprocess.CalledProcessError):
+                            PLAN.run_local(
+                                pathlib.Path("/example/ArkDeck"),
+                                self.plan(swift=False, app=False, rust=True),
+                            )
 
 
 if __name__ == "__main__":

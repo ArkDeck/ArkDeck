@@ -109,11 +109,12 @@ Conventions shared by every task:
 
 ## TASK-XPA-002 — Rust contract kernel and the first Windows GJ-1 hops (doctor, device candidates)
 
-- Status:blocked（awaits merge of the proposal PR and SPK-3 on a Windows host）
+- Status:in-progress（read-only foundation against the pinned Swift development baseline; Windows acceptance and maintainer review remain outstanding, see `evidence/xpa-002-readonly-foundation.md`）
 - Platform:windows（the same crates run read-only on macOS as a shadow tool）
 - Requirements:`toolchain-hdc-server` REQ-HDC-006/REQ-HDC-009 (unchanged), CLI-REQ-001/005/006/013/014
 - Acceptance:XPA-AC-1, XPA-AC-3, XPA-AC-6; Windows GJ-1 `NOT_STARTED → IMPLEMENTING`
-- Depends on:TASK-XPA-001
+- Depends on:TASK-XPA-001（implementation input: its published single-v1 method schemas and recorded Swift corpus, pinned in `spec/baselines/swift-single-v1.json`; neither TASK-SVC-005 nor TASK-XPA-001's remaining real-device re-pass blocks this bounded implementation）
+- Acceptance prerequisites:the unchanged XPA-AC-1/3/6 and verification rows below, including SPK-3 and Windows 11 x64 + DAYU200 with a trusted installed daemon and a reviewed Windows HDC tuple/output family; the development baseline and host tests do not satisfy them or establish approval, verification or completion. This dependency clarification changes no Allowed paths, operation, Core requirement or hardware criterion.
 - Readiness input pins（非载体示例）:
 
   ```yaml pin-example
@@ -124,7 +125,7 @@ Conventions shared by every task:
   ```
 
 - Applicable failure patterns:AF-002, AF-003, AF-004, AF-007, AF-011
-- Production reachability:`arkdeck.exe doctor` / `device candidates` → user-private named pipe → `arkdeck-control` → `doctor` / `device.candidates` → `hdc.exe list targets -v` as an argument array with handle-bound hash verification → parser → projection; read-only, no durable write, no capability
+- Production reachability:`arkdeck.exe doctor` / `operation list` / `device candidates` → user-private named pipe → `arkdeck-control` → `doctor` / `operation.list` / `device.observations` → `hdc.exe list targets -v` as an argument array with handle-bound hash verification → parser → projection; read-only, no durable write, no capability
 - Trusted fact sources:catalog digest from `Catalog/operations/*.json` via the generator; canonical JSON/CBOR/digest vectors from `openspec/contracts/cli-canonical-json-vectors.json` and the permit vectors; HDC output classification from the hash-pinned Golden/Probe fixtures; pipe peer identity from the logon SID DACL plus server-side SID/elevation check; pipe **server** identity from the pipe object's owner SID and, where the connection's server PID is obtainable, from the daemon instance's image and signature/package identity (design §F.2, r3/r5)
 - Allowed paths:
   - `rust/**`

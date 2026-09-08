@@ -1,0 +1,108 @@
+name: Rust CI
+
+# Called only by the shared planner. Its result is required by the existing
+# swift aggregate, so a Rust failure cannot leave branch protection green.
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  workspace:
+    name: Rust workspace (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-26, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+        working-directory: rust
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - name: Checkout exact revision with runner Git
+        working-directory: .
+        env:
+          ARKDECK_CI_REF: ${{ github.ref }}
+          ARKDECK_CI_SHA: ${{ github.sha }}
+        run: |
+          set -eu
+          git init .
+          # Contract/corpus digests are over repository bytes on every host.
+          git config core.autocrlf false
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags --prune origin \
+            "+refs/heads/main:refs/remotes/origin/main" \
+            "+${ARKDECK_CI_REF}:refs/remotes/origin/ci"
+          git checkout --detach refs/remotes/origin/ci
+          test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"
+
+      - name: Set up Python for contract validation
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0 (Node 24)
+        with:
+          python-version: "3.14"
+
+      - name: Install pinned contract validation dependencies
+        run: python -m pip install PyYAML==6.0.3 jsonschema==4.26.0
+
+      - name: Activate workspace toolchain and required components
+        run: |
+          set -eu
+          rustup toolchain install --profile minimal --component rustfmt,clippy --no-self-update
+          rustup show active-toolchain
+          rustc --version
+          cargo --version
+
+      - name: Verify generated contract inputs against the pinned Swift commit
+        working-directory: .
+        run: python rust/scripts/generate-contract.py --check
+
+      - name: Format check
+        run: cargo fmt --all --check
+
+      - name: Fetch the locked dependency graph for all host platforms
+        run: cargo fetch --locked
+
+      - name: Clippy with warnings denied
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+
+      - name: Workspace tests
+        run: cargo test --workspace --locked
+
+      - name: Native verified-process argument, output and timeout checks
+        run: cargo run --package arkdeck-platform --example windows_spk3 --locked -- process-selftest
+
+      - name: Build the read-only product binaries
+        run: cargo build --workspace --bins --locked
+
+      - name: Read-only black-box checks and completed frame schema validation
+        working-directory: .
+        run: python rust/scripts/check-readonly.py
+
+      - name: Install pinned dependency policy tools
+        run: |
+          set -eu
+          cargo install --locked --version 0.20.2 cargo-deny
+          cargo install --locked --version 0.10.2 cargo-vet
+
+      - name: Dependency source, license, ban and advisory policy
+        run: cargo deny --locked check
+
+      - name: Require the committed dependency audits
+        run: cargo vet --locked --no-registry-suggestions
+
+      - name: Verify checks left locked inputs unchanged
+        run: git diff --exit-code -- Cargo.lock supply-chain
+
+      - name: Preserve actual read-only recordings
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1 (Node 24)
+        with:
+          name: rust-readonly-recordings-${{ matrix.os }}
+          path: rust/target/readonly-check/
+          if-no-files-found: warn
+          retention-days: 7

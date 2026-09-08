@@ -1,0 +1,31 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.98"
+license = "MIT"
+publish = false
+
+[workspace.dependencies]
+arkdeck-contract = { path = "crates/arkdeck-contract" }
+arkdeck-platform = { path = "crates/arkdeck-platform" }
+arkdeck-control = { path = "crates/arkdeck-control" }
+arkdeck-provider-hdc = { path = "crates/arkdeck-provider-hdc" }
+arkdeck-client = { path = "crates/arkdeck-client" }
+serde = { version = "=1.0.228", features = ["derive"] }
+serde_json = { version = "1.0.151", features = ["float_roundtrip"] }
+sha2 = "0.10.9"
+hmac = "0.12.1"
+libc = "0.2"
+windows-sys = "0.61.2"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[profile.release]
+panic = "abort"
+lto = "thin"
+strip = "debuginfo"

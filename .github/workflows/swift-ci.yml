@@ -39,6 +39,7 @@ jobs:
       swift: ${{ steps.paths.outputs.swift }}
       app: ${{ steps.paths.outputs.app }}
       ds: ${{ steps.paths.outputs.ds }}
+      rust: ${{ steps.paths.outputs.rust }}
       base: ${{ steps.paths.outputs.base }}
       reason: ${{ steps.paths.outputs.reason }}
       changed-count: ${{ steps.paths.outputs.changed-count }}
@@ -81,6 +82,7 @@ jobs:
             echo "- ArkDeckKit full tests: \`${{ steps.paths.outputs.swift }}\`"
             echo "- ArkDeck App build-for-testing: \`${{ steps.paths.outputs.app }}\`"
             echo "- @arkdeck/ds interaction tests: \`${{ steps.paths.outputs.ds }}\`"
+            echo "- Rust workspace and dependency policy: \`${{ steps.paths.outputs.rust }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
   swift-tests:
@@ -263,12 +265,17 @@ jobs:
         working-directory: docs/design/arkdeck-ds
         run: npm test
 
+  rust-checks:
+    needs: plan
+    if: needs.plan.outputs.rust == 'true'
+    uses: ./.github/workflows/rust-ci.yml
+
   # Stable required-check name.  A job-level skip is a successful no-op;
   # workflow-level paths filters are intentionally absent because GitHub can
   # leave a required workflow that never started pending indefinitely.
   swift:
     if: always()
-    needs: [plan, swift-tests, app-build, ds-interactions]
+    needs: [plan, swift-tests, app-build, ds-interactions, rust-checks]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -281,6 +288,8 @@ jobs:
           APP_RESULT: ${{ needs.app-build.result }}
           DS_SELECTED: ${{ needs.plan.outputs.ds }}
           DS_RESULT: ${{ needs.ds-interactions.result }}
+          RUST_SELECTED: ${{ needs.plan.outputs.rust }}
+          RUST_RESULT: ${{ needs.rust-checks.result }}
         run: |
           set -eu
           test "$PLAN_RESULT" = success
@@ -299,6 +308,11 @@ jobs:
           else
             test "$DS_RESULT" = skipped
           fi
+          if [ "$RUST_SELECTED" = true ]; then
+            test "$RUST_RESULT" = success
+          else
+            test "$RUST_RESULT" = skipped
+          fi
 
       - name: Coverage summary
         if: always()
@@ -308,6 +322,8 @@ jobs:
             echo "- ArkDeckKit lane selected: \`${{ needs.plan.outputs.swift }}\`; result: \`${{ needs.swift-tests.result }}\`."
             echo "- ArkDeck App lane selected: \`${{ needs.plan.outputs.app }}\`; result: \`${{ needs.app-build.result }}\`."
             echo "- @arkdeck/ds interaction lane selected: \`${{ needs.plan.outputs.ds }}\`; result: \`${{ needs.ds-interactions.result }}\`."
+            echo "- Rust workspace lane selected: \`${{ needs.plan.outputs.rust }}\`; result: \`${{ needs.rust-checks.result }}\`."
+            echo "- Rust checks run on Windows, macOS and Linux; hosted runners do not constitute Windows device acceptance."
             echo "- ArkDeckKit changes retain the full test suite; test-only changes do not rebuild the App."
             echo "- App/UI-test/project changes compile with build-for-testing; no simulator or device test is claimed."
             echo "- Design, App and Package changes run the @arkdeck/ds interaction tests after an exact npm ci."

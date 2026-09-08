@@ -1,7 +1,7 @@
 # 平台交付/conformance 状态的唯一事实源(V2:不再逐文件 hash pin;历史对比用 git)
-lock: PLATFORM-PROFILES-0.4.0
+lock: PLATFORM-PROFILES-0.5.0
 status: current
-updated_at: 2026-07-30
+updated_at: 2026-09-08
 current_delivery_platforms: [macos]
 not_started_platforms: [windows, linux]
 
@@ -16,8 +16,9 @@ profiles:
     last_verified: null
   - id: PLATFORM-WINDOWS
     platform: windows
-    version: 0.1.0
+    version: 0.2.0
     profile_path: openspec/platforms/windows/profile.md
+    case_manifest_path: openspec/platforms/windows/conformance-cases.yaml
     conformance_status: notStarted
     last_verified: null
   - id: PLATFORM-LINUX
@@ -31,5 +32,9 @@ change_rule: >-
   Platform delivery and conformance status change via maintainer-approved PR.
   A platform may not claim "supported" while notStarted or needsReverification;
   verified is scoped to the exact OS/arch/build tuples actually evidenced.
-  Windows/Linux keep only a future-facing profile until the W0/L0 spikes start;
-  their conformance cases and verification plans will be authored in those changes.
+  CHG-2026-074 proposes the shared Rust strategy in all three profiles for
+  maintainer PR review. Windows profile 0.2.0 and its case manifest register
+  W0/XPA-002 preparation only; every required Windows 11 case is NOT_RUN, and no
+  support cell or spike execution is approved by this lock entry. Linux L0
+  remains unstarted. The delivery lists, conformance statuses and last_verified
+  values above are unchanged; compilation and hosted CI do not advance them.
