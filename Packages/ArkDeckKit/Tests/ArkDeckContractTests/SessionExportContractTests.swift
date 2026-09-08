@@ -248,6 +248,70 @@ final class SessionExportContractTests: XCTestCase {
     XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
   }
 
+  /// `outcomeUnknown` is the most expensive classification this surface has —
+  /// it tells a caller the export may be half-published — and the apply path
+  /// used to stamp it on *every* error from the publication block with one
+  /// fixed sentence. A refusal that wrote nothing, and the catalog-drift case
+  /// that has its own message, both arrived as the same unusable line.
+  ///
+  /// Found on the reference host: `session export apply` answered
+  /// `outcomeUnknown` / "requires destination inspection", the destination did
+  /// not exist, and there was nothing to inspect it *for*.
+  func testApplyKeepsAClassifiedFailuresOwnCode() throws {
+    let storage = try store(
+      faultInjector: SessionStorageFaultInjector { point in
+        if point == .exportBeforeReplace {
+          throw RuntimeSessionStorageFailure("resourceConflict", "fixture classified refusal")
+        }
+      })
+    _ = try finalizedSession(id: "session-classified", timestamp: "2026-08-07T00:00:00Z")
+    let destination = exportsRoot.appending(path: "classified-copy", directoryHint: .isDirectory)
+    let preview = try object(
+      storage.previewSessionExport(
+        sessionID: "session-classified", destinationPath: destination.path,
+        allowSensitive: false))
+    let (previewID, previewDigest) = try tuple(preview)
+
+    XCTAssertThrowsError(
+      try storage.applySessionExport(previewID: previewID, previewDigest: previewDigest)
+    ) { error in
+      let failure = error as? RuntimeSessionStorageFailure
+      XCTAssertEqual(failure?.code, "resourceConflict")
+      XCTAssertEqual(failure?.message, "fixture classified refusal")
+    }
+    XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
+  }
+
+  /// An unclassified failure still becomes `outcomeUnknown`, because the
+  /// exporter may already have created the destination — but it has to name
+  /// what failed, or the instruction to inspect the destination is unusable.
+  func testApplyNamesAnUnclassifiedCauseInsteadOfTheBareSentence() throws {
+    let storage = try store(
+      faultInjector: SessionStorageFaultInjector { point in
+        if point == .exportBeforeReplace { throw FixtureFailure.io }
+      })
+    _ = try finalizedSession(id: "session-opaque", timestamp: "2026-08-08T00:00:00Z")
+    let destination = exportsRoot.appending(path: "opaque-copy", directoryHint: .isDirectory)
+    let preview = try object(
+      storage.previewSessionExport(
+        sessionID: "session-opaque", destinationPath: destination.path, allowSensitive: false))
+    let (previewID, previewDigest) = try tuple(preview)
+
+    XCTAssertThrowsError(
+      try storage.applySessionExport(previewID: previewID, previewDigest: previewDigest)
+    ) { error in
+      let failure = error as? RuntimeSessionStorageFailure
+      XCTAssertEqual(failure?.code, "outcomeUnknown")
+      XCTAssertTrue(
+        failure?.message.contains("requires destination inspection") == true,
+        failure?.message ?? "-")
+      XCTAssertNotEqual(
+        failure?.message, "Session export outcome requires destination inspection",
+        "the cause must be named, not replaced by the bare sentence")
+    }
+    XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
+  }
+
   func testFaultAfterApplyingBecomesOutcomeUnknownAndNeverReplays() throws {
     let attempts = Counter()
     let storage = try store(
