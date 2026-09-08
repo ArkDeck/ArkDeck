@@ -1817,6 +1817,19 @@ enum RuntimeCLI {
             "targetId": .string(try required("--target")),
             "expectedBindingRevision": .integer(revision),
           ]))
+    case "reconcile-alias":
+      guard let revision = Int64(try required("--expected-binding-revision")) else {
+        throw CLIError(
+          exitCode: EX_USAGE,
+          message: "flash reconcile-alias --expected-binding-revision must be a number")
+      }
+      session.emit(
+        try session.request(
+          "flash.reconcile-alias",
+          [
+            "targetId": .string(try required("--target")),
+            "expectedBindingRevision": .integer(revision),
+          ]))
     default:
       throw CLIError(exitCode: EX_USAGE, message: "unsupported flash subcommand")
     }

@@ -77,6 +77,7 @@
     "argv/flash.postflight.json",
     "argv/flash.prerequisites.json",
     "argv/flash.preview.json",
+    "argv/flash.reconcile-alias.json",
     "argv/flash.run.json",
     "argv/help.json",
     "argv/history.filter.delete.json",

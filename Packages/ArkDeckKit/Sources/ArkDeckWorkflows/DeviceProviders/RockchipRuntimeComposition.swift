@@ -141,8 +141,10 @@ package struct TargetStoreRockchipRuntimeFactsPort: RockchipRuntimeFactsPort {
                   "flash.postFlashHDCAliasLineageReissued: the stored alias names this target and "
                     + "Loader identity at revision \(routed.bindingRevision) while the live target "
                     + "is at revision \(target.bindingRevision). The revision counter was reissued, "
-                    + "so the two are not comparable; the stored alias must be reconciled against "
-                    + "fresh device facts before this target can be flashed")
+                    + "so the two are not comparable. Reconcile the stored alias against fresh "
+                    + "device facts with `arkdeck flash reconcile-alias --target "
+                    + "\(target.targetID) --expected-binding-revision \(target.bindingRevision)`, "
+                    + "with the board attached in hdc-normal mode")
               }
               throw DeviceProviderError.factsUnavailable(
                 "flash.postFlashHDCBindingConflict: stored alias revision "

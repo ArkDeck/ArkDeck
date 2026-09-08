@@ -540,7 +540,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
         target: liveTarget(revision: 2),
         observedHDCIdentitySHA256: fixture.identity,
         observedHDCConnectKey: "reissue-connect-key",
-        observedBuildVersion: "OpenHarmony-7.0.0.37",
+        observedUSBTopology: "2097152",
         nowUTC: "2026-09-08T08:00:00Z"))
     XCTAssertEqual(outcome.archivedRevision, 4)
     XCTAssertEqual(outcome.publishedRevision, 2)
@@ -569,7 +569,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       try fixture.store.reconcileReissuedLineage(
         target: liveTarget(revision: 2), observedHDCIdentitySHA256: fixture.identity,
         observedHDCConnectKey: "reissue-connect-key",
-        observedBuildVersion: "OpenHarmony-7.0.0.37", nowUTC: "2026-09-08T08:05:00Z"))
+        observedUSBTopology: "2097152", nowUTC: "2026-09-08T08:05:00Z"))
     XCTAssertEqual(try fixture.store.loadIfPresent(), current)
   }
 
@@ -586,7 +586,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
               bindingRevision: 2, connectKey: "reissue-connect-key", toolVersion: "3.2.0f",
               adoptedAtUTC: "2026-09-07T02:20:01Z"),
             observedHDCIdentitySHA256: identity, observedHDCConnectKey: "reissue-connect-key",
-            observedBuildVersion: "OpenHarmony-7.0.0.37", nowUTC: "2026-09-08T08:00:00Z"))
+            observedUSBTopology: "2097152", nowUTC: "2026-09-08T08:00:00Z"))
       }),
       ("different target", { store, identity in
         XCTAssertNil(
@@ -597,7 +597,7 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
               bindingRevision: 2, connectKey: "reissue-connect-key", toolVersion: "3.2.0f",
               adoptedAtUTC: "2026-09-07T02:20:01Z"),
             observedHDCIdentitySHA256: identity, observedHDCConnectKey: "reissue-connect-key",
-            observedBuildVersion: "OpenHarmony-7.0.0.37", nowUTC: "2026-09-08T08:00:00Z"))
+            observedUSBTopology: "2097152", nowUTC: "2026-09-08T08:00:00Z"))
       }),
       ("device now answers on another HDC identity", { store, _ in
         let other = "other-connect-key"
@@ -607,21 +607,21 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
           try store.reconcileReissuedLineage(
             target: self.liveTarget(revision: 2), observedHDCIdentitySHA256: otherIdentity,
             observedHDCConnectKey: other,
-            observedBuildVersion: "OpenHarmony-7.0.0.37", nowUTC: "2026-09-08T08:00:00Z"))
+            observedUSBTopology: "2097152", nowUTC: "2026-09-08T08:00:00Z"))
       }),
-      ("device now reports another build", { store, identity in
+      ("device is attached at another USB topology", { store, identity in
         XCTAssertNil(
           try store.reconcileReissuedLineage(
             target: self.liveTarget(revision: 2), observedHDCIdentitySHA256: identity,
             observedHDCConnectKey: "reissue-connect-key",
-            observedBuildVersion: "OpenHarmony-7.0.0.38", nowUTC: "2026-09-08T08:00:00Z"))
+            observedUSBTopology: "18874368", nowUTC: "2026-09-08T08:00:00Z"))
       }),
       ("stored alias is not ahead of the live target", { store, identity in
         XCTAssertNil(
           try store.reconcileReissuedLineage(
             target: self.liveTarget(revision: 9), observedHDCIdentitySHA256: identity,
             observedHDCConnectKey: "reissue-connect-key",
-            observedBuildVersion: "OpenHarmony-7.0.0.37", nowUTC: "2026-09-08T08:00:00Z"))
+            observedUSBTopology: "2097152", nowUTC: "2026-09-08T08:00:00Z"))
       }),
     ]
     for (label, check) in cases {
@@ -664,11 +664,122 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       try fixture.store.reconcileReissuedLineage(
         target: liveTarget(revision: 2), observedHDCIdentitySHA256: fixture.identity,
         observedHDCConnectKey: "reissue-connect-key",
-        observedBuildVersion: "OpenHarmony-7.0.0.37", nowUTC: "2026-09-08T08:00:00Z"))
+        observedUSBTopology: "2097152", nowUTC: "2026-09-08T08:00:00Z"))
     // Both records survive: the live one was not overwritten and the occupant
     // was not replaced.
     XCTAssertEqual(try fixture.store.loadIfPresent(), fixture.stored)
     XCTAssertEqual(try Data(contentsOf: archive), bytes)
+  }
+
+  /// The leaf that the reissue refusal now names. It gathers its own facts —
+  /// the durable target record and whatever is attached to USB right now — so
+  /// no caller can assert its way past the proof.
+  private func reconcilerFixture(
+    root: URL, targetRevision: Int, attached: [RockchipProductUSBIdentity]
+  ) throws -> (
+    reconciler: ProductRockchipPostFlashAliasReconciler,
+    store: RockchipPostFlashHDCBindingStore, stored: RockchipPostFlashHDCBinding,
+    targetID: String
+  ) {
+    let targets = try RuntimeTargetStore(
+      directoryURL: root.appending(path: "targets", directoryHint: .isDirectory))
+    // Reach the wanted revision the way the product does: adopt at 1, then let
+    // `advanceBindingLineage` carry it forward. Writing a record directly would
+    // fabricate a lineage the store itself refuses to produce, and the target
+    // identity has to be the one adoption mints rather than a literal.
+    let adopted = try targets.adopt(
+      stableIdentitySHA256: String(repeating: "b", count: 64),
+      connectKey: "reissue-connect-key", toolVersion: "3.2.0f",
+      nowUTC: "2026-09-07T02:20:01Z"
+    ).record
+    var revision = adopted.bindingRevision
+    var identity = adopted.stablePhysicalIdentitySHA256
+    while revision < targetRevision {
+      let next =
+        revision == targetRevision - 1
+        ? String(repeating: "a", count: 64)
+        : String(repeating: String(revision + 1), count: 64)
+      _ = try targets.advanceBindingLineage(
+        RuntimeTargetBindingLineageAdvance(
+          previousStableIdentitySHA256: identity, previousRevision: revision,
+          currentStableIdentitySHA256: next, currentRevision: revision + 1))
+      identity = next
+      revision += 1
+    }
+    let target = try XCTUnwrap(try targets.find(targetID: adopted.targetID))
+
+    let connectKey = "reissue-connect-key"
+    let hdcIdentity = SHA256.hash(data: Data(connectKey.utf8))
+      .map { String(format: "%02x", $0) }.joined()
+    let store = RockchipPostFlashHDCBindingStore(
+      rootURL: root.appending(path: "binding", directoryHint: .isDirectory))
+    let stored = RockchipPostFlashHDCBinding(
+      targetID: target.targetID, bindingRevision: 4,
+      stableLoaderIdentitySHA256: target.stablePhysicalIdentitySHA256,
+      previousHDCIdentitySHA256: hdcIdentity, hdcIdentitySHA256: hdcIdentity,
+      hdcConnectKey: connectKey, usbTopology: "2097152", productModel: "ohos",
+      buildVersion: "OpenHarmony-7.0.0.37", jobID: "job-reissue",
+      establishedAtUTC: "2026-09-02T07:00:39Z")
+    _ = try store.publish(stored, expectedPreviousHDCIdentitySHA256: hdcIdentity)
+    return (
+      ProductRockchipPostFlashAliasReconciler(
+        targetStore: targets, postFlashStore: store,
+        usbProbe: RockchipProductUSBProbe(identitySource: { attached }),
+        nowUTC: { "2026-09-08T09:30:00Z" }),
+      store, stored, target.targetID
+    )
+  }
+
+  private func attachedHDCNormal(
+    serial: String = "reissue-connect-key", topology: String = "2097152"
+  ) -> RockchipProductUSBIdentity {
+    RockchipProductUSBIdentity(
+      serial: serial, vendorID: RockchipProbeEvidence.rockUSBVendorID,
+      productID: RockchipHDCIntegrationProfile.dayu200NormalProductID,
+      topology: topology, productName: "\"HDC Device\"")
+  }
+
+  func testReconcileAliasLeafRepublishesOnlyWithTheBoardAttachedInHDCNormal() throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let fixture = try reconcilerFixture(
+      root: root, targetRevision: 2, attached: [attachedHDCNormal()])
+
+    let receipt = try fixture.reconciler.reconcileReissuedAlias(
+      targetID: fixture.targetID, expectedBindingRevision: 2)
+    XCTAssertTrue(receipt.reconciled)
+    XCTAssertEqual(receipt.archivedBindingRevision, 4)
+    XCTAssertEqual(receipt.bindingRevision, 2)
+    XCTAssertEqual(receipt.hdcIdentitySHA256, fixture.stored.hdcIdentitySHA256)
+    // The receipt never carries the raw connect key.
+    XCTAssertFalse("\(receipt)".contains(fixture.stored.hdcConnectKey))
+    XCTAssertEqual(try fixture.store.loadIfPresent()?.bindingRevision, 2)
+  }
+
+  func testReconcileAliasLeafRefusesWithoutACompleteFreshProof() throws {
+    let loader = RockchipProductUSBIdentity(
+      serial: "reissue-connect-key", vendorID: RockchipProbeEvidence.rockUSBVendorID,
+      productID: RockchipProbeEvidence.dayu200LoaderProductID, topology: "2097152")
+    let cases: [(String, Int, [RockchipProductUSBIdentity])] = [
+      ("nothing attached", 2, []),
+      ("board is in Loader mode, not hdc-normal", 2, [loader]),
+      ("two registered boards attached", 2, [attachedHDCNormal(), attachedHDCNormal()]),
+      ("another board answered", 2, [attachedHDCNormal(serial: "other-connect-key")]),
+      ("same board on another USB topology", 2, [attachedHDCNormal(topology: "18874368")]),
+      ("caller's expected revision is stale", 1, [attachedHDCNormal()]),
+    ]
+    for (label, expectedRevision, attached) in cases {
+      let root = try temporaryDirectory()
+      defer { try? FileManager.default.removeItem(at: root) }
+      let fixture = try reconcilerFixture(
+        root: root, targetRevision: 2, attached: attached)
+      XCTAssertThrowsError(
+        try fixture.reconciler.reconcileReissuedAlias(
+          targetID: fixture.targetID, expectedBindingRevision: expectedRevision), label)
+      XCTAssertEqual(
+        try fixture.store.loadIfPresent(), fixture.stored,
+        "a refused reconciliation must leave the stored alias exactly as it was: \(label)")
+    }
   }
 
   func testPostFlashHDCSerialRotationUsesBoundTopologyAndPublishesOnlyAfterExactBuild()

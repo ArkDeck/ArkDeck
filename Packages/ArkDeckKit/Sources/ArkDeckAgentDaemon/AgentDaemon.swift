@@ -112,6 +112,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
   private let rockchipBootloaderStatusObserver: (any RockchipBootloaderStatusObserving)?
   private let rockchipDeviceAccessObserver: (any RockchipDeviceAccessObserving)?
   private let rockchipLoaderBindingCoordinator: (any RockchipLoaderBindingCoordinating)?
+  private let rockchipPostFlashAliasReconciler: (any RockchipPostFlashAliasReconciling)?
   private let traceRuntimeProbe: (any TraceRuntimeProbing)?
   private let debugRuntimeProbe: (any DebugRuntimeProbing)?
   private let debugInvocationController: RuntimeDebugInvocationController?
@@ -161,6 +162,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     rockchipBootloaderStatusObserver: (any RockchipBootloaderStatusObserving)? = nil,
     rockchipDeviceAccessObserver: (any RockchipDeviceAccessObserving)? = nil,
     rockchipLoaderBindingCoordinator: (any RockchipLoaderBindingCoordinating)? = nil,
+    rockchipPostFlashAliasReconciler: (any RockchipPostFlashAliasReconciling)? = nil,
     traceRuntimeProbe: (any TraceRuntimeProbing)? = nil,
     debugRuntimeProbe: (any DebugRuntimeProbing)? = nil,
     debugInvocationController: RuntimeDebugInvocationController? = nil,
@@ -190,6 +192,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
       rockchipBootloaderStatusObserver: rockchipBootloaderStatusObserver,
       rockchipDeviceAccessObserver: rockchipDeviceAccessObserver,
       rockchipLoaderBindingCoordinator: rockchipLoaderBindingCoordinator,
+      rockchipPostFlashAliasReconciler: rockchipPostFlashAliasReconciler,
       traceRuntimeProbe: traceRuntimeProbe,
       debugRuntimeProbe: debugRuntimeProbe,
       debugInvocationController: debugInvocationController,
@@ -224,6 +227,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     rockchipBootloaderStatusObserver: (any RockchipBootloaderStatusObserving)? = nil,
     rockchipDeviceAccessObserver: (any RockchipDeviceAccessObserving)? = nil,
     rockchipLoaderBindingCoordinator: (any RockchipLoaderBindingCoordinating)? = nil,
+    rockchipPostFlashAliasReconciler: (any RockchipPostFlashAliasReconciling)? = nil,
     traceRuntimeProbe: (any TraceRuntimeProbing)? = nil,
     debugRuntimeProbe: (any DebugRuntimeProbing)? = nil,
     debugInvocationController: RuntimeDebugInvocationController? = nil,
@@ -255,6 +259,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     self.rockchipBootloaderStatusObserver = rockchipBootloaderStatusObserver
     self.rockchipDeviceAccessObserver = rockchipDeviceAccessObserver
     self.rockchipLoaderBindingCoordinator = rockchipLoaderBindingCoordinator
+    self.rockchipPostFlashAliasReconciler = rockchipPostFlashAliasReconciler
     self.traceRuntimeProbe = traceRuntimeProbe
     self.debugRuntimeProbe = debugRuntimeProbe
     self.debugInvocationController = debugInvocationController
@@ -561,6 +566,42 @@ public struct RuntimeControlPlaneHandler: Sendable {
         return failure(
           id: request.id, code: .rejected,
           message: "Rockchip bootloader status could not be observed: \(error)")
+      }
+
+    case "flash.reconcile-alias":
+      guard case .string(let targetID)? = request.params?["targetId"],
+        case .integer(let expectedRevision)? = request.params?["expectedBindingRevision"],
+        expectedRevision > 0
+      else {
+        return failure(
+          id: request.id, code: .invalidParams,
+          message: "targetId and expectedBindingRevision are required")
+      }
+      guard let rockchipPostFlashAliasReconciler else {
+        return failure(
+          id: request.id, code: .internalError,
+          message: "Rockchip post-flash alias reconciliation is not configured")
+      }
+      do {
+        let receipt = try rockchipPostFlashAliasReconciler.reconcileReissuedAlias(
+          targetID: targetID, expectedBindingRevision: Int(expectedRevision))
+        return success(
+          id: request.id,
+          result: .object([
+            "targetId": .string(receipt.targetID),
+            "reconciled": .bool(receipt.reconciled),
+            "archivedBindingRevision": receipt.archivedBindingRevision.map {
+              .integer(Int64($0))
+            } ?? .null,
+            "bindingRevision": .integer(Int64(receipt.bindingRevision)),
+            "hdcIdentitySha256": .string(receipt.hdcIdentitySHA256),
+          ]))
+      } catch {
+        // Nothing was written and nothing was dispatched to the device: this
+        // leaf only ever archives-and-republishes under a complete proof.
+        return failure(
+          id: request.id, code: .rejected,
+          message: "post-flash alias reconciliation was refused: \(error)")
       }
 
     case "flash.bind-current-loader":

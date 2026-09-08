@@ -507,6 +507,7 @@ enum CLIMachineContracts {
       "flash.device-access": .leaf("flash.device-access"),
       "flash.lanePlanPreview": .leaf("flash.lane-preview"),
       "flash.prerequisites": .leaf("flash.prerequisites"),
+      "flash.reconcile-alias": .leaf("flash.reconcile-alias"),
       "health": .leaf("runtime.health"),
       "history.filter.delete": .leaf("history.filter.delete"),
       "history.filter.list": .leaf("history.filter.list"),

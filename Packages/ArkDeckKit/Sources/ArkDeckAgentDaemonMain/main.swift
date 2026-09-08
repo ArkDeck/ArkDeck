@@ -1389,6 +1389,8 @@ Task.detached {
         runtimeDirectory: arkForgeRuntimeDirectory),
       rockchipLoaderBindingCoordinator: ProductRockchipLoaderBindingCoordinator(
         targetStore: targetStore, applicationSupportRoot: rockchipRoot),
+      rockchipPostFlashAliasReconciler: ProductRockchipPostFlashAliasReconciler(
+        targetStore: targetStore, applicationSupportRoot: rockchipRoot),
       traceRuntimeProbe: traceRuntimeProbe,
       debugRuntimeProbe: debugRuntimeProbe,
       debugInvocationController: debugInvocationController,
