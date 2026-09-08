@@ -152,6 +152,55 @@ fn every_registered_presence_vector_matches_swift_and_retains_fixture_hash() {
             "{}: {actual:?}",
             vector["id"]
         );
+
+        // The same hash-verified bytes must also cross the candidate-list arm.
+        // Routing them only through the presence parser hid a real divergence:
+        // presence normalizes CRLF in its own code, so a target-list parser
+        // that refused CRLF stayed green here while Swift accepted it.
+        let expected_candidates: Result<&str, &str> = match vector["id"].as_str().unwrap() {
+            "device-observation-all-offline-two" => Ok("a1|usb|Offline;b2|usb|Offline"),
+            "device-observation-duplicate-key" => Ok("a1|usb|Connected;a1|usb|Offline"),
+            "device-observation-empty-marker" => Ok(""),
+            "device-observation-empty-stdout" => Err("empty"),
+            "device-observation-marker-double-cr" => {
+                Err("target line is not the registered 5-column family")
+            }
+            "device-observation-mixed-connected-offline" => Ok("a1|usb|Connected;b2|usb|Offline"),
+            "device-observation-rows-crlf" => Ok("a1|usb|Connected"),
+            "device-observation-single-connected" => Ok("a1|usb|Connected"),
+            "device-observation-single-offline" => Ok("a1|usb|Offline"),
+            "device-observation-two-connected" => Ok("a1|usb|Connected;b2|usb|Connected"),
+            "device-observation-unknown-state" => Err("unregistered target state"),
+            "device-observation-wrong-columns" => {
+                Err("target line is not the registered 5-column family")
+            }
+            id => panic!("unhandled current Swift observation vector {id}"),
+        };
+        let candidates = parse_target_list(&bytes, "3.2.0f", false);
+        let rendered = match &candidates {
+            Ok(rows) => Ok(rows
+                .iter()
+                .map(|row| {
+                    // The fixtures pad their connect keys to 32 characters;
+                    // compare the distinguishing suffix, not the padding.
+                    let key = &row.connect_key[row.connect_key.len() - 2..];
+                    format!("{key}|{}|{}", row.transport, row.state)
+                })
+                .collect::<Vec<_>>()
+                .join(";")),
+            Err(ParseError::Empty) => Err("empty"),
+            Err(ParseError::Malformed(reason)) => Err(*reason),
+            Err(other) => panic!("{}: unexpected {other:?}", vector["id"]),
+        };
+        assert_eq!(
+            rendered
+                .as_ref()
+                .map(String::as_str)
+                .map_err(|reason| *reason),
+            expected_candidates,
+            "{}: candidate list arm",
+            vector["id"]
+        );
     }
 }
 
@@ -333,10 +382,15 @@ fn candidate_parser_matches_current_swift_without_borrowing_presence_semantics()
 
 #[test]
 fn current_swift_crlf_family_boundary_is_explicit() {
-    // Verified against Foundation String.split and CharacterSet.whitespaces:
-    // the compatibility parser does not normalize CRLF, while the separately
-    // registered presence parser does. Porting must not silently merge them.
-    assert!(parse_target_list(b"[Empty]\r\n", "3.2.0f", false).is_err());
+    // Three parsers, three different CRLF rules, verified against Foundation
+    // String indices, CharacterSet.newlines and CharacterSet.whitespaces.
+    // The target-list family registers LF and the single CRLF grapheme as
+    // terminators; the version probes still split Character("\n") only; the
+    // presence parser keeps its own normalization. Porting must not merge them.
+    assert_eq!(
+        parse_target_list(b"[Empty]\r\n", "3.2.0f", false),
+        Ok(Vec::new())
+    );
     assert!(parse_client_version(b"Ver: 3.2.0f\r\n", false).is_err());
     assert_eq!(
         parse_client_version(b"[I] noise\r\nVer: 3.2.0f\n", false),
@@ -346,6 +400,82 @@ fn current_swift_crlf_family_boundary_is_explicit() {
         parse_registered_presence(&ObservationInput::exited(b"[Empty]\r\n", b"", 0), &[0; 32]),
         Ok(PresenceSnapshot::ObservedEmpty)
     );
+}
+
+#[test]
+fn current_swift_target_line_terminators_and_unregistered_newlines_match() {
+    // Only LF and the CRLF grapheme terminate a target line. Every other
+    // Foundation newline stays inside its line, keeps the line untrimmed and
+    // admits it past the diagnostic filter, so the row grammar refuses it
+    // instead of the filter quietly deleting the evidence.
+    let mixed = "[I] ignored\r\n\nfirst\t\tUSB\tConnected\tlocalhost\r\n\
+                 second\t\tUSB\tOffline\tlocalhost\nthird\t\tUSB\tConnected\tlocalhost\r\n";
+    let rows = parse_target_list(mixed.as_bytes(), "3.2.0f", false).unwrap();
+    assert_eq!(
+        rows.iter()
+            .map(|row| format!("{}|{}|{}", row.connect_key, row.transport, row.state))
+            .collect::<Vec<_>>(),
+        [
+            "first|usb|Connected",
+            "second|usb|Offline",
+            "third|usb|Connected"
+        ]
+    );
+
+    for accepted in [
+        "[Empty]\r\n".as_bytes(),
+        b"[Empty]\n",
+        b"[Empty]\r\n\r\n",
+        // Foundation CharacterSet.whitespaces trims NBSP; it is not a newline.
+        "\u{00a0}[Empty]\u{00a0}\r\n".as_bytes(),
+    ] {
+        assert_eq!(
+            parse_target_list(accepted, "3.2.0f", false),
+            Ok(Vec::new()),
+            "{accepted:?}"
+        );
+    }
+    assert_eq!(
+        parse_target_list(b"key\t\tUSB\tConnected\tlocalhost\r\n\n", "3.2.0f", false)
+            .unwrap()
+            .len(),
+        1
+    );
+    // A bare CR, a double CR and a lone LF terminate nothing.
+    for empty in [b"\r\n".as_slice(), b"\n", b"[I] noise\r\n"] {
+        assert_eq!(
+            parse_target_list(empty, "3.2.0f", false),
+            Err(ParseError::Empty),
+            "{empty:?}"
+        );
+    }
+    for malformed in [
+        b"[Empty]\r".as_slice(),
+        b"[Empty]\r\r\n",
+        b"[Empty]\r\nkey\t\tUSB\tConnected\tlocalhost\n",
+        b"key\t\tUSB\tConnected\tlocalhost\r\r\n",
+        b"\r",
+        // Unregistered newlines override the ignorable-diagnostic filter, so a
+        // dropped `[I]`/`[W]` line can never turn a corrupt feed into `[Empty]`.
+        b"[I] malformed\r\n[Empty]\r\n[W] residual\r",
+        b"[I] noise\rmore\n[Empty]\n",
+        b"[Empty]\x0b\n",
+        b"[Empty]\x0c\n",
+        "[Empty]\u{0085}".as_bytes(),
+        "[Empty]\r\n[W] residual\u{0085}".as_bytes(),
+        "[Empty]\r\n\u{2028}".as_bytes(),
+        "[Empty]\r\n\u{2029}".as_bytes(),
+        // A residual CR inside a field is whitespace, so the key bound rejects it.
+        b"ke\ry\t\tUSB\tConnected\tlocalhost\n",
+    ] {
+        assert!(
+            matches!(
+                parse_target_list(malformed, "3.2.0f", false),
+                Err(ParseError::Malformed(_))
+            ),
+            "{malformed:?}"
+        );
+    }
 }
 
 #[test]

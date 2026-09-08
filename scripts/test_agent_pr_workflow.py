@@ -489,6 +489,12 @@ def validate_rust_ci_contract(text: str) -> None:
         "rustup show active-toolchain",
         "run: cargo fmt --all --check",
         "run: cargo fetch --locked",
+        # Only these two steps compile and run the checkout. Every contract
+        # step either reads Git objects at the pinned Swift commit or builds a
+        # separate candidate view, so dropping either one lets a workspace
+        # that does not build, or whose tests fail, pass a green rust lane.
+        "run: cargo clippy --workspace --all-targets -- -D warnings\n",
+        "run: cargo test --workspace\n",
         "        working-directory: .\n"
         "        run: python rust/scripts/test_contract_checks.py\n",
         "        working-directory: .\n"
@@ -716,6 +722,15 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
                 "os: [ubuntu-latest, macos-26]",
             ),
             rust.replace("run: python rust/scripts/test_contract_checks.py", "run: true"),
+            rust.replace(
+                "run: cargo clippy --workspace --all-targets -- -D warnings\n",
+                "run: cargo clippy --workspace\n",
+            ),
+            rust.replace(
+                "run: cargo clippy --workspace --all-targets -- -D warnings\n", "run: true\n"
+            ),
+            rust.replace("run: cargo test --workspace\n", "run: cargo test -p arkdeck-contract\n"),
+            rust.replace("run: cargo test --workspace\n", "run: true\n"),
             rust.replace("run: python rust/scripts/check-contracts.py", "run: cargo test --workspace --locked"),
             rust.replace("run: python rust/scripts/check-contracts.py", "run: python rust/scripts/check-contracts.py --published-only"),
             rust.replace(

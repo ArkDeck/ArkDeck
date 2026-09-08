@@ -67,6 +67,16 @@ jobs:
       - name: Fetch the locked dependency graph for all host platforms
         run: cargo fetch --locked
 
+      # The contract steps around these read Git objects at the pinned Swift
+      # commit or regenerate their own candidate view under rust/target. These
+      # two steps are the only ones that compile and run the checkout itself,
+      # so without them a red workspace reaches main behind a green lane.
+      - name: Lint the workspace, its tests and its examples
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Workspace tests
+        run: cargo test --workspace
+
       - name: Contract isolation and provenance regression tests
         working-directory: .
         run: python rust/scripts/test_contract_checks.py

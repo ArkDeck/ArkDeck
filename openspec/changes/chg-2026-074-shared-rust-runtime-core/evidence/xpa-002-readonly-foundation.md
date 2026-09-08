@@ -17,12 +17,12 @@ development pin, not a readiness approval or hardware certificate.
 
 | Input | Pin |
 | --- | --- |
-| Swift commit | `3940b87592bbd62342dbe7c757da16bfbca400af` |
+| Swift commit | `50dd15e97f84ebca87df8763700af66a6136b890` |
 | Protocol | `1.0.0` |
 | Contract identity | `1054d17b598ce23003ebbdec4d42eb359b63016d6421709ba53c3f21f7c6558d` |
 | Catalog digest | `508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684` |
-| 96 method schemas, directory digest | `5a127a679b587a61cd8f515e3f73137e050607db1a863d40a0e6e17cfa646a42` |
-| 96 Swift corpus files, directory digest | `4ad7766288b8b679c821acb9c5ef2bd4f675834929a6eb1a9e542a26b116e849` |
+| 96 method schemas, directory digest | `ebe719ec8423b064e4a751ce98458510e8b1dd005563768295f4a768af359cd5` |
+| 96 Swift corpus files, directory digest | `769ec0f008f706c07c4dcf995e5ba0d09915ac896c974661618bbe8cdf3ebbb5` |
 | HDC fixture directory digest | `9ae93642e7b81bcea918469216711d7f6a17135a29cf021556ceef0f2f789196` |
 
 Per-file blob IDs and SHA-256 values are in the baseline. Directory digests use
@@ -38,6 +38,18 @@ fix in #1766. The development pin and agent branch were synchronized to
 directory digest is identical, and generated Rust did not change. Earlier raw
 recordings retain their original commit metadata. This update does not certify
 the [remaining SVC acceptance](../../../../docs/design/references/single-v1/svc-acceptance-2026-09-08.md).
+
+Main then merged the Job failure-frame repair in #1769 and the HAP failure
+compensation in #1773. #1773 rewrote 25 consumed inputs — 11 `ControlFrames`
+corpus files, `journal-event.schema.json`, `workflow-step.schema.json` and 12
+`spec/control/methods` schemas — so the pin was re-synchronized to
+`50dd15e97f84ebca87df8763700af66a6136b890`. The corpus grew from 382 to 416
+recorded shapes (248 successes, 168 errors) and the method-schema and corpus
+directory digests changed accordingly; generated Rust, the contract identity and
+the Catalog digest did not change. Between #1773 and this re-pin
+`cargo test --workspace` was red on protected main — `corpus_parity` refused both
+the drifted `agent.abandon.jsonl` input hash and the stale recorded shape counts —
+which is what motivated the CI lane repair below.
 
 The minimum dependency clarification in `tasks.md` distinguishes two things:
 the published, pinned schemas and corpus are sufficient to start this bounded
@@ -73,6 +85,30 @@ snapshot, accept caller-selected arguments, or create device authority.
 The current tool registry contains macOS tuples only, so Windows tool selection
 is unavailable. The macOS commandless server identity lease is not implemented;
 that missing proof prevents every HDC dispatch on the shadow path as well.
+
+`parse_target_list` reproduces the Swift target-list grammar as it stands after
+[#1775](https://github.com/ArkDeck/ArkDeck/pull/1775), which made Swift walk
+`Character` values so a lone LF and the single CRLF grapheme both terminate a
+line. The Rust port still emulated the pre-#1775 `Character("\n")` split and
+refused every CRLF row, so the two implementations disagreed about the shared
+`rows-crlf.bin` and `empty-marker.bin` fixtures: Swift parsed them, Rust
+returned `target line is not the registered 5-column family`. The parity test
+missed it because it routed those fixtures only through
+`parse_registered_presence`, which normalizes CRLF in its own code — the same
+shape of gap #1775 records on the Swift side, where the registry tests exercised
+a separate reference classifier. Both fixtures now cross the target-list arm of
+`every_registered_presence_vector_matches_swift_and_retains_fixture_hash`, with
+an explicit expected outcome for each of the 12 hash-verified vectors, so the
+divergence cannot recur silently. The port was derived from the current Swift
+source and checked against it: a driver compiled from the unmodified
+`HDCCompatibilityProfile.swift` agreed with the Rust parser on all 12 vectors
+and 32 further literal cases, including bare CR, double CR, NEL, LS, PS,
+vertical tab, form feed, mixed terminators, NBSP padding, the 128-byte key bound
+and diagnostic lines carrying an unregistered newline. Bare CR and every other
+Foundation newline remain refusals, an unregistered newline still overrides the
+ignorable-diagnostic filter so a corrupt feed can never read as `[Empty]`, and
+the version probes keep their unchanged `Character("\n")` boundaries. No Swift
+source was modified; this is the Rust side catching up to a merged Swift change.
 
 The [platform boundary and SPK-3 instructions](../../../../rust/crates/arkdeck-platform/README.md)
 describe UDS permissions and peer checks, Windows pipe identity, retained process
@@ -123,6 +159,21 @@ cargo-deny and cargo-vet into the Rust lane.
 The hosted matrix targets Windows, macOS and Linux, and the existing `swift`
 aggregate carries its selected-lane result. The workflow preserves actual raw
 recordings even after failure.
+
+Until 2026-09-08 the lane's clippy and Rust tests ran only inside the temporary
+source views that `check-contracts.py` builds, never against the checkout:
+`generate-contract.py --check` reads Git objects at the pinned commit and
+`check-contracts.py` regenerates its own published and candidate views, so
+neither observes worktree drift. A workspace that did not build, or whose tests
+failed, therefore passed a green lane — which is how the #1773 baseline drift
+above reached main unnoticed. `cargo clippy --workspace --all-targets -- -D
+warnings` and `cargo test --workspace` now run on the checkout in both the
+`--run-local` lane and the hosted job, positioned after `cargo fetch --locked`
+and before the contract scripts. `scripts/ci/test_plan.py` pins their exact text
+and order and asserts that either one failing fails the local gate;
+`scripts/test_agent_pr_workflow.py` pins both hosted steps and rejects four
+weakening mutations of them. No existing assertion was relaxed and the `swift`
+aggregate's `needs` list is unchanged.
 
 The [completed hosted run](https://github.com/ArkDeck/ArkDeck/actions/runs/34173310437)
 tested commit `2da3dfef276a4e97efc1648cf9f0a97dfab660bf`. Its

@@ -14,10 +14,17 @@ From `rust/`, rustup selects the committed Rust 1.98.0 toolchain:
 ```sh
 cargo fmt --all --check
 cargo fetch --locked
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
 python scripts/generate-contract.py --check
 python scripts/test_contract_checks.py
 python scripts/check-contracts.py
 ```
+
+Clippy and the workspace tests are the only checks that compile this checkout.
+Every other check reads Git objects at the pinned commit or regenerates its own
+source view, so a workspace that does not build, or whose tests fail, passes
+them all.
 
 The Python checks require Python 3.11+ with `PyYAML==6.0.3` and
 `jsonschema==4.26.0`. The repository's unified planner also runs these checks,
@@ -31,8 +38,11 @@ Each runs clippy, the full test suite, native process checks, binary builds and
 the same black-box check. Candidate generation stays in its temporary view;
 it cannot update the published pin. Both views replay every recorded shape and
 verify their exact input hashes, directory membership and per-method counts.
-The pin at `8151907bee9919a0847edc9a9aeb1f0ff84f6d15` covers 96 methods and
-382 recorded shapes (217 successes and 165 errors).
+The pin at `50dd15e97f84ebca87df8763700af66a6136b890` covers 96 methods and
+416 recorded shapes (248 successes and 168 errors). Re-pin with
+`python scripts/generate-contract.py --write --baseline-revision <commit>`
+whenever a merged Swift change edits a consumed input; the corpus parity tests
+refuse a stale pin.
 
 Method schema definitions are checked recursively before values are evaluated,
 including alternatives and absent properties. Unknown keywords, unsupported

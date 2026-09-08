@@ -56,6 +56,11 @@ fn require_version(version: &str) -> Result<(), ParseError> {
     }
 }
 
+/// Diagnostic noise the daemon may interleave with observation output, in the
+/// same closed prefix order as Swift `ignorableDiagnosticPrefixes`.
+const IGNORABLE_DIAGNOSTIC_PREFIXES: [&str; 5] =
+    ["[I]", "[W]", "[D]", "* daemon", "Connect server failed"];
+
 // Foundation CharacterSet.whitespaces: horizontal whitespace, excluding line
 // terminators. Keeping this set explicit prevents a CRLF/double-CR extension
 // from silently changing the current Swift compatibility parser's grammar.
@@ -67,14 +72,25 @@ fn is_swift_whitespace(character: char) -> bool {
     )
 }
 
+// Foundation CharacterSet.newlines: U+000A-U+000D, U+0085, U+2028, U+2029.
+// Only the registered LF and CRLF terminators end a target line; every other
+// member stays inside the line and marks it unregistered.
+fn is_foundation_newline(character: char) -> bool {
+    matches!(
+        character,
+        '\u{000a}'..='\u{000d}' | '\u{0085}' | '\u{2028}' | '\u{2029}'
+    )
+}
+
+/// Swift `HDCObservationSemanticParser.normalizedLines` parity, used only by
+/// the version probes. Those split `Character("\n")`, which does not split the
+/// single CRLF grapheme; the target-list family below and the registered
+/// presence parser each have their own, different CRLF handling.
 fn normalized_lines(stdout: &[u8], truncated: bool) -> Result<Vec<&str>, ParseError> {
     if truncated {
         return Err(ParseError::Truncated);
     }
     let text = std::str::from_utf8(stdout).map_err(|_| ParseError::InvalidEncoding)?;
-    // Swift splits Character("\n"), which does not split the single CRLF
-    // grapheme. The registered presence parser below has its own explicit
-    // CRLF normalization; do not accidentally extend this different family.
     let mut previous = '\0';
     let lines: Vec<_> = text
         .split(|character| {
@@ -85,7 +101,7 @@ fn normalized_lines(stdout: &[u8], truncated: bool) -> Result<Vec<&str>, ParseEr
         .map(|line| line.trim_matches(is_swift_whitespace))
         .filter(|line| {
             !line.is_empty()
-                && !["[I]", "[W]", "[D]", "* daemon", "Connect server failed"]
+                && !IGNORABLE_DIAGNOSTIC_PREFIXES
                     .iter()
                     .any(|prefix| line.starts_with(prefix))
         })
@@ -95,6 +111,54 @@ fn normalized_lines(stdout: &[u8], truncated: bool) -> Result<Vec<&str>, ParseEr
     } else {
         Ok(lines)
     }
+}
+
+/// A segment between two registered target-line terminators, normalized the
+/// way Swift `targetOutputLines.appendLine` does it.
+fn push_target_line<'a>(lines: &mut Vec<&'a str>, content: &'a str) {
+    // Swift keeps a segment that still holds an unregistered newline exactly
+    // as it arrived, and admits it even when it looks empty or diagnostic, so
+    // the row grammar rejects it instead of the filter silently dropping it.
+    if content.chars().any(is_foundation_newline) {
+        lines.push(content);
+        return;
+    }
+    let normalized = content.trim_matches(is_swift_whitespace);
+    if normalized.is_empty()
+        || IGNORABLE_DIAGNOSTIC_PREFIXES
+            .iter()
+            .any(|prefix| normalized.starts_with(prefix))
+    {
+        return;
+    }
+    lines.push(normalized);
+}
+
+/// Swift `HDCObservationSemanticParser.targetOutputLines` parity. Swift walks
+/// `Character` values, so a lone LF and the single CRLF grapheme both end a
+/// line while a bare CR stays inside one; the target-list family registers
+/// both terminators (TASK-AIN-021). LF and CR never occur as UTF-8
+/// continuation bytes, so scanning bytes stays on char boundaries.
+fn target_output_lines(text: &str) -> Vec<&str> {
+    let bytes = text.as_bytes();
+    let mut lines = Vec::new();
+    let mut start = 0;
+    let mut index = 0;
+    while index < bytes.len() {
+        let terminator_len = match bytes[index] {
+            b'\r' if bytes.get(index + 1) == Some(&b'\n') => 2,
+            b'\n' => 1,
+            _ => {
+                index += 1;
+                continue;
+            }
+        };
+        push_target_line(&mut lines, &text[start..index]);
+        index += terminator_len;
+        start = index;
+    }
+    push_target_line(&mut lines, &text[start..]);
+    lines
 }
 
 /// Swift `HDCObservationSemanticParser.parseClientVersion` parity. This pure
@@ -163,7 +227,11 @@ pub fn parse_target_list(
         return Err(ParseError::Truncated);
     }
     require_version(tool_version)?;
-    let lines = normalized_lines(stdout, false)?;
+    let text = std::str::from_utf8(stdout).map_err(|_| ParseError::InvalidEncoding)?;
+    let lines = target_output_lines(text);
+    if lines.is_empty() {
+        return Err(ParseError::Empty);
+    }
     if lines == ["[Empty]"] {
         return Ok(Vec::new());
     }

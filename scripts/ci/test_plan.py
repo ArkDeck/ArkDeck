@@ -436,6 +436,11 @@ class CommandSelectionTests(unittest.TestCase):
         self.assertEqual(rust_commands, [
             "cargo fmt --all --check",
             "cargo fetch --locked",
+            # Nothing else in the lane compiles the checkout: the contract
+            # scripts read Git objects at the pinned Swift commit or build
+            # their own candidate view, so a red workspace passed the lane.
+            "cargo clippy --workspace --all-targets -- -D warnings",
+            "cargo test --workspace",
             "cargo deny --locked check",
             "cargo vet --locked --no-registry-suggestions",
         ])
@@ -445,7 +450,12 @@ class CommandSelectionTests(unittest.TestCase):
         self.assertLess(generator, commands.index("cargo fmt --all --check"))
         regressions = commands.index(f"{sys.executable} rust/scripts/test_contract_checks.py")
         parity = commands.index(f"{sys.executable} rust/scripts/check-contracts.py")
-        self.assertLess(commands.index("cargo fetch --locked"), regressions)
+        fetch = commands.index("cargo fetch --locked")
+        clippy = commands.index("cargo clippy --workspace --all-targets -- -D warnings")
+        workspace_tests = commands.index("cargo test --workspace")
+        self.assertLess(fetch, clippy)
+        self.assertLess(clippy, workspace_tests)
+        self.assertLess(workspace_tests, regressions)
         self.assertLess(regressions, parity)
         self.assertLess(parity, commands.index("cargo deny --locked check"))
         self.assertNotIn(f"{sys.executable} rust/scripts/check-readonly.py", commands)
@@ -466,6 +476,8 @@ class CommandSelectionTests(unittest.TestCase):
         for command in (
             (sys.executable, "rust/scripts/test_contract_checks.py"),
             (sys.executable, "rust/scripts/check-contracts.py"),
+            ("cargo", "clippy", "--workspace", "--all-targets", "--", "-D", "warnings"),
+            ("cargo", "test", "--workspace"),
             ("cargo", "deny", "--locked", "check"),
             ("cargo", "vet", "--locked", "--no-registry-suggestions"),
         ):
