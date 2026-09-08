@@ -84,6 +84,56 @@ intent/outcome、debt、terminal 和 capability outcome 各崩溃窗口均以 du
 终态并结算 capability。缺少预声明或完整证明的历史 Job 不补造 descriptor，也不因
 升级自动产生新 dispatch。
 
+## Current Session publication: candidate scoped delta
+
+本节修复当前 Job 未生成正式 Session，以及 unrelated manifestless Session 阻断精确
+导出的实测产品缺口。现象和固定契约见
+[审查记录](evidence/runs/TASK-SVC-002/session-publication-scope-review.md)，实际 host
+执行见[验收记录](evidence/runs/TASK-SVC-005/host-import-export-20260908.md)。
+本候选不修改 current Core spec、Task/change 状态、operation、authority 或用户数据。
+
+### Proposed clarification to REQ-ART-001/002/004
+
+新 production admission SHALL 由同一 Runtime-owned storage policy/root 和 host-wide
+coordinator 建立 durable Job/Session ownership，先取得 metadata/finalization headroom。
+完整 output/copy 增长预算未获准时保持 queued，零 Provider/可选 Artifact dispatch；
+不得把 heavy/unknown writer 改称 light。只有完整 claim 升级已耐久保存才开始执行。
+
+执行终态与 Session publication SHALL 分别读回。status/summary 及其 CLI/App/Agent
+消费者增加同一 required closed `sessionPublication`；缺当前 ownership 时为 unavailable，
+不从 sessionId、Job success、历史目录或人工确认推断 published。publication 失败或未知
+不得改写原 operation outcome、产生新的 device dispatch 或释放未决 capability。
+Agent 的 compact job 仅在已有 Job 的分支同步该 required 字段；no-Job 和其他 HAR/
+controlAction/challenge 分支保持现有形状。runner receipt 的 publication key 始终存在，
+未取得可信 Job status 时显式 null，不把未观察状态伪造为 unavailable。
+
+Runtime SHALL 从本次 Job 的实际计划、Journal、outputs、binding 和 admission 证明构造
+当前 Manifest，固定 proposal 后封闭原 Journal，再以相同字节和已验证的 Artifact 副本
+发布 Session、登记 catalog、耐久保存 receipt，最后释放 claim。crash recovery 仅处理
+已有 authoritative ownership，重新准入剩余增长，重验 root/configuration/identity 与
+原始 hashes；不继承旧内存 lease，不重写已封闭 Journal，不重放 Provider intent。
+
+Manifest SHALL 忠实表达现行 defaultReadOnlyPolicy/runtimeCapability、无设备 host target
+及 recovered 语义，不伪造 interactive/lab actor 或缺失的 consumption/coverage/epoch。
+pre-consume failure/cancellation 只有在 Journal 中机械证明零 mutation intent 时允许
+没有 consumed authority。recovered 必须携带属于本次独立恢复的完整 consumption、
+coverage、postflight 和 supersession 关联；原 covered Jobs 保留 unknown。只有一种
+current v1 布局；schema、Swift validator、writer、隐私导出和正负 fixtures 同车更新。
+
+### Proposed narrow clarification to exact Session export
+
+既有 `session.export.preview/apply` MAY 导出正式登记、完整 finalized 的精确目标，
+即使同一根目录中存在已机械定位为 unrelated leaf 的未计入 catalog 内容。成功响应
+SHALL 显式携带全局 incomplete/blocker/count/已测 bytes 与精确源 identity、Manifest
+及 Journal hashes；这些事实均纳入既有完整 JCS previewDigest，apply 重新验证。
+
+root/volume 不可信、catalog corrupt/unavailable、unscoped unknown、duplicate Session
+identity、目标本身 incomplete 或无匹配 catalog entry 时仍 SHALL fail closed，零导出
+输出。全局 list/show/pin/unpin/cleanup、heavy writer 准入、stale preview 与 applying
+unknown 永不 replay 的规则保持；不得以 partial catalog、目录迁移或补造 manifest 隐去
+旧 unknown。默认隐私规则及 raw/partial 排除保持，新增 audit 字段的源 digest 和关联
+脱敏同车验证。导出派生物不能成为新 Runtime authority 或原始 Session。
+
 ## Acceptance ownership
 
 SVC-AC-01..10 是本 change 的局部验收，在 [verification.md](verification.md) 登记。

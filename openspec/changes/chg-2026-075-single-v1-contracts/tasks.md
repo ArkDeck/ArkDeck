@@ -180,6 +180,7 @@ methods.md无未处置生产caller；所有保留方法只走一个protocol/shap
   - `Packages/ArkDeckKit/Sources/ArkDeckCore/JobStateMachine.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckCore/WorkflowStep.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckCore/RuntimeCapability.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckCore/RuntimeSessionPublicationContract.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckRuntime/RuntimeOperationModels.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeJobEngine.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeJobRecord.swift`
@@ -187,7 +188,13 @@ methods.md无未处置生产caller；所有保留方法只走一个protocol/shap
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeRecoveryService.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeJobReadProjection.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/HistoricalEvolutionCampaignArchive.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeSessionPublication.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeSessionStorageStore.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeSessionExportRecordStore.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeHistoryApplicationFacade.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/XPCConnectionBox.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipLegacyFlashJournalReconcile.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DiagnosticSessionUIFixture.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/ArkForgeRuntimeJobState.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AgentExecutionStore.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AgentExecutionCoordinator.swift`
@@ -201,9 +208,19 @@ methods.md无未处置生产caller；所有保留方法只走一个protocol/shap
   - `Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckCLIMain.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckCLI/CLICommandRegistry.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/main.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckCLI/CLIJobResources.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckCLI/CLIJobEvents.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckCLI/CLISessionResources.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckCLI/CLIAgentExecutions.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckRuntimeCommands.swift`
+  - `Packages/ArkDeckKit/Scripts/generate-control-contract.py`
+  - `ArkDeckApp/Features/History/RuntimeHistoryView.swift`
+  - `ArkDeckApp/Resources/HistoryLocalizable.xcstrings`
+  - `ArkDeckAppUITests/AppShell/AppShellUITests.swift`
   - `openspec/contracts/cli-command-registry.yaml`
   - `openspec/contracts/cli-feature-coverage.json`
   - `openspec/contracts/journal-event.schema.json`
+  - `openspec/contracts/cli-next-action.schema.json`
   - `openspec/contracts/workflow-step.schema.json`
   - `openspec/contracts/manifest.schema.json`
   - `openspec/contracts/runtime-control-plane.schema.json`
@@ -215,6 +232,7 @@ methods.md无未处置生产caller；所有保留方法只走一个protocol/shap
   - `Packages/ArkDeckKit/Tests/ArkDeckEngineCrashFixture/**`
   - `docs/design/cli-job-resources.md`
   - `docs/design/cli-session-resources.md`
+  - `docs/design/cli-session-export.md`
   - `docs/design/cli-runtime-storage.md`
   - `openspec/changes/chg-2026-075-single-v1-contracts/**`
 - Forbidden paths:
@@ -227,6 +245,20 @@ methods.md无未处置生产caller；所有保留方法只走一个protocol/shap
 - Hardware required:no
 
 ### Scope supplement
+
+当前 Session publication 候选补入上表的 18 个精确 producer/consumer 路径，完成当前
+Job → 正式 Session → 既有 exact finalized export 的完整链路。新增只读 publication
+事实与 current Manifest audit/host/recovered 形状同车更新严格 CLI、App、schema/corpus；
+历史无 ownership marker 的 unknown 不被接管。见
+[Session scoped delta](spec-delta.md#current-session-publication-candidate-scoped-delta)
+及[精确契约与验证矩阵](evidence/runs/TASK-SVC-002/session-publication-scope-review.md)。
+本候选不修改 Task 状态；只有维护者 review 合入 base 后，补充路径才能用于生产实现。
+本范围 PR 不让 head 的路径声明授权其自身范围外代码。
+
+其中 `CLIJobEvents.swift`、`CLIAgentExecutions.swift` 与 `cli-next-action.schema.json`
+也覆盖已获范围 review 的 GJ-2 finalizing/reconcile 消费修复：合法的
+`job.finalizationPending` 应被严格 CLI 接受，不被当作普通 wait 或未知 outcome。
+这是已有补偿语义的消费者同步，不新增状态/操作/权限；见同一审查记录的 GJ-2 部分。
 
 本次候选补充仅纳入 `WorkflowStep.swift` 与 `workflow-step.schema.json`，使已存在的
 `uninstallPackage` typed kind 可作为既有 `CompensationDescriptor` 使用；不新增 operation、
