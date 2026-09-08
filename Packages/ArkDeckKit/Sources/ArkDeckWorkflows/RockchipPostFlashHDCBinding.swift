@@ -86,8 +86,16 @@ package struct RockchipPostFlashHDCBindingStore: Sendable {
   }
 
   /// Publishes one exact verified alias. Repeating the same proof is
-  /// idempotent; replacing it requires the caller to name the currently
-  /// trusted alias digest, so a stale Job cannot rotate a newer route.
+  /// idempotent.
+  ///
+  /// What stops a stale Job rotating a newer route is the else-branch below,
+  /// whose fourth conjunct compares the *store's* current alias against
+  /// `expectedPreviousHDCIdentitySHA256`. The guard immediately following this
+  /// comment is not a second line of defence and must not be read as one: the
+  /// sole production caller — the `verifyBoundBuild` arm of
+  /// `FoundationRockchipRuntimeActionExecutor.execute` — passes
+  /// `expectation.previousIdentitySHA256` to *both* operands, so in production
+  /// the comparison can only ever be true and checks well-formedness alone.
   package func publish(
     _ candidate: RockchipPostFlashHDCBinding,
     expectedPreviousHDCIdentitySHA256: String
@@ -142,6 +150,14 @@ package struct RockchipPostFlashHDCBindingStore: Sendable {
       }
     }
 
+    return try commit(candidate, rootDescriptor: root)
+  }
+
+  /// Atomic write plus readback, shared by publication and lineage
+  /// reconciliation. The caller already holds the store lock.
+  private func commit(
+    _ candidate: RockchipPostFlashHDCBinding, rootDescriptor root: Int32
+  ) throws -> RockchipPostFlashHDCBinding {
     let encoder = CanonicalJSONEncoders.canonical()
     var data = try encoder.encode(candidate)
     data.append(0x0A)
@@ -175,6 +191,107 @@ package struct RockchipPostFlashHDCBindingStore: Sendable {
     return readback
   }
 
+  /// The exact reason a stored alias cannot be compared to the live target,
+  /// and what the Runtime proved about it. This is a fact, not a decision.
+  package struct ReissuedLineageReconciliation: Sendable, Equatable {
+    package let archivedRevision: Int
+    package let publishedRevision: Int
+    package let targetID: String
+    package let hdcIdentitySHA256: String
+  }
+
+  /// Reconcile an alias whose revision was issued by a target store that no
+  /// longer exists.
+  ///
+  /// `bindingRevision` on this record is a copy of the *target store's* counter
+  /// at publication time. The two Rockchip stores live in the Application
+  /// Support root while the target store that issues those revisions lives
+  /// inside the daemon state directory, so retiring the state directory — an
+  /// operation the product itself offers — reissues the counter from 1 while
+  /// this record keeps the retired store's high-water mark. Every later Flash
+  /// on that host is then refused as "stored alias revision N is newer than
+  /// target revision M", forever, with no product path out.
+  ///
+  /// A reissue is distinguishable from a genuinely newer route, and the proof
+  /// is mechanical rather than asserted. A target's `bindingRevision` is 1 at
+  /// adoption and thereafter only moves through `advanceBindingLineage`, which
+  /// refuses unless the stable physical identity *changes*. So within one
+  /// store a `(targetID, stableIdentity)` pair has exactly one revision, and
+  /// there is no path that lowers one. A stored alias whose target, Loader
+  /// identity, HDC identity, connect key and build all equal the live target's
+  /// freshly observed facts, but whose revision is higher, therefore cannot be
+  /// describing a newer route: a newer route differs in at least one of those
+  /// identities, because that is what a route is. The only remaining
+  /// explanation is that the counter restarted underneath it.
+  ///
+  /// Anything less than all five agreeing keeps the original refusal. Nothing
+  /// here invents a revision, lowers one, edits a target, rewrites evidence or
+  /// resolves an unknown Job outcome: the superseded entry is archived beside
+  /// the store and the same route is republished under the live revision.
+  package func reconcileReissuedLineage(
+    target: RuntimeTargetRecord,
+    observedHDCIdentitySHA256: String,
+    observedHDCConnectKey: String,
+    observedBuildVersion: String,
+    nowUTC: String
+  ) throws -> ReissuedLineageReconciliation? {
+    try prepareRoot()
+    let root = Darwin.open(rootURL.path, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW)
+    guard root >= 0 else { throw failure("post-flash binding root cannot be opened") }
+    defer { Darwin.close(root) }
+    let lock = Darwin.openat(
+      root, Self.lockName, O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW, 0o600)
+    guard lock >= 0 else { throw failure("post-flash binding lock cannot be opened") }
+    defer { Darwin.close(lock) }
+    try validateFile(lock, label: "post-flash binding lock")
+    guard flock(lock, LOCK_EX) == 0 else {
+      throw failure("post-flash binding lock cannot be acquired")
+    }
+    defer { _ = flock(lock, LOCK_UN) }
+
+    guard let existing = try load(rootDescriptor: root) else { return nil }
+    // Only the reissue shape. A stored alias at or below the live revision is
+    // the ordinary case and is not this function's business.
+    guard existing.bindingRevision > target.bindingRevision else { return nil }
+    guard existing.targetID == target.targetID,
+      existing.stableLoaderIdentitySHA256 == target.stablePhysicalIdentitySHA256,
+      existing.hdcIdentitySHA256 == observedHDCIdentitySHA256,
+      existing.hdcConnectKey == observedHDCConnectKey,
+      existing.buildVersion == observedBuildVersion,
+      Self.isSHA256(observedHDCIdentitySHA256),
+      Self.sha256(observedHDCConnectKey) == observedHDCIdentitySHA256,
+      ISO8601Timestamps.parse(nowUTC) != nil
+    else { return nil }
+
+    let republished = RockchipPostFlashHDCBinding(
+      targetID: existing.targetID,
+      bindingRevision: target.bindingRevision,
+      stableLoaderIdentitySHA256: existing.stableLoaderIdentitySHA256,
+      // The chain rule holds within an epoch. The republished entry opens the
+      // live store's epoch for a route that is already the trusted one, so it
+      // names itself as its own previous alias — exactly what the publisher's
+      // sole production caller passes, and what the original entry recorded.
+      previousHDCIdentitySHA256: existing.hdcIdentitySHA256,
+      hdcIdentitySHA256: existing.hdcIdentitySHA256,
+      hdcConnectKey: existing.hdcConnectKey,
+      usbTopology: existing.usbTopology,
+      productModel: existing.productModel,
+      buildVersion: existing.buildVersion,
+      jobID: existing.jobID,
+      establishedAtUTC: nowUTC)
+    try validate(republished)
+    // Archive first. `archiveSuperseded` refuses a name collision that holds a
+    // different entry, so the live record is never overwritten while the entry
+    // it replaces is unpreserved.
+    try archiveSuperseded(existing, rootDescriptor: root)
+    _ = try commit(republished, rootDescriptor: root)
+    return ReissuedLineageReconciliation(
+      archivedRevision: existing.bindingRevision,
+      publishedRevision: target.bindingRevision,
+      targetID: existing.targetID,
+      hdcIdentitySHA256: existing.hdcIdentitySHA256)
+  }
+
   /// Archives a superseded epoch's entry beside the store.
   ///
   /// Named by its establishment time, so re-archiving the same epoch after a
@@ -194,7 +311,18 @@ package struct RockchipPostFlashHDCBindingStore: Sendable {
     let descriptor = Darwin.openat(
       rootDescriptor, name, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW, 0o600)
     if descriptor < 0 {
-      if errno == EEXIST { return }
+      // The name is derived from the establishment time alone, so two entries
+      // of different epochs can collide on it. Returning success here archived
+      // nothing and let the caller overwrite the live record, discarding the
+      // entry this function promises to preserve. Idempotency is re-archiving
+      // *the same* entry; anything else is a collision and must refuse.
+      if errno == EEXIST {
+        guard try archivedEntryMatches(data, name: name, rootDescriptor: rootDescriptor) else {
+          throw failure(
+            "superseded post-flash binding archive \(name) already holds a different entry")
+        }
+        return
+      }
       throw failure("superseded post-flash binding archive cannot be created")
     }
     defer { Darwin.close(descriptor) }
@@ -202,6 +330,35 @@ package struct RockchipPostFlashHDCBindingStore: Sendable {
     guard Darwin.fsync(descriptor) == 0, Darwin.fsync(rootDescriptor) == 0 else {
       throw failure("superseded post-flash binding archive cannot be synchronized")
     }
+  }
+
+  /// True only when the archive already on disk is byte-for-byte the entry
+  /// this call would have written.
+  private func archivedEntryMatches(
+    _ data: Data, name: String, rootDescriptor: Int32
+  ) throws -> Bool {
+    let descriptor = Darwin.openat(rootDescriptor, name, O_RDONLY | O_CLOEXEC | O_NOFOLLOW)
+    guard descriptor >= 0 else {
+      throw failure("superseded post-flash binding archive cannot be reopened")
+    }
+    defer { Darwin.close(descriptor) }
+    try validateFile(descriptor, label: "superseded post-flash binding archive")
+    var metadata = stat()
+    guard fstat(descriptor, &metadata) == 0, metadata.st_size >= 0,
+      metadata.st_size <= Self.maximumBytes
+    else { throw failure("superseded post-flash binding archive size is invalid") }
+    guard Int(metadata.st_size) == data.count else { return false }
+    var existing = Data()
+    var buffer = [UInt8](repeating: 0, count: 4_096)
+    while existing.count < data.count {
+      let count = Darwin.read(descriptor, &buffer, min(buffer.count, data.count - existing.count))
+      if count < 0, errno == EINTR { continue }
+      guard count > 0 else {
+        throw failure("superseded post-flash binding archive is truncated")
+      }
+      existing.append(contentsOf: buffer.prefix(count))
+    }
+    return existing == data
   }
 
   private func load(rootDescriptor: Int32) throws -> RockchipPostFlashHDCBinding? {

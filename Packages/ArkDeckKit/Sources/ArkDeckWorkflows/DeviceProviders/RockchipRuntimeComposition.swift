@@ -116,6 +116,34 @@ package struct TargetStoreRockchipRuntimeFactsPort: RockchipRuntimeFactsPort {
                 "flash.postFlashHDCBindingConflict: the stored alias belongs to another target")
             }
             guard routed.bindingRevision <= target.bindingRevision else {
+              // Two different things reach here and they need different
+              // answers. `bindingRevision` on the alias is a copy of the
+              // *target store's* counter, and that store lives inside the
+              // daemon state directory while this one lives a level up in the
+              // Application Support root. Retiring the state directory — which
+              // the product itself offers — restarts the counter and leaves
+              // this record holding the retired store's high-water mark, so a
+              // route that is demonstrably the current one reads as "newer"
+              // forever.
+              //
+              // The two cases are distinguishable from durable state alone. A
+              // target's revision is 1 at adoption and afterwards only moves
+              // through `advanceBindingLineage`, which refuses unless the
+              // stable physical identity changes, and no path lowers one. So a
+              // stored alias that still names this target, this Loader
+              // identity and this build cannot be describing a newer route: a
+              // newer route differs in one of those. Say which one this is.
+              // Neither branch admits anything — the refusal stands either way.
+              if routed.targetID == target.targetID,
+                routed.stableLoaderIdentitySHA256 == target.stablePhysicalIdentitySHA256
+              {
+                throw DeviceProviderError.factsUnavailable(
+                  "flash.postFlashHDCAliasLineageReissued: the stored alias names this target and "
+                    + "Loader identity at revision \(routed.bindingRevision) while the live target "
+                    + "is at revision \(target.bindingRevision). The revision counter was reissued, "
+                    + "so the two are not comparable; the stored alias must be reconciled against "
+                    + "fresh device facts before this target can be flashed")
+              }
               throw DeviceProviderError.factsUnavailable(
                 "flash.postFlashHDCBindingConflict: stored alias revision "
                   + "\(routed.bindingRevision) is newer than target revision \(target.bindingRevision)")
