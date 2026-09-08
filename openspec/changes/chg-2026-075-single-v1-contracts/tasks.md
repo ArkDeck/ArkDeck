@@ -178,6 +178,7 @@ methods.md无未处置生产caller；所有保留方法只走一个protocol/shap
 - Allowed paths:
   - `Packages/ArkDeckKit/Sources/ArkDeckStorage/**`
   - `Packages/ArkDeckKit/Sources/ArkDeckCore/JobStateMachine.swift`
+  - `Packages/ArkDeckKit/Sources/ArkDeckCore/WorkflowStep.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckCore/RuntimeCapability.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckRuntime/RuntimeOperationModels.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeJobEngine.swift`
@@ -203,6 +204,7 @@ methods.md无未处置生产caller；所有保留方法只走一个protocol/shap
   - `openspec/contracts/cli-command-registry.yaml`
   - `openspec/contracts/cli-feature-coverage.json`
   - `openspec/contracts/journal-event.schema.json`
+  - `openspec/contracts/workflow-step.schema.json`
   - `openspec/contracts/manifest.schema.json`
   - `openspec/contracts/runtime-control-plane.schema.json`
   - `openspec/contracts/hardware-evidence.schema.json`
@@ -225,6 +227,14 @@ methods.md无未处置生产caller；所有保留方法只走一个protocol/shap
 - Hardware required:no
 
 ### Scope supplement
+
+本次候选补充仅纳入 `WorkflowStep.swift` 与 `workflow-step.schema.json`，使已存在的
+`uninstallPackage` typed kind 可作为既有 `CompensationDescriptor` 使用；不新增 operation、
+Job 状态、权限或另一种补偿记录。具体 finalization/recovery 语义由
+[GJ-2 scoped delta](spec-delta.md#gj-2-confirmed-failure-compensation-candidate-scoped-delta)
+和[缺陷及验证矩阵](evidence/runs/TASK-SVC-002/gj2-compensation-scope-review.md)说明。
+本补充不改变 Task 状态；维护者 review 前不视为已批准，也不让本 PR 的 head 路径声明
+授权同一 PR 的范围外生产修改。
 
 补充现有CLI入口、命令注册表、daemon组合入口及两个CLI生成契约，覆盖已review的
 旧archive消费者删除与mutation state continuity接线。实现仍随本Task同车交付；
