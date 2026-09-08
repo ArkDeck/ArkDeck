@@ -1010,11 +1010,18 @@ private struct AppShellView: View {
     switch deviceList.presentation.availability {
     case .checking:
       EmptyView()
-    case .unavailable:
+    case .unavailable(let reason):
       Label {
-        Text("app.devices.unavailable")
-          .font(WorkspaceFont.secondary)
-          .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: WorkspaceMetrics.rowGap) {
+          Text("app.devices.unavailable")
+            .font(WorkspaceFont.secondary)
+          Text(verbatim: reason)
+            .font(WorkspaceFont.caption)
+            .lineLimit(3)
+            .help(reason)
+            .accessibilityIdentifier("app.devices.unavailable.reason")
+        }
+        .foregroundStyle(.secondary)
       } icon: {
         Image(systemName: "antenna.radiowaves.left.and.right.slash")
           .foregroundStyle(.secondary)
@@ -1059,7 +1066,19 @@ private struct AppShellView: View {
         .accessibilityIdentifier("app.devices.checking")
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     } else if case .device(let connectKey) = shellSelection {
-      if let candidate = deviceList.candidate(forConnectKey: connectKey) {
+      if case .unavailable(let reason) = deviceList.presentation.availability {
+        ContentUnavailableView {
+          Label("app.devices.unavailable", systemImage: "antenna.radiowaves.left.and.right.slash")
+        } description: {
+          Text(verbatim: reason)
+            .textSelection(.enabled)
+            .accessibilityIdentifier("app.devices.unavailable.detailReason")
+        } actions: {
+          Button(deviceString("device.action.recheck"), action: deviceList.refresh)
+            .disabled(deviceList.isRefreshing)
+            .accessibilityIdentifier("device.action.recheck")
+        }
+      } else if let candidate = deviceList.candidate(forConnectKey: connectKey) {
         DeviceDetailView(
           candidate: candidate,
           displayName: deviceList.displayName(for: candidate),
@@ -1072,8 +1091,7 @@ private struct AppShellView: View {
             storedSelection = ShellSelection.navigation(.overview).storageValue
           })
       } else {
-        // The chosen device left the candidate list (unplugged, or the list
-        // was re-read). Say so; do not render stale facts as current.
+        // A successful observation no longer contains the chosen device.
         ContentUnavailableView {
           Label {
             Text("app.devices.gone")

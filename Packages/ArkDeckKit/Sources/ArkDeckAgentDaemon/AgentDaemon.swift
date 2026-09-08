@@ -2806,6 +2806,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
       return AgentWireProtocol.Response(
         id: request.id, ok: false, result: nil,
         error: .init(code: error.code, message: error.message, details: details))
+    } catch BootstrapError.observationFailed(let reason) {
+      return failure(id: request.id, code: .internalError, message: reason)
     } catch {
       return failure(id: request.id, code: .internalError, message: "human-action resource could not be read")
     }
@@ -2902,6 +2904,10 @@ public struct RuntimeControlPlaneHandler: Sendable {
       return AgentWireProtocol.Response(
         id: request.id, ok: false, result: nil,
         error: .init(code: error.code, message: error.message, details: details))
+    } catch BootstrapError.observationFailed(let reason) {
+      // Diagnostic text does not prove that an invocation did nothing. Keep
+      // the existing failure code and absence of zero-dispatch evidence.
+      return failure(id: request.id, code: .internalError, message: reason)
     } catch let error as RuntimeJobEngineError {
       switch error {
       case .rejected(.invalidInput, _), .rejected(.invalidRequest, _):
@@ -3044,6 +3050,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
       return AgentWireProtocol.Response(
         id: request.id, ok: false, result: nil,
         error: .init(code: error.code, message: error.message, details: details))
+    } catch BootstrapError.observationFailed(let reason) {
+      return failure(id: request.id, code: .internalError, message: reason)
     } catch {
       // A store error may occur after its write started. Do not invent a
       // zero-mutation receipt for that case; callers must inspect the target.

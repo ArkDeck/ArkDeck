@@ -45,7 +45,11 @@ final class RuntimeAgentExecutionContractTests: XCTestCase {
     private let lock = NSLock()
     private var count = 0
     private var gate: Gate?
+    private var targetOutput: Data?
     func hold(_ value: Gate) { lock.withLock { gate = value } }
+    func setTargetOutput(_ value: String?) {
+      lock.withLock { targetOutput = value.map { Data($0.utf8) } }
+    }
     var dispatchCount: Int { lock.withLock { count } }
     func dispatch(_ plan: TypedProcessPlan) async throws -> ProviderProcessReceipt {
       let paused = lock.withLock { count += 1; let value = gate; gate = nil; return value }
@@ -54,7 +58,13 @@ final class RuntimeAgentExecutionContractTests: XCTestCase {
       switch plan.action {
       case .hdc(.observeTool): output = "Ver: 3.2.0f\n"
       case .hdc(.observeServer): output = "Client version:Ver: 3.2.0f, server version:Ver: 3.2.0f\n"
-      case .hdc(.observeDevice), .hdc(.listDeviceCandidates): output = "150100424a544e4600\t\tUSB\tConnected\tlocalhost\n"
+      case .hdc(.observeDevice), .hdc(.listDeviceCandidates):
+        if let bytes = lock.withLock({ targetOutput }) {
+          return ProviderProcessReceipt(
+            exitStatus: 0, stdout: bytes, stderr: Data(), stdoutTruncated: false,
+            durationSeconds: 0.01)
+        }
+        output = "150100424a544e4600\t\tUSB\tConnected\tlocalhost\n"
       case .hdc(.queryProperty(.productName)): output = "OpenHarmony Reference Device\n"
       case .hdc(.queryProperty(.fullBuildVersion)): output = "OpenHarmony-4.1-release\n"
       default: throw RuntimeDispatchFailure.failed("unexpected fixture action")
@@ -104,10 +114,12 @@ final class RuntimeAgentExecutionContractTests: XCTestCase {
     try? FileManager.default.removeItem(at: directory)
   }
 
-  private func owner() throws -> RuntimeAgentExecutionCoordinator {
+  private func owner(
+    observations suppliedObservations: TargetObservationCoordinator? = nil
+  ) throws -> RuntimeAgentExecutionCoordinator {
     let capturedPort = port!
     let capturedClock = clock!
-    let observations = TargetObservationCoordinator(
+    let observations = suppliedObservations ?? TargetObservationCoordinator(
       observation: capturedPort, targetStore: targets, usbRelations: { try capturedPort.relations() },
       nowUTC: { RuntimeAgentTime.format(capturedClock.now()) })
     return try RuntimeAgentExecutionCoordinator(
@@ -136,12 +148,17 @@ final class RuntimeAgentExecutionContractTests: XCTestCase {
     throw AgentClientFixtureError.missingObject
   }
 
-  private func startServer(_ owner: RuntimeAgentExecutionCoordinator) throws -> AgentDaemonServer {
+  private func startServer(
+    _ owner: RuntimeAgentExecutionCoordinator,
+    observations: TargetObservationCoordinator? = nil,
+    humanActions: RuntimeHumanActionResourceCoordinator? = nil
+  ) throws -> AgentDaemonServer {
     let capturedClock = clock!
     let handler = RuntimeControlPlaneHandler(
       engine: engine, capabilityStore: try RuntimeCapabilityStore(directoryURL: directory.appending(path: "capabilities")),
       providerIDs: ["hdc"], nowUTC: { RuntimeAgentTime.format(capturedClock.now()) },
-      targetStore: targets, agentExecutions: owner,
+      targetStore: targets, targetObservations: observations, agentExecutions: owner,
+      humanActionResources: humanActions,
       artifactStore: try RuntimeArtifactStore(rootURL: directory.appending(path: "artifacts"),
         nowUTC: { RuntimeAgentTime.format(capturedClock.now()) }))
     let instance = AgentDaemonServer(stateDirectory: directory.appending(path: "control"), handler: handler,
@@ -641,6 +658,199 @@ final class RuntimeAgentExecutionContractTests: XCTestCase {
     XCTAssertEqual(dispatcher.dispatchCount, count)
     let actionAfter = try object(await owner.humanAction(actionID))
     XCTAssertEqual(actionAfter["status"], .string("resolvedByFreshProbe"))
+  }
+
+  func testBootstrapLimitsRawToolFailuresAndPreservesBoundedTargetDiagnostics() async throws {
+    struct ReceiptDispatcher: RuntimeProcessDispatching {
+      let receipt: ProviderProcessReceipt
+      func dispatch(_ plan: TypedProcessPlan) async throws -> ProviderProcessReceipt { receipt }
+    }
+    let capturedClock = clock!
+    func observation(_ bytes: Data, truncated: Bool = false) -> ProviderBootstrapObservation {
+      ProviderBootstrapObservation(
+        provider: HDCObservationProviderAdapter(factsPort: Facts(targets: targets, clock: clock)),
+        dispatcher: ReceiptDispatcher(receipt: ProviderProcessReceipt(
+          exitStatus: 0, stdout: bytes, stderr: Data(), stdoutTruncated: truncated,
+          durationSeconds: 0.01)),
+        nowUTC: { RuntimeAgentTime.format(capturedClock.now()) })
+    }
+    for output in ["Ver: \u{1B}[2J\n", "Ver: " + String(repeating: "x", count: 16_384) + "\n",
+      "Ver: access_token=fixture-tool-value\n", ""]
+    {
+      do {
+        _ = try await observation(Data(output.utf8)).observeToolVersion()
+        XCTFail("unverified tool output must be refused")
+      } catch BootstrapError.observationFailed(let reason) {
+        XCTAssertEqual(reason, "tool version could not be verified")
+      }
+    }
+    let version = try await observation(Data("Ver: 3.2.0f\n".utf8)).observeToolVersion()
+    XCTAssertEqual(version, "3.2.0f")
+
+    let rejected = Data(("key\t\tUSB\t" + String(repeating: "\u{1B}", count: 10_000) + "\tlocalhost\n").utf8)
+    guard case .malformed(let preview) = HDCObservationSemanticParser.parseTargetList(
+      stdout: rejected, profile: .openHarmony320Family, toolVersion: "3.2.0f", truncated: false)
+    else { return XCTFail("fixture must produce a bounded target diagnostic") }
+    for (bytes, truncated, expected) in [
+      (rejected, false, preview),
+      (Data([0xFF, 0xFE]), false, "invalidEncoding: stdout is not valid UTF-8"),
+      (rejected, true, "truncated: stdout exceeded its byte budget"),
+      (Data(), false, "empty observation output"),
+    ] {
+      for identity in [false, true] {
+        do {
+          let port = observation(bytes, truncated: truncated)
+          if identity { _ = try await port.observeDeviceIdentity(connectKey: "key") }
+          else { _ = try await port.listCandidates() }
+          XCTFail("unverified target output must be refused")
+        } catch BootstrapError.observationFailed(let reason) {
+          XCTAssertEqual(reason, expected, "the target preview must not be escaped twice")
+          XCTAssertLessThanOrEqual(reason.utf8.count, 1_536)
+          XCTAssertTrue(reason.utf8.allSatisfy { (0x20...0x7E).contains($0) })
+        }
+      }
+    }
+  }
+
+  func testProductionTargetDiagnosticReachesDiscoveryAdoptionAndBothCLIResumePaths() async throws {
+    let malformed = "[I] ignored\n\n150100424a544e4600\tConnected\r\n"
+    guard case .malformed(let reason) = HDCObservationSemanticParser.parseTargetList(
+      stdout: Data(malformed.utf8), profile: .openHarmony320Family,
+      toolVersion: "3.2.0f", truncated: false)
+    else { return XCTFail("fixture must be refused by the production parser") }
+    let capturedClock = clock!
+    let capturedPort = port!
+    let observations = TargetObservationCoordinator(
+      observation: ProviderBootstrapObservation(
+        provider: HDCObservationProviderAdapter(factsPort: Facts(targets: targets, clock: clock)),
+        dispatcher: dispatcher, nowUTC: { RuntimeAgentTime.format(capturedClock.now()) }),
+      targetStore: targets, usbRelations: { try capturedPort.relations() },
+      nowUTC: { RuntimeAgentTime.format(capturedClock.now()) })
+    let owner = try owner(observations: observations)
+    let humanActions = try RuntimeHumanActionResourceCoordinator(
+      directory: directory.appending(path: "human-actions"), agents: owner, controlResources: nil)
+    let server = try startServer(owner, observations: observations, humanActions: humanActions)
+
+    func refused(_ arguments: [String], code: String, exitCode: Int32) throws {
+      let before = dispatcher.dispatchCount
+      let reply = try cli(arguments, server: server)
+      XCTAssertEqual(reply.0, exitCode)
+      XCTAssertEqual(reply.1["ok"], .bool(false))
+      let error = try object(XCTUnwrap(reply.1["error"]))
+      XCTAssertEqual(error["code"], .string(code))
+      XCTAssertEqual(error["message"], .string(reason))
+      if case .object(let details)? = error["details"] {
+        XCTAssertNil(details["phase"])
+        XCTAssertNil(details["newDispatchCount"], "a failed read probe is not a zero-dispatch proof")
+      }
+      XCTAssertEqual(dispatcher.dispatchCount, before + 1, "one explicit request performs one bounded target probe")
+      XCTAssertTrue(try targets.list().isEmpty)
+    }
+
+    dispatcher.setTargetOutput(malformed)
+    try refused(["device", "candidates"], code: "internalError", exitCode: 70)
+    try refused(["agent", "run", "--execution-id", "malformed-discovery",
+      "--operation", "observe.device@1"], code: "outcomeUnknown", exitCode: 75)
+
+    // Adoption must first possess a real observation reference. Its fresh
+    // recheck then returns the same production diagnostic and creates no target.
+    dispatcher.setTargetOutput(nil)
+    let client = AgentClient(socketPath: server.socketURL.path)
+    let snapshot = try object(client.request(method: "device.observations"))
+    guard case .array(let rows)? = snapshot["observations"],
+      let row = rows.first, case .string(let generation)? = snapshot["snapshotGeneration"],
+      case .string(let observationID)? = try object(row)["observationId"]
+    else { return XCTFail("production discovery did not return a reference") }
+    dispatcher.setTargetOutput(malformed)
+    try refused(["target", "adopt", "--candidate", "150100424a544e4600",
+      "--observation", observationID, "--observation-generation", generation],
+      code: "outcomeUnknown", exitCode: 75)
+
+    dispatcher.setTargetOutput("150100424a544e4600\t\tUSB\tUnauthorized\tlocalhost\n")
+    let paused = try cli(["agent", "run", "--execution-id", "execution-test",
+      "--operation", "observe.device@1"], server: server)
+    XCTAssertEqual(paused.0, 75)
+    let pausedError = try object(XCTUnwrap(paused.1["error"]))
+    XCTAssertEqual(pausedError["code"], .string("humanActionRequired"))
+    let details = try object(XCTUnwrap(pausedError["details"]))
+    let pending = try action(XCTUnwrap(details["execution"]))
+    guard case .string(let actionID)? = pending.fields["actionId"] else {
+      return XCTFail("production observation did not produce a physical action")
+    }
+    let actionBefore = try await owner.humanAction(actionID)
+    dispatcher.setTargetOutput(malformed)
+    try refused(["agent", "resume", "--resume-reference", pending.reference],
+      code: "outcomeUnknown", exitCode: 75)
+    try refused(["human-action", "resume", "--human-action", actionID,
+      "--resume-reference", pending.reference], code: "outcomeUnknown", exitCode: 75)
+    let actionAfter = try await owner.humanAction(actionID)
+    XCTAssertEqual(actionAfter, actionBefore, "a parse refusal cannot consume or replace physical assistance")
+    let jobs = try await engine.listJobs()
+    XCTAssertTrue(jobs.isEmpty)
+  }
+
+  func testTargetDiagnosticSurvivesJobRestartAndCLIReadsWithoutClosingOrReplayingItsIntent() async throws {
+    let malformed = "150100424a544e4600\tConnected\r\n"
+    guard case .malformed(let reason) = HDCObservationSemanticParser.parseTargetList(
+      stdout: Data(malformed.utf8), profile: .openHarmony320Family,
+      toolVersion: "3.2.0f", truncated: false)
+    else { return XCTFail("fixture must be refused by the production parser") }
+    let target = try targets.adopt(
+      stableIdentitySHA256: DeviceBootstrapMachine.stableIdentitySHA256(serial: "150100424a544e4600"),
+      connectKey: "150100424a544e4600", toolVersion: "3.2.0f",
+      nowUTC: RuntimeAgentTime.format(clock.now())).record
+    let request = try RuntimeOperationRequest(
+      requestID: "malformed-target-request", idempotencyKey: "malformed-target-job",
+      target: .init(targetID: target.targetID, expectedBindingRevision: target.bindingRevision),
+      operation: .init(id: "observe.device", version: 1), inputs: [:],
+      requestedOutputs: [.derivedArtifacts], authorization: nil, clientContext: nil)
+    dispatcher.setTargetOutput(malformed)
+    let accepted = try await engine.submit(RuntimeOperationCodec.encodeRequest(request))
+    let status = try await engine.run(jobID: accepted.jobID)
+    XCTAssertEqual(status.state, "waitingForRecovery")
+    XCTAssertTrue(status.outcomeUnknown)
+    XCTAssertEqual(dispatcher.dispatchCount, 3, "tool, server and exact target probes run once")
+    let diagnostic = try XCTUnwrap(status.timeline.first { $0.contains(reason) })
+    let journal = directory.appending(path: "engine/jobs/\(accepted.jobID)/journal.jsonl")
+    let original = try DurableJournalRecovery.inspect(url: journal)
+    XCTAssertEqual(original.outstandingIntents.count, 1)
+    let intent = try XCTUnwrap(original.outstandingIntents.first)
+    XCTAssertEqual(intent.stepID, "confirm-evidence-target")
+    XCTAssertFalse(original.events.contains { $0.correlatedIntentEventID == intent.eventID })
+    XCTAssertTrue(original.events.contains { $0.payload["reason"] == .string("outcomeUnknown: \(reason)") })
+
+    engine = try makeEngine()
+    _ = try await engine.recoverActiveJobs()
+    let restarted = try await engine.status(jobID: accepted.jobID)
+    XCTAssertEqual(restarted.state, "waitingForRecovery")
+    XCTAssertTrue(restarted.outcomeUnknown)
+    XCTAssertTrue(restarted.timeline.contains(diagnostic))
+    do {
+      _ = try await engine.run(jobID: accepted.jobID)
+      XCTFail("an outstanding observation intent must not be replayed")
+    } catch RuntimeJobEngineError.jobNotRunnable {}
+
+    let server = try startServer(owner())
+    let shown = try cli(["job", "show", "--job", accepted.jobID], server: server)
+    XCTAssertEqual(shown.0, 0)
+    let detail = try object(XCTUnwrap(shown.1["result"]))
+    let timeline = try object(XCTUnwrap(detail["timeline"]))
+    guard case .array(let entries)? = timeline["entries"] else {
+      return XCTFail("the bounded diagnostic must be inline in Job detail")
+    }
+    XCTAssertTrue(entries.contains(.string(diagnostic)))
+    let page = try cli(["job", "timeline", "--job", accepted.jobID], server: server)
+    XCTAssertEqual(page.0, 0)
+    let pageFields = try object(XCTUnwrap(page.1["result"]))
+    guard case .array(let items)? = pageFields["items"] else { return XCTFail("timeline page is absent") }
+    XCTAssertTrue(try items.map(object).contains { $0["text"] == .string(diagnostic) })
+    let readStatus = try cli(["job", "status", "--job", accepted.jobID], server: server)
+    XCTAssertEqual(readStatus.0, 0)
+    XCTAssertEqual(try object(XCTUnwrap(readStatus.1["result"]))["outcomeUnknown"], .bool(true))
+    let afterReads = try DurableJournalRecovery.inspect(url: journal)
+    XCTAssertEqual(afterReads.outstandingIntents, original.outstandingIntents)
+    XCTAssertFalse(afterReads.events.contains { $0.correlatedIntentEventID == intent.eventID })
+    XCTAssertEqual(dispatcher.dispatchCount, 3, "restart and every readback perform zero new dispatches")
   }
 
   func testCLIClientTimeoutAndConcurrentJobRunCannotCancelOrDuplicateTheJob() async throws {

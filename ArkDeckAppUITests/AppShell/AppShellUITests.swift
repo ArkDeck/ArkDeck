@@ -1032,6 +1032,37 @@ final class AppShellUITests: XCTestCase {
     }
   }
 
+  func testDeviceObservationFailureRemainsInspectableInBothLanguages() throws {
+    let reason = "target output line 3: target line is not the registered 5-column family; saw 2 columns; preview \"fixture-device\\tConnected\""
+    for language in ["(en)", "(zh-Hans)"] {
+      try "".write(to: fixtureStateFileURL, atomically: true, encoding: .utf8)
+      let app = launch(arguments: [
+        "--ui-test-runtime-history", "--ui-test-flash", "--ui-test-devices",
+        "--ui-test-fixture-state", fixtureStateFileURL.path, "-AppleLanguages", language,
+      ])
+      defer { app.terminate() }
+      let device = element("device.row.150100469346864", in: app)
+      XCTAssertTrue(device.waitForExistenceFast(timeout: 10))
+      device.click()
+      XCTAssertTrue(element("device.detail", in: app).waitForExistenceFast(timeout: 10))
+      writeFixtureState("--ui-test-device-observation-unavailable", in: app)
+      let recheck = app.buttons["device.action.recheck"]
+      XCTAssertTrue(recheck.waitForExistenceFast(timeout: 10))
+      recheck.click()
+      assertDisplayed(element("app.devices.unavailable.reason", in: app), equals: reason)
+      assertDisplayed(element("app.devices.unavailable.detailReason", in: app), equals: reason)
+      XCTAssertFalse(element("app.devices.gone", in: app).exists)
+      XCTAssertFalse(element("device.detail", in: app).exists)
+
+      // A fresh successful observation restores the same selected device.
+      writeFixtureState("", in: app)
+      recheck.click()
+      XCTAssertTrue(element("device.detail", in: app).waitForExistenceFast(timeout: 10))
+      XCTAssertFalse(element("app.devices.unavailable.detailReason", in: app).exists)
+      XCTAssertFalse(element("app.devices.gone", in: app).exists)
+    }
+  }
+
   func testDeviceContextMenuRenamesAndRefreshesDeviceState() {
     try? "".write(to: fixtureStateFileURL, atomically: true, encoding: .utf8)
     let fixtureArguments = [

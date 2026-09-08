@@ -362,7 +362,16 @@ private actor DeviceListFixtureApplicationProvider: DeviceListApplicationProvidi
   }
 
   func refreshCandidates() async -> DeviceListPresentation {
-    DeviceListPresentation(
+    if let stateFileURL,
+      let text = try? String(contentsOf: stateFileURL, encoding: .utf8),
+      text.contains("--ui-test-device-observation-unavailable")
+    {
+      return DeviceListPresentation(
+        availability: .unavailable(
+          reason: "target output line 3: target line is not the registered 5-column family; saw 2 columns; preview \"fixture-device\\tConnected\""),
+        candidates: [])
+    }
+    return DeviceListPresentation(
       availability: .available,
       candidates: [
         DeviceCandidatePresentation(

@@ -81,13 +81,68 @@ package enum HDCObservationSemanticParser {
     "[I]", "[W]", "[D]", "* daemon", "Connect server failed",
   ]
 
+  private struct OutputLine {
+    let number: Int
+    let source: Substring
+    let normalized: String
+  }
+
+  private static func outputLines(_ text: String) -> [OutputLine] {
+    var number = 1
+    return text.split(separator: "\n", omittingEmptySubsequences: false).compactMap { source in
+      let lineNumber = number
+      // Keep the parser's existing Character-based splitting, including its
+      // refusal of unregistered CRLF shapes. Count physical LF bytes for the
+      // diagnostic even when a CRLF grapheme remains inside one parser line.
+      number += source.utf8.filter { $0 == 0x0A }.count + 1
+      let normalized = source.trimmingCharacters(in: .whitespaces)
+      guard !normalized.isEmpty,
+        !ignorableDiagnosticPrefixes.contains(where: { normalized.hasPrefix($0) })
+      else { return nil }
+      return OutputLine(number: lineNumber, source: source, normalized: normalized)
+    }
+  }
+
   private static func normalizedLines(_ text: String) -> [String] {
-    text.split(separator: "\n", omittingEmptySubsequences: true)
-      .map { $0.trimmingCharacters(in: .whitespaces) }
-      .filter { line in
-        guard !line.isEmpty else { return false }
-        return !ignorableDiagnosticPrefixes.contains { line.hasPrefix($0) }
-      }
+    outputLines(text).map(\.normalized)
+  }
+
+  /// This is bounded failure prose, not a process receipt or raw Artifact.
+  /// Escape bytes before they reach a terminal, Job timeline or control error;
+  /// neither control sequences nor non-ASCII direction markers may render.
+  private static func invalidTargetOutput(
+    _ reason: String, line: OutputLine, columnCount: Int
+  ) -> HDCObservationParseOutcome<HDCParsedTargetList> {
+    let maximumPreviewBytes = 256
+    let byteCount = line.source.utf8.count
+    let preview: String
+    // A malformed row can be arbitrary tool text. Do not persist an apparent
+    // credential or private key merely because it reached a target-list parser.
+    // Match sensitive fragments conservatively: snake/camel-case suffixes such
+    // as SECRET_ACCESS_KEY and SecretAccessKey need no adjacent delimiter.
+    let sensitive = line.source.range(
+      of: #"(?i)(token|secret|password|passwd|api[_-]?key|authorization)|-----BEGIN [A-Z ]*PRIVATE KEY-----"#,
+      options: .regularExpression) != nil
+    if sensitive {
+      preview = "<sensitive text omitted>"
+    } else {
+      preview = line.source.utf8.prefix(maximumPreviewBytes).map { byte in
+        switch byte {
+        case 0x09: return "\\t"
+        case 0x0A: return "\\n"
+        case 0x0D: return "\\r"
+        case 0x22: return "\\\""
+        case 0x5C: return "\\\\"
+        case 0x20...0x7E: return String(UnicodeScalar(byte))
+        default: return String(format: "\\x%02X", byte)
+        }
+      }.joined()
+    }
+    let truncation = byteCount > maximumPreviewBytes
+      ? "; preview truncated to \(maximumPreviewBytes) of \(byteCount) bytes" : ""
+    return .malformed(
+      reason: "target output line \(line.number): \(reason); saw \(columnCount) columns; "
+        + "preview \"\(preview)\"\(truncation)")
   }
 
   /// Parses `hdc -v` / `hdc checkserver` style version output:
@@ -180,31 +235,36 @@ package enum HDCObservationSemanticParser {
     guard let text = String(data: stdout, encoding: .utf8) else {
       return .invalidEncoding
     }
-    let lines = normalizedLines(text)
+    let lines = outputLines(text)
     guard !lines.isEmpty else { return .empty }
-    if lines == ["[Empty]"] {
+    if lines.map(\.normalized) == ["[Empty]"] {
       return .parsed(HDCParsedTargetList(targets: []))
     }
     var targets: [HDCParsedTargetLine] = []
     for line in lines {
-      let columns = line.split(separator: "\t", omittingEmptySubsequences: false)
+      let columns = line.normalized.split(separator: "\t", omittingEmptySubsequences: false)
         .map(String.init)
       guard columns.count == 5, columns[1].isEmpty, columns[4] == "localhost" else {
-        return .malformed(reason: "target line is not the registered 5-column family")
+        return invalidTargetOutput(
+          "target line is not the registered 5-column family", line: line,
+          columnCount: columns.count)
       }
       let key = columns[0]
       guard !key.isEmpty, key.utf8.count <= 128,
         key.unicodeScalars.allSatisfy({ $0.isASCII && !$0.properties.isWhitespace })
       else {
-        return .malformed(reason: "connect key length out of bounds")
+        return invalidTargetOutput(
+          "connect key length out of bounds", line: line, columnCount: columns.count)
       }
       let transport = columns[2]
       guard ["USB", "TCP", "UART"].contains(transport) else {
-        return .malformed(reason: "unregistered target transport \(transport)")
+        return invalidTargetOutput(
+          "unregistered target transport", line: line, columnCount: columns.count)
       }
       let state = columns[3]
       guard ["Connected", "Unauthorized", "Offline"].contains(state) else {
-        return .malformed(reason: "unregistered target state \(state)")
+        return invalidTargetOutput(
+          "unregistered target state", line: line, columnCount: columns.count)
       }
       targets.append(
         HDCParsedTargetLine(connectKey: key, transport: transport.lowercased(), state: state))
