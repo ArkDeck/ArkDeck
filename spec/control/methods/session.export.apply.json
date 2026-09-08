@@ -47,6 +47,37 @@
     "result": {
       "additionalProperties": false,
       "properties": {
+        "catalogStatus": {
+          "additionalProperties": false,
+          "properties": {
+            "blocker": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "complete": {
+              "type": "boolean"
+            },
+            "measurementIncomplete": {
+              "type": "boolean"
+            },
+            "unaccountedSessionCount": {
+              "type": "string"
+            },
+            "usedBytes": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "blocker",
+            "complete",
+            "measurementIncomplete",
+            "unaccountedSessionCount",
+            "usedBytes"
+          ],
+          "type": "object"
+        },
         "deviceIdentifierPolicy": {
           "type": "string"
         },
@@ -86,6 +117,49 @@
         "sessionId": {
           "type": "string"
         },
+        "source": {
+          "additionalProperties": false,
+          "properties": {
+            "jobId": {
+              "type": "string"
+            },
+            "journalSha256": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "manifestSha256": {
+              "type": "string"
+            },
+            "rootDevice": {
+              "type": "string"
+            },
+            "rootInode": {
+              "type": "string"
+            },
+            "sessionDevice": {
+              "type": "string"
+            },
+            "sessionInode": {
+              "type": "string"
+            },
+            "volumeIdentity": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "jobId",
+            "journalSha256",
+            "manifestSha256",
+            "rootDevice",
+            "rootInode",
+            "sessionDevice",
+            "sessionInode",
+            "volumeIdentity"
+          ],
+          "type": "object"
+        },
         "sourceArtifactIds": {
           "items": {
             "type": "string"
@@ -94,6 +168,7 @@
         }
       },
       "required": [
+        "catalogStatus",
         "deviceIdentifierPolicy",
         "evidenceClass",
         "excludedArtifactIds",
@@ -106,6 +181,7 @@
         "resultGeneration",
         "schemaVersion",
         "sessionId",
+        "source",
         "sourceArtifactIds"
       ],
       "type": "object"
@@ -119,8 +195,8 @@
   "x-arkdeck-method": "session.export.apply",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 4,
-    "request": 8,
-    "result": 4
+    "error": 2,
+    "request": 5,
+    "result": 3
   }
 }

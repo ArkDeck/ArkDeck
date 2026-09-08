@@ -174,6 +174,133 @@ final class RuntimeSessionPublicationContractTests: XCTestCase {
     XCTAssertTrue(status.measurementIncomplete)
   }
 
+  /// The reference host, reproduced: one Session this Runtime just produced,
+  /// beside one 2026-08 directory from an earlier build that has no manifest.
+  ///
+  /// Before this change every read refused, because a single blanket guard
+  /// asked whether the *whole* root was accounted for. `session list` still
+  /// asks that question and must still refuse. An exact export asks a
+  /// narrower one — is *this* Session known, complete and registered — so it
+  /// answers, and says in the same breath what it is not accounting for.
+  func testAnExactExportSucceedsWhileTheHistoricalUnknownIsDisclosedAndStillRefused()
+    async throws
+  {
+    let harness = try await Harness(root: root, publishing: true)
+    let historical = harness.sessionsRoot
+      .appending(path: "2026/08/session-historical", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(
+      at: historical, withIntermediateDirectories: true,
+      attributes: [.posixPermissions: 0o700])
+    let identity = historical.appending(path: ".session-identity.json")
+    let journal = historical.appending(path: "journal.jsonl")
+    try Data(#"{"jobId":"JOB-HISTORICAL","schemaVersion":"1.0.0","sessionId":"session-historical"}"#.utf8)
+      .write(to: identity)
+    try Data("{\"kind\":\"jobCreated\"}\n".utf8).write(to: journal)
+    let before = try snapshot(of: [identity, journal])
+
+    let job = try await harness.runAnalyzerJob()
+    let sessionID = "session-\(job.jobID)"
+    XCTAssertEqual(job.sessionPublication.state, .published)
+
+    // The global family keeps its fail-closed contract, and keeps naming the
+    // leaf and its reason.
+    for global in [
+      { _ = try harness.owner.listSessions(pageSize: 20, cursor: nil) },
+      { _ = try harness.owner.showSession(sessionID: sessionID) },
+    ] as [() throws -> Void] {
+      XCTAssertThrowsError(try global()) { error in
+        let failure = error as? RuntimeSessionStorageFailure
+        XCTAssertEqual(failure?.code, "operationUnavailable")
+        XCTAssertTrue(
+          (failure?.message ?? "").contains("2026/08/session-historical"),
+          "the global refusal must still name the leaf: \(failure?.message ?? "")")
+      }
+    }
+
+    // The exact export answers, and discloses.
+    let destination = root.appending(path: "disclosed-export", directoryHint: .isDirectory)
+    guard case .object(let preview) = try harness.owner.previewSessionExport(
+      sessionID: sessionID, destinationPath: destination.path, allowSensitive: false)
+    else { return XCTFail("exact export refused a known, complete, registered Session") }
+    guard case .object(let catalogStatus)? = preview["catalogStatus"] else {
+      return XCTFail("the preview published no catalog status")
+    }
+    XCTAssertEqual(catalogStatus["complete"], .bool(false))
+    XCTAssertEqual(catalogStatus["unaccountedSessionCount"], .string("1"))
+    XCTAssertEqual(catalogStatus["measurementIncomplete"], .bool(true))
+    XCTAssertEqual(catalogStatus["blocker"], .string("unaccountedSessionContent"))
+    // `usedBytes` is measured known content, so it is strictly smaller than
+    // the scan's total, which folds in what it measured for the leaf it could
+    // not account for.
+    guard case .string(let usedText)? = catalogStatus["usedBytes"],
+      let usedBytes = UInt64(usedText)
+    else { return XCTFail("the disclosed usage is not a canonical decimal") }
+    XCTAssertGreaterThan(usedBytes, 0)
+    XCTAssertLessThan(usedBytes, try harness.owner.status().currentBytes)
+
+    guard case .object(let source)? = preview["source"] else {
+      return XCTFail("the preview published no source facts")
+    }
+    XCTAssertEqual(source["jobId"], .string(job.jobID))
+    XCTAssertEqual(source["manifestSha256"], job.sessionPublication.manifestSHA256.map(JSONValue.string))
+    let sessionRoot = harness.sessionsRoot
+      .appending(path: "2026/07/\(sessionID)", directoryHint: .isDirectory)
+    XCTAssertEqual(
+      source["journalSha256"],
+      .string(SHA256Hex.string(of: try Data(contentsOf: sessionRoot.appending(path: "journal.jsonl")))))
+    XCTAssertEqual(source["volumeIdentity"], preview["destination"].flatMap {
+      guard case .object(let facts) = $0 else { return nil }
+      return facts["volumeIdentity"]
+    }, "the fixture root and its destination share one volume")
+
+    // The digest still covers the whole preview minus itself, including both
+    // new objects: dropping either one changes it.
+    guard case .string(let digest)? = preview["previewDigest"],
+      case .string(let previewID)? = preview["previewId"]
+    else { return XCTFail("the preview published no digest tuple") }
+    var digestFields = preview
+    digestFields.removeValue(forKey: "previewDigest")
+    XCTAssertEqual(
+      SHA256Hex.string(of: try PortableCanonicalJSON.canonicalBytes(.object(digestFields))),
+      digest)
+    for dropped in ["source", "catalogStatus"] {
+      var without = digestFields
+      without.removeValue(forKey: dropped)
+      XCTAssertNotEqual(
+        SHA256Hex.string(of: try PortableCanonicalJSON.canonicalBytes(.object(without))),
+        digest, "previewDigest must cover \(dropped)")
+    }
+
+    // Exporting the unaccounted leaf itself stays refused.
+    XCTAssertThrowsError(
+      try harness.owner.previewSessionExport(
+        sessionID: "session-historical",
+        destinationPath: root.appending(path: "historical-export").path,
+        allowSensitive: false)
+    ) { error in
+      XCTAssertEqual((error as? RuntimeSessionStorageFailure)?.code, "operationUnavailable")
+    }
+
+    guard case .object(let applied) = try harness.owner.applySessionExport(
+      previewID: previewID, previewDigest: digest)
+    else { return XCTFail("apply refused its own durable preview") }
+    XCTAssertEqual(applied["source"], preview["source"])
+    XCTAssertEqual(applied["catalogStatus"], preview["catalogStatus"])
+    XCTAssertTrue(
+      FileManager.default.fileExists(atPath: destination.appending(path: "manifest.json").path))
+
+    // Nothing about the historical directory moved. It was not adopted,
+    // repaired, registered or rewritten to make the export possible.
+    XCTAssertEqual(try snapshot(of: [identity, journal]), before)
+    XCTAssertFalse(
+      FileManager.default.fileExists(atPath: historical.appending(path: "manifest.json").path),
+      "no manifest may be invented for a Session that never had one")
+    let status = try harness.owner.status()
+    XCTAssertEqual(status.sessionCount, 1)
+    XCTAssertEqual(status.unaccountedSessionCount, 1)
+    XCTAssertTrue(status.measurementIncomplete)
+  }
+
   func testTheControlPlanePublishesTheReceiptOnEveryJobReadMethod() async throws {
     let harness = try await Harness(root: root, publishing: true)
     let job = try await harness.runAnalyzerJob()

@@ -319,8 +319,8 @@ extension RuntimeCLI {
         "schemaVersion", "previewId", "previewDigest", "digestAlgorithm", "sessionId",
         "generation", "policyGeneration", "createdAtUtc", "expiresAtUtc",
         "confirmationRequired", "allowSensitive", "sensitiveDefaultExcluded",
-        "deviceIdentifierPolicy", "estimatedBytes", "destination", "artifacts",
-        "newDispatchCount",
+        "deviceIdentifierPolicy", "estimatedBytes", "destination", "source",
+        "catalogStatus", "artifacts", "newDispatchCount",
       ],
       fields["schemaVersion"] == .string("arkdeck.session-export-preview/1"),
       fields["digestAlgorithm"] == .string("sha256-jcs"),
@@ -352,6 +352,8 @@ extension RuntimeCLI {
       destination["expectedState"] == .string("absent"),
       case .array(let rows)? = fields["artifacts"]
     else { throw fail() }
+    try validateSessionExportSource(fields["source"], session: session)
+    try validateSessionExportCatalogStatus(fields["catalogStatus"], session: session)
     var priorID: String?
     var includedBytes: UInt64 = 0
     for row in rows {
@@ -394,6 +396,72 @@ extension RuntimeCLI {
     else { throw fail() }
   }
 
+  /// The exact source an export names. Every field is required and closed:
+  /// the Job the Session came from, the digests of the two documents that make
+  /// it a Session, and the filesystem identity of both the Sessions root and
+  /// this leaf. `journalSha256` is the one nullable member — a Session that
+  /// never carried a Journal is a knowable fact, and the Runtime refuses
+  /// rather than nulling one it cannot read.
+  private static func validateSessionExportSource(
+    _ value: JSONValue?,
+    session: CLIRuntimeSession
+  ) throws {
+    func fail() -> CLIRegistryError {
+      session.fail(.recordUnreadable, "the Runtime returned an invalid Session export source")
+    }
+    guard case .object(let source)? = value,
+      Set(source.keys) == [
+        "jobId", "manifestSha256", "journalSha256", "rootDevice", "rootInode",
+        "volumeIdentity", "sessionDevice", "sessionInode",
+      ],
+      case .string(let jobID)? = source["jobId"], AgentExecutionIntent.validIdentifier(jobID),
+      case .string(let manifestDigest)? = source["manifestSha256"],
+      SHA256Hex.isLowercaseSHA256(manifestDigest),
+      canonicalDecimal(source["rootDevice"]) != nil,
+      canonicalDecimal(source["rootInode"]) != nil,
+      canonicalDecimal(source["sessionDevice"]) != nil,
+      canonicalDecimal(source["sessionInode"]) != nil,
+      case .string(let volume)? = source["volumeIdentity"], !volume.isEmpty
+    else { throw fail() }
+    switch source["journalSha256"] {
+    case .null: break
+    case .string(let digest) where SHA256Hex.isLowercaseSHA256(digest): break
+    default: throw fail()
+    }
+  }
+
+  /// The global accounting state this exact export was published against.
+  /// Exactly two tuples are answerable: a complete catalog with no blocker, or
+  /// an incomplete one that names `unaccountedSessionContent` and at least one
+  /// leaf it could not account for. Anything between them would let a partial
+  /// measurement read as a complete one.
+  private static func validateSessionExportCatalogStatus(
+    _ value: JSONValue?,
+    session: CLIRuntimeSession
+  ) throws {
+    func fail() -> CLIRegistryError {
+      session.fail(
+        .recordUnreadable, "the Runtime returned an invalid Session export catalog status")
+    }
+    guard case .object(let status)? = value,
+      Set(status.keys) == [
+        "complete", "unaccountedSessionCount", "measurementIncomplete", "usedBytes", "blocker",
+      ],
+      case .bool(let complete)? = status["complete"],
+      case .bool(let incomplete)? = status["measurementIncomplete"],
+      let unaccounted = canonicalDecimal(status["unaccountedSessionCount"]),
+      canonicalDecimal(status["usedBytes"]) != nil,
+      complete != incomplete
+    else { throw fail() }
+    if complete {
+      guard unaccounted == 0, status["blocker"] == .null else { throw fail() }
+    } else {
+      guard unaccounted >= 1, status["blocker"] == .string("unaccountedSessionContent") else {
+        throw fail()
+      }
+    }
+  }
+
   private static func validateSessionExportResult(
     _ value: JSONValue,
     session: CLIRuntimeSession
@@ -415,8 +483,9 @@ extension RuntimeCLI {
     guard case .object(let fields) = value,
       Set(fields.keys) == [
         "schemaVersion", "previewId", "previewDigest", "sessionId", "generation",
-        "resultGeneration", "publishedAtUtc", "exportedPath", "sourceArtifactIds",
-        "excludedArtifactIds", "deviceIdentifierPolicy", "evidenceClass", "newDispatchCount",
+        "resultGeneration", "publishedAtUtc", "exportedPath", "source", "catalogStatus",
+        "sourceArtifactIds", "excludedArtifactIds", "deviceIdentifierPolicy", "evidenceClass",
+        "newDispatchCount",
       ],
       fields["schemaVersion"] == .string("arkdeck.session-export-result/1"),
       fields["deviceIdentifierPolicy"] == .string("redact"),
@@ -434,6 +503,8 @@ extension RuntimeCLI {
       ISO8601Timestamps.parseCanonicalPlain(publishedText) != nil,
       case .string(let exportedPath)? = fields["exportedPath"], exportedPath.hasPrefix("/")
     else { throw fail() }
+    try validateSessionExportSource(fields["source"], session: session)
+    try validateSessionExportCatalogStatus(fields["catalogStatus"], session: session)
     let included = try identifiers(fields["sourceArtifactIds"])
     let excluded = try identifiers(fields["excludedArtifactIds"])
     guard Set(included).isDisjoint(with: excluded) else { throw fail() }

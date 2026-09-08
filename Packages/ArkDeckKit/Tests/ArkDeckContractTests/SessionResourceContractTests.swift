@@ -295,6 +295,126 @@ final class SessionResourceContractTests: XCTestCase {
     XCTAssertTrue(jobs.isEmpty)
   }
 
+  /// The disclosed shape has to survive the strict client, not only the owner.
+  /// A real `arkdeck` process previews and applies an exact export while one
+  /// unrelated manifest-less leaf sits under the same root, and refuses
+  /// `session list` over the same catalog in the same run.
+  func testRealCLIProcessExportsAnExactSessionWhileGlobalListStaysRefused() async throws {
+    let sessions = try store()
+    let exported = try finalizedSessionWithArtifacts(
+      id: "session-disclosed", jobID: "job-disclosed", month: "08",
+      timestamp: "2026-08-05T00:00:00Z")
+    // A Session the current writer produced carries the Job's own Journal, so
+    // this one does too: its digest is a published source fact, where a
+    // Session that never had a Journal publishes an explicit null.
+    let exportedJournal = Data("{\"kind\":\"jobCreated\"}\n{\"kind\":\"finalized\"}\n".utf8)
+    try ownerFile(exportedJournal, at: exported.appending(path: "journal.jsonl"))
+    // The shape the reference host carries: identity and Journal, no manifest.
+    let stranded = sessionsRoot
+      .appending(path: "2026/08/session-stranded", directoryHint: .isDirectory)
+    try ownerDirectory(stranded)
+    try ownerFile(
+      try CanonicalJSONEncoders.canonical().encode(
+        JSONValue.object([
+          "schemaVersion": .string("1.0.0"),
+          "sessionId": .string("session-stranded"),
+          "jobId": .string("job-stranded"),
+        ])),
+      at: stranded.appending(path: ".session-identity.json"))
+    try ownerFile(Data("{}\n".utf8), at: stranded.appending(path: "journal.jsonl"))
+    let strandedBefore = try FileManager.default.contentsOfDirectory(atPath: stranded.path).sorted()
+
+    let artifacts = try RuntimeArtifactStore(
+      rootURL: root.appending(path: "artifacts", directoryHint: .isDirectory),
+      quota: ArtifactQuota(totalBytes: 12_345),
+      nowUTC: { "2026-09-02T00:00:00Z" })
+    let capabilities = try RuntimeCapabilityStore(
+      directoryURL: root.appending(path: "capabilities", directoryHint: .isDirectory))
+    let engine = try RuntimeJobEngine(
+      configuration: .init(
+        stateDirectory: root.appending(path: "engine", directoryHint: .isDirectory)),
+      providers: DeviceProviderRegistry(providers: []),
+      dispatcher: DescriptorBoundProcessDispatcher(
+        resolver: try FixedExecutableResolver.hashing(path: "/bin/ls", providerID: "hdc")),
+      capabilityStore: capabilities, artifactStore: artifacts,
+      nowUTC: { "2026-09-02T00:00:00Z" })
+    let handler = RuntimeControlPlaneHandler(
+      engine: engine, capabilityStore: capabilities, providerIDs: [],
+      nowUTC: { "2026-09-02T00:00:00Z" }, artifactStore: artifacts,
+      runtimeSessionStorage: sessions)
+    let server = AgentDaemonServer(
+      stateDirectory: root.appending(path: "control", directoryHint: .isDirectory),
+      handler: handler, nowUTC: { "2026-09-02T00:00:00Z" })
+    _ = try server.start()
+    defer { server.stop() }
+
+    // The global page keeps its fail-closed contract, and keeps naming the leaf.
+    let listed = try await run([
+      "session", "list", "--socket", server.socketURL.path, "--output", "json",
+    ])
+    XCTAssertEqual(listed.exitCode, 69, diagnostic(listed))
+    let listError = try error(listed)
+    XCTAssertEqual(listError["code"], .string("operationUnavailable"))
+    guard case .string(let listMessage)? = listError["message"] else {
+      return XCTFail("the global refusal published no message")
+    }
+    XCTAssertTrue(
+      listMessage.contains("2026/08/session-stranded"), listMessage)
+
+    let exports = root.appending(path: "exports", directoryHint: .isDirectory)
+    try ownerDirectory(exports)
+    let destination = exports.appending(path: "disclosed-copy", directoryHint: .isDirectory)
+    let previewRun = try await run([
+      "session", "export", "preview", "--session", "session-disclosed",
+      "--destination", destination.path, "--socket", server.socketURL.path,
+      "--output", "json",
+    ])
+    XCTAssertEqual(previewRun.exitCode, 0, diagnostic(previewRun))
+    let preview = try result(previewRun)
+    XCTAssertEqual(
+      try object(preview["catalogStatus"])["blocker"], .string("unaccountedSessionContent"))
+    XCTAssertEqual(try object(preview["catalogStatus"])["complete"], .bool(false))
+    XCTAssertEqual(
+      try object(preview["catalogStatus"])["unaccountedSessionCount"], .string("1"))
+    XCTAssertEqual(try object(preview["source"])["jobId"], .string("job-disclosed"))
+    XCTAssertEqual(
+      try object(preview["source"])["journalSha256"],
+      .string(SHA256Hex.string(of: exportedJournal)))
+    guard case .string(let previewID)? = preview["previewId"],
+      case .string(let previewDigest)? = preview["previewDigest"]
+    else { return XCTFail("export preview tuple is missing") }
+
+    let applied = try await run([
+      "session", "export", "apply", "--preview-id", previewID,
+      "--preview-digest", previewDigest, "--socket", server.socketURL.path,
+      "--output", "json",
+    ])
+    XCTAssertEqual(applied.exitCode, 0, diagnostic(applied))
+    let exportResult = try result(applied)
+    XCTAssertEqual(exportResult["source"], preview["source"])
+    XCTAssertEqual(exportResult["catalogStatus"], preview["catalogStatus"])
+    XCTAssertTrue(
+      FileManager.default.fileExists(atPath: destination.appending(path: "manifest.json").path))
+
+    // Exporting the unaccounted leaf itself stays refused.
+    let refused = try await run([
+      "session", "export", "preview", "--session", "session-stranded",
+      "--destination", exports.appending(path: "stranded-copy").path,
+      "--socket", server.socketURL.path, "--output", "json",
+    ])
+    XCTAssertEqual(refused.exitCode, 69, diagnostic(refused))
+    XCTAssertEqual(try error(refused)["code"], .string("operationUnavailable"))
+    XCTAssertFalse(
+      FileManager.default.fileExists(atPath: exports.appending(path: "stranded-copy").path))
+
+    // The historical directory is exactly as it was: still no manifest.
+    XCTAssertEqual(
+      try FileManager.default.contentsOfDirectory(atPath: stranded.path).sorted(),
+      strandedBefore)
+    XCTAssertFalse(
+      FileManager.default.fileExists(atPath: stranded.appending(path: "manifest.json").path))
+  }
+
   func testParserPublishesClosedSessionResourceArguments() {
     XCTAssertNotNil(
       CLIArgumentParser.parse([
