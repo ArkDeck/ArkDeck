@@ -387,6 +387,110 @@ final class RuntimeAgentExecutionContractTests: XCTestCase {
     XCTAssertEqual(runEvidence["actualStepKinds"], .null)
   }
 
+  /// A terminal Job that published one of its two required Artifacts and never
+  /// published the other. `job.evidence` calls that `artifactIntegrityFailed`;
+  /// the Agent execution projection used to call the same Job `verified` with
+  /// an empty blocker list, because it only checked that the Artifacts that do
+  /// exist verify and never checked which required ones are absent. Found on a
+  /// real DAYU200 `deploy.native-library.app-owned@1` rollback Job, whose
+  /// `verification-report.json` was missing after the deliberate load failure.
+  ///
+  /// The assertion is deliberately a comparison, not a copied literal: the two
+  /// surfaces read one record, so a future change that teaches one of them a
+  /// new fact must teach the other the same fact.
+  func testAgentEvidenceAgreesWithJobEvidenceWhenARequiredArtifactIsMissing() async throws {
+    let jobID = "job-agent-missing-required"
+    let executionID = "execution-missing-required"
+    let seed = RuntimeAgentExecutionStore.fingerprint(Data(executionID.utf8))
+    let request = try RuntimeOperationRequest(
+      requestID: "agent-request-\(seed)", idempotencyKey: "agent-execution-\(seed)",
+      target: DurableTargetReference(targetID: "TGT-fixture", expectedBindingRevision: 2),
+      operation: RuntimeOperationReference(id: "flash.full-restore", version: 1))
+    var record = RuntimeJobRecord(
+      jobID: jobID, request: request, operationReference: ArkForgeFlashOperation.canonicalReference,
+      catalogDigest: RuntimeOperationCatalog.catalogDigest, providerID: "arkforge",
+      createdAtUTC: RuntimeAgentTime.format(clock.now()), actualEffect: "destructive",
+      admissionEvidence: nil, materializedPlanDigest: String(repeating: "a", count: 64),
+      materializedStableTargetIdentitySHA256: nil, materializedBindingRevision: 2)
+    record.state = "failed"
+    _ = try RuntimeJobRepository(stateDirectory: directory.appending(path: "engine")).admit(
+      jobID: jobID, idempotencyKey: request.idempotencyKey,
+      requestHash: String(repeating: "c", count: 64), initialState: record.state,
+      createdAtUTC: record.createdAtUTC, initialRecordData: record.durableData())
+
+    // `flash.full-restore@1` declares `flash-report.json` and
+    // `post-flash-facts.json` as required. Publish the first only: the store
+    // is readable and every Artifact in it verifies, so the weaker derivation
+    // finds nothing wrong.
+    let capturedClock = clock!
+    let artifactStore = try RuntimeArtifactStore(
+      rootURL: directory.appending(path: "artifacts"),
+      nowUTC: { RuntimeAgentTime.format(capturedClock.now()) })
+    _ = try await artifactStore.publish(
+      RuntimeArtifactPublicationRequest(
+        jobID: jobID, sessionID: record.sessionID, stepID: "finalize-session",
+        name: "flash-report.json", mediaType: "application/json", privacy: .standard,
+        retentionClass: .default, sourceOperation: ArkForgeFlashOperation.canonicalReference,
+        providerID: "arkforge",
+        bindingSnapshot: ArtifactBindingSnapshot(
+          targetID: "TGT-fixture", bindingRevision: 2,
+          stableIdentitySHA256: String(repeating: "d", count: 64)),
+        contents: Data("{}".utf8)))
+
+    let intent = try AgentExecutionIntent([
+      "schemaVersion": .string(AgentExecutionIntent.schemaVersion),
+      "executionId": .string(executionID),
+      "operation": .string(ArkForgeFlashOperation.canonicalReference),
+      "inputs": .object([:]),
+      "maximumWaitMilliseconds": .string("30000"),
+    ])
+    let now = RuntimeAgentTime.format(clock.now())
+    let store = try RuntimeAgentExecutionStore(directory: directory.appending(path: "executions"))
+    try store.save(
+      RuntimeAgentExecutionRecord(
+        schemaVersion: "arkdeck.runtime-agent-execution/1", intent: intent,
+        intentFingerprintSHA256: RuntimeAgentExecutionStore.fingerprint(try intent.canonicalIntent),
+        catalogDigest: RuntimeOperationCatalog.catalogDigest, createdAt: now,
+        deadline: RuntimeAgentTime.format(clock.now().addingTimeInterval(30)),
+        lastObservedAt: now, generation: 1, state: .completed,
+        target: AgentResolvedTarget(targetID: "TGT-fixture", bindingRevision: 2),
+        submissionRequest: try CanonicalJSONEncoders.canonical().encode(request),
+        jobID: jobID, jobState: "failed", outcomeUnknown: false,
+        failureCode: nil, actions: []),
+      expectedGeneration: nil)
+
+    let handler = RuntimeControlPlaneHandler(
+      engine: engine,
+      capabilityStore: try RuntimeCapabilityStore(directoryURL: directory.appending(path: "capabilities")),
+      providerIDs: ["hdc"], nowUTC: { RuntimeAgentTime.format(capturedClock.now()) },
+      targetStore: targets, agentExecutions: try owner(), artifactStore: artifactStore)
+
+    let agent = await handler.handleFrame(
+      try JSONEncoder().encode(
+        AgentWireProtocol.Request(
+          id: UUID().uuidString, method: "agent.status",
+          params: ["executionId": .string(executionID)])))
+    XCTAssertTrue(agent.ok, agent.error?.message ?? "-")
+    let agentEvidence = try object(XCTUnwrap(try object(XCTUnwrap(agent.result))["evidence"]))
+
+    let job = await handler.handleFrame(
+      try JSONEncoder().encode(
+        AgentWireProtocol.Request(
+          id: UUID().uuidString, method: "job.evidence",
+          params: ["jobId": .string(jobID)])))
+    XCTAssertTrue(job.ok, job.error?.message ?? "-")
+    let jobEvidence = try object(XCTUnwrap(job.result))
+
+    XCTAssertEqual(jobEvidence["missingRequiredArtifacts"], .array([.string("post-flash-facts.json")]))
+    XCTAssertEqual(jobEvidence["status"], .string("artifactIntegrityFailed"))
+    guard case .array(let jobBlockers)? = jobEvidence["blockers"],
+      case .array(let agentBlockers)? = agentEvidence["blockers"]
+    else { return XCTFail("both evidence surfaces must publish their blockers") }
+    XCTAssertEqual(agentBlockers, jobBlockers)
+    XCTAssertTrue(agentBlockers.contains(.string("artifactIntegrityFailed")))
+    XCTAssertNotEqual(agentEvidence["status"], .string("verified"))
+  }
+
   func testAgentListAndAbandonPublishTheirResultShapesThroughTheControlPlane() async throws {
     port.setState("Unauthorized")
     let owner = try owner()
