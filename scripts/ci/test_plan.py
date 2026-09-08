@@ -440,7 +440,6 @@ class CommandSelectionTests(unittest.TestCase):
             # scripts read Git objects at the pinned Swift commit or build
             # their own candidate view, so a red workspace passed the lane.
             "cargo clippy --workspace --all-targets -- -D warnings",
-            "cargo test --workspace",
             "cargo deny --locked check",
             "cargo vet --locked --no-registry-suggestions",
         ])
@@ -452,7 +451,9 @@ class CommandSelectionTests(unittest.TestCase):
         parity = commands.index(f"{sys.executable} rust/scripts/check-contracts.py")
         fetch = commands.index("cargo fetch --locked")
         clippy = commands.index("cargo clippy --workspace --all-targets -- -D warnings")
-        workspace_tests = commands.index("cargo test --workspace")
+        workspace_tests = commands.index(
+            f"{sys.executable} rust/scripts/workspace-tests.py"
+        )
         self.assertLess(fetch, clippy)
         self.assertLess(clippy, workspace_tests)
         self.assertLess(workspace_tests, regressions)
@@ -477,7 +478,7 @@ class CommandSelectionTests(unittest.TestCase):
             (sys.executable, "rust/scripts/test_contract_checks.py"),
             (sys.executable, "rust/scripts/check-contracts.py"),
             ("cargo", "clippy", "--workspace", "--all-targets", "--", "-D", "warnings"),
-            ("cargo", "test", "--workspace"),
+            (sys.executable, "rust/scripts/workspace-tests.py"),
             ("cargo", "deny", "--locked", "check"),
             ("cargo", "vet", "--locked", "--no-registry-suggestions"),
         ):

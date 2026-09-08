@@ -497,8 +497,16 @@ def local_commands(repo_root: pathlib.Path, plan: CIPlan) -> tuple[tuple[str, ..
                 # commit or regenerates its own candidate view under
                 # rust/target, so none of them compiles the checkout. Clippy
                 # and the workspace tests are the only lane members that do.
+                #
+                # The workspace tests go through a wrapper because two
+                # `corpus_parity` cases assert the checkout equals the pin, and
+                # the pin can only name a commit already in origin/main. On a
+                # branch that changes a recorded frame that assertion is false
+                # until the branch merges, so the wrapper asks the two
+                # questions separately: whether the pin is current against
+                # main, and whether the Rust code replays the contract.
                 ("cargo", "clippy", "--workspace", "--all-targets", "--", "-D", "warnings"),
-                ("cargo", "test", "--workspace"),
+                (sys.executable, "rust/scripts/workspace-tests.py"),
                 (sys.executable, "rust/scripts/test_contract_checks.py"),
                 (sys.executable, "rust/scripts/check-contracts.py"),
                 ("cargo", "deny", "--locked", "check"),
