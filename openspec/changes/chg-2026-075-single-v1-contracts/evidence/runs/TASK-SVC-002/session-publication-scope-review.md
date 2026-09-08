@@ -60,6 +60,27 @@ and this change. No Workflows or App wildcard is added. Global Inspector,
 Settings, operation/Catalog, Core specs, Constitution, archives and user data
 are outside this repair; there is no new Session export UI.
 
+### Existing Runtime soak fixture caller
+
+The production writer requirement also reaches the existing executable fixture
+at `Packages/ArkDeckKit/Tests/ArkDeckRuntimeSoakFixture/main.swift`. Its
+`makeEngine` currently calls the production `Configuration` initializer without
+a Session writer. Once the publication repair refuses that missing production
+dependency, the fixture would fail admission before exercising its existing
+soak scenario.
+
+The additional exact path permits only switching that fixture call from
+`.init(stateDirectory:)` to `.fixture(stateDirectory:)`, alongside the already
+scoped contract/crash fixture callers. The proposed one-line implementation
+has compiled in the Session candidate. Its production missing-writer and
+explicit-fixture admission regressions have passed. No production fallback,
+environment detection, new operation or hardware execution is introduced.
+
+This supplement requires maintainer review and merge before the implementation
+may use it as base authority. Task status and acceptance requirements are
+unchanged. Compatibility: the existing fixture dependency needs this one-path
+review; no additional readiness or status-only delivery is introduced.
+
 ### GJ-2 finalization consumers covered by the same supplement
 
 The reviewed [GJ-2 compensation scope](gj2-compensation-scope-review.md) permits
