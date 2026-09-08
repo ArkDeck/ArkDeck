@@ -2937,21 +2937,18 @@ public struct RuntimeControlPlaneHandler: Sendable {
     ])
     guard JobState(rawValue: job.state)?.isTerminal == true else { return .object(fields) }
     let snapshot = try await engine.evidenceSnapshot(jobID: jobID)
-    var artifacts: [RuntimeVerifiedArtifactEvidence] = []
-    var blockers: [String] = []
-    let declaresNoArtifacts = RuntimeOperationCatalog.descriptor(reference: snapshot.operationReference)?.artifacts.isEmpty == true
-    if let artifactStore {
-      do {
-        let inventory = try await artifactStore.list(jobID: jobID)
-        if !declaresNoArtifacts || !inventory.isEmpty {
-          let omitted = try await engine.intentionallyOmittedArtifactNames(jobID: jobID)
-          artifacts = try await artifactStore.verifiedEvidenceArtifacts(jobID: jobID, intentionallyOmittedNames: omitted)
-        }
-      } catch { blockers.append("artifactIntegrityFailed") }
-    } else if !declaresNoArtifacts { blockers.append("artifactStoreUnavailable") }
-    // An Agent result that cannot say which typed steps ran is not a verified
-    // result. Same fact, same blocker as the Job read surface.
-    if snapshot.actualStepKinds == nil { blockers.append(RuntimeJobResourceReader.stepKindsUnprovable) }
+    // Same Job, same facts, same blockers as `job.evidence`. This projection
+    // used to derive its own weaker set — it noticed only an Artifact store it
+    // could not read at all — so a terminal Job that never published a required
+    // Artifact was reported here as `status: "verified"` with an empty blocker
+    // list while `job.evidence` reported `artifactIntegrityFailed` for that same
+    // Job. An Agent that reads this surface must not reach a cleaner conclusion
+    // than the Job read surface reaches from the same record.
+    let record = try await engine.jobReadSnapshot(jobID: jobID).record
+    let facts = await RuntimeJobResourceReader.evidenceFacts(
+      engine: engine, artifactStore: artifactStore, record: record, terminal: true)
+    let artifacts = facts.verified
+    let blockers = facts.blockers.sorted()
     if case .object(var evidence) = Self.encodeEvidence(snapshot: snapshot, artifacts: artifacts, blockers: blockers) {
       // Automatic Agent results disclose evidence identities, never original
       // inputs or unbounded probe detail. Sensitive bytes still require export.

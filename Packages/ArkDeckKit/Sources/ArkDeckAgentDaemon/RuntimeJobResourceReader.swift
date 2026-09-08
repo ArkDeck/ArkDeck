@@ -113,12 +113,42 @@ struct RuntimeJobResourceReader {
     }
   }
 
-  private func evidence(record: RuntimeJobRecord, terminal: Bool) async throws -> (evidence: JSONValue, inventory: [JSONValue]) {
+  /// Everything both published evidence surfaces read out of one Job.
+  ///
+  /// `job.evidence` and the Agent execution projection are two views of the
+  /// same durable record, and they used to derive `blockers` separately. The
+  /// Agent copy was the weaker of the two — it noticed only an Artifact store
+  /// it could not read at all — so a terminal Job that never published a
+  /// required Artifact answered `status: "verified"` with an empty blocker
+  /// list on `agent.run` while `job.evidence` answered `artifactIntegrityFailed`
+  /// for the same Job. Deriving the facts once is what keeps the two answers
+  /// from disagreeing again; each surface still renders them in its own shape.
+  struct EvidenceFacts {
+    var blockers: Set<String>
+    var metadata: [RuntimeArtifactMetadata]
+    var verified: [RuntimeVerifiedArtifactEvidence]
+    var inventoryAvailable: Bool
+    var missingRequiredArtifacts: [String]
+    var snapshot: RuntimeJobEvidenceSnapshot?
+    var descriptorAvailable: Bool
+  }
+
+  /// Derive the shared facts. This never throws: an unreadable owner is itself
+  /// one of the facts, and a surface that cannot say why it is degraded is the
+  /// defect this exists to prevent.
+  static func evidenceFacts(
+    engine: RuntimeJobEngine,
+    artifactStore: RuntimeArtifactStore?,
+    record: RuntimeJobRecord,
+    terminal: Bool
+  ) async -> EvidenceFacts {
     let jobID = record.jobID
     var blockers: Set<String> = []
     var metadata: [RuntimeArtifactMetadata] = []
     var verified: [RuntimeVerifiedArtifactEvidence] = []
     var inventoryAvailable = false
+    // A Job admitted under a different Catalog must not be judged by this
+    // build's descriptor: its declared Artifact set may be a different one.
     let descriptor = record.catalogDigest == RuntimeOperationCatalog.catalogDigest
       ? RuntimeOperationCatalog.descriptor(reference: record.operationReference) : nil
     if descriptor == nil { blockers.insert("operationUnavailable") }
@@ -148,12 +178,27 @@ struct RuntimeJobResourceReader {
     do { snapshot = try await engine.evidenceSnapshot(jobID: jobID) }
     catch { snapshot = nil; blockers.insert("recordUnreadable") }
     // Typed steps the Runtime could not prove are a reason to withhold
-    // `verified`, not a detail beside it. Without this a destructive Job whose
-    // write cannot be proven answered `status: "verified"` with an empty
-    // blocker list, and every gate that reads only `blockers` let it through.
+    // `verified`, not a detail beside it.
     if snapshot?.actualStepKinds == nil, snapshot != nil {
       blockers.insert(Self.stepKindsUnprovable)
     }
+    return EvidenceFacts(
+      blockers: blockers, metadata: metadata, verified: verified,
+      inventoryAvailable: inventoryAvailable || descriptor?.artifacts.isEmpty == true,
+      missingRequiredArtifacts: missing.sorted(), snapshot: snapshot,
+      descriptorAvailable: descriptor != nil)
+  }
+
+  private func evidence(record: RuntimeJobRecord, terminal: Bool) async throws -> (evidence: JSONValue, inventory: [JSONValue]) {
+    let jobID = record.jobID
+    let facts = await Self.evidenceFacts(
+      engine: engine, artifactStore: artifactStore, record: record, terminal: terminal)
+    let blockers = facts.blockers
+    let metadata = facts.metadata
+    let verified = facts.verified
+    let inventoryAvailable = facts.inventoryAvailable
+    let missing = facts.missingRequiredArtifacts
+    let snapshot = facts.snapshot
     let reason: String
     if !terminal { reason = "resultNotReady" }
     else if blockers.contains("recordUnreadable") { reason = "recordUnreadable" }
@@ -192,8 +237,8 @@ struct RuntimeJobResourceReader {
     }
     fields["schemaVersion"] = .string("arkdeck.job-evidence/1")
     fields["status"] = .string(reason)
-    fields["inventoryAvailable"] = .bool(inventoryAvailable || descriptor?.artifacts.isEmpty == true)
-    fields["missingRequiredArtifacts"] = .array(missing.sorted().map(JSONValue.string))
+    fields["inventoryAvailable"] = .bool(inventoryAvailable)
+    fields["missingRequiredArtifacts"] = .array(missing.map(JSONValue.string))
     let verifiedReferences = Set(verified.map(\.reference))
     let inventory = metadata.sorted { ($0.name, $0.artifactID) < ($1.name, $1.artifactID) }.map { value in
       let reference = "arkdeck-artifact://\(jobID)/\(value.artifactID)"
@@ -222,4 +267,5 @@ struct RuntimeJobResourceReader {
     ])
   }
   private func failure(_ code: String, _ text: String) -> AgentExecutionControlFailure { .init(code, text) }
+  private static func failure(_ code: String, _ text: String) -> AgentExecutionControlFailure { .init(code, text) }
 }
