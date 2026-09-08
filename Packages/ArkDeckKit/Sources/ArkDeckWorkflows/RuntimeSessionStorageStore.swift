@@ -924,13 +924,39 @@ public final class RuntimeSessionStorageStore: @unchecked Sendable {
     }
   }
 
+  /// A bounded, stable sentence naming the unaccounted content. Bounded
+  /// because a root with thousands of stray directories must not turn one
+  /// refusal into an unbounded payload.
+  static func unaccountedSummary(_ snapshot: SessionRetentionCatalogSnapshot) -> String {
+    let entries = snapshot.unaccountedSessions
+    guard !entries.isEmpty else {
+      // `unknownPressure` without a named leaf: the measurement itself is
+      // incomplete. Saying so is still better than naming nothing.
+      return "the measurement is incomplete; no individual leaf could be named"
+    }
+    let shown = entries.prefix(unaccountedSummaryLimit)
+      .map { "\($0.reference) (\($0.reason.rawValue))" }
+      .joined(separator: ", ")
+    let remaining = entries.count - min(entries.count, unaccountedSummaryLimit)
+    return remaining > 0 ? "\(shown), and \(remaining) more" : shown
+  }
+
+  private static let unaccountedSummaryLimit = 8
+
   private func sessionRows(
     _ snapshot: SessionRetentionCatalogSnapshot
   ) throws -> [SessionRow] {
     guard !snapshot.unknownPressure, snapshot.unknownSessionIDs.isEmpty else {
+      // The refusal decision is unchanged; what it says is not. "Inspect
+      // runtime storage status" sent the operator to a surface that publishes
+      // a count and nothing else, so the only way to learn which leaf under
+      // the Sessions root is unaccounted — and whether it was never
+      // registered, cannot be read, or collides with another identity — was to
+      // read the directory tree by hand. Name it here instead.
       throw RuntimeSessionStorageFailure(
         "operationUnavailable",
-        "Session catalog contains unaccounted content; inspect runtime storage status")
+        "Session catalog contains unaccounted content: "
+          + Self.unaccountedSummary(snapshot))
     }
     guard let generation = snapshot.catalogGeneration,
       generation <= UInt64(Int64.max)

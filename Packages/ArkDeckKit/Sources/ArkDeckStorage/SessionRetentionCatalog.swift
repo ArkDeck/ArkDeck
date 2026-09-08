@@ -78,6 +78,40 @@ package struct SessionRetentionCatalogArtifact: Equatable, Sendable {
   }
 }
 
+/// One piece of content under the Sessions root that the scan measured but
+/// could not attribute to a registered Session, and why.
+public struct UnaccountedSession: Equatable, Sendable {
+  /// Closed vocabulary. A reason the scan cannot establish is `unreadable`
+  /// rather than a guess.
+  public enum Reason: String, Equatable, Sendable, CaseIterable {
+    /// Present under `yyyy/mm/` but absent from the catalog metadata, or
+    /// registered with a different completion time.
+    case notRegistered
+    /// The leaf exists but its own content could not be read as a Session —
+    /// a missing or unreadable manifest is the common case.
+    case unreadable
+    /// The same Session identifier appears more than once under the root.
+    case duplicateIdentity
+    /// The name is not a valid Session identifier.
+    case invalidIdentifier
+    /// Content that does not sit at `yyyy/mm/<sessionId>` at all.
+    case outsideSessionLayout
+    /// The catalog metadata itself could not be read, so nothing under the
+    /// root can be attributed.
+    case catalogMetadataCorrupt
+  }
+
+  /// The Session identifier, or the `yyyy/mm/<name>` path for content that has
+  /// no valid identifier.
+  public let reference: String
+  public let reason: Reason
+
+  public init(reference: String, reason: Reason) {
+    self.reference = reference
+    self.reason = reason
+  }
+}
+
 package struct SessionRetentionCatalogSnapshot: Equatable, Sendable {
   public let catalogGeneration: UInt64?
   public let sessions: [RetainedSession]
@@ -85,6 +119,12 @@ package struct SessionRetentionCatalogSnapshot: Equatable, Sendable {
   public let currentBytes: UInt64
   public let unknownPressure: Bool
   public let unknownSessionIDs: [String]
+  /// The same content as `unknownSessionIDs`, each with the reason the scan
+  /// could not account for it. A count alone told an operator that something
+  /// under the Sessions root is unaccounted and nothing else — not which leaf,
+  /// and not whether it is a directory that was never registered, one whose
+  /// manifest cannot be read, or a duplicate identity.
+  public let unaccountedSessions: [UnaccountedSession]
   public let rootIdentity: SessionCatalogRootIdentity
   public let volumeIdentity: VolumeIdentity
   package let artifactsBySession: [String: [SessionRetentionCatalogArtifact]]
@@ -261,24 +301,28 @@ package struct SessionRetentionCatalog: Sendable {
   ) throws -> SessionRetentionCatalogSnapshot {
     let tree = try scanTree(root)
     let metadataState = try loadMetadata(root)
-    var unknownIDs = Set(tree.unknownIDs)
+    var unknown = tree.unknown
     var unknownPressure = tree.unknownPressure
     var sessions: [RetainedSession] = []
     var entrySnapshots: [SessionRetentionCatalogEntry] = []
     let duplicateIDs = Set(
       Dictionary(grouping: tree.observedSessionIDs, by: { $0 })
         .filter { $0.value.count > 1 }.keys)
-    unknownIDs.formUnion(duplicateIDs)
+    // A duplicate identity is the more precise fact about a leaf that is also
+    // unregistered, so it wins over whatever the tree scan recorded.
+    for id in duplicateIDs { unknown[id] = .duplicateIdentity }
     if !duplicateIDs.isEmpty { unknownPressure = true }
 
     switch metadataState {
     case .corrupt:
       unknownPressure = true
-      unknownIDs.formUnion(tree.sessions.map(\.sessionID))
+      for scanned in tree.sessions where unknown[scanned.sessionID] == nil {
+        unknown[scanned.sessionID] = .catalogMetadataCorrupt
+      }
       return snapshot(
         root: root, generation: nil, sessions: [], entries: [],
         currentBytes: tree.currentBytes, unknownPressure: unknownPressure,
-        unknownIDs: unknownIDs, scannedSessions: tree.sessions)
+        unknown: unknown, scannedSessions: tree.sessions)
 
     case .missing:
       var document = PersistentCatalog(generation: 0, entries: [])
@@ -304,7 +348,7 @@ package struct SessionRetentionCatalog: Sendable {
       return snapshot(
         root: root, generation: document.generation, sessions: sessions,
         entries: entrySnapshots, currentBytes: tree.currentBytes,
-        unknownPressure: unknownPressure, unknownIDs: unknownIDs,
+        unknownPressure: unknownPressure, unknown: unknown,
         scannedSessions: tree.sessions)
 
     case .valid(var document):
@@ -317,7 +361,9 @@ package struct SessionRetentionCatalog: Sendable {
           parseTimestamp(entry.completedAt) == scanned.completedAt
         else {
           unknownPressure = true
-          unknownIDs.insert(scanned.sessionID)
+          if unknown[scanned.sessionID] == nil {
+            unknown[scanned.sessionID] = .notRegistered
+          }
           continue
         }
         let expiresAt = try expiration(
@@ -366,7 +412,7 @@ package struct SessionRetentionCatalog: Sendable {
         sessions: sessions.sorted {
           $0.sessionID < $1.sessionID
         }, entries: entrySnapshots, currentBytes: tree.currentBytes,
-        unknownPressure: unknownPressure, unknownIDs: unknownIDs,
+        unknownPressure: unknownPressure, unknown: unknown,
         scannedSessions: tree.sessions)
     }
   }
@@ -378,7 +424,7 @@ package struct SessionRetentionCatalog: Sendable {
     entries: [SessionRetentionCatalogEntry],
     currentBytes: UInt64,
     unknownPressure: Bool,
-    unknownIDs: Set<String>,
+    unknown: [String: UnaccountedSession.Reason],
     scannedSessions: [ScannedSession]
   ) -> SessionRetentionCatalogSnapshot {
     let retainedIDs = Set(sessions.map(\.sessionID))
@@ -388,7 +434,10 @@ package struct SessionRetentionCatalog: Sendable {
       entries: entries.sorted { $0.sessionID < $1.sessionID },
       currentBytes: currentBytes,
       unknownPressure: unknownPressure,
-      unknownSessionIDs: unknownIDs.sorted(),
+      unknownSessionIDs: unknown.keys.sorted(),
+      unaccountedSessions: unknown.keys.sorted().map {
+        UnaccountedSession(reference: $0, reason: unknown[$0] ?? .unreadable)
+      },
       rootIdentity: root.identity,
       volumeIdentity: root.volumeIdentity,
       artifactsBySession: Dictionary(
@@ -419,7 +468,7 @@ package struct SessionRetentionCatalog: Sendable {
 
   private func scanTree(_ root: LockedRoot) throws -> ScannedTree {
     var sessions: [ScannedSession] = []
-    var unknownIDs: [String] = []
+    var unknown: [String: UnaccountedSession.Reason] = [:]
     var observedSessionIDs: [String] = []
     var currentBytes: UInt64 = 0
     var unknownPressure = false
@@ -433,9 +482,10 @@ package struct SessionRetentionCatalog: Sendable {
       else {
         hasUnscopedUnknown = true
         recordUnknown(
-          name: year, parent: root.descriptor, expectedDevice: root.device,
+          name: year, reason: .outsideSessionLayout, parent: root.descriptor,
+          expectedDevice: root.device,
           currentBytes: &currentBytes, unknownPressure: &unknownPressure,
-          unknownIDs: &unknownIDs)
+          unknown: &unknown)
         continue
       }
       defer { Darwin.close(yearDescriptor) }
@@ -447,41 +497,58 @@ package struct SessionRetentionCatalog: Sendable {
         else {
           hasUnscopedUnknown = true
           recordUnknown(
-            name: month, displayName: relativeMonth, parent: yearDescriptor,
+            name: month, displayName: relativeMonth, reason: .outsideSessionLayout,
+            parent: yearDescriptor,
             expectedDevice: root.device, currentBytes: &currentBytes,
-            unknownPressure: &unknownPressure, unknownIDs: &unknownIDs)
+            unknownPressure: &unknownPressure, unknown: &unknown)
           continue
         }
         defer { Darwin.close(monthDescriptor) }
         for sessionID in try directoryEntryNames(monthDescriptor) {
           observedSessionIDs.append(sessionID)
           let relativeSession = "\(year)/\(month)/\(sessionID)"
+          // The two failures below are different facts and one catch cannot
+          // tell them apart: a name that is not a Session identifier at all,
+          // and a directory that is correctly named but whose own content
+          // cannot be read as a Session. Reporting the second as the first
+          // would send an operator looking for a typo.
           do {
             try SessionStorageValidation.identifier(sessionID, field: "sessionId")
+          } catch {
+            recordUnknown(
+              name: sessionID, displayName: relativeSession, reason: .invalidIdentifier,
+              parent: monthDescriptor,
+              expectedDevice: root.device, currentBytes: &currentBytes,
+              unknownPressure: &unknownPressure, unknown: &unknown)
+            continue
+          }
+          do {
             guard
               let scanned = try scanSession(
                 parent: monthDescriptor, year: year, month: month,
                 sessionID: sessionID, expectedDevice: root.device)
             else {
               recordUnknown(
-                name: sessionID, displayName: relativeSession, parent: monthDescriptor,
+                name: sessionID, displayName: relativeSession, reason: .unreadable,
+                parent: monthDescriptor,
                 expectedDevice: root.device, currentBytes: &currentBytes,
-                unknownPressure: &unknownPressure, unknownIDs: &unknownIDs)
+                unknownPressure: &unknownPressure, unknown: &unknown)
               continue
             }
             sessions.append(scanned)
             add(scanned.sizeBytes, to: &currentBytes, unknownPressure: &unknownPressure)
           } catch {
             recordUnknown(
-              name: sessionID, displayName: relativeSession, parent: monthDescriptor,
+              name: sessionID, displayName: relativeSession, reason: .unreadable,
+              parent: monthDescriptor,
               expectedDevice: root.device, currentBytes: &currentBytes,
-              unknownPressure: &unknownPressure, unknownIDs: &unknownIDs)
+              unknownPressure: &unknownPressure, unknown: &unknown)
           }
         }
       }
     }
     return ScannedTree(
-      sessions: sessions, unknownIDs: unknownIDs,
+      sessions: sessions, unknown: unknown,
       observedSessionIDs: observedSessionIDs,
       currentBytes: currentBytes, unknownPressure: unknownPressure,
       hasUnscopedUnknown: hasUnscopedUnknown)
@@ -557,14 +624,15 @@ package struct SessionRetentionCatalog: Sendable {
   private func recordUnknown(
     name: String,
     displayName: String? = nil,
+    reason: UnaccountedSession.Reason,
     parent: Int32,
     expectedDevice: dev_t,
     currentBytes: inout UInt64,
     unknownPressure: inout Bool,
-    unknownIDs: inout [String]
+    unknown: inout [String: UnaccountedSession.Reason]
   ) {
     unknownPressure = true
-    unknownIDs.append(displayName ?? name)
+    unknown[displayName ?? name] = reason
     if let measured = try? measureEntry(
       parent: parent, name: name, expectedDevice: expectedDevice)
     {
@@ -1094,7 +1162,7 @@ private struct ScannedSession {
 
 private struct ScannedTree {
   let sessions: [ScannedSession]
-  let unknownIDs: [String]
+  let unknown: [String: UnaccountedSession.Reason]
   let observedSessionIDs: [String]
   let currentBytes: UInt64
   let unknownPressure: Bool

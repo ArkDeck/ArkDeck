@@ -392,6 +392,66 @@ final class SessionResourceContractTests: XCTestCase {
     XCTAssertTrue(FileManager.default.fileExists(atPath: rogue.path))
   }
 
+  /// The refusal decision above is right and unchanged. What it says was not
+  /// usable: "inspect runtime storage status" pointed at a surface that
+  /// publishes a count, so the only way to find out *which* leaf was
+  /// unaccounted, and why, was to read the directory tree by hand.
+  ///
+  /// The fixture is the shape a real host carries: a Session directory from an
+  /// earlier build holding its identity file and Journal but no manifest, so
+  /// the scan measures it and cannot attribute it. Nothing about it is
+  /// repaired, moved or invented here — it stays exactly as unaccounted as it
+  /// was, and every session operation still refuses.
+  func testUnaccountedContentIsNamedWithItsReasonInsteadOfACount() throws {
+    let storage = try store()
+    let stranded = sessionsRoot
+      .appending(path: "2026", directoryHint: .isDirectory)
+      .appending(path: "08", directoryHint: .isDirectory)
+      .appending(path: "rockchip-session-stranded", directoryHint: .isDirectory)
+    try ownerDirectory(stranded)
+    try ownerFile(
+      try CanonicalJSONEncoders.canonical().encode(
+        JSONValue.object([
+          "schemaVersion": .string("1.0.0"),
+          "sessionId": .string("rockchip-session-stranded"),
+          "jobId": .string("rockchip-job-stranded"),
+        ])),
+      at: stranded.appending(path: ".session-identity.json"))
+    try ownerFile(Data("{}\n".utf8), at: stranded.appending(path: "journal.jsonl"))
+    let rogue = sessionsRoot.appending(path: "not-a-year", directoryHint: .isDirectory)
+    try ownerDirectory(rogue)
+    try ownerFile(Data([0x01]), at: rogue.appending(path: "unknown.bin"))
+
+    XCTAssertThrowsError(try storage.listSessions(pageSize: 100, cursor: nil)) { error in
+      let failure = error as? RuntimeSessionStorageFailure
+      XCTAssertEqual(failure?.code, "operationUnavailable")
+      let message = failure?.message ?? ""
+      XCTAssertTrue(
+        message.contains("2026/08/rockchip-session-stranded"),
+        "the refusal must name the leaf it cannot account for: \(message)")
+      XCTAssertTrue(
+        message.contains(UnaccountedSession.Reason.unreadable.rawValue),
+        "a Session directory with no readable manifest is unreadable: \(message)")
+      XCTAssertTrue(
+        message.contains("not-a-year"),
+        "content outside the layout must be named too: \(message)")
+      XCTAssertTrue(
+        message.contains(UnaccountedSession.Reason.outsideSessionLayout.rawValue), message)
+      XCTAssertFalse(
+        message.contains("inspect runtime storage status"),
+        "the old sentence sent the operator to a surface that publishes a count")
+    }
+
+    // Preserved exactly: naming content is not repairing it.
+    XCTAssertTrue(
+      FileManager.default.fileExists(
+        atPath: stranded.appending(path: ".session-identity.json").path))
+    XCTAssertFalse(
+      FileManager.default.fileExists(atPath: stranded.appending(path: "manifest.json").path),
+      "no manifest may be invented for a Session that never had one")
+    XCTAssertTrue(FileManager.default.fileExists(atPath: rogue.path))
+  }
+
   private func store() throws -> RuntimeSessionStorageStore {
     try RuntimeSessionStorageStore(
       ownerRoot: ownerRoot, defaultSessionsRoot: sessionsRoot)
