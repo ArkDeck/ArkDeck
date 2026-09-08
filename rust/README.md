@@ -13,11 +13,10 @@ From `rust/`, rustup selects the committed Rust 1.98.0 toolchain:
 
 ```sh
 cargo fmt --all --check
-cargo clippy --workspace --all-targets --locked -- -D warnings
-cargo test --workspace --locked
-cargo build --workspace --bins --locked
+cargo fetch --locked
 python scripts/generate-contract.py --check
-python scripts/check-readonly.py
+python scripts/test_contract_checks.py
+python scripts/check-contracts.py
 ```
 
 The Python checks require Python 3.11+ with `PyYAML==6.0.3` and
@@ -26,8 +25,18 @@ The Python checks require Python 3.11+ with `PyYAML==6.0.3` and
 The committed policy combines imported source audits with nine bounded publisher
 trust entries and no exemptions. Both dependency checks must pass.
 
+The shared runner checks two independent temporary source views: current Rust
+against the published Git inputs, and current Rust against the candidate inputs.
+Each runs clippy, the full test suite, native process checks, binary builds and
+the same black-box check. Candidate generation stays in its temporary view;
+it cannot update the published pin. Both views replay every recorded shape and
+verify their exact input hashes, directory membership and per-method counts.
+The pin at `8151907bee9919a0847edc9a9aeb1f0ff84f6d15` covers 96 methods and
+382 recorded shapes (217 successes and 165 errors).
+
 The black-box check starts only its own daemon with a unique endpoint and HDC
-configuration removed. It saves the actual outputs under `target/readonly-check/`
+configuration removed. It saves the actual outputs, input manifests and provenance
+under `target/readonly-check/<run>/{published,candidate}/`
 and validates schemas after all commands finish and the daemon exits. On Unix it
 records every current method, malformed frames and the three CLI leaves. On
 Windows an unsigned build must refuse the actual daemon identity before sending
@@ -83,6 +92,11 @@ boundary. `arkdeck-client` owns same-connection health and refusal handling;
 `arkdeck-cli` presents the current CLI envelope; `arkdeck-agentd` composes them.
 The black-box check also verifies these dependency edges.
 
+The macOS cleanup path retains each signal error and the owned child PID while
+waiting for the existing terminal-child and complete process-group proof. It
+resolves a transient `EPERM` only within the cleanup budget and before reaping;
+unproven groups, other signal errors and lost child ownership remain failures.
+
 The full 96-method contract remains the current single-v1 registry; the other
 92 methods are structurally understood and refused before a host handler.
 There is no Runtime capability owner, recovery, journal, durable target store,
@@ -95,6 +109,16 @@ its existing binary64 spelling below `1e-4` and above the Int64 fast path. Swift
 currently emits `1e-6` and `1e+20` where RFC 8785 would use decimal notation.
 Native Swift boundary vectors pin that known difference; this phase does not
 claim universal RFC 8785 conformity or change Swift semantics independently.
-The generated baseline records every schema, corpus, source and fixture digest.
-Regenerating a pin requires an explicit protected-main revision and matching
-working inputs; generator checks are separate from actual output validation.
+The generated baseline records every consumed schema, corpus, source and fixture
+digest. `generate-contract.py --check` reconstructs that pin and its generated
+bindings from immutable Git objects and verifies the commit is in `origin/main`
+history. Candidate files can differ; `check-contracts.py` must also pass against
+those current inputs. Unsupported schema vocabulary, stale Catalog output and
+native Swift oracle source drift remain failures. A candidate manifest is always
+marked `candidate` and names its source revision and input digest separately from
+the published commit. No runtime protocol negotiation or version fallback is added.
+
+Updating the pin uses `python scripts/generate-contract.py --write
+--baseline-revision <published-commit>` after publication. Keep `origin/main`
+available locally so publication ancestry can be checked. Generation and host
+conformance remain separate from actual device acceptance.

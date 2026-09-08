@@ -67,21 +67,13 @@ jobs:
       - name: Fetch the locked dependency graph for all host platforms
         run: cargo fetch --locked
 
-      - name: Clippy with warnings denied
-        run: cargo clippy --workspace --all-targets --locked -- -D warnings
-
-      - name: Workspace tests
-        run: cargo test --workspace --locked
-
-      - name: Native verified-process argument, output and timeout checks
-        run: cargo run --package arkdeck-platform --example windows_spk3 --locked -- process-selftest
-
-      - name: Build the read-only product binaries
-        run: cargo build --workspace --bins --locked
-
-      - name: Read-only black-box checks and completed frame schema validation
+      - name: Contract isolation and provenance regression tests
         working-directory: .
-        run: python rust/scripts/check-readonly.py
+        run: python rust/scripts/test_contract_checks.py
+
+      - name: Published consumer and candidate contract parity
+        working-directory: .
+        run: python rust/scripts/check-contracts.py
 
       - name: Install pinned dependency policy tools
         run: |

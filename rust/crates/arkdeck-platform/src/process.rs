@@ -325,42 +325,101 @@ fn finish_reader(
 }
 
 #[cfg(unix)]
+struct ChildSignalFailure {
+    target: libc::pid_t,
+    error: io::Error,
+}
+
+#[cfg(unix)]
+fn child_signal_error(failures: &[ChildSignalFailure]) -> Option<io::Error> {
+    failures.first().map(|failure| {
+        io::Error::new(
+            failure.error.kind(),
+            format!(
+                "cannot terminate child target {}: {}",
+                failure.target, failure.error
+            ),
+        )
+    })
+}
+
+#[cfg(target_os = "macos")]
+fn pending_macos_permission_failures(
+    pid: libc::pid_t,
+    failures: &mut Vec<ChildSignalFailure>,
+    mut proof: impl FnMut(libc::pid_t, bool) -> io::Result<bool>,
+) -> io::Result<bool> {
+    let mut pending = false;
+    let mut index = 0;
+    while index < failures.len() {
+        let failure = &failures[index];
+        if failure.error.raw_os_error() == Some(libc::EPERM) {
+            if proof(pid, failure.target < 0)? {
+                failures.remove(index);
+                continue;
+            }
+            pending = true;
+        }
+        index += 1;
+    }
+    Ok(pending)
+}
+
+#[cfg(unix)]
 fn terminate_unix_child(pid: libc::pid_t, reaped: &mut bool) -> io::Result<()> {
     if *reaped {
         return Ok(());
     }
-    let mut signal_error = None;
+    let deadline = Instant::now() + CLEANUP_TIMEOUT;
+    let mut signal_failures = Vec::new();
     for target in [-pid, pid] {
         // SAFETY: waitid uses WNOWAIT, so this child PID remains reserved until
         // waitpid below. The fresh child process group cannot be our own group.
         if unsafe { libc::kill(target, libc::SIGKILL) } != 0 {
             let error = io::Error::last_os_error();
-            #[cfg(target_os = "macos")]
-            if error.raw_os_error() == Some(libc::EPERM)
-                && macos_process::only_retained_zombie_remains(pid, target < 0)
-            {
-                // Darwin can reject a signal to an already-exited member. This
-                // exception requires kernel proof that no other group member
-                // exists; ordinary permission failures are still returned.
-                continue;
-            }
             if error.raw_os_error() != Some(libc::ESRCH) {
-                signal_error.get_or_insert_with(|| {
-                    io::Error::new(
-                        error.kind(),
-                        format!("cannot terminate child target {target}: {error}"),
-                    )
-                });
+                // Keep every target and its raw errno until cleanup is resolved.
+                // In particular, ErrorKind::PermissionDenied also covers EACCES,
+                // which is not eligible for Darwin's retained-zombie proof.
+                signal_failures.push(ChildSignalFailure { target, error });
             }
         }
     }
-    let deadline = Instant::now() + CLEANUP_TIMEOUT;
     loop {
+        #[cfg(target_os = "macos")]
+        if Instant::now() < deadline {
+            // A signal may see an exiting process before waitid exposes its
+            // terminal status. Preserve its PID and defer only EPERM until the
+            // same exact child/group proof becomes available within this budget.
+            let pending =
+                pending_macos_permission_failures(pid, &mut signal_failures, |pid, group| {
+                    macos_process::only_retained_zombie_remains(pid, group)
+                        .map(|proven| proven && Instant::now() < deadline)
+                });
+            let pending = match pending {
+                Ok(pending) => pending,
+                Err(error) => {
+                    if error.raw_os_error() == Some(libc::ECHILD) {
+                        // The owned PID is no longer retained: neither this loop
+                        // nor Drop may signal or query a replacement process.
+                        *reaped = true;
+                    }
+                    return Err(error);
+                }
+            };
+            if pending && Instant::now() < deadline {
+                std::thread::sleep(
+                    Duration::from_millis(5)
+                        .min(deadline.saturating_duration_since(Instant::now())),
+                );
+                continue;
+            }
+        }
         // SAFETY: reap only this owned child, without a blocking wait.
         let waited = unsafe { libc::waitpid(pid, std::ptr::null_mut(), libc::WNOHANG) };
         if waited == pid {
             *reaped = true;
-            return signal_error.map_or(Ok(()), Err);
+            return child_signal_error(&signal_failures).map_or(Ok(()), Err);
         }
         if waited < 0 {
             let error = io::Error::last_os_error();
@@ -372,7 +431,7 @@ fn terminate_unix_child(pid: libc::pid_t, reaped: &mut bool) -> io::Result<()> {
             }
         }
         if Instant::now() >= deadline {
-            return Err(signal_error.unwrap_or_else(|| {
+            return Err(child_signal_error(&signal_failures).unwrap_or_else(|| {
                 io::Error::new(
                     io::ErrorKind::TimedOut,
                     "terminated child did not exit within cleanup budget",
@@ -618,6 +677,122 @@ use macos_process::spawn;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_cleanup_defers_eperm_until_retained_terminal_proof_is_available() {
+        let pid = 321;
+        let mut failures = vec![
+            ChildSignalFailure {
+                target: -pid,
+                error: io::Error::from_raw_os_error(libc::EPERM),
+            },
+            ChildSignalFailure {
+                target: pid,
+                error: io::Error::from_raw_os_error(libc::EPERM),
+            },
+        ];
+        let mut queried = Vec::new();
+        // The first poll occurs while the child is exiting. Cleanup must retain
+        // both raw errors and must not proceed to the reaping branch yet.
+        assert!(
+            pending_macos_permission_failures(pid, &mut failures, |observed_pid, group| {
+                queried.push((observed_pid, group));
+                Ok(false)
+            })
+            .unwrap()
+        );
+        assert_eq!(queried, [(pid, true), (pid, false)]);
+        assert_eq!(failures.len(), 2);
+        assert!(
+            failures
+                .iter()
+                .all(|failure| failure.error.raw_os_error() == Some(libc::EPERM))
+        );
+        // A later poll has both the owned zombie and the complete group proof.
+        // This is the only transition that permits reaping without a signal error.
+        assert!(
+            !pending_macos_permission_failures(pid, &mut failures, |observed_pid, _| {
+                assert_eq!(observed_pid, pid);
+                Ok(true)
+            })
+            .unwrap()
+        );
+        assert!(child_signal_error(&failures).is_none());
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_cleanup_retains_unproven_group_error_after_direct_child_exit() {
+        let pid = 321;
+        let mut failures = vec![
+            ChildSignalFailure {
+                target: -pid,
+                error: io::Error::from_raw_os_error(libc::EPERM),
+            },
+            ChildSignalFailure {
+                target: pid,
+                error: io::Error::from_raw_os_error(libc::EPERM),
+            },
+        ];
+        // The child is terminal, but a live member or an incomplete group table
+        // prevents the group proof. Reaching the deadline must return this error.
+        assert!(
+            pending_macos_permission_failures(pid, &mut failures, |_, group| Ok(!group)).unwrap()
+        );
+        assert_eq!(failures.len(), 1);
+        assert_eq!(failures[0].target, -pid);
+        assert_eq!(failures[0].error.raw_os_error(), Some(libc::EPERM));
+        let error = child_signal_error(&failures).unwrap();
+        assert_eq!(error.kind(), io::ErrorKind::PermissionDenied);
+        assert!(error.to_string().contains("child target -321"));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_cleanup_never_clears_non_eperm_signal_errors() {
+        let pid = 321;
+        for errno in [libc::EACCES, libc::EIO] {
+            let mut failures = vec![ChildSignalFailure {
+                target: -pid,
+                error: io::Error::from_raw_os_error(errno),
+            }];
+            assert!(
+                !pending_macos_permission_failures(pid, &mut failures, |_, _| {
+                    panic!("non-EPERM failure cannot use the zombie exception")
+                })
+                .unwrap()
+            );
+            assert_eq!(failures[0].error.raw_os_error(), Some(errno));
+            let error = child_signal_error(&failures).unwrap();
+            assert_eq!(error.kind(), io::Error::from_raw_os_error(errno).kind());
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_cleanup_stops_proof_queries_when_child_ownership_is_lost() {
+        let pid = 321;
+        let mut failures = vec![
+            ChildSignalFailure {
+                target: -pid,
+                error: io::Error::from_raw_os_error(libc::EPERM),
+            },
+            ChildSignalFailure {
+                target: pid,
+                error: io::Error::from_raw_os_error(libc::EPERM),
+            },
+        ];
+        let mut queries = 0;
+        let error = pending_macos_permission_failures(pid, &mut failures, |_, _| {
+            queries += 1;
+            Err(io::Error::from_raw_os_error(libc::ECHILD))
+        })
+        .unwrap_err();
+        assert_eq!(error.raw_os_error(), Some(libc::ECHILD));
+        assert_eq!(queries, 1);
+        assert_eq!(failures.len(), 2);
+    }
 
     #[test]
     fn reader_completion_never_joins_a_blocked_reader() {

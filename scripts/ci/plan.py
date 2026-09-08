@@ -25,6 +25,37 @@ SWIFT_WORKFLOW = ".github/workflows/swift-ci.yml"
 RUST_WORKFLOW = ".github/workflows/rust-ci.yml"
 PLANNER_PREFIX = "scripts/ci/"
 RUST_WORKSPACE_DIR = "rust"
+# Both published and candidate contract checks consume these shared inputs.
+# Keep source-only edits visible even when a schema or recorded corpus has not
+# changed yet; test_plan verifies coverage against the generator's actual INPUTS.
+RUST_CONTRACT_INPUT_PREFIXES = (
+    "rust/",
+    "spec/",
+    "Catalog/",
+    "scripts/catalog_gen/",
+    "Packages/ArkDeckKit/Contracts/",
+    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/",
+    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/",
+    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI/",
+)
+RUST_CONTRACT_SOURCE_PREFIXES = (
+    "Packages/ArkDeckKit/Sources/ArkDeckCore/Canonical",
+    "Packages/ArkDeckKit/Sources/ArkDeckCore/Control",
+    "Packages/ArkDeckKit/Sources/ArkDeckStorage/Journal",
+)
+RUST_CONTRACT_INPUT_FILES = frozenset({
+    "Packages/ArkDeckKit/Sources/ArkDeckCore/PortableCanonicalJSON.swift",
+    "Packages/ArkDeckKit/Sources/ArkDeckCLI/CLICanonicalJSON.swift",
+    "Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/ControlFrameRecorder.swift",
+    "Packages/ArkDeckKit/Scripts/generate-control-contract.py",
+    "openspec/contracts/runtime-control-plane.schema.json",
+    "openspec/contracts/cli-canonical-json-vectors.json",
+    "openspec/contracts/cli-result.schema.json",
+    "openspec/contracts/cli-error-registry.yaml",
+    "openspec/contracts/journal-event.schema.json",
+    "openspec/contracts/workflow-step.schema.json",
+    "openspec/changes/chg-2026-059-arkdeck-arkforge-authority/permit-vectors.md",
+})
 APP_PACKAGE_TARGET_PREFIXES = (
     "Packages/ArkDeckKit/Sources/ArkDeckCore/",
     "Packages/ArkDeckKit/Sources/ArkDeckProcess/",
@@ -107,9 +138,16 @@ def classify_paths(paths: Sequence[str]) -> LaneSelection:
             rust = True
             continue
 
-        # Contract bundles are executable inputs to Rust conformance tests.
-        # A Rust-only or spec-only diff must never pass without this lane.
-        if path.startswith(("rust/", "spec/")):
+        # Each view must consume the contract it actually validates. Selecting
+        # only rust/spec misses source, schema, fixture and Catalog-only edits.
+        if (
+            path.startswith(RUST_CONTRACT_INPUT_PREFIXES)
+            or path in RUST_CONTRACT_INPUT_FILES
+            or (
+                path.endswith(".swift")
+                and path.startswith(RUST_CONTRACT_SOURCE_PREFIXES)
+            )
+        ):
             rust = True
 
         if path.startswith("Packages/ArkDeckKit/") or path.startswith("Package."):
@@ -455,17 +493,8 @@ def local_commands(repo_root: pathlib.Path, plan: CIPlan) -> tuple[tuple[str, ..
                 # vet --locked freezes cargo metadata too. Fetch the complete
                 # graph first, including dependencies for other host targets.
                 ("cargo", "fetch", "--locked"),
-                (
-                    "cargo", "clippy", "--workspace", "--all-targets", "--locked",
-                    "--", "-D", "warnings",
-                ),
-                ("cargo", "test", "--workspace", "--locked"),
-                (
-                    "cargo", "run", "--package", "arkdeck-platform", "--example",
-                    "windows_spk3", "--locked", "--", "process-selftest",
-                ),
-                ("cargo", "build", "--workspace", "--bins", "--locked"),
-                (sys.executable, "rust/scripts/check-readonly.py"),
+                (sys.executable, "rust/scripts/test_contract_checks.py"),
+                (sys.executable, "rust/scripts/check-contracts.py"),
                 ("cargo", "deny", "--locked", "check"),
                 ("cargo", "vet", "--locked", "--no-registry-suggestions"),
             ]

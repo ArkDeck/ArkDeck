@@ -90,7 +90,7 @@ fn output_overflow_kills_and_reaps_the_child() {
             },
         )
         .unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::FileTooLarge);
+    assert_eq!(error.kind(), ErrorKind::FileTooLarge, "{error:#?}");
     assert!(started.elapsed() < Duration::from_secs(2));
 }
 
