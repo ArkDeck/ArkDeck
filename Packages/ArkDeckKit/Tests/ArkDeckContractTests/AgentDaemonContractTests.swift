@@ -1134,6 +1134,7 @@ final class AgentDaemonContractTests: XCTestCase {
     rockchipBootloaderStatusObserver: (any RockchipBootloaderStatusObserving)? = nil,
     rockchipDeviceAccessObserver: (any RockchipDeviceAccessObserving)? = nil,
     rockchipLoaderBindingCoordinator: (any RockchipLoaderBindingCoordinating)? = nil,
+    rockchipPostFlashAliasReconciler: (any RockchipPostFlashAliasReconciling)? = nil,
     hdcRuntimeDiagnostics: HDCManagedRuntimeDiagnostics? = nil,
     workspaceProjectStore: RuntimeWorkspaceProjectStore? = nil,
     workspaceProjects: [WorkspaceProjectPublication] = [],
@@ -1202,6 +1203,7 @@ final class AgentDaemonContractTests: XCTestCase {
       rockchipBootloaderStatusObserver: rockchipBootloaderStatusObserver,
       rockchipDeviceAccessObserver: rockchipDeviceAccessObserver,
       rockchipLoaderBindingCoordinator: rockchipLoaderBindingCoordinator,
+      rockchipPostFlashAliasReconciler: rockchipPostFlashAliasReconciler,
       workspaceProjects: workspaceProjects,
       methodObserver: nil)
     return (handler, engine)
@@ -2336,6 +2338,70 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertFalse(unavailable.ok)
     let jobs = try await engine.listJobs()
     XCTAssertTrue(jobs.isEmpty)
+  }
+
+  /// #1786 shipped the `flash reconcile-alias` leaf with its handler, its CLI
+  /// registry entry, its regenerated contract products and 44 passing tests,
+  /// and the daemon never published the method: it was absent from
+  /// `Contracts/control-protocol.json`, so on the reference host the call
+  /// answered `controlMethodUnavailable` / `unknownMethod`. Nothing failed,
+  /// because `ControlMethodReachabilityContractTests` only asks whether every
+  /// published method dispatches, never whether a leaf that says it reaches the
+  /// Runtime points at a published method.
+  ///
+  /// This exercises the method through the real handler, and records both wire
+  /// shapes into the frame corpus the per-method schema is derived from.
+  func testReconcileAliasDispatchesAndRedactsItsReceipt() async throws {
+    struct Reconciler: RockchipPostFlashAliasReconciling {
+      func reconcileReissuedAlias(
+        targetID: String, expectedBindingRevision: Int
+      ) throws -> RockchipPostFlashAliasReconciliationReceipt {
+        guard expectedBindingRevision == 2 else {
+          throw RockchipFlashExecutionError.admissionRejected(
+            "selected target or binding revision is stale")
+        }
+        return RockchipPostFlashAliasReconciliationReceipt(
+          targetID: targetID, reconciled: true, archivedBindingRevision: 4,
+          bindingRevision: expectedBindingRevision,
+          hdcIdentitySHA256: String(repeating: "9", count: 64))
+      }
+    }
+    let (handler, _) = try makeStack(rockchipPostFlashAliasReconciler: Reconciler())
+
+    let reconciled = try await request(
+      handler, method: "flash.reconcile-alias",
+      params: [
+        "targetId": .string("TGT-SELECTED"),
+        "expectedBindingRevision": .integer(2),
+      ])
+    guard case .object(let receipt)? = reconciled.result else {
+      return XCTFail("reconciliation must return a receipt: \(reconciled.error?.message ?? "-")")
+    }
+    XCTAssertTrue(reconciled.ok, reconciled.error?.message ?? "-")
+    XCTAssertEqual(receipt["targetId"], .string("TGT-SELECTED"))
+    XCTAssertEqual(receipt["reconciled"], .bool(true))
+    XCTAssertEqual(receipt["archivedBindingRevision"], .integer(4))
+    XCTAssertEqual(receipt["bindingRevision"], .integer(2))
+    XCTAssertEqual(
+      Set(receipt.keys),
+      [
+        "targetId", "reconciled", "archivedBindingRevision", "bindingRevision",
+        "hdcIdentitySha256",
+      ])
+    // The raw connect key never leaves the product boundary.
+    XCTAssertNil(receipt["hdcConnectKey"])
+    XCTAssertNil(receipt["serial"])
+    XCTAssertNil(receipt["usbTopology"])
+
+    let refused = try await request(
+      handler, method: "flash.reconcile-alias",
+      params: [
+        "targetId": .string("TGT-SELECTED"),
+        "expectedBindingRevision": .integer(9),
+      ])
+    XCTAssertFalse(refused.ok)
+    XCTAssertNil(refused.result)
+    XCTAssertEqual(refused.error?.code, "rejected")
   }
 
   func testBootloaderStatusAndClosedLoaderBindingHaveRedactedWireShapes() async throws {

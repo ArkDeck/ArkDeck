@@ -5,7 +5,7 @@
       "additionalProperties": false,
       "properties": {
         "contractIdentity": {
-          "const": "1054d17b598ce23003ebbdec4d42eb359b63016d6421709ba53c3f21f7c6558d"
+          "const": "8a662759721a2081e974306399997801246de4022047365c050107de5dce2912"
         },
         "id": {
           "minLength": 1,
@@ -52,6 +52,7 @@
             "flash.device-access",
             "flash.lanePlanPreview",
             "flash.prerequisites",
+            "flash.reconcile-alias",
             "health",
             "history.filter.delete",
             "history.filter.list",
@@ -213,7 +214,7 @@
   "title": "arkdeck.runtime-control-plane/1",
   "x-arkdeck-bundleVersion": "arkdeck.cli.contracts/1",
   "x-arkdeck-cliVersion": "0.1.0",
-  "x-arkdeck-contractIdentity": "1054d17b598ce23003ebbdec4d42eb359b63016d6421709ba53c3f21f7c6558d",
+  "x-arkdeck-contractIdentity": "8a662759721a2081e974306399997801246de4022047365c050107de5dce2912",
   "x-arkdeck-currentProtocolVersion": "1.0.0",
   "x-arkdeck-methodSchemaDirectory": "spec/control/methods",
   "x-arkdeck-methods": [
@@ -411,6 +412,11 @@
       "method": "flash.prerequisites",
       "published": true,
       "schema": "spec/control/methods/flash.prerequisites.json"
+    },
+    {
+      "method": "flash.reconcile-alias",
+      "published": true,
+      "schema": "spec/control/methods/flash.reconcile-alias.json"
     },
     {
       "method": "health",
