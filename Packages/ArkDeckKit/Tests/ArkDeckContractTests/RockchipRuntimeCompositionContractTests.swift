@@ -495,6 +495,182 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
     XCTAssertEqual(polls, 2, "the malformed first read must be re-polled, not fatal")
   }
 
+  // MARK: - Reissued alias lineage
+
+  private func reissueFixture(
+    root: URL, storedRevision: Int, connectKey: String = "reissue-connect-key"
+  ) throws -> (store: RockchipPostFlashHDCBindingStore, stored: RockchipPostFlashHDCBinding,
+    identity: String)
+  {
+    let identity = SHA256.hash(data: Data(connectKey.utf8))
+      .map { String(format: "%02x", $0) }.joined()
+    let store = RockchipPostFlashHDCBindingStore(
+      rootURL: root.appending(path: "binding", directoryHint: .isDirectory))
+    let stored = RockchipPostFlashHDCBinding(
+      targetID: "TGT-REISSUE", bindingRevision: storedRevision,
+      stableLoaderIdentitySHA256: String(repeating: "a", count: 64),
+      previousHDCIdentitySHA256: identity, hdcIdentitySHA256: identity,
+      hdcConnectKey: connectKey, usbTopology: "2097152", productModel: "ohos",
+      buildVersion: "OpenHarmony-7.0.0.37", jobID: "job-reissue",
+      establishedAtUTC: "2026-09-02T07:00:39Z")
+    _ = try store.publish(stored, expectedPreviousHDCIdentitySHA256: identity)
+    return (store, stored, identity)
+  }
+
+  private func liveTarget(revision: Int, connectKey: String = "reissue-connect-key")
+    -> RuntimeTargetRecord
+  {
+    RuntimeTargetRecord(
+      targetID: "TGT-REISSUE",
+      stablePhysicalIdentitySHA256: String(repeating: "a", count: 64),
+      bindingRevision: revision, connectKey: connectKey, toolVersion: "3.2.0f",
+      adoptedAtUTC: "2026-09-07T02:20:01Z")
+  }
+
+  /// The whole point. A stored alias whose revision came from a target store
+  /// that no longer exists is not a newer route, and the host must not be
+  /// permanently unflashable because a counter restarted underneath it.
+  func testReissuedAliasLineageIsArchivedAndRepublishedAtTheLiveRevision() throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let fixture = try reissueFixture(root: root, storedRevision: 4)
+
+    let outcome = try XCTUnwrap(
+      fixture.store.reconcileReissuedLineage(
+        target: liveTarget(revision: 2),
+        observedHDCIdentitySHA256: fixture.identity,
+        observedHDCConnectKey: "reissue-connect-key",
+        observedBuildVersion: "OpenHarmony-7.0.0.37",
+        nowUTC: "2026-09-08T08:00:00Z"))
+    XCTAssertEqual(outcome.archivedRevision, 4)
+    XCTAssertEqual(outcome.publishedRevision, 2)
+
+    let current = try XCTUnwrap(fixture.store.loadIfPresent())
+    XCTAssertEqual(current.bindingRevision, 2)
+    // Every routing fact survives; only the counter and the establishment
+    // time move. The route itself was never in doubt.
+    XCTAssertEqual(current.hdcIdentitySHA256, fixture.stored.hdcIdentitySHA256)
+    XCTAssertEqual(current.hdcConnectKey, fixture.stored.hdcConnectKey)
+    XCTAssertEqual(current.stableLoaderIdentitySHA256, fixture.stored.stableLoaderIdentitySHA256)
+    XCTAssertEqual(current.usbTopology, fixture.stored.usbTopology)
+    XCTAssertEqual(current.buildVersion, fixture.stored.buildVersion)
+    XCTAssertEqual(current.jobID, fixture.stored.jobID)
+
+    // The superseded entry is preserved beside the store, not discarded.
+    let archive = root.appending(path: "binding", directoryHint: .isDirectory)
+      .appending(path: "post-flash-superseded-20260902T070039Z.json")
+    let archived = try JSONDecoder().decode(
+      RockchipPostFlashHDCBinding.self, from: try Data(contentsOf: archive))
+    XCTAssertEqual(archived, fixture.stored)
+
+    // Idempotent: the store now satisfies the ordinary comparison, so a repeat
+    // is not this function's business and changes nothing.
+    XCTAssertNil(
+      try fixture.store.reconcileReissuedLineage(
+        target: liveTarget(revision: 2), observedHDCIdentitySHA256: fixture.identity,
+        observedHDCConnectKey: "reissue-connect-key",
+        observedBuildVersion: "OpenHarmony-7.0.0.37", nowUTC: "2026-09-08T08:05:00Z"))
+    XCTAssertEqual(try fixture.store.loadIfPresent(), current)
+  }
+
+  /// Each disagreement means the stored alias may genuinely describe another
+  /// route, and the original refusal has to stand. One case per fact.
+  func testReissuedAliasReconciliationRefusesOnAnyIdentityDisagreement() throws {
+    let cases: [(String, (RockchipPostFlashHDCBindingStore, String) throws -> Void)] = [
+      ("different Loader identity", { store, identity in
+        XCTAssertNil(
+          try store.reconcileReissuedLineage(
+            target: RuntimeTargetRecord(
+              targetID: "TGT-REISSUE",
+              stablePhysicalIdentitySHA256: String(repeating: "b", count: 64),
+              bindingRevision: 2, connectKey: "reissue-connect-key", toolVersion: "3.2.0f",
+              adoptedAtUTC: "2026-09-07T02:20:01Z"),
+            observedHDCIdentitySHA256: identity, observedHDCConnectKey: "reissue-connect-key",
+            observedBuildVersion: "OpenHarmony-7.0.0.37", nowUTC: "2026-09-08T08:00:00Z"))
+      }),
+      ("different target", { store, identity in
+        XCTAssertNil(
+          try store.reconcileReissuedLineage(
+            target: RuntimeTargetRecord(
+              targetID: "TGT-OTHER",
+              stablePhysicalIdentitySHA256: String(repeating: "a", count: 64),
+              bindingRevision: 2, connectKey: "reissue-connect-key", toolVersion: "3.2.0f",
+              adoptedAtUTC: "2026-09-07T02:20:01Z"),
+            observedHDCIdentitySHA256: identity, observedHDCConnectKey: "reissue-connect-key",
+            observedBuildVersion: "OpenHarmony-7.0.0.37", nowUTC: "2026-09-08T08:00:00Z"))
+      }),
+      ("device now answers on another HDC identity", { store, _ in
+        let other = "other-connect-key"
+        let otherIdentity = SHA256.hash(data: Data(other.utf8))
+          .map { String(format: "%02x", $0) }.joined()
+        XCTAssertNil(
+          try store.reconcileReissuedLineage(
+            target: self.liveTarget(revision: 2), observedHDCIdentitySHA256: otherIdentity,
+            observedHDCConnectKey: other,
+            observedBuildVersion: "OpenHarmony-7.0.0.37", nowUTC: "2026-09-08T08:00:00Z"))
+      }),
+      ("device now reports another build", { store, identity in
+        XCTAssertNil(
+          try store.reconcileReissuedLineage(
+            target: self.liveTarget(revision: 2), observedHDCIdentitySHA256: identity,
+            observedHDCConnectKey: "reissue-connect-key",
+            observedBuildVersion: "OpenHarmony-7.0.0.38", nowUTC: "2026-09-08T08:00:00Z"))
+      }),
+      ("stored alias is not ahead of the live target", { store, identity in
+        XCTAssertNil(
+          try store.reconcileReissuedLineage(
+            target: self.liveTarget(revision: 9), observedHDCIdentitySHA256: identity,
+            observedHDCConnectKey: "reissue-connect-key",
+            observedBuildVersion: "OpenHarmony-7.0.0.37", nowUTC: "2026-09-08T08:00:00Z"))
+      }),
+    ]
+    for (label, check) in cases {
+      let root = try temporaryDirectory()
+      defer { try? FileManager.default.removeItem(at: root) }
+      let fixture = try reissueFixture(root: root, storedRevision: 4)
+      try check(fixture.store, fixture.identity)
+      XCTAssertEqual(
+        try fixture.store.loadIfPresent(), fixture.stored,
+        "the stored alias must survive a refused reconciliation: \(label)")
+    }
+  }
+
+  /// The archive name is derived from the establishment time alone, so two
+  /// entries of different epochs can collide on it. Returning success without
+  /// writing let the caller then overwrite the live record, discarding the
+  /// entry the archive exists to preserve.
+  func testSupersededArchiveRefusesToDiscardADifferentEntryOnANameCollision() throws {
+    let root = try temporaryDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let fixture = try reissueFixture(root: root, storedRevision: 4)
+    let bindingRoot = root.appending(path: "binding", directoryHint: .isDirectory)
+    let archive = bindingRoot.appending(path: "post-flash-superseded-20260902T070039Z.json")
+    // A different record already occupying the name this reconciliation would
+    // choose. This host really carries such a file.
+    let squatter = RockchipPostFlashHDCBinding(
+      targetID: "TGT-REISSUE", bindingRevision: 3,
+      stableLoaderIdentitySHA256: String(repeating: "e", count: 64),
+      previousHDCIdentitySHA256: String(repeating: "f", count: 64),
+      hdcIdentitySHA256: String(repeating: "f", count: 64),
+      hdcConnectKey: "older-connect-key", usbTopology: "18874368", productModel: "ohos",
+      buildVersion: "OpenHarmony-7.0.0.37", jobID: "job-older",
+      establishedAtUTC: "2026-09-02T07:00:39Z")
+    var bytes = try CanonicalJSONEncoders.canonical().encode(squatter)
+    bytes.append(0x0A)
+    try bytes.write(to: archive)
+    try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: archive.path)
+
+    XCTAssertThrowsError(
+      try fixture.store.reconcileReissuedLineage(
+        target: liveTarget(revision: 2), observedHDCIdentitySHA256: fixture.identity,
+        observedHDCConnectKey: "reissue-connect-key",
+        observedBuildVersion: "OpenHarmony-7.0.0.37", nowUTC: "2026-09-08T08:00:00Z"))
+    // Both records survive: the live one was not overwritten and the occupant
+    // was not replaced.
+    XCTAssertEqual(try fixture.store.loadIfPresent(), fixture.stored)
+    XCTAssertEqual(try Data(contentsOf: archive), bytes)
+  }
+
   func testPostFlashHDCSerialRotationUsesBoundTopologyAndPublishesOnlyAfterExactBuild()
     async throws
   {
@@ -1122,7 +1298,20 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
   func testUnpublishablePostFlashAliasRefusesPlanAndSubmitBeforeCapabilityOrDeviceWork()
     async throws
   {
+    // Each conflict keeps its own code. `newer-revision` on the *same* target
+    // and Loader identity is the reissued-counter case: a target's revision
+    // only advances when its stable identity changes and no path lowers one,
+    // so that shape cannot be a newer route and says so. The property this
+    // test exists for is unchanged — every conflict refuses before any
+    // capability or device work, and every durable file is byte-identical
+    // afterwards.
+    let expectedCode = [
+      "newer-revision": "flash.postFlashHDCAliasLineageReissued",
+      "different-target": "flash.postFlashHDCBindingConflict",
+      "different-loader": "flash.postFlashHDCBindingConflict",
+    ]
     for conflict in ["newer-revision", "different-target", "different-loader"] {
+      let code = try XCTUnwrap(expectedCode[conflict])
       let root = try temporaryDirectory()
       defer { try? FileManager.default.removeItem(at: root) }
       let fixture = try boundFactsFixture(root: root)
@@ -1144,13 +1333,13 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
         _ = try await fixture.port.currentFacts(targetID: fixture.target.targetID)
         XCTFail("\(conflict) must not fall back to the binding's HDC alias")
       } catch let DeviceProviderError.factsUnavailable(detail) {
-        XCTAssertTrue(detail.contains("flash.postFlashHDCBindingConflict"), detail)
+        XCTAssertTrue(detail.contains(code), detail)
       }
       do {
         _ = try await fixture.port.observePrerequisites(targetID: fixture.target.targetID)
         XCTFail("the App prerequisite reader must refuse the same conflict")
       } catch let DeviceProviderError.factsUnavailable(detail) {
-        XCTAssertTrue(detail.contains("flash.postFlashHDCBindingConflict"), detail)
+        XCTAssertTrue(detail.contains(code), detail)
       }
 
       let state = root.appending(path: "Agentd", directoryHint: .isDirectory)
@@ -1195,16 +1384,16 @@ final class RockchipRuntimeCompositionContractTests: XCTestCase {
       do {
         _ = try await engine.planOnly(data)
         XCTFail("the exact-plan preview must report \(conflict)")
-      } catch let RuntimeJobEngineError.rejected(code, detail) {
-        XCTAssertEqual(code, .invalidInput)
-        XCTAssertTrue(detail.contains("flash.postFlashHDCBindingConflict"), detail)
+      } catch let RuntimeJobEngineError.rejected(rejection, detail) {
+        XCTAssertEqual(rejection, .invalidInput)
+        XCTAssertTrue(detail.contains(code), detail)
       }
       do {
         _ = try await engine.submit(data)
         XCTFail("\(conflict) must refuse before admitting a destructive Job")
-      } catch let RuntimeJobEngineError.rejected(code, detail) {
-        XCTAssertEqual(code, .invalidInput)
-        XCTAssertTrue(detail.contains("flash.postFlashHDCBindingConflict"), detail)
+      } catch let RuntimeJobEngineError.rejected(rejection, detail) {
+        XCTAssertEqual(rejection, .invalidInput)
+        XCTAssertTrue(detail.contains(code), detail)
       }
       let observed = await fixture.probe.observedConnectKeys()
       let dispatched = await dispatches.snapshot()
