@@ -55,6 +55,23 @@ probe output and exception text. `inventoryAvailable: false` explicitly marks
 an unreadable inventory. An unreadable cleanup ledger fails the result query;
 it is never represented as an empty successful cleanup list.
 
+Every Job status and summary carries a required, non-null `sessionPublication`
+object with exactly four keys: `state`, `manifestSha256`, `catalogGeneration`
+and `reasonCode`, with nullable values written as explicit `null`. `published`
+carries a lowercase SHA-256 and a canonical decimal generation and no reason;
+`pending`, `failed`, `outcomeUnknown` and `unavailable` carry no receipt and
+name their reason. A Job with no publication ownership marker — every Job
+admitted before the production writer existed, and every Job a build with no
+composed writer finishes — reports `unavailable` / `noCurrentPublicationRecord`
+rather than a Session nobody wrote. The same object appears on the compact Job
+projection Agent results carry.
+
+This is a storage receipt, not a device-success claim and not a retention
+promise: `published` means the Manifest was published, read back and registered
+in the catalog, and it neither confirms nor revises the Job's own outcome. Job
+state, failure facts and CLI exit codes keep their existing meaning, and no
+read path retries a publication.
+
 Successful `status/show` queries exit 0 regardless of Job outcome. A nonterminal
 `result` returns `resultNotReady`, exit 75, and the Runtime next action. Terminal
 failed/cancelled/interrupted results remain `ok: true` with exit 1. Evidence

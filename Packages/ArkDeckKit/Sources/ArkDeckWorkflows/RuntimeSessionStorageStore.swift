@@ -911,6 +911,41 @@ public final class RuntimeSessionStorageStore: @unchecked Sendable {
     let projection: JSONValue
   }
 
+  /// Registers a Session this Runtime just finalized, and reads its exact
+  /// catalog entry back.
+  ///
+  /// Registration is the catalog's own decision and it refuses anything it
+  /// cannot account for: a leaf outside `yyyy/mm/`, a missing or non-canonical
+  /// manifest, or an identity that already belongs to another entry. Reading
+  /// the entry back afterwards is what makes the receipt a fact rather than a
+  /// hope — a generation number alone would not prove this Session is in it.
+  /// An existing identical registration is idempotent and does not advance
+  /// the generation, so a repeat returns the same receipt.
+  package func registerPublishedSession(sessionRoot: URL) throws -> UInt64 {
+    try withLockedDocument { _, document in
+      let root = try activeRoot(document, createDefaultIfMissing: false)
+      let catalog = try SessionRetentionCatalog(sessionsRoot: root)
+      do {
+        try catalog.registerFinalizedSession(
+          sessionRoot: sessionRoot, retentionDays: document.policy.retentionDays,
+          policyGeneration: document.generation)
+        let snapshot = try catalog.scan(
+          retentionDays: document.policy.retentionDays,
+          policyGeneration: document.generation)
+        guard let generation = snapshot.catalogGeneration,
+          snapshot.entries.contains(where: { $0.sessionID == sessionRoot.lastPathComponent })
+        else {
+          throw RuntimeSessionStorageFailure(
+            "recordUnreadable",
+            "the Session catalog does not hold the entry it just registered")
+        }
+        return generation
+      } catch let failure as SessionRetentionCatalogError {
+        throw mapCatalogFailure(failure)
+      }
+    }
+  }
+
   private func sessionCatalog(
     _ document: Document
   ) throws -> SessionRetentionCatalogSnapshot {

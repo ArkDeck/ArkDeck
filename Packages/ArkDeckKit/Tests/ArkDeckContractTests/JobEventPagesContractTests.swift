@@ -344,6 +344,11 @@ final class JobEventPagesContractTests: XCTestCase {
     let owner = JSONValue.object(["kind": .string("job"), "id": .string("job-test")])
     var status: [String: JSONValue] = ["schemaVersion": .string("arkdeck.job-status/1"),
       "jobId": .string("job-test"), "state": .string("failed"), "outcomeUnknown": .bool(true), "waitingForHuman": .bool(false),
+      // Observation validates the Session publication too, so the fixture
+      // carries the same required fact a Runtime status carries.
+      "sessionPublication": .object([
+        "state": .string("unavailable"), "manifestSha256": .null,
+        "catalogGeneration": .null, "reasonCode": .string("noCurrentPublicationRecord")]),
       "nextAction": .object(["kind": .string("reconcile"), "owner": owner, "resource": owner, "reasonCode": .string("recovery.outcomeUnknown")])]
     XCTAssertThrowsError(try RuntimeCLI.validatedObservedJobStatus(.object(status), jobID: "job-test", session: session)) {
       XCTAssertEqual(($0 as? CLIRegistryError)?.code, .outcomeUnknown)

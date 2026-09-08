@@ -186,7 +186,13 @@ extension RuntimeCLI {
       case .string(let raw)? = fields["state"], let state = JobState(rawValue: raw),
       case .bool(let unknown)? = fields["outcomeUnknown"], case .bool(let human)? = fields["waitingForHuman"],
       case .object(let next)? = fields["nextAction"], case .string(let kind)? = next["kind"],
-      next["owner"] == .object(["kind": .string("job"), "id": .string(jobID)])
+      next["owner"] == .object(["kind": .string("job"), "id": .string(jobID)]),
+      // `run`, `wait` and `watch` observe this object without going through
+      // the full Job decoder, so the Session publication is validated here as
+      // well. A caller that waits for a Job to finish must not be handed a
+      // publication shape no Runtime could have written.
+      let publication = fields["sessionPublication"],
+      (try? RuntimeSessionPublicationFact.validated(publication)) != nil
     else { throw unreadable() }
     let base: Set<String> = ["kind", "owner", "resource", "reasonCode"]
     if kind == "humanAction" {

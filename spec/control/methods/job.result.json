@@ -224,7 +224,10 @@
                 "additionalProperties": false,
                 "properties": {
                   "bindingRevision": {
-                    "type": "integer"
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
                   },
                   "byteCount": {
                     "type": "string"
@@ -335,7 +338,10 @@
               ]
             },
             "bindingRevision": {
-              "type": "integer"
+              "type": [
+                "integer",
+                "null"
+              ]
             },
             "blockers": {
               "items": {
@@ -501,6 +507,9 @@
                   "type": "string"
                 },
                 "privateInput": {
+                  "type": "string"
+                },
+                "sourceArtifactRef": {
                   "type": "string"
                 }
               },
@@ -702,6 +711,39 @@
             "sessionId": {
               "type": "string"
             },
+            "sessionPublication": {
+              "additionalProperties": false,
+              "properties": {
+                "catalogGeneration": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "manifestSha256": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "reasonCode": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "state": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "catalogGeneration",
+                "manifestSha256",
+                "reasonCode",
+                "state"
+              ],
+              "type": "object"
+            },
             "startedAtUtc": {
               "type": [
                 "null",
@@ -744,6 +786,7 @@
             "resolvedByTargetAliasResolutionId",
             "schemaVersion",
             "sessionId",
+            "sessionPublication",
             "startedAtUtc",
             "state",
             "supersededByRecoveryEpochId",
@@ -844,8 +887,8 @@
   "x-arkdeck-method": "job.result",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 7,
-    "request": 18,
-    "result": 11
+    "error": 6,
+    "request": 22,
+    "result": 16
   }
 }

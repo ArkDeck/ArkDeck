@@ -92,6 +92,13 @@ final class CLIWorkspaceContinuationContractTests: XCTestCase {
       "supersededByRecoveryEpochId": superseded.map(JSONValue.string) ?? .null,
       "recoveryEpochId": .null,
       "resolvedByTargetAliasResolutionId": .null,
+      // A source Job the continuation reads is a real Job the Runtime
+      // answered for, so its status carries the same required Session
+      // publication fact every other Job status does.
+      "sessionPublication": .object([
+        "state": .string("unavailable"), "manifestSha256": .null,
+        "catalogGeneration": .null, "reasonCode": .string("noCurrentPublicationRecord"),
+      ]),
       "nextAction": nextAction,
       "failure": .null,
       "processProgress": .null,

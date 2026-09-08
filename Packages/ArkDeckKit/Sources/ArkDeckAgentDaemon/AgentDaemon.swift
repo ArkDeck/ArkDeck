@@ -2975,6 +2975,10 @@ public struct RuntimeControlPlaneHandler: Sendable {
       "jobId": .string(jobID), "state": .string(job.state), "outcome": .string(job.outcomeUnknown ? "outcomeUnknown" : job.state),
       "outcomeUnknown": .bool(job.outcomeUnknown), "waitingForHuman": .bool(job.waitingForHuman),
       "outstandingResidueCount": job.outstandingResidueCount.map { .integer(Int64($0)) } ?? .null,
+      // The same fact `job.status` publishes, on the compact object Agent
+      // callers read. An Agent that finished a Job must be able to see
+      // whether its Session exists without asking a second surface.
+      "sessionPublication": job.sessionPublication.json,
     ])
     guard JobState(rawValue: job.state)?.isTerminal == true else { return .object(fields) }
     let snapshot = try await engine.evidenceSnapshot(jobID: jobID)

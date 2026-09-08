@@ -603,6 +603,11 @@ package struct StorageClaim: Equatable, @unchecked Sendable {
 
   package var finalizationOnly: Bool { permit.isFinalizationOnly() }
 
+  /// The admission generation as an opaque label. A durable owner records it
+  /// so a restart can tell its own claim from a later readmission under the
+  /// same claim ID; it stays opaque because it is an identity, not authority.
+  package var admissionGenerationIdentity: String { admissionGeneration.uuidString }
+
   func requireOptionalWriteAuthorization(forJobID jobID: String) throws {
     guard self.jobID == jobID else {
       throw SessionStorageError.claimUnavailable("\(claimID):job-mismatch")
@@ -1184,6 +1189,26 @@ package actor HostStorageCoordinator {
     try validateTerminalReceipt(receipt, claim: claim, disposition: .succeeded)
     try release(claim, receipt: receipt)
     return .executed(value)
+  }
+
+  /// Stops optional writes on an admitted claim and pins its terminal disposition, without
+  /// releasing anything.
+  ///
+  /// `performWithClaim` releases the claim as soon as its finalizer returns a receipt. A Session
+  /// publication cannot use that shape: its catalog entry has to be registered *after* the
+  /// receipt exists and *before* the headroom is given back, so a crash in between leaves a
+  /// claim to recover rather than an unregistered Session whose reservation is already gone.
+  /// Release still requires the minted receipt, through `completeRecoveredFinalization`.
+  package func beginTerminalFinalization(
+    claimID: String,
+    disposition: StorageTerminalDisposition
+  ) throws -> StorageClaim {
+    purgeCompletedClaims()
+    guard let claim = claims[claimID] else {
+      throw SessionStorageError.claimUnavailable(claimID)
+    }
+    claim.beginFinalization(disposition)
+    return claim
   }
 
   /// Completes a retained finalization-only claim after terminal persistence has been repaired.

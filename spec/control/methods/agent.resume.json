@@ -582,6 +582,30 @@
                 "null"
               ]
             },
+            "sessionPublication": {
+              "additionalProperties": false,
+              "properties": {
+                "catalogGeneration": {
+                  "type": "null"
+                },
+                "manifestSha256": {
+                  "type": "null"
+                },
+                "reasonCode": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "catalogGeneration",
+                "manifestSha256",
+                "reasonCode",
+                "state"
+              ],
+              "type": "object"
+            },
             "state": {
               "type": "string"
             },
@@ -594,6 +618,7 @@
             "outcome",
             "outcomeUnknown",
             "outstandingResidueCount",
+            "sessionPublication",
             "state",
             "waitingForHuman"
           ],
@@ -722,8 +747,8 @@
   "x-arkdeck-method": "agent.resume",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 4,
+    "error": 5,
     "request": 12,
-    "result": 8
+    "result": 7
   }
 }
