@@ -1,0 +1,18 @@
+[package]
+name = "arkdeck-provider-hdc"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+arkdeck-platform.workspace = true
+hmac.workspace = true
+sha2.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[lints]
+workspace = true

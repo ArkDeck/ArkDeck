@@ -1,0 +1,176 @@
+use arkdeck_contract::{
+    DeviceObservationsResult, DeviceObservationsResultObservationsItem, WireError,
+};
+use arkdeck_control::{HdcStatus, ReadOnlyHost};
+use arkdeck_platform::{VerifiedTool, random_bytes};
+use arkdeck_provider_hdc::HdcReadOnlyProvider;
+use std::io;
+use std::sync::Mutex;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+pub struct Host {
+    provider: Option<HdcReadOnlyProvider>,
+    unavailable: &'static str,
+    generation: Mutex<u64>,
+}
+
+impl Host {
+    pub fn from_environment() -> Self {
+        let path = std::env::var_os("ARKDECK_HDC_PATH");
+        let digest = std::env::var("ARKDECK_HDC_SHA256").ok();
+        let (provider, unavailable) = match (path, digest) {
+            (None, None) => (None, "hdc.notConfigured"),
+            (Some(path), Some(digest)) => match VerifiedTool::open(path, &digest) {
+                Ok(tool) => match HdcReadOnlyProvider::new(tool) {
+                    Ok(provider) => (Some(provider), ""),
+                    Err(_) => (None, "hdc.platformEvidenceUnavailable"),
+                },
+                Err(_) => (None, "hdc.toolIdentityUnavailable"),
+            },
+            _ => (None, "hdc.toolConfigurationIncomplete"),
+        };
+        Self {
+            provider,
+            unavailable,
+            generation: Mutex::new(0),
+        }
+    }
+}
+
+impl ReadOnlyHost for Host {
+    fn observed_at(&self) -> String {
+        utc_now()
+    }
+    fn hdc_status(&self, deep: bool) -> HdcStatus {
+        let Some(provider) = &self.provider else {
+            return HdcStatus::unavailable(deep, self.unavailable);
+        };
+        // No lifecycle operation is available here. A deep observation is the
+        // same registered, identity-bracketed read used by device candidates.
+        let (availability, reason) = if !deep {
+            ("notChecked", "doctor.deepNotRequested")
+        } else if provider.list_candidates().is_ok() {
+            ("available", "hdc.observationReady")
+        } else {
+            ("unavailable", "hdc.identityUnavailable")
+        };
+        HdcStatus {
+            configured: true,
+            checked: deep,
+            availability: availability.into(),
+            ownership: "external".into(),
+            server_health: "unknown".into(),
+            reason_code: reason.into(),
+        }
+    }
+    fn observations(&self) -> Result<DeviceObservationsResult, WireError> {
+        let fail = |message: &str| WireError {
+            code: "rejected".into(),
+            message: message.into(),
+            details: None,
+        };
+        let Some(provider) = &self.provider else {
+            return Err(fail(self.unavailable));
+        };
+        // Serialize refreshes, so generations order the actual completed reads.
+        let mut generation = self
+            .generation
+            .lock()
+            .map_err(|_| fail("the observation generation is unavailable"))?;
+        let mut candidates = provider
+            .list_candidates()
+            .map_err(|error| fail(&format!("{}: {error}", error.classification())))?;
+        let next = generation
+            .checked_add(1)
+            .ok_or_else(|| fail("the observation generation is exhausted"))?;
+        candidates.sort_by(|a, b| {
+            a.connect_key
+                .cmp(&b.connect_key)
+                .then_with(|| a.state.cmp(&b.state))
+        });
+        let mut observations = Vec::with_capacity(candidates.len());
+        for candidate in candidates {
+            observations.push(DeviceObservationsResultObservationsItem {
+                candidate_key: candidate.connect_key,
+                authorization_state: candidate.state,
+                observation_id: format!(
+                    "obs-{}",
+                    fresh_id().map_err(|_| fail("observation identity entropy is unavailable"))?
+                ),
+                observation_continuity: "generationScoped".into(),
+                display_name_generation: next.to_string(),
+                adopted_target_id: None,
+                binding_revision: None,
+                display_name: None,
+                device_information: None,
+                observed_facts: (),
+            });
+        }
+        *generation = next;
+        Ok(DeviceObservationsResult {
+            schema_version: "arkdeck.device-observations/1".into(),
+            snapshot_generation: next.to_string(),
+            observed_at_utc: utc_now(),
+            health: "current".into(),
+            observations,
+        })
+    }
+}
+
+pub fn fresh_id() -> io::Result<String> {
+    let mut bytes = random_bytes::<16>()?;
+    bytes[6] = (bytes[6] & 15) | 0x40;
+    bytes[8] = (bytes[8] & 63) | 0x80;
+    let hex: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
+    Ok(format!(
+        "{}-{}-{}-{}-{}",
+        &hex[..8],
+        &hex[8..12],
+        &hex[12..16],
+        &hex[16..20],
+        &hex[20..]
+    ))
+}
+
+fn utc_now() -> String {
+    timestamp(
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs(),
+    )
+}
+
+// Proleptic Gregorian conversion; the output uses the existing UTC seconds
+// spelling. Monotonic generation ordering does not depend on this wall clock.
+fn timestamp(seconds: u64) -> String {
+    let days = (seconds / 86_400) as i64 + 719_468;
+    let era = days / 146_097;
+    let day_of_era = days - era * 146_097;
+    let year_of_era =
+        (day_of_era - day_of_era / 1460 + day_of_era / 36524 - day_of_era / 146096) / 365;
+    let year = year_of_era + era * 400;
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let month_index = (5 * day_of_year + 2) / 153;
+    let day = day_of_year - (153 * month_index + 2) / 5 + 1;
+    let month = month_index + if month_index < 10 { 3 } else { -9 };
+    let year = year + i64::from(month <= 2);
+    let time = seconds % 86_400;
+    format!(
+        "{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}Z",
+        time / 3600,
+        time / 60 % 60,
+        time % 60
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn utc_spelling_and_leap_day() {
+        assert_eq!(timestamp(0), "1970-01-01T00:00:00Z");
+        assert_eq!(timestamp(1_709_251_199), "2024-02-29T23:59:59Z");
+        assert_eq!(timestamp(1_709_251_200), "2024-03-01T00:00:00Z");
+    }
+}

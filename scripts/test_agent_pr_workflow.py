@@ -18,6 +18,7 @@ REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "agent-pr.yml"
 SDD_WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "sdd-guard.yml"
 SWIFT_WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "swift-ci.yml"
+RUST_WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "rust-ci.yml"
 ARKFORGE_AUTH_PATH = REPOSITORY_ROOT / "scripts" / "ci" / "arkforge-package-auth.sh"
 EXPECTED_PATTERNS = ("agent/**", "!agent/host-loop/**")
 EXPECTED_PUSH_FLOW = '    branches: [main, "agent/**"]'
@@ -334,6 +335,7 @@ def validate_automatic_check_contract(
     swift_tests_job = _job_block(swift_text, "swift-tests")
     app_build_job = _job_block(swift_text, "app-build")
     ds_job = _job_block(swift_text, "ds-interactions")
+    rust_job = _job_block(swift_text, "rust-checks")
     swift_aggregate_job = _job_block(swift_text, "swift")
     for job_name, job_block in (
         ("Swift test", swift_tests_job),
@@ -357,6 +359,7 @@ def validate_automatic_check_contract(
         "python3 scripts/ci/plan.py",
         '--event "$GITHUB_EVENT_PATH"',
         '--github-output "$GITHUB_OUTPUT"',
+        "      rust: ${{ steps.paths.outputs.rust }}\n",
     )
     required_swift_tests = (
         "    needs: plan\n",
@@ -410,15 +413,27 @@ def validate_automatic_check_contract(
         "        run: npm test\n",
     )
     required_aggregate = (
-        "    needs: [plan, swift-tests, app-build, ds-interactions]\n",
+        "    needs: [plan, swift-tests, app-build, ds-interactions, rust-checks]\n",
         "PLAN_RESULT: ${{ needs.plan.result }}",
         "SWIFT_RESULT: ${{ needs.swift-tests.result }}",
         "APP_RESULT: ${{ needs.app-build.result }}",
         "DS_RESULT: ${{ needs.ds-interactions.result }}",
+        "RUST_SELECTED: ${{ needs.plan.outputs.rust }}",
+        "RUST_RESULT: ${{ needs.rust-checks.result }}",
         'test "$PLAN_RESULT" = success',
         'test "$SWIFT_RESULT" = success',
         'test "$APP_RESULT" = success',
         'test "$DS_RESULT" = success',
+        '          if [ "$RUST_SELECTED" = true ]; then\n'
+        '            test "$RUST_RESULT" = success\n'
+        '          else\n'
+        '            test "$RUST_RESULT" = skipped\n'
+        '          fi\n',
+    )
+    required_rust = (
+        "    needs: plan\n",
+        "    if: needs.plan.outputs.rust == 'true'\n",
+        "    uses: ./.github/workflows/rust-ci.yml\n",
     )
     for token in required_plan:
         if token not in plan_job:
@@ -442,11 +457,81 @@ def validate_automatic_check_contract(
         raise WorkflowContractError(
             "ds interaction job must install exact dependencies before testing"
         )
+    for token in required_rust:
+        if token not in rust_job:
+            raise WorkflowContractError(f"Rust job missing contract token: {token}")
     for token in required_aggregate:
         if token not in swift_aggregate_job:
             raise WorkflowContractError(
                 f"Swift aggregate job missing contract token: {token}"
             )
+
+
+def validate_rust_ci_contract(text: str) -> None:
+    """Require native host checks and fail-closed locked dependency audits."""
+
+    if extract_event_names(text) != ("workflow_call",):
+        raise WorkflowContractError("Rust CI must be called through the shared planner")
+    required = (
+        "permissions:\n  contents: read\n",
+        "      fail-fast: false\n",
+        "        os: [ubuntu-latest, macos-26, windows-latest]\n",
+        "    runs-on: ${{ matrix.os }}\n",
+        "        shell: bash\n        working-directory: rust\n",
+        "git config core.autocrlf false",
+        '"+refs/heads/main:refs/remotes/origin/main"',
+        'test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"',
+        "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97",
+        '          python-version: "3.14"\n',
+        "run: python -m pip install PyYAML==6.0.3 jsonschema==4.26.0",
+        "run: python rust/scripts/generate-contract.py --check",
+        "rustup show active-toolchain",
+        "rustup component add rustfmt clippy",
+        "run: cargo fmt --all --check",
+        "run: cargo fetch --locked",
+        "run: cargo clippy --workspace --all-targets --locked -- -D warnings",
+        "run: cargo test --workspace --locked",
+        "run: cargo build --workspace --bins --locked",
+        "run: python rust/scripts/check-readonly.py",
+        "cargo install --locked --version 0.20.2 cargo-deny",
+        "cargo install --locked --version 0.10.2 cargo-vet",
+        "run: cargo deny --locked check",
+        "run: cargo vet --locked --no-registry-suggestions",
+        "run: git diff --exit-code -- Cargo.lock supply-chain",
+        "      - name: Preserve actual read-only recordings\n"
+        "        if: always()\n"
+        "        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1 (Node 24)\n"
+        "        with:\n"
+        "          name: rust-readonly-recordings-${{ matrix.os }}\n"
+        "          path: rust/target/readonly-check/\n"
+        "          if-no-files-found: warn\n"
+        "          retention-days: 7\n",
+    )
+    for token in required:
+        if token not in text:
+            raise WorkflowContractError(f"Rust CI missing contract token: {token}")
+    for token in (
+        "continue-on-error:", "secrets.", "secrets[", "secrets: inherit",
+        "contents: write", "id-token: write", "cargo vet init",
+        "cargo vet regenerate", "cargo vet add-exemption", "|| true",
+        "--depth=", "--depth ",
+    ):
+        if token in text:
+            raise WorkflowContractError(f"Rust CI contains forbidden token: {token}")
+    if text.index("run: cargo fetch --locked") > text.index("run: cargo vet --locked"):
+        raise WorkflowContractError("Rust CI must fetch locked metadata before locked vet")
+    if text.index("run: python rust/scripts/generate-contract.py --check") > text.index(
+        "run: cargo clippy --workspace"
+    ):
+        raise WorkflowContractError("Rust CI must check generated inputs before compilation")
+    if text.index("run: cargo build --workspace --bins --locked") > text.index(
+        "run: python rust/scripts/check-readonly.py"
+    ):
+        raise WorkflowContractError("Rust CI must build product binaries before black-box checks")
+    if text.index("run: python rust/scripts/check-readonly.py") > text.index(
+        "      - name: Preserve actual read-only recordings"
+    ):
+        raise WorkflowContractError("Rust CI must preserve recordings after their producer runs")
 
 
 def validate_arkforge_private_package_auth(swift_text: str, auth_text: str) -> None:
@@ -601,6 +686,54 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
             SWIFT_WORKFLOW_PATH.read_text(encoding="utf-8"),
             ARKFORGE_AUTH_PATH.read_text(encoding="utf-8"),
         )
+        validate_rust_ci_contract(RUST_WORKFLOW_PATH.read_text(encoding="utf-8"))
+
+    def test_rust_checks_reject_skipped_hosts_and_unlocked_or_bypassed_policy(self) -> None:
+        rust = RUST_WORKFLOW_PATH.read_text(encoding="utf-8")
+        mutations = (
+            rust.replace("  workflow_call:\n", "  push:\n"),
+            rust.replace(
+                "os: [ubuntu-latest, macos-26, windows-latest]",
+                "os: [ubuntu-latest, macos-26]",
+            ),
+            rust.replace("--all-targets --locked -- -D warnings", "--all-targets"),
+            rust.replace("run: cargo test --workspace --locked", "run: cargo check --locked"),
+            rust.replace(
+                "run: cargo deny --locked check", "run: cargo deny --locked check || true"
+            ),
+            rust.replace("run: cargo vet --locked --no-registry-suggestions", "run: cargo vet"),
+            rust.replace(
+                "cargo install --locked --version 0.10.2 cargo-vet", "cargo install cargo-vet"
+            ),
+            rust + "\n        continue-on-error: true\n",
+            rust + "\n        run: cargo vet init\n",
+            rust.replace("working-directory: rust", "working-directory: ."),
+            rust.replace("git config core.autocrlf false", "git config core.autocrlf true"),
+            rust.replace("git fetch --no-tags --prune origin", "git fetch --depth=1 origin"),
+            rust.replace(
+                "run: python rust/scripts/generate-contract.py --check", "run: true"
+            ),
+            rust.replace("run: python rust/scripts/check-readonly.py", "run: true"),
+        )
+        for mutated in mutations:
+            with self.assertRaises(WorkflowContractError):
+                validate_rust_ci_contract(mutated)
+
+    def test_rust_recordings_are_preserved_after_failures(self) -> None:
+        rust = RUST_WORKFLOW_PATH.read_text(encoding="utf-8")
+        upload_start = rust.index("      - name: Preserve actual read-only recordings")
+        upload = rust[upload_start:]
+        producer = "      - name: Read-only black-box checks"
+        for mutated in (
+            rust.replace("        if: always()\n", "        if: success()\n"),
+            rust.replace("path: rust/target/readonly-check/", "path: target/readonly-check/"),
+            rust.replace("rust-readonly-recordings-${{ matrix.os }}", "rust-readonly-recordings"),
+            rust.replace("if-no-files-found: warn", "if-no-files-found: ignore"),
+            rust.replace("actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a", "actions/upload-artifact@v7"),
+            rust[:upload_start].replace(producer, upload + "\n" + producer),
+        ):
+            with self.assertRaises(WorkflowContractError):
+                validate_rust_ci_contract(mutated)
 
     def test_arkforge_private_package_auth_rejects_credential_regressions(self) -> None:
         swift = SWIFT_WORKFLOW_PATH.read_text(encoding="utf-8")
@@ -708,6 +841,24 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
                     '            test "$DS_RESULT" = success\n',
                     "            true\n",
                 ),
+            ),
+            (
+                "Rust lane not gated on plan",
+                agent,
+                sdd,
+                swift.replace("    if: needs.plan.outputs.rust == 'true'\n", ""),
+            ),
+            (
+                "aggregator ignores Rust failure",
+                agent,
+                sdd,
+                swift.replace('            test "$RUST_RESULT" = success\n', "            true\n"),
+            ),
+            (
+                "aggregator ignores unexpectedly skipped Rust lane",
+                agent,
+                sdd,
+                swift.replace('            test "$RUST_RESULT" = skipped\n', "            true\n"),
             ),
             (
                 "missing stable aggregator",

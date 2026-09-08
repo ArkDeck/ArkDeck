@@ -4,11 +4,28 @@
 > Version：0.2.0
 > Status：review（M0A 后决定 Sandbox/distribution）  (distribution 面已于 2026-07-21 经 DEC-004 #261/ADR-0002 决定,见下各节 dated 注记)
 > Core baseline：CORE-2.0.0  
-> Core strategy：native-conforming-shared-contract-vector-suite  
+> Core strategy：shared-rust-runtime-native-ui-shared-contract-vector-suite
+> Strategy status：proposed by CHG-2026-074; pending maintainer PR review
 > Shared inputs：由每个 Task 固定 accepted Integration lock、profile 与 Core conformance hash  
 > Minimum target：macOS 14
 
 本文件只定义 macOS 实现；它不得覆盖 Core Requirement 或 AC。
+
+## Rust migration target（CHG-2026-074）
+
+本次策略注记是[共享 Rust Runtime 架构](../../architecture/core-portability.md)的待审查
+阶段目标。当前 production 仍为下文 Swift/App 形态；XPA-002 的只读 shadow 基础没有
+切换 LaunchAgent、XPC 或 durable store owner，macOS Conformance 在
+[`PLATFORM-PROFILES.lock.yaml`](../PLATFORM-PROFILES.lock.yaml) 中仍为
+`needsReverification`。Rust 的 macOS commandless HDC server lease 尚未实现，因此该
+shadow 路径没有 HDC dispatch；下文已登记的 Swift probe mapping 不会自动赋予它 authority。
+
+后续依次迁移 façade、store owner、authority 与 Provider family，保持单 writer、当前
+单 v1 schema/字段集合和同 release App/daemon 回滚。XPA-017 的 Swift Runtime targets
+删除必须等待 XPA-018/019 客户端脱钩、XPA-025 性能车道切换及纯 Rust daemon 上当前
+Catalog digest 的 GJ-1..5 和原验收通过；本次未完成这些迁移。SwiftUI 保留为原生 UI，
+最低 OS、entitlements、distribution 及本 Profile 的 Core Requirement/AC 均不因目标
+策略变更而放宽。阶段与删除条件以[设计 §G](../../../docs/design/cross-platform/rust-core-cross-platform-architecture.md#g-persistence-migration-cutover-and-rollback)及所属任务为准。
 
 ## Technology profile
 

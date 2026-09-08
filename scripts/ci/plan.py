@@ -22,7 +22,9 @@ from collections.abc import Mapping, Sequence
 ZERO_OID = "0" * 40
 DEFAULT_BRANCH = "main"
 SWIFT_WORKFLOW = ".github/workflows/swift-ci.yml"
+RUST_WORKFLOW = ".github/workflows/rust-ci.yml"
 PLANNER_PREFIX = "scripts/ci/"
+RUST_WORKSPACE_DIR = "rust"
 APP_PACKAGE_TARGET_PREFIXES = (
     "Packages/ArkDeckKit/Sources/ArkDeckCore/",
     "Packages/ArkDeckKit/Sources/ArkDeckProcess/",
@@ -57,6 +59,7 @@ class LaneSelection:
     swift: bool
     app: bool
     ds: bool
+    rust: bool
 
 
 @dataclasses.dataclass(frozen=True)
@@ -73,6 +76,7 @@ class CIPlan:
             "swift": self.lanes.swift,
             "app": self.lanes.app,
             "ds": self.lanes.ds,
+            "rust": self.lanes.rust,
             "baseRevision": self.base_revision,
             "headRevision": self.head_revision,
             "baseKind": self.base_kind,
@@ -86,6 +90,7 @@ def classify_paths(paths: Sequence[str]) -> LaneSelection:
     swift = False
     app = False
     ds = False
+    rust = False
     for raw_path in paths:
         if not raw_path or "\x00" in raw_path:
             raise PlanError("changed paths must be non-empty and NUL-free")
@@ -93,11 +98,19 @@ def classify_paths(paths: Sequence[str]) -> LaneSelection:
 
         # A planner/workflow change validates every branch of the decision it
         # is changing.  This prevents a broken classifier from self-skipping.
-        if path == SWIFT_WORKFLOW or path.startswith(PLANNER_PREFIX):
+        if path in (
+            SWIFT_WORKFLOW, RUST_WORKFLOW, "scripts/test_agent_pr_workflow.py"
+        ) or path.startswith(PLANNER_PREFIX):
             swift = True
             app = True
             ds = True
+            rust = True
             continue
+
+        # Contract bundles are executable inputs to Rust conformance tests.
+        # A Rust-only or spec-only diff must never pass without this lane.
+        if path.startswith(("rust/", "spec/")):
+            rust = True
 
         if path.startswith("Packages/ArkDeckKit/") or path.startswith("Package."):
             swift = True
@@ -123,7 +136,7 @@ def classify_paths(paths: Sequence[str]) -> LaneSelection:
         ):
             app = True
 
-    return LaneSelection(swift=swift, app=app, ds=ds)
+    return LaneSelection(swift=swift, app=app, ds=ds, rust=rust)
 
 
 def _git(
@@ -230,7 +243,7 @@ def _all_lanes_plan(
     *, head_revision: str, base_kind: str, reason: str
 ) -> CIPlan:
     return CIPlan(
-        lanes=LaneSelection(swift=True, app=True, ds=True),
+        lanes=LaneSelection(swift=True, app=True, ds=True, rust=True),
         base_revision=None,
         head_revision=head_revision,
         base_kind=base_kind,
@@ -353,6 +366,7 @@ def _append_github_output(path: pathlib.Path, plan: CIPlan) -> None:
         "swift": str(plan.lanes.swift).lower(),
         "app": str(plan.lanes.app).lower(),
         "ds": str(plan.lanes.ds).lower(),
+        "rust": str(plan.lanes.rust).lower(),
         "base": plan.base_revision or "unavailable",
         "head": plan.head_revision,
         "base-kind": plan.base_kind,
@@ -433,13 +447,37 @@ def local_commands(repo_root: pathlib.Path, plan: CIPlan) -> tuple[tuple[str, ..
                 ("sh", "scripts/ci/run-xcodebuild.sh"),
             ]
         )
+    if plan.lanes.rust:
+        commands.extend(
+            [
+                (sys.executable, "rust/scripts/generate-contract.py", "--check"),
+                ("cargo", "fmt", "--all", "--check"),
+                # vet --locked freezes cargo metadata too. Fetch the complete
+                # graph first, including dependencies for other host targets.
+                ("cargo", "fetch", "--locked"),
+                (
+                    "cargo", "clippy", "--workspace", "--all-targets", "--locked",
+                    "--", "-D", "warnings",
+                ),
+                ("cargo", "test", "--workspace", "--locked"),
+                ("cargo", "build", "--workspace", "--bins", "--locked"),
+                (sys.executable, "rust/scripts/check-readonly.py"),
+                ("cargo", "deny", "--locked", "check"),
+                ("cargo", "vet", "--locked", "--no-registry-suggestions"),
+            ]
+        )
     return tuple(commands)
 
 
 def run_local(repo_root: pathlib.Path, plan: CIPlan) -> None:
     for command in local_commands(repo_root, plan):
-        print("+ " + " ".join(command), flush=True)
-        subprocess.run(command, cwd=repo_root, env=os.environ.copy(), check=True)
+        # rustup discovers rust-toolchain.toml from the working directory,
+        # not --manifest-path. Run each Cargo invocation in the workspace so
+        # local validation uses the same pinned toolchain as hosted CI.
+        cwd = repo_root / RUST_WORKSPACE_DIR if command[0] == "cargo" else repo_root
+        location = f"[{RUST_WORKSPACE_DIR}] " if cwd != repo_root else ""
+        print("+ " + location + " ".join(command), flush=True)
+        subprocess.run(command, cwd=cwd, env=os.environ.copy(), check=True)
 
 
 def _parse_arguments(argv: Sequence[str]) -> argparse.Namespace:
