@@ -1,8 +1,9 @@
 # TASK-SVC-005 run record
 
 Status stays `ready`. This Task is not done: GJ-4 is still blocked, GJ-5 was not
-started, GJ-1's HAR leg and GJ-3's rollback leg did not pass, and Session export
-has no producer. The four defects found during the window were reviewed, merged
+started, GJ-1's HAR leg was not run, and Session export has no producer.
+GJ-3's rollback leg **did** pass — this record originally said otherwise and is
+corrected below. The four defects found during the window were reviewed, merged
 and re-verified on this host the same day.
 
 ## Windows
@@ -33,7 +34,7 @@ digests needed to re-check them.
 | `agent.run` reported a failed Job's evidence as `verified` | TASK-SVC-002, #1777 merged and re-verified on `31142a78` |
 | Session refusal named nothing, and a readable-name/unreadable-content directory was reported as a malformed name | TASK-SVC-002, #1780 merged and re-verified on `16fe9617` against the real 2026-08-02 directory |
 | Post-flash alias revision counter is reissued when the daemon state directory is retired; GJ-4 blocked | TASK-AFA-001, #1779 merged; the named refusal is live on the host, **the reconciliation still has no entry point** — it needs `openspec/contracts/cli-command-registry.yaml` and `cli-feature-coverage.json` added to that Task |
-| `deploy.native-library.app-owned@1` publishes no rollback attestation, so the rollback leg cannot be shown to have restored anything | unassigned; recorded unverified rather than repaired |
+| ~~`deploy.native-library.app-owned@1` publishes no rollback attestation~~ | **Withdrawn.** It does, in the Job Journal: `verified rollback-native-library ["processIds", "restored", "restoredSha256"]` then `verified cleanup-native-library-compensation ["backupRetained", "cleaned"]`. The original finding was made from the Artifact inventory and a deduplicated step-kind list, neither of which can show a compensation. GJ-3's rollback leg is `REAL_DEVICE_PASS`. |
 | No production caller publishes a Session; SVC-AC-05 and SVC-AC-10 cannot pass | the reviewed Session publication slice, not delivered |
 | `flash.full-restore@1` is Catalog-`unavailable` on this host (no named hardware acceptance campaign) | maintainer window, independent of the alias blocker |
 | GJ-1 §2.1 HAR crash-resume not executed | needs a physical USB detach and reattach |
@@ -41,11 +42,9 @@ digests needed to re-check them.
 
 ## Still required before this Task can be done
 
-1. Wire the alias reconciliation entry point (needs the two contract paths
-   above), then clear GJ-4's second gate — `flash.full-restore@1` is separately
-   Catalog-`unavailable` for want of a named hardware acceptance campaign.
-2. Give `deploy.native-library.app-owned@1` a rollback attestation, then re-run
-   GJ-3's rollback leg.
+1. Wire the alias reconciliation entry point, then clear GJ-4's second gate —
+   `flash.full-restore@1` is separately Catalog-`unavailable` for want of a
+   named hardware acceptance campaign.
 3. Run GJ-1 §2.1 HAR crash-resume (physical detach and reattach).
 4. Deliver the reviewed Session publication slice, then SVC-AC-05 and the
    Session half of SVC-AC-10.

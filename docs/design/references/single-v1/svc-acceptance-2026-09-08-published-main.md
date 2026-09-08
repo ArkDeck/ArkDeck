@@ -70,7 +70,7 @@ current Runtime record on digest `508783ac…` shows it.
 | GJ-2 HAP Debug | `REAL_DEVICE_PASS` | `debug.hap@1` → `job-458fadbe5a6f543ab35832a88ff7093b`, succeeded, `deviceMutation`, `evidence.status verified`, `cleanup []`, all ten step kinds `[probeDevice, runApprovedRemoteRead, sendFile, installPackage, startApplication, verifyRemoteState, captureRemoteStdout, stopApplication, uninstallPackage, cleanupOwnedRemotePath]`, capability `CAP-RT-POLICY-51F798AE3292E1898AE9B95742A0711DA0B42406-G1` reserved and consumed with plan, step-set and Artifact digests. |
 | GJ-2 failure compensation (#1773) | `REAL_DEVICE_PASS` | A confirmed failure produced by a bundle whose named Ability does not exist. `job-461b9ade98f8ce0164382eded520ec0b`: `agent run` returned exit 75 with `state finalizing`, `outcomeUnknown false` and `nextAction {kind: reconcile, reasonCode: job.finalizationPending}` and no `retryAfter` — the strict CLI accepted the new variant rather than polling or calling it unreadable. `job reconcile` then returned `failed` with `nextAction readResult`. Compensation actually ran on the device: `actualStepKinds` ends `[… verifyRemoteState, stopApplication, uninstallPackage, cleanupOwnedRemotePath]` and `cleanup []`. |
 | GJ-3 Native Debug, positive | `REAL_DEVICE_PASS` | `debug.hap@1` with `cleanupPolicy retain` → `job-33af2af4715f1d158e0aa985c8328cca` left the bundle installed and running. `deploy.native-library.app-owned@1` → `job-a48fdb55ba96e68256b566848d39c538`, succeeded, `verified`, `verification-report.json` reports `loaderVerified true`, `abi armeabi-v7a`, `processIds 1996`, `publishedSha256 15d07bb340003996a6cca6b84a2bb7ab46bffca10c7e92283426ea28abdd0877`. |
-| GJ-3 rollback leg | **not passed** | The ghost fixture reached the device: `job-5b91a6a9f87b23fc689aa12584469758` failed with `outcomeUnknown false`, `status artifactIntegrityFailed`, `missingRequiredArtifacts ["verification-report.json"]`, and `publish-report.json` carries the ghost's `publishedSha256 260a533ae2b02e23810aa5ab6ea9c1a5cf4524b19484ede66cb4dc0b7bb86d3a`. The runbook requires the evidence to prove the backup was rolled back and the target process recovered. It does not: the Job published no rollback attestation and no restored-library readback. Recorded unverified rather than passed. |
+| GJ-3 rollback leg | `REAL_DEVICE_PASS` | **Corrected — see [the correction](#correction-gj-3s-rollback-leg-did-pass).** The ghost fixture reached the device and `job-5b91a6a9f87b23fc689aa12584469758` failed with `outcomeUnknown false` exactly as designed. The Runtime then rolled back automatically and proved it: the Job's durable Journal carries `intent-rollback-native-library` at `07:48:55Z` and `outcome-rollback-native-library` at `07:49:03Z`, verified on `["processIds", "restored", "restoredSha256"]`, followed by `cleanup-native-library-compensation` verified on `["backupRetained", "cleaned"]`. That is the backup restored, its bytes read back, and the target process recovered. |
 | GJ-4 Flash Recovery | `BLOCKED_BY_PRODUCT_DEFECT` | Two independent gates. `flash prerequisites` and `flash lane-preview` both refuse with `flash.postFlashHDCBindingConflict: stored alias revision 4 is newer than target revision 2`; `flash bootloader-status` reads `hdcNormal`/`unbound`. Separately `flash.full-restore@1` is `unavailable` in the Catalog (`provider_tool_unavailable`, ArkForge connected for assessment only, no named hardware acceptance campaign). No Flash was submitted. Diagnosis and the delivered mechanism: `chg-2026-059/evidence/runs/TASK-AFA-001/alias-lineage-reissue-20260908.md`. |
 | GJ-5 Bounded AI Debug Loop | `NOT_STARTED` | Not attempted in this window. Two of its operations are `unavailable` on this host (`workspace.sign-openharmony-hap@1`, `workspace.symbolize-crash@1`), and GJ-1's HAR leg and GJ-3's rollback leg were prioritised first. |
 
@@ -87,8 +87,8 @@ byte-identical to the imported source.
    `status verified` / `blockers []` while `job.evidence` published
    `artifactIntegrityFailed`. Two derivations of one record; the Agent copy
    never checked which required Artifacts were absent. Fixed under TASK-SVC-002.
-2. **GJ-3's rollback leg publishes no rollback attestation.** See the row above.
-   Not repaired; recorded for the Journey.
+2. ~~GJ-3's rollback leg publishes no rollback attestation.~~ **Withdrawn.** It
+   does; see the correction below.
 3. **The alias revision counter is reissued when the daemon state directory is
    retired**, permanently blocking Flash with a refusal that describes a newer
    route. Mechanism, proof and tests delivered under TASK-AFA-001; the entry
@@ -112,7 +112,7 @@ byte-identical to the imported source.
 | SVC-AC-07 evidence integrity | **met after #1777** | On `6ba5a0b9` the Agent evidence surface published `verified` for a Job whose authoritative evidence was `artifactIntegrityFailed`. Re-verified on `31142a78`: `agent status --execution-id gj3-rb-20260908b` and `job evidence` for `job-5b91a6a9f87b23fc689aa12584469758` now publish the same `blockers`. |
 | SVC-AC-08 internal formats | **not re-verified** | Debug permit/document and bound Provider descriptor paths were not exercised in this window. |
 | SVC-AC-09 current configuration | **partially met** | `runtime service update` wrote the current install receipt and preserved the ArkForge lane, ArkTrace descriptor and pinned HDC unchanged. All four App presentation cases passed, including the two that read this build's real Runtime data. The signing-credential legs were not exercised. |
-| SVC-AC-10 complete delivery | **not met** | GJ-4 still blocked (its reconciliation entry point is not wired), GJ-5 not started, GJ-1's HAR leg and GJ-3's rollback leg not passed, and Session export has no producer. The four defects found in the window are fixed and merged. |
+| SVC-AC-10 complete delivery | **not met** | GJ-4 still blocked (its second gate needs a named hardware acceptance campaign), GJ-5 not started, GJ-1's HAR leg not run, and Session export has no producer. The four defects found in the window are fixed and merged. |
 
 ## App presentation
 
@@ -211,6 +211,47 @@ target `TGT-958780b2ffb7` still at `bindingRevision 2` on
 The three pre-existing `waitingForRecovery` Jobs were untouched throughout; the
 ledger grew only by the Jobs this window created.
 
+## Correction: GJ-3's rollback leg did pass
+
+This record originally called GJ-3's rollback leg **not passed** and listed "the
+Job published no rollback attestation" as a defect. Both were wrong, and the
+mistake was in where the evidence was looked for.
+
+The judgement was made from `artifact list` and `evidence.actualStepKinds`
+alone. `actualStepKinds` deduplicates, so the rollback's own
+`runApprovedRemoteMutation` adds no new kind and is invisible there, and the
+Catalog declares only the two success-path Artifacts, so nothing about a
+rollback would ever appear in the Artifact inventory. The rollback's proof lives
+where the Runtime actually records step evidence — the Job's durable Journal —
+and reading `job timeline` and `job events` for the same Job shows it plainly:
+
+```text
+20  intent start-target
+21  failed start-target: nativeTargetNotRunning: com.example.scrollablecomponentstatic did not start
+22  intent rollback-native-library
+23  verified rollback-native-library ["processIds", "restored", "restoredSha256"]
+24  native deployment failure restored previous library
+25  intent cleanup-native-library-compensation
+26  verified cleanup-native-library-compensation ["backupRetained", "cleaned"]
+```
+
+with `intent-rollback-native-library` at `2026-09-08T07:48:55Z` and
+`outcome-rollback-native-library` at `07:49:03Z` in the event stream. `restored`
+and `restoredSha256` are the backup put back and its bytes read back;
+`processIds` is the target process recovered. That is exactly what the runbook
+requires the rollback leg to prove, and the Runtime did it automatically from a
+deterministic post-publish verification failure.
+
+`missingRequiredArtifacts: ["verification-report.json"]` and the resulting
+`evidence.status: artifactIntegrityFailed` remain correct and are not a defect:
+that Artifact is the *success* path's loaded-library verification, and this Job
+correctly never produced one.
+
+The lesson worth keeping is narrow and mechanical: on this product the
+authoritative per-step evidence surface is the Journal, and an Artifact
+inventory plus a deduplicated step-kind list cannot answer "did this
+compensation run".
+
 ## Not executed, and why
 
 - **GJ-1 §2.1 HAR crash-resume** — needs a physical USB detach and reattach.
@@ -239,7 +280,7 @@ from `6ba5a0b9` — the four merged fixes changed no published shape:
 | Runtime Catalog digest | `508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684` |
 
 This is a **development** baseline, not a hardware-verified one. GJ-4 and GJ-5
-did not pass on it, GJ-1's HAR leg and GJ-3's rollback leg did not, and Session
-export has no producer. CHG-2026-074 may consume the contract identity, schema,
+did not pass on it, GJ-1's HAR leg was not run, and Session export has no
+producer. CHG-2026-074 may consume the contract identity, schema,
 corpus and Catalog digests; it may not treat this as a completed real-device
 acceptance.
