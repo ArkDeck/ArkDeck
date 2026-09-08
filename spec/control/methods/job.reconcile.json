@@ -41,10 +41,47 @@
           "type": "string"
         },
         "failure": {
-          "type": "null"
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "category": {
+                  "type": "string"
+                },
+                "code": {
+                  "type": "string"
+                },
+                "recovery": {
+                  "type": "string"
+                },
+                "retryability": {
+                  "type": "string"
+                },
+                "schemaVersion": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "category",
+                "code",
+                "recovery",
+                "retryability",
+                "schemaVersion"
+              ],
+              "type": "object"
+            },
+            {
+              "type": [
+                "null"
+              ]
+            }
+          ]
         },
         "finishedAtUtc": {
-          "type": "null"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "jobId": {
           "type": "string"
@@ -98,8 +135,7 @@
             "kind",
             "owner",
             "reasonCode",
-            "resource",
-            "retryAfter"
+            "resource"
           ],
           "type": "object"
         },
@@ -189,7 +225,7 @@
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
     "error": 1,
-    "request": 2,
-    "result": 1
+    "request": 6,
+    "result": 5
   }
 }

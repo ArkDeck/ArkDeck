@@ -12,6 +12,7 @@ final class AgentClientDeadlineContractTests: XCTestCase {
   private func withPeer(
     connections: Int = 1,
     readRequest: Bool = true,
+    receiveBufferBytes: Int32? = nil,
     reply: @escaping @Sendable (Int, Int32, Data) -> Void,
     body: (AgentClient) throws -> Void
   ) throws {
@@ -23,6 +24,11 @@ final class AgentClientDeadlineContractTests: XCTestCase {
     let listener = socket(AF_UNIX, SOCK_STREAM, 0)
     XCTAssertGreaterThanOrEqual(listener, 0)
     defer { close(listener) }
+    if var receiveBufferBytes {
+      XCTAssertEqual(setsockopt(
+        listener, SOL_SOCKET, SO_RCVBUF, &receiveBufferBytes,
+        socklen_t(MemoryLayout.size(ofValue: receiveBufferBytes))), 0)
+    }
     var address = sockaddr_un()
     address.sun_family = sa_family_t(AF_UNIX)
     withUnsafeMutableBytes(of: &address.sun_path) { buffer in
@@ -178,27 +184,38 @@ final class AgentClientDeadlineContractTests: XCTestCase {
   }
 
   func testBlockedWritesCannotOutliveTheSameDeadline() throws {
+    let padding = String(repeating: "x", count: 32 * 1024)
     try withPeer(
       readRequest: false,
+      receiveBufferBytes: 1024,
       reply: { _, connection, _ in
-        // Keep the peer's receive buffer full past the client's total budget.
+        // A small receive window blocks a bounded request without spending
+        // the deadline encoding megabytes before the socket is even opened.
         Thread.sleep(forTimeInterval: 0.5)
         var bytes = [UInt8](repeating: 0, count: 4096)
+        var received = 0
         while true {
           let count = read(connection, &bytes, bytes.count)
-          if count == 0 { return }
+          if count == 0 { break }
           guard count > 0 else { return XCTFail("the expired client did not close its connection") }
+          received += count
+          XCTAssertFalse(bytes.prefix(count).contains(0x0A), "the request must not finish writing")
         }
+        XCTAssertGreaterThan(received, 0, "the deadline must be exercised after writing begins")
+        XCTAssertLessThan(received, padding.utf8.count, "the blocked write must remain partial")
       }
     ) { client in
       let deadline = try AgentClientWaitDeadline(milliseconds: 200)
+      let started = ContinuousClock.now
       XCTAssertThrowsError(
         try client.bounded(by: deadline).request(
           method: "health",
-          params: ["fixturePadding": .string(String(repeating: "x", count: 3 * 1024 * 1024))])
+          params: ["fixturePadding": .string(padding)])
       ) {
         XCTAssertEqual($0 as? AgentClientError, .deadlineExceeded)
       }
+      XCTAssertLessThan(started.duration(to: .now), .seconds(2))
+      XCTAssertEqual(deadline.remainingMilliseconds, 0)
     }
   }
 

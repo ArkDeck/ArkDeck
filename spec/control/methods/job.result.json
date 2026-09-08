@@ -74,8 +74,7 @@
             "kind",
             "owner",
             "reasonCode",
-            "resource",
-            "retryAfter"
+            "resource"
           ],
           "type": "object"
         },
@@ -788,8 +787,8 @@
   "x-arkdeck-method": "job.result",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 3,
-    "request": 10,
-    "result": 7
+    "error": 4,
+    "request": 14,
+    "result": 10
   }
 }
