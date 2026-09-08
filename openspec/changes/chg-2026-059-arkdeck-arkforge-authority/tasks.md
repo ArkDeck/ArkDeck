@@ -46,7 +46,8 @@ review/merge 进入 protected `main` 后生效；合入前不得开始实现 PR�
   - `Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckCLIMain.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckRuntimeCommands.swift`
   - `Packages/ArkDeckKit/Contracts/control-protocol.json`
-  - `spec/control/methods/flash.reconcile-alias.json`
+  - `spec/control/methods/**`
+  - `openspec/contracts/runtime-control-plane.schema.json`
   - `Packages/ArkDeckKit/Sources/ArkDeckCLI/CLICommandRegistry.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckCLI/CLIControlMethodRegistry.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckCLI/CLIMachineContracts.swift`
@@ -104,6 +105,24 @@ alias store，响应丢失无法自证是否已写，调用方应改读 `flash p
 因此补两条：`control-protocol.json`（生成的 `ControlProtocolGenerated.swift`
 在已有的 `ArkDeckCore/**` 内）与该方法的 per-method schema。发布方法会改变
 contract identity，这是有意的已发布面变更。
+
+第五次也是最后一次补充，这次的清单是**实测出来的**而不是估计的：把方法加进
+`control-protocol.json` 会改变 contract identity（`1054d17b…` → `8a662759…`），
+而每一份 per-method schema 都带着这个 identity，所以 97 份全部必须重新派生，
+`openspec/contracts/runtime-control-plane.schema.json` 也跟着 identity 走。
+#1789 只给了该方法自己的 schema，是我按"只会动它自己"估计的，跑完才发现不对。
+
+因此把 `spec/control/methods/flash.reconcile-alias.json` 扩为
+`spec/control/methods/**`，并补 `runtime-control-plane.schema.json`。语料目录在
+`Tests/ArkDeckContractTests/**` 内，已在范围。至此这就是全部：我按这份改动实际
+跑过一遍完整派生并逐行读过 diff。
+
+churn 是量过的，不是假设的：97 份 schema 的 diff 里除了
+`x-arkdeck-contractIdentity` 和 `x-arkdeck-sampleCounts` 两行之外**没有任何内容**
+——没有任何 request / result / errorCode / errorDetails 形状发生变化；58 份语料
+文件变动、其中两份行数变少是生成器为同一组挑了更小的代表，按"每方法不同请求/
+响应键形状"统计，`job.show` 不变（3），`agent.run` 反而多了一个（7→8），没有丢
+覆盖。
 
 同时补上让这个缺陷得以发生的闸：现有
 `ControlMethodReachabilityContractTests` 只检查"已发布 → 有 dispatch"，没有反
