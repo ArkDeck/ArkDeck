@@ -1,14 +1,501 @@
 {
   "catalogDigest": "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
-  "commit": "3940b87592bbd62342dbe7c757da16bfbca400af",
+  "commit": "8151907bee9919a0847edc9a9aeb1f0ff84f6d15",
   "contractIdentity": "1054d17b598ce23003ebbdec4d42eb359b63016d6421709ba53c3f21f7c6558d",
   "corpusFileCount": 96,
+  "corpusMethodCounts": {
+    "agent.abandon": {
+      "errors": 1,
+      "requests": 2,
+      "successes": 1
+    },
+    "agent.list": {
+      "errors": 1,
+      "requests": 2,
+      "successes": 1
+    },
+    "agent.resume": {
+      "errors": 2,
+      "requests": 3,
+      "successes": 1
+    },
+    "agent.run": {
+      "errors": 2,
+      "requests": 6,
+      "successes": 4
+    },
+    "agent.status": {
+      "errors": 1,
+      "requests": 4,
+      "successes": 3
+    },
+    "artifact.export": {
+      "errors": 4,
+      "requests": 5,
+      "successes": 1
+    },
+    "artifact.import.abort": {
+      "errors": 2,
+      "requests": 3,
+      "successes": 1
+    },
+    "artifact.import.append": {
+      "errors": 3,
+      "requests": 5,
+      "successes": 2
+    },
+    "artifact.import.begin": {
+      "errors": 5,
+      "requests": 7,
+      "successes": 2
+    },
+    "artifact.import.commit": {
+      "errors": 3,
+      "requests": 7,
+      "successes": 4
+    },
+    "artifact.import.inspect": {
+      "errors": 2,
+      "requests": 5,
+      "successes": 3
+    },
+    "artifact.import.inspection": {
+      "errors": 1,
+      "requests": 5,
+      "successes": 4
+    },
+    "artifact.import.list": {
+      "errors": 0,
+      "requests": 2,
+      "successes": 2
+    },
+    "artifact.import.release": {
+      "errors": 2,
+      "requests": 3,
+      "successes": 1
+    },
+    "artifact.inspect": {
+      "errors": 2,
+      "requests": 6,
+      "successes": 4
+    },
+    "artifact.list": {
+      "errors": 4,
+      "requests": 10,
+      "successes": 6
+    },
+    "artifact.quota": {
+      "errors": 0,
+      "requests": 1,
+      "successes": 1
+    },
+    "artifact.read": {
+      "errors": 6,
+      "requests": 8,
+      "successes": 2
+    },
+    "capability.inspect": {
+      "errors": 2,
+      "requests": 3,
+      "successes": 1
+    },
+    "capability.list": {
+      "errors": 0,
+      "requests": 2,
+      "successes": 2
+    },
+    "cleanupDebt.continue": {
+      "errors": 1,
+      "requests": 2,
+      "successes": 1
+    },
+    "cleanupDebt.list": {
+      "errors": 0,
+      "requests": 2,
+      "successes": 2
+    },
+    "control-action.list": {
+      "errors": 1,
+      "requests": 2,
+      "successes": 1
+    },
+    "control-action.reconcile": {
+      "errors": 1,
+      "requests": 2,
+      "successes": 1
+    },
+    "control-action.show": {
+      "errors": 2,
+      "requests": 3,
+      "successes": 1
+    },
+    "debug.evaluate": {
+      "errors": 1,
+      "requests": 2,
+      "successes": 1
+    },
+    "debug.probe": {
+      "errors": 3,
+      "requests": 4,
+      "successes": 1
+    },
+    "debug.start": {
+      "errors": 1,
+      "requests": 2,
+      "successes": 1
+    },
+    "debug.status": {
+      "errors": 1,
+      "requests": 2,
+      "successes": 1
+    },
+    "debug.template.run": {
+      "errors": 1,
+      "requests": 2,
+      "successes": 1
+    },
+    "device.display-name.clear": {
+      "errors": 2,
+      "requests": 3,
+      "successes": 1
+    },
+    "device.display-name.set": {
+      "errors": 2,
+      "requests": 3,
+      "successes": 1
+    },
+    "device.observations": {
+      "errors": 6,
+      "requests": 12,
+      "successes": 6
+    },
+    "doctor": {
+      "errors": 2,
+      "requests": 10,
+      "successes": 8
+    },
+    "flash.bind-current-loader": {
+      "errors": 1,
+      "requests": 2,
+      "successes": 1
+    },
+    "flash.bootloader-status": {
+      "errors": 1,
+      "requests": 2,
+      "successes": 1
+    },
+    "flash.device-access": {
+      "errors": 2,
+      "requests": 3,
+      "successes": 1
+    },
+    "flash.lanePlanPreview": {
+      "errors": 2,
+      "requests": 5,
+      "successes": 3
+    },
+    "flash.prerequisites": {
+      "errors": 2,
+      "requests": 3,
+      "successes": 1
+    },
+    "health": {
+      "errors": 0,
+      "requests": 2,
+      "successes": 2
+    },
+    "history.filter.delete": {
+      "errors": 2,
+      "requests": 3,
+      "successes": 1
+    },
+    "history.filter.list": {
+      "errors": 1,
+      "requests": 2,
+      "successes": 1
+    },
+    "history.filter.save": {
+      "errors": 1,
+      "requests": 2,
+      "successes": 1
+    },
+    "human-action.list": {
+      "errors": 1,
+      "requests": 2,
+      "successes": 1
+    },
+    "human-action.resume": {
+      "errors": 1,
+      "requests": 5,
+      "successes": 4
+    },
+    "human-action.show": {
+      "errors": 1,
+      "requests": 3,
+      "successes": 2
+    },
+    "job.cancel": {
+      "errors": 2,
+      "requests": 3,
+      "successes": 1
+    },
+    "job.events": {
+      "errors": 3,
+      "requests": 13,
+      "successes": 10
+    },
+    "job.evidence": {
+      "errors": 1,
+      "requests": 10,
+      "successes": 9
+    },
+    "job.list": {
+      "errors": 7,
+      "requests": 14,
+      "successes": 7
+    },
+    "job.plan": {
+      "errors": 2,
+      "requests": 4,
+      "successes": 2
+    },
+    "job.reconcile": {
+      "errors": 1,
+      "requests": 3,
+      "successes": 2
+    },
+    "job.result": {
+      "errors": 4,
+      "requests": 12,
+      "successes": 8
+    },
+    "job.run": {
+      "errors": 2,
+      "requests": 4,
+      "successes": 2
+    },
+    "job.show": {
+      "errors": 2,
+      "requests": 11,
+      "successes": 9
+    },
+    "job.status": {
+      "errors": 2,
+      "requests": 8,
+      "successes": 6
+    },
+    "job.submit": {
+      "errors": 2,
+      "requests": 3,
+      "successes": 1
+    },
+    "job.timeline": {
+      "errors": 1,
+      "requests": 1,
+      "successes": 0
+    },
+    "operation.describe": {
+      "errors": 0,
+      "requests": 24,
+      "successes": 24
+    },
+    "operation.list": {
+      "errors": 0,
+      "requests": 1,
+      "successes": 1
+    },
+    "recovery.flash-invocation.list": {
+      "errors": 1,
+      "requests": 2,
+      "successes": 1
+    },
+    "runtime.hdc.impact-preview": {
+      "errors": 1,
+      "requests": 2,
+      "successes": 1
+    },
+    "runtime.hdc.restart": {
+      "errors": 1,
+      "requests": 2,
+      "successes": 1
+    },
+    "runtime.hdc.status": {
+      "errors": 1,
+      "requests": 3,
+      "successes": 2
+    },
+    "runtime.storage.policy": {
+      "errors": 1,
+      "requests": 2,
+      "successes": 1
+    },
+    "runtime.storage.root": {
+      "errors": 2,
+      "requests": 3,
+      "successes": 1
+    },
+    "runtime.storage.status": {
+      "errors": 1,
+      "requests": 2,
+      "successes": 1
+    },
+    "runtime.tool.select": {
+      "errors": 2,
+      "requests": 3,
+      "successes": 1
+    },
+    "session.cleanup.apply": {
+      "errors": 1,
+      "requests": 2,
+      "successes": 1
+    },
+    "session.cleanup.preview": {
+      "errors": 1,
+      "requests": 2,
+      "successes": 1
+    },
+    "session.export.apply": {
+      "errors": 2,
+      "requests": 3,
+      "successes": 1
+    },
+    "session.export.preview": {
+      "errors": 1,
+      "requests": 2,
+      "successes": 1
+    },
+    "session.list": {
+      "errors": 1,
+      "requests": 2,
+      "successes": 1
+    },
+    "session.pin": {
+      "errors": 1,
+      "requests": 2,
+      "successes": 1
+    },
+    "session.show": {
+      "errors": 1,
+      "requests": 2,
+      "successes": 1
+    },
+    "session.unpin": {
+      "errors": 2,
+      "requests": 3,
+      "successes": 1
+    },
+    "target.adopt": {
+      "errors": 3,
+      "requests": 4,
+      "successes": 1
+    },
+    "target.availability": {
+      "errors": 2,
+      "requests": 3,
+      "successes": 1
+    },
+    "target.display-name.clear": {
+      "errors": 2,
+      "requests": 3,
+      "successes": 1
+    },
+    "target.display-name.set": {
+      "errors": 3,
+      "requests": 4,
+      "successes": 1
+    },
+    "target.list": {
+      "errors": 1,
+      "requests": 4,
+      "successes": 3
+    },
+    "target.show": {
+      "errors": 2,
+      "requests": 5,
+      "successes": 3
+    },
+    "trace.cache.purge": {
+      "errors": 3,
+      "requests": 4,
+      "successes": 1
+    },
+    "trace.cache.status": {
+      "errors": 2,
+      "requests": 3,
+      "successes": 1
+    },
+    "trace.inspect": {
+      "errors": 2,
+      "requests": 3,
+      "successes": 1
+    },
+    "trace.probe": {
+      "errors": 1,
+      "requests": 2,
+      "successes": 1
+    },
+    "workspace.preset.list": {
+      "errors": 2,
+      "requests": 4,
+      "successes": 2
+    },
+    "workspace.preset.register": {
+      "errors": 1,
+      "requests": 2,
+      "successes": 1
+    },
+    "workspace.preset.remove": {
+      "errors": 1,
+      "requests": 2,
+      "successes": 1
+    },
+    "workspace.preset.show": {
+      "errors": 2,
+      "requests": 3,
+      "successes": 1
+    },
+    "workspace.preset.update": {
+      "errors": 1,
+      "requests": 2,
+      "successes": 1
+    },
+    "workspace.project.list": {
+      "errors": 1,
+      "requests": 3,
+      "successes": 2
+    },
+    "workspace.project.register": {
+      "errors": 1,
+      "requests": 2,
+      "successes": 1
+    },
+    "workspace.project.remove": {
+      "errors": 1,
+      "requests": 2,
+      "successes": 1
+    },
+    "workspace.project.show": {
+      "errors": 2,
+      "requests": 3,
+      "successes": 1
+    },
+    "workspace.project.update": {
+      "errors": 1,
+      "requests": 2,
+      "successes": 1
+    }
+  },
+  "corpusRecordCounts": {
+    "errors": 165,
+    "requests": 382,
+    "successes": 217
+  },
   "directoryDigests": {
     "Catalog/operations": "16671abf96551e9d5b9c3382fe4eb08f3fcd150cff68e7419634cd10ecda4bfd",
     "Catalog/profiles": "58ca1d970d40019ba2718646fde81fefda22533c5448e620217582e30f5d648f",
-    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "4ad7766288b8b679c821acb9c5ef2bd4f675834929a6eb1a9e542a26b116e849",
+    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "2e695da7815683b80dd2904d66f30890a1b527915d800393a87f8e846a069edd",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC": "9ae93642e7b81bcea918469216711d7f6a17135a29cf021556ceef0f2f789196",
-    "spec/control/methods": "5a127a679b587a61cd8f515e3f73137e050607db1a863d40a0e6e17cfa646a42"
+    "spec/control/methods": "630cc2ea1ecb272c6ee59cadcb7d836f05c7feee10edb081e1e83317909c105a"
   },
   "files": {
     "Catalog/generated/effect-authorization-matrix.md": {
@@ -388,20 +875,20 @@
       "sha256": "468e10f862fd2297708bf4d4467bf0c864499ba0c2266362590435177e7018e3"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.reconcile.jsonl": {
-      "blob": "4704c7abecd276221f23698b966a7c312eac3b3a",
-      "sha256": "c717662e8eba631ee60b5f6b6fffc563a6b9f4aefed60580f746891d94fdea4d"
+      "blob": "312f39eac4b0dec05fcb91fc96488a053aaf47b1",
+      "sha256": "6ced89f70da714fab118ca3d41888d255ad4922f990e26776d6f385445ce6101"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.result.jsonl": {
-      "blob": "ae540e15088f97491f629a60b1d942cb78234d0d",
-      "sha256": "53a9821712a03111e49749038a5d7b4324343406a886f77179b9717152a41358"
+      "blob": "1f39a342cbcae93296ae1770bb6bc608d5fe9a62",
+      "sha256": "37978ec8678083d0a2285846fcb8a8b19d41685d7dd52f218b2bdfb26645090b"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.run.jsonl": {
       "blob": "37e4cb3b85e8f5115c92fce5b6a061ee90292f61",
       "sha256": "3a051a0d41015a1f839aa11f69f7ce27ac4b94a3f7fdd8bf85c13e6df68d2817"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.show.jsonl": {
-      "blob": "8f1ca6ea026a17edb6aca8558fea89cdc8716c79",
-      "sha256": "95bc5d38bab46e494c103f215065387ebe93b4bdec8b68b1db6a97e0f30695ea"
+      "blob": "68319fc28ac5e26de573ac843a74a8a18f5d8937",
+      "sha256": "661c046027715eccd3cc3a70078f7bf36889a59b891fe126cb9a6af91f77a1de"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.status.jsonl": {
       "blob": "32b7c0a6a1579851d327bdf2996a4d191cf0d9c4",
@@ -739,6 +1226,10 @@
       "blob": "22dde4e3b985eb37a8df152398dbb8636f790fa9",
       "sha256": "528a9b202c0d35bfa2078a15710886061645553d98bb1aa686733ae91e271137"
     },
+    "openspec/contracts/workflow-step.schema.json": {
+      "blob": "de77addf9d58e709a815634fc9aa5b2ba63bf3a7",
+      "sha256": "81e9c16b48608b5065a9424ee94a2942e7490b71c5c0322b7428cc6fe33a6f41"
+    },
     "spec/control/methods/agent.abandon.json": {
       "blob": "59404e87d3590f136c4c7e17f631ff420bc757da",
       "sha256": "fb9076bbb8f7f6426385be139887e3c6098a38ad11b3e7e19086e20109d94c98"
@@ -944,20 +1435,20 @@
       "sha256": "858065484985cb6617e0bc6ac71219a6a8e3090cedc39d9481c6bb7630864c87"
     },
     "spec/control/methods/job.reconcile.json": {
-      "blob": "db27304d644b22271570dc69853366715b039475",
-      "sha256": "45b964c1c7f5c09cc0b21b92e9d91ced2669b2b87b746cdb4fd0f0eb304b2ac7"
+      "blob": "cd3835429025fe4a2c562adfd1f3704de79000c1",
+      "sha256": "95304e75c67efb4cc3801a98535d7878f87100ca9427b60ea5b293e6d4cd5ad1"
     },
     "spec/control/methods/job.result.json": {
-      "blob": "f14b3f1bbd7d633026594aa585ff19163c43d7fa",
-      "sha256": "0d8af661b5b0fead48eb0679c17c873b38c3da45d74cd5750e6762e0aa666163"
+      "blob": "09170c590d84bb5e6dbc9b52601bce58dd6ac99d",
+      "sha256": "8703aab0f4e903c73a15aea7dabaf7ae9c7c1bb231bbd122baebc07a850efb8a"
     },
     "spec/control/methods/job.run.json": {
       "blob": "c2b6ef2975eeea5d49eed5184a14ddff51ff9335",
       "sha256": "ef5f7b223543d59d168e692fea9db9fdba0698790950d8c87c9f047c19ec6302"
     },
     "spec/control/methods/job.show.json": {
-      "blob": "7442d4a177564233ee453002a5ed5d3c2a3aeb7e",
-      "sha256": "13778ca08e5c2954c0e4300c4ea6dc47fe089b0fc75b18f19742862922f24bab"
+      "blob": "303e1835dad5e5e36faaf66db858fceda112ef2a",
+      "sha256": "306b200139c744f3073c4628d4ac1d543cbd593ceeb670cd3f9de1e25f8991cf"
     },
     "spec/control/methods/job.status.json": {
       "blob": "76d39e2c752b149fa07085eb6f40740b29dfc3e6",
@@ -1124,6 +1615,7 @@
       "sha256": "a27199d0d0daa9ad366d544886278cf3b6a2e2c4a8ca436001d4a9497c3232db"
     }
   },
+  "inputDigest": "8b5d1d8a12bc5000000cc6582d257d4be141bbe02fd21611ccb72d5c005a58f4",
   "kind": "development",
   "methodCount": 96,
   "protocolVersion": "1.0.0",

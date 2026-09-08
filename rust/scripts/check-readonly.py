@@ -26,6 +26,7 @@ import jsonschema
 
 ROOT = Path(__file__).resolve().parents[2]
 BASELINE = ROOT / "spec/baselines/swift-single-v1.json"
+CANDIDATE_INPUTS = ROOT / "spec/baselines/swift-candidate-inputs.json"
 REGISTRY = ROOT / "Packages/ArkDeckKit/Contracts/control-protocol.json"
 SUPPORTED = {"health", "doctor", "operation.list", "device.observations"}
 
@@ -64,6 +65,37 @@ def read_json(path: Path) -> dict:
     return json.loads(path.read_bytes())
 
 
+def contract_identity(registry: dict) -> str:
+    canonical = json.dumps(registry, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(canonical).hexdigest()
+
+
+def input_metadata(registry: dict) -> dict:
+    path = CANDIDATE_INPUTS if CANDIDATE_INPUTS.is_file() else BASELINE
+    contents = path.read_bytes()
+    inputs = json.loads(contents)
+    published = read_json(BASELINE)
+    assert published["kind"] == "development"
+    assert published["schemaVersion"] == "arkdeck.swift-development-baseline/1"
+    published_commit = published["commit"]
+    if path == CANDIDATE_INPUTS:
+        assert inputs["kind"] == "candidate"
+        assert inputs["schemaVersion"] == "arkdeck.swift-candidate-inputs/1"
+        assert "commit" not in inputs, "candidate inputs have no published commit"
+        assert inputs["publishedBaselineCommit"] == published_commit
+    else:
+        assert inputs["kind"] == "development"
+        assert inputs["schemaVersion"] == "arkdeck.swift-development-baseline/1"
+    identity = contract_identity(registry)
+    assert inputs["contractIdentity"] == identity
+    assert inputs["protocolVersion"] == registry["currentVersion"]
+    assert inputs["methodCount"] == len(registry["methods"])
+    return {"baseline": published_commit, "publishedBaselineCommit": published_commit,
+            "inputKind": inputs["kind"], "inputDigest": inputs["inputDigest"],
+            "inputManifestSHA256": hashlib.sha256(contents).hexdigest(),
+            "contractIdentity": identity}
+
+
 def record(directory: Path, rows: list, name: str, kind: str, data: bytes, **metadata) -> dict:
     path = directory / f"{len(rows):03}-{name}.{kind}"
     path.write_bytes(data)
@@ -88,7 +120,7 @@ def invoke(cli: Path, directory: Path, rows: list, environment: dict, name: str,
 
 def request(registry: dict, method: str, identifier: str, params=None) -> dict:
     value = {"protocolVersion": registry["currentVersion"],
-             "contractIdentity": read_json(BASELINE)["contractIdentity"],
+             "contractIdentity": contract_identity(registry),
              "id": identifier, "method": method}
     if params is not None:
         value["params"] = params
@@ -183,11 +215,12 @@ def validate_spk3(directory: Path) -> None:
         data = path.read_bytes()
         assert json.loads(data)["command"] == command, path.name
         rows.append({"file": path.name, "kind": "cli.jsonl", "sha256": hashlib.sha256(data).hexdigest()})
-    counts = validate_completed(directory, rows, read_json(REGISTRY))
+    registry = read_json(REGISTRY)
+    counts = validate_completed(directory, rows, registry)
     result = {"schemaVersion": "arkdeck.spk3-output-schema-check/1", "result": "PASS",
               "allRecordingsCompletedBeforeValidation": True, "counts": counts,
               "recordings": rows, "deviceAcceptance": False,
-              "baseline": read_json(BASELINE)["commit"]}
+              **input_metadata(registry)}
     # This is a derived validation result; the raw host record is not rewritten.
     output = directory / "spk3-schema-validation.json"
     contents = json.dumps(result, indent=2) + "\n"
@@ -218,6 +251,7 @@ def main() -> None:
     cli = args.bin_dir.resolve() / f"arkdeck{suffix}"
     daemon_binary = args.bin_dir.resolve() / f"arkdeck-agentd{suffix}"
     registry = read_json(REGISTRY)
+    metadata = input_metadata(registry)
     rows = []
     environment = {key: value for key, value in os.environ.items()
                    if not key.startswith(("ARKDECK_", "OHOS_HDC_"))}
@@ -286,7 +320,7 @@ def main() -> None:
     summary = {"schemaVersion": "arkdeck.rust-readonly-host-check/1", "kind": "host-test",
                "result": "PASS", "platform": platform.platform(), "deviceAcceptance": False,
                "windowsInstalledDaemonAcceptance": False, "allRecordingsCompletedBeforeValidation": True,
-               "baseline": read_json(BASELINE)["commit"], "counts": counts,
+               **metadata, "counts": counts,
                "binaries": {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in [cli, daemon_binary]}}
     (directory / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     print(json.dumps({"recordingDirectory": str(directory), **summary}))

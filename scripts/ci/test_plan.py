@@ -139,6 +139,75 @@ class PathClassificationTests(unittest.TestCase):
             with self.subTest(path=path):
                 self.assert_lanes([path], swift=False, app=False, ds=False, rust=True)
 
+    def test_contract_schema_catalog_and_generator_only_changes_select_rust(self):
+        for path in (
+            "openspec/contracts/runtime-control-plane.schema.json",
+            "openspec/contracts/cli-canonical-json-vectors.json",
+            "openspec/contracts/cli-result.schema.json",
+            "openspec/contracts/cli-error-registry.yaml",
+            "openspec/contracts/journal-event.schema.json",
+            "openspec/contracts/workflow-step.schema.json",
+            "openspec/changes/chg-2026-059-arkdeck-arkforge-authority/permit-vectors.md",
+            "Catalog/operations/observe.device.json",
+            "Catalog/profiles/default.json",
+            "Catalog/generated/effect-authorization-matrix.md",
+            "scripts/catalog_gen/generate.py",
+        ):
+            with self.subTest(path=path):
+                self.assert_lanes([path], swift=False, app=False, ds=False, rust=True)
+
+    def test_source_only_canonical_control_and_journal_changes_select_rust(self):
+        for name in (
+            "ArkDeckCore/PortableCanonicalJSON.swift",
+            "ArkDeckCore/CanonicalCBOR.swift",
+            "ArkDeckCore/CanonicalDigests.swift",
+            "ArkDeckCore/ControlProtocolGenerated.swift",
+            "ArkDeckCore/ControlProtocolContract.swift",
+            "ArkDeckCore/ControlFrameJSON.swift",
+            "ArkDeckStorage/JournalEvent.swift",
+            "ArkDeckStorage/JournalEventValidation.swift",
+            "ArkDeckStorage/JournalReplay.swift",
+        ):
+            path = f"Packages/ArkDeckKit/Sources/{name}"
+            with self.subTest(path=path):
+                self.assert_lanes([path], swift=True, app=True, ds=True, rust=True)
+
+    def test_control_producer_and_fixture_only_changes_select_rust_without_app(self):
+        for path in (
+            "Packages/ArkDeckKit/Contracts/control-protocol.json",
+            "Packages/ArkDeckKit/Scripts/generate-control-contract.py",
+            "Packages/ArkDeckKit/Sources/ArkDeckCLI/CLICanonicalJSON.swift",
+            "Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/ControlFrameRecorder.swift",
+            "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.show.jsonl",
+            "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Golden/1.0.0/registry.json",
+            "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI/argv/doctor.json",
+        ):
+            with self.subTest(path=path):
+                self.assert_lanes([path], swift=True, app=False, ds=True, rust=True)
+
+    def test_every_declared_generator_input_selects_rust(self):
+        root = SCRIPT.resolve().parents[2]
+        spec = importlib.util.spec_from_file_location(
+            "arkdeck_rust_contract_generator", root / "rust/scripts/generate-contract.py"
+        )
+        assert spec is not None and spec.loader is not None
+        generator = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = generator
+        spec.loader.exec_module(generator)
+        self.assertTrue(generator.INPUTS)
+        for path in generator.INPUTS:
+            source = root / path
+            if source.is_dir():
+                inputs = [str(file.relative_to(root)) for file in source.rglob("*") if file.is_file()]
+                # A newly added member of a declared directory must select the
+                # lane too, without waiting for a baseline manifest refresh.
+                inputs.append(f"{path}/new-contract-input.json")
+            else:
+                inputs = [path]
+            for candidate in inputs:
+                with self.subTest(input=path, changed_path=candidate):
+                    self.assertTrue(PLAN.classify_paths([candidate]).rust)
+
 
 class GitPlanTests(unittest.TestCase):
     def setUp(self):
@@ -367,10 +436,6 @@ class CommandSelectionTests(unittest.TestCase):
         self.assertEqual(rust_commands, [
             "cargo fmt --all --check",
             "cargo fetch --locked",
-            "cargo clippy --workspace --all-targets --locked -- -D warnings",
-            "cargo test --workspace --locked",
-            "cargo run --package arkdeck-platform --example windows_spk3 --locked -- process-selftest",
-            "cargo build --workspace --bins --locked",
             "cargo deny --locked check",
             "cargo vet --locked --no-registry-suggestions",
         ])
@@ -378,9 +443,12 @@ class CommandSelectionTests(unittest.TestCase):
             f"{sys.executable} rust/scripts/generate-contract.py --check"
         )
         self.assertLess(generator, commands.index("cargo fmt --all --check"))
-        black_box = commands.index(f"{sys.executable} rust/scripts/check-readonly.py")
-        self.assertLess(commands.index("cargo build --workspace --bins --locked"), black_box)
-        self.assertLess(black_box, commands.index("cargo deny --locked check"))
+        regressions = commands.index(f"{sys.executable} rust/scripts/test_contract_checks.py")
+        parity = commands.index(f"{sys.executable} rust/scripts/check-contracts.py")
+        self.assertLess(commands.index("cargo fetch --locked"), regressions)
+        self.assertLess(regressions, parity)
+        self.assertLess(parity, commands.index("cargo deny --locked check"))
+        self.assertNotIn(f"{sys.executable} rust/scripts/check-readonly.py", commands)
         self.assertNotIn("xcodebuild", "\n".join(commands))
 
     def test_rust_commands_use_workspace_toolchain_directory(self):
@@ -394,8 +462,10 @@ class CommandSelectionTests(unittest.TestCase):
         )
         self.assertTrue(all(call.kwargs["check"] for call in run.call_args_list))
 
-    def test_dependency_policy_failure_cannot_pass_local_gate(self):
+    def test_contract_or_dependency_policy_failure_cannot_pass_local_gate(self):
         for command in (
+            (sys.executable, "rust/scripts/test_contract_checks.py"),
+            (sys.executable, "rust/scripts/check-contracts.py"),
             ("cargo", "deny", "--locked", "check"),
             ("cargo", "vet", "--locked", "--no-registry-suggestions"),
         ):

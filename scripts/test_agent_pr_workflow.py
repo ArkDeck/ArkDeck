@@ -489,11 +489,10 @@ def validate_rust_ci_contract(text: str) -> None:
         "rustup show active-toolchain",
         "run: cargo fmt --all --check",
         "run: cargo fetch --locked",
-        "run: cargo clippy --workspace --all-targets --locked -- -D warnings",
-        "run: cargo test --workspace --locked",
-        "run: cargo run --package arkdeck-platform --example windows_spk3 --locked -- process-selftest",
-        "run: cargo build --workspace --bins --locked",
-        "run: python rust/scripts/check-readonly.py",
+        "        working-directory: .\n"
+        "        run: python rust/scripts/test_contract_checks.py\n",
+        "        working-directory: .\n"
+        "        run: python rust/scripts/check-contracts.py\n",
         "cargo install --locked --version 0.20.2 cargo-deny",
         "cargo install --locked --version 0.10.2 cargo-vet",
         "run: cargo deny --locked check",
@@ -526,14 +525,22 @@ def validate_rust_ci_contract(text: str) -> None:
     ):
         raise WorkflowContractError("Rust CI must install rustfmt before checking generated inputs")
     if text.index("run: python rust/scripts/generate-contract.py --check") > text.index(
-        "run: cargo clippy --workspace"
+        "run: python rust/scripts/check-contracts.py"
     ):
         raise WorkflowContractError("Rust CI must check generated inputs before compilation")
-    if text.index("run: cargo build --workspace --bins --locked") > text.index(
-        "run: python rust/scripts/check-readonly.py"
+    if text.index("run: cargo fetch --locked") > text.index(
+        "run: python rust/scripts/check-contracts.py"
     ):
-        raise WorkflowContractError("Rust CI must build product binaries before black-box checks")
-    if text.index("run: python rust/scripts/check-readonly.py") > text.index(
+        raise WorkflowContractError("Rust CI must fetch locked metadata before contract checks")
+    if text.index("run: python rust/scripts/test_contract_checks.py") > text.index(
+        "run: python rust/scripts/check-contracts.py"
+    ):
+        raise WorkflowContractError("Rust CI must verify isolation and provenance before contract checks")
+    if text.index("run: python rust/scripts/check-contracts.py") > text.index(
+        "run: cargo deny --locked check"
+    ):
+        raise WorkflowContractError("Rust CI must record contract checks before dependency policy")
+    if text.index("run: python rust/scripts/check-contracts.py") > text.index(
         "      - name: Preserve actual read-only recordings"
     ):
         raise WorkflowContractError("Rust CI must preserve recordings after their producer runs")
@@ -708,8 +715,9 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
                 "os: [ubuntu-latest, macos-26, windows-latest]",
                 "os: [ubuntu-latest, macos-26]",
             ),
-            rust.replace("--all-targets --locked -- -D warnings", "--all-targets"),
-            rust.replace("run: cargo test --workspace --locked", "run: cargo check --locked"),
+            rust.replace("run: python rust/scripts/test_contract_checks.py", "run: true"),
+            rust.replace("run: python rust/scripts/check-contracts.py", "run: cargo test --workspace --locked"),
+            rust.replace("run: python rust/scripts/check-contracts.py", "run: python rust/scripts/check-contracts.py --published-only"),
             rust.replace(
                 "run: cargo deny --locked check", "run: cargo deny --locked check || true"
             ),
@@ -725,7 +733,7 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
             rust.replace(
                 "run: python rust/scripts/generate-contract.py --check", "run: true"
             ),
-            rust.replace("run: python rust/scripts/check-readonly.py", "run: true"),
+            rust.replace("run: python rust/scripts/check-contracts.py", "run: true"),
         )
         for mutated in mutations:
             with self.assertRaises(WorkflowContractError):
@@ -735,7 +743,7 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
         rust = RUST_WORKFLOW_PATH.read_text(encoding="utf-8")
         upload_start = rust.index("      - name: Preserve actual read-only recordings")
         upload = rust[upload_start:]
-        producer = "      - name: Read-only black-box checks"
+        producer = "      - name: Published consumer and candidate contract parity"
         for mutated in (
             rust.replace("        if: always()\n", "        if: success()\n"),
             rust.replace("path: rust/target/readonly-check/", "path: target/readonly-check/"),

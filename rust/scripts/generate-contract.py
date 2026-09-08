@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
-"""Consume the protected-main Swift contract without changing its source or corpus.
+"""Verify the published Swift input pin independently of candidate files.
 
-The baseline is a development input, never a hardware acceptance certificate.
---write requires an explicit protected-main revision. --check uses the recorded
-commit, checks every pinned input, and compares generated Rust without writing.
+--write requires a commit in origin/main history. --check reads immutable Git
+objects, verifies the complete pin and compares generated Rust without writing.
+Candidate conformance is checked separately by check-contracts.py in isolation.
+Neither input view is a hardware acceptance certificate.
 """
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 import hashlib
 import json
 from pathlib import Path
@@ -36,6 +38,7 @@ INPUTS = [
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI/argv/device.candidates.json",
     "openspec/changes/chg-2026-059-arkdeck-arkforge-authority/permit-vectors.md",
     "openspec/contracts/journal-event.schema.json",
+    "openspec/contracts/workflow-step.schema.json",
     METHODS,
     CORPUS,
     "Catalog/operations",
@@ -54,37 +57,127 @@ def sha(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
-def baseline(commit: str) -> dict:
-    files = {}
-    directories = {}
+@dataclass
+class ContractInputs:
+    files: dict[str, bytes]
+    blobs: dict[str, str]
+    directories: set[str]
+
+    def json(self, path: str) -> dict:
+        return json.loads(self.files[path])
+
+
+def published_inputs(commit: str) -> ContractInputs:
+    """Read path types, membership and bytes from Git, never from the worktree."""
+    if not isinstance(commit, str) or not re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", commit):
+        raise ValueError("published pin requires a full immutable commit ID")
+    resolved = git("rev-parse", "--verify", "--end-of-options", commit + "^{commit}").decode().strip()
+    if resolved != commit:
+        raise ValueError("published pin requires a full immutable commit ID")
+    subprocess.check_call(["git", "-C", str(ROOT), "merge-base", "--is-ancestor", commit, "origin/main"])
+    files, blobs, directories = {}, {}, set()
     for path in INPUTS:
-        rows = git("ls-tree", "-r", commit, "--format=%(objectname) %(path)", "--", path)
+        kind = git("cat-file", "-t", f"{commit}:{path}").decode().strip()
+        if kind == "tree":
+            directories.add(path)
+        elif kind != "blob":
+            raise ValueError(f"unsupported published input type: {path}: {kind}")
+        rows = git("ls-tree", "-r", commit,
+                   "--format=%(objectmode) %(objecttype) %(objectname) %(path)", "--", path)
         if not rows:
-            raise ValueError(f"missing baseline input: {path}")
-        if (ROOT / path).is_dir():
-            directories[path] = sha(b"".join(line + b"\n" for line in sorted(rows.splitlines())))
+            raise ValueError(f"missing published input: {path}")
         for line in rows.decode().splitlines():
-            blob, file = line.split(" ", 1)
-            contents = git("show", f"{commit}:{file}")
-            if (ROOT / file).read_bytes() != contents:
-                raise ValueError(f"working input differs from Swift baseline: {file}")
-            files[file] = {"blob": blob, "sha256": sha(contents)}
-    registry = json.loads((ROOT / REGISTRY).read_bytes())
+            mode, kind, blob, file = line.split(" ", 3)
+            if kind != "blob" or mode not in ("100644", "100755"):
+                raise ValueError(f"published input must be a regular file: {file}")
+            files[file] = git("cat-file", "blob", blob)
+            blobs[file] = blob
+    return ContractInputs(files, blobs, directories)
+
+
+def working_inputs() -> ContractInputs:
+    files, blobs, directories = {}, {}, set()
+    object_format = git("rev-parse", "--show-object-format").decode().strip()
+    for relative in INPUTS:
+        path = ROOT / relative
+        if path.is_symlink() or not path.exists():
+            raise ValueError(f"missing or symlinked candidate input: {relative}")
+        paths = [path]
+        if path.is_dir():
+            directories.add(relative)
+            paths = sorted(path.rglob("*"))
+        for file in paths:
+            if file.is_symlink():
+                raise ValueError(f"candidate input must be a regular file: {file}")
+            if file.is_dir():
+                continue
+            data = file.read_bytes()
+            name = file.relative_to(ROOT).as_posix()
+            files[name] = data
+            blobs[name] = hashlib.new(object_format, f"blob {len(data)}\0".encode() + data).hexdigest()
+    return ContractInputs(files, blobs, directories)
+
+
+def describe_inputs(inputs: ContractInputs) -> dict:
+    files = {path: {"blob": inputs.blobs[path], "sha256": sha(data)}
+             for path, data in sorted(inputs.files.items())}
+    directories = {
+        directory: sha("".join(sorted(
+            f"{inputs.blobs[path]} {path}\n" for path in files if path.startswith(directory + "/")
+        )).encode()) for directory in sorted(inputs.directories)
+    }
+    registry = inputs.json(REGISTRY)
+    methods = registry["methods"]
+    if not methods or len(methods) != len(set(methods)):
+        raise ValueError("registry methods must be nonempty and unique")
+    for directory, suffix in [(METHODS, ".json"), (CORPUS, ".jsonl")]:
+        expected = {f"{directory}/{method}{suffix}" for method in methods}
+        actual = {path for path in files if path.startswith(directory + "/")}
+        if actual != expected:
+            raise ValueError(f"method/file set drift: {directory}")
+    counts = {"requests": 0, "successes": 0, "errors": 0}
+    method_counts = {}
+    for method in methods:
+        raw = inputs.files[f"{CORPUS}/{method}.jsonl"]
+        if not raw or not raw.endswith(b"\n"):
+            raise ValueError(f"empty or torn corpus: {method}")
+        method_counts[method] = dict.fromkeys(counts, 0)
+        for line in raw[:-1].split(b"\n"):
+            row = json.loads(line)
+            if (row.get("method") != method or row.get("protocolVersion") != registry["currentVersion"]
+                    or type(row.get("ok")) is not bool):
+                raise ValueError(f"invalid corpus envelope: {method}")
+            for key in ("requests", "successes" if row["ok"] else "errors"):
+                method_counts[method][key] += 1
+                counts[key] += 1
     identity = sha(json.dumps(registry, sort_keys=True, separators=(",", ":")).encode())
-    matrix = (ROOT / "Catalog/generated/effect-authorization-matrix.md").read_text(encoding="utf-8")
-    digest = re.search(r"Catalog digest: `([a-f0-9]{64})`", matrix).group(1)
+    matrix = inputs.files["Catalog/generated/effect-authorization-matrix.md"].decode()
+    match = re.search(r"Catalog digest: `([a-f0-9]{64})`", matrix)
+    if match is None:
+        raise ValueError("missing Catalog digest")
     return {
-        "schemaVersion": "arkdeck.swift-development-baseline/1",
-        "kind": "development",
-        "commit": commit,
         "protocolVersion": registry["currentVersion"],
         "contractIdentity": identity,
-        "catalogDigest": digest,
-        "methodCount": len(registry["methods"]),
-        "corpusFileCount": len(list((ROOT / CORPUS).glob("*.jsonl"))),
+        "catalogDigest": match.group(1),
+        "methodCount": len(methods),
+        "corpusFileCount": len(methods),
+        "corpusRecordCounts": counts,
+        "corpusMethodCounts": method_counts,
+        "inputDigest": sha(json.dumps(files, sort_keys=True, separators=(",", ":")).encode()),
         "directoryDigests": directories,
-        "files": dict(sorted(files.items())),
+        "files": files,
     }
+
+
+def baseline(commit: str, inputs: ContractInputs | None = None) -> dict:
+    return {"schemaVersion": "arkdeck.swift-development-baseline/1", "kind": "development",
+            "commit": commit, **describe_inputs(inputs or published_inputs(commit))}
+
+
+def candidate(inputs: ContractInputs, published_commit: str, source_revision: str) -> dict:
+    return {"schemaVersion": "arkdeck.swift-candidate-inputs/1", "kind": "candidate",
+            "publishedBaselineCommit": published_commit, "sourceRevision": source_revision,
+            **describe_inputs(inputs)}
 
 
 def check_vocabulary(schema: dict) -> None:
@@ -99,8 +192,8 @@ def check_vocabulary(schema: dict) -> None:
         check_vocabulary(schema["items"])
 
 
-def generate(info: dict) -> str:
-    registry = json.loads((ROOT / REGISTRY).read_text(encoding="utf-8"))
+def generate(info: dict, inputs: ContractInputs) -> str:
+    registry = inputs.json(REGISTRY)
     lines = ["// Generated by rust/scripts/generate-contract.py. Do not edit.", ""]
     for key, rust_name in [("currentVersion", "PROTOCOL_VERSION"),
                            ("maximumRequestFrameBytes", "MAX_REQUEST_BYTES"),
@@ -110,13 +203,16 @@ def generate(info: dict) -> str:
         lines.append(f"pub const {rust_name}: {ty} = {json.dumps(value)};")
     lines.append(f'pub const CONTRACT_IDENTITY: &str = "{info["contractIdentity"]}";')
     lines.append('pub const SWIFT_BASELINE: &str = include_str!("../../../../spec/baselines/swift-single-v1.json");')
+    lines.append('pub const CONTRACT_INPUTS: &str = ' + (
+        'include_str!("../../../../spec/baselines/swift-candidate-inputs.json");'
+        if info["kind"] == "candidate" else 'SWIFT_BASELINE;'))
     lines.append("pub const METHODS: &[&str] = &[")
     lines.extend(f'    "{method}",' for method in registry["methods"])
     lines.append("];\n")
     lines.append("pub const METHOD_SCHEMAS: &[(&str, &str)] = &[")
     schemas = {}
     for method in registry["methods"]:
-        document = json.loads((ROOT / METHODS / f"{method}.json").read_text(encoding="utf-8"))
+        document = inputs.json(f"{METHODS}/{method}.json")
         if document["x-arkdeck-contractIdentity"] != info["contractIdentity"]:
             raise ValueError(f"schema identity drift: {method}")
         schemas[method] = document["$defs"]
@@ -170,6 +266,32 @@ def generate(info: dict) -> str:
     return "\n".join(lines)
 
 
+def formatted(content: str) -> str:
+    # The rustup proxy discovers rust/rust-toolchain.toml on a fresh host.
+    return subprocess.check_output(
+        ["rustfmt", "--edition", "2024", "--config", "newline_style=Unix"],
+        input=content.encode("utf-8"), cwd=ROOT / "rust",
+    ).decode("utf-8")
+
+
+def published_outputs(commit: str) -> tuple[ContractInputs, dict, dict[Path, str]]:
+    inputs = published_inputs(commit)
+    info = baseline(commit, inputs)
+    return inputs, info, {
+        BASELINE: json.dumps(info, indent=2, sort_keys=True) + "\n",
+        GENERATED: formatted(generate(info, inputs)),
+    }
+
+
+def verify_published() -> tuple[ContractInputs, dict]:
+    commit = json.loads(BASELINE.read_bytes())["commit"]
+    inputs, info, outputs = published_outputs(commit)
+    for path, content in outputs.items():
+        if not path.exists() or path.read_bytes() != content.encode():
+            raise ValueError(f"generated input drift: {path.relative_to(ROOT)}")
+    return inputs, info
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     modes = parser.add_mutually_exclusive_group(required=True)
@@ -180,26 +302,15 @@ def main() -> None:
     if args.write:
         if not args.baseline_revision:
             parser.error("--write requires --baseline-revision (the protected-main Swift commit)")
-        commit = git("rev-parse", args.baseline_revision + "^{commit}").decode().strip()
-        subprocess.check_call(["git", "-C", str(ROOT), "merge-base", "--is-ancestor", commit, "origin/main"])
-    else:
-        commit = json.loads(BASELINE.read_text(encoding="utf-8"))["commit"]
-    info = baseline(commit)
-    outputs = {BASELINE: json.dumps(info, indent=2, sort_keys=True) + "\n", GENERATED: generate(info)}
-    for path, content in outputs.items():
-        if path == GENERATED:
-            # The rustup proxy discovers and installs rust/rust-toolchain.toml
-            # on a fresh host; `rustup run` would require a prior installation.
-            content = subprocess.check_output(
-                ["rustfmt", "--edition", "2024", "--config", "newline_style=Unix"],
-                input=content.encode("utf-8"), cwd=ROOT / "rust",
-            ).decode("utf-8")
-        if args.write:
+        commit = git("rev-parse", "--verify", "--end-of-options", args.baseline_revision + "^{commit}").decode().strip()
+        _, info, outputs = published_outputs(commit)
+        for path, content in outputs.items():
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(content, encoding="utf-8", newline="\n")
-        elif not path.exists() or path.read_text(encoding="utf-8") != content:
-            raise SystemExit(f"generated input drift: {path.relative_to(ROOT)}")
-    print(f'Swift development baseline {commit}: {info["methodCount"]} methods, {info["corpusFileCount"]} corpus files')
+    else:
+        _, info = verify_published()
+    print(f'Swift published development baseline {info["commit"]}: {info["methodCount"]} methods, '
+          f'{info["corpusRecordCounts"]["requests"]} recorded shapes')
 
 
 if __name__ == "__main__":

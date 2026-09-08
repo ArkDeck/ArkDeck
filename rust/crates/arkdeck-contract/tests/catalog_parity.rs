@@ -2,7 +2,7 @@ use std::fmt::Write;
 use std::fs;
 
 use arkdeck_contract::{
-    CATALOG_CANONICAL_JSON, CATALOG_DIGEST, SWIFT_BASELINE, sha256_hex, strict_json,
+    CATALOG_CANONICAL_JSON, CATALOG_DIGEST, CONTRACT_INPUTS, sha256_hex, strict_json,
 };
 use serde_json::Value;
 
@@ -10,9 +10,9 @@ use serde_json::Value;
 mod common;
 
 #[test]
-fn all_30_current_operations_reproduce_the_swift_catalog_digest() {
-    let baseline = strict_json(SWIFT_BASELINE.as_bytes()).unwrap();
-    assert_eq!(baseline["catalogDigest"], CATALOG_DIGEST);
+fn all_current_operations_reproduce_the_input_catalog_digest() {
+    let inputs = strict_json(CONTRACT_INPUTS.as_bytes()).unwrap();
+    assert_eq!(inputs["catalogDigest"], CATALOG_DIGEST);
     assert_eq!(
         sha256_hex(CATALOG_CANONICAL_JSON.as_bytes()),
         CATALOG_DIGEST
@@ -33,7 +33,14 @@ fn all_30_current_operations_reproduce_the_swift_catalog_digest() {
                 b["version"].as_u64().unwrap_or(0),
             ))
     });
-    assert_eq!(operations.len(), 30);
+    let expected_count = inputs["files"]
+        .as_object()
+        .unwrap()
+        .keys()
+        .filter(|path| path.starts_with("Catalog/operations/") && path.ends_with(".json"))
+        .count();
+    assert!(expected_count > 0);
+    assert_eq!(operations.len(), expected_count);
     let value = Value::Array(operations);
     assert_eq!(
         strict_json(CATALOG_CANONICAL_JSON.as_bytes()).unwrap(),
@@ -62,5 +69,5 @@ fn all_30_current_operations_reproduce_the_swift_catalog_digest() {
     .unwrap();
     assert!(matrix.contains(&format!("Catalog digest: `{CATALOG_DIGEST}`")));
     let registry = common::load_json("Packages/ArkDeckKit/Contracts/control-protocol.json");
-    assert_eq!(registry["currentVersion"], baseline["protocolVersion"]);
+    assert_eq!(registry["currentVersion"], inputs["protocolVersion"]);
 }

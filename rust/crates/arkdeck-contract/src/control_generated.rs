@@ -6,6 +6,7 @@ pub const MAX_RESPONSE_BYTES: usize = 8388608;
 pub const CONTRACT_IDENTITY: &str =
     "1054d17b598ce23003ebbdec4d42eb359b63016d6421709ba53c3f21f7c6558d";
 pub const SWIFT_BASELINE: &str = include_str!("../../../../spec/baselines/swift-single-v1.json");
+pub const CONTRACT_INPUTS: &str = SWIFT_BASELINE;
 pub const METHODS: &[&str] = &[
     "agent.abandon",
     "agent.list",
