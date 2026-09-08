@@ -124,14 +124,18 @@ final class JobReadResourcesContractTests: XCTestCase {
       throw error
     }
   }
-  private func publishRequired(_ id: String, target: String = "TGT-fixture", size: Int = 20) async throws -> [RuntimeArtifactMetadata] {
-    let descriptor = try XCTUnwrap(RuntimeOperationCatalog.descriptor(reference: "observe.device@1"))
+  private func publishRequired(
+    _ id: String, target: String = "TGT-fixture", size: Int = 20,
+    operationReference: String = "observe.device@1", providerID: String = "hdc",
+    bindingRevision: Int = 1
+  ) async throws -> [RuntimeArtifactMetadata] {
+    let descriptor = try XCTUnwrap(RuntimeOperationCatalog.descriptor(reference: operationReference))
     var values: [RuntimeArtifactMetadata] = []
     for declaration in descriptor.artifacts where declaration.isRequired {
       values.append(try await artifacts.publish(.init(jobID: id, sessionID: "session-\(id)", stepID: "fixture-probe",
         name: declaration.name, mediaType: declaration.mediaType, privacy: declaration.privacy,
-        retentionClass: declaration.retentionClass, sourceOperation: descriptor.reference, providerID: "hdc",
-        bindingSnapshot: .init(targetID: target, bindingRevision: 1, stableIdentitySHA256: nil),
+        retentionClass: declaration.retentionClass, sourceOperation: descriptor.reference, providerID: providerID,
+        bindingSnapshot: .init(targetID: target, bindingRevision: bindingRevision, stableIdentitySHA256: nil),
         contents: Data(String(repeating: "x", count: size).utf8))))
     }
     return values
@@ -756,12 +760,21 @@ final class JobReadResourcesContractTests: XCTestCase {
     XCTAssertEqual(facts.executionMode, "execute")
     XCTAssertNil(facts.actualStepKinds)
 
+    // This response must also survive the real CLI validator and emission,
+    // not only the shared App/Agent evidence decoder.
+    try startServer()
+    let emitted = try cli(["job", "evidence", "--job", "job-unprovable-flash"])
+    XCTAssertEqual(emitted.0, 75)
+    XCTAssertEqual(emitted.1["ok"], .bool(true))
+    XCTAssertEqual(emitted.1["result"], response.result)
+
     // Negative control: nothing else started reporting its steps as unknown.
     try seed("job-provable-steps")
     let controlResponse = try await read("job.evidence", id: "job-provable-steps")
     let control = try object(XCTUnwrap(controlResponse.result))
     XCTAssertEqual(control["actualStepKinds"], .array([]))
     XCTAssertEqual(try CurrentRuntimeResourceReads.evidence(.object(control)).actualStepKinds, [])
+    XCTAssertEqual(dispatcher.dispatchCount, 0)
   }
 
   /// The degraded read that runs when the evidence snapshot itself fails. It
@@ -808,6 +821,9 @@ final class JobReadResourcesContractTests: XCTestCase {
     // typed steps ran. `job.result` refuses a non-terminal Job outright, so
     // this is the reachable shape for the Agent-facing evidence surfaces.
     try seedUnprovableFlash("job-unprovable-terminal", jobState: "failed")
+    _ = try await publishRequired(
+      "job-unprovable-terminal", operationReference: ArkForgeFlashOperation.canonicalReference,
+      providerID: "arkforge", bindingRevision: 2)
 
     let response = try await read("job.result", id: "job-unprovable-terminal")
     XCTAssertTrue(response.ok, response.error?.message ?? "-")
@@ -816,10 +832,18 @@ final class JobReadResourcesContractTests: XCTestCase {
 
     XCTAssertEqual(evidence["actualStepKinds"], .null)
     XCTAssertTrue(Self.strings(evidence["blockers"]).contains("stepKindsUnprovable"))
-    XCTAssertNotEqual(evidence["status"], .string("verified"))
+    XCTAssertEqual(evidence["status"], .string("stepKindsUnprovable"))
     // The CLI's own integrity gate reads only `blockers`, so this is what
     // turns an unprovable destructive Job into a non-zero exit.
     XCTAssertNotNil(RuntimeCLI.evidenceIntegrityExit(.object(evidence)))
+
+    try startServer()
+    for verb in ["evidence", "result"] {
+      let emitted = try cli(["job", verb, "--job", "job-unprovable-terminal"])
+      XCTAssertEqual(emitted.0, 2, verb)
+      XCTAssertEqual(emitted.1["ok"], .bool(true), verb)
+      XCTAssertEqual(emitted.1["result"], verb == "evidence" ? .object(evidence) : response.result, verb)
+    }
 
     // Negative control: an ordinary Job whose steps the record does prove is
     // still verified, still an array, and still exits clean.
@@ -835,6 +859,57 @@ final class JobReadResourcesContractTests: XCTestCase {
     XCTAssertFalse(Self.strings(controlEvidence["blockers"]).contains("stepKindsUnprovable"))
     XCTAssertEqual(controlEvidence["status"], .string("verified"))
     XCTAssertNil(RuntimeCLI.evidenceIntegrityExit(.object(controlEvidence)))
+    for verb in ["evidence", "result"] {
+      let emitted = try cli(["job", verb, "--job", "job-provable-terminal"])
+      XCTAssertEqual(emitted.0, 0, verb)
+      XCTAssertEqual(emitted.1["ok"], .bool(true), verb)
+      XCTAssertEqual(emitted.1["result"], verb == "evidence" ? .object(controlEvidence) : controlResponse.result, verb)
+    }
+    XCTAssertEqual(dispatcher.dispatchCount, 0)
+  }
+
+  func testCLIEvidenceReasonsRemainReadableButCannotBypassVerification() async throws {
+    let record = try seed("job-open-evidence-reasons")
+    _ = try await publishRequired(record.jobID)
+    let response = try await read("job.result", id: record.jobID)
+    let result = try object(XCTUnwrap(response.result))
+    let evidence = try object(XCTUnwrap(result["evidence"]))
+
+    for verb in ["evidence", "result"] {
+      var rest = ["--output", "json"]
+      let session = RuntimeCLI.runtimeSession(&rest, command: "job.\(verb)")
+      func validate(_ changes: [String: JSONValue]) throws -> Int32 {
+        let changed = JSONValue.object(evidence.merging(changes) { _, new in new })
+        let value = verb == "evidence" ? changed : .object(result.merging(["evidence": changed]) { _, new in new })
+        return try CLIJobReadValidation.validate(
+          value, verb: verb, jobID: record.jobID, options: [:], session: session)
+      }
+
+      // Open reason strings remain visible even when the client has never
+      // named them. They must never become a successful verification.
+      for status in ["artifactIntegrityFailed", "futureEvidenceBlocker"] {
+        XCTAssertEqual(
+          try validate(["status": .string(status), "blockers": .array([.string("futureEvidenceBlocker")])]),
+          2, verb)
+      }
+      for changes: [String: JSONValue] in [
+        ["status": .string("verified"), "blockers": .array([.string("futureEvidenceBlocker")])],
+        ["status": .string("futureEvidenceBlocker"), "blockers": .array([])],
+        ["status": .null],
+        ["status": .integer(2)],
+        ["blockers": .string("futureEvidenceBlocker")],
+        ["blockers": .array([.null])],
+        ["blockers": .array([.integer(2)])],
+        ["blockers": .array([.object(["reason": .string("futureEvidenceBlocker")])])],
+        ["schemaVersion": .string("arkdeck.job-evidence/99")],
+        ["futureField": .bool(true)],
+      ] {
+        XCTAssertThrowsError(try validate(changes), verb) { error in
+          XCTAssertEqual((error as? CLIRegistryError)?.code, .recordUnreadable, verb)
+        }
+      }
+    }
+    XCTAssertEqual(dispatcher.dispatchCount, 0)
   }
 
   /// `job.show` echoes the durable record. Its five neighbouring optional
