@@ -1,0 +1,802 @@
+{
+  "schemaVersion": "arkdeck.gj-headless-rerun/1",
+  "date": "2026-09-09",
+  "catalogDigest": "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "runbook": "docs/design/cli-golden-journey-headless-runbook.md §6 (GJ-5)",
+  "journeys": [
+    {
+      "date": "2026-09-09",
+      "goldenJourney": "GJ-5",
+      "state": "REAL_DEVICE_PASS",
+      "evidenceKind": "redacted-metadata-derived-from-real-runtime",
+      "catalogDigest": "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+      "runtimeSourceRevision": "protected main 8c6a376c + agent/ohs-001-orphan-credential-owner-20260909 5e1702f4 (PR #1810), local helper build",
+      "runtimeExecutableSHA256": "6e6c4df2dcfd6521c49c4c6696b68c8b9b7b15585ca5f3e4dd9db3b8fb5f2d6e",
+      "cliBuildIdentity": "sha256:b34f888b3c58b01812cb32d0fd915267fe80b563c28c5f9e8a3906b4ebb529e3",
+      "contractIdentity": "8a662759721a2081e974306399997801246de4022047365c050107de5dce2912",
+      "hdcExecutableSHA256": "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83",
+      "hdcVersion": "3.2.0f",
+      "targetID": "TGT-958780b2ffb7",
+      "bindingRevision": 2,
+      "executionIDs": [
+        "gj5-20260909-analyze",
+        "gj5-20260909-build",
+        "gj5-20260909-diag-verify",
+        "gj5-20260909-diag",
+        "gj5-20260909-diag2",
+        "gj5-20260909-isolate",
+        "gj5-20260909-patch",
+        "gj5-20260909-repro",
+        "gj5-20260909-sign",
+        "gj5-20260909-verify",
+        "gj5-20260909-patch-stale"
+      ],
+      "inputs": {
+        "crashProbeHap": {
+          "name": "waterflow-crash-baseline.hap",
+          "sha256": "ee08314929e2ecb8347414e64e1afacb1d22b0c04e5a22664de8410d4b2c4ba6",
+          "bundleName": "com.example.waterflowdemo",
+          "abilityName": "EntryAbility",
+          "importRequestId": "gj5-20260909-probe",
+          "lease": "lease-v1:imp-ed844b68-e7e7-45d0-ba68-0cafd57ea2b1:ART-1fa1b9300e200ec755a435afc980f2b6"
+        },
+        "fixPatch": {
+          "name": "gj5-fix.patch",
+          "sha256": "b8111bf165619e104be1664224d030f7ec0b96d7b383929922c389c9bebadb44",
+          "byteCount": 610,
+          "importRequestId": "gj5-20260909-patch",
+          "lease": "lease-v1:imp-b38a2e08-bc77-44ce-bf7d-4f1d80519474:ART-94615ec33f2adc1663fcf34f344ea6da",
+          "shape": "removes the armCrashProbe() call and its import from entry/src/main/ets/entryability/EntryAbility.ets (-3 lines); FixtureMode untouched"
+        },
+        "project": {
+          "projectRef": "project-fd677365f7bdefabda66a3c1",
+          "profile": "waterflow-openharmony@1",
+          "buildPreset": "preset-9cc94c378346e500cb0a0b4a",
+          "signingPreset": "preset-3cae17c26b7aca2c2bfba389",
+          "credential": "credential:sha256-2fa4fa4bcccf2d5867f960f18ab2a7c25691e43feba1607c949f950891096f7a",
+          "toolchain": "toolchain:sha256:9cee08f1e191112cb68a24ec3aa941f8d5342482224258ee3e34cdd122855e27"
+        }
+      },
+      "credentialRebind": {
+        "before": {
+          "credentialRef": "credential:sha256-562430f169572876eb7ea8c3f5f0f2f0fa6553004cdf7726306790ebf760d6f1",
+          "projectRef": "demo-app",
+          "referenceCount": 2,
+          "signingPreset": "preset-23114ce6017f4fbdd8930bcc (unresolved)"
+        },
+        "blocker": "credential owner ledger still pinned by preset-3667528438767fb6b68fd0ad, a preset of the retired 2026-09-02 demo-app registration that no store record carries; runtime signing remove/install refused with no product path out",
+        "fix": "PR #1810 (TASK-OHS-001): the daemon releases credential owners its preset store no longer carries at startup; agentd.log: 'signing credential owner released presets no store record carries: preset-3667528438767fb6b68fd0ad'",
+        "after": {
+          "credentialRef": "credential:sha256-2fa4fa4bcccf2d5867f960f18ab2a7c25691e43feba1607c949f950891096f7a",
+          "projectRef": "project-fd677365f7bdefabda66a3c1",
+          "referenceCount": 1,
+          "signingPreset": "preset-3cae17c26b7aca2c2bfba389 (active)",
+          "operationsAvailable": "28/30 (only the two hardware-gated Flash entries unavailable)"
+        },
+        "path": "workspace preset remove → runtime service update --daemon <PR #1810 build> → runtime signing install --build-profile … --project-ref project-fd677365f7bdefabda66a3c1 → workspace preset register --kind signing → runtime service restart; no file edited by hand"
+      },
+      "repro": {
+        "debugHap": {
+          "jobID": "job-cde216d01fba8c0fd54f7517b6fdb11e",
+          "executionID": "gj5-20260909-repro",
+          "operationReference": "debug.hap@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "artifactCount": 3,
+          "actualEffect": "deviceMutation",
+          "actualStepKinds": [
+            "probeDevice",
+            "runApprovedRemoteRead",
+            "sendFile",
+            "installPackage",
+            "startApplication",
+            "verifyRemoteState",
+            "captureRemoteStdout",
+            "cleanupOwnedRemotePath"
+          ],
+          "startedAtUTC": "2026-09-09T07:56:51Z",
+          "finishedAtUTC": "2026-09-09T07:57:03Z",
+          "error": null
+        },
+        "captureInsideWindowNotTaken": "the first capture ran 34 s after the app start, already outside the 12 s crash window",
+        "captureAfterCrashWindow": [
+          {
+            "job": {
+              "jobID": "job-18983343b576393eb9ace107bae95143",
+              "executionID": "gj5-20260909-diag",
+              "operationReference": "capture.diagnostics@1",
+              "terminalState": "succeeded",
+              "outcomeUnknown": false,
+              "evidenceBlockers": [],
+              "humanActions": [],
+              "artifactCount": 7,
+              "actualEffect": "readOnly",
+              "actualStepKinds": [
+                "probeDevice",
+                "runApprovedRemoteRead",
+                "preflightDeviceStorage",
+                "verifyRemoteState",
+                "captureRemoteStdout"
+              ],
+              "startedAtUTC": "2026-09-09T07:57:25Z",
+              "finishedAtUTC": "2026-09-09T07:57:35Z",
+              "error": null
+            },
+            "liveness": {
+              "processState": "STOPPED",
+              "reasonCode": "targetProcessNotRunning",
+              "pidObserved": false,
+              "observedAtUtc": "2026-09-09T07:59:35Z"
+            },
+            "note": "requested without crashLogs; liveness only"
+          },
+          {
+            "job": {
+              "jobID": "job-5fc645325245724ee9f272576d7c3517",
+              "executionID": "gj5-20260909-diag2",
+              "operationReference": "capture.diagnostics@1",
+              "terminalState": "succeeded",
+              "outcomeUnknown": false,
+              "evidenceBlockers": [],
+              "humanActions": [],
+              "artifactCount": 8,
+              "actualEffect": "readOnly",
+              "actualStepKinds": [
+                "probeDevice",
+                "runApprovedRemoteRead",
+                "preflightDeviceStorage",
+                "verifyRemoteState",
+                "captureRemoteStdout"
+              ],
+              "startedAtUTC": "2026-09-09T07:59:35Z",
+              "finishedAtUTC": "2026-09-09T07:59:47Z",
+              "error": null
+            },
+            "liveness": {
+              "processState": "STOPPED",
+              "reasonCode": "targetProcessNotRunning"
+            },
+            "crashIndexArtifact": "ART-e1ffd7be663bcebb5a9f7162fe28c6b8",
+            "crashIndexEntryCount": 10,
+            "note": "crashLogs: true; the Faultlogger index lists the device's whole crash ledger, 10 entries, the newest a jscrash of com.example.waterflowdemo"
+          }
+        ],
+        "analyzeCrashSignature": {
+          "job": {
+            "jobID": "job-45ee65fe426b7dd3981bcce2ee930ee5",
+            "executionID": "gj5-20260909-analyze",
+            "operationReference": "analyzer.extract-crash-signature@1",
+            "terminalState": "succeeded",
+            "outcomeUnknown": false,
+            "evidenceBlockers": [],
+            "humanActions": [],
+            "artifactCount": 1,
+            "actualEffect": "hostOnly",
+            "actualStepKinds": [
+              "runDeterministicAnalyzer"
+            ],
+            "startedAtUTC": "2026-09-09T07:59:49Z",
+            "finishedAtUTC": "2026-09-09T07:59:49Z",
+            "error": null
+          },
+          "status": "answered",
+          "entries": 5,
+          "analyzerVersion": "arkdeck-fault-log-ledger@1"
+        }
+      },
+      "fixLeg": {
+        "isolate": {
+          "job": {
+            "jobID": "job-f7fadc632f9894ae6b3c0da6457fcc30",
+            "executionID": "gj5-20260909-isolate",
+            "operationReference": "workspace.prepare-isolated-copy@1",
+            "terminalState": "succeeded",
+            "outcomeUnknown": false,
+            "evidenceBlockers": [],
+            "humanActions": [],
+            "artifactCount": 1,
+            "actualEffect": "hostOnly",
+            "actualStepKinds": [
+              "prepareWorkspaceIsolation"
+            ],
+            "startedAtUTC": "2026-09-09T07:59:50Z",
+            "finishedAtUTC": "2026-09-09T07:59:50Z",
+            "error": null
+          },
+          "sourceWorkspaceRevision": "701c5bd956121cbd187195411f2f12ec6c3db362ff10851d29b1a33cd8531dae",
+          "sourceRevisionComputedLocally": "701c5bd956121cbd187195411f2f12ec6c3db362ff10851d29b1a33cd8531dae (same algorithm as WorkspaceProviderSupport.workspaceRevision over the profile globs; equal to the 2026-09-02 value, the source tree is unchanged)",
+          "isolatedProjectRef": "evolution-659f702fc0a1dfab0136",
+          "workspaceId": "evo-659f702fc0a1dfab013654a3",
+          "isolatedRevision": "e0d4131e6973b82a946a68c1de3c4251c24b964e2beffff2336dda409b1a174e",
+          "allowedFileGlobs": [
+            "entry/src/main/ets/**"
+          ]
+        },
+        "patch": {
+          "job": {
+            "jobID": "job-0606053d21a71b8c53195e485abf6e7d",
+            "executionID": "gj5-20260909-patch",
+            "operationReference": "workspace.apply-patch@1",
+            "terminalState": "succeeded",
+            "outcomeUnknown": false,
+            "evidenceBlockers": [],
+            "humanActions": [],
+            "artifactCount": 1,
+            "actualEffect": "deviceMutation",
+            "actualStepKinds": [
+              "applyWorkspacePatch"
+            ],
+            "startedAtUTC": "2026-09-09T07:59:50Z",
+            "finishedAtUTC": "2026-09-09T07:59:50Z",
+            "error": null
+          },
+          "previousWorkspaceRevision": "e0d4131e6973b82a946a68c1de3c4251c24b964e2beffff2336dda409b1a174e",
+          "workspaceRevision": "e145d3939161b394c66843133c92987722a6af3a05637d8fd24497ecceb6d405",
+          "patchAttemptRef": "patch-d4062a3e27667be942c964568ccc08b9",
+          "exitStatus": "0",
+          "target": "TGT-958780b2ffb7 (lease scope), projectRef = the isolated copy"
+        },
+        "build": {
+          "job": {
+            "jobID": "job-62b82ee7ae27fe0c11a6d6e8d0e5b485",
+            "executionID": "gj5-20260909-build",
+            "operationReference": "workspace.build-openharmony@1",
+            "terminalState": "succeeded",
+            "outcomeUnknown": false,
+            "evidenceBlockers": [],
+            "humanActions": [],
+            "artifactCount": 2,
+            "actualEffect": "deviceMutation",
+            "actualStepKinds": [
+              "buildWorkspaceOpenHarmony"
+            ],
+            "startedAtUTC": "2026-09-09T07:59:51Z",
+            "finishedAtUTC": "2026-09-09T08:00:00Z",
+            "error": null
+          },
+          "unsignedHap": {
+            "artifactId": "ART-abb74a8b15cf6ff0f53a1a12c4a3da5f",
+            "sha256": "c0a449dc2cc7d415d4396ba798ae3181eb547970fbf35927faf3a77cab45e5a2",
+            "byteCount": 2748896
+          }
+        },
+        "sign": {
+          "job": {
+            "jobID": "job-7915e6758eb9940a6e9be8008b3cfa3f",
+            "executionID": "gj5-20260909-sign",
+            "operationReference": "workspace.sign-openharmony-hap@1",
+            "terminalState": "succeeded",
+            "outcomeUnknown": false,
+            "evidenceBlockers": [],
+            "humanActions": [],
+            "artifactCount": 2,
+            "actualEffect": "hostOnly",
+            "actualStepKinds": [
+              "signWorkspaceOpenHarmonyHap"
+            ],
+            "startedAtUTC": "2026-09-09T08:00:00Z",
+            "finishedAtUTC": "2026-09-09T08:00:02Z",
+            "error": null
+          },
+          "projectRef": "project-fd677365f7bdefabda66a3c1",
+          "target": "evolution-659f702fc0a1dfab0136",
+          "signedHap": {
+            "artifactId": "ART-1e4f0cca67e9784fc8fb6735c07401cd",
+            "sha256": "5cc2c45dc5cb73e095bb3d49abcb9b3d1f9c82ce1f909e46ba2da606eb634c1f",
+            "byteCount": 2816438
+          }
+        },
+        "export": {
+          "exportedSha256": "5cc2c45dc5cb73e095bb3d49abcb9b3d1f9c82ce1f909e46ba2da606eb634c1f",
+          "matchesSignedArtifact": true
+        }
+      },
+      "verify": {
+        "import": {
+          "importRequestId": "gj5-20260909-verify",
+          "lease": "lease-v1:imp-a077fcf7-a88f-4466-90dc-bd4731f1084f:ART-5aed3e951bbc39ad7baec4acc1f90938"
+        },
+        "debugHap": {
+          "jobID": "job-843c84621fff4918a23c4daa5d384518",
+          "executionID": "gj5-20260909-verify",
+          "operationReference": "debug.hap@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "artifactCount": 3,
+          "actualEffect": "deviceMutation",
+          "actualStepKinds": [
+            "probeDevice",
+            "runApprovedRemoteRead",
+            "sendFile",
+            "installPackage",
+            "startApplication",
+            "verifyRemoteState",
+            "captureRemoteStdout",
+            "cleanupOwnedRemotePath"
+          ],
+          "startedAtUTC": "2026-09-09T08:00:03Z",
+          "finishedAtUTC": "2026-09-09T08:00:15Z",
+          "error": null
+        },
+        "installReadback": {
+          "deployedArtifactSha256": "5cc2c45dc5cb73e095bb3d49abcb9b3d1f9c82ce1f909e46ba2da606eb634c1f",
+          "matchesSignedHap": true,
+          "installed": "true",
+          "firmware": "OpenHarmony-7.0.0.37"
+        },
+        "livenessAfterWindow": {
+          "job": {
+            "jobID": "job-a35106585f5ddfcde97d9e47f76a1fe7",
+            "executionID": "gj5-20260909-diag-verify",
+            "operationReference": "capture.diagnostics@1",
+            "terminalState": "succeeded",
+            "outcomeUnknown": false,
+            "evidenceBlockers": [],
+            "humanActions": [],
+            "artifactCount": 8,
+            "actualEffect": "readOnly",
+            "actualStepKinds": [
+              "probeDevice",
+              "runApprovedRemoteRead",
+              "preflightDeviceStorage",
+              "verifyRemoteState",
+              "captureRemoteStdout"
+            ],
+            "startedAtUTC": "2026-09-09T08:00:37Z",
+            "finishedAtUTC": "2026-09-09T08:00:47Z",
+            "error": null
+          },
+          "processState": "RUNNING",
+          "reasonCode": "targetProcessRunning",
+          "pidObserved": true,
+          "observedAtUtc": "2026-09-09T08:00:37Z",
+          "secondsAfterStart": 46,
+          "crashIndexEntryCount": 10,
+          "crashIndexUnchangedSinceRepro": true
+        }
+      },
+      "negative": {
+        "input": "gj5-patch-stale.json: same patch lease, expectedWorkspaceRevision = the superseded isolated revision",
+        "executionID": "gj5-20260909-patch-stale",
+        "cliExit": 77,
+        "errorCode": "admissionDenied",
+        "message": "execution stopped before Job creation",
+        "executionState": "failed",
+        "failureCode": "admissionDenied",
+        "jobCreated": false,
+        "ledger": {
+          "before": 32,
+          "after": 32,
+          "newJobs": []
+        }
+      },
+      "jobs": [
+        {
+          "jobID": "job-45ee65fe426b7dd3981bcce2ee930ee5",
+          "executionID": "gj5-20260909-analyze",
+          "operationReference": "analyzer.extract-crash-signature@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "artifactCount": 1,
+          "actualEffect": "hostOnly",
+          "actualStepKinds": [
+            "runDeterministicAnalyzer"
+          ],
+          "startedAtUTC": "2026-09-09T07:59:49Z",
+          "finishedAtUTC": "2026-09-09T07:59:49Z",
+          "error": null
+        },
+        {
+          "jobID": "job-62b82ee7ae27fe0c11a6d6e8d0e5b485",
+          "executionID": "gj5-20260909-build",
+          "operationReference": "workspace.build-openharmony@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "artifactCount": 2,
+          "actualEffect": "deviceMutation",
+          "actualStepKinds": [
+            "buildWorkspaceOpenHarmony"
+          ],
+          "startedAtUTC": "2026-09-09T07:59:51Z",
+          "finishedAtUTC": "2026-09-09T08:00:00Z",
+          "error": null
+        },
+        {
+          "jobID": "job-a35106585f5ddfcde97d9e47f76a1fe7",
+          "executionID": "gj5-20260909-diag-verify",
+          "operationReference": "capture.diagnostics@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "artifactCount": 8,
+          "actualEffect": "readOnly",
+          "actualStepKinds": [
+            "probeDevice",
+            "runApprovedRemoteRead",
+            "preflightDeviceStorage",
+            "verifyRemoteState",
+            "captureRemoteStdout"
+          ],
+          "startedAtUTC": "2026-09-09T08:00:37Z",
+          "finishedAtUTC": "2026-09-09T08:00:47Z",
+          "error": null
+        },
+        {
+          "jobID": "job-18983343b576393eb9ace107bae95143",
+          "executionID": "gj5-20260909-diag",
+          "operationReference": "capture.diagnostics@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "artifactCount": 7,
+          "actualEffect": "readOnly",
+          "actualStepKinds": [
+            "probeDevice",
+            "runApprovedRemoteRead",
+            "preflightDeviceStorage",
+            "verifyRemoteState",
+            "captureRemoteStdout"
+          ],
+          "startedAtUTC": "2026-09-09T07:57:25Z",
+          "finishedAtUTC": "2026-09-09T07:57:35Z",
+          "error": null
+        },
+        {
+          "jobID": "job-5fc645325245724ee9f272576d7c3517",
+          "executionID": "gj5-20260909-diag2",
+          "operationReference": "capture.diagnostics@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "artifactCount": 8,
+          "actualEffect": "readOnly",
+          "actualStepKinds": [
+            "probeDevice",
+            "runApprovedRemoteRead",
+            "preflightDeviceStorage",
+            "verifyRemoteState",
+            "captureRemoteStdout"
+          ],
+          "startedAtUTC": "2026-09-09T07:59:35Z",
+          "finishedAtUTC": "2026-09-09T07:59:47Z",
+          "error": null
+        },
+        {
+          "jobID": "job-f7fadc632f9894ae6b3c0da6457fcc30",
+          "executionID": "gj5-20260909-isolate",
+          "operationReference": "workspace.prepare-isolated-copy@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "artifactCount": 1,
+          "actualEffect": "hostOnly",
+          "actualStepKinds": [
+            "prepareWorkspaceIsolation"
+          ],
+          "startedAtUTC": "2026-09-09T07:59:50Z",
+          "finishedAtUTC": "2026-09-09T07:59:50Z",
+          "error": null
+        },
+        {
+          "jobID": "job-0606053d21a71b8c53195e485abf6e7d",
+          "executionID": "gj5-20260909-patch",
+          "operationReference": "workspace.apply-patch@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "artifactCount": 1,
+          "actualEffect": "deviceMutation",
+          "actualStepKinds": [
+            "applyWorkspacePatch"
+          ],
+          "startedAtUTC": "2026-09-09T07:59:50Z",
+          "finishedAtUTC": "2026-09-09T07:59:50Z",
+          "error": null
+        },
+        {
+          "jobID": "job-cde216d01fba8c0fd54f7517b6fdb11e",
+          "executionID": "gj5-20260909-repro",
+          "operationReference": "debug.hap@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "artifactCount": 3,
+          "actualEffect": "deviceMutation",
+          "actualStepKinds": [
+            "probeDevice",
+            "runApprovedRemoteRead",
+            "sendFile",
+            "installPackage",
+            "startApplication",
+            "verifyRemoteState",
+            "captureRemoteStdout",
+            "cleanupOwnedRemotePath"
+          ],
+          "startedAtUTC": "2026-09-09T07:56:51Z",
+          "finishedAtUTC": "2026-09-09T07:57:03Z",
+          "error": null
+        },
+        {
+          "jobID": "job-7915e6758eb9940a6e9be8008b3cfa3f",
+          "executionID": "gj5-20260909-sign",
+          "operationReference": "workspace.sign-openharmony-hap@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "artifactCount": 2,
+          "actualEffect": "hostOnly",
+          "actualStepKinds": [
+            "signWorkspaceOpenHarmonyHap"
+          ],
+          "startedAtUTC": "2026-09-09T08:00:00Z",
+          "finishedAtUTC": "2026-09-09T08:00:02Z",
+          "error": null
+        },
+        {
+          "jobID": "job-843c84621fff4918a23c4daa5d384518",
+          "executionID": "gj5-20260909-verify",
+          "operationReference": "debug.hap@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "artifactCount": 3,
+          "actualEffect": "deviceMutation",
+          "actualStepKinds": [
+            "probeDevice",
+            "runApprovedRemoteRead",
+            "sendFile",
+            "installPackage",
+            "startApplication",
+            "verifyRemoteState",
+            "captureRemoteStdout",
+            "cleanupOwnedRemotePath"
+          ],
+          "startedAtUTC": "2026-09-09T08:00:03Z",
+          "finishedAtUTC": "2026-09-09T08:00:15Z",
+          "error": null
+        }
+      ],
+      "zeroDispatchChecks": [
+        {
+          "executionID": "gj5-20260909-patch-stale",
+          "newJobs": [],
+          "ledgerUnchanged": true
+        }
+      ],
+      "budgets": {
+        "maxRounds": 1,
+        "roundsUsed": 1,
+        "e1Jobs": [
+          "job-cde216d01fba8c0fd54f7517b6fdb11e",
+          "job-0606053d21a71b8c53195e485abf6e7d",
+          "job-62b82ee7ae27fe0c11a6d6e8d0e5b485",
+          "job-843c84621fff4918a23c4daa5d384518"
+        ],
+        "stopOnOutcomeUnknown": "none occurred",
+        "stopOnHumanActionRequired": "none occurred",
+        "stopOnAuthorizationRequired": "none occurred (the isolated copy is authorised automatically)",
+        "wallClock": "07:56:51Z repro → 08:00:49Z negative"
+      },
+      "discipline": {
+        "rawDeviceCommands": 0,
+        "appUse": 0,
+        "repositoryFileWrites": 0,
+        "note": "published arkdeck leaves only, driven by /private/tmp/arkdeck-gj-headless-20260909/gj5/driver.py; the source project tests/waterflow-demo was not modified (the patch lands on the Runtime-owned isolated copy)"
+      },
+      "notes": "The Runtime under test is protected main 8c6a376c plus PR #1810, built locally; #1810 changes only the daemon's startup reconciliation of the credential owner ledger and no GJ-5 path. Re-run on the merged build with the same driver once #1810 is on main."
+    }
+  ],
+  "operationRealDeviceCoverage": {
+    "catalogDigest": "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+    "window": "GJ-5 only; GJ-1..3 coverage on this digest is in svc-acceptance-2026-09-08-published-main.md, GJ-1 §2.1 in svc-acceptance-2026-09-09-published-main.md",
+    "operations": [
+      {
+        "operationReference": "analyzer.analyze-trace@1",
+        "availability": "available",
+        "state": "notExercised",
+        "jobIDs": []
+      },
+      {
+        "operationReference": "analyzer.extract-crash-signature@1",
+        "availability": "available",
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-45ee65fe426b7dd3981bcce2ee930ee5"
+        ]
+      },
+      {
+        "operationReference": "analyzer.summarize-hilog@1",
+        "availability": "available",
+        "state": "notExercised",
+        "jobIDs": []
+      },
+      {
+        "operationReference": "analyzer.summarize-trace@1",
+        "availability": "available",
+        "state": "notExercised",
+        "jobIDs": []
+      },
+      {
+        "operationReference": "capture.diagnostics@1",
+        "availability": "available",
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-a35106585f5ddfcde97d9e47f76a1fe7",
+          "job-18983343b576393eb9ace107bae95143",
+          "job-5fc645325245724ee9f272576d7c3517"
+        ]
+      },
+      {
+        "operationReference": "capture.screen-sequence@1",
+        "availability": "available",
+        "state": "notExercised",
+        "jobIDs": []
+      },
+      {
+        "operationReference": "debug.hap@1",
+        "availability": "available",
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-cde216d01fba8c0fd54f7517b6fdb11e",
+          "job-843c84621fff4918a23c4daa5d384518"
+        ]
+      },
+      {
+        "operationReference": "debug.template@1",
+        "availability": "available",
+        "state": "notExercised",
+        "jobIDs": []
+      },
+      {
+        "operationReference": "deploy.native-library.app-owned@1",
+        "availability": "available",
+        "state": "notExercised",
+        "jobIDs": []
+      },
+      {
+        "operationReference": "flash.full-restore@1",
+        "availability": "unavailable",
+        "state": "notExercised",
+        "jobIDs": []
+      },
+      {
+        "operationReference": "input.long-press@1",
+        "availability": "available",
+        "state": "notExercised",
+        "jobIDs": []
+      },
+      {
+        "operationReference": "input.swipe@1",
+        "availability": "available",
+        "state": "notExercised",
+        "jobIDs": []
+      },
+      {
+        "operationReference": "input.tap@1",
+        "availability": "available",
+        "state": "notExercised",
+        "jobIDs": []
+      },
+      {
+        "operationReference": "observe.device@1",
+        "availability": "available",
+        "state": "notExercised",
+        "jobIDs": []
+      },
+      {
+        "operationReference": "port-forward.create@1",
+        "availability": "available",
+        "state": "notExercised",
+        "jobIDs": []
+      },
+      {
+        "operationReference": "port-forward.remove@1",
+        "availability": "available",
+        "state": "notExercised",
+        "jobIDs": []
+      },
+      {
+        "operationReference": "workspace.apply-patch@1",
+        "availability": "available",
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-0606053d21a71b8c53195e485abf6e7d"
+        ]
+      },
+      {
+        "operationReference": "workspace.build-openharmony@1",
+        "availability": "available",
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-62b82ee7ae27fe0c11a6d6e8d0e5b485"
+        ]
+      },
+      {
+        "operationReference": "workspace.create-checkpoint@1",
+        "availability": "available",
+        "state": "notExercised",
+        "jobIDs": []
+      },
+      {
+        "operationReference": "workspace.inspect-diff@1",
+        "availability": "available",
+        "state": "notExercised",
+        "jobIDs": []
+      },
+      {
+        "operationReference": "workspace.inspect-git-status@1",
+        "availability": "available",
+        "state": "notExercised",
+        "jobIDs": []
+      },
+      {
+        "operationReference": "workspace.inspect-source@1",
+        "availability": "available",
+        "state": "notExercised",
+        "jobIDs": []
+      },
+      {
+        "operationReference": "workspace.prepare-isolated-copy@1",
+        "availability": "available",
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-f7fadc632f9894ae6b3c0da6457fcc30"
+        ]
+      },
+      {
+        "operationReference": "workspace.read-source-range@1",
+        "availability": "available",
+        "state": "notExercised",
+        "jobIDs": []
+      },
+      {
+        "operationReference": "workspace.revert-patch@1",
+        "availability": "available",
+        "state": "notExercised",
+        "jobIDs": []
+      },
+      {
+        "operationReference": "workspace.run-tests@1",
+        "availability": "available",
+        "state": "notExercised",
+        "jobIDs": []
+      },
+      {
+        "operationReference": "workspace.sign-openharmony-hap@1",
+        "availability": "available",
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-7915e6758eb9940a6e9be8008b3cfa3f"
+        ]
+      },
+      {
+        "operationReference": "workspace.sweep-isolated-copies@1",
+        "availability": "available",
+        "state": "notExercised",
+        "jobIDs": []
+      },
+      {
+        "operationReference": "workspace.symbolize-crash@1",
+        "availability": "available",
+        "state": "notExercised",
+        "jobIDs": []
+      }
+    ]
+  }
+}

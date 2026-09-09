@@ -152,6 +152,8 @@ rollback attestation is a Journal entry, not an entry in the table above.
 | --- | --- | --- |
 | SVC-AC-05 current durable formats | **publication, read and export all met** | A production caller publishes a Session; `session show` answers for it (#1805); and the exact finalized export completes through published typed operations with the source preserved and the device identifier redacted to a schema-valid form. `session list` still refuses while the 2026-08-02 directory is unaccounted, which is the correct whole-root contract and not an outstanding item. The earlier record's "no production caller publishes a Session" is superseded. |
 | SVC-AC-07 evidence integrity | met, re-read on this build | `job-5b91a6a9f87b23fc689aa12584469758` publishes `artifactIntegrityFailed` rather than `verified`. |
+| SVC-AC-09 current configuration | **signing legs met on the candidate build** | The credential rebind below exercised `workspace preset remove`, `runtime signing status/remove/install --build-profile --project-ref`, `workspace preset register --kind signing` and `runtime service restart` end to end on a Data Protection Keychain credential; the one refusal (`signing remove` while an owner remained) was the product defect #1810 repairs, not a configuration-format regression. |
+| SVC-AC-10 complete delivery | **GJ-5 met on the candidate build; GJ-4 outstanding** | GJ-5 `REAL_DEVICE_PASS` on `8c6a376c` + #1810 (section below, record `gj-headless-rerun-2026-09-09.json`). GJ-4's second gate is a decision, now taken: DEC-014 (agent/dec-014-015-campaign-redaction-20260909) names `runtime service update --arkforge-campaign gj4-<date>` as the acceptance-window authority; the device reads `flash prerequisites` loader/recoveryPath/unlocked `satisfied`, `bootloader-status` `hdcNormal`/`exactBoundTarget` r2. |
 
 Every other SVC-AC row keeps the status and the build it was recorded against in
 [`svc-acceptance-2026-09-08-published-main.md`](svc-acceptance-2026-09-08-published-main.md).
@@ -283,7 +285,9 @@ the reason and publishes something else. Neither is repaired here.
 in no SVC Task's Allowed paths in this change, so the repair needs a scope
 revision rather than a quiet widening.
 
-### The remedy is an operator action, not a code change
+### The remedy is an operator action, not a code change — superseded the same day
+
+> Superseded by the GJ-5 section below: the operator action was attempted through the product and refused by a second defect (a credential owner no preset record carries); #1810 repairs it and the rebind then completed through published leaves only.
 
 The credential must be rebound to the registered project. `runtime signing
 install` takes `--project-ref`, so the path is to reinstall it against
@@ -332,31 +336,92 @@ Runtime republishes it as `authorizationState: Offline`, `adoptedTargetId: null`
 product behaved correctly; the runbook sentence describes a state that does not
 occur, and following it literally would make an operator think the step failed.
 
+## GJ-5 Bounded AI Debug Loop — `REAL_DEVICE_PASS` on the candidate build
+
+Executed 2026-09-09 07:56Z–08:01Z with the real DAYU200 (`TGT-958780b2ffb7`,
+`bindingRevision 2`, OpenHarmony-7.0.0.37) through published `arkdeck` leaves
+only, driven by a host-side script that calls nothing but the CLI
+(`/private/tmp/arkdeck-gj-headless-20260909/gj5/driver.py`). The redacted
+record is [`gj-headless-rerun-2026-09-09.json`](gj-headless-rerun-2026-09-09.json).
+
+**The Runtime under test is not protected `main`.** It is `main` `8c6a376c`
+plus `agent/ohs-001-orphan-credential-owner-20260909` (PR #1810, `5e1702f4`),
+built locally (`build-local-helpers.sh`, CLI `42c7b992…`, daemon `6e6c4df2…`,
+contract identity `8a662759…`, Catalog digest `508783ac…`). #1810 changes only
+the daemon's startup reconciliation of the signing credential owner ledger; no
+GJ-5 path. The run must be repeated on the merged build before this Task is
+done, and the same driver does it in five minutes.
+
+### Why a fix was needed first
+
+The remedy named above — reinstall the credential against the registered
+project — was tried through the product and hit a second defect:
+
+| Step | Result |
+| --- | --- |
+| `workspace preset remove … --preset preset-23114ce6017f4fbdd8930bcc` | exit 0, `removed`; `runtime signing status` `referenceCount` 2 → 1 |
+| `runtime signing remove` | exit 1, `signing credential is referenced by an active workspace preset` |
+| the remaining owner | `preset-3667528438767fb6b68fd0ad`, the signing preset the 2026-09-02 window registered under the legacy `demo-app` root; no store record carries it (the state directory was retired since), but the credential owner ledger lives beside the signing material and kept the pin. `OpenHarmonySigningCredentialOwner.ledgerForMutation` refuses `install` and `remove` while any owner remains, and the only release path is a store mutation of a preset the store carries — so there was no product path out |
+
+#1810 (`TASK-OHS-001`): the daemon on the default state directory releases,
+at startup, every credential owner its preset store no longer carries, and
+says so. On this host: `agentd.log` `signing credential owner released presets
+no store record carries: preset-3667528438767fb6b68fd0ad`, then
+`referenceCount 0`, `runtime signing install --build-profile … --project-ref
+project-fd677365f7bdefabda66a3c1` → `credential:sha256-2fa4fa4b…`,
+`workspace preset register --kind signing` → `preset-3cae17c26b7aca2c2bfba389`,
+`runtime service restart` → the preset `active`, `operation list` **28 of 30
+available** (only the two hardware-gated Flash entries left). No file under the
+signing root or the state directory was edited by hand. Record:
+`chg-2026-057/evidence/runs/TASK-OHS-001/orphaned-credential-owner-20260909.md`.
+
+### The loop
+
+| Hop | Job | Result |
+| --- | --- | --- |
+| repro `debug.hap@1` (crash-probe HAP `ee083149…`, `retain`, `running`, 20 s diagnostics) | `job-cde216d01fba8c0fd54f7517b6fdb11e` | succeeded, `deviceMutation`, 3 Artifacts |
+| liveness 34 s after start (`capture.diagnostics@1`) | `job-18983343b576393eb9ace107bae95143` | `processState STOPPED`, `targetProcessNotRunning`, `pidObserved false` |
+| the same with `crashLogs: true` | `job-5fc645325245724ee9f272576d7c3517` | `crash-index.txt` published: 10 Faultlogger entries, the newest a `jscrash` of `com.example.waterflowdemo` |
+| `analyzer.extract-crash-signature@1 --target TGT` on that crash-index lease | `job-45ee65fe426b7dd3981bcce2ee930ee5` | `answered`, 5 parsed entries |
+| `workspace.prepare-isolated-copy@1` (`expectedWorkspaceRevision` computed locally by the provider's algorithm: `701c5bd9…`) | `job-f7fadc632f9894ae6b3c0da6457fcc30` | copy `evolution-659f702fc0a1dfab0136`, `sourceWorkspaceRevision` echoed equal, isolated revision `e0d4131e…` |
+| `artifact import workspace-patch` (`gj5-fix.patch` `b8111bf1…`, 610 bytes) + `workspace.apply-patch@1 --target TGT` on the copy | `job-0606053d21a71b8c53195e485abf6e7d` | succeeded; `previousWorkspaceRevision e0d4131e…` → `workspaceRevision e145d393…`, `entry/src/main/ets/entryability/EntryAbility.ets` |
+| `workspace.build-openharmony@1` on the copy, `preset-9cc94c378346e500cb0a0b4a` | `job-62b82ee7ae27fe0c11a6d6e8d0e5b485` | `unsigned.hap` 2 748 896 bytes |
+| `workspace.sign-openharmony-hap@1 --target <copy>`, `preset-3cae17c26b7aca2c2bfba389` | `job-7915e6758eb9940a6e9be8008b3cfa3f` | `signed.hap` 2 816 438 bytes, `5cc2c45d…`; `signing-report.json` names the same keystore/certificate/profile digests the credential was installed from |
+| `artifact export` → `artifact import hap` → verify `debug.hap@1` | `job-843c84621fff4918a23c4daa5d384518` | succeeded; `install-readback.json` `deployedArtifactSha256 == 5cc2c45d…`, `installed true`, firmware `OpenHarmony-7.0.0.37` |
+| liveness 34 s after the fixed start | `job-a35106585f5ddfcde97d9e47f76a1fe7` | **`processState RUNNING`, `targetProcessRunning`, `pidObserved true`**; crash-index still 10 entries — unchanged since the repro |
+| negative: same patch lease, `expectedWorkspaceRevision` = the superseded `e0d4131e…` | none | exit 77 `admissionDenied`, `execution stopped before Job creation`, `outcomeUnknown false`; Job ledger 32 before, 32 after, no new Job |
+
+Every criterion of runbook §6 holds: repro `UNHEALTHY`/`targetProcessNotRunning`
+with a crash entry and an `answered` signature; isolate, import, patch, build,
+sign all `succeeded` with `outcomeUnknown false` and the patch evidence naming
+`previousWorkspaceRevision` → new revision; the install readback pinned to the
+signed HAP's SHA-256; `HEALTHY` after the crash window with the crash-index
+count unchanged; a named refusal with an unchanged ledger. Raw device commands
+0, App 0, repository writes 0 (the patch lands on the Runtime-owned copy; the
+source `tests/waterflow-demo` is untouched). No HAR, no `outcomeUnknown`, no
+`authorizationRequired` — the isolated copy is authorised automatically.
+
+The isolated revision, the post-patch revision and the unsigned/signed byte
+counts are identical to the 2026-09-02 record's, which is the expected sign of
+a deterministic pipeline over an unchanged source tree, not a copied result:
+every Job id above is new and readable on this host.
+
 ## Still required before this Task can be done
 
-1. **GJ-4's second gate.** `flash.dayu200` and `flash.full-restore@1` are
-   Catalog-`unavailable` because the ArkForge lane is bound to no acceptance
-   campaign: the install receipt reads `arkForgeLane.campaign: ""`, and
-   `ArkForgeLaneComposition` publishes `.unavailable` exactly when
-   `inputs.campaign.isEmpty`, with `ArkForgeAuthoritySupport.seal` reporting
-   state `hardwareGated`. A non-empty campaign flips the seal to
-   `hardwareCampaign` and the operations to available, and the per-plan
-   mechanics/authority seals and Runtime admission still gate every flash, so it
-   is not a bypass. The mechanical step is one flag —
-   `runtime service update --arkforge-campaign <campaign-id>` — but the id is an
-   assertion that this exact authority build, control map, HDC, permit codec,
-   mechanics and platform combination has a reviewed hardware acceptance record.
-   The 2026-08-04 window passed under `ECAMP-96EFFF15` and `ECAMP-31E041BC`;
-   every axis of that seal has moved since, so reusing either would claim
-   acceptance for a configuration that was never accepted, and inventing one
-   would fabricate the record. **A maintainer has to name the campaign.**
-2. **GJ-5.** Its blocker is diagnosed above: the signing credential is bound to
-   `demo-app`, which is not a registered project, and must be reinstalled
-   against `project-fd677365f7bdefabda66a3c1` with
-   `runtime signing install --project-ref …`. That needs the credential material
-   and its passwords, so it is a maintainer action.
-3. **The Windows read-only chain**, which needs a Windows 11 x64 host, a signing
-   identity and a DAYU200 that this window did not have.
+1. **GJ-4.** DEC-014 settles the entry point: the acceptance window is opened
+   by `runtime service update --arkforge-bundle <bundle> --arkforge-campaign
+   gj4-<date>` and closed by the same command without the campaign flag, as
+   runbook §5 already says. The device is ready — `flash device-access` sees
+   no Loader-mode observation, `flash bootloader-status` reads `hdcNormal` /
+   `exactBoundTarget` at `bindingRevision 2`, and `flash prerequisites` reads
+   `loader`, `recoveryPath` and `unlocked` `satisfied` (`stablePower` unknown).
+   The full-restore flash itself is the one destructive action of this
+   acceptance and waits for the maintainer's explicit go.
+2. **GJ-5 on the merged build.** Repeat the driver once #1810 is on `main`
+   and the helper pair is rebuilt from it; the credential and preset above
+   carry over.
+3. **The Windows read-only chain** is not this Task's: it needs a Windows 11
+   x64 host, a signing identity and a DAYU200.
 
 Nothing further is outstanding on the preserved incomplete Session. It blocks
 `session list`, which is the correct answer to a question about the whole root,
