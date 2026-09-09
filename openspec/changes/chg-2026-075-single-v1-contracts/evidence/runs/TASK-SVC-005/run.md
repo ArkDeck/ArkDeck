@@ -3,10 +3,10 @@
 Status stays `ready`. This Task is not done: GJ-4's second gate is still blocked
 on a maintainer decision and GJ-5 was not started.
 
-Session export is no longer blocked. A production caller publishes a Session and
-`session export apply` completes on the published Runtime — see the 2026-09-09
-window. `session list` and `session show` are still refused by one preserved
-incomplete 2026-08-02 Session.
+Session publication, read and export all complete on the published Runtime — see
+the 2026-09-09 window. `session list` still refuses while one preserved
+incomplete 2026-08-02 Session is unaccounted, which is the correct answer for a
+question about the whole root.
 
 GJ-3's rollback leg **did** pass — this record originally said otherwise and is
 corrected below. The defects found during these windows were reviewed, merged
@@ -45,7 +45,7 @@ digests needed to re-check them.
 | ~~No production caller publishes a Session; SVC-AC-05 and SVC-AC-10 cannot pass~~ | **Superseded.** A production caller publishes a Session (`job-71f00adafcce67d0de4eed11ebb4b5c3`, `manifestSha256 270bd40d…`), and on 2026-09-09 `session export apply` completed on the published Runtime after #1799 fixed the export redaction. `session list`/`session show` remain refused by the preserved incomplete 2026-08-02 Session. |
 | Session export produced a manifest its own validator refused | TASK-SVC-002, #1799 merged and verified on the published Runtime on 2026-09-09 |
 | A pre-publication export refusal reports `outcomeUnknown` and consumes the preview; three previews on this host are stranded in `applying` | TASK-SVC-002, #1800 merged. **Not exercised on the published Runtime** — every refusal reachable from the published surface is raised before the preview is claimed, so the fix rests on its contract tests and the gate. The three stranded previews are not released retroactively. |
-| `session list`/`session show` refuse on a catalog the export path completes against | product decision; the incomplete 2026-08-02 Session is preserved and now named exactly in the refusal |
+| ~~`session list`/`session show` refuse on a catalog the export path completes against~~ | **Resolved.** The distinction was deliberate: a whole-root answer cannot be partial, an exact answer about one named Session can. `show` was on the wrong side of it — repaired by #1805 and verified on the published Runtime. `list` still refuses, correctly, and names the leaf. |
 | `flash.full-restore@1` is Catalog-`unavailable` on this host (no named hardware acceptance campaign) | maintainer window, independent of the alias blocker |
 | GJ-1 §2.1 HAR crash-resume still not demonstrated | needs a physical USB detach and reattach. The execution named `gj1-har-20260908` completed with `humanAction: null` and a straight `queued→preflight→running→finalizing→succeeded` timeline, so it did not exercise the path its name claims. |
 | GJ-5 not started; `workspace.sign-openharmony-hap@1` unavailable | **Blocker diagnosed 2026-09-09.** The signing credential `credential:sha256-562430f169…` is bound to `projectRef: demo-app`, which is not a registered project, so the signing preset fails its startup binding check and is projected as `runtimeRestartRequired` — a remedy no restart can satisfy. Remedy is `runtime signing install --project-ref project-fd677365f7bdefabda66a3c1`, a maintainer action requiring the credential material. |
@@ -59,8 +59,8 @@ digests needed to re-check them.
 3. Run GJ-1 §2.1 HAR crash-resume (physical detach and reattach), which
    `gj1-har-20260908` did not exercise.
 4. Run GJ-5.
-5. Decide what a Runtime should do when one preserved incomplete Session blocks
-   `session list` and `session show` while the export path completes.
+5. Nothing further on the preserved incomplete Session: it blocks only
+   `session list`, which is the correct whole-root contract.
 
 Each Journey result stays attached to the build it was taken on and is not
 carried forward to a later digest.

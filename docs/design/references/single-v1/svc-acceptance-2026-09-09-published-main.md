@@ -77,6 +77,29 @@ The exported product was verified, not assumed:
 This is a published-Runtime typed operation over the user-private UDS, not a
 fixture and not a host script.
 
+### The read leg, closed on a later build
+
+`session show` refused all day for the same reason `list` did. It was grouped
+with the whole-root family on the reasoning that each of them "answers about the
+whole root", which is true of `list` and not of `show`: the published
+`session.show` result carries only that Session's own facts. #1805 answers it at
+the scope it asks about, under the same guard the export path already used and
+had reviewed, factored so the two cannot drift.
+
+Verified on protected `main` `eadb46b8`, CLI
+`33643ee7e540f52b9feb8bc599bd7dfaf73bf68b18f23f31a220021399a0346f`, daemon
+`4153ec722359825304afba50484e75ff08c19b3dd2e9f3c24fd31c55e0047ce3`, installed
+`2026-09-09T04:32:39Z`:
+
+| Command | Exit | Result |
+| --- | --- | --- |
+| `session show --session session-job-71f00adafcce67d0de4eed11ebb4b5c3` | **0** | `sizeBytes 5395`, `completedAtUtc 2026-09-08T13:23:16Z`, `expiresAtUtc 2026-12-07T13:23:16Z`, `pinned false`, `generation 1` — and no total over the root |
+| `session show --session rockchip-session-42f8e86d-…` | 69 | `operationUnavailable`, naming the leaf: showing the unaccounted Session itself stays refused |
+| `session list` | 69 | `operationUnavailable`, naming the leaf: the whole-root contract is unchanged |
+
+So on the published Runtime a healthy Session can now be published, read and
+exported while one preserved incomplete directory remains exactly where it is.
+
 ### The historical Session, and what it still blocks
 
 `session list` and `session show` still refuse, with
@@ -93,11 +116,12 @@ rather than failing anonymously, which is the diagnosable handling this Task
 asked for — but naming it is not repairing it, and `session list`/`session show`
 remain unavailable while it is there.
 
-Export and list disagree about the same catalog: the export path completes with
-`catalogStatus.blocker: unaccountedSessionContent` reported in its own result,
-while list and show refuse on that identical condition. Both behaviours are
-defensible on their own; together they are inconsistent, and which one is
-correct is a product decision rather than a defect this Task can settle.
+An earlier draft of this record called export completing while list refuses an
+inconsistency needing a product decision. That was wrong, and the correction is
+worth keeping: the distinction is deliberate and documented in the source — an
+answer about the whole root cannot be partial, an answer about one named Session
+can be exact. What was actually wrong was `show` sitting on the wrong side of
+that line, which #1805 fixed.
 
 ## Journey evidence readable on this build
 
@@ -126,7 +150,7 @@ rollback attestation is a Journal entry, not an entry in the table above.
 
 | AC | Status | Basis |
 | --- | --- | --- |
-| SVC-AC-05 current durable formats | **export leg met; list/show leg not met** | A production caller publishes a Session, and the exact finalized export now completes through published typed operations with the source preserved and the device identifier redacted to a schema-valid form. `session list`/`session show` remain refused by the preserved incomplete 2026-08-02 Session. The earlier record's "no production caller publishes a Session" is superseded. |
+| SVC-AC-05 current durable formats | **publication, read and export all met** | A production caller publishes a Session; `session show` answers for it (#1805); and the exact finalized export completes through published typed operations with the source preserved and the device identifier redacted to a schema-valid form. `session list` still refuses while the 2026-08-02 directory is unaccounted, which is the correct whole-root contract and not an outstanding item. The earlier record's "no production caller publishes a Session" is superseded. |
 | SVC-AC-07 evidence integrity | met, re-read on this build | `job-5b91a6a9f87b23fc689aa12584469758` publishes `artifactIntegrityFailed` rather than `verified`. |
 
 Every other SVC-AC row keeps the status and the build it was recorded against in
@@ -291,8 +315,10 @@ work above, and not investigated in this window.
    `demo-app`, which is not a registered project, and must be reinstalled
    against `project-fd677365f7bdefabda66a3c1`.
 3. GJ-1 §2.1 HAR crash-resume, which `gj1-har-20260908` did not exercise.
-4. A product decision on the preserved incomplete Session: today it blocks
-   `session list` and `session show` on a Runtime whose export path works.
+4. Nothing further on the preserved incomplete Session. It blocks `session list`,
+   which is the correct answer for a question about the whole root, and it no
+   longer blocks reading or exporting a healthy Session. The directory stays as
+   it is; no product decision is outstanding.
 5. The Windows read-only chain, which needs a Windows 11 x64 host, a signing
    identity and a DAYU200 that this window did not have.
 
