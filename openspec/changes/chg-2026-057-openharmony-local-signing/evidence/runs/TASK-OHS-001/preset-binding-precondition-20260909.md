@@ -56,10 +56,48 @@ start-up, before the wedge; `doctor` answered `overall: degraded`, `ready: true`
 - 267 tests across the workspace store, daemon, workspace and signing suites
   pass.
 
-## The reference host
+## Verified on the published Runtime
 
-Still wedged at the time of writing, by the refused registration this record
-describes. It is a persisted pending mutation, not damaged data: installing a
-daemon carrying this change abandons the intent on first access and restores the
-store. No file was hand-edited, no credential was installed, removed or entered,
-and the mismatched credential binding itself is untouched.
+Built from clean protected `main` `f5594bbc5e2c851103b2abfcc4c5aeb444422eb2`
+(#1803), CLI `98ce528869f65bb1209545b1f4085bd004990d267155a70d2d6f097a123814ad`,
+daemon `18b3dd7a664b814dc369730235bb1707e690a3fa5aebb948cbc681a65eb96db5`,
+installed `2026-09-09T03:23:51Z` with `runtime service update --daemon`, exit 0.
+
+**The wedge cleared on its own.** The store had been refusing every read since the
+2026-09-09 refused registration. On the first access after this daemon started,
+`workspace project list` and `workspace preset list` both answer, exit 0:
+
+| Preset | Status |
+| --- | --- |
+| signing `preset-23114ce6017f4fbdd8930bcc` | `unresolved` |
+| build `preset-9cc94c378346e500cb0a0b4a` | `active` |
+| test `preset-a5cc1aa79368c99ea5e9a590` | `active` |
+| symbol `preset-cbeb3954de5b7119e638ddbc` | `active` |
+
+No file was hand-edited to achieve this; the abandoned intent was dropped by the
+product on first access, which is the repair this change makes.
+
+**The refusal no longer wedges.** Registering the same mismatched binding again
+is refused, exit 65:
+
+```
+resourceConflict: signing credential credential:sha256-562430f169… is bound to
+project demo-app, not project-fd677365f7bdefabda66a3c1
+```
+
+and `workspace project list` and `workspace preset list` both answer immediately
+afterwards, exit 0, with the four presets unchanged. That is the whole defect,
+closed on the real product: the operator gets the diagnosis and keeps the store.
+
+**Nothing else moved.** `job list` returns the same 21 Jobs with the same
+outcomes as before the first install of this window, across all five daemon
+installs; `operation list` is 27 of 30 available with the same three
+(`flash.dayu200`, `flash.full-restore@1`, `workspace.sign-openharmony-hap@1`);
+and `session export apply` still completes with the same exported manifest
+`cac181bfea901bf7045e981ccbcbb23f331afdd2174b25ed73c40526fc46f037` and the same
+`projectRef = redacted-device-aa46c4f072672f57dee812c2`.
+
+No credential was installed, removed, migrated or entered, and the mismatched
+credential binding itself is untouched. `workspace.sign-openharmony-hap@1` stays
+`unavailable`: the preset is now honestly `unresolved`, and rebinding the
+credential remains a maintainer action.
