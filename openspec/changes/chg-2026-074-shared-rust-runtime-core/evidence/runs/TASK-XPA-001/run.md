@@ -285,6 +285,41 @@ post-SVC-001 build. The maintainer decides whether SVC-002 or a dedicated task c
 
 The device re-pass stays open; this task advances no hop.
 
+### Real-device windows 2026-09-08 and 2026-09-09 on the current digest
+
+The device re-pass this task owes is the same headless runbook, on the same
+digest, through the same single-v1 CLI that `TASK-SVC-005` runs for its own
+acceptance, so the two are one set of windows rather than two. Recorded here by
+reference, with the build each result was taken on; nothing is restated as
+current beyond what those records claim.
+
+| Journey | State on digest `508783ac…` | Build / contract identity | Record |
+| --- | --- | --- | --- |
+| GJ-1 Device Observe | `REAL_DEVICE_PASS` | `main` `6ba5a0b9` (2026-09-08), identity `1054d17b…`; §2.1 HAR crash-resume on `main` `eadb46b8` (2026-09-09), identity `8a662759…` — `job-06c4e41e…`, `job-49720bb2…` | `docs/design/references/single-v1/svc-acceptance-2026-09-08-published-main.md`, `…-2026-09-09-published-main.md` |
+| GJ-2 HAP Debug | `REAL_DEVICE_PASS` (incl. the confirmed-failure compensation) | `main` `6ba5a0b9` → `16fe9617` (2026-09-08), identity `1054d17b…` — `job-458fadbe…`, `job-461b9ade…` | `svc-acceptance-2026-09-08-published-main.md` |
+| GJ-3 Native Debug | `REAL_DEVICE_PASS` (positive and rollback legs) | same window — `job-a48fdb55…`, `job-5b91a6a9…` | same |
+| GJ-4 Flash Recovery | **outstanding** | first gate (alias lineage) cleared 2026-09-08; the second gate is the operator-named acceptance campaign of runbook §5, settled by DEC-014; the flash waits for the maintainer's go | `svc-acceptance-2026-09-09-published-main.md` §Still required |
+| GJ-5 Bounded AI Debug Loop | `REAL_DEVICE_PASS` on a candidate build | `main` `8c6a376c` + PR #1810 (2026-09-09), identity `8a662759…` — repro `job-cde216d0…` … verify `job-843c8462…`; to be repeated on the merged build | `docs/design/references/single-v1/gj-headless-rerun-2026-09-09.json` |
+
+What this means for XPA-AC-3: every control-plane frame those windows exchanged
+was answered by a daemon whose method table and per-method schemas are the ones
+published here (identity `1054d17b…` for the 09-08 windows, `8a662759…` after
+#1794/#1795 — the 96 earlier methods' request, result and error shapes are
+identical under both, per AFA-001's diff record). The corpus committed under
+`Fixtures/ControlFrames` is a contract-test sample and not a recording of these
+device windows; the device records carry Job identities and digests, not frames.
+
+The pins block above moved from `eac476cd` to `8c6a376c` for the same reason:
+the control blobs changed with #1794 (`f47372fe…`→`9c5bec14…`,
+`6d3c1fb6…`→`35c66af8…`), the identity to `8a662759…`, and the schema/corpus
+directories were re-derived by #1795 under it (`spec/control/methods`
+`47059447…`, `Fixtures/ControlFrames` `c8054a23…`, git-tree digests as in
+`TASK-SVC-005/single-v1-baseline.md`). `generate-control-contract.py --check`
+exits 0 on that tree.
+
+This task flips to `done` when GJ-4 has passed on this digest; nothing else is
+owed.
+
 ## Stop condition
 
 Not triggered: no post-SVC frame or document shape changed, no method effect changed, and no
