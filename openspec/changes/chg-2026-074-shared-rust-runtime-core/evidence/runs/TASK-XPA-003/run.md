@@ -347,3 +347,61 @@ authorized SIGTERM. A SIGKILL exception for that same re-verified identity is
 pending; it has not been assumed. Original daemon restoration therefore still
 does not establish healthy service. No GJ or device dispatch has run in this
 window. The implementation remains local and will not be pushed as a partial PR.
+
+PR #1830 was subsequently merged by the maintainer as
+`fc8263bdd36893383346ef170b309a4e175568ed`. The local implementation was rebased
+onto that commit. All 44 anticipated paths pass the base-tree scope probe.
+The approved optimization now touches only the two job.status/job.list read
+projection decode call sites, with at most 128 decoded records and 2 MiB of
+retained source bytes. Every lookup still reads current storage bytes, compares
+exactly, and performs the existing row coherence and fresh status checks.
+Mutation callers and the shared decoder remain unchanged.
+
+JobReadResourcesContractTests passed 26 tests (exit 0); new cases cover changed
+bytes, warm-cache row metadata mismatch, corrupt bytes, restoration, and reads
+after a working set exceeding cache capacity. The first test run caught an
+incorrect new test expectation for the existing inline timeline envelope; only
+that expectation was corrected. The release IPC remeasurement is pending.
+
+The actual App and new smoke suite compiled and signed successfully through
+`run-ui-tests.sh --build-once` with Developer ID identity and manual signing
+overrides (exit 0). An earlier invocation omitted the manual override and failed
+Xcode's Swift-package signing configuration checks; no project or entitlement
+change was needed. No live UI smoke result is claimed yet. Signed helper build
+r5 also passed, but predates the read-projection optimization.
+
+## Origin and performance follow-up
+
+Typed private-origin decoding avoids speculative JSONValue scalar decoding while
+retaining the strict duplicate validator, exact keys/types, UID/PID checks, and
+frame SHA-256 equality. Rust now serializes typed origin metadata directly,
+without allocating an intermediate JSON dictionary. Client bytes are unchanged.
+Six release facade transport fixtures passed. With both external executable
+environment variables explicitly set, AgentFacadeContractTests passed all four
+tests, including both actual Swift durable-store crash/readback cases (11 s).
+The earlier four-test discovery without those variables is not evidence for the
+two optional external-process cases.
+
+HDCControlActionContractTests passed 20 tests with the release facade explicitly
+selected. The new test runs a real Swift private listener/handler behind facade
+origin forwarding: foreground PTY gets interactiveConsole, redirected stdin
+retains the HAR and its original reasonCode, and dispatchCount remains zero.
+The child only transfers ephemeral test pairing, which is removed immediately;
+this is an isolated host contract and never hardware evidence.
+
+AC-5 remains FAILED. The typed Swift-origin run measured facade health/job.list/
+job.status p95 at 0.137625/12.656083/0.339791 ms (+22.83%/-2.82%/-7.19%). After
+typed Rust encoding the three-run medians were 0.156000/13.924334/0.423708 ms
+(+39.23%/+6.92%/+15.73%); one run had a large latency spike, and host load
+subsequently exceeded the quiet threshold. Both results are retained in
+`ipc-release-comparison.json`; no successful latency result is substituted.
+The measurement tool now reports the original baseline's p95 spread/stability
+criterion as well as its unchanged +20% threshold. A stable quiet-host result
+is still required. No further acceptance performance run is currently active.
+
+The foreign-euid fixture launches an administrator-authenticated executable that
+only connects to its isolated UDS and attempts one health frame, then checks zero
+forwarding and continued same-uid service. Compilation succeeded, but macOS
+authentication did not complete within 120 seconds (exit 1/TimeoutExpired). The
+fixture was cleaned up; AC-6 foreign-euid rejection is NOT passed. This test
+does not signal the installed HDC process or alter Runtime state.

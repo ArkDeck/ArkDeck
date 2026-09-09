@@ -15,8 +15,20 @@ import time
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / 'scripts'))
-from bench import harness
+from bench import harness, baseline as bench_baseline
 from bench.control import ControlClient
+
+
+def wait_for_quiet_host():
+    deadline = time.monotonic() + 300
+    while True:
+        try:
+            return harness.assert_host_is_quiet()
+        except harness.HostTooBusy:
+            if time.monotonic() >= deadline:
+                raise
+            print('Waiting for the original quiet-host threshold', flush=True)
+            time.sleep(10)
 
 
 def measure(swift, facade, soak, output):
@@ -29,7 +41,7 @@ def measure(swift, facade, soak, output):
     for backend in ['swift', 'facade']:
         runs = []
         for run in range(3):
-            load = harness.assert_host_is_quiet()
+            load = wait_for_quiet_host()
             root = Path(tempfile.mkdtemp(prefix='xpa-bench-', dir='/private/tmp'))
             process = None
             try:
@@ -50,6 +62,7 @@ def measure(swift, facade, soak, output):
                         if process.poll() is not None or time.monotonic() > deadline:
                             raise RuntimeError('isolated daemon did not become ready')
                         time.sleep(.01)
+                load = wait_for_quiet_host()
                 samples = {name: [] for name in ['ipc.health', 'ipc.jobList', 'ipc.jobStatus']}
                 with ControlClient(str(root / 'agentd.sock')) as client:
                     page = client.call('job.list', {'pageSize': 50})
@@ -65,6 +78,8 @@ def measure(swift, facade, soak, output):
                 runs.append({'loadAverage': load, 'jobCount': 30, 'rows': {
                     name: {'p95ms': sorted(values)[math.ceil(len(values)*.95)-1], 'samplesMs': values}
                     for name, values in samples.items()}})
+                report['backends'][backend] = {'runs': runs}
+                output.write_text(json.dumps(report, indent=2) + '\n')
             finally:
                 if process and process.poll() is None:
                     process.terminate()
@@ -76,12 +91,15 @@ def measure(swift, facade, soak, output):
         for name in runs[0]['rows']:
             p95 = statistics.median(run['rows'][name]['p95ms'] for run in runs)
             reference = baseline['metrics'][name]['aggregate']['p95']
+            spread = bench_baseline.spread_ratio([run['rows'][name]['p95ms'] for run in runs])
             comparisons[name] = {'p95ms': p95, 'spk1P95ms': reference,
+                                 'p95SpreadRatio': spread,
+                                 'stable': spread <= bench_baseline.MAXIMUM_P95_SPREAD_RATIO,
                                  'increasePercent': (p95/reference - 1)*100, 'passes20Percent': p95 <= reference*1.2}
         report['backends'][backend] = {'runs': runs, 'comparison': comparisons}
         output.write_text(json.dumps(report, indent=2) + '\n')
     print(json.dumps({name: value['comparison'] for name, value in report['backends'].items()}, indent=2))
-    return all(row['passes20Percent'] for row in report['backends']['facade']['comparison'].values())
+    return all(row['passes20Percent'] and row['stable'] for row in report['backends']['facade']['comparison'].values())
 
 
 if __name__ == '__main__':

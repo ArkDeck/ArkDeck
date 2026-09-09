@@ -46,27 +46,58 @@ struct AgentFacadeOrigin: Sendable {
   let context: RuntimeControlRequestContext
   let frameSHA256: String
 
+  /// Typed private metadata avoids JSONValue's speculative scalar decodes on
+  /// every forwarded frame. Duplicate, unknown and malformed fields remain closed.
+  private struct Fields: Decodable {
+    let arkdeckOrigin: Int
+    let transport: String
+    let foregroundConsole: Bool
+    let peerEUID: Int64
+    let peerPID: Int64
+    let frameSHA256: String
+
+    private struct Key: CodingKey {
+      let stringValue: String
+      var intValue: Int? { nil }
+      init?(intValue: Int) { return nil }
+      init(stringValue: String) { self.stringValue = stringValue }
+    }
+    init(from decoder: Decoder) throws {
+      let fields = try decoder.container(keyedBy: Key.self)
+      guard Set(fields.allKeys.map(\.stringValue)) == [
+        "arkdeckOrigin", "transport", "foregroundConsole", "peerEUID", "peerPID", "frameSHA256"
+      ] else { throw ControlFrameJSON.Failure.malformed }
+      arkdeckOrigin = try fields.decode(Int.self, forKey: Key(stringValue: "arkdeckOrigin"))
+      transport = try fields.decode(String.self, forKey: Key(stringValue: "transport"))
+      foregroundConsole = try fields.decode(Bool.self, forKey: Key(stringValue: "foregroundConsole"))
+      peerEUID = try fields.decode(Int64.self, forKey: Key(stringValue: "peerEUID"))
+      peerPID = try fields.decode(Int64.self, forKey: Key(stringValue: "peerPID"))
+      frameSHA256 = try fields.decode(String.self, forKey: Key(stringValue: "frameSHA256"))
+    }
+  }
+
   init?(_ line: Data) {
-    guard line.count <= 1024,
-      let fields = try? ControlFrameJSON.decodeObject(line, maximumBytes: 1024),
-      Set(fields.keys) == ["arkdeckOrigin", "transport", "foregroundConsole", "peerEUID", "peerPID", "frameSHA256"],
-      fields["arkdeckOrigin"] == .integer(1),
-      fields["peerEUID"] == .integer(Int64(geteuid())),
-      case .integer(let pid)? = fields["peerPID"], pid >= 0, pid <= Int32.max,
-      case .bool(let foreground)? = fields["foregroundConsole"],
-      case .string(let digest)? = fields["frameSHA256"], digest.utf8.count == 64,
-      digest.utf8.allSatisfy({ (48...57).contains($0) || (97...102).contains($0) })
+    guard line.count < 1024, String(data: line, encoding: .utf8) != nil,
+      !line.contains(0x0A), !line.contains(0x0D) else { return nil }
+    var validator = StrictJSONDuplicateValidator(data: line)
+    guard (try? validator.validate()) != nil,
+      let fields = try? JSONDecoder().decode(Fields.self, from: line),
+      fields.arkdeckOrigin == 1, fields.peerEUID == Int64(geteuid()),
+      fields.peerPID >= 0, fields.peerPID <= Int32.max,
+      fields.frameSHA256.utf8.count == 64,
+      fields.frameSHA256.utf8.allSatisfy({ (48...57).contains($0) || (97...102).contains($0) })
     else { return nil }
-    switch fields["transport"] {
-    case .string("unixSocket"):
+    let pid = fields.peerPID, foreground = fields.foregroundConsole
+    switch fields.transport {
+    case "unixSocket":
       guard !foreground || pid > 1 else { return nil }
       context = .unixSocket(foregroundConsole: foreground)
-    case .string("appXPC"):
+    case "appXPC":
       guard !foreground, pid > 1 else { return nil }
       context = .appXPC
     default: return nil
     }
-    frameSHA256 = digest
+    frameSHA256 = fields.frameSHA256
   }
 
   func validates(_ frame: Data) -> Bool { SHA256Hex.string(of: frame) == frameSHA256 }

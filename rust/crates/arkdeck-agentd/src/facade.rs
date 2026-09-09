@@ -7,6 +7,7 @@ use arkdeck_platform::{
     LocalConnection, LocalEndpoint, LocalListener, PeerOrigin, ServerIdentity, listen_mach,
     random_bytes, read_frame,
 };
+use serde::Serialize;
 use serde_json::json;
 use std::{
     fs,
@@ -90,15 +91,39 @@ fn validate(frame: &[u8]) -> Result<String, Vec<u8>> {
         }
     }
 }
+#[derive(Serialize)]
+struct Origin<'a> {
+    #[serde(rename = "arkdeckOrigin")]
+    version: u8,
+    transport: &'a str,
+    #[serde(rename = "foregroundConsole")]
+    foreground_console: bool,
+    #[serde(rename = "peerEUID")]
+    peer_euid: u32,
+    #[serde(rename = "peerPID")]
+    peer_pid: i32,
+    #[serde(rename = "frameSHA256")]
+    frame_sha256: String,
+}
+
 fn exchange(
     reader: &mut BufReader<LocalConnection>,
     frame: &[u8],
     peer: PeerOrigin,
     transport: &str,
 ) -> io::Result<Vec<u8>> {
-    let origin = json!({"arkdeckOrigin":1,"transport":transport,"foregroundConsole":peer.foreground_console,
-        "peerEUID":peer.euid,"peerPID":peer.pid,"frameSHA256":sha256_hex(frame)});
-    let origin = encode_frame(&origin, 1024).map_err(io::Error::other)?;
+    let origin = encode_frame(
+        &Origin {
+            version: 1,
+            transport,
+            foreground_console: peer.foreground_console,
+            peer_euid: peer.euid,
+            peer_pid: peer.pid,
+            frame_sha256: sha256_hex(frame),
+        },
+        1024,
+    )
+    .map_err(io::Error::other)?;
     // A partial write is already an ambiguous interruption. No error produced
     // below carries details.phase/newDispatchCount, and no request is retried.
     // One vectored write avoids waking Swift for an origin whose frame has
