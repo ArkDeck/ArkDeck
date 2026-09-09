@@ -44,7 +44,23 @@ fn refused_before_first_byte(identity: ServerIdentity, expected_message: &str) {
     let server = std::thread::spawn(move || {
         let mut listener = LocalListener::bind(&server_endpoint).unwrap();
         ready_tx.send(()).unwrap();
-        let mut connection = listener.accept().unwrap();
+        // The client refuses this server on identity and closes without a
+        // frame. Whether the listener sees that as a connection that reads
+        // end-of-pipe, or as `ConnectNamedPipe` completing on an already
+        // closed client, depends only on scheduling; both are the refusal the
+        // test asserts, and only data or a lingering client is a failure.
+        let mut connection = match listener.accept() {
+            Ok(connection) => connection,
+            Err(error)
+                if error.kind() == io::ErrorKind::PermissionDenied
+                    && error
+                        .to_string()
+                        .contains("pipe client disconnected before authentication") =>
+            {
+                return;
+            }
+            Err(error) => panic!("untrusted server could not accept the client: {error}"),
+        };
         connection
             .set_read_timeout(Some(Duration::from_secs(3)))
             .unwrap();
