@@ -368,6 +368,61 @@ final class RuntimeSessionPublicationContractTests: XCTestCase {
     }
   }
 
+  /// `session.export.apply` after the destination has been replaced: the
+  /// exporter cannot know whether the publication landed, so the owner
+  /// answers `outcomeUnknown` — the code the handler forwards verbatim and
+  /// the one code its published schema never learned, because no recording
+  /// had ever driven this path through the control plane. Recorded here so
+  /// the derived `spec/control/methods/session.export.apply.json` carries it.
+  func testAnExportInterruptedAfterPublicationAnswersOutcomeUnknownThroughTheControlPlane()
+    async throws
+  {
+    let harness = try await Harness(
+      root: root, publishing: true,
+      exportFaultInjector: SessionStorageFaultInjector { point in
+        if point == .exportAfterReplace { throw HarnessExportFault.io }
+      })
+    let job = try await harness.runAnalyzerJob()
+    let sessionID = "session-\(job.jobID)"
+    let handler = RuntimeControlPlaneHandler(
+      engine: harness.engine, capabilityStore: harness.capabilities,
+      providerIDs: ["analyzer"], nowUTC: { "2026-07-31T00:00:00Z" },
+      artifactStore: harness.artifactStore,
+      runtimeSessionStorage: harness.owner)
+    func answer(_ id: String, _ method: String, _ params: [String: JSONValue]) async throws
+      -> AgentWireProtocol.Response
+    {
+      let request = AgentWireProtocol.Request(id: id, method: method, params: params)
+      let line = try CanonicalJSONEncoders.canonical().encode(request)
+      return try JSONDecoder().decode(
+        AgentWireProtocol.Response.self, from: await handler.handleLine(line))
+    }
+    let destination = root.appending(path: "interrupted-export", directoryHint: .isDirectory)
+    let preview = try await answer(
+      "ctl-export-preview", "session.export.preview",
+      [
+        "sessionId": .string(sessionID), "destinationPath": .string(destination.path),
+        "allowSensitive": .bool(false),
+      ])
+    guard preview.ok, case .object(let previewFields)? = preview.result,
+      let previewID = previewFields["previewId"], let previewDigest = previewFields["previewDigest"]
+    else { return XCTFail("export preview refused: \(String(describing: preview.error))") }
+
+    let applied = try await answer(
+      "ctl-export-apply", "session.export.apply",
+      ["previewId": previewID, "previewDigest": previewDigest])
+    XCTAssertFalse(applied.ok)
+    XCTAssertEqual(applied.error?.code, "outcomeUnknown")
+    XCTAssertEqual(applied.error?.details?["phase"], .string("sessionOwner"))
+    XCTAssertEqual(applied.error?.details?["newDispatchCount"], .integer(0))
+    // The preview stays spent: a retry must not publish a second time.
+    let retried = try await answer(
+      "ctl-export-apply-retry", "session.export.apply",
+      ["previewId": previewID, "previewDigest": previewDigest])
+    XCTAssertEqual(retried.error?.code, "outcomeUnknown")
+    XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
+  }
+
   // MARK: - Refusals
 
   func testASessionIsNotPublishedForFactsTheCurrentManifestCannotExpress() async throws {
@@ -483,6 +538,8 @@ final class RuntimeSessionPublicationContractTests: XCTestCase {
 
 // MARK: - Production composition under test
 
+private enum HarnessExportFault: Error { case io }
+
 private struct AnalyzerResultDispatcher: RuntimeProcessDispatching {
   let output: Data
 
@@ -508,13 +565,16 @@ private struct Harness {
   let capabilities: RuntimeCapabilityStore
   let lease: String
 
-  init(root: URL, publishing: Bool) async throws {
+  init(
+    root: URL, publishing: Bool,
+    exportFaultInjector: SessionStorageFaultInjector = .none
+  ) async throws {
     let state = root.appending(path: "state", directoryHint: .isDirectory)
     engineState = state.appending(path: "engine", directoryHint: .isDirectory)
     sessionsRoot = root.appending(path: "Sessions", directoryHint: .isDirectory)
     owner = try RuntimeSessionStorageStore(
       ownerRoot: state.appending(path: "session-owner", directoryHint: .isDirectory),
-      defaultSessionsRoot: sessionsRoot)
+      defaultSessionsRoot: sessionsRoot, exportFaultInjector: exportFaultInjector)
     writer = RuntimeSessionPublicationWriter(owner: owner)
 
     artifactStore = try RuntimeArtifactStore(
