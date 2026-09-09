@@ -298,7 +298,7 @@ current beyond what those records claim.
 | GJ-1 Device Observe | `REAL_DEVICE_PASS` | `main` `6ba5a0b9` (2026-09-08), identity `1054d17b…`; §2.1 HAR crash-resume on `main` `eadb46b8` (2026-09-09), identity `8a662759…` — `job-06c4e41e…`, `job-49720bb2…` | `docs/design/references/single-v1/svc-acceptance-2026-09-08-published-main.md`, `…-2026-09-09-published-main.md` |
 | GJ-2 HAP Debug | `REAL_DEVICE_PASS` (incl. the confirmed-failure compensation) | `main` `6ba5a0b9` → `16fe9617` (2026-09-08), identity `1054d17b…` — `job-458fadbe…`, `job-461b9ade…` | `svc-acceptance-2026-09-08-published-main.md` |
 | GJ-3 Native Debug | `REAL_DEVICE_PASS` (positive and rollback legs) | same window — `job-a48fdb55…`, `job-5b91a6a9…` | same |
-| GJ-4 Flash Recovery | **`BLOCKED_BY_PRODUCT_DEFECT`** (2026-09-09) | the DEC-014 campaign window admitted nothing: `agent run flash.full-restore@1` refused `admissionDenied`, and the protected recovery invocation (`debug-070a56fb…`, published `8a28f182`) refused the same pinned request before dispatch with `completeOverwriteRecovery.sharedFourHourBudgetExpired` — the two 2026-09-07 unknown outcomes (`job-bf0b748e…`, `job-c9274a31…`) can no longer be superseded on r2 by any published path; device not written; needs a maintainer ruling on the four-hour recovery budget for campaign windows or a target without unknown lineage | `svc-acceptance-2026-09-09-published-main.md` §GJ-4, `gj-headless-rerun-2026-09-09.json` |
+| GJ-4 Flash Recovery | `REAL_DEVICE_PASS` (2026-09-09 10:20Z) | published `main` `6e8c3ed5` (DEC-016 #1821 + #1822), identity `8a662759…`: `flash.full-restore@1` `job-6d1e329e44d4dfa1acf61921f9f2adad` admitted as a complete-overwrite recovery epoch under campaign `gj4-headless-20260909b`, terminal `recovered`, evidence `verified`, readback `OpenHarmony-7.0.0.37`, epoch `recovery-epoch-a985dcca…` superseding `job-c9274a31…`; postflight `observe.device@1` `job-9b2b7535…` succeeded at r2; the two refused attempts earlier that day (no Job) are in the same record | `docs/design/references/single-v1/gj-headless-rerun-2026-09-09.json` (GJ-4 runs 1 and 2), `svc-acceptance-2026-09-09-published-main.md` §GJ-4 |
 | GJ-5 Bounded AI Debug Loop | `REAL_DEVICE_PASS` on the published Runtime | protected `main` `8a28f182` (2026-09-09 08:30Z, daemon `6035adcb…`, CLI `494e2a35…`), identity `8a662759…` — repro `job-88183e90…` … verify `job-89ffb2fb…`, after the same pass on `8c6a376c` + #1810 at 07:56Z | `docs/design/references/single-v1/gj-headless-rerun-2026-09-09.json` (runs 1 and 2) |
 
 What this means for XPA-AC-3: every control-plane frame those windows exchanged
@@ -317,12 +317,11 @@ directories were re-derived by #1795 under it (`spec/control/methods`
 `TASK-SVC-005/single-v1-baseline.md`). `generate-control-contract.py --check`
 exits 0 on that tree.
 
-This task flips to `done` when GJ-4 has passed on this digest; nothing else is
-owed. GJ-4's own blocker is not a schema or contract matter: the recovery invocation
-path was run and refused on the four-hour complete-overwrite budget, so the
-two 2026-09-07 unknown outcomes stay unsuperseded until the maintainer rules on
-that budget for campaign-authorised windows or moves GJ-4 to a target without
-unknown lineage.
+GJ-4 passed on this digest on 2026-09-09 after the maintainer ruled (DEC-016,
+#1821) and the ruling was implemented (#1822), so every Journey the task's
+verification row names has a current real-device record and the task is
+`done`. Nothing else is owed: the schemas, the corpus, the journal contract and
+the pinned baseline are as the third delivery left them.
 
 ## Stop condition
 
