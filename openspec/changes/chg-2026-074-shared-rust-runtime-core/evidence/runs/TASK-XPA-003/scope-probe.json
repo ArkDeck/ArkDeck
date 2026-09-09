@@ -1,0 +1,173 @@
+{
+  "base": "62d5cffd00f968e410f56e8ead7f0b51454f69b7",
+  "task": "TASK-XPA-003",
+  "note": "Existing and anticipated files, including optional transport composition and validation tooling; no new crate currently planned. Paths alone do not authorize handler/admission/entitlement changes.",
+  "paths": [
+    {
+      "path": "ArkDeckApp/App/ArkDeckApp.swift",
+      "authorized": true
+    },
+    {
+      "path": "ArkDeckAppUITests/AppShell/FacadeRollbackUITests.swift",
+      "authorized": false,
+      "reason": "declared task TASK-XPA-003 has paths outside Allowed paths: ArkDeckAppUITests/AppShell/FacadeRollbackUITests.swift"
+    },
+    {
+      "path": "Packages/ArkDeckKit/Distribution/macOS/build-helpers.sh",
+      "authorized": true
+    },
+    {
+      "path": "Packages/ArkDeckKit/Distribution/macOS/build-local-helpers.sh",
+      "authorized": true
+    },
+    {
+      "path": "Packages/ArkDeckKit/LaunchAgents/LaunchAgentService.swift",
+      "authorized": true
+    },
+    {
+      "path": "Packages/ArkDeckKit/LaunchAgents/com.arkdeck.agentd.plist",
+      "authorized": true
+    },
+    {
+      "path": "Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/AgentDaemon.swift",
+      "authorized": true
+    },
+    {
+      "path": "Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/AgentFacadeOrigin.swift",
+      "authorized": true
+    },
+    {
+      "path": "Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/AgentXPCListener.swift",
+      "authorized": true
+    },
+    {
+      "path": "Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/main.swift",
+      "authorized": true
+    },
+    {
+      "path": "Packages/ArkDeckKit/Sources/ArkDeckCore/AgentXPCContract.swift",
+      "authorized": true
+    },
+    {
+      "path": "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/HeadlessHDCServerHost.swift",
+      "authorized": false,
+      "reason": "declared task TASK-XPA-003 has paths outside Allowed paths: Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/HeadlessHDCServerHost.swift"
+    },
+    {
+      "path": "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/XPCConnectionBox.swift",
+      "authorized": true
+    },
+    {
+      "path": "Packages/ArkDeckKit/Tests/ArkDeckContractTests/AgentDaemonContractTests.swift",
+      "authorized": true
+    },
+    {
+      "path": "Packages/ArkDeckKit/Tests/ArkDeckContractTests/AgentFacadeContractTests.swift",
+      "authorized": true
+    },
+    {
+      "path": "Packages/ArkDeckKit/Tests/ArkDeckContractTests/AgentXPCTransportContractTests.swift",
+      "authorized": true
+    },
+    {
+      "path": "Packages/ArkDeckKit/Tests/ArkDeckContractTests/HeadlessHDCServerHostContractTests.swift",
+      "authorized": true
+    },
+    {
+      "path": "Packages/ArkDeckKit/Tests/ArkDeckContractTests/LaunchAgentServiceContractTests.swift",
+      "authorized": true
+    },
+    {
+      "path": "docs/design/references/single-v1/gj-headless-rerun-2026-09-09-xpa003.json",
+      "authorized": true
+    },
+    {
+      "path": "docs/design/references/single-v1/xpa003-facade-acceptance-2026-09-09.md",
+      "authorized": true
+    },
+    {
+      "path": "openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-003/run.md",
+      "authorized": true
+    },
+    {
+      "path": "openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-003/scope-probe.json",
+      "authorized": true
+    },
+    {
+      "path": "openspec/changes/chg-2026-074-shared-rust-runtime-core/tasks.md",
+      "authorized": true
+    },
+    {
+      "path": "rust/Cargo.lock",
+      "authorized": true
+    },
+    {
+      "path": "rust/Cargo.toml",
+      "authorized": true
+    },
+    {
+      "path": "rust/crates/arkdeck-agentd/Cargo.toml",
+      "authorized": true
+    },
+    {
+      "path": "rust/crates/arkdeck-agentd/build.rs",
+      "authorized": true
+    },
+    {
+      "path": "rust/crates/arkdeck-agentd/src/facade.rs",
+      "authorized": true
+    },
+    {
+      "path": "rust/crates/arkdeck-agentd/src/main.rs",
+      "authorized": true
+    },
+    {
+      "path": "rust/crates/arkdeck-client/src/lib.rs",
+      "authorized": true
+    },
+    {
+      "path": "rust/crates/arkdeck-platform/Cargo.toml",
+      "authorized": true
+    },
+    {
+      "path": "rust/crates/arkdeck-platform/build.rs",
+      "authorized": true
+    },
+    {
+      "path": "rust/crates/arkdeck-platform/src/lib.rs",
+      "authorized": true
+    },
+    {
+      "path": "rust/crates/arkdeck-platform/src/macos_control.c",
+      "authorized": true
+    },
+    {
+      "path": "rust/crates/arkdeck-platform/src/macos_control.rs",
+      "authorized": true
+    },
+    {
+      "path": "rust/crates/arkdeck-platform/src/unix.rs",
+      "authorized": true
+    },
+    {
+      "path": "rust/scripts/benchmark-macos-facade.py",
+      "authorized": true
+    },
+    {
+      "path": "rust/scripts/macos-xpc-probe.swift",
+      "authorized": true
+    },
+    {
+      "path": "rust/scripts/package-macos-facade.sh",
+      "authorized": true
+    },
+    {
+      "path": "rust/scripts/test-macos-facade-journal.py",
+      "authorized": true
+    },
+    {
+      "path": "rust/scripts/test-macos-facade.py",
+      "authorized": true
+    }
+  ]
+}

@@ -3473,6 +3473,8 @@ public enum AgentDaemonStartResult: Sendable, Equatable {
 public final class AgentDaemonServer: @unchecked Sendable {
   public let stateDirectory: URL
   public let socketURL: URL
+  private let facade: AgentFacadeConfiguration?
+  private let appEndpoint: AgentXPCEndpoint
   private let handler: RuntimeControlPlaneHandler
   private let nowUTC: @Sendable () -> String
   private var listenerFD: Int32 = -1
@@ -3484,13 +3486,24 @@ public final class AgentDaemonServer: @unchecked Sendable {
   private var activeConnections: Set<Int32> = []
   private var activeRequestCount = 0
 
-  public init(
+  public convenience init(
     stateDirectory: URL,
     handler: RuntimeControlPlaneHandler,
     nowUTC: @escaping @Sendable () -> String
   ) {
+    self.init(stateDirectory: stateDirectory, handler: handler, nowUTC: nowUTC, facade: nil)
+  }
+
+  public init(
+    stateDirectory: URL,
+    handler: RuntimeControlPlaneHandler,
+    nowUTC: @escaping @Sendable () -> String,
+    facade: AgentFacadeConfiguration?
+  ) {
     self.stateDirectory = stateDirectory
-    self.socketURL = stateDirectory.appending(
+    self.facade = facade
+    self.appEndpoint = AgentXPCEndpoint(handler: handler, appJobs: AgentXPCAppJobGate())
+    self.socketURL = facade?.socketURL ?? stateDirectory.appending(
       path:
         ArkDeckAgentFilesystemLayout.socketFilename)
     self.handler = handler
@@ -3517,6 +3530,18 @@ public final class AgentDaemonServer: @unchecked Sendable {
       throw AgentDaemonError.io("another instance holds the lock but left no instance document")
     }
 
+    if facade != nil {
+      var parent = stat()
+      let path = socketURL.deletingLastPathComponent().path
+      guard let physical = realpath(path, nil) else {
+        throw AgentDaemonError.io("private socket parent is unavailable")
+      }
+      defer { free(physical) }
+      guard lstat(path, &parent) == 0, parent.st_uid == geteuid(),
+        parent.st_mode & S_IFMT == S_IFDIR, parent.st_mode & 0o777 == 0o700,
+        String(cString: physical) == path
+      else { throw AgentDaemonError.io("private socket parent must be physical and owner-only") }
+    }
     unlink(socketURL.path)
     listenerFD = socket(AF_UNIX, SOCK_STREAM, 0)
     guard listenerFD >= 0 else { throw AgentDaemonError.io("cannot create socket") }
@@ -3548,7 +3573,7 @@ public final class AgentDaemonServer: @unchecked Sendable {
     guard listen(listenerFD, 16) == 0 else { throw AgentDaemonError.io("listen failed") }
 
     let instance = AgentDaemonInstance(
-      pid: getpid(), socketPath: socketURL.path,
+      pid: getpid(), socketPath: stateDirectory.appending(path: ArkDeckAgentFilesystemLayout.socketFilename).path,
       protocolVersion: AgentWireProtocol.version, startedAtUTC: nowUTC())
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys]
@@ -3583,6 +3608,7 @@ public final class AgentDaemonServer: @unchecked Sendable {
       listenerFD = -1
     }
     unlink(socketURL.path)
+    if facade != nil { _ = rmdir(socketURL.deletingLastPathComponent().path) }
     while activeRequestCount > 0, Date() < cutoff {
       lifecycle.wait(until: cutoff)
     }
@@ -3647,7 +3673,10 @@ public final class AgentDaemonServer: @unchecked Sendable {
         if !isAccepting { return }
         continue
       }
-      guard register(connection: connectionFD) else {
+      var peerUID: uid_t = 0
+      var peerGID: gid_t = 0
+      guard getpeereid(connectionFD, &peerUID, &peerGID) == 0, peerUID == geteuid(),
+        register(connection: connectionFD) else {
         close(connectionFD)
         continue
       }
@@ -3655,7 +3684,7 @@ public final class AgentDaemonServer: @unchecked Sendable {
       Task.detached { [self] in
         defer { finish(connection: connectionFD) }
         await Self.serve(
-          connectionFD: connectionFD, handler: handler,
+          connectionFD: connectionFD, handler: handler, facade: facade, appEndpoint: appEndpoint,
           beginRequest: { self.beginRequest() }, finishRequest: { self.finishRequest() })
       }
     }
@@ -3671,6 +3700,8 @@ public final class AgentDaemonServer: @unchecked Sendable {
   private static func serve(
     connectionFD: Int32,
     handler: RuntimeControlPlaneHandler,
+    facade: AgentFacadeConfiguration?,
+    appEndpoint: AgentXPCEndpoint,
     beginRequest: @escaping @Sendable () -> Void,
     finishRequest: @escaping @Sendable () -> Void
   ) async {
@@ -3688,6 +3719,8 @@ public final class AgentDaemonServer: @unchecked Sendable {
         connectionFD, SOL_SOCKET, SO_NOSIGPIPE, &suppressSignal,
         socklen_t(MemoryLayout<Int32>.size)) == 0
     else { return }
+    var authenticated = facade == nil
+    var origin: AgentFacadeOrigin?
     var buffer = Data()
     var scannedByteCount = 0  // leading bytes already known to hold no terminator
     let chunkSize = 64 * 1024
@@ -3703,9 +3736,26 @@ public final class AgentDaemonServer: @unchecked Sendable {
         buffer.removeSubrange(start...(start + terminatorOffset))
         scannedByteCount = 0
         guard !line.isEmpty else { continue }
+        if let facade, !authenticated {
+          guard facade.authenticates(line) else { return }
+          authenticated = true
+          continue
+        }
+        if facade != nil, origin == nil {
+          guard let parsed = AgentFacadeOrigin(line) else { return }
+          origin = parsed
+          continue
+        }
+        if let origin, !origin.validates(line) { return }
+        let context = origin?.context ?? requestContext(connectionFD: connectionFD)
+        origin = nil
         beginRequest()
-        let response = await handler.handleLine(
-          line, context: requestContext(connectionFD: connectionFD))
+        let response: Data
+        if facade != nil, context.transport == .appXPC {
+          response = await appEndpoint.responseFrame(line)
+        } else {
+          response = await handler.handleLine(line, context: context)
+        }
         var written = 0
         let total = response.count
         let sent: Bool = response.withUnsafeBytes { raw in

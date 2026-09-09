@@ -1455,8 +1455,9 @@ Task.detached {
       debugRuntimeProbe: debugRuntimeProbe,
       debugInvocationController: debugInvocationController,
       workspaceProjects: workspaceProjectPublications)
+    let facade = try AgentFacadeConfiguration.inherited()
     let server = AgentDaemonServer(
-      stateDirectory: resolvedStateDirectory, handler: handler, nowUTC: utcNow)
+      stateDirectory: resolvedStateDirectory, handler: handler, nowUTC: utcNow, facade: facade)
     switch try server.start() {
     case .started:
       startedServer = server
@@ -1466,12 +1467,14 @@ Task.detached {
       // daemon was not started by launchd there is no Mach service to check
       // in to, which is the normal CLI and CI configuration; the Unix socket
       // above is unaffected either way.
+      if facade == nil {
       let xpcListener = AgentXPCListener(handler: handler)
       xpcListener.activate()
       startedXPCListener = xpcListener
       print(
         "arkdeck-agentd read-only XPC door: \(AgentXPCListener.machServiceName) "
           + "(active only when launchd vends the Mach service)")
+      }
       // Redirected stdout is block-buffered: without this flush an operator
       // tailing the log sees nothing until the daemon exits.
       fflush(stdout)
@@ -1540,4 +1543,13 @@ let signalSources = [SIGTERM, SIGINT].map { signalNumber -> DispatchSourceSignal
   return source
 }
 _ = signalSources
+if ProcessInfo.processInfo.environment["ARKDECK_PRIVATE_SOCKET"] != nil {
+  // Parent death closes the inherited pairing pipe. Stop through the ordinary
+  // drain path; no request is replayed and no durable state is rewritten here.
+  Thread.detachNewThread {
+    var byte: UInt8 = 0
+    while read(STDIN_FILENO, &byte, 1) < 0 && errno == EINTR {}
+    kill(getpid(), SIGTERM)
+  }
+}
 dispatchMain()

@@ -12,44 +12,62 @@
 import ArkDeckCore
 import ArkDeckWorkflows
 import Foundation
+import XPC
+import Darwin
+import os
 
-package final class AgentXPCListener: NSObject, NSXPCListenerDelegate, @unchecked Sendable {
-  /// Re-exported so the daemon executable can report the vended name without
-  /// taking a second import for one string.
+package final class AgentXPCListener: @unchecked Sendable {
   public static var machServiceName: String { ArkDeckAgentXPC.machServiceName }
-
-  private let handler: RuntimeControlPlaneHandler
-  private let listener: NSXPCListener
-  private let appJobs = AgentXPCAppJobGate()
+  private let listener: ArkDeckRawXPCObject
+  private let endpoint: AgentXPCEndpoint
 
   public init(handler: RuntimeControlPlaneHandler) {
-    self.handler = handler
-    listener = NSXPCListener(machServiceName: ArkDeckAgentXPC.machServiceName)
-    super.init()
-    listener.delegate = self
+    endpoint = AgentXPCEndpoint(handler: handler, appJobs: AgentXPCAppJobGate())
+    listener = ArkDeckRawXPCObject(xpc_connection_create_mach_service(
+      ArkDeckAgentXPC.machServiceName, nil, UInt64(XPC_CONNECTION_MACH_SERVICE_LISTENER)))
   }
 
-  /// Best effort by design. A daemon started directly from a shell is not a
-  /// launchd job and has no Mach service to check in to; that is a normal
-  /// configuration for CLI and CI use and must not stop the Unix socket from
-  /// serving. Callers get the outcome so it can be reported, not so it can
-  /// be treated as fatal.
   public func activate() {
-    listener.resume()
+    let endpoint = self.endpoint
+    xpc_connection_set_event_handler(listener.value) { event in
+      guard xpc_get_type(event) == XPC_TYPE_CONNECTION else { return }
+      let peer = ArkDeckRawXPCObject(event)
+      guard xpc_connection_get_euid(peer.value) == geteuid(),
+        xpc_connection_set_peer_code_signing_requirement(
+          peer.value, ArkDeckAgentXPC.appCodeRequirement) == 0 else {
+        xpc_connection_cancel(peer.value)
+        return
+      }
+      let busy = OSAllocatedUnfairLock(initialState: false)
+      xpc_connection_set_event_handler(peer.value) { event in
+        guard xpc_get_type(event) == XPC_TYPE_DICTIONARY,
+          let replyObject = xpc_dictionary_create_reply(event) else { return }
+        guard busy.withLock({ value in
+          guard !value else { return false }; value = true; return true
+        }) else { xpc_connection_cancel(peer.value); return }
+        let reply = ArkDeckRawXPCObject(replyObject)
+        var length = 0
+        let bytes = xpc_dictionary_get_data(event, "frame", &length)
+        let frame: Data
+        if xpc_dictionary_get_count(event) == 1, let bytes,
+          length < ArkDeckControlProtocol.maximumRequestFrameBytes {
+          frame = Data(bytes: bytes, count: length)
+        } else { frame = Data() }
+        Task {
+          let response = await endpoint.responseFrame(frame)
+          response.withUnsafeBytes {
+            xpc_dictionary_set_data(reply.value, "frame", $0.baseAddress, $0.count)
+          }
+          busy.withLock { $0 = false }
+          xpc_connection_send_message(peer.value, reply.value)
+        }
+      }
+      xpc_connection_activate(peer.value)
+    }
+    xpc_connection_activate(listener.value)
   }
 
-  package func invalidate() {
-    listener.invalidate()
-  }
-
-  package func listener(
-    _ listener: NSXPCListener, shouldAcceptNewConnection connection: NSXPCConnection
-  ) -> Bool {
-    connection.exportedInterface = NSXPCInterface(with: ArkDeckAgentXPCProtocol.self)
-    connection.exportedObject = AgentXPCEndpoint(handler: handler, appJobs: appJobs)
-    connection.resume()
-    return true
-  }
+  package func invalidate() { xpc_connection_cancel(listener.value) }
 }
 
 /// Jobs are the one place where a method-name allowlist is not narrow enough:

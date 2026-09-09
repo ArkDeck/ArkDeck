@@ -5377,3 +5377,35 @@ final class HeadlessHDCServerHostContractTests: XCTestCase {
     return Bundle.main.bundleURL
   }
 }
+
+extension AgentDaemonContractTests {
+  func testPrivateSocketRejectsMissingPairingAndOriginDigestMismatch() throws {
+    let (handler, _) = try makeStack()
+    let directory = URL(filePath: "/private/tmp/xpa-private-\(UUID().uuidString.prefix(8))")
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let secret = String(repeating: "a", count: 64)
+    let configuration = try AgentFacadeConfiguration(socketURL: directory.appending(path: "s.sock"), secret: secret)
+    let privateServer = AgentDaemonServer(stateDirectory: stateDirectory, handler: handler,
+      nowUTC: { "2026-09-09T00:00:00Z" }, facade: configuration)
+    XCTAssertEqual(try privateServer.start(), .started)
+    defer { privateServer.stop() }
+    let request = try ArkDeckAgentXPC.requestFrame(method: "health", requestID: "private-health")
+    let pairing: JSONValue = .object(["arkdeckPairing": .integer(1), "secret": .string(secret)])
+    let origin: JSONValue = .object([
+      "arkdeckOrigin": .integer(1), "transport": .string("unixSocket"),
+      "foregroundConsole": .bool(false), "peerEUID": .integer(Int64(geteuid())),
+      "peerPID": .integer(Int64(getpid())), "frameSHA256": .string(SHA256Hex.string(of: request))])
+    let encoder = CanonicalJSONEncoders.canonical()
+    let preamble = try encoder.encode(pairing) + Data([10]) + encoder.encode(origin) + Data([10])
+    XCTAssertThrowsError(try exchangeRawFrames(socketPath: privateServer.socketURL.path,
+      payload: request + Data([10]), pieceBytes: 4096, expectedResponses: 1))
+    XCTAssertThrowsError(try exchangeRawFrames(socketPath: privateServer.socketURL.path,
+      payload: preamble + request + Data(" \n".utf8), pieceBytes: 4096, expectedResponses: 1))
+    let response = try exchangeRawFrames(socketPath: privateServer.socketURL.path,
+      payload: preamble + request + Data([10]), pieceBytes: 4096, expectedResponses: 1)
+    XCTAssertEqual(response.count, 1)
+    let fields = try JSONDecoder().decode([String: JSONValue].self, from: Data(response[0].utf8))
+    XCTAssertEqual(fields["ok"], .bool(true))
+  }
+}

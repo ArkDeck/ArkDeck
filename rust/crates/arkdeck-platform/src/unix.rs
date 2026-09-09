@@ -103,6 +103,7 @@ pub struct LocalListener {
     path: PathBuf,
     device: u64,
     inode: u64,
+    _directory_lock: Option<fs::File>,
 }
 
 impl LocalListener {
@@ -118,7 +119,38 @@ impl LocalListener {
             path: endpoint.as_path().into(),
             device: metadata.dev(),
             inode: metadata.ino(),
+            _directory_lock: None,
         })
+    }
+
+    /// Facade restart owns a kernel lock on the transport directory before
+    /// reclaiming a dead socket. This writes no lock/Runtime record. The default
+    /// foundation bind still refuses every occupied name unchanged.
+    #[cfg(target_os = "macos")]
+    pub fn bind_facade(endpoint: &LocalEndpoint) -> io::Result<Self> {
+        private_parent(endpoint.as_path(), false)?;
+        let parent = endpoint.as_path().parent().expect("validated parent");
+        let lock = fs::File::open(parent)?;
+        // SAFETY: live directory descriptor, nonblocking advisory transport lock.
+        if unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } != 0 {
+            return Err(denied("another facade owns the public transport directory"));
+        }
+        match fs::symlink_metadata(endpoint.as_path()) {
+            Ok(_) => {
+                validate_socket(endpoint.as_path())?;
+                match UnixStream::connect(endpoint.as_path()) {
+                    Err(error) if error.kind() == io::ErrorKind::ConnectionRefused => {
+                        fs::remove_file(endpoint.as_path())?;
+                    }
+                    _ => return Err(denied("public transport endpoint is already occupied")),
+                }
+            }
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error),
+        }
+        let mut listener = Self::bind(endpoint)?;
+        listener._directory_lock = Some(lock);
+        Ok(listener)
     }
 
     pub fn accept(&mut self) -> io::Result<LocalConnection> {
@@ -192,5 +224,11 @@ impl LoopbackServerLease {
             io::ErrorKind::Unsupported,
             "no server lease",
         ))
+    }
+}
+
+impl AsRawFd for LocalConnection {
+    fn as_raw_fd(&self) -> std::os::fd::RawFd {
+        self.0.as_raw_fd()
     }
 }

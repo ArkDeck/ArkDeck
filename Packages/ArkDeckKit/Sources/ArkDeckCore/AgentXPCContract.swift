@@ -12,6 +12,7 @@
 // It deliberately has nowhere to put an executable, argv, or authority.
 
 import Foundation
+import XPC
 
 /// Shared filesystem layout for the CLI and daemon composition roots.
 package enum ArkDeckAgentFilesystemLayout {
@@ -223,4 +224,30 @@ package enum ArkDeckAgentXPC {
   func sendRequestFrame(
     _ frame: Data,
     with reply: @escaping @Sendable (Data?, String?) -> Void)
+}
+
+/// libxpc retains objects; access is serialized by each transport's dispatch queue.
+package final class ArkDeckRawXPCObject: @unchecked Sendable {
+  package let value: xpc_object_t
+  package init(_ value: xpc_object_t) { self.value = value }
+}
+
+extension ArkDeckAgentXPC {
+  package static let appCodeRequirement =
+    "anchor apple generic and certificate leaf[subject.OU] = \"8AQTYW5FKR\" and identifier \"com.arkdeck.desktop\""
+  private static let serverIdentityRequirement =
+    "anchor apple generic and certificate leaf[subject.OU] = \"8AQTYW5FKR\" and (identifier \"com.arkdeck.agentd\" or identifier \"com.arkdeck.agentd.facade\")"
+}
+
+extension ArkDeckAgentXPC {
+  package static var serverCodeRequirement: String {
+    let info = Bundle.main.infoDictionary ?? [:]
+    let version = info["CFBundleShortVersionString"] as? String ?? "0.1.0"
+    let build = info["CFBundleVersion"] as? String ?? "1"
+    let releaseParts = [version, build]
+    guard releaseParts.allSatisfy({ !$0.isEmpty && $0.utf8.allSatisfy({ (48...57).contains($0) || $0 == 46 }) }) else {
+      return "never"
+    }
+    return serverIdentityRequirement + " and info[CFBundleShortVersionString] = \"\(version)\" and info[CFBundleVersion] = \"\(build)\""
+  }
 }

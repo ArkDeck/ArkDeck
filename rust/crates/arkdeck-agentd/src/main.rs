@@ -1,3 +1,5 @@
+#[cfg(target_os = "macos")]
+mod facade;
 mod host;
 
 use arkdeck_contract::MAX_REQUEST_BYTES;
@@ -11,6 +13,10 @@ use std::sync::{
 use std::time::Duration;
 
 fn serve() -> Result<(), Box<dyn std::error::Error>> {
+    #[cfg(target_os = "macos")]
+    if let Some(swift) = facade::swift_executable() {
+        return facade::serve(swift);
+    }
     if std::env::args_os().len() != 1 {
         return Err("arkdeck-agentd takes no device, command, path or authority arguments; configure the local host environment".into());
     }

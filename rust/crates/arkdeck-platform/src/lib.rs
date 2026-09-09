@@ -96,3 +96,8 @@ pub fn random_bytes<const N: usize>() -> io::Result<[u8; N]> {
     }
     Ok(bytes)
 }
+
+#[cfg(target_os = "macos")]
+mod macos_control;
+#[cfg(target_os = "macos")]
+pub use macos_control::{PeerOrigin, listen_mach};
