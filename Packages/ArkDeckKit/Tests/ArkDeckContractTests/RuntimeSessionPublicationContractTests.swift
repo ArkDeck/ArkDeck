@@ -202,20 +202,40 @@ final class RuntimeSessionPublicationContractTests: XCTestCase {
     let sessionID = "session-\(job.jobID)"
     XCTAssertEqual(job.sessionPublication.state, .published)
 
-    // The global family keeps its fail-closed contract, and keeps naming the
-    // leaf and its reason.
+    // Answers about the whole root keep their fail-closed contract, and keep
+    // naming the leaf and its reason. `listSessions` is one: a partial
+    // inventory presented as the inventory would be a lie. Showing the
+    // unaccounted leaf itself is refused for the separate reason that it is
+    // the content nobody can account for.
     for global in [
       { _ = try harness.owner.listSessions(pageSize: 20, cursor: nil) },
-      { _ = try harness.owner.showSession(sessionID: sessionID) },
+      { _ = try harness.owner.showSession(sessionID: "session-historical") },
     ] as [() throws -> Void] {
       XCTAssertThrowsError(try global()) { error in
         let failure = error as? RuntimeSessionStorageFailure
         XCTAssertEqual(failure?.code, "operationUnavailable")
         XCTAssertTrue(
           (failure?.message ?? "").contains("2026/08/session-historical"),
-          "the global refusal must still name the leaf: \(failure?.message ?? "")")
+          "the refusal must still name the leaf: \(failure?.message ?? "")")
       }
     }
+
+    // `showSession` publishes only this Session's own facts — identity, size,
+    // completion, expiry, pin — and no total over the root, so it asks the same
+    // shape of question the exact export asks and is answered at the same
+    // scope, under the same guard. This assertion previously required it to
+    // refuse, grouped with `list` on the reasoning that it "answers about the
+    // whole root"; the published `session.show` result has no root-level field,
+    // so that reason did not hold for it, and the refusal only made a healthy
+    // Session unreadable through every face at once.
+    guard case .object(let shown) = try harness.owner.showSession(sessionID: sessionID) else {
+      return XCTFail("show refused a known, complete, registered Session")
+    }
+    XCTAssertEqual(shown["sessionId"], .string(sessionID))
+    XCTAssertNotNil(shown["sizeBytes"])
+    XCTAssertNil(
+      shown["unaccountedSessionCount"],
+      "show answers about one Session and must not publish a root total")
 
     // The exact export answers, and discloses.
     let destination = root.appending(path: "disclosed-export", directoryHint: .isDirectory)

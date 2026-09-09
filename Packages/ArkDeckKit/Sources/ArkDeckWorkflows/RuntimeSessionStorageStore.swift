@@ -213,7 +213,14 @@ public final class RuntimeSessionStorageStore: @unchecked Sendable {
     }
     return try withLockedDocument { _, document in
       let snapshot = try sessionCatalog(document)
-      guard let row = try sessionRows(snapshot).first(where: { $0.sessionID == sessionID }) else {
+      // `session.show` publishes only this Session's own facts — identity,
+      // size, completion, expiry, pin — and no total over the root, so it is
+      // the same shape of question an exact export asks and reads at the same
+      // scope. `list` still answers about the whole root and still refuses.
+      guard
+        let row = try sessionRows(snapshot, scopedTo: sessionID)
+          .first(where: { $0.sessionID == sessionID })
+      else {
         throw RuntimeSessionStorageFailure(
           "resourceNotFound", "Session is not present in the Runtime catalog")
       }
@@ -836,7 +843,10 @@ public final class RuntimeSessionStorageStore: @unchecked Sendable {
   /// not place inside the layout at all, `catalogMetadataCorrupt` means no
   /// leaf under the root can be attributed, and `duplicateIdentity` means an
   /// identity under this root resolves to more than one directory.
-  private static let exportScopedUnaccountedReasons: Set<UnaccountedSession.Reason> = [
+  /// Unaccounted reasons a scoped read may proceed past: the scan located the
+  /// leaf and can say why it is unaccounted. Anything else means it could not
+  /// place the bytes at all, and no answer about the root is safe.
+  private static let scopedReadableUnaccountedReasons: Set<UnaccountedSession.Reason> = [
     .notRegistered, .unreadable, .invalidIdentifier,
   ]
 
@@ -872,26 +882,7 @@ public final class RuntimeSessionStorageStore: @unchecked Sendable {
     sessionID: String
   ) throws -> ExportCatalogStatus {
     let complete = !snapshot.unknownPressure && snapshot.unknownSessionIDs.isEmpty
-    if !complete {
-      // The scan names a leaf either by its bare Session identifier or by its
-      // `yyyy/mm/<name>` position, depending on which fact it established.
-      // Both spellings have to be checked, or the selected Session could be
-      // exported while it is itself the content nobody can account for.
-      func namesSelectedSession(_ reference: String) -> Bool {
-        reference == sessionID || reference.hasSuffix("/" + sessionID)
-      }
-      guard !snapshot.unaccountedSessions.isEmpty,
-        snapshot.unaccountedSessions.allSatisfy({
-          Self.exportScopedUnaccountedReasons.contains($0.reason)
-            && !namesSelectedSession($0.reference)
-        })
-      else {
-        throw RuntimeSessionStorageFailure(
-          "operationUnavailable",
-          "Session catalog contains unaccounted content: "
-            + Self.unaccountedSummary(snapshot))
-      }
-    }
+    try requireAccountedCatalog(snapshot, scopedTo: sessionID)
     // Measured known content, never a total: the scan folds the bytes it
     // measured for unaccounted leaves into `currentBytes`, and publishing that
     // number here would claim the export owner accounted for them.
@@ -1295,21 +1286,53 @@ public final class RuntimeSessionStorageStore: @unchecked Sendable {
 
   private static let unaccountedSummaryLimit = 8
 
-  private func sessionRows(
-    _ snapshot: SessionRetentionCatalogSnapshot
-  ) throws -> [SessionRow] {
-    guard !snapshot.unknownPressure, snapshot.unknownSessionIDs.isEmpty else {
-      // The refusal decision is unchanged; what it says is not. "Inspect
-      // runtime storage status" sent the operator to a surface that publishes
-      // a count and nothing else, so the only way to learn which leaf under
-      // the Sessions root is unaccounted — and whether it was never
-      // registered, cannot be read, or collides with another identity — was to
-      // read the directory tree by hand. Name it here instead.
+  /// Whether this snapshot may be read at all, and for whom.
+  ///
+  /// `scopedTo` nil is a question about the whole Sessions root — `list`, the
+  /// pin transitions, cleanup — and any unaccounted byte makes every answer a
+  /// partial one, so it refuses. A named Session is a different question: the
+  /// answer is about that leaf, and refusing it because an unrelated directory
+  /// has no manifest makes a healthy Session unreachable and teaches nobody
+  /// anything. So a scoped read proceeds when every unaccounted leaf was
+  /// actually located, is not the selected Session, and failed for a reason the
+  /// scan could place. Anything it could not place stays refused for both.
+  ///
+  /// The refusal names the leaves. "Inspect runtime storage status" sent the
+  /// operator to a surface that publishes a count and nothing else, so the only
+  /// way to learn which leaf under the Sessions root is unaccounted — and
+  /// whether it was never registered, cannot be read, or collides with another
+  /// identity — was to read the directory tree by hand.
+  private func requireAccountedCatalog(
+    _ snapshot: SessionRetentionCatalogSnapshot,
+    scopedTo sessionID: String? = nil
+  ) throws {
+    if !snapshot.unknownPressure, snapshot.unknownSessionIDs.isEmpty { return }
+    // The scan names a leaf either by its bare Session identifier or by its
+    // `yyyy/mm/<name>` position, depending on which fact it established. Both
+    // spellings have to be checked, or the selected Session could be read while
+    // it is itself the content nobody can account for.
+    func namesSelectedSession(_ reference: String) -> Bool {
+      guard let sessionID else { return false }
+      return reference == sessionID || reference.hasSuffix("/" + sessionID)
+    }
+    guard sessionID != nil, !snapshot.unaccountedSessions.isEmpty,
+      snapshot.unaccountedSessions.allSatisfy({
+        Self.scopedReadableUnaccountedReasons.contains($0.reason)
+          && !namesSelectedSession($0.reference)
+      })
+    else {
       throw RuntimeSessionStorageFailure(
         "operationUnavailable",
         "Session catalog contains unaccounted content: "
           + Self.unaccountedSummary(snapshot))
     }
+  }
+
+  private func sessionRows(
+    _ snapshot: SessionRetentionCatalogSnapshot,
+    scopedTo sessionID: String? = nil
+  ) throws -> [SessionRow] {
+    try requireAccountedCatalog(snapshot, scopedTo: sessionID)
     guard let generation = snapshot.catalogGeneration,
       generation <= UInt64(Int64.max)
     else {
