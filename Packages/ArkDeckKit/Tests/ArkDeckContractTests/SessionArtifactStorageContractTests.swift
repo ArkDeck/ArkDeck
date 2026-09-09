@@ -1003,6 +1003,142 @@ final class SessionArtifactStorageContractTests: XCTestCase {
           reason: "rebound writer fixture")))
   }
 
+  /// An argument the validator reads as an ArkDeck identifier can also be a
+  /// device identifier. On the reference host `inspect-git-status` carried a
+  /// `projectRef` equal to its Job's target id, so the manifest's
+  /// device-identifier set contained it, and redaction rewrote it to the
+  /// free-text `[REDACTED-DEVICE-ID]` sentinel. Brackets are not legal in an
+  /// ArkDeck identifier, so the exporter's own `SessionManifestDocument`
+  /// validation refused the document it had just built and `session export
+  /// apply` answered `outcomeUnknown`. The redacted value has to keep the shape
+  /// its own reader requires.
+  func testDiagnosticExportKeepsRedactedIdentifierArgumentsValid() async throws {
+    let fixture = try await makeSession(
+      sessionID: "session-export-identifier-argument",
+      jobID: "job-export-identifier-argument")
+    defer { try? FileManager.default.removeItem(at: fixture.base) }
+    // One string is both the device identity and a schema-validated argument.
+    let shared = "fixture-serial"
+    let step = try executionStep(
+      id: "inspect-git-status", kind: "inspectWorkspaceGitStatus", effect: "hostOnly",
+      cancellation: "immediate", bindingRequirement: "none",
+      arguments: [
+        "projectRef": .string(shared),
+        "artifactId": .string("artifact-\(shared)"),
+      ],
+      disposition: "executed", outcomeCertainty: "confirmed", semanticResult: "succeeded")
+    let manifest = try SessionManifestDocument(
+      data: SessionStorageFixtures.manifest(
+        sessionID: fixture.layout.sessionID, jobID: fixture.layout.jobID,
+        executionMode: "execute", executionAuthority: "interactiveUser",
+        steps: [step], artifacts: [], realConnectKey: shared,
+        realIdentitySnapshot: .object(["serial": .string(shared)])))
+    try manifest.canonicalData.write(to: fixture.layout.manifestURL)
+    let (_, exportClaim) = try await admittedClaim(
+      claimID: "claim-export-identifier-argument", jobID: fixture.layout.jobID,
+      layout: fixture.layout, writer: .heavy)
+    let destination = fixture.base.appending(path: "identifier-argument-export")
+
+    let materialized = try SessionDiagnosticExporter().export(
+      layout: fixture.layout, artifacts: [], claim: exportClaim, to: destination,
+      deviceIdentifierPolicy: .redact)
+
+    let exported = try Data(contentsOf: materialized.root.appending(path: "manifest.json"))
+    let text = try XCTUnwrap(String(data: exported, encoding: .utf8))
+    XCTAssertFalse(text.contains(shared), "the device identifier survived redaction")
+    // The free-text sentinel is still correct for fields with no schema, such
+    // as the target's connectKey; only the identifier-typed argument may not
+    // take it.
+    guard
+      case .object(let exportedRoot) = try JSONDecoder().decode(JSONValue.self, from: exported),
+      case .array(let exportedSteps)? = exportedRoot["steps"],
+      case .object(let exportedStep) = exportedSteps.first ?? .null,
+      case .object(let exportedArguments)? = exportedStep["arguments"],
+      case .string(let exportedProjectRef)? = exportedArguments["projectRef"]
+    else { return XCTFail("the exported manifest lost the step this fixture exports") }
+    XCTAssertNotEqual(
+      exportedProjectRef, "[REDACTED-DEVICE-ID]",
+      "an identifier-typed argument took the free-text sentinel its own reader rejects")
+    XCTAssertTrue(
+      exportedProjectRef.hasPrefix("redacted-device-"),
+      "expected the schema-safe pseudonym, got \(exportedProjectRef)")
+    // The Runtime reads an exported Session back through this same validation,
+    // and the exporter itself refuses to publish a manifest that fails it.
+    _ = try SessionManifestDocument(data: exported)
+  }
+
+  /// The digest half of the same rule. A four-byte device identity is enough to
+  /// match inside a string, so it collides with hex by chance, and a SHA-256
+  /// argument that took either replacement — the free-text sentinel or the
+  /// identifier pseudonym — would stop being a digest. One step here carries
+  /// three digest arguments and two identifier arguments that all contain the
+  /// device identity, so the export has to preserve one kind and rewrite the
+  /// other, in the same manifest.
+  func testDiagnosticExportPreservesDigestArgumentsItCannotRedact() async throws {
+    let fixture = try await makeSession(
+      sessionID: "session-export-digest-argument", jobID: "job-export-digest-argument")
+    defer { try? FileManager.default.removeItem(at: fixture.base) }
+    let identity = "beefcafe"
+    let workspaceRevision = identity + String(repeating: "0", count: 56)
+    let expectedRevision = identity + String(repeating: "1", count: 56)
+    let scopesDigest = identity + String(repeating: "2", count: 56)
+    let step = try executionStep(
+      id: "prepare-isolation", kind: "prepareWorkspaceIsolation", effect: "hostOnly",
+      cancellation: "atSafeBoundary", bindingRequirement: "none",
+      arguments: [
+        "sourceProjectRef": .string("project-\(identity)"),
+        "workspaceProjectRef": .string("workspace-\(identity)"),
+        "expectedWorkspaceRevision": .string(expectedRevision),
+        "workspaceRevision": .string(workspaceRevision),
+        "allowedFileScopesDigest": .string(scopesDigest),
+        "artifactId": .string("artifact-isolation"),
+      ],
+      disposition: "executed", outcomeCertainty: "confirmed", semanticResult: "succeeded")
+    let manifest = try SessionManifestDocument(
+      data: SessionStorageFixtures.manifest(
+        sessionID: fixture.layout.sessionID, jobID: fixture.layout.jobID,
+        executionMode: "execute", executionAuthority: "interactiveUser",
+        steps: [step], artifacts: [], realConnectKey: identity,
+        realIdentitySnapshot: .object(["serial": .string(identity)])))
+    try manifest.canonicalData.write(to: fixture.layout.manifestURL)
+    let (_, exportClaim) = try await admittedClaim(
+      claimID: "claim-export-digest-argument", jobID: fixture.layout.jobID,
+      layout: fixture.layout, writer: .heavy)
+    let destination = fixture.base.appending(path: "digest-argument-export")
+
+    let materialized = try SessionDiagnosticExporter().export(
+      layout: fixture.layout, artifacts: [], claim: exportClaim, to: destination,
+      deviceIdentifierPolicy: .redact)
+
+    let exported = try Data(contentsOf: materialized.root.appending(path: "manifest.json"))
+    guard
+      case .object(let exportedRoot) = try JSONDecoder().decode(JSONValue.self, from: exported),
+      case .array(let exportedSteps)? = exportedRoot["steps"],
+      case .object(let exportedStep) = exportedSteps.first ?? .null,
+      case .object(let arguments)? = exportedStep["arguments"]
+    else { return XCTFail("the exported manifest lost the step this fixture exports") }
+    for key in ["expectedWorkspaceRevision", "workspaceRevision", "allowedFileScopesDigest"] {
+      guard case .string(let value)? = arguments[key] else {
+        return XCTFail("\(key) is missing from the exported step")
+      }
+      XCTAssertEqual(
+        value.count, 64, "\(key) stopped being a digest: \(value)")
+      XCTAssertTrue(
+        value.allSatisfy { $0.isHexDigit && !$0.isUppercase }, "\(key) is not hex: \(value)")
+    }
+    for key in ["sourceProjectRef", "workspaceProjectRef"] {
+      guard case .string(let value)? = arguments[key] else {
+        return XCTFail("\(key) is missing from the exported step")
+      }
+      XCTAssertTrue(
+        value.hasPrefix("redacted-device-"),
+        "\(key) kept a device identity or took the free-text sentinel: \(value)")
+    }
+    // The Runtime reads an exported Session back through this same validation,
+    // and the exporter itself refuses to publish a manifest that fails it.
+    _ = try SessionManifestDocument(data: exported)
+  }
+
   func testDiagnosticExportRejectsForeignSessionManifest() async throws {
     let fixture = try await makeSession(
       sessionID: "session-export-foreign", jobID: "job-export-foreign")
