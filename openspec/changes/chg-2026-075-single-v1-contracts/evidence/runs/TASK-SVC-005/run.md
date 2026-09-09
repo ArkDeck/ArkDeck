@@ -52,7 +52,7 @@ digests needed to re-check them.
 | `flash.full-restore@1` is Catalog-`unavailable` on this host (no named hardware acceptance campaign) | maintainer window, independent of the alias blocker |
 | ~~GJ-1 §2.1 HAR crash-resume still not demonstrated~~ | **`REAL_DEVICE_PASS` 2026-09-09.** Executed on the published Runtime with the real DAYU200: `agent run` with no target parked a `physicalConnection` HAR at exit 75 with `newDispatchCount 0`, the receipt was discarded unread, and recovery from the execution id alone produced the identical `resumeReference` through `agent status` and `human-action show`. After resume the action reads `resolvedByFreshProbe`, `job-49720bb2a6c389007eb44e1998f7160f` is `succeeded` with no blockers, and all three Artifacts stay on `TGT-958780b2ffb7` at `bindingRevision 2` — no rebind. |
 | ~~GJ-5 not started; `workspace.sign-openharmony-hap@1` unavailable~~ | **`REAL_DEVICE_PASS` on the published Runtime `8a28f182`** (08:30Z), after passing on the `main` + #1810 candidate build (07:56Z) that cleared the credential blocker. |
-| A new destructive execution on `TGT-958780b2ffb7` is refused at admission while the two 2026-09-07 flash Jobs stay `outcomeUnknown` (`flash.recoveryProofMissing`); GJ-4 blocked | Policy, not a defect (POL-RECOVERY-001); the remedy is the protected Flash recovery invocation (CLI spec §7.7) in a window of its own — runbook §5 does not yet describe it, `TASK-SVC-005` may add it |
+| A new destructive execution on `TGT-958780b2ffb7` is refused at admission while the two 2026-09-07 flash Jobs stay `outcomeUnknown`; GJ-4 blocked | **Diagnosed to the rule, 2026-09-09 09:44Z, through the recovery invocation path** (`debug-070a56fb…`, `refusedBeforeDispatch`, 0 epochs): `completeOverwriteRecovery.sharedFourHourBudgetExpired` — the complete-overwrite recovery that would supersede the unknowns is refused because four hours have passed since the first unknown intent, and the engine calls that non-overridable. `arkforged`'s journals show the 07:25Z Job never wrote and the 08:53Z Job wrote through `DEVICE_RESET` without a terminal. A maintainer ruling is needed: let a DEC-014 campaign authorise a complete-overwrite recovery epoch after the four hours (one branch in `RuntimeRecoveryService.completeOverwriteAdmission`, TASK-AFA-001 paths), or take GJ-4 on a target without unknown lineage. Not a runbook step. |
 | `agent run` reports `admissionDenied` / `execution stopped before Job creation` with the engine's reason dropped; `agent status`, the execution record and `agentd.log` carry none either | TASK-SVC-002 (`AgentExecutionCoordinator.swift`): publish the refusal reason; needs the `agent.run`/`agent.status` schemas re-derived because `arkdeck.runtime-agent-execution/1` is closed |
 | `runtime service update` restarts fail transiently on the orphaned managed HDC server (`managed HDC launch could not be bound to its live process identity`) until launchd's retry succeeds — twice today | Observation; the restart race the 2026-09-02 record describes, recovered without intervention both times |
 | A credential owner no preset record carries blocks `runtime signing remove` and `install` for good (the 2026-09-02 `demo-app` signing preset survived the state-directory retirement in the owner ledger) | TASK-OHS-001, #1810 (`agent/ohs-001-orphan-credential-owner-20260909`): startup release of owners the store no longer carries; verified on this host before GJ-5 ran |
@@ -62,9 +62,9 @@ digests needed to re-check them.
 
 ## Still required before this Task can be done
 
-1. GJ-4 through the protected Flash recovery invocation path (CLI spec §7.7) to
-   supersede the two 2026-09-07 unknown outcomes, then the runbook §5 flash under
-   a named campaign (DEC-014). A window of its own.
+1. GJ-4: a maintainer ruling on the four-hour complete-overwrite recovery budget
+   for campaign-authorised windows, or a target without unknown lineage; then
+   the runbook §5 flash under a named campaign (DEC-014).
 2. Nothing further on GJ-5 or on the preserved incomplete Session.
 
 Each Journey result stays attached to the build it was taken on and is not
