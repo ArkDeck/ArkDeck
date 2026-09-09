@@ -804,6 +804,21 @@ final class ArkForgeLaneHostContractTests: XCTestCase {
       failureClassification: "", facts: [])
   }
 
+  /// DEC-016 reads the campaign from the lane the engine was composed with;
+  /// a hardware-gated lane exposes none, so the recovery admission cannot be
+  /// talked past the four-hour budget by anything but `runtime service update`.
+  func testTheLaneExposesItsHardwareAcceptanceCampaignOnlyWhenBound() {
+    let counter = StartCounter()
+    let source = ScriptedPlanSource.executable(requestRecorder: MaterializeRequestRecorder())
+    XCTAssertEqual(
+      sealTestHost(controller: source, publicSource: source, counter: counter, campaign: "AFA-SEAL")
+        .hardwareAcceptanceCampaign,
+      "AFA-SEAL")
+    XCTAssertNil(
+      sealTestHost(controller: source, publicSource: source, counter: counter, campaign: "")
+        .hardwareAcceptanceCampaign)
+  }
+
   private func sealTestHost(
     controller: any ArkForgePlanSource,
     publicSource: any ArkForgeAssessmentSource,

@@ -677,6 +677,89 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
       service: recoveryService(), request: try flashRequest(id: "attempt-17"))
   }
 
+  /// DEC-016: the shared four-hour clock bounds unattended automation. An
+  /// operator-named hardware acceptance campaign stands in for it — and for
+  /// nothing else: coverage, the sixteen-epoch bound and every other blocker
+  /// keep refusing exactly as before, and without a campaign the expired
+  /// budget still refuses.
+  func testANamedHardwareAcceptanceCampaignAdmitsRecoveryAfterTheSharedFourHourBudget()
+    async throws
+  {
+    _ = try writeUnknownJob(
+      jobID: "job-stale-unknown", timestamp: "2026-08-08T00:00:00Z",
+      correlatedUnknownOutcome: false)
+    let twoDaysLater = "2026-08-10T00:00:00Z"
+
+    await assertRecoveryBlocked(
+      "completeOverwriteRecovery.sharedFourHourBudgetExpired",
+      service: recoveryService(nowUTC: twoDaysLater),
+      request: try flashRequest(id: "expired-without-campaign"))
+    await assertRecoveryBlocked(
+      "completeOverwriteRecovery.sharedFourHourBudgetExpired",
+      service: recoveryService(nowUTC: twoDaysLater, hardwareAcceptanceCampaign: ""),
+      request: try flashRequest(id: "expired-empty-campaign"))
+
+    let admitted = try await recoveryService(
+      nowUTC: twoDaysLater, hardwareAcceptanceCampaign: "gj4-acceptance-20260909"
+    ).completeOverwriteAdmission(
+      request: try flashRequest(id: "expired-under-campaign"),
+      descriptor: try flashDescriptor(),
+      stableIdentitySHA256: identity, bindingRevision: 2)
+    let context = try XCTUnwrap(admitted.recoveryContext)
+    XCTAssertNil(admitted.recognizedEpoch)
+    XCTAssertEqual(admitted.campaignAuthorizedBeyondBudget, "gj4-acceptance-20260909")
+    XCTAssertEqual(context.coveredIntents.map(\.jobID), ["job-stale-unknown"])
+    XCTAssertEqual(context.destructiveEpochOrdinal, 2)
+
+    // Inside the budget the campaign is not consulted and leaves no mark, and
+    // the recovery it admits is the same recovery: the campaign changes when
+    // a recovery may be admitted, never what it must cover.
+    let inBudget = try await recoveryService(
+      nowUTC: "2026-08-08T01:00:00Z", hardwareAcceptanceCampaign: "gj4-acceptance-20260909"
+    ).completeOverwriteAdmission(
+      request: try flashRequest(id: "fresh-under-campaign"),
+      descriptor: try flashDescriptor(),
+      stableIdentitySHA256: identity, bindingRevision: 2)
+    let inBudgetContext = try XCTUnwrap(inBudget.recoveryContext)
+    XCTAssertNil(inBudget.campaignAuthorizedBeyondBudget)
+    XCTAssertEqual(inBudgetContext.coveredEffectSetSHA256, context.coveredEffectSetSHA256)
+    XCTAssertEqual(inBudgetContext.uncertainEffectSetSHA256, context.uncertainEffectSetSHA256)
+    XCTAssertEqual(inBudgetContext.coveredIntents, context.coveredIntents)
+    XCTAssertEqual(inBudgetContext.destructiveEpochOrdinal, context.destructiveEpochOrdinal)
+
+    // The campaign lifts the clock only: incomplete coverage and the shared
+    // sixteen-epoch bound refuse under it exactly as without it.
+    var incompleteInputs = try flashRequest(id: "campaign-incomplete").inputs
+    incompleteInputs["partitionPlan"] = .array(
+      Array(try recoveryPartitions().dropLast()).map(JSONValue.string))
+    await assertRecoveryBlocked(
+      "completeOverwriteRecovery.incompleteRequestedCoverage",
+      service: recoveryService(nowUTC: twoDaysLater, hardwareAcceptanceCampaign: "gj4-acceptance-20260909"),
+      request: try RuntimeOperationRequest(
+        requestID: "request-campaign-incomplete",
+        idempotencyKey: "idempotency-campaign-incomplete",
+        target: DurableTargetReference(
+          targetID: "TGT-DAYU200-RECOVERY", expectedBindingRevision: 2),
+        operation: RuntimeOperationReference(id: "flash.dayu200"),
+        inputs: incompleteInputs))
+    let budgetRoot = try isolatedStateDirectory("campaign-budget")
+    let originalRoot = stateDirectory
+    stateDirectory = budgetRoot
+    defer {
+      stateDirectory = originalRoot
+      try? FileManager.default.removeItem(at: budgetRoot)
+    }
+    for ordinal in 1...16 {
+      _ = try writeUnknownJob(
+        jobID: "job-campaign-budget-\(ordinal)", timestamp: "2026-08-08T00:00:00Z",
+        correlatedUnknownOutcome: false)
+    }
+    await assertRecoveryBlocked(
+      "completeOverwriteRecovery.sharedEpochBudgetExhausted",
+      service: recoveryService(nowUTC: twoDaysLater, hardwareAcceptanceCampaign: "gj4-acceptance-20260909"),
+      request: try flashRequest(id: "campaign-attempt-17"))
+  }
+
   func testDistinctRecoveryRunsThroughRuntimeOwnedCapabilityAndTypedProvider() async throws {
     // A current Runtime creates its admission index before any durable intent.
     _ = try RuntimeJobRepository(stateDirectory: stateDirectory)
@@ -1293,10 +1376,12 @@ final class CompleteOverwriteRecoveryContractTests: XCTestCase {
   }
 
   private func recoveryService(
-    nowUTC: String = "2026-08-08T01:00:00Z"
+    nowUTC: String = "2026-08-08T01:00:00Z",
+    hardwareAcceptanceCampaign: String? = nil
   ) -> RuntimeRecoveryService {
     RuntimeRecoveryService(
-      stateDirectory: stateDirectory, nowUTC: { nowUTC })
+      stateDirectory: stateDirectory, nowUTC: { nowUTC },
+      hardwareAcceptanceCampaign: hardwareAcceptanceCampaign)
   }
 
   private func flashDescriptor() throws -> CatalogOperationDescriptor {
