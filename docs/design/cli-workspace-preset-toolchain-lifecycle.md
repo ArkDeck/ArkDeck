@@ -92,7 +92,19 @@ new toolchain/credential set, publishes the preset state, releases the old
 set, and clears the pending action. All operations are idempotent. Startup and
 every store read finish an interrupted transaction before serving data. The
 public projection remains path-free and reports `runtimeRestartRequired` until
-the daemon observes that exact generation.
+the daemon observes that exact generation. A preset the daemon observed but
+could not resolve at startup — a signing credential bound to another project,
+a toolchain pin that no longer resolves — is projected as `unresolved`
+instead: a restart provably cannot change it, so the projection must not
+promise one. The projection carries no reason field (its item schema is
+closed); the operator reads the cause from the dependency itself, for a
+signing preset by comparing `runtime signing status` → `projectRef` with
+`workspace project list`, and repairs it through the same leaves — for a
+credential, `runtime signing install --project-ref <registered project>` and
+a fresh `workspace preset register`. The daemon also releases, at startup,
+every credential owner its preset store no longer carries, so a state
+directory retired underneath the signing material does not pin the credential
+for good.
 
 At startup, build/test presets resolve only through their retained toolchain
 pin. Runtime derives the fixed Hvigor operation and argument array from the
