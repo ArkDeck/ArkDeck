@@ -173,6 +173,28 @@ package final class OpenHarmonySigningCredentialOwner: @unchecked Sendable {
     }
   }
 
+  /// Releases every owner the workspace preset store no longer carries.
+  ///
+  /// A preset pins the credential through `acquire` and lets go through
+  /// `release`, both driven by the store's own mutations. This ledger lives
+  /// beside the signing material, outside the state directory that store
+  /// lives in, so retiring or replacing that directory drops the store's
+  /// records and keeps the ledger — which then names presets no record
+  /// carries, and a pin no preset can exercise refuses `replace` and `remove`
+  /// for good. The store is the authority on which presets exist: the daemon
+  /// passes the references it holds, everything else is released, and the
+  /// released references come back so the caller can say what it did.
+  package func releaseOwners(absentFrom registered: Set<String>) throws -> [String] {
+    try withOwnerLock { rootFD in
+      var (ledger, _) = try loadAndRecover(rootFD: rootFD)
+      let orphaned = ledger.presetOwners.filter { !registered.contains($0) }
+      guard !orphaned.isEmpty else { return [] }
+      ledger.presetOwners.removeAll { !registered.contains($0) }
+      try save(ledger, rootFD: rootFD)
+      return orphaned
+    }
+  }
+
   /// Replaces the installed receipt only while no workspace preset owns it.
   /// The durable `replacing` marker makes a crash after the receipt write
   /// recover by adopting the exact receipt that actually landed.

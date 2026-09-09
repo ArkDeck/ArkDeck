@@ -112,6 +112,60 @@ final class OpenHarmonyLocalSigningContractTests: XCTestCase {
     XCTAssertEqual(try owner.current().credentialRef, installed.credentialRef)
   }
 
+  /// The reference host, reproduced: a preset registered under a project the
+  /// state directory has since been retired with still pinned the credential,
+  /// so `runtime signing install` and `remove` refused for good. The store is
+  /// the authority on which presets exist; owners it does not carry are
+  /// released, owners it carries are kept, and the mutations open up again.
+  func testCredentialOwnerReleasesOwnersTheStoreNoLongerCarries() throws {
+    let fixture = try makeFixture(mode: "success")
+    let owner = OpenHarmonySigningCredentialOwner(store: fixture.store)
+    XCTAssertEqual(
+      try owner.releaseOwners(absentFrom: []), [],
+      "an empty owner has nothing to release and must not fail")
+    let (_, installed) = try owner.replace {
+      try fixture.store.install(
+        configuration: fixture.configuration,
+        keystorePassword: Data("keystore-secret".utf8),
+        keyPassword: Data("key-secret".utf8))
+    }
+    try owner.acquire(installed.credentialRef, owner: "preset-carried-by-the-store")
+    try owner.acquire(installed.credentialRef, owner: "preset-of-a-retired-state-directory")
+    XCTAssertEqual(try owner.current().referenceCount, 2)
+
+    XCTAssertEqual(
+      try owner.releaseOwners(absentFrom: ["preset-carried-by-the-store"]),
+      ["preset-of-a-retired-state-directory"])
+    XCTAssertEqual(try owner.current().referenceCount, 1)
+    XCTAssertNoThrow(
+      try owner.resolve(installed.credentialRef, owner: "preset-carried-by-the-store"),
+      "the pin the store carries must survive the reconciliation")
+    XCTAssertThrowsError(
+      try owner.resolve(installed.credentialRef, owner: "preset-of-a-retired-state-directory"))
+    XCTAssertEqual(
+      try owner.releaseOwners(absentFrom: ["preset-carried-by-the-store"]), [],
+      "a second pass finds nothing and writes nothing")
+
+    // The pin the store carries still blocks a rewrite, exactly as before.
+    var replacementRan = false
+    XCTAssertThrowsError(
+      try owner.replace {
+        replacementRan = true
+      } as (Void, OpenHarmonySigningCredentialResource))
+    XCTAssertFalse(replacementRan)
+    // Once the store drops it too, the credential can be replaced again.
+    XCTAssertEqual(
+      try owner.releaseOwners(absentFrom: []), ["preset-carried-by-the-store"])
+    XCTAssertEqual(try owner.current().referenceCount, 0)
+    let (_, replaced) = try owner.replace {
+      try fixture.store.install(
+        configuration: fixture.configuration,
+        keystorePassword: Data("keystore-secret".utf8),
+        keyPassword: Data("key-secret".utf8))
+    }
+    XCTAssertEqual(replaced.referenceCount, 0)
+  }
+
   func testCredentialOwnerRecoversMutationMarkerAndRejectsLedgerDrift() throws {
     let fixture = try makeFixture(mode: "success")
     let owner = OpenHarmonySigningCredentialOwner(store: fixture.store)
