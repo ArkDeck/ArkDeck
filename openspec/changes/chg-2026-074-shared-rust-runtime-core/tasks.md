@@ -223,19 +223,34 @@ Conventions shared by every task:
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/HeadlessHDCServerHost.swift`（managed HDC startup/shutdown lifecycle synchronization and diagnostics needed for paired-daemon restart/rollback only; preserve identity-bound spawn, exact endpoint ownership, fail-closed readiness and all Supervisor admission rules）
   - `ArkDeckAppUITests/AppShell/FacadeRollbackUITests.swift`（read-only Overview/History smoke against the signed façade and same-release Swift rollback; no device mutation or fixture-as-hardware evidence）
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeJobEngine.swift`（read projections only: bounded in-memory reuse of validated decoded persisted records after reading and comparing exact current bytes; preserve all validation, admission, capability and persistence semantics）
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AgentExecutionCoordinator.swift`（preserve the existing typed pre-admission refusal reason and owner-issued zero-dispatch proof after confirming no accepted Job; no admission, dispatch, retry, capability or persistence-format changes）
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/XPCConnectionBox.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckCore/AgentXPCContract.swift`
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/**`
   - `ArkDeckApp/**`（transport only; no visible copy or navigation change）
   - `docs/design/**`
 - Forbidden paths:
-  - Any admission/capability/storage source, including `RuntimeJobEngine.swift` outside the read-projection exception above; no changes to mutation callers or the shared persisted-record decoder
+  - Any admission/capability/storage source, including `RuntimeJobEngine.swift` and `AgentExecutionCoordinator.swift` outside their explicit read-projection/refusal-projection exceptions above; no changes to mutation callers or the shared persisted-record decoder
   - `ArkDeckApp/ArkDeckApp.entitlements`（the entitlement set must not widen）
 - Risk:medium（production path change with a one-flag rollback）
 - Hardware required:yes（DAYU200 for the GJ-1..5 re-pass）
 - Decision-Grade:D1
 
 ### Deliverables
+
+Refusal-proof scope supplement (2026-09-09, proposed): the facade GJ-5 run
+completed reproduction, analysis, isolated repair, build, signing and healthy
+verification. Its stale-revision negative case was refused with an unchanged
+62-Job ledger, but AgentExecutionCoordinator discarded the typed admission
+reason after confirming that no Job had been accepted. The CLI therefore
+reported only generic admissionDenied, without the required owner-issued
+zero-dispatch proof. Permit forwarding that existing refusal through the
+existing AgentExecutionControlFailure path after the same durable terminal
+transition. Preserve accepted-Job reconciliation, terminal no-replay behavior,
+all admission decisions, dispatch ordering and persistence formats. Tests must
+cover the refusal proof, durable terminal readback and absence of dispatch;
+ambiguous/internal failures must not gain proof. No acceptance criterion, Catalog,
+readiness pin or task status changes. This exception requires maintainer merge.
 
 Read-performance scope supplement (2026-09-09, proposed): release measurements
 found standalone Swift job.status/job.list p95 already approximately 256%/196%
