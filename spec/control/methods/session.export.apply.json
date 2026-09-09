@@ -8,6 +8,7 @@
         "malformedFrame",
         "notFound",
         "operationUnavailable",
+        "outcomeUnknown",
         "recordUnreadable",
         "rejected",
         "resourceConflict",
@@ -195,8 +196,8 @@
   "x-arkdeck-method": "session.export.apply",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 2,
-    "request": 5,
+    "error": 4,
+    "request": 7,
     "result": 3
   }
 }
