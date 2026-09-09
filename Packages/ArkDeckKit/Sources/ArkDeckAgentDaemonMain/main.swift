@@ -720,6 +720,32 @@ Task.detached {
     let registeredWorkspaceProjects = registeredWorkspaceStartup.map(\.resource)
     let registeredWorkspacePresetCompositions = try workspaceProjectStore
       .presetCompositionRecords()
+    // The credential owner ledger lives beside the signing material, outside
+    // the state directory the preset store lives in. Retiring or replacing that
+    // directory drops the store's records and keeps the ledger, which then pins
+    // the credential for presets no record carries — and a pin no preset can
+    // exercise refuses `runtime signing install` and `remove` for good. The
+    // store is the authority on which presets exist, so the daemon that owns
+    // the default state directory releases the rest here, before any preset
+    // resolves, and says so. A daemon on a private `--state-dir` shares the
+    // ledger but not the store, so it must not judge the production pins.
+    if resolvedStateDirectory.standardizedFileURL == defaultStateDirectory.standardizedFileURL {
+      do {
+        let orphanedCredentialOwners = try signingCredentialOwner.releaseOwners(
+          absentFrom: Set(registeredWorkspacePresetCompositions.map(\.resource.presetRef)))
+        if !orphanedCredentialOwners.isEmpty {
+          print(
+            "signing credential owner released presets no store record carries: "
+              + orphanedCredentialOwners.joined(separator: ","))
+          fflush(stdout)
+        }
+      } catch {
+        // An unreadable owner is reported where it matters: every signing
+        // preset fails its resolution below with the same cause.
+        FileHandle.standardError.write(
+          Data("signing credential owner reconciliation skipped: \(error)\n".utf8))
+      }
+    }
     let registeredWorkspaceCompositions = registeredWorkspaceStartup.compactMap(\.composition)
     let registeredWorkspaceRoots = Dictionary(
       uniqueKeysWithValues: registeredWorkspaceCompositions.map {
