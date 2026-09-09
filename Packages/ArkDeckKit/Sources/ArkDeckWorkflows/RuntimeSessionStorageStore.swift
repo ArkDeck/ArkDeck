@@ -395,6 +395,7 @@ public final class RuntimeSessionStorageStore: @unchecked Sendable {
           "quotaExceeded", "Session export destination lacks bounded headroom")
       }
       record = try store.markApplying(record)
+      var destinationReplacementBegan = false
       do {
         let materialized = try SessionDiagnosticExporter(
           faultInjector: exportFaultInjector
@@ -402,7 +403,8 @@ public final class RuntimeSessionStorageStore: @unchecked Sendable {
           layout: layout, artifacts: artifacts, claim: claim,
           to: URL(filePath: destinationPath),
           includeDeviceData: allowSensitive,
-          deviceIdentifierPolicy: .redact)
+          deviceIdentifierPolicy: .redact,
+          willReplaceDestination: { destinationReplacementBegan = true })
         let after = try sessionCatalog(document)
         guard after == snapshot else {
           throw RuntimeSessionStorageFailure(
@@ -420,20 +422,41 @@ public final class RuntimeSessionStorageStore: @unchecked Sendable {
         // Already classified by the owner that raised it — including the
         // catalog-drift case just above, whose own `outcomeUnknown` message
         // says what actually changed. Rewriting it lost that.
+        if !destinationReplacementBegan { releasePreviewAfterRefusal(store, record) }
         throw failure
       } catch {
-        // Everything else genuinely cannot be told apart from a partial write
-        // here, because the exporter may already have created the destination.
-        // It still has to say what went wrong: the old blanket message turned
-        // every cause — a refused validation that wrote nothing included —
-        // into one sentence, so an operator could not tell a confirmed refusal
-        // from a possible partial publication, and had nothing to inspect the
-        // destination *for*.
+        // The exporter stages into a private directory and replaces the
+        // destination in one step at the end, so it knows which side of that
+        // step it failed on. Before it, nothing was written: the outcome is
+        // known, and saying it "requires destination inspection" sent operators
+        // to look at a destination that was never created. Three previews on
+        // the reference host were consumed this way by attempts that published
+        // nothing.
+        guard destinationReplacementBegan else {
+          releasePreviewAfterRefusal(store, record)
+          throw RuntimeSessionStorageFailure(
+            "recordUnreadable",
+            "Session export was refused before publication and the destination "
+              + "was not created: \(error)")
+        }
+        // From the replacement onward a partial publication really is possible,
+        // and the preview stays spent so a retry cannot publish twice.
         throw RuntimeSessionStorageFailure(
           "outcomeUnknown",
           "Session export outcome requires destination inspection: \(error)")
       }
     }
+  }
+
+  /// A refusal raised before the destination was touched leaves the preview
+  /// usable: the caller can fix the cause and apply the same tuple again. If
+  /// the release itself fails the original refusal still propagates, because
+  /// the export outcome is what the caller asked about.
+  private func releasePreviewAfterRefusal(
+    _ store: RuntimeSessionExportRecordStore,
+    _ record: RuntimeSessionExportRecordStore.Record
+  ) {
+    _ = try? store.markRefusedBeforePublication(record)
   }
 
   package func previewSessionCleanup(
