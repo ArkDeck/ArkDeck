@@ -491,6 +491,97 @@ Open question 不得以聊天记忆留存。每项记录默认决策、阻塞范
 - Affected specs：`docs/design/arkdeck-cli-product-spec.md`（0.3 → 0.4：§1、§6.2、§13.2、
   §13.4、§14、§16、§18）；`openspec/specs/**` 不变。
 
+## DEC-014 硬件验收 campaign 的入口：operator 命名的 `--arkforge-campaign` 即验收窗口授权，不另建 preview/accept 两段式
+
+- Status：decided（2026-09-09；裁决由维护者作出，效力由维护者 review/merge 本 decision PR
+  构成——merge 即 attestation，V2 治理，先例 DEC-012/DEC-013）
+- Owner：product owner
+- Raised：2026-09-09，TASK-SVC-005 验收窗口：GJ-4 第二道门 `flash.full-restore@1` 在 Catalog
+  中 `unavailable`（`ArkForgeLaneComposition` 在 `inputs.campaign.isEmpty` 时发布
+  `hardwareGated`），而 #1809 的设计记录把「产品没有 campaign 入口」列为产品缺口，提出
+  `flash campaign preview` → `flash campaign accept --campaign <id>` 两段式、Runtime 自有
+  campaign 记录、lane 按 seal key 解析的方案，并留下三问：(a) 是否批准该形态；(b) accept 是否
+  要求 reviewer 身份/理由/有效期；(c) 「任意非空字符串都能开门」是否要先修。
+- Question：硬件验收窗口里，谁、以什么载体断言「本次刷机属于一次具名硬件验收 campaign」？
+  这个断言需要 Runtime 把 campaign 解析成一个绑定 seal key 的对象吗？
+- Decision：
+  1. **operator 命名的 campaign 就是入口，且已经是被批准的规程。**
+     `docs/design/cli-golden-journey-headless-runbook.md` §0 与 §5 明文：「若仅因空 campaign 报
+     `hardwareGated`，在已获授权的本轮硬件验收中可以使用已有发布配置面」，即
+     `runtime service update --arkforge-bundle <bundle> --arkforge-campaign gj4-<date>`，用后
+     省略 `--arkforge-campaign` 读回 `campaign: ""`；`real-device-validation.md` GJ-4 行的
+     `REAL_DEVICE_PASS`（2026-09-02，`gj4-headless-20260902`）正是这样取得的。seal 的
+     `hardwareCampaign` 状态本身表达的就是「operator 断言这是一次具名验收」，它与
+     `productionVerified` 是两个状态：前者是取得证据的窗口，后者是 AFA-001 第 6 步按
+     (authority, platform, toolchain digest, evidence set) 发布的成熟度。#1809 的「没有入口」
+     前提不成立。
+  2. **不建两段式 campaign 记录。** 一个 Runtime 自有的 campaign 存储要把 authority seal key
+     绑进去，而 seal key 只在设备接入、mechanics assessment 之后才存在——#1809 自己论证了这一点。
+     这个约束说明「campaign 记录」本质上就是「一次验收的证据」，它的正本已经是 evidence run
+     记录（脱敏元数据里的 `authorization.campaign` / `runtimeCapability` / ArkForge job）。再造
+     一层 Runtime 记录是第二真相源，对刷机安全没有增量：每次刷机仍由 materialization、fresh
+     facts、完整 plan、精确 RuntimeCapability reservation/consumption 与 durable intent 准入，
+     campaign 名不替代其中任何一环（runbook §0）。
+  3. **(c) 不单独修。** `--arkforge-campaign` 只能由本机 LaunchAgent 的所有者经
+     `runtime service update` 写入，同一个人拥有整个 daemon；它不是安全边界，是操作者对自己
+     验收窗口的命名。要求名字「命名某个对象」没有可校验的对象可指。保留现状；若日后要审计，
+     落点是 `flash prerequisites`/`doctor` 把当前 campaign 名原样呈现（读面，不是记录存储）。
+  4. **(b) 的「reviewer 身份/理由/有效期」由 evidence run 记录承担**：谁开的窗口、什么 build、
+     什么 seal/capability、结果如何，都写进 `docs/design/references/single-v1/` 的脱敏元数据与
+     change evidence；campaign 用后即关，`campaign: ""` 读回是关闭证据。
+- 依据：
+  - 代码事实：`ArkForgeLaneComposition.swift`（`inputs.campaign.isEmpty ? .unavailable : .available`）、
+    `ArkForgeAuthoritySupport.seal`（`hardwareCampaign` 状态、`permitsExecution`）、
+    `ArkForgeLaneHost.swift` 在 mechanics assessment 之后才 compose seal。
+  - 规程事实：runbook §0「ArkForge 的 named hardware campaign 只选择已发布的硬件验收
+    qualification，不能替代 Runtime authority。获得本轮真机验收授权时可使用 §5 的命名 staging
+    路径，保留 `hardwareCampaign` 分类」；§5 的开/关 argv 与 `campaign: ""` 读回判据。
+  - 先例：2026-09-02 GJ-4 `REAL_DEVICE_PASS`（campaign `gj4-headless-20260902`，capability
+    `CAP-RT-POLICY-1CB94C1D…-G1`，ArkForge JOB 23/23，readback 7.0.0.37，用后即关）。
+- Boundary：
+  1. 本裁决不放宽任何刷机准入：capability、plan/step-set digest、fresh facts、unknown/lineage
+     阻断全部照旧；campaign 名不能解除任何 blocker（runbook §5）。
+  2. 本裁决不发布 `productionVerified`；成熟度发布仍是 AFA-001 第 6 步的独立交付。
+  3. #1809 的设计记录保留为 AFA-001 evidence 中的一份被否决方案记录（不合入代码）；
+     Reopen rule：若 ArkDeck 需要在**多台主机/多位操作者**之间转移刷机授权，或 campaign 需要
+     被第三方核验，再考虑 Runtime 自有记录。
+- Unblocked by this decision：TASK-SVC-005 的 GJ-4 第二道门按 runbook §5 走
+  `--arkforge-campaign gj4-<date>`；TASK-AFA-001 不再背「campaign 入口」缺口。
+- Affected specs：无 `openspec/specs/**` 变更；`docs/design/cli-golden-journey-headless-runbook.md`
+  §5 已含本规程。
+
+## DEC-015 Session export 脱敏：字符受限参数不做第三张脱敏表，host-scope target 的身份集合不收窄
+
+- Status：decided（2026-09-09；裁决由维护者作出，效力由维护者 review/merge 本 decision PR
+  构成——merge 即 attestation，V2 治理，先例 DEC-013/DEC-014）
+- Owner：product owner
+- Raised：2026-09-09，TASK-SVC-005 验收：#1799 补齐了 identifier/digest 两张脱敏键表后，
+  仍有 21 个带字符受限校验器（enumeration/constant/actionIdentifier/remoteAbsolutePath/
+  partitionName/relativePath/signingPresetReference）的参数没有脱敏规则；#1806 钉住的现状是
+  「导出在触碰目的地之前拒绝并点名参数」，#1800 把它归为 `recordUnreadable`、preview 可复用。
+  同时，host-scope target 的 `identitySnapshot` 里 `providerId: "workspace"` 这类普通词也进了
+  设备身份集合，四字节子串匹配会与 `catalogId` 等参数碰撞。
+- Question：(a) 这类 Session 是否应当可导出？(b) host-scope target 是否应贡献设备身份集合？
+- Decision：
+  1. **(a) 拒绝就是正确终态。** 对闭集枚举、常量与结构化路径，任何改写都会产出一个校验器
+     拒绝的文档（#1799 修的正是「脱敏后自己不认」）；「原样保留」则等于泄露。所以不建第三张
+     键表；导出前点名拒绝 + preview 可复用（#1800/#1806）就是产品行为。文档化：这类 Session
+     只能在不含设备身份碰撞的前提下导出，操作者的出路是不把设备身份用作项目/目录名。
+  2. **(b) 不收窄。** 把 `providerId`、catalog digest 从身份集合里拿掉能消掉多数碰撞，但会改变
+     `projectRef` 等字段是否被脱敏，是隐私策略变化而不是清理。当前策略宁可多脱敏、宁可拒绝，
+     不冒漏脱敏的险；实测代价只是一次具名拒绝。
+  3. Reopen rule：出现一个**真实**（非枚举构造）的碰撞样本，且操作者无法改名绕开时，再以
+     独立 change 修订身份集合的定义（属 POL-PRIVACY-001 范围）。
+- 依据：`RuntimeSessionStorageStore.applySessionExport` 的两段式（pre-publication refusal /
+  post-publication outcomeUnknown）、#1799/#1800/#1806 的合入记录与
+  `docs/design/references/single-v1/svc-acceptance-2026-09-09-published-main.md`「Residual」节；
+  宿主上唯一受影响的 Session 只带 `projectRef`，21 个键无一有真实样本。
+- Boundary：不改 `SessionManifestDocument` 校验器，不改导出的 sentinel 形状，不动
+  `POL-PRIVACY-001`。
+- Unblocked by this decision：TASK-SVC-005 的 SVC-AC-05 导出腿以 #1799/#1800/#1805/#1806 的
+  状态结案；A3 不再是 SVC-002 的待办。
+- Affected specs：无。
+
 ## RISK-001 DAYU200 恢复演练残余风险接受(检查单第 4 项)
 
 - Revision：r2 evidence-owner correction candidate；仅维护者 review/merge 本 PR 后生效
