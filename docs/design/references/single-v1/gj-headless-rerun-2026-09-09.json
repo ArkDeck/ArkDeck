@@ -1267,7 +1267,53 @@
       "observations": [
         "the daemon restart that `runtime service update` performs failed twice before launchd's retry succeeded (`serverDidNotBecomeReady(\"managed HDC launch could not be bound to its live process identity\")`, then `…Supervisor could not establish registered health and generation`), health ok after 30 s; the same orphaned-managed-HDC-server restart race the 2026-09-02 record describes"
       ],
-      "notes": "The DAYU200 was not written: no Job was created, the two parked Jobs were read and reconciled by read-back only, no state was reset or replaced, and the campaign was cleared after the attempt."
+      "notes": "The DAYU200 was not written: no Job was created, the two parked Jobs were read and reconciled by read-back only, no state was reset or replaced, and the campaign was cleared after the attempt. The recovery invocation path was then run on the maintainer's go and refused before dispatch with the durable reason completeOverwriteRecovery.sharedFourHourBudgetExpired; see recoveryInvocation.",
+      "recoveryInvocation": {
+        "window": {
+          "campaign": "gj4-recovery-20260909",
+          "enabledAtUtc": "2026-09-09T09:40:31Z",
+          "operationsWithCampaign": "30/30",
+          "closed": true,
+          "campaignAfterRun": "",
+          "operationsAfterRun": "28/30"
+        },
+        "invocationID": "debug-070a56fb-cdc6-40a1-8bc4-5629669e6654",
+        "seedRequestFingerprintSHA256": "89174a7840082e7cf026d9dab7beada0351943c65275a84ede6f3455840e8df7",
+        "baselineMaterializedPlanDigest": "125accebd44c6f78e42405f291de25e1647b0fa79360463e989dc21b4b3b7669",
+        "evaluations": [
+          {
+            "ordinal": 1,
+            "action": "observePinnedRequest",
+            "disposition": "observed",
+            "dispatchDisposition": "notDispatched"
+          },
+          {
+            "ordinal": 2,
+            "action": "executePinnedRequest",
+            "disposition": "refusedBeforeDispatch",
+            "outcome": "refused",
+            "detail": "rejected(authorizationRequired, \"non-overridable recovery blocker: blocked(\\\"completeOverwriteRecovery.sharedFourHourBudgetExpired\\\")\")"
+          },
+          {
+            "ordinal": 3,
+            "action": "stop",
+            "reasonCode": "recovery.sharedFourHourBudgetExpired",
+            "disposition": "stopped"
+          }
+        ],
+        "destructiveEpochsUsed": 0,
+        "finalState": "stopped",
+        "ledger": {
+          "before": 41,
+          "after": 41
+        },
+        "deviceWritten": false,
+        "arkforgedJournals": {
+          "JOB-000001A07AC41449-0001": "jobCreated, stepIntentRecorded STEP-001, permitConsuming enter-updater; no write, no terminal",
+          "JOB-000001A07B12F273-0002": "loader observed (vid=2207 pid=350a), partition writes from STEP-004 (uboot), typed-skip readbacks boot_linux/system/updater, DEVICE_RESET at STEP-022, STEP-023 intent; no terminal"
+        },
+        "decisionNeeded": "campaign-authorised complete-overwrite recovery after the four-hour budget (RuntimeRecoveryService.completeOverwriteAdmission, TASK-AFA-001 paths) or a target without unknown lineage"
+      }
     }
   ],
   "operationRealDeviceCoverage": {

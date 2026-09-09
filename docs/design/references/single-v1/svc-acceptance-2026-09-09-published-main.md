@@ -490,13 +490,80 @@ does not lift an unknown lineage (runbook §5 says so in as many words).
   `evaluate`, `status`; `list` is empty on this host). That is a destructive
   window of its own with its own decision document and was not attempted here.
 
+### The recovery invocation path, run on the maintainer's go (09:40Z–09:44Z)
+
+The way out named above was executed on the published `8a28f182` build, after
+#1815, #1816 and #1818 merged: the protected destructive-recovery broker of
+CHG-2026-056 (`recovery flash-invocation`), whose `evaluate executePinnedRequest`
+submits the pinned request through the same `RuntimeJobEngine` admission as
+`agent run` but keeps the refusal text in the invocation's own durable record.
+
+| Step | Result |
+| --- | --- |
+| window opened, `--arkforge-campaign gj4-recovery-20260909` | exit 0, health `ok` in 10 s, 30 of 30 available; `recovery flash-invocation list` empty |
+| `recovery flash-invocation start --request-file gj4-recovery-seed.json` (the same full-restore request: lease `imp-56ab6e97…`, `dayu200`, `fullRestore`, `full`, target `TGT-958780b2ffb7` r2) | `debug-070a56fb-cdc6-40a1-8bc4-5629669e6654`, `active`, `baselineMaterializedPlanDigest 125acceb…`, expiry 13:41Z, 16 epochs |
+| `evaluate` `observePinnedRequest` | `observed`: plan-only, `dispatchDisposition notDispatched`, same plan digest, `stableIdentitySHA256 94a25a89…` |
+| `evaluate` `executePinnedRequest` | **`refusedBeforeDispatch`**, outcome `refused`, no Job, 0 epochs: `rejected(authorizationRequired, "non-overridable recovery blocker: blocked(\"completeOverwriteRecovery.sharedFourHourBudgetExpired\")")` |
+| `evaluate` `stop` (`recovery.sharedFourHourBudgetExpired`) | invocation `stopped`, `destructiveEpochsUsed 0` |
+| window closed | `campaign: ""`, 28 of 30; Job ledger 41 → 41; the device was not written |
+
+So the reason `agent run` dropped this morning is now on record, and it is not
+the capability lineage as such: `RuntimeRecoveryService.completeOverwriteAdmission`
+found the two unresolved destructive intents, found that this request covers
+every effect they could have had, and then refused because the shared
+four-hour budget — measured from the *first* unresolved intent,
+2026-09-07T07:28Z — has expired. The engine calls that blocker non-overridable,
+and it is: no published leaf, no campaign and no reconcile can move it.
+
+What the ArkForge side knows, read from `arkforged`'s own durable journals under
+`Agentd/arkforge/store/jobs/`: `JOB-000001A07AC41449-0001` (the 07:25Z Job)
+recorded `jobCreated`, `stepIntentRecorded STEP-001` and `permitConsuming
+enter-updater` and nothing after — it never reached a partition write;
+`JOB-000001A07B12F273-0002` (the 08:53Z Job) recorded the Loader
+(`vid=2207 pid=350a mode=loader`), transport evidence of partition writes
+from STEP-004 (`uboot`) on, typed-skip readbacks for `boot_linux`, `system`,
+`updater`, `DEVICE_RESET` at STEP-022 and the STEP-023 intent, and no
+terminal — the paired ArkDeck daemon went away before the plan closed
+(`arkforged: paired authority liveness pipe closed; refusing orphaned
+service`). Neither journal is a complete-plan receipt, so `job reconcile`'s
+`flash.recoveryProofMissing` is correct; the device's healthy
+`OpenHarmony-7.0.0.37` readback since then is consistent with the second Job
+having completed its writes, and the Runtime is right not to treat a build
+readback as proof of every partition.
+
+### What this leaves for the maintainer
+
+The four-hour budget is CHG-2026-056's bound for an automation invocation
+(sixteen serial destructive epochs, four hours, concurrency one). The engine
+applies the same clock to a complete-overwrite recovery, so an unknown outcome
+older than four hours can never be superseded on its binding revision: the
+only recognised supersession is a later successful complete flash, which the
+same rule refuses to admit. On this host that closes GJ-4 at
+`bindingRevision 2` for good. Three ways forward, none of which this Task may
+take on its own:
+
+1. **Rule that an operator-named acceptance campaign (DEC-014) may authorise a
+   complete-overwrite recovery epoch after the four hours.** The epoch would
+   still be a complete overwrite of every covered effect, admitted with fresh
+   facts, a full plan and a Runtime capability, so the supersession argument
+   does not depend on elapsed time; the clock protects unattended automation,
+   which a campaign window is not. One admission branch in
+   `RuntimeRecoveryService.completeOverwriteAdmission` (in `TASK-AFA-001`'s
+   Allowed paths) plus a DEC recording the boundary.
+2. Keep the rule and take GJ-4 on a target with no unknown lineage (another
+   DAYU200, or this one after a re-onboarding the maintainer performs and
+   records — runbook §5 forbids `--rebind` as a way out of unknown lineage, so
+   that is a maintainer act, not a runbook step).
+3. Accept GJ-4 as blocked on this host and close SVC-005 without it, which
+   SVC-AC-10 does not allow.
+
 ## Still required before this Task can be done
 
-1. **GJ-4 through the recovery invocation path**, in a window of its own:
-   supersede the two 2026-09-07 unknown outcomes with a complete-overwrite
-   recovery, then the ordinary runbook §5 flash under a named campaign.
-   Everything else for it is in place: DEC-014, the archive import, the lane
-   plan and the device prerequisites above.
+1. **GJ-4 needs a maintainer ruling** on the four-hour complete-overwrite
+   recovery budget for campaign-authorised windows (option 1 above), or a
+   target without unknown lineage (option 2). Every other prerequisite is in
+   place: DEC-014, the archive import, the lane plan, the device prerequisites,
+   and the refusal reason on record.
 2. Nothing further on GJ-5, which passed on the published Runtime, and nothing
    further on the preserved incomplete Session.
 
