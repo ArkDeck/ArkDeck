@@ -220,6 +220,8 @@ Conventions shared by every task:
   - `Packages/ArkDeckKit/Distribution/macOS/build-helpers.sh`（same paired packaging for release; preserve provisioning, signing, notarization and assessment）
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/**`
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/**`（private-socket listener and origin-line → context construction only; the handler and admission code are untouched, r3）
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/HeadlessHDCServerHost.swift`（managed HDC startup/shutdown lifecycle synchronization and diagnostics needed for paired-daemon restart/rollback only; preserve identity-bound spawn, exact endpoint ownership, fail-closed readiness and all Supervisor admission rules）
+  - `ArkDeckAppUITests/AppShell/FacadeRollbackUITests.swift`（read-only Overview/History smoke against the signed façade and same-release Swift rollback; no device mutation or fixture-as-hardware evidence）
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/XPCConnectionBox.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckCore/AgentXPCContract.swift`
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/**`
@@ -233,6 +235,17 @@ Conventions shared by every task:
 - Decision-Grade:D1
 
 ### Deliverables
+
+Acceptance scope supplement (2026-09-09, proposed): the complete implementation
+path probe against protected main `62d5cffd` found two missing paths. Signed
+pair/rollback testing currently encounters a managed-HDC startup failure
+(`managed HDC launch identity was not retained`), including after restoring the
+original daemon; the root cause remains to be diagnosed, so any correction in
+that host file is restricted to lifecycle synchronization/diagnostics and must
+retain every existing identity and admission check. The new UI test supplies
+AC-9's real-service Overview/History smoke. This proposal changes no production
+code, entitlement, task status, readiness pin or acceptance criterion; it takes
+effect only after maintainer merge.
 
 Packaging scope supplement (2026-09-09, proposed for maintainer review): the two
 existing helper build entry points above currently package only the Swift daemon.
