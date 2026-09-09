@@ -44,7 +44,7 @@ final class RuntimeWorkspaceProjectStoreContractTests: XCTestCase {
 
     func owner() -> RuntimeWorkspaceCredentialPinning {
       RuntimeWorkspaceCredentialPinning(
-        acquire: { [self] reference, presetRef in
+        acquire: { [self] reference, presetRef, _ in
           _ = lock.withLock { values[reference, default: []].insert(presetRef) }
         },
         release: { [self] reference, presetRef in
@@ -73,6 +73,110 @@ final class RuntimeWorkspaceProjectStoreContractTests: XCTestCase {
 
   override func tearDownWithError() throws {
     try? FileManager.default.removeItem(at: stateDirectory)
+  }
+
+  /// `runtimeRestartRequired` is honest for a preset registered since the daemon
+  /// last started — a restart really does apply it. It is a lie for a preset the
+  /// daemon already tried and refused, and the two were reported identically.
+  ///
+  /// Found on the reference host: a signing preset registered 2026-09-07 still
+  /// read `runtimeRestartRequired` after several real restarts, because its
+  /// credential is bound to a project that is not registered. The start-up
+  /// resolver recorded exactly that reason and the projection discarded it,
+  /// leaving the operator a remedy that could not work and no way to see why.
+  func testAPresetTheDaemonRefusedIsNotReportedAsAwaitingRestart() throws {
+    let root = try makeRoot("resolution-project")
+    let pins = ToolchainPins()
+    let store = try RuntimeWorkspaceProjectStore(
+      rootURL: stateDirectory, toolchainPinning: pins.owner(),
+      nowUTC: { "2026-09-01T12:00:00.000Z" })
+    let project = try store.register(
+      requestID: "resolution-project-registration", kind: "openharmony", rootPath: root.path)
+    let toolchain = "toolchain:sha256:" + String(repeating: "c", count: 64)
+    let preset = try store.registerPreset(
+      requestID: "resolution-preset", projectRef: project.projectRef,
+      kind: "build", templateRef: "openharmony.hvigor-build@1",
+      toolchainRef: toolchain, toolchainGeneration: 1, credentialRef: nil,
+      timeoutSeconds: 1_800,
+      constraints: RuntimeWorkspacePresetConstraints(
+        module: "entry", product: "default", buildMode: "debug"))
+
+    // Registered, nothing applied yet: a restart is the actual remedy.
+    XCTAssertEqual(preset.configurationStatus, "runtimeRestartRequired")
+
+    // The daemon started and applied it.
+    store.markApplied(
+      projects: [project.projectRef: project.generation],
+      presets: [preset.presetRef: preset.generation])
+    XCTAssertEqual(
+      try store.inspectPreset(projectRef: project.projectRef, presetRef: preset.presetRef)
+        .configurationStatus, "active")
+
+    // The daemon started, tried to resolve it and refused. Restarting again
+    // will reach the same refusal, so it must not be named as the remedy.
+    store.markApplied(
+      projects: [project.projectRef: project.generation], presets: [:],
+      presetResolutionFailures: [
+        preset.presetRef: "workspace.presetResolutionFailed:signing credential is bound "
+          + "to project demo-app, not \(project.projectRef)"
+      ])
+    XCTAssertEqual(
+      try store.inspectPreset(projectRef: project.projectRef, presetRef: preset.presetRef)
+        .configurationStatus, "unresolved")
+    XCTAssertEqual(
+      try store.listPresets(projectRef: project.projectRef).map(\.configurationStatus),
+      ["unresolved"])
+
+    // A different preset's failure must not change this one's status.
+    store.markApplied(
+      projects: [project.projectRef: project.generation], presets: [:],
+      presetResolutionFailures: ["preset-someone-else": "workspace.presetResolutionFailed:x"])
+    XCTAssertEqual(
+      try store.inspectPreset(projectRef: project.projectRef, presetRef: preset.presetRef)
+        .configurationStatus, "runtimeRestartRequired")
+  }
+
+  /// The credential owner is the only party that can compare a signing
+  /// credential's own project binding with the preset's, and it could not: the
+  /// pin was requested with the preset alone. Registration therefore accepted a
+  /// preset that start-up would always refuse. The project has to reach the
+  /// owner for the refusal to happen where the operator is standing.
+  func testCredentialPinningReceivesTheProjectThePresetBelongsTo() throws {
+    let root = try makeRoot("binding-project")
+    let toolchainPins = ToolchainPins()
+    let observed = ObservedCredentialPin()
+    let store = try RuntimeWorkspaceProjectStore(
+      rootURL: stateDirectory, toolchainPinning: toolchainPins.owner(),
+      credentialPinning: observed.owner(), nowUTC: { "2026-09-01T12:00:00.000Z" })
+    let project = try store.register(
+      requestID: "binding-project-registration", kind: "openharmony", rootPath: root.path)
+    let toolchain = "toolchain:sha256:" + String(repeating: "d", count: 64)
+    let credential = "credential:sha256-" + String(repeating: "e", count: 64)
+
+    let preset = try store.registerPreset(
+      requestID: "binding-preset", projectRef: project.projectRef,
+      kind: "signing", templateRef: "openharmony.local-sign@1",
+      toolchainRef: toolchain, toolchainGeneration: 1, credentialRef: credential,
+      timeoutSeconds: 600, constraints: RuntimeWorkspacePresetConstraints())
+
+    XCTAssertEqual(
+      observed.calls, [[credential, preset.presetRef, project.projectRef]],
+      "the owner cannot enforce the credential's project binding without the project")
+  }
+
+  private final class ObservedCredentialPin: @unchecked Sendable {
+    private let lock = NSLock()
+    private var recorded: [[String]] = []
+
+    var calls: [[String]] { lock.withLock { recorded } }
+
+    func owner() -> RuntimeWorkspaceCredentialPinning {
+      RuntimeWorkspaceCredentialPinning(
+        acquire: { [self] reference, presetRef, projectRef in
+          lock.withLock { recorded.append([reference, presetRef, projectRef]) }
+        },
+        release: { _, _ in })
+    }
   }
 
   func testRegistrationIsDurableIdempotentAndKeepsTheRootPrivate() throws {
