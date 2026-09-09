@@ -407,6 +407,39 @@ final class SessionResourceContractTests: XCTestCase {
     XCTAssertFalse(
       FileManager.default.fileExists(atPath: exports.appending(path: "stranded-copy").path))
 
+    // `session show` publishes one Session's own facts and no total over the
+    // root, so it asks the same shape of question an exact export asks and now
+    // reads at the same scope. Refusing it because an unrelated directory has
+    // no manifest made a healthy Session unreadable through every face at once.
+    let shown = try await run([
+      "session", "show", "--session", "session-disclosed",
+      "--socket", server.socketURL.path, "--output", "json",
+    ])
+    XCTAssertEqual(shown.exitCode, 0, diagnostic(shown))
+    let shownSession = try result(shown)
+    XCTAssertEqual(shownSession["sessionId"], .string("session-disclosed"))
+    XCTAssertNotNil(shownSession["sizeBytes"])
+    XCTAssertNil(
+      shownSession["unaccountedSessionCount"],
+      "show answers about one Session and must not publish a root total")
+
+    // Showing the unaccounted leaf itself stays refused, on the same rule the
+    // export path applies.
+    let refusedShow = try await run([
+      "session", "show", "--session", "session-stranded",
+      "--socket", server.socketURL.path, "--output", "json",
+    ])
+    XCTAssertEqual(refusedShow.exitCode, 69, diagnostic(refusedShow))
+    XCTAssertEqual(try error(refusedShow)["code"], .string("operationUnavailable"))
+
+    // `list` still answers about the whole root, so it still refuses: a partial
+    // inventory presented as the inventory would be a lie.
+    let refusedList = try await run([
+      "session", "list", "--socket", server.socketURL.path, "--output", "json",
+    ])
+    XCTAssertEqual(refusedList.exitCode, 69, diagnostic(refusedList))
+    XCTAssertEqual(try error(refusedList)["code"], .string("operationUnavailable"))
+
     // The historical directory is exactly as it was: still no manifest.
     XCTAssertEqual(
       try FileManager.default.contentsOfDirectory(atPath: stranded.path).sorted(),
