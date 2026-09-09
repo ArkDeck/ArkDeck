@@ -66,3 +66,22 @@ refuses. Record: `docs/design/references/single-v1/svc-acceptance-2026-09-09-pub
 After this merges the helper pair is rebuilt from `main`, the campaign window
 is opened as runbook §5 says, and GJ-4 runs; its result is recorded under
 `TASK-SVC-005`, not here.
+
+## On the device, after the merge
+
+Helper pair rebuilt from protected `main` `6e8c3ed5` (#1822) and installed
+at `2026-09-09T10:19:14Z` (daemon `02d685a0…`, CLI `6216ec38…`). Under the
+campaign `gj4-headless-20260909b` the same full-restore request that had been
+refused twice was admitted: `job-6d1e329e44d4dfa1acf61921f9f2adad`, timeline
+`complete-overwrite recovery classified epoch 2; covered intents 1` then
+`complete-overwrite recovery admitted after the shared four-hour budget under
+hardware acceptance campaign gj4-headless-20260909b`, capability
+`CAP-RT-POLICY-75A88361…-G1` (a lineage of its own), `arkforged` job
+`JOB-000001A085AF2FC7-0003`. Terminal `recovered` at 10:23:34Z: complete
+overwrite, readback (`const.ohos.fullname OpenHarmony-7.0.0.37`), reboot,
+rebind and postflight confirmed; evidence `verified`, no blocker, residue 0;
+epoch `recovery-epoch-a985dcca…` supersedes `job-c9274a31…`'s unknown intent.
+The 07:25Z unknown (`job-bf0b748e…`) ran at binding revision 1 and stays
+parked outside the r2 lineage. The campaign was cleared afterwards
+(`campaign: ""`, 28 of 30). GJ-4's acceptance record is `TASK-SVC-005`'s
+(`docs/design/references/single-v1/gj-headless-rerun-2026-09-09.json`, run 2).
