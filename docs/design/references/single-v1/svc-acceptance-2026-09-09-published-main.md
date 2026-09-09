@@ -292,35 +292,76 @@ and key alias. That needs the credential material and its passwords, so it is th
 maintainer's action; it was not performed in this window and no credential was
 entered, installed, removed or migrated.
 
-## A GJ-1 leg that is still not demonstrated
+## GJ-1 §2.1 HAR crash-resume — `REAL_DEVICE_PASS`
 
-The execution `gj1-har-20260908` exists on this host and completed, but it did
-not exercise GJ-1 §2.1. `agent status --execution-id gj1-har-20260908` reports
-`humanAction: null`, and `job timeline --job job-2aabc8981b1b1cb91552a13d098854a5`
-is a straight `jobCreated → queued→preflight → preflight→running →
-running→finalizing → finalizing→succeeded` with no waiting state and no resume.
-The execution is named for the leg it was meant to cover; the record it left does
-not show that leg being taken. It is recorded here as **not demonstrated**, and
-the physical detach and reattach it needs is still outstanding.
+Executed on the published Runtime with the real DAYU200 (`TGT-958780b2ffb7`,
+OpenHarmony-7.0.0.37), protected `main` `eadb46b8`, daemon `4153ec72…`. The
+physical detach and reattach were performed by the maintainer at the two points
+the procedure requires.
 
-The same execution's `job.sessionPublication` reports
-`state: failed`, `reasonCode: sourceIntegrityFailed` — unrelated to the export
-work above, and not investigated in this window.
+An earlier draft of this record listed this leg as **not demonstrated**, because
+the execution named `gj1-har-20260908` completed with `humanAction: null` and a
+straight `queued→succeeded` timeline: it was named for the leg but never took it.
+That entry is superseded by the run below, which did.
+
+| Step | Result |
+| --- | --- |
+| 1. USB detached | `device candidates` exit 0 |
+| 2. `agent run --operation observe.device@1 --execution-id gj1-20260909-har`, no `--target` | **exit 75**, `humanActionRequired`, `state waitingForHuman`, `humanAction.category physicalConnection`, `minimumAction human.connectOrPowerDevice`, `reasonCode device.notObserved`, **`newDispatchCount 0`**, `actionId har-c12db578-b15d-449a-a2c3-b3fcfebf5621` |
+| 3. client crash simulated | that stdout was sealed unread (`bc3e8d3974ade7bf97da321ce04185804125051dd4612a6e24b30bffa8434547`); its `resumeReference` was never used |
+| 4. USB reattached, execution id only | `agent status` → `waiting`, `nextAction.resumeReference resume-3dff6d13-8e67-4761-abf5-558bfa07efab`; `human-action list --owner-kind agentExecution --owner gj1-20260909-har` → exactly one action, same id; `human-action show` → **the identical reference, verbatim** |
+| 5. `agent resume --resume-reference …` | exit 0, `state completed`, `jobState succeeded`, `job-49720bb2a6c389007eb44e1998f7160f` |
+| 6. after resume | the action reads **`resolvedByFreshProbe`** |
+| 7. `job evidence` | `terminalState succeeded`, `blockers []`, `actualStepKinds [probeHostTool, probeHDCServer, probeDevice, runApprovedRemoteRead]`, 3 verified Artifacts |
+
+The binding did not move. All three Artifacts carry `TGT-958780b2ffb7` at
+`bindingRevision 2`, the same target and revision as before the detach, so the
+reattach was resolved by a fresh probe rather than a rebind — which is the point
+of the leg.
+
+The Job ledger gained exactly this one Job: 21 before, 22 after, none removed and
+every prior outcome unchanged.
+
+### One correction to the runbook, not to the product
+
+`docs/design/cli-golden-journey-headless-runbook.md` §2.1 step 1 says to confirm
+`candidates` is **empty** after the detach. It is not: HDC keeps the entry and the
+Runtime republishes it as `authorizationState: Offline`, `adoptedTargetId: null`,
+`deviceInformation: null`, `bindingRevision: null`. The HAR fired anyway, and its
+`reasonCode` says why — `device.notObserved`, not "the list is empty". The
+product behaved correctly; the runbook sentence describes a state that does not
+occur, and following it literally would make an operator think the step failed.
 
 ## Still required before this Task can be done
 
-1. GJ-4's second gate: `flash.full-restore@1` is Catalog-`unavailable` for want
-   of a named hardware acceptance campaign — a maintainer decision.
-2. GJ-5. Its blocker is now diagnosed above: the signing credential is bound to
+1. **GJ-4's second gate.** `flash.dayu200` and `flash.full-restore@1` are
+   Catalog-`unavailable` because the ArkForge lane is bound to no acceptance
+   campaign: the install receipt reads `arkForgeLane.campaign: ""`, and
+   `ArkForgeLaneComposition` publishes `.unavailable` exactly when
+   `inputs.campaign.isEmpty`, with `ArkForgeAuthoritySupport.seal` reporting
+   state `hardwareGated`. A non-empty campaign flips the seal to
+   `hardwareCampaign` and the operations to available, and the per-plan
+   mechanics/authority seals and Runtime admission still gate every flash, so it
+   is not a bypass. The mechanical step is one flag —
+   `runtime service update --arkforge-campaign <campaign-id>` — but the id is an
+   assertion that this exact authority build, control map, HDC, permit codec,
+   mechanics and platform combination has a reviewed hardware acceptance record.
+   The 2026-08-04 window passed under `ECAMP-96EFFF15` and `ECAMP-31E041BC`;
+   every axis of that seal has moved since, so reusing either would claim
+   acceptance for a configuration that was never accepted, and inventing one
+   would fabricate the record. **A maintainer has to name the campaign.**
+2. **GJ-5.** Its blocker is diagnosed above: the signing credential is bound to
    `demo-app`, which is not a registered project, and must be reinstalled
-   against `project-fd677365f7bdefabda66a3c1`.
-3. GJ-1 §2.1 HAR crash-resume, which `gj1-har-20260908` did not exercise.
-4. Nothing further on the preserved incomplete Session. It blocks `session list`,
-   which is the correct answer for a question about the whole root, and it no
-   longer blocks reading or exporting a healthy Session. The directory stays as
-   it is; no product decision is outstanding.
-5. The Windows read-only chain, which needs a Windows 11 x64 host, a signing
+   against `project-fd677365f7bdefabda66a3c1` with
+   `runtime signing install --project-ref …`. That needs the credential material
+   and its passwords, so it is a maintainer action.
+3. **The Windows read-only chain**, which needs a Windows 11 x64 host, a signing
    identity and a DAYU200 that this window did not have.
+
+Nothing further is outstanding on the preserved incomplete Session. It blocks
+`session list`, which is the correct answer to a question about the whole root,
+and it no longer blocks reading or exporting a healthy Session. The directory
+stays exactly as it is.
 
 Local captures for this window are under `/private/tmp/arkdeck-svc-20260909/`
 (`before/`, `after/`, `gj/`, `export-dest/`). They are not committed; the
