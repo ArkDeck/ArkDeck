@@ -48,7 +48,7 @@ Conventions shared by every task:
 
 ## TASK-XPA-001 — Publish per-method typed schemas from the single v1 contract for Rust consumers
 
-- Status:in-progress（started on the maintainer's instruction after TASK-SVC-001 merged: the recording seam, the derivation and the per-method schemas of the single v1 control table are delivered, and every method's result shape is published by success-path contract tests, `evidence/runs/TASK-XPA-001/run.md`; the re-derivation covering the TASK-SVC-002, TASK-SVC-003 and TASK-SVC-004 merges is delivered against `main` `eac476cd` and changed no request, result or error shape, and the single current journal contract is verified against the post-SVC-002 Swift reader; only the headless GJ-1..5 re-pass remains, and it waits for a device window）
+- Status:in-progress（started on the maintainer's instruction after TASK-SVC-001 merged: the recording seam, the derivation and the per-method schemas of the single v1 control table are delivered, and every method's result shape is published by success-path contract tests, `evidence/runs/TASK-XPA-001/run.md`; the re-derivation covering the TASK-SVC-002, TASK-SVC-003 and TASK-SVC-004 merges is delivered against `main` `eac476cd` and changed no request, result or error shape, and the single current journal contract is verified against the post-SVC-002 Swift reader; the headless re-pass on the current digest `508783ac…` is recorded for GJ-1 (incl. §2.1 HAR crash-resume), GJ-2, GJ-3 and GJ-5 by the TASK-SVC-005 windows of 2026-09-08/09 through the normal single-v1 CLI, `evidence/runs/TASK-XPA-001/run.md` §Golden Journey; GJ-4 alone is outstanding and waits for the maintainer's go on the acceptance-window flash (DEC-014)）
 - Platform:macos（contract is platform-neutral）
 - Requirements:CLI-REQ-013, CLI-REQ-014, CLI-REQ-025 as aligned by CHG-2026-075; no Core REQ edited by this task
 - Acceptance:XPA-AC-1, XPA-AC-3; the post-SVC single-v1 positive and negative frame corpus
@@ -57,14 +57,14 @@ Conventions shared by every task:
 
   ```yaml pins
   - path: main
-    commit: eac476cdca4da29bc0b2e705f4697beeeefe8227
+    commit: 8c6a376cff3b6212cabf61fa6e203e123ade8654
   - path: Packages/ArkDeckKit/Contracts/control-protocol.json
-    blob: f47372feb9034ba17560b59d5dbde91206cb9aae
+    blob: 9c5bec149513faecb967b72ef6dd9b990193448f
   - path: Packages/ArkDeckKit/Sources/ArkDeckCore/ControlProtocolGenerated.swift
-    blob: 6d3c1fb680d6a338ba59cb80af53aa46505196cb
+    blob: 35c66af882807939bf13da4d1deacece7e466bd1
   ```
 
-  The commit is `main` after TASK-SVC-004 (#1742); the earlier pin was `main` after TASK-SVC-001 (#1733), `600e4b72a016b38e3289103484208668e6690984`. Both control blobs are unchanged across the SVC-002, SVC-003 and SVC-004 merges, so the registry's contract identity is still `1054d17b598ce23003ebbdec4d42eb359b63016d6421709ba53c3f21f7c6558d` over the same 96 methods. The old r1–r5 protocol/journal blobs are historical inputs, not this task's baseline.
+  The commit is `main` on 2026-09-09 (#1808). The earlier pins were `main` after TASK-SVC-001 (#1733, `600e4b72…`) and after TASK-SVC-004 (#1742, `eac476cd…`, control blobs `f47372fe…`/`6d3c1fb6…`, identity `1054d17b…`, 96 methods). Since then TASK-AFA-001 published `flash.reconcile-alias` (#1794) and re-derived all 97 schemas under the new identity `8a662759721a2081e974306399997801246de4022047365c050107de5dce2912` (#1795); the request/result/error shapes of the 96 earlier methods did not move (AFA-001's own diff record). The old r1–r5 protocol/journal blobs are historical inputs, not this task's baseline.
 - Applicable failure patterns:AF-004, AF-006, AF-014
 - Production reachability:`arkdeck` CLI → UDS → `RuntimeControlPlaneHandler` → the single v1 method table → existing handlers; no new effect or dispatch point
 - Trusted fact sources:the method set and current document shapes come from the protected-main Swift implementation after SVC-001..004 and its canonical generators; per-method schemas are checked against actual request/result/error frames; callers cannot widen the method set
