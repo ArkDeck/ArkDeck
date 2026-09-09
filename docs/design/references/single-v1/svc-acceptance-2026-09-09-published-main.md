@@ -152,8 +152,8 @@ rollback attestation is a Journal entry, not an entry in the table above.
 | --- | --- | --- |
 | SVC-AC-05 current durable formats | **publication, read and export all met** | A production caller publishes a Session; `session show` answers for it (#1805); and the exact finalized export completes through published typed operations with the source preserved and the device identifier redacted to a schema-valid form. `session list` still refuses while the 2026-08-02 directory is unaccounted, which is the correct whole-root contract and not an outstanding item. The earlier record's "no production caller publishes a Session" is superseded. |
 | SVC-AC-07 evidence integrity | met, re-read on this build | `job-5b91a6a9f87b23fc689aa12584469758` publishes `artifactIntegrityFailed` rather than `verified`. |
-| SVC-AC-09 current configuration | **signing legs met on the candidate build** | The credential rebind below exercised `workspace preset remove`, `runtime signing status/remove/install --build-profile --project-ref`, `workspace preset register --kind signing` and `runtime service restart` end to end on a Data Protection Keychain credential; the one refusal (`signing remove` while an owner remained) was the product defect #1810 repairs, not a configuration-format regression. |
-| SVC-AC-10 complete delivery | **GJ-5 met on the candidate build; GJ-4 outstanding** | GJ-5 `REAL_DEVICE_PASS` on `8c6a376c` + #1810 (section below, record `gj-headless-rerun-2026-09-09.json`). GJ-4's second gate is a decision, now taken: DEC-014 (agent/dec-014-015-campaign-redaction-20260909) names `runtime service update --arkforge-campaign gj4-<date>` as the acceptance-window authority; the device reads `flash prerequisites` loader/recoveryPath/unlocked `satisfied`, `bootloader-status` `hdcNormal`/`exactBoundTarget` r2. |
+| SVC-AC-09 current configuration | **met on the published Runtime** | The credential rebind exercised `workspace preset remove`, `runtime signing status/remove/install --build-profile --project-ref`, `workspace preset register --kind signing` and `runtime service restart` end to end on a Data Protection Keychain credential (the one refusal was #1810's defect, since merged), and the published `8a28f182` build resolved the same preset `active` on its first start. |
+| SVC-AC-10 complete delivery | **GJ-5 met on the published Runtime; GJ-4 blocked** | GJ-5 `REAL_DEVICE_PASS` twice: on `8c6a376c` + #1810 (07:56Z) and on the published `8a28f182` build (08:30Z), record `gj-headless-rerun-2026-09-09.json`. GJ-4: the acceptance window was opened under DEC-014 and the flash was refused at admission because the destructive lineage of this target is closed by two 2026-09-07 Jobs still `outcomeUnknown` — section below. |
 
 Every other SVC-AC row keeps the status and the build it was recorded against in
 [`svc-acceptance-2026-09-08-published-main.md`](svc-acceptance-2026-09-08-published-main.md).
@@ -336,7 +336,7 @@ Runtime republishes it as `authorizationState: Offline`, `adoptedTargetId: null`
 product behaved correctly; the runbook sentence describes a state that does not
 occur, and following it literally would make an operator think the step failed.
 
-## GJ-5 Bounded AI Debug Loop — `REAL_DEVICE_PASS` on the candidate build
+## GJ-5 Bounded AI Debug Loop — `REAL_DEVICE_PASS`, first on the candidate build, then on the published Runtime
 
 Executed 2026-09-09 07:56Z–08:01Z with the real DAYU200 (`TGT-958780b2ffb7`,
 `bindingRevision 2`, OpenHarmony-7.0.0.37) through published `arkdeck` leaves
@@ -406,22 +406,99 @@ counts are identical to the 2026-09-02 record's, which is the expected sign of
 a deterministic pipeline over an unchanged source tree, not a copied result:
 every Job id above is new and readable on this host.
 
+### Repeated on the published Runtime
+
+After #1810, #1813 and #1814 merged, the helper pair was rebuilt from protected
+`main` `8a28f182` (CLI `494e2a35…`, daemon `6035adcb…`) and installed at
+`2026-09-09T08:29:37Z` (`runtime service update --daemon`, exit 0; HDC, ArkForge
+lane and ArkTrace descriptor preserved, campaign `""`). On its first start the
+signing preset `preset-3cae17c26b7aca2c2bfba389` resolved `active` without any
+reconciliation, `operation list` read 28 of 30, and the same driver ran the same
+inputs under new execution ids (`gj5-20260909b-*`):
+
+| Hop | Job | Result |
+| --- | --- | --- |
+| repro `debug.hap@1` | `job-88183e9096fcb9338ff006934e5b783f` | succeeded |
+| capture after the window, `crashLogs: true` | `job-8be6bf583f218c7a666352e3ea3e869b` | `STOPPED` / `targetProcessNotRunning`; crash-index 11 entries |
+| `analyzer.extract-crash-signature@1` | `job-a96c77015f647c0d10cd5cfdef8b639c` | `answered` |
+| `workspace.prepare-isolated-copy@1` | `job-2b14340e759ed7e06eb2e2beb0334693` | source revision `701c5bd9…` echoed; isolated `e0d4131e…` |
+| `workspace.apply-patch@1` | `job-ab36c5d64096c16e5eb7c4c1f389b297` | `e0d4131e…` → `e145d393…` |
+| `workspace.build-openharmony@1` | `job-f747e4bba66b9830351225c2bc7c2fc0` | `unsigned.hap` 2 748 896 bytes |
+| `workspace.sign-openharmony-hap@1` | `job-622d66471f0d1ed3097de83266847260` | `signed.hap` 2 816 427 bytes, `b9ff6f88…` |
+| verify `debug.hap@1` | `job-89ffb2fb4f0925a6fa2eeb8461dfe662` | `deployedArtifactSha256 == b9ff6f88…`, `installed true`, firmware `OpenHarmony-7.0.0.37` |
+| liveness after the window | `job-58e350e329b87b7dda9cbfa23572e63c` | **`RUNNING` / `targetProcessRunning`**; crash-index still 11 |
+| negative, stale revision | none | exit 77 `admissionDenied` before Job creation; ledger 41 → 41 |
+
+Same criteria, same outcomes, every Job id new and readable on this host. The
+signed HAP's bytes differ from the morning's only by the signature's timestamp.
+**This is the run that counts for this Task**; the 07:56Z run stays in the
+record as the one that found and cleared the blocker.
+
+## GJ-4 Flash Recovery — `BLOCKED_BY_PRODUCT_DEFECT` (window 08:18Z–08:27Z)
+
+The maintainer gave the go and the window was run exactly as runbook §5 and
+DEC-014 say, on the `8c6a376c` + #1810 build:
+
+| Step | Result |
+| --- | --- |
+| `runtime service update --hdc … --arkforge-bundle … --arktrace-descriptor … --arkforge-campaign gj4-headless-20260909` | exit 0, receipt `campaign: gj4-headless-20260909`; the restart failed twice on the orphaned managed HDC server (`serverDidNotBecomeReady("managed HDC launch could not be bound to its live process identity")`) and launchd's retry brought it up, health `ok` after 30 s |
+| `operation list` | **30 of 30 available** — `flash.dayu200` and `flash.full-restore@1` open under the campaign |
+| `flash device-access` / `flash bootloader-status` / `flash prerequisites` | no Loader observation; `hdcNormal`, `exactBoundTarget`, `bindingRevision 2`; `loader`, `recoveryPath`, `unlocked` `satisfied`, `stablePower` `unknown` |
+| `flash install-binding` | refused `durable binding differs from the only connected Loader; explicit rebind is required`; the existing binding was kept and `--rebind` not used |
+| `artifact import flash-bundle --import-request-id gj4-20260909 --device-profile dayu200` | `committed`, `4fd35765…`, 730 783 514 bytes, `imp-56ab6e97-9a3e-4be3-bd63-f75b84f1d13d`, 08:19:33Z–08:21:04Z |
+| `flash lane-preview --archive-sha256 4fd35765…` | `state available`, `PLAN-4bbbbc06516a54cc6cdbd401`, `planSha256 6508d876…`, `observationMode hdc-normal` |
+| `agent run --operation flash.full-restore@1 --target TGT-958780b2ffb7 --inputs-file gj4.json --execution-id gj4-20260909 --maximum-wait 30m` | **exit 77 `admissionDenied`, `execution stopped before Job creation`**, `state failed`, `jobId null`, `humanAction null`, `outcomeUnknown false` |
+| `runtime service update` without the campaign flag | exit 0, `campaign: ""`, `operation list` back to 28 of 30 |
+| Job ledger | 32 before, 32 after; **the DAYU200 was not written** |
+
+### Why admission refused, read from the Runtime
+
+`capability list` shows the two destructive envelopes this target already
+holds, `CAP-RT-POLICY-13179669…-G1` and `CAP-RT-POLICY-D7876EA9…-G1`, both
+`lineageAllowsNewExecution: false`, `lineageBlocker: "use 1 is outcomeUnknown"`.
+They belong to the two 2026-09-07 `flash.full-restore@1` Jobs
+`job-bf0b748ef707e7e2ca80d8063959e6d1` and `job-c9274a31cb5ba7c8aad61451416af4f4`,
+still `waitingForRecovery` / `outcomeUnknown`. Their Journals say why: `HDC
+reboot-loader exited but the exact bound Loader was not observed
+[hdcExitStatus=0]`, the correlated `arkforged` job terminal remains unknown, and
+every reconciliation since — including `job reconcile` on both today, read-back
+only — ends in `flash.recoveryProofMissing: no correlated complete-plan receipt;
+a model/build readback cannot prove all destructive effects`.
+
+`RuntimeJobEngine`'s automatic destructive policy returns the exhausted
+envelope when a generation's terminal is `outcomeUnknown`, so the store's
+validation fails closed and the execution is refused before any Job exists.
+That is POL-RECOVERY-001 doing its job: a campaign selects the qualification, it
+does not lift an unknown lineage (runbook §5 says so in as many words).
+
+### The defect, and the way out
+
+- **The refusal reason never reaches the operator.** `AgentExecutionCoordinator`
+  maps the engine's `.rejected` — whose message names the blocked lineage — to
+  `failureCode: admissionDenied` and drops the text; the CLI envelope says only
+  `execution stopped before Job creation`, `agent status` and the durable
+  execution record carry no reason, and `agentd.log` writes nothing. An operator
+  has to reconstruct it from `capability list` and two Job Journals, which is
+  what this record did. Owner `TASK-SVC-002` (`AgentExecutionCoordinator.swift`
+  is in its Allowed paths); publishing the reason touches the closed
+  `arkdeck.runtime-agent-execution/1` shape and so needs the `agent.run` /
+  `agent.status` schemas re-derived.
+- **The way out is the recovery path, not another campaign.** The two unknown
+  outcomes can only be superseded by a complete-overwrite recovery that
+  publishes a correlated complete-plan receipt — the protected Flash recovery
+  invocation of CLI spec §7.7 (`recovery flash-invocation start --request-file …`,
+  `evaluate`, `status`; `list` is empty on this host). That is a destructive
+  window of its own with its own decision document and was not attempted here.
+
 ## Still required before this Task can be done
 
-1. **GJ-4.** DEC-014 settles the entry point: the acceptance window is opened
-   by `runtime service update --arkforge-bundle <bundle> --arkforge-campaign
-   gj4-<date>` and closed by the same command without the campaign flag, as
-   runbook §5 already says. The device is ready — `flash device-access` sees
-   no Loader-mode observation, `flash bootloader-status` reads `hdcNormal` /
-   `exactBoundTarget` at `bindingRevision 2`, and `flash prerequisites` reads
-   `loader`, `recoveryPath` and `unlocked` `satisfied` (`stablePower` unknown).
-   The full-restore flash itself is the one destructive action of this
-   acceptance and waits for the maintainer's explicit go.
-2. **GJ-5 on the merged build.** Repeat the driver once #1810 is on `main`
-   and the helper pair is rebuilt from it; the credential and preset above
-   carry over.
-3. **The Windows read-only chain** is not this Task's: it needs a Windows 11
-   x64 host, a signing identity and a DAYU200.
+1. **GJ-4 through the recovery invocation path**, in a window of its own:
+   supersede the two 2026-09-07 unknown outcomes with a complete-overwrite
+   recovery, then the ordinary runbook §5 flash under a named campaign.
+   Everything else for it is in place: DEC-014, the archive import, the lane
+   plan and the device prerequisites above.
+2. Nothing further on GJ-5, which passed on the published Runtime, and nothing
+   further on the preserved incomplete Session.
 
 Nothing further is outstanding on the preserved incomplete Session. It blocks
 `session list`, which is the correct answer to a question about the whole root,
