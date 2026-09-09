@@ -216,6 +216,8 @@ Conventions shared by every task:
   - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`
   - `rust/**`
   - `Packages/ArkDeckKit/LaunchAgents/**`
+  - `Packages/ArkDeckKit/Distribution/macOS/build-local-helpers.sh`（façade/Swift same-release helper packaging only; preserve provisioning and signing checks）
+  - `Packages/ArkDeckKit/Distribution/macOS/build-helpers.sh`（same paired packaging for release; preserve provisioning, signing, notarization and assessment）
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/**`
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/**`（private-socket listener and origin-line → context construction only; the handler and admission code are untouched, r3）
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/XPCConnectionBox.swift`
@@ -231,6 +233,14 @@ Conventions shared by every task:
 - Decision-Grade:D1
 
 ### Deliverables
+
+Packaging scope supplement (2026-09-09, proposed for maintainer review): the two
+existing helper build entry points above currently package only the Swift daemon.
+They need to include the façade/Swift pair before bundle signing so the existing
+local and release commands can produce the required installation artifacts. This
+supplement changes no task status, readiness pin, acceptance criterion, entitlement
+or Runtime authority. The path extension takes effect only after maintainer merge;
+this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run.md`.
 
 - Façade daemon owning the public socket and the Mach service; `runtime service install/update` accepts the façade/Swift binary pair; black-box contract tests parameterised by `ARKDECK_DAEMON_UNDER_TEST`.
 - App transport pairing (r5): the Swift daemon's Mach service listener moves from `NSXPCListener` (`AgentXPCListener.swift:26`) to the raw libxpc frame listener the façade implements, and the App moves from `NSXPCConnection` (`XPCConnectionBox.swift`) to `xpc_connection`, **in the same PR**. The daemon is installed from the App bundle's nested helper (`ArkDeckRuntimeCommands.swift:1258` → `~/Library/Application Support/ArkDeck/Helpers/ArkDeckAgent.app`, receipt with `daemonSHA256`), so the rollback pair is always the updated App and the Swift daemon of the same release; a Swift daemon that still spoke NSXPC would leave that App unable to connect after `runtime service update --daemon <swift>`. A LaunchAgent pointing at a daemon of another release is detected by the receipt/executable identity check and reported as daemon-unavailable with the `runtime service update` remedy, never a silent hang.
