@@ -162,6 +162,13 @@ package actor ArkForgeLaneHost: RuntimeJobEngine.ArkForgeLane {
   /// public endpoint agreeing on the exact same combination.
   private let makeAssessmentSource: @Sendable (String) throws -> any ArkForgeAssessmentSource
   private let authoritySupport: ArkForgeAuthoritySupport.Configuration
+
+  /// The campaign the lane was composed with, or `nil` while hardware-gated.
+  /// Read from the immutable configuration, so it is nonisolated like
+  /// `toolchainSHA256` and the engine's admission can read it without a hop.
+  package nonisolated var hardwareAcceptanceCampaign: String? {
+    authoritySupport.hardwareCampaign.isEmpty ? nil : authoritySupport.hardwareCampaign
+  }
   /// Built from the plan that was actually materialized, not from the job alone.
   ///
   /// The authority signs against the plan digest and the device it approved, and

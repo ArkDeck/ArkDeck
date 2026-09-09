@@ -859,6 +859,11 @@ public actor RuntimeJobEngine {
     /// cancellation or unknown terminal is deliberately absent: neither is a
     /// completed plan and neither may satisfy a recovery verification step.
     func completedPlanReceipt(jobID: String) async -> ArkForgeActionReceiptSummary?
+
+    /// The operator-named hardware acceptance campaign this lane is bound to,
+    /// or `nil` when the lane is hardware-gated (DEC-014). Read by the
+    /// complete-overwrite recovery admission (DEC-016); never a plan input.
+    var hardwareAcceptanceCampaign: String? { get }
   }
 
   private typealias ArkForgeArtifactPrewarmTask = Task<
@@ -1050,6 +1055,7 @@ public actor RuntimeJobEngine {
     let evidence: RuntimeAdmissionEvidence?
     let completeOverwriteRecovery: RuntimeCompleteOverwriteRecoveryContext?
     let recognizedRecoveryEpochID: String?
+    var campaignAuthorizedBeyondBudget: String? = nil
   }
 
   /// The steps `arkforged` performs under a StepPermit rather than ArkDeck
@@ -1846,6 +1852,11 @@ public actor RuntimeJobEngine {
         record.timeline.append(
           "complete-overwrite recovery classified epoch \(recovery.destructiveEpochOrdinal); "
             + "covered intents \(recovery.coveredIntents.count)")
+        if let campaign = preparedAuthorization.campaignAuthorizedBeyondBudget {
+          record.timeline.append(
+            "complete-overwrite recovery admitted after the shared four-hour budget "
+              + "under hardware acceptance campaign \(campaign)")
+        }
       }
       if let epochID = preparedAuthorization.recognizedRecoveryEpochID {
         record.timeline.append(
@@ -8202,7 +8213,8 @@ public actor RuntimeJobEngine {
         recoveryAdmission = try await RuntimeRecoveryService(
           stateDirectory: configuration.stateDirectory,
           capabilityStore: capabilityStore,
-          nowUTC: nowUTC
+          nowUTC: nowUTC,
+          hardwareAcceptanceCampaign: configuration.arkForgeLane?.hardwareAcceptanceCampaign
         ).completeOverwriteAdmission(
           request: request, descriptor: descriptor,
           stableIdentitySHA256: identity, bindingRevision: bindingRevision)
@@ -8269,7 +8281,8 @@ public actor RuntimeJobEngine {
       return PreparedAuthorization(
         reference: authorization, evidence: nil,
         completeOverwriteRecovery: recoveryAdmission.recoveryContext,
-        recognizedRecoveryEpochID: recoveryAdmission.recognizedEpoch?.epochID)
+        recognizedRecoveryEpochID: recoveryAdmission.recognizedEpoch?.epochID,
+        campaignAuthorizedBeyondBudget: recoveryAdmission.campaignAuthorizedBeyondBudget)
     } catch let error as RuntimeCapabilityStoreError {
       throw RuntimeJobEngineError.rejected(
         .authorizationRequired,
@@ -8607,7 +8620,8 @@ public actor RuntimeJobEngine {
       admission = try await RuntimeRecoveryService(
         stateDirectory: configuration.stateDirectory,
         capabilityStore: capabilityStore,
-        nowUTC: nowUTC
+        nowUTC: nowUTC,
+        hardwareAcceptanceCampaign: configuration.arkForgeLane?.hardwareAcceptanceCampaign
       ).completeOverwriteAdmission(
         request: runtime.record.request, descriptor: descriptor,
         stableIdentitySHA256: identity, bindingRevision: bindingRevision)
@@ -10757,6 +10771,12 @@ public actor RuntimeJobEngine {
     ).runtimeBuildVersion
   }
 
+}
+
+extension RuntimeJobEngine.ArkForgeLane {
+  /// A lane that never binds a campaign — every test fake — stays
+  /// hardware-gated, so the recovery admission sees no campaign (DEC-016).
+  package var hardwareAcceptanceCampaign: String? { nil }
 }
 
 extension RuntimeJobEngine.ArkForgeLane {

@@ -24,6 +24,20 @@ enum RuntimeCompleteOverwriteRecoveryError: Error, Equatable, Sendable {
 struct RuntimeCompleteOverwriteAdmissionResult: Equatable, Sendable {
   let recoveryContext: RuntimeCompleteOverwriteRecoveryContext?
   let recognizedEpoch: SupersedingRecoveryEpoch?
+  /// The hardware acceptance campaign that stood in for the shared four-hour
+  /// budget, when the recovery was admitted after it (DEC-016); `nil` when the
+  /// budget itself admitted the recovery, or nothing was recovered.
+  let campaignAuthorizedBeyondBudget: String?
+
+  init(
+    recoveryContext: RuntimeCompleteOverwriteRecoveryContext?,
+    recognizedEpoch: SupersedingRecoveryEpoch?,
+    campaignAuthorizedBeyondBudget: String? = nil
+  ) {
+    self.recoveryContext = recoveryContext
+    self.recognizedEpoch = recognizedEpoch
+    self.campaignAuthorizedBeyondBudget = campaignAuthorizedBeyondBudget
+  }
 
   static let noRecovery = RuntimeCompleteOverwriteAdmissionResult(
     recoveryContext: nil, recognizedEpoch: nil)
@@ -33,15 +47,21 @@ struct RuntimeRecoveryService {
   private let stateDirectory: URL
   private let capabilityStore: RuntimeCapabilityStore?
   private let nowUTC: @Sendable () -> String
+  /// The operator-named hardware acceptance campaign the ArkForge lane is
+  /// bound to, if any (`runtime service update --arkforge-campaign`, DEC-014).
+  private let hardwareAcceptanceCampaign: String?
 
   init(
     stateDirectory: URL,
     capabilityStore: RuntimeCapabilityStore? = nil,
-    nowUTC: @escaping @Sendable () -> String
+    nowUTC: @escaping @Sendable () -> String,
+    hardwareAcceptanceCampaign: String? = nil
   ) {
     self.stateDirectory = stateDirectory
     self.capabilityStore = capabilityStore
     self.nowUTC = nowUTC
+    self.hardwareAcceptanceCampaign =
+      hardwareAcceptanceCampaign.flatMap { $0.isEmpty ? nil : $0 }
   }
 
   /// Resolves target-lane uncertainty without trusting caller text. Existing
@@ -120,11 +140,24 @@ struct RuntimeRecoveryService {
         recoveryContext: nil, recognizedEpoch: epoch)
     }
 
-    guard let now = ISO8601Timestamps.parse(nowUTC()),
-      now.timeIntervalSince(started) < 4 * 60 * 60
-    else {
+    guard let now = ISO8601Timestamps.parse(nowUTC()) else {
       throw RuntimeCompleteOverwriteRecoveryError.blocked(
         "completeOverwriteRecovery.sharedFourHourBudgetExpired")
+    }
+    // The shared four-hour clock bounds an unattended automation invocation
+    // (CHG-2026-056: sixteen serial destructive epochs, four hours, concurrency
+    // one). An operator-named hardware acceptance campaign is not that: the
+    // person who bound it owns the window, and the epoch it admits is still a
+    // complete overwrite of every covered effect under fresh facts, a full plan
+    // and a Runtime capability (DEC-016). Without a campaign an unknown older
+    // than four hours stays exactly where it was.
+    var campaignAuthorizedBeyondBudget: String?
+    if now.timeIntervalSince(started) >= 4 * 60 * 60 {
+      guard let campaign = hardwareAcceptanceCampaign else {
+        throw RuntimeCompleteOverwriteRecoveryError.blocked(
+          "completeOverwriteRecovery.sharedFourHourBudgetExpired")
+      }
+      campaignAuthorizedBeyondBudget = campaign
     }
     let priorEpochs = epochs.filter {
       $0.stableTargetIdentitySHA256 == stableIdentitySHA256
@@ -147,7 +180,8 @@ struct RuntimeRecoveryService {
         coveredEffectSetSHA256: Self.effectDigest(profileContract.coveredEffects),
         profileReference: profile,
         destructiveEpochOrdinal: ordinal),
-      recognizedEpoch: nil)
+      recognizedEpoch: nil,
+      campaignAuthorizedBeyondBudget: campaignAuthorizedBeyondBudget)
   }
 
   private func unresolvedDestructiveIntents(
