@@ -222,19 +222,31 @@ Conventions shared by every task:
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/**`（private-socket listener and origin-line → context construction only; the handler and admission code are untouched, r3）
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/HeadlessHDCServerHost.swift`（managed HDC startup/shutdown lifecycle synchronization and diagnostics needed for paired-daemon restart/rollback only; preserve identity-bound spawn, exact endpoint ownership, fail-closed readiness and all Supervisor admission rules）
   - `ArkDeckAppUITests/AppShell/FacadeRollbackUITests.swift`（read-only Overview/History smoke against the signed façade and same-release Swift rollback; no device mutation or fixture-as-hardware evidence）
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeJobEngine.swift`（read projections only: bounded in-memory reuse of validated decoded persisted records after reading and comparing exact current bytes; preserve all validation, admission, capability and persistence semantics）
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/XPCConnectionBox.swift`
   - `Packages/ArkDeckKit/Sources/ArkDeckCore/AgentXPCContract.swift`
   - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/**`
   - `ArkDeckApp/**`（transport only; no visible copy or navigation change）
   - `docs/design/**`
 - Forbidden paths:
-  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeJobEngine.swift` and any admission/capability/storage source
+  - Any admission/capability/storage source, including `RuntimeJobEngine.swift` outside the read-projection exception above; no changes to mutation callers or the shared persisted-record decoder
   - `ArkDeckApp/ArkDeckApp.entitlements`（the entitlement set must not widen）
 - Risk:medium（production path change with a one-flag rollback）
 - Hardware required:yes（DAYU200 for the GJ-1..5 re-pass）
 - Decision-Grade:D1
 
 ### Deliverables
+
+Read-performance scope supplement (2026-09-09, proposed): release measurements
+found standalone Swift job.status/job.list p95 already approximately 256%/196%
+above SPK-1; sampling identifies repeated persisted-record decoding in read
+projections. Permit a bounded process-local decoded-record cache only for those
+reads: fetch current persisted bytes on every read, reuse only on exact byte
+equality, and retain all row/record validation and fresh projection checks. Cache
+misses use the unchanged decoder; mutation/admission callers remain unchanged.
+Contract tests must cover changed/malformed bytes, eviction and fresh reads.
+This proposal changes no code, task status, readiness pin, SPK-1 baseline or
+AC-5 +20% threshold. The exception takes effect only after maintainer merge.
 
 Acceptance scope supplement (2026-09-09, proposed): the complete implementation
 path probe against protected main `62d5cffd` found two missing paths. Signed
