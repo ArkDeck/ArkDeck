@@ -113,11 +113,17 @@ package struct RuntimeWorkspaceToolchainPinning: Sendable {
 }
 
 package struct RuntimeWorkspaceCredentialPinning: Sendable {
-  package let acquire: @Sendable (_ credentialRef: String, _ presetRef: String) throws -> Void
+  /// `projectRef` is the project the preset being pinned belongs to. A signing
+  /// credential carries its own project binding, and the daemon refuses to
+  /// resolve a preset whose credential names a different one — so the owner has
+  /// to be able to make that comparison here, at registration, rather than
+  /// leaving a preset that can never resolve.
+  package let acquire:
+    @Sendable (_ credentialRef: String, _ presetRef: String, _ projectRef: String) throws -> Void
   package let release: @Sendable (_ credentialRef: String, _ presetRef: String) throws -> Void
 
   package init(
-    acquire: @escaping @Sendable (String, String) throws -> Void,
+    acquire: @escaping @Sendable (String, String, String) throws -> Void,
     release: @escaping @Sendable (String, String) throws -> Void
   ) {
     self.acquire = acquire
@@ -266,6 +272,12 @@ public final class RuntimeWorkspaceProjectStore: @unchecked Sendable {
   private var presetUses: [String: Set<UUID>] = [:]
   private var appliedGenerations: [String: UInt64]
   private var appliedPresetGenerations: [String: UInt64]
+  /// Why a registered preset was not applied at start-up, keyed by presetRef.
+  ///
+  /// Without this the projection cannot tell "registered since the daemon last
+  /// started" from "the daemon tried and refused", and reported both as
+  /// `runtimeRestartRequired` — a remedy the second case can never satisfy.
+  private var presetResolutionFailures: [String: String]
   private let toolchainPinning: RuntimeWorkspaceToolchainPinning?
   private let credentialPinning: RuntimeWorkspaceCredentialPinning?
 
@@ -282,6 +294,7 @@ public final class RuntimeWorkspaceProjectStore: @unchecked Sendable {
     directoryURL = rootURL.appending(path: "workspace-projects", directoryHint: .isDirectory)
     self.appliedGenerations = appliedGenerations
     self.appliedPresetGenerations = appliedPresetGenerations
+    self.presetResolutionFailures = [:]
     self.toolchainPinning = toolchainPinning
     self.credentialPinning = credentialPinning
     self.nowUTC = nowUTC
@@ -299,11 +312,13 @@ public final class RuntimeWorkspaceProjectStore: @unchecked Sendable {
   }
 
   package func markApplied(
-    projects: [String: UInt64], presets: [String: UInt64]
+    projects: [String: UInt64], presets: [String: UInt64],
+    presetResolutionFailures: [String: String] = [:]
   ) {
     processLock.withLock {
       appliedGenerations = projects
       appliedPresetGenerations = presets
+      self.presetResolutionFailures = presetResolutionFailures
     }
   }
 
@@ -924,7 +939,9 @@ public final class RuntimeWorkspaceProjectStore: @unchecked Sendable {
       configurationStatus: record.state == "removed"
         ? "removed"
         : (appliedPresetGenerations[record.presetRef] == record.generation
-          ? "active" : "runtimeRestartRequired"))
+          ? "active"
+          : (presetResolutionFailures[record.presetRef] == nil
+            ? "runtimeRestartRequired" : "unresolved")))
   }
 
   private func requireDependencyOwners(
@@ -968,7 +985,7 @@ public final class RuntimeWorkspaceProjectStore: @unchecked Sendable {
           toolchainRef, toolchainGeneration, pending.presetRef)
       }
       if let credentialRef = pending.credentialRef {
-        try credentialPinning!.acquire(credentialRef, pending.presetRef)
+        try credentialPinning!.acquire(credentialRef, pending.presetRef, proposed.projectRef)
       }
       if let index = next.presets.firstIndex(where: { $0.presetRef == pending.presetRef }) {
         next.presets[index] = proposed

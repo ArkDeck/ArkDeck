@@ -653,7 +653,30 @@ Task.detached {
         }
       })
     let workspaceCredentialPinning = RuntimeWorkspaceCredentialPinning(
-      acquire: { reference, presetRef in
+      acquire: { reference, presetRef, projectRef in
+        // The same binding rule start-up applies below, applied here instead —
+        // a preset whose credential belongs to another project can never
+        // resolve, so registering it only produces a preset that reports a
+        // problem later, in a surface that cannot say what it was.
+        do {
+          // No `owner:` — the preset does not own the credential yet, this is
+          // the call that decides whether it may. No secrets either: the
+          // binding is on the receipt, and reading secrets here would summon a
+          // Keychain prompt to answer a question that does not need one.
+          let credential = try signingCredentialOwner.resolve(
+            reference, requireSecrets: false)
+          guard credential.projectRef == projectRef else {
+            throw RuntimeWorkspaceProjectFailure(
+              "resourceConflict",
+              "signing credential \(reference) is bound to project "
+                + "\(credential.projectRef), not \(projectRef)")
+          }
+        } catch let failure as RuntimeWorkspaceProjectFailure {
+          throw failure
+        } catch {
+          throw RuntimeWorkspaceProjectFailure(
+            "resourceConflict", "signing credential pin could not be validated")
+        }
         do {
           try signingCredentialOwner.acquire(reference, owner: presetRef)
         } catch {
@@ -952,7 +975,8 @@ Task.detached {
       projects: Dictionary(uniqueKeysWithValues: registeredWorkspaceProjects.map {
         ($0.projectRef, $0.generation)
       }),
-      presets: appliedPresetGenerations)
+      presets: appliedPresetGenerations,
+      presetResolutionFailures: workspacePresetResolutionFailures)
     let workspaceReferenceLedger = WorkspaceReferenceLedgerHandle()
     if let evolution = workspaceEvolution {
       workspaceDispatcher = RuntimeOwnedWorkspaceDispatcher(
