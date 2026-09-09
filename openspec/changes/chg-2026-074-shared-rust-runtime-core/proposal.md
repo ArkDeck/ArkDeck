@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-074-shared-rust-runtime-core
-revision: 7
+revision: 8
 status: approved # 维护者 review + merge 本 proposal PR 后才生效；合入前任何 TASK-XPA 不开工，第一个实现 PR 只能在合入后声明
 class: platform
 core_change_level: none
@@ -81,6 +81,47 @@ The pinned design blob in `design.md` is re-pinned in this revision: the section
 row, the section J.3 SPK-2 row, risk R3 in section K, one section L open-items row and the
 notes on items 3 and 6 of section L.1 changed; nothing else.
 
+## Revision 8 — the macOS side first (2026-09-09)
+
+Revision 8 changes no scope, no Requirement, no Acceptance Scenario, no platform disposition, no
+Allowed path and no hardware criterion, and it does not approve r6, r7 or itself; the maintainer's
+merge of this PR is the attestation of the ruling it records. It re-orders the task DAG.
+
+1. **Ruling.** The macOS strangler chain is completed first — `TASK-XPA-003` → 012 → 013 → 014 →
+   015 → 016, then 018 ∥ 019 and 025, then 017 — and GJ-1..5 re-pass headless on the pure Rust
+   daemon (design §J.5 gate G5) before any Windows Golden Journey task starts. Windows is built
+   once, on the final Rust runtime. Reasons: (a) the macOS side carries the differential burden —
+   byte-for-byte parity with the Swift single-v1 durable formats and the real acceptance on the
+   reference host — so shaping the shared `arkdeck-durable`/`arkdeck-runtime`/`provider-*` crates
+   on Windows first, as §J.5 recommended through r7, would let that burden reshape them afterwards
+   and redo the Windows hops on the new shape; (b) the macOS reference host and the DAYU200 are in
+   hand and GJ-1..5 are `REAL_DEVICE_PASS` on the current digest (`TASK-SVC-005` done on
+   2026-09-09), while the Windows chain waits for hosts that do not exist yet, so macOS-first is
+   also the only order that can start today.
+2. **`TASK-XPA-003` is `ready`.** Its dependency is `TASK-XPA-002`'s delivered macOS read-only
+   foundation (#1768, `evidence/xpa-002-readonly-foundation.md`, baseline re-pinned at `main`
+   `a61848f9`), not `TASK-XPA-002`'s Windows acceptance; SPK-2 passed in r7. Its readiness pins are
+   instantiated in this revision; the implementing PR flips it to `in-progress`.
+3. **No macOS task depends on a Windows task.** `TASK-XPA-014` no longer waits for
+   `TASK-XPA-005`: the journal discipline and the SQLite `runtime_job` store are delivered on macOS
+   by `TASK-XPA-014` (lock and atomic-replace primitives earlier by 012/013) against the Swift
+   strict decoders, and `TASK-XPA-005` ports the NTFS primitives (SPK-5) and runs the Windows end
+   to end on the same crates. `TASK-XPA-018`'s continuous dependency is the foundation's Rust CLI;
+   `TASK-XPA-024`'s macOS half waits for `TASK-XPA-019`. The design DAG edge `XPA-005 → XPA-015`
+   is removed.
+4. **The Windows phase starts after `TASK-XPA-017`.** `TASK-XPA-004` and the Windows acceptance
+   of `TASK-XPA-002` (SPK-3, Windows 11 x64 + DAYU200 with a trusted installed daemon and a
+   reviewed Windows HDC tuple) wait for `TASK-XPA-017`; the read-only foundation keeps evolving
+   with the macOS chain and its Windows acceptance runs against the final runtime. `TASK-XPA-002`
+   stays `in-progress` with that acceptance outstanding. SPK-3 is a platform fact and may run
+   whenever a Windows host exists; nothing Windows-side is built on it before G5. XPA-AC-1/3/6, the
+   Windows support tuple, packaging and the Windows conformance rows are unchanged. A Windows host
+   arriving before `TASK-XPA-017` does not by itself re-open the Windows phase; only a further
+   revision can.
+5. **Design re-pin.** Sections A (item 6), G.1 (the walking-skeleton edge), J.2 (DAG edges), J.4
+   (rows 002, 003, 004, 005, 014, 018, 024), J.5 (critical path, parallel groups, current entry,
+   gate order) and L.1 (item 18) changed; nothing else.
+
 ## Governance loop
 
 1. **Why a change is required at all.** `core-portability.md:30` states that introducing a shared
@@ -150,7 +191,8 @@ notes on items 3 and 6 of section L.1 changed; nothing else.
   - macOS: no observable change until each cutover task; each cutover re-passes GJ-1..5 headless on
     the current digest before it ships.
   - Windows: from `NOT_STARTED` to a real `arkdeck doctor` / `device candidates` / `target adopt` /
-    `observe.device@1` / `capture.diagnostics@1` walking skeleton, then GJ-2..5.
+    `observe.device@1` / `capture.diagnostics@1` walking skeleton, then GJ-2..5 — after the macOS
+    side is complete (r8, design §J.5 gate G5).
 
 ## Scope (Requirements / AC)
 
@@ -198,7 +240,8 @@ change and the `Core strategy` value change; (2) Rust dependency policy (vetted 
 zero-dependency); (3) control-plane peer hardening; (4) Golden Journey re-pass rule on runtime
 replacement; (9) Windows support tuple (Windows 11 x64 + ARM64); (10) MSIX packaged + self-contained
 Windows App SDK; (13) ADR-0009 open ruling before recovery is ported; (17) the same-user trust
-boundary statement (r5).
+boundary statement (r5); (18) the macOS-first order, ruled on 2026-09-09 and recorded in r8,
+effective on its merge.
 
 ## Historical revisions 2–5
 

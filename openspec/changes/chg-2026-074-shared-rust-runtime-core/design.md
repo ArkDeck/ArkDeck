@@ -9,8 +9,8 @@ SLO and benchmark plan, task DAG, risk register, maintainer decisions) is:
 
 ```yaml pins
 - path: docs/design/cross-platform/rust-core-cross-platform-architecture.md
-  blob: 070aa0984ca741b344220e15c32447e74d02254a
-  sha256: 833675cd0e67e0d93d161e7ff2bd5c7a24499a0f75c8598bcc5d901598189746
+  blob: fd93c408f99b8cd5126f5fd7b380a3b4c09d706d
+  sha256: 42b1608a2765d88e4512bc86e91660c907e3be53f45ad5bcbf3e98bbe4cd8973
 ```
 
 Later revisions of the design must re-pin here in the same PR; the pinned blob is what the
@@ -28,6 +28,8 @@ facts and revision history remain evidence of the earlier design, not implementa
 Revision 7 re-pins it for the SPK-2 outcome: the section F.2 identity row, the section J.3 SPK-2
 row, risk R3 in section K, one section L open-items row and the notes on items 3 and 6 of section
 L.1 changed; nothing else.
+Revision 8 re-pins it for the macOS-first sequencing: sections A (item 6), G.1, J.2, J.4 (rows
+002, 003, 004, 005, 014, 018, 024), J.5 and L.1 (item 18) changed; nothing else.
 
 The 2026-09-06 design refresh is re-pinned for review against checkout
 `d3d5c32c60cf60c96c64c50f8f1ab52b4d444cfa`. It updates current single-v1 facts,

@@ -1,6 +1,6 @@
 # Verification — CHG-2026-074
 
-> Change:CHG-2026-074-shared-rust-runtime-core@r7
+> Change:CHG-2026-074-shared-rust-runtime-core@r8
 > Status:planned; nothing in this file approves the change, and no host, fixture or simulation
 > result counts as platform or hardware support (POL-VERIFY-001, POL-MODE-001).
 
@@ -13,6 +13,12 @@ post-SVC commit and corpus; SVC-005 remains CHG-2026-075's release acceptance ta
 Revision 7 records the SPK-2 spike result (`evidence/runs/TASK-XPA-003/spk-2-run.md`) and
 changes no acceptance row: the wrongly signed XPC peer refusal of XPA-AC-6 now has host
 evidence from the spike, and the row's acceptance stays with `TASK-XPA-003`.
+
+Revision 8 re-orders the task DAG — the macOS side completes and GJ-1..5 re-pass on the pure Rust
+daemon (gate G5) before any Windows Golden Journey task starts — and changes no acceptance row,
+method, expected result or evidence directory. The Windows rows are attempted after G5; the
+`TASK-XPA-005/` evidence for XPA-AC-1/2/7 records the NTFS port of a durable layer first delivered
+and verified on macOS under `TASK-XPA-012..014/`.
 
 ## Environment
 
