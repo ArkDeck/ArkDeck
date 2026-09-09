@@ -582,6 +582,48 @@ Open question 不得以聊天记忆留存。每项记录默认决策、阻塞范
   状态结案；A3 不再是 SVC-002 的待办。
 - Affected specs：无。
 
+## DEC-016 具名硬件验收 campaign 可在共享四小时预算之后授权 complete-overwrite recovery epoch
+
+- Status：decided（2026-09-09；裁决由维护者作出，效力由维护者 review/merge 本 decision PR
+  构成——merge 即 attestation，V2 治理，先例 DEC-014/DEC-015）
+- Owner：product owner
+- Raised：2026-09-09，TASK-SVC-005 GJ-4 验收窗口：`agent run flash.full-restore@1` 与
+  `recovery flash-invocation evaluate executePinnedRequest` 都在派发前被拒，durable 原文为
+  `non-overridable recovery blocker: completeOverwriteRecovery.sharedFourHourBudgetExpired`。
+  `RuntimeRecoveryService.completeOverwriteAdmission` 找到了 2026-09-07 两条未决 destructive
+  intent（`job-bf0b748e…`、`job-c9274a31…`）、确认本次请求覆盖其全部可能效应，然后因距**首条**
+  unknown 已超过四小时而拒绝建立 complete-overwrite recovery epoch。引擎承认的唯一 supersession
+  是「一次成功的后续完整刷机」，而它同样进不了准入——在该 target 的 binding revision 上形成死锁。
+- Question：操作者按 DEC-014 命名了硬件验收 campaign 时，Runtime 是否仍应以四小时时钟拒绝
+  complete-overwrite recovery？
+- Decision：
+  1. **四小时时钟保护的是无人值守自动化，不是操作者的验收窗口。** CHG-2026-056 把「16 个串行
+     destructive epoch、四小时、并发一」定为自动化 invocation 的硬上限；引擎把同一时钟套在
+     complete-overwrite recovery 上，使超过四小时的 unknown 永远不能被 supersede。当 ArkForge lane
+     绑定了操作者具名的 campaign（`runtime service update --arkforge-campaign`，DEC-014 认定的
+     验收窗口授权），该时钟不再阻断：recovery epoch 照常建立。
+  2. **不放宽任何安全论证。** epoch 仍是覆盖 profile 全部 covered effects 的完整重写，仍要
+     fresh facts、完整 materialized plan、Runtime capability、独立的 recovery lineage 与 durable
+     intent；`sharedEpochBudgetExhausted`（16）、coverage、cancellation、torn journal 等其余阻断全部
+     照旧；campaign 本身被 ArkForge 密封进 plan digest，epoch 的 receipt 因而是 campaign 证据。
+  3. **准入记录写明**：admission 后 Job timeline 追加一行「complete-overwrite recovery admitted
+     after the shared four-hour budget under hardware acceptance campaign <name>」，
+     evidence/记录可复查。
+- 依据：`RuntimeRecoveryService.completeOverwriteAdmission`（四小时 guard 在 `historicalRecovery`
+  之后、epoch 预算之前）；`RuntimeJobEngine.prepareAuthorization` 把 recovery context 编入独立的
+  capability policy fingerprint；`arkforged --hardware-campaign` 帮助文本「The campaign is sealed
+  into every plan digest it produces, so its receipts stay campaign evidence」；
+  `svc-acceptance-2026-09-09-published-main.md` §GJ-4 与 `gj-headless-rerun-2026-09-09.json` 的
+  invocation 记录（`debug-070a56fb…`，`refusedBeforeDispatch`，0 epoch）。
+- Boundary：
+  1. 没有具名 campaign 时行为不变：四小时后仍是 `sharedFourHourBudgetExpired`。
+  2. 自动化 invocation（`recovery flash-invocation`）自己的 16 epoch/四小时/并发一上限不变。
+  3. 不新增 caller 提供的授权字段；campaign 只来自 LaunchAgent 所有者的 `runtime service update`。
+  4. Reopen rule：若出现 campaign 窗口内 recovery epoch 未能 supersede 的实证，收回本裁决。
+- Unblocked by this decision：TASK-AFA-001 实现 `completeOverwriteAdmission` 的 campaign 分支；
+  TASK-SVC-005 的 GJ-4 在该分支合入后按 runbook §5 执行。
+- Affected specs：无 `openspec/specs/**` 变更；CHG-2026-056 的 invocation 上限不动。
+
 ## RISK-001 DAYU200 恢复演练残余风险接受(检查单第 4 项)
 
 - Revision：r2 evidence-owner correction candidate；仅维护者 review/merge 本 PR 后生效
