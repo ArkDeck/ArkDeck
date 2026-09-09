@@ -158,7 +158,8 @@ arkdeck job result --job <job-id> --output json
 zero-candidate discovery 分支——它是唯一能确定性触发的 AgentExecution HAR：
 
 ```text
-# 1. 拔掉设备 USB，确认 candidates 为空
+# 1. 拔掉设备 USB；candidates 不会变空——HDC 保留条目，Runtime 把它重新发布为
+#    authorizationState: Offline / adoptedTargetId: null，HAR 触发的是 device.notObserved
 arkdeck device candidates --output json
 # 2. 不带 --target 启动 execution：Runtime 持久化 physicalConnection（connectDevice）HAR
 arkdeck agent run --operation observe.device@1 \
@@ -402,7 +403,8 @@ arkdeck agent run --operation debug.hap@1 --target <TGT> --inputs-file gj5-verif
 材料（profile 只对样例 bundle 有效），DAYU200 对 waterflowdemo 报 `code:9568329 verify signature
 failed`；可用的是 DevEco 自动签名的 debug profile（device-ids 含本机 UDID）。用
 `runtime signing install --build-profile <DevEco build-profile.json5> --keystore <同一 storeFile>
-… --key-alias debugKey --project-ref demo-app` 免 TTY 安装；换凭据前先 `workspace preset remove`
+… --key-alias debugKey --project-ref <workspace project list 里的注册项目引用>` 免 TTY 安装（凭据绑定的
+`projectRef` 必须等于 signing preset 的项目，否则 preset 投影为 `unresolved`）；换凭据前先 `workspace preset remove`
 掉钉住旧凭据的 signing preset，再 `runtime signing remove`，装完再 `workspace preset register
 --kind signing --credential <新 credential>` 并 `runtime service restart`。
 
