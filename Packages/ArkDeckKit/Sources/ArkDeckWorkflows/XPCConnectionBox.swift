@@ -20,6 +20,7 @@ final class XPCConnectionBox: @unchecked Sendable {
   private var connection: ArkDeckRawXPCObject?
   private var waiting: [Pending] = []
   private var active: Pending?
+  private var healthPending: UUID?
   private var generation = UUID()
 
   func enqueue(token: UUID, live: OSAllocatedUnfairLock<Bool>, frame: Data, health: Data, requestID: String, healthID: String, reply: @escaping Reply) {
@@ -46,6 +47,7 @@ final class XPCConnectionBox: @unchecked Sendable {
     if let connection { xpc_connection_cancel(connection.value) }
     connection = nil
     generation = UUID()
+    healthPending = nil
   }
 
   private func finish(_ result: RuntimeXPCRequestTransport.ResultValue, token: UUID, invalid: Bool = false) {
@@ -81,7 +83,14 @@ final class XPCConnectionBox: @unchecked Sendable {
       connection = peer
       xpc_connection_activate(peer.value)
     }
+    healthPending = request.token
+    queue.asyncAfter(deadline: .now() + 5) { [weak self] in
+      guard let self, self.healthPending == request.token else { return }
+      self.finish(.failure(.unavailable("Runtime did not establish the current transport contract; run runtime service update")),
+        token: request.token, invalid: true)
+    }
     send(request.health, token: request.token) { [self] result in
+      healthPending = nil
       switch result {
       case .failure(let error): finish(.failure(error), token: request.token, invalid: true)
       case .success(let data):

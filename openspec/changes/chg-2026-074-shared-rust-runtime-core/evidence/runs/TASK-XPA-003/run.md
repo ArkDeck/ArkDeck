@@ -260,3 +260,90 @@ for the final working tree. No tests or baselines were weakened.
 
 Maintainer decision remains L.1 item 3: whether release adds the Developer ID
 intermediate certificate requirement. It has not been added unilaterally.
+
+
+## Complete scope survey and continuation after #1829
+
+The revised task instruction requires one complete implementation PR, only after
+all deliverables/acceptance and GJ-1..5 pass; no intermediate implementation PR
+will be published. GJ-4 still requires explicit go immediately before its window.
+
+`scope-probe.json` lists 41 existing/anticipated paths, including both packaging
+entry points, LaunchAgent, Swift private listener, raw XPC server/client,
+contract tests, App transport composition, and Rust modules/tooling. The current
+design extends existing crates; it does not require a new crate. New files under
+`rust/**` are covered by that glob. The base-tree checker found 39 authorized
+paths and two gaps at `62d5cffd`: `HeadlessHDCServerHost.swift` and
+`ArkDeckAppUITests/AppShell/FacadeRollbackUITests.swift`.
+
+Governance PR #1829 (`Scope facade rollback smoke and bounded HDC lifecycle repair`)
+changed only tasks.md (13 added lines). SDD: exit 0, 0 errors/warnings, 121 AC IDs;
+unified documentation gate: exit 0; committed preflight: exit 0 (`none`). The bot
+created an open, non-draft PR; title/body/files were read back, required hosted
+checks passed, and the maintainer merged it as
+`f887851099897f4c0fcf9a31f64b6de7a5553a02`. The implementation was saved in a local
+commit, rebased onto that protected-main commit, and all 41 paths passed the
+base-tree checker again. That local implementation commit has not been pushed.
+
+The second unified implementation run passed the full Swift lanes (2527 parallel
+tests, one serialized process-identity test, five Viewer scale tests) and App
+build-for-testing, then failed at Rust's Python import because jsonschema was
+missing. A temporary venv now has the same CI pins, PyYAML 6.0.3 and jsonschema
+4.26.0; no system Python or dependency declaration changed. The third full gate
+is running with that environment and the subsequent lifecycle change.
+
+`AgentFacadeContractTests.testForwardedSubmitSurvivesFacadeDeathWithoutReplay`
+now uses the actual Swift daemon and durable store in an isolated temporary
+fixture directory. A transport-only barrier holds Swift's committed submit reply;
+the test kills the facade, restarts the normal Swift executable on that same
+store, reads job.status/job.list, and explicitly resubmits the same idempotency
+key. It observed one Job and a deduplicated acceptance of the same Job. The
+forwarded interruption carried no zero-dispatch proof. Focused suite: exit 0,
+three tests. Seed Artifact contents are fixture data; this is host contract
+validation, not hardware acceptance or a device Job run.
+
+Further startup diagnosis found one surviving Bootstrap HDC listener at 8710:
+PID 33562, parent 1, start 2026-09-09 20:22:46 local, executable SHA-256
+`05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83`, exact argv
+`-s 127.0.0.1:8710 -m`. No raw HDC command or process termination was performed.
+The original blanket error was refined to retain the closed exit/capture outcome;
+new attempts reported foreground exit status 0. This does not grant ownership of
+the surviving PID. A narrowly identified manual recovery exception was requested
+because the runbook explicitly forbids manual intervention; it is not assumed.
+
+Code inspection found SIGTERM handling was installed only after startup completed.
+The pending fix installs it before owned children start, cancels and awaits the
+startup task, and then uses the existing drain/child-stop path. Private pairing is
+consumed before composition, so facade death can also signal cleanup during
+startup. No handler, Supervisor admission, capability or identity requirement was
+relaxed. The daemon build passed; a cold-start fixture cancellation test and the
+full gate are being run. The surviving process's exact cause is not proven merely
+by finding this signal-window defect.
+
+## Read-performance scope proposal and current checks
+
+Release comparison (`ipc-release-comparison.json`) failed AC-5; the standalone
+Swift backend already exceeds the original SPK-1 job.status/job.list p95 by
+approximately 256%/196%. Sampling identifies persisted-record decode work in
+read projections. The maintainer authorized a separate minimal scope proposal.
+PR #1830, `Scope bounded persisted-record decoding reuse for read projections`,
+is open and non-draft at `8bfcf1eb`, based on protected main `f8878510`. It changes
+only tasks.md (13 additions, one deletion); no implementation is included.
+SDD (0 errors/warnings, 121 AC IDs), the documentation unified gate, committed
+path preflight and all applicable hosted checks passed. Its scope exception is
+not active until maintainer merge. The original SPK-1 baseline and +20% threshold
+are unchanged; no performance pass is claimed.
+
+The fourth complete implementation gate exited 0: full Swift lanes, App
+build-for-testing, design-system checks, Rust published/candidate contract
+checks, cargo deny and cargo vet (25 fully audited). This includes the startup
+cancellation and vectored-write changes. Six transport fault fixtures and
+workspace clippy also passed. The subsequently added opt-in
+`FacadeRollbackUITests` is being compiled separately and has not run against
+either installed backend. The final committed gate remains required.
+
+The exact identified orphan HDC process did not exit after the separately
+authorized SIGTERM. A SIGKILL exception for that same re-verified identity is
+pending; it has not been assumed. Original daemon restoration therefore still
+does not establish healthy service. No GJ or device dispatch has run in this
+window. The implementation remains local and will not be pushed as a partial PR.

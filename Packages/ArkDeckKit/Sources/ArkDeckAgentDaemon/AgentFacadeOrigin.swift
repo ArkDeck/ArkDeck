@@ -33,10 +33,10 @@ public struct AgentFacadeConfiguration: Sendable {
   }
 
   func authenticates(_ line: Data) -> Bool {
-    guard let object = try? JSONSerialization.jsonObject(with: line) as? [String: Any],
+    guard let object = try? ControlFrameJSON.decodeObject(line, maximumBytes: 1024),
       Set(object.keys) == ["arkdeckPairing", "secret"],
-      object["arkdeckPairing"] as? Int == 1,
-      let provided = object["secret"] as? String,
+      object["arkdeckPairing"] == .integer(1),
+      case .string(let provided)? = object["secret"],
       provided.utf8.count == secret.utf8.count else { return false }
     return zip(provided.utf8, secret.utf8).reduce(UInt8(0)) { $0 | ($1.0 ^ $1.1) } == 0
   }
@@ -48,7 +48,7 @@ struct AgentFacadeOrigin: Sendable {
 
   init?(_ line: Data) {
     guard line.count <= 1024,
-      let fields = try? JSONDecoder().decode([String: JSONValue].self, from: line),
+      let fields = try? ControlFrameJSON.decodeObject(line, maximumBytes: 1024),
       Set(fields.keys) == ["arkdeckOrigin", "transport", "foregroundConsole", "peerEUID", "peerPID", "frameSHA256"],
       fields["arkdeckOrigin"] == .integer(1),
       fields["peerEUID"] == .integer(Int64(geteuid())),
@@ -76,18 +76,40 @@ extension AgentXPCEndpoint {
   /// Transport adapter only: retain the existing App allowlist and one-shot gate.
   /// Both raw XPC and forwarded appXPC use the same response-frame encoding.
   func responseFrame(_ frame: Data) async -> Data {
-    await withCheckedContinuation { continuation in
+    let fields: [String: JSONValue]
+    do { fields = try ControlProtocolContract.requestFields(frame) }
+    catch {
+      let incompatible = (error as? ControlProtocolContract.Failure) == .unsupportedVersion
+        || (error as? ControlProtocolContract.Failure) == .contractMismatch
+      let decoded = try? ControlFrameJSON.decodeObject(frame,
+        maximumBytes: ArkDeckControlProtocol.maximumRequestFrameBytes)
+      let id: String
+      if incompatible, case .string(let value)? = decoded?["id"] { id = value }
+      else { id = "" }
+      return Self.transportRefusal(id: id,
+        code: incompatible ? "unsupportedProtocolVersion" : "malformedFrame")
+    }
+    guard case .string(let id)? = fields["id"], case .string(let method)? = fields["method"] else {
+      return Self.transportRefusal(id: "", code: "malformedFrame")
+    }
+    guard ArkDeckControlProtocol.methods.contains(method) else {
+      return Self.transportRefusal(id: id, code: "unknownMethod")
+    }
+    return await withCheckedContinuation { continuation in
       sendRequestFrame(frame) { response, refusal in
         if let response { continuation.resume(returning: response); return }
-        let id = (try? JSONDecoder().decode(AgentWireProtocol.Request.self, from: frame))?.id ?? ""
-        let value: JSONValue = .object([
-          "id": .string(id), "ok": .bool(false),
-          "error": .object(["code": .string(refusal ?? "malformedFrame"),
-            "message": .string("Runtime transport refused this request")])])
-        var bytes = (try? CanonicalJSONEncoders.canonical().encode(value)) ?? Data()
-        bytes.append(10)
-        continuation.resume(returning: bytes)
+        continuation.resume(returning: Self.transportRefusal(id: id, code: refusal ?? "malformedFrame"))
       }
     }
+  }
+
+  private static func transportRefusal(id: String, code: String) -> Data {
+    let value: JSONValue = .object([
+      "id": .string(id), "ok": .bool(false),
+      "error": .object(["code": .string(code),
+        "message": .string("Runtime transport refused this request")])])
+    var bytes = (try? CanonicalJSONEncoders.canonical().encode(value)) ?? Data()
+    bytes.append(10)
+    return bytes
   }
 }

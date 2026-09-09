@@ -1,6 +1,6 @@
 use crate::{LocalEndpoint, ServerIdentity, VerifiedTool, denied, invalid};
 use std::fs::{self, DirBuilder};
-use std::io::{self, Read, Write};
+use std::io::{self, IoSlice, Read, Write};
 use std::net::SocketAddrV4;
 use std::os::fd::AsRawFd;
 use std::os::unix::fs::{DirBuilderExt, FileTypeExt, MetadataExt, PermissionsExt};
@@ -204,6 +204,9 @@ impl Write for LocalConnection {
     }
     fn flush(&mut self) -> io::Result<()> {
         self.0.flush()
+    }
+    fn write_vectored(&mut self, bytes: &[IoSlice<'_>]) -> io::Result<usize> {
+        self.0.write_vectored(bytes)
     }
 }
 

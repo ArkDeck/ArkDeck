@@ -371,6 +371,16 @@ struct ProductTraceOfflineInspector: RuntimeTraceInspecting {
 // instead of reaching back into main-actor-isolated top-level variables.
 let resolvedStateDirectory = stateDirectory
 let ready = DispatchSemaphore(value: 0)
+// Install signal handling before starting any owned child. A service update
+// can arrive during composition, before the public socket becomes ready.
+signal(SIGINT, SIG_IGN)
+signal(SIGTERM, SIG_IGN)
+let inheritedFacade: AgentFacadeConfiguration?
+do { inheritedFacade = try AgentFacadeConfiguration.inherited() }
+catch {
+  FileHandle.standardError.write(Data("arkdeck-agentd pairing failed: \(error)\n".utf8))
+  exit(1)
+}
 nonisolated(unsafe) var startupFailure: (any Error)?
 nonisolated(unsafe) var startedServer: AgentDaemonServer?
 nonisolated(unsafe) var startedXPCListener: AgentXPCListener?
@@ -380,9 +390,10 @@ nonisolated(unsafe) var startedArkForgeDaemon: ArkForgeLaneComposition.DaemonLif
 // Detached on purpose: the top level is @MainActor-isolated, so a plain
 // `Task { }` would inherit the main actor and deadlock against the
 // semaphore wait below.
-Task.detached {
+let startupTask = Task.detached {
   defer { ready.signal() }
   do {
+    try Task.checkCancellation()
     let capabilityStore = try RuntimeCapabilityStore(
       directoryURL: resolvedStateDirectory.appending(
         path: "capabilities", directoryHint: .isDirectory)
@@ -1455,7 +1466,8 @@ Task.detached {
       debugRuntimeProbe: debugRuntimeProbe,
       debugInvocationController: debugInvocationController,
       workspaceProjects: workspaceProjectPublications)
-    let facade = try AgentFacadeConfiguration.inherited()
+    try Task.checkCancellation()
+    let facade = inheritedFacade
     let server = AgentDaemonServer(
       stateDirectory: resolvedStateDirectory, handler: handler, nowUTC: utcNow, facade: facade)
     switch try server.start() {
@@ -1503,34 +1515,25 @@ Task.detached {
   }
 }
 
-ready.wait()
-
-if let startupFailure {
-  FileHandle.standardError.write(Data("arkdeck-agentd failed to start: \(startupFailure)\n".utf8))
-  exit(1)
-}
-guard let server = startedServer else {
-  // Second instance: the existing one keeps serving.
-  exit(0)
-}
-
-signal(SIGINT, SIG_IGN)
-signal(SIGTERM, SIG_IGN)
 let shutdownLock = NSLock()
-var shutdownStarted = false
+nonisolated(unsafe) var shutdownStarted = false
 let signalSources = [SIGTERM, SIGINT].map { signalNumber -> DispatchSourceSignal in
-  let source = DispatchSource.makeSignalSource(signal: signalNumber, queue: .main)
-  source.setEventHandler {
+  let source = DispatchSource.makeSignalSource(signal: signalNumber, queue: .global(qos: .utility))
+  source.setEventHandler { @Sendable in
     shutdownLock.lock()
     let shouldStart = !shutdownStarted
     shutdownStarted = true
     shutdownLock.unlock()
     guard shouldStart else { return }
+    startupTask.cancel()
     Task.detached {
+      // Cancellation lets an in-progress startup run its existing child cleanup
+      // before the process exits. For a serving daemon this await is immediate.
+      await startupTask.value
       // Do not release the instance lock or terminate while a request still
       // owns a Runtime durability boundary.  The 20-second cap is explicit:
       // an unresponsive client cannot block macOS service shutdown forever.
-      server.drainAndStop(deadline: 20)
+      startedServer?.drainAndStop(deadline: 20)
       startedArkForgeDaemon?.stop()
       startedArkForgeDaemon = nil
       await startedHDCServerHost?.stop()
@@ -1543,7 +1546,7 @@ let signalSources = [SIGTERM, SIGINT].map { signalNumber -> DispatchSourceSignal
   return source
 }
 _ = signalSources
-if ProcessInfo.processInfo.environment["ARKDECK_PRIVATE_SOCKET"] != nil {
+if inheritedFacade != nil {
   // Parent death closes the inherited pairing pipe. Stop through the ordinary
   // drain path; no request is replayed and no durable state is rewritten here.
   Thread.detachNewThread {
@@ -1552,4 +1555,15 @@ if ProcessInfo.processInfo.environment["ARKDECK_PRIVATE_SOCKET"] != nil {
     kill(getpid(), SIGTERM)
   }
 }
+ready.wait()
+
+if let startupFailure {
+  FileHandle.standardError.write(Data("arkdeck-agentd failed to start: \(startupFailure)\n".utf8))
+  exit(1)
+}
+guard startedServer != nil else {
+  // Second instance: the existing one keeps serving.
+  exit(0)
+}
+
 dispatchMain()

@@ -169,5 +169,10 @@
       "path": "rust/scripts/test-macos-facade.py",
       "authorized": true
     }
-  ]
+  ],
+  "recheck": {
+    "base": "f887851099897f4c0fcf9a31f64b6de7a5553a02",
+    "allPathsAuthorized": true,
+    "governancePR": 1829
+  }
 }

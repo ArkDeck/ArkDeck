@@ -10,7 +10,7 @@ use arkdeck_platform::{
 use serde_json::json;
 use std::{
     fs,
-    io::{self, BufReader, Write},
+    io::{self, BufReader, IoSlice, Write},
     os::unix::fs::DirBuilderExt,
     path::PathBuf,
     process::{Command, Stdio},
@@ -101,9 +101,22 @@ fn exchange(
     let origin = encode_frame(&origin, 1024).map_err(io::Error::other)?;
     // A partial write is already an ambiguous interruption. No error produced
     // below carries details.phase/newDispatchCount, and no request is retried.
-    reader.get_mut().write_all(&origin)?;
-    reader.get_mut().write_all(frame)?;
-    reader.get_mut().write_all(b"\n")?;
+    // One vectored write avoids waking Swift for an origin whose frame has
+    // not arrived yet. Partial writes advance only over bytes already sent.
+    let mut slices = [
+        IoSlice::new(&origin),
+        IoSlice::new(frame),
+        IoSlice::new(b"\n"),
+    ];
+    let mut remaining = &mut slices[..];
+    while !remaining.is_empty() {
+        match reader.get_mut().write_vectored(remaining) {
+            Ok(0) => return Err(io::Error::from(io::ErrorKind::WriteZero)),
+            Ok(count) => IoSlice::advance_slices(&mut remaining, count),
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+            Err(error) => return Err(error),
+        }
+    }
     let mut response = read_frame(reader, MAX_RESPONSE_BYTES)?;
     // Do not parse, normalize, cache or rewrite the authority's response bytes.
     response.push(b'\n');
