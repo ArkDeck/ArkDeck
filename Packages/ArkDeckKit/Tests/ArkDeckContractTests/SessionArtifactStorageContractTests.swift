@@ -1139,6 +1139,61 @@ final class SessionArtifactStorageContractTests: XCTestCase {
     _ = try SessionManifestDocument(data: exported)
   }
 
+  /// Not every argument the validator constrains has a redaction that could
+  /// satisfy it. A closed constant has exactly one legal value, so no
+  /// replacement is correct — and the device-identifier set really can collide
+  /// with one. On the reference host `originalTarget.identitySnapshot` carries
+  /// `providerId: "workspace"`, a nine-byte ordinary word, and the substring
+  /// matcher fires at four bytes, so a provider name or a path component is
+  /// enough to rewrite an unrelated field.
+  ///
+  /// What must not happen is a corrupted export that reads as a success. The
+  /// export refuses, before it has touched the destination, and names the
+  /// argument it could not redact — which is what `session export apply` then
+  /// reports as a confirmed refusal rather than an unknown outcome.
+  func testDiagnosticExportRefusesAnArgumentItCannotRedactSafely() async throws {
+    let fixture = try await makeSession(
+      sessionID: "session-export-unredactable", jobID: "job-export-unredactable")
+    defer { try? FileManager.default.removeItem(at: fixture.base) }
+    // The provider name is the device identity, exactly as the host records it.
+    let identity = "remote"
+    let step = try executionStep(
+      id: "approved-read", kind: "runApprovedRemoteRead", effect: "readOnly",
+      cancellation: "immediate", bindingRequirement: "confirmedDevice",
+      arguments: [
+        // A closed constant whose only legal value contains the identity.
+        "catalogId": .string("arkdeck-remote-operations"),
+        "actionId": .string("deviceSummary"),
+        "parameters": .object([:]),
+        "artifactId": .string("artifact-approved-read"),
+      ],
+      disposition: "executed", outcomeCertainty: "confirmed", semanticResult: "succeeded")
+    let manifest = try SessionManifestDocument(
+      data: SessionStorageFixtures.manifest(
+        sessionID: fixture.layout.sessionID, jobID: fixture.layout.jobID,
+        executionMode: "execute", executionAuthority: "interactiveUser",
+        steps: [step], artifacts: [], realConnectKey: identity,
+        realIdentitySnapshot: .object(["providerId": .string(identity)])))
+    try manifest.canonicalData.write(to: fixture.layout.manifestURL)
+    let (_, exportClaim) = try await admittedClaim(
+      claimID: "claim-export-unredactable", jobID: fixture.layout.jobID,
+      layout: fixture.layout, writer: .heavy)
+    let destination = fixture.base.appending(path: "unredactable-export")
+
+    XCTAssertThrowsError(
+      try SessionDiagnosticExporter().export(
+        layout: fixture.layout, artifacts: [], claim: exportClaim, to: destination,
+        deviceIdentifierPolicy: .redact)
+    ) { error in
+      XCTAssertTrue(
+        "\(error)".contains("catalogId"),
+        "the refusal must name the argument it could not redact: \(error)")
+    }
+    XCTAssertFalse(
+      FileManager.default.fileExists(atPath: destination.path),
+      "a refusal raised before publication must leave no destination")
+  }
+
   func testDiagnosticExportRejectsForeignSessionManifest() async throws {
     let fixture = try await makeSession(
       sessionID: "session-export-foreign", jobID: "job-export-foreign")
