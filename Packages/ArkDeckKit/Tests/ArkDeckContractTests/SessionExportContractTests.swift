@@ -282,10 +282,14 @@ final class SessionExportContractTests: XCTestCase {
     XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
   }
 
-  /// An unclassified failure still becomes `outcomeUnknown`, because the
-  /// exporter may already have created the destination — but it has to name
-  /// what failed, or the instruction to inspect the destination is unusable.
-  func testApplyNamesAnUnclassifiedCauseInsteadOfTheBareSentence() throws {
+  /// An unclassified failure raised before the destination was replaced is a
+  /// confirmed refusal, not an unknown outcome. The exporter stages into a
+  /// private directory and replaces the destination in one step at the end, so
+  /// a failure before that step provably wrote nothing — telling the caller to
+  /// inspect a destination that was never created is wrong, and it has to name
+  /// the cause. `outcomeUnknown` is reserved for the window where a partial
+  /// publication is really possible.
+  func testApplyReportsAPrePublicationFailureAsAConfirmedRefusal() throws {
     let storage = try store(
       faultInjector: SessionStorageFaultInjector { point in
         if point == .exportBeforeReplace { throw FixtureFailure.io }
@@ -301,22 +305,62 @@ final class SessionExportContractTests: XCTestCase {
       try storage.applySessionExport(previewID: previewID, previewDigest: previewDigest)
     ) { error in
       let failure = error as? RuntimeSessionStorageFailure
-      XCTAssertEqual(failure?.code, "outcomeUnknown")
+      XCTAssertEqual(failure?.code, "recordUnreadable")
       XCTAssertTrue(
+        failure?.message.contains("was not created") == true, failure?.message ?? "-")
+      XCTAssertFalse(
         failure?.message.contains("requires destination inspection") == true,
-        failure?.message ?? "-")
+        "nothing was written, so there is nothing to inspect")
       XCTAssertNotEqual(
-        failure?.message, "Session export outcome requires destination inspection",
+        failure?.message, "Session export was refused before publication",
         "the cause must be named, not replaced by the bare sentence")
     }
     XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
   }
 
+  /// A refusal that published nothing must not consume the preview. On the
+  /// reference host three previews were left stranded in `applying` by attempts
+  /// that never touched a destination, so every retry needed an identical new
+  /// preview. Fixing the cause has to be enough.
+  func testAPrePublicationRefusalLeavesThePreviewUsable() throws {
+    // The first attempt is refused; the second finds the cause gone.
+    let attempts = Counter()
+    let storage = try store(
+      faultInjector: SessionStorageFaultInjector { point in
+        if point == .exportBeforeReplace, attempts.increment() == 1 { throw FixtureFailure.io }
+      })
+    _ = try finalizedSession(id: "session-retry", timestamp: "2026-08-09T00:00:00Z")
+    let destination = exportsRoot.appending(path: "retry-copy", directoryHint: .isDirectory)
+    let preview = try object(
+      storage.previewSessionExport(
+        sessionID: "session-retry", destinationPath: destination.path, allowSensitive: false))
+    let (previewID, previewDigest) = try tuple(preview)
+
+    XCTAssertThrowsError(
+      try storage.applySessionExport(previewID: previewID, previewDigest: previewDigest)
+    ) { error in
+      XCTAssertEqual((error as? RuntimeSessionStorageFailure)?.code, "recordUnreadable")
+    }
+    XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
+
+    let result = try object(
+      storage.applySessionExport(previewID: previewID, previewDigest: previewDigest))
+    guard case .string(let exportedPath)? = result["exportedPath"] else {
+      return XCTFail("the same preview must apply once the cause is gone")
+    }
+    XCTAssertEqual(exportedPath, destination.standardizedFileURL.path)
+    XCTAssertEqual(attempts.value, 2, "the retry must reach the exporter, not a cached result")
+    XCTAssertTrue(FileManager.default.fileExists(atPath: destination.path))
+  }
+
+  /// After the destination has been replaced a partial publication is really
+  /// possible, so the outcome is unknown and the preview stays spent — a retry
+  /// must never publish a second time.
   func testFaultAfterApplyingBecomesOutcomeUnknownAndNeverReplays() throws {
     let attempts = Counter()
     let storage = try store(
       faultInjector: SessionStorageFaultInjector { point in
-        if point == .exportBeforeReplace {
+        if point == .exportAfterReplace {
           _ = attempts.increment()
           throw FixtureFailure.io
         }

@@ -488,7 +488,8 @@ package struct SessionDiagnosticExporter: Sendable {
     claim: StorageClaim,
     to destination: URL,
     includeDeviceData: Bool = false,
-    deviceIdentifierPolicy: SessionExportDeviceIdentifierPolicy = .redact
+    deviceIdentifierPolicy: SessionExportDeviceIdentifierPolicy = .redact,
+    willReplaceDestination: () -> Void = {}
   ) throws -> MaterializedSessionExport {
     do {
       try DurableFilePrimitives.requireAbsoluteFileURL(destination)
@@ -705,6 +706,10 @@ package struct SessionDiagnosticExporter: Sendable {
         try requireClaimVolume(claim, descriptor: staging.parentDescriptor)
         try requireClaimVolume(claim, descriptor: staging.descriptor)
         try faultInjector.check(.exportBeforeReplace)
+        // Everything above this line stages into a private directory and leaves
+        // the destination alone, so a caller that has not been told this much
+        // can report a refusal as a confirmed one. From here it cannot.
+        willReplaceDestination()
         try staging.publish()
         try faultInjector.check(.exportAfterReplace)
         try staging.validatePublishedBinding()

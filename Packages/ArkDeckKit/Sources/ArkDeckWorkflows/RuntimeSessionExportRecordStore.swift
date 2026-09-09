@@ -137,6 +137,26 @@ package final class RuntimeSessionExportRecordStore: @unchecked Sendable {
     return updated
   }
 
+  /// Return a preview to `ready` after an attempt that provably published
+  /// nothing.
+  ///
+  /// `markApplying` is the point of no return for an outcome that cannot be
+  /// told apart from a partial publication, and it must stay that way. It is
+  /// not the right answer for a refusal raised before the exporter began
+  /// replacing the destination: nothing was written, the cause is known, and
+  /// burning the preview only forces the caller to build an identical one.
+  /// The caller must have proof of non-publication before calling this.
+  package func markRefusedBeforePublication(_ record: Record) throws -> Record {
+    guard record.state == .applying, record.result == .null else {
+      throw RuntimeSessionStorageFailure(
+        "recordUnreadable", "Session export refusal transition is invalid")
+    }
+    var updated = record
+    updated.state = .ready
+    try save(updated)
+    return updated
+  }
+
   package func markApplied(_ record: Record, result: JSONValue) throws -> Record {
     guard record.state == .applying, record.result == .null else {
       throw RuntimeSessionStorageFailure(
