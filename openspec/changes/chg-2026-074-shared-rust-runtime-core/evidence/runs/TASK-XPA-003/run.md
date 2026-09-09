@@ -405,3 +405,233 @@ forwarding and continued same-uid service. Compilation succeeded, but macOS
 authentication did not complete within 120 seconds (exit 1/TimeoutExpired). The
 fixture was cleaned up; AC-6 foreign-euid rejection is NOT passed. This test
 does not signal the installed HDC process or alter Runtime state.
+
+## Current local checkpoint (not implementation delivery)
+
+Protected base: `fc8263bdd36893383346ef170b309a4e175568ed`. Local source commit:
+`0eb8a45c42dc8c64fb25f21e6daf09050534d5ab`. No implementation branch push or
+implementation PR has occurred. The complete 46-path probe and committed
+preflight pass for TASK-XPA-003.
+
+The fifth unified gate on that commit exited 0: common/SDD checks, design-system
+checks, full Swift lanes (2534 selected parallel cases plus serialized identity
+and Viewer-scale lanes), App build-for-testing, Rust published/candidate
+contracts, cargo deny, and cargo vet (25 fully audited). Optional external cases
+are validated separately with their required environment variables. The latest
+release Swift and facade each passed the identical external single-v1 subset
+(exit 0, one case per backend). This final checkpoint text was added after that
+gate; it does not change the tested source.
+
+The signed App/UI-test build was refreshed at the same source commit and passed
+(exit 0) through the UI wrapper's build-only mode. The r6 signed helper build
+also passed, including strict signature verification, and is retained at
+`/private/tmp/xpa003-signed-helpers-r6`. It has not been installed. Its executable
+SHA-256 values are:
+
+- cli: `c75ca1ceb8fbb91d1b6af581f66d41c9e4a0b2f3efc6695f9902ef13e9bf9b63`
+- facade: `a46120dddaaf7ab4906ae846f99335de0471c329b8d5ed48eacf906a7ab7ace2`
+- pairedSwift: `abb37651e945c5c7d294b852ac5452a7df01621b0f3b2bc568cf36189a5fa013`
+- rollbackSwift: `65d8e45fb903cb2021b88124390fcf561980414b48f888e7064ee05c88989767`
+
+A fresh service status identified the earlier diagnostic Swift rollback
+(`19839d9…`) as still installed. The authorized temporary-test cleanup has now
+restored the original main-6e8c3ed5 helper again via `runtime service update`
+(exit 0). Readback confirms SHA-256
+`02d685a01a51c36dfc69a751aa4bdc7c38b5ab9971c032aba44cbb64f216392b`,
+installed=true and loaded=true, but ready=false/socketPresent=false. The same
+PID 33562 (parent 1, UID 501, start 2026-09-09 20:22:46) still listens on
+127.0.0.1:8710. No SIGKILL was sent; the exact-process exception remains pending.
+Restoring the original binary is not a service-health pass.
+
+Remaining TASK-XPA-003 acceptance: stable AC-5 within +20% for every facade row;
+foreign-euid OS-authenticated test; live signed XPC peer-negative and release
+mismatch checks; live App Overview/History rollback and headless drill; and
+GJ-1..5. All five GJs remain NOT_STARTED, with zero device dispatch in this
+window. GJ-4 has no go and no campaign window was opened. L.1 item 3 remains a
+maintainer decision; no Developer ID intermediate-certificate clause was added.
+
+
+## Maintainer decisions and resumed installed acceptance
+
+The maintainer accepted the four proposed decisions: identity-rechecked SIGKILL
+of the specific orphan HDC process, retry of the OS-authenticated foreign-euid
+probe, retaining the +20% per-row performance gate, and retaining the SPK-2
+anchor/team/identifier requirement without an extra Developer ID intermediate
+clause. L.1 item 3 is therefore resolved for this implementation.
+
+The exact orphan UID, birth time, executable arguments and SHA-256 were rechecked
+before SIGKILL. Original helper service health then returned ready with a public
+socket. The OS-authenticated foreign-euid fixture passed: root connected but was
+denied, zero frames were forwarded, and the same-UID client remained served.
+This is host transport evidence, not hardware evidence.
+
+The r6 signed facade pair was installed through `runtime service update`; status
+confirmed ready and facade SHA-256
+`a46120dddaaf7ab4906ae846f99335de0471c329b8d5ed48eacf906a7ab7ace2`.
+The fresh signed raw-XPC probe passed four live contract cases (health, forged
+public origin rejection, and appXPC job.run/job.cancel denials). The wrong App
+identifier and ad-hoc signature were rejected with zero completed requests;
+a wrong server version was rejected as Peer Forbidden. The correctly signed
+client completed all eleven health requests. Raw local outputs are
+`/tmp/xpa003-r6-xpc-contract.json` and `/tmp/xpa003-r6-xpc-security.json`.
+
+Deep doctor exited 0: ready=true, zero blockers, current Catalog digest
+`508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684`,
+28/30 operations available with the hardware campaign closed. Warnings concern
+two gated operations and the pre-existing unpublished Session output owner.
+App smoke, same-release rollback, stable IPC and GJ reruns remain in progress.
+
+
+### r6 headless device progress and App startup limitation
+
+Raw outputs are under `/private/tmp/xpa003-gj-20260909/`. GJ-1 observe
+`job-57778758636d39059197893ac5ededac` and device-level diagnostics
+`job-cdb2c3027f13febb2734ba41d29d3556` succeeded, with no unknown/blocker.
+All nine published artifacts were read in full and SHA-256 matched. HiLog is
+593170 bytes and UI Dump 1489 bytes; capture completeness is complete with no
+missing required artifacts. Restart persistence and physical HAR remain pending.
+
+GJ-2 `job-926c285a066a01f983715e1aff752c01` succeeded with no unknown/blocker
+and zero residue. The current Catalog's debug.hap captures HiLog only; compatible
+composition uses the existing capture.diagnostics operation for the runbook's
+UI Dump/Trace legs. The retained app installation used GJ-3 preflight Job
+`job-42c140aba1b99dc0aa42d429dcfccc44`. App-scoped capture
+`job-b0670f13d7b68ef633cafd4e027350b8` succeeded: HiLog 645294 bytes, UI Dump
+1590 bytes, Trace 10623 bytes, all read and digest checked. Capture summary is
+complete, with no missing required artifact. No Catalog/Provider change was made.
+
+GJ-3 positive `job-f9d67b75275f379bc0dc6ca80ed20d60` succeeded. The fixed signed
+rollback fixture SHA-256 is
+`260a533ae2b02e23810aa5ab6ea9c1a5cf4524b19484ede66cb4dc0b7bb86d3a`, matching
+the earlier fixture. Negative Job `job-e03ee1e514da224c9d48a8ceba5f9b84` failed
+at start-target after atomic publication. Its typed job.show timeline explicitly
+verifies rollback-native-library [processIds, restored, restoredSha256], then
+verifies compensation cleanup. outcomeUnknown=false, outstandingResidueCount=0.
+The agent evidence projection retains artifactIntegrityFailed and CLI exits 2;
+this is recorded without relabeling the failed Job or inventing an artifact.
+
+Signed App smoke failed twice before establishing the test-runner connection;
+no test assertion ran. Initial runner sample was blocked in _libsecinit_appsandbox.
+The retry used the required TEST_RUNNER_ parameter prefix and the same wrapper.
+Results: `/tmp/xpa003-r6-facade-ui.log`,
+`/tmp/xpa003-r6-facade-ui-retry.log`; xcresults are in
+`/private/tmp/xpa003-ui-derived/Logs/Test/`. Host permission information has been
+requested from the maintainer; the one bootstrap retry is exhausted.
+
+
+### AC-5 quiet-host pass and standalone Swift rollback
+
+The complete six-run Release instrument exited 0. The median facade p95 rows
+are health 0.132959 ms (+18.6689%), job.list 12.626667 ms (-3.0446%), and
+job.status 0.337667 ms (-7.7727%). All three meet the unchanged +20% gate and
+SPK-1's unchanged 30% p95-spread criterion. Each row has 1000 samples per run;
+page size is 50 with exactly 30 seeded Jobs. The run and raw-sample hash are
+retained as quietHostFollowUp in ipc-release-comparison.json; previous failures
+remain intact. No further transport optimization was introduced for this pass.
+Raw output: `/tmp/xpa003-release-ipc-quiet-r6.json`; log exit 0.
+
+Standalone same-release Swift rollback via runtime service update exited 0,
+ready=true, diagnostics empty, daemon SHA-256
+`65d8e45fb903cb2021b88124390fcf561980414b48f888e7064ee05c88989767`.
+The same signed real-XPC four-case contract probe passed. Updated CLI job.show
+and job.result for both GJ-1 Jobs succeeded after this daemon restart, preserving
+their original evidence. The App presentation portion remains unexecuted because
+of the host runner startup failure described above.
+
+
+### Completed device legs and GJ-5 refusal-proof gap
+
+GJ-2 and GJ-3 now have complete composed headless results recorded in
+`docs/design/references/single-v1/gj-headless-rerun-2026-09-09-xpa003.json`.
+Post-rollback diagnostics Job `job-4a567048cd0c07668c00b6ac27330e51` confirms
+HEALTHY/targetProcessRunning; every published artifact was read and hashed.
+Final typed debug.hap Job `job-107aa51a31ba79b48c113a591a21a222` stopped and
+uninstalled the retained test application and cleaned staging. This existing
+operation also performs its ordinary install path; no raw cleanup command was used.
+
+GJ-5 reproduced exactly one additional crash (index 6 -> 7), obtained an answered
+signature, applied the fixed patch to an isolated workspace, built/signed/deployed
+matching bytes, then observed HEALTHY with the index still 7. All positive Jobs
+succeeded without unknown outcomes. The initial driver read the analyzer's status
+from the wrong level; inspection found result.status=answered, and continuation
+started from completed analysis without repeating deployment, capture or analysis.
+
+The stale-revision negative exited 77/admissionDenied with the complete 62-Job
+sets equal, but the error contains no phase/newDispatchCount proof and loses the
+specific refusal reason. Source inspection confirms the .rejected branch in
+AgentExecutionCoordinator.drive commits failed/admissionDenied and returns only
+the execution projection after acceptedJobForAgent returns nil. GJ-5 remains
+BLOCKED_BY_PRODUCT_DEFECT until this published headless refusal path preserves
+its owner proof; ledger equality alone is not counted as acceptance.
+
+Scope PR #1831 (single tasks.md, fb807ccc) requests only that refusal projection
+repair. SDD, the unified local gate and path preflight passed before push; the
+bot-created PR is open and ready for review. No production source outside the
+existing Allowed paths has been changed. An allowed-path regression test
+reproduces the three missing assertions (reason, phase, zero-dispatch count);
+the paired post-admission interruption test passes and confirms no fabricated
+proof. Full implementation completion remains pending, not a partial PR.
+
+Restoring the UI runner's default ad-hoc signature did not resolve its startup
+hang; that run also failed before assertions after 353.8 seconds. The signed App
+and its entitlements were untouched. Raw log:
+`/tmp/xpa003-r6-swift-ui-adhoc-runner.log`. The r6 facade pair is again installed
+and healthy. GJ-1 physical HAR and GJ-4 separate GO are requested; no flash campaign
+has been opened. The 730783514-byte archive matches its required SHA-256.
+
+
+### Waiting checkpoint
+
+PR #1831 exact-head CI is green (fb807ccc4d9fc13e41509b64e65c05aa5c338eeb),
+with maintainer review still required. Updated acceptance records pass SDD and
+diff whitespace checks. The newly added refusal-proof regression intentionally
+fails before the scoped fix; the interrupted-admission receipt test passes.
+No complete implementation PR has been published and TASK-XPA-003 stays in progress.
+
+While awaiting maintainer and physical actions, the original protected-main
+6e8c3ed5 helper was restored through runtime service update. Fresh status:
+ready=true, loaded=true, socketPresent=true, diagnostics=[], health=ok, daemon
+SHA-256 `02d685a01a51c36dfc69a751aa4bdc7c38b5ab9971c032aba44cbb64f216392b`.
+The flash campaign remains closed. Local status file:
+`/tmp/xpa003-original-restored-after-acceptance-status.json`.
+
+
+### Refusal proof repair after scope approval (r7)
+
+Maintainer merged PR #1831 as `d4e68f2e74b5f94f1791d2c57aaca5871f766fd6`.
+The implementation branch now includes that approval. The scoped Coordinator
+repair keeps the existing terminal commit and no-accepted-Job check, then forwards
+the original typed refusal reason with the owner's preAdmission/zero-dispatch
+proof. Admission, dispatch, retries and persistence formats are unchanged.
+
+All 29 RuntimeAgentExecutionContractTests pass, including the regression that
+failed before repair and the post-admission interruption case that must not claim
+zero dispatch. Log: `/private/tmp/xpa003-refusal-proof-after-fix.log`.
+
+The signed r7 facade/Swift pair was temporarily installed using the typed service
+update. The existing GJ-5 isolated workspace was submitted once with its stale
+revision under fresh execution `gj5-xpa003-20260909-patch-stale-r7`. Result: exit 77,
+admissionDenied, original workspace.revisionConflict reason, phase=preAdmission,
+newDispatchCount=0. Complete before/after ledgers are equal (62 Jobs), and durable
+readback is failed/admissionDenied, jobId=null, outcomeUnknown=false. Local raw
+outputs: `/private/tmp/xpa003-gj-20260909/gj5/refusal-r7/`. The positive GJ-5 chain
+remains the r6 run; only the affected refusal path was rerun. The same published
+Catalog digest applies. GJ-5 is now REAL_DEVICE_PASS; prior failure is retained in
+the metadata as previousNegative/resolvedBlocker.
+
+The original protected-main 6e8c3ed5 Runtime was restored after this test. Status is
+ready=true, loaded=true, diagnostics=[]; the new terminal execution remains
+readable after restoration. GJ-1 physical HAR, GJ-4 separate GO and the host UI
+runner startup issue remain outstanding. No flash campaign or device dispatch was
+introduced by this refusal retest.
+
+
+Final local validation (2026-09-10): the complete 38-file diff passes the unified
+CI planner (exit 0), including common checks, full Swift tests, App
+build-for-testing, Rust tests/contracts and dependency audit. Log:
+`/private/tmp/xpa003-r7-unified-gate-final.log`. Run with the existing
+`/private/tmp/xpa003-ci-venv` on PATH and ARKDECK_PYTHON set to its interpreter.
+Two earlier invocations reached the Rust Python checks but failed because their
+interpreters lacked jsonschema; the final invocation used verified dependencies.
+UI assertions remain unexecuted because of the previously recorded runner startup
+failure, and are not implied by the successful App build.

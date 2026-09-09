@@ -701,5 +701,192 @@
     },
     "rawSamplesSHA256": "edfeb5f3888cfc9e4f394e7f79c61f48db5d080e091a3b58aff5808877914d30",
     "result": "FAILED_AC_5"
-  }
+  },
+  "quietHostFollowUp": {
+    "schemaVersion": "xpa003-ipc-comparison/1",
+    "buildConfiguration": "release",
+    "hardwareEvidence": false,
+    "samplesPerRow": 1000,
+    "runsPerBackend": 3,
+    "pageSize": 50,
+    "backends": {
+      "swift": {
+        "runs": [
+          {
+            "loadAverage": 1.83154296875,
+            "jobCount": 30,
+            "rows": {
+              "ipc.health": {
+                "p95ms": 0.10599999222904444,
+                "sampleCount": 1000
+              },
+              "ipc.jobList": {
+                "p95ms": 12.09845906123519,
+                "sampleCount": 1000
+              },
+              "ipc.jobStatus": {
+                "p95ms": 0.2874169731512666,
+                "sampleCount": 1000
+              }
+            }
+          },
+          {
+            "loadAverage": 1.7822265625,
+            "jobCount": 30,
+            "rows": {
+              "ipc.health": {
+                "p95ms": 0.1075830077752471,
+                "sampleCount": 1000
+              },
+              "ipc.jobList": {
+                "p95ms": 12.589458958245814,
+                "sampleCount": 1000
+              },
+              "ipc.jobStatus": {
+                "p95ms": 0.2947920002043247,
+                "sampleCount": 1000
+              }
+            }
+          },
+          {
+            "loadAverage": 1.78076171875,
+            "jobCount": 30,
+            "rows": {
+              "ipc.health": {
+                "p95ms": 0.1052080187946558,
+                "sampleCount": 1000
+              },
+              "ipc.jobList": {
+                "p95ms": 12.630874989554286,
+                "sampleCount": 1000
+              },
+              "ipc.jobStatus": {
+                "p95ms": 0.29329105746001005,
+                "sampleCount": 1000
+              }
+            }
+          }
+        ],
+        "comparison": {
+          "ipc.health": {
+            "p95ms": 0.10599999222904444,
+            "spk1P95ms": 0.11204194743186235,
+            "p95SpreadRatio": 0.022405558063244277,
+            "stable": true,
+            "increasePercent": -5.392583172023402,
+            "passes20Percent": true
+          },
+          "ipc.jobList": {
+            "p95ms": 12.589458958245814,
+            "spk1P95ms": 13.023165985941887,
+            "p95SpreadRatio": 0.04229061233567754,
+            "stable": true,
+            "increasePercent": -3.330273361824976,
+            "passes20Percent": true
+          },
+          "ipc.jobStatus": {
+            "p95ms": 0.29329105746001005,
+            "spk1P95ms": 0.3661249647848308,
+            "p95SpreadRatio": 0.02514576174578294,
+            "stable": true,
+            "increasePercent": -19.893182473264215,
+            "passes20Percent": true
+          }
+        }
+      },
+      "facade": {
+        "runs": [
+          {
+            "loadAverage": 1.68212890625,
+            "jobCount": 30,
+            "rows": {
+              "ipc.health": {
+                "p95ms": 0.15183293726295233,
+                "sampleCount": 1000
+              },
+              "ipc.jobList": {
+                "p95ms": 13.086959021165967,
+                "sampleCount": 1000
+              },
+              "ipc.jobStatus": {
+                "p95ms": 0.40558306500315666,
+                "sampleCount": 1000
+              }
+            }
+          },
+          {
+            "loadAverage": 1.76513671875,
+            "jobCount": 30,
+            "rows": {
+              "ipc.health": {
+                "p95ms": 0.13216608203947544,
+                "sampleCount": 1000
+              },
+              "ipc.jobList": {
+                "p95ms": 12.62666704133153,
+                "sampleCount": 1000
+              },
+              "ipc.jobStatus": {
+                "p95ms": 0.3293330082669854,
+                "sampleCount": 1000
+              }
+            }
+          },
+          {
+            "loadAverage": 2.00732421875,
+            "jobCount": 30,
+            "rows": {
+              "ipc.health": {
+                "p95ms": 0.1329589867964387,
+                "sampleCount": 1000
+              },
+              "ipc.jobList": {
+                "p95ms": 12.62350007891655,
+                "sampleCount": 1000
+              },
+              "ipc.jobStatus": {
+                "p95ms": 0.33766706474125385,
+                "sampleCount": 1000
+              }
+            }
+          }
+        ],
+        "comparison": {
+          "ipc.health": {
+            "p95ms": 0.1329589867964387,
+            "spk1P95ms": 0.11204194743186235,
+            "p95SpreadRatio": 0.14791670497299295,
+            "stable": true,
+            "increasePercent": 18.668935915539066,
+            "passes20Percent": true
+          },
+          "ipc.jobList": {
+            "p95ms": 12.62666704133153,
+            "spk1P95ms": 13.023165985941887,
+            "p95SpreadRatio": 0.03670477258427366,
+            "stable": true,
+            "increasePercent": -3.0445664674654815,
+            "passes20Percent": true
+          },
+          "ipc.jobStatus": {
+            "p95ms": 0.33766706474125385,
+            "spk1P95ms": 0.3661249647848308,
+            "p95SpreadRatio": 0.2258143144478714,
+            "stable": true,
+            "increasePercent": -7.772728652989147,
+            "passes20Percent": true
+          }
+        }
+      }
+    },
+    "binarySHA256": {
+      "swift": "2208024650eff683fa0811674402891e9ccd13811d455155089c7ab1a67c70dc",
+      "facade": "4841c27a4895a8204db354ec3b171aa0098a9c3173bcbb5b5fe4c9540f8b2210",
+      "soak": "3b3678d4ec46ccb2a0bc7c5c48059d129ae20fb54e993917af4056a53c28baca"
+    },
+    "rawSamplesSHA256": "b05226d47224c3695e62d3a4d9b228b743f17b1d50e6768b236284ecba82e82e",
+    "result": "PASSED_AC_5",
+    "note": "Three complete runs per backend under the unchanged SPK-1 quiet-host and p95-spread thresholds. Earlier unsuccessful measurements remain recorded."
+  },
+  "latestResult": "PASSED_AC_5"
 }
