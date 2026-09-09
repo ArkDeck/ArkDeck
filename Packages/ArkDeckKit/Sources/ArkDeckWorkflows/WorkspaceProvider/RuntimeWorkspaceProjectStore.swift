@@ -113,19 +113,28 @@ package struct RuntimeWorkspaceToolchainPinning: Sendable {
 }
 
 package struct RuntimeWorkspaceCredentialPinning: Sendable {
-  /// `projectRef` is the project the preset being pinned belongs to. A signing
-  /// credential carries its own project binding, and the daemon refuses to
-  /// resolve a preset whose credential names a different one — so the owner has
-  /// to be able to make that comparison here, at registration, rather than
-  /// leaving a preset that can never resolve.
+  /// Whether this credential may be pinned to a preset in `projectRef` at all.
+  ///
+  /// A signing credential carries its own project binding, and the daemon
+  /// refuses to resolve a preset whose credential names a different one. That
+  /// is a precondition, not part of the acquire transaction: the store persists
+  /// its pending mutation *before* performing it, so a refusal raised inside
+  /// the transaction leaves an intent that can never complete and that every
+  /// later read re-attempts. This runs first, while nothing has been written.
+  package let validateBinding:
+    @Sendable (_ credentialRef: String, _ projectRef: String) throws -> Void
+  /// `projectRef` is the project the preset being pinned belongs to, so the
+  /// owner can make the same comparison again at the moment it pins.
   package let acquire:
     @Sendable (_ credentialRef: String, _ presetRef: String, _ projectRef: String) throws -> Void
   package let release: @Sendable (_ credentialRef: String, _ presetRef: String) throws -> Void
 
   package init(
+    validateBinding: @escaping @Sendable (String, String) throws -> Void = { _, _ in },
     acquire: @escaping @Sendable (String, String, String) throws -> Void,
     release: @escaping @Sendable (String, String) throws -> Void
   ) {
+    self.validateBinding = validateBinding
     self.acquire = acquire
     self.release = release
   }
@@ -448,8 +457,8 @@ public final class RuntimeWorkspaceProjectStore: @unchecked Sendable {
           state: "available", lastMutationRequestID: requestID,
           lastMutationDigest: digest)
         if toolchainRef != nil || credentialRef != nil {
-          try requireDependencyOwners(
-            toolchainRef: toolchainRef, credentialRef: credentialRef)
+          try requirePresetDependencies(
+            projectRef: projectRef, toolchainRef: toolchainRef, credentialRef: credentialRef)
           next.pendingToolchainMutation = PendingDependencyMutation(
             action: "acquire", toolchainRef: toolchainRef,
             toolchainGeneration: toolchainGeneration, credentialRef: credentialRef,
@@ -548,8 +557,9 @@ public final class RuntimeWorkspaceProjectStore: @unchecked Sendable {
           || credentialRef != current.credentialRef
         {
           if toolchainRef != nil || credentialRef != nil {
-            try requireDependencyOwners(
-              toolchainRef: toolchainRef, credentialRef: credentialRef)
+            try requirePresetDependencies(
+              projectRef: current.projectRef, toolchainRef: toolchainRef,
+              credentialRef: credentialRef)
             next.pendingToolchainMutation = PendingDependencyMutation(
               action: "acquire", toolchainRef: toolchainRef,
               toolchainGeneration: toolchainGeneration, credentialRef: credentialRef,
@@ -944,6 +954,19 @@ public final class RuntimeWorkspaceProjectStore: @unchecked Sendable {
             ? "runtimeRestartRequired" : "unresolved")))
   }
 
+  /// The binding preconditions for a preset definition, checked before the
+  /// store writes anything. A refusal here costs the caller an error and leaves
+  /// the document untouched; the same refusal raised later, from inside the
+  /// pending-mutation transaction, wedges every subsequent read.
+  private func requirePresetDependencies(
+    projectRef: String, toolchainRef: String?, credentialRef: String?
+  ) throws {
+    try requireDependencyOwners(toolchainRef: toolchainRef, credentialRef: credentialRef)
+    if let credentialRef {
+      try credentialPinning!.validateBinding(credentialRef, projectRef)
+    }
+  }
+
   private func requireDependencyOwners(
     toolchainRef: String?, credentialRef: String?
   ) throws {
@@ -978,14 +1001,27 @@ public final class RuntimeWorkspaceProjectStore: @unchecked Sendable {
           "recordUnreadable", "workspace preset acquire transaction is inconsistent")
       }
       try validatePresetRecord(proposed, projects: document.records)
-      if let toolchainRef = pending.toolchainRef,
-        let toolchainGeneration = pending.toolchainGeneration
-      {
-        try toolchainPinning!.acquire(
-          toolchainRef, toolchainGeneration, pending.presetRef)
-      }
-      if let credentialRef = pending.credentialRef {
-        try credentialPinning!.acquire(credentialRef, pending.presetRef, proposed.projectRef)
+      // The intent was persisted before this ran, and every later access
+      // reconciles it again — so an acquire that cannot succeed would refuse
+      // every read of this store, not just the registration that asked for it.
+      // The preset is only added after both pins succeed, so abandoning the
+      // intent restores exactly the state before the registration. The failure
+      // still propagates, so the caller that asked for it is told.
+      do {
+        if let toolchainRef = pending.toolchainRef,
+          let toolchainGeneration = pending.toolchainGeneration
+        {
+          try toolchainPinning!.acquire(
+            toolchainRef, toolchainGeneration, pending.presetRef)
+        }
+        if let credentialRef = pending.credentialRef {
+          try credentialPinning!.acquire(credentialRef, pending.presetRef, proposed.projectRef)
+        }
+      } catch {
+        var abandoned = document
+        abandoned.pendingToolchainMutation = nil
+        try save(abandoned, rootFD: rootFD)
+        throw error
       }
       if let index = next.presets.firstIndex(where: { $0.presetRef == pending.presetRef }) {
         next.presets[index] = proposed

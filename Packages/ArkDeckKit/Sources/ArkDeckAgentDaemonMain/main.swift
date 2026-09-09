@@ -652,15 +652,14 @@ Task.detached {
           throw RuntimeWorkspaceProjectFailure(failure.code, failure.message)
         }
       })
-    let workspaceCredentialPinning = RuntimeWorkspaceCredentialPinning(
-      acquire: { reference, presetRef, projectRef in
-        // The same binding rule start-up applies below, applied here instead —
-        // a preset whose credential belongs to another project can never
-        // resolve, so registering it only produces a preset that reports a
-        // problem later, in a surface that cannot say what it was.
+    // Checked before the store persists its pending mutation. The store writes
+    // its intent and then performs it, so the same refusal raised inside that
+    // transaction leaves an intent no later read can complete.
+    let requireCredentialProjectBinding:
+      @Sendable (String, String) throws -> Void = { reference, projectRef in
         do {
           // No `owner:` — the preset does not own the credential yet, this is
-          // the call that decides whether it may. No secrets either: the
+          // the check that decides whether it may. No secrets either: the
           // binding is on the receipt, and reading secrets here would summon a
           // Keychain prompt to answer a question that does not need one.
           let credential = try signingCredentialOwner.resolve(
@@ -677,6 +676,12 @@ Task.detached {
           throw RuntimeWorkspaceProjectFailure(
             "resourceConflict", "signing credential pin could not be validated")
         }
+      }
+    let workspaceCredentialPinning = RuntimeWorkspaceCredentialPinning(
+      validateBinding: requireCredentialProjectBinding,
+      acquire: { reference, presetRef, projectRef in
+        // The same comparison again at the moment of pinning.
+        try requireCredentialProjectBinding(reference, projectRef)
         do {
           try signingCredentialOwner.acquire(reference, owner: presetRef)
         } catch {

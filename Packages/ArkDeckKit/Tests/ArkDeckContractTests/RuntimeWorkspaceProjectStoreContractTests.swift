@@ -75,6 +75,115 @@ final class RuntimeWorkspaceProjectStoreContractTests: XCTestCase {
     try? FileManager.default.removeItem(at: stateDirectory)
   }
 
+  /// The store persists its pending dependency mutation and then performs it,
+  /// and every later access — reads included — reconciles whatever it finds
+  /// pending. A refusal raised inside that transaction therefore does not refuse
+  /// one registration; it refuses every subsequent read of the store.
+  ///
+  /// Reproduced on the reference host: a refused signing registration left a
+  /// pending acquire behind, after which `workspace project list` and
+  /// `workspace preset list` both answered `resourceConflict` with the
+  /// registration's message. A binding that can never match must be refused
+  /// before anything is written, and a pending acquire that cannot complete
+  /// must be abandoned rather than replayed forever.
+  func testARefusedPresetRegistrationLeavesTheStoreReadable() throws {
+    let root = try makeRoot("refusal-project")
+    let toolchainPins = ToolchainPins()
+    let refusing = RefusingCredentialPin(
+      binding: RuntimeWorkspaceProjectFailure(
+        "resourceConflict", "signing credential is bound to project demo-app"))
+    let store = try RuntimeWorkspaceProjectStore(
+      rootURL: stateDirectory, toolchainPinning: toolchainPins.owner(),
+      credentialPinning: refusing.owner(), nowUTC: { "2026-09-01T12:00:00.000Z" })
+    let project = try store.register(
+      requestID: "refusal-project-registration", kind: "openharmony", rootPath: root.path)
+    let toolchain = "toolchain:sha256:" + String(repeating: "f", count: 64)
+    let credential = "credential:sha256-" + String(repeating: "9", count: 64)
+
+    XCTAssertThrowsError(
+      try store.registerPreset(
+        requestID: "refused-preset", projectRef: project.projectRef,
+        kind: "signing", templateRef: "openharmony.local-sign@1",
+        toolchainRef: toolchain, toolchainGeneration: 1, credentialRef: credential,
+        timeoutSeconds: 600, constraints: RuntimeWorkspacePresetConstraints())
+    ) { error in
+      XCTAssertEqual((error as? RuntimeWorkspaceProjectFailure)?.code, "resourceConflict")
+    }
+    XCTAssertEqual(
+      refusing.acquireCount, 0,
+      "the binding is a precondition; nothing should have been pinned or persisted")
+
+    // The store has to still answer, on this handle and on a fresh one.
+    XCTAssertEqual(try store.listPresets(projectRef: project.projectRef), [])
+    XCTAssertEqual(try store.list().map(\.projectRef), [project.projectRef])
+    let reopened = try RuntimeWorkspaceProjectStore(rootURL: stateDirectory)
+    XCTAssertEqual(try reopened.listPresets(projectRef: project.projectRef), [])
+    XCTAssertEqual(try reopened.list().map(\.projectRef), [project.projectRef])
+  }
+
+  /// The precondition cannot catch everything: an acquire may still fail after
+  /// the intent is durable, which is the window the two-phase write exists for.
+  /// The intent must then be abandoned, because the preset is only added once
+  /// both pins succeed — so dropping it restores exactly the pre-registration
+  /// state instead of refusing every later read.
+  func testAPendingAcquireThatCannotCompleteIsAbandonedRatherThanReplayed() throws {
+    let root = try makeRoot("wedge-project")
+    let toolchainPins = ToolchainPins()
+    let refusing = RefusingCredentialPin(
+      acquire: RuntimeWorkspaceProjectFailure("ioFailure", "fixture acquire interruption"))
+    let store = try RuntimeWorkspaceProjectStore(
+      rootURL: stateDirectory, toolchainPinning: toolchainPins.owner(),
+      credentialPinning: refusing.owner(), nowUTC: { "2026-09-01T12:00:00.000Z" })
+    let project = try store.register(
+      requestID: "wedge-project-registration", kind: "openharmony", rootPath: root.path)
+
+    XCTAssertThrowsError(
+      try store.registerPreset(
+        requestID: "wedged-preset", projectRef: project.projectRef,
+        kind: "signing", templateRef: "openharmony.local-sign@1",
+        toolchainRef: "toolchain:sha256:" + String(repeating: "8", count: 64),
+        toolchainGeneration: 1,
+        credentialRef: "credential:sha256-" + String(repeating: "7", count: 64),
+        timeoutSeconds: 600, constraints: RuntimeWorkspacePresetConstraints())
+    ) { error in
+      XCTAssertEqual((error as? RuntimeWorkspaceProjectFailure)?.code, "ioFailure")
+    }
+    XCTAssertEqual(refusing.acquireCount, 1, "the precondition passed, so the pin was attempted")
+
+    XCTAssertEqual(try store.listPresets(projectRef: project.projectRef), [])
+    let reopened = try RuntimeWorkspaceProjectStore(rootURL: stateDirectory)
+    XCTAssertEqual(try reopened.listPresets(projectRef: project.projectRef), [])
+    XCTAssertEqual(
+      refusing.acquireCount, 1,
+      "an abandoned intent must not be re-attempted by every later read")
+  }
+
+  private final class RefusingCredentialPin: @unchecked Sendable {
+    private let lock = NSLock()
+    private var attempts = 0
+    private let bindingFailure: Error?
+    private let acquireFailure: Error?
+
+    init(binding: Error? = nil, acquire: Error? = nil) {
+      bindingFailure = binding
+      acquireFailure = acquire
+    }
+
+    var acquireCount: Int { lock.withLock { attempts } }
+
+    func owner() -> RuntimeWorkspaceCredentialPinning {
+      RuntimeWorkspaceCredentialPinning(
+        validateBinding: { [self] _, _ in
+          if let bindingFailure { throw bindingFailure }
+        },
+        acquire: { [self] _, _, _ in
+          lock.withLock { attempts += 1 }
+          if let acquireFailure { throw acquireFailure }
+        },
+        release: { _, _ in })
+    }
+  }
+
   /// `runtimeRestartRequired` is honest for a preset registered since the daemon
   /// last started — a restart really does apply it. It is a lie for a preset the
   /// daemon already tried and refused, and the two were reported identically.
