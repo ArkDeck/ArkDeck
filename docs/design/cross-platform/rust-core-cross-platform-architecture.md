@@ -19,7 +19,7 @@
 3. **FFI 只允许一个 crate `arkdeck-contract-ffi`**，内容限定为确定性纯计算：canonical JSON/CBOR、digest、schema/文档校验、离线 journal/artifact index 解码、（按需）Viewer 大树索引。它没有任何 authority、I/O 或副作用；panic 在边界捕获并返回错误码。它是可选优化，不是架构依赖。
 4. **语言无关契约成为唯一事实源**：Catalog、JSON Schema、逐 method typed schema、状态机表、reason code、canonical vectors、CLI fixtures 全部放入 `spec/` 类目录，Rust 与 Swift/C# 都从它生成或直接消费；迁移期以 SVC 完成后的最新 Swift 单 v1 字节为 oracle、Rust 为新实现，通过 byte-for-byte differential 与只读 shadow 证明相等后再切换 owner。
 5. **迁移是 strangler，不是 big-bang**：第一刀是 Rust「控制面 façade」拥有 socket/XPC/pipe 并把未迁移方法转发给 Swift daemon；随后按 durable store 的 owner 逐个搬迁（host-only 存储 → artifact → admission/job/capability/recovery），provider 逐族搬迁，Swift 最终只剩 App 与客户端 SDK；Swift daemon/引擎/存储 target 的删除（XPA-017）只在 Rust CLI 与 App 都已脱钩（XPA-018/019）之后进行，仓库不经过「客户端链接已删模块」的中间态（r3）。每一步 macOS 都可发布、可通过 LaunchAgent 指回 Swift daemon 回滚，数据 schema 从 SVC 完成后的基线起在迁移期保持不变。
-6. **Windows 从最薄的真实 GJ-1 walking skeleton 开始**（`arkdeck doctor` → `device candidates` → `target adopt` → `observe.device@1` → `capture.diagnostics@1` → 重启后可读），每个 PR 推进一个 hop，然后 GJ-2～GJ-5。
+6. **Windows 从最薄的真实 GJ-1 walking skeleton 开始**（`arkdeck doctor` → `device candidates` → `target adopt` → `observe.device@1` → `capture.diagnostics@1` → 重启后可读），每个 PR 推进一个 hop，然后 GJ-2～GJ-5。（r8：Windows 阶段在 macOS 侧完成、GJ-1～5 在纯 Rust daemon 上 PASS（§J.5 G5）之后才开始。）
 
 淘汰理由摘要：方案 2（进程内 cdylib）把 authority 放进每个客户端进程，破坏「唯一 owner / 单写者」与 crash isolation，且沙箱 App 在结构上不能拥有设备副作用；方案 1（纯 daemon、零 FFI）与推荐方案只差一个可选的纯计算 kernel，差异在 Viewer/离线解析的跨平台一致性与性能，因此推荐方案吸收方案 1 为骨干、把 FFI 收窄为「无 authority 的纯函数」。详见 §C 决策矩阵。
 
@@ -484,10 +484,12 @@ flowchart LR
   S5 --> S6["S6 provider 逐族迁入 Rust<br/>analyzer/workspace → hdc → arkforge<br/>XPA-015/016/017"]
   S6 --> S7["S7 移除 Swift daemon/引擎/存储<br/>Swift 只剩 App + ClientKit<br/>XPA-017/018/019"]
   W1["Windows walking skeleton GJ-1<br/>XPA-002/004/005/006"] --> W2["Windows GJ-2..5<br/>XPA-008..011"]
-  S1 --> W1
+  S7 --> W1
 ```
 
 每一步 macOS 都可发布：S2 之后的任何时刻，`arkdeck runtime service update --daemon <swift-binary>` 把 LaunchAgent 指回 Swift daemon 即回滚（`LaunchAgentService.swift` 已有 executable identity 校验与 receipt）。**回滚对象是同一 release、SVC 完成后的 Swift daemon**（r5）：daemon 从 App 包内嵌的 helper 安装（`ArkDeckRuntimeCommands.swift:1258` → `~/Library/Application Support/ArkDeck/Helpers/ArkDeckAgent.app`，receipt 记 `daemonSHA256`），App 与 daemon 按 release 成对。App 一旦改用 `xpc_connection`（§L.1 第 6 条），仍提供 `NSXPCListener`（`AgentXPCListener.swift:26`）的 Swift daemon 就无法为它服务——CLI 能回滚，更新后的 App 却断连。因此 XPA-003 必须在同一 PR 内把 Swift daemon 的 Mach service 监听器换成与 façade 相同的 raw libxpc 帧监听器，并把「新 App → 回滚后的 Swift daemon」列为回滚验收（XPC 契约测试 + App UI smoke），不只做 headless 演练；LaunchAgent 指向其它 release 的 daemon 时由 receipt/executable identity 检出并提示 `runtime service update`，不得静默挂起。
+
+（r8）Windows walking skeleton（W1）从 S7 之后开始，不再与 S1 并行：共享 crates 先在 macOS 付清 differential 负担并在纯 Rust daemon 上取得 GJ-1～5 PASS，Windows 侧随后只做平台差异（named pipe、NTFS 原语、打包），不返工。
 
 ### G.2 当前单 v1 基线互读（逐存储）
 
@@ -730,9 +732,10 @@ flowchart TD
   X001 --> X002
   SPK3 --> X002
   SPK5 --> X005
-  X002 --> X003
+  X002 -->|已交付的 macOS read-only foundation| X003
   SPK2 --> X003
-  X002 --> X004 --> X005 --> X006
+  X002 -->|Windows 验收，在 X017 之后| X004 --> X005 --> X006
+  X017 --> X004
   SPK4 --> X007
   X006 --> X007
   X006 --> X008 --> X009 --> X010
@@ -742,8 +745,7 @@ flowchart TD
   X016 --> X017
   X018 --> X017
   X019 --> X017
-  X005 --> X015
-  X002 --> X018
+  X002 -->|foundation 的 Rust CLI，持续| X018
   X016 --> X018
   X001 --> X019
   X014 --> X019
@@ -753,6 +755,7 @@ flowchart TD
   X010 --> X022
   X011 --> X022
   SPK1 --> X024
+  X019 --> X024
   X020 --> X024
   X014 --> X025
   X023 --> X025
@@ -792,7 +795,7 @@ flowchart TD
 - 用户结果：Windows 工程师运行 `arkdeck doctor --deep` 与 `arkdeck device candidates` 看到 DAYU200，机器输出与 macOS fixture 字节一致。
 - 平台/GJ：Windows GJ-1 `NOT_STARTED → IMPLEMENTING`（hop 1–3）。
 - 缺口：仓内无生产 Rust workspace、无 Windows daemon；SPK-2 Rust 实验不替代本任务；B.1 #23。
-- 依赖：XPA-001、SPK-3；并行：XPA-003 的 façade 代码同源。
+- 依赖：XPA-001；macOS read-only foundation 已交付（#1768）并供 XPA-003 消费；SPK-3 与 Windows 11 x64 + DAYU200 验收在 XPA-017 之后（r8）。
 - Production reachability：`arkdeck.exe` → named pipe → `arkdeck-control` → 当前 `doctor/device.observations` 方法 → HDC provider/观测投影（executable + argv 数组、句柄绑定 hash）。CLI `device candidates` 不引入同名旧 RPC。读-only，无 effect。
 - 模块/路径：新 `rust/**`（`arkdeck-contract`、`arkdeck-platform`、`arkdeck-control`、`arkdeck-provider-hdc`（parsers）、`arkdeck-client`、`arkdeck-cli`、`arkdeck-agentd`）、`spec/**`、`.github/workflows/rust-ci.yml`、`scripts/catalog_gen/generate.py`（生成 Rust）、`scripts/ci/plan.py` + `scripts/ci/test_plan.py` + `.github/workflows/swift-ci.yml` + `scripts/test_agent_pr_workflow.py`（r3/r5：新增 `rust` 车道并接入统一入口——今日 `classify_paths` 对 `rust/**` 全部车道为 false，只改 Rust 的 PR 本地闸会空转通过；新车道必须折进 `swift` 聚合 job 的 `needs`，而 `test_agent_pr_workflow.py:412-421` 逐字钉住该列表，须同 PR 更新）、`openspec/platforms/windows/**`；Forbidden `Packages/**` 生产源码（本任务不改 Swift 语义）。
 - 交付物：JCS/CBOR/digest 向量全过；catalog digest 与 Swift 相等；单 v1 帧验证矩阵；HDC Golden/Probe fixtures 回放；Windows pipe（DACL/REJECT_REMOTE/FIRST_INSTANCE/SID 校验）+ 客户端对服务端的两层认证（owner SID + 本连接服务端 PID 的映像/签名实例认证，§F.2，r3/r5）；macOS UDS（peer euid）；planner `rust` 车道（r3）折进 `swift` 聚合器（r5）。
@@ -807,7 +810,7 @@ flowchart TD
 - 用户结果：macOS 用户与 agent 不感知变化；未授权 UID 进程被拒；App 沙箱经 XPC 照常工作。
 - 平台/GJ：macOS GJ-1～5 re-pass（假设 A4）。
 - 缺口：Rust 尚未处在生产路径；ADR-0005 的 peer 硬化未做（B.1 #17）。
-- 依赖：XPA-002、SPK-2。并行：Windows 链。
+- 依赖：XPA-002 已交付的 macOS read-only foundation（r8：不含其 Windows 验收）、SPK-2（已过）。Windows 链在 XPA-017 之后开始，不与本任务并行（r8）。
 - Production reachability：客户端 → Rust façade（UDS/XPC）→ 转发到 Swift daemon 私有 socket → 既有 admission；façade 不解释语义、不缓存、不改帧（只做单 v1 帧校验与准入）。
 - 来源上下文（r3）：每帧前置一行 origin 前导（§F.2「来源上下文」行）；否则 Swift 看到的对端是 façade，`human-action.resume` 的交互式 impact 确认永久失效。
 - 路径：`rust/**`、`Packages/ArkDeckKit/LaunchAgents/**`（plist 与 service 指向）、`Sources/ArkDeckAgentDaemonMain/**`（私有 socket 参数）、`Sources/ArkDeckAgentDaemon/**`（r3：私有监听器与 origin 行 → context，不动 handler/admission）、`Sources/ArkDeckWorkflows/XPCConnectionBox.swift`（改 xpc C API）、`ArkDeckApp/**`（仅 transport）、`Tests/**`。
@@ -823,7 +826,7 @@ flowchart TD
 - 用户结果：Windows 上 `arkdeck target adopt` 从零建立 durable binding，多候选必须显式选择，未信任设备进入 `waitingForHuman`。
 - 平台/GJ：Windows GJ-1 hop 4–5。
 - 缺口：`DeviceBootstrapMachine`（ADR-0006）无 Rust 实现。
-- 依赖：XPA-002。并行：XPA-012（同一 targets store 代码）。
+- 依赖：XPA-002 的 Windows 验收、XPA-017（r8：macOS 侧 G5 之后才开始 Windows GJ）。targets store 代码此时已由 XPA-012 在 macOS 交付。
 - Reachability：CLI → pipe → `target.adopt` → `arkdeck-runtime::bootstrap`（四例封闭观测动作）→ `targets/` + `.targets.lock`。
 - 路径：`rust/**`、`spec/**`；Forbidden `Packages/**`。
 - 交付物：bootstrap 状态机、targets store（同 JSON 形状）、HAR `physicalConnection/needsSelection`。
@@ -837,7 +840,7 @@ flowchart TD
 - 用户结果：Windows 上 `agent run --operation observe.device@1` 得到 job/result/artifact，daemon 重启后仍可读。
 - 平台/GJ：Windows GJ-1 hop 6、9、10。
 - 缺口：Rust 无 job store/journal/admission/HDC observe lowering/artifact publish。
-- 依赖：XPA-004、SPK-5。并行：XPA-015 复用 analyzer 无关。
+- 依赖：XPA-004、SPK-5。r8：durable 层与 admission 顺序先由 XPA-012/013/014 在 macOS 交付并经 Swift 严格解码器验证，本任务移植 NTFS 原语并在同一 crates 上跑通 Windows 端到端，不重新塑形。
 - Reachability：CLI → `job.submit`（E0 默认只读策略）→ post-SVC SQLite v1 + journal + record → `hdc.exe -t <connectKey> …`（`deviceArguments` 唯一注入点）→ 语义 verify → artifact index → `job.events/status/result`。
 - 路径：`rust/**`（`arkdeck-durable`、`arkdeck-runtime`、`arkdeck-provider-hdc`）。
 - 交付物：durable 层（journal fsync、tail cursor、torn tail、atomic replace、post-SVC SQLite v1）、admission 顺序（§D.3）、observe lowering、artifact store 最小面、`job.events` 分页。
@@ -942,7 +945,7 @@ flowchart TD
 #### TASK-XPA-014 — Move admission, job store, capability and recovery to Rust with the Swift engine as executor sidecar
 - 用户结果：macOS 的 authority 在 Rust；Swift 只按逐 step typed permit 执行 lowering；语义不变。
 - 平台/GJ：macOS GJ-1～5 re-pass。
-- 依赖：XPA-013、XPA-005（复用 durable/admission 代码）。
+- 依赖：XPA-013（r8：不再依赖 XPA-005；durable/admission 代码在本任务于 macOS 首写，之后回流 Windows）。
 - Reachability：Rust admission（§D.3 顺序）→ journal intent → 私有 `executor.step.execute{jobId, stepId, typedAction, planDigest, targetFacts, useOrdinal}` → Swift lowering + process + verify → receipt → Rust outcome/artifact。
 - AC：cutover preflight（无活动 job/未决 intent/running execution）；outcomeUnknown lane 原样承接；crash-window 四象限（Rust/Swift × intent 前后）全部 fail closed；GJ re-pass；回滚演练。
 - 验证：differential（`job.plan` digest 两端相等）、fault-injection、真机。
@@ -971,8 +974,8 @@ flowchart TD
 - 规模：L。
 
 #### TASK-XPA-018 — Rust CLI full parity and Swift CLI retirement
-- 平台/GJ：macOS GJ-1～5 headless 用 Rust CLI re-pass；Windows 已用。
-- 依赖：XPA-002 起持续，最终依赖 XPA-016（所有 leaf 含 macOS 进程内兼容 leaf 由 Rust daemon 服务或按 CLI 规格 §12 tombstone）；必须先于 XPA-017 完成（r3）。
+- 平台/GJ：macOS GJ-1～5 headless 用 Rust CLI re-pass；Windows 侧开始后即为唯一 CLI（r8）。
+- 依赖：XPA-002 已交付 foundation 的 Rust CLI 起持续（r8），最终依赖 XPA-016（所有 leaf 含 macOS 进程内兼容 leaf 由 Rust daemon 服务或按 CLI 规格 §12 tombstone）；必须先于 XPA-017 完成（r3）。
 - AC：当前单 v1 index 中全部 argv fixtures（本次为 208 个）与 envelope/page/nextAction 样本字节相等；`maintainer contracts export` 由 Rust 生成并与已发布 bundle 零漂移；`cli-feature-coverage.json` 在两平台 `fullFunction`；Swift CLI 删除。
 - 规模：L。
 
@@ -1009,6 +1012,7 @@ flowchart TD
 
 #### TASK-XPA-024 — Optional FFI kernel for Viewer indexing and offline inspectors
 - 触发条件：SPK-1/XPA-020 测得 Viewer 20k 节点或 Diagnostics 离线解析在任一平台不达 §I 预算，或两端搜索/hit-test 结果不一致。
+- 依赖（r8）：SPK-1；macOS 半部等 XPA-019，Windows 半部等 XPA-020。
 - AC：`arkdeck-contract-ffi` ABI 版本函数、`catch_unwind`、fuzz 24 h 无崩溃；Swift 调用点 `unsafe` 集中在 ClientKit 一处；C# `LibraryImport`；两端索引结果字节相等。
 - 规模：M。
 
@@ -1022,21 +1026,25 @@ flowchart TD
 
 ### J.5 Critical path、并行组、前三项、release gates
 
-**Critical path（到「Windows/macOS supported」）**：SVC-001..004 → XPA-001；XPA-001 与 SPK-3 → XPA-002 → XPA-004 → XPA-005 → XPA-006 → XPA-008 → XPA-010（外部依赖 ArkForge AF-W1）→ XPA-022 → gate。GJ-3/5 与 XPA-020/021 并行汇入。
+**Critical path（r8，macOS 先行）**：SVC-001..004 → XPA-001（done）→ XPA-002 的 macOS read-only foundation（已交付）→ XPA-003 → XPA-012 → XPA-013 → XPA-014 → XPA-015 → XPA-016 →（XPA-018 ∥ XPA-019，XPA-025）→ XPA-017 = G5 → Windows 阶段：XPA-002 的 Windows 验收（SPK-3）→ XPA-004 → XPA-005（SPK-5）→ XPA-006 → XPA-008 → XPA-010（外部依赖 ArkForge AF-W1）→ XPA-022 → gate。GJ-3/5（XPA-009/011）与 XPA-007/020/021 在 Windows 阶段内并行汇入。r7 以前的 critical path 以 Windows 链为主干、macOS 链并行，r8 反转。
 
-**可并行组**：
-1. Windows GJ 链（XPA-002/004/005/006/008/009/010/011）；
-2. macOS store 搬迁链（XPA-003/012/013/014/015/016 → XPA-018 ∥ XPA-019 → XPA-017；r3：客户端先脱钩再删 Swift target）；
-3. 客户端链（XPA-007/019/020，双语目录）；
-4. 基础设施（SPK-1、XPA-023、XPA-025、XPA-022）；XPA-017 另等 XPA-025（r5）。
-组 1 与组 2 共享 `arkdeck-durable/runtime/provider-*` 代码，建议同一 crate 先在 Windows 走通再回流 macOS（Windows 没有旧字节负担，macOS 有 differential 负担）。
+**可并行组（r8）**：
+1. macOS 迁移链（XPA-003/012/013/014/015/016 → XPA-018 ∥ XPA-019 → XPA-017；r3：客户端先脱钩再删 Swift target；XPA-017 另等 XPA-025）；
+2. 基础设施（XPA-025 在 XPA-014 之后；SPK-3/SPK-4/SPK-5 可在任一 Windows 主机可用时先做，只产出平台事实，不建 Windows 任务）；
+3. Windows 阶段（G5 之后）：GJ 链（XPA-002 验收/004/005/006/008/009/010/011）与客户端链（XPA-007/020/021）、分发（XPA-022）。
+共享的 `arkdeck-durable/runtime/provider-*` 代码先在 macOS 走通再到 Windows（r8，反转 r7 的建议）：differential 负担在 macOS，先付清；Windows 没有旧字节负担，此后只做 NTFS/named pipe/打包的平台差异，一次建成。
 
 **当前进度与后续入口（2026-09-06）**：
 1. SVC-001..004、96 份 schema 的代码交付、SPK-1 harness 与 SPK-2 实验已有记录，无需作为未开始工作重做；SVC-005 与 XPA-001 各自的 headless 验收仍未完成。
 2. XPA-002 等后续实现消费 §F.1 当前基线；Windows 首要验证仍是 SPK-3 与 doctor/candidates 的真实闭环，XPA-003 依赖保持不变。
 3. SPK-4 结合 §H.5/§H.6 核对原生工具链和 UI 自动化，供 XPA-007 使用；SPK-1 后续仅补当前代码复测、分页/RSS 裁决与实际缺口。具体 Task 状态与依赖仍以 tasks.md 为准。
 
-**Release gates（macOS-only → Windows/macOS supported）**：
+**当前进度与后续入口（2026-09-09，r8）**：
+1. SVC-005 done：GJ-1～5 在当前 digest `508783ac…` 上全部 `REAL_DEVICE_PASS`（GJ-4 于已发布 `6e8c3ed5` 构建）；XPA-001 done；XPA-002 的 macOS read-only foundation 已交付（#1768），基线 pin 在 `main` `a61848f9`。
+2. 下一项是 XPA-003（`ready`，readiness pins 已实例化），随后按 macOS 迁移链推进；Windows 任务在 G5 之后开始。
+
+
+**Release gates（macOS-only → Windows/macOS supported）**：（r8）G5 先于 G2：Windows GJ 任务在 G5 达成后才开始，G2/G3/G4/G9 随 Windows 阶段。
 | Gate | 判据 | 载体 |
 |---|---|---|
 | G1 架构批准 | `CHG-2026-074` approved；`core-portability.md` 决策更新；三 Profile `Core strategy` 更新 | 维护者 PR review |
@@ -1098,6 +1106,7 @@ flowchart TD
 15. **idle RSS 上限**（r2 新增，当前证据见 §I.2 注 2）：冷 idle 独立采样与两电平已交付；启动 plateau 73.71 MB、steady 21.53 MB 对拟定 64 MiB 得出不同结果。仍需决定上限约束哪个阶段、是否分别预算，并复测当前单 v1 二进制；本次不提高上限或宣布稳态预算已批准。
 16. **分页投影预算**（r2 新增，当前证据见 §I.2 注 1）：行数已机械记录为 30，尚需多规模测量来分离固定开销与每行成本。当前记录推导的 `≤ 19.5 ms p95` 仅作该规模回归参考，不作发布门。
 17. **同用户信任边界（r5 新增，见 §F.2）**：确认「同用户、同完整性级别的任意代码在信任边界之外；本产品签名的 daemon 二进制按构造可信」这一表述，与 ADR-0005 决策 1 的 MVP 立场一致；若维护者要求把同用户任意代码也纳入边界，Windows 需要 protected-process 级别的方案而 macOS UDS 没有对应物，本文不推荐。
+18. **macOS 先行次序（r8 新增，维护者 2026-09-09 裁定，本 revision 合入即为 attestation）**：macOS 迁移链完成并在纯 Rust daemon 上取得 GJ-1～5 PASS（G5）之后才开始任何 Windows GJ 任务；XPA-003 只依赖 XPA-002 已交付的 macOS read-only foundation；XPA-014 不再依赖 XPA-005；XPA-004 与 XPA-002 的 Windows 验收等 XPA-017。Windows 主机提前到位不自动重开 Windows 阶段，只有新的 revision 可以。
 
 ### L.2 缺失证据（本文无法从仓库或官方资料取得）
 

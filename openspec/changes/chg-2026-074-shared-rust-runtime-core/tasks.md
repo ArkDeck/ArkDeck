@@ -13,6 +13,19 @@ Every later reference to the Swift oracle, unchanged schema, rollback or a froze
 means the latest Swift single-v1 baseline after those tasks. Historical pre-SVC formats,
 negotiation and authority branches must not be revived by a Rust port.
 
+Revision 8 (2026-09-09) sequences the macOS side before the Windows side. The maintainer ruled
+that the macOS strangler chain — TASK-XPA-003 → 012 → 013 → 014 → 015 → 016, then 018 ∥ 019 and
+025, then 017 — is completed and GJ-1..5 re-passed headless on the pure Rust daemon (design §J.5
+gate G5) before any Windows Golden Journey task starts, so that the Windows side is built once,
+on the final Rust runtime, rather than on a read-only snapshot that the macOS differential then
+reshapes. TASK-XPA-003 depends on TASK-XPA-002's delivered macOS read-only foundation (#1768,
+`evidence/xpa-002-readonly-foundation.md`), not on its Windows acceptance, and is `ready`; no
+macOS task depends on a Windows task any more (TASK-XPA-014 no longer waits for TASK-XPA-005;
+TASK-XPA-024's macOS half waits for TASK-XPA-019); TASK-XPA-004 and the Windows acceptance of
+TASK-XPA-002 wait for TASK-XPA-017. SPK-3 is a platform fact and may run whenever a Windows host
+exists, but nothing Windows-side is built on it before G5. This PR proposes r8 for maintainer
+review; its merge is the attestation.
+
 Conventions shared by every task:
 
 - One task = one vertical PR that carries production code, tests, applicable real-device
@@ -41,7 +54,7 @@ Conventions shared by every task:
 | Spike | Purpose | Pass | Fail | Unlocks |
 | --- | --- | --- | --- | --- |
 | SPK-1 | macOS performance baseline for the 13 metrics in design §I.2 | ≥3 runs with stable p50/p95/p99 (< 30% p95 spread), `perf-baseline-<date>.json` archived | spread > 30% | most budgets in §I.2 (the paged-projection and idle-RSS rows and the `artifact.open` / FFI decisions stay open, see §I.2 notes 1–2 and §L.1 items 15–16) |
-| SPK-2 | A Rust process vends the launchd Mach service `com.arkdeck.agentd` through the libxpc C API; the sandboxed App connects with the existing entitlements; peer code-signing requirement enforced | connect without entitlement changes; wrongly signed peer refused; 1,000 round trips p95 ≤ 8 ms | new entitlement needed or NSXPC-only semantics cannot be reproduced | TASK-XPA-003（r7: passed on 2026-09-05 on the macOS reference host, `evidence/runs/TASK-XPA-003/spk-2-run.md`; XPA-003 now waits on TASK-XPA-002 and maintainer review only）|
+| SPK-2 | A Rust process vends the launchd Mach service `com.arkdeck.agentd` through the libxpc C API; the sandboxed App connects with the existing entitlements; peer code-signing requirement enforced | connect without entitlement changes; wrongly signed peer refused; 1,000 round trips p95 ≤ 8 ms | new entitlement needed or NSXPC-only semantics cannot be reproduced | TASK-XPA-003（r7: passed on 2026-09-05 on the macOS reference host, `evidence/runs/TASK-XPA-003/spk-2-run.md`; XPA-003 now waits on TASK-XPA-002 and maintainer review only; r8: `ready`, its dependency being TASK-XPA-002's delivered macOS read-only foundation）|
 | SPK-3 | Windows W0 (`openspec/platforms/windows/profile.md:71-81`) plus a Rust named-pipe daemon and `hdc.exe list targets -v` against a DAYU200 | cross-account connect refused (Win32 error 5); packaged App and unpackaged CLI both reach the pipe; MotW/SmartScreen behaviour recorded; Golden fixtures parse identically | driver needs silent elevation or pipe unreachable from a packaged App | TASK-XPA-002, Windows support tuple, packaging |
 | SPK-4 | WinUI 3 gate (design §H.4 a–e) | all pass | any fails and cannot be fixed in two weeks | WinUI 3 vs WPF |
 | SPK-5 | NTFS durability primitives (`FlushFileBuffers`, `MoveFileExW` write-through, `LockFileEx`, torn-tail exhaustive test) | torn-tail matrix passes; append p95 recorded | atomic replace cannot be proven | TASK-XPA-005 write path design |
@@ -109,12 +122,12 @@ Conventions shared by every task:
 
 ## TASK-XPA-002 — Rust contract kernel and the first Windows GJ-1 hops (doctor, device candidates)
 
-- Status:in-progress（read-only foundation against the pinned Swift development baseline; Windows acceptance and maintainer review remain outstanding, see `evidence/xpa-002-readonly-foundation.md`）
+- Status:in-progress（the macOS read-only foundation against the pinned Swift development baseline is delivered — #1768, baseline re-pinned at `main` `a61848f9` — and is TASK-XPA-003's input (r8); the Windows acceptance — SPK-3, Windows 11 x64 + DAYU200 with a trusted installed daemon and a reviewed Windows HDC tuple — is the first step of the Windows phase after TASK-XPA-017 (r8), and maintainer review remains outstanding, see `evidence/xpa-002-readonly-foundation.md`）
 - Platform:windows（the same crates run read-only on macOS as a shadow tool）
 - Requirements:`toolchain-hdc-server` REQ-HDC-006/REQ-HDC-009 (unchanged), CLI-REQ-001/005/006/013/014
 - Acceptance:XPA-AC-1, XPA-AC-3, XPA-AC-6; Windows GJ-1 `NOT_STARTED → IMPLEMENTING`
 - Depends on:TASK-XPA-001（implementation input: its published single-v1 method schemas and recorded Swift corpus, pinned in `spec/baselines/swift-single-v1.json`; neither TASK-SVC-005 nor TASK-XPA-001's remaining real-device re-pass blocks this bounded implementation）
-- Acceptance prerequisites:the unchanged XPA-AC-1/3/6 and verification rows below, including SPK-3 and Windows 11 x64 + DAYU200 with a trusted installed daemon and a reviewed Windows HDC tuple/output family; the development baseline and host tests do not satisfy them or establish approval, verification or completion. This dependency clarification changes no Allowed paths, operation, Core requirement or hardware criterion.
+- Acceptance prerequisites:the unchanged XPA-AC-1/3/6 and verification rows below, including SPK-3 and Windows 11 x64 + DAYU200 with a trusted installed daemon and a reviewed Windows HDC tuple/output family; the development baseline and host tests do not satisfy them or establish approval, verification or completion. This dependency clarification changes no Allowed paths, operation, Core requirement or hardware criterion. r8: this acceptance is sequenced after TASK-XPA-017 and runs against the final Rust runtime; the foundation keeps evolving with the macOS chain meanwhile.
 - Readiness input pins（非载体示例）:
 
   ```yaml pin-example
@@ -177,17 +190,24 @@ Conventions shared by every task:
 
 ## TASK-XPA-003 — Rust control-plane façade on macOS with peer hardening
 
-- Status:blocked（awaits maintainer review of the proposal and TASK-XPA-002; SPK-2 passed on 2026-09-05, r7, `evidence/runs/TASK-XPA-003/spk-2-run.md`）
+- Status:ready（r8, 2026-09-09: its dependency is TASK-XPA-002's delivered macOS read-only foundation, SPK-2 passed on 2026-09-05 (r7, `evidence/runs/TASK-XPA-003/spk-2-run.md`) and the readiness pins below are instantiated; the implementing PR flips this to in-progress. The Windows chain does not run alongside it: design §J.5, r8）
 - Platform:macos
 - Requirements:ADR-0005 decisions 1–4 (transport, single-v1 frames, transport-free handler, single instance); no Core REQ edited
 - Acceptance:XPA-AC-3, XPA-AC-5, XPA-AC-6, XPA-AC-7
-- Depends on:TASK-XPA-002
-- Readiness input pins（非载体示例）:
+- Depends on:TASK-XPA-002's macOS read-only foundation（delivered 2026-09-08 by #1768; r8: not its Windows acceptance, which follows TASK-XPA-017）, SPK-2（passed）
+- Readiness input pins（r8: instantiated at `main` on 2026-09-09）:
 
-  ```yaml pin-example
+  ```yaml pins
+  - path: main
+    commit: ad816795cddf8f8ef480d4819a48cedc697999b0
   - path: Packages/ArkDeckKit/LaunchAgents/com.arkdeck.agentd.plist
-    blob: <40-hex git OID>
+    blob: aa941bbee4d65c746ce74bf50650f6930ce22159
+  - path: spec/baselines/swift-single-v1.json
+    blob: a58db1350b712061f7ba092b11bdbe33cf239eff
   ```
+
+  The LaunchAgent template is the file the façade takes over; the baseline is the delivered
+  read-only foundation's contract input (97 methods, 435 recorded shapes, identity `8a662759…`).
 
 - Applicable failure patterns:AF-002, AF-007, AF-014, AF-018
 - Production reachability:client → Rust façade (UDS + Mach service) → forwarded frame to the Swift daemon on a private socket → existing admission; the façade validates the single-v1 frame, admits by peer identity and frame shape, and never interprets, caches or rewrites a frame. **Origin context (r3):** the Swift daemon derives `RuntimeControlRequestContext` for every frame from kernel facts of the accepted socket (`AgentDaemon.swift:5095,5149-5194`: peer euid, `LOCAL_PEERPID`, the peer's process group equals its controlling terminal's foreground group, stdin/stderr are that terminal, start time re-checked) and issues the interactive impact-approval challenge only for `unixSocket && hasForegroundConsole` (`:3978`), otherwise returning the HAR unchanged (`:4007-4010`). Behind a transparent forwarder that peer would be the façade — a background daemon with no terminal — and console confirmation would never work again. Therefore the façade derives the same facts on its own accepted descriptor at the moment it forwards each frame and writes to the private socket one origin line `{arkdeckOrigin:1, transport:"unixSocket"|"appXPC", foregroundConsole, peerEUID, peerPID, frameSHA256}` followed by the raw frame bytes; the Swift private listener accepts origin lines only on the private socket, checks `frameSHA256` against the following line, and builds the context from it. No request field participates; an `arkdeckOrigin` object inside a client frame is an ordinary unknown field.
@@ -234,11 +254,11 @@ Conventions shared by every task:
 
 ## TASK-XPA-004 — Windows target adopt with durable binding and human trust stop
 
-- Status:blocked
+- Status:blocked（r8: waits for the macOS side to complete, TASK-XPA-017）
 - Platform:windows
 - Requirements:`device-targeting-auth` (identity before convenience, POL-TARGET-001); ADR-0006 decisions 1–5
 - Acceptance:XPA-AC-1, XPA-AC-2; Windows GJ-1 hops 4–5
-- Depends on:TASK-XPA-002
+- Depends on:TASK-XPA-002（its Windows acceptance）, TASK-XPA-017（r8: GJ-1..5 on the pure Rust daemon — design §J.5 gate G5 — before any Windows Golden Journey task starts）
 - Readiness input pins（非载体示例）:
 
   ```yaml pin-example
@@ -307,6 +327,7 @@ Conventions shared by every task:
 ### Deliverables
 
 - `arkdeck-durable` (journal fsync discipline, tail cursor, torn-tail repair, atomic replace, SQLite `runtime_job` in the pinned post-SVC layout without `user_version` drift), admission pipeline in the published order, observe lowering, minimal artifact store, `job.events` cursor pages, `recoverActiveJobs` read-back with zero dispatch.
+- r8: the durable layer named above is delivered first on macOS — lock and atomic-replace primitives by TASK-XPA-012/013, the journal discipline and the SQLite `runtime_job` store by TASK-XPA-014 — against the Swift strict decoders. This task ports the platform primitives to NTFS (SPK-5: `FlushFileBuffers`, `MoveFileExW` write-through, `LockFileEx`, the torn-tail matrix) and delivers the Windows end to end on the same crates; it does not shape them.
 
 ### Verification
 
@@ -686,7 +707,7 @@ Conventions shared by every task:
 - Platform:macos
 - Requirements:REQ-JOB-001, REQ-JOB-006, REQ-WF-004, POL-AGENT-002, POL-RECOVERY-001, POL-MODE-001, POL-TARGET-001
 - Acceptance:XPA-AC-1, XPA-AC-2, XPA-AC-4, XPA-AC-7, XPA-AC-9; macOS GJ-1..5 re-pass
-- Depends on:TASK-XPA-013, TASK-XPA-005
+- Depends on:TASK-XPA-013（r8: no longer TASK-XPA-005 — the shared durable and admission code is written here on macOS first and flows to Windows）
 - Readiness input pins（非载体示例）:
 
   ```yaml pin-example
@@ -719,6 +740,7 @@ Conventions shared by every task:
 ### Deliverables
 
 - Rust authority; executor-sidecar protocol; cutover preflight with the blocking/parked split of design §G.4 (r5) — blocking: any Job in `queued`, `preflight`, `running`, `waitingForDevice`, `awaitingRebindConfirmation`, `planning`, `cancelRequested`, `cancellingAtSafeBoundary`, `reconciling`, `recoveringByCompleteOverwrite`, `resumeAtConfirmedSafeBoundary`, `userAbandonRequested` or `finalizing`, any pending intent, any running agent execution, any reserved-but-unsettled capability use; parked and carried over unchanged: `waitingForRecovery` (the `outcomeUnknown` lane) and every terminal state; the predicate lives in the shared state table so both implementations agree; state-directory snapshot before cutover; rollback drill.
+- r8: `arkdeck-durable`'s journal discipline (fsync, tail cursor, torn-tail repair) and the SQLite `runtime_job` store in the pinned post-SVC layout without `user_version` drift, previously listed under TASK-XPA-005, are delivered here against the Swift strict decoders; the atomic-replace and lock primitives arrive earlier with TASK-XPA-012/013.
 
 ### Verification
 
@@ -841,10 +863,10 @@ Conventions shared by every task:
 ## TASK-XPA-018 — Rust CLI full parity and Swift CLI retirement
 
 - Status:blocked
-- Platform:macos（Windows already uses the Rust CLI）
+- Platform:macos（r8: the Rust CLI becomes the only CLI on Windows when that side starts）
 - Requirements:CLI-REQ-001..025, `docs/design/arkdeck-cli-product-spec.md` §14/§15/§18
 - Acceptance:XPA-AC-3; `cli-feature-coverage.json` `fullFunction` on both platforms
-- Depends on:TASK-XPA-002（continuous）, TASK-XPA-016（final: every leaf, including the macOS in-process compatibility leaves, is served by the Rust daemon or tombstoned per CLI spec §12; r3 — previously the final dependency was TASK-XPA-017, which is the wrong way round because `ArkDeckCLI` links the modules TASK-XPA-017 deletes）
+- Depends on:TASK-XPA-002's macOS read-only foundation（continuous: the Rust CLI's read-only leaves, r8）, TASK-XPA-016（final: every leaf, including the macOS in-process compatibility leaves, is served by the Rust daemon or tombstoned per CLI spec §12; r3 — previously the final dependency was TASK-XPA-017, which is the wrong way round because `ArkDeckCLI` links the modules TASK-XPA-017 deletes）
 - Readiness input pins（非载体示例）:
 
   ```yaml pin-example
@@ -1051,7 +1073,7 @@ Conventions shared by every task:
 - Platform:macos and windows
 - Requirements:`ui-dump` spec presentation clauses; REQ-DIAG-001
 - Acceptance:XPA-AC-5, XPA-AC-8
-- Depends on:SPK-1, TASK-XPA-020
+- Depends on:SPK-1; TASK-XPA-019 for the macOS half, TASK-XPA-020 for the Windows half（r8）
 - Readiness input pins（非载体示例）:
 
   ```yaml pin-example
