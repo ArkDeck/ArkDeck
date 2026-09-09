@@ -485,7 +485,7 @@ Job 状态、权限或另一种补偿记录。具体 finalization/recovery 语�
 
 ## TASK-SVC-005 — Verify the published single-v1 product through headless journeys
 
-- Status:ready
+- Status:done（2026-09-09: GJ-1..5 all `REAL_DEVICE_PASS` on the current Catalog digest `508783ac…` — GJ-1..3 on 2026-09-08, GJ-1 §2.1 and GJ-5 on the published Runtime on 2026-09-09, GJ-4 on the published `6e8c3ed5` build on 2026-09-09 after DEC-016 (#1821/#1822) admitted the complete-overwrite recovery under the DEC-014 campaign; SVC-AC-01..10 each have a reviewable result, SVC-AC-04/08 resting on the SVC-001/003 contract tests and run records rather than a device run; App presentation checked on 2026-09-08; the eleven product defects found in the windows were fixed under their implementing Tasks and re-verified; records `docs/design/references/single-v1/svc-acceptance-2026-09-08-published-main.md`, `svc-acceptance-2026-09-09-published-main.md`, `gj-headless-rerun-2026-09-09.json`, `evidence/runs/TASK-SVC-005/run.md`）
 - Platform:macos（契约供Windows/Rust复用，本Task不实现新平台）
 - Decision grade:D1
 - Requirements/AC:SVC-AC-01, SVC-AC-02, SVC-AC-03, SVC-AC-04, SVC-AC-05, SVC-AC-06, SVC-AC-07, SVC-AC-08, SVC-AC-09, SVC-AC-10; POL-SAFETY-001, POL-TARGET-001, POL-RECOVERY-001, POL-AGENT-002

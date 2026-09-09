@@ -1,10 +1,14 @@
 # SVC acceptance on the published `5933ba84` build — 2026-09-09
 
-An execution record for `TASK-SVC-005`. It does not mark that Task done and does
-not mark CHG-2026-075 verified. This window was host-only: no device was
-connected, so no Journey result here is a device result. Journey outcomes from
-earlier windows stay attached to the builds they were taken on and are not
-restated as current.
+An execution record for `TASK-SVC-005`, kept in the order the day ran. The
+first window was host-only. The DAYU200 was connected from 07:56Z, and the
+device sections below (GJ-1 §2.1, GJ-5 twice, GJ-4 refused twice and then
+passed) are device results on the builds they name. With the last of them,
+GJ-4 `REAL_DEVICE_PASS` at 10:23Z on the published `6e8c3ed5` build, every
+Journey has a current record on Catalog digest `508783ac…` and the Task is
+marked done in the pull request that carries that section. This record does
+not mark CHG-2026-075 verified. Journey outcomes from earlier windows stay
+attached to the builds they were taken on and are not restated as current.
 
 What is new: **`session export apply` passes on the published Runtime.** It was
 the last blocker on SVC-AC-05's export leg and had failed on every previous
@@ -151,9 +155,10 @@ rollback attestation is a Journal entry, not an entry in the table above.
 | AC | Status | Basis |
 | --- | --- | --- |
 | SVC-AC-05 current durable formats | **publication, read and export all met** | A production caller publishes a Session; `session show` answers for it (#1805); and the exact finalized export completes through published typed operations with the source preserved and the device identifier redacted to a schema-valid form. `session list` still refuses while the 2026-08-02 directory is unaccounted, which is the correct whole-root contract and not an outstanding item. The earlier record's "no production caller publishes a Session" is superseded. |
+| SVC-AC-06 old state and recovery | **recovery leg met on the published Runtime** | GJ-4 on `6e8c3ed5`: the two 2026-09-07 unknown intents were never replayed (`distinct complete-overwrite capability reserved; original intents not replayed`), the r2 unknown was superseded by a complete-overwrite recovery epoch with no dispatch outside the admitted plan, and no state was reset or directory swapped. The full fault matrix stays with the contract tests, as the 2026-09-08 record says. |
 | SVC-AC-07 evidence integrity | met, re-read on this build | `job-5b91a6a9f87b23fc689aa12584469758` publishes `artifactIntegrityFailed` rather than `verified`. |
 | SVC-AC-09 current configuration | **met on the published Runtime** | The credential rebind exercised `workspace preset remove`, `runtime signing status/remove/install --build-profile --project-ref`, `workspace preset register --kind signing` and `runtime service restart` end to end on a Data Protection Keychain credential (the one refusal was #1810's defect, since merged), and the published `8a28f182` build resolved the same preset `active` on its first start. |
-| SVC-AC-10 complete delivery | **GJ-5 met on the published Runtime; GJ-4 blocked** | GJ-5 `REAL_DEVICE_PASS` twice: on `8c6a376c` + #1810 (07:56Z) and on the published `8a28f182` build (08:30Z), record `gj-headless-rerun-2026-09-09.json`. GJ-4: the acceptance window was opened under DEC-014 and the flash was refused at admission because the destructive lineage of this target is closed by two 2026-09-07 Jobs still `outcomeUnknown` — section below. |
+| SVC-AC-10 complete delivery | **met: GJ-1..5 all `REAL_DEVICE_PASS` on digest `508783ac…`** | GJ-1..3 on 2026-09-08 (`6ba5a0b9` → `16fe9617`, the 2026-09-08 record); GJ-1 §2.1 today on the published Runtime; GJ-5 twice today (`8c6a376c` + #1810 at 07:56Z, published `8a28f182` at 08:30Z); GJ-4 today on the published `6e8c3ed5` build at 10:23Z, after two refusals and the maintainer's DEC-016 — sections below. Machine record for today: `gj-headless-rerun-2026-09-09.json` (GJ-5 runs 1 and 2, GJ-4 runs 1 and 2). SVC-AC-04 and SVC-AC-08 keep their 2026-09-08 status: they rest on SVC-001's and SVC-003's contract tests and run records, not on a device run. |
 
 Every other SVC-AC row keeps the status and the build it was recorded against in
 [`svc-acceptance-2026-09-08-published-main.md`](svc-acceptance-2026-09-08-published-main.md).
@@ -436,6 +441,10 @@ record as the one that found and cleared the blocker.
 
 ## GJ-4 Flash Recovery — `BLOCKED_BY_PRODUCT_DEFECT` (window 08:18Z–08:27Z)
 
+*Superseded the same day: after the maintainer's ruling the flash passed at
+10:23Z, recorded after the maintainer options below. This section stays as
+the record of the refusal.*
+
 The maintainer gave the go and the window was run exactly as runbook §5 and
 DEC-014 say, on the `8c6a376c` + #1810 build:
 
@@ -557,15 +566,89 @@ take on its own:
 3. Accept GJ-4 as blocked on this host and close SVC-005 without it, which
    SVC-AC-10 does not allow.
 
-## Still required before this Task can be done
+The maintainer took option 1 the same day: DEC-016 (#1821), implemented under
+`TASK-AFA-001` by #1822.
 
-1. **GJ-4 needs a maintainer ruling** on the four-hour complete-overwrite
-   recovery budget for campaign-authorised windows (option 1 above), or a
-   target without unknown lineage (option 2). Every other prerequisite is in
-   place: DEC-014, the archive import, the lane plan, the device prerequisites,
-   and the refusal reason on record.
-2. Nothing further on GJ-5, which passed on the published Runtime, and nothing
-   further on the preserved incomplete Session.
+## GJ-4 Flash Recovery — `REAL_DEVICE_PASS` on the published `6e8c3ed5` build (window 10:19Z–10:25Z)
+
+DEC-016 lets an operator-named hardware acceptance campaign admit a
+complete-overwrite recovery epoch after the shared four-hour budget, and
+nothing else: coverage, cancellation, torn journals and the sixteen-epoch
+bound refuse as before. #1821 and #1822 merged into protected `main`
+`6e8c3ed5`; the helper pair was rebuilt from that commit and installed at
+10:19:14Z (daemon `02d685a0…`, CLI `6216ec38…`), Catalog digest unchanged at
+`508783ac…`. The window then ran as runbook §5 says, with the same archive
+lease, inputs and target as the two refused attempts:
+
+| Step | Result |
+| --- | --- |
+| `runtime service update --hdc … --arkforge-bundle … --arktrace-descriptor … --arkforge-campaign gj4-headless-20260909b` | exit 0 at 10:19:40Z, receipt `campaign: gj4-headless-20260909b`, health `ok`, `operation list` **30 of 30** |
+| `flash device-access` / `flash bootloader-status` / `flash prerequisites` | as in the morning: no Loader observed, `hdcNormal`, `exactBoundTarget`, `bindingRevision 2`, prerequisites satisfied |
+| `flash lane-preview --archive-sha256 4fd35765…` | `state available`, `PLAN-76e77b4b7573fbef405d86c8`, `planSha256 d8d36f7c…`, `observationMode hdc-normal` — a new plan, because the campaign name is sealed into the digest |
+| `agent run --operation flash.full-restore@1 --target TGT-958780b2ffb7 --inputs-file gj4.json --execution-id gj4-20260909b --maximum-wait 30m` | `ok true`, `state completed`; Job `job-6d1e329e44d4dfa1acf61921f9f2adad` created 10:20:45Z, terminal **`recovered`** 10:23:34Z, `outcomeUnknown false`, no human action |
+| `job evidence` | `status verified`, `blockers []`, `actualEffect destructive`, `actualStepKinds` `waitForReconnect`, `probeDevice`, `flashPartition`, `verifyRemoteState`, `rebootDevice`, `captureRemoteStdout`; `outstandingResidueCount 0`; `materializedPlanDigest 125acceb…` |
+| `artifact list` and readback | `flash-report.json` (`completeness complete`, `missingRequired []`, ten verified steps from `enter-loader-mode` through `flash-partitions`, `verify-flash-readback`, `reboot-device`, `rebind-and-verify-build` to `capture-post-flash-diagnostics`; authority `runtimeCapability CAP-RT-POLICY-75A88361…-G1`), `post-flash-facts.json` (`const.ohos.fullname OpenHarmony-7.0.0.37`, the imported build), `post-flash-hilog.txt` |
+| postflight `device candidates` / `target show` / `agent run --operation observe.device@1 --execution-id gj4-20260909b-postflight` | `TGT-958780b2ffb7` `Connected`, `bindingRevision 2` — no rebind — `systemVersion OpenHarmony-7.0.0.37`; `job-9b2b7535461c5a0fc8c3579f8e5e62e6` `succeeded`, evidence `verified`, no blockers |
+| `runtime service update` without the campaign flag | exit 0 at 10:25:21Z, `campaign: ""`, `operation list` back to 28 of 30 |
+| Job ledger | 41 before, 43 after (the flash Job and the postflight Job); `job show` after the closing restart still reads `recovered` with the same epoch |
+
+### The admission, read from the Job timeline
+
+The third and fourth timeline lines are the ruling at work:
+`complete-overwrite recovery classified epoch 2; covered intents 1`, then
+`complete-overwrite recovery admitted after the shared four-hour budget under
+hardware acceptance campaign gj4-headless-20260909b`. The engine bound the
+destructive intent to a capability of its own lineage,
+`CAP-RT-POLICY-75A88361B729732751664131798EC4D48158F977-G1` (`maximumUses 1`,
+consumed once), moved the Job `running -> recoveringByCompleteOverwrite` for
+`distinct complete-overwrite capability reserved; original intents not
+replayed`, recorded `recovery coverage 36b59977… for 1 unknown intent(s)`,
+correlated the `flash-partitions` intent with `arkforged`'s
+`JOB-000001A085AF2FC7-0003`, and closed with `superseding recovery epoch
+recovery-epoch-a985dccaca9f079e72c3ea2f7735b243 established; original
+outcomes remain unknown` and `finalizing -> recovered` for `complete
+overwrite, readback, reboot, rebind and postflight confirmed`.
+
+The epoch on `job evidence` carries the argument: `source
+distinctRecoveryExecution`, `bindingRevision 2`, one covered intent — the
+`flash-partitions` intent of `job-c9274a31cb5ba7c8aad61451416af4f4`
+(2026-09-07 08:56:28Z) with its nine possible partition effects —
+`coveredEffectSetSha256` equal to `uncertainEffectSetSha256` (`36b59977…`),
+`confirmedStepIds` `flash-partitions`, `verify-flash-readback`,
+`reboot-device`, `wait-for-hdc`, `rebind-and-verify-build`,
+`capture-post-flash-diagnostics`, `artifactSha256 4fd35765…`,
+`materializedPlanDigestSha256 125acceb…`.
+
+Two things the pass does not change. The 2026-09-07 Jobs keep their unknown
+outcomes (`waitingForRecovery`, `outcomeUnknown true`) and their capabilities
+keep `use 1 is outcomeUnknown`: the epoch supersedes the uncertain effect set
+on this binding revision, it does not rewrite history. What `job show` adds
+is the pointer — `job-c9274a31…` now carries `supersededByRecoveryEpochId
+recovery-epoch-a985dcca…`, `job-bf0b748e…` carries none. And only
+`job-c9274a31…` is covered. The 07:25Z Job
+`job-bf0b748e…` ran at `bindingRevision 1`, before the binding advanced, so it
+is outside the r2 lineage the admission scans and stays parked, as the runbook
+requires of historical unknowns.
+
+No durable record was hand-modified, no capability was created or edited, no
+unknown intent was replayed, `--rebind` was not used, and the state directory
+was neither swapped nor cleared. Captures:
+`/private/tmp/arkdeck-gj-headless-20260909/gj4b/`. Machine record:
+`gj-headless-rerun-2026-09-09.json`, GJ-4 run 2.
+
+## Nothing further is required of this Task
+
+GJ-4 passed on the published `6e8c3ed5` build, GJ-5 on the published
+`8a28f182` build, GJ-1 §2.1 today and GJ-1..3 on 2026-09-08, all on Catalog
+digest `508783ac…`. SVC-AC-01..10 each have a reviewable result between this
+record and the 2026-09-08 one; SVC-AC-04 and SVC-AC-08 rest on SVC-001's and
+SVC-003's contract tests and run records rather than on a device run, and are
+recorded as such rather than restated as device results. `TASK-SVC-005` is
+marked done in the pull request that carries this section. The change-level
+verify and archive steps for CHG-2026-075 are the maintainer's governance
+steps and are not taken here. The open items in the run record's residual
+table (the dropped `agent run` refusal reason, the alias reconciliation entry
+point) belong to `TASK-SVC-002` and `TASK-AFA-001` and do not gate this Task.
 
 Nothing further is outstanding on the preserved incomplete Session. It blocks
 `session list`, which is the correct answer to a question about the whole root,

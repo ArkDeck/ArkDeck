@@ -2,7 +2,7 @@
   "schemaVersion": "arkdeck.gj-headless-rerun/1",
   "date": "2026-09-09",
   "catalogDigest": "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
-  "runbook": "docs/design/cli-golden-journey-headless-runbook.md §6 (GJ-5)",
+  "runbook": "docs/design/cli-golden-journey-headless-runbook.md §5 (GJ-4), §6 (GJ-5)",
   "journeys": [
     {
       "date": "2026-09-09",
@@ -1267,7 +1267,7 @@
       "observations": [
         "the daemon restart that `runtime service update` performs failed twice before launchd's retry succeeded (`serverDidNotBecomeReady(\"managed HDC launch could not be bound to its live process identity\")`, then `…Supervisor could not establish registered health and generation`), health ok after 30 s; the same orphaned-managed-HDC-server restart race the 2026-09-02 record describes"
       ],
-      "notes": "The DAYU200 was not written: no Job was created, the two parked Jobs were read and reconciled by read-back only, no state was reset or replaced, and the campaign was cleared after the attempt. The recovery invocation path was then run on the maintainer's go and refused before dispatch with the durable reason completeOverwriteRecovery.sharedFourHourBudgetExpired; see recoveryInvocation.",
+      "notes": "The DAYU200 was not written: no Job was created, the two parked Jobs were read and reconciled by read-back only, no state was reset or replaced, and the campaign was cleared after the attempt. The recovery invocation path was then run on the maintainer's go and refused before dispatch with the durable reason completeOverwriteRecovery.sharedFourHourBudgetExpired; see recoveryInvocation. Superseded for acceptance by run 2: after DEC-016 (#1821/#1822) the same request was admitted as a complete-overwrite recovery epoch on the published 6e8c3ed5 build and passed.",
       "recoveryInvocation": {
         "window": {
           "campaign": "gj4-recovery-20260909",
@@ -1313,12 +1313,266 @@
           "JOB-000001A07B12F273-0002": "loader observed (vid=2207 pid=350a), partition writes from STEP-004 (uboot), typed-skip readbacks boot_linux/system/updater, DEVICE_RESET at STEP-022, STEP-023 intent; no terminal"
         },
         "decisionNeeded": "campaign-authorised complete-overwrite recovery after the four-hour budget (RuntimeRecoveryService.completeOverwriteAdmission, TASK-AFA-001 paths) or a target without unknown lineage"
-      }
+      },
+      "runNumber": 1
+    },
+    {
+      "date": "2026-09-09",
+      "goldenJourney": "GJ-4",
+      "state": "REAL_DEVICE_PASS",
+      "runNumber": 2,
+      "evidenceKind": "redacted-metadata-derived-from-real-runtime",
+      "catalogDigest": "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+      "runtimeSourceRevision": "protected main 6e8c3ed5 (#1822, DEC-016 implementation; #1821 DEC-016), local helper build installed at 2026-09-09T10:19:14Z",
+      "runtimeExecutableSHA256": "Support/ArkDeck/Toolchains/arkdeck-helpers-main-6e8c3ed5/ArkDeckCLI.app/Contents/MacOS/arkdeck",
+      "cliBuildIdentity": "sha256:6216ec38d8892e685aafb250e5c443a45641e4733c1995d65618d6d68b296304",
+      "contractIdentity": "8a662759721a2081e974306399997801246de4022047365c050107de5dce2912",
+      "hdcExecutableSHA256": "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83",
+      "hdcVersion": "3.2.0f",
+      "targetID": "TGT-958780b2ffb7",
+      "bindingRevision": 2,
+      "executionIDs": [
+        "gj4-20260909b",
+        "gj4-20260909b-postflight"
+      ],
+      "authorization": {
+        "campaign": "gj4-headless-20260909b",
+        "enabledVia": "runtime service update --arkforge-campaign (DEC-014)",
+        "enabledAtUtc": "2026-09-09T10:19:40Z",
+        "operationsWithCampaign": "30/30",
+        "disabledAtUtc": "2026-09-09T10:25:21Z",
+        "campaignAfterRun": "",
+        "operationsAfterRun": "28/30",
+        "runtimeCapability": "CAP-RT-POLICY-75A88361B729732751664131798EC4D48158F977-G1",
+        "arkforgedSHA256": "435844144822a1a679433be5b0168bf0bae3d6038539b3071de082744931370d",
+        "recoveryEpoch": "recovery-epoch-a985dccaca9f079e72c3ea2f7735b243",
+        "decision": "DEC-016: the named campaign admitted the complete-overwrite recovery epoch after the shared four-hour budget (timeline line 3)"
+      },
+      "archive": {
+        "name": "version-Daily_Version-OpenHarmony_7.0.0.37-20260811_180231-dayu200_img.tar.gz",
+        "sha256": "4fd35765fa75b9e2ce7c11f614144804f72efdc955a197e657014df1349ac674",
+        "byteCount": 730783514,
+        "importRequestId": "gj4-20260909",
+        "lease": "lease-v1:imp-56ab6e97-9a3e-4be3-bd63-f75b84f1d13d:ART-182fa0a09b38e0844fd47397b69d2ca1",
+        "reusedFromTheMorningWindow": true
+      },
+      "lanePreview": {
+        "bindingRevision": 2,
+        "observationMode": "hdc-normal",
+        "planId": "PLAN-76e77b4b7573fbef405d86c8",
+        "planSha256": "d8d36f7c3e657e30076ec1a49c484f10d6c355e845fd7694a661a17bc2e2e59b",
+        "state": "available",
+        "targetId": "TGT-958780b2ffb7"
+      },
+      "jobs": [
+        {
+          "jobID": "job-6d1e329e44d4dfa1acf61921f9f2adad",
+          "executionID": "gj4-20260909b",
+          "operationReference": "flash.full-restore@1",
+          "terminalState": "recovered",
+          "outcome": "recovered",
+          "outcomeUnknown": false,
+          "evidenceStatus": "verified",
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "outstandingResidueCount": 0,
+          "actualEffect": "destructive",
+          "actualStepKinds": [
+            "waitForReconnect",
+            "probeDevice",
+            "flashPartition",
+            "verifyRemoteState",
+            "rebootDevice",
+            "captureRemoteStdout"
+          ],
+          "artifactCount": 3,
+          "startedAtUTC": "2026-09-09T10:20:45Z",
+          "finishedAtUTC": "2026-09-09T10:23:34Z",
+          "materializedPlanDigest": "125accebd44c6f78e42405f291de25e1647b0fa79360463e989dc21b4b3b7669",
+          "recoveryEpochId": "recovery-epoch-a985dccaca9f079e72c3ea2f7735b243"
+        },
+        {
+          "jobID": "job-9b2b7535461c5a0fc8c3579f8e5e62e6",
+          "executionID": "gj4-20260909b-postflight",
+          "operationReference": "observe.device@1",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "humanActions": [],
+          "actualStepKinds": [
+            "probeHostTool",
+            "probeHDCServer",
+            "probeDevice",
+            "runApprovedRemoteRead"
+          ],
+          "bindingRevision": 2
+        }
+      ],
+      "readback": {
+        "const.ohos.fullname": "OpenHarmony-7.0.0.37",
+        "firmware": "OpenHarmony-7.0.0.37",
+        "model": "ohos",
+        "transport": "usb",
+        "flashReportCompleteness": "complete",
+        "missingRequired": [],
+        "verifiedSteps": [
+          "capture-post-flash-diagnostics",
+          "enter-loader-mode",
+          "flash-partitions",
+          "rebind-and-verify-build",
+          "rebind-loader-identity",
+          "reboot-device",
+          "verify-flash-readback",
+          "wait-for-hdc",
+          "wait-loader-disconnect",
+          "wait-loader-reconnect"
+        ]
+      },
+      "recoveryEpoch": {
+        "artifactSha256": "4fd35765fa75b9e2ce7c11f614144804f72efdc955a197e657014df1349ac674",
+        "bindingRevision": 2,
+        "confirmedStepIds": [
+          "flash-partitions",
+          "verify-flash-readback",
+          "reboot-device",
+          "wait-for-hdc",
+          "rebind-and-verify-build",
+          "capture-post-flash-diagnostics"
+        ],
+        "coverageContractVersion": "1.0.0",
+        "coveredEffectSetSha256": "36b599777d71481c57a200af15cde497c1f907d1afb9fefd6dac9f0215512678",
+        "coveredIntents": [
+          {
+            "intentEventId": "intent-flash-partitions",
+            "jobId": "job-c9274a31cb5ba7c8aad61451416af4f4",
+            "observedAtUtc": "2026-09-07T08:56:28Z",
+            "operationReference": "flash.full-restore@1",
+            "possibleEffects": [
+              "partition:uboot",
+              "partition:resource",
+              "partition:boot_linux",
+              "partition:ramdisk",
+              "partition:system",
+              "partition:vendor",
+              "partition:updater",
+              "partition:chip_ckm",
+              "partition:userdata"
+            ],
+            "profileReference": "dayu200"
+          }
+        ],
+        "epochId": "recovery-epoch-a985dccaca9f079e72c3ea2f7735b243",
+        "epochSha256": "a07d3ce3fcabaa7da6eb1a5c5368ed348c8557d30d19a9ad380ceecd0c0d85ee",
+        "establishedAtUtc": "2026-09-09T10:23:34Z",
+        "materializedPlanDigestSha256": "125accebd44c6f78e42405f291de25e1647b0fa79360463e989dc21b4b3b7669",
+        "operationReference": "flash.full-restore@1",
+        "profileReference": "dayu200",
+        "providerExecutableSha256": "435844144822a1a679433be5b0168bf0bae3d6038539b3071de082744931370d",
+        "recoveryIntentEventId": "intent-flash-partitions",
+        "recoveryJobId": "job-6d1e329e44d4dfa1acf61921f9f2adad",
+        "resultingTargetEpochSha256": "3be78d62ce0def2b7fa99a3baf77e4dceb07d3e6491fd30bcac9d3a362a39294",
+        "source": "distinctRecoveryExecution",
+        "stableTargetIdentitySha256": "94a25a89c9c214dc9f8a0cf1b2cb3703a466e132a97fa015dfdbebfc65546f42",
+        "uncertainEffectSetSha256": "36b599777d71481c57a200af15cde497c1f907d1afb9fefd6dac9f0215512678"
+      },
+      "supersession": {
+        "job-c9274a31cb5ba7c8aad61451416af4f4": {
+          "state": "waitingForRecovery",
+          "supersededByRecoveryEpochId": "recovery-epoch-a985dccaca9f079e72c3ea2f7735b243"
+        },
+        "job-bf0b748ef707e7e2ca80d8063959e6d1": {
+          "state": "waitingForRecovery",
+          "supersededByRecoveryEpochId": null,
+          "note": "its unknown belongs to bindingRevision 1 (the 2026-09-07 07:25Z attempt ran before the binding advanced to 2), so it is outside the r2 lineage this epoch covers and stays parked, as the runbook requires of historical unknowns"
+        }
+      },
+      "capabilityLineages": [
+        {
+          "capabilityId": "CAP-RT-POLICY-13179669E05E7165AD5BD108B77BD3397B7269F7-G1",
+          "consumptionCount": 1,
+          "maximumUses": 1,
+          "lineageAllowsNewExecution": false,
+          "lineageBlocker": "use 1 is outcomeUnknown"
+        },
+        {
+          "capabilityId": "CAP-RT-POLICY-D7876EA9730CF3A55F50104AF3DDE3535BC13BFC-G1",
+          "consumptionCount": 1,
+          "maximumUses": 1,
+          "lineageAllowsNewExecution": false,
+          "lineageBlocker": "use 1 is outcomeUnknown"
+        },
+        {
+          "capabilityId": "CAP-RT-POLICY-75A88361B729732751664131798EC4D48158F977-G1",
+          "consumptionCount": 1,
+          "maximumUses": 1,
+          "lineageAllowsNewExecution": false,
+          "lineageBlocker": "maximumUses exhausted"
+        }
+      ],
+      "postflight": {
+        "deviceCandidates": [
+          {
+            "adoptedTargetId": "TGT-958780b2ffb7",
+            "authorizationState": "Connected",
+            "bindingRevision": 2,
+            "systemVersion": "OpenHarmony-7.0.0.37"
+          }
+        ],
+        "bindingRevisionAfter": 2
+      },
+      "zeroDispatchChecks": [],
+      "ledger": {
+        "before": 41,
+        "after": 43,
+        "newJobs": [
+          "job-6d1e329e44d4dfa1acf61921f9f2adad",
+          "job-9b2b7535461c5a0fc8c3579f8e5e62e6"
+        ]
+      },
+      "durability": "job show after the window-closing daemon restart still reads recovered with the same recoveryEpochId",
+      "timeline": [
+        "jobCreated",
+        "queued->preflight",
+        "complete-overwrite recovery classified epoch 2; covered intents 1",
+        "complete-overwrite recovery admitted after the shared four-hour budget under hardware acceptance campaign gj4-headless-20260909b",
+        "preflight->running",
+        "reason: steps-start",
+        "ArkForge artifact prewarm started after durable admission",
+        "verify-image-bundle profile=dayu200 build=OpenHarmony-7.0.0.37 sha256=4fd35765fa75b9e2ce7c11f614144804f72efdc955a197e657014df1349ac674",
+        "host-step verify-image-bundle",
+        "hash-images profile=dayu200 build=OpenHarmony-7.0.0.37 sha256=4fd35765fa75b9e2ce7c11f614144804f72efdc955a197e657014df1349ac674",
+        "host-step hash-images",
+        "destructive intent bound to Runtime capability CAP-RT-POLICY-75A88361B729732751664131798EC4D48158F977-G1",
+        "delegated enter-loader-mode to the ArkForge lane's own plan",
+        "delegated wait-loader-disconnect to the ArkForge lane's own plan",
+        "delegated wait-loader-reconnect to the ArkForge lane's own plan",
+        "delegated rebind-loader-identity to the ArkForge lane's own plan",
+        "ArkForge artifact prewarm ready (store-hit, total 0 ms, consume wait 0 ms)",
+        "capability consumed before first mutation",
+        "running->recoveringByCompleteOverwrite",
+        "reason: distinct complete-overwrite capability reserved; original intents not replayed",
+        "recovery coverage 36b599777d71481c57a200af15cde497c1f907d1afb9fefd6dac9f0215512678 for 1 unknown intent(s)",
+        "intent flash-partitions correlated daemon-job=JOB-000001A085AF2FC7-0003",
+        "delegated reboot-device to the ArkForge lane's own plan",
+        "delegated wait-for-hdc to the ArkForge lane's own plan",
+        "delegated rebind-and-verify-build to the ArkForge lane's own plan",
+        "artifact post-flash-facts.json -> ART-119806d8627bfa0a061390404179287a",
+        "intent capture-post-flash-diagnostics",
+        "verified capture-post-flash-diagnostics [\"byteCount\", \"debugRuntime\", \"recordID\", \"recordId\", \"verification\"]",
+        "artifact post-flash-hilog.txt -> ART-4c11a6f41ecda3022082106a2321b3e9",
+        "host-step finalize-session",
+        "recoveringByCompleteOverwrite->finalizing",
+        "reason: steps-complete",
+        "superseding recovery epoch recovery-epoch-a985dccaca9f079e72c3ea2f7735b243 established; original outcomes remain unknown",
+        "finalizing->recovered",
+        "reason: complete overwrite, readback, reboot, rebind and postflight confirmed"
+      ],
+      "notes": "The terminal state is `recovered`, the engine's terminal for a superseding complete-overwrite recovery epoch (`complete overwrite, readback, reboot, rebind and postflight confirmed`), with evidence status verified and no blocker; it is the state a full restore reaches when it also supersedes earlier unknown outcomes on the lineage."
     }
   ],
   "operationRealDeviceCoverage": {
     "catalogDigest": "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
-    "window": "GJ-5 twice (candidate build 07:56Z, published Runtime 08:30Z) and the GJ-4 attempt (no Job); GJ-1..3 coverage on this digest is in svc-acceptance-2026-09-08-published-main.md, GJ-1 §2.1 in svc-acceptance-2026-09-09-published-main.md",
+    "window": "GJ-5 twice (candidate build 07:56Z, published Runtime 08:30Z), the refused GJ-4 attempts (no Job) and GJ-4 REAL_DEVICE_PASS on the published 6e8c3ed5 build at 10:20Z; GJ-1..3 coverage on this digest is in svc-acceptance-2026-09-08-published-main.md, GJ-1 §2.1 in svc-acceptance-2026-09-09-published-main.md",
     "operations": [
       {
         "operationReference": "analyzer.analyze-trace@1",
@@ -1391,8 +1645,10 @@
       {
         "operationReference": "flash.full-restore@1",
         "availability": "unavailable",
-        "state": "notExercised",
-        "jobIDs": []
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-6d1e329e44d4dfa1acf61921f9f2adad"
+        ]
       },
       {
         "operationReference": "input.long-press@1",
@@ -1415,8 +1671,10 @@
       {
         "operationReference": "observe.device@1",
         "availability": "available",
-        "state": "notExercised",
-        "jobIDs": []
+        "state": "realDevicePass",
+        "jobIDs": [
+          "job-9b2b7535461c5a0fc8c3579f8e5e62e6"
+        ]
       },
       {
         "operationReference": "port-forward.create@1",
