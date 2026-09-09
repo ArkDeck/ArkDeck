@@ -47,7 +47,7 @@ digests needed to re-check them.
 | A pre-publication export refusal reports `outcomeUnknown` and consumes the preview; three previews on this host are stranded in `applying` | TASK-SVC-002, #1800 merged. **Not exercised on the published Runtime** — every refusal reachable from the published surface is raised before the preview is claimed, so the fix rests on its contract tests and the gate. The three stranded previews are not released retroactively. |
 | ~~`session list`/`session show` refuse on a catalog the export path completes against~~ | **Resolved.** The distinction was deliberate: a whole-root answer cannot be partial, an exact answer about one named Session can. `show` was on the wrong side of it — repaired by #1805 and verified on the published Runtime. `list` still refuses, correctly, and names the leaf. |
 | `flash.full-restore@1` is Catalog-`unavailable` on this host (no named hardware acceptance campaign) | maintainer window, independent of the alias blocker |
-| GJ-1 §2.1 HAR crash-resume still not demonstrated | needs a physical USB detach and reattach. The execution named `gj1-har-20260908` completed with `humanAction: null` and a straight `queued→preflight→running→finalizing→succeeded` timeline, so it did not exercise the path its name claims. |
+| ~~GJ-1 §2.1 HAR crash-resume still not demonstrated~~ | **`REAL_DEVICE_PASS` 2026-09-09.** Executed on the published Runtime with the real DAYU200: `agent run` with no target parked a `physicalConnection` HAR at exit 75 with `newDispatchCount 0`, the receipt was discarded unread, and recovery from the execution id alone produced the identical `resumeReference` through `agent status` and `human-action show`. After resume the action reads `resolvedByFreshProbe`, `job-49720bb2a6c389007eb44e1998f7160f` is `succeeded` with no blockers, and all three Artifacts stay on `TGT-958780b2ffb7` at `bindingRevision 2` — no rebind. |
 | GJ-5 not started; `workspace.sign-openharmony-hap@1` unavailable | **Blocker diagnosed 2026-09-09.** The signing credential `credential:sha256-562430f169…` is bound to `projectRef: demo-app`, which is not a registered project, so the signing preset fails its startup binding check and is projected as `runtimeRestartRequired` — a remedy no restart can satisfy. Remedy is `runtime signing install --project-ref project-fd677365f7bdefabda66a3c1`, a maintainer action requiring the credential material. |
 | The preset resolution failure is discarded and shown as `runtimeRestartRequired`; `runtime signing status` reports `ready: true` for a credential no registered project can use | needs a scope revision — `RuntimeWorkspaceProjectStore.swift` and `ArkDeckAgentDaemonMain/main.swift` are in no SVC Task's Allowed paths in this change |
 
@@ -56,10 +56,8 @@ digests needed to re-check them.
 1. Wire the alias reconciliation entry point, then clear GJ-4's second gate —
    `flash.full-restore@1` is separately Catalog-`unavailable` for want of a
    named hardware acceptance campaign.
-3. Run GJ-1 §2.1 HAR crash-resume (physical detach and reattach), which
-   `gj1-har-20260908` did not exercise.
-4. Run GJ-5.
-5. Nothing further on the preserved incomplete Session: it blocks only
+3. Run GJ-5.
+4. Nothing further on the preserved incomplete Session: it blocks only
    `session list`, which is the correct whole-root contract.
 
 Each Journey result stays attached to the build it was taken on and is not
