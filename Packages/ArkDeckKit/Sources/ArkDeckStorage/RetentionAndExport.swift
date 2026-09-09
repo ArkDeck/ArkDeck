@@ -1066,18 +1066,45 @@ package struct SessionDiagnosticExporter: Sendable {
     "recovery.recoveryOfJobId",
   ]
 
+  /// Workflow arguments whose value must still be an ArkDeck identifier after
+  /// redaction, so they take `redactSchemaIdentifier` rather than the free-text
+  /// scrubber.
+  ///
+  /// This has to cover every argument `WorkflowStep` validates with
+  /// `identifier(...)`. When one is missing, the free-text scrubber replaces a
+  /// value that *is* a device identifier with `[REDACTED-DEVICE-ID]`, whose
+  /// brackets no ArkDeck identifier may contain — so the export writes a
+  /// document its own validator then refuses. `WorkflowStepRedactionContractTests`
+  /// derives the required set from `WorkflowStep.swift` and fails if this list
+  /// falls behind it.
   private static let workflowArgumentIdentifierKeys: Set<String> = [
-    "artifactId", "artifactSeriesId", "bufferId", "captureStepId", "clientIdentity",
-    "confirmationId", "evidencePolicy", "forwardId", "imageArtifactId", "inputArtifactIds",
-    "outputArtifactId", "ownershipEvidenceId", "packageArtifactId", "probeId", "processorId",
-    "name", "profileId", "promptKey", "reason", "safeBoundaryId", "sessionId",
-    "snapshotStepId",
-    "sourceArtifactId", "stopPolicy", "toolIdentity", "volumeIdentity",
+    "artifactId", "artifactSeriesId", "buildPresetRef", "bufferId", "captureStepId",
+    "clientIdentity", "confirmationId", "dumpArtifactId", "evidencePolicy", "forwardId",
+    "imageArtifactId", "inputArtifactId", "inputArtifactIds", "outputArtifactId",
+    "ownershipEvidenceId", "packageArtifactId", "patchArtifactId", "patchAttemptRef",
+    "probeId", "processorId", "projectRef",
+    "name", "profileId", "promptKey", "reason", "safeBoundaryId",
+    "semanticResultPolicy", "sessionId", "snapshotStepId", "sourceArtifactId",
+    "sourceProjectRef", "stopPolicy", "symbolPresetRef", "testPresetRef", "toolIdentity",
+    "validationPolicy", "volumeIdentity", "workspaceProjectRef",
   ]
 
+  /// Workflow arguments the validator reads as a SHA-256, so redaction must
+  /// leave them exactly as they are.
+  ///
+  /// Neither replacement the scrubber has produces a valid digest: the
+  /// free-text sentinel is not hex, and the schema-safe pseudonym is 40
+  /// characters of the wrong shape. A digest whose text happens to contain a
+  /// device identifier — four bytes is enough to match, so a short identity
+  /// collides with hex by chance — would be rewritten into something its own
+  /// reader rejects. Preserving them keeps content digests verifiable; they
+  /// identify bytes, not a device. This has to cover every argument
+  /// `WorkflowStep` validates with `sha256(...)` or `optionalSHA256(...)`, and
+  /// `WorkflowStepRedactionContractTests` fails if it falls behind.
   private static let workflowArgumentDigestKeys: Set<String> = [
-    "expectedSha256", "impactSnapshotHash", "imageSha256", "packageSha256", "scopeHash",
-    "sourceSha256",
+    "allowedFileScopesDigest", "dumpSha256", "expectedSha256", "expectedWorkspaceRevision",
+    "imageSha256", "impactSnapshotHash", "inputSha256", "packageSha256", "patchSha256",
+    "scopeHash", "sourceSha256", "workspaceRevision",
   ]
 
   private func exportLineage(for artifact: ArtifactRecord, redacted: Bool) -> String {

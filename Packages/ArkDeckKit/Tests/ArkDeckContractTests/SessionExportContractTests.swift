@@ -463,6 +463,78 @@ final class SessionExportContractTests: XCTestCase {
   /// One finalized Session holding a sensitive raw Artifact and a log
   /// Artifact, the smallest inventory that exercises both privacy branches.
   @discardableResult
+  /// Redaction has three outcomes for a manifest string: the free-text
+  /// `[REDACTED-DEVICE-ID]` sentinel, a pseudonym that is still a valid ArkDeck
+  /// identifier, or preservation. Workflow arguments choose between them
+  /// through two hand-kept key lists in `RetentionAndExport`, while the rule
+  /// they have to satisfy lives in `WorkflowStep`: an argument read with
+  /// `identifier` must still parse as one afterwards, and an argument read with
+  /// `sha256` must still be a digest. The sentinel is neither, and the
+  /// pseudonym is not a digest.
+  ///
+  /// Found on the reference host: a `projectRef` that was also the Job's target
+  /// id landed in the manifest's device-identifier set, `projectRef` was missing
+  /// from the identifier list, and the export produced a manifest its own
+  /// validation then refused. The digest list was short by six the same way —
+  /// four bytes is enough to match, so a short device identity collides with hex
+  /// by chance. Lists that must agree with a validator cannot be kept by hand,
+  /// so this derives what each one owes and fails on the difference.
+  func testRedactionCoversEveryValidatedWorkflowArgument() throws {
+    let packageRoot = URL(filePath: #filePath)
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+      .deletingLastPathComponent()
+    let validatorSource = try String(
+      contentsOf: packageRoot.appending(path: "Sources/ArkDeckCore/WorkflowStep.swift"),
+      encoding: .utf8)
+    let redactionSource = try String(
+      contentsOf: packageRoot.appending(path: "Sources/ArkDeckStorage/RetentionAndExport.swift"),
+      encoding: .utf8)
+
+    for (readers, list, minimum, requirement) in [
+      (
+        "identifier|optionalIdentifier|identifierArray", "workflowArgumentIdentifierKeys", 30,
+        "stay ArkDeck identifiers after redaction and need the schema-safe pseudonym"
+      ),
+      (
+        "sha256|optionalSHA256", "workflowArgumentDigestKeys", 10,
+        "stay SHA-256 digests after redaction and must be preserved"
+      ),
+    ] {
+      let required = try Self.quotedMatches(
+        in: validatorSource,
+        pattern: #"reader\.(?:\#(readers))\(\s*"([^"]+)""#)
+      // A scan that silently stopped matching would turn this gate into a pass
+      // for everything, so it has to find the population it constrains.
+      XCTAssertGreaterThan(
+        required.count, minimum,
+        "the \(readers) scan found \(required.count) keys; the reader spelling changed")
+
+      guard
+        let declaration = redactionSource.range(
+          of: #"\#(list): Set<String> = \[[^\]]*\]"#, options: .regularExpression)
+      else {
+        XCTFail("\(list) was renamed or reshaped; this gate cannot read it")
+        continue
+      }
+      let allowed = try Self.quotedMatches(
+        in: String(redactionSource[declaration]), pattern: #""([^"]+)""#)
+
+      XCTAssertEqual(
+        required.subtracting(allowed).sorted(), [],
+        "these arguments \(requirement); \(list) is behind \(readers)")
+    }
+  }
+
+  private static func quotedMatches(in source: String, pattern: String) throws -> Set<String> {
+    let expression = try NSRegularExpression(pattern: pattern)
+    let range = NSRange(source.startIndex..<source.endIndex, in: source)
+    return Set(
+      expression.matches(in: source, range: range).compactMap { match in
+        Range(match.range(at: 1), in: source).map { String(source[$0]) }
+      })
+  }
+
   private func finalizedSession(id: String, timestamp: String) throws -> URL {
     let session = sessionsRoot
       .appending(path: "2026", directoryHint: .isDirectory)
