@@ -228,6 +228,76 @@ final class HostStoreTraceShadowTests: XCTestCase {
     }
   }
 
+  func testTraceFilesystemPermissionsAndExistingLocks() async throws {
+    let cases = ["root-public", "trace-public", "entry-public", "metadata-public", "metadata-hardlink",
+      "key-public", "lease-public", "key-hardlink", "lease-hardlink", "key-readonly", "lease-readonly",
+      "key-large", "lease-large", "key-missing", "lease-missing", "locks-missing", "leases-missing",
+      "key-directory", "lease-directory", "key-symlink", "lease-symlink", "metadata-empty", "metadata-large"]
+    let refused: Set<String> = ["key-readonly", "lease-readonly", "key-large", "key-directory", "lease-directory", "key-symlink", "lease-symlink"]
+    let unaccounted: Set<String> = ["key-missing", "lease-missing", "locks-missing", "leases-missing", "metadata-empty", "metadata-large"]
+    for name in cases {
+      try FileManager.default.removeItem(at: cache)
+      try directory(cache)
+      let service = try ArkDeckTraceCacheMaintenanceService(cachesDirectory: root)
+      let trace = cache.appending(path: traceName), entry = trace.appending(path: parserName)
+      try directory(entry)
+      let metadataURL = entry.appending(path: "metadata.json")
+      try file(Data([1, 2, 3]), at: entry.appending(path: "database.sqlite"))
+      try file(JSONSerialization.data(withJSONObject: metadata(), options: [.sortedKeys]), at: metadataURL)
+      let id = hash(Data("\(traceName):\(parserName)".utf8))
+      let locks = cache.appending(path: ".locks"), leases = cache.appending(path: ".leases")
+      try directory(locks); try directory(leases)
+      let key = locks.appending(path: id + ".lock"), lease = leases.appending(path: id + ".lease")
+      try file(Data(), at: key); try file(Data(), at: lease)
+      let target: URL = name.hasPrefix("key-") ? key : name.hasPrefix("lease-") ? lease : metadataURL
+      switch name {
+      case "root-public", "trace-public", "entry-public":
+        let path = name == "root-public" ? cache! : name == "trace-public" ? trace : entry
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: path.path)
+      case "metadata-public", "key-public", "lease-public":
+        try FileManager.default.setAttributes([.posixPermissions: 0o644], ofItemAtPath: target.path)
+      case "metadata-hardlink", "key-hardlink", "lease-hardlink":
+        try FileManager.default.linkItem(at: target, to: root.appending(path: "hardlink-" + name))
+      case "key-readonly", "lease-readonly":
+        try FileManager.default.setAttributes([.posixPermissions: 0o400], ofItemAtPath: target.path)
+      case "key-large", "lease-large": try file(Data(repeating: 0, count: 4097), at: target)
+      case "key-missing", "lease-missing": try FileManager.default.removeItem(at: target)
+      case "locks-missing": try FileManager.default.removeItem(at: locks)
+      case "leases-missing": try FileManager.default.removeItem(at: leases)
+      case "key-directory", "lease-directory":
+        try FileManager.default.removeItem(at: target); try directory(target)
+      case "key-symlink", "lease-symlink":
+        try FileManager.default.removeItem(at: target)
+        try FileManager.default.createSymbolicLink(at: target, withDestinationURL: root.appending(path: "original.htrace"))
+      case "metadata-empty": try file(Data(), at: metadataURL)
+      case "metadata-large": try file(Data(repeating: 32, count: 16_385), at: metadataURL)
+      default: XCTFail("missing filesystem fixture")
+      }
+      // Rust reads before Swift, whose existing inventory may normalize root
+      // directory permissions. Only the isolated Swift oracle may do so.
+      let before = try snapshot()
+      let result = try rust()
+      XCTAssertEqual(try snapshot(), before, name + " Rust must retain bytes, permissions and links")
+      if refused.contains(name) {
+        do { _ = try await service.inventory(); XCTFail("Swift accepted " + name) }
+        catch { }
+        XCTAssertEqual(result.status, 65, name)
+        XCTAssertTrue(result.output.isEmpty, name)
+        try record("trace-filesystem-" + name, input: before, output: Data(), outcome: "refused")
+      } else {
+        let swift = try await service.inventory()
+        XCTAssertEqual(swift.activeEntryCount, unaccounted.contains(name) ? 1 : 0, name)
+        let projection: [String: Any] = ["schemaVersion": "arkdeck.trace-cache-status/1", "entryCount": swift.entryCount,
+          "totalByteCount": String(swift.totalByteCount), "activeEntryCount": swift.activeEntryCount,
+          "inactiveEntryCount": swift.entryCount - swift.activeEntryCount, "purgeScope": "inactiveDerivedDatabases"]
+        let bytes = try JSONSerialization.data(withJSONObject: projection, options: [.sortedKeys, .withoutEscapingSlashes])
+        XCTAssertEqual(result.status, 0, name)
+        XCTAssertEqual(result.output, bytes + Data([10]), name)
+        try record("trace-filesystem-" + name, input: before, output: bytes, outcome: "equal")
+      }
+    }
+  }
+
   private func compare(_ name: String, service: ArkDeckTraceCacheMaintenanceService) async throws {
     let before = try snapshot()
     let swift = try await service.inventory()
@@ -283,13 +353,16 @@ final class HostStoreTraceShadowTests: XCTestCase {
   private func hash(_ bytes: Data) -> String { SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined() }
 
   private func snapshot() throws -> Data {
-    let paths = try FileManager.default.subpathsOfDirectory(atPath: cache.path).sorted()
+    let paths = ["."] + (try FileManager.default.subpathsOfDirectory(atPath: cache.path).sorted())
     var values: [[String: String]] = []
     for path in paths {
       let url = cache.appending(path: path)
       let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
       let type = try XCTUnwrap(attributes[.type] as? FileAttributeType)
       var value = ["path": path, "type": type.rawValue]
+      for key in [FileAttributeKey.posixPermissions, .referenceCount, .systemNumber, .systemFileNumber] {
+        value[key.rawValue] = String(describing: try XCTUnwrap(attributes[key]))
+      }
       if type == .typeRegular { value["sha256"] = hash(try Data(contentsOf: url)) }
       if type == .typeSymbolicLink { value["link"] = try FileManager.default.destinationOfSymbolicLink(atPath: url.path) }
       values.append(value)

@@ -310,17 +310,18 @@ fn available(
     root: &HostDirectory,
     name: &str,
     filename: &str,
+    maximum: Option<u64>,
 ) -> io::Result<Option<arkdeck_platform::HostReadLock>> {
     let directory = match root.child(name) {
         Ok(directory) => directory,
         Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
         Err(error) => return Err(error),
     };
-    directory.try_lock_existing(filename)
+    directory.try_trace_lock_existing(filename, maximum)
 }
 
 pub fn trace_inventory(path: &Path) -> io::Result<Value> {
-    let root = HostDirectory::open(path)?;
+    let root = HostDirectory::open_trace_inventory(path)?;
     let mut count = 0usize;
     let mut total = 0i64;
     let mut active = 0usize;
@@ -367,16 +368,18 @@ pub fn trace_inventory(path: &Path) -> io::Result<Value> {
             let id = arkdeck_contract::sha256_hex(
                 format!("{}:{}", metadata.key.trace_sha256, metadata.key.parser_key).as_bytes(),
             );
-            let Some(_key_lock) = available(&root, ".locks", &format!("{id}.lock"))? else {
+            let Some(_key_lock) = available(&root, ".locks", &format!("{id}.lock"), Some(4096))?
+            else {
                 active += 1;
                 continue;
             };
-            let Some(_lease) = available(&root, ".leases", &format!("{id}.lease"))? else {
+            let Some(_lease) = available(&root, ".leases", &format!("{id}.lease"), None)? else {
                 active += 1;
                 continue;
             };
         }
     }
+    root.validate_path(path)?;
     Ok(
         json!({"schemaVersion": "arkdeck.trace-cache-status/1", "entryCount": count,
         "totalByteCount": total.to_string(), "activeEntryCount": active,

@@ -12,18 +12,20 @@ pub struct HostDirectory(File, Ownership);
 #[derive(Clone, Copy)]
 enum Ownership {
     Private,
+    TraceInventory,
     SessionTree { device: u64 },
 }
 impl Ownership {
     fn mode_mask(self) -> u32 {
         match self {
             Self::Private => 0o077,
+            Self::TraceInventory => 0,
             Self::SessionTree { .. } => 0o022,
         }
     }
     fn same_volume(self, device: u64) -> bool {
         match self {
-            Self::Private => true,
+            Self::Private | Self::TraceInventory => true,
             Self::SessionTree { device: root } => root == device,
         }
     }
@@ -64,11 +66,12 @@ fn segment(name: &str) -> io::Result<CString> {
 }
 fn owned(file: &File, directory: bool, ownership: Ownership) -> io::Result<()> {
     let stat = file.metadata()?;
-    if stat.uid() != unsafe { libc::geteuid() }
+    let trace = matches!(ownership, Ownership::TraceInventory);
+    if (!trace && stat.uid() != unsafe { libc::geteuid() })
         || stat.mode() & ownership.mode_mask() != 0
         || !ownership.same_volume(stat.dev())
         || (directory && !stat.is_dir())
-        || (!directory && (!stat.is_file() || stat.nlink() != 1))
+        || (!directory && (!stat.is_file() || (!trace && stat.nlink() != 1)))
     {
         return Err(fail());
     }
@@ -78,6 +81,24 @@ fn owned(file: &File, directory: bool, ownership: Ownership) -> io::Result<()> {
 impl HostDirectory {
     pub fn open(path: &Path) -> io::Result<Self> {
         Self::open_root(path, false)
+    }
+
+    /// ArkTrace inventory measures readable entries without imposing the
+    /// private writer's permission or single-link rules. Its root must still be
+    /// owned by this user, as Swift's root chmod requires. No chmod is performed.
+    pub fn open_trace_inventory(path: &Path) -> io::Result<Self> {
+        if !path.is_absolute() || path.canonicalize()? != path {
+            return Err(fail());
+        }
+        let file = OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+            .open(path)?;
+        if file.metadata()?.uid() != unsafe { libc::geteuid() } {
+            return Err(fail());
+        }
+        owned(&file, true, Ownership::TraceInventory)?;
+        Ok(Self(file, Ownership::TraceInventory))
     }
 
     /// SessionRetentionCatalog's existing owner/same-volume/no-public-write
@@ -128,12 +149,16 @@ impl HostDirectory {
     }
 
     fn open_at(&self, name: &str, flags: i32) -> io::Result<File> {
+        self.open_at_access(name, flags, libc::O_RDONLY)
+    }
+
+    fn open_at_access(&self, name: &str, flags: i32, access: i32) -> io::Result<File> {
         let name = segment(name)?;
         let fd = unsafe {
             libc::openat(
                 self.0.as_raw_fd(),
                 name.as_ptr(),
-                libc::O_RDONLY | libc::O_CLOEXEC | libc::O_NOFOLLOW | libc::O_NONBLOCK | flags,
+                access | libc::O_CLOEXEC | libc::O_NOFOLLOW | libc::O_NONBLOCK | flags,
             )
         };
         if fd < 0 {
@@ -268,6 +293,39 @@ impl HostDirectory {
             return Err(fail());
         }
         Ok(bytes)
+    }
+
+    /// Match ArkTrace's existing lock probe. O_RDWR is needed to preserve its
+    /// refusal of read-only lock files; no creation, truncation or write occurs.
+    /// Key locks are bounded to 4096 bytes; entry leases have no size bound.
+    pub fn try_trace_lock_existing(
+        &self,
+        name: &str,
+        maximum: Option<u64>,
+    ) -> io::Result<Option<HostReadLock>> {
+        if !matches!(self.1, Ownership::TraceInventory) {
+            return Err(fail());
+        }
+        let file = match self.open_at_access(name, 0, libc::O_RDWR) {
+            Ok(file) => file,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+            Err(error) => return Err(error),
+        };
+        owned(&file, false, self.1)?;
+        let size = file.metadata()?.len();
+        if maximum.is_some_and(|limit| size > limit) {
+            return Err(fail());
+        }
+        if unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } != 0 {
+            let error = io::Error::last_os_error();
+            if error.kind() == io::ErrorKind::WouldBlock {
+                return Ok(None);
+            }
+            return Err(error);
+        }
+        let lock = HostReadLock { file };
+        lock.validate_link(self, name)?;
+        Ok(Some(lock))
     }
 
     pub fn try_lock_existing(&self, name: &str) -> io::Result<Option<HostReadLock>> {

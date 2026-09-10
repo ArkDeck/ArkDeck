@@ -122,6 +122,8 @@ EXPECTED = {
     "trace-entry-symlink": "refused", "trace-entry-overflow": "refused",
     **{f"trace-integer-{field}-{i}": "equal" for field in range(7) for i in range(36)},
     **{f"trace-structure-{i}": "equal" for i in range(125)},
+    **{f"trace-filesystem-{name}": "equal" for name in ("root-public", "trace-public", "entry-public", "metadata-public", "metadata-hardlink", "key-public", "lease-public", "key-hardlink", "lease-hardlink", "lease-large", "key-missing", "lease-missing", "locks-missing", "leases-missing", "metadata-empty", "metadata-large")},
+    **{f"trace-filesystem-{name}": "refused" for name in ("key-readonly", "lease-readonly", "key-large", "key-directory", "lease-directory", "key-symlink", "lease-symlink")},
     **{f"trace-date-{field}-{i}": "equal" for field in ("createdAt", "lastAccessedAt") for i in range(18)},
     **{f"session-{state}": "equal" for state in ("policy", "custom-root", "maximum-quota")},
     "session-extra-policy-field": "refused", "session-extra-document-field": "refused",
