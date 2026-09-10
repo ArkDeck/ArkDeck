@@ -3,7 +3,10 @@
 use crate::session_manifest::{ManifestError, ManifestSummary, decode_manifest, identifier};
 use crate::session_time::session_timestamp;
 use crate::{decode_session_configuration, roundtrip};
-use arkdeck_platform::{HostDirectory, HostEntryKind, host_gregorian_add_days};
+use arkdeck_platform::{
+    DocumentPublishError, HostDirectory, HostEntryKind, host_gregorian_add_days,
+    host_gregorian_timestamp,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
@@ -191,6 +194,16 @@ fn catalog(root: &HostDirectory) -> Option<Catalog> {
 }
 
 pub fn session_inventory(configuration: &[u8], path: &Path) -> io::Result<Value> {
+    inventory(configuration, path, false)
+}
+
+/// Scan and durably reconcile the retention catalog of a private Session root.
+/// Existing unknown or corrupt entries are never registered, erased, or repaired.
+pub fn session_inventory_owned(configuration: &[u8], path: &Path) -> io::Result<Value> {
+    inventory(configuration, path, true)
+}
+
+fn inventory(configuration: &[u8], path: &Path, owns_catalog: bool) -> io::Result<Value> {
     let mut projection = decode_session_configuration(configuration)
         .map_err(|_| invalid())?
         .projection;
@@ -209,12 +222,21 @@ pub fn session_inventory(configuration: &[u8], path: &Path) -> io::Result<Value>
         .parse::<u64>()
         .map_err(|_| invalid())?;
     let root = HostDirectory::open_session_tree(path)?;
-    let lock = root.try_lock_existing(LOCK)?.ok_or_else(|| {
-        io::Error::new(
-            io::ErrorKind::WouldBlock,
-            "Session snapshot lock unavailable",
-        )
-    })?;
+    let owner = if owns_catalog {
+        Some(HostDirectory::open(path)?)
+    } else {
+        None
+    };
+    let lock = if let Some(owner) = &owner {
+        owner.lock_document(LOCK)?
+    } else {
+        root.try_lock_existing(LOCK)?.ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::WouldBlock,
+                "Session snapshot lock unavailable",
+            )
+        })?
+    };
     let marker = root.read(LOCK, 1)?;
     if !marker.is_empty() && marker != [0xA5] {
         return Err(invalid());
@@ -235,21 +257,40 @@ pub fn session_inventory(configuration: &[u8], path: &Path) -> io::Result<Value>
     let absent =
         matches!(root.kind_and_size(METADATA), Err(e) if e.kind() == io::ErrorKind::NotFound);
     let current = catalog(&root);
+    let seal_existing = owns_catalog && fresh && current.is_some();
     let mut catalog_generation = None;
+    let mut publication = None;
     let (mut session_count, mut pinned_count, mut pinned_bytes) = (0_usize, 0_usize, 0_u64);
     let expiry = |at| -> io::Result<f64> {
         host_gregorian_add_days(at, i32::try_from(days).map_err(|_| invalid())?).ok_or_else(invalid)
     };
     if absent && fresh {
-        // Predict the current owner's first catalog, without writing it.
+        let mut entries = Vec::new();
         for row in &tree.sessions {
             if !duplicates.contains(&row.manifest.session_id) {
-                expiry(row.manifest.completed_at)?;
+                let expires = expiry(row.manifest.completed_at)?;
+                if owns_catalog {
+                    entries.push(Entry {
+                        session_id: row.manifest.session_id.clone(),
+                        completed_at: host_gregorian_timestamp(row.manifest.completed_at)
+                            .ok_or_else(invalid)?,
+                        expires_at: host_gregorian_timestamp(expires).ok_or_else(invalid)?,
+                        is_pinned: false,
+                        policy_generation: generation,
+                    });
+                }
                 session_count += 1;
             }
         }
         catalog_generation = Some(0);
-    } else if let Some(doc) = current {
+        if owns_catalog {
+            publication = Some(Catalog {
+                schema_version: "1.0.0".into(),
+                generation: 0,
+                entries,
+            });
+        }
+    } else if let Some(mut doc) = current {
         let by_id: BTreeMap<_, _> = doc
             .entries
             .iter()
@@ -257,6 +298,7 @@ pub fn session_inventory(configuration: &[u8], path: &Path) -> io::Result<Value>
             .collect();
         let mut retained = BTreeSet::new();
         let mut changed = false;
+        let mut updated = BTreeMap::new();
         for row in &tree.sessions {
             let id = row.manifest.session_id.as_str();
             let entry = by_id.get(id).copied().filter(|e| {
@@ -272,6 +314,13 @@ pub fn session_inventory(configuration: &[u8], path: &Path) -> io::Result<Value>
                 || entry.policy_generation != generation
             {
                 changed = true;
+                if owns_catalog {
+                    let mut next = entry.clone();
+                    next.expires_at = host_gregorian_timestamp(expiry(row.manifest.completed_at)?)
+                        .ok_or_else(invalid)?;
+                    next.policy_generation = generation;
+                    updated.insert(id.to_owned(), next);
+                }
             }
             retained.insert(id.to_owned());
             if entry.is_pinned {
@@ -296,6 +345,20 @@ pub fn session_inventory(configuration: &[u8], path: &Path) -> io::Result<Value>
         } else {
             doc.generation
         });
+        if owns_catalog && changed {
+            doc.entries.retain(|entry| {
+                tree.unscoped
+                    || retained.contains(&entry.session_id)
+                    || observed.contains(&entry.session_id)
+            });
+            for entry in &mut doc.entries {
+                if let Some(next) = updated.remove(&entry.session_id) {
+                    *entry = next;
+                }
+            }
+            doc.generation = catalog_generation.ok_or_else(invalid)?;
+            publication = Some(doc);
+        }
     } else {
         tree.incomplete = true;
         for row in &tree.sessions {
@@ -310,6 +373,28 @@ pub fn session_inventory(configuration: &[u8], path: &Path) -> io::Result<Value>
     }
     root.validate_path(path)?;
     lock.validate_link(&root, LOCK)?;
+    if let Some(mut document) = publication {
+        let owner = owner.as_ref().ok_or_else(invalid)?;
+        document
+            .entries
+            .sort_by(|a, b| a.session_id.cmp(&b.session_id));
+        let value = serde_json::to_value(document).map_err(|_| invalid())?;
+        let bytes = serde_json::to_vec(&value).map_err(|_| invalid())?;
+        owner
+            .publish_document(METADATA, &bytes, 16 * 1024 * 1024)
+            .map_err(|error| match error {
+                DocumentPublishError::BeforePublication(error) => error,
+                DocumentPublishError::OutcomeUnknown(error) => io::Error::other(format!(
+                    "Session catalog publication outcome unknown: {error}"
+                )),
+            })?;
+        lock.mark_catalog_initialized(owner, LOCK)?;
+        owner.validate_path(path)?;
+    } else if seal_existing {
+        let owner = owner.as_ref().ok_or_else(invalid)?;
+        lock.mark_catalog_initialized(owner, LOCK)?;
+        owner.validate_path(path)?;
+    }
     let fields = projection.as_object_mut().ok_or_else(invalid)?;
     fields.insert(
         "schemaVersion".into(),
@@ -325,4 +410,84 @@ pub fn session_inventory(configuration: &[u8], path: &Path) -> io::Result<Value>
         "sessionCount": session_count.to_string(), "pinnedSessionCount": pinned_count.to_string(),
         "unaccountedSessionCount": tree.unknown.len().to_string(), "measurementIncomplete": tree.incomplete}));
     Ok(projection)
+}
+
+#[cfg(test)]
+mod owner_tests {
+    use super::*;
+    use std::{fs, os::unix::fs::DirBuilderExt, path::PathBuf};
+    struct Root(PathBuf);
+    impl Root {
+        fn new() -> Self {
+            let nonce = u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap());
+            let path = std::env::temp_dir()
+                .canonicalize()
+                .unwrap()
+                .join(format!("session-owner-{nonce:x}"));
+            fs::DirBuilder::new().mode(0o700).create(&path).unwrap();
+            Self(path)
+        }
+        fn config(&self) -> Vec<u8> {
+            let mut bytes = serde_json::to_vec(&json!({"schemaVersion":"arkdeck.session-storage-store/1", "generation":1,
+                "rootKind":"default", "rootPath":self.0, "policy":{"totalQuotaBytes":20000,"safetyMarginBytes":1000,"retentionDays":90}})).unwrap();
+            bytes.push(b'\n');
+            bytes
+        }
+        fn scan(&self) -> Value {
+            session_inventory_owned(&self.config(), &self.0).unwrap()
+        }
+    }
+    impl Drop for Root {
+        fn drop(&mut self) {
+            fs::remove_dir_all(&self.0).unwrap();
+        }
+    }
+    #[test]
+    fn initializes_once_and_does_not_rebuild_a_lost_catalog() {
+        let root = Root::new();
+        let first = root.scan();
+        assert_eq!(first["catalogGeneration"], "0");
+        assert_eq!(fs::read(root.0.join(LOCK)).unwrap(), [0xA5]);
+        let original = fs::read(root.0.join(METADATA)).unwrap();
+        assert!(catalog(&HostDirectory::open(&root.0).unwrap()).is_some());
+        assert_eq!(root.scan(), first);
+        assert_eq!(fs::read(root.0.join(METADATA)).unwrap(), original);
+        fs::remove_file(root.0.join(METADATA)).unwrap();
+        let missing = root.scan();
+        assert!(missing["catalogGeneration"].is_null());
+        assert_eq!(missing["usage"]["measurementIncomplete"], true);
+        assert!(!root.0.join(METADATA).exists());
+    }
+    #[test]
+    fn unknown_content_counts_bytes_and_lock_conflict_never_initializes() {
+        let root = Root::new();
+        let owner = HostDirectory::open(&root.0).unwrap();
+        let lock = owner.lock_document(LOCK).unwrap();
+        assert_eq!(
+            session_inventory_owned(&root.config(), &root.0)
+                .unwrap_err()
+                .kind(),
+            io::ErrorKind::WouldBlock
+        );
+        assert!(!root.0.join(METADATA).exists());
+        drop(lock);
+        fs::write(root.0.join("unregistered"), b"12345").unwrap();
+        let value = root.scan();
+        assert_eq!(value["usage"]["usedBytes"], "5");
+        assert_eq!(value["usage"]["measurementIncomplete"], true);
+        assert_eq!(value["usage"]["sessionCount"], "0");
+    }
+    #[test]
+    fn seals_valid_publication_after_restart_and_preserves_corrupt_bytes() {
+        let root = Root::new();
+        let owner = HostDirectory::open(&root.0).unwrap();
+        drop(owner.lock_document(LOCK).unwrap());
+        let data = br#"{"entries":[],"generation":3,"schemaVersion":"1.0.0"}"#;
+        owner.publish_document(METADATA, data, 4096).unwrap();
+        assert_eq!(root.scan()["catalogGeneration"], "3");
+        assert_eq!(fs::read(root.0.join(LOCK)).unwrap(), [0xA5]);
+        fs::write(root.0.join(METADATA), b"bad catalog").unwrap();
+        assert!(root.scan()["catalogGeneration"].is_null());
+        assert_eq!(fs::read(root.0.join(METADATA)).unwrap(), b"bad catalog");
+    }
 }

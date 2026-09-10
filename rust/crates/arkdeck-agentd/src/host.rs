@@ -12,11 +12,25 @@ pub struct Host {
     provider: Option<HdcReadOnlyProvider>,
     #[cfg(target_os = "macos")]
     history: Option<arkdeck_hoststore::HistoryStore>,
+    #[cfg(target_os = "macos")]
+    storage: Option<(
+        arkdeck_hoststore::SessionStore,
+        arkdeck_hoststore::ArtifactUsage,
+    )>,
     unavailable: &'static str,
     generation: Mutex<u64>,
 }
 
 impl Host {
+    #[cfg(target_os = "macos")]
+    pub fn with_storage(
+        mut self,
+        sessions: arkdeck_hoststore::SessionStore,
+        artifacts: arkdeck_hoststore::ArtifactUsage,
+    ) -> Self {
+        self.storage = Some((sessions, artifacts));
+        self
+    }
     #[cfg(target_os = "macos")]
     pub fn with_history(mut self, history: arkdeck_hoststore::HistoryStore) -> Self {
         self.history = Some(history);
@@ -41,6 +55,8 @@ impl Host {
             provider,
             #[cfg(target_os = "macos")]
             history: None,
+            #[cfg(target_os = "macos")]
+            storage: None,
             unavailable,
             generation: Mutex::new(0),
         }
@@ -48,6 +64,32 @@ impl Host {
 }
 
 impl HostServices for Host {
+    #[cfg(target_os = "macos")]
+    fn runtime_storage(
+        &self,
+        method: &str,
+        params: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<serde_json::Value, WireError> {
+        let failed = |code: &str, message: &str| WireError {
+            code: code.into(),
+            message: message.into(),
+            details: Some(serde_json::Map::from_iter([
+                ("phase".into(), serde_json::json!("runtimeStorageOwner")),
+                ("newDispatchCount".into(), serde_json::json!(0)),
+            ])),
+        };
+        let (sessions, artifacts) = self
+            .storage
+            .as_ref()
+            .ok_or_else(|| failed("rejected", "Runtime storage owners are not configured"))?;
+        let artifact = artifacts
+            .status()
+            .map_err(|_| failed("recordUnreadable", "Artifact inventory is unreadable"))?;
+        let session = sessions.handle(method, params)?;
+        Ok(
+            serde_json::json!({"schemaVersion":"arkdeck.runtime-storage/1", "sessionDomain":session, "artifactDomain":artifact}),
+        )
+    }
     #[cfg(target_os = "macos")]
     fn history_filter(
         &self,

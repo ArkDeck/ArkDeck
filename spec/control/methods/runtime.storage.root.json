@@ -4,10 +4,13 @@
       "enum": [
         "conflict",
         "internalError",
+        "invalidInput",
         "invalidParams",
+        "ioFailure",
         "malformedFrame",
         "notFound",
         "operationUnavailable",
+        "outcomeUnknown",
         "recordUnreadable",
         "rejected",
         "resourceConflict",
@@ -89,7 +92,10 @@
           "additionalProperties": false,
           "properties": {
             "catalogGeneration": {
-              "type": "string"
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "generation": {
               "type": "string"
@@ -184,8 +190,8 @@
   "x-arkdeck-method": "runtime.storage.root",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 4,
-    "request": 6,
-    "result": 2
+    "error": 5,
+    "request": 9,
+    "result": 4
   }
 }

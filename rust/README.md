@@ -123,6 +123,23 @@ cargo run -p arkdeck-cli -- --output json history filter save --expected-generat
 cargo run -p arkdeck-cli -- --output json history filter delete --expected-generation 2
 ```
 
+The same development Runtime serves `runtime storage status`, `runtime storage
+policy --expected-generation <n> --total-quota-bytes <bytes>
+--safety-margin-bytes <bytes> --retention-days <days>`, and `runtime storage root
+--expected-generation <n> --root <existing-private-directory>` (or `--default`).
+It owns `session-state/session-storage.json` and the `sessions` retention catalog.
+Custom Session roots must stay inside the development root and disjoint from
+state and immutable Artifacts. Artifact indexed usage is verified before Session
+mutation, including retained payload identity and SHA-256. Unknown Session bytes
+remain visible as incomplete measurement; corrupt or lost initialized catalogs
+are preserved for inspection. Artifact publication and Session export/cleanup
+are still pending migration.
+
+Run `python3 rust/scripts/check-session-owner.py` after building the binaries for
+actual socket/CLI, nonempty Session census, restart/CAS, pin retention, damaged
+catalog, isolated-root refusal and corrupt-payload-before-mutation checks. Its
+fixtures are explicitly simulated host data and provide no device evidence.
+
 Use the generation actually returned by `list`. Conflicts require a fresh read;
 lost mutation replies report `outcomeUnknown` and are never automatically replayed.
 No old state is imported, rewritten or removed. Current response schemas include

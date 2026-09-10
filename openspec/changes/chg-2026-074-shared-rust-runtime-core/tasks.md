@@ -702,7 +702,7 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 
 ## TASK-XPA-012 — Move host-only durable stores to the Rust owner on macOS
 
-- Status:in-progress（2026-09-10: existing shadow regression retained; isolated Rust History owner serves CLI/control writes and restart reads; remaining host stores and final integration acceptance pending）
+- Status:in-progress（2026-09-10: existing shadow regression retained; isolated Rust History and Session configuration owners serve CLI/control writes and restart reads; remaining Session resources, host stores and final integration acceptance pending）
 - Platform:macos
 - Requirements:`session-artifact-storage` (storage owner), `docs/design/cli-runtime-storage.md:11-24`
 - Acceptance:XPA-AC-1, XPA-AC-7, XPA-AC-9; macOS GJ-1 re-pass
@@ -727,6 +727,7 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
   - `rust/**`
   - `Packages/ArkDeckKit/Scripts/generate-control-contract.py`（declared scope extension: publish the existing History owner error vocabulary alongside actual recorded responses）
   - `spec/control/methods/history.filter.*.json`（current empty/saved/deleted History response shapes, nullable identities and owner failures）
+  - `spec/control/methods/runtime.storage.*.json`（declared scope extension: existing storage owner failures and nullable corrupt-catalog generation, backed by actual isolated Rust responses）
   - `.github/workflows/swift-slow-lanes.yml`（proposed scope supplement: add the host-only read-only shadow nightly job and archive its comparison receipts; preserve existing jobs, triggers, permissions and gates; effective only after maintainer merge）
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/**`（disable the Swift owner of these stores）
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/**`

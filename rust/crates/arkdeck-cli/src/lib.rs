@@ -54,7 +54,13 @@ impl CliError {
     pub fn from_client(error: ClientError, method: &str) -> Self {
         let mut result = match error {
             ClientError::Transport(error) => Self::new(
-                if matches!(method, "history.filter.save" | "history.filter.delete") {
+                if matches!(
+                    method,
+                    "history.filter.save"
+                        | "history.filter.delete"
+                        | "runtime.storage.policy"
+                        | "runtime.storage.root"
+                ) {
                     "outcomeUnknown"
                 } else if matches!(
                     error.kind(),
@@ -85,20 +91,30 @@ impl CliError {
                     d.get("phase") == Some(&json!("preAdmission"))
                         && d.get("newDispatchCount") == Some(&json!(0))
                 });
-                let history_proof = matches!(
+                let host_proof = matches!(
                     method,
                     "history.filter.list" | "history.filter.save" | "history.filter.delete"
                 ) && error.details.as_ref().is_some_and(|d| {
                     d.get("phase") == Some(&json!("historyFilterOwner"))
                         && d.get("newDispatchCount") == Some(&json!(0))
                 });
+                let host_proof = host_proof
+                    || (matches!(
+                        method,
+                        "runtime.storage.status"
+                            | "runtime.storage.policy"
+                            | "runtime.storage.root"
+                    ) && error.details.as_ref().is_some_and(|d| {
+                        d.get("phase") == Some(&json!("runtimeStorageOwner"))
+                            && d.get("newDispatchCount") == Some(&json!(0))
+                    }));
                 let code = match error.code.as_str() {
-                    "invalidInput" if history_proof => "invalidInput",
-                    "resourceConflict" if history_proof => "resourceConflict",
-                    "resourceNotFound" if history_proof => "resourceNotFound",
-                    "ioFailure" if history_proof => "ioFailure",
-                    "outcomeUnknown" if history_proof => "outcomeUnknown",
-                    "quotaExceeded" if history_proof => "quotaExceeded",
+                    "invalidInput" if host_proof => "invalidInput",
+                    "resourceConflict" if host_proof => "resourceConflict",
+                    "resourceNotFound" if host_proof => "resourceNotFound",
+                    "ioFailure" if host_proof => "ioFailure",
+                    "outcomeUnknown" if host_proof => "outcomeUnknown",
+                    "quotaExceeded" if host_proof => "quotaExceeded",
                     "unsupportedProtocolVersion" => "protocolVersionUnsupported",
                     "malformedFrame" => "protocolMalformed",
                     "unknownMethod" => "controlMethodUnavailable",
@@ -138,7 +154,7 @@ pub fn valid_correlation(id: &str) -> bool {
 
 pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
     let mut positional = Vec::new();
-    let mut history_options = Map::new();
+    let mut method_options = Map::new();
     let mut seen = std::collections::BTreeSet::new();
     let (mut mode, mut id, mut socket) = (None, None, None);
     let (mut deep, mut require_healthy, mut help) = (false, false, false);
@@ -156,7 +172,14 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                 "--help" | "-h" => help = true,
                 "--deep" => deep = true,
                 "--require-healthy" => require_healthy = true,
+                "--default" => {
+                    method_options.insert("resetToDefault".into(), json!(true));
+                }
                 "--expected-generation"
+                | "--root"
+                | "--total-quota-bytes"
+                | "--safety-margin-bytes"
+                | "--retention-days"
                 | "--search"
                 | "--status"
                 | "--mode"
@@ -169,19 +192,20 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                         .get(index)
                         .filter(|v| !v.starts_with("--"))
                         .ok_or_else(|| {
-                            CliError::new(
-                                "invalidOption",
-                                "the History filter option requires a value",
-                            )
+                            CliError::new("invalidOption", "the option requires a value")
                         })?;
                     let key = match argument.as_str() {
                         "--expected-generation" => "expectedGeneration",
+                        "--root" => "rootPath",
+                        "--total-quota-bytes" => "totalQuotaBytes",
+                        "--safety-margin-bytes" => "safetyMarginBytes",
+                        "--retention-days" => "retentionDays",
                         "--session" => "sessionId",
                         "--target" => "targetId",
                         "--time" => "timeRange",
                         other => &other[2..],
                     };
-                    history_options.insert(key.to_owned(), json!(value));
+                    method_options.insert(key.to_owned(), json!(value));
                 }
                 "--output" | "--control-request-id" | "--socket" => {
                     index += 1;
@@ -237,6 +261,9 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["doctor"] => "doctor",
         ["operation", "list"] => "operation.list",
         ["device", "candidates"] => "device.candidates",
+        ["runtime", "storage", "status"] => "runtime.storage.status",
+        ["runtime", "storage", "policy"] => "runtime.storage.policy",
+        ["runtime", "storage", "root"] => "runtime.storage.root",
         ["history", "filter", "list"] => "history.filter.list",
         ["history", "filter", "save"] => "history.filter.save",
         ["history", "filter", "delete"] => "history.filter.delete",
@@ -244,7 +271,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         _ => {
             return Err(CliError::new(
                 "invalidCommand",
-                "available commands: doctor, operation list, device candidates, history filter list|save|delete",
+                "available commands: doctor, operation list, device candidates, history filter list|save|delete, runtime storage status|policy|root",
             ));
         }
     };
@@ -254,29 +281,77 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             "--deep and --require-healthy belong to doctor",
         ));
     }
-    if !matches!(command, "history.filter.save" | "history.filter.delete")
-        && !history_options.is_empty()
-        || command == "history.filter.delete"
-            && history_options
-                .keys()
-                .any(|key| key != "expectedGeneration")
+    let allowed: &[&str] = match command {
+        "history.filter.save" => &[
+            "expectedGeneration",
+            "search",
+            "status",
+            "mode",
+            "sessionId",
+            "targetId",
+            "timeRange",
+            "activity",
+        ],
+        "history.filter.delete" => &["expectedGeneration"],
+        "runtime.storage.policy" => &[
+            "expectedGeneration",
+            "totalQuotaBytes",
+            "safetyMarginBytes",
+            "retentionDays",
+        ],
+        "runtime.storage.root" => &["expectedGeneration", "rootPath", "resetToDefault"],
+        _ => &[],
+    };
+    if method_options
+        .keys()
+        .any(|key| !allowed.contains(&key.as_str()))
     {
         return Err(CliError::new(
             "invalidOption",
             "the option does not belong to this command",
         ));
     }
+    if !help && !allowed.is_empty() && !method_options.contains_key("expectedGeneration") {
+        return Err(CliError::new(
+            "invalidOption",
+            "the mutation requires --expected-generation",
+        ));
+    }
     if !help
-        && matches!(command, "history.filter.save" | "history.filter.delete")
-        && !history_options.contains_key("expectedGeneration")
+        && command == "runtime.storage.policy"
+        && allowed.iter().any(|key| !method_options.contains_key(*key))
     {
         return Err(CliError::new(
             "invalidOption",
-            "History filter save and delete require --expected-generation",
+            "Storage policy requires all policy fields",
         ));
     }
+    if !help
+        && command == "runtime.storage.root"
+        && (method_options.contains_key("rootPath")
+            == method_options.contains_key("resetToDefault"))
+    {
+        return Err(CliError::new(
+            "invalidOption",
+            "Storage root requires exactly one of --root and --default",
+        ));
+    }
+    for key in ["totalQuotaBytes", "safetyMarginBytes", "retentionDays"] {
+        if !help
+            && method_options.get(key).is_some_and(|v| {
+                !v.as_str().unwrap_or("").parse::<u64>().is_ok_and(|n| {
+                    n > 0 && n <= i64::MAX as u64 && n.to_string() == v.as_str().unwrap_or("")
+                })
+            })
+        {
+            return Err(CliError::new(
+                "invalidOption",
+                "Storage policy requires canonical positive integers",
+            ));
+        }
+    }
     if !help {
-        if let Some(generation) = history_options.get("expectedGeneration") {
+        if let Some(generation) = method_options.get("expectedGeneration") {
             let text = generation.as_str().expect("option text");
             if !text
                 .parse::<u64>()
@@ -323,7 +398,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                 ][..],
             ),
         ] {
-            if history_options
+            if method_options
                 .get(key)
                 .is_some_and(|v| !allowed.contains(&v.as_str().expect("option text")))
             {
@@ -344,7 +419,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             ("timeRange", json!("anyTime")),
             ("activity", json!("all")),
         ] {
-            history_options.entry(key).or_insert(value);
+            method_options.entry(key).or_insert(value);
         }
     }
     if help && mode.is_some() {
@@ -362,8 +437,9 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         },
         params: if command == "doctor" {
             Some(serde_json::from_value(json!({"deep":deep})).unwrap())
-        } else if command.starts_with("history.filter.") {
-            Some(history_options)
+        } else if command.starts_with("history.filter.") || command.starts_with("runtime.storage.")
+        {
+            Some(method_options)
         } else {
             None
         },

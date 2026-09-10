@@ -11,6 +11,17 @@ use serde_json::{Value, json};
 /// The composition root supplies local resources and device observations.
 /// This interface provides no device mutation or authority administration.
 pub trait HostServices: Send + Sync {
+    fn runtime_storage(
+        &self,
+        _method: &str,
+        _params: &serde_json::Map<String, Value>,
+    ) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "rejected".into(),
+            message: "Runtime storage owners are not configured".into(),
+            details: None,
+        })
+    }
     fn history_filter(
         &self,
         _method: &str,
@@ -193,6 +204,12 @@ impl<H: HostServices> Control<H> {
                 id: request.id.clone(),
                 outcome: self.host.history_filter(&request.method, &params),
             },
+            "runtime.storage.status" | "runtime.storage.policy" | "runtime.storage.root" => {
+                Response {
+                    id: request.id.clone(),
+                    outcome: self.host.runtime_storage(&request.method, &params),
+                }
+            }
             _ => Response::failure(
                 &request.id,
                 "rejected",

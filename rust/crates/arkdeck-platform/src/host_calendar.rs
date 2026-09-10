@@ -56,6 +56,55 @@ impl Drop for Owned {
     }
 }
 
+/// Current Session retention timestamps preserve nanoseconds from the
+/// Foundation epoch, including dates before 2001.
+pub fn host_gregorian_timestamp(at: f64) -> Option<String> {
+    if !at.is_finite() {
+        return None;
+    }
+    let mut whole = at.floor();
+    let mut nanos = ((at - whole) * 1_000_000_000.0).round() as u32;
+    if nanos == 1_000_000_000 {
+        whole += 1.0;
+        nanos = 0;
+    }
+    // SAFETY: create-rule objects are owned locally; the six output pointers
+    // match the y/M/d/H/m/s C-int descriptors and live through the call.
+    unsafe {
+        let calendar = CFCalendarCreateWithIdentifier(std::ptr::null(), kCFGregorianCalendar);
+        if calendar.is_null() {
+            return None;
+        }
+        let calendar = Owned(calendar);
+        let zone = CFTimeZoneCreateWithTimeIntervalFromGMT(std::ptr::null(), 0.0);
+        if zone.is_null() {
+            return None;
+        }
+        let zone = Owned(zone);
+        CFCalendarSetTimeZone(calendar.0.cast_mut(), zone.0);
+        let (mut year, mut month, mut day, mut hour, mut minute, mut second) =
+            (0_i32, 0_i32, 0_i32, 0_i32, 0_i32, 0_i32);
+        if CFCalendarDecomposeAbsoluteTime(
+            calendar.0,
+            whole,
+            c"yMdHms".as_ptr(),
+            &mut year as *mut i32,
+            &mut month as *mut i32,
+            &mut day as *mut i32,
+            &mut hour as *mut i32,
+            &mut minute as *mut i32,
+            &mut second as *mut i32,
+        ) == 0
+            || !(1..=9999).contains(&year)
+        {
+            return None;
+        }
+        Some(format!(
+            "{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}.{nanos:09}Z"
+        ))
+    }
+}
+
 /// Returns seconds from the Foundation reference epoch, after the current
 /// Gregorian calendar's month range check. Callers validate numeric fields.
 pub fn host_gregorian_seconds(
@@ -162,5 +211,27 @@ pub fn host_gregorian_add_days(at: f64, days: i32) -> Option<f64> {
             return None;
         }
         Some(result)
+    }
+}
+
+#[cfg(test)]
+mod timestamp_tests {
+    use super::*;
+    #[test]
+    fn retention_timestamp_keeps_fraction_before_epoch_and_handles_rounding_carry() {
+        assert_eq!(
+            host_gregorian_timestamp(-0.125).as_deref(),
+            Some("2000-12-31T23:59:59.875000000Z")
+        );
+        assert_eq!(
+            host_gregorian_timestamp(0.999_999_999_8).as_deref(),
+            Some("2001-01-01T00:00:01.000000000Z")
+        );
+        let at = host_gregorian_seconds(2026, 7, 17, 8, 0, 0).unwrap();
+        assert_eq!(
+            host_gregorian_timestamp(host_gregorian_add_days(at, 30).unwrap()).as_deref(),
+            Some("2026-08-16T08:00:00.000000000Z")
+        );
+        assert!(host_gregorian_timestamp(f64::NAN).is_none());
     }
 }
