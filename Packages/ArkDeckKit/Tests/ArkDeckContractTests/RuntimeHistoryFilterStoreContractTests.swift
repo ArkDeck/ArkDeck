@@ -71,6 +71,32 @@ final class RuntimeHistoryFilterStoreContractTests: XCTestCase {
     }
   }
 
+  func testReaderRefusesExtraOrDuplicateKeysWithoutRewritingBytes() throws {
+    let store = RuntimeHistoryFilterStore(
+      rootURL: directory, nowUTC: { "2026-09-10T01:02:03.456Z" })
+    _ = try store.save(expectedGeneration: 1, query: query)
+    let file = directory.appending(path: "history-filter.json")
+    let original = try Data(contentsOf: file)
+    let extraDocument = Data(("{\"extra\":true," + String(decoding: original.dropFirst(), as: UTF8.self)).utf8)
+    let duplicate = Data(("{\"generation\":2," + String(decoding: original.dropFirst(), as: UTF8.self)).utf8)
+    var object = try XCTUnwrap(JSONSerialization.jsonObject(with: original) as? [String: Any])
+    var nested = try XCTUnwrap(object["query"] as? [String: Any])
+    nested["extra"] = true
+    object["query"] = nested
+    let extraQuery = try JSONSerialization.data(withJSONObject: object)
+    for bytes in [extraDocument, duplicate, extraQuery] {
+      try bytes.write(to: file)
+      XCTAssertThrowsError(try store.read()) { error in
+        XCTAssertEqual((error as? RuntimeHistoryFilterFailure)?.code, "recordUnreadable")
+      }
+      XCTAssertEqual(try Data(contentsOf: file), bytes)
+    }
+    let reordered = try JSONSerialization.data(
+      withJSONObject: JSONSerialization.jsonObject(with: original), options: [.prettyPrinted])
+    try reordered.write(to: file)
+    XCTAssertEqual(try store.read().query, query)
+  }
+
   func testUnsafeDirectoryFailsClosedWithoutCreatingAResource() throws {
     try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: directory.path)
     let store = RuntimeHistoryFilterStore(rootURL: directory)

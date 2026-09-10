@@ -27,6 +27,7 @@ allow = [
     "arkdeck-client@0.1.0",
     "arkdeck-contract@0.1.0",
     "arkdeck-control@0.1.0",
+    "arkdeck-hoststore@0.1.0",
     "arkdeck-platform@0.1.0",
     "arkdeck-provider-hdc@0.1.0",
     "block-buffer@0.10.4",

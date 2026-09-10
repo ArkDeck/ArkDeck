@@ -52,6 +52,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "arkdeck-hoststore"
+version = "0.1.0"
+dependencies = [
+ "arkdeck-contract",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "arkdeck-platform"
 version = "0.1.0"
 dependencies = [

@@ -687,16 +687,18 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 
 ## TASK-XPA-012 — Move host-only durable stores to the Rust owner on macOS
 
-- Status:blocked
+- Status:in-progress（2026-09-10: offline host-store shadow harness and strict-reader differential; owner cutover awaits complete coverage, seven nightly days and rollback/GJ-1 acceptance）
 - Platform:macos
 - Requirements:`session-artifact-storage` (storage owner), `docs/design/cli-runtime-storage.md:11-24`
 - Acceptance:XPA-AC-1, XPA-AC-7, XPA-AC-9; macOS GJ-1 re-pass
 - Depends on:TASK-XPA-003
-- Readiness input pins（非载体示例）:
+- Readiness input pins（protected-main source baseline; candidate changes are tested against these inputs）:
 
-  ```yaml pin-example
+  ```yaml pins
+  - path: main
+    commit: eae27c6b97c2d9e5d67c8eee2d9353f2c0d38b93
   - path: Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeSessionStorageStore.swift
-    blob: <40-hex git OID>
+    blob: 5d4f994d33f8054c9cb6988aeaa94b0be7ce16ab
   ```
 
 - Applicable failure patterns:AF-004, AF-005, AF-018
