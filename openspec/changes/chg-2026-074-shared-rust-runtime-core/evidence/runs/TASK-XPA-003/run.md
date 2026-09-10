@@ -635,3 +635,33 @@ Two earlier invocations reached the Rust Python checks but failed because their
 interpreters lacked jsonschema; the final invocation used verified dependencies.
 UI assertions remain unexecuted because of the previously recorded runner startup
 failure, and are not implied by the successful App build.
+
+
+### GJ-4 authorized full restore (2026-09-10)
+
+The maintainer explicitly requested GJ-4 flashing. On signed r7, opened the named
+`gj4-xpa003-20260910` campaign through typed runtime service update: 30/30
+operations available. Verified the 730783514-byte archive against SHA-256
+`4fd35765fa75b9e2ce7c11f614144804f72efdc955a197e657014df1349ac674` and imported
+it through the published flash-bundle API. Existing binding revision 2 was retained.
+
+One agent run created `job-668735b572ec56dd44120abe9e428e36`. It succeeded in
+170 seconds with Runtime-issued/consumed authority, all six required actual Step
+kinds, machine-readback OpenHarmony-7.0.0.37, no unknown result, no outstanding
+residue and an empty execution human-action list. Three published artifacts were
+read completely and their SHA-256/length checked. The flash report is complete
+with missingRequired=[]. Postflight observe Job
+`job-fed59c473a7a650b2bdf51979f97be2d` also succeeded with verified evidence.
+GJ-4's runbook criteria are REAL_DEVICE_PASS.
+
+Session publication separately reports failed/sourceIntegrityFailed. Its precise
+cause is not exposed in the typed job events; no Session-publication pass or
+repair is claimed. Flash Artifact integrity and device verification passed as
+recorded above. Preserve this remaining publication issue for its owning Runtime
+Session work; no publication source or durable records were changed.
+
+Closed the campaign by explicit ArkForge bundle update without a campaign, restored
+the original 6e8c3ed5 Runtime, and verified ready=true, campaign="", 28/30 available
+operations. No raw device commands, binding rebind override or unknown replay.
+Redacted record: `docs/design/references/single-v1/gj-headless-rerun-2026-09-10-xpa003.json`.
+Raw local CLI outputs: `/private/tmp/xpa003-gj4-20260910/`.
