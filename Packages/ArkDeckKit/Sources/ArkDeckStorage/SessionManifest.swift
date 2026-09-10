@@ -448,6 +448,9 @@ private enum SessionManifestJournalValidator {
     let coreSpecBaseline = try object.manifestString("coreSpecBaseline")
     let stepValues = try object.manifestArray("steps")
     let compensationValues = try object.manifestArray("compensations")
+    let runtimeDevice =
+      try object.manifestObject("toolchain").manifestString("kind") == "runtimeProvider"
+    let originalTarget = try object.manifestObject("originalTarget")
     var bindingsByRevision: [Int: JSONValue] = [:]
     for value in try object.manifestArray("bindingHistory") {
       guard case .object(var binding) = value else {
@@ -512,6 +515,20 @@ private enum SessionManifestJournalValidator {
     for event in replay.events {
       guard event.sessionID == manifest.sessionID, event.jobID == manifest.jobID else {
         throw failure("journal event identity does not match Manifest: \(event.eventID)")
+      }
+      if runtimeDevice, event.kind == .stepIntent || event.kind == .compensationIntent,
+        case .object(let target)? = event.payload["target"],
+        target["scope"] == .string("device")
+      {
+        let snapshot = try originalTarget.manifestObject("identitySnapshot")
+        guard target["connectKey"] == originalTarget["connectKey"],
+          target["targetId"] == snapshot["targetId"],
+          target["identitySnapshotHash"] == snapshot["stableIdentitySHA256"],
+          let revision = event.bindingRevision,
+          case .object(let binding)? = bindingsByRevision[revision],
+          binding["connectKey"] == originalTarget["connectKey"],
+          binding["transport"] == originalTarget["transport"]
+        else { throw failure("Runtime device binding does not match Journal: \(event.eventID)") }
       }
       switch event.kind {
       case .stepIntent:
@@ -714,7 +731,10 @@ private enum LockedSessionManifestValidator {
   static func validate(_ object: [String: JSONValue]) throws {
     let schemaVersion = try object.manifestString("schemaVersion")
     guard schemaVersion == "1.0.0" else { throw failure("unsupported schemaVersion") }
-    try object.manifestRequireKeys(topLevelKeys)
+    guard
+      Set(object.keys) == topLevelKeys
+        || Set(object.keys) == topLevelKeys.union(["runtimeAuthority"])
+    else { throw failure("unknown or missing Manifest field") }
     for key in ["appVersion", "platformProfile"] {
       guard !(try object.manifestString(key)).isEmpty else { throw failure("empty \(key)") }
     }
@@ -765,6 +785,32 @@ private enum LockedSessionManifestValidator {
 
     let steps = try object.manifestArray("steps")
     try steps.forEach(validateStep)
+    let toolchain = try object.manifestObject("toolchain")
+    if toolchain["kind"] == .string("runtimeProvider") {
+      guard mode == "execute", !isHostTarget else {
+        throw failure("Runtime Provider audit requires a real execution")
+      }
+      let audit = try object.manifestObject("runtimeAuthority")
+      try validateRuntimeAuthority(audit)
+      func isMutation(_ value: JSONValue) -> Bool {
+        guard case .object(let row) = value else { return false }
+        let declaration: [String: JSONValue]
+        if case .object(let descriptor)? = row["descriptor"] {
+          declaration = descriptor
+        } else {
+          declaration = row
+        }
+        return declaration["effect"] == .string("deviceMutation")
+          || declaration["effect"] == .string("destructive")
+      }
+      let compensationRows = try object.manifestArray("compensations")
+      if steps.contains(where: isMutation) || compensationRows.contains(where: isMutation) {
+        guard audit["kind"] == .string("runtimeCapability")
+        else { throw failure("device mutation requires consumed Runtime capability audit") }
+      }
+    } else if object["runtimeAuthority"] != nil {
+      throw failure("Runtime authority audit requires a Runtime Provider toolchain")
+    }
     if isHostTarget {
       // The host branch is only honest while nothing in it could have touched
       // a device. One step declaring a device effect or a confirmed binding
@@ -796,6 +842,9 @@ private enum LockedSessionManifestValidator {
     try validateFailure(object["failure"]!)
     try validateRecovery(object["recovery"]!)
     try validateRelationships(
+      runtimeProvider: toolchain["kind"] == .string("runtimeProvider")
+        && (try? object.manifestObject("runtimeAuthority"))?["kind"] == .string("runtimeCapability")
+        ? toolchain["providerIdentity"] : nil,
       bindings: bindings, steps: steps, parameters: parameters,
       compensations: compensations, confirmations: confirmations,
       artifacts: artifacts, recovery: object["recovery"]!)
@@ -886,7 +935,7 @@ private enum LockedSessionManifestValidator {
     guard Set(object.keys).isSubset(of: allowed), object["kind"] != nil else {
       throw failure("unknown or missing toolchain field")
     }
-    let kind = try enumValue(object, "kind", ["hdc", "hostTool", "none"])
+    let kind = try enumValue(object, "kind", ["hdc", "hostTool", "runtimeProvider", "none"])
     if kind == "none" {
       // Nothing external ran. That is true of a simulated Session, and of a
       // host Session whose work happened inside this process; it is never
@@ -896,8 +945,10 @@ private enum LockedSessionManifestValidator {
       }
       return
     }
-    if kind == "hostTool" {
-      guard host, !simulated else { throw failure("hostTool toolchain requires a host Session") }
+    if kind == "hostTool" || kind == "runtimeProvider" {
+      guard !simulated, host == (kind == "hostTool") else {
+        throw failure("Provider toolchain does not match the Session target")
+      }
       try object.manifestRequireKeys([
         "kind", "providerIdentity", "profileIdentifier", "reportedVersion", "sha256",
       ])
@@ -908,6 +959,9 @@ private enum LockedSessionManifestValidator {
       }
       try SessionStorageValidation.sha256(
         try object.manifestString("sha256"), field: "toolchain.sha256")
+      if kind == "runtimeProvider" {
+        _ = try enumValue(object, "providerIdentity", ["hdc", "arkforge"])
+      }
       return
     }
     guard !host else { throw failure("host Session cannot declare a device toolchain") }
@@ -930,6 +984,43 @@ private enum LockedSessionManifestValidator {
     }
     _ = try enumValue(object, "serverOwnership", ["external", "arkDeckManaged", "unknown"])
     if object["daemonVersion"] != nil { _ = try object.manifestNullableString("daemonVersion") }
+  }
+
+  private static func validateRuntimeAuthority(_ object: [String: JSONValue]) throws {
+    try object.manifestRequireKeys([
+      "kind", "reference", "admittedAtUtc", "validUntilUtc", "consumptionFingerprintSha256",
+      "reservationId", "useOrdinal", "planDigest", "stepSetDigest", "targetBindingDigest",
+      "artifactDigest",
+    ])
+    let kind = try enumValue(object, "kind", ["defaultReadOnlyPolicy", "runtimeCapability"])
+    guard !(try object.manifestString("reference")).isEmpty else {
+      throw failure("empty authority reference")
+    }
+    try timestamp(object, "admittedAtUtc")
+    let consumptionKeys = [
+      "validUntilUtc", "consumptionFingerprintSha256", "reservationId", "useOrdinal",
+      "planDigest", "stepSetDigest", "targetBindingDigest", "artifactDigest",
+    ]
+    if kind == "defaultReadOnlyPolicy" {
+      guard consumptionKeys.allSatisfy({ object.manifestIsNull($0) }) else {
+        throw failure("read-only policy cannot carry capability consumption")
+      }
+      return
+    }
+    try timestamp(object, "validUntilUtc")
+    guard !(try object.manifestString("reservationId")).isEmpty,
+      try object.manifestInteger("useOrdinal") > 0
+    else { throw failure("missing Runtime capability reservation/use") }
+    for key in [
+      "consumptionFingerprintSha256", "planDigest", "stepSetDigest", "targetBindingDigest",
+    ] {
+      try SessionStorageValidation.sha256(
+        try object.manifestString(key), field: "runtimeAuthority.\(key)")
+    }
+    if !object.manifestIsNull("artifactDigest") {
+      try SessionStorageValidation.sha256(
+        try object.manifestString("artifactDigest"), field: "runtimeAuthority.artifactDigest")
+    }
   }
 
   private static func validateWorkflow(_ object: [String: JSONValue], simulated: Bool) throws {
@@ -1214,6 +1305,7 @@ private enum LockedSessionManifestValidator {
   }
 
   private static func validateRelationships(
+    runtimeProvider: JSONValue?,
     bindings: [JSONValue],
     steps: [JSONValue],
     parameters _: [JSONValue],
@@ -1311,6 +1403,19 @@ private enum LockedSessionManifestValidator {
     for (stepID, step) in stepsByID {
       let arguments = try step.manifestObject("arguments")
       guard let value = arguments["confirmationId"], !value.manifestIsNull else { continue }
+      // These are the existing Runtime's typed audit labels, not interactive
+      // confirmations. They resolve only through the validated consumption
+      // audit and their exact Provider/Step combination.
+      if runtimeProvider == .string("arkforge"), step["kind"] == .string("flashPartition"),
+        value == .string("runtimeE2Admission")
+      {
+        continue
+      }
+      if runtimeProvider == .string("hdc"), step["kind"] == .string("runApprovedRemoteMutation"),
+        value == .string("runtime-capability-admission")
+      {
+        continue
+      }
       guard case .string(let confirmationID) = value,
         let relatedStepIDs = confirmationsByID[confirmationID],
         relatedStepIDs.contains(stepID)
@@ -1429,6 +1534,16 @@ private enum LockedSessionManifestValidator {
     compensations: [JSONValue]
   ) throws {
     if mode == "planOnly", status == "succeeded" { throw failure("planOnly cannot succeed") }
+    // The caller's historical actor label is not the Runtime's authority.
+    // Only the already-validated, closed consumption audit admits this
+    // device branch; a bare standardAgent Manifest retains its restrictions.
+    let consumedRuntimeAuthority: Bool = {
+      guard case .object(let tool)? = object["toolchain"],
+        tool["kind"] == .string("runtimeProvider"),
+        case .object(let audit)? = object["runtimeAuthority"]
+      else { return false }
+      return audit["kind"] == .string("runtimeCapability")
+    }()
     if status == "planned" {
       guard mode == "planOnly", certainty == "confirmed", object["failure"]!.manifestIsNull,
         object["recovery"]!.manifestIsNull
@@ -1464,7 +1579,7 @@ private enum LockedSessionManifestValidator {
       let disposition = try step.manifestString("disposition")
       let stepCertainty = try step.manifestString("outcomeCertainty")
       let result = try step.manifestString("semanticResult")
-      if authority == "standardAgent", effect == "destructive" {
+      if authority == "standardAgent", !consumedRuntimeAuthority, effect == "destructive" {
         guard ["notExecuted(planned)", "skipped"].contains(disposition),
           stepCertainty == "notApplicable", result == "notRun"
         else { throw failure("standardAgent destructive step executed") }
@@ -1483,7 +1598,9 @@ private enum LockedSessionManifestValidator {
         throw failure("succeeded status contains failed Step")
       }
     }
-    if authority == "standardAgent", mode == "execute", status == "succeeded" {
+    if authority == "standardAgent", !consumedRuntimeAuthority, mode == "execute",
+      status == "succeeded"
+    {
       let containsDestructive = try steps.contains { value in
         guard case .object(let step) = value else { return false }
         return try step.manifestString("effect") == "destructive"
@@ -1492,7 +1609,7 @@ private enum LockedSessionManifestValidator {
         throw failure("standardAgent execute manifest with destructive Step cannot succeed")
       }
     }
-    if authority == "standardAgent" {
+    if authority == "standardAgent", !consumedRuntimeAuthority {
       for compensationValue in compensations {
         guard case .object(let compensation) = compensationValue,
           case .object(let descriptor)? = compensation["descriptor"]

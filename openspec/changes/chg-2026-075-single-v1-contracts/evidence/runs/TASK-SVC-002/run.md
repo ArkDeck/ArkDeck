@@ -580,3 +580,14 @@ carries the resulting `sessionPublication` fact. It is a subset — host-only Jo
 no Manifest `runtimeAuthority`, no export `source`/`catalogStatus`, no App History row.
 What was built, what was verified and every boundary is in
 [session-publication-run-2026-09-08.md](session-publication-run-2026-09-08.md).
+
+
+## Device Session publication repair, 2026-09-10
+
+The host-only producer refused a successful GJ-4 Job with
+`sourceIntegrityFailed`. The [bounded repair and validation record](device-session-publication-review-20260910.md)
+adds the original device/Provider/admission audit and a zero-dispatch retry of
+confirmed pre-seal publication failures. It retains the original Job Artifacts
+and refuses uncertain or partially sealed history. The live retry awaits the
+reviewed protected-main reader; the copied historical source passes isolated
+publication without changing the live Runtime.

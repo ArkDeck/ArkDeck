@@ -117,6 +117,17 @@ package struct RuntimeSessionPublicationRecord: Codable, Sendable, Equatable {
   package var receipt: RuntimeSessionPublicationReceipt?
   package var failure: RuntimeSessionPublicationFailureRecord?
 
+  /// Only the writer's confirmed, unbound source refusal can start a new
+  /// publication attempt. A partial seal belongs to its recovery owner.
+  package var isUnboundSourceFailure: Bool {
+    failure?.code == RuntimeSessionPublicationReason.sourceIntegrityFailed.rawValue
+      && failure?.certainty == "confirmed" && phase == .awaitingStorage
+      && receipt == nil && proposal == nil && checkpointSeal == nil && journalSeal == nil
+      && sessionRootIdentity == nil && claims.isEmpty && relativeSessionPath.isEmpty
+      && root.path.isEmpty && root.device == "0" && root.inode == "0"
+      && root.volumeIdentity.isEmpty && policyGeneration == "0"
+  }
+
   /// The observable fact for this marker.
   ///
   /// A receipt outranks everything: once the catalog holds the entry, a later
@@ -124,9 +135,10 @@ package struct RuntimeSessionPublicationRecord: Codable, Sendable, Equatable {
   /// reported with its own certainty, and anything else is still pending.
   package var fact: RuntimeSessionPublicationFact {
     if let receipt {
-      return (try? RuntimeSessionPublicationFact.published(
-        manifestSHA256: receipt.manifestSHA256,
-        catalogGeneration: receipt.catalogGeneration))
+      return
+        (try? RuntimeSessionPublicationFact.published(
+          manifestSHA256: receipt.manifestSHA256,
+          catalogGeneration: receipt.catalogGeneration))
         ?? .outcomeUnknown
     }
     if let failure {
@@ -136,8 +148,9 @@ package struct RuntimeSessionPublicationRecord: Codable, Sendable, Equatable {
       if failure.certainty != "confirmed" || !reason.isConfirmedFailure { return .outcomeUnknown }
       return (try? RuntimeSessionPublicationFact.failed(reason)) ?? .outcomeUnknown
     }
-    return (try? RuntimeSessionPublicationFact.pending(
-      phase == .awaitingStorage ? .waitingForStorage : .jobNotTerminal)) ?? .outcomeUnknown
+    return
+      (try? RuntimeSessionPublicationFact.pending(
+        phase == .awaitingStorage ? .waitingForStorage : .jobNotTerminal)) ?? .outcomeUnknown
   }
 }
 
@@ -175,7 +188,8 @@ package struct RuntimeSessionPublicationOutcome: Sendable {
 /// that composed no writer refuses admission rather than quietly finishing
 /// Jobs whose Sessions nobody writes.
 package protocol RuntimeSessionPublicationWriting: Sendable {
-  func publish(_ request: RuntimeSessionPublicationRequest) async -> RuntimeSessionPublicationOutcome
+  func publish(_ request: RuntimeSessionPublicationRequest) async
+    -> RuntimeSessionPublicationOutcome
 }
 
 // MARK: - Manifest composition
@@ -251,9 +265,13 @@ package enum RuntimeSessionManifestComposer {
 
     let steps = try manifestSteps(replay: replay)
     let compensations = try manifestCompensations(replay: replay)
-    let bindings = manifestBindings(replay: replay)
-    let target = try manifestTarget(record: record, replay: replay, bindings: bindings)
-    let toolchain = try manifestToolchain(record: record, target: target)
+    var bindings = manifestBindings(replay: replay)
+    let device = try deviceContext(record: record, replay: replay)
+    if let device, bindings.isEmpty { bindings = [device.binding] }
+    let target =
+      try device?.target
+      ?? manifestTarget(record: record, replay: replay, bindings: bindings)
+    let toolchain = try device?.toolchain ?? manifestToolchain(record: record, target: target)
 
     var manifest: [String: JSONValue] = [
       "schemaVersion": .string("1.0.0"),
@@ -290,6 +308,7 @@ package enum RuntimeSessionManifestComposer {
       "warnings": .array([]),
       "recovery": .null,
     ]
+    if let device { manifest["runtimeAuthority"] = device.authority }
     if status == "failed" {
       guard let failure = record.operationFailure else {
         throw Refusal(
@@ -438,6 +457,156 @@ package enum RuntimeSessionManifestComposer {
       byRevision[revision] = .object(entry)
     }
     return byRevision.keys.sorted().compactMap { byRevision[$0] }
+  }
+
+  /// Audit projection of facts already owned by this Job. In particular, an
+  /// ArkForge observation is not an HDC server snapshot, and a journal's
+  /// opaque device key is not replaced by whatever is attached today.
+  private struct DeviceContext {
+    let target: JSONValue
+    let binding: JSONValue
+    let toolchain: JSONValue
+    let authority: JSONValue
+  }
+
+  private static func deviceContext(
+    record: RuntimeJobRecord, replay: JournalReplay
+  ) throws -> DeviceContext? {
+    let intents = replay.events.filter { event in
+      guard event.kind == .stepIntent || event.kind == .compensationIntent,
+        case .object(let step)? = event.payload[
+          event.kind == .stepIntent ? "step" : "descriptor"]
+      else { return false }
+      return step.publicationString("effect") != "hostOnly"
+        || step.publicationString("bindingRequirement") != "none"
+    }
+    guard !intents.isEmpty else { return nil }
+    func refused(_ detail: String) -> Refusal {
+      Refusal(reason: .sourceIntegrityFailed, detail: "device Session: \(detail)")
+    }
+    guard replay.executionMode == "execute", let observation = record.evidenceObservation,
+      let targetID = observation.targetID, targetID == record.request.target.targetID,
+      let revision = observation.bindingRevision, revision > 0,
+      revision == record.request.target.expectedBindingRevision,
+      record.materializedBindingRevision.map({ $0 == revision }) ?? true,
+      let identity = observation.stableIdentitySHA256, SHA256Hex.isLowercaseSHA256(identity),
+      record.materializedStableTargetIdentitySHA256.map({ $0 == identity }) ?? true,
+      observation.providerID == record.providerID,
+      ["hdc", "arkforge"].contains(observation.providerID),
+      let model = observation.model, !model.isEmpty,
+      let firmware = observation.firmware, !firmware.isEmpty,
+      let transport = observation.transport, ["usb", "tcp", "uart"].contains(transport),
+      observation.confirmationMethod == "machineReadback",
+      let confirmed = observation.confirmedAtUTC,
+      let confirmedAt = ISO8601Timestamps.parse(confirmed),
+      let startedAt = ISO8601Timestamps.parse(record.createdAtUTC),
+      let finished = record.finishedAtUTC, let finishedAt = ISO8601Timestamps.parse(finished),
+      startedAt <= confirmedAt, confirmedAt <= finishedAt,
+      !observation.toolVersion.isEmpty, SHA256Hex.isLowercaseSHA256(observation.toolSHA256)
+    else { throw refused("missing or inconsistent job-local target/tool observation") }
+
+    var connectKey: String?
+    var confirmedOutcome = false
+    var hasMutation = false
+    let outcomes = Dictionary(
+      uniqueKeysWithValues: replay.events.compactMap {
+        event -> (String, JournalEvent)? in
+        guard event.kind == .stepOutcome || event.kind == .compensationOutcome,
+          let intentID = event.correlatedIntentEventID
+        else { return nil }
+        return (intentID, event)
+      })
+    for intent in intents {
+      guard intent.bindingRevision == revision,
+        case .object(let target)? = intent.payload["target"],
+        target.publicationString("scope") == "device",
+        target.publicationString("targetId") == targetID,
+        target.publicationString("identitySnapshotHash") == identity,
+        let key = target.publicationString("connectKey"), !key.isEmpty,
+        connectKey.map({ $0 == key }) ?? true
+      else { throw refused("Journal target or binding differs from the verified observation") }
+      connectKey = key
+      guard let outcome = outcomes[intent.eventID],
+        outcome.payload.publicationString("outcomeCertainty") == "confirmed"
+      else { throw refused("Journal device outcome is missing or not confirmed") }
+      if outcome.payload.publicationString("result") == "succeeded" {
+        confirmedOutcome = true
+      }
+      if case .object(let step)? = intent.payload[
+        intent.kind == .stepIntent ? "step" : "descriptor"]
+      {
+        hasMutation =
+          hasMutation
+          || ["deviceMutation", "destructive"].contains(step.publicationString("effect") ?? "")
+      }
+    }
+    guard let connectKey, confirmedOutcome else {
+      throw refused("no confirmed device outcome substantiates the target")
+    }
+    guard let evidence = record.admissionEvidence, !evidence.reference.isEmpty,
+      let admittedAt = ISO8601Timestamps.parse(evidence.admittedAtUTC), admittedAt <= confirmedAt,
+      evidence.completeOverwriteRecovery == nil
+    else { throw refused("missing admission audit or unsupported recovery provenance") }
+    var authority: [String: JSONValue] = [
+      "kind": .string(evidence.kind.rawValue), "reference": .string(evidence.reference),
+      "admittedAtUtc": .string(evidence.admittedAtUTC),
+      "validUntilUtc": evidence.validUntilUTC.map(JSONValue.string) ?? .null,
+      "consumptionFingerprintSha256": evidence.consumptionFingerprintSHA256.map(JSONValue.string)
+        ?? .null,
+      "reservationId": .null, "useOrdinal": .null, "planDigest": .null,
+      "stepSetDigest": .null, "targetBindingDigest": .null, "artifactDigest": .null,
+    ]
+    switch evidence.kind {
+    case .defaultReadOnlyPolicy:
+      guard !hasMutation, evidence.validUntilUTC == nil,
+        evidence.consumptionFingerprintSHA256 == nil, evidence.runtimeCapabilityCorrelation == nil
+      else { throw refused("read-only policy cannot substantiate a mutation") }
+    case .runtimeCapability:
+      guard let correlation = evidence.runtimeCapabilityCorrelation,
+        !correlation.reservationID.isEmpty, correlation.useOrdinal > 0,
+        let fingerprint = evidence.consumptionFingerprintSHA256,
+        SHA256Hex.isLowercaseSHA256(fingerprint),
+        let validUntil = evidence.validUntilUTC,
+        let expiresAt = ISO8601Timestamps.parse(validUntil), admittedAt < expiresAt,
+        correlation.planDigestSHA256 == record.materializedPlanDigest,
+        [
+          correlation.planDigestSHA256, correlation.stepSetDigestSHA256,
+          correlation.targetBindingDigestSHA256,
+        ].allSatisfy(SHA256Hex.isLowercaseSHA256),
+        correlation.artifactSHA256.map(SHA256Hex.isLowercaseSHA256) ?? true
+      else { throw refused("missing or inconsistent consumed Runtime capability audit") }
+      authority["reservationId"] = .string(correlation.reservationID)
+      authority["useOrdinal"] = .integer(Int64(correlation.useOrdinal))
+      authority["planDigest"] = .string(correlation.planDigestSHA256)
+      authority["stepSetDigest"] = .string(correlation.stepSetDigestSHA256)
+      authority["targetBindingDigest"] = .string(correlation.targetBindingDigestSHA256)
+      authority["artifactDigest"] = correlation.artifactSHA256.map(JSONValue.string) ?? .null
+    }
+    let snapshot: JSONValue = .object([
+      "targetId": .string(targetID), "stableIdentitySHA256": .string(identity),
+      "model": .string(model), "firmware": .string(firmware),
+    ])
+    return DeviceContext(
+      target: .object([
+        "kind": .string("real"), "connectKey": .string(connectKey),
+        "transport": .string(transport), "identitySnapshot": snapshot,
+      ]),
+      binding: .object([
+        "revision": .integer(Int64(revision)), "connectKey": .string(connectKey),
+        "transport": .string(transport), "identitySnapshot": snapshot,
+        "evidence": .array([
+          .string("Job-local machine readback at \(confirmed)"),
+          .string("Confirmed Journal device outcomes at binding revision \(revision)"),
+        ]),
+        "confirmedBy": .string("corePolicy"),
+        "channelProtection": .string("unverifiedAssumeUnprotected"),
+      ]),
+      toolchain: .object([
+        "kind": .string("runtimeProvider"), "providerIdentity": .string(observation.providerID),
+        "profileIdentifier": .string(record.operationReference),
+        "reportedVersion": .string(observation.toolVersion),
+        "sha256": .string(observation.toolSHA256),
+      ]), authority: .object(authority))
   }
 
   private static func manifestTarget(
@@ -722,7 +891,8 @@ package struct RuntimeSessionPublicationWriter: RuntimeSessionPublicationWriting
     detail: String
   ) -> RuntimeSessionPublicationRecord {
     var marker = Self.marker(
-      request, root: RuntimeSessionPublicationRoot(
+      request,
+      root: RuntimeSessionPublicationRoot(
         path: "", device: "0", inode: "0", volumeIdentity: ""),
       relative: "", policyGeneration: 0, claims: [])
     marker.failure = RuntimeSessionPublicationFailureRecord(
