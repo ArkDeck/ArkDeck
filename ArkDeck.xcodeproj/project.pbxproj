@@ -68,6 +68,7 @@
 		A100000000000000000000D0 /* SettingsRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000D2 /* SettingsRootView.swift */; };
 		A100000000000000000000D1 /* SettingsLocalizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000D3 /* SettingsLocalizable.xcstrings */; };
 		C10000000000000000000001 /* FlashLocalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000011 /* FlashLocalization.swift */; };
+		F30000000000000000000225 /* FacadeRollbackUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F30000000000000000000125 /* FacadeRollbackUITests.swift */; };
 		A1000000000000000000001F /* AppShellUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000038 /* AppShellUITests.swift */; };
 		A100000000000000000000E0 /* ViewerUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000E1 /* ViewerUITests.swift */; };
 		A10000000000000000000F10 /* DeviceStaleFrameUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000F11 /* DeviceStaleFrameUITests.swift */; };
@@ -135,6 +136,7 @@
 		A100000000000000000000D2 /* SettingsRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsRootView.swift; sourceTree = "<group>"; };
 		A100000000000000000000D3 /* SettingsLocalizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = SettingsLocalizable.xcstrings; sourceTree = "<group>"; };
 		C10000000000000000000011 /* FlashLocalization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlashLocalization.swift; sourceTree = "<group>"; };
+		F30000000000000000000125 /* FacadeRollbackUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FacadeRollbackUITests.swift; sourceTree = "<group>"; };
 		A10000000000000000000038 /* AppShellUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppShellUITests.swift; sourceTree = "<group>"; };
 		A100000000000000000000E1 /* ViewerUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ViewerUITests.swift; sourceTree = "<group>"; };
 		A10000000000000000000F11 /* DeviceStaleFrameUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceStaleFrameUITests.swift; sourceTree = "<group>"; };
@@ -427,6 +429,7 @@
 		A1000000000000000000003A /* App Shell UI Tests */ = {
 			isa = PBXGroup;
 			children = (
+				F30000000000000000000125 /* FacadeRollbackUITests.swift */,
 				A10000000000000000000038 /* AppShellUITests.swift */,
 				A100000000000000000000A1 /* KeyboardInputSourcePin.swift */,
 				A100000000000000000000E1 /* ViewerUITests.swift */,
@@ -651,6 +654,7 @@
 				F30000000000000000000222 /* HistoryFilterDependenciesTests.swift in Sources */,
 				F30000000000000000000223 /* TraceFlagTagEditorTests.swift in Sources */,
 				F30000000000000000000224 /* SettingsStorageStateTests.swift in Sources */,
+				F30000000000000000000225 /* FacadeRollbackUITests.swift in Sources */,
 				A1000000000000000000001F /* AppShellUITests.swift in Sources */,
 				A100000000000000000000E0 /* ViewerUITests.swift in Sources */,
 				A10000000000000000000F10 /* DeviceStaleFrameUITests.swift in Sources */,
