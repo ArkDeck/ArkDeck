@@ -80,6 +80,10 @@ jobs:
               printf 'Bootstrap exception: maintainer-authorized one-time base/head/path tuple; it expires when this PR changes `main`.\n\n' >> "$BODY"
             elif [ "$TASK_ID" != "none" ]; then
               printf 'Task: %s\n\n' "$TASK_ID" >> "$BODY"
+              # A declared scope extension travels with the Task so the
+              # event-mode guard reads the trailers the preflight read.
+              git log -1 --pretty=%b "$HEAD_SHA" | grep -E '^[[:space:]]*Scope-Extension:' >> "$BODY" || true
+              printf '\n' >> "$BODY"
             fi
             printf 'Agent-drafted change from `%s`.\n\n- Review per AGENTS.md authority order; approval by the human CODEOWNER constitutes the governance decision.\n- Required exact-head checks are attached by push workflows.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n' "$BRANCH" >> "$BODY"
             gh pr create \
@@ -189,4 +193,8 @@ jobs:
             --expected-head-ref "$HEAD_REF" \
             --expected-head-oid "$HEAD_SHA" \
             --expected-author 'github-actions[bot]' \
-            --allow-bootstrap
+            --allow-bootstrap \
+            --scope-extension-summary "$RUNNER_TEMP/scope-extension.md"
+          if [ -s "$RUNNER_TEMP/scope-extension.md" ]; then
+            cat "$RUNNER_TEMP/scope-extension.md" >> "$GITHUB_STEP_SUMMARY"
+          fi

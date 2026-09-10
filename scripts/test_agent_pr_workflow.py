@@ -254,6 +254,7 @@ def validate_automatic_check_contract(
         "maintainer-authorized one-time base/head/path tuple",
         'if [ "$TASK_ID" != "none" ]; then',
         "printf 'Task: %s\\n\\n' \"$TASK_ID\" >> \"$BODY\"",
+        "grep -E '^[[:space:]]*Scope-Extension:' >> \"$BODY\" || true",
         "gh api --method GET --paginate --slurp",
         "--pull-list \"$CANDIDATES\"",
         "--identity-only",
@@ -271,6 +272,8 @@ def validate_automatic_check_contract(
         "--pull-request \"$PULL_REQUEST\"",
         "--expected-head-oid \"$HEAD_SHA\"",
         "--allow-bootstrap",
+        '--scope-extension-summary "$RUNNER_TEMP/scope-extension.md"',
+        'cat "$RUNNER_TEMP/scope-extension.md" >> "$GITHUB_STEP_SUMMARY"',
     )
     for token in required_open:
         if token not in open_job:
@@ -286,6 +289,11 @@ def validate_automatic_check_contract(
     if not preflight_index < task_body_index < create_index:
         raise WorkflowContractError(
             "Agent PR must preflight and write Task before creating the PR"
+        )
+    extension_body_index = open_job.index("Scope-Extension:")
+    if not task_body_index < extension_body_index < create_index:
+        raise WorkflowContractError(
+            "Agent PR must copy Scope-Extension trailers after Task and before creating the PR"
         )
     if agent_text.count("--allow-bootstrap") != 2:
         raise WorkflowContractError(

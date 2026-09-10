@@ -16,6 +16,16 @@ then admit only the new change's own four review documents and its matching
 ``evidence/runs/<new-task-id>/`` namespace as a self-describing supplement.
 The head Task must describe the complete diff, but never authorises it.
 
+A declared scope extension (CHG-2026-076, TASK-DSE-001) is the one way a
+pull request may touch paths outside its declared Task's base-tree Allowed
+paths: the same pull request adds the patterns to that Task in ``tasks.md``,
+the final commit body carries one ``Scope-Extension: <pattern>`` trailer per
+added pattern, every pattern is bounded (a fixed prefix at least two segments
+deep that exists in the base tree; at most eight per pull request) and nothing
+in ``never_self_extend`` of the automation config is touched or overlapped.
+The declaration is surfaced, never authority: the base tree still says what
+is authorised without one, and the maintainer's merge stays the approval.
+
 Known residual (TASK-DEC-004, ledger B-H2): both workflows check out the
 head being reviewed and run *this file* from that checkout, so a task whose
 Allowed paths include `scripts/**` can change the checker and its tests in
@@ -47,6 +57,16 @@ TASK_TOKEN_RE = re.compile(rf"(?<![A-Z0-9-])({TASK_TOKEN_TEXT})(?![A-Z0-9-])")
 # a body containing a bare `Task:` line would bind whatever token starts the
 # next line.
 TASK_LINE_RE = re.compile(rf"^[ \t]*Task:[ \t]*({TASK_TOKEN_TEXT})[ \t]*$", re.MULTILINE)
+# A scope-extension trailer names one pattern per line. Patterns stay ASCII
+# path globs: a trailer is data written by the pull request under review, and
+# a confusable or control character must never reach the glob translator.
+SCOPE_EXTENSION_LINE_RE = re.compile(
+    r"^[ \t]*Scope-Extension:[ \t]*([^\s][^\n]*?)[ \t]*$", re.MULTILINE
+)
+SCOPE_EXTENSION_PATTERN_RE = re.compile(r"^[A-Za-z0-9_.@+~/*?\[\]-]+$")
+SCOPE_EXTENSION_LIMIT = 8
+SCOPE_EXTENSION_MIN_PREFIX_SEGMENTS = 2
+GLOB_CHARACTERS = frozenset("*?[")
 TASK_HEADER_RE = re.compile(rf"^##\s+({TASK_TOKEN_TEXT})(?:\s|$)", re.MULTILINE)
 FULL_TASK_RE = re.compile(rf"^{TASK_TOKEN_TEXT}$")
 FULL_OID_RE = re.compile(r"^[0-9a-fA-F]{40}$")
@@ -91,9 +111,9 @@ VERTICAL_IMPLEMENTATION_PATTERNS = (
 # data travel in the same checkout and the same `scripts/**` protection domain
 # (TASK-DEC-001). Loading is fail-closed: a missing or malformed file is a
 # CheckError on every run, never a silent fallback to a built-in default.
-CONFIG_SCHEMA = "arkdeck-automation-config/v1"
+CONFIG_SCHEMA = "arkdeck-automation-config/v2"
 CONFIG_PATH = Path(__file__).resolve().parent / "automation_config.json"
-CONFIG_KEYS = frozenset({"schema", "sensitive_paths"})
+CONFIG_KEYS = frozenset({"schema", "sensitive_paths", "never_self_extend"})
 
 # Maintainer-authorized one-time bootstrap for the vertical-change preflight
 # upgrade. It is deliberately a three-part fuse: exact old main, exact agent
@@ -112,7 +132,7 @@ class CheckError(ValueError):
     """A named, user-correctable PR scope violation."""
 
 
-def load_sensitive_patterns(config_path: Path = CONFIG_PATH) -> tuple[str, ...]:
+def _load_automation_config(config_path: Path) -> dict:
     try:
         raw_text = config_path.read_text(encoding="utf-8")
     except (OSError, UnicodeError) as error:
@@ -139,24 +159,43 @@ def load_sensitive_patterns(config_path: Path = CONFIG_PATH) -> tuple[str, ...]:
             f"automation config {config_path} has unknown keys: "
             + ", ".join(unknown_keys)
         )
-    patterns = config.get("sensitive_paths")
+    return config
+
+
+def _config_pattern_list(config: dict, config_path: Path, key: str) -> tuple[str, ...]:
+    patterns = config.get(key)
     if not isinstance(patterns, list) or not patterns:
         raise CheckError(
-            f"automation config {config_path} sensitive_paths must be a "
+            f"automation config {config_path} {key} must be a "
             "non-empty list"
         )
     if any(not isinstance(pattern, str) for pattern in patterns):
         raise CheckError(
-            f"automation config {config_path} sensitive_paths entries must "
+            f"automation config {config_path} {key} entries must "
             "all be strings"
         )
     duplicates = sorted({p for p in patterns if patterns.count(p) > 1})
     if duplicates:
         raise CheckError(
-            f"automation config {config_path} sensitive_paths has duplicate "
+            f"automation config {config_path} {key} has duplicate "
             "entries: " + ", ".join(duplicates)
         )
     return tuple(patterns)
+
+
+def load_sensitive_patterns(config_path: Path = CONFIG_PATH) -> tuple[str, ...]:
+    config = _load_automation_config(config_path)
+    # Both tables are validated on every load, so a malformed
+    # `never_self_extend` list fails every guard run, not only the runs that
+    # go on to consult it.
+    _config_pattern_list(config, config_path, "never_self_extend")
+    return _config_pattern_list(config, config_path, "sensitive_paths")
+
+
+def load_never_self_extend_patterns(config_path: Path = CONFIG_PATH) -> tuple[str, ...]:
+    config = _load_automation_config(config_path)
+    _config_pattern_list(config, config_path, "sensitive_paths")
+    return _config_pattern_list(config, config_path, "never_self_extend")
 
 
 @dataclass(frozen=True)
@@ -192,6 +231,7 @@ class CheckResult:
     task_id: str | None
     changed_paths: tuple[str, ...]
     allowed_patterns: tuple[str, ...]
+    scope_extension: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -854,6 +894,227 @@ def verify_atomic_archive_fallback(
     )
 
 
+def resolve_scope_extension_declaration(
+    context: PullRequestContext,
+) -> tuple[str, ...]:
+    """Read the `Scope-Extension:` trailers of the declaration body.
+
+    The body is the final commit body in preflight and the pull request body
+    in event mode; the workflow copies the trailers from the one into the
+    other, so both guards read one declaration.
+    """
+    patterns: list[str] = []
+    for match in SCOPE_EXTENSION_LINE_RE.finditer(context.body):
+        pattern = match.group(1)
+        if not SCOPE_EXTENSION_PATTERN_RE.fullmatch(pattern):
+            raise CheckError(
+                "Scope-Extension trailer carries an invalid pattern "
+                f"{pattern!r}; patterns are ASCII repository path globs"
+            )
+        if pattern in patterns:
+            raise CheckError(f"Scope-Extension trailer repeats {pattern}")
+        patterns.append(pattern)
+    return tuple(patterns)
+
+
+def _fixed_prefix(pattern: str) -> str:
+    for index, character in enumerate(pattern):
+        if character in GLOB_CHARACTERS:
+            return pattern[:index]
+    return pattern
+
+
+def _prefix_directory(pattern: str) -> str:
+    """The base-tree directory a pattern is anchored under.
+
+    For a glob it is the directory holding the fixed prefix; for an exact
+    path it is the parent directory. Either must exist in the base tree.
+    """
+    prefix = _fixed_prefix(pattern)
+    return prefix.rsplit("/", 1)[0] if "/" in prefix else ""
+
+
+def _git_tree_exists(repo_root: Path, oid: str, tree_path: str) -> bool:
+    completed = subprocess.run(
+        ["git", "-C", str(repo_root), "cat-file", "-t", f"{oid}:{tree_path}"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    return completed.returncode == 0 and completed.stdout.strip() == "tree"
+
+
+def validate_scope_extension_pattern(
+    repo_root: Path, base_oid: str, pattern: str
+) -> None:
+    segments = pattern.split("/")
+    if (
+        pattern.startswith("/")
+        or "\\" in pattern
+        or any(segment in {"", ".", ".."} for segment in segments)
+    ):
+        raise CheckError(
+            f"scope extension pattern {pattern} is not a bounded repository path"
+        )
+    directory = _prefix_directory(pattern)
+    depth = len([segment for segment in directory.split("/") if segment])
+    if depth < SCOPE_EXTENSION_MIN_PREFIX_SEGMENTS:
+        raise CheckError(
+            f"scope extension pattern {pattern} is unbounded: its fixed prefix "
+            f"must name a directory at least {SCOPE_EXTENSION_MIN_PREFIX_SEGMENTS} "
+            "segments deep"
+        )
+    if not _git_tree_exists(repo_root, base_oid, directory):
+        raise CheckError(
+            f"scope extension pattern {pattern} names a fixed prefix {directory}/ "
+            "that does not exist in the base tree"
+        )
+
+
+def _scope_extension_conflict(
+    pattern: str,
+    never_patterns: Sequence[str],
+    covered_paths: Sequence[str],
+) -> str | None:
+    """The `never_self_extend` entry a pattern overlaps, if any.
+
+    Overlap is refused in both directions on the fixed prefixes, so a broad
+    directory pattern cannot swallow a kernel file and a kernel directory
+    cannot be entered through a narrower sibling; entries without a fixed
+    prefix (such as `**/*.entitlements`) are matched against the pattern text
+    and against every changed path the pattern would admit.
+    """
+    pattern_prefix = _fixed_prefix(pattern).lower()
+    for never in never_patterns:
+        never_prefix = _fixed_prefix(never).lower()
+        if (
+            pattern_prefix
+            and never_prefix
+            and (
+                pattern_prefix.startswith(never_prefix)
+                or never_prefix.startswith(pattern_prefix)
+            )
+        ):
+            return never
+        if glob_regex(never, ignore_case=True).match(pattern):
+            return never
+        if any(
+            path_matches(path, (never,), ignore_case=True) for path in covered_paths
+        ):
+            return never
+    return None
+
+
+def declared_scope_extension(
+    repo_root: Path,
+    context: PullRequestContext,
+    task: TaskDefinition,
+    base_patterns: Sequence[str],
+    changed_paths: Sequence[str],
+    offenders: Sequence[str],
+    head_definitions: dict[str, TaskDefinition],
+    *,
+    config_path: Path = CONFIG_PATH,
+) -> tuple[str, ...] | None:
+    """Admit the patterns a pull request adds to its own Task, when declared.
+
+    Returns None when no trailer is present, so the original refusal stands;
+    every other shortfall is its own named error. Nothing here is authority:
+    the base tree is unchanged, and the extension is reported for review.
+    """
+    declared = resolve_scope_extension_declaration(context)
+    if not declared:
+        return None
+    head_task = head_definitions.get(task.task_id)
+    if head_task is None:
+        raise CheckError(
+            f"Scope-Extension trailers need task {task.task_id} to stay active "
+            "in the head tree"
+        )
+    head_patterns = extract_allowed_patterns(repo_root, head_task)
+    removed = [pattern for pattern in base_patterns if pattern not in head_patterns]
+    if removed:
+        raise CheckError(
+            f"scope extension of {task.task_id} removes base-authorised Allowed "
+            "paths: " + ", ".join(removed)
+        )
+    added = tuple(
+        pattern for pattern in head_patterns if pattern not in base_patterns
+    )
+    if not added:
+        raise CheckError(
+            "Scope-Extension trailers name patterns the head tasks.md does not "
+            f"add to {task.task_id}: " + ", ".join(declared)
+        )
+    if set(declared) != set(added):
+        parts = []
+        missing = sorted(set(added) - set(declared))
+        extra = sorted(set(declared) - set(added))
+        if missing:
+            parts.append("added without a trailer: " + ", ".join(missing))
+        if extra:
+            parts.append("trailer without an addition: " + ", ".join(extra))
+        raise CheckError(
+            f"scope extension of {task.task_id} does not match its trailers; "
+            + "; ".join(parts)
+        )
+    if len(added) > SCOPE_EXTENSION_LIMIT:
+        raise CheckError(
+            f"scope extension of {task.task_id} declares {len(added)} patterns; "
+            f"at most {SCOPE_EXTENSION_LIMIT} per pull request"
+        )
+    never_patterns = load_never_self_extend_patterns(config_path)
+    for pattern in added:
+        validate_scope_extension_pattern(repo_root, context.base_oid, pattern)
+        if pattern in base_patterns or path_matches(pattern, base_patterns):
+            raise CheckError(
+                f"scope extension pattern {pattern} is already covered by the "
+                f"base Allowed paths of {task.task_id}"
+            )
+        covered = [path for path in changed_paths if path_matches(path, (pattern,))]
+        conflict = _scope_extension_conflict(pattern, never_patterns, covered)
+        if conflict is not None:
+            raise CheckError(
+                f"scope extension pattern {pattern} overlaps never_self_extend "
+                f"entry {conflict}; that surface needs its own reviewed scope change"
+            )
+    remaining = sorted(path for path in offenders if not path_matches(path, added))
+    if remaining:
+        raise CheckError(
+            f"declared task {task.task_id} has paths outside Allowed paths and "
+            "the declared extension: " + ", ".join(remaining)
+        )
+    return added
+
+
+def render_scope_extension_summary(result: CheckResult) -> str:
+    if not result.scope_extension:
+        return ""
+    lines = [
+        f"### Scope extension declared by {result.task_id}",
+        "",
+        "This pull request adds the following Allowed paths to its Task and uses "
+        "them in the same change. The declaration is not authority: review the "
+        "extended files before merging.",
+        "",
+    ]
+    lines.extend(f"- `{pattern}`" for pattern in result.scope_extension)
+    return "\n".join(lines) + "\n"
+
+
+def _report_scope_extension(result: CheckResult, summary_path: Path | None) -> None:
+    summary = render_scope_extension_summary(result)
+    if summary:
+        print(
+            f"check_pr_paths: SCOPE EXTENSION: {result.task_id} adds "
+            f"{len(result.scope_extension)} pattern(s): "
+            + ", ".join(result.scope_extension),
+            file=sys.stderr,
+        )
+    if summary_path is not None:
+        summary_path.write_text(summary, encoding="utf-8")
+
+
 def check_paths(
     repo_root: Path,
     context: PullRequestContext,
@@ -933,9 +1194,23 @@ def check_paths(
             base_allowed_patterns=allowed_patterns,
         )
         if supplement_patterns is None:
-            raise CheckError(
-                f"declared task {task_id} has paths outside Allowed paths: "
-                + ", ".join(offenders)
+            extension = declared_scope_extension(
+                repo_root,
+                context,
+                task,
+                allowed_patterns,
+                repository_paths,
+                offenders,
+                head_definitions,
+                config_path=config_path,
+            )
+            if extension is None:
+                raise CheckError(
+                    f"declared task {task_id} has paths outside Allowed paths: "
+                    + ", ".join(offenders)
+                )
+            return CheckResult(
+                task_id, repository_paths, allowed_patterns + extension, extension
             )
         allowed_patterns = allowed_patterns + supplement_patterns
     return CheckResult(task_id, repository_paths, allowed_patterns)
@@ -1321,6 +1596,12 @@ def preflight_paths(
             raise CheckError(f"{error}; {hint}") from error
         return PreflightResult(result, "explicit")
 
+    if resolve_scope_extension_declaration(declaration_context):
+        raise CheckError(
+            "Scope-Extension trailers require an explicit Task ID in the final "
+            "commit subject; an inferred task cannot carry a scope extension"
+        )
+
     if allow_bootstrap:
         bootstrap_context = PullRequestContext(
             title=title,
@@ -1420,6 +1701,14 @@ def parse_args(argv: Sequence[str]) -> argparse.Namespace:
             "all base/head/path mismatches fall through to the normal guard"
         ),
     )
+    parser.add_argument(
+        "--scope-extension-summary",
+        type=Path,
+        help=(
+            "write a Markdown block describing a declared scope extension "
+            "(empty file when none) for the PR body or job summary"
+        ),
+    )
     parser.add_argument("--allow-zero", action="store_true")
     parser.add_argument("--identity-only", action="store_true")
     parser.add_argument("--expected-repository")
@@ -1489,6 +1778,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "one-time base/head/path bootstrap tuple",
                     file=sys.stderr,
                 )
+            _report_scope_extension(preflight.check, args.scope_extension_summary)
             print(
                 "bootstrap"
                 if preflight.declaration_source == "bootstrap"
@@ -1508,6 +1798,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.pull_list is not None:
             if args.allow_bootstrap:
                 raise CheckError("--allow-bootstrap is invalid with --pull-list")
+            if args.scope_extension_summary is not None:
+                raise CheckError("--scope-extension-summary is invalid with --pull-list")
             if args.identity_only:
                 raise CheckError("--identity-only is invalid with --pull-list")
             number = select_unique_pull_request_number(
@@ -1550,6 +1842,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 result = check_paths(repo_root, context, changed_paths)
         else:
             result = check_paths(repo_root, context, changed_paths)
+        _report_scope_extension(result, args.scope_extension_summary)
     except CheckError as error:
         print(f"check_pr_paths: ERROR: {error}", file=sys.stderr)
         return 1

@@ -14,7 +14,7 @@
 
 ## TASK-DSE-001 — Declared scope extension in the PR path guard
 
-- Status:ready
+- Status:done（2026-09-10: delivered in one PR — guard rule, `never_self_extend` table, reporting, workflow wiring, test matrix, `AGENTS.md` wording and the live probe in `evidence/runs/TASK-DSE-001/run.md`; the maintainer's merge of that PR confirms decision 2, the initial list）
 - Platform:macos（repository tooling; runs on every hosted runner）
 - Decision grade:D1
 - Requirements/AC:DSE-AC-01, DSE-AC-02, DSE-AC-03, DSE-AC-04, DSE-AC-05, DSE-AC-06

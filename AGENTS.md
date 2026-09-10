@@ -107,6 +107,13 @@ bootstrap timeout 可重试一次。未执行检查及原因如实写入交付�
     --base-revision origin/main --head-revision HEAD
   ```
 
+- 实现确需 base 上该 Task Allowed paths 之外的路径时，可在同一 PR 内把该路径加进 Task 的
+  Allowed paths，并在最终 commit 正文逐条写 `Scope-Extension: <pattern>` trailer（CHG-2026-076）。
+  只允许有界 pattern：固定前缀至少两级且在 base 树存在、每 PR 至多 8 条、不与 base 已授权路径
+  重复；`scripts/automation_config.json` 的 `never_self_extend`（CI 信任根、治理文本、durable 格式、
+  device lowering、admission/capability/recovery 内核）不可自扩，仍走单独的 scope PR。
+  声明不是授权：checker 只把它写进 PR 正文与检查摘要，合入才是批准。
+
 sandbox 内 `gh auth status` 报未登录或 token 无效时，用受控权限提升重试，不据此要求
 维护者重复登录；若仍失败，报告实际错误。
 
