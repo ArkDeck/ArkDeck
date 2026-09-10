@@ -57,18 +57,6 @@ struct Tree {
     incomplete: bool,
     unscoped: bool,
 }
-struct Budget {
-    remaining: usize,
-}
-impl Budget {
-    fn visit(&mut self, depth: usize) -> io::Result<()> {
-        if depth > 64 || self.remaining == 0 {
-            return Err(coverage());
-        }
-        self.remaining -= 1;
-        Ok(())
-    }
-}
 fn add(tree: &mut Tree, bytes: u64) {
     match tree.bytes.checked_add(bytes) {
         Some(sum) => tree.bytes = sum,
@@ -78,45 +66,30 @@ fn add(tree: &mut Tree, bytes: u64) {
         }
     }
 }
-fn measure(
-    parent: &HostDirectory,
-    name: &str,
-    budget: &mut Budget,
-    depth: usize,
-) -> io::Result<u64> {
-    budget.visit(depth)?;
+fn measure(parent: &HostDirectory, name: &str) -> io::Result<u64> {
     match parent.owned_kind_and_size(name)? {
         (HostEntryKind::Regular, size) => Ok(size),
-        (HostEntryKind::Directory, _) => measure_directory(&parent.child(name)?, budget, depth + 1),
+        (HostEntryKind::Directory, _) => measure_directory(&parent.child(name)?),
         _ => Err(invalid()),
     }
 }
-fn measure_directory(root: &HostDirectory, budget: &mut Budget, depth: usize) -> io::Result<u64> {
+fn measure_directory(root: &HostDirectory) -> io::Result<u64> {
     let mut sum = 0_u64;
-    for name in root.names(100_000)? {
-        sum = sum
-            .checked_add(measure(root, &name, budget, depth)?)
-            .ok_or_else(invalid)?;
+    // The frozen Swift Session census has no node-count or depth cutoff.
+    // Trace has its own published enumeration bounds; do not import them here.
+    for name in root.names(usize::MAX)? {
+        sum = sum.checked_add(measure(root, &name)?).ok_or_else(invalid)?;
     }
     Ok(sum)
 }
-fn unknown(
-    tree: &mut Tree,
-    parent: &HostDirectory,
-    name: &str,
-    display: String,
-    budget: &mut Budget,
-) -> io::Result<()> {
+fn unknown(tree: &mut Tree, parent: &HostDirectory, name: &str, display: String) {
     tree.incomplete = true;
     tree.unknown.insert(display);
-    match measure(parent, name, budget, 0) {
-        Ok(bytes) => add(tree, bytes),
-        Err(error) if error.kind() == io::ErrorKind::Unsupported => return Err(error),
-        Err(_) => (), // Current Swift measurement leaves unsafe entries unmeasured.
+    if let Ok(bytes) = measure(parent, name) {
+        add(tree, bytes);
     }
-    Ok(())
 }
-fn scan_session(parent: &HostDirectory, name: &str, budget: &mut Budget) -> io::Result<Scanned> {
+fn scan_session(parent: &HostDirectory, name: &str) -> io::Result<Scanned> {
     let root = parent.child(name)?;
     let bytes = root.read(".session-identity.json", 4096)?;
     let (identity, canonical) =
@@ -137,17 +110,15 @@ fn scan_session(parent: &HostDirectory, name: &str, budget: &mut Budget) -> io::
     if manifest.session_id != name || manifest.job_id != identity.job_id {
         return Err(invalid());
     }
-    let bytes = measure_directory(&root, budget, 0)?;
+    let bytes = measure_directory(&root)?;
     Ok(Scanned { manifest, bytes })
 }
 fn scan(root: &HostDirectory) -> io::Result<Tree> {
     let mut tree = Tree::default();
-    let mut budget = Budget { remaining: 100_000 };
-    for year in root.names(100_000)? {
+    for year in root.names(usize::MAX)? {
         if year == METADATA || year == LOCK {
             continue;
         }
-        budget.visit(0)?;
         let year_root = if year.len() == 4 && year.bytes().all(|b| b.is_ascii_digit()) {
             root.child(&year).ok()
         } else {
@@ -155,11 +126,10 @@ fn scan(root: &HostDirectory) -> io::Result<Tree> {
         };
         let Some(year_root) = year_root else {
             tree.unscoped = true;
-            unknown(&mut tree, root, &year, year.clone(), &mut budget)?;
+            unknown(&mut tree, root, &year, year.clone());
             continue;
         };
-        for month in year_root.names(100_000)? {
-            budget.visit(1)?;
+        for month in year_root.names(usize::MAX)? {
             let month_root = if month.len() == 2
                 && month.bytes().all(|b| b.is_ascii_digit())
                 && month
@@ -173,20 +143,13 @@ fn scan(root: &HostDirectory) -> io::Result<Tree> {
             };
             let Some(month_root) = month_root else {
                 tree.unscoped = true;
-                unknown(
-                    &mut tree,
-                    &year_root,
-                    &month,
-                    format!("{year}/{month}"),
-                    &mut budget,
-                )?;
+                unknown(&mut tree, &year_root, &month, format!("{year}/{month}"));
                 continue;
             };
-            for name in month_root.names(100_000)? {
-                budget.visit(2)?;
+            for name in month_root.names(usize::MAX)? {
                 tree.observed.push(name.clone());
                 let result = if identifier(&name) {
-                    scan_session(&month_root, &name, &mut budget)
+                    scan_session(&month_root, &name)
                 } else {
                     Err(invalid())
                 };
@@ -201,8 +164,7 @@ fn scan(root: &HostDirectory) -> io::Result<Tree> {
                         &month_root,
                         &name,
                         format!("{year}/{month}/{name}"),
-                        &mut budget,
-                    )?,
+                    ),
                 }
             }
         }

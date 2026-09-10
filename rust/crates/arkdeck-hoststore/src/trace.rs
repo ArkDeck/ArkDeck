@@ -93,48 +93,6 @@ fn hex(value: &str) -> bool {
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 
-// The pinned writer emits UTC ISO8601 seconds. Additional accepted Foundation
-// spellings remain differential vectors before this candidate can own a store.
-fn timestamp(text: &str) -> bool {
-    let bytes = text.as_bytes();
-    if bytes.len() != 20
-        || bytes[4] != b'-'
-        || bytes[7] != b'-'
-        || bytes[10] != b'T'
-        || bytes[13] != b':'
-        || bytes[16] != b':'
-        || bytes[19] != b'Z'
-    {
-        return false;
-    }
-    let number = |range: std::ops::Range<usize>| -> Option<u32> {
-        let part = bytes.get(range)?;
-        if !part.iter().all(u8::is_ascii_digit) {
-            return None;
-        }
-        Some(part.iter().fold(0, |n, b| n * 10 + u32::from(b - b'0')))
-    };
-    let (Some(year), Some(month), Some(day), Some(hour), Some(minute), Some(second)) = (
-        number(0..4),
-        number(5..7),
-        number(8..10),
-        number(11..13),
-        number(14..16),
-        number(17..19),
-    ) else {
-        return false;
-    };
-    let leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
-    let days = match month {
-        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
-        4 | 6 | 9 | 11 => 30,
-        2 if leap => 29,
-        2 => 28,
-        _ => 0,
-    };
-    (1..=days).contains(&day) && hour < 24 && minute < 60 && second < 60
-}
-
 fn available(
     root: &HostDirectory,
     name: &str,
@@ -182,8 +140,8 @@ pub fn trace_inventory(path: &Path) -> io::Result<Value> {
             let Some(metadata) = metadata.filter(|m| {
                 m.key.trace_sha256 == trace
                     && m.key.parser_key == parser
-                    && timestamp(&m.created_at)
-                    && timestamp(&m.last_accessed_at)
+                    && crate::format_time::valid_format_timestamp(&m.created_at)
+                    && crate::format_time::valid_format_timestamp(&m.last_accessed_at)
                     && entry
                         .kind_and_size("database.sqlite")
                         .is_ok_and(|(kind, size)| {

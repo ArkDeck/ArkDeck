@@ -29,15 +29,15 @@ Swift oracle may initialize or reconcile only its isolated fixtures.
 
 | Surface | Cases | Current comparison |
 | --- | ---: | --- |
-| History filter | 19 | Durable bytes, list projection, generations, strict fields, enum/text refusal |
-| Display names | 24 | Target/candidate projections, tombstones, ordering, identity and staged-name consistency |
+| History filter | 83 | Durable bytes, list projection, generations, strict fields, enum/text/time refusal |
+| Display names | 152 | Target/candidate projections, tombstones, ordering, identity, staged names and time refusal |
 | Bundle registry | 31 | Available/retained/removed metadata, closed fields, reference/state/owner/bounds/time refusal |
 | Tool registry | 74 | Closed metadata, trust/dependency shape, legacy schema, active/pending/outcome selection ledger |
 | Published tool identity | 7 | Actual Swift diagnostic lookup of both existing published digests and unknown spellings |
 | Session configuration | 5 | Policy/custom-root/full-width values and strict canonical fields |
 | Session timestamps | 20 | Exact Swift Date Double bits or matching refusal |
 | Session canonical JSON | 52 | UTF-8 keys, canonical duplicates, integer/float spelling, depth and manifest byte bounds |
-| Session status | 37 | Actual used/pinned bytes, counts, catalog generations, unsafe layout and incomplete measurement |
+| Session status | 39 | Actual bytes/counts, catalog generations, unsafe layout and large/deep census |
 | Session parameters | 28 | Typed state, restore byte equality, status consistency and Swift character-count boundaries |
 | Session Steps | 224 | All 56 kinds, valid typed arguments, closed fields, required arguments and digests |
 | Session compensation | 84 | All six permitted kinds, declarations, execution records, source relationships and outcomes |
@@ -47,7 +47,7 @@ Swift oracle may initialize or reconcile only its isolated fixtures.
 | Session recovery | 44 | Typed hazards, guides, device mode, abandon records and compensation relationships |
 | Runtime audit records | 37 | Closed historical audit fields, Provider/Step labels and mutation consumption requirements |
 | Grapheme corpus batches | 3 | Unicode 16/17 official inputs and 54,660 generated Indic property combinations |
-| Trace cache | 7 | Actual Swift adapter inventory, missing metadata, key/lease contention and unsafe entries |
+| Trace cache | 43 | Actual Swift inventory, metadata dates, key/lease contention and unsafe entries |
 
 The 105-case receipt is preserved unchanged in
 [local-shadow-20260910.json](local-shadow-20260910.json). It identifies itself as
@@ -141,11 +141,27 @@ extra-field and noncanonical identity files, hardlinks, FIFOs, writable year/mon
 session/file entries, and invalid or regular-file layout components. Rust leaves
 every fixture unchanged and matches Swift's incomplete measurement projection.
 
+History and both display-name timestamp fields now validate the same acceptance
+domain as the actual `ISO8601Timestamps.parse` owner. The independent Rust predicate
+retains original text and matches the pinned Swift 6.2 FormatStyle behavior:
+fractional seconds through nine digits, normalized date/time components, numeric
+and GMT/UTC offsets, trailing text, and calendar component bounds. The actual
+store readers independently exercise 34 accepted and 30 refused strings for each
+field. Trace inventory exercises both metadata dates through its actual upstream
+`JSONDecoder.iso8601` reader; undecodable dates retain unaccounted bytes.
+Implementation references are the official Swift 6.2
+[FormatStyle source](https://github.com/swiftlang/swift-foundation/blob/swift-6.2-RELEASE/Sources/FoundationEssentials/Formatting/DateComponents%2BISO8601FormatStyle.swift)
+and [Gregorian component bounds](https://github.com/swiftlang/swift-foundation/blob/swift-6.2-RELEASE/Sources/FoundationEssentials/Calendar/Calendar_Gregorian.swift).
+The local Swift differential is authoritative; newer upstream parsing differs.
+
+The earlier Rust-only Session depth/node ceilings were removed to preserve the
+frozen Swift census domain. Real fixture comparisons now pass for 70 directory
+levels and 100,001 regular files in one directory. The existing metadata size,
+ownership, link, volume and catalog-lock checks remain in effect.
+
 ## Remaining work before harness review
 
-- Finish the Session scan budget refusal checks.
-- Complete History/display-name timestamp refusal and remaining Trace metadata
-  compatibility.
+- Complete remaining Trace metadata compatibility checks.
 - Finalize the complete nightly corpus. The nightly job is wired locally but has not been pushed or run.
 - Run the final unified gate and committed preflight on the complete harness.
 
@@ -155,6 +171,16 @@ retries cannot manufacture those days. Owner/CAS/crash-window work, UI assertion
 GJ-1 re-pass and rollback evidence remain a later authorized cutover stage.
 
 ## Validation so far
+
+- 1012 cases across 28 XCTest methods passed, including timestamp acceptance
+  and the full large/deep Session census. Immutable receipt:
+  [local-shadow-time-census-20260910.json](local-shadow-time-census-20260910.json).
+  Log: `/private/tmp/xpa012-shadow-time-census.log`.
+  Hoststore all-target Clippy and seven receipt integrity tests also passed.
+- The 1012-case implementation passed the complete-diff unified gate (exit 0):
+  Swift full suite, App test build, design-system, published/candidate Rust
+  contracts, cargo deny and cargo vet (26 audited). Log:
+  `/private/tmp/xpa012-shadow-time-census-gate.log`.
 
 - 782 cases across 25 XCTest methods passed. Immutable receipt:
   [local-shadow-filesystem-20260910.json](local-shadow-filesystem-20260910.json).

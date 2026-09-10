@@ -119,6 +119,60 @@ final class HostStoreShadowContractTests: XCTestCase {
     }
   }
 
+  func testHistoryAndDisplayNameTimestampAcceptance() throws {
+    let historyRoot = root.appending(path: "time-history")
+    try FileManager.default.createDirectory(at: historyRoot, withIntermediateDirectories: true,
+      attributes: [.posixPermissions: 0o700])
+    let history = RuntimeHistoryFilterStore(rootURL: historyRoot, nowUTC: { "2026-01-01T00:00:00Z" })
+    _ = try history.save(expectedGeneration: 1, query: RuntimeHistoryFilterQuery())
+    let historyFile = historyRoot.appending(path: "history-filter.json")
+    let historyDocument = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: historyFile)) as? [String: Any])
+    let namesRoot = root.appending(path: "time-names")
+    try FileManager.default.createDirectory(at: namesRoot, withIntermediateDirectories: true,
+      attributes: [.posixPermissions: 0o700])
+    let names = RuntimeTargetDisplayNameStore(rootURL: namesRoot, nowUTC: { "2026-01-01T00:00:00Z" })
+    _ = try names.set(targetID: "target-time", expectedGeneration: 1, name: "Time fixture")
+    let first = TargetObservationReference(candidate: "candidate-time", observationID: "observation-time", generation: 1)
+    _ = try names.setCandidate(first, activeReferences: [first], nextGeneration: 2, name: "Candidate time")
+    let reference = TargetObservationReference(candidate: first.candidate, observationID: first.observationID, generation: 2)
+    let namesFile = namesRoot.appending(path: "target-display-names.json")
+    let namesDocument = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: namesFile)) as? [String: Any])
+    let namesRead: () throws -> JSONValue = {
+      let candidates = try names.candidateDisplayNames(references: [reference])
+      let candidate = try XCTUnwrap(candidates[reference.observationID])
+      return .object(["targets": .array([try names.read(targetID: "target-time").projection]),
+        "candidates": .array([candidate.projection])])
+    }
+    for (accepted, timestamps) in [(true, HostStoreTimeShadowFixtures.accepted), (false, HostStoreTimeShadowFixtures.refused)] {
+      for (index, timestamp) in timestamps.enumerated() {
+        XCTAssertEqual(ISO8601Timestamps.parse(timestamp) != nil, accepted, timestamp)
+        for surface in ["history", "target", "candidate"] {
+          var document = surface == "history" ? historyDocument : namesDocument
+          if surface == "history" { document["updatedAtUTC"] = timestamp }
+          else {
+            let key = surface == "target" ? "records" : "candidateRecords"
+            var records = try XCTUnwrap(document[key] as? [[String: Any]])
+            records[0]["updatedAtUTC"] = timestamp
+            document[key] = records
+          }
+          let file = surface == "history" ? historyFile : namesFile
+          let kind = surface == "history" ? "history-filter" : "display-names"
+          let prefix = surface == "history" ? "history" : "names-" + surface
+          let name = prefix + "-time-" + (accepted ? "accepted-" : "refused-") + String(index)
+          let read: () throws -> JSONValue = surface == "history" ? { try history.read().listProjection } : namesRead
+          if accepted {
+            var bytes = try JSONSerialization.data(withJSONObject: document, options: [.sortedKeys, .withoutEscapingSlashes])
+            bytes.append(0x0A)
+            try bytes.write(to: file)
+            try compareStore(name: name, kind: kind, file: file, read: read)
+          } else {
+            try compareRefusal(name: name, kind: kind, document: document, file: file, read: read)
+          }
+        }
+      }
+    }
+  }
+
   func testBundleRegistryAvailableRetainedAndRemoved() throws {
     let registryRoot = root.appending(path: "registry")
     let source = root.appending(path: "Fixture.app")
@@ -642,6 +696,37 @@ final class HostStoreShadowContractTests: XCTestCase {
       try compareSessionStatus("filesystem-" + label, store: store, config: config, sessions: sessions)
       try FileManager.default.removeItem(at: file)
     }
+  }
+
+  func testSessionCensusBeyondFormerCandidateLimits() throws {
+    let owner = root.appending(path: "large-owner")
+    let sessions = root.appending(path: "large-tree")
+    let store = try RuntimeSessionStorageStore(ownerRoot: owner, defaultSessionsRoot: sessions)
+    _ = try store.updatePolicy(.init(totalQuotaBytes: 1_000_000, safetyMarginBytes: 100,
+      retentionDays: 7), expectedGeneration: 1)
+    let catalog = try SessionRetentionCatalog(sessionsRoot: sessions)
+    let config = owner.appending(path: "session-storage.json")
+    let session = try seedShadowSession(sessions: sessions, month: "01", id: "session-large",
+      timestamp: "2026-01-01T00:00:00Z")
+    try catalog.registerFinalizedSession(sessionRoot: session, retentionDays: 7, policyGeneration: 2)
+    var deep = session
+    for _ in 0..<70 { deep.append(path: "d") }
+    try FileManager.default.createDirectory(at: deep, withIntermediateDirectories: true,
+      attributes: [.posixPermissions: 0o700])
+    try Data("deep payload".utf8).write(to: deep.appending(path: "payload"))
+    try compareSessionStatus("census-depth-70", store: store, config: config, sessions: sessions)
+    // More than the removed 100,000-entry ceiling in a single directory. The
+    // real Swift reader measures these test-owned empty regular files normally.
+    let large = session.appending(path: "many")
+    try FileManager.default.createDirectory(at: large, withIntermediateDirectories: true,
+      attributes: [.posixPermissions: 0o700])
+    for index in 0..<100_001 {
+      let path = large.appending(path: String(index)).path
+      let fd = Darwin.open(path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0o600)
+      guard fd >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+      guard Darwin.close(fd) == 0 else { throw POSIXError(.EIO) }
+    }
+    try compareSessionStatus("census-entries-100001", store: store, config: config, sessions: sessions)
   }
 
   private func seedShadowSession(sessions: URL, month: String, id: String, timestamp: String, includeArtifacts: Bool = false) throws -> URL {

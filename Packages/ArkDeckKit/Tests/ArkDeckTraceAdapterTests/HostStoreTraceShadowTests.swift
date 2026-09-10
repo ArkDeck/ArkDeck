@@ -74,6 +74,35 @@ final class HostStoreTraceShadowTests: XCTestCase {
     try await refuse("trace-entry-overflow", service: service)
   }
 
+  func testTraceMetadataDateProjectionMatchesActualDecoder() async throws {
+    let service = try ArkDeckTraceCacheMaintenanceService(cachesDirectory: root)
+    let entry = cache.appending(path: traceName).appending(path: parserName)
+    try directory(entry)
+    try file(Data([1, 2, 3]), at: entry.appending(path: "database.sqlite"))
+    let id = hash(Data("\(traceName):\(parserName)".utf8))
+    for (folder, suffix) in [(".locks", ".lock"), (".leases", ".lease")] {
+      let path = cache.appending(path: folder)
+      try directory(path)
+      try file(Data(), at: path.appending(path: id + suffix))
+    }
+    // Inventory counts undecodable metadata as active/unaccounted, while the
+    // original payload remains measurable. It does not refuse the whole scan.
+    let dates = ["2026-01-01T00:00:00Z", "2026-01-01T00:00:00.123456789Z",
+      "2026-01-01T00:00:00Ztail", "2026-2-31T1:2:3z", "0-1-1T0:0:0Z",
+      "506714-1-1T0:0:0Z", "2026-1-1T24:00:01Z", "2026-1-1T0:0:61Z",
+      "2026-1-1T0:0:0GMT+1:2:3", "2026-1-1T0:0:0-18", "2026-1-1T0:0:0+01:00:",
+      "", "invalid", "2026-1-1T0:0:0.1234567890Z", "2026-1-1T0:0:0+18:00:01",
+      "506715-1-1T0:0:0Z", "2026-1-1T0:0:2147483648Z", "2026-1-1t0:0:0Z"]
+    for field in ["createdAt", "lastAccessedAt"] {
+      for (index, date) in dates.enumerated() {
+        var document = metadata()
+        document[field] = date
+        try file(JSONSerialization.data(withJSONObject: document, options: [.sortedKeys]), at: entry.appending(path: "metadata.json"))
+        try await compare("trace-date-" + field + "-" + String(index), service: service)
+      }
+    }
+  }
+
   private func compare(_ name: String, service: ArkDeckTraceCacheMaintenanceService) async throws {
     let before = try snapshot()
     let swift = try await service.inventory()

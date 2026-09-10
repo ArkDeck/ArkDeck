@@ -83,10 +83,13 @@ pub fn decode_display_names(bytes: &[u8]) -> Result<DecodedStore, DecodeError> {
             .iter()
             .any(|r| !(2..=i64::MAX as u64).contains(&r.generation))
         || doc.records.iter().any(|r| {
-            !target_identifier(&r.target_id) || r.name.as_ref().is_some_and(|n| !valid_name(n))
+            !target_identifier(&r.target_id)
+                || r.name.as_ref().is_some_and(|n| !valid_name(n))
+                || !crate::format_time::valid_format_timestamp(&r.updated_at)
         })
         || candidates.iter().any(|r| {
             !valid_name(&r.name)
+                || !crate::format_time::valid_format_timestamp(&r.updated_at)
                 || !(1..=1024).contains(&r.candidate.len())
                 || !(1..=128).contains(&r.observation_id.len())
         })

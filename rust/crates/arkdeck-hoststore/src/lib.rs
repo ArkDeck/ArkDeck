@@ -9,6 +9,7 @@
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 mod display_names;
+mod format_time;
 pub use display_names::decode_display_names;
 mod session_json;
 pub use session_json::decode_session_json;
@@ -125,6 +126,10 @@ pub fn decode_history(bytes: &[u8]) -> Result<DecodedStore, DecodeError> {
         || doc.generation > i64::MAX as u64
         || (doc.generation == 1 && doc.query.is_some())
         || (doc.updated_at_utc.is_none() != (doc.generation == 1))
+        || doc
+            .updated_at_utc
+            .as_ref()
+            .is_some_and(|v| !format_time::valid_format_timestamp(v))
     {
         return Err(DecodeError::Header);
     }
