@@ -116,6 +116,43 @@ fn owned(file: &File, directory: bool, ownership: Ownership) -> io::Result<()> {
 }
 
 impl HostDirectory {
+    /// Metadata of a private regular document, resolved relative to the held
+    /// directory. Snapshot retention uses this instead of trusting path stats.
+    pub fn document_metadata(&self, name: &str) -> io::Result<std::fs::Metadata> {
+        if !matches!(self.1, Ownership::Private) {
+            return Err(fail());
+        }
+        let file = self.open_at(name, 0)?;
+        owned(&file, false, self.1)?;
+        let metadata = file.metadata()?;
+        let linked = self.stat_at(name)?;
+        if metadata.dev() != linked.st_dev as u64 || metadata.ino() != linked.st_ino {
+            return Err(fail());
+        }
+        Ok(metadata)
+    }
+
+    /// Reclaim exactly the private document inspected by snapshot retention.
+    /// The caller holds its snapshot-store lock throughout selection and unlink.
+    pub fn remove_document(&self, name: &str, expected: &std::fs::Metadata) -> io::Result<()> {
+        let current = self.document_metadata(name)?;
+        if current.dev() != expected.dev()
+            || current.ino() != expected.ino()
+            || current.len() != expected.len()
+            || current.mtime() != expected.mtime()
+            || current.mtime_nsec() != expected.mtime_nsec()
+            || current.ctime() != expected.ctime()
+            || current.ctime_nsec() != expected.ctime_nsec()
+        {
+            return Err(fail());
+        }
+        let name = segment(name)?;
+        if unsafe { libc::unlinkat(self.0.as_raw_fd(), name.as_ptr(), 0) } != 0 {
+            return Err(io::Error::last_os_error());
+        }
+        self.0.sync_all()
+    }
+
     /// Check owner permissions and actual create/remove access (including ACLs)
     /// before a Session root selection is published. No existing entry changes.
     pub fn probe_writable(&self) -> io::Result<()> {

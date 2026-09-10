@@ -80,6 +80,11 @@ HISTORY_OWNER_ERROR_CODES = [
 STORAGE_OWNER_ERROR_CODES = [
     "invalidInput", "resourceConflict", "recordUnreadable", "ioFailure", "outcomeUnknown",
 ]
+SESSION_OWNER_ERROR_CODES = [
+    "invalidInput", "invalidCursor", "resourceConflict", "resourceNotFound",
+    "operationUnavailable", "inputTooLarge", "recordUnreadable", "quotaExceeded",
+    "ioFailure", "outcomeUnknown",
+]
 MAXIMUM_SIGNATURES_PER_METHOD = 24
 MAXIMUM_SAMPLE_BYTES = 65536
 
@@ -204,6 +209,9 @@ def derive_method_schemas(source):
                        } else set())
                        | (set(STORAGE_OWNER_ERROR_CODES) if method in {
                            "runtime.storage.status", "runtime.storage.policy", "runtime.storage.root"
+                       } else set())
+                       | (set(SESSION_OWNER_ERROR_CODES) if method in {
+                           "session.list", "session.show", "session.pin", "session.unpin"
                        } else set()))
         schema = {
             "$schema": "https://json-schema.org/draft/2020-12/schema",

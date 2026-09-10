@@ -206,6 +206,48 @@ final class SessionResourceContractTests: XCTestCase {
     XCTAssertTrue(jobs.isEmpty)
   }
 
+  func testRealCLIProcessReadsRetainedSessionCursorAndRefusesQueryDrift() async throws {
+    let sessions = try store()
+    for (id, month) in [("session-first", "07"), ("session-latest", "08")] {
+      _ = try finalizedSession(
+        id: id, jobID: "job-\(id)", month: month,
+        timestamp: "2026-\(month)-01T00:00:00Z", bytes: 32)
+    }
+    let artifacts = try RuntimeArtifactStore(
+      rootURL: root.appending(path: "artifacts", directoryHint: .isDirectory),
+      quota: ArtifactQuota(totalBytes: 12_345), nowUTC: { "2026-09-02T00:00:00Z" })
+    let capabilities = try RuntimeCapabilityStore(
+      directoryURL: root.appending(path: "capabilities", directoryHint: .isDirectory))
+    let engine = try RuntimeJobEngine(
+      configuration: .init(stateDirectory: root.appending(path: "engine", directoryHint: .isDirectory)),
+      providers: DeviceProviderRegistry(providers: []),
+      dispatcher: DescriptorBoundProcessDispatcher(
+        resolver: try FixedExecutableResolver.hashing(path: "/bin/ls", providerID: "hdc")),
+      capabilityStore: capabilities, artifactStore: artifacts,
+      nowUTC: { "2026-09-02T00:00:00Z" })
+    let handler = RuntimeControlPlaneHandler(
+      engine: engine, capabilityStore: capabilities, providerIDs: [],
+      nowUTC: { "2026-09-02T00:00:00Z" }, artifactStore: artifacts,
+      runtimeSessionStorage: sessions)
+    let server = AgentDaemonServer(
+      stateDirectory: root.appending(path: "control", directoryHint: .isDirectory),
+      handler: handler, nowUTC: { "2026-09-02T00:00:00Z" })
+    _ = try server.start()
+    defer { server.stop() }
+    let common = ["--socket", server.socketURL.path, "--output", "json"]
+    let listed = try await run(["session", "list", "--page-size", "1"] + common)
+    XCTAssertEqual(listed.exitCode, 0, diagnostic(listed))
+    let first = try result(listed)
+    XCTAssertEqual(first["hasMore"], .bool(true))
+    guard case .string(let cursor)? = first["nextCursor"] else { return XCTFail("cursor missing") }
+    let drift = try await run(["session", "list", "--page-size", "2", "--cursor", cursor] + common)
+    XCTAssertEqual(drift.exitCode, 65, diagnostic(drift))
+    let next = try await run(["session", "list", "--page-size", "1", "--cursor", cursor] + common)
+    XCTAssertEqual(next.exitCode, 0, diagnostic(next))
+    XCTAssertEqual(try result(next)["snapshotRevision"], first["snapshotRevision"])
+    XCTAssertEqual(try firstItem(try result(next))["sessionId"], .string("session-first"))
+  }
+
   func testRealCLIProcessExportsASessionThroughPreviewAndApply() async throws {
     let sessions = try store()
     let source = try finalizedSessionWithArtifacts(

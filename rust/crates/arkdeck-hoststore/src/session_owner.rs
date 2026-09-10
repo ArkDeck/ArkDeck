@@ -53,6 +53,168 @@ fn bytes(value: &Value) -> Result<Vec<u8>, WireError> {
     Ok(bytes)
 }
 impl SessionStore {
+    pub fn handle_resource(
+        &self,
+        method: &str,
+        params: &Map<String, Value>,
+    ) -> Result<Value, WireError> {
+        use crate::snapshot_pager::{SnapshotPager, failure};
+        if method == "session.list" {
+            if params
+                .keys()
+                .any(|key| !["pageSize", "cursor"].contains(&key.as_str()))
+            {
+                return Err(failure("invalidInput", "Session list options are closed"));
+            }
+            let page_size = match params.get("pageSize") {
+                None => 100,
+                Some(value) => value
+                    .as_u64()
+                    .filter(|count| (1..=1000).contains(count))
+                    .ok_or_else(|| failure("invalidInput", "pageSize must be between 1 and 1000"))?
+                    as usize,
+            };
+            let cursor = match params.get("cursor") {
+                None => None,
+                Some(Value::String(value)) if !value.is_empty() && value.len() <= 2048 => {
+                    Some(value.as_str())
+                }
+                _ => return Err(failure("invalidCursor", "Session cursor is malformed")),
+            };
+            self.root
+                .validate_path(&self.path)
+                .map_err(|_| failure("recordUnreadable", "Session owner is unavailable"))?;
+            self.root
+                .private_child("session-resource-snapshots")
+                .map_err(|_| {
+                    failure(
+                        "recordUnreadable",
+                        "Session snapshot directory is unavailable",
+                    )
+                })?;
+            let pager = SnapshotPager::open(&self.path.join("session-resource-snapshots"))
+                .map_err(|_| {
+                    failure(
+                        "recordUnreadable",
+                        "Session snapshot directory is unavailable",
+                    )
+                })?;
+            return pager.page(
+                method,
+                "completedAtDescSessionIdAsc",
+                page_size,
+                cursor,
+                || self.resource_rows(None, None),
+            );
+        }
+        let mutation = matches!(method, "session.pin" | "session.unpin");
+        if !mutation && method != "session.show" {
+            return Err(failure("unknownMethod", "Not a Session resource method"));
+        }
+        let keys: &[&str] = if mutation {
+            &["sessionId", "expectedGeneration"]
+        } else {
+            &["sessionId"]
+        };
+        if params.len() != keys.len() || keys.iter().any(|key| !params.contains_key(*key)) {
+            return Err(failure(
+                "invalidInput",
+                "Session resource parameters are closed",
+            ));
+        }
+        let id = params["sessionId"]
+            .as_str()
+            .filter(|id| crate::session_manifest::identifier(id))
+            .ok_or_else(|| {
+                failure(
+                    "invalidInput",
+                    "sessionId must be one bounded Runtime identifier",
+                )
+            })?;
+        let pin = if mutation {
+            let text = params["expectedGeneration"].as_str().unwrap_or("");
+            let expected = text
+                .parse::<u64>()
+                .ok()
+                .filter(|value| *value <= i64::MAX as u64 && value.to_string() == text)
+                .ok_or_else(|| {
+                    failure(
+                        "invalidInput",
+                        "Session pin requires a canonical catalog generation",
+                    )
+                })?;
+            Some((expected, method == "session.pin"))
+        } else {
+            None
+        };
+        self.resource_rows(Some(id), pin)?
+            .into_iter()
+            .next()
+            .ok_or_else(|| {
+                failure(
+                    "resourceNotFound",
+                    "Session is not present in the Runtime catalog",
+                )
+            })
+    }
+
+    fn resource_rows(
+        &self,
+        selected: Option<&str>,
+        pin: Option<(u64, bool)>,
+    ) -> Result<Vec<Value>, WireError> {
+        use crate::snapshot_pager::failure;
+        let unavailable = |_| {
+            failure(
+                "recordUnreadable",
+                "Session storage is unavailable or unsafe",
+            )
+        };
+        self.root.validate_path(&self.path).map_err(unavailable)?;
+        let lock = self.root.lock_document(LOCK).map_err(|error| {
+            if error.kind() == io::ErrorKind::WouldBlock {
+                failure("resourceConflict", "Session storage is being updated")
+            } else {
+                unavailable(error)
+            }
+        })?;
+        let loaded = match self.root.read(DOCUMENT, MAXIMUM) {
+            Ok(value) => value,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => bytes(&json!({
+                "schemaVersion":"arkdeck.session-storage-store/1", "generation":1,
+                "rootKind":"default", "rootPath":self.default_sessions,
+                "policy":{"totalQuotaBytes":21474836480_u64,"safetyMarginBytes":2147483648_u64,"retentionDays":90}}))?,
+            Err(error) => return Err(unavailable(error)),
+        };
+        let document = decode_session_configuration(&loaded)
+            .map_err(|_| unavailable(io::Error::other("invalid configuration")))?;
+        let path = PathBuf::from(
+            document.projection["rootPath"]
+                .as_str()
+                .ok_or_else(|| unavailable(io::Error::other("missing root")))?,
+        );
+        if document.projection["rootKind"] == "default" && path != self.default_sessions {
+            return Err(unavailable(io::Error::other("default root mismatch")));
+        }
+        self.selected_root(&path)
+            .map_err(|_| unavailable(io::Error::other("invalid selected root")))?;
+        let result =
+            crate::session_inventory::session_resource_rows(&loaded, &path, selected, pin)?;
+        if lock.validate_link(&self.root, LOCK).is_err()
+            || self.root.validate_path(&self.path).is_err()
+        {
+            return Err(failure(
+                if pin.is_some() {
+                    "outcomeUnknown"
+                } else {
+                    "recordUnreadable"
+                },
+                "Session owner changed while reading the catalog",
+            ));
+        }
+        Ok(result)
+    }
+
     pub fn open(path: &Path, default_sessions: &Path) -> io::Result<Self> {
         let root = HostDirectory::open(path)?;
         let default_root = HostDirectory::open(default_sessions)?;

@@ -99,6 +99,8 @@ def commands(view: Path, output: Path, *, owners: bool = False) -> list[tuple[li
                         "--bin-dir", str(rust / "target/debug")], view))
         result.append(([sys.executable, str(rust / "scripts/check-session-owner.py"),
                         "--bin-dir", str(rust / "target/debug")], view))
+        result.append(([sys.executable, str(rust / "scripts/check-session-resources.py"),
+                        "--bin-dir", str(rust / "target/debug")], view))
     return result
 
 

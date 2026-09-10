@@ -11,6 +11,17 @@ use serde_json::{Value, json};
 /// The composition root supplies local resources and device observations.
 /// This interface provides no device mutation or authority administration.
 pub trait HostServices: Send + Sync {
+    fn session_resource(
+        &self,
+        _method: &str,
+        _params: &serde_json::Map<String, Value>,
+    ) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "rejected".into(),
+            message: "Session owner is not configured".into(),
+            details: None,
+        })
+    }
     fn runtime_storage(
         &self,
         _method: &str,
@@ -203,6 +214,10 @@ impl<H: HostServices> Control<H> {
             "history.filter.list" | "history.filter.save" | "history.filter.delete" => Response {
                 id: request.id.clone(),
                 outcome: self.host.history_filter(&request.method, &params),
+            },
+            "session.list" | "session.show" | "session.pin" | "session.unpin" => Response {
+                id: request.id.clone(),
+                outcome: self.host.session_resource(&request.method, &params),
             },
             "runtime.storage.status" | "runtime.storage.policy" | "runtime.storage.root" => {
                 Response {
