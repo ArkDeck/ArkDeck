@@ -705,6 +705,7 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 - Allowed paths:
   - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`
   - `rust/**`
+  - `.github/workflows/swift-slow-lanes.yml`（proposed scope supplement: add the host-only read-only shadow nightly job and archive its comparison receipts; preserve existing jobs, triggers, permissions and gates; effective only after maintainer merge）
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/**`（disable the Swift owner of these stores）
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/**`
   - `Packages/ArkDeckKit/Tests/**`（r9: contract tests and the fixtures beside them）
