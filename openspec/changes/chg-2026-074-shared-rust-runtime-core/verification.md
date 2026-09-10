@@ -1,6 +1,6 @@
 # Verification — CHG-2026-074
 
-> Change:CHG-2026-074-shared-rust-runtime-core@r8
+> Change:CHG-2026-074-shared-rust-runtime-core@r9
 > Status:planned; nothing in this file approves the change, and no host, fixture or simulation
 > result counts as platform or hardware support (POL-VERIFY-001, POL-MODE-001).
 
@@ -19,6 +19,10 @@ daemon (gate G5) before any Windows Golden Journey task starts — and changes n
 method, expected result or evidence directory. The Windows rows are attempted after G5; the
 `TASK-XPA-005/` evidence for XPA-AC-1/2/7 records the NTFS port of a durable layer first delivered
 and verified on macOS under `TASK-XPA-012..014/`.
+
+Revision 9 reconciles the Allowed paths of `TASK-XPA-012..018` with the modules their
+deliverables live in and changes no acceptance row, method, expected result or evidence
+directory.
 
 ## Environment
 

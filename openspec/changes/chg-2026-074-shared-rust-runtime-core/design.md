@@ -30,6 +30,8 @@ row, risk R3 in section K, one section L open-items row and the notes on items 3
 L.1 changed; nothing else.
 Revision 8 re-pins it for the macOS-first sequencing: sections A (item 6), G.1, J.2, J.4 (rows
 002, 003, 004, 005, 014, 018, 024), J.5 and L.1 (item 18) changed; nothing else.
+Revision 9 changes no design text and keeps the pin above; its Allowed-path reconciliation lives
+in `tasks.md`, and the §J.4 rows of XPA-012..025 carry no path lines.
 
 The 2026-09-06 design refresh is re-pinned for review against checkout
 `d3d5c32c60cf60c96c64c50f8f1ab52b4d444cfa`. It updates current single-v1 facts,

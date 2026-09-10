@@ -26,6 +26,22 @@ TASK-XPA-002 wait for TASK-XPA-017. SPK-3 is a platform fact and may run wheneve
 exists, but nothing Windows-side is built on it before G5. This PR proposes r8 for maintainer
 review; its merge is the attestation.
 
+Revision 9 (2026-09-10) reconciles the Allowed paths of the macOS chain with the modules its
+deliverables actually live in. Between 2026-09-09 and 2026-09-10 TASK-XPA-003 needed one
+implementation PR (#1833) and five scope PRs (#1828 packaging scripts, #1829 HDC host lifecycle
+and rollback smoke, #1830 read projections, #1831 refusal proofs, #1834 pbxproj registration),
+because its paths were written file by file at proposal time. r9 rewrites TASK-XPA-012..018 at
+module granularity, verified against the current tree: the host-only stores' Swift consumers,
+the tool/bundle registry and the trace cache reader (012); the shared models, fixtures, cutover
+switch, paired packaging and rollback-drill UI smoke every cutover repeats (012–016); the
+durable-store hand-off, the sidecar process face and the runtime models (014); the analyzer
+contracts and composition root (015); the process executor, the HDC provider and supervisor
+observation modules (016); and the CI lane files that the retirements must edit (017, 018,
+precedent TASK-XPA-002 r3/r5). `Forbidden paths` keep carrying the narrowing for reviewers, and a
+scope supplement PR is from now on expected only for a security-kernel exception, not for an
+adjacent file. TASK-XPA-003's live supplements stand as they are. r9 changes no dependency,
+status, acceptance criterion, hardware criterion or design text.
+
 Conventions shared by every task:
 
 - One task = one vertical PR that carries production code, tests, applicable real-device
@@ -691,7 +707,15 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
   - `rust/**`
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/**`（disable the Swift owner of these stores）
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/**`
-  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/**`
+  - `Packages/ArkDeckKit/Tests/**`（r9: contract tests and the fixtures beside them）
+  - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/**`（r9: the Swift consumers of the host-only stores — `RuntimeSessionStorageStore`, `RuntimeHistoryFilterStore`, display names, `RuntimeTraceCacheApplicationFacade`, storage policy; no engine, admission or capability edit）
+  - `Packages/ArkDeckKit/Sources/ArkDeckBootstrap/**`（r9: tool and bundle registry owner hand-off）
+  - `Packages/ArkDeckKit/Sources/ArkDeckTraceAdapter/**`（r9: trace cache reader）
+  - `Packages/ArkDeckKit/Sources/ArkDeckCore/**`（r9: shared models）
+  - `Packages/ArkDeckKit/LaunchAgents/**`（r9: cutover switch and install receipt）
+  - `Packages/ArkDeckKit/Distribution/macOS/**`（r9: paired helper packaging as the cutover moves; provisioning, signing, notarization and assessment checks preserved）
+  - `ArkDeckAppUITests/**`（r9: the rollback-drill App smoke of this cutover only; no fixture-as-hardware evidence）
+  - `ArkDeck.xcodeproj/project.pbxproj`（r9: registration of those UI-test files in the existing UI-test target only）
   - `docs/design/**`
 - Forbidden paths:
   - `Packages/ArkDeckKit/Sources/ArkDeckStorage/**`（formats stay frozen）
@@ -738,7 +762,12 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/**`（engine publish path only）
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/**`
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/**`
-  - `Packages/ArkDeckKit/Tests/ArkDeckContractTests/**`
+  - `Packages/ArkDeckKit/Tests/**`（r9: contract tests and the fixtures beside them）
+  - `Packages/ArkDeckKit/Sources/ArkDeckCore/**`（r9: shared models）
+  - `Packages/ArkDeckKit/LaunchAgents/**`（r9: cutover switch and install receipt）
+  - `Packages/ArkDeckKit/Distribution/macOS/**`（r9: paired helper packaging as the cutover moves; provisioning, signing, notarization and assessment checks preserved）
+  - `ArkDeckAppUITests/**`（r9: the rollback-drill App smoke of this cutover only; no fixture-as-hardware evidence）
+  - `ArkDeck.xcodeproj/project.pbxproj`（r9: registration of those UI-test files in the existing UI-test target only）
   - `docs/design/**`
 - Forbidden paths:
   - `Packages/ArkDeckKit/Sources/ArkDeckStorage/**`、`openspec/specs/**`
@@ -788,6 +817,12 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
   - `Packages/ArkDeckKit/Sources/ArkDeckCore/**`
   - `Packages/ArkDeckKit/Tests/**`
   - `Packages/ArkDeckKit/LaunchAgents/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckStorage/**`（r9: owner hand-off and the strict-reader oracle only; formats frozen, no `user_version` bump）
+  - `Packages/ArkDeckKit/Sources/ArkDeckProcess/**`（r9: the executor sidecar's process face）
+  - `Packages/ArkDeckKit/Sources/ArkDeckRuntime/**`（r9: runtime models and HAR types）
+  - `Packages/ArkDeckKit/Distribution/macOS/**`（r9: paired helper packaging as the cutover moves; provisioning, signing, notarization and assessment checks preserved）
+  - `ArkDeckAppUITests/**`（r9: the rollback-drill App smoke of this cutover only; no fixture-as-hardware evidence）
+  - `ArkDeck.xcodeproj/project.pbxproj`（r9: registration of those UI-test files in the existing UI-test target only）
   - `docs/design/**`
 - Forbidden paths:
   - `openspec/specs/**`、`openspec/constitution.md`、`Catalog/**`
@@ -836,6 +871,13 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
   - `rust/**`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/**`（sidecar coverage shrink only）
   - `Packages/ArkDeckKit/Tests/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/**`（r9: composition root of the shrinking sidecar）
+  - `Packages/ArkDeckKit/Sources/ArkDeckCore/**`（r9: shared models）
+  - `Packages/ArkDeckKit/Sources/ArkDeckRuntime/**`（r9: analyzer contracts and HAR types）
+  - `Packages/ArkDeckKit/LaunchAgents/**`（r9: cutover switch and install receipt）
+  - `Packages/ArkDeckKit/Distribution/macOS/**`（r9: paired helper packaging as the cutover moves; provisioning, signing, notarization and assessment checks preserved）
+  - `ArkDeckAppUITests/**`（r9: the rollback-drill App smoke of this cutover only; no fixture-as-hardware evidence）
+  - `ArkDeck.xcodeproj/project.pbxproj`（r9: registration of those UI-test files in the existing UI-test target only）
   - `docs/design/**`
 - Forbidden paths:
   - `openspec/specs/**`、`Catalog/**`
@@ -869,6 +911,15 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
   - `rust/**`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/**`
   - `Packages/ArkDeckKit/Tests/**`
+  - `Packages/ArkDeckKit/Sources/ArkDeckProcess/**`（r9: the process executor being ported）
+  - `Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/**`（r9: the HDC provider and supervisor observation being ported）
+  - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/**`（r9: composition root of the shrinking sidecar）
+  - `Packages/ArkDeckKit/Sources/ArkDeckCore/**`（r9: shared models）
+  - `Packages/ArkDeckKit/Sources/ArkDeckRuntime/**`（r9: runtime models and HAR types）
+  - `Packages/ArkDeckKit/LaunchAgents/**`（r9: cutover switch and install receipt）
+  - `Packages/ArkDeckKit/Distribution/macOS/**`（r9: paired helper packaging as the cutover moves; provisioning, signing, notarization and assessment checks preserved）
+  - `ArkDeckAppUITests/**`（r9: the rollback-drill App smoke of this cutover only; no fixture-as-hardware evidence）
+  - `ArkDeck.xcodeproj/project.pbxproj`（r9: registration of those UI-test files in the existing UI-test target only）
   - `docs/design/**`
 - Forbidden paths:
   - `openspec/integrations/**`、`openspec/specs/**`、`Catalog/**`
@@ -907,6 +958,11 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
   - `openspec/platforms/macos/**`（macOS re-verified on the pure Rust daemon, r3）
   - `openspec/platforms/PLATFORM-PROFILES.lock.yaml`
   - `openspec/verification/traceability.md`（macOS column only）
+  - `scripts/ci/plan.py`（r9: retire the lanes that build the SwiftPM products this task deletes; no other edit — precedent TASK-XPA-002 r3/r5）
+  - `scripts/ci/test_plan.py`（r9: the matching planner tests）
+  - `.github/workflows/swift-ci.yml`（r9: the same lane retirement; no other edit）
+  - `scripts/test_agent_pr_workflow.py`（r9: the `swift` aggregate's pinned `needs` list）
+  - `ArkDeckAppUITests/**`（r9: the retirement's App smoke only）
   - `docs/design/**`
 - Forbidden paths:
   - `openspec/specs/**`、`openspec/constitution.md`、`Catalog/**`
@@ -941,6 +997,10 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
   - `rust/**`
   - `Packages/ArkDeckKit/**`（Swift CLI removal）
   - `openspec/contracts/cli-*.yaml`、`openspec/contracts/cli-*.json`、`openspec/contracts/runtime-control-plane.schema.json`
+  - `scripts/ci/plan.py`（r9: retire the lanes that build the SwiftPM products the Swift CLI removal deletes; no other edit — precedent TASK-XPA-002 r3/r5）
+  - `scripts/ci/test_plan.py`（r9: the matching planner tests）
+  - `.github/workflows/swift-ci.yml`（r9: the same lane retirement; no other edit）
+  - `scripts/test_agent_pr_workflow.py`（r9: the `swift` aggregate's pinned `needs` list）
   - `docs/design/**`
 - Forbidden paths:
   - `openspec/specs/**`、`Catalog/**`
