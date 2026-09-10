@@ -1,6 +1,6 @@
 ---
 id: CHG-2026-074-shared-rust-runtime-core
-revision: 8
+revision: 9
 status: approved # 维护者 review + merge 本 proposal PR 后才生效；合入前任何 TASK-XPA 不开工，第一个实现 PR 只能在合入后声明
 class: platform
 core_change_level: none
@@ -121,6 +121,44 @@ merge of this PR is the attestation of the ruling it records. It re-orders the t
 5. **Design re-pin.** Sections A (item 6), G.1 (the walking-skeleton edge), J.2 (DAG edges), J.4
    (rows 002, 003, 004, 005, 014, 018, 024), J.5 (critical path, parallel groups, current entry,
    gate order) and L.1 (item 18) changed; nothing else.
+
+## Revision 9 — path reconciliation for the macOS chain (2026-09-10)
+
+Revision 9 changes no scope, no Requirement, no Acceptance Scenario, no platform disposition, no
+dependency, no status, no hardware criterion and no design text, and it does not approve r6–r8 or
+itself; the maintainer's merge of this PR is the attestation. It rewrites the Allowed paths of
+`TASK-XPA-012..018` at the granularity of the modules their deliverables live in.
+
+1. **Why.** `TASK-XPA-003` needed one implementation PR (#1833) and five scope PRs in a day
+   (#1828 packaging scripts, #1829 HDC host lifecycle and rollback smoke, #1830 read projections,
+   #1831 refusal proofs, #1834 pbxproj registration). `scripts/check_pr_paths.py` reads Allowed
+   paths from the base tree only, which is right, so every adjacent file a task discovers costs a
+   maintainer round trip and paused the executor at the first gap. Paths written file by file at
+   proposal time cannot foresee packaging, test registration or a provider host file.
+2. **What moved, checked against the tree.** 012: `ArkDeckWorkflows/**` (the store consumers
+   `RuntimeSessionStorageStore`, `RuntimeHistoryFilterStore`, display names,
+   `RuntimeTraceCacheApplicationFacade`, storage policy live there, not in the daemon targets),
+   `ArkDeckBootstrap/**` (tool/bundle registry), `ArkDeckTraceAdapter/**`, `ArkDeckCore/**`;
+   012–016: `Packages/ArkDeckKit/Tests/**`, `LaunchAgents/**`, `Distribution/macOS/**`,
+   `ArkDeckAppUITests/**` and `ArkDeck.xcodeproj/project.pbxproj` for the rollback-drill smoke
+   each cutover repeats (XPA-AC-9, r5); 014: `ArkDeckStorage/**` (owner hand-off and strict-reader
+   oracle; formats frozen), `ArkDeckProcess/**`, `ArkDeckRuntime/**`; 015: the composition root,
+   `ArkDeckCore/**`, `ArkDeckRuntime/**`; 016: `ArkDeckProcess/**` and `ArkDeckOpenHarmony/**`,
+   which hold the process executor, the HDC provider and the supervisor observation the task
+   ports; 017 and 018: `scripts/ci/plan.py`, `scripts/ci/test_plan.py`,
+   `.github/workflows/swift-ci.yml` and `scripts/test_agent_pr_workflow.py` for the lane
+   retirements, exactly as `TASK-XPA-002` r3/r5 granted them. Every addition carries a
+   parenthetical stating the deliverable it serves; `Forbidden paths` are unchanged and keep the
+   narrowing for reviewers (`ArkDeckStorage/**` stays forbidden for 012 and 013, `user_version`
+   bumps for 014, `Packages/**` for 025).
+3. **Boundary.** Wider paths are not wider scope: each task's Deliverables, Verification and stop
+   conditions are unchanged, and a security-kernel exception (admission, capability, recovery or
+   storage semantics outside a task's stated deliverable) still needs its own scope supplement
+   PR. `TASK-XPA-003`'s live supplements stand. `TASK-XPA-019` and `TASK-XPA-025` already list
+   their modules and are untouched.
+4. **Companion.** What reconnaissance cannot foresee is handled by
+   [CHG-2026-076](../chg-2026-076-declared-scope-extension/proposal.md), which lets a PR declare an
+   adjacent-path extension in band under bounded, reviewed conditions.
 
 ## Governance loop
 
