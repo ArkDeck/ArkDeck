@@ -60,6 +60,7 @@ fn main() {
             "display-names",
             "session-configuration",
             "session-timestamp",
+            "session-graphemes",
         ]
         .contains(&args[0].as_str())
     {
@@ -81,6 +82,7 @@ fn main() {
         "display-names" => arkdeck_hoststore::decode_display_names(&input),
         "session-configuration" => arkdeck_hoststore::decode_session_configuration(&input),
         "session-timestamp" => arkdeck_hoststore::decode_session_timestamp(&input),
+        "session-graphemes" => arkdeck_hoststore::decode_graphemes(&input),
         _ => unreachable!(),
     };
     let decoded = match result {

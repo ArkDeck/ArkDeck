@@ -36,7 +36,15 @@ Swift oracle may initialize or reconcile only its isolated fixtures.
 | Session configuration | 5 | Policy/custom-root/full-width values and strict canonical fields |
 | Session timestamps | 20 | Exact Swift Date Double bits or matching refusal |
 | Session status | 20 | Actual used/pinned bytes, counts, catalog generations and incomplete measurement |
-| Session parameters | 26 | Typed state, restore byte equality, status consistency and Swift character-count boundaries |
+| Session parameters | 28 | Typed state, restore byte equality, status consistency and Swift character-count boundaries |
+| Session Steps | 224 | All 56 kinds, valid typed arguments, closed fields, required arguments and digests |
+| Session compensation | 84 | All six permitted kinds, declarations, execution records, source relationships and outcomes |
+| Session confirmations | 16 | Typed actors, decisions, scopes and Step backreferences |
+| Session Step semantics | 32 | Risk declarations, binding references, terminal states, standardAgent and plan-only conditions |
+| Session arguments | 38 | Scalar and path bounds, optional fields, remote action and workspace argument semantics |
+| Session recovery | 44 | Typed hazards, guides, device mode, abandon records and compensation relationships |
+| Runtime audit records | 37 | Closed historical audit fields, Provider/Step labels and mutation consumption requirements |
+| Grapheme corpus batches | 3 | Unicode 16/17 official inputs and 54,660 generated Indic property combinations |
 | Trace cache | 7 | Actual Swift adapter inventory, missing metadata, key/lease contention and unsafe entries |
 
 The 105-case receipt is preserved unchanged in
@@ -79,23 +87,34 @@ confer no Runtime authority or tool trust.
 Parameter validation covers missing/unreadable/value states, the desired-value
 requirement, restore dispositions, and exact UTF-8 equality for a restored value.
 Length comparisons exercise 4096/4097 Swift Characters with family emoji, CRLF,
-combining marks, flags, Hangul, Indic conjuncts and skin-tone modifiers. These
-are boundary regressions, not exhaustive Unicode conformance. The CRLF case
-exposed a CoreFoundation composed-range difference; the candidate explicitly
-joins CRLF for counting under [UAX #29 GB3](https://www.unicode.org/reports/tr29/),
-preserving source bytes.
+combining marks, flags, Hangul, Indic conjuncts and skin-tone modifiers. The
+candidate now uses exactly pinned `unicode-segmentation` 1.13.3 with narrowly
+scoped Swift Indic-linker compatibility rules. The earlier CoreFoundation
+composed-range counter was removed after it disagreed with Swift segmentation.
+The actual Swift Character iterator is compared on all 1,859 official Unicode
+16/17 GraphemeBreakTest inputs and 54,660 generated consonant/linker sequences.
+The official fixtures and Unicode license are retained unchanged; the generated
+property table is checked against the pinned DerivedCoreProperties input on
+every shadow run. The dependency's public Mozilla cargo-vet audit is imported;
+this does not constitute maintainer approval of the implementation or cutover.
+
+All 56 Step types now receive typed structural, argument and digest validation.
+Compensation records and confirmations are checked against declared source Steps.
+Recovery parsing covers the complete closed record and interrupted-state
+requirements. Historical Runtime Provider audits are interpreted solely as
+stored data; the candidate cannot mint, reserve or consume authority. HDC keeps
+its existing closed field set, including the allowed cross-branch metadata keys.
 
 ## Remaining work before harness review
 
-- Complete manifest Steps, compensations, confirmations, Runtime
-  Provider audit and recovery branches, plus complex Foundation canonical JSON.
-  Unsupported branches currently stop the entire comparison explicitly; they
-  are never reported as corrupt or unaccounted Sessions.
+- Complete complex Foundation canonical JSON coverage. Unsupported encoding branches still stop the entire
+  comparison explicitly; they are never reported as corrupt or unaccounted
+  Sessions.
 - Finish the Session scan failure matrix and root/configuration stability checks.
 - Complete History/display-name timestamp refusal, registry semantic validation,
   published tool identity/selection and remaining Trace metadata compatibility.
-- Verify actual dependency checkout provenance and finalize the complete nightly
-  corpus. The nightly job is wired locally but has not been pushed or run.
+- Automate dependency checkout provenance verification and finalize the complete
+  nightly corpus. The nightly job is wired locally but has not been pushed or run.
 - Run the final unified gate and committed preflight on the complete harness.
 
 After harness review/merge, seven actual scheduled nightly days must be matched
@@ -104,6 +123,25 @@ retries cannot manufacture those days. Owner/CAS/crash-window work, UI assertion
 GJ-1 re-pass and rollback evidence remain a later authorized cutover stage.
 
 ## Validation so far
+
+- The 611-case implementation passed the complete-diff unified gate (exit 0):
+  Swift full suite (2565 parallel tests plus six serialized timing/race tests),
+  App test build, design-system, published/candidate Rust contracts, cargo deny,
+  and cargo vet (26 audited). Log:
+  `/private/tmp/xpa012-shadow-typed-manifests-gate.log`.
+
+- 611 cases across 20 XCTest methods passed, including 32 new Step semantic
+  boundaries. Initial fixture setup omitted catalog initialization; adding it
+  restored the expected complete measurement for valid cases. The immutable snapshot is
+  [local-shadow-typed-manifests-20260910.json](local-shadow-typed-manifests-20260910.json).
+  It retains `sourceDirty: true` and `cutoverEligible: false`.
+  Log: `/private/tmp/xpa012-shadow-semantics-catalog.log`.
+- The actual SwiftPM ArkTrace checkout was read-only checked at the pinned
+  revision and had no tracked or untracked changes. Automated receipt checks
+  for that external source remain to be added.
+
+- 579 cases across 19 XCTest methods passed after the Runtime audit field fix.
+  Log: `/private/tmp/xpa012-shadow-runtime-audit-fixed.log`. Its source is superseded by the 611-case snapshot above.
 
 - 131 cases across 12 XCTest methods passed after the parameter/Unicode fixes.
   Log: `/private/tmp/xpa012-shadow-parameter-unicode-fixed.log`.

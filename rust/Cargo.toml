@@ -21,6 +21,7 @@ sha2 = "0.10.9"
 hmac = "0.12.1"
 libc = "0.2"
 windows-sys = "0.61.2"
+unicode-segmentation = "=1.13.3"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

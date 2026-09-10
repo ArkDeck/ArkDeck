@@ -26,7 +26,6 @@ unsafe extern "C" {
     ) -> *mut c_void;
     fn CFStringNormalize(string: *mut c_void, form: isize);
     fn CFStringGetLength(string: *const c_void) -> isize;
-    fn CFStringGetCharacterAtIndex(string: *const c_void, index: isize) -> u16;
     fn CFStringGetMaximumSizeForEncoding(length: isize, encoding: u32) -> isize;
     fn CFStringGetBytes(
         string: *const c_void,
@@ -38,7 +37,6 @@ unsafe extern "C" {
         maximum: isize,
         used: *mut isize,
     ) -> isize;
-    fn CFStringGetRangeOfComposedCharactersAtIndex(string: *const c_void, index: isize) -> Range;
     fn CFRelease(object: *const c_void);
 }
 
@@ -109,52 +107,5 @@ pub fn host_canonical_text(value: &str) -> Option<String> {
         }
         buffer.truncate(used as usize);
         String::from_utf8(buffer).ok()
-    }
-}
-
-/// Bounded composed-character count for the current macOS parameter reader.
-/// Iteration uses UTF-16 positions, never byte offsets or Unicode scalar count.
-pub fn host_composed_text_within(value: &str, maximum: usize) -> Option<bool> {
-    struct Owned(*const c_void);
-    impl Drop for Owned {
-        fn drop(&mut self) {
-            unsafe { CFRelease(self.0) };
-        }
-    }
-    let length = isize::try_from(value.len()).ok()?;
-    // SAFETY: valid UTF-8 remains live during creation. The guard owns the
-    // resulting string; each queried index is in its checked UTF-16 range.
-    unsafe {
-        let text = CFStringCreateWithBytes(std::ptr::null(), value.as_ptr(), length, 0x08000100, 0);
-        if text.is_null() {
-            return None;
-        }
-        let text = Owned(text);
-        let units = CFStringGetLength(text.0);
-        let (mut position, mut count) = (0, 0_usize);
-        while position < units {
-            if count == maximum {
-                return Some(false);
-            }
-            // CF composed ranges split CRLF on macOS. Swift Character follows
-            // UAX #29 GB3: CR × LF, with breaks around other controls (GB4/5).
-            // Join this pair for counting without changing the source bytes.
-            if position + 1 < units
-                && CFStringGetCharacterAtIndex(text.0, position) == 0x0d
-                && CFStringGetCharacterAtIndex(text.0, position + 1) == 0x0a
-            {
-                position += 2;
-                count += 1;
-                continue;
-            }
-            let range = CFStringGetRangeOfComposedCharactersAtIndex(text.0, position);
-            let end = range.location.checked_add(range.length)?;
-            if range.location < 0 || range.location > position || end <= position || end > units {
-                return None;
-            }
-            position = end;
-            count += 1;
-        }
-        Some(true)
     }
 }

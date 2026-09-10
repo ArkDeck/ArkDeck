@@ -408,6 +408,574 @@ final class HostStoreShadowContractTests: XCTestCase {
     try record(name: "inventory-" + name, input: before, output: output, outcome: "equal", store: "session-storage")
   }
 
+  func testSessionRuntimeAuditProjection() throws {
+    let owner = root.appending(path: "audit-owner")
+    let sessions = root.appending(path: "audit-sessions")
+    let store = try RuntimeSessionStorageStore(ownerRoot: owner, defaultSessionsRoot: sessions)
+    _ = try store.updatePolicy(.init(totalQuotaBytes: 1_000_000, safetyMarginBytes: 100,
+      retentionDays: 7), expectedGeneration: 1)
+    let directory = try seedShadowSession(sessions: sessions, month: "01", id: "session-audit",
+      timestamp: "2026-01-01T00:00:00Z")
+    let catalog = try SessionRetentionCatalog(sessionsRoot: sessions)
+    try catalog.registerFinalizedSession(sessionRoot: directory, retentionDays: 7, policyGeneration: 2)
+    _ = try catalog.updatePin(sessionID: "session-audit", isPinned: true, expectedGeneration: 1)
+    let accepted = ["readonly-hdc", "readonly-arkforge", "capability-hdc", "capability-arkforge", "hdc-label",
+      "arkforge-label", "artifact-digest", "maximum-ordinal", "unordered-times", "hdc-cross-branch-field",
+      "readonly-declared-compensation", "capability-compensation"]
+    let refused = ["missing-audit", "unknown-audit-kind", "extra-audit-field", "missing-audit-field", "empty-reference",
+      "invalid-admitted-date", "invalid-valid-until", "empty-reservation", "zero-ordinal", "overflow-ordinal",
+      "digest-shape", "artifact-digest-shape", "readonly-consumption", "mutation-with-readonly", "readonly-artifact",
+      "label-wrong-provider", "label-wrong-step", "label-without-capability", "unknown-provider", "host-tool-audit",
+      "planonly-provider", "simulated-provider", "host-provider-target", "readonly-compensation-mutation", "hdc-extra-field"]
+    for name in accepted + refused {
+      var step = try HostStoreStepShadowFixtures.step(.probeDevice)
+      var provider = name == "readonly-arkforge" || name == "capability-arkforge" ? "arkforge" : "hdc"
+      // Closed historical Manifest fields in an isolated directory. No Runtime
+      // capability factory, reservation store or Provider is reachable here.
+      let sha = JSONValue.string(HostStoreStepShadowFixtures.hash)
+      var audit: [String: JSONValue] = ["kind": .string("runtimeCapability"), "reference": .string("fixture-authority"),
+        "admittedAtUtc": .string("2026-01-01T00:00:00Z"), "validUntilUtc": .string("2026-01-01T01:00:00Z"),
+        "consumptionFingerprintSha256": sha, "reservationId": .string("fixture-reservation"), "useOrdinal": .integer(1),
+        "planDigest": sha, "stepSetDigest": sha, "targetBindingDigest": sha, "artifactDigest": .null]
+      if name.hasPrefix("readonly-") || ["mutation-with-readonly", "label-without-capability"].contains(name) {
+        audit["kind"] = .string("defaultReadOnlyPolicy")
+        for key in ["validUntilUtc", "consumptionFingerprintSha256", "reservationId", "useOrdinal", "planDigest", "stepSetDigest", "targetBindingDigest", "artifactDigest"] { audit[key] = .null }
+      }
+      switch name {
+      case "unknown-audit-kind": audit["kind"] = .string("unexpected")
+      case "extra-audit-field": audit["extra"] = .bool(true)
+      case "missing-audit-field": audit.removeValue(forKey: "artifactDigest")
+      case "empty-reference": audit["reference"] = .string("")
+      case "invalid-admitted-date": audit["admittedAtUtc"] = .string("2026-02-30T00:00:00Z")
+      case "invalid-valid-until": audit["validUntilUtc"] = .string("2026-02-30T00:00:00Z")
+      case "empty-reservation": audit["reservationId"] = .string("")
+      case "zero-ordinal": audit["useOrdinal"] = .integer(0)
+      case "overflow-ordinal": audit["useOrdinal"] = .unsignedInteger(UInt64.max)
+      case "maximum-ordinal": audit["useOrdinal"] = .integer(Int64.max)
+      case "digest-shape": audit["planDigest"] = .string("invalid")
+      case "artifact-digest-shape": audit["artifactDigest"] = .string("invalid")
+      case "artifact-digest", "readonly-artifact": audit["artifactDigest"] = sha
+      case "unordered-times": audit["validUntilUtc"] = .string("2025-01-01T00:00:00Z")
+      case "readonly-consumption": audit["useOrdinal"] = .integer(1)
+      case "unknown-provider": provider = "unexpected"
+      case "mutation-with-readonly": step = try HostStoreStepShadowFixtures.step(.setParameter)
+      case "hdc-label", "label-wrong-provider", "label-without-capability", "label-wrong-step", "arkforge-label":
+        let kind: WorkflowStepKind = name == "arkforge-label" ? .flashPartition : name == "label-wrong-step" ? .clearLogBuffer : .runApprovedRemoteMutation
+        step = try HostStoreStepShadowFixtures.step(kind)
+        if name == "arkforge-label" || name == "label-wrong-provider" { provider = "arkforge" }
+        guard case .object(var arguments) = step["arguments"] else { return XCTFail("audit Step fixture") }
+        arguments["confirmationId"] = .string(name == "arkforge-label" ? "runtimeE2Admission" : "runtime-capability-admission")
+        step["arguments"] = .object(arguments)
+        step["argumentsHash"] = .string(SHA256Hex.string(of: try CanonicalJSONEncoders.canonical().encode(JSONValue.object(arguments))))
+      default: break
+      }
+      var compensations: [JSONValue] = []
+      if ["readonly-declared-compensation", "readonly-compensation-mutation", "capability-compensation"].contains(name) {
+        let raw = try HostStoreStepShadowFixtures.step(.restoreParameter, id: "comp-shadow")
+        var descriptor = Dictionary(uniqueKeysWithValues: ["id", "kind", "effect", "cancellation", "bindingRequirement", "arguments", "argumentsHash"].map { ($0, raw[$0]!) })
+        descriptor["trigger"] = .string("onAnyTerminal")
+        step["compensationDescriptors"] = .array([.object(descriptor)])
+        if name != "readonly-declared-compensation" {
+          compensations = [.object(["descriptor": .object(descriptor), "sourceStepId": .string("step-shadow"),
+            "disposition": .string("notRun"), "outcomeCertainty": .string("notApplicable"), "result": .string("notRun"),
+            "failure": .null, "journalEventIds": .array([])])]
+        }
+      }
+      let data = try SessionStorageFixtures.manifest(sessionID: "session-audit", jobID: "job-session-audit",
+        status: name == "planonly-provider" ? "planned" : "succeeded",
+        executionMode: name == "planonly-provider" ? "planOnly" : name == "simulated-provider" ? "simulated" : "execute",
+        timestamp: "2026-01-01T00:00:00Z", steps: [.object(step)], compensations: compensations)
+      guard case .object(var document) = try JSONDecoder().decode(JSONValue.self, from: data) else { return XCTFail("audit manifest fixture") }
+      if name == "hdc-extra-field" || name == "hdc-cross-branch-field" {
+        guard case .object(var tool) = document["toolchain"] else { return XCTFail("HDC fixture") }
+        tool[name == "hdc-extra-field" ? "legacyMetadata" : "profileIdentifier"] = .string("fixture-profile")
+        document["toolchain"] = .object(tool)
+      } else {
+        document["toolchain"] = .object(["kind": .string(name == "host-tool-audit" ? "hostTool" : "runtimeProvider"),
+          "providerIdentity": .string(provider), "profileIdentifier": .string("fixture-profile"), "reportedVersion": .string("fixture-version"), "sha256": sha])
+        if name != "missing-audit" { document["runtimeAuthority"] = .object(audit) }
+        if ["host-tool-audit", "host-provider-target"].contains(name) {
+          document["originalTarget"] = .object(["kind": .string("host"), "transport": .string("host"), "connectKey": .null,
+            "identitySnapshot": .object(["fixture": .string("host")])])
+          document["bindingHistory"] = .array([])
+        }
+      }
+      try CanonicalJSONEncoders.canonical().encode(JSONValue.object(document)).write(to: directory.appending(path: "manifest.json"))
+      XCTAssertEqual(try store.status().measurementIncomplete, refused.contains(name), name)
+      try compareSessionStatus("audit-" + name, store: store,
+        config: owner.appending(path: "session-storage.json"), sessions: sessions)
+    }
+  }
+
+  func testSessionRecoveryProjection() throws {
+    let owner = root.appending(path: "recovery-owner")
+    let sessions = root.appending(path: "recovery-sessions")
+    let store = try RuntimeSessionStorageStore(ownerRoot: owner, defaultSessionsRoot: sessions)
+    _ = try store.updatePolicy(.init(totalQuotaBytes: 1_000_000, safetyMarginBytes: 100,
+      retentionDays: 7), expectedGeneration: 1)
+    let directory = try seedShadowSession(sessions: sessions, month: "01", id: "session-recovery",
+      timestamp: "2026-01-01T00:00:00Z")
+    let catalog = try SessionRetentionCatalog(sessionsRoot: sessions)
+    try catalog.registerFinalizedSession(sessionRoot: directory, retentionDays: 7, policyGeneration: 2)
+    _ = try catalog.updatePin(sessionID: "session-recovery", isPinned: true, expectedGeneration: 1)
+    let base = try RecoveryManifestRecord(needsAttention: true, interruptedReason: "fixture interruption",
+      deviceHazards: [try .init(code: "fixture.hazard", summary: "fixture hazard", severity: "possibleBrick", outcomeCertainty: "outcomeUnknown")],
+      abandonAuditEventIDs: ["event-abandon"], lastConfirmedStepID: "step-shadow",
+      lastDeviceMode: .known(value: "fixture-mode", evidence: "fixture observation"), managedHostProcessState: "notRunning",
+      recoveryGuide: try .init(providerIdentity: "fixture-provider", automaticRecoveryAvailable: false,
+        summary: "fixture recovery", steps: ["fixture guidance"]), unexecutedCompensations: [],
+      userConfirmation: try .init(confirmationID: "confirmation-abandon", confirmedAt: "2026-01-01T00:00:00Z"),
+      recoveryOfSessionID: nil, recoveryOfJobID: nil)
+    guard case .object(let original) = try JSONDecoder().decode(JSONValue.self, from: RecoveryManifestCodec.encode(base)) else {
+      return XCTFail("recovery fixture")
+    }
+    let processStates = ["notStarted", "notRunning", "stoppedAtSafeBoundary", "stillRunningUnknown", "notApplicable"]
+    let accepted = ["interrupted", "failed", "cancelled", "unknown-mode", "guide-automatic", "failed-no-attention",
+      "last-confirmed-null", "recovery-of-pair", "unexecuted", "unexecuted-duplicate", "unknown-step"] + processStates
+    let refused = ["success-recovery", "planned-recovery", "interrupted-no-audit", "interrupted-no-confirmation",
+      "interrupted-no-attention", "interrupted-no-reason", "empty-reason", "missing-key", "extra-key", "duplicate-audit",
+      "bad-audit-id", "unknown-last-step", "invalid-recovery-of", "hazard-extra", "hazard-bad-severity",
+      "hazard-empty-summary", "device-mode-extra", "device-mode-empty-evidence", "unknown-process", "guide-empty-steps",
+      "guide-empty-item", "guide-extra", "confirmation-actor", "confirmation-date", "confirmation-missing-key",
+      "undeclared-compensation", "mismatched-compensation", "unexecuted-bad-hash"]
+    for name in accepted + refused {
+      var recovery = original
+      var step = try HostStoreStepShadowFixtures.step(.probeDevice)
+      var status = "interrupted"
+      var mode = "execute"
+      switch name {
+      case "failed", "cancelled": status = name
+      case "success-recovery": status = "succeeded"
+      case "planned-recovery": status = "planned"; mode = "planOnly"
+      case "unknown-mode": recovery["lastDeviceMode"] = .object(["state": .string("unknown")])
+      case "interrupted-no-audit": recovery["abandonAuditEventIds"] = .array([])
+      case "interrupted-no-confirmation": recovery["userConfirmation"] = .null
+      case "interrupted-no-attention", "failed-no-attention":
+        recovery["needsAttention"] = .bool(false)
+        if name == "failed-no-attention" { status = "failed" }
+      case "interrupted-no-reason": recovery["interruptedReason"] = .null
+      case "empty-reason": recovery["interruptedReason"] = .string("")
+      case "missing-key": recovery.removeValue(forKey: "lastConfirmedStepId")
+      case "extra-key": recovery["extra"] = .bool(true)
+      case "duplicate-audit": recovery["abandonAuditEventIds"] = .array([.string("event-abandon"), .string("event-abandon")])
+      case "bad-audit-id": recovery["abandonAuditEventIds"] = .array([.string(" invalid")])
+      case "unknown-last-step": recovery["lastConfirmedStepId"] = .string("step-absent")
+      case "last-confirmed-null": recovery["lastConfirmedStepId"] = .null
+      case "invalid-recovery-of": recovery["recoveryOfSessionId"] = .string(" invalid")
+      case "recovery-of-pair": recovery["recoveryOfSessionId"] = .string("session-prior"); recovery["recoveryOfJobId"] = .string("job-prior")
+      case "hazard-extra", "hazard-bad-severity", "hazard-empty-summary":
+        guard case .array(let hazards) = recovery["deviceHazards"], case .object(var hazard) = hazards[0] else { return XCTFail("hazard fixture") }
+        if name == "hazard-extra" { hazard["extra"] = .bool(true) }
+        if name == "hazard-bad-severity" { hazard["severity"] = .string("unexpected") }
+        if name == "hazard-empty-summary" { hazard["summary"] = .string("") }
+        recovery["deviceHazards"] = .array([.object(hazard)])
+      case "device-mode-extra": recovery["lastDeviceMode"] = .object(["state": .string("unknown"), "extra": .bool(true)])
+      case "device-mode-empty-evidence": recovery["lastDeviceMode"] = .object(["state": .string("known"), "value": .string("mode"), "evidence": .string("")])
+      case "unknown-process": recovery["managedHostProcessState"] = .string("unexpected")
+      case "guide-automatic", "guide-empty-steps", "guide-empty-item", "guide-extra":
+        guard case .object(var guide) = recovery["recoveryGuide"] else { return XCTFail("guide fixture") }
+        if name == "guide-automatic" { guide["automaticRecoveryAvailable"] = .bool(true) }
+        if name == "guide-empty-steps" { guide["steps"] = .array([]) }
+        if name == "guide-empty-item" { guide["steps"] = .array([.string("")]) }
+        if name == "guide-extra" { guide["extra"] = .bool(true) }
+        recovery["recoveryGuide"] = .object(guide)
+      case "confirmation-actor", "confirmation-date", "confirmation-missing-key":
+        guard case .object(var confirmation) = recovery["userConfirmation"] else { return XCTFail("confirmation fixture") }
+        if name == "confirmation-actor" { confirmation["actor"] = .string("standardAgent") }
+        if name == "confirmation-date" { confirmation["confirmedAt"] = .string("2026-02-30T00:00:00Z") }
+        if name == "confirmation-missing-key" { confirmation.removeValue(forKey: "actor") }
+        recovery["userConfirmation"] = .object(confirmation)
+      case "unexecuted", "unexecuted-duplicate", "undeclared-compensation", "mismatched-compensation", "unexecuted-bad-hash":
+        let raw = try HostStoreStepShadowFixtures.step(.restoreParameter, id: "comp-shadow")
+        var descriptor = Dictionary(uniqueKeysWithValues: ["id", "kind", "effect", "cancellation", "bindingRequirement", "arguments", "argumentsHash"].map { ($0, raw[$0]!) })
+        descriptor["trigger"] = .string("onAnyTerminal")
+        if name != "undeclared-compensation" { step["compensationDescriptors"] = .array([.object(descriptor)]) }
+        if name == "mismatched-compensation" { descriptor["trigger"] = .string("onFailure") }
+        if name == "unexecuted-bad-hash" { descriptor["argumentsHash"] = .string(String(repeating: "0", count: 64)) }
+        recovery["unexecutedCompensations"] = .array(name == "unexecuted-duplicate" ? [.object(descriptor), .object(descriptor)] : [.object(descriptor)])
+      case "unknown-step":
+        step["disposition"] = .string("outcomeUnknown")
+        step["outcomeCertainty"] = .string("outcomeUnknown")
+        step["semanticResult"] = .string("unknown")
+        recovery["lastConfirmedStepId"] = .null
+      default:
+        if processStates.contains(name) { recovery["managedHostProcessState"] = .string(name) }
+      }
+      let data = try SessionStorageFixtures.manifest(sessionID: "session-recovery", jobID: "job-session-recovery",
+        status: status, executionMode: mode, executionAuthority: "interactiveUser", timestamp: "2026-01-01T00:00:00Z",
+        steps: [.object(step)], recovery: .object(recovery))
+      try data.write(to: directory.appending(path: "manifest.json"))
+      XCTAssertEqual(try store.status().measurementIncomplete, refused.contains(name), name)
+      try compareSessionStatus("recovery-" + name, store: store,
+        config: owner.appending(path: "session-storage.json"), sessions: sessions)
+    }
+  }
+
+  func testSessionGraphemeCorpusMatchesActualSwift() throws {
+    let fixtures = URL(filePath: #filePath).deletingLastPathComponent().appending(path: "Fixtures/Unicode")
+    func compare(_ name: String, _ texts: [String]) throws {
+      let input = try JSONEncoder().encode(texts)
+      let response = try rust(input, kind: "session-graphemes")
+      XCTAssertEqual(response.status, 0, name)
+      let envelope = try XCTUnwrap(JSONSerialization.jsonObject(with: response.output) as? [String: Any])
+      let projection = try XCTUnwrap(envelope["projection"] as? [String: [[Int]]])
+      let expected = texts.map { $0.map { String($0).utf8.count } }
+      let actual = try XCTUnwrap(projection["utf8GraphemeLengths"])
+      XCTAssertEqual(actual.count, expected.count)
+      for index in expected.indices {
+        XCTAssertEqual(actual[index], expected[index], "\(name) vector \(index): \(texts[index].unicodeScalars.map { String($0.value, radix: 16) })")
+      }
+      try record(name: name, input: input, output: JSONEncoder().encode(expected), outcome: "equal", store: "session-graphemes")
+    }
+    for (version, count) in [("16.0.0", 1093), ("17.0.0", 766)] {
+      let source = try String(contentsOf: fixtures.appending(path: "GraphemeBreakTest-" + version + ".txt"), encoding: .utf8)
+      var texts: [String] = []
+      for line in source.components(separatedBy: "\n") {
+        let data = line.split(separator: "#", maxSplits: 1, omittingEmptySubsequences: false)[0]
+        let tokens = data.split(whereSeparator: { $0.isWhitespace })
+        if tokens.isEmpty { continue }
+        var value = ""
+        for token in tokens where token != "÷" && token != "×" {
+          value.unicodeScalars.append(try XCTUnwrap(UInt32(token, radix: 16).flatMap(Unicode.Scalar.init)))
+        }
+        texts.append(value)
+      }
+      XCTAssertEqual(texts.count, count)
+      // The source corpus supplies inputs; the migration oracle is the actual
+      // Swift runtime, whose boundaries differ from either full Unicode version.
+      try compare("graphemes-unicode-" + version, texts)
+    }
+    let properties = try String(contentsOf: fixtures.appending(path: "DerivedCoreProperties-17.0.0.txt"), encoding: .utf8)
+    var consonants: [Unicode.Scalar] = []
+    var linkers: [Unicode.Scalar] = []
+    for line in properties.components(separatedBy: "\n") {
+      let data = line.split(separator: "#", maxSplits: 1, omittingEmptySubsequences: false)[0]
+      let fields = data.components(separatedBy: ";").map { $0.trimmingCharacters(in: .whitespaces) }
+      guard fields.count == 3, fields[1] == "InCB", ["Consonant", "Linker"].contains(fields[2]) else { continue }
+      let bounds = fields[0].components(separatedBy: "..")
+      let first = try XCTUnwrap(UInt32(bounds[0], radix: 16))
+      let last = try XCTUnwrap(UInt32(bounds.last!, radix: 16))
+      let values = try (first...last).map { try XCTUnwrap(Unicode.Scalar($0)) }
+      if fields[2] == "Consonant" { consonants += values } else { linkers += values }
+    }
+    XCTAssertEqual(consonants.count, 911)
+    XCTAssertEqual(linkers.count, 20)
+    var texts: [String] = []
+    for consonant in consonants {
+      for linker in linkers {
+        for scalars in [[consonant, linker, consonant], [Unicode.Scalar(0x915)!, linker, consonant],
+          [consonant, linker, Unicode.Scalar(0x308)!, consonant]] {
+          texts.append(String(String.UnicodeScalarView(scalars)))
+        }
+      }
+    }
+    XCTAssertEqual(texts.count, 54_660)
+    try compare("graphemes-indic-properties", texts)
+  }
+
+  func testSessionStepArgumentBoundaries() throws {
+    let owner = root.appending(path: "argument-owner")
+    let sessions = root.appending(path: "argument-sessions")
+    let store = try RuntimeSessionStorageStore(ownerRoot: owner, defaultSessionsRoot: sessions)
+    _ = try store.updatePolicy(.init(totalQuotaBytes: 1_000_000, safetyMarginBytes: 100,
+      retentionDays: 7), expectedGeneration: 1)
+    let directory = try seedShadowSession(sessions: sessions, month: "01", id: "session-arguments",
+      timestamp: "2026-01-01T00:00:00Z")
+    let catalog = try SessionRetentionCatalog(sessionsRoot: sessions)
+    try catalog.registerFinalizedSession(sessionRoot: directory, retentionDays: 7, policyGeneration: 2)
+    _ = try catalog.updatePin(sessionID: "session-arguments", isPinned: true, expectedGeneration: 1)
+    let vectors: [(String, WorkflowStepKind, [String: JSONValue], Bool)] = [
+      ("identifier-boundary", .probeDevice, ["evidencePolicy": .string(String(repeating: "a", count: 128))], true),
+      ("identifier-overflow", .probeDevice, ["evidencePolicy": .string(String(repeating: "a", count: 129))], false),
+      ("scalar-boundary", .setParameter, ["value": .string(String(repeating: "e\u{301}", count: 2048))], true),
+      ("scalar-overflow", .setParameter, ["value": .string(String(repeating: "e\u{301}", count: 4096))], false),
+      ("relative-unicode-length", .receiveFile, ["localRelativePath": .string(String(repeating: "界", count: 400))], true),
+      ("relative-combining-slash", .receiveFile, ["localRelativePath": .string("a/\u{301}b")], false),
+      ("relative-prepend-dot", .receiveFile, ["localRelativePath": .string("a\u{600}.")], true),
+      ("remote-combining-slash", .sendFile, ["remotePath": .string("/\u{301}a")], false),
+      ("remote-prepend-slash", .sendFile, ["remotePath": .string("/a\u{600}/..")], true),
+      ("remote-empty-segments", .sendFile, ["remotePath": .string("//")], true),
+      ("remote-traversal", .sendFile, ["remotePath": .string("/a/../b")], false),
+      ("remote-ascii-control", .sendFile, ["remotePath": .string("/a\n")], false),
+      ("remote-c1-control", .sendFile, ["remotePath": .string("/a\u{85}")], true),
+      ("optional-hash-null", .sendFile, ["overwritePolicy": .null], false),
+      ("optional-generation-null", .probeHDCServer, ["expectedServerGeneration": .null], true),
+      ("optional-generation-maximum", .probeHDCServer, ["expectedServerGeneration": .unsignedInteger(UInt64.max)], true),
+      ("pointer-null-optionals", .injectPointerInput, ["durationMs": .null, "displayId": .null], true),
+      ("swipe-missing-endpoint", .injectPointerInput, ["gesture": .string("swipe")], false),
+      ("swipe-boundary", .injectPointerInput, ["gesture": .string("swipe"), "pointerToX": .integer(32767),
+        "pointerToY": .integer(0), "durationMs": .integer(80)], true),
+      ("swipe-duration-underflow", .injectPointerInput, ["gesture": .string("swipe"), "pointerToX": .integer(1),
+        "pointerToY": .integer(1), "durationMs": .integer(79)], false),
+      ("options-null-scalar", .postprocessArtifact, ["parameters": .object(["value": .null])], true),
+      ("options-null-array", .postprocessArtifact, ["parameters": .object(["value": .array([.null])])], false),
+      ("options-array-boundary", .postprocessArtifact, ["parameters": .object(["value": .array(Array(repeating: .bool(true), count: 256))])], true),
+      ("options-array-overflow", .postprocessArtifact, ["parameters": .object(["value": .array(Array(repeating: .bool(true), count: 257))])], false),
+      ("options-unsafe-key", .postprocessArtifact, ["parameters": .object(["Command": .string("fixture")])], false),
+      ("options-nested-object", .postprocessArtifact, ["parameters": .object(["value": .object([:])])], false),
+      ("frames-untyped-null", .cleanupOwnedRemotePath, ["framesDirectory": .null], true),
+      ("frames-unsafe-key", .cleanupOwnedRemotePath, ["framesDirectory": .object(["shell": .null])], false),
+      ("forbidden-action", .enterUpdater, ["providerOperationId": .string("eXeC")], false),
+      ("signing-preset-reference", .signWorkspaceOpenHarmonyHap, ["signingPresetRef": .string("preset-fixture")], true),
+      ("signing-preset-empty", .signWorkspaceOpenHarmonyHap, ["signingPresetRef": .string("preset-")], false),
+      ("diagnostics-id-newline", .captureRemoteStdout, ["actionId": .string("componentDetail"),
+        "parameters": .object(["byteBudget": .integer(1024), "windowId": .string("123\r\n"), "componentId": .string("9")])], false),
+      ("diagnostics-id-overflow", .captureRemoteStdout, ["actionId": .string("componentDetail"),
+        "parameters": .object(["byteBudget": .integer(1024), "windowId": .string(String(repeating: "1", count: 21)), "componentId": .string("9")])], false),
+      ("diagnostics-fault-newline", .captureRemoteStdout, ["actionId": .string("crashLog"),
+        "parameters": .object(["byteBudget": .integer(1024), "faultLogName": .string("cppcrash-fixture\n")])], false),
+      ("diagnostics-fault-path", .captureRemoteStdout, ["actionId": .string("crashLog"),
+        "parameters": .object(["byteBudget": .integer(1024), "faultLogName": .string("cppcrash-../fixture")])], false),
+      ("diagnostics-hilog", .captureRemoteStdout, ["actionId": .string("boundedHilog"),
+        "parameters": .object(["byteBudget": .integer(1024), "durationSeconds": .integer(600), "filters": .array([.string("tag:*")])])], true),
+      ("diagnostics-hilog-filter", .captureRemoteStdout, ["actionId": .string("boundedHilog"),
+        "parameters": .object(["byteBudget": .integer(1024), "durationSeconds": .integer(600), "filters": .array([.string("tag\n")])])], false),
+      ("argument-extra-field", .probeDevice, ["extra": .bool(true)], false),
+    ]
+    for (name, kind, changes, accepted) in vectors {
+      var step = try HostStoreStepShadowFixtures.step(kind)
+      var arguments = HostStoreStepShadowFixtures.arguments(kind)
+      arguments.merge(changes) { _, new in new }
+      step["arguments"] = .object(arguments)
+      step["argumentsHash"] = .string(SHA256Hex.string(of: try CanonicalJSONEncoders.canonical().encode(JSONValue.object(arguments))))
+      let data = try SessionStorageFixtures.manifest(sessionID: "session-arguments", jobID: "job-session-arguments",
+        executionMode: "execute", executionAuthority: "interactiveUser", timestamp: "2026-01-01T00:00:00Z",
+        steps: [.object(step)], confirmations: HostStoreStepShadowFixtures.confirmations(step))
+      try data.write(to: directory.appending(path: "manifest.json"))
+      XCTAssertEqual(try store.status().measurementIncomplete, !accepted, name)
+      try compareSessionStatus("argument-" + name, store: store,
+        config: owner.appending(path: "session-storage.json"), sessions: sessions)
+    }
+  }
+
+  func testSessionCompensationProjection() throws {
+    let owner = root.appending(path: "compensation-owner")
+    let sessions = root.appending(path: "compensation-sessions")
+    let store = try RuntimeSessionStorageStore(ownerRoot: owner, defaultSessionsRoot: sessions)
+    _ = try store.updatePolicy(.init(totalQuotaBytes: 1_000_000, safetyMarginBytes: 100,
+      retentionDays: 7), expectedGeneration: 1)
+    let directory = try seedShadowSession(sessions: sessions, month: "01", id: "session-compensations",
+      timestamp: "2026-01-01T00:00:00Z")
+    let catalog = try SessionRetentionCatalog(sessionsRoot: sessions)
+    try catalog.registerFinalizedSession(sessionRoot: directory, retentionDays: 7, policyGeneration: 2)
+    _ = try catalog.updatePin(sessionID: "session-compensations", isPinned: true, expectedGeneration: 1)
+    let accepted = ["executed", "with-step", "executed-failed", "unknown-result", "not-run"]
+    let refused = ["step-trigger-mismatch", "undeclared-step", "duplicate-descriptor", "duplicate-record",
+      "unknown-source", "hash-mismatch", "record-mismatch", "missing-failure", "not-run-with-failure"]
+    for kind in CompensationDescriptor.allowedKinds.sorted(by: { $0.rawValue < $1.rawValue }) {
+      let compensationStep = try HostStoreStepShadowFixtures.step(kind, id: "comp-shadow")
+      var descriptor = Dictionary(uniqueKeysWithValues: ["id", "kind", "effect", "cancellation",
+        "bindingRequirement", "arguments", "argumentsHash"].map { ($0, compensationStep[$0]!) })
+      descriptor["trigger"] = .string("onAnyTerminal")
+      for variant in accepted + refused {
+        var source = try HostStoreStepShadowFixtures.step(.probeDevice)
+        source["compensationDescriptors"] = .array([.object(descriptor)])
+        var record: [String: JSONValue] = ["descriptor": .object(descriptor), "sourceStepId": .string("step-shadow"),
+          "disposition": .string("executed"), "outcomeCertainty": .string("confirmed"), "result": .string("succeeded"),
+          "failure": .null, "journalEventIds": .array([.string("event-shadow")])]
+        var execution = compensationStep
+        execution["sourceStepId"] = .string("step-shadow")
+        execution["compensationTrigger"] = .string("onAnyTerminal")
+        var steps: [JSONValue] = []
+        let failure: JSONValue = .object(["stage": .string("restore"), "code": .string("restore.failed"), "summary": .string("fixture failure")])
+        switch variant {
+        case "with-step": steps = [.object(execution)]
+        case "step-trigger-mismatch":
+          execution["compensationTrigger"] = .string("onFailure")
+          steps = [.object(execution)]
+        case "undeclared-step":
+          execution["id"] = .string("comp-undeclared")
+          steps = [.object(execution)]
+        case "duplicate-descriptor": source["compensationDescriptors"] = .array([.object(descriptor), .object(descriptor)])
+        case "unknown-source": record["sourceStepId"] = .string("step-absent")
+        case "hash-mismatch", "record-mismatch":
+          var changed = descriptor
+          changed[variant == "hash-mismatch" ? "argumentsHash" : "trigger"] = .string(variant == "hash-mismatch" ? String(repeating: "0", count: 64) : "onFailure")
+          record["descriptor"] = .object(changed)
+        case "executed-failed", "missing-failure":
+          record["result"] = .string("failed")
+          if variant == "executed-failed" { record["failure"] = failure }
+        case "unknown-result":
+          record["disposition"] = .string("outcomeUnknown")
+          record["outcomeCertainty"] = .string("outcomeUnknown")
+          record["result"] = .string("unknown")
+        case "not-run", "not-run-with-failure":
+          record["disposition"] = .string("notRun")
+          record["outcomeCertainty"] = .string("notApplicable")
+          record["result"] = .string("notRun")
+          if variant == "not-run-with-failure" { record["failure"] = failure }
+        default: break
+        }
+        steps.insert(.object(source), at: 0)
+        let records: [JSONValue] = variant == "duplicate-record" ? [.object(record), .object(record)] : [.object(record)]
+        let data = try SessionStorageFixtures.manifest(sessionID: "session-compensations", jobID: "job-session-compensations",
+          status: ["executed-failed", "missing-failure", "unknown-result"].contains(variant) ? "failed" : "succeeded",
+          executionMode: "execute", executionAuthority: "interactiveUser", timestamp: "2026-01-01T00:00:00Z",
+          steps: steps, compensations: records)
+        try data.write(to: directory.appending(path: "manifest.json"))
+        let name = "compensation-" + kind.rawValue + "-" + variant
+        XCTAssertEqual(try store.status().measurementIncomplete, refused.contains(variant), name)
+        try compareSessionStatus(name, store: store,
+          config: owner.appending(path: "session-storage.json"), sessions: sessions)
+      }
+    }
+  }
+
+  func testSessionStepSemanticBoundaries() throws {
+    let owner = root.appending(path: "semantics-owner")
+    let sessions = root.appending(path: "semantics-sessions")
+    let store = try RuntimeSessionStorageStore(ownerRoot: owner, defaultSessionsRoot: sessions)
+    _ = try store.updatePolicy(.init(totalQuotaBytes: 1_000_000, safetyMarginBytes: 100,
+      retentionDays: 7), expectedGeneration: 1)
+    let directory = try seedShadowSession(sessions: sessions, month: "01", id: "session-semantics",
+      timestamp: "2026-01-01T00:00:00Z")
+    let catalog = try SessionRetentionCatalog(sessionsRoot: sessions)
+    try catalog.registerFinalizedSession(sessionRoot: directory, retentionDays: 7, policyGeneration: 2)
+    let variants = ["valid", "effect-understated", "cancellation-understated", "binding-understated",
+      "unknown-kind", "unknown-effect", "unknown-cancellation", "unknown-binding", "unknown-disposition",
+      "unknown-certainty", "unknown-result", "executed-not-run", "skipped-confirmed", "skipped-valid",
+      "unknown-terminal", "failed-success", "failed-failed", "missing-binding", "unknown-binding-revision",
+      "negative-duration", "maximum-duration", "null-duration", "overflow-exit", "minimum-exit",
+      "source-without-trigger", "trigger-without-source", "duplicate-step", "standard-executed",
+      "standard-skipped-success", "standard-skipped-cancelled", "plan-executed", "plan-skipped"]
+    for variant in variants {
+      var step = try HostStoreStepShadowFixtures.step(.flashPartition)
+      var status = "succeeded"
+      var mode = "execute"
+      var authority = "interactiveUser"
+      switch variant {
+      case "effect-understated": step["effect"] = .string("deviceMutation")
+      case "cancellation-understated": step["cancellation"] = .string("immediate")
+      case "binding-understated": step["bindingRequirement"] = .string("none"); step["bindingRevision"] = .null
+      case "unknown-kind": step["kind"] = .string("unknown")
+      case "unknown-effect": step["effect"] = .string("unknown")
+      case "unknown-cancellation": step["cancellation"] = .string("unknown")
+      case "unknown-binding": step["bindingRequirement"] = .string("unknown")
+      case "unknown-disposition": step["disposition"] = .string("unknown")
+      case "unknown-certainty": step["outcomeCertainty"] = .string("unknown")
+      case "unknown-result": step["semanticResult"] = .string("other")
+      case "executed-not-run": step["semanticResult"] = .string("notRun")
+      case "skipped-confirmed": step["disposition"] = .string("skipped")
+      case "unknown-terminal":
+        step["disposition"] = .string("outcomeUnknown")
+        step["outcomeCertainty"] = .string("outcomeUnknown"); step["semanticResult"] = .string("unknown")
+      case "failed-success", "failed-failed":
+        step["semanticResult"] = .string("failed")
+        if variant == "failed-failed" { status = "failed" }
+      case "missing-binding": step["bindingRevision"] = .null
+      case "unknown-binding-revision": step["bindingRevision"] = .integer(2)
+      case "negative-duration": step["durationNanoseconds"] = .integer(-1)
+      case "maximum-duration": step["durationNanoseconds"] = .integer(Int64.max)
+      case "null-duration": step["durationNanoseconds"] = .null
+      case "overflow-exit": step["exitCode"] = .unsignedInteger(UInt64.max)
+      case "minimum-exit": step["exitCode"] = .integer(Int64.min)
+      case "source-without-trigger": step["sourceStepId"] = .string("source")
+      case "trigger-without-source": step["compensationTrigger"] = .string("onFailure")
+      default: break
+      }
+      if variant.hasPrefix("standard-") { authority = "standardAgent" }
+      if variant == "standard-skipped-cancelled" { status = "cancelled" }
+      if variant.hasPrefix("plan-") { mode = "planOnly"; status = "planned" }
+      if ["skipped-valid", "standard-skipped-success", "standard-skipped-cancelled", "plan-skipped"].contains(variant) {
+        step["disposition"] = .string("skipped")
+        step["outcomeCertainty"] = .string("notApplicable"); step["semanticResult"] = .string("notRun")
+      }
+      let rows: [JSONValue] = variant == "duplicate-step" ? [.object(step), .object(step)] : [.object(step)]
+      let data = try SessionStorageFixtures.manifest(sessionID: "session-semantics", jobID: "job-session-semantics",
+        status: status, executionMode: mode, executionAuthority: authority, timestamp: "2026-01-01T00:00:00Z",
+        steps: rows, confirmations: HostStoreStepShadowFixtures.confirmations(step))
+      try data.write(to: directory.appending(path: "manifest.json"))
+      let accepted = ["valid", "skipped-valid", "failed-failed", "maximum-duration", "null-duration", "minimum-exit",
+        "standard-skipped-cancelled", "plan-skipped"].contains(variant)
+      XCTAssertEqual(try store.status().measurementIncomplete, !accepted, variant)
+      try compareSessionStatus("semantics-" + variant, store: store,
+        config: owner.appending(path: "session-storage.json"), sessions: sessions)
+    }
+  }
+
+  func testSessionEveryStepKindProjection() throws {
+    let owner = root.appending(path: "step-owner")
+    let sessions = root.appending(path: "step-sessions")
+    let store = try RuntimeSessionStorageStore(ownerRoot: owner, defaultSessionsRoot: sessions)
+    _ = try store.updatePolicy(.init(totalQuotaBytes: 1_000_000, safetyMarginBytes: 100,
+      retentionDays: 7), expectedGeneration: 1)
+    let directory = try seedShadowSession(sessions: sessions, month: "01", id: "session-steps",
+      timestamp: "2026-01-01T00:00:00Z")
+    let catalog = try SessionRetentionCatalog(sessionsRoot: sessions)
+    try catalog.registerFinalizedSession(sessionRoot: directory, retentionDays: 7, policyGeneration: 2)
+    _ = try catalog.updatePin(sessionID: "session-steps", isPinned: true, expectedGeneration: 1)
+    for kind in WorkflowStepKind.allCases {
+      let original = try HostStoreStepShadowFixtures.step(kind)
+      let confirmations = HostStoreStepShadowFixtures.confirmations(original)
+      for variant in ["valid", "extra-field", "missing-argument", "wrong-hash"] {
+        var step = original
+        switch variant {
+        case "extra-field": step["extra"] = .bool(true)
+        case "missing-argument":
+          guard case .object(var arguments) = step["arguments"] else { return XCTFail("fixture arguments") }
+          let key = try XCTUnwrap(WorkflowStepRegistry.metadata(for: kind).requiredArgumentKeys.sorted().first)
+          arguments.removeValue(forKey: key)
+          step["arguments"] = .object(arguments)
+          step["argumentsHash"] = .string(SHA256Hex.string(of: try CanonicalJSONEncoders.canonical().encode(JSONValue.object(arguments))))
+        case "wrong-hash": step["argumentsHash"] = .string(String(repeating: "0", count: 64))
+        default: break
+        }
+        let data = try SessionStorageFixtures.manifest(sessionID: "session-steps", jobID: "job-session-steps",
+          executionMode: "execute", executionAuthority: "interactiveUser", timestamp: "2026-01-01T00:00:00Z",
+          steps: [.object(step)], confirmations: confirmations)
+        try data.write(to: directory.appending(path: "manifest.json"))
+        let name = "step-" + kind.rawValue + "-" + variant
+        XCTAssertEqual(try store.status().measurementIncomplete, variant != "valid", name)
+        try compareSessionStatus(name, store: store,
+          config: owner.appending(path: "session-storage.json"), sessions: sessions)
+      }
+    }
+  }
+
+  func testSessionConfirmationProjection() throws {
+    let owner = root.appending(path: "confirmation-owner")
+    let sessions = root.appending(path: "confirmation-sessions")
+    let store = try RuntimeSessionStorageStore(ownerRoot: owner, defaultSessionsRoot: sessions)
+    _ = try store.updatePolicy(.init(totalQuotaBytes: 1_000_000, safetyMarginBytes: 100,
+      retentionDays: 7), expectedGeneration: 1)
+    let directory = try seedShadowSession(sessions: sessions, month: "01", id: "session-confirmations",
+      timestamp: "2026-01-01T00:00:00Z")
+    let catalog = try SessionRetentionCatalog(sessionsRoot: sessions)
+    try catalog.registerFinalizedSession(sessionRoot: directory, retentionDays: 7, policyGeneration: 2)
+    _ = try catalog.updatePin(sessionID: "session-confirmations", isPinned: true, expectedGeneration: 1)
+    let file = directory.appending(path: "manifest.json")
+    let original = try Data(contentsOf: file)
+    let accepted = ["deviceMutation", "destructive", "serverLifecycle", "recoveryAbandon", "securityBoundary", "rejected"]
+    let refused = ["unknown-kind", "unknown-decision", "unknown-actor", "actor-extra-field",
+      "extra-field", "invalid-id", "invalid-hash", "invalid-date", "unknown-step", "duplicate-id"]
+    for name in accepted + refused {
+      var document = try XCTUnwrap(JSONSerialization.jsonObject(with: original) as? [String: Any])
+      var confirmation: [String: Any] = ["confirmationId": "confirmation-shadow", "kind": "securityBoundary",
+        "scopeHash": String(repeating: "a", count: 64), "decision": "accepted",
+        "actor": ["kind": "interactiveUser"], "decidedAt": "2026-01-01T00:00:00Z", "relatedStepIds": []]
+      switch name {
+      case "deviceMutation", "destructive", "serverLifecycle", "recoveryAbandon", "securityBoundary":
+        confirmation["kind"] = name
+      case "rejected": confirmation["decision"] = "rejected"
+      case "unknown-kind": confirmation["kind"] = "unexpected"
+      case "unknown-decision": confirmation["decision"] = "unexpected"
+      case "unknown-actor": confirmation["actor"] = ["kind": "standardAgent"]
+      case "actor-extra-field": confirmation["actor"] = ["kind": "interactiveUser", "extra": true]
+      case "extra-field": confirmation["extra"] = true
+      case "invalid-id": confirmation["confirmationId"] = " invalid"
+      case "invalid-hash": confirmation["scopeHash"] = String(repeating: "g", count: 64)
+      case "invalid-date": confirmation["decidedAt"] = "2026-02-30T00:00:00Z"
+      case "unknown-step": confirmation["relatedStepIds"] = ["step-absent"]
+      default: break
+      }
+      document["confirmations"] = name == "duplicate-id" ? [confirmation, confirmation] : [confirmation]
+      try JSONSerialization.data(withJSONObject: document, options: [.sortedKeys, .withoutEscapingSlashes]).write(to: file)
+      XCTAssertEqual(try store.status().measurementIncomplete, refused.contains(name), name)
+      try compareSessionStatus("confirmation-" + name, store: store,
+        config: owner.appending(path: "session-storage.json"), sessions: sessions)
+    }
+  }
+
   func testSessionParameterStateProjection() throws {
     let owner = root.appending(path: "parameter-owner")
     let sessions = root.appending(path: "parameter-sessions")
@@ -422,7 +990,7 @@ final class HostStoreShadowContractTests: XCTestCase {
     let file = directory.appending(path: "manifest.json")
     let original = try Data(contentsOf: file)
     let graphemes = ["crlf": "\r\n", "combining": "e\u{301}", "flag": "🇨🇳",
-      "hangul": "\u{1100}\u{1161}\u{11A8}", "indic": "\u{0915}\u{094D}\u{0937}", "skin-tone": "👍🏽"]
+      "hangul": "\u{1100}\u{1161}\u{11A8}", "indic": "\u{0915}\u{094D}\u{0937}", "skin-tone": "👍🏽", "prepend": "\u{600}a"]
     let accepted = ["restored", "missing-before", "unreadable-before", "empty-value", "unicode-boundary", "failed-session"]
       + graphemes.keys.sorted().map { $0 + "-boundary" }
     let rejected = ["different-bytes", "restored-missing-before", "desired-missing", "value-too-long",

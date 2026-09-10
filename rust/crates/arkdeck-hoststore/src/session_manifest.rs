@@ -1,16 +1,19 @@
 //! Session manifest reader for the inventory candidate. Unsupported typed
 //! branches stop the entire shadow comparison; they never become "unaccounted"
 //! data or an assertion that a valid Session is corrupt.
+use crate::session_graphemes::graphemes;
 use crate::session_time::session_timestamp;
 use serde_json::{Map, Value};
+#[path = "session_steps.rs"]
+mod steps;
 
-type Object = Map<String, Value>;
+pub(super) type Object = Map<String, Value>;
 #[derive(Debug)]
 pub(super) enum ManifestError {
     Invalid,
     Unsupported,
 }
-type Result<T> = std::result::Result<T, ManifestError>;
+pub(super) type Result<T> = std::result::Result<T, ManifestError>;
 #[derive(Debug)]
 pub(super) struct ManifestSummary {
     pub session_id: String,
@@ -25,17 +28,17 @@ pub(super) fn identifier(value: &str) -> bool {
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || b"._:-".contains(&b))
 }
-fn require(condition: bool) -> Result<()> {
+pub(super) fn require(condition: bool) -> Result<()> {
     if condition {
         Ok(())
     } else {
         Err(ManifestError::Invalid)
     }
 }
-fn object(value: &Value) -> Result<&Object> {
+pub(super) fn object(value: &Value) -> Result<&Object> {
     value.as_object().ok_or(ManifestError::Invalid)
 }
-fn text<'a>(value: &'a Object, key: &str) -> Result<&'a str> {
+pub(super) fn text<'a>(value: &'a Object, key: &str) -> Result<&'a str> {
     value
         .get(key)
         .and_then(Value::as_str)
@@ -73,7 +76,7 @@ fn nonempty(value: &Object, key: &str) -> Result<()> {
 fn timestamp(value: &Object, key: &str) -> Result<f64> {
     session_timestamp(text(value, key)?).ok_or(ManifestError::Invalid)
 }
-fn hash(value: &str) -> bool {
+pub(super) fn hash(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
@@ -291,7 +294,7 @@ pub(super) fn decode_manifest(bytes: &[u8]) -> Result<ManifestSummary> {
             keys(tool, &["kind"], &[])?;
             require(simulated || host)?;
         }
-        "hostTool" => {
+        "hostTool" | "runtimeProvider" => {
             keys(
                 tool,
                 &[
@@ -303,9 +306,12 @@ pub(super) fn decode_manifest(bytes: &[u8]) -> Result<ManifestSummary> {
                 ],
                 &[],
             )?;
-            require(!simulated && host && hash(text(tool, "sha256")?))?;
+            require(!simulated && host == (kind == "hostTool") && hash(text(tool, "sha256")?))?;
             for key in ["providerIdentity", "profileIdentifier", "reportedVersion"] {
                 nonempty(tool, key)?;
+            }
+            if kind == "runtimeProvider" {
+                choice(tool, "providerIdentity", &["hdc", "arkforge"])?;
             }
         }
         "hdc" => {
@@ -355,7 +361,26 @@ pub(super) fn decode_manifest(bytes: &[u8]) -> Result<ManifestSummary> {
         }
         _ => return Err(ManifestError::Unsupported),
     }
-    require(!doc.contains_key("runtimeAuthority"))?;
+    if kind == "runtimeProvider" {
+        require(mode == "execute" && !host)?;
+        let audit = object(doc.get("runtimeAuthority").ok_or(ManifestError::Invalid)?)?;
+        validate_runtime_audit(audit)?;
+        for key in ["steps", "compensations"] {
+            for value in array(doc, key)? {
+                let row = object(value)?;
+                let declaration = if key == "compensations" {
+                    object(row.get("descriptor").ok_or(ManifestError::Invalid)?)?
+                } else {
+                    row
+                };
+                if ["deviceMutation", "destructive"].contains(&text(declaration, "effect")?) {
+                    require(text(audit, "kind")? == "runtimeCapability")?;
+                }
+            }
+        }
+    } else {
+        require(!doc.contains_key("runtimeAuthority"))?;
+    }
     let workflow = object(&doc["workflow"])?;
     keys(
         workflow,
@@ -375,11 +400,8 @@ pub(super) fn decode_manifest(bytes: &[u8]) -> Result<ManifestSummary> {
             require(value.is_some_and(|s| !s.is_empty()))?;
         }
     }
-    for key in ["steps", "compensations", "confirmations"] {
-        if !array(doc, key)?.is_empty() {
-            return Err(ManifestError::Unsupported);
-        }
-    }
+    steps::validate(doc, host)?;
+    validate_confirmations(array(doc, "confirmations")?, array(doc, "steps")?)?;
     validate_parameters(array(doc, "parameters")?, status)?;
     validate_artifacts(array(doc, "artifacts")?)?;
     require(
@@ -394,16 +416,28 @@ pub(super) fn decode_manifest(bytes: &[u8]) -> Result<ManifestSummary> {
         nonempty(failure, "summary")?;
         require(identifier(text(failure, "code")?))?;
     }
-    if !doc["recovery"].is_null() {
-        return Err(ManifestError::Unsupported);
-    }
     require(!(mode == "planOnly" && status == "succeeded"))?;
     match status {
-        "planned" => {
-            require(mode == "planOnly" && certainty == "confirmed" && doc["failure"].is_null())?
-        }
-        "succeeded" | "cancelled" => require(certainty == "confirmed" && doc["failure"].is_null())?,
+        "planned" => require(
+            mode == "planOnly"
+                && certainty == "confirmed"
+                && doc["failure"].is_null()
+                && doc["recovery"].is_null(),
+        )?,
+        "succeeded" => require(
+            certainty == "confirmed" && doc["failure"].is_null() && doc["recovery"].is_null(),
+        )?,
+        "cancelled" => require(certainty == "confirmed" && doc["failure"].is_null())?,
         "failed" => require(certainty == "confirmed" && !doc["failure"].is_null())?,
+        "interrupted" => {
+            let recovery = object(&doc["recovery"])?;
+            require(
+                recovery["needsAttention"] == true
+                    && nullable_text(recovery, "interruptedReason")?.is_some_and(|s| !s.is_empty())
+                    && !array(recovery, "abandonAuditEventIds")?.is_empty()
+                    && !recovery["userConfirmation"].is_null(),
+            )?;
+        }
         _ => return Err(ManifestError::Invalid),
     }
     supported_json(&value)?;
@@ -600,6 +634,109 @@ fn validate_artifacts(values: &[Value]) -> Result<()> {
     require(visited == artifacts.len())
 }
 
+fn validate_confirmations(values: &[Value], steps: &[Value]) -> Result<()> {
+    let step_ids: std::collections::BTreeSet<_> = steps
+        .iter()
+        .map(|step| text(object(step)?, "id"))
+        .collect::<Result<_>>()?;
+    let mut ids = std::collections::BTreeSet::new();
+    for value in values {
+        let row = object(value)?;
+        keys(
+            row,
+            &[
+                "confirmationId",
+                "kind",
+                "scopeHash",
+                "decision",
+                "actor",
+                "decidedAt",
+                "relatedStepIds",
+            ],
+            &[],
+        )?;
+        let id = text(row, "confirmationId")?;
+        require(identifier(id) && ids.insert(id))?;
+        choice(
+            row,
+            "kind",
+            &[
+                "deviceMutation",
+                "destructive",
+                "serverLifecycle",
+                "recoveryAbandon",
+                "securityBoundary",
+            ],
+        )?;
+        require(hash(text(row, "scopeHash")?))?;
+        choice(row, "decision", &["accepted", "rejected"])?;
+        let actor = object(&row["actor"])?;
+        keys(actor, &["kind"], &[])?;
+        require(text(actor, "kind")? == "interactiveUser")?;
+        timestamp(row, "decidedAt")?;
+        for related in array(row, "relatedStepIds")? {
+            let id = related.as_str().ok_or(ManifestError::Invalid)?;
+            require(identifier(id) && step_ids.contains(id))?;
+        }
+    }
+    Ok(())
+}
+
+fn validate_runtime_audit(row: &Object) -> Result<()> {
+    keys(
+        row,
+        &[
+            "kind",
+            "reference",
+            "admittedAtUtc",
+            "validUntilUtc",
+            "consumptionFingerprintSha256",
+            "reservationId",
+            "useOrdinal",
+            "planDigest",
+            "stepSetDigest",
+            "targetBindingDigest",
+            "artifactDigest",
+        ],
+        &[],
+    )?;
+    let kind = choice(row, "kind", &["defaultReadOnlyPolicy", "runtimeCapability"])?;
+    nonempty(row, "reference")?;
+    timestamp(row, "admittedAtUtc")?;
+    if kind == "defaultReadOnlyPolicy" {
+        require(
+            [
+                "validUntilUtc",
+                "consumptionFingerprintSha256",
+                "reservationId",
+                "useOrdinal",
+                "planDigest",
+                "stepSetDigest",
+                "targetBindingDigest",
+                "artifactDigest",
+            ]
+            .iter()
+            .all(|key| row[*key].is_null()),
+        )?;
+    } else {
+        timestamp(row, "validUntilUtc")?;
+        nonempty(row, "reservationId")?;
+        require(row["useOrdinal"].as_i64().is_some_and(|n| n > 0))?;
+        for key in [
+            "consumptionFingerprintSha256",
+            "planDigest",
+            "stepSetDigest",
+            "targetBindingDigest",
+        ] {
+            require(hash(text(row, key)?))?;
+        }
+        if !row["artifactDigest"].is_null() {
+            require(hash(text(row, "artifactDigest")?))?;
+        }
+    }
+    Ok(())
+}
+
 fn parameter_state(value: &Value) -> Result<&str> {
     let row = object(value)?;
     let state = text(row, "state")?;
@@ -611,10 +748,7 @@ fn parameter_state(value: &Value) -> Result<&str> {
         }
         "value" => {
             keys(row, &["state", "value"], &[])?;
-            require(
-                arkdeck_platform::host_composed_text_within(text(row, "value")?, 4096)
-                    .ok_or(ManifestError::Unsupported)?,
-            )?;
+            require(graphemes(text(row, "value")?).take(4097).count() <= 4096)?;
         }
         _ => return Err(ManifestError::Invalid),
     }

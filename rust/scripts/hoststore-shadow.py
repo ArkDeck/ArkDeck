@@ -21,9 +21,63 @@ import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
+STEP_KINDS = (
+    "probeHostTool", "probeHDCServer", "mutateHDCServerLifecycle", "probeDevice", "captureRemoteStdout",
+    "captureRemoteFile", "stopRemoteCapture", "sendFile", "receiveFile", "snapshotParameter", "setParameter",
+    "restoreParameter", "waitForDisconnect", "waitForReconnect", "verifyRemoteState", "verifyArtifact",
+    "preflightHostStorage", "preflightDeviceStorage", "hashFile", "postprocessArtifact", "cleanupOwnedRemotePath",
+    "requestConfirmation", "installPackage", "uninstallPackage", "startApplication", "stopApplication",
+    "createPortForward", "removePortForward", "injectPointerInput", "clearLogBuffer", "resizeLogBuffer",
+    "startDeviceLogPersist", "runApprovedRemoteRead", "runApprovedRemoteMutation", "rebootDevice", "enterUpdater",
+    "flashPartition", "updatePackage", "erasePartition", "formatPartition", "unlockDevice", "finalizeSession",
+    "inspectWorkspaceSource", "prepareWorkspaceIsolation", "sweepWorkspaceIsolation", "applyWorkspacePatch",
+    "buildWorkspaceOpenHarmony", "signWorkspaceOpenHarmonyHap", "runWorkspaceTests", "symbolizeWorkspaceCrash",
+    "revertWorkspacePatch", "inspectWorkspaceGitStatus", "inspectWorkspaceDiff", "readWorkspaceSourceRange",
+    "createWorkspaceCheckpoint", "runDeterministicAnalyzer",
+)
 EXPECTED = {
+    **{f"inventory-semantics-{name}": "equal" for name in ("valid", "effect-understated", "cancellation-understated", "binding-understated",      "unknown-kind", "unknown-effect", "unknown-cancellation", "unknown-binding", "unknown-disposition",      "unknown-certainty", "unknown-result", "executed-not-run", "skipped-confirmed", "skipped-valid",      "unknown-terminal", "failed-success", "failed-failed", "missing-binding", "unknown-binding-revision",      "negative-duration", "maximum-duration", "null-duration", "overflow-exit", "minimum-exit",      "source-without-trigger", "trigger-without-source", "duplicate-step", "standard-executed",      "standard-skipped-success", "standard-skipped-cancelled", "plan-executed", "plan-skipped")},
+    **{f"inventory-audit-{name}": "equal" for name in (
+        "readonly-hdc", "readonly-arkforge", "capability-hdc", "capability-arkforge", "hdc-label", "arkforge-label",
+        "artifact-digest", "maximum-ordinal", "unordered-times", "hdc-extra-field", "hdc-cross-branch-field", "readonly-declared-compensation",
+        "capability-compensation", "missing-audit", "unknown-audit-kind", "extra-audit-field", "missing-audit-field", "empty-reference",
+        "invalid-admitted-date", "invalid-valid-until", "empty-reservation", "zero-ordinal", "overflow-ordinal", "digest-shape",
+        "artifact-digest-shape", "readonly-consumption", "mutation-with-readonly", "readonly-artifact", "label-wrong-provider",
+        "label-wrong-step", "label-without-capability", "unknown-provider", "host-tool-audit", "planonly-provider",
+        "simulated-provider", "host-provider-target", "readonly-compensation-mutation")},
+    **{f"inventory-recovery-{name}": "equal" for name in (
+        "interrupted", "failed", "cancelled", "unknown-mode", "guide-automatic", "failed-no-attention", "last-confirmed-null",
+        "recovery-of-pair", "unexecuted", "unexecuted-duplicate", "unknown-step", "notStarted", "notRunning", "stoppedAtSafeBoundary",
+        "stillRunningUnknown", "notApplicable", "success-recovery", "planned-recovery", "interrupted-no-audit",
+        "interrupted-no-confirmation", "interrupted-no-attention", "interrupted-no-reason", "empty-reason", "missing-key", "extra-key",
+        "duplicate-audit", "bad-audit-id", "unknown-last-step", "invalid-recovery-of", "hazard-extra", "hazard-bad-severity",
+        "hazard-empty-summary", "device-mode-extra", "device-mode-empty-evidence", "unknown-process", "guide-empty-steps",
+        "guide-empty-item", "guide-extra", "confirmation-actor", "confirmation-date", "confirmation-missing-key",
+        "undeclared-compensation", "mismatched-compensation", "unexecuted-bad-hash")},
+    "graphemes-unicode-16.0.0": "equal", "graphemes-unicode-17.0.0": "equal", "graphemes-indic-properties": "equal",
+    **{f"inventory-argument-{name}": "equal" for name in (
+        "identifier-boundary", "identifier-overflow", "scalar-boundary", "scalar-overflow",
+        "relative-unicode-length", "relative-combining-slash", "relative-prepend-dot", "remote-combining-slash",
+        "remote-prepend-slash", "remote-empty-segments", "remote-traversal", "remote-ascii-control", "remote-c1-control",
+        "optional-hash-null", "optional-generation-null", "optional-generation-maximum", "pointer-null-optionals",
+        "swipe-missing-endpoint", "swipe-boundary", "swipe-duration-underflow", "options-null-scalar", "options-null-array",
+        "options-array-boundary", "options-array-overflow", "options-unsafe-key", "options-nested-object",
+        "frames-untyped-null", "frames-unsafe-key", "forbidden-action", "signing-preset-reference", "signing-preset-empty",
+        "diagnostics-id-newline", "diagnostics-id-overflow", "diagnostics-fault-newline", "diagnostics-fault-path",
+        "diagnostics-hilog", "diagnostics-hilog-filter", "argument-extra-field")},
+    **{f"inventory-compensation-{kind}-{variant}": "equal" for kind in
+        ("stopRemoteCapture", "restoreParameter", "cleanupOwnedRemotePath", "removePortForward", "stopApplication", "uninstallPackage")
+        for variant in ("executed", "with-step", "executed-failed", "unknown-result", "not-run", "step-trigger-mismatch",
+                        "undeclared-step", "duplicate-descriptor", "duplicate-record", "unknown-source", "hash-mismatch",
+                        "record-mismatch", "missing-failure", "not-run-with-failure")},
+    **{f"inventory-step-{kind}-{variant}": "equal" for kind in STEP_KINDS
+        for variant in ("valid", "extra-field", "missing-argument", "wrong-hash")},
+    **{f"inventory-confirmation-{name}": "equal" for name in ("deviceMutation", "destructive",
+        "serverLifecycle", "recoveryAbandon", "securityBoundary", "rejected", "unknown-kind",
+        "unknown-decision", "unknown-actor", "actor-extra-field", "extra-field", "invalid-id",
+        "invalid-hash", "invalid-date", "unknown-step", "duplicate-id")},
     **{f"inventory-parameter-{kind}-{bound}": "equal" for kind in
-        ("crlf", "combining", "flag", "hangul", "indic", "skin-tone") for bound in ("boundary", "too-long")},
+        ("crlf", "combining", "flag", "hangul", "indic", "skin-tone", "prepend") for bound in ("boundary", "too-long")},
     **{f"inventory-parameter-{name}": "equal" for name in ("restored", "missing-before", "unreadable-before",
         "empty-value", "unicode-boundary", "failed-session", "different-bytes", "restored-missing-before",
         "desired-missing", "value-too-long", "unicode-too-long", "state-extra-field", "success-failed-restore", "unreadable-empty-reason")},
@@ -54,6 +108,13 @@ EXPECTED = {
     **{f"{kind}-extra-{level}-field": "refused" for kind in ("bundle", "tool") for level in ("record", "index")},
 }
 INPUTS = [
+    "rust/scripts/generate-swift-grapheme-tables.py",
+    "rust/crates/arkdeck-hoststore/UNICODE-LICENSE",
+    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/Unicode/GraphemeBreakTest-16.0.0.txt",
+    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/Unicode/GraphemeBreakTest-17.0.0.txt",
+    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/Unicode/DerivedCoreProperties-17.0.0.txt",
+    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/Unicode/LICENSE.txt",
+    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/HostStoreStepShadowFixtures.swift",
     ".github/workflows/swift-slow-lanes.yml",
     "Packages/ArkDeckKit/Scripts/run-swiftpm.sh",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/SessionStorage/SessionStorageFixtures.swift",
@@ -109,7 +170,7 @@ def validate_cases(directory: Path) -> list[dict]:
         case = json.loads(path.read_bytes())
         if set(case) != {"case", "store", "outcome", "inputSHA256", "projectionSHA256", "oracleBinarySHA256"}:
             raise ValueError("unexpected case shape")
-        expected_store = {"history": "history-filter", "bundle": "bundle-registry", "tool": "tool-registry", "names": "display-names", "session": "session-configuration", "trace": "trace-cache", "timestamp": "session-timestamp", "inventory": "session-storage"}[path.stem.split("-", 1)[0]]
+        expected_store = {"history": "history-filter", "bundle": "bundle-registry", "tool": "tool-registry", "names": "display-names", "session": "session-configuration", "trace": "trace-cache", "timestamp": "session-timestamp", "inventory": "session-storage", "graphemes": "session-graphemes"}[path.stem.split("-", 1)[0]]
         if (case["case"] != path.stem or case["store"] != expected_store
                 or case["outcome"] != EXPECTED[path.stem]):
             raise ValueError("case identity or outcome mismatch")
@@ -131,6 +192,10 @@ def main() -> int:
         parser.error("output already exists")
     started = datetime.now(timezone.utc).isoformat()
     hashes = source_hashes()
+    subprocess.run([os.environ.get("ARKDECK_PYTHON", "python3"), "rust/scripts/generate-swift-grapheme-tables.py",
+                    "--input", "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/Unicode/DerivedCoreProperties-17.0.0.txt",
+                    "--output", "rust/crates/arkdeck-hoststore/src/session_grapheme_tables.rs", "--check"],
+                   cwd=ROOT, check=True, timeout=30)
     subprocess.run(["cargo", "build", "--locked", "-p", "arkdeck-hoststore"],
                    cwd=ROOT / "rust", check=True, timeout=600)
     metadata = json.loads(subprocess.check_output(
