@@ -35,6 +35,7 @@ struct Key {
     #[serde(rename = "schemaAdapterVersion")]
     schema_adapter_version: String,
     #[serde(rename = "indexSchemaVersion")]
+    #[serde(deserialize_with = "decode_integer")]
     index_schema_version: i64,
     #[serde(rename = "parserKey")]
     parser_key: String,
@@ -47,16 +48,19 @@ struct Preparation {
     #[serde(rename = "schemaFingerprint")]
     schema_fingerprint: String,
     #[serde(rename = "indexVersion")]
+    #[serde(deserialize_with = "decode_integer")]
     index_version: i64,
     #[serde(rename = "upstreamDatabaseSHA256")]
     upstream_database_sha256: String,
     #[serde(rename = "upstreamDatabaseByteCount")]
+    #[serde(deserialize_with = "decode_integer")]
     upstream_database_byte_count: i64,
 }
 #[derive(Deserialize)]
 #[allow(dead_code)]
 struct Metadata {
     #[serde(rename = "formatVersion")]
+    #[serde(deserialize_with = "decode_integer")]
     format_version: i64,
     #[serde(rename = "cacheKey")]
     key: Key,
@@ -66,21 +70,121 @@ struct Metadata {
     #[serde(rename = "sourceSHA256")]
     source_sha256: String,
     #[serde(rename = "sourceByteCount")]
+    #[serde(deserialize_with = "decode_integer")]
     source_byte_count: i64,
     #[serde(rename = "schemaFingerprint")]
     schema_fingerprint: String,
     #[serde(rename = "schemaAdapterVersion")]
     schema_adapter_version: String,
     #[serde(rename = "indexSchemaVersion")]
+    #[serde(deserialize_with = "decode_integer")]
     index_schema_version: i64,
     #[serde(rename = "databasePreparation")]
     preparation: Preparation,
     #[serde(rename = "databaseByteCount")]
+    #[serde(deserialize_with = "decode_integer")]
     database_byte_count: i64,
     #[serde(rename = "createdAt")]
     created_at: String,
     #[serde(rename = "lastAccessedAt")]
     last_accessed_at: String,
+}
+
+// Preserve the numeric token: serde's binary64 intermediate would erase the
+// Decimal fallback used by the pinned Foundation JSONDecoder above 2^53.
+fn decode_integer<'de, D: serde::Deserializer<'de>>(decoder: D) -> Result<i64, D::Error> {
+    let raw = Box::<serde_json::value::RawValue>::deserialize(decoder)?;
+    foundation_integer(raw.get()).ok_or_else(|| serde::de::Error::custom("trace integer refused"))
+}
+
+fn foundation_integer(token: &str) -> Option<i64> {
+    if let Ok(value) = token.parse::<i64>() {
+        return Some(value);
+    }
+    // RawValue has already checked JSON syntax, but strings and other JSON
+    // values must never enter the numeric conversion path.
+    if !matches!(token.as_bytes().first(), Some(b'-' | b'0'..=b'9')) {
+        return None;
+    }
+    let number = token.parse::<f64>().ok()?;
+    if !number.is_finite()
+        || number.fract() != 0.0
+        || !(-9_223_372_036_854_775_808.0..9_223_372_036_854_775_808.0).contains(&number)
+    {
+        return None;
+    }
+    if number.abs() < 9_007_199_254_740_992.0 {
+        // The preceding checks prove this cast is integral and in range.
+        #[allow(clippy::cast_possible_truncation)]
+        return Some(number as i64);
+    }
+    decimal_integer(token)
+}
+
+fn decimal_integer(token: &str) -> Option<i64> {
+    // Foundation's Decimal parser accumulates a 128-bit mantissa, drops digits
+    // after overflow, then compacts trailing zeros. Its integer conversion first
+    // requires the compact mantissa to fit UInt64, before applying the exponent.
+    let negative = token.starts_with('-');
+    let token = token.strip_prefix('-').unwrap_or(token);
+    let (significand, explicit) = token.split_once(['e', 'E']).unwrap_or((token, "0"));
+    let explicit = explicit.parse::<i32>().ok()?;
+    if !(-254..=254).contains(&explicit) {
+        return None;
+    }
+    let (whole, fraction) = significand.split_once('.').unwrap_or((significand, ""));
+    let mut mantissa = 0u128;
+    let mut exponent = 0i32;
+    let mut overflow = false;
+    for digit in whole.bytes() {
+        let next = mantissa
+            .checked_mul(10)
+            .and_then(|n| n.checked_add(u128::from(digit - b'0')));
+        if overflow || next.is_none() {
+            overflow = true;
+            exponent += 1;
+            if exponent > 127 {
+                return None;
+            }
+        } else {
+            mantissa = next?;
+        }
+    }
+    for digit in fraction.bytes() {
+        if overflow {
+            continue;
+        }
+        let Some(next) = mantissa
+            .checked_mul(10)
+            .and_then(|n| n.checked_add(u128::from(digit - b'0')))
+        else {
+            overflow = true;
+            continue;
+        };
+        mantissa = next;
+        exponent -= 1;
+        if exponent < -128 {
+            return None;
+        }
+    }
+    exponent += explicit;
+    if !(-128..=127).contains(&exponent) {
+        return None;
+    }
+    while mantissa != 0 && mantissa.is_multiple_of(10) && exponent < 127 {
+        mantissa /= 10;
+        exponent += 1;
+    }
+    let mut value = u64::try_from(mantissa).ok()?;
+    for _ in 0..exponent.abs() {
+        value = if exponent < 0 {
+            value / 10
+        } else {
+            value.checked_mul(10)?
+        };
+    }
+    let value = i64::try_from(value).ok()?;
+    Some(if negative { -value } else { value })
 }
 
 fn invalid() -> io::Error {

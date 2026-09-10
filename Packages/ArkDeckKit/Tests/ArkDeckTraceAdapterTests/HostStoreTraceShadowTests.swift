@@ -103,6 +103,50 @@ final class HostStoreTraceShadowTests: XCTestCase {
     }
   }
 
+  func testTraceMetadataIntegerProjectionMatchesActualDecoder() async throws {
+    let service = try ArkDeckTraceCacheMaintenanceService(cachesDirectory: root)
+    let entry = cache.appending(path: traceName).appending(path: parserName)
+    try directory(entry)
+    try file(Data([1, 2, 3]), at: entry.appending(path: "database.sqlite"))
+    let id = hash(Data("\(traceName):\(parserName)".utf8))
+    for (folder, suffix) in [(".locks", ".lock"), (".leases", ".lease")] {
+      let path = cache.appending(path: folder)
+      try directory(path)
+      try file(Data(), at: path.appending(path: id + suffix))
+    }
+    let numbers = ["3", "3.0", "3e0", "30e-1", "0.3e1", "-0", "-0.0", "0e999", "1e-999",
+      "3.0000000000000000000001", "2.9999999999999999999999", "3.1", "0.00000000000000000000001",
+      "9007199254740991.0", "9007199254740992.0", "9007199254740993.0", "9007199254740993.1",
+      "9007199254740993.000000000000000000000000000000000000000000000000001",
+      "9007199254740993000000000000000000000000000000000000000000000e-45",
+      "9223372036854775807", "9223372036854775807.0", "9223372036854775808", "-9223372036854775808",
+      "-9223372036854775808.0", "9223372036854774784.0", "9223372036854774784.1",
+      "-9007199254740993.0", "1e309", "-1e309", "1e-309", "0e-999", "true", "null", "\"3\"", "[]", "{}"]
+    let fields = [["formatVersion"], ["sourceByteCount"], ["indexSchemaVersion"], ["databaseByteCount"],
+      ["cacheKey", "indexSchemaVersion"], ["databasePreparation", "indexVersion"],
+      ["databasePreparation", "upstreamDatabaseByteCount"]]
+    for (fieldIndex, path) in fields.enumerated() {
+      for (index, number) in numbers.enumerated() {
+        var document = metadata()
+        if path.count == 1 { document[path[0]] = "NUMERIC_TOKEN" }
+        else {
+          var nested = try XCTUnwrap(document[path[0]] as? [String: Any])
+          nested[path[1]] = "NUMERIC_TOKEN"
+          document[path[0]] = nested
+        }
+        let template = try JSONSerialization.data(withJSONObject: document, options: [.sortedKeys])
+        let text = try XCTUnwrap(String(data: template, encoding: .utf8))
+          .replacingOccurrences(of: "\"NUMERIC_TOKEN\"", with: number)
+        try file(Data(text.utf8), at: entry.appending(path: "metadata.json"))
+        let parsed = try? JSONDecoder().decode(Int64.self, from: Data(number.utf8))
+        let inactive = parsed != nil && (path != ["databaseByteCount"] || parsed == 3)
+        let actual = try await service.inventory()
+        XCTAssertEqual(actual.activeEntryCount, inactive ? 0 : 1, "\(path): \(number)")
+        try await compare("trace-integer-\(fieldIndex)-\(index)", service: service)
+      }
+    }
+  }
+
   private func compare(_ name: String, service: ArkDeckTraceCacheMaintenanceService) async throws {
     let before = try snapshot()
     let swift = try await service.inventory()

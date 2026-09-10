@@ -47,7 +47,7 @@ Swift oracle may initialize or reconcile only its isolated fixtures.
 | Session recovery | 44 | Typed hazards, guides, device mode, abandon records and compensation relationships |
 | Runtime audit records | 37 | Closed historical audit fields, Provider/Step labels and mutation consumption requirements |
 | Grapheme corpus batches | 3 | Unicode 16/17 official inputs and 54,660 generated Indic property combinations |
-| Trace cache | 43 | Actual Swift inventory, metadata dates, key/lease contention and unsafe entries |
+| Trace cache | 295 | Actual Swift inventory, metadata dates and numeric domain, key/lease contention and unsafe entries |
 
 The 105-case receipt is preserved unchanged in
 [local-shadow-20260910.json](local-shadow-20260910.json). It identifies itself as
@@ -159,9 +159,26 @@ frozen Swift census domain. Real fixture comparisons now pass for 70 directory
 levels and 100,001 regular files in one directory. The existing metadata size,
 ownership, link, volume and catalog-lock checks remain in effect.
 
+The Trace numeric comparison now covers all seven integer fields independently,
+including decimal/exponent spellings, binary64 rounding, underflow, exact 64-bit
+bounds, Decimal mantissa overflow, and wrong JSON types. Rust retains raw numeric
+tokens before matching the pinned Foundation conversion order. The 252 new
+comparisons reproduced 116 inventory projection differences before the fix and
+pass afterward. Original metadata and payload bytes remain unchanged. Reference:
+[Swift 6.2 JSONDecoder](https://github.com/swiftlang/swift-foundation/blob/swift-6.2-RELEASE/Sources/FoundationEssentials/JSON/JSONDecoder.swift)
+and [Decimal parser](https://github.com/swiftlang/swift-foundation/blob/swift-6.2-RELEASE/Sources/FoundationEssentials/Decimal/Decimal.swift).
+
+The upstream strict-field fix is submitted separately as
+[ArkTrace PR #24](https://github.com/ArkDeck/ArkTrace/pull/24), commit
+`921bb569646bd2a6092cc26c0af9d75eb0bf798f`. Its required CI passed; maintainer
+review/merge remains pending. It rejects additional metadata keys at all four
+object levels without changing writer bytes. This worktree still uses the
+published dependency pin above and does not claim the pending behavior.
+
 ## Remaining work before harness review
 
-- Complete remaining Trace metadata compatibility checks.
+- Complete remaining Trace structural metadata and filesystem compatibility checks.
+- After ArkTrace PR #24 is reviewed and merged, authorize/update the downstream dependency pin and add strict-field differential vectors against that published reader.
 - Finalize the complete nightly corpus. The nightly job is wired locally but has not been pushed or run.
 - Run the final unified gate and committed preflight on the complete harness.
 
@@ -171,6 +188,19 @@ retries cannot manufacture those days. Owner/CAS/crash-window work, UI assertion
 GJ-1 re-pass and rollback evidence remain a later authorized cutover stage.
 
 ## Validation so far
+
+- The 1264-case implementation passed the complete-diff unified gate (exit 0):
+  Swift full suite, App test build, design-system, published/candidate Rust
+  contracts, cargo deny and cargo vet (26 audited). Log:
+  `/private/tmp/xpa012-shadow-trace-integers-gate.log`.
+
+- 1264 cases across 29 XCTest methods passed, including the 252 Trace numeric
+  comparisons. Immutable receipt:
+  [local-shadow-trace-integers-20260910.json](local-shadow-trace-integers-20260910.json).
+  Log: `/private/tmp/xpa012-shadow-trace-integers.log`.
+- Seven receipt integrity tests and all-target hoststore Clippy passed. The first
+  targeted launch used an incorrect binary filename; correcting the path then
+  reproduced 116 differences with the old binary. The corrected candidate passed.
 
 - 1012 cases across 28 XCTest methods passed, including timestamp acceptance
   and the full large/deep Session census. Immutable receipt:

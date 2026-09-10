@@ -120,6 +120,7 @@ EXPECTED = {
     "history-extra-document-field": "refused",
     **{f"trace-{state}": "equal" for state in ("empty", "unaccounted", "ready-inactive", "key-contended", "lease-contended")},
     "trace-entry-symlink": "refused", "trace-entry-overflow": "refused",
+    **{f"trace-integer-{field}-{i}": "equal" for field in range(7) for i in range(36)},
     **{f"trace-date-{field}-{i}": "equal" for field in ("createdAt", "lastAccessedAt") for i in range(18)},
     **{f"session-{state}": "equal" for state in ("policy", "custom-root", "maximum-quota")},
     "session-extra-policy-field": "refused", "session-extra-document-field": "refused",
