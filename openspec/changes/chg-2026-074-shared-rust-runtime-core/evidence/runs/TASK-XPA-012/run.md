@@ -12,7 +12,7 @@ The workflow scope supplement was reviewed and merged through
 The Task readiness pins retain the protected-main implementation baseline
 `eae27c6b97c2d9e5d67c8eee2d9353f2c0d38b93`. Each run additionally hashes its actual
 source files and candidate binary. The pinned ArkTrace dependency revision is
-`c85731b0f903261bd69cf789027774fde615c8de` in Package.resolved.
+`e6e3133d410fbd7455df17c9486dcd369607e97f` in both Package.resolved files and the package manifest. Earlier immutable receipts retain their original dependency revisions.
 
 The implementation remains local on `agent/xpa-012-hoststore-shadow-20260910`.
 There is no implementation PR yet: the remaining harness coverage below must be
@@ -47,7 +47,7 @@ Swift oracle may initialize or reconcile only its isolated fixtures.
 | Session recovery | 44 | Typed hazards, guides, device mode, abandon records and compensation relationships |
 | Runtime audit records | 37 | Closed historical audit fields, Provider/Step labels and mutation consumption requirements |
 | Grapheme corpus batches | 3 | Unicode 16/17 official inputs and 54,660 generated Indic property combinations |
-| Trace cache | 295 | Actual Swift inventory, metadata dates and numeric domain, key/lease contention and unsafe entries |
+| Trace cache | 420 | Actual Swift inventory, closed fields, duplicate keys, text encodings, dates/numbers, locks and unsafe entries |
 
 The 105-case receipt is preserved unchanged in
 [local-shadow-20260910.json](local-shadow-20260910.json). It identifies itself as
@@ -168,17 +168,46 @@ pass afterward. Original metadata and payload bytes remain unchanged. Reference:
 [Swift 6.2 JSONDecoder](https://github.com/swiftlang/swift-foundation/blob/swift-6.2-RELEASE/Sources/FoundationEssentials/JSON/JSONDecoder.swift)
 and [Decimal parser](https://github.com/swiftlang/swift-foundation/blob/swift-6.2-RELEASE/Sources/FoundationEssentials/Decimal/Decimal.swift).
 
-The upstream strict-field fix is submitted separately as
-[ArkTrace PR #24](https://github.com/ArkDeck/ArkTrace/pull/24), commit
-`921bb569646bd2a6092cc26c0af9d75eb0bf798f`. Its required CI passed; maintainer
-review/merge remains pending. It rejects additional metadata keys at all four
-object levels without changing writer bytes. This worktree still uses the
-published dependency pin above and does not claim the pending behavior.
+The upstream strict-field fix was approved by maintainer `lvye` at
+2026-09-10T13:09:41Z and merged by the same maintainer at 13:09:50Z through
+[ArkTrace PR #24](https://github.com/ArkDeck/ArkTrace/pull/24). The merge commit
+`e6e3133d410fbd7455df17c9486dcd369607e97f` changes only the cache metadata reader,
+its focused tests and integration documentation from the previous pin. Its
+required CI passed. The downstream package manifest and both resolution files
+now select this reviewed reader. The adapter revision constant and pin assertions
+are synchronized; the independent App project pin awaits the scope review below.
+
+The same TASK-XPA-012 PR declares three exact adjacent paths under CHG-2026-076:
+`Packages/ArkDeckKit/Package.swift`, `Packages/ArkDeckKit/Package.resolved` and
+`ArkDeck.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved`.
+The scope checker accepted their fixed prefixes and absence of protected-kernel
+overlap. Their Task additions and final commit trailers remain declarations for
+maintainer review, not self-approval.
+
+All four Trace metadata object levels now enforce their current field sets in
+Rust. The 125 added vectors cover each required field being absent, null or the
+wrong type, one extra field per object, and both duplicate-key orderings. Original
+numeric tokens survive first-key-wins dictionary decoding. UTF-8/16/32 vectors
+include non-ASCII text, BOMs and truncation. They preserve the actual Foundation
+6.2 prefix table: conventional UTF-32LE BOM input is refused, while its swapped
+prefix is accepted. This compatibility behavior is tested against the actual
+reader and the [published JSONDecoder source](https://github.com/swiftlang/swift-foundation/blob/swift-6.2-RELEASE/Sources/FoundationEssentials/JSON/JSONDecoder.swift);
+no snapshot bytes are rewritten on disk.
+
+The Xcode project file's current scope permits UI-test registration only.
+[ArkDeck scope PR #1840](https://github.com/ArkDeck/ArkDeck/pull/1840), commit
+`7f9949d5c3c3e146cd1b9725d51aa4c0bc784d5b`, requests only its ArkTrace revision
+replacement. Its committed SDD, unified common checks and path preflight passed;
+all selected hosted checks passed. Maintainer review/merge remains pending.
+The project pin is unchanged until that approval. Consequently the current
+complete-diff gate is not passing: its architecture/dependency pin assertions
+exposed the remaining App pin. No implementation PR is published in this state.
 
 ## Remaining work before harness review
 
-- Complete remaining Trace structural metadata and filesystem compatibility checks.
-- After ArkTrace PR #24 is reviewed and merged, authorize/update the downstream dependency pin and add strict-field differential vectors against that published reader.
+- After scope PR #1840 is reviewed and merged, update the independent App project pin and complete all dependency-consistency checks.
+
+- Complete the remaining Trace filesystem compatibility checks.
 - Finalize the complete nightly corpus. The nightly job is wired locally but has not been pushed or run.
 - Run the final unified gate and committed preflight on the complete harness.
 
@@ -188,6 +217,29 @@ retries cannot manufacture those days. Owner/CAS/crash-window work, UI assertion
 GJ-1 re-pass and rollback evidence remain a later authorized cutover stage.
 
 ## Validation so far
+
+- After synchronizing the adapter constant and pin assertions, all 1389 shadow
+  cases across 30 XCTest methods passed again. Current immutable receipt:
+  [local-shadow-trace-reviewed-pin-20260910.json](local-shadow-trace-reviewed-pin-20260910.json).
+  Log: `/private/tmp/xpa012-shadow-trace-reviewed-pin.log`. The preceding
+  structure receipt stays unchanged and records its earlier source snapshot.
+- The second unified run reached the full Swift suite and failed the old pin
+  expectations in architecture/dependency assertions. Those expected revisions
+  were synchronized; the App project revision remains pending scope approval.
+  Log: `/private/tmp/xpa012-shadow-trace-structure-final-gate.log`.
+
+- The first unified gate stopped at the design mirror pin assertion. The
+  shortcut catalog and parser source lock are byte-identical across the upstream
+  update; current design/CLI/user-guide references were refreshed to the same pin.
+
+- 1389 cases across 30 XCTest methods passed using the reviewed dependency.
+  Immutable receipt:
+  [local-shadow-trace-structure-20260910.json](local-shadow-trace-structure-20260910.json).
+  Log: `/private/tmp/xpa012-shadow-trace-structure.log`.
+- All five Trace test methods, seven receipt integrity tests, and all-target
+  hoststore Clippy passed. The initial structure vectors exposed decoder
+  differences; the Unicode extension also caught the Foundation UTF-32LE prefix
+  behavior before the final comparison passed.
 
 - The 1264-case implementation passed the complete-diff unified gate (exit 0):
   Swift full suite, App test build, design-system, published/candidate Rust

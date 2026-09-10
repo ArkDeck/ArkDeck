@@ -12,7 +12,7 @@ public enum ArkDeckTraceConfiguration {
   /// Exact ArkTrace source revision linked into this build. Package and Xcode
   /// resolution tests bind this value to both lockfiles.
   public static let arkTraceSourceRevision =
-    "c85731b0f903261bd69cf789027774fde615c8de"
+    "e6e3133d410fbd7455df17c9486dcd369607e97f"
   public static let bundleIdentifier = "com.arkdeck.desktop"
   public static let recentDocumentsKey = "ArkDeck.Trace.RecentTraceBookmarks.v1"
   public static let signpostSubsystem = "com.arkdeck.desktop.trace"

@@ -705,6 +705,9 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 - Production reachability:the façade serves session storage, history filters, display names, trace cache, tool/bundle registry and storage policy locally; lock file names and JSON shapes unchanged; the Swift daemon no longer opens these stores
 - Trusted fact sources:generation-CAS documents under the same lock discipline; the App's `UserDefaults` record remains a one-shot migration candidate only
 - Allowed paths:
+  - `Packages/ArkDeckKit/Package.swift`（declared scope extension: pin the reviewed ArkTrace strict metadata reader; no dependency product or target changes）
+  - `Packages/ArkDeckKit/Package.resolved`（declared scope extension: pin the reviewed ArkTrace strict metadata reader; no dependency product or target changes）
+  - `ArkDeck.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved`（declared scope extension: pin the reviewed ArkTrace strict metadata reader; no dependency product or target changes）
   - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`
   - `rust/**`
   - `.github/workflows/swift-slow-lanes.yml`（proposed scope supplement: add the host-only read-only shadow nightly job and archive its comparison receipts; preserve existing jobs, triggers, permissions and gates; effective only after maintainer merge）

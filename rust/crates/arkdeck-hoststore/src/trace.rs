@@ -6,6 +6,7 @@ use serde_json::{Value, json};
 use std::{io, path::Path};
 
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 #[allow(dead_code)]
 struct Parser {
     name: String,
@@ -24,6 +25,7 @@ struct Parser {
     build_recipe_version: String,
 }
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 #[allow(dead_code)]
 struct Key {
     #[serde(rename = "traceSHA256")]
@@ -41,6 +43,7 @@ struct Key {
     parser_key: String,
 }
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 #[allow(dead_code)]
 struct Preparation {
     #[serde(rename = "schemaAdapterVersion")]
@@ -57,6 +60,7 @@ struct Preparation {
     upstream_database_byte_count: i64,
 }
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 #[allow(dead_code)]
 struct Metadata {
     #[serde(rename = "formatVersion")]
@@ -88,6 +92,111 @@ struct Metadata {
     created_at: String,
     #[serde(rename = "lastAccessedAt")]
     last_accessed_at: String,
+}
+
+// Decode dictionary members in Foundation's first-key-wins order while
+// retaining the original numeric tokens for the integer compatibility path.
+struct FirstFields(std::collections::BTreeMap<String, Box<serde_json::value::RawValue>>);
+impl<'de> Deserialize<'de> for FirstFields {
+    fn deserialize<D: serde::Deserializer<'de>>(decoder: D) -> Result<Self, D::Error> {
+        struct FieldsVisitor;
+        impl<'de> serde::de::Visitor<'de> for FieldsVisitor {
+            type Value = FirstFields;
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("a Trace metadata object")
+            }
+            fn visit_map<M: serde::de::MapAccess<'de>>(
+                self,
+                mut map: M,
+            ) -> Result<Self::Value, M::Error> {
+                let mut fields = std::collections::BTreeMap::new();
+                while let Some((key, value)) =
+                    map.next_entry::<String, Box<serde_json::value::RawValue>>()?
+                {
+                    fields.entry(key).or_insert(value);
+                }
+                Ok(FirstFields(fields))
+            }
+        }
+        decoder.deserialize_map(FieldsVisitor)
+    }
+}
+
+fn metadata_snapshot(bytes: &[u8]) -> Option<Metadata> {
+    let text = json_text(bytes)?;
+    let mut fields = serde_json::from_str::<FirstFields>(&text).ok()?.0;
+    for name in ["cacheKey", "parser", "databasePreparation"] {
+        let nested = serde_json::from_str::<FirstFields>(fields.get(name)?.get())
+            .ok()?
+            .0;
+        fields.insert(
+            name.to_owned(),
+            serde_json::value::to_raw_value(&nested).ok()?,
+        );
+    }
+    serde_json::from_slice(&serde_json::to_vec(&fields).ok()?).ok()
+}
+
+fn json_text(bytes: &[u8]) -> Option<String> {
+    // JSONDecoder recognizes UTF-8, UTF-16 and UTF-32 from a BOM or the
+    // leading ASCII JSON code unit. Conversion changes only this read snapshot.
+    let (width, big_endian, skip) = if bytes.starts_with(&[0, 0, 0xfe, 0xff]) {
+        (4, true, 4)
+    } else if bytes.starts_with(&[0xfe, 0xff, 0, 0]) {
+        // Preserve the published Swift 6.2 prefix table, including this
+        // swapped UTF-32LE marker. A conventional FF FE 00 00 marker
+        // follows its UTF-16LE branch and fails metadata decoding.
+        (4, false, 4)
+    } else if bytes.starts_with(&[0xfe, 0xff]) {
+        (2, true, 2)
+    } else if bytes.starts_with(&[0xff, 0xfe]) {
+        (2, false, 2)
+    } else if bytes.starts_with(&[0xef, 0xbb, 0xbf]) {
+        (1, false, 3)
+    } else if bytes.len() >= 4 && bytes[..3] == [0, 0, 0] && bytes[3] != 0 {
+        (4, true, 0)
+    } else if bytes.len() >= 4 && bytes[1..4] == [0, 0, 0] && bytes[0] != 0 {
+        (4, false, 0)
+    } else if bytes.len() >= 4 && bytes[0] == 0 && bytes[2] == 0 && bytes[1] != 0 && bytes[3] != 0 {
+        (2, true, 0)
+    } else if bytes.len() >= 4 && bytes[1] == 0 && bytes[3] == 0 && bytes[0] != 0 && bytes[2] != 0 {
+        (2, false, 0)
+    } else {
+        (1, false, 0)
+    };
+    let bytes = &bytes[skip..];
+    match width {
+        1 => String::from_utf8(bytes.to_vec()).ok(),
+        2 if bytes.len().is_multiple_of(2) => {
+            let units: Vec<u16> = bytes
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .map(|pair| {
+                    if big_endian {
+                        u16::from_be_bytes([pair[0], pair[1]])
+                    } else {
+                        u16::from_le_bytes([pair[0], pair[1]])
+                    }
+                })
+                .collect();
+            String::from_utf16(&units).ok()
+        }
+        4 if bytes.len().is_multiple_of(4) => bytes
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .map(|unit| {
+                let unit = [unit[0], unit[1], unit[2], unit[3]];
+                char::from_u32(if big_endian {
+                    u32::from_be_bytes(unit)
+                } else {
+                    u32::from_le_bytes(unit)
+                })
+            })
+            .collect(),
+        _ => None,
+    }
 }
 
 // Preserve the numeric token: serde's binary64 intermediate would erase the
@@ -240,7 +349,7 @@ pub fn trace_inventory(path: &Path) -> io::Result<Value> {
             let metadata = entry
                 .read("metadata.json", 16_384)
                 .ok()
-                .and_then(|bytes| serde_json::from_slice::<Metadata>(&bytes).ok());
+                .and_then(|bytes| metadata_snapshot(&bytes));
             let Some(metadata) = metadata.filter(|m| {
                 m.key.trace_sha256 == trace
                     && m.key.parser_key == parser

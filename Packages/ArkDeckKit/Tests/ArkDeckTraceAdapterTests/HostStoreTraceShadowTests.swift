@@ -147,6 +147,87 @@ final class HostStoreTraceShadowTests: XCTestCase {
     }
   }
 
+  func testTraceMetadataClosedFieldsAndJSONRepresentation() async throws {
+    let service = try ArkDeckTraceCacheMaintenanceService(cachesDirectory: root)
+    let entry = cache.appending(path: traceName).appending(path: parserName)
+    try directory(entry)
+    try file(Data([1, 2, 3]), at: entry.appending(path: "database.sqlite"))
+    let id = hash(Data("\(traceName):\(parserName)".utf8))
+    for (folder, suffix) in [(".locks", ".lock"), (".leases", ".lease")] {
+      let path = cache.appending(path: folder)
+      try directory(path)
+      try file(Data(), at: path.appending(path: id + suffix))
+    }
+    var vectors: [(Data, Int?)] = []
+    let baseline = metadata()
+    for group in ["", "cacheKey", "parser", "databasePreparation"] {
+      let fields = group.isEmpty ? baseline : try XCTUnwrap(baseline[group] as? [String: Any])
+      for key in fields.keys.sorted() {
+        for kind in 0..<3 {
+          var changed = fields
+          switch kind {
+          case 0: changed.removeValue(forKey: key)
+          case 1: changed[key] = NSNull()
+          default: changed[key] = [Any]()
+          }
+          var document = baseline
+          if group.isEmpty { document = changed } else { document[group] = changed }
+          vectors.append((try JSONSerialization.data(withJSONObject: document, options: [.sortedKeys]), 1))
+        }
+      }
+      var changed = fields
+      changed["unsupportedField"] = "fixture"
+      var document = baseline
+      if group.isEmpty { document = changed } else { document[group] = changed }
+      vectors.append((try JSONSerialization.data(withJSONObject: document, options: [.sortedKeys]), 1))
+      // Foundation dictionaries keep the first duplicate key. Both orderings
+      // matter: a later valid value must not rescue an invalid first value.
+      let key = try XCTUnwrap(fields.keys.sorted().first)
+      var duplicateFields = fields
+      duplicateFields[key] = "DUPLICATE_TOKEN"
+      document = baseline
+      if group.isEmpty { document = duplicateFields } else { document[group] = duplicateFields }
+      let template = try XCTUnwrap(String(data: JSONSerialization.data(withJSONObject: document, options: [.sortedKeys]), encoding: .utf8))
+      let keyText = try XCTUnwrap(String(data: JSONSerialization.data(withJSONObject: key, options: [.fragmentsAllowed]), encoding: .utf8))
+      let valueText = try XCTUnwrap(String(data: JSONSerialization.data(withJSONObject: fields[key]!, options: [.sortedKeys, .fragmentsAllowed]), encoding: .utf8))
+      for validFirst in [true, false] {
+        let replacement = validFirst ? valueText + "," + keyText + ":null" : "null," + keyText + ":" + valueText
+        vectors.append((Data(template.replacingOccurrences(of: "\"DUPLICATE_TOKEN\"", with: replacement).utf8), validFirst ? 0 : 1))
+      }
+    }
+    var unicode = baseline
+    var parser = try XCTUnwrap(unicode["parser"] as? [String: Any])
+    parser["reportedVersion"] = "fixture café 🧪"
+    unicode["parser"] = parser
+    let original = try JSONSerialization.data(withJSONObject: unicode, options: [.sortedKeys])
+    let text = try XCTUnwrap(String(data: original, encoding: .utf8))
+    vectors.append((Data([0xef, 0xbb, 0xbf]) + original, 0))
+    let encodings: [(String.Encoding, [UInt8])] = [(.utf16LittleEndian, [0xff, 0xfe]),
+      (.utf16BigEndian, [0xfe, 0xff]), (.utf32LittleEndian, [0xff, 0xfe, 0, 0]),
+      (.utf32BigEndian, [0, 0, 0xfe, 0xff])]
+    for (encoding, bom) in encodings {
+      let encoded = try XCTUnwrap(text.data(using: encoding))
+      vectors.append((encoded, 0))
+      // The pinned Foundation table interprets the conventional UTF-32LE
+      // BOM as UTF-16LE. Retain its refusal until a reviewed oracle changes.
+      vectors.append((Data(bom) + encoded, encoding == .utf32LittleEndian ? 1 : 0))
+      vectors.append((Data(encoded.dropLast()), 1))
+    }
+    vectors.append((Data([0xfe, 0xff, 0, 0]) + (try XCTUnwrap(text.data(using: .utf32LittleEndian))), 0))
+    vectors.append((original + Data([0xff]), 1))
+    vectors.append((original + Data(" trailing".utf8), 1))
+    vectors.append((Data(" \n\t".utf8) + original + Data(" \r\n".utf8), 0))
+    XCTAssertEqual(vectors.count, 125)
+    for (index, vector) in vectors.enumerated() {
+      try file(vector.0, at: entry.appending(path: "metadata.json"))
+      if let expectedActive = vector.1 {
+        let actual = try await service.inventory()
+        XCTAssertEqual(actual.activeEntryCount, expectedActive, "structure \(index)")
+      }
+      try await compare("trace-structure-\(index)", service: service)
+    }
+  }
+
   private func compare(_ name: String, service: ArkDeckTraceCacheMaintenanceService) async throws {
     let before = try snapshot()
     let swift = try await service.inventory()
