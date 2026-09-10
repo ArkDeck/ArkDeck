@@ -222,6 +222,7 @@ Conventions shared by every task:
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/**`（private-socket listener and origin-line → context construction only; the handler and admission code are untouched, r3）
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/HeadlessHDCServerHost.swift`（managed HDC startup/shutdown lifecycle synchronization and diagnostics needed for paired-daemon restart/rollback only; preserve identity-bound spawn, exact endpoint ownership, fail-closed readiness and all Supervisor admission rules）
   - `ArkDeckAppUITests/AppShell/FacadeRollbackUITests.swift`（read-only Overview/History smoke against the signed façade and same-release Swift rollback; no device mutation or fixture-as-hardware evidence）
+  - `ArkDeck.xcodeproj/project.pbxproj`（register only the already-declared `FacadeRollbackUITests.swift` in the existing ArkDeckHDCUITests target; no product targets, build settings, entitlements or unrelated project changes）
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeJobEngine.swift`（read projections only: bounded in-memory reuse of validated decoded persisted records after reading and comparing exact current bytes; preserve all validation, admission, capability and persistence semantics）
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AgentExecutionCoordinator.swift`（preserve the existing typed pre-admission refusal reason and owner-issued zero-dispatch proof after confirming no accepted Job; no admission, dispatch, retry, capability or persistence-format changes）
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/XPCConnectionBox.swift`
@@ -237,6 +238,14 @@ Conventions shared by every task:
 - Decision-Grade:D1
 
 ### Deliverables
+
+UI-test registration scope supplement (2026-09-10, proposed): PR #1833 added the
+allowed `FacadeRollbackUITests.swift`, but the Xcode project uses explicit source
+membership. The file is absent from that membership, so selecting the suite
+returned `TEST EXECUTE SUCCEEDED` with zero tests and cannot satisfy XPA-AC-9.
+Permit only its file reference, group membership and Sources build-phase entry
+in the existing UI-test target. This scope change does not register the file
+itself; the implementation and an actual nonzero test result follow after review.
 
 Refusal-proof scope supplement (2026-09-09, proposed): the facade GJ-5 run
 completed reproduction, analysis, isolated repair, build, signing and healthy
