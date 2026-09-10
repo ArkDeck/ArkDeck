@@ -130,7 +130,7 @@ policy --expected-generation <n> --total-quota-bytes <bytes>
 It owns `session-state/session-storage.json` and the `sessions` retention catalog.
 Custom Session roots must stay inside the development root and disjoint from
 state and immutable Artifacts. Artifact indexed usage is verified before Session
-mutation, including retained payload identity and SHA-256. Unknown Session bytes
+configuration mutation, including retained payload identity and SHA-256. Unknown Session bytes
 remain visible as incomplete measurement; corrupt or lost initialized catalogs
 are preserved for inspection. Artifact publication and Session export/cleanup
 are still pending migration.
@@ -139,6 +139,22 @@ Run `python3 rust/scripts/check-session-owner.py` after building the binaries fo
 actual socket/CLI, nonempty Session census, restart/CAS, pin retention, damaged
 catalog, isolated-root refusal and corrupt-payload-before-mutation checks. Its
 fixtures are explicitly simulated host data and provide no device evidence.
+
+The isolated owner also serves `session list [--page-size <n>] [--cursor <cursor>]`,
+`session show --session <id>`, and `session pin|unpin --session <id>
+--expected-generation <catalog-generation>`. Catalog generations can start at
+zero; they are distinct from the storage configuration generation. Repeating an
+already satisfied pin state does not advance the catalog. A stale generation or
+an incomplete whole-root measurement prevents pin publication.
+
+Pages are immutable private snapshots with query-bound cursors and bounded
+retention (32 snapshots, 64 MiB total, 16 MiB per snapshot, 1 MiB per page). They
+survive restart and active-root changes. A reclaimed cursor fails explicitly;
+it never rescans. Ordering uses the published completion timestamp, with Session
+ID ordering for ties, so hidden fractional seconds cannot create an invalid page.
+`python3 rust/scripts/check-session-resources.py` verifies the actual owner and CLI;
+`--cli-path Packages/ArkDeckKit/.build/debug/arkdeck` checks the current Swift CLI
+against the same Rust owner. Export, cleanup and installed activation are pending.
 
 Use the generation actually returned by `list`. Conflicts require a fresh read;
 lost mutation replies report `outcomeUnknown` and are never automatically replayed.

@@ -1,5 +1,5 @@
-//! Read-only Session census and retention projection over one explicit fixture
-//! root. Nothing is created, repaired, pinned, deleted, or published here.
+//! Session census with separate read-only and explicit owner entry points.
+//! The fixture reader never writes; resource pin transitions hold the catalog lock.
 use crate::session_manifest::{ManifestError, ManifestSummary, decode_manifest, identifier};
 use crate::session_time::session_timestamp;
 use crate::{decode_session_configuration, roundtrip};
@@ -201,6 +201,242 @@ pub fn session_inventory(configuration: &[u8], path: &Path) -> io::Result<Value>
 /// Existing unknown or corrupt entries are never registered, erased, or repaired.
 pub fn session_inventory_owned(configuration: &[u8], path: &Path) -> io::Result<Value> {
     inventory(configuration, path, true)
+}
+
+/// The configuration owner remains locked by the caller. Reconcile first,
+/// then read a fresh tree under the catalog lock used for the pin CAS itself.
+pub(crate) fn session_resource_rows(
+    configuration: &[u8],
+    path: &Path,
+    selected: Option<&str>,
+    pin: Option<(u64, bool)>,
+) -> Result<Vec<Value>, arkdeck_contract::WireError> {
+    use crate::snapshot_pager::failure;
+    let unreadable = |_| failure("recordUnreadable", "Session catalog cannot be read safely");
+    let conflict = |error: io::Error| {
+        if error.kind() == io::ErrorKind::WouldBlock {
+            failure("resourceConflict", "Session catalog is being updated")
+        } else {
+            unreadable(error)
+        }
+    };
+    session_inventory_owned(configuration, path).map_err(conflict)?;
+    let root = HostDirectory::open_session_tree(path).map_err(unreadable)?;
+    let owner = HostDirectory::open(path).map_err(unreadable)?;
+    let lock = owner.lock_document(LOCK).map_err(conflict)?;
+    let mut document = catalog(&root).ok_or_else(|| unreadable(invalid()))?;
+    if document.generation > i64::MAX as u64 {
+        return Err(unreadable(invalid()));
+    }
+    let tree = scan(&root).map_err(unreadable)?;
+    let mut observed = BTreeSet::new();
+    let mut duplicates = BTreeSet::new();
+    for id in &tree.observed {
+        if !observed.insert(id) {
+            duplicates.insert(id.clone());
+        }
+    }
+    let by_id: BTreeMap<_, _> = document
+        .entries
+        .iter()
+        .map(|entry| (entry.session_id.as_str(), entry))
+        .collect();
+    let mut unknown = tree.unknown.clone();
+    unknown.extend(duplicates.iter().cloned());
+    let mut retained = Vec::new();
+    for row in &tree.sessions {
+        if by_id
+            .get(row.manifest.session_id.as_str())
+            .is_some_and(|entry| {
+                session_timestamp(&entry.completed_at) == Some(row.manifest.completed_at)
+            })
+        {
+            retained.push(row);
+        } else {
+            unknown.insert(row.manifest.session_id.clone());
+        }
+    }
+    let scoped = pin.is_none() && selected.is_some();
+    if tree.unscoped
+        || !duplicates.is_empty()
+        || (!unknown.is_empty()
+            && (!scoped
+                || unknown.iter().any(|reference| {
+                    selected
+                        .is_some_and(|id| reference == id || reference.ends_with(&format!("/{id}")))
+                })))
+        || (tree.incomplete && unknown.is_empty())
+    {
+        let mut summary = unknown
+            .iter()
+            .take(8)
+            .map(String::as_str)
+            .collect::<Vec<_>>()
+            .join(", ");
+        if unknown.len() > 8 {
+            summary.push_str(&format!(", and {} more", unknown.len() - 8));
+        }
+        if summary.is_empty() {
+            summary = "the measurement is incomplete; no individual leaf could be named".into();
+        }
+        return Err(failure(
+            "operationUnavailable",
+            &format!("Session catalog contains unaccounted content: {summary}"),
+        ));
+    }
+    if retained.len() != document.entries.len() {
+        return Err(unreadable(invalid()));
+    }
+    let configuration = decode_session_configuration(configuration)
+        .map_err(|_| unreadable(invalid()))?
+        .projection;
+    let policy_generation = configuration["generation"]
+        .as_str()
+        .ok_or_else(|| unreadable(invalid()))?;
+    let days = configuration["policy"]["retentionDays"]
+        .as_str()
+        .and_then(|value| value.parse::<i32>().ok())
+        .ok_or_else(|| unreadable(invalid()))?;
+    let plain = |at| {
+        host_gregorian_timestamp(at)
+            .map(|value| format!("{}Z", value.split('.').next().unwrap_or(&value)))
+    };
+    // Validate every projected field before any pin publication. A later
+    // encoding failure must not conceal an already applied pin transition.
+    for row in &retained {
+        let entry = by_id[row.manifest.session_id.as_str()];
+        let expiry = session_timestamp(&entry.expires_at).ok_or_else(|| unreadable(invalid()))?;
+        if Some(expiry) != host_gregorian_add_days(row.manifest.completed_at, days)
+            || entry.policy_generation.to_string() != policy_generation
+            || row.bytes > i64::MAX as u64
+            || plain(row.manifest.completed_at).is_none()
+            || plain(expiry).is_none()
+        {
+            return Err(unreadable(invalid()));
+        }
+    }
+    if pin.is_some_and(|(expected, _)| expected != document.generation) {
+        return Err(failure(
+            "resourceConflict",
+            "Session catalog generation changed",
+        ));
+    }
+    if let Some(id) = selected
+        && !retained.iter().any(|row| row.manifest.session_id == id)
+    {
+        return Err(failure(
+            "resourceNotFound",
+            "Session is not present in the Runtime catalog",
+        ));
+    }
+    let mut published = false;
+    if let Some((_, pinned)) = pin {
+        let entry = document
+            .entries
+            .iter_mut()
+            .find(|entry| Some(entry.session_id.as_str()) == selected)
+            .ok_or_else(|| {
+                failure(
+                    "resourceNotFound",
+                    "Session is not present in the Runtime catalog",
+                )
+            })?;
+        if entry.is_pinned != pinned {
+            if document.generation == i64::MAX as u64 {
+                return Err(failure(
+                    "resourceConflict",
+                    "Session catalog generation is exhausted",
+                ));
+            }
+            entry.is_pinned = pinned;
+            document.generation += 1;
+            document
+                .entries
+                .sort_by(|a, b| a.session_id.cmp(&b.session_id));
+            let value = serde_json::to_value(&document).map_err(|_| unreadable(invalid()))?;
+            let bytes = serde_json::to_vec(&value).map_err(|_| unreadable(invalid()))?;
+            lock.validate_link(&owner, LOCK).map_err(unreadable)?;
+            owner.validate_path(path).map_err(unreadable)?;
+            owner.publish_document(METADATA, &bytes, 16 * 1024 * 1024).map_err(|error| match error {
+                DocumentPublishError::BeforePublication(_) => failure("ioFailure", "Session pin could not be published"),
+                DocumentPublishError::OutcomeUnknown(_) => failure("outcomeUnknown", "Session pin publication is uncertain; read current generation before another update"),
+            })?;
+            published = true;
+            if root.read(METADATA, 16 * 1024 * 1024).ok().as_ref() != Some(&bytes)
+                || lock.validate_link(&owner, LOCK).is_err()
+                || owner.validate_path(path).is_err()
+            {
+                return Err(failure(
+                    "outcomeUnknown",
+                    "Session pin publication cannot be read back exactly",
+                ));
+            }
+            let after = scan(&root).map_err(|_| {
+                failure(
+                    "outcomeUnknown",
+                    "Session content cannot be read back after pin publication",
+                )
+            })?;
+            let signature = |tree: &Tree| {
+                tree.sessions
+                    .iter()
+                    .map(|row| {
+                        (
+                            row.manifest.session_id.clone(),
+                            (
+                                row.manifest.job_id.clone(),
+                                row.manifest.completed_at.to_bits(),
+                                row.bytes,
+                            ),
+                        )
+                    })
+                    .collect::<BTreeMap<_, _>>()
+            };
+            if after.incomplete
+                || after.observed.len() != tree.observed.len()
+                || signature(&after) != signature(&tree)
+            {
+                return Err(failure(
+                    "outcomeUnknown",
+                    "Session content changed during pin publication",
+                ));
+            }
+        }
+    }
+    let mut rows = Vec::new();
+    for row in retained {
+        let entry = document
+            .entries
+            .iter()
+            .find(|entry| entry.session_id == row.manifest.session_id)
+            .ok_or_else(|| unreadable(invalid()))?;
+        let expiry = session_timestamp(&entry.expires_at).ok_or_else(|| unreadable(invalid()))?;
+        let completed = plain(row.manifest.completed_at).ok_or_else(|| unreadable(invalid()))?;
+        rows.push((completed.clone(), row.manifest.session_id.clone(), json!({
+            "schemaVersion":"arkdeck.session/1", "sessionId":row.manifest.session_id,
+            "generation":document.generation.to_string(), "completedAtUtc":completed,
+            "expiresAtUtc":plain(expiry).ok_or_else(|| unreadable(invalid()))?,"sizeBytes":row.bytes.to_string(),
+            "pinned":entry.is_pinned,"policyGeneration":entry.policy_generation.to_string()
+        })));
+    }
+    // Consumers order the published whole-second timestamp. Hidden fractional
+    // seconds must not reverse the required identity order within a wire tie.
+    rows.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.cmp(&b.1)));
+    if lock.validate_link(&owner, LOCK).is_err() || root.validate_path(path).is_err() {
+        return Err(failure(
+            if published {
+                "outcomeUnknown"
+            } else {
+                "recordUnreadable"
+            },
+            "Session catalog owner changed during access",
+        ));
+    }
+    Ok(rows
+        .into_iter()
+        .filter(|(_, id, _)| selected.is_none_or(|selected| selected == id))
+        .map(|(_, _, value)| value)
+        .collect())
 }
 
 fn inventory(configuration: &[u8], path: &Path, owns_catalog: bool) -> io::Result<Value> {

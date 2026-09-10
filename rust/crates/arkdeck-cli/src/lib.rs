@@ -2,6 +2,8 @@
 use arkdeck_client::ClientError;
 use arkdeck_contract::{ContractError, PROTOCOL_VERSION, canonical_json};
 use serde_json::{Map, Value, json};
+mod session_resources;
+pub use session_resources::validate_session_response;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Invocation {
@@ -33,6 +35,8 @@ impl CliError {
         match self.code {
             "invalidCommand" | "invalidOption" => 64,
             "invalidInput"
+            | "invalidCursor"
+            | "inputTooLarge"
             | "resourceConflict"
             | "resourceNotFound"
             | "workspaceReferenceNotFound" => 65,
@@ -41,6 +45,7 @@ impl CliError {
             | "protocolVersionUnsupported"
             | "controlMethodUnavailable"
             | "healthRequirementFailed" => 69,
+            "operationUnavailable" => 69,
             "recordUnreadable" => 2,
             "ioFailure" => 74,
             "outcomeUnknown" => 75,
@@ -60,6 +65,8 @@ impl CliError {
                         | "history.filter.delete"
                         | "runtime.storage.policy"
                         | "runtime.storage.root"
+                        | "session.pin"
+                        | "session.unpin"
                 ) {
                     "outcomeUnknown"
                 } else if matches!(
@@ -108,6 +115,14 @@ impl CliError {
                         d.get("phase") == Some(&json!("runtimeStorageOwner"))
                             && d.get("newDispatchCount") == Some(&json!(0))
                     }));
+                let host_proof = host_proof
+                    || (matches!(
+                        method,
+                        "session.list" | "session.show" | "session.pin" | "session.unpin"
+                    ) && error.details.as_ref().is_some_and(|details| {
+                        details.get("phase") == Some(&json!("sessionOwner"))
+                            && details.get("newDispatchCount") == Some(&json!(0))
+                    }));
                 let code = match error.code.as_str() {
                     "invalidInput" if host_proof => "invalidInput",
                     "resourceConflict" if host_proof => "resourceConflict",
@@ -115,6 +130,9 @@ impl CliError {
                     "ioFailure" if host_proof => "ioFailure",
                     "outcomeUnknown" if host_proof => "outcomeUnknown",
                     "quotaExceeded" if host_proof => "quotaExceeded",
+                    "invalidCursor" if host_proof => "invalidCursor",
+                    "inputTooLarge" if host_proof => "inputTooLarge",
+                    "operationUnavailable" if host_proof => "operationUnavailable",
                     "unsupportedProtocolVersion" => "protocolVersionUnsupported",
                     "malformedFrame" => "protocolMalformed",
                     "unknownMethod" => "controlMethodUnavailable",
@@ -176,6 +194,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                     method_options.insert("resetToDefault".into(), json!(true));
                 }
                 "--expected-generation"
+                | "--page-size"
+                | "--cursor"
                 | "--root"
                 | "--total-quota-bytes"
                 | "--safety-margin-bytes"
@@ -196,6 +216,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                         })?;
                     let key = match argument.as_str() {
                         "--expected-generation" => "expectedGeneration",
+                        "--page-size" => "pageSize",
                         "--root" => "rootPath",
                         "--total-quota-bytes" => "totalQuotaBytes",
                         "--safety-margin-bytes" => "safetyMarginBytes",
@@ -264,6 +285,10 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["runtime", "storage", "status"] => "runtime.storage.status",
         ["runtime", "storage", "policy"] => "runtime.storage.policy",
         ["runtime", "storage", "root"] => "runtime.storage.root",
+        ["session", "list"] => "session.list",
+        ["session", "show"] => "session.show",
+        ["session", "pin"] => "session.pin",
+        ["session", "unpin"] => "session.unpin",
         ["history", "filter", "list"] => "history.filter.list",
         ["history", "filter", "save"] => "history.filter.save",
         ["history", "filter", "delete"] => "history.filter.delete",
@@ -271,7 +296,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         _ => {
             return Err(CliError::new(
                 "invalidCommand",
-                "available commands: doctor, operation list, device candidates, history filter list|save|delete, runtime storage status|policy|root",
+                "available commands: doctor, operation list, device candidates, history filter list|save|delete, runtime storage status|policy|root, session list|show|pin|unpin",
             ));
         }
     };
@@ -300,6 +325,9 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             "retentionDays",
         ],
         "runtime.storage.root" => &["expectedGeneration", "rootPath", "resetToDefault"],
+        "session.list" => &["pageSize", "cursor"],
+        "session.show" => &["sessionId"],
+        "session.pin" | "session.unpin" => &["sessionId", "expectedGeneration"],
         _ => &[],
     };
     if method_options
@@ -311,11 +339,35 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             "the option does not belong to this command",
         ));
     }
-    if !help && !allowed.is_empty() && !method_options.contains_key("expectedGeneration") {
+    if !help
+        && allowed.contains(&"expectedGeneration")
+        && !method_options.contains_key("expectedGeneration")
+    {
         return Err(CliError::new(
             "invalidOption",
             "the mutation requires --expected-generation",
         ));
+    }
+    if !help
+        && matches!(command, "session.show" | "session.pin" | "session.unpin")
+        && !method_options.contains_key("sessionId")
+    {
+        return Err(CliError::new(
+            "invalidOption",
+            "Session command requires --session",
+        ));
+    }
+    if !help && command == "session.list" {
+        let size = method_options
+            .get("pageSize")
+            .map_or(Some(100), |value| {
+                value.as_str().and_then(|text| text.parse::<u64>().ok())
+            })
+            .filter(|size| (1..=1000).contains(size))
+            .ok_or_else(|| {
+                CliError::new("invalidOption", "page-size must be between 1 and 1000")
+            })?;
+        method_options.insert("pageSize".into(), json!(size));
     }
     if !help
         && command == "runtime.storage.policy"
@@ -353,10 +405,11 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
     if !help {
         if let Some(generation) = method_options.get("expectedGeneration") {
             let text = generation.as_str().expect("option text");
-            if !text
-                .parse::<u64>()
-                .is_ok_and(|n| n > 0 && n <= i64::MAX as u64 && n.to_string() == text)
-            {
+            if !text.parse::<u64>().is_ok_and(|n| {
+                (n > 0 || matches!(command, "session.pin" | "session.unpin"))
+                    && n <= i64::MAX as u64
+                    && n.to_string() == text
+            }) {
                 return Err(CliError::new(
                     "invalidOption",
                     "--expected-generation must be a canonical positive integer",
@@ -437,7 +490,9 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         },
         params: if command == "doctor" {
             Some(serde_json::from_value(json!({"deep":deep})).unwrap())
-        } else if command.starts_with("history.filter.") || command.starts_with("runtime.storage.")
+        } else if command.starts_with("history.filter.")
+            || command.starts_with("runtime.storage.")
+            || command.starts_with("session.")
         {
             Some(method_options)
         } else {

@@ -60,6 +60,7 @@ fn execute(invocation: &Invocation, id: &str) -> Result<Value, CliError> {
     let result = client
         .request(id, invocation.method, invocation.params.clone())
         .map_err(|error| CliError::from_client(error, invocation.method))?;
+    arkdeck_cli::validate_session_response(invocation, &result)?;
     if invocation.command == "doctor" {
         if result["schemaVersion"] != "arkdeck.doctor-report/1" || !result["ready"].is_boolean() {
             return Err(CliError::new(
@@ -122,7 +123,7 @@ fn main() -> std::process::ExitCode {
     };
     if invocation.help {
         println!(
-            "ArkDeck commands:\n  doctor [--deep] [--require-healthy]\n  operation list\n  device candidates\n  history filter list\n  history filter save --expected-generation <n> [--search <text>] [--status <status>] [--mode <mode>] [--session <id>] [--target <id>] [--time <range>] [--activity <activity>]\n  history filter delete --expected-generation <n>\n  runtime storage status\n  runtime storage policy --expected-generation <n> --total-quota-bytes <bytes> --safety-margin-bytes <bytes> --retention-days <days>\n  runtime storage root --expected-generation <n> (--root <path> | --default)\n\nOptions: --output human|json, --control-request-id <id>\nA private local Runtime must be running. Windows requires the installed daemon identity."
+            "ArkDeck commands:\n  doctor [--deep] [--require-healthy]\n  operation list\n  device candidates\n  history filter list\n  history filter save --expected-generation <n> [--search <text>] [--status <status>] [--mode <mode>] [--session <id>] [--target <id>] [--time <range>] [--activity <activity>]\n  history filter delete --expected-generation <n>\n  runtime storage status\n  runtime storage policy --expected-generation <n> --total-quota-bytes <bytes> --safety-margin-bytes <bytes> --retention-days <days>\n  runtime storage root --expected-generation <n> (--root <path> | --default)\n  session list [--page-size <n>] [--cursor <cursor>]\n  session show --session <id>\n  session pin|unpin --session <id> --expected-generation <n>\n\nOptions: --output human|json, --control-request-id <id>\nA private local Runtime must be running. Windows requires the installed daemon identity."
         );
         return 0.into();
     }

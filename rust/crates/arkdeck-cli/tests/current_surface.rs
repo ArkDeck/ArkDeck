@@ -130,6 +130,8 @@ fn host_owner_failure_scope_and_lost_reply_are_preserved() {
         "history.filter.save",
         "runtime.storage.root",
         "runtime.storage.policy",
+        "session.pin",
+        "session.unpin",
     ] {
         let interrupted = CliError::from_client(
             ClientError::Transport(std::io::ErrorKind::BrokenPipe.into()),
@@ -142,6 +144,78 @@ fn host_owner_failure_scope_and_lost_reply_are_preserved() {
             false
         );
     }
+}
+
+#[test]
+fn session_cli_requires_exact_identity_and_preserves_zero_catalog_generation() {
+    for verb in ["pin", "unpin"] {
+        let parsed = parse(
+            &[
+                "session",
+                verb,
+                "--session",
+                "session-one",
+                "--expected-generation",
+                "0",
+            ]
+            .map(str::to_owned),
+        )
+        .unwrap();
+        assert_eq!(
+            json!(parsed.params),
+            json!({"sessionId":"session-one","expectedGeneration":"0"})
+        );
+    }
+    let page =
+        parse(&["session", "list", "--page-size", "1", "--cursor", "opaque"].map(str::to_owned))
+            .unwrap();
+    assert_eq!(json!(page.params), json!({"pageSize":1,"cursor":"opaque"}));
+    for args in [
+        vec!["session", "pin", "--session", "one"],
+        vec!["session", "show"],
+        vec![
+            "session",
+            "show",
+            "--session",
+            "one",
+            "--expected-generation",
+            "0",
+        ],
+        vec!["session", "list", "--page-size", "0"],
+        vec!["session", "list", "--page-size", "1001"],
+    ] {
+        assert!(parse(&args.into_iter().map(str::to_owned).collect::<Vec<_>>()).is_err());
+    }
+}
+
+#[test]
+fn session_client_refuses_invalid_rows_and_partial_or_mixed_pages() {
+    let invocation = parse(&["session", "list", "--page-size", "2"].map(str::to_owned)).unwrap();
+    let row = json!({"schemaVersion":"arkdeck.session/1","sessionId":"session-one","generation":"0","completedAtUtc":"2026-08-02T00:00:00Z", "expiresAtUtc":"2026-10-31T00:00:00Z","sizeBytes":"1","pinned":false,"policyGeneration":"1"});
+    let page = json!({"schemaVersion":"arkdeck.cli.page/1","pageKind":"snapshot","order":"completedAtDescSessionIdAsc", "snapshotRevision":"aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa","hasMore":false,"nextCursor":null,"items":[row.clone()]});
+    validate_session_response(&invocation, &page).unwrap();
+    for (field, value) in [
+        ("generation", json!("00")),
+        ("sizeBytes", json!("9223372036854775808")),
+        ("policyGeneration", json!("0")),
+        ("completedAtUtc", json!("2026-02-30T00:00:00Z")),
+        ("expiresAtUtc", json!("2026-08-01T00:00:00Z")),
+    ] {
+        let mut invalid = page.clone();
+        invalid["items"][0][field] = value;
+        assert_eq!(
+            validate_session_response(&invocation, &invalid)
+                .unwrap_err()
+                .code,
+            "recordUnreadable"
+        );
+    }
+    let mut duplicate = page.clone();
+    duplicate["items"] = json!([row.clone(), row]);
+    assert!(validate_session_response(&invocation, &duplicate).is_err());
+    let mut invalid = page;
+    invalid["hasMore"] = json!(true);
+    assert!(validate_session_response(&invocation, &invalid).is_err());
 }
 
 #[test]

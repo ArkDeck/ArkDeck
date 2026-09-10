@@ -13,6 +13,8 @@ pub use history_owner::HistoryStore;
 #[cfg(target_os = "macos")]
 mod session_owner;
 #[cfg(target_os = "macos")]
+mod snapshot_pager;
+#[cfg(target_os = "macos")]
 pub use session_owner::SessionStore;
 #[cfg(target_os = "macos")]
 mod artifact_usage;

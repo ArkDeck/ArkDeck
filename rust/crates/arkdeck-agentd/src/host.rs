@@ -65,6 +65,19 @@ impl Host {
 
 impl HostServices for Host {
     #[cfg(target_os = "macos")]
+    fn session_resource(
+        &self,
+        method: &str,
+        params: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<serde_json::Value, WireError> {
+        let (sessions, _) = self.storage.as_ref().ok_or_else(|| WireError {
+            code: "rejected".into(),
+            message: "Session owner is not configured".into(),
+            details: None,
+        })?;
+        sessions.handle_resource(method, params)
+    }
+    #[cfg(target_os = "macos")]
     fn runtime_storage(
         &self,
         method: &str,
