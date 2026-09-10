@@ -665,3 +665,79 @@ the original 6e8c3ed5 Runtime, and verified ready=true, campaign="", 28/30 avail
 operations. No raw device commands, binding rebind override or unknown replay.
 Redacted record: `docs/design/references/single-v1/gj-headless-rerun-2026-09-10-xpa003.json`.
 Raw local CLI outputs: `/private/tmp/xpa003-gj4-20260910/`.
+
+
+## Post-merge Session repair, 2026-09-10
+
+The separate TASK-SVC-002 fix merged as PR #1832 at protected main
+`36f1d951f25b3a50ec01980ec9a3287dcd299b86`, with all selected local and remote
+checks passing. Its provisioned local reader was built, signature-verified and
+installed through `runtime service update`; daemon SHA-256 is
+`2acdb818d2bb781c0d28443d03e980dccc662718fa04f51015308774406e75e3`.
+This published reader is now the rollback baseline: restoring the old 6e8c3ed5
+reader after publishing the new Manifest shape would make those Sessions unreadable.
+
+The exact original GJ-4 and postflight Jobs were repaired through typed
+`job reconcile`. Both now report `published`, with catalog generations 11 and
+12 respectively (10 before the repair). Each original Journal prefix is unchanged
+and contains exactly one additional `finalized` event, with no new Provider intent.
+GJ-4 repeated reconciliation and reconciliation after restarting the same reader
+returned the identical receipt. `session show` resolves both entries. The original
+three flash Artifact digests and verified bytes are unchanged; `job result`
+continues to report verified evidence for both Jobs. The Job ID set remains the
+same 64 entries. No flash was rerun and the ArkForge campaign stays closed.
+
+The pre-existing unaccounted Session count is 1 both before and after the repair;
+that unrelated inventory was neither adopted nor deleted. Detailed redacted
+readback metadata is appended to
+`docs/design/references/single-v1/gj-headless-rerun-2026-09-10-xpa003.json`;
+raw command responses remain under `/private/tmp/svc002-live-*.json` locally.
+This is publication repair of existing real results, not a new GJ hardware run.
+
+The XPA implementation was rebased onto this protected-main reader before
+continuing acceptance. GJ-1 physical HAR and the App UI smoke remain outstanding;
+the complete XPA implementation PR is still withheld until those pass.
+
+
+## Rebased acceptance preparation, 2026-09-10
+
+At implementation HEAD `407c1925`, the r8 signed facade/Swift helper pair built
+successfully. The isolated macOS facade host suite passed all 6 tests (exit 0);
+local log: `/private/tmp/xpa003-r8-facade-host.log`. These are host tests, not
+additional hardware acceptance.
+
+`ARKDECK_UI_TEST_DERIVED_DATA=/private/tmp/xpa003-ui-r8 sh
+scripts/ci/run-ui-tests.sh --build-once -jobs 4` completed with exit 0. A subsequent
+App-only `xcodebuild build` in that DerivedData directory with the existing
+Developer ID identity also completed with exit 0. The stock UI Runner executable
+SHA-256 matched before and after App signing. No entitlement source or system
+permission was changed. Local logs: `/private/tmp/xpa003-ui-r8-build.log` and
+`/private/tmp/xpa003-ui-r8-app-sign.log`.
+
+UI execution has not started: the 8-core host reported one-minute load 58.66,
+above the required threshold of 12. No foreign UI runner was present, and no
+other session's processes were interrupted. A fresh test attempt requires a
+quiet host; physical USB disconnect/reconnect for the GJ-1 HAR remains pending
+user availability. The published 36f1d951 Runtime remains installed, healthy,
+with a closed flash campaign and no executing Jobs (64 existing entries).
+The r8 candidate has not been installed. Neither UI nor physical HAR is claimed
+as passed by this preparation.
+
+
+## Implementation PR submission requested, 2026-09-10
+
+The maintainer subsequently requested submitting all outstanding implementation
+and evidence changes as a PR now. This supersedes the earlier instruction to
+withhold the implementation PR until all acceptance is complete. TASK-XPA-003
+remains in-progress: physical GJ-1 HAR crash-resume and the installed facade /
+same-release Swift App UI smoke have not passed. PR submission does not mark
+these acceptance items complete or verified. The implementation includes the
+paired Rust facade, Swift private listener and raw XPC transport, signed helper
+packaging, contract/crash/identity tests, performance measurements, rollback
+readback and the real-device records already documented above.
+
+The latest Session publication repair is included as readback evidence only;
+its production fix is already on protected main through TASK-SVC-002 PR #1832.
+No new device operation is needed to submit this PR. The final local gate and
+path preflight are run against this submission before push; CI results remain
+subject to the remote exact-head checks.

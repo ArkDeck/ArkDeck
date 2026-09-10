@@ -92,7 +92,7 @@
         "reasonCode": "sourceIntegrityFailed",
         "state": "failed"
       },
-      "sessionPublicationLimitation": "Session publication reports sourceIntegrityFailed. All three flash artifacts passed full byte-count and SHA-256 readback; flash Job and postflight succeeded. The publication issue remains unresolved and is not counted as passing Session acceptance."
+      "sessionPublicationLimitation": "The initial publication failure shown above was repaired after PR #1832 merged. See sessionPublicationRepair for the subsequent typed retry and readback; the original flash execution and Artifact evidence remain unchanged."
     }
   ],
   "cleanup": {
@@ -109,5 +109,59 @@
     "unknownIntentReplays": 0,
     "bindingRebindOverrides": 0
   },
-  "rawOutputs": "/private/tmp/xpa003-gj4-20260910 (local only)"
+  "rawOutputs": "/private/tmp/xpa003-gj4-20260910 (local only)",
+  "sessionPublicationRepair": {
+    "kind": "runtime-session-publication-readback",
+    "date": "2026-09-10",
+    "repairPR": "https://github.com/ArkDeck/ArkDeck/pull/1832",
+    "protectedMainCommit": "36f1d951f25b3a50ec01980ec9a3287dcd299b86",
+    "daemonSHA256": "2acdb818d2bb781c0d28443d03e980dccc662718fa04f51015308774406e75e3",
+    "cliSHA256": "3f6f82a4947f0b4aa2702a87f1b97860830c5cf1363ce102db22ed2fa9c86a7d",
+    "jobCountBefore": 64,
+    "jobCountAfter": 64,
+    "catalogGenerationBefore": "10",
+    "catalogGenerationAfter": "12",
+    "sessions": [
+      {
+        "jobId": "job-668735b572ec56dd44120abe9e428e36",
+        "sessionId": "session-job-668735b572ec56dd44120abe9e428e36",
+        "receipt": {
+          "catalogGeneration": "11",
+          "manifestSha256": "b40052c280c07039b1e1b090af9e08f09072e000553f6c3272aab089de9cad55",
+          "reasonCode": null,
+          "state": "published"
+        },
+        "originalJournalPrefixUnchanged": true,
+        "appendedEventKinds": [
+          "finalized"
+        ],
+        "newProviderIntentEvents": 0
+      },
+      {
+        "jobId": "job-fed59c473a7a650b2bdf51979f97be2d",
+        "sessionId": "session-job-fed59c473a7a650b2bdf51979f97be2d",
+        "receipt": {
+          "catalogGeneration": "12",
+          "manifestSha256": "7350c0057ea4876f61ffed2e8f4e960fe362ca92ad1c806d5db0ec027e7d0f8a",
+          "reasonCode": null,
+          "state": "published"
+        },
+        "originalJournalPrefixUnchanged": true,
+        "appendedEventKinds": [
+          "finalized"
+        ],
+        "newProviderIntentEvents": 0
+      }
+    ],
+    "sameReceiptAfterRepeat": true,
+    "sameReceiptAfterRestart": true,
+    "originalArtifactDigestsUnchanged": true,
+    "originalEvidenceStatus": "verified",
+    "originalArtifactBytesVerified": true,
+    "postflightEvidenceStatus": "verified",
+    "unaccountedSessionCountBefore": "1",
+    "unaccountedSessionCountAfter": "1",
+    "campaignClosed": true,
+    "newFlashJobs": 0
+  }
 }
