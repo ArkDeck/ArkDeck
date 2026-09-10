@@ -36,6 +36,7 @@ Swift oracle may initialize or reconcile only its isolated fixtures.
 | Session configuration | 5 | Policy/custom-root/full-width values and strict canonical fields |
 | Session timestamps | 20 | Exact Swift Date Double bits or matching refusal |
 | Session status | 20 | Actual used/pinned bytes, counts, catalog generations and incomplete measurement |
+| Session parameters | 26 | Typed state, restore byte equality, status consistency and Swift character-count boundaries |
 | Trace cache | 7 | Actual Swift adapter inventory, missing metadata, key/lease contention and unsafe entries |
 
 The 105-case receipt is preserved unchanged in
@@ -46,6 +47,11 @@ raw filter strings, display names, payload bytes or hardware claims. Each case
 pins the actual Swift XCTest executable; the runner rejects missing cases,
 unexpected outcomes, invalid hashes or mixed oracle binaries. macOS,
 architecture, Swift, Rust and Xcode versions are recorded.
+
+The expanded 131-case snapshot is preserved separately in
+[local-shadow-parameters-20260910.json](local-shadow-parameters-20260910.json),
+also with `sourceDirty: true` and `cutoverEligible: false`. The earlier receipt
+remains an immutable record of its own tested source snapshot.
 
 History and display-name Swift readers gained duplicate/extra-field checks to
 meet the frozen field-set requirement. Their writers and durable keys were not
@@ -70,9 +76,18 @@ provenance, canonical Base64, path/size/hash constraints, source-hash matching,
 unique lineage and cycle detection. These only interpret fixture records; they
 confer no Runtime authority or tool trust.
 
+Parameter validation covers missing/unreadable/value states, the desired-value
+requirement, restore dispositions, and exact UTF-8 equality for a restored value.
+Length comparisons exercise 4096/4097 Swift Characters with family emoji, CRLF,
+combining marks, flags, Hangul, Indic conjuncts and skin-tone modifiers. These
+are boundary regressions, not exhaustive Unicode conformance. The CRLF case
+exposed a CoreFoundation composed-range difference; the candidate explicitly
+joins CRLF for counting under [UAX #29 GB3](https://www.unicode.org/reports/tr29/),
+preserving source bytes.
+
 ## Remaining work before harness review
 
-- Complete manifest Steps, parameters, compensations, confirmations, Runtime
+- Complete manifest Steps, compensations, confirmations, Runtime
   Provider audit and recovery branches, plus complex Foundation canonical JSON.
   Unsupported branches currently stop the entire comparison explicitly; they
   are never reported as corrupt or unaccounted Sessions.
@@ -90,6 +105,12 @@ GJ-1 re-pass and rollback evidence remain a later authorized cutover stage.
 
 ## Validation so far
 
+- 131 cases across 12 XCTest methods passed after the parameter/Unicode fixes.
+  Log: `/private/tmp/xpa012-shadow-parameter-unicode-fixed.log`.
+- The parameter snapshot passed the full unified gate (exit 0): Swift full
+  suite, App test build, design-system, published/candidate Rust contracts,
+  cargo deny and cargo vet (25 audited). Log:
+  `/private/tmp/xpa012-shadow-parameters-gate.log`.
 - 105 cases across 11 XCTest methods passed. Latest execution log:
   `/private/tmp/xpa012-shadow-session-artifacts.log`.
 - Four receipt integrity tests, five filesystem/lock tests and hoststore/platform

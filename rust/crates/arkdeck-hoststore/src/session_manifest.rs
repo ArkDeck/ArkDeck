@@ -375,11 +375,12 @@ pub(super) fn decode_manifest(bytes: &[u8]) -> Result<ManifestSummary> {
             require(value.is_some_and(|s| !s.is_empty()))?;
         }
     }
-    for key in ["steps", "parameters", "compensations", "confirmations"] {
+    for key in ["steps", "compensations", "confirmations"] {
         if !array(doc, key)?.is_empty() {
             return Err(ManifestError::Unsupported);
         }
     }
+    validate_parameters(array(doc, "parameters")?, status)?;
     validate_artifacts(array(doc, "artifacts")?)?;
     require(
         array(doc, "warnings")?
@@ -597,4 +598,77 @@ fn validate_artifacts(values: &[Value]) -> Result<()> {
         }
     }
     require(visited == artifacts.len())
+}
+
+fn parameter_state(value: &Value) -> Result<&str> {
+    let row = object(value)?;
+    let state = text(row, "state")?;
+    match state {
+        "missing" => keys(row, &["state"], &[])?,
+        "unreadable" => {
+            keys(row, &["state", "reason"], &[])?;
+            nonempty(row, "reason")?;
+        }
+        "value" => {
+            keys(row, &["state", "value"], &[])?;
+            require(
+                arkdeck_platform::host_composed_text_within(text(row, "value")?, 4096)
+                    .ok_or(ManifestError::Unsupported)?,
+            )?;
+        }
+        _ => return Err(ManifestError::Invalid),
+    }
+    Ok(state)
+}
+fn validate_parameters(values: &[Value], status: &str) -> Result<()> {
+    for value in values {
+        let row = object(value)?;
+        keys(
+            row,
+            &[
+                "name",
+                "beforeState",
+                "desiredState",
+                "afterState",
+                "restoreState",
+                "restoreDisposition",
+            ],
+            &[],
+        )?;
+        let name = text(row, "name")?;
+        require(
+            (1..=255).contains(&name.len())
+                && name
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b"_.-".contains(&b)),
+        )?;
+        let before = parameter_state(&row["beforeState"])?;
+        require(parameter_state(&row["desiredState"])? == "value")?;
+        parameter_state(&row["afterState"])?;
+        let restore = parameter_state(&row["restoreState"])?;
+        let disposition = choice(
+            row,
+            "restoreDisposition",
+            &[
+                "notRequired",
+                "restored",
+                "persistentChangeAccepted",
+                "failed",
+                "outcomeUnknown",
+            ],
+        )?;
+        if disposition == "restored" {
+            require(before == "value" && restore == "value")?;
+            // Unlike display-name equality, a restored parameter must preserve
+            // the captured original bytes, even for canonically equal text.
+            require(
+                text(object(&row["beforeState"])?, "value")?.as_bytes()
+                    == text(object(&row["restoreState"])?, "value")?.as_bytes(),
+            )?;
+        }
+        if status == "succeeded" {
+            require(!["failed", "outcomeUnknown"].contains(&disposition))?;
+        }
+    }
+    Ok(())
 }

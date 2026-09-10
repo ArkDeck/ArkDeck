@@ -22,6 +22,11 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 EXPECTED = {
+    **{f"inventory-parameter-{kind}-{bound}": "equal" for kind in
+        ("crlf", "combining", "flag", "hangul", "indic", "skin-tone") for bound in ("boundary", "too-long")},
+    **{f"inventory-parameter-{name}": "equal" for name in ("restored", "missing-before", "unreadable-before",
+        "empty-value", "unicode-boundary", "failed-session", "different-bytes", "restored-missing-before",
+        "desired-missing", "value-too-long", "unicode-too-long", "state-extra-field", "success-failed-restore", "unreadable-empty-reason")},
     **{f"inventory-{name}": "equal" for name in ("empty", "unregistered", "registered", "pinned", "leap-second",
         "unscoped", "corrupt-manifest", "symlink", "corrupt-catalog", "missing-catalog",
         "fresh-catalog", "reconcile-policy", "duplicate-identity", "reconcile-removed",

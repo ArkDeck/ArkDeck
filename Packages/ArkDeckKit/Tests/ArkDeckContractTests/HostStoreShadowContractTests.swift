@@ -408,6 +408,69 @@ final class HostStoreShadowContractTests: XCTestCase {
     try record(name: "inventory-" + name, input: before, output: output, outcome: "equal", store: "session-storage")
   }
 
+  func testSessionParameterStateProjection() throws {
+    let owner = root.appending(path: "parameter-owner")
+    let sessions = root.appending(path: "parameter-sessions")
+    let store = try RuntimeSessionStorageStore(ownerRoot: owner, defaultSessionsRoot: sessions)
+    _ = try store.updatePolicy(.init(totalQuotaBytes: 1_000_000, safetyMarginBytes: 100,
+      retentionDays: 7), expectedGeneration: 1)
+    let directory = try seedShadowSession(sessions: sessions, month: "01", id: "session-parameters",
+      timestamp: "2026-01-01T00:00:00Z")
+    let catalog = try SessionRetentionCatalog(sessionsRoot: sessions)
+    try catalog.registerFinalizedSession(sessionRoot: directory, retentionDays: 7, policyGeneration: 2)
+    _ = try catalog.updatePin(sessionID: "session-parameters", isPinned: true, expectedGeneration: 1)
+    let file = directory.appending(path: "manifest.json")
+    let original = try Data(contentsOf: file)
+    let graphemes = ["crlf": "\r\n", "combining": "e\u{301}", "flag": "🇨🇳",
+      "hangul": "\u{1100}\u{1161}\u{11A8}", "indic": "\u{0915}\u{094D}\u{0937}", "skin-tone": "👍🏽"]
+    let accepted = ["restored", "missing-before", "unreadable-before", "empty-value", "unicode-boundary", "failed-session"]
+      + graphemes.keys.sorted().map { $0 + "-boundary" }
+    let rejected = ["different-bytes", "restored-missing-before", "desired-missing", "value-too-long",
+      "unicode-too-long", "state-extra-field", "success-failed-restore", "unreadable-empty-reason"]
+      + graphemes.keys.sorted().map { $0 + "-too-long" }
+    for name in accepted + rejected {
+      var document = try XCTUnwrap(JSONSerialization.jsonObject(with: original) as? [String: Any])
+      var parameter: [String: Any] = ["name": "persist.shadow", "beforeState": ["state": "value", "value": "original"],
+        "desiredState": ["state": "value", "value": "desired"], "afterState": ["state": "value", "value": "original"],
+        "restoreState": ["state": "value", "value": "original"], "restoreDisposition": "restored"]
+      switch name {
+      case "missing-before", "unreadable-before", "unreadable-empty-reason":
+        parameter["beforeState"] = name == "missing-before" ? ["state": "missing"]
+          : ["state": "unreadable", "reason": name == "unreadable-before" ? "fixture unavailable" : ""]
+        parameter["restoreState"] = ["state": "missing"]
+        parameter["restoreDisposition"] = "notRequired"
+      case "empty-value": parameter["desiredState"] = ["state": "value", "value": ""]
+      case "unicode-boundary", "unicode-too-long":
+        parameter["desiredState"] = ["state": "value", "value": String(repeating: "👩‍👩‍👦", count: name == "unicode-boundary" ? 4096 : 4097)]
+      case "different-bytes":
+        parameter["beforeState"] = ["state": "value", "value": "café"]
+        parameter["restoreState"] = ["state": "value", "value": "cafe\u{301}"]
+      case "restored-missing-before": parameter["beforeState"] = ["state": "missing"]
+      case "desired-missing": parameter["desiredState"] = ["state": "missing"]
+      case "value-too-long": parameter["desiredState"] = ["state": "value", "value": String(repeating: "a", count: 4097)]
+      case "state-extra-field": parameter["desiredState"] = ["state": "value", "value": "desired", "extra": true]
+      case "success-failed-restore", "failed-session":
+        parameter["restoreDisposition"] = "failed"
+        if name == "failed-session" {
+          document["status"] = "failed"
+          document["failure"] = ["stage": "restore", "code": "restore.failed", "summary": "fixture failure"]
+        }
+      default: break
+      }
+      for (kind, grapheme) in graphemes where name == kind + "-boundary" || name == kind + "-too-long" {
+        let count = name.hasSuffix("-boundary") ? 4096 : 4097
+        let value = String(repeating: grapheme, count: count)
+        XCTAssertEqual(value.count, count, name)
+        parameter["desiredState"] = ["state": "value", "value": value]
+      }
+      document["parameters"] = [parameter]
+      try JSONSerialization.data(withJSONObject: document, options: [.sortedKeys, .withoutEscapingSlashes]).write(to: file)
+      XCTAssertEqual(try store.status().measurementIncomplete, rejected.contains(name), name)
+      try compareSessionStatus("parameter-" + name, store: store,
+        config: owner.appending(path: "session-storage.json"), sessions: sessions)
+    }
+  }
+
   func testSessionTimestampCalculationMatchesFrozenSwiftDecoder() throws {
     let accepted = [
       "2001-01-01T00:00:00Z", "2026-09-10T01:02:03.123456789123Z",
