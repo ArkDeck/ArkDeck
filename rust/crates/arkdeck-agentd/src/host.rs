@@ -1,7 +1,7 @@
 use arkdeck_contract::{
     DeviceObservationsResult, DeviceObservationsResultObservationsItem, WireError,
 };
-use arkdeck_control::{HdcStatus, ReadOnlyHost};
+use arkdeck_control::{HdcStatus, HostServices};
 use arkdeck_platform::{VerifiedTool, random_bytes};
 use arkdeck_provider_hdc::HdcReadOnlyProvider;
 use std::io;
@@ -10,11 +10,19 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 pub struct Host {
     provider: Option<HdcReadOnlyProvider>,
+    #[cfg(target_os = "macos")]
+    history: Option<arkdeck_hoststore::HistoryStore>,
     unavailable: &'static str,
     generation: Mutex<u64>,
 }
 
 impl Host {
+    #[cfg(target_os = "macos")]
+    pub fn with_history(mut self, history: arkdeck_hoststore::HistoryStore) -> Self {
+        self.history = Some(history);
+        self
+    }
+
     pub fn from_environment() -> Self {
         let path = std::env::var_os("ARKDECK_HDC_PATH");
         let digest = std::env::var("ARKDECK_HDC_SHA256").ok();
@@ -31,13 +39,29 @@ impl Host {
         };
         Self {
             provider,
+            #[cfg(target_os = "macos")]
+            history: None,
             unavailable,
             generation: Mutex::new(0),
         }
     }
 }
 
-impl ReadOnlyHost for Host {
+impl HostServices for Host {
+    #[cfg(target_os = "macos")]
+    fn history_filter(
+        &self,
+        method: &str,
+        params: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<serde_json::Value, WireError> {
+        let store = self.history.as_ref().ok_or_else(|| WireError {
+            code: "rejected".into(),
+            message: "History filter owner is not configured".into(),
+            details: None,
+        })?;
+        store.handle(method, params, &utc_now())
+    }
+
     fn observed_at(&self) -> String {
         utc_now()
     }

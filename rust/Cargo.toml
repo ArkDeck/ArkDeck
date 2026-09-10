@@ -13,6 +13,7 @@ publish = false
 arkdeck-contract = { path = "crates/arkdeck-contract" }
 arkdeck-platform = { path = "crates/arkdeck-platform" }
 arkdeck-control = { path = "crates/arkdeck-control" }
+arkdeck-hoststore = { path = "crates/arkdeck-hoststore" }
 arkdeck-provider-hdc = { path = "crates/arkdeck-provider-hdc" }
 arkdeck-client = { path = "crates/arkdeck-client" }
 serde = { version = "=1.0.228", features = ["derive"] }
@@ -21,6 +22,7 @@ sha2 = "0.10.9"
 hmac = "0.12.1"
 libc = "0.2"
 windows-sys = "0.61.2"
+unicode-segmentation = "=1.13.3"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

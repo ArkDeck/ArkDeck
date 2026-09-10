@@ -1,0 +1,1394 @@
+{
+  "actions": {
+    "GITHUB_EVENT_NAME": null,
+    "GITHUB_REPOSITORY": null,
+    "GITHUB_RUN_ATTEMPT": null,
+    "GITHUB_RUN_ID": null,
+    "GITHUB_SHA": null
+  },
+  "binarySHA256": "ad92330eace8d81582045c9952d6a754316b208c2235e0a0b13ed05a6dae8302",
+  "cases": [
+    {
+      "case": "bundle-available",
+      "inputSHA256": "f143ee06942476795c3b5f8973a7726d1679198d2b31cd4c9d7585204bc12830",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "624d610354fcec272ad4ff7052e7d78acd68157ec7583e9fc2dae05ed33287b6",
+      "store": "bundle-registry"
+    },
+    {
+      "case": "bundle-extra-index-field",
+      "inputSHA256": "420799db7cd9f2d9b46c33074b473d4065a28011d3c662a55d8e6addf581c1e2",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "bundle-registry"
+    },
+    {
+      "case": "bundle-extra-record-field",
+      "inputSHA256": "26d70eee5af027a0792109eaac0473cd821d2116077e70cae8452144eac626c2",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "bundle-registry"
+    },
+    {
+      "case": "bundle-removed",
+      "inputSHA256": "0cd244d0591c0269b9ea0f2fefdd29cfde36e0c500811a1bf16784bec174ea40",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "e0067d19a294c148652179514a0292a429b37b166e94de6286893f8bb912c5e0",
+      "store": "bundle-registry"
+    },
+    {
+      "case": "bundle-retained",
+      "inputSHA256": "fbc4f4bc55787770539fce28dd90a9fb0e70adcdd8b9187703bc451c74faa1b5",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "25244ff9b89f76b355d57ee34a6715ce86ec6b40926cfae959dd9e60d9e4e18c",
+      "store": "bundle-registry"
+    },
+    {
+      "case": "history-deleted-0",
+      "inputSHA256": "3a50674c068b9a9ac5c33e652541f8e41322501a9acd587222ab58ece4bd181e",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "9765f3d2b31dc551ae009fae893963271136a4bb6793479eff1834663529c263",
+      "store": "history-filter"
+    },
+    {
+      "case": "history-deleted-1",
+      "inputSHA256": "c4fea8c726b1813dbb27542042f17ebc46df1de8a4e2e0cb1675f2cae2fda07f",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "f241311e335ea3ac31b7f6954dc66a54cd8f4d08b3f9e57ba7ff9671bfb6ee8f",
+      "store": "history-filter"
+    },
+    {
+      "case": "history-deleted-2",
+      "inputSHA256": "7c14d4bbcd256917b9ed3389ca3724623d64f5d7fe3aa68ef724d855edb7f739",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "b43d0fedfaac7c284ae8e545720184055457e8242edf9c856c34beb85c5a7e42",
+      "store": "history-filter"
+    },
+    {
+      "case": "history-extra-document-field",
+      "inputSHA256": "3f36ccb2d475e923bdd960494a1044ad1f84cf782356e6b5d9d84949680f67a5",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "history-filter"
+    },
+    {
+      "case": "history-extra-query-field",
+      "inputSHA256": "5337a123c8ecc9c2bec102bc77b9a3d7639bd07513af81c70c9e81c24a86fb19",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "history-filter"
+    },
+    {
+      "case": "history-invalid-activity",
+      "inputSHA256": "bc6c39f5c60e9ca36e66ee5459736fa79819a874eabb34db42b7f21cce70077a",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "history-filter"
+    },
+    {
+      "case": "history-invalid-mode",
+      "inputSHA256": "02f388baa8c5193176be275c58c6f5753f4e79633b91ec0706d6220431c8810f",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "history-filter"
+    },
+    {
+      "case": "history-invalid-search-bound",
+      "inputSHA256": "dfe51986e03564949534795a26b1973f9162c4fcf53596dc38f420e65c5fcdb9",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "history-filter"
+    },
+    {
+      "case": "history-invalid-search-control",
+      "inputSHA256": "a55031778a23bbeed911eb42cb788730fa9a746d3e0547bc5d0007d5f7872052",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "history-filter"
+    },
+    {
+      "case": "history-invalid-search-format-control",
+      "inputSHA256": "0ed1a0c0abe88086d65aff8e1869bb44b8f13afe5794fd010c9f590a1f8a8da4",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "history-filter"
+    },
+    {
+      "case": "history-invalid-session-empty",
+      "inputSHA256": "c64cfdc62f18b9ce7aeec77e4e650fd68115a5c62131978f5224cb7be23b0f93",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "history-filter"
+    },
+    {
+      "case": "history-invalid-session-leading-space",
+      "inputSHA256": "48f5a0d6bf3b706c21f494c212885902e3d91922302ef455ca9050fb1bc1aab4",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "history-filter"
+    },
+    {
+      "case": "history-invalid-status",
+      "inputSHA256": "adc2af0c6ff97af2a8bcb8bd2af90376054dedbe768f14ee4b032382215f0cdd",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "history-filter"
+    },
+    {
+      "case": "history-invalid-target-bound",
+      "inputSHA256": "6dcbd35e76c1da02e77188704706ea1a27de94ef58d30c02bdbb9f59dc99c5b5",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "history-filter"
+    },
+    {
+      "case": "history-invalid-time-range",
+      "inputSHA256": "e483e83cf1bc25b6a8454c745ffa29e5f99e15f4c06a3d460fb1474aa21c7115",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "history-filter"
+    },
+    {
+      "case": "history-maximum-generation",
+      "inputSHA256": "c62b2fbe9bbe8e01a4d5eff32ee166430116a019ce0f6c7b8049577f7eefe6b2",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "6d169df4c272c70c99a25189d3c4c99b56030c4f6cb4a0ceafbaea4e42eef3e1",
+      "store": "history-filter"
+    },
+    {
+      "case": "history-saved-0",
+      "inputSHA256": "368743e31850bd4f15f7782af84accf742113aa1001aa3d5fb0b800cf1edaee4",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "c8db8d0db2339d0e70f8b0d2765f984f6350e5fde36fb7a2cfb6ae52d76d03e3",
+      "store": "history-filter"
+    },
+    {
+      "case": "history-saved-1",
+      "inputSHA256": "030f4e4aac9f524ab5841cbd02b02b9294a1f658f9563c42cef731f8c662a325",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "e57ab30d0b66caab092b8e1649380d2ee8174da112d7e77bac204cd694988612",
+      "store": "history-filter"
+    },
+    {
+      "case": "history-saved-2",
+      "inputSHA256": "4a34385e7b3c12a9fa8fac920ff08dde0ac4cab7ff729141e22c94a1e4a6c4a2",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "4180a0aed94077d11b10e77700f148b8c5f4f5539c2c09951f5da2e8c31f5ca8",
+      "store": "history-filter"
+    },
+    {
+      "case": "inventory-artifact-hash-mismatch",
+      "inputSHA256": "0d186c5ae01236458f1fa85a229ee58289e00038ebfc53ac3bcefcf1b8bb8b6f",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "e2a7dedb59977e4cffa6e1f2b931d9b544cc98d68cf6349b75a4fd4223dfc850",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-artifact-invalid-path",
+      "inputSHA256": "53de9894c146188f608fec7f54ffaac913cdcdaa68b1d6098c102d36addd990c",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "1fa00dab10ec7832b4bcdf641af4c1a2629256b28e9cbe61034cb163cf7ec595",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-artifact-lineage-cycle",
+      "inputSHA256": "3dcc78ba3ef82b4cb99b6595aa94128ef9f011ecd901a8b6d0c5f1abafb0f0aa",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "6243c77eee6c579614e151ea4b8cf64092f8971095332e64d8b72fc573bd06f2",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-corrupt-catalog",
+      "inputSHA256": "7d63aeb659722aca0ccbfdde3a699552bc92c9a99257e3acaebc3bbeaba02bac",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "99828252a8b685b179abfbf8800ecf20c8485805037dfefb749fb9f2af9c9e80",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-corrupt-manifest",
+      "inputSHA256": "99e7e7ce6976a5b809d808edcba81e5ab56a1ca9774a263fc1f5309d61260bcf",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "cfe50007a8c50a2fedd86a98f627a2db587d9a1a1c41a6209404a0cc6f898be4",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-duplicate-identity",
+      "inputSHA256": "1ca6ff448f7d691512d5b4db8a8f3d682e87c91309e32f8793e55e7917cccacf",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "3c3043d7d2ac4269e4ff5d806d270935b5e5780618e9dca3450f1bcaf0c98041",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-empty",
+      "inputSHA256": "0a6eae8ebc5974113233112745fead43e9c55af740fa0b028aaf9bf7af1744d1",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "2570e9f999e66200a01d390bbdf62781ecd3b3a9db41de7070fa6aa59f3c8d66",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-extra-catalog-field",
+      "inputSHA256": "df3241edc5f6c541b8df39c9d9fa323fa4e7ce8b5c728bba5be22f001ca16a59",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "99828252a8b685b179abfbf8800ecf20c8485805037dfefb749fb9f2af9c9e80",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-fresh-catalog",
+      "inputSHA256": "4b56682ee0079a557365e6377a56359545809259a816ae41a4f3fec8c077aa0d",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "2570e9f999e66200a01d390bbdf62781ecd3b3a9db41de7070fa6aa59f3c8d66",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-identity-mismatch",
+      "inputSHA256": "ebc28e8e481eac97a04ba4d510e0f14fc27b53695c455cf59f00acffa0d45546",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "381873e7ae06741a9bfa2e787546e54b5b647dcced4c264409f505d3ef8b02a8",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-leap-second",
+      "inputSHA256": "b191210c7d1c7348d2af8a201f6c8bb0344af9b33683528abf139985ada7a64d",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "2db7e783a74319ec9766099eaaf856f9f91a6761bf3c222a7ac0f3fbcfaa2351",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-missing-catalog",
+      "inputSHA256": "ce18899abd105f0caed39f212b0a3771799ed9c703607c4476a85441e0f18bbe",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "99828252a8b685b179abfbf8800ecf20c8485805037dfefb749fb9f2af9c9e80",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-parameter-combining-boundary",
+      "inputSHA256": "0caf225ae0c83500af41f088554a22d7f87198c4718031521812be07e76ba28c",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "407ee075c3c1ce21d56626adfc8995bcde339ccd45b34be5441da4b26d728c79",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-parameter-combining-too-long",
+      "inputSHA256": "39206d95d79eeaf0488c26aa55c67c386a4e5bc66b57529eb1a693b47305d2a0",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "07ff243e3fb9e60e4ef0734e1c84e2cc53663740edf1a27ed73eeb1bcd6ed961",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-parameter-crlf-boundary",
+      "inputSHA256": "78591d1362f954440332ae81b2ee0bc09d9823daeccee608287662356a4b494d",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "660fbc1680680e37ef3d69f5d4bceaf8a2312093788ad8faae229f0892d5ae2d",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-parameter-crlf-too-long",
+      "inputSHA256": "0efd80b86170c20da8b6183831375d161699227af6b35c2404e0656b0599c2a1",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "1576c1db28ca3f7c88f26afec295ee67b4d8701ab1e378f56affad249faa40b8",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-parameter-desired-missing",
+      "inputSHA256": "68a5ef4148c1244f094ce117f9437c5bfb09c5d8453cd3eb063191800bf1994b",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "2c2a7a8beb6f3d5d736426b16cfb1f09d03ff03f6dcfddc7acc307b2f49df29e",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-parameter-different-bytes",
+      "inputSHA256": "e54866d18213d050c4e0c5329f859612d2e6704c2b6a4540f3414f817309ef3d",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "83a6bd4ff0c8e820f7bb812ace7389d610c1bf0f1c20ca1295ffca596bf1867d",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-parameter-empty-value",
+      "inputSHA256": "165f827a5fd028f42da0dfb1cf6e14936e49b8d13201196b6709bdf796460fde",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "8c18f41874d6b1da41b1467303a7413a4d41ac15c54ac59086a7b16aa1b2843f",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-parameter-failed-session",
+      "inputSHA256": "88caf3562339a28af9da68bedb0db87d4a6867f88a55b0a8507e90c1aac36850",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "e494e1897c24a065f032166db9852ab77f4681eca3cc04958d543dd37c4d06f1",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-parameter-flag-boundary",
+      "inputSHA256": "74c79c2661227f05203d59c530451ab753d59f11b76dfc3a3a04f9649f89f40c",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "3fa1d2e0ee121cb14f96e73608951e6ccb031730ebe356b3bf17e83ab196a4b8",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-parameter-flag-too-long",
+      "inputSHA256": "dca7e66b5bd8554ce9cae0283b39092d080c57c7dabe19e6fc795ee081e1129c",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "c260ea2bf30f87de18142f935e850fba2ec340afd403e3445e85919c08f8dbd7",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-parameter-hangul-boundary",
+      "inputSHA256": "1c804ac3c836a0ea609b447ebffcf23cc4cf986fc7e7cc428ecb46e8425ed1d2",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "0baf84e6fdf2bdd913144648f72a69b091c72de6c43160ed71c632477f22ffb7",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-parameter-hangul-too-long",
+      "inputSHA256": "b84af401ae32aca3d6f33b3e9a7d50829cbb26087a46e996b7ae6b521beb81f9",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "9969368f38037595dc70f48b002c3048ae0006b3b79a7a278ad45fad0bb6f1af",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-parameter-indic-boundary",
+      "inputSHA256": "ecc8a525810051ffc56710310b273493910361bfea06b1af6cfb5f41c7cd00f8",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "0baf84e6fdf2bdd913144648f72a69b091c72de6c43160ed71c632477f22ffb7",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-parameter-indic-too-long",
+      "inputSHA256": "3a8632fbbc43e490942f98917baf514cc10e7ca151078c1d0e7a106472506c62",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "9969368f38037595dc70f48b002c3048ae0006b3b79a7a278ad45fad0bb6f1af",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-parameter-missing-before",
+      "inputSHA256": "8ea72072e778a3861701e8e39860d64dc5f3a9bf78913e0912f0845c205754b0",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "774e069446eba09b2ca08a2305721785010ae5d938707563eb2d8f06251a48c1",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-parameter-restored-missing-before",
+      "inputSHA256": "54e0a379172140d0e0d9b22a77f6414d7f4420d25c37d7860ff3592ef6a0df6e",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "eb6453f7bcebffa12ec3e168b663de00cb7648e9b554d4289788f2bc9add4881",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-parameter-restored",
+      "inputSHA256": "263fcf4cfcf210de01fcc7cfcfc4c73cea0fc5138417a68be0a6192922ec2247",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "2f1e9152b32f155da07fdd8664aaf92b792cfad886b1d1fb29880ab15fa7be2e",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-parameter-skin-tone-boundary",
+      "inputSHA256": "b7365d7b66a10d0eb2920e9720f3acb3f2c49fb502b1a8ab80ca59b24e82ff81",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "3fa1d2e0ee121cb14f96e73608951e6ccb031730ebe356b3bf17e83ab196a4b8",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-parameter-skin-tone-too-long",
+      "inputSHA256": "bc2995a18eac5c632e1378f8f191506ca4d75cbfaf88e6347f93c1b5302be247",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "c260ea2bf30f87de18142f935e850fba2ec340afd403e3445e85919c08f8dbd7",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-parameter-state-extra-field",
+      "inputSHA256": "29ee6fef976396eaf31b1a39f60e50578d577b35b6d46ddf4344d424874ff0a1",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "72da0d9cb6f592f59d16b684d7dd56cfd130d7df995f83af7e8e46e757ef7a88",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-parameter-success-failed-restore",
+      "inputSHA256": "964ef9fbf43391a5e5265d0deba35d9ac7f5b6bd3917f2689054dd413b5abc74",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "03cce76e2ef8d38540b36d462b880cd6391a208cbac0204c35492083a0fbf669",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-parameter-unicode-boundary",
+      "inputSHA256": "9966dd89a5dbad0a2d035847d516d185a3de00fabe3323998f5a63020dc406d3",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "cc5b7802f7ff7c598f5e307ad2e28af033884623e0b99d215be382ef8167e6f0",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-parameter-unicode-too-long",
+      "inputSHA256": "ac8ddc1aa1666af059b6ddb5e2710254ae629fc3aa4010d9e8e3e9352332ba09",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "4d3c8667fb4fee3332a7ce8f162f899e43c7914dfa63300e4fb6b335df6f4bcf",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-parameter-unreadable-before",
+      "inputSHA256": "7a9c99724119bf51239cbe116087b7b6e5b392ede2b361be74152f6157add3e3",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "06e876dd37d260bfcbe87c60c64798387766b26218156a9d10f6272c5c92d9ba",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-parameter-unreadable-empty-reason",
+      "inputSHA256": "3a8e44e347bca60bd75a7aed0c4dbf9d70802f173dd582b2bbc86be88e24b8eb",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "2c2a7a8beb6f3d5d736426b16cfb1f09d03ff03f6dcfddc7acc307b2f49df29e",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-parameter-value-too-long",
+      "inputSHA256": "012913cfb0efb3c6f7f26ff1faa58a622fd87696260885b6c269ae066beaa36f",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "cccacd1b292bc0c518dc449297b9683d7116250cd904a9b6caeac4821a227127",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-pinned",
+      "inputSHA256": "5e54acfa4142c2115d609e0fa3518f5b0e868d6e72b3eca84410cf0e91511a68",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "e9fe080c75e5e5bcc38363535d278e94094a9c38c9eee885fd78084bd5442ea9",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-reconcile-policy",
+      "inputSHA256": "42cb53918466290a288286c13dc739a84819a9a69e3d3d9db0d6129f3db2ad68",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "be460f94e38b63426f17623912ae7fd0eae1c8e65f0032d856185a4c853d3ad1",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-reconcile-removed",
+      "inputSHA256": "db70fefd8a65381070cba44f9ac8ae015bb2b2b3ea74a3bd962e2a49592739c9",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "a9cd4091e25e312810404dd6cb36365fb5bd1bec2f6fa38e0f7e49c376db2044",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-registered",
+      "inputSHA256": "6da3ce805b64827945263d8883a4c81ca6f1eea4e5114969966ddaa631c16ede",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "7c5e7a681c6a9f77d086ae0fe6047c7b0055cbc835edff655c0fe54a333d377b",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-symlink",
+      "inputSHA256": "863d855d1244fcf59cc40b726a6d56ed3abe11d3e3b5235a9232ae2325af2c05",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "6e599f610328e4be7fb4c7d7c7b281f9056e1f0440440c9c133864d28b7bd06b",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-unregistered",
+      "inputSHA256": "aa0ed1d849c69ccc47d8e568617bc400a79c2affbd9e9426047b56fabb94c8aa",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "00ab0a2fa5440b9b9b10e90180cbc077426dabb199ea22bd9ac729a8359c7ea7",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-unscoped-retains-missing",
+      "inputSHA256": "fca89098b2e489442845be91174bb99ca5ece9cbb16ea2a6db802e55b6917bf9",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "5b27d042ab5f3a03e9c6bccaecdf66d0c579d6101a7f572bb46ccfaa0e0ca447",
+      "store": "session-storage"
+    },
+    {
+      "case": "inventory-unscoped",
+      "inputSHA256": "01bb73e660e9d152f7958006a92e92435301f8964b52f95a9bfed835709cb333",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "9c062cb4a5d5f3c549b6d16071093303aba7cddb6a2a8ae97441948b805f80be",
+      "store": "session-storage"
+    },
+    {
+      "case": "names-candidate",
+      "inputSHA256": "acbee4d6ef35d0c5c5b2be2733c1061db9993de87bfd7570e8356c9d277f5097",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "ec9cfffb30bb97f05cb9e08b7480358678c59a006581fd760463e76c7859bb87",
+      "store": "display-names"
+    },
+    {
+      "case": "names-canonical-stage",
+      "inputSHA256": "ef49e4a09134ccbc68c4f471ad2fd45fe86f08f6fb5ab46610a947ac41e1a2b5",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "ff9f032b6225ad316a7886444a3ea862810e485b475a7417dbffe12dd821817b",
+      "store": "display-names"
+    },
+    {
+      "case": "names-decomposed-unicode",
+      "inputSHA256": "ef1711b5eff2ab731d83353818711c8f1b406cb09b523e6c39fcc825c98fe90d",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "17e56f0090889f7ec2921fb9bdba039312d5c42a82a12b778e943168f4e4c472",
+      "store": "display-names"
+    },
+    {
+      "case": "names-embedded-null-candidate",
+      "inputSHA256": "4f382466a9223f7eb0afc3733f2b72f6f76e7933ce62aa5013b78dca5d1cf33f",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "2c16b19063accf1111ec622194e76f8e9a92963aecd63825f780dd9aa519db3d",
+      "store": "display-names"
+    },
+    {
+      "case": "names-extra-index-field",
+      "inputSHA256": "56a7859688deee66fb957ab7c17417fcf82473388f464ab8c0c4608e08f0e779",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "display-names"
+    },
+    {
+      "case": "names-extra-record-field",
+      "inputSHA256": "4a8f3e709e9a5c311e04677733f87d0291744367b9a51550edd254532e32f0ca",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "display-names"
+    },
+    {
+      "case": "names-invalid-candidate-bound",
+      "inputSHA256": "1daf573844b4410558e6fd0eca315ccecb3305e502913ab93d9b4b76721bc2a1",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "display-names"
+    },
+    {
+      "case": "names-invalid-candidate-empty",
+      "inputSHA256": "eb965a3fd6623a86b0d3ebb542a5ba7d72078726ba46e187fd90ec8580e040d5",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "display-names"
+    },
+    {
+      "case": "names-invalid-candidate-key-collision",
+      "inputSHA256": "a312686ecffdb56788503e7ba82674de47748dd0a88d4f51913ad356b2150df5",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "display-names"
+    },
+    {
+      "case": "names-invalid-canonical-duplicate-candidate",
+      "inputSHA256": "3d9a009a36225c158954f7128bcf6842987f57a3b87a78162051b3a03ea9780d",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "display-names"
+    },
+    {
+      "case": "names-invalid-duplicate-candidate",
+      "inputSHA256": "568f482e8e6c0163642f7b82407246f5fcf1a744c98c5ada4f2b30e1ca5eb193",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "display-names"
+    },
+    {
+      "case": "names-invalid-duplicate-target",
+      "inputSHA256": "ba30ccee474b86511af672cb115ed6f746244ff6df7583eb99446c0a2d7bb8e2",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "display-names"
+    },
+    {
+      "case": "names-invalid-name-bound",
+      "inputSHA256": "9e40e97826a7c7cda62872bbadaaf93146b266099a8102d27079d516728147ba",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "display-names"
+    },
+    {
+      "case": "names-invalid-name-empty",
+      "inputSHA256": "f9179ddd45384cc8a82a5266a37a51a016dc50a476433ee7bf2fac0624a93378",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "display-names"
+    },
+    {
+      "case": "names-invalid-name-format-control",
+      "inputSHA256": "ff1746ef10a997d3bf061360f387852bcd6480709cd376ef97d501cb1c4e43da",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "display-names"
+    },
+    {
+      "case": "names-invalid-name-space",
+      "inputSHA256": "e4db9dc74f9e6e2a9d9b33222c39f7a9ca0edac3b2e1aea1954f17c9024e55b0",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "display-names"
+    },
+    {
+      "case": "names-invalid-observation-bound",
+      "inputSHA256": "9ad82001ea4c3a73e74d57a08fcfa131916537b081e88d3b840c0d7af9d6e4c1",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "display-names"
+    },
+    {
+      "case": "names-invalid-observation-empty",
+      "inputSHA256": "564cc698b8c2baf5a65f87c44b9cf6a41a3959d9ec1807520dfc167a6297c6e6",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "display-names"
+    },
+    {
+      "case": "names-invalid-stage-mismatch",
+      "inputSHA256": "1e4bc026994c15da43cbaaa85362670254836997756b9ff3a9e9c802eb04d925",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "display-names"
+    },
+    {
+      "case": "names-invalid-stage-unpaired",
+      "inputSHA256": "edaf9afbe65b1a5df4aa93933a789376b40171afea501c6052860c3879cd74ff",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "display-names"
+    },
+    {
+      "case": "names-invalid-target-identifier",
+      "inputSHA256": "65111d88089b75e5d9becb22696b57a0351c20f35581da8a43f2c3f916f04482",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "display-names"
+    },
+    {
+      "case": "names-invalid-unordered-targets",
+      "inputSHA256": "202df78ed4cda1ab5a9f8132b24ac265de556e8d5657c2b49b1600cb6a849cee",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "display-names"
+    },
+    {
+      "case": "names-targets",
+      "inputSHA256": "0401dec2b5a3b65a35b3dba36a62117bb55a9f88769b019ad85b383a42fd7ef2",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "68b43f9bf4237c53c49f10a1b7feb2ba2e3bfd6504eeeb5e9387389b57b8a744",
+      "store": "display-names"
+    },
+    {
+      "case": "names-tombstone",
+      "inputSHA256": "859df5ff6d58a1a66d14b0053b0f63233e06e0e9d34a8be794ba2703ecb18970",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "664dc70a4e531f49e2ef93e35b096e4d7a124389acc999194d5c7b023f62f4a3",
+      "store": "display-names"
+    },
+    {
+      "case": "session-custom-root",
+      "inputSHA256": "b29730e32bab57d1c285eb58a3040999dd92f29638802fb6b4ba5676dccf791c",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "9b5fd37a7a1e8c2c0a5ae927bc64142204804c60b63132b0e293b407326e761d",
+      "store": "session-configuration"
+    },
+    {
+      "case": "session-extra-document-field",
+      "inputSHA256": "595bec5f594156d09c249c7e49044ca429b98cc895cb7b04a4eecb8424af1198",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "session-configuration"
+    },
+    {
+      "case": "session-extra-policy-field",
+      "inputSHA256": "1c71441928b2d50bb73c191afde84f6a8d5c5f867f6bdd17f3e41969eb307206",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "session-configuration"
+    },
+    {
+      "case": "session-maximum-quota",
+      "inputSHA256": "1f22afcc6d5aa7250507c79239786034c97eb7bd37090b227e7d4ccbde4ffecf",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "3aa0be5def6f106c2e4f00c180e3a8ff1e3d34be9abb3a36b8132b30ed5982e4",
+      "store": "session-configuration"
+    },
+    {
+      "case": "session-policy",
+      "inputSHA256": "afb24b530cf3744d61be06ba7cb81e83ab4642a7bf23706c6700768e4ff4c1f1",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "836668991bb3beb64d94b709f11dcdb72dceea1f3921aca3b365ab14b922675a",
+      "store": "session-configuration"
+    },
+    {
+      "case": "timestamp-accepted-0",
+      "inputSHA256": "a26ea7773e7136d7216aa488f1ed377cd85fcf1ff83a5e8bad57b586a6a40f11",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "2a1659c589d0a7dd38856fda87e3d290c8cdca4340ddc430bf8c21b4674a0cd4",
+      "store": "session-timestamp"
+    },
+    {
+      "case": "timestamp-accepted-1",
+      "inputSHA256": "450791721dc1e9efdbee22fd41275fc4b07b3f5cfe531f13b04baea37ce77f40",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "20ecc457ff72630dd67239b8a40449f12afb02522cd21f51a501a8a371a7f80d",
+      "store": "session-timestamp"
+    },
+    {
+      "case": "timestamp-accepted-2",
+      "inputSHA256": "cd078364244b3d6eee29e38f6cc74e13cd66c322d9be2efaa6e945823287b64b",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "7f1872cc4b1bf9992ef24977e6f260a94584c23ad35a5188424048b2da027944",
+      "store": "session-timestamp"
+    },
+    {
+      "case": "timestamp-accepted-3",
+      "inputSHA256": "4f9355ec37a330cc5a8a5d2ea7dfe8390517ac993840aae4391b41973cddb8b5",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "4c15afeac426a35bc6cc2a4abb3e9cfbe59447810e97883c8a3dbd4cf7bd6bd1",
+      "store": "session-timestamp"
+    },
+    {
+      "case": "timestamp-accepted-4",
+      "inputSHA256": "5ff8c2905e56d243596bedd80f6eb9db72fbbd372eff5ce053aa7bfe0e225816",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "72604e72d33a1a2e7042f004ea7482509f83fdc8568ab33cdb2081f9196c136e",
+      "store": "session-timestamp"
+    },
+    {
+      "case": "timestamp-accepted-5",
+      "inputSHA256": "3402aed6506926a4a346eb3113821eb5bac960a5348e3631ac6e573bf4a6a148",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "c3f37b1787c8fe81d54882db481a55865bf555a95493d3438a491f4e382a665b",
+      "store": "session-timestamp"
+    },
+    {
+      "case": "timestamp-accepted-6",
+      "inputSHA256": "750a64786bc9ea554a923b983701fd8fc960dd6998f616368bc71e65d8f6ca55",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "61454f572a14acea772730cb993745ef3cd6db32caa3172ffcfe9206d94e036e",
+      "store": "session-timestamp"
+    },
+    {
+      "case": "timestamp-accepted-7",
+      "inputSHA256": "166c48e60aa0dcd73c9a6516a129652aa1cebc60c5735db4946616913222506f",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "b8511b8f0699195c5372c3725a277a703cdd9daa50e93d5c8be24d2e834d1209",
+      "store": "session-timestamp"
+    },
+    {
+      "case": "timestamp-accepted-8",
+      "inputSHA256": "15b50b61599d693d3efdeaf441eea2170274074e25c3c72d902868a1f2acf480",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "395d3f868a45f0929a46b9c956cf06a7d3ff809fdc22cd0851865b169551c673",
+      "store": "session-timestamp"
+    },
+    {
+      "case": "timestamp-accepted-9",
+      "inputSHA256": "12d92e8c7c815851d84cb483ab95436c4e0b2ea522e3ccbc6eb1fa5716ab12f2",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "1565a3b298f9e8edd5427c4f2dbe40d13e707a187c811aa6af1b6ebe19ca0647",
+      "store": "session-timestamp"
+    },
+    {
+      "case": "timestamp-refused-0",
+      "inputSHA256": "46496571ed42f3048bf9139b6d65fbc476257b628766004f8f366e77a0173bb1",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "session-timestamp"
+    },
+    {
+      "case": "timestamp-refused-1",
+      "inputSHA256": "2dbf5c29a60f5a25ed8cbf8bea60d3d38e6d4a5b7aa8ea9cd99a7f96af594b08",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "session-timestamp"
+    },
+    {
+      "case": "timestamp-refused-2",
+      "inputSHA256": "3257d71e7c19d8ee2f75a17783ae6aab44b6590f3ff07f80e288f3ccb7d28bec",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "session-timestamp"
+    },
+    {
+      "case": "timestamp-refused-3",
+      "inputSHA256": "3e22181689e4f9e76a6b1bbed5868c14090d2dac4b5f1fa6c5e4d2be5caf8a2d",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "session-timestamp"
+    },
+    {
+      "case": "timestamp-refused-4",
+      "inputSHA256": "bbea62ed2dde3ea52740dfd6c7f1aed01b88ccedb30c7aaa7c9385a90577328f",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "session-timestamp"
+    },
+    {
+      "case": "timestamp-refused-5",
+      "inputSHA256": "8495ace8a8874260e705a9ad1da3caa8c5335af857b67763a154feeeffe57345",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "session-timestamp"
+    },
+    {
+      "case": "timestamp-refused-6",
+      "inputSHA256": "e9dd9256f2f5871b281d9e04d6d5609e99fede13c9c1b083d717a039aa0bce42",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "session-timestamp"
+    },
+    {
+      "case": "timestamp-refused-7",
+      "inputSHA256": "1adbf231721f4a65d75dbfecd71e2de09ba34a15dfe87fedbcc194d1c547f3ff",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "session-timestamp"
+    },
+    {
+      "case": "timestamp-refused-8",
+      "inputSHA256": "1fab5e25393e1ec09f5d5854c095aa4fb69b65171fc2f609d796776c406a6654",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "session-timestamp"
+    },
+    {
+      "case": "timestamp-refused-9",
+      "inputSHA256": "c0a553b9edabf87a38ee53359ba17e326c7dd2ff2a3a617dab5ab1277e3e8282",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "session-timestamp"
+    },
+    {
+      "case": "tool-available",
+      "inputSHA256": "fa2e7b591605c61648935325e42e1c426ce5f85567867197c5845c8f9f65290b",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "1a9545f92ed11d77cc2a55e5f9722f9fc61dac85526d7131b21488482da9aa02",
+      "store": "tool-registry"
+    },
+    {
+      "case": "tool-extra-index-field",
+      "inputSHA256": "108b6c9d9a7719a4c83d6650178a9d43ab282451464b43aafaef5a8a84049142",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "tool-registry"
+    },
+    {
+      "case": "tool-extra-record-field",
+      "inputSHA256": "c7775b1fe40d4059cf23ed89037291564b04f60907ea8c09a4f0540012c2b67c",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "tool-registry"
+    },
+    {
+      "case": "tool-removed",
+      "inputSHA256": "bca7cabc6259108d795329068ef2e786f5368e7935a67416310bc720509718e1",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "db5d221432175564453897a165682456ad58e0caf59bf670fd65f2a7061b7eb9",
+      "store": "tool-registry"
+    },
+    {
+      "case": "tool-retained",
+      "inputSHA256": "8a0a74fec2d092fe0cb97fc20395aff9ee62a25363294e543c76ec0762f0c5ae",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "9eb26343fcea5aff795f4827ad7c8197d56cd0181c83b1353c9efc077971a587",
+      "store": "tool-registry"
+    },
+    {
+      "case": "trace-empty",
+      "inputSHA256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "5cad749566c80eb9e7de5d031b94d7e58057cd567c2aafe4f0cab79f9204a0b8",
+      "store": "trace-cache"
+    },
+    {
+      "case": "trace-entry-overflow",
+      "inputSHA256": "34a4bf2ece64d464ba10ff9b8e12b69c948f98041ba8b067d71b8ce16f6f5f30",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "trace-cache"
+    },
+    {
+      "case": "trace-entry-symlink",
+      "inputSHA256": "bd4d488ba3edbc458bfa62169118f68902b60b8891966f47216aada584624650",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "refused",
+      "projectionSHA256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "store": "trace-cache"
+    },
+    {
+      "case": "trace-key-contended",
+      "inputSHA256": "0f898f0c3ed17e8b33f3ffcb41da455b2570bd3769723d139c6ac0a1eb94b068",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "5a0eaa14ad055463cfffb03e4d907c256e60d0664e50409dd4b6452dde00abfe",
+      "store": "trace-cache"
+    },
+    {
+      "case": "trace-lease-contended",
+      "inputSHA256": "0f898f0c3ed17e8b33f3ffcb41da455b2570bd3769723d139c6ac0a1eb94b068",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "5a0eaa14ad055463cfffb03e4d907c256e60d0664e50409dd4b6452dde00abfe",
+      "store": "trace-cache"
+    },
+    {
+      "case": "trace-ready-inactive",
+      "inputSHA256": "0f898f0c3ed17e8b33f3ffcb41da455b2570bd3769723d139c6ac0a1eb94b068",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "372ba3cd98a8979706b0298694a1a2fcef27c0efd9b4887a2e0d04aec48e2df9",
+      "store": "trace-cache"
+    },
+    {
+      "case": "trace-unaccounted",
+      "inputSHA256": "fececf10d8d867d6aa364f35c8b25c5483c220c1041283eb2d2736b5566c5b48",
+      "oracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+      "outcome": "equal",
+      "projectionSHA256": "437022ad9d292beb7ccfa39b5ffb9c103709d51e187506222a725d3041a22bff",
+      "store": "trace-cache"
+    }
+  ],
+  "completedAtUTC": "2026-09-10T10:18:43.670524+00:00",
+  "coveredStores": [
+    "history-filter",
+    "bundle-registry",
+    "tool-registry",
+    "display-names",
+    "session-configuration",
+    "trace-cache"
+  ],
+  "cutoverEligible": false,
+  "host": {
+    "machine": "arm64",
+    "system": "Darwin",
+    "version": "26.6.2"
+  },
+  "kind": "isolated-host-differential",
+  "remainingCoverage": [
+    "complete Session manifest branches and scan failure matrix",
+    "full semantic refusal parity",
+    "tool published identity/selection",
+    "filesystem ownership and cutover"
+  ],
+  "remainingStores": [
+    "session-storage"
+  ],
+  "schemaVersion": "arkdeck.hoststore-shadow-run/1",
+  "sourceCommit": "b297d687fbdc6eace05345fb54adb36b808b2588",
+  "sourceDiffSHA256": "1b42596bdd23bd950ffdb457e667fde17de5088da94552746c4b801ee80591ec",
+  "sourceDirty": true,
+  "sourceFiles": {
+    ".github/workflows/swift-slow-lanes.yml": "beba0cd9f802b3751b5f44a412e7452954e58c22d72d3a1da5ed53f40f54fe75",
+    "Packages/ArkDeckKit/Package.resolved": "a8ca9e3d1eb3b681668d5cbb91625d234edc715ac86b895898ce03099956afe6",
+    "Packages/ArkDeckKit/Package.swift": "f825d427c7f5a3dd70a94cb4845a3eb0d2e21c5318bcec4c7b09340129942d75",
+    "Packages/ArkDeckKit/Scripts/run-swiftpm.sh": "99b51fbb1a8a375a9b871de5e86804ad04eac4dd79d9d24537bef67be3a128a1",
+    "Packages/ArkDeckKit/Sources/ArkDeckBootstrap/BootstrapBundleFiles.swift": "5e0827673bd7fe464684a5327abc49687aee26c7b7a4c1d701b5e22528c40721",
+    "Packages/ArkDeckKit/Sources/ArkDeckBootstrap/BootstrapBundleRegistry.swift": "c324d363ae53a3155d64d41d1dd0b77472a3e5c0a936a709dc66a39663239695",
+    "Packages/ArkDeckKit/Sources/ArkDeckBootstrap/BootstrapDevEcoToolchainRegistry.swift": "870df6272cf944357308d8f0446c901a0516393f97c3e9e197be4f0fe695590e",
+    "Packages/ArkDeckKit/Sources/ArkDeckBootstrap/BootstrapToolFiles.swift": "f5405cbae4bd4100aefe1cbf31877bcc23b6fea0c00617dee68f0169a7aacc61",
+    "Packages/ArkDeckKit/Sources/ArkDeckBootstrap/BootstrapToolMachO.swift": "d5809be8f481a7fe02f9051b1bcf122c1390eda999b1417797bccc2d14a67f9f",
+    "Packages/ArkDeckKit/Sources/ArkDeckBootstrap/BootstrapToolRegistry.swift": "37ec21ce8a05d685c826d410535f121011f3dc406934a1598fd34d3e5f2ce311",
+    "Packages/ArkDeckKit/Sources/ArkDeckBootstrap/BootstrapToolTrust.swift": "177cb787be720b26306f795bc31712855359de6dc38ab977fea575f6bd5cc303",
+    "Packages/ArkDeckKit/Sources/ArkDeckCore/AgentExecutionContract.swift": "a65e15eb08a179b9c224555e17863cb75a66c1bf7ecb514b86c3528b2352cfa0",
+    "Packages/ArkDeckKit/Sources/ArkDeckCore/AgentXPCContract.swift": "402bbc33f2d297af1f37b33c67783409e7ffdf38327089b393052b44cc237223",
+    "Packages/ArkDeckKit/Sources/ArkDeckCore/ArkDeckCore.swift": "5024815cab2e964ed18dece414370dc250b3f9db5b8cf08e98003d41901a4711",
+    "Packages/ArkDeckKit/Sources/ArkDeckCore/ArkDeckHelperIdentity.swift": "629f79bb472d428c6a4397617d93a36f6b9b828c9432cc8447a36fc93402dd80",
+    "Packages/ArkDeckKit/Sources/ArkDeckCore/ArkForgeFlashOperation.swift": "cdebcd9a7b00ab8babd17dbdbca1fb0f4c58566410bf0e8e381c1f268448cf86",
+    "Packages/ArkDeckKit/Sources/ArkDeckCore/ArkForgeStepPermit.swift": "136891bf72981ba634801f8361fba2b716da84f09a4e7f7d8d54b7de14cf7e45",
+    "Packages/ArkDeckKit/Sources/ArkDeckCore/ArtifactImportContract.swift": "df5b19e1c9a02e60a1456e87ac397a007fb6b3dd31def68d96a4c2594413fc4b",
+    "Packages/ArkDeckKit/Sources/ArkDeckCore/ArtifactImportInspectionProjection.swift": "55e20d6173b0d56b4179122cf74244780ba4cf898dfd5c10e576dcf24b3e8671",
+    "Packages/ArkDeckKit/Sources/ArkDeckCore/ArtifactImportProjection.swift": "e1c8520d04134a7d6ab086fe5e8a6a253f77e1d7cf62ad1999793b21a8afbbdd",
+    "Packages/ArkDeckKit/Sources/ArkDeckCore/ArtifactImportReleaseProjection.swift": "5e89e96af32ded3e896f10b75d06ec12c84d7806c6649ff213dd95ac5c94dbc8",
+    "Packages/ArkDeckKit/Sources/ArkDeckCore/ArtifactResourceContract.swift": "4e7ae3fbaf3e2b8a62e43465bbbbc3b8160c31388570ad2ed3cb7ae9841254d7",
+    "Packages/ArkDeckKit/Sources/ArkDeckCore/CanonicalCBOR.swift": "b6b2bf7deaf8d4e29fe2ff922c8b13b02e557a88f4f78668a8c7c570e37fa0ff",
+    "Packages/ArkDeckKit/Sources/ArkDeckCore/CanonicalDigests.swift": "0fb2e482b99b81092bb69a6eb6f4552259c7feca453743dca31aa7b46b4b5f95",
+    "Packages/ArkDeckKit/Sources/ArkDeckCore/ControlFrameJSON.swift": "1bbf4644ea8b5a19669873accaa3c2beae33e24d713c3852ce9408838eab758b",
+    "Packages/ArkDeckKit/Sources/ArkDeckCore/ControlProtocolContract.swift": "e918467baabd3823f76511b37a803f83508fe0ce3e87424781e966acc1e7bcf4",
+    "Packages/ArkDeckKit/Sources/ArkDeckCore/ControlProtocolGenerated.swift": "651410740404a890d900b69ca17945493a80df800d37c05115912f334c109f0e",
+    "Packages/ArkDeckKit/Sources/ArkDeckCore/DeviceTargeting.swift": "0ef537ae9596c08e40ba197dd9b9a150a9387e76af4debcabf3bb0aeb51d57f8",
+    "Packages/ArkDeckKit/Sources/ArkDeckCore/HDCControlActionContract.swift": "6affafdf20e1508c1de631698410d26297901b30cd5f9bd1d6da4e36ea386bca",
+    "Packages/ArkDeckKit/Sources/ArkDeckCore/HDCControlActionRecord.swift": "843452b9f99a9b6145d21678ff00cac206f802f7c8ffb6e09a9f1cb5cfbac8ab",
+    "Packages/ArkDeckKit/Sources/ArkDeckCore/HDCControlLifecycleRecord.swift": "1399a1ba757d1acdcc6d3114388bd158ed99b91651554d1dbc649ab906f3be03",
+    "Packages/ArkDeckKit/Sources/ArkDeckCore/JobEventProjectionContract.swift": "053e801909581c0b7210a2cca020b4973d35800306c07858da2d63ff90a6d5d8",
+    "Packages/ArkDeckKit/Sources/ArkDeckCore/JobStateMachine.swift": "46d6cc0d12e7e61f8639f4699775d1308156916761a7e3ff3cc4593acc19c132",
+    "Packages/ArkDeckKit/Sources/ArkDeckCore/JobToolchainIntent.swift": "4424503eb2af75603a8af9b74b802ce6ba18fec24df26adff29e39017785fbb2",
+    "Packages/ArkDeckKit/Sources/ArkDeckCore/PortableCanonicalJSON.swift": "beca3dbfb02c5705841ba273b868cbfd01d8bf31edbb25f6ab1100a967b8b779",
+    "Packages/ArkDeckKit/Sources/ArkDeckCore/RuntimeCapability.swift": "5b756aaaf87cc8f4e38006a42b2869c0f3de0de0e5f6f6e362ed54a1286e38a9",
+    "Packages/ArkDeckKit/Sources/ArkDeckCore/RuntimeOperationCatalogGenerated.swift": "79ca8a6ebe45bd7d16853e63896bec9e9a89bb3f0ca2c72f1559d8922fb4d8b0",
+    "Packages/ArkDeckKit/Sources/ArkDeckCore/RuntimeOperationCatalogTypes.swift": "5dfdb4cb825bf3b1208b7534a6b77bb15040add9cc39ff8a1f1b99c9d4b8cc72",
+    "Packages/ArkDeckKit/Sources/ArkDeckCore/RuntimeSessionPublicationContract.swift": "269c7cb68bef1ad86b051ed3f423a37dd9194e322edea7dec996696afcec9b83",
+    "Packages/ArkDeckKit/Sources/ArkDeckCore/RuntimeToolSelectionControlAction.swift": "40886d83f50fc5c20553a5b3dd70e0675b624541912d15b69d58eaf83565764b",
+    "Packages/ArkDeckKit/Sources/ArkDeckCore/StrictJSON.swift": "2840e12fd765776a52215960d9a8eb4ceb6963938a124a17757bc754ecd15b56",
+    "Packages/ArkDeckKit/Sources/ArkDeckCore/WorkflowStep.swift": "aecdb1f5f6fa5b37e38e9b1e0b4f9d27fbd60448461fae61c75cc53ce2e0fec3",
+    "Packages/ArkDeckKit/Sources/ArkDeckStorage/ArkDeckStorage.swift": "ebd16681122d67d069d1cb75e548d029201828920a306e837be8a14146e0551d",
+    "Packages/ArkDeckKit/Sources/ArkDeckStorage/ArtifactStorage.swift": "511cc356c449d908d3a73567a94a63905e59abd50ff6e7306b54ce8c32d9942e",
+    "Packages/ArkDeckKit/Sources/ArkDeckStorage/DurableFiles.swift": "cbad31d1e3612b5fa04b4eeaca324c09506b2a9f19ca7f16d583177bdb687dcb",
+    "Packages/ArkDeckKit/Sources/ArkDeckStorage/HostStorage.swift": "66d0fa221ba3917a0120723c81ddf3384c76adad0db3c9d5da10b9e5929e24b9",
+    "Packages/ArkDeckKit/Sources/ArkDeckStorage/JournalEvent.swift": "6b8904107ff7e2cce810015256ffac5dec15218460f7ccb46ad4e0aa2a4c880f",
+    "Packages/ArkDeckKit/Sources/ArkDeckStorage/JournalEventPages.swift": "80f0738c08b51f55e5fbff0040181221140924465f57e367020c0b28d090d7c3",
+    "Packages/ArkDeckKit/Sources/ArkDeckStorage/JournalEventValidation.swift": "7fb2aac5d6ae157ebca4b9ad048ee9bac4bc19707c7b5e4e678d553e83b263eb",
+    "Packages/ArkDeckKit/Sources/ArkDeckStorage/JournalReplay.swift": "62b3f71d7020e315c616c7dcfc2ce4494527abb325fd2ae025f00b1fd85cf20b",
+    "Packages/ArkDeckKit/Sources/ArkDeckStorage/LocalDiagnosticBundle.swift": "f607bd5f6195910164d8a5fe0a45db292bc4954d0eb1041425c1f04b628ef267",
+    "Packages/ArkDeckKit/Sources/ArkDeckStorage/RecoveryCoordination.swift": "ae85b0583addc0bdaf5acb0516a86957184155ef8cb7917c041e0501e0aa2546",
+    "Packages/ArkDeckKit/Sources/ArkDeckStorage/RecoveryManifestContract.swift": "fe3188c5cd95f0527366bfa57761cb02f99c6e7082b3a19845c7666cf398ec81",
+    "Packages/ArkDeckKit/Sources/ArkDeckStorage/RetentionAndExport.swift": "852fba81cbe9257df6619f7821b5891e3ffe2ab3f5ab83dc2a15716243b0e494",
+    "Packages/ArkDeckKit/Sources/ArkDeckStorage/RuntimeCapabilityStore.swift": "288507e6ddd9c3db9c5502ffe7cb59af8e551e9e938ecabd76fa0ff892266bc5",
+    "Packages/ArkDeckKit/Sources/ArkDeckStorage/RuntimeHDCControlActionStore.swift": "ea6006e32743e2d521448c4d71b580bbd7403561f511358d2b5b0df5b3c6a51a",
+    "Packages/ArkDeckKit/Sources/ArkDeckStorage/RuntimeJobRepository.swift": "6f8990e9fb7513f1dcdc4210cbe76b6ecf6b5ff006eb1db589055136ed5e15ac",
+    "Packages/ArkDeckKit/Sources/ArkDeckStorage/RuntimeStateContinuity.swift": "832ab4d255273545cf012d20b23dfd90c7b190b04cb0f09d357d8235c82fd1f1",
+    "Packages/ArkDeckKit/Sources/ArkDeckStorage/RuntimeToolSelectionControlActionStore.swift": "75b654f7cc7f0debcd3c74d5a5789e82ebf684520e89621d6360601a125af231",
+    "Packages/ArkDeckKit/Sources/ArkDeckStorage/SessionAudit.swift": "b8c0f0660aa7cd42956d4050803f77f1647bb0ea6a2febc13545dc3184e11ae8",
+    "Packages/ArkDeckKit/Sources/ArkDeckStorage/SessionLayout.swift": "8786de14f66faa637f5e05e265311eb59868e83c9d77e19177cabb935190e298",
+    "Packages/ArkDeckKit/Sources/ArkDeckStorage/SessionManifest.swift": "a310753f91d625465fed55ea54979a612dc84ffa5a6d7c06e6b9b6c4eff6c822",
+    "Packages/ArkDeckKit/Sources/ArkDeckStorage/SessionRetentionCatalog.swift": "6b01263477a2482f4d27cd9c144ae6701a90bbfbc7b4376f1dd188d5dc15a44c",
+    "Packages/ArkDeckKit/Sources/ArkDeckStorage/SessionStorageTypes.swift": "076d41293d2e4bbdce201550cf2816b2eaaa8c660e27f9d852f98e191d82cbbc",
+    "Packages/ArkDeckKit/Sources/ArkDeckStorage/StrictJSON.swift": "a64a6d8bd6f89ee8312b548d65cbcc2b8983e45bc9b39dee2443319c7570461d",
+    "Packages/ArkDeckKit/Sources/ArkDeckTraceAdapter/ArkDeckTraceConfiguration.swift": "caadb6e864307eb7d5a842623041f508f9dec9d9be5371a6cdad709705d77509",
+    "Packages/ArkDeckKit/Sources/ArkDeckTraceAdapter/ArkDeckTraceOfflineInspection.swift": "18bc56ca0bdd542a66c01e4ff1970b2f44422f48b21eccd58be1e1e2f5ffe057",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AgentComposition/EvolutionWorkspaceManager.swift": "545fdfb6bdaaec04456ec47b83469958c543dae2d3f85156899509fca5ebd9db",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AgentComposition/EvolutionWorkspaceModel.swift": "298c80d32a623c449dab31c01f915896e95823afc7a534e5a69e954e19259fe3",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AgentComposition/RuntimeOwnedWorkspaceDispatcher.swift": "f7282684f84b192d75a7ed0777a6ce2cbf7f1e0276004b32ec7f8ee96034be32",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AgentDeviceOperations/NativeDeployment/AppOwnedNativeLibrary.swift": "e2f77fc87d7cda6b72e7fe49dcc818c2b855921ab8b9f0147dc245245c72d238",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AgentExecutionCoordinator.swift": "ff65a722b19b7a7884c6d50273dfb75f203c9ca5ad662d52045363a31e009feb",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AgentExecutionStore.swift": "a6fc80005cf01e923dfe7c3d8492264a960ecd64b26190a56e39bc4fbe543c28",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AnalyzerProvider/AnalyzerProvider.swift": "cafef3ed38983a85620f263d83acc9783064df1c9d5fa87ae2f76ce2fceb4921",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AnalyzerProvider/ArkTraceAnalysisEnvelopeValidator.swift": "c23f04db2e367d1bbdd8cbd43ffe49bad58b43c2e4279745f6e2aa5ed38ae82d",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AnalyzerProvider/ArkTraceSummaryAnalyzerProfile.swift": "46238e0fea6581d5e29bdc2f6741bae7aed3c392a9e05248f473aceadc375325",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AnalyzerProvider/ArkTraceSummaryEnvelopeValidator.swift": "02a4385341ceec7a969a48fd3df60f881d332a0aa1aed88f77a8b2d6524aaa79",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AnalyzerProvider/HarnessCrashLedgerDerivedAnalyzer.swift": "05fb4f6cef3b1665d8de30c8475531b47836552b54a96064abab3c9bad98ac84",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AnalyzerProvider/HilogSummaryDerivedAnalyzer.swift": "b4a2acd78641655afc9553d4246f79da202b8941bda91127612d1f9883768e25",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AppProductCapabilityRegistry.swift": "7ffb5bb3b15390ec58ba781d98ec573f2838ffe2d7cc171d610eeb5c01e5707e",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/ArkDeckWorkflows.swift": "46b72dce7fdab845a122a870545fe190ca4efb7178928168a880ae62f6b3f33e",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/ArkForgeAuthoritySupport.swift": "7ebfea3dd09576b2593151d76aa3fc3df75bbac78831818df521bce5d117b297",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/ArkForgeControlPerformer.swift": "3cc3762e5085cec05d103fa145304166980f2ce04859cc74a143a5c4fde1c340",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/ArkForgeExecutionAuthority.swift": "33452a926a7cece84766f7710b2f1f7e159df280e04acb204f7ebb2db0810fc1",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/ArkForgeFlashRequest.swift": "4f0bf31b513b8894f40969113e05867d4a8e17d8fd7fd83e786c56fa7df51464",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/ArkForgeFlashSession.swift": "7bbdb1838542fccbda3a77fcc2f4df212339c92f3ed6b4b1d13a8a218c3db33e",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/ArkForgeLaneComposition.swift": "4da8db40f24b3bd4c3d0446ed51b7cf421aa146ac4bab0c4a0cba3ec842eee75",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/ArkForgeLaneHost.swift": "b92186ca2f4968dbcf335227e879e97c25643155a8a90e1c0be6ecfcc883d6fa",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/ArkForgeLoaderObservation.swift": "61bcf1b05f6abcea94db448fdaaf739fb67f365165bd38b690ead5cf4bfa5c0d",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/ArkForgeManagedControlPort.swift": "81e17f981af16a61f85768468fd025dad6a742ac4667a51bd9a9b790c5c76120",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/ArkForgeObservationSelection.swift": "830cbdcd68dac4b38df9df292bcd311e1bfbfe462c96b82ecaaab0f4118d25aa",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/ArkForgeRuntimeJobState.swift": "687bf93c2bffaab72d7a1f08af3a14d8e9dc3378d6d6c86b288955c39c391279",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Artifacts/RuntimeArtifactExport.swift": "4b2a60379da7da254173450b235536ffff070b0567ce531bf3a92f8217c0e4cc",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Artifacts/RuntimeArtifactService.swift": "5ae8d48a7db1f896a4572e88e5ac8b99bc5ed20fa3d8259608b0f0fca459da9d",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Artifacts/RuntimeArtifactStore.swift": "d1805f3ab1acce045a462e5951aac7f81c8987ab6ff5e8bd81ff830dd5c62e7f",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Artifacts/RuntimeImportReferences.swift": "363761ccf7bcffb1c46c1e0c56e6930fbff329c5dea42e54b084a053fc00a91a",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Artifacts/RuntimeImportStore.swift": "c4ae279789c84de3d08897bc96d3d0ab23dc4de2448b010966e11a66f043c3b2",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AutoUpdate/AutoUpdateFilesystemLayout.swift": "2dc9a0305f0da354e2cce9b0a10b3f92c9d9cfa7e17649e4fa505aba573c7c49",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AutoUpdate/AutoUpdateService.swift": "a810f87dd49181af3a65193c41c0916512ed2341fad47ed3de4410391c942cc2",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AutoUpdate/AutoUpdateUIFixture.swift": "99ee33e5435adce3fbd7bdf5fe58b9d247f0d9335a1c5c56e33abb299f600355",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AutoUpdate/RuntimeUpdateApplicationFacade.swift": "c5de46ffbfe4a292ccc015f28c0a02ecb0e08ffa67261d05ae405f112aa6c99d",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AutoUpdate/RuntimeUpdateStateStore.swift": "92068f8807b3d5b7e16db64fc8bbd61439b0869daa4922f8fe45aca1c855f061",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AutoUpdate/UpdateArtifactSecurity.swift": "6151f28be848e2c5dafdea6566a800ccdb2b1077f3200101d3a37c531efca5fb",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AutoUpdate/UpdateDownload.swift": "99fb25a9b61ac394703a139a748abeebce9ebcf2b127b0e29c71cc075a08c0f5",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AutoUpdate/UpdateFeed.swift": "c0cb78dc4a3bc05f9327a6dfc5ae378306c9c19cbcd5703f0f73476f9ebc182a",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AutoUpdate/UpdateLogging.swift": "2b210eb4fb65b10148ce3e5b33c344ef1686a8ab738310b2829ec93d449dcb16",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AutoUpdate/UpdateNetwork.swift": "f34eee38d40b08db4e1fb5eb7c1c7ac6a7c0a4d557b11e1c7170706a8fd009ea",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Bootstrap/DeviceBootstrap.swift": "1128d53e752a6b0a62db030494752467ff83731b63b6d156b3684602f75413e9",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Bootstrap/DeviceObservationIdentity.swift": "ab99f6ffbd83065fe041332774b7f3a76fd1d8e74a93673b7e53c5670d3e2b03",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Bootstrap/ProviderBootstrapObservation.swift": "b0d4d0dd3e8d5c01ad1ded25ec726854c82bf86cf8d51905fc82b64e69be74ef",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Bootstrap/RuntimeTargetDisplayNameStore.swift": "dad7d5f0d719f588d180e01bb0459f8139fc453efdc4320e60137865f4c1fb8c",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Bootstrap/TargetObservationCoordinator.swift": "69552c97dc34bdcbb65d5d9d316b0b37e8e1dc55f1e252aba833d330db960f1b",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DebugApplicationFacade.swift": "2393dee1840fb37a137028302190e9dbbfbfe0ee63a3e421228f1348f7695709",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceControlFacade.swift": "e15090525968c2a667a4c20d431cade24bc7e5608257dc454d50bba1de7fcacf",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceFrameArchive.swift": "05d948aebd81fc4bad45807ebeec0e323f4cb18f1db168e4540348fab3303df3",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceFrameLiveness.swift": "1f6416415cbe5290fa6167eaa55431456c615a8c4fdc8a6487083283aa98cbd1",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceGestureClassification.swift": "0201feef5f3b541c95b79ab5b186c7fd4cfccf8a975245f89984f6e9255a8934",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceListApplicationFacade.swift": "c2e6ec1a4211ecc3bc79c01e3bb45fa7103195488116639d94982c9e02e40c57",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/DebugRuntimeProbe.swift": "019b524c41d9fc4dcfbcd852923e9a4559dd407b4c8f41bad3601915f83382db",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/DescriptorBoundProcessDispatcher.swift": "0b29726edc938fcb2a0a7147f1b886be536ad592bfe5c027b28c5c6934301848",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/DeviceProviderAdapters.swift": "371727f1a1287c34d0be97e730925b826bffb311d0d5075c22263a5c3e3cbf28",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/DeviceProviderContract.swift": "c94c2d944e74f279c25c175d1b91991d841897c7dac7656ac070980234b6e616",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/HDCE0ActionPack.swift": "3773bce10ca6f5d00e870c733f6e37ff3cc16c13a045a50ae2b679e1a9efc196",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/HDCReadOnlyProbeReceiptValidation.swift": "c4722e12e2b6bf0bd2ac47691d5eb957b8032c6265b4c1e44ffd40c397db76f6",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/HeadlessHDCBootstrapIdentity.swift": "c5fad38e93a8243421918db8444430035af3c364711ebb59f828fbeb3f3fdb61",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/HeadlessHDCControlImpactSource.swift": "119b2357808bb6d767243cf62319e7d4f2d3509e71c5a6a078edece6d05ecd61",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/HeadlessHDCControlLifecycleDriver.swift": "7476af5bb554112fbc51bf9139a1b724e1131ebe1c9e8d57156cf9173138595e",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/HeadlessHDCServerHost.swift": "44caf96eea97b6cfe2afb5b55e9ef95277dfc09090201fc9bfd9db09001bc181",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/HeadlessHDCStatusObserver.swift": "abed204e09a6041a5a113d753978db01e62acadabf26b2715215331673231499",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/HeadlessHDCToolSelectionLifecycleDriver.swift": "b35fb48f192151bcdd5050002b1cbfa95c1dabcac964d622ce064a01585b3582",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/OpenHarmonyNativeCodeSignHelper.swift": "f54f82f29fdc11edde7cca6e81b1b3b44ca800409fe1bde2c120edfd531360b1",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/PointerInputChannelDispatcher.swift": "d9d921f782751e399154ae4cf96bc9b7b5f2e907b9e9c1c7d566aa60f641b23f",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/RockchipBindingReactivationProof.swift": "8ae3caa565ce0a9cb26b1d3b258674d33ca5af74a3e2de28c8a946738304fbe5",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/RockchipHostManagedActionCatalog.swift": "92d86a10229dc4e67ea21608c83aba492d498da205408453caed44d75ad78a48",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/RockchipHostProcessDiagnostics.swift": "47ab4e50c37d12e6d0424c57a2accae287ba15ad567d07a4a2f948400f3b50d6",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/RockchipLiveModeProbe.swift": "3bcda2c829951bfc8b1ebfe5ba7e6a848d410ce355d82283fc012e3ee0983c27",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/RockchipRuntimeActionHost.swift": "294bfd698bc7a2949274fda1beb08d92a645cd934f25f9ea1c9f2084f1ce3681",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/RockchipRuntimeComposition.swift": "d303f159f7ed96b011f96c955731bcdd299c9283ad8dad0b6d2ad95c56543e19",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/RuntimeDebugInvocation.swift": "afc04771f523a8d9b9eba563fdbc9028d52ffd4dc8dc84a8980a399d32d6e6d9",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/TraceRuntimeProbe.swift": "536b9d88a4881d9b1e057f1daf2481a4e166fece07e3c6308f1c4e1bd85f7742",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceRecordingBudget.swift": "87f9a43ae63a43ed3276974db1b767420074d317ef824589eb5c185b8e357bc7",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceRecordingComposer.swift": "c1e96b8b8dd312c5550d8119d845abed13722fe6e639ec4b39acb2eca748dbdb",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceRecordingExport.swift": "b178b1bb95f026613396c555573e7b54d4097ee576ce4303c1c845e989993f30",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceRecordingFixture.swift": "6017ca61119ac5891f5d9ea0e7d5f2358b2380bf3451879705944b9ff8dc605d",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceRecordingValidation.swift": "e830f657eb267bfa999c59086fe2ec0d819c089d937196d36eac0101909f0ff3",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DiagnosticCapturePreset.swift": "072397aa833f6ae142d187e642d00c4e0d7e2e4b26fc84e9242703da3ce55bdd",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DiagnosticHilogSummaryReader.swift": "1b7f3bb3442b478f769db9daa8dcf9d09de48115a915f1dbab3692acea43585c",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DiagnosticSessionApplicationReader.swift": "40395c707faced6b9b27b16732fdb638e0699dc34a32faf9427ffe001645dda8",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DiagnosticSessionOfflineInspector.swift": "d572d8eae50e7937f2c83c7757a8ef3ea4c440e7b635c375d28ad67aeb98189d",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DiagnosticSessionReading.swift": "b9d6a4fef39373954be1c6883df36ebb50e07b152e4256f2d8c515fcadeaca6d",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DiagnosticSessionUIFixture.swift": "4c669054758f60341bd3bb1512a51404170c8eda17de9faa2f247d859c136886",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/FlashApplicationFacade.swift": "1700575c3a1b29a016d07d30fec900a0f0ca7b400fa6a7884b655e231e222443",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/GzipTarArchiveReader.swift": "dbc8c321be5f4055ee99e87e2525728b4572610a05d2b4ca1701e0f596059f16",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/HDCApplicationDiagnosticsFacade.swift": "d989362f87d85e34ea8b1a4e408f5dcc9ddbf64cd34324137d95a73b19fcf01f",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/HDCApplicationParticipantRegistry.swift": "31d550c1c70f62f1225d48b23feb139fe14aedca47d82f54550c3c74936277cf",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/HDCControlActionCoordinator.swift": "0d5ee180e18fc43e579bdf37e485053a0da953cd14b67edde83d0c2052d41db0",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/HDCControlLifecycleAuditStore.swift": "5bd4e91d76ab5e893a61f2563c9b0a9ac76fdf3e4cc42f2534d2c71be9a51b2c",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/HDCServerLifecycleJournalAdapter.swift": "1158a8e9088ca7ab0739f396dbd46613e8adac3adc3ea169779f3f9c4123c46e",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/OverviewActionProjection.swift": "68ca348eda0aa3f51036d2cc252bcceb6d7ebba7e98098398ff02263cbd0fc2b",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/OverviewCapabilityApplicationFacade.swift": "d3bbdf9762a224a4ecea51f8cb9706e97e6f3bbadacdf5f461e21e1676a2e8a1",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/OverviewRunRecord.swift": "288b97adf83053bdc278219a150d2502b44793303016b17137fa330cfd5ad96a",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RemoteBuildSource/RemoteBuildSourceApplicationFacade.swift": "91995e18b497203ffa7bf63274380959cab7593f66143afbe405415f34d9ee4a",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipBootloaderStatus.swift": "87ac2bc749aca4d8e71330be48d3bb3b0b49ba7f275324e6dbab59f53e86570c",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipDeviceAccessAdvisor.swift": "cdc395c733cd2b11c2314a52463fd0cabea39369d0a88896f7889322d16945c1",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipDeviceAccessApplicationFacade.swift": "a105bb2e3cffa0f838d13c34474fc100fdac3f0a57d852da551abbfdba92480c",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipDeviceAccessObservation.swift": "b3190fce849a2657eb96cbb9e23a92bc43f4bf9597b5a13f705a1a2f57fad066",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipDeviceBinding.swift": "d35d4953a106dd5d77b9f93684e791fe7c274555899f5b25b08e3ce851b97773",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipDigestValidation.swift": "8180974a72592da73a21b22cc790a731c3e9ec101fc067560d43eb6b92723388",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashAuthorization.swift": "49ef93a50762ae215c550cd46a8eae376b0dfb7498d2f8d455b6a347629e07d2",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashExecution.swift": "7321b5598153d8ff7e63a2aaa3094017ea82b9282e12e266d3baca08cc0bb9fd",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashProfile.swift": "9f6e663c66b13f8ca063590e1ea5b1458c42c618e115d4cf5a17b90fc39ddf89",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashReviewTypes.swift": "0dc5f64df8c7483ee76b35f2dc54edeede28e9ebe5f0756eee323d42f9ec7a8e",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipImageArchiveIntrospection.swift": "4bef6b2ab1f8c333032e3770d5039b3ff4e6c85c1e3c192323c59b0492fea13f",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipPostFlashHDCBinding.swift": "744b41e6cca05e93fb0c5510df4780706c6b92253a15f20aada9350686718bbd",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipTargetAliasReconciliation.swift": "ffc308dcde89e8ff77f6ee1813bda49062a2fb89cb6ff7bb8b324716a4152a3d",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeAdmissionService.swift": "05e361230fab0a3861d3b1fc74d4ef1f6499f93d4a3a12d2bcaf6029406c5568",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeAppJobListPolicy.swift": "c5ade05f99533cbbd86744f78efce59c03a2b62e72b85172c20f6ca800f4b5a4",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeControlActionResourceCoordinator.swift": "a1b9975ece8218dfd8799e3729ec8fe6fef94f02e85065148f218bfb90b96bfd",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeHistoryApplicationFacade.swift": "6aeb6bc367100b09818a89a8195bce4f1c52ba6e2bcc63aba56f8852f9c7af62",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeHistoryFilterApplicationFacade.swift": "a03d2ff10b72138bd47ea47d7be68f9fbac5683f456a6ad91c9c894efea82a2a",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeHistoryFilterStore.swift": "044c87aecea8cfbaac3c6e4b85b76cb2bc9114bbcc18a249e9d799c4ba764e5c",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeHumanActionResourceCoordinator.swift": "8ba0f040b621dc300ce24f60cbbe1490f45e60aa5bccf20d92cdce923628db28",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeJobControlApplicationFacade.swift": "8c75306349ce536dcffc37ffb52a386cb273f1062c696cfc571112a8060a41dc",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeJobEngine.swift": "651896eeed2e41b2abd96a561bc068ba1db8ef4b39f01994c3d0c197a5a732c6",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeJobReadProjection.swift": "6a98b43e5d902bb0eb9c8218c6cec0d159dcad01c250fa5fc533e96db1269805",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeJobRecord.swift": "f7d597fece8c99b71c25a77b587a8bcb0b90ae9a86d9bb5325a53fe4a13b6384",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeRecoveryService.swift": "68dce6cff735218ebe3ad4302298d9a78289e97ca76cc53b15f0b521ac02d82b",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeSessionCleanupRecordStore.swift": "a95015cfa4b3ee840c883d8e55d29f9bd3d1d7885f83a40a6406506a23ecb127",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeSessionExportRecordStore.swift": "fdf2bf77b8498c5b6679b9383f39d5b7a7eb92c68599588b009ca8e5d620ecf7",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeSessionPublication.swift": "7cd77ff57982bf2e7625ec586af9db6c196da4df296afad3106e1cbbbdc1678d",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeSessionStorageStore.swift": "9e2631973c66a22bce1fb68f96fbba92952d5219f416a3d1ae19ca9e83d05cde",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeSnapshotPager.swift": "6e3f8340547367615c2f2611438ae77edeee164a740a117d44e8a8660403ff7b",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeToolSelectionCoordinator.swift": "100c0421d946405618899e534eb4f426e259e67555bf43649aef8fb2f648c68b",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeToolSelectionLifecycleAuditStore.swift": "394a5cdffe91750655bbeecc7e3f19f59e0b44695967af5561f6e948df0eedee",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeTraceCacheApplicationFacade.swift": "69411e484a69815f49d7c4d7f23f9fbefefbc73b829804d2cb86067a9991df5a",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeTraceInspection.swift": "e1dc686110368698404203cd37bb047f419fa0ae5206ad6f6ec273971dd96558",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeWorkspaceContinuation.swift": "aedd7661262674657491cb9fc91f0cb9d31c385c007515b4a6a43214b0029efa",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeWorkspaceKind.swift": "361b69c043d6227951c31ec4f3c767d9779e7f51914ae09677a8e4b97c6f1905",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeWorkspaceThread.swift": "1751931ef32425c45fd53ff83a32923fb074e5f9e196e6a86d8360a768903760",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/SessionSettings/SessionSettings.swift": "75743b0396da9a4c6417b406ddfcdfad5db251d08818349b603fbbd586649885",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/SessionSettings/SessionStorageApplicationRuntime.swift": "de4463f84996f0d60f9b8f62ac927fdea79e1dbc83e0c702feb56b20d6985fbe",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Settings/RuntimeSupportBundleApplicationFacade.swift": "93ee48285de34597b53f2d136442723c99fb2b6622bd21b7c00df90ba38220d7",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Settings/SettingsApplicationFacade.swift": "c47dbbd747c516e1990280c120625fe966fca5e32d049a560975912ab24832eb",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Settings/SettingsStorageUIFixture.swift": "28e68ef19d7f72a7e7121f8ca1d241a1d3afb7f2aab77a69a78ad00c76e2f57d",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/TraceApplicationFacade.swift": "e6152cf20ffdbe772b393dbb3f094ceaf43a5c99fc3ac62d995959400405de59",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/TraceCatalogContracts.swift": "3eca0c49ef17f6d426343d224262a19e49e404119ccfc458272582e39685f5bb",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/TraceParameterContracts.swift": "f84213237f8eb31dfb9297d35c26bd9709bc8824f1d1e3b8a92f5fd1ecd9d42e",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/UIDumpApplicationFacade.swift": "a8707127ff483edc3dcb6c3e41d397168b4008d3009e70d84843139e48a5ad1e",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/UIDumpOfflineInspector.swift": "0c7b563071dfd5c443201cec04448e5a3ff5c05f33647b2db1f5f9cb8c3b458a",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/ViewerCaptureMetrics.swift": "9c3c175a41a4bdefef17c708d2bfe2eb45fee06a28c9715fe7c84ee0aec36f7a",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/ViewerUIFixture.swift": "8569c33255efa461b5b7970f9af39b60eeea120cb4d6f38c5dbd65b2b589c762",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/WorkspaceProvider/DaemonIdentityCache.swift": "92cfb210b25a84fd7a2f812bcdb79a932a40fbf460d2844aeaf813ba38df5416",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/WorkspaceProvider/DevEcoPasswordDecoder.swift": "6d86a9f60c736a6543c02e35576254866ce4f9f4bd8f76fd27f99977765c3fe8",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/WorkspaceProvider/OpenHarmonyLocalSigning.swift": "44e25c14c0290b7b498042f674713abe7d49dd438d2c5f5d67be396aa7b91a63",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/WorkspaceProvider/OpenHarmonySDKReleaseSigning.swift": "fdda86e90576036ffbaaff15b1e82b4dc91184c6f8103484819192a7b011d737",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/WorkspaceProvider/OpenHarmonySigningCredentialOwner.swift": "6421a1f95effbb2f977417529439c68e30e8d416088abc2cce415ea9c5507496",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/WorkspaceProvider/RuntimeWorkspaceProjectReferences.swift": "a605a202a2ac2ed2fde43a8d16f8d60b90d706703bc6763b5b4b7863aff33c12",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/WorkspaceProvider/RuntimeWorkspaceProjectStore.swift": "310c2f37bfa10302343dae5b1a33e564a390a57782b7654bbb6562364ff5bd98",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/WorkspaceProvider/WorkspaceOperationsProvider.swift": "ed81f78c5bbb0deefd053c077da1b1c43187b55b5995b3539a214df74ec380c6",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/WorkspaceProvider/WorkspaceProjectPublication.swift": "f7e8db6399d3ef9a73e87c976e7b47fdfe7e2a0feab96e10781b00192a672298",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/WorkspaceProvider/WorkspaceProvider.swift": "2c6c774c7acfbf264defaabefdb24aa04d1c1edb10561432ad4b469f9201f0e1",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/XPCConnectionBox.swift": "3d2adbba5e023eaf3ac4aab6d0858750c27528d403a2ba860349dca0aa069db4",
+    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/SessionStorage/SessionStorageFixtures.swift": "c3c01a36818f6bb5d98ee14731a094424bc56c0134d10636102e0cf4d8f2ade5",
+    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/HostStoreShadowContractTests.swift": "e7bc4d4d046a550fec44a1cf57af11f8ace38a2ddeef7f05eedd308492ff958c",
+    "Packages/ArkDeckKit/Tests/ArkDeckTraceAdapterTests/HostStoreTraceShadowTests.swift": "550daaba5bbf60cd10d3c8869858dfa56da6fded2e9fd50bfcd077c702eafbd8",
+    "rust/Cargo.lock": "e7db8587e28bd41ca969eb2256552ccf57f8f3ef016bd542ce8767a768f394fa",
+    "rust/Cargo.toml": "b3e552d3fab5e468205e7b0d1c742569528867d1d25be0e4b54c317fcfa524eb",
+    "rust/crates/arkdeck-agentd/Cargo.toml": "c0c5d5ffcccc2c0d2720ee32b9968e2c6bf87f965b1de177a31141a05d2e8758",
+    "rust/crates/arkdeck-agentd/build.rs": "7b576756772bb90d165afde7eeffa5d7e577ce94d8ad1282c36427e85ea134c0",
+    "rust/crates/arkdeck-agentd/src/facade.rs": "01cc12203099e073b98f2b9acf1e36b6bab609ceb6ebfbbcb75bdf50712c8a91",
+    "rust/crates/arkdeck-agentd/src/host.rs": "e34bfe1006f004abffdb891e7c7b944111e1cc90a1cf18bd6c9e4655adef5d97",
+    "rust/crates/arkdeck-agentd/src/main.rs": "ac28928a3f40ddcba5754ecc282ce05b018de14ef4c1504663d43c57a8e01be3",
+    "rust/crates/arkdeck-cli/Cargo.toml": "25ab2bf9c5c4e5b77657f55faae6b0b2fa640e780443299a7fa09124b1f28d62",
+    "rust/crates/arkdeck-cli/src/lib.rs": "d537e87f3c9d040348040d50027d7e7cffca96ea20cf2ec552f5e2d21349731e",
+    "rust/crates/arkdeck-cli/src/main.rs": "2d9e108b9c340645e8b63fe29c57da049f500acdbe7f7bc10b85caf5f81cdc9f",
+    "rust/crates/arkdeck-cli/tests/current_surface.rs": "67d955073c49d2750d3116979d8b6e66d7904e31219ead71d697cf996f6dc3ae",
+    "rust/crates/arkdeck-client/Cargo.toml": "414272134843634826ccf8f1a43b56a26d260d44a21970b6d91342546a88fe66",
+    "rust/crates/arkdeck-client/src/lib.rs": "57687f9933034800963ec1b52f9f0c49fde4027f964feeea8495edcb178d1f0c",
+    "rust/crates/arkdeck-client/tests/no_replay.rs": "53b95f3f1781299fe31af3cea4812f4955dda66dbb32bdeaea7ae053b4a8bb08",
+    "rust/crates/arkdeck-contract/Cargo.toml": "3fe343ae5934186604660b5577c7365b071a0c57bef2c2de33c4b5b0bc0b4fc4",
+    "rust/crates/arkdeck-contract/src/canonical.rs": "9541b373bcf6980f3832e487142f97f164c8078a7c27a9dbfca2cec66d6b9c44",
+    "rust/crates/arkdeck-contract/src/catalog_generated.rs": "4919bf3405ae16880583561e926a53e456aee8377d0fd48c9205959837c0b8d7",
+    "rust/crates/arkdeck-contract/src/cbor.rs": "ea92b35bbd173e324e48a29430385681860bad1ebfd4684686313f31a0f2bd31",
+    "rust/crates/arkdeck-contract/src/control_generated.rs": "b38a65a6d3a7d104a007f9c23912707be7921034308548aa9e2efdea3915cf9b",
+    "rust/crates/arkdeck-contract/src/framing.rs": "55de9a6c0eb69bfbeb2240669408d1568d33656296a38da6f81ef6220014badb",
+    "rust/crates/arkdeck-contract/src/lib.rs": "a3013052724fbce90c14027c0d0162ec9325acce74fb61e91edcd0440ac578ca",
+    "rust/crates/arkdeck-contract/src/schema.rs": "6d264338890ebf1bb88124af8f84335cdd566e1a7ff601a528b67950eb506694",
+    "rust/crates/arkdeck-contract/src/schema_tests.rs": "f8aecd94be07a7241c5b8e0aeec00abaea93c9787916269b6d4104afd51ee627",
+    "rust/crates/arkdeck-contract/tests/canonical_parity.rs": "bf1ba74885b46b08742957c1fe7c0fc1f2b347674a81b5393f66cea62ba60815",
+    "rust/crates/arkdeck-contract/tests/catalog_parity.rs": "f6379faab154d19379cd608b370c5af6bda7bb11da848493271dea543818949d",
+    "rust/crates/arkdeck-contract/tests/common/mod.rs": "7e79e1f9ad397924b8402cd302fb3fce40d82ddc12b66c9ecf1689140d0eed9f",
+    "rust/crates/arkdeck-contract/tests/corpus_parity.rs": "90e9b385a4546a789ab4d4185e6142d8801b8f6a6641ec7685ccd7f1c79eeaf9",
+    "rust/crates/arkdeck-contract/tests/framing_failures.rs": "196481c6f902a256d03f4aea70970cf690cb874513ef3abc1fa0570874423b53",
+    "rust/crates/arkdeck-control/Cargo.toml": "1e29414570d50a6aa4515a2894bfe01f98b3abcfb1c71ac025355a409988fdbd",
+    "rust/crates/arkdeck-control/src/lib.rs": "7645611f22fbada7a2480ccc4fc2a391e8d1a43b0157a30a52b41b436cc93f3a",
+    "rust/crates/arkdeck-control/tests/read_only.rs": "52ec82106b8157104455d6cc731a5c7201bf324793b6ef5b4db4bc0a52946b5c",
+    "rust/crates/arkdeck-hoststore/Cargo.toml": "d5682c2ce212c627598529af7e3720037e1c2b0c92640a84aeb914391ebae2dc",
+    "rust/crates/arkdeck-hoststore/src/display_names.rs": "90b718cbbcb1fc2e913c25ffcc4b7f811ce226dab17b09611f19829915592f18",
+    "rust/crates/arkdeck-hoststore/src/lib.rs": "78bb74074ba23e3f6104fe5e1009c81686d0b53d7737d0097a31615df6710b0e",
+    "rust/crates/arkdeck-hoststore/src/main.rs": "bacdd140bca724a41decbc5a0b47187c7a2dc031d84d33f19956156df5b2f0f3",
+    "rust/crates/arkdeck-hoststore/src/registry.rs": "ea8f276b91343954c6e6f1794695b9e51265674968a92fdbdca011b82aa08893",
+    "rust/crates/arkdeck-hoststore/src/session.rs": "c43415eeafcf8e190f6fb5c3af0636952142a9ddf0c6e3279b0735cb2f746ebe",
+    "rust/crates/arkdeck-hoststore/src/session_inventory.rs": "fcfeae72d875c719599ecbda35e1a718c3d236031f562642bc6c4593d6a7fc9a",
+    "rust/crates/arkdeck-hoststore/src/session_manifest.rs": "0e8b92f019795fc847569323bbc9c2c4f4ce9480ed50ca3b8633af4ea1f5db05",
+    "rust/crates/arkdeck-hoststore/src/session_time.rs": "d79d3ca40cdb347fe55af9f0d4b85e0adfc4daf69a5f369a41c48a13257e6a64",
+    "rust/crates/arkdeck-hoststore/src/trace.rs": "9ce2c778f026d043fa670938f68864ed08df0a93b6b490037c933beb2228958e",
+    "rust/crates/arkdeck-platform/Cargo.toml": "f400532b126dadf7263e7a1b275517118b0b863e9941f6167e4fd45c5e829558",
+    "rust/crates/arkdeck-platform/build.rs": "6761595159254c6afc01a7f1733f30f29cfa251cc03cd098b89093fc2247ef0b",
+    "rust/crates/arkdeck-platform/examples/windows_spk3.rs": "774a739ff5507927c2a0e69f66e08cc6cd87969fe21e5a96db5a8df153e65a39",
+    "rust/crates/arkdeck-platform/src/frame.rs": "a6c40b10fbad5302089d9629363ef03e5518907eb250e3da6577c1f9ffc360b8",
+    "rust/crates/arkdeck-platform/src/host_calendar.rs": "c6493267e632ff2a9a2a8e7e051af69313a47621a5af427b3d0f1d78ab075380",
+    "rust/crates/arkdeck-platform/src/host_store.rs": "4ebf74e80e7c8c7347d90aaa04cb1f9775db3507ae790b71350a11f75a4403bf",
+    "rust/crates/arkdeck-platform/src/host_text.rs": "9419979b85994c944b119363cf70cf83089d899d4f71431f3be4c98513fb5ffb",
+    "rust/crates/arkdeck-platform/src/lib.rs": "58c3915a914300fffd5b814b7926b375117b14096a64b856b7ad6869911eda19",
+    "rust/crates/arkdeck-platform/src/macos_control.rs": "ec938eec4c98c74f0fe894d96388cc8196e03d21e82a1b31e14aa60160a167e5",
+    "rust/crates/arkdeck-platform/src/macos_process.rs": "bf660a4b8546c7e99964efa606c07e6446a514662f06331607d6b7b87a6e6ab1",
+    "rust/crates/arkdeck-platform/src/process.rs": "7848244f98d35cb1beabe38ce1a9e59e1009206b022929f9430bd3e90d62f973",
+    "rust/crates/arkdeck-platform/src/unix.rs": "02643c5da26958921f716172f1491dfa676ed2386328bea912cb1f09cd9e2e47",
+    "rust/crates/arkdeck-platform/src/windows/identity.rs": "16ec598a7c36fd6ac75f1b0a139c958fc83cafff79011e13e9bd54c8034fac88",
+    "rust/crates/arkdeck-platform/src/windows/mod.rs": "bbe6f83ea4f90386fc7a4d6d95dfc8497dec6c238f05594a34569c06fdc3a7af",
+    "rust/crates/arkdeck-platform/src/windows/process.rs": "c11b475b6f233629d155fa08ba96e10c72fe54e68ef3de957f929ce43ffbc2e1",
+    "rust/crates/arkdeck-platform/src/windows/server.rs": "83ada6d27645db36633a2809034361b7f9c474f3cd37063dce25b42364ce0d3d",
+    "rust/crates/arkdeck-platform/tests/host_store.rs": "9cbe24bca791eae916188638a1651be32b3c7e29429c760eebdfc3f5ac68922e",
+    "rust/crates/arkdeck-platform/tests/unix_transport.rs": "4b6b3e85c6668fcd5f5c477e78f784c348f2280822fe5894290363f5d0dc053b",
+    "rust/crates/arkdeck-platform/tests/verified_process.rs": "64b023004e85c5c085b0d9fb7907950ac9142c8172034412b9e3407c741f8c2d",
+    "rust/crates/arkdeck-platform/tests/windows_transport.rs": "323c2ae411f8445cec32c96dee5085a370c3aa053510bd3659b8eec152f9bb9a",
+    "rust/crates/arkdeck-provider-hdc/Cargo.toml": "4ccb4e59cc4f8e997242d79411fe1a994b95db38f00ef7d247acc07ce5d4b0a2",
+    "rust/crates/arkdeck-provider-hdc/src/lib.rs": "78b3d65e60598de638d5fd7a47152488b74b628e94d7d7ea71af13fb6888cd3b",
+    "rust/crates/arkdeck-provider-hdc/src/observation.rs": "cec99704294aa1f29fa3897a8759455bfd2b277da47c30b9261a2868e97d8587",
+    "rust/crates/arkdeck-provider-hdc/src/presence.rs": "24763546cb0732328e7a58cb0d550f328cd5efc701351d31f7fd34668a08d894",
+    "rust/crates/arkdeck-provider-hdc/src/provider.rs": "2c43f2a66b1e0b70d8dbc2796d4bff3ad8ec9349297daaf0969d2372b25a3ead",
+    "rust/crates/arkdeck-provider-hdc/src/semantic.rs": "a56534fdab005c13c40d200eabcbeb1c0aa49f627b95db6d143c012eb04a407e",
+    "rust/crates/arkdeck-provider-hdc/tests/swift_fixture_parity.rs": "2637c3f1726b5bac63c7ef71f4187994818ed272698f6da7bb42a912411ed99b",
+    "rust/rust-toolchain.toml": "e879701472a698533f43f54989bbf5f3101eb0503472159d32633f3bb8a13fdf",
+    "rust/scripts/hoststore-shadow.py": "1cb2e1bf9b4af47a86144b1b46d860947cda25cb223bba47f2e12bd46ab67962",
+    "rust/scripts/test_hoststore_shadow.py": "8dce13a1a4e5bcf07a568116b4ed99613e13963e0b2c7ca3833bcd9ff3a3b5fd"
+  },
+  "startedAtUTC": "2026-09-10T10:18:23.029623+00:00",
+  "swiftOracleBinarySHA256": "1af3af4e29f552af23bddf9d8cde175f473fe039b5df081070148e0b4f9dd76a",
+  "toolchains": {
+    "rust": "rustc 1.98.0 (88d9e12ae 2026-08-18)\nbinary: rustc\ncommit-hash: 88d9e12ae178fab0fb5cc050a94da85685d449ea\ncommit-date: 2026-08-18\nhost: aarch64-apple-darwin\nrelease: 1.98.0\nLLVM version: 22.1.8",
+    "swift": "Apple Swift version 6.3.3 (swiftlang-6.3.3.1.3 clang-2100.1.1.101)\nTarget: arm64-apple-macosx26.0",
+    "xcode": "Xcode 26.6\nBuild version 17F113"
+  }
+}

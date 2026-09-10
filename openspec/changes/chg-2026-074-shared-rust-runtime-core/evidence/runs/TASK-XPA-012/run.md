@@ -1,0 +1,423 @@
+# TASK-XPA-012 — host-store shadow work
+
+Status: **in progress**. Rust now serves `history.filter.*` directly in an explicit
+isolated development root through its daemon and CLI. Installed Swift owners remain
+active for the installed product. This is host-only development, not installed
+cutover, GJ-1 or hardware acceptance. Nightly calendar counting and same-release
+Swift rollback are no longer development gates under the user's r10 route.
+
+## Scope and baseline
+
+The workflow scope supplement was reviewed and merged through
+[PR #1839](https://github.com/ArkDeck/ArkDeck/pull/1839) at
+`7b43ea0fabb697e5d0550df5d2a6b8264410362f`; see [scope.md](scope.md).
+The Task readiness pins retain the protected-main implementation baseline
+`eae27c6b97c2d9e5d67c8eee2d9353f2c0d38b93`. Each run additionally hashes its actual
+source files and candidate binary. The pinned ArkTrace dependency revision is
+`e6e3133d410fbd7455df17c9486dcd369607e97f` in both Package.resolved files and the package manifest. Earlier immutable receipts retain their original dependency revisions.
+
+The implementation remains local on `agent/xpa-012-hoststore-shadow-20260910`.
+There is no implementation PR yet. Existing shadow coverage is retained; current
+work implements actual Rust owners rather than expanding legacy parsing parity.
+
+## Implemented comparisons
+
+`rust/scripts/hoststore-shadow.py` runs the actual Swift store readers against
+Rust using fresh test-owned directories. Document candidates receive bounded
+snapshot bytes through stdin. Trace and Session inventory candidates read one
+explicit physical fixture root through descriptor-relative, no-follow access.
+All filesystem comparisons check snapshots before and after Rust reads. The
+Swift oracle may initialize or reconcile only its isolated fixtures.
+
+| Surface | Cases | Current comparison |
+| --- | ---: | --- |
+| History filter | 83 | Durable bytes, list projection, generations, strict fields, enum/text/time refusal |
+| Display names | 152 | Target/candidate projections, tombstones, ordering, identity, staged names and time refusal |
+| Bundle registry | 31 | Available/retained/removed metadata, closed fields, reference/state/owner/bounds/time refusal |
+| Tool registry | 74 | Closed metadata, trust/dependency shape, legacy schema, active/pending/outcome selection ledger |
+| Published tool identity | 7 | Actual Swift diagnostic lookup of both existing published digests and unknown spellings |
+| Session configuration | 5 | Policy/custom-root/full-width values and strict canonical fields |
+| Session timestamps | 20 | Exact Swift Date Double bits or matching refusal |
+| Session canonical JSON | 52 | UTF-8 keys, canonical duplicates, integer/float spelling, depth and manifest byte bounds |
+| Session status | 39 | Actual bytes/counts, catalog generations, unsafe layout and large/deep census |
+| Session parameters | 28 | Typed state, restore byte equality, status consistency and Swift character-count boundaries |
+| Session Steps | 224 | All 56 kinds, valid typed arguments, closed fields, required arguments and digests |
+| Session compensation | 84 | All six permitted kinds, declarations, execution records, source relationships and outcomes |
+| Session confirmations | 16 | Typed actors, decisions, scopes and Step backreferences |
+| Session Step semantics | 32 | Risk declarations, binding references, terminal states, standardAgent and plan-only conditions |
+| Session arguments | 38 | Scalar and path bounds, optional fields, remote action and workspace argument semantics |
+| Session recovery | 44 | Typed hazards, guides, device mode, abandon records and compensation relationships |
+| Runtime audit records | 37 | Closed historical audit fields, Provider/Step labels and mutation consumption requirements |
+| Grapheme corpus batches | 3 | Unicode 16/17 official inputs and 54,660 generated Indic property combinations |
+| Trace cache | 443 | Actual Swift inventory, closed fields, duplicate keys, text encodings, dates/numbers, locks and unsafe entries |
+
+The 105-case receipt is preserved unchanged in
+[local-shadow-20260910.json](local-shadow-20260910.json). It identifies itself as
+an isolated host differential with `sourceDirty: true` and `cutoverEligible:
+false`; its per-file hashes describe the tested local snapshot. It contains no
+raw filter strings, display names, payload bytes or hardware claims. Each case
+pins the actual Swift XCTest executable; the runner rejects missing cases,
+unexpected outcomes, invalid hashes or mixed oracle binaries. macOS,
+architecture, Swift, Rust and Xcode versions are recorded.
+
+The expanded 131-case snapshot is preserved separately in
+[local-shadow-parameters-20260910.json](local-shadow-parameters-20260910.json),
+also with `sourceDirty: true` and `cutoverEligible: false`. The earlier receipt
+remains an immutable record of its own tested source snapshot.
+
+History and display-name Swift readers gained duplicate/extra-field checks to
+meet the frozen field-set requirement. Their writers and durable keys were not
+changed. macOS Unicode handling uses the same immutable CoreFoundation control
+and whitespace sets as Foundation. Canonical-equivalence keys match Swift String
+equality while preserving original durable spellings and embedded NUL in bounded
+candidate identifiers.
+
+The Session scanner measures the actual tree, validates identity and supported
+manifest branches, joins the retention catalog, and predicts initialization,
+policy reconciliation and removal without writing. Cases cover registered and
+unregistered Sessions, pinning, duplicate identity, unscoped content, corrupt or
+missing metadata, identity mismatch, and symlinks. Selected comparisons run Rust
+before Swift reconciliation and compare the resulting full status afterward.
+The Session filesystem entry point preserves owner/no-group-or-world-write and
+same-volume rules; Trace uses the published inventory reader's separate file and lock rules.
+
+Session date conversion preserves the frozen grammar, leap seconds, offsets up
+to ±23:59, arbitrary fractional precision with the current nanosecond truncation,
+and Gregorian calendar behavior. Manifest artifact checks include typed derived
+provenance, canonical Base64, path/size/hash constraints, source-hash matching,
+unique lineage and cycle detection. These only interpret fixture records; they
+confer no Runtime authority or tool trust.
+
+Parameter validation covers missing/unreadable/value states, the desired-value
+requirement, restore dispositions, and exact UTF-8 equality for a restored value.
+Length comparisons exercise 4096/4097 Swift Characters with family emoji, CRLF,
+combining marks, flags, Hangul, Indic conjuncts and skin-tone modifiers. The
+candidate now uses exactly pinned `unicode-segmentation` 1.13.3 with narrowly
+scoped Swift Indic-linker compatibility rules. The earlier CoreFoundation
+composed-range counter was removed after it disagreed with Swift segmentation.
+The actual Swift Character iterator is compared on all 1,859 official Unicode
+16/17 GraphemeBreakTest inputs and 54,660 generated consonant/linker sequences.
+The official fixtures and Unicode license are retained unchanged; the generated
+property table is checked against the pinned DerivedCoreProperties input on
+every shadow run. The dependency's public Mozilla cargo-vet audit is imported;
+this does not constitute maintainer approval of the implementation or cutover.
+
+All 56 Step types now receive typed structural, argument and digest validation.
+Compensation records and confirmations are checked against declared source Steps.
+Recovery parsing covers the complete closed record and interrupted-state
+requirements. Historical Runtime Provider audits are interpreted solely as
+stored data; the candidate cannot mint, reserve or consume authority. HDC keeps
+its existing closed field set, including the allowed cross-branch metadata keys.
+
+Registry semantic validation now covers both state/generation pairs, bounded and
+unique owners, reference identity, sorted unique records, legacy date parsing,
+version/trust/dependency constraints, and the full active/pending/outcome tool
+selection ledger. Two separately registered fixture executables exercise pending
+pins and successful/failed outcomes without executing either fixture. Published
+identity lookup mirrors the existing Swift diagnostic composition; it adds no
+Provider support declaration or admission authority. Content/signature
+revalidation remains part of the subsequent filesystem owner implementation;
+these registry comparisons cover metadata decoders and their projections.
+
+The Session reader now validates the full current canonical JSON domain with a
+separate encoder/parser: UTF-8 key ordering, Swift canonical-equivalent duplicate
+keys, exact 64-bit integers, Foundation floating-point spelling and the current
+256-level strict-parser bound. It does not use the CLI JCS encoder or serde's
+smaller wire nesting bound. Noncanonical numeric/string spellings are refused;
+no durable document is normalized or rewritten. The implementation is exercised
+against the actual Swift encoder on finite values from 2048 deterministic
+binary64 bit patterns, explicit numeric boundaries, and full manifest/derived
+provenance records. A 16 MiB manifest and one-byte overflow verify the real store
+reader's size boundary and resulting inventory projection.
+
+Session inventory now revalidates the configured physical root and its directory
+identity before returning, plus the held lock inode and initialization marker.
+Deterministic platform tests replace the directory or lock and change permissions
+while descriptors remain open; the final binding checks refuse those states.
+Configuration is an immutable stdin snapshot, not a live configuration-file read.
+The later owner stage must coordinate live configuration publications under its
+store lock; this harness does not claim that contract yet.
+
+Seventeen additional actual Swift comparisons cover missing, oversized,
+extra-field and noncanonical identity files, hardlinks, FIFOs, writable year/month/
+session/file entries, and invalid or regular-file layout components. Rust leaves
+every fixture unchanged and matches Swift's incomplete measurement projection.
+
+History and both display-name timestamp fields now validate the same acceptance
+domain as the actual `ISO8601Timestamps.parse` owner. The independent Rust predicate
+retains original text and matches the pinned Swift 6.2 FormatStyle behavior:
+fractional seconds through nine digits, normalized date/time components, numeric
+and GMT/UTC offsets, trailing text, and calendar component bounds. The actual
+store readers independently exercise 34 accepted and 30 refused strings for each
+field. Trace inventory exercises both metadata dates through its actual upstream
+`JSONDecoder.iso8601` reader; undecodable dates retain unaccounted bytes.
+Implementation references are the official Swift 6.2
+[FormatStyle source](https://github.com/swiftlang/swift-foundation/blob/swift-6.2-RELEASE/Sources/FoundationEssentials/Formatting/DateComponents%2BISO8601FormatStyle.swift)
+and [Gregorian component bounds](https://github.com/swiftlang/swift-foundation/blob/swift-6.2-RELEASE/Sources/FoundationEssentials/Calendar/Calendar_Gregorian.swift).
+The local Swift differential is authoritative; newer upstream parsing differs.
+
+The earlier Rust-only Session depth/node ceilings were removed to preserve the
+frozen Swift census domain. Real fixture comparisons now pass for 70 directory
+levels and 100,001 regular files in one directory. The existing metadata size,
+ownership, link, volume and catalog-lock checks remain in effect.
+
+The Trace numeric comparison now covers all seven integer fields independently,
+including decimal/exponent spellings, binary64 rounding, underflow, exact 64-bit
+bounds, Decimal mantissa overflow, and wrong JSON types. Rust retains raw numeric
+tokens before matching the pinned Foundation conversion order. The 252 new
+comparisons reproduced 116 inventory projection differences before the fix and
+pass afterward. Original metadata and payload bytes remain unchanged. Reference:
+[Swift 6.2 JSONDecoder](https://github.com/swiftlang/swift-foundation/blob/swift-6.2-RELEASE/Sources/FoundationEssentials/JSON/JSONDecoder.swift)
+and [Decimal parser](https://github.com/swiftlang/swift-foundation/blob/swift-6.2-RELEASE/Sources/FoundationEssentials/Decimal/Decimal.swift).
+
+The upstream strict-field fix was approved by maintainer `lvye` at
+2026-09-10T13:09:41Z and merged by the same maintainer at 13:09:50Z through
+[ArkTrace PR #24](https://github.com/ArkDeck/ArkTrace/pull/24). The merge commit
+`e6e3133d410fbd7455df17c9486dcd369607e97f` changes only the cache metadata reader,
+its focused tests and integration documentation from the previous pin. Its
+required CI passed. The downstream package manifest and both resolution files
+now select this reviewed reader. The adapter revision constant and pin assertions
+are synchronized. The independent App project pin now selects the same revision
+under the scope approval below.
+
+The same TASK-XPA-012 PR declares three exact adjacent paths under CHG-2026-076:
+`Packages/ArkDeckKit/Package.swift`, `Packages/ArkDeckKit/Package.resolved` and
+`ArkDeck.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved`.
+The scope checker accepted their fixed prefixes and absence of protected-kernel
+overlap. Their Task additions and final commit trailers remain declarations for
+maintainer review, not self-approval.
+
+All four Trace metadata object levels now enforce their current field sets in
+Rust. The 125 added vectors cover each required field being absent, null or the
+wrong type, one extra field per object, and both duplicate-key orderings. Original
+numeric tokens survive first-key-wins dictionary decoding. UTF-8/16/32 vectors
+include non-ASCII text, BOMs and truncation. They preserve the actual Foundation
+6.2 prefix table: conventional UTF-32LE BOM input is refused, while its swapped
+prefix is accepted. This compatibility behavior is tested against the actual
+reader and the [published JSONDecoder source](https://github.com/swiftlang/swift-foundation/blob/swift-6.2-RELEASE/Sources/FoundationEssentials/JSON/JSONDecoder.swift);
+no snapshot bytes are rewritten on disk.
+
+The App project pin scope was approved by maintainer `lvye` at
+2026-09-10T13:50:52Z and merged at 13:50:58Z through
+[ArkDeck PR #1840](https://github.com/ArkDeck/ArkDeck/pull/1840), merge commit
+`86bc190ab6d0edabcec31ac9cd46b175cb64e19a`. The implementation branch was rebased
+onto that approved base before changing the project's single ArkTrace revision.
+The two previously failing dependency-consistency tests now pass.
+
+Twenty-three new filesystem vectors run Rust before Swift can normalize its
+isolated root permissions. Snapshots now include root/file modes, link counts
+and file identities in addition to bytes and symlink destinations. Trace
+inventory matches the published reader's readable directories/metadata and
+hardlink handling; its existing key/lease probes use O_RDWR without creation,
+truncation or content writes. Key locks enforce the actual 4096-byte bound,
+while leases do not invent that bound. Read-only locks, directories and symlinks
+are refused; missing locks and unreadable metadata remain active/unaccounted.
+The prior private and Session policies are preserved and their platform tests
+pass. The candidate also revalidates its physical root before returning.
+
+## Remaining product work
+
+The existing 1412-case shadow corpus is retained. New work prioritizes actual Rust
+owners for the remaining host/artifact/Job paths and their current consumers.
+There is no seven-day nightly prerequisite or same-release Swift rollback target.
+Installed activation and final GJ/UI acceptance remain pending; isolated host
+checks do not authorize device dispatch or erase unresolved real-device records.
+
+## Validation so far
+
+- 1412 cases across 31 XCTest methods passed on the approved scope baseline.
+  Immutable receipt:
+  [local-shadow-trace-filesystem-20260910.json](local-shadow-trace-filesystem-20260910.json).
+  Log: `/private/tmp/xpa012-shadow-trace-filesystem.log`.
+- The 23 new filesystem vectors reproduced 16 assertion failures before the
+  candidate fix and then passed with all six Trace test methods. Both previously
+  failing App/package dependency tests, all seven platform filesystem/lock tests,
+  and all-target hoststore/platform Clippy also passed.
+
+- After synchronizing the adapter constant and pin assertions, all 1389 shadow
+  cases across 30 XCTest methods passed again. Current immutable receipt:
+  [local-shadow-trace-reviewed-pin-20260910.json](local-shadow-trace-reviewed-pin-20260910.json).
+  Log: `/private/tmp/xpa012-shadow-trace-reviewed-pin.log`. The preceding
+  structure receipt stays unchanged and records its earlier source snapshot.
+- The second unified run reached the full Swift suite and failed the old pin
+  expectations in architecture/dependency assertions. Those expected revisions
+  were synchronized afterward. The App scope approval and matching revision
+  were then completed as recorded above.
+  Log: `/private/tmp/xpa012-shadow-trace-structure-final-gate.log`.
+
+- The first unified gate stopped at the design mirror pin assertion. The
+  shortcut catalog and parser source lock are byte-identical across the upstream
+  update; current design/CLI/user-guide references were refreshed to the same pin.
+
+- 1389 cases across 30 XCTest methods passed using the reviewed dependency.
+  Immutable receipt:
+  [local-shadow-trace-structure-20260910.json](local-shadow-trace-structure-20260910.json).
+  Log: `/private/tmp/xpa012-shadow-trace-structure.log`.
+- All five Trace test methods, seven receipt integrity tests, and all-target
+  hoststore Clippy passed. The initial structure vectors exposed decoder
+  differences; the Unicode extension also caught the Foundation UTF-32LE prefix
+  behavior before the final comparison passed.
+
+- The 1264-case implementation passed the complete-diff unified gate (exit 0):
+  Swift full suite, App test build, design-system, published/candidate Rust
+  contracts, cargo deny and cargo vet (26 audited). Log:
+  `/private/tmp/xpa012-shadow-trace-integers-gate.log`.
+
+- 1264 cases across 29 XCTest methods passed, including the 252 Trace numeric
+  comparisons. Immutable receipt:
+  [local-shadow-trace-integers-20260910.json](local-shadow-trace-integers-20260910.json).
+  Log: `/private/tmp/xpa012-shadow-trace-integers.log`.
+- Seven receipt integrity tests and all-target hoststore Clippy passed. The first
+  targeted launch used an incorrect binary filename; correcting the path then
+  reproduced 116 differences with the old binary. The corrected candidate passed.
+
+- 1012 cases across 28 XCTest methods passed, including timestamp acceptance
+  and the full large/deep Session census. Immutable receipt:
+  [local-shadow-time-census-20260910.json](local-shadow-time-census-20260910.json).
+  Log: `/private/tmp/xpa012-shadow-time-census.log`.
+  Hoststore all-target Clippy and seven receipt integrity tests also passed.
+- The 1012-case implementation passed the complete-diff unified gate (exit 0):
+  Swift full suite, App test build, design-system, published/candidate Rust
+  contracts, cargo deny and cargo vet (26 audited). Log:
+  `/private/tmp/xpa012-shadow-time-census-gate.log`.
+
+- 782 cases across 25 XCTest methods passed. Immutable receipt:
+  [local-shadow-filesystem-20260910.json](local-shadow-filesystem-20260910.json).
+  Log: `/private/tmp/xpa012-shadow-filesystem-initialized.log`.
+  Seven platform filesystem/lock tests, seven receipt integrity tests and
+  hoststore/platform all-target Clippy also passed.
+- The 782-case implementation passed the complete-diff unified gate (exit 0):
+  Swift full suite, App test build, design-system, published/candidate Rust
+  contracts, cargo deny and cargo vet (26 audited). Log:
+  `/private/tmp/xpa012-shadow-filesystem-gate.log`.
+
+- 765 cases across 24 XCTest methods passed, including the new Session JSON
+  domain and manifest limits. Immutable receipt:
+  [local-shadow-session-json-20260910.json](local-shadow-session-json-20260910.json).
+  Log: `/private/tmp/xpa012-shadow-session-json-bounded.log`.
+- The 765-case implementation passed the complete-diff unified gate (exit 0):
+  Swift full suite, App test build, design-system, published/candidate Rust
+  contracts, cargo deny and cargo vet (26 audited). Log:
+  `/private/tmp/xpa012-shadow-session-json-gate.log`.
+
+- The 713-case implementation passed the complete-diff unified gate (exit 0):
+  Swift full suite (2567 parallel tests plus six serialized timing/race tests),
+  App test build, design-system, published/candidate Rust contracts, cargo deny,
+  and cargo vet (26 audited). Log: `/private/tmp/xpa012-shadow-registry-gate.log`.
+
+- 713 cases across 22 XCTest methods passed, including expanded registry and
+  published-identity coverage. The immutable receipt is
+  [local-shadow-registry-20260910.json](local-shadow-registry-20260910.json).
+  It includes actual dependency source hashes and remains `cutoverEligible: false`.
+  Log: `/private/tmp/xpa012-shadow-registry-provenance-build.log`.
+
+- The 611-case implementation passed the complete-diff unified gate (exit 0):
+  Swift full suite (2565 parallel tests plus six serialized timing/race tests),
+  App test build, design-system, published/candidate Rust contracts, cargo deny,
+  and cargo vet (26 audited). Log:
+  `/private/tmp/xpa012-shadow-typed-manifests-gate.log`.
+
+- 611 cases across 20 XCTest methods passed, including 32 new Step semantic
+  boundaries. Initial fixture setup omitted catalog initialization; adding it
+  restored the expected complete measurement for valid cases. The immutable snapshot is
+  [local-shadow-typed-manifests-20260910.json](local-shadow-typed-manifests-20260910.json).
+  It retains `sourceDirty: true` and `cutoverEligible: false`.
+  Log: `/private/tmp/xpa012-shadow-semantics-catalog.log`.
+- The runner now verifies the actual SwiftPM ArkTrace checkout before and after
+  the comparisons. It requires the resolved revision and actual HEAD to match,
+  rejects dirty/untracked/ignored inputs, compares every tracked file with the
+  fixed Git tree, and records SHA-256 for all 370 checkout files. The two upstream
+  license files explicitly marked CRLF are verified with pinned-tree attributes
+  and their original checkout bytes are retained in the hash manifest.
+- Seven receipt/provenance integrity tests pass, including modified bytes hidden
+  behind a clean Git status, resolution mismatch and restricted CRLF conversion.
+
+- 579 cases across 19 XCTest methods passed after the Runtime audit field fix.
+  Log: `/private/tmp/xpa012-shadow-runtime-audit-fixed.log`. Its source is superseded by the 611-case snapshot above.
+
+- 131 cases across 12 XCTest methods passed after the parameter/Unicode fixes.
+  Log: `/private/tmp/xpa012-shadow-parameter-unicode-fixed.log`.
+- The parameter snapshot passed the full unified gate (exit 0): Swift full
+  suite, App test build, design-system, published/candidate Rust contracts,
+  cargo deny and cargo vet (25 audited). Log:
+  `/private/tmp/xpa012-shadow-parameters-gate.log`.
+- 105 cases across 11 XCTest methods passed. Latest execution log:
+  `/private/tmp/xpa012-shadow-session-artifacts.log`.
+- Four receipt integrity tests, five filesystem/lock tests and hoststore/platform
+  all-target Clippy passed. One Clippy style finding was fixed using `as_chunks`.
+- Earlier full unified gates passed through the 65-case implementation, including
+  Swift, App build-for-testing, design-system and published/candidate Rust lanes,
+  cargo deny and cargo vet (25 audited).
+- The expanded Session implementation also passed the complete-diff unified
+  gate (exit 0), including all selected lanes and cargo vet (25 audited). Log:
+  `/private/tmp/xpa012-shadow-session-gate.log`.
+
+Initial differential failures exposed extra-field acceptance in Swift and were
+fixed in the readers. Trace fixture initialization initially failed because
+Foundation normalizes `/private/tmp` after directory creation; fixture path
+handling was corrected without relaxing production guards. The Session timestamp
+test initially needed `@testable import ArkDeckStorage`; no production visibility
+or frozen Storage source was changed. No device operation was run.
+
+
+## Rust History owner development slice
+
+The completed pre-owner snapshot passed the full unified gate (exit 0), including
+Swift/App, published/candidate Rust checks, cargo deny and cargo vet. Log:
+`/private/tmp/xpa012-shadow-trace-filesystem-gate.log`. This result describes the
+shadow snapshot, not the subsequent owner implementation.
+
+The new slice directly serves History filter list/save/delete through the Rust
+control handler and CLI. `ARKDECK_DEVELOPMENT_STATE_ROOT` must name an existing
+physical private directory outside installed ArkDeck state, and `ARKDECK_ENDPOINT`
+must be directly inside it. Swift pairing and HDC configuration are refused in
+this mode. The directory transport lock prevents a second daemon and permits
+restart after process death; the per-document lock plus CAS serializes updates.
+The writer uses a fresh 0600 file, file sync, rename and directory sync. Errors
+with uncertain publication require read-back and are never retried automatically.
+
+`rust/scripts/check-history-owner.py` passed 18 real control exchanges plus CLI
+save/list/stale-generation checks. It kills and restarts the daemon on the same
+endpoint, checks concurrent CAS, an externally held lock, second-daemon refusal,
+delete/tombstone generations, orphan transactions, corrupt/link refusal and a
+real permission-induced write failure. All directories are disposable test-owned
+roots; device dispatch count is zero. Recorded exchanges supplement the three
+current method schemas (saved-list timestamp, nullable identities, owner errors).
+The schema generator retains the owner's existing failure vocabulary even when
+an individual recording does not encounter every filesystem crash window.
+
+Platform subprocess tests terminate at the actual pre-rename and post-rename
+checkpoints. A new process reads exactly the complete old or new document,
+reacquires the lock and publishes again. This proves process-crash behavior, not
+power-loss durability or hardware acceptance. Existing decoder regression tests
+remain unchanged.
+
+The unified entry completed common checks, the full Swift suite, App
+build-for-testing and design-system checks. Its Rust view initially failed because
+new tests imported History CLI fixtures outside the existing baseline input list.
+An attempted pin expansion passed a local Rust check, but automatic approval
+review rejected adding the baseline path to this task's scope. That expansion was
+reverted before publication. The original baseline remains byte-for-byte intact;
+new History argument tests live within the Rust test target, alongside the actual
+daemon/CLI integration checks. No existing corpus or test was removed.
+
+The final Rust recheck after that scope reduction passed both published and
+candidate views, including Clippy, all workspace tests, process self-test, the
+read-only control/CLI checks and 18 actual candidate History exchanges. Final log:
+`/private/tmp/xpa012-history-owner-final-rust.log`. Earlier logs:
+`/private/tmp/xpa012-history-owner-gate.log` and
+`/private/tmp/xpa012-history-owner-rust-gate.log`.
+Unaffected Swift/App lanes were not repeated after Rust test-input changes.
+SDD reported zero errors/warnings; cargo deny and cargo vet passed (26 audited
+dependencies). The implementation remains pending maintainer review and installed
+acceptance.
+
+
+PR [#1841](https://github.com/ArkDeck/ArkDeck/pull/1841) was created by the repository
+bot. Its initial Swift tests, App build, design-system and path/SDD checks passed.
+Linux and Windows Clippy found `session_graphemes::indices` unused because its
+consumers are macOS-only. The helper now uses the same macOS compilation guard;
+no lint suppression or consumer behavior changed. Local all-workspace/all-target
+Clippy passed for both `x86_64-unknown-linux-gnu` and `x86_64-pc-windows-msvc`, and
+macOS hoststore Clippy passed. These are compilation checks, not Windows support
+or device acceptance. Remote checks on the updated commit remain pending.

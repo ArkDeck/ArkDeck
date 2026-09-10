@@ -70,6 +70,13 @@ GENERIC_ERROR_CODES = [
     "recordUnreadable", "rejected", "unknownMethod", "unsupportedProtocolVersion",
     "workspaceReferenceNotFound",
 ]
+# The local History owner can report publication failures even when a bounded
+# recording run does not hit a filesystem fault. Keep its current failure
+# vocabulary explicit alongside the generic errors; do not infer safe replay.
+HISTORY_OWNER_ERROR_CODES = [
+    "invalidInput", "resourceConflict", "resourceNotFound", "recordUnreadable",
+    "quotaExceeded", "ioFailure", "outcomeUnknown",
+]
 MAXIMUM_SIGNATURES_PER_METHOD = 24
 MAXIMUM_SAMPLE_BYTES = 65536
 
@@ -188,7 +195,10 @@ def derive_method_schemas(source):
         results = [frame["result"] for frame, _ in samples if frame["ok"] and "result" in frame]
         errors = [frame["error"] for frame, _ in samples if not frame["ok"]]
         details = [error["details"] for error in errors if "details" in error]
-        codes = sorted({error["code"] for error in errors} | set(GENERIC_ERROR_CODES))
+        codes = sorted({error["code"] for error in errors} | set(GENERIC_ERROR_CODES)
+                       | (set(HISTORY_OWNER_ERROR_CODES) if method in {
+                           "history.filter.list", "history.filter.save", "history.filter.delete"
+                       } else set()))
         schema = {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "$id": f"https://arkdeck.dev/schemas/control/methods/{method}.json",

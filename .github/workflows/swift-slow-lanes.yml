@@ -34,6 +34,52 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  host-store-shadow:
+    runs-on: macos-26
+    timeout-minutes: 30
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+    steps:
+      - name: Checkout default branch with runner Git
+        run: |
+          set -eu
+          git init .
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags --prune --depth 1 origin "${GITHUB_REF}"
+          git checkout --detach FETCH_HEAD
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - name: Select pinned toolchains
+        working-directory: rust
+        run: |
+          set -eu
+          test -d "$DEVELOPER_DIR"
+          xcodebuild -version
+          rustup toolchain install --profile minimal --no-self-update
+          rustup show active-toolchain
+      - name: Compare isolated host stores through both implementations
+        run: |
+          set -euo pipefail
+          python3 -m unittest rust/scripts/test_hoststore_shadow.py
+          python3 rust/scripts/hoststore-shadow.py \
+            --output "$RUNNER_TEMP/host-store-shadow.json" \
+            2>&1 | tee "$RUNNER_TEMP/host-store-shadow.log"
+      - name: Archive comparison receipts and failure diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1 (Node 24)
+        with:
+          name: host-store-shadow-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/host-store-shadow.json
+            ${{ runner.temp }}/host-store-shadow.log
+          if-no-files-found: error
+          retention-days: 90
+      - name: Summary
+        if: always()
+        run: |
+          echo "Host stores: isolated Swift/Rust differential fixtures; no installed Runtime state." >> "$GITHUB_STEP_SUMMARY"
+          echo "Receipts report remaining coverage. Success alone does not authorize owner cutover." >> "$GITHUB_STEP_SUMMARY"
+          echo "Manual runs and retries do not add nightly days; scheduled evidence requires run provenance review." >> "$GITHUB_STEP_SUMMARY"
+
   slow-lanes:
     runs-on: macos-26
     # Measured locally (warm build): the four lanes take ~170s total

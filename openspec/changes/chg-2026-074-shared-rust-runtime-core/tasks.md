@@ -42,6 +42,21 @@ scope supplement PR is from now on expected only for a security-kernel exception
 adjacent file. TASK-XPA-003's live supplements stand as they are. r9 changes no dependency,
 status, acceptance criterion, hardware criterion or design text.
 
+Revision 10 (2026-09-10, implementation review) applies the user's unreleased-product
+premise: ordinary existing state is rebuildable test data. Development proceeds by actual
+interfaces and runnable milestones, not the old numbered serial DAG. There is no seven-day
+nightly wait and no same-release Swift rollback or universal old-data interread goal.
+Existing differential tests, fixes and immutable receipts remain regression evidence.
+A: Rust host/artifact/Job execution plus HDC Observe/Diagnostics and CLI persistence;
+B: remaining macOS features, ClientKit, performance and soak along their actual dependencies;
+C: remove Swift targets and the facade only after consumers detach, then verify final
+GJ-1..5, App UI, installation/signing/IPC identity and recovery. Windows follows macOS.
+Compatibility note (PRODUCT-LOOP §2/§16): old readiness and sequencing labels do not block
+isolated implementation. Normal path checks and maintainer review still apply. New roots
+never erase Raw Artifact, real intent/outcome, capability/recovery or evidence, nor bypass
+pending effects on the same device. Device activation still requires one published Runtime,
+fresh facts and complete mechanical safety proof. No approval or hardware pass is implied.
+
 Conventions shared by every task:
 
 - One task = one vertical PR that carries production code, tests, applicable real-device
@@ -687,24 +702,31 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 
 ## TASK-XPA-012 — Move host-only durable stores to the Rust owner on macOS
 
-- Status:blocked
+- Status:in-progress（2026-09-10: existing shadow regression retained; isolated Rust History owner serves CLI/control writes and restart reads; remaining host stores and final integration acceptance pending）
 - Platform:macos
 - Requirements:`session-artifact-storage` (storage owner), `docs/design/cli-runtime-storage.md:11-24`
 - Acceptance:XPA-AC-1, XPA-AC-7, XPA-AC-9; macOS GJ-1 re-pass
 - Depends on:TASK-XPA-003
-- Readiness input pins（非载体示例）:
+- Readiness input pins（protected-main source baseline; candidate changes are tested against these inputs）:
 
-  ```yaml pin-example
+  ```yaml pins
+  - path: main
+    commit: eae27c6b97c2d9e5d67c8eee2d9353f2c0d38b93
   - path: Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeSessionStorageStore.swift
-    blob: <40-hex git OID>
+    blob: 5d4f994d33f8054c9cb6988aeaa94b0be7ce16ab
   ```
 
 - Applicable failure patterns:AF-004, AF-005, AF-018
-- Production reachability:the façade serves session storage, history filters, display names, trace cache, tool/bundle registry and storage policy locally; lock file names and JSON shapes unchanged; the Swift daemon no longer opens these stores
-- Trusted fact sources:generation-CAS documents under the same lock discipline; the App's `UserDefaults` record remains a one-shot migration candidate only
+- Production reachability:the Rust daemon owns session storage, history filters, display names, trace cache, tool/bundle registry and storage policy; develop against an explicit isolated root, then detach Swift consumers before installed activation. The first slice serves `history.filter.*` directly without a Swift child.
+- Trusted fact sources:generation-CAS documents under the same lock discipline; ordinary saved filters and display preferences may be rebuilt. These local preferences confer no device authority.
 - Allowed paths:
+  - `Packages/ArkDeckKit/Package.swift`（declared scope extension: pin the reviewed ArkTrace strict metadata reader; no dependency product or target changes）
+  - `Packages/ArkDeckKit/Package.resolved`（declared scope extension: pin the reviewed ArkTrace strict metadata reader; no dependency product or target changes）
+  - `ArkDeck.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved`（declared scope extension: pin the reviewed ArkTrace strict metadata reader; no dependency product or target changes）
   - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`
   - `rust/**`
+  - `Packages/ArkDeckKit/Scripts/generate-control-contract.py`（declared scope extension: publish the existing History owner error vocabulary alongside actual recorded responses）
+  - `spec/control/methods/history.filter.*.json`（current empty/saved/deleted History response shapes, nullable identities and owner failures）
   - `.github/workflows/swift-slow-lanes.yml`（proposed scope supplement: add the host-only read-only shadow nightly job and archive its comparison receipts; preserve existing jobs, triggers, permissions and gates; effective only after maintainer merge）
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/**`（disable the Swift owner of these stores）
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/**`
@@ -727,13 +749,13 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 
 ### Deliverables
 
-- Read-only shadow comparison harness (≥ 7 nightly days of byte-equal projections before cutover); owner switch with rollback drill.
+- Preserve the existing read-only shadow regression and deliver actual Rust owners with bounded local/CI checks, restart read-back, locks, CAS and atomic publication. Nightly is background regression, not a calendar gate.
 
 ### Verification
 
-- XPA-AC-1 → Swift's current strict decoders read Rust-written documents; the key set of every record equals the Swift `CodingKeys`; a negative vector with one extra key is refused by Swift (field-set freeze, design §G.2, r3).
+- XPA-AC-1 → current consumers, wire schemas, canonical bytes and digest/reference identity remain correct; retain strict field checks. No requirement to read rebuildable legacy test data solely for rollback.
 - XPA-AC-7 → lock contention and CAS conflicts fail closed.
-- XPA-AC-9 → rollback drill recorded.
+- XPA-AC-9 → isolated-root restart and single-owner checks; preserve installed state and unresolved real-device records until the reviewed final activation.
 
 ### Notes / handoff
 

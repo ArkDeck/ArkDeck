@@ -268,7 +268,18 @@ public final class RuntimeHistoryFilterStore: @unchecked Sendable {
       data.append(contentsOf: buffer.prefix(count))
     }
     do {
+      var duplicateValidator = StrictJSONDuplicateValidator(data: data)
+      try duplicateValidator.validate()
       let document = try JSONDecoder().decode(Document.self, from: data)
+      let raw = try JSONSerialization.jsonObject(with: data) as? NSDictionary
+      let roundtrip = try JSONSerialization.jsonObject(
+        with: CanonicalJSONEncoders.canonical().encode(document)) as? NSDictionary
+      // Freeze the complete Codable field set, including nested query fields.
+      // Accept existing whitespace/key ordering; never silently drop a new key.
+      guard let raw, let roundtrip, raw == roundtrip else {
+        throw RuntimeHistoryFilterFailure(
+          "recordUnreadable", "History filter document contains unsupported fields")
+      }
       try validate(document)
       return document
     } catch let failure as RuntimeHistoryFilterFailure {

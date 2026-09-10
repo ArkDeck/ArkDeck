@@ -1,4 +1,4 @@
-//! The first three current CLI leaves; machine envelopes follow the Swift v1 contract.
+//! Current Rust CLI leaves; machine envelopes follow the current contract.
 use arkdeck_client::ClientError;
 use arkdeck_contract::{ContractError, PROTOCOL_VERSION, canonical_json};
 use serde_json::{Map, Value, json};
@@ -42,6 +42,9 @@ impl CliError {
             | "controlMethodUnavailable"
             | "healthRequirementFailed" => 69,
             "recordUnreadable" => 2,
+            "ioFailure" => 74,
+            "outcomeUnknown" => 75,
+            "quotaExceeded" => 69,
             "operationFailed" => 1,
             "clientTimeout" => 75,
             "admissionDenied" => 77,
@@ -51,7 +54,9 @@ impl CliError {
     pub fn from_client(error: ClientError, method: &str) -> Self {
         let mut result = match error {
             ClientError::Transport(error) => Self::new(
-                if matches!(
+                if matches!(method, "history.filter.save" | "history.filter.delete") {
+                    "outcomeUnknown"
+                } else if matches!(
                     error.kind(),
                     std::io::ErrorKind::TimedOut | std::io::ErrorKind::WouldBlock
                 ) {
@@ -80,7 +85,20 @@ impl CliError {
                     d.get("phase") == Some(&json!("preAdmission"))
                         && d.get("newDispatchCount") == Some(&json!(0))
                 });
+                let history_proof = matches!(
+                    method,
+                    "history.filter.list" | "history.filter.save" | "history.filter.delete"
+                ) && error.details.as_ref().is_some_and(|d| {
+                    d.get("phase") == Some(&json!("historyFilterOwner"))
+                        && d.get("newDispatchCount") == Some(&json!(0))
+                });
                 let code = match error.code.as_str() {
+                    "invalidInput" if history_proof => "invalidInput",
+                    "resourceConflict" if history_proof => "resourceConflict",
+                    "resourceNotFound" if history_proof => "resourceNotFound",
+                    "ioFailure" if history_proof => "ioFailure",
+                    "outcomeUnknown" if history_proof => "outcomeUnknown",
+                    "quotaExceeded" if history_proof => "quotaExceeded",
                     "unsupportedProtocolVersion" => "protocolVersionUnsupported",
                     "malformedFrame" => "protocolMalformed",
                     "unknownMethod" => "controlMethodUnavailable",
@@ -120,6 +138,7 @@ pub fn valid_correlation(id: &str) -> bool {
 
 pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
     let mut positional = Vec::new();
+    let mut history_options = Map::new();
     let mut seen = std::collections::BTreeSet::new();
     let (mut mode, mut id, mut socket) = (None, None, None);
     let (mut deep, mut require_healthy, mut help) = (false, false, false);
@@ -137,6 +156,33 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                 "--help" | "-h" => help = true,
                 "--deep" => deep = true,
                 "--require-healthy" => require_healthy = true,
+                "--expected-generation"
+                | "--search"
+                | "--status"
+                | "--mode"
+                | "--session"
+                | "--target"
+                | "--time"
+                | "--activity" => {
+                    index += 1;
+                    let value = argv
+                        .get(index)
+                        .filter(|v| !v.starts_with("--"))
+                        .ok_or_else(|| {
+                            CliError::new(
+                                "invalidOption",
+                                "the History filter option requires a value",
+                            )
+                        })?;
+                    let key = match argument.as_str() {
+                        "--expected-generation" => "expectedGeneration",
+                        "--session" => "sessionId",
+                        "--target" => "targetId",
+                        "--time" => "timeRange",
+                        other => &other[2..],
+                    };
+                    history_options.insert(key.to_owned(), json!(value));
+                }
                 "--output" | "--control-request-id" | "--socket" => {
                     index += 1;
                     let value =
@@ -178,7 +224,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                 _ => {
                     return Err(CliError::new(
                         "invalidOption",
-                        "the option is not available for this read-only command",
+                        "the option is not available for this command",
                     ));
                 }
             }
@@ -191,11 +237,14 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["doctor"] => "doctor",
         ["operation", "list"] => "operation.list",
         ["device", "candidates"] => "device.candidates",
+        ["history", "filter", "list"] => "history.filter.list",
+        ["history", "filter", "save"] => "history.filter.save",
+        ["history", "filter", "delete"] => "history.filter.delete",
         [] if help => "help",
         _ => {
             return Err(CliError::new(
                 "invalidCommand",
-                "available commands: doctor, operation list, device candidates",
+                "available commands: doctor, operation list, device candidates, history filter list|save|delete",
             ));
         }
     };
@@ -204,6 +253,99 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             "invalidOption",
             "--deep and --require-healthy belong to doctor",
         ));
+    }
+    if !matches!(command, "history.filter.save" | "history.filter.delete")
+        && !history_options.is_empty()
+        || command == "history.filter.delete"
+            && history_options
+                .keys()
+                .any(|key| key != "expectedGeneration")
+    {
+        return Err(CliError::new(
+            "invalidOption",
+            "the option does not belong to this command",
+        ));
+    }
+    if !help
+        && matches!(command, "history.filter.save" | "history.filter.delete")
+        && !history_options.contains_key("expectedGeneration")
+    {
+        return Err(CliError::new(
+            "invalidOption",
+            "History filter save and delete require --expected-generation",
+        ));
+    }
+    if !help {
+        if let Some(generation) = history_options.get("expectedGeneration") {
+            let text = generation.as_str().expect("option text");
+            if !text
+                .parse::<u64>()
+                .is_ok_and(|n| n > 0 && n <= i64::MAX as u64 && n.to_string() == text)
+            {
+                return Err(CliError::new(
+                    "invalidOption",
+                    "--expected-generation must be a canonical positive integer",
+                ));
+            }
+        }
+        for (key, allowed) in [
+            (
+                "status",
+                &[
+                    "all",
+                    "active",
+                    "needsAttention",
+                    "succeeded",
+                    "failed",
+                    "interrupted",
+                    "cancelled",
+                ][..],
+            ),
+            (
+                "mode",
+                &["all", "execute", "planned", "simulated", "unknown"][..],
+            ),
+            (
+                "timeRange",
+                &["anyTime", "lastHour", "lastDay", "lastWeek"][..],
+            ),
+            (
+                "activity",
+                &[
+                    "all",
+                    "flash",
+                    "viewer",
+                    "trace",
+                    "diagnostics",
+                    "debug",
+                    "device",
+                    "other",
+                ][..],
+            ),
+        ] {
+            if history_options
+                .get(key)
+                .is_some_and(|v| !allowed.contains(&v.as_str().expect("option text")))
+            {
+                return Err(CliError::new(
+                    "invalidOption",
+                    "unsupported History filter option value",
+                ));
+            }
+        }
+    }
+    if command == "history.filter.save" {
+        for (key, value) in [
+            ("search", json!("")),
+            ("status", json!("all")),
+            ("mode", json!("all")),
+            ("sessionId", Value::Null),
+            ("targetId", Value::Null),
+            ("timeRange", json!("anyTime")),
+            ("activity", json!("all")),
+        ] {
+            history_options.entry(key).or_insert(value);
+        }
     }
     if help && mode.is_some() {
         return Err(CliError::new(
@@ -220,6 +362,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         },
         params: if command == "doctor" {
             Some(serde_json::from_value(json!({"deep":deep})).unwrap())
+        } else if command.starts_with("history.filter.") {
+            Some(history_options)
         } else {
             None
         },

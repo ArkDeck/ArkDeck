@@ -1,4 +1,4 @@
-//! Transport-free read-only handlers.
+//! Transport-free handlers for the current control contract.
 
 use arkdeck_contract::{
     CATALOG_CANONICAL_JSON, CATALOG_DIGEST, CONTRACT_IDENTITY, ContractError,
@@ -8,9 +8,20 @@ use arkdeck_contract::{
 };
 use serde_json::{Value, json};
 
-/// Only the composition root can provide observations. There is no process,
-/// durable owner, caller-supplied evidence, or mutation entry point here.
-pub trait ReadOnlyHost: Send + Sync {
+/// The composition root supplies local resources and device observations.
+/// This interface provides no device mutation or authority administration.
+pub trait HostServices: Send + Sync {
+    fn history_filter(
+        &self,
+        _method: &str,
+        _params: &serde_json::Map<String, Value>,
+    ) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "rejected".into(),
+            message: "History filter owner is not configured".into(),
+            details: None,
+        })
+    }
     fn observed_at(&self) -> String;
     fn hdc_status(&self, deep: bool) -> HdcStatus;
     fn observations(&self) -> Result<DeviceObservationsResult, WireError>;
@@ -44,7 +55,7 @@ pub struct Control<H> {
     operations: Value,
 }
 
-impl<H: ReadOnlyHost> Control<H> {
+impl<H: HostServices> Control<H> {
     pub fn new(host: H) -> Result<Self, ContractError> {
         if sha256_hex(CATALOG_CANONICAL_JSON.as_bytes()) != CATALOG_DIGEST {
             return Err(ContractError::ContractMismatch);
@@ -178,6 +189,10 @@ impl<H: ReadOnlyHost> Control<H> {
                     }
                 }
             }
+            "history.filter.list" | "history.filter.save" | "history.filter.delete" => Response {
+                id: request.id.clone(),
+                outcome: self.host.history_filter(&request.method, &params),
+            },
             _ => Response::failure(
                 &request.id,
                 "rejected",

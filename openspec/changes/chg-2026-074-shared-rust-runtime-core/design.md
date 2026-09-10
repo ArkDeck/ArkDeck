@@ -112,25 +112,30 @@ materialisation.
 
 ## Migration order (design §G)
 
-1. After SVC-001..004, XPA-001 publishes per-method typed schemas; the Rust contract kernel
-   proves byte-for-byte equality with the pinned post-SVC Swift oracle per current asset.
-2. Rust control-plane façade owns UDS/Mach service and forwards to the Swift daemon on a private
-   socket; peer hardening; the Swift daemon's Mach service speaks the same raw libxpc frames so
-   the App and daemon of one release roll back together.
-3. Read-only shadow validation, then durable stores move owner one at a time: host-only stores →
-   artifact store → admission/job/capability/recovery, with the Swift engine reduced to an executor
-   sidecar under per-step typed permits.
-4. Providers move family by family (analyzer/workspace → HDC → ArkForge lane); the Rust CLI
-   reaches full fixture parity, the App moves to `ArkDeckClientKit` and the performance lanes
-   measure the Rust daemon and a Rust soak fixture; only then are the Swift daemon, engine and
-   storage targets retired (r3/r5: nothing may still link or build a deleted target).
-5. Windows starts from the thinnest real GJ-1 walking skeleton and proceeds to GJ-2..5; the WinUI
-   3 client follows the same daemon projections.
+The r10 implementation proposal uses the unreleased-product premise: ordinary test data is
+rebuildable. Retain the delivered facade/IPC foundation and existing regression corpus, but
+remove the seven-nightly-day wait, same-release Swift rollback and universal legacy interread
+requirements from development. No historical receipt is rewritten or reclassified.
 
-Every macOS step is releasable and rolls back by pointing the LaunchAgent at the Swift daemon of
-the same release after SVC, which reads Rust-written bytes with the pinned strict decoders; cutover
-preflight refuses in-flight jobs and pending intents while parked `waitingForRecovery` jobs and
-`outcomeUnknown` lanes are carried across owners unchanged.
+1. Build the final Rust host/artifact/Job path and HDC Observe/Diagnostics with a working Rust
+   CLI. Use an explicit isolated development root; prove write/restart, CAS, locking and crash
+   windows. The first History slice configures `ARKDECK_DEVELOPMENT_STATE_ROOT` and a socket
+   directly inside it; it refuses Swift pairing and HDC configuration and holds the existing
+   transport-directory lock, so this host-only slice cannot activate real device execution.
+2. Complete HAP Debug, native library, workspace/analyzer and ArkForge capabilities alongside
+   ClientKit adoption and Rust performance/soak. Follow real interface dependencies, not Task
+   number order. Add a temporary executor sidecar only if needed to shorten the final path.
+3. Detach all actual consumers before removing Swift daemon/engine/storage/CLI and the temporary
+   facade. Validate paired installation, signing, IPC identity, final GJ-1..5, applicable App UI,
+   crash recovery and performance. Windows implementation/acceptance follows.
+
+Old state is preserved or explicitly archived. Raw Artifact, real device intent/outcome,
+capability/recovery and evidence remain immutable/preserved. A new root cannot clear unresolved
+facts about the same real device: stop old execution, mechanically check pending work and keep
+one authoritative Runtime before activation. Unknown results never replay; missing proof means
+zero dangerous dispatch. Current contract, digest/reference and safety behavior still govern;
+necessary schema changes stay minimal, synchronized and subject to maintainer review. This
+proposal does not approve an AC change or declare any device validation complete.
 
 ## Alternatives rejected (design §C)
 

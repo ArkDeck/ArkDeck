@@ -559,7 +559,16 @@ package final class RuntimeTargetDisplayNameStore: @unchecked Sendable {
       data.append(contentsOf: buffer.prefix(count))
     }
     do {
+      var duplicateValidator = StrictJSONDuplicateValidator(data: data)
+      try duplicateValidator.validate()
       let document = try JSONDecoder().decode(Document.self, from: data)
+      let raw = try JSONSerialization.jsonObject(with: data) as? NSDictionary
+      let roundtrip = try JSONSerialization.jsonObject(
+        with: CanonicalJSONEncoders.canonical().encode(document)) as? NSDictionary
+      guard let raw, let roundtrip, raw == roundtrip else {
+        throw RuntimeTargetDisplayNameFailure(
+          "recordUnreadable", "display-name document contains unsupported fields")
+      }
       try validate(document)
       return document
     } catch let failure as RuntimeTargetDisplayNameFailure {

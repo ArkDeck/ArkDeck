@@ -101,3 +101,23 @@ pub fn random_bytes<const N: usize>() -> io::Result<[u8; N]> {
 mod macos_control;
 #[cfg(target_os = "macos")]
 pub use macos_control::{PeerOrigin, listen_mach};
+
+#[cfg(target_os = "macos")]
+mod host_store;
+#[cfg(target_os = "macos")]
+pub use host_store::{DocumentPublishError, HostDirectory, HostEntryKind, HostReadLock};
+
+#[cfg(target_os = "macos")]
+mod host_text;
+#[cfg(target_os = "macos")]
+pub use host_text::{host_canonical_text, host_control_character, host_whitespace_or_newline};
+
+#[cfg(target_os = "macos")]
+mod host_calendar;
+#[cfg(target_os = "macos")]
+pub use host_calendar::{host_gregorian_add_days, host_gregorian_seconds};
+
+#[cfg(target_os = "macos")]
+mod host_date_formatter;
+#[cfg(target_os = "macos")]
+pub use host_date_formatter::host_legacy_iso8601;

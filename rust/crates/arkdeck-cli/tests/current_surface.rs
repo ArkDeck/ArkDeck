@@ -4,7 +4,7 @@ use arkdeck_contract::WireError;
 use serde_json::{Value, json};
 
 #[test]
-fn current_three_argv_fixture_families_replay_without_a_device() {
+fn current_argv_fixture_families_replay_without_a_device() {
     for bytes in [
         include_str!(
             "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI/argv/doctor.json"
@@ -90,4 +90,92 @@ fn unknown_execution_is_never_invented_as_zero_execution_by_error_mapping() {
     assert!(!error.details.contains_key("newDispatchCount"));
     let envelope = failure_envelope("device.candidates", &error, "ctl-test", true);
     assert_eq!(envelope["error"]["controlRequestRetryable"], false);
+}
+
+#[test]
+fn history_owner_failure_scope_and_lost_reply_are_preserved() {
+    for (method, phase, expected) in [
+        (
+            "history.filter.save",
+            "historyFilterOwner",
+            "resourceConflict",
+        ),
+        ("job.run", "historyFilterOwner", "internalError"),
+        ("history.filter.save", "other", "internalError"),
+    ] {
+        let error = CliError::from_client(
+            ClientError::Remote(WireError {
+                code: "resourceConflict".into(),
+                message: "version changed".into(),
+                details: Some(
+                    serde_json::from_value(json!({"phase":phase,"newDispatchCount":0})).unwrap(),
+                ),
+            }),
+            method,
+        );
+        assert_eq!(error.code, expected);
+    }
+    let interrupted = CliError::from_client(
+        ClientError::Transport(std::io::ErrorKind::BrokenPipe.into()),
+        "history.filter.save",
+    );
+    assert_eq!(interrupted.code, "outcomeUnknown");
+    assert!(!interrupted.details.contains_key("newDispatchCount"));
+    assert_eq!(
+        failure_envelope("history.filter.save", &interrupted, "ctl-test", true)["error"]["controlRequestRetryable"],
+        false
+    );
+}
+
+#[test]
+fn history_cli_builds_complete_queries_and_rejects_invalid_options() {
+    let save =
+        parse(&["history", "filter", "save", "--expected-generation", "1"].map(str::to_owned))
+            .unwrap();
+    assert_eq!(save.method, "history.filter.save");
+    assert_eq!(
+        json!(save.params),
+        json!({"expectedGeneration":"1", "search":"", "status":"all", "mode":"all", "sessionId":null, "targetId":null, "timeRange":"anyTime", "activity":"all"})
+    );
+    for args in [
+        vec!["history", "filter", "save"],
+        vec!["history", "filter", "save", "--expected-generation", "01"],
+        vec![
+            "history",
+            "filter",
+            "save",
+            "--expected-generation",
+            "1",
+            "--status",
+            "invalid",
+        ],
+        vec![
+            "history",
+            "filter",
+            "delete",
+            "--expected-generation",
+            "1",
+            "--search",
+            "value",
+        ],
+        vec!["history", "filter", "list", "--expected-generation", "1"],
+        vec![
+            "history",
+            "filter",
+            "delete",
+            "--expected-generation",
+            "1",
+            "--expected-generation",
+            "1",
+        ],
+    ] {
+        assert_eq!(
+            parse(&args.into_iter().map(str::to_owned).collect::<Vec<_>>())
+                .unwrap_err()
+                .code,
+            "invalidOption"
+        );
+    }
+    let help = parse(&["history", "filter", "save", "--help"].map(str::to_owned)).unwrap();
+    assert!(help.help);
 }

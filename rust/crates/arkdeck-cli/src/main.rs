@@ -122,7 +122,7 @@ fn main() -> std::process::ExitCode {
     };
     if invocation.help {
         println!(
-            "ArkDeck read-only commands:\n  doctor [--deep] [--require-healthy]\n  operation list\n  device candidates\n\nOptions: --output human|json, --control-request-id <id>\nA private local Runtime must be running. Windows requires the installed daemon identity."
+            "ArkDeck commands:\n  doctor [--deep] [--require-healthy]\n  operation list\n  device candidates\n  history filter list\n  history filter save --expected-generation <n> [--search <text>] [--status <status>] [--mode <mode>] [--session <id>] [--target <id>] [--time <range>] [--activity <activity>]\n  history filter delete --expected-generation <n>\n\nOptions: --output human|json, --control-request-id <id>\nA private local Runtime must be running. Windows requires the installed daemon identity."
         );
         return 0.into();
     }

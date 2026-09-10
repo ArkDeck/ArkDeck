@@ -47,7 +47,7 @@ let package = Package(
       revision: "3f5b48cd7247f7e4304bb4f9d8a158f4feda5a92"),
     .package(
       url: "https://github.com/ArkDeck/ArkTrace.git",
-      revision: "c85731b0f903261bd69cf789027774fde615c8de"),
+      revision: "e6e3133d410fbd7455df17c9486dcd369607e97f"),
   ],
   targets: [
     .target(
