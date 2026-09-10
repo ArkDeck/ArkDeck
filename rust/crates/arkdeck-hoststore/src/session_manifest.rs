@@ -80,52 +80,8 @@ pub(super) fn hash(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
-// The CLI canonical encoder is intentionally not reused: its integer limit
-// and UTF-16 ordering are a different contract. Complex canonical JSON is an
-// explicit remaining branch until its Foundation encoder parity is covered.
-fn supported_json(value: &Value) -> Result<()> {
-    match value {
-        Value::Number(n) if !n.is_i64() && !n.is_u64() => Err(ManifestError::Unsupported),
-        Value::Object(fields) => {
-            if fields.keys().any(|key| !key.is_ascii()) {
-                return Err(ManifestError::Unsupported);
-            }
-            fields.values().try_for_each(supported_json)
-        }
-        Value::Array(values) => values.iter().try_for_each(supported_json),
-        _ => Ok(()),
-    }
-}
-
 pub(super) fn decode_manifest(bytes: &[u8]) -> Result<ManifestSummary> {
-    require(!bytes.is_empty() && bytes.len() <= 16 * 1024 * 1024)?;
-    // Do not misclassify a valid deep document as corrupt because serde's own
-    // recursion bound is lower than the current Swift reader's domain.
-    let (mut depth, mut string, mut escaped) = (0_usize, false, false);
-    for b in bytes {
-        if string {
-            if escaped {
-                escaped = false;
-            } else if *b == b'\\' {
-                escaped = true;
-            } else if *b == b'"' {
-                string = false;
-            }
-        } else {
-            match b {
-                b'"' => string = true,
-                b'{' | b'[' => {
-                    depth += 1;
-                    if depth > 64 {
-                        return Err(ManifestError::Unsupported);
-                    }
-                }
-                b'}' | b']' => depth = depth.saturating_sub(1),
-                _ => (),
-            }
-        }
-    }
-    let value = arkdeck_contract::strict_json(bytes).map_err(|_| ManifestError::Invalid)?;
+    let value = crate::session_json::parse(bytes).map_err(|_| ManifestError::Invalid)?;
     let doc = object(&value)?;
     keys(
         doc,
@@ -440,8 +396,6 @@ pub(super) fn decode_manifest(bytes: &[u8]) -> Result<ManifestSummary> {
         }
         _ => return Err(ManifestError::Invalid),
     }
-    supported_json(&value)?;
-    require(serde_json::to_vec(&value).map_err(|_| ManifestError::Invalid)? == bytes)?;
     Ok(ManifestSummary {
         session_id: session_id.to_owned(),
         job_id: job_id.to_owned(),
@@ -504,7 +458,7 @@ fn provenance(origin: &str) -> Result<Vec<String>> {
             .strip_prefix("derived:")
             .ok_or(ManifestError::Invalid)?,
     )?;
-    let value = arkdeck_contract::strict_json(&bytes).map_err(|_| ManifestError::Invalid)?;
+    let value = crate::session_json::parse(&bytes).map_err(|_| ManifestError::Invalid)?;
     let doc = object(&value)?;
     keys(
         doc,
@@ -538,8 +492,6 @@ fn provenance(origin: &str) -> Result<Vec<String>> {
             .iter()
             .all(|(k, v)| !k.is_empty() && k.len() <= 128 && v.as_i64().is_some_and(|v| v >= 0)),
     )?;
-    supported_json(&value)?;
-    require(serde_json::to_vec(&value).map_err(|_| ManifestError::Invalid)? == bytes)?;
     Ok(result)
 }
 fn validate_artifacts(values: &[Value]) -> Result<()> {

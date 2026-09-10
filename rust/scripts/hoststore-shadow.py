@@ -36,6 +36,10 @@ STEP_KINDS = (
     "createWorkspaceCheckpoint", "runDeterministicAnalyzer",
 )
 EXPECTED = {
+    **{f"json-{name}": "equal" for name in ("unicode-keys", "escaped-text", "integer-limits", "empty-object", "empty-array", "binary64-batch", "depth-256", "empty-depth-256")},
+    **{f"json-number-{index}": "equal" for index in range(17)},
+    **{f"json-refused-{name}": "refused" for name in ("duplicate-key", "canonical-duplicate-key", "escaped-duplicate-key", "unordered-keys", "whitespace", "integer-decimal", "negative-zero", "integer-exponent", "exponent-no-plus", "exponent-short", "noncanonical-escape", "invalid-escape", "lone-surrogate", "trailing-comma", "leading-zero", "infinity", "invalid-number", "trailing-data", "depth-overflow")},
+    **{f"inventory-json-{name}": "equal" for name in ("unicode-keys", "float-small", "float-big", "depth-boundary", "depth-overflow", "derived-unicode", "byte-boundary", "byte-overflow")},
     **{f"identity-published-{index}": "equal" for index in range(7)},
     **{f"tool-ledger-{name}": "equal" for name in ("active", "pending", "outcome-succeeded", "outcome-failed", "outcome-failed-reason", "pending-maximum-generation")},
     **{f"tool-ledger-{name}": "refused" for name in ("unordered-records", "pending-old-mismatch", "pending-new-missing", "pending-generation-mismatch",      "pending-action-invalid", "pending-old-unpinned", "pending-new-unpinned", "pending-outcome-paired",      "outcome-action-invalid", "outcome-result-invalid", "outcome-generation-mismatch", "outcome-old-missing",      "outcome-new-missing", "outcome-active-mismatch", "outcome-reason-invalid", "active-unavailable", "active-extra-owner")},
@@ -132,9 +136,7 @@ INPUTS = [
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/Unicode/LICENSE.txt",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/HostStoreStepShadowFixtures.swift",
     ".github/workflows/swift-slow-lanes.yml",
-    "Packages/ArkDeckKit/Scripts/run-swiftpm.sh",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/SessionStorage/SessionStorageFixtures.swift",
-    "rust/scripts/test_hoststore_shadow.py",
     "rust/Cargo.lock", "rust/Cargo.toml", "rust/rust-toolchain.toml",
     "Packages/ArkDeckKit/Package.swift", "Packages/ArkDeckKit/Package.resolved",
     "rust/crates/arkdeck-hoststore/Cargo.toml",
@@ -261,7 +263,7 @@ def validate_cases(directory: Path) -> list[dict]:
         case = json.loads(path.read_bytes())
         if set(case) != {"case", "store", "outcome", "inputSHA256", "projectionSHA256", "oracleBinarySHA256"}:
             raise ValueError("unexpected case shape")
-        expected_store = {"history": "history-filter", "bundle": "bundle-registry", "tool": "tool-registry", "names": "display-names", "session": "session-configuration", "trace": "trace-cache", "timestamp": "session-timestamp", "inventory": "session-storage", "graphemes": "session-graphemes", "identity": "tool-identity"}[path.stem.split("-", 1)[0]]
+        expected_store = {"history": "history-filter", "bundle": "bundle-registry", "tool": "tool-registry", "names": "display-names", "session": "session-configuration", "trace": "trace-cache", "timestamp": "session-timestamp", "inventory": "session-storage", "graphemes": "session-graphemes", "identity": "tool-identity", "json": "session-json"}[path.stem.split("-", 1)[0]]
         if (case["case"] != path.stem or case["store"] != expected_store
                 or case["outcome"] != EXPECTED[path.stem]):
             raise ValueError("case identity or outcome mismatch")

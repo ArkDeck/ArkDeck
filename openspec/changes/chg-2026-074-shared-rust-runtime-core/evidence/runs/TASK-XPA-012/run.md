@@ -36,6 +36,7 @@ Swift oracle may initialize or reconcile only its isolated fixtures.
 | Published tool identity | 7 | Actual Swift diagnostic lookup of both existing published digests and unknown spellings |
 | Session configuration | 5 | Policy/custom-root/full-width values and strict canonical fields |
 | Session timestamps | 20 | Exact Swift Date Double bits or matching refusal |
+| Session canonical JSON | 52 | UTF-8 keys, canonical duplicates, integer/float spelling, depth and manifest byte bounds |
 | Session status | 20 | Actual used/pinned bytes, counts, catalog generations and incomplete measurement |
 | Session parameters | 28 | Typed state, restore byte equality, status consistency and Swift character-count boundaries |
 | Session Steps | 224 | All 56 kinds, valid typed arguments, closed fields, required arguments and digests |
@@ -116,11 +117,19 @@ Provider support declaration or admission authority. Content/signature
 revalidation remains part of the subsequent filesystem owner implementation;
 these registry comparisons cover metadata decoders and their projections.
 
+The Session reader now validates the full current canonical JSON domain with a
+separate encoder/parser: UTF-8 key ordering, Swift canonical-equivalent duplicate
+keys, exact 64-bit integers, Foundation floating-point spelling and the current
+256-level strict-parser bound. It does not use the CLI JCS encoder or serde's
+smaller wire nesting bound. Noncanonical numeric/string spellings are refused;
+no durable document is normalized or rewritten. The implementation is exercised
+against the actual Swift encoder on finite values from 2048 deterministic
+binary64 bit patterns, explicit numeric boundaries, and full manifest/derived
+provenance records. A 16 MiB manifest and one-byte overflow verify the real store
+reader's size boundary and resulting inventory projection.
+
 ## Remaining work before harness review
 
-- Complete complex Foundation canonical JSON coverage. Unsupported encoding branches still stop the entire
-  comparison explicitly; they are never reported as corrupt or unaccounted
-  Sessions.
 - Finish the Session scan failure matrix and root/configuration stability checks.
 - Complete History/display-name timestamp refusal and remaining Trace metadata
   compatibility.
@@ -133,6 +142,15 @@ retries cannot manufacture those days. Owner/CAS/crash-window work, UI assertion
 GJ-1 re-pass and rollback evidence remain a later authorized cutover stage.
 
 ## Validation so far
+
+- 765 cases across 24 XCTest methods passed, including the new Session JSON
+  domain and manifest limits. Immutable receipt:
+  [local-shadow-session-json-20260910.json](local-shadow-session-json-20260910.json).
+  Log: `/private/tmp/xpa012-shadow-session-json-bounded.log`.
+- The 765-case implementation passed the complete-diff unified gate (exit 0):
+  Swift full suite, App test build, design-system, published/candidate Rust
+  contracts, cargo deny and cargo vet (26 audited). Log:
+  `/private/tmp/xpa012-shadow-session-json-gate.log`.
 
 - The 713-case implementation passed the complete-diff unified gate (exit 0):
   Swift full suite (2567 parallel tests plus six serialized timing/race tests),

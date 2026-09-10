@@ -45,8 +45,8 @@ fn typed(row: &Object) -> Result<()> {
         rank >= policy.binding
     })?;
     // Use the frozen Foundation document encoding domain, not CLI JCS.
-    supported_json(&row["arguments"])?;
-    let bytes = serde_json::to_vec(&row["arguments"]).map_err(|_| ManifestError::Invalid)?;
+    let bytes =
+        crate::session_json::encode(&row["arguments"]).map_err(|_| ManifestError::Invalid)?;
     require(
         text(row, "argumentsHash")?.to_ascii_lowercase() == arkdeck_contract::sha256_hex(&bytes),
     )

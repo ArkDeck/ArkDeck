@@ -10,6 +10,8 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 mod display_names;
 pub use display_names::decode_display_names;
+mod session_json;
+pub use session_json::decode_session_json;
 mod session_time;
 pub use session_time::decode_session_timestamp;
 mod session;

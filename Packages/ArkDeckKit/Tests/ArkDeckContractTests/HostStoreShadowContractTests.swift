@@ -170,6 +170,141 @@ final class HostStoreShadowContractTests: XCTestCase {
     try refuseExtraRegistryFields(kind: "tool-registry", prefix: "tool", file: file, read: read)
   }
 
+  private func frozenCanonicalJSON(_ value: JSONValue) throws -> Data {
+    let encoder = CanonicalJSONEncoders.canonical()
+    let first = try encoder.encode(value)
+    let canonical = try encoder.encode(JSONDecoder().decode(JSONValue.self, from: first))
+    XCTAssertEqual(try encoder.encode(JSONDecoder().decode(JSONValue.self, from: canonical)), canonical)
+    return canonical
+  }
+
+  func testSessionCanonicalJSONDomain() throws {
+    var values: [(String, JSONValue)] = [
+      ("unicode-keys", .object(["é": .integer(1), "e\u{301}x": .integer(2), "😀": .integer(3), "\u{E000}": .integer(4),
+        "Z": .integer(5), "z": .integer(6), "a2": .integer(7), "a10": .integer(8)])),
+      ("escaped-text", .string("\u{0}\u{8}\u{c}\n\r\t\u{1f}/\\\"\u{2028}\u{2029}😀")),
+      ("integer-limits", .array([.integer(Int64.min), .integer(Int64.max), .unsignedInteger(UInt64.max)])),
+      ("empty-object", .object([:])), ("empty-array", .array([])),
+    ]
+    let numbers: [Double] = [-0.0, 1.5, 0.0001, 0.00001, 0.000001, 1e20, -1e20,
+      Double.greatestFiniteMagnitude, Double.leastNormalMagnitude, Double.leastNonzeroMagnitude,
+      1000000000000000.25, 9007199254740992, -9223372036854775808.0, 18446744073709551616.0,
+      0.1, 1.2345678901234567, -2.2250738585072014e-308]
+    values += numbers.enumerated().map { ("number-\($0.offset)", .number($0.element)) }
+    var generator: UInt64 = 0x4a534f4e53574946
+    var random: [JSONValue] = []
+    for _ in 0..<2048 {
+      generator ^= generator << 13; generator ^= generator >> 7; generator ^= generator << 17
+      let number = Double(bitPattern: generator)
+      if number.isFinite { random.append(.number(number)) }
+    }
+    values.append(("binary64-batch", .array(random)))
+    var nested: JSONValue = .integer(0)
+    for _ in 0..<256 { nested = .array([nested]) }
+    values.append(("depth-256", nested))
+    nested = .array([])
+    for _ in 0..<256 { nested = .array([nested]) }
+    values.append(("empty-depth-256", nested))
+    for (name, value) in values {
+      let input = try frozenCanonicalJSON(value)
+      var strict = ArkDeckCore.StrictJSONDuplicateValidator(data: input)
+      try strict.validate()
+      let result = try rust(input, kind: "session-json")
+      XCTAssertEqual(result.status, 0, name)
+      if result.status != 0, name == "binary64-batch" {
+        for (index, scalar) in random.enumerated() {
+          let bytes = try frozenCanonicalJSON(scalar)
+          let probe = try rust(bytes, kind: "session-json")
+          if probe.status != 0 { XCTFail("binary64 scalar \(index): \(String(decoding: bytes, as: UTF8.self))") }
+        }
+      }
+      let envelope = try XCTUnwrap(JSONSerialization.jsonObject(with: result.output) as? [String: Any])
+      XCTAssertEqual(Data(try XCTUnwrap(envelope["document"] as? String).utf8), input, name)
+      let projection = try XCTUnwrap(envelope["projection"] as? [String: String])
+      XCTAssertEqual(projection["canonicalSHA256"], SHA256Hex.string(of: input), name)
+      try record(name: "json-" + name, input: input,
+        output: JSONSerialization.data(withJSONObject: projection, options: [.sortedKeys]), outcome: "equal", store: "session-json")
+    }
+    let rejected = [
+      "duplicate-key": #"{"a":1,"a":2}"#,
+      "canonical-duplicate-key": #"{"e\u0301":1,"é":2}"#,
+      "escaped-duplicate-key": #"{"\u0061":1,"a":2}"#,
+      "unordered-keys": #"{"z":1,"a":2}"#,
+      "whitespace": "[ 1]", "integer-decimal": "1.0", "negative-zero": "-0", "integer-exponent": "1e0",
+      "exponent-no-plus": "1e20", "exponent-short": "1e-5", "noncanonical-escape": #""\u0061""#,
+      "invalid-escape": #""\x20""#, "lone-surrogate": #""\ud800""#,
+      "trailing-comma": "[1,]", "leading-zero": "01", "infinity": "1e999", "invalid-number": "1.",
+      "trailing-data": "{}null", "depth-overflow": String(repeating: "[", count: 257) + "0" + String(repeating: "]", count: 257),
+    ]
+    for (name, text) in rejected {
+      let input = Data(text.utf8)
+      let accepted = (try? { () throws -> Bool in
+        var strict = ArkDeckCore.StrictJSONDuplicateValidator(data: input)
+        try strict.validate()
+        return try CanonicalJSONEncoders.canonical().encode(JSONDecoder().decode(JSONValue.self, from: input)) == input
+      }()) ?? false
+      XCTAssertFalse(accepted, name)
+      let result = try rust(input, kind: "session-json")
+      XCTAssertEqual(result.status, 65, name)
+      XCTAssertTrue(result.output.isEmpty, name)
+      try record(name: "json-refused-" + name, input: input, output: Data(), outcome: "refused", store: "session-json")
+    }
+  }
+
+  func testSessionComplexJSONManifestProjection() throws {
+    let owner = root.appending(path: "json-owner")
+    let sessions = root.appending(path: "json-sessions")
+    let store = try RuntimeSessionStorageStore(ownerRoot: owner, defaultSessionsRoot: sessions)
+    _ = try store.updatePolicy(.init(totalQuotaBytes: 1_000_000, safetyMarginBytes: 100, retentionDays: 7), expectedGeneration: 1)
+    let directory = try seedShadowSession(sessions: sessions, month: "01", id: "session-json", timestamp: "2026-01-01T00:00:00Z", includeArtifacts: true)
+    let baseData = try Data(contentsOf: directory.appending(path: "manifest.json"))
+    let catalog = try SessionRetentionCatalog(sessionsRoot: sessions)
+    try catalog.registerFinalizedSession(sessionRoot: directory, retentionDays: 7, policyGeneration: 2)
+    var deep: JSONValue = .integer(1)
+    for _ in 0..<252 { deep = .array([deep]) }
+    let values: [(String, JSONValue)] = [
+      ("unicode-keys", .object(["é": .string("decomposed e\u{301}"), "😀": .number(1.25), "\u{E000}": .null])),
+      ("float-small", .number(0.00001)), ("float-big", .number(1e20)),
+      ("depth-boundary", deep), ("depth-overflow", .array([deep])),
+    ]
+    for (name, value) in values {
+      var step = try HostStoreStepShadowFixtures.step(.cleanupOwnedRemotePath)
+      guard case .object(var arguments) = step["arguments"] else { return XCTFail("fixture arguments") }
+      arguments["framesDirectory"] = value
+      step["arguments"] = .object(arguments)
+      step["argumentsHash"] = .string(SHA256Hex.string(of: try CanonicalJSONEncoders.canonical().encode(JSONValue.object(arguments))))
+      let data = try SessionStorageFixtures.manifest(sessionID: "session-json", jobID: "job-session-json",
+        executionMode: "execute", executionAuthority: "interactiveUser", timestamp: "2026-01-01T00:00:00Z", steps: [.object(step)])
+      try data.write(to: directory.appending(path: "manifest.json"))
+      XCTAssertEqual(try store.status().measurementIncomplete, name == "depth-overflow", name)
+      try compareSessionStatus("json-" + name, store: store, config: owner.appending(path: "session-storage.json"), sessions: sessions)
+    }
+    var document = try XCTUnwrap(JSONSerialization.jsonObject(with: baseData) as? [String: Any])
+    var artifacts = try XCTUnwrap(document["artifacts"] as? [[String: Any]])
+    let provenance = try DerivedArtifactProvenance(operation: "shadow.derive",
+      inputHashes: [XCTUnwrap(artifacts[0]["sha256"] as? String)],
+      parameters: ["é": "café", "😀": "UTF8", "a10": "10", "a2": "2"],
+      statistics: ["é": 1, "\u{E000}": 2])
+    artifacts[1]["origin"] = try provenance.manifestOrigin()
+    document["artifacts"] = artifacts
+    try JSONSerialization.data(withJSONObject: document, options: [.sortedKeys, .withoutEscapingSlashes])
+      .write(to: directory.appending(path: "manifest.json"))
+    XCTAssertFalse(try store.status().measurementIncomplete)
+    try compareSessionStatus("json-derived-unicode", store: store,
+      config: owner.appending(path: "session-storage.json"), sessions: sessions)
+    document["warnings"] = [""]
+    let overhead = try JSONSerialization.data(withJSONObject: document, options: [.sortedKeys, .withoutEscapingSlashes]).count
+    for extra in 0...1 {
+      document["warnings"] = [String(repeating: "x", count: SessionManifestDocument.maximumCanonicalBytes - overhead + extra)]
+      let bytes = try JSONSerialization.data(withJSONObject: document, options: [.sortedKeys, .withoutEscapingSlashes])
+      XCTAssertEqual(bytes.count, SessionManifestDocument.maximumCanonicalBytes + extra)
+      try bytes.write(to: directory.appending(path: "manifest.json"))
+      XCTAssertEqual(try store.status().measurementIncomplete, extra != 0)
+      try compareSessionStatus(extra == 0 ? "json-byte-boundary" : "json-byte-overflow", store: store,
+        config: owner.appending(path: "session-storage.json"), sessions: sessions)
+    }
+  }
+
   func testPublishedToolIdentityDiagnosticLookup() throws {
     let known = "48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260"
     let inputs = [known, "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83",
@@ -1425,7 +1560,7 @@ final class HostStoreShadowContractTests: XCTestCase {
     try process.run()
     try stdin.fileHandleForWriting.write(contentsOf: input)
     try stdin.fileHandleForWriting.close()
-    // The adapter is bounded to 4 MiB input. Drain before wait to avoid pipe backpressure.
+    // Drain before wait to avoid pipe backpressure; each adapter bounds its own input.
     let output = stdout.fileHandleForReading.readDataToEndOfFile()
     _ = stderr.fileHandleForReading.readDataToEndOfFile()
     process.waitUntilExit()

@@ -61,6 +61,7 @@ fn main() {
             "display-names",
             "session-configuration",
             "session-timestamp",
+            "session-json",
             "session-graphemes",
         ]
         .contains(&args[0].as_str())
@@ -69,8 +70,13 @@ fn main() {
         std::process::exit(64);
     }
     let mut input = Vec::new();
+    let maximum = if args[0] == "session-json" {
+        16 * 1024 * 1024
+    } else {
+        4 * 1024 * 1024
+    };
     if io::stdin()
-        .take(4 * 1024 * 1024 + 1)
+        .take(maximum + 1)
         .read_to_end(&mut input)
         .is_err()
     {
@@ -84,6 +90,7 @@ fn main() {
         "display-names" => arkdeck_hoststore::decode_display_names(&input),
         "session-configuration" => arkdeck_hoststore::decode_session_configuration(&input),
         "session-timestamp" => arkdeck_hoststore::decode_session_timestamp(&input),
+        "session-json" => arkdeck_hoststore::decode_session_json(&input),
         "session-graphemes" => arkdeck_hoststore::decode_graphemes(&input),
         _ => unreachable!(),
     };
