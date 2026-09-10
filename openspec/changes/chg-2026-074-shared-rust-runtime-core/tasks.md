@@ -716,7 +716,7 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
   - `Packages/ArkDeckKit/LaunchAgents/**`（r9: cutover switch and install receipt）
   - `Packages/ArkDeckKit/Distribution/macOS/**`（r9: paired helper packaging as the cutover moves; provisioning, signing, notarization and assessment checks preserved）
   - `ArkDeckAppUITests/**`（r9: the rollback-drill App smoke of this cutover only; no fixture-as-hardware evidence）
-  - `ArkDeck.xcodeproj/project.pbxproj`（r9: registration of those UI-test files in the existing UI-test target only）
+  - `ArkDeck.xcodeproj/project.pbxproj`（r9: registration of those UI-test files in the existing UI-test target; scoped supplement: update only the ArkTrace package revision from `c85731b0f903261bd69cf789027774fde615c8de` to reviewed merge `e6e3133d410fbd7455df17c9486dcd369607e97f` for the strict host-store metadata reader; no target, product, build-setting or signing change）
   - `docs/design/**`
 - Forbidden paths:
   - `Packages/ArkDeckKit/Sources/ArkDeckStorage/**`（formats stay frozen）
