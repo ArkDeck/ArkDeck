@@ -592,6 +592,58 @@ final class HostStoreShadowContractTests: XCTestCase {
     try compareSessionStatus("missing-catalog", store: store, config: config, sessions: sessions)
   }
 
+  func testSessionInventoryFilesystemFailures() throws {
+    let owner = root.appending(path: "failure-owner")
+    let sessions = root.appending(path: "failure-tree")
+    let store = try RuntimeSessionStorageStore(ownerRoot: owner, defaultSessionsRoot: sessions)
+    _ = try store.updatePolicy(.init(totalQuotaBytes: 1_000_000, safetyMarginBytes: 100,
+      retentionDays: 7), expectedGeneration: 1)
+    let catalog = try SessionRetentionCatalog(sessionsRoot: sessions)
+    let config = owner.appending(path: "session-storage.json")
+    let session = try seedShadowSession(sessions: sessions, month: "01", id: "session-failure",
+      timestamp: "2026-01-01T00:00:00Z")
+    try catalog.registerFinalizedSession(sessionRoot: session, retentionDays: 7, policyGeneration: 2)
+    let identity = session.appending(path: ".session-identity.json")
+    let original = try Data(contentsOf: identity)
+    for variant in ["missing-identity", "oversize-identity", "extra-identity", "noncanonical-identity"] {
+      switch variant {
+      case "missing-identity": try FileManager.default.removeItem(at: identity)
+      case "oversize-identity": try Data(repeating: 0x20, count: 4097).write(to: identity)
+      case "extra-identity":
+        var value = try XCTUnwrap(JSONSerialization.jsonObject(with: original) as? [String: Any])
+        value["extra"] = true
+        try JSONSerialization.data(withJSONObject: value, options: [.sortedKeys, .withoutEscapingSlashes]).write(to: identity)
+      default: try (original + Data([0x0A])).write(to: identity)
+      }
+      try compareSessionStatus("filesystem-" + variant, store: store, config: config, sessions: sessions)
+      try original.write(to: identity)
+    }
+    let payload = session.appending(path: "payload.bin")
+    let hardlink = root.appending(path: "payload-hardlink")
+    try FileManager.default.linkItem(at: payload, to: hardlink)
+    try compareSessionStatus("filesystem-hardlink", store: store, config: config, sessions: sessions)
+    try FileManager.default.removeItem(at: hardlink)
+    let fifo = session.appending(path: "fifo")
+    XCTAssertEqual(mkfifo(fifo.path, 0o600), 0)
+    try compareSessionStatus("filesystem-fifo", store: store, config: config, sessions: sessions)
+    try FileManager.default.removeItem(at: fifo)
+    for (label, url) in [("year", sessions.appending(path: "2026")),
+      ("month", sessions.appending(path: "2026/01")), ("session", session), ("file", payload)] {
+      let mode = try XCTUnwrap(FileManager.default.attributesOfItem(atPath: url.path)[.posixPermissions] as? NSNumber)
+      try FileManager.default.setAttributes([.posixPermissions: 0o770], ofItemAtPath: url.path)
+      try compareSessionStatus("filesystem-writable-" + label, store: store, config: config, sessions: sessions)
+      try FileManager.default.setAttributes([.posixPermissions: mode], ofItemAtPath: url.path)
+    }
+    for (label, relative) in [("invalid-year", "year"), ("invalid-month-zero", "2026/00"),
+      ("invalid-month-high", "2026/13"), ("invalid-session", "2026/01/-invalid"),
+      ("year-file", "2027"), ("month-file", "2026/02"), ("session-file", "2026/01/session-file")] {
+      let file = sessions.appending(path: relative)
+      try Data("unaccounted fixture".utf8).write(to: file)
+      try compareSessionStatus("filesystem-" + label, store: store, config: config, sessions: sessions)
+      try FileManager.default.removeItem(at: file)
+    }
+  }
+
   private func seedShadowSession(sessions: URL, month: String, id: String, timestamp: String, includeArtifacts: Bool = false) throws -> URL {
     let directory = sessions.appending(path: "2026/" + month + "/" + id)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true,

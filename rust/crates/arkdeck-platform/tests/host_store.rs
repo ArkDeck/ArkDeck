@@ -98,6 +98,50 @@ fn child_lock_probe() {
 }
 
 #[test]
+fn snapshot_root_replacement_and_permission_changes_are_refused() {
+    let fixture = Fixture::new();
+    let path = fixture.0.join("sessions");
+    fs::create_dir(&path).unwrap();
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o700)).unwrap();
+    let root = HostDirectory::open_session_tree(&path).unwrap();
+    root.validate_path(&path).unwrap();
+    let original = fixture.0.join("original");
+    fs::rename(&path, &original).unwrap();
+    assert!(root.validate_path(&path).is_err());
+    fs::create_dir(&path).unwrap();
+    assert!(root.validate_path(&path).is_err());
+    fs::remove_dir(&path).unwrap();
+    symlink(&original, &path).unwrap();
+    assert!(root.validate_path(&path).is_err());
+    fs::remove_file(&path).unwrap();
+    fs::rename(&original, &path).unwrap();
+    root.validate_path(&path).unwrap();
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o770)).unwrap();
+    assert!(root.validate_path(&path).is_err());
+}
+
+#[test]
+fn held_lock_replacement_is_refused_even_when_the_new_lock_is_available() {
+    let fixture = Fixture::new();
+    fixture.file("store.lock", b"");
+    let root = HostDirectory::open(&fixture.0).unwrap();
+    let held = root.try_lock_existing("store.lock").unwrap().unwrap();
+    held.validate_link(&root, "store.lock").unwrap();
+    fs::rename(fixture.0.join("store.lock"), fixture.0.join("old.lock")).unwrap();
+    assert!(held.validate_link(&root, "store.lock").is_err());
+    fixture.file("store.lock", b"");
+    let replacement = root.try_lock_existing("store.lock").unwrap().unwrap();
+    assert!(held.validate_link(&root, "store.lock").is_err());
+    replacement.validate_link(&root, "store.lock").unwrap();
+    fs::set_permissions(
+        fixture.0.join("store.lock"),
+        fs::Permissions::from_mode(0o666),
+    )
+    .unwrap();
+    assert!(replacement.validate_link(&root, "store.lock").is_err());
+}
+
+#[test]
 fn session_tree_accepts_read_permissions_but_refuses_writable_or_linked_content() {
     let fixture = Fixture::new();
     fixture.file("record.json", b"session fixture");

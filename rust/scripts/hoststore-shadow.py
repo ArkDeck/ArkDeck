@@ -98,6 +98,11 @@ EXPECTED = {
         "fresh-catalog", "reconcile-policy", "duplicate-identity", "reconcile-removed",
         "unscoped-retains-missing", "identity-mismatch", "extra-catalog-field",
         "artifact-hash-mismatch", "artifact-lineage-cycle", "artifact-invalid-path")},
+    **{f"inventory-filesystem-{name}": "equal" for name in (
+        "missing-identity", "oversize-identity", "extra-identity", "noncanonical-identity",
+        "hardlink", "fifo", "writable-year", "writable-month", "writable-session", "writable-file",
+        "invalid-year", "invalid-month-zero", "invalid-month-high", "invalid-session",
+        "year-file", "month-file", "session-file")},
     **{f"timestamp-accepted-{i}": "equal" for i in range(10)},
     **{f"timestamp-refused-{i}": "refused" for i in range(10)},
     **{f"history-{state}-{index}": "equal" for state in ("saved", "deleted") for index in range(3)},

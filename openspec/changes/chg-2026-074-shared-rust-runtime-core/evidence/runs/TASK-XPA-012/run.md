@@ -37,7 +37,7 @@ Swift oracle may initialize or reconcile only its isolated fixtures.
 | Session configuration | 5 | Policy/custom-root/full-width values and strict canonical fields |
 | Session timestamps | 20 | Exact Swift Date Double bits or matching refusal |
 | Session canonical JSON | 52 | UTF-8 keys, canonical duplicates, integer/float spelling, depth and manifest byte bounds |
-| Session status | 20 | Actual used/pinned bytes, counts, catalog generations and incomplete measurement |
+| Session status | 37 | Actual used/pinned bytes, counts, catalog generations, unsafe layout and incomplete measurement |
 | Session parameters | 28 | Typed state, restore byte equality, status consistency and Swift character-count boundaries |
 | Session Steps | 224 | All 56 kinds, valid typed arguments, closed fields, required arguments and digests |
 | Session compensation | 84 | All six permitted kinds, declarations, execution records, source relationships and outcomes |
@@ -128,9 +128,22 @@ binary64 bit patterns, explicit numeric boundaries, and full manifest/derived
 provenance records. A 16 MiB manifest and one-byte overflow verify the real store
 reader's size boundary and resulting inventory projection.
 
+Session inventory now revalidates the configured physical root and its directory
+identity before returning, plus the held lock inode and initialization marker.
+Deterministic platform tests replace the directory or lock and change permissions
+while descriptors remain open; the final binding checks refuse those states.
+Configuration is an immutable stdin snapshot, not a live configuration-file read.
+The later owner stage must coordinate live configuration publications under its
+store lock; this harness does not claim that contract yet.
+
+Seventeen additional actual Swift comparisons cover missing, oversized,
+extra-field and noncanonical identity files, hardlinks, FIFOs, writable year/month/
+session/file entries, and invalid or regular-file layout components. Rust leaves
+every fixture unchanged and matches Swift's incomplete measurement projection.
+
 ## Remaining work before harness review
 
-- Finish the Session scan failure matrix and root/configuration stability checks.
+- Finish the Session scan budget refusal checks.
 - Complete History/display-name timestamp refusal and remaining Trace metadata
   compatibility.
 - Finalize the complete nightly corpus. The nightly job is wired locally but has not been pushed or run.
@@ -142,6 +155,16 @@ retries cannot manufacture those days. Owner/CAS/crash-window work, UI assertion
 GJ-1 re-pass and rollback evidence remain a later authorized cutover stage.
 
 ## Validation so far
+
+- 782 cases across 25 XCTest methods passed. Immutable receipt:
+  [local-shadow-filesystem-20260910.json](local-shadow-filesystem-20260910.json).
+  Log: `/private/tmp/xpa012-shadow-filesystem-initialized.log`.
+  Seven platform filesystem/lock tests, seven receipt integrity tests and
+  hoststore/platform all-target Clippy also passed.
+- The 782-case implementation passed the complete-diff unified gate (exit 0):
+  Swift full suite, App test build, design-system, published/candidate Rust
+  contracts, cargo deny and cargo vet (26 audited). Log:
+  `/private/tmp/xpa012-shadow-filesystem-gate.log`.
 
 - 765 cases across 24 XCTest methods passed, including the new Session JSON
   domain and manifest limits. Immutable receipt:

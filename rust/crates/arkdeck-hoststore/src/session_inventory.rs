@@ -247,7 +247,7 @@ pub fn session_inventory(configuration: &[u8], path: &Path) -> io::Result<Value>
         .parse::<u64>()
         .map_err(|_| invalid())?;
     let root = HostDirectory::open_session_tree(path)?;
-    let _lock = root.try_lock_existing(LOCK)?.ok_or_else(|| {
+    let lock = root.try_lock_existing(LOCK)?.ok_or_else(|| {
         io::Error::new(
             io::ErrorKind::WouldBlock,
             "Session snapshot lock unavailable",
@@ -340,6 +340,14 @@ pub fn session_inventory(configuration: &[u8], path: &Path) -> io::Result<Value>
             tree.unknown.insert(row.manifest.session_id.clone());
         }
     }
+    // Configuration is an immutable caller-supplied byte snapshot. Validate
+    // its root binding again; this shadow command does not own a live config
+    // file or claim that a concurrent config publication was observed.
+    if Path::new(root_path).canonicalize()? != path || root.read(LOCK, 1)? != marker {
+        return Err(invalid());
+    }
+    root.validate_path(path)?;
+    lock.validate_link(&root, LOCK)?;
     let fields = projection.as_object_mut().ok_or_else(invalid)?;
     fields.insert(
         "schemaVersion".into(),

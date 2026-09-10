@@ -29,7 +29,21 @@ impl Ownership {
     }
 }
 pub struct HostReadLock {
-    _file: File,
+    file: File,
+}
+
+impl HostReadLock {
+    /// The advisory lock only covers this inode. A replacement at the same
+    /// name must never be mistaken for the lock held by this snapshot.
+    pub fn validate_link(&self, root: &HostDirectory, name: &str) -> io::Result<()> {
+        owned(&self.file, false, root.1)?;
+        let held = self.file.metadata()?;
+        let linked = root.stat_at(name)?;
+        if held.dev() != linked.st_dev as u64 || held.ino() != linked.st_ino {
+            return Err(fail());
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -89,6 +103,22 @@ impl HostDirectory {
         };
         owned(&file, true, ownership)?;
         Ok(Self(file, ownership))
+    }
+
+    /// Recheck the caller's root binding after a bounded snapshot. Descriptor
+    /// reads remain anchored after rename, but cannot certify a replacement
+    /// namespace at the original path.
+    pub fn validate_path(&self, path: &Path) -> io::Result<()> {
+        if !path.is_absolute() || path.canonicalize()? != path {
+            return Err(fail());
+        }
+        owned(&self.0, true, self.1)?;
+        let held = self.0.metadata()?;
+        let linked = std::fs::symlink_metadata(path)?;
+        if !linked.is_dir() || held.dev() != linked.dev() || held.ino() != linked.ino() {
+            return Err(fail());
+        }
+        Ok(())
     }
 
     pub fn child(&self, name: &str) -> io::Result<Self> {
@@ -260,11 +290,8 @@ impl HostDirectory {
             }
             return Err(error);
         }
-        let held = file.metadata()?;
-        let linked = self.stat_at(name)?;
-        if held.dev() != linked.st_dev as u64 || held.ino() != linked.st_ino {
-            return Err(fail());
-        }
-        Ok(Some(HostReadLock { _file: file }))
+        let lock = HostReadLock { file };
+        lock.validate_link(self, name)?;
+        Ok(Some(lock))
     }
 }
