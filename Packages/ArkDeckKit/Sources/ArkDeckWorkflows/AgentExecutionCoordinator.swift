@@ -248,12 +248,17 @@ public actor RuntimeAgentExecutionCoordinator {
             "executionId": .string(record.intent.executionID),
             "phase": .string("preAdmission"), "newDispatchCount": .integer(0),
           ])
-      case .rejected:
+      case .rejected(_, let message):
         if try await engine.acceptedJobForAgent(request) == nil {
           record.state = .failed
           record.failureCode = "admissionDenied"
           try commit(&record)
-          return record.projection
+          throw AgentExecutionControlFailure(
+            "admissionDenied", message,
+            details: [
+              "executionId": .string(record.intent.executionID),
+              "phase": .string("preAdmission"), "newDispatchCount": .integer(0),
+            ])
         }
       default: break
       }

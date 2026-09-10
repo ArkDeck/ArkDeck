@@ -1,0 +1,892 @@
+{
+  "schemaVersion": "xpa003-ipc-comparison/1",
+  "buildConfiguration": "release",
+  "hardwareEvidence": false,
+  "samplesPerRow": 1000,
+  "runsPerBackend": 3,
+  "pageSize": 50,
+  "binarySHA256": {
+    "swift": "6f2a747b4a1e63fed3aabe9dd9ea05b87e615358e8e4bd0a4ad31374880674f1",
+    "facade": "99086a25072d51e898e20043659b76593e26fecf258f32c607377376c6a2bb90",
+    "soak": "3b3678d4ec46ccb2a0bc7c5c48059d129ae20fb54e993917af4056a53c28baca"
+  },
+  "backends": {
+    "swift": {
+      "comparison": {
+        "ipc.health": {
+          "p95ms": 0.13149995356798172,
+          "spk1P95ms": 0.11204194743186235,
+          "increasePercent": 17.366715397331546,
+          "passes20Percent": true
+        },
+        "ipc.jobList": {
+          "p95ms": 38.50258397869766,
+          "spk1P95ms": 13.023165985941887,
+          "increasePercent": 195.6468804917332,
+          "passes20Percent": false
+        },
+        "ipc.jobStatus": {
+          "p95ms": 1.3049590634182096,
+          "spk1P95ms": 0.3661249647848308,
+          "increasePercent": 256.4244968067461,
+          "passes20Percent": false
+        }
+      },
+      "runs": [
+        {
+          "loadAverage": 2.67626953125,
+          "jobCount": 30,
+          "rows": {
+            "ipc.health": {
+              "p95ms": 0.13658299576491117,
+              "sampleCount": 1000
+            },
+            "ipc.jobList": {
+              "p95ms": 38.62012492027134,
+              "sampleCount": 1000
+            },
+            "ipc.jobStatus": {
+              "p95ms": 1.3603330589830875,
+              "sampleCount": 1000
+            }
+          }
+        },
+        {
+          "loadAverage": 2.7880859375,
+          "jobCount": 30,
+          "rows": {
+            "ipc.health": {
+              "p95ms": 0.13149995356798172,
+              "sampleCount": 1000
+            },
+            "ipc.jobList": {
+              "p95ms": 38.50258397869766,
+              "sampleCount": 1000
+            },
+            "ipc.jobStatus": {
+              "p95ms": 1.3049590634182096,
+              "sampleCount": 1000
+            }
+          }
+        },
+        {
+          "loadAverage": 2.8544921875,
+          "jobCount": 30,
+          "rows": {
+            "ipc.health": {
+              "p95ms": 0.12008391786366701,
+              "sampleCount": 1000
+            },
+            "ipc.jobList": {
+              "p95ms": 37.72687492892146,
+              "sampleCount": 1000
+            },
+            "ipc.jobStatus": {
+              "p95ms": 1.2482500169426203,
+              "sampleCount": 1000
+            }
+          }
+        }
+      ]
+    },
+    "facade": {
+      "comparison": {
+        "ipc.health": {
+          "p95ms": 0.1492910087108612,
+          "spk1P95ms": 0.11204194743186235,
+          "increasePercent": 33.245638917202555,
+          "passes20Percent": false
+        },
+        "ipc.jobList": {
+          "p95ms": 37.71537495777011,
+          "spk1P95ms": 13.023165985941887,
+          "increasePercent": 189.6021981020799,
+          "passes20Percent": false
+        },
+        "ipc.jobStatus": {
+          "p95ms": 1.2439580168575048,
+          "spk1P95ms": 0.3661249647848308,
+          "increasePercent": 239.7632329138142,
+          "passes20Percent": false
+        }
+      },
+      "runs": [
+        {
+          "loadAverage": 2.392578125,
+          "jobCount": 30,
+          "rows": {
+            "ipc.health": {
+              "p95ms": 0.15145796351134777,
+              "sampleCount": 1000
+            },
+            "ipc.jobList": {
+              "p95ms": 37.71537495777011,
+              "sampleCount": 1000
+            },
+            "ipc.jobStatus": {
+              "p95ms": 1.2602079659700394,
+              "sampleCount": 1000
+            }
+          }
+        },
+        {
+          "loadAverage": 2.52001953125,
+          "jobCount": 30,
+          "rows": {
+            "ipc.health": {
+              "p95ms": 0.1464590895920992,
+              "sampleCount": 1000
+            },
+            "ipc.jobList": {
+              "p95ms": 37.73083398118615,
+              "sampleCount": 1000
+            },
+            "ipc.jobStatus": {
+              "p95ms": 1.237874967046082,
+              "sampleCount": 1000
+            }
+          }
+        },
+        {
+          "loadAverage": 2.38134765625,
+          "jobCount": 30,
+          "rows": {
+            "ipc.health": {
+              "p95ms": 0.1492910087108612,
+              "sampleCount": 1000
+            },
+            "ipc.jobList": {
+              "p95ms": 37.65637497417629,
+              "sampleCount": 1000
+            },
+            "ipc.jobStatus": {
+              "p95ms": 1.2439580168575048,
+              "sampleCount": 1000
+            }
+          }
+        }
+      ]
+    }
+  },
+  "result": "FAILED_AC_5",
+  "note": "Measured before vectored-write optimization. No waiver or replacement baseline.",
+  "readProjectionFollowUp": {
+    "schemaVersion": "xpa003-ipc-comparison/1",
+    "buildConfiguration": "release",
+    "hardwareEvidence": false,
+    "samplesPerRow": 1000,
+    "runsPerBackend": 3,
+    "pageSize": 50,
+    "backends": {
+      "swift": {
+        "runs": [
+          {
+            "loadAverage": 3.9736328125,
+            "jobCount": 30,
+            "rows": {
+              "ipc.health": {
+                "p95ms": 0.34541694913059473,
+                "sampleCount": 1000
+              },
+              "ipc.jobList": {
+                "p95ms": 19.050167058594525,
+                "sampleCount": 1000
+              },
+              "ipc.jobStatus": {
+                "p95ms": 0.9861250873655081,
+                "sampleCount": 1000
+              }
+            }
+          },
+          {
+            "loadAverage": 3.509765625,
+            "jobCount": 30,
+            "rows": {
+              "ipc.health": {
+                "p95ms": 0.14016707427799702,
+                "sampleCount": 1000
+              },
+              "ipc.jobList": {
+                "p95ms": 16.05287496931851,
+                "sampleCount": 1000
+              },
+              "ipc.jobStatus": {
+                "p95ms": 0.4647079622372985,
+                "sampleCount": 1000
+              }
+            }
+          },
+          {
+            "loadAverage": 3.14208984375,
+            "jobCount": 30,
+            "rows": {
+              "ipc.health": {
+                "p95ms": 0.10545901022851467,
+                "sampleCount": 1000
+              },
+              "ipc.jobList": {
+                "p95ms": 12.668207986280322,
+                "sampleCount": 1000
+              },
+              "ipc.jobStatus": {
+                "p95ms": 0.2997079864144325,
+                "sampleCount": 1000
+              }
+            }
+          }
+        ],
+        "comparison": {
+          "ipc.health": {
+            "p95ms": 0.14016707427799702,
+            "spk1P95ms": 0.11204194743186235,
+            "increasePercent": 25.10231881076397,
+            "passes20Percent": false
+          },
+          "ipc.jobList": {
+            "p95ms": 16.05287496931851,
+            "spk1P95ms": 13.023165985941887,
+            "increasePercent": 23.263997300250196,
+            "passes20Percent": false
+          },
+          "ipc.jobStatus": {
+            "p95ms": 0.4647079622372985,
+            "spk1P95ms": 0.3661249647848308,
+            "increasePercent": 26.92605174039531,
+            "passes20Percent": false
+          }
+        }
+      },
+      "facade": {
+        "runs": [
+          {
+            "loadAverage": 2.84033203125,
+            "jobCount": 30,
+            "rows": {
+              "ipc.health": {
+                "p95ms": 0.14841603115200996,
+                "sampleCount": 1000
+              },
+              "ipc.jobList": {
+                "p95ms": 12.60849996469915,
+                "sampleCount": 1000
+              },
+              "ipc.jobStatus": {
+                "p95ms": 0.3609579289332032,
+                "sampleCount": 1000
+              }
+            }
+          },
+          {
+            "loadAverage": 2.96337890625,
+            "jobCount": 30,
+            "rows": {
+              "ipc.health": {
+                "p95ms": 0.14316593296825886,
+                "sampleCount": 1000
+              },
+              "ipc.jobList": {
+                "p95ms": 12.626624898985028,
+                "sampleCount": 1000
+              },
+              "ipc.jobStatus": {
+                "p95ms": 0.34070899710059166,
+                "sampleCount": 1000
+              }
+            }
+          },
+          {
+            "loadAverage": 2.61572265625,
+            "jobCount": 30,
+            "rows": {
+              "ipc.health": {
+                "p95ms": 0.13483292423188686,
+                "sampleCount": 1000
+              },
+              "ipc.jobList": {
+                "p95ms": 12.811750057153404,
+                "sampleCount": 1000
+              },
+              "ipc.jobStatus": {
+                "p95ms": 0.3278750227764249,
+                "sampleCount": 1000
+              }
+            }
+          }
+        ],
+        "comparison": {
+          "ipc.health": {
+            "p95ms": 0.14316593296825886,
+            "spk1P95ms": 0.11204194743186235,
+            "increasePercent": 27.77886876281257,
+            "passes20Percent": false
+          },
+          "ipc.jobList": {
+            "p95ms": 12.626624898985028,
+            "spk1P95ms": 13.023165985941887,
+            "increasePercent": -3.0448900627152664,
+            "passes20Percent": true
+          },
+          "ipc.jobStatus": {
+            "p95ms": 0.34070899710059166,
+            "spk1P95ms": 0.3661249647848308,
+            "increasePercent": -6.941883271788352,
+            "passes20Percent": true
+          }
+        }
+      }
+    },
+    "binarySHA256": {
+      "swift": "21f2d3bf96e562d228593ac932110d479e1b99665cea1b5505187e16c42855bf",
+      "facade": "4b45b37bf20f7345dfa6888540daf0d54b662deb2d2e8623904d4d82795684f9",
+      "soak": "3b3678d4ec46ccb2a0bc7c5c48059d129ae20fb54e993917af4056a53c28baca"
+    },
+    "result": "FAILED_AC_5",
+    "note": "Read-projection reuse and vectored forwarding; health remains above +20%. Before typed private-origin decoding.",
+    "rawSamplesSHA256": "a73b0cea36e80e3af6b1b1910edba9b349cae2f11118c0552f5910e700846411"
+  },
+  "typedSwiftOriginFollowUp": {
+    "schemaVersion": "xpa003-ipc-comparison/1",
+    "buildConfiguration": "release",
+    "hardwareEvidence": false,
+    "samplesPerRow": 1000,
+    "runsPerBackend": 3,
+    "pageSize": 50,
+    "backends": {
+      "swift": {
+        "runs": [
+          {
+            "loadAverage": 2.10546875,
+            "jobCount": 30,
+            "rows": {
+              "ipc.health": {
+                "p95ms": 0.10529195424169302,
+                "sampleCount": 1000
+              },
+              "ipc.jobList": {
+                "p95ms": 12.682959088124335,
+                "sampleCount": 1000
+              },
+              "ipc.jobStatus": {
+                "p95ms": 0.28791697695851326,
+                "sampleCount": 1000
+              }
+            }
+          },
+          {
+            "loadAverage": 2.29638671875,
+            "jobCount": 30,
+            "rows": {
+              "ipc.health": {
+                "p95ms": 0.10845798533409834,
+                "sampleCount": 1000
+              },
+              "ipc.jobList": {
+                "p95ms": 12.7406669780612,
+                "sampleCount": 1000
+              },
+              "ipc.jobStatus": {
+                "p95ms": 0.3149170661345124,
+                "sampleCount": 1000
+              }
+            }
+          },
+          {
+            "loadAverage": 2.19921875,
+            "jobCount": 30,
+            "rows": {
+              "ipc.health": {
+                "p95ms": 0.1092919846996665,
+                "sampleCount": 1000
+              },
+              "ipc.jobList": {
+                "p95ms": 12.679125065915287,
+                "sampleCount": 1000
+              },
+              "ipc.jobStatus": {
+                "p95ms": 0.3130420809611678,
+                "sampleCount": 1000
+              }
+            }
+          }
+        ],
+        "comparison": {
+          "ipc.health": {
+            "p95ms": 0.10845798533409834,
+            "spk1P95ms": 0.11204194743186235,
+            "increasePercent": -3.198768122040707,
+            "passes20Percent": true,
+            "p95SpreadRatio": 0.03688092163662846
+          },
+          "ipc.jobList": {
+            "p95ms": 12.682959088124335,
+            "spk1P95ms": 13.023165985941887,
+            "increasePercent": -2.6123209838897488,
+            "passes20Percent": true,
+            "p95SpreadRatio": 0.004852330731204306
+          },
+          "ipc.jobStatus": {
+            "p95ms": 0.3130420809611678,
+            "spk1P95ms": 0.3661249647848308,
+            "increasePercent": -14.4985698680393,
+            "passes20Percent": true,
+            "p95SpreadRatio": 0.08625066985594332
+          }
+        }
+      },
+      "facade": {
+        "runs": [
+          {
+            "loadAverage": 2.13525390625,
+            "jobCount": 30,
+            "rows": {
+              "ipc.health": {
+                "p95ms": 0.13762502931058407,
+                "sampleCount": 1000
+              },
+              "ipc.jobList": {
+                "p95ms": 12.619499932043254,
+                "sampleCount": 1000
+              },
+              "ipc.jobStatus": {
+                "p95ms": 0.33979094587266445,
+                "sampleCount": 1000
+              }
+            }
+          },
+          {
+            "loadAverage": 2.09814453125,
+            "jobCount": 30,
+            "rows": {
+              "ipc.health": {
+                "p95ms": 0.1283750170841813,
+                "sampleCount": 1000
+              },
+              "ipc.jobList": {
+                "p95ms": 12.656083097681403,
+                "sampleCount": 1000
+              },
+              "ipc.jobStatus": {
+                "p95ms": 0.3182920627295971,
+                "sampleCount": 1000
+              }
+            }
+          },
+          {
+            "loadAverage": 1.9326171875,
+            "jobCount": 30,
+            "rows": {
+              "ipc.health": {
+                "p95ms": 0.15462504234164953,
+                "sampleCount": 1000
+              },
+              "ipc.jobList": {
+                "p95ms": 14.18216701131314,
+                "sampleCount": 1000
+              },
+              "ipc.jobStatus": {
+                "p95ms": 0.41166599839925766,
+                "sampleCount": 1000
+              }
+            }
+          }
+        ],
+        "comparison": {
+          "ipc.health": {
+            "p95ms": 0.13762502931058407,
+            "spk1P95ms": 0.11204194743186235,
+            "increasePercent": 22.833485551721534,
+            "passes20Percent": false,
+            "p95SpreadRatio": 0.1907358377249004
+          },
+          "ipc.jobList": {
+            "p95ms": 12.656083097681403,
+            "spk1P95ms": 13.023165985941887,
+            "increasePercent": -2.8186916196625167,
+            "passes20Percent": true,
+            "p95SpreadRatio": 0.12347161971117011
+          },
+          "ipc.jobStatus": {
+            "p95ms": 0.33979094587266445,
+            "spk1P95ms": 0.3661249647848308,
+            "increasePercent": -7.192631326750054,
+            "passes20Percent": true,
+            "p95SpreadRatio": 0.274798186366779
+          }
+        }
+      }
+    },
+    "binarySHA256": {
+      "swift": "2208024650eff683fa0811674402891e9ccd13811d455155089c7ab1a67c70dc",
+      "facade": "4b45b37bf20f7345dfa6888540daf0d54b662deb2d2e8623904d4d82795684f9",
+      "soak": "3b3678d4ec46ccb2a0bc7c5c48059d129ae20fb54e993917af4056a53c28baca"
+    },
+    "rawSamplesSHA256": "d99f61abc0b9d84b74d1d754758c84cbf8e536bdaae550ac22d920ce9833689a",
+    "result": "FAILED_AC_5"
+  },
+  "typedBothOriginFollowUp": {
+    "schemaVersion": "xpa003-ipc-comparison/1",
+    "buildConfiguration": "release",
+    "hardwareEvidence": false,
+    "samplesPerRow": 1000,
+    "runsPerBackend": 3,
+    "pageSize": 50,
+    "backends": {
+      "swift": {
+        "runs": [
+          {
+            "loadAverage": 1.55322265625,
+            "jobCount": 30,
+            "rows": {
+              "ipc.health": {
+                "p95ms": 0.12979097664356232,
+                "sampleCount": 1000
+              },
+              "ipc.jobList": {
+                "p95ms": 13.346374966204166,
+                "sampleCount": 1000
+              },
+              "ipc.jobStatus": {
+                "p95ms": 0.42083405423909426,
+                "sampleCount": 1000
+              }
+            }
+          },
+          {
+            "loadAverage": 2.318359375,
+            "jobCount": 30,
+            "rows": {
+              "ipc.health": {
+                "p95ms": 0.10841595940291882,
+                "sampleCount": 1000
+              },
+              "ipc.jobList": {
+                "p95ms": 12.679875013418496,
+                "sampleCount": 1000
+              },
+              "ipc.jobStatus": {
+                "p95ms": 0.3001249860972166,
+                "sampleCount": 1000
+              }
+            }
+          },
+          {
+            "loadAverage": 2.3935546875,
+            "jobCount": 30,
+            "rows": {
+              "ipc.health": {
+                "p95ms": 0.26108301244676113,
+                "sampleCount": 1000
+              },
+              "ipc.jobList": {
+                "p95ms": 16.52416691649705,
+                "sampleCount": 1000
+              },
+              "ipc.jobStatus": {
+                "p95ms": 0.9053749963641167,
+                "sampleCount": 1000
+              }
+            }
+          }
+        ],
+        "comparison": {
+          "ipc.health": {
+            "p95ms": 0.12979097664356232,
+            "spk1P95ms": 0.11204194743186235,
+            "increasePercent": 15.841414415341127,
+            "passes20Percent": true,
+            "p95SpreadRatio": 1.1762532110618389
+          },
+          "ipc.jobList": {
+            "p95ms": 13.346374966204166,
+            "spk1P95ms": 13.023165985941887,
+            "increasePercent": 2.481800359537556,
+            "passes20Percent": true,
+            "p95SpreadRatio": 0.2880401541851711
+          },
+          "ipc.jobStatus": {
+            "p95ms": 0.42083405423909426,
+            "spk1P95ms": 0.3661249647848308,
+            "increasePercent": 14.942736692761605,
+            "passes20Percent": true,
+            "p95SpreadRatio": 1.4382153824534147
+          }
+        }
+      },
+      "facade": {
+        "runs": [
+          {
+            "loadAverage": 2.37841796875,
+            "jobCount": 30,
+            "rows": {
+              "ipc.health": {
+                "p95ms": 0.14245894271880388,
+                "sampleCount": 1000
+              },
+              "ipc.jobList": {
+                "p95ms": 12.719291029497981,
+                "sampleCount": 1000
+              },
+              "ipc.jobStatus": {
+                "p95ms": 0.36508298944681883,
+                "sampleCount": 1000
+              }
+            }
+          },
+          {
+            "loadAverage": 2.349609375,
+            "jobCount": 30,
+            "rows": {
+              "ipc.health": {
+                "p95ms": 0.49020908772945404,
+                "sampleCount": 1000
+              },
+              "ipc.jobList": {
+                "p95ms": 23.540667025372386,
+                "sampleCount": 1000
+              },
+              "ipc.jobStatus": {
+                "p95ms": 1.5007919864729047,
+                "sampleCount": 1000
+              }
+            }
+          },
+          {
+            "loadAverage": 3.392578125,
+            "jobCount": 30,
+            "rows": {
+              "ipc.health": {
+                "p95ms": 0.15600002370774746,
+                "sampleCount": 1000
+              },
+              "ipc.jobList": {
+                "p95ms": 13.924334081821144,
+                "sampleCount": 1000
+              },
+              "ipc.jobStatus": {
+                "p95ms": 0.4237079992890358,
+                "sampleCount": 1000
+              }
+            }
+          }
+        ],
+        "comparison": {
+          "ipc.health": {
+            "p95ms": 0.15600002370774746,
+            "spk1P95ms": 0.11204194743186235,
+            "increasePercent": 39.23358820821814,
+            "passes20Percent": false,
+            "p95SpreadRatio": 2.22916725744946
+          },
+          "ipc.jobList": {
+            "p95ms": 13.924334081821144,
+            "spk1P95ms": 13.023165985941887,
+            "increasePercent": 6.919731322260958,
+            "passes20Percent": true,
+            "p95SpreadRatio": 0.7771557284022801
+          },
+          "ipc.jobStatus": {
+            "p95ms": 0.4237079992890358,
+            "spk1P95ms": 0.3661249647848308,
+            "increasePercent": 15.727699567836396,
+            "passes20Percent": true,
+            "p95SpreadRatio": 2.6804048989675855
+          }
+        }
+      }
+    },
+    "binarySHA256": {
+      "swift": "2208024650eff683fa0811674402891e9ccd13811d455155089c7ab1a67c70dc",
+      "facade": "4841c27a4895a8204db354ec3b171aa0098a9c3173bcbb5b5fe4c9540f8b2210",
+      "soak": "3b3678d4ec46ccb2a0bc7c5c48059d129ae20fb54e993917af4056a53c28baca"
+    },
+    "rawSamplesSHA256": "edfeb5f3888cfc9e4f394e7f79c61f48db5d080e091a3b58aff5808877914d30",
+    "result": "FAILED_AC_5"
+  },
+  "quietHostFollowUp": {
+    "schemaVersion": "xpa003-ipc-comparison/1",
+    "buildConfiguration": "release",
+    "hardwareEvidence": false,
+    "samplesPerRow": 1000,
+    "runsPerBackend": 3,
+    "pageSize": 50,
+    "backends": {
+      "swift": {
+        "runs": [
+          {
+            "loadAverage": 1.83154296875,
+            "jobCount": 30,
+            "rows": {
+              "ipc.health": {
+                "p95ms": 0.10599999222904444,
+                "sampleCount": 1000
+              },
+              "ipc.jobList": {
+                "p95ms": 12.09845906123519,
+                "sampleCount": 1000
+              },
+              "ipc.jobStatus": {
+                "p95ms": 0.2874169731512666,
+                "sampleCount": 1000
+              }
+            }
+          },
+          {
+            "loadAverage": 1.7822265625,
+            "jobCount": 30,
+            "rows": {
+              "ipc.health": {
+                "p95ms": 0.1075830077752471,
+                "sampleCount": 1000
+              },
+              "ipc.jobList": {
+                "p95ms": 12.589458958245814,
+                "sampleCount": 1000
+              },
+              "ipc.jobStatus": {
+                "p95ms": 0.2947920002043247,
+                "sampleCount": 1000
+              }
+            }
+          },
+          {
+            "loadAverage": 1.78076171875,
+            "jobCount": 30,
+            "rows": {
+              "ipc.health": {
+                "p95ms": 0.1052080187946558,
+                "sampleCount": 1000
+              },
+              "ipc.jobList": {
+                "p95ms": 12.630874989554286,
+                "sampleCount": 1000
+              },
+              "ipc.jobStatus": {
+                "p95ms": 0.29329105746001005,
+                "sampleCount": 1000
+              }
+            }
+          }
+        ],
+        "comparison": {
+          "ipc.health": {
+            "p95ms": 0.10599999222904444,
+            "spk1P95ms": 0.11204194743186235,
+            "p95SpreadRatio": 0.022405558063244277,
+            "stable": true,
+            "increasePercent": -5.392583172023402,
+            "passes20Percent": true
+          },
+          "ipc.jobList": {
+            "p95ms": 12.589458958245814,
+            "spk1P95ms": 13.023165985941887,
+            "p95SpreadRatio": 0.04229061233567754,
+            "stable": true,
+            "increasePercent": -3.330273361824976,
+            "passes20Percent": true
+          },
+          "ipc.jobStatus": {
+            "p95ms": 0.29329105746001005,
+            "spk1P95ms": 0.3661249647848308,
+            "p95SpreadRatio": 0.02514576174578294,
+            "stable": true,
+            "increasePercent": -19.893182473264215,
+            "passes20Percent": true
+          }
+        }
+      },
+      "facade": {
+        "runs": [
+          {
+            "loadAverage": 1.68212890625,
+            "jobCount": 30,
+            "rows": {
+              "ipc.health": {
+                "p95ms": 0.15183293726295233,
+                "sampleCount": 1000
+              },
+              "ipc.jobList": {
+                "p95ms": 13.086959021165967,
+                "sampleCount": 1000
+              },
+              "ipc.jobStatus": {
+                "p95ms": 0.40558306500315666,
+                "sampleCount": 1000
+              }
+            }
+          },
+          {
+            "loadAverage": 1.76513671875,
+            "jobCount": 30,
+            "rows": {
+              "ipc.health": {
+                "p95ms": 0.13216608203947544,
+                "sampleCount": 1000
+              },
+              "ipc.jobList": {
+                "p95ms": 12.62666704133153,
+                "sampleCount": 1000
+              },
+              "ipc.jobStatus": {
+                "p95ms": 0.3293330082669854,
+                "sampleCount": 1000
+              }
+            }
+          },
+          {
+            "loadAverage": 2.00732421875,
+            "jobCount": 30,
+            "rows": {
+              "ipc.health": {
+                "p95ms": 0.1329589867964387,
+                "sampleCount": 1000
+              },
+              "ipc.jobList": {
+                "p95ms": 12.62350007891655,
+                "sampleCount": 1000
+              },
+              "ipc.jobStatus": {
+                "p95ms": 0.33766706474125385,
+                "sampleCount": 1000
+              }
+            }
+          }
+        ],
+        "comparison": {
+          "ipc.health": {
+            "p95ms": 0.1329589867964387,
+            "spk1P95ms": 0.11204194743186235,
+            "p95SpreadRatio": 0.14791670497299295,
+            "stable": true,
+            "increasePercent": 18.668935915539066,
+            "passes20Percent": true
+          },
+          "ipc.jobList": {
+            "p95ms": 12.62666704133153,
+            "spk1P95ms": 13.023165985941887,
+            "p95SpreadRatio": 0.03670477258427366,
+            "stable": true,
+            "increasePercent": -3.0445664674654815,
+            "passes20Percent": true
+          },
+          "ipc.jobStatus": {
+            "p95ms": 0.33766706474125385,
+            "spk1P95ms": 0.3661249647848308,
+            "p95SpreadRatio": 0.2258143144478714,
+            "stable": true,
+            "increasePercent": -7.772728652989147,
+            "passes20Percent": true
+          }
+        }
+      }
+    },
+    "binarySHA256": {
+      "swift": "2208024650eff683fa0811674402891e9ccd13811d455155089c7ab1a67c70dc",
+      "facade": "4841c27a4895a8204db354ec3b171aa0098a9c3173bcbb5b5fe4c9540f8b2210",
+      "soak": "3b3678d4ec46ccb2a0bc7c5c48059d129ae20fb54e993917af4056a53c28baca"
+    },
+    "rawSamplesSHA256": "b05226d47224c3695e62d3a4d9b228b743f17b1d50e6768b236284ecba82e82e",
+    "result": "PASSED_AC_5",
+    "note": "Three complete runs per backend under the unchanged SPK-1 quiet-host and p95-spread thresholds. Earlier unsuccessful measurements remain recorded."
+  },
+  "latestResult": "PASSED_AC_5"
+}

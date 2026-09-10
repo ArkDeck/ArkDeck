@@ -93,6 +93,10 @@ cp -R "$workflows_resource_bundle" "$daemon_bundle/Contents/Resources/"
 cp -R "$launch_agent_resource_bundle" "$cli_bundle/Contents/Resources/"
 chmod 700 "$cli_bundle/Contents/MacOS/arkdeck" "$daemon_bundle/Contents/MacOS/arkdeck-agentd"
 
+bash "$package_root/../../rust/scripts/package-macos-facade.sh" release \
+  "$daemon_bundle" "$staging_root/rollback/ArkDeckAgent.app" "$identity" \
+  "$distribution_root/ArkDeckAgent.entitlements"
+
 codesign --force --sign "$identity" --options runtime --timestamp \
   --entitlements "$distribution_root/ArkDeckAgent.entitlements" "$daemon_bundle"
 codesign --force --sign "$identity" --options runtime --timestamp \
@@ -104,6 +108,12 @@ xcrun notarytool submit "$archive" --keychain-profile "$notary_profile" --wait
 xcrun stapler staple "$cli_bundle"
 spctl --assess --type execute --verbose=2 "$cli_bundle"
 rm "$archive"
+rollback_archive="$staging_root/ArkDeckAgent-rollback-notarization.zip"
+ditto -c -k --keepParent "$staging_root/rollback/ArkDeckAgent.app" "$rollback_archive"
+xcrun notarytool submit "$rollback_archive" --keychain-profile "$notary_profile" --wait
+xcrun stapler staple "$staging_root/rollback/ArkDeckAgent.app"
+spctl --assess --type execute --verbose=2 "$staging_root/rollback/ArkDeckAgent.app"
+rm "$rollback_archive"
 mkdir -p "$(dirname "$output_root")"
 mv "$staging_root" "$output_root"
 staging_root=""

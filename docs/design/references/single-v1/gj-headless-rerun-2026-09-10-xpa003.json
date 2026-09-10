@@ -1,0 +1,167 @@
+{
+  "schemaVersion": "arkdeck.gj-headless-rerun/1",
+  "date": "2026-09-10",
+  "catalogDigest": "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "runbook": "docs/design/cli-golden-journey-headless-runbook.md \u00a75",
+  "journeys": [
+    {
+      "goldenJourney": "GJ-4",
+      "state": "REAL_DEVICE_PASS",
+      "evidenceKind": "redacted-metadata-derived-from-real-runtime",
+      "runtimeBuild": "TASK-XPA-003 signed r7; implementation source matches 89f5fe74",
+      "protectedMainBase": "d4e68f2e74b5f94f1791d2c57aaca5871f766fd6",
+      "binarySHA256": {
+        "Contents/MacOS/arkdeck": "4f608335bf67c031e9abec255d275bee3813d0d06312e148314e4c603c587c05",
+        "Contents/Helpers/ArkDeckAgent.app/Contents/MacOS/arkdeck-agentd": "f12b721e51ee8ad6a54752c0974b6aad0fa2eeaaea3b0f0fa9799cd6c86f0820",
+        "Contents/Helpers/ArkDeckAgent.app/Contents/MacOS/arkdeck-facade": "b645dc51b5ce88f5c75a4ddfe8d74668c91c4bb2bc871dcbcac165c094ff12f2"
+      },
+      "targetID": "TGT-958780b2ffb7",
+      "bindingRevisionBefore": 2,
+      "bindingRevisionAfter": 2,
+      "executionID": "gj4-xpa003-20260910",
+      "jobId": "job-668735b572ec56dd44120abe9e428e36",
+      "terminalState": "succeeded",
+      "outcomeUnknown": false,
+      "outstandingResidueCount": 0,
+      "humanActions": [],
+      "actualStepKinds": [
+        "waitForReconnect",
+        "probeDevice",
+        "flashPartition",
+        "verifyRemoteState",
+        "rebootDevice",
+        "captureRemoteStdout"
+      ],
+      "startedAtUtc": "2026-09-10T00:15:52Z",
+      "finishedAtUtc": "2026-09-10T00:18:42Z",
+      "firmware": "OpenHarmony-7.0.0.37",
+      "confirmationMethod": "machineReadback",
+      "authority": {
+        "admittedAtUtc": "2026-09-10T00:15:53Z",
+        "artifactDigest": "4fd35765fa75b9e2ce7c11f614144804f72efdc955a197e657014df1349ac674",
+        "consumptionFingerprintSha256": "2664205b4555764cf9a9261288458eba331097686e629efa6d89cf14b92d9831",
+        "kind": "runtimeCapability",
+        "planDigest": "e90cf8da666610861951763f0cdc9e70f20a98984fb0daf2c8d0dd8c05f9ec31",
+        "recoveryEpoch": null,
+        "reference": "CAP-RT-POLICY-C9BD531CB60AE6D8938D4EE274FB19B73BF4B63F-G1",
+        "reservationId": "agent-execution-8db625c1e21a26d626258a5bd6ec172a26abd3e56b94d2ae7a3648e0abccccb9",
+        "stepSetDigest": "c1ab01f8c7c24649080d109c481f9c034ffb73edcc62033684ac8a59875e0b12",
+        "targetBindingDigest": "28c2131ca929d14cbbb71733a3cdf4b01ecbfc4c7c044b8a9a7b6d3cc0b4f41a",
+        "useOrdinal": 1,
+        "validUntilUtc": "2026-09-10T04:15:52Z"
+      },
+      "recoveryEpoch": null,
+      "archive": {
+        "byteCount": 730783514,
+        "sha256": "4fd35765fa75b9e2ce7c11f614144804f72efdc955a197e657014df1349ac674"
+      },
+      "artifacts": [
+        {
+          "name": "flash-report.json",
+          "byteCount": 1855,
+          "sha256": "2051458907b4014f62c1c93e72dcd6e229716f6510361cd67df366c6340172fe",
+          "verified": true
+        },
+        {
+          "name": "post-flash-hilog.txt",
+          "byteCount": 600325,
+          "sha256": "f758bc8c43dcf6b906bb389b3592b66c9c29a3217874c7eaf106b15de71df6be",
+          "verified": true
+        },
+        {
+          "name": "post-flash-facts.json",
+          "byteCount": 947,
+          "sha256": "6bc108f89c62da94a7c0244f43f1448b1f40332366c9c17d2827d7a8927d44f2",
+          "verified": true
+        }
+      ],
+      "missingRequiredArtifacts": [],
+      "blockers": [],
+      "postflight": {
+        "operation": "observe.device@1",
+        "executionID": "gj4-xpa003-20260910-postflight",
+        "jobId": "job-fed59c473a7a650b2bdf51979f97be2d",
+        "state": "succeeded",
+        "outcomeUnknown": false,
+        "firmware": "OpenHarmony-7.0.0.37",
+        "blockers": []
+      },
+      "sessionPublication": {
+        "catalogGeneration": null,
+        "manifestSha256": null,
+        "reasonCode": "sourceIntegrityFailed",
+        "state": "failed"
+      },
+      "sessionPublicationLimitation": "The initial publication failure shown above was repaired after PR #1832 merged. See sessionPublicationRepair for the subsequent typed retry and readback; the original flash execution and Artifact evidence remain unchanged."
+    }
+  ],
+  "cleanup": {
+    "campaign": "",
+    "availableOperations": 28,
+    "publishedOperations": 30,
+    "restoredOriginalRuntime": true,
+    "ready": true,
+    "daemonSHA256": "02d685a01a51c36dfc69a751aa4bdc7c38b5ab9971c032aba44cbb64f216392b"
+  },
+  "discipline": {
+    "rawDeviceCommands": 0,
+    "runtimeAuthorityRecordEdits": 0,
+    "unknownIntentReplays": 0,
+    "bindingRebindOverrides": 0
+  },
+  "rawOutputs": "/private/tmp/xpa003-gj4-20260910 (local only)",
+  "sessionPublicationRepair": {
+    "kind": "runtime-session-publication-readback",
+    "date": "2026-09-10",
+    "repairPR": "https://github.com/ArkDeck/ArkDeck/pull/1832",
+    "protectedMainCommit": "36f1d951f25b3a50ec01980ec9a3287dcd299b86",
+    "daemonSHA256": "2acdb818d2bb781c0d28443d03e980dccc662718fa04f51015308774406e75e3",
+    "cliSHA256": "3f6f82a4947f0b4aa2702a87f1b97860830c5cf1363ce102db22ed2fa9c86a7d",
+    "jobCountBefore": 64,
+    "jobCountAfter": 64,
+    "catalogGenerationBefore": "10",
+    "catalogGenerationAfter": "12",
+    "sessions": [
+      {
+        "jobId": "job-668735b572ec56dd44120abe9e428e36",
+        "sessionId": "session-job-668735b572ec56dd44120abe9e428e36",
+        "receipt": {
+          "catalogGeneration": "11",
+          "manifestSha256": "b40052c280c07039b1e1b090af9e08f09072e000553f6c3272aab089de9cad55",
+          "reasonCode": null,
+          "state": "published"
+        },
+        "originalJournalPrefixUnchanged": true,
+        "appendedEventKinds": [
+          "finalized"
+        ],
+        "newProviderIntentEvents": 0
+      },
+      {
+        "jobId": "job-fed59c473a7a650b2bdf51979f97be2d",
+        "sessionId": "session-job-fed59c473a7a650b2bdf51979f97be2d",
+        "receipt": {
+          "catalogGeneration": "12",
+          "manifestSha256": "7350c0057ea4876f61ffed2e8f4e960fe362ca92ad1c806d5db0ec027e7d0f8a",
+          "reasonCode": null,
+          "state": "published"
+        },
+        "originalJournalPrefixUnchanged": true,
+        "appendedEventKinds": [
+          "finalized"
+        ],
+        "newProviderIntentEvents": 0
+      }
+    ],
+    "sameReceiptAfterRepeat": true,
+    "sameReceiptAfterRestart": true,
+    "originalArtifactDigestsUnchanged": true,
+    "originalEvidenceStatus": "verified",
+    "originalArtifactBytesVerified": true,
+    "postflightEvidenceStatus": "verified",
+    "unaccountedSessionCountBefore": "1",
+    "unaccountedSessionCountAfter": "1",
+    "campaignClosed": true,
+    "newFlashJobs": 0
+  }
+}

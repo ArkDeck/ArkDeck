@@ -403,13 +403,11 @@ public final class LaunchAgentService: @unchecked Sendable {
     beforeBootstrap: (@Sendable () throws -> Void)? = nil
   ) throws -> LaunchAgentInstallReceipt {
     let daemonBundleSource = try daemonBundleValidator(daemonBundleSource)
-    let daemonSource = daemonBundleSource.appending(
-      path:
-        "Contents/MacOS/\(ArkDeckHelperIdentity.daemonExecutableName)")
     let hdcExecutable = try validatedExecutable(hdcExecutable, name: "HDC")
     let workspace = try workspace.map(validatedWorkspace)
     let arkTraceDescriptor = try arkTraceDescriptor.map(validatedArkTraceDescriptor)
-    let daemonSHA256 = try sha256(daemonSource)
+    let launchSource = try transportExecutable(in: daemonBundleSource)
+    let daemonSHA256 = try sha256(launchSource)
     let hdcSHA256 = try sha256(hdcExecutable)
     try createOwnedDirectory(paths.plist.deletingLastPathComponent())
     try createOwnedDirectory(paths.installedDaemonBundle.deletingLastPathComponent())
@@ -436,8 +434,9 @@ public final class LaunchAgentService: @unchecked Sendable {
     try fileManager.setAttributes(
       [.posixPermissions: 0o700], ofItemAtPath: paths.installedDaemon.path)
 
+    let launchExecutable = try transportExecutable(in: paths.installedDaemonBundle)
     let renderedPlist = try renderTemplate(
-      daemonPath: paths.installedDaemon.path,
+      daemonPath: launchExecutable.path,
       hdcPath: hdcExecutable.path,
       stdoutPath: paths.standardOutput.path,
       stderrPath: paths.standardError.path,
@@ -447,7 +446,7 @@ public final class LaunchAgentService: @unchecked Sendable {
     try fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: paths.plist.path)
 
     let receipt = LaunchAgentInstallReceipt(
-      installedAtUTC: nowUTC(), daemonPath: paths.installedDaemon.path,
+      installedAtUTC: nowUTC(), daemonPath: launchExecutable.path,
       daemonSHA256: daemonSHA256, hdcPath: hdcExecutable.path,
       hdcSHA256: hdcSHA256,
       workspaceProjectPath: workspace?.projectRoot.path,
@@ -482,6 +481,26 @@ public final class LaunchAgentService: @unchecked Sendable {
     }
     try bootstrap()
     return receipt
+  }
+
+  /// The Swift executable remains the credential/analyzer identity. A signed
+  /// sibling facade owns the public transports only when the release includes it.
+  private func transportExecutable(in bundle: URL) throws -> URL {
+    let facade = bundle.appending(path: "Contents/MacOS/arkdeck-facade")
+    guard fileManager.fileExists(atPath: facade.path) else {
+      return bundle.appending(path: "Contents/MacOS/\(ArkDeckHelperIdentity.daemonExecutableName)")
+    }
+    _ = try validatedExecutable(facade, name: "control-plane facade")
+    var code: SecStaticCode?
+    var requirement: SecRequirement?
+    guard SecStaticCodeCreateWithPath(facade as CFURL, [], &code) == errSecSuccess,
+      let code,
+      SecRequirementCreateWithString(
+        "anchor apple generic and certificate leaf[subject.OU] = \"8AQTYW5FKR\" and identifier \"com.arkdeck.agentd.facade\"" as CFString,
+        [], &requirement) == errSecSuccess,
+      SecStaticCodeCheckValidity(code, SecCSFlags(rawValue: kSecCSStrictValidate), requirement) == errSecSuccess
+    else { throw LaunchAgentServiceError.invalidExecutable("facade signature is invalid; run runtime service update") }
+    return facade
   }
 
   public func uninstall() throws -> LaunchAgentRemoval {
@@ -547,7 +566,7 @@ public final class LaunchAgentService: @unchecked Sendable {
         } catch {
           diagnostics.append("installed daemon helper bundle is invalid: \(error)")
         }
-        if configuration.daemon != paths.installedDaemon.path {
+        if configuration.daemon != (try transportExecutable(in: paths.installedDaemonBundle)).path {
           diagnostics.append("ProgramArguments does not name the ArkDeck-managed daemon path")
         }
         do {
@@ -737,6 +756,11 @@ public final class LaunchAgentService: @unchecked Sendable {
         "plist must keep the user-session lifecycle, Mach service, log paths, "
           + "one daemon argument and an explicit ARKDECK_HDC_PATH")
     }
+    if daemon != paths.installedDaemon.path {
+      guard environment["ARKDECK_SWIFT_SHA256"] == (try sha256(paths.installedDaemon)) else {
+        throw LaunchAgentServiceError.configuration("paired Swift daemon identity drifted; run runtime service update")
+      }
+    }
     let projectEntry = environment[ArkDeckLaunchAgent.workspaceProjectsEnvironmentKey]
     let activeProject = environment[ArkDeckLaunchAgent.workspaceActiveProjectEnvironmentKey]
     let sdk = environment[ArkDeckLaunchAgent.devecoSDKEnvironmentKey]
@@ -748,7 +772,7 @@ public final class LaunchAgentService: @unchecked Sendable {
     // inspector to the one system tool — whenever it is present; they simply
     // no longer force a workspace to exist, and their absence no longer makes
     // a workspace configuration look complete.
-    guard analyzer == nil || analyzer == daemon else {
+    guard analyzer == nil || analyzer == paths.installedDaemon.path else {
       throw LaunchAgentServiceError.configuration(
         "the analyzer path must be this installation's own daemon")
     }
@@ -765,7 +789,7 @@ public final class LaunchAgentService: @unchecked Sendable {
       guard let projectEntry, projectEntry.hasPrefix(prefix),
         !String(projectEntry.dropFirst(prefix.count)).isEmpty,
         activeProject == ArkDeckLaunchAgent.waterFlowProjectRef,
-        let sdk, analyzer == daemon, inspector == "/usr/bin/grep"
+        let sdk, analyzer == paths.installedDaemon.path, inspector == "/usr/bin/grep"
       else {
         throw LaunchAgentServiceError.configuration(
           "workspace environment must be the closed demo-app ProjectProfile configuration")
@@ -852,7 +876,10 @@ public final class LaunchAgentService: @unchecked Sendable {
     // even with its symbol preset `active` and carrying its source map, and
     // `workspace.inspect-source@1` as `no_workspace_inspector_configured`.
     // Each reason blamed a preset the operator had already registered.
-    environment[ArkDeckLaunchAgent.analyzerEnvironmentKey] = daemonPath
+    environment[ArkDeckLaunchAgent.analyzerEnvironmentKey] = paths.installedDaemon.path
+    if daemonPath != paths.installedDaemon.path {
+      environment["ARKDECK_SWIFT_SHA256"] = try sha256(paths.installedDaemon)
+    }
     environment[ArkDeckLaunchAgent.workspaceInspectorEnvironmentKey] = "/usr/bin/grep"
     if let workspace {
       environment[ArkDeckLaunchAgent.workspaceProjectsEnvironmentKey] =

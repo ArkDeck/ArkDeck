@@ -1216,6 +1216,12 @@ public actor RuntimeJobEngine {
   /// pinned - and therefore comparable - observation window.
   private let nowPreciseUTC: @Sendable () -> String
   private var jobs: [String: JobRuntime] = [:]
+  // Read projections always fetch current durable bytes before consulting this
+  // process-local cache. It contains decoded values, never status or authority.
+  private var decodedReadRecords: [String: (bytes: Data, record: RuntimeJobRecord)] = [:]
+  private var decodedReadRecordOrder: [String] = []
+  private var decodedReadRecordBytes = 0
+
   private var jobFailureFinalizations: [String: Task<RuntimeJobStatus, Error>] = [:]
   private var jobReconciliations: [String: Task<RuntimeJobStatus, Error>] = [:]
   private var jobRuns: [String: Task<RuntimeJobStatus, Error>] = [:]
@@ -5230,7 +5236,7 @@ public actor RuntimeJobEngine {
     if let current = jobs[jobID]?.record { record = current }
     else {
       guard let persisted = try admissionService.boundedJob(jobID: jobID) else { throw RuntimeJobEngineError.jobNotFound(jobID) }
-      record = try decodePersistedRecord(persisted)
+      record = try decodePersistedRecordForProjection(persisted)
       guard record.state == persisted.state, persisted.createdAtMatches(record.createdAtUTC),
         record.request.idempotencyKey == persisted.idempotencyKey, persisted.version > 0
       else { throw RuntimeJobEngineError.jobRecordUnreadable(jobID) }
@@ -5272,7 +5278,7 @@ public actor RuntimeJobEngine {
         captured.append((created, record.jobID, projection))
       }
       try admissionService.forEachJob { persisted in
-        let durable = try decodePersistedRecord(persisted)
+        let durable = try decodePersistedRecordForProjection(persisted)
         guard durable.state == persisted.state, persisted.createdAtMatches(durable.createdAtUTC),
           durable.request.idempotencyKey == persisted.idempotencyKey, persisted.version > 0
         else { throw RuntimeJobEngineError.jobRecordUnreadable(persisted.jobID) }
@@ -9280,6 +9286,37 @@ public actor RuntimeJobEngine {
         "idempotency key belongs to a Job admitted under a different Catalog digest")
     }
     return existing
+  }
+
+  /// Called only by job.status/job.list read projections. The caller still
+  /// validates row metadata and computes status using fresh recovery indexes.
+  private func decodePersistedRecordForProjection(_ persisted: RuntimePersistedJob) throws -> RuntimeJobRecord {
+    if let cached = decodedReadRecords[persisted.jobID],
+      cached.bytes == persisted.initialRecordData {
+      decodedReadRecordOrder.removeAll { $0 == persisted.jobID }
+      decodedReadRecordOrder.append(persisted.jobID)
+      return cached.record
+    }
+    if let stale = decodedReadRecords.removeValue(forKey: persisted.jobID) {
+      decodedReadRecordBytes -= stale.bytes.count
+      decodedReadRecordOrder.removeAll { $0 == persisted.jobID }
+    }
+    let record = try decodePersistedRecord(persisted)
+    // Bound both retained source bytes and entry overhead; oversized records
+    // retain the original decode-on-every-read behavior. No failed decode is cached.
+    let maximumBytes = 2 * 1024 * 1024
+    if let bytes = persisted.initialRecordData, bytes.count <= maximumBytes {
+      while decodedReadRecords.count >= 128 || decodedReadRecordBytes + bytes.count > maximumBytes {
+        let evictedID = decodedReadRecordOrder.removeFirst()
+        if let evicted = decodedReadRecords.removeValue(forKey: evictedID) {
+          decodedReadRecordBytes -= evicted.bytes.count
+        }
+      }
+      decodedReadRecords[persisted.jobID] = (bytes, record)
+      decodedReadRecordOrder.append(persisted.jobID)
+      decodedReadRecordBytes += bytes.count
+    }
+    return record
   }
 
   private func decodePersistedRecord(_ persisted: RuntimePersistedJob) throws -> RuntimeJobRecord {

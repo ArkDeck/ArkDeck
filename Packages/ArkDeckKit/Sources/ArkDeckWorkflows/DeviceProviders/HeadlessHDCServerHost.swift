@@ -47,11 +47,17 @@ package final class HeadlessHDCServerHost: @unchecked Sendable {
     private var exitReason: String?
     private var stopping = false
     private var launch: HDCManagedProcessLaunch?
+    private var launchCaptureFailed = false
     private var confirmedLifecycleExitDeadline: UInt64?
 
     func recordLaunch(pid: Int32, executable: ProcessExecutableIdentityReceipt, request: ProcessRequest) {
       let captured = HDCManagedProcessLaunch.capture(pid: pid, executable: executable, request: request)
-      lock.withLock { if launch == nil, !exited, !stopping { launch = captured } }
+      lock.withLock {
+        if launch == nil, !exited, !stopping {
+          launch = captured
+          launchCaptureFailed = captured == nil
+        }
+      }
     }
 
     func activeLaunch() -> HDCManagedProcessLaunch? {
@@ -60,6 +66,15 @@ package final class HeadlessHDCServerHost: @unchecked Sendable {
 
     func retainedLaunch() -> HDCManagedProcessLaunch? {
       lock.withLock { !exited && !stopping ? launch : nil }
+    }
+
+    func missingLaunchReason() -> String {
+      lock.withLock {
+        if let exitReason { return exitReason }
+        if stopping { return "managed HDC stopped during readiness" }
+        if launchCaptureFailed { return "managed HDC spawn identity capture failed" }
+        return "managed HDC spawn observer did not record a launch"
+      }
     }
 
     func expectConfirmedLifecycleExit() {
@@ -199,7 +214,7 @@ package final class HeadlessHDCServerHost: @unchecked Sendable {
         executable: executable, endpoint: selection, lifecycle: lifecycle)
       guard let launch = lifecycle.retainedLaunch() else {
         throw HeadlessHDCServerHostError.serverDidNotBecomeReady(
-          "managed HDC launch identity was not retained")
+          lifecycle.missingLaunchReason())
       }
       let toolchain = HDCCandidate(
         path: URL(filePath: executable.path), source: .userConfigured,

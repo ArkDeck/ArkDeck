@@ -110,6 +110,10 @@ cp -R "$workflows_resource_bundle" "$daemon_bundle/Contents/Resources/"
 cp -R "$launch_agent_resource_bundle" "$cli_bundle/Contents/Resources/"
 chmod 700 "$cli_bundle/Contents/MacOS/arkdeck" "$daemon_bundle/Contents/MacOS/arkdeck-agentd"
 
+bash "$package_root/../../rust/scripts/package-macos-facade.sh" debug \
+  "$daemon_bundle" "$staging_root/rollback/ArkDeckAgent.app" "$identity" \
+  "$distribution_root/ArkDeckAgent.entitlements"
+
 codesign --force --sign "$identity" --options runtime --timestamp=none \
   --entitlements "$distribution_root/ArkDeckAgent.entitlements" "$daemon_bundle"
 codesign --force --sign "$identity" --options runtime --timestamp=none \

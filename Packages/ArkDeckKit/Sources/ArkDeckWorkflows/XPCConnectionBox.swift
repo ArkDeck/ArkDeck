@@ -1,14 +1,141 @@
 import ArkDeckCore
 import Foundation
 import os
+import XPC
 
-/// Sendable-safe holder for an `NSXPCConnection` captured by facade reply
-/// closures. One definition for all App-facing facades; the connection class
-/// itself is thread-safe, the box only carries the reference across the
-/// `@Sendable` boundary.
+/// Two persistent channels keep a bounded job.run from occupying the ordinary
+/// read channel. Each channel serializes health + request, with no replay.
 final class XPCConnectionBox: @unchecked Sendable {
-  let connection: NSXPCConnection
-  init(_ connection: NSXPCConnection) { self.connection = connection }
+  typealias Reply = RuntimeXPCRequestTransport.Reply
+  private struct Pending {
+    let token: UUID
+    let live: OSAllocatedUnfairLock<Bool>
+    let frame: Data
+    let health: Data
+    let requestID: String
+    let healthID: String
+    let reply: Reply
+  }
+  private let queue = DispatchQueue(label: "com.arkdeck.runtime.xpc")
+  private var connection: ArkDeckRawXPCObject?
+  private var waiting: [Pending] = []
+  private var active: Pending?
+  private var healthPending: UUID?
+  private var generation = UUID()
+
+  func enqueue(token: UUID, live: OSAllocatedUnfairLock<Bool>, frame: Data, health: Data, requestID: String, healthID: String, reply: @escaping Reply) {
+    queue.async {
+      guard live.withLock({ $0 }) else { return }
+      self.waiting.append(Pending(token: token, live: live, frame: frame, health: health,
+        requestID: requestID, healthID: healthID, reply: reply))
+      self.advance()
+    }
+  }
+
+  func cancel(_ token: UUID) {
+    queue.async {
+      self.waiting.removeAll { $0.token == token }
+      if self.active?.token == token {
+        self.active = nil
+        self.invalidate()
+        self.advance()
+      }
+    }
+  }
+
+  private func invalidate() {
+    if let connection { xpc_connection_cancel(connection.value) }
+    connection = nil
+    generation = UUID()
+    healthPending = nil
+  }
+
+  private func finish(_ result: RuntimeXPCRequestTransport.ResultValue, token: UUID, invalid: Bool = false) {
+    guard let request = active, request.token == token else { return }
+    active = nil
+    if invalid { invalidate() }
+    request.reply(result)
+    advance()
+  }
+
+  private func advance() {
+    guard active == nil, !waiting.isEmpty else { return }
+    let request = waiting.removeFirst()
+    guard request.live.withLock({ $0 }) else { advance(); return }
+    active = request
+    if connection == nil {
+      let peer = ArkDeckRawXPCObject(xpc_connection_create_mach_service(ArkDeckAgentXPC.machServiceName, queue, 0))
+      guard xpc_connection_set_peer_code_signing_requirement(peer.value, ArkDeckAgentXPC.serverCodeRequirement) == 0 else {
+        xpc_connection_cancel(peer.value)
+        finish(.failure(.unavailable("Runtime identity requirement is invalid; run runtime service update")), token: request.token, invalid: true)
+        return
+      }
+      let current = generation
+      xpc_connection_set_event_handler(peer.value) { [weak self] event in
+        guard let self, xpc_get_type(event) == XPC_TYPE_ERROR else { return }
+        self.queue.async {
+          guard self.generation == current else { return }
+          if let active = self.active {
+            self.finish(.failure(.unavailable("Runtime connection interrupted; run runtime service update")), token: active.token, invalid: true)
+          } else { self.invalidate() }
+        }
+      }
+      connection = peer
+      xpc_connection_activate(peer.value)
+    }
+    healthPending = request.token
+    queue.asyncAfter(deadline: .now() + 5) { [weak self] in
+      guard let self, self.healthPending == request.token else { return }
+      self.finish(.failure(.unavailable("Runtime did not establish the current transport contract; run runtime service update")),
+        token: request.token, invalid: true)
+    }
+    send(request.health, token: request.token) { [self] result in
+      healthPending = nil
+      switch result {
+      case .failure(let error): finish(.failure(error), token: request.token, invalid: true)
+      case .success(let data):
+        let line = data.last == 10 ? Data(data.dropLast()) : data
+        guard (try? ControlProtocolContract.validateHealth(line, id: request.healthID)) != nil else {
+          finish(.failure(.unavailable("Runtime contract mismatch; run runtime service update")), token: request.token, invalid: true)
+          return
+        }
+        send(request.frame, token: request.token) { [self] result in
+          if case .success(let bytes) = result {
+            let line = bytes.last == 10 ? Data(bytes.dropLast()) : bytes
+            guard (try? ControlProtocolContract.responseFields(line, id: request.requestID)) != nil else {
+              finish(.failure(.refused("malformedResponse")), token: request.token, invalid: true)
+              return
+            }
+          }
+          if case .failure = result { finish(result, token: request.token, invalid: true) }
+          else { finish(result, token: request.token) }
+        }
+      }
+    }
+  }
+
+  private func send(_ frame: Data, token: UUID, reply: @escaping Reply) {
+    guard let active, active.token == token, let connection else { return }
+    guard active.live.withLock({ $0 }) else { self.active = nil; invalidate(); advance(); return }
+    let message = xpc_dictionary_create(nil, nil, 0)
+    frame.withUnsafeBytes { xpc_dictionary_set_data(message, "frame", $0.baseAddress, $0.count) }
+    let current = generation
+    xpc_connection_send_message_with_reply(connection.value, message, queue) { [self] response in
+      guard self.active?.token == token, generation == current else { return }
+      guard xpc_get_type(response) == XPC_TYPE_DICTIONARY,
+        xpc_dictionary_get_count(response) == 1 else {
+        reply(.failure(.unavailable("Runtime transport mismatch or interruption; run runtime service update")))
+        return
+      }
+      var length = 0
+      guard let bytes = xpc_dictionary_get_data(response, "frame", &length),
+        length <= ArkDeckControlProtocol.maximumResponseFrameBytes else {
+        reply(.failure(.refused("malformedResponse")))
+        return
+      }
+      reply(.success(Data(bytes: bytes, count: length)))
+    }
+  }
 }
 
 private final class XPCDispatchWorkItemBox: @unchecked Sendable {
@@ -51,6 +178,9 @@ enum RuntimeXPCRequestTransport {
   typealias ResultValue = Result<Data, Failure>
   typealias Reply = @Sendable (ResultValue) -> Void
 
+  private static let ordinaryConnection = XPCConnectionBox()
+  private static let jobConnection = XPCConnectionBox()
+
   static let ordinaryTimeoutSeconds: TimeInterval = 120
   static let runtimeJobTimeoutSeconds: TimeInterval = (4 * 60 * 60) + (5 * 60)
 
@@ -72,70 +202,15 @@ enum RuntimeXPCRequestTransport {
       return .failure(.compose)
     }
 
-    let box = XPCConnectionBox(
-      NSXPCConnection(machServiceName: ArkDeckAgentXPC.machServiceName, options: []))
-    let mayDispatch = OSAllocatedUnfairLock(initialState: true)
+    let box = method == "job.run" ? jobConnection : ordinaryConnection
+    let token = UUID()
+    let live = OSAllocatedUnfairLock(initialState: true)
     return await awaitReply(
       timeoutSeconds: timeoutSeconds ?? defaultTimeoutSeconds(for: method),
-      cleanup: {
-        mayDispatch.withLock { $0 = false }
-        box.connection.invalidate()
-      }
+      cleanup: { live.withLock { $0 = false }; box.cancel(token) }
     ) { finish in
-      let connection = box.connection
-      connection.remoteObjectInterface = NSXPCInterface(with: ArkDeckAgentXPCProtocol.self)
-      // A replacement peer needs a new health check. Permanently invalidate
-      // this connection so NSXPC cannot reconnect between health and dispatch.
-      connection.interruptionHandler = {
-        box.connection.invalidate()
-        finish(.failure(.unavailable("Runtime connection interrupted")))
-      }
-      connection.resume()
-      let proxy =
-        connection.remoteObjectProxyWithErrorHandler { error in
-          finish(.failure(.unavailable(error.localizedDescription)))
-        } as? ArkDeckAgentXPCProtocol
-      guard let proxy else {
-        finish(.failure(.unavailable(nil)))
-        return
-      }
-      proxy.sendRequestFrame(healthFrame) { healthData, refusal in
-        if let refusal {
-          finish(.failure(.refused(refusal)))
-          return
-        }
-        guard let healthData else { finish(.failure(.emptyResponse)); return }
-        let healthLine = healthData.last == 0x0A ? Data(healthData.dropLast()) : healthData
-        guard (try? ControlProtocolContract.validateHealth(healthLine, id: healthID)) != nil else {
-          finish(.failure(.refused("contractMismatch")))
-          return
-        }
-        guard mayDispatch.withLock({ active -> Bool in
-          guard active else { return false }
-          active = false
-          return true
-        }) else { return }
-        guard let proxy = box.connection.remoteObjectProxyWithErrorHandler({ error in
-          finish(.failure(.unavailable(error.localizedDescription)))
-        }) as? ArkDeckAgentXPCProtocol else {
-          finish(.failure(.unavailable(nil)))
-          return
-        }
-        proxy.sendRequestFrame(frame) { data, refusal in
-          if let refusal {
-            finish(.failure(.refused(refusal)))
-          } else if let data {
-            let line = data.last == 0x0A ? Data(data.dropLast()) : data
-            guard (try? ControlProtocolContract.responseFields(line, id: requestID)) != nil else {
-              finish(.failure(.refused("malformedResponse")))
-              return
-            }
-            finish(.success(data))
-          } else {
-            finish(.failure(.emptyResponse))
-          }
-        }
-      }
+      box.enqueue(token: token, live: live, frame: frame, health: healthFrame,
+        requestID: requestID, healthID: healthID, reply: finish)
     }
   }
 

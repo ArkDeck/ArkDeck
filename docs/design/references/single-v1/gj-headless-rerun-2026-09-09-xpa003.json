@@ -1,0 +1,461 @@
+{
+  "schemaVersion": "arkdeck.gj-headless-rerun/1",
+  "date": "2026-09-09",
+  "catalogDigest": "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "runbook": "docs/design/cli-golden-journey-headless-runbook.md \u00a7\u00a70\u20137",
+  "journeys": [
+    {
+      "evidenceKind": "redacted-metadata-derived-from-real-runtime",
+      "catalogDigest": "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+      "runtimeSourceRevision": "0eb8a45c42dc8c64fb25f21e6daf09050534d5ab (TASK-XPA-003 implementation build r6)",
+      "protectedMainBase": "fc8263bdd36893383346ef170b309a4e175568ed",
+      "runtimeExecutableSHA256": "a46120dddaaf7ab4906ae846f99335de0471c329b8d5ed48eacf906a7ab7ace2",
+      "pairedSwiftExecutableSHA256": "abb37651e945c5c7d294b852ac5452a7df01621b0f3b2bc568cf36189a5fa013",
+      "cliBuildIdentity": "sha256:c75ca1ceb8fbb91d1b6af581f66d41c9e4a0b2f3efc6695f9902ef13e9bf9b63",
+      "contractIdentity": "8a662759721a2081e974306399997801246de4022047365c050107de5dce2912",
+      "hdcExecutableSHA256": "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83",
+      "hdcVersion": "3.2.0f",
+      "targetID": "TGT-958780b2ffb7",
+      "bindingRevision": 2,
+      "firmware": "OpenHarmony-7.0.0.37",
+      "goldenJourney": "GJ-1",
+      "state": "IMPLEMENTING",
+      "jobs": [
+        {
+          "jobId": "job-57778758636d39059197893ac5ededac",
+          "executionID": "xpa003-gj1-20260909-observe",
+          "state": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "verifiedArtifactCount": 3,
+          "actualStepKinds": [
+            "probeHostTool",
+            "probeHDCServer",
+            "probeDevice",
+            "runApprovedRemoteRead"
+          ]
+        },
+        {
+          "jobId": "job-cdb2c3027f13febb2734ba41d29d3556",
+          "executionID": "xpa003-gj1-20260909-capture",
+          "state": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "verifiedArtifactCount": 6,
+          "actualStepKinds": [
+            "probeDevice",
+            "runApprovedRemoteRead",
+            "preflightDeviceStorage",
+            "captureRemoteStdout"
+          ]
+        }
+      ],
+      "publishedArtifactsReadAndDigestVerified": 9,
+      "captureCompleteness": "complete",
+      "missingRequired": [],
+      "restartReadback": "Both Jobs: updated CLI job.show and job.result succeeded after typed daemon rollback/restart.",
+      "remaining": [
+        "Physical USB HAR crash-resume per runbook \u00a72.1"
+      ]
+    },
+    {
+      "evidenceKind": "redacted-metadata-derived-from-real-runtime",
+      "catalogDigest": "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+      "runtimeSourceRevision": "0eb8a45c42dc8c64fb25f21e6daf09050534d5ab (TASK-XPA-003 implementation build r6)",
+      "protectedMainBase": "fc8263bdd36893383346ef170b309a4e175568ed",
+      "runtimeExecutableSHA256": "a46120dddaaf7ab4906ae846f99335de0471c329b8d5ed48eacf906a7ab7ace2",
+      "pairedSwiftExecutableSHA256": "abb37651e945c5c7d294b852ac5452a7df01621b0f3b2bc568cf36189a5fa013",
+      "cliBuildIdentity": "sha256:c75ca1ceb8fbb91d1b6af581f66d41c9e4a0b2f3efc6695f9902ef13e9bf9b63",
+      "contractIdentity": "8a662759721a2081e974306399997801246de4022047365c050107de5dce2912",
+      "hdcExecutableSHA256": "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83",
+      "hdcVersion": "3.2.0f",
+      "targetID": "TGT-958780b2ffb7",
+      "bindingRevision": 2,
+      "firmware": "OpenHarmony-7.0.0.37",
+      "goldenJourney": "GJ-2",
+      "state": "REAL_DEVICE_PASS",
+      "jobs": [
+        {
+          "jobId": "job-926c285a066a01f983715e1aff752c01",
+          "executionID": "xpa003-gj2-20260909",
+          "state": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "verifiedArtifactCount": 3,
+          "actualStepKinds": [
+            "probeDevice",
+            "runApprovedRemoteRead",
+            "sendFile",
+            "installPackage",
+            "startApplication",
+            "verifyRemoteState",
+            "captureRemoteStdout",
+            "stopApplication",
+            "uninstallPackage",
+            "cleanupOwnedRemotePath"
+          ]
+        },
+        {
+          "jobId": "job-42c140aba1b99dc0aa42d429dcfccc44",
+          "executionID": "xpa003-gj3-20260909-install",
+          "state": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "verifiedArtifactCount": 2,
+          "actualStepKinds": [
+            "probeDevice",
+            "runApprovedRemoteRead",
+            "sendFile",
+            "installPackage",
+            "startApplication",
+            "verifyRemoteState",
+            "cleanupOwnedRemotePath"
+          ]
+        },
+        {
+          "jobId": "job-b0670f13d7b68ef633cafd4e027350b8",
+          "executionID": "xpa003-gj2-20260909-app-capture",
+          "state": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "verifiedArtifactCount": 8,
+          "actualStepKinds": [
+            "probeDevice",
+            "runApprovedRemoteRead",
+            "preflightDeviceStorage",
+            "verifyRemoteState",
+            "captureRemoteStdout",
+            "captureRemoteFile",
+            "receiveFile",
+            "cleanupOwnedRemotePath"
+          ]
+        },
+        {
+          "jobId": "job-107aa51a31ba79b48c113a591a21a222",
+          "executionID": "xpa003-gj23-20260909-final-cleanup",
+          "state": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "verifiedArtifactCount": 2,
+          "actualStepKinds": [
+            "probeDevice",
+            "runApprovedRemoteRead",
+            "sendFile",
+            "installPackage",
+            "startApplication",
+            "verifyRemoteState",
+            "stopApplication",
+            "uninstallPackage",
+            "cleanupOwnedRemotePath"
+          ]
+        }
+      ],
+      "outstandingResidueCount": 0,
+      "capture": {
+        "hilogBytes": 645294,
+        "uiDumpBytes": 1590,
+        "traceBytes": 10623,
+        "publishedBytesReadAndDigestVerified": true,
+        "completeness": "complete",
+        "missingRequired": []
+      },
+      "notes": [
+        "Current debug.hap selects HiLog only. The existing app-scoped capture.diagnostics operation supplies UI Dump and Trace, without changing the Catalog.",
+        "A retained-running debug.hap preflight supports capture/native work. Final debug.hap with capture disabled follows its existing install, stop, uninstall and staging cleanup plan; no raw stop command was issued."
+      ]
+    },
+    {
+      "evidenceKind": "redacted-metadata-derived-from-real-runtime",
+      "catalogDigest": "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+      "runtimeSourceRevision": "0eb8a45c42dc8c64fb25f21e6daf09050534d5ab (TASK-XPA-003 implementation build r6)",
+      "protectedMainBase": "fc8263bdd36893383346ef170b309a4e175568ed",
+      "runtimeExecutableSHA256": "a46120dddaaf7ab4906ae846f99335de0471c329b8d5ed48eacf906a7ab7ace2",
+      "pairedSwiftExecutableSHA256": "abb37651e945c5c7d294b852ac5452a7df01621b0f3b2bc568cf36189a5fa013",
+      "cliBuildIdentity": "sha256:c75ca1ceb8fbb91d1b6af581f66d41c9e4a0b2f3efc6695f9902ef13e9bf9b63",
+      "contractIdentity": "8a662759721a2081e974306399997801246de4022047365c050107de5dce2912",
+      "hdcExecutableSHA256": "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83",
+      "hdcVersion": "3.2.0f",
+      "targetID": "TGT-958780b2ffb7",
+      "bindingRevision": 2,
+      "firmware": "OpenHarmony-7.0.0.37",
+      "goldenJourney": "GJ-3",
+      "state": "REAL_DEVICE_PASS",
+      "jobs": [
+        {
+          "jobId": "job-f9d67b75275f379bc0dc6ca80ed20d60",
+          "executionID": "xpa003-gj3-20260909-positive",
+          "state": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "verifiedArtifactCount": 2,
+          "actualStepKinds": [
+            "sendFile",
+            "runApprovedRemoteRead",
+            "runApprovedRemoteMutation",
+            "stopApplication",
+            "startApplication",
+            "verifyRemoteState",
+            "cleanupOwnedRemotePath"
+          ]
+        },
+        {
+          "jobId": "job-e03ee1e514da224c9d48a8ceba5f9b84",
+          "executionID": "xpa003-gj3-20260909-rollback",
+          "state": "failed",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [
+            "artifactIntegrityFailed"
+          ],
+          "verifiedArtifactCount": 1,
+          "actualStepKinds": [
+            "sendFile",
+            "runApprovedRemoteRead",
+            "runApprovedRemoteMutation",
+            "stopApplication",
+            "startApplication",
+            "cleanupOwnedRemotePath"
+          ]
+        },
+        {
+          "jobId": "job-4a567048cd0c07668c00b6ac27330e51",
+          "executionID": "xpa003-gj3-20260909-post-rollback",
+          "state": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "verifiedArtifactCount": 8,
+          "actualStepKinds": [
+            "probeDevice",
+            "runApprovedRemoteRead",
+            "preflightDeviceStorage",
+            "verifyRemoteState",
+            "captureRemoteStdout"
+          ]
+        }
+      ],
+      "outstandingResidueCount": 0,
+      "positivePublishedArtifactsReadAndDigestVerified": 2,
+      "rollback": {
+        "fixedFixtureSHA256": "260a533ae2b02e23810aa5ab6ea9c1a5cf4524b19484ede66cb4dc0b7bb86d3a",
+        "failure": "nativeTargetNotRunning at start-target after atomic publication",
+        "runtimeTimeline": [
+          "verified rollback-native-library [processIds, restored, restoredSha256]",
+          "native deployment failure restored previous library",
+          "verified cleanup-native-library-compensation [backupRetained, cleaned]",
+          "native compensation cleanup complete"
+        ],
+        "freshPostRollbackLiveness": "HEALTHY",
+        "freshPostRollbackReasonCode": "targetProcessRunning",
+        "negativeJobRemainsFailed": true,
+        "agentExitCode": 2,
+        "evidenceProjectionBlockers": [
+          "artifactIntegrityFailed"
+        ],
+        "note": "The deliberate failing Job is not relabeled. Restoration is proved by its typed Runtime timeline and the independent successful post-rollback diagnostics, whose published bytes were read and digest checked."
+      }
+    },
+    {
+      "evidenceKind": "redacted-metadata-derived-from-real-runtime",
+      "catalogDigest": "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+      "runtimeSourceRevision": "0eb8a45c42dc8c64fb25f21e6daf09050534d5ab (TASK-XPA-003 implementation build r6)",
+      "protectedMainBase": "fc8263bdd36893383346ef170b309a4e175568ed",
+      "runtimeExecutableSHA256": "a46120dddaaf7ab4906ae846f99335de0471c329b8d5ed48eacf906a7ab7ace2",
+      "pairedSwiftExecutableSHA256": "abb37651e945c5c7d294b852ac5452a7df01621b0f3b2bc568cf36189a5fa013",
+      "cliBuildIdentity": "sha256:c75ca1ceb8fbb91d1b6af581f66d41c9e4a0b2f3efc6695f9902ef13e9bf9b63",
+      "contractIdentity": "8a662759721a2081e974306399997801246de4022047365c050107de5dce2912",
+      "hdcExecutableSHA256": "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83",
+      "hdcVersion": "3.2.0f",
+      "targetID": "TGT-958780b2ffb7",
+      "bindingRevision": 2,
+      "firmware": "OpenHarmony-7.0.0.37",
+      "goldenJourney": "GJ-4",
+      "state": "NOT_STARTED",
+      "remaining": [
+        "Separate maintainer GO for the destructive flash window"
+      ]
+    },
+    {
+      "evidenceKind": "redacted-metadata-derived-from-real-runtime",
+      "catalogDigest": "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+      "runtimeSourceRevision": "0eb8a45c42dc8c64fb25f21e6daf09050534d5ab (TASK-XPA-003 implementation build r6)",
+      "protectedMainBase": "fc8263bdd36893383346ef170b309a4e175568ed",
+      "runtimeExecutableSHA256": "a46120dddaaf7ab4906ae846f99335de0471c329b8d5ed48eacf906a7ab7ace2",
+      "pairedSwiftExecutableSHA256": "abb37651e945c5c7d294b852ac5452a7df01621b0f3b2bc568cf36189a5fa013",
+      "cliBuildIdentity": "sha256:c75ca1ceb8fbb91d1b6af581f66d41c9e4a0b2f3efc6695f9902ef13e9bf9b63",
+      "contractIdentity": "8a662759721a2081e974306399997801246de4022047365c050107de5dce2912",
+      "hdcExecutableSHA256": "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83",
+      "hdcVersion": "3.2.0f",
+      "targetID": "TGT-958780b2ffb7",
+      "bindingRevision": 2,
+      "firmware": "OpenHarmony-7.0.0.37",
+      "goldenJourney": "GJ-5",
+      "state": "REAL_DEVICE_PASS",
+      "jobs": [
+        {
+          "phase": "pre-crash",
+          "jobId": "job-2e8b62d817689cd0e44e53c82f5aece3",
+          "state": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": []
+        },
+        {
+          "phase": "repro",
+          "jobId": "job-d7240cd97cf504af89702b038dbacb50",
+          "state": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": []
+        },
+        {
+          "phase": "diag2",
+          "jobId": "job-3db550da1bac78d27a55ee65e65adab8",
+          "state": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": []
+        },
+        {
+          "phase": "analyze",
+          "jobId": "job-918c752eee239c5aa855091470a9bb2c",
+          "state": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": []
+        },
+        {
+          "phase": "isolate",
+          "jobId": "job-1873c658e008eae9b4a5c4d9996a92c1",
+          "state": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": []
+        },
+        {
+          "phase": "patch",
+          "jobId": "job-300abdf8839c3d7ac4c5c43079fdf617",
+          "state": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": []
+        },
+        {
+          "phase": "build",
+          "jobId": "job-d3d35fd9b445f3ad5cd0b7271c2a3436",
+          "state": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": []
+        },
+        {
+          "phase": "sign",
+          "jobId": "job-0df0933c529e1ddc76a7a715e3c6ecc6",
+          "state": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": []
+        },
+        {
+          "phase": "verify",
+          "jobId": "job-bce8051aeac8ec3ca5b272aa37df7bef",
+          "state": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": []
+        },
+        {
+          "phase": "diag-verify",
+          "jobId": "job-a25709f673fe71e85651d99d1e95a51e",
+          "state": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": []
+        }
+      ],
+      "crashIndexCounts": {
+        "before": 6,
+        "afterReproduction": 7,
+        "afterFix": 7
+      },
+      "reproductionLiveness": "UNHEALTHY",
+      "fixedLiveness": "HEALTHY",
+      "analyzerStatus": "answered",
+      "fixedSignedSHA256": "7361640f05459d80c87e303d8280461b49059580e61de82276f474295cd62356",
+      "deployedSHA256": "7361640f05459d80c87e303d8280461b49059580e61de82276f474295cd62356",
+      "budgets": {
+        "maxRounds": 1,
+        "maxWallClockSeconds": 1800,
+        "maxArtifactBytes": 268435456,
+        "maxE1Mutations": 5,
+        "allowedOperations": [
+          "debug.hap@1",
+          "capture.diagnostics@1",
+          "analyzer.extract-crash-signature@1",
+          "workspace.prepare-isolated-copy@1",
+          "workspace.apply-patch@1",
+          "workspace.build-openharmony@1",
+          "workspace.sign-openharmony-hap@1"
+        ],
+        "stopOnRepeatedFailure": true,
+        "stopOnOutcomeUnknown": true,
+        "stopOnHumanActionRequired": true,
+        "stopOnAuthorizationRequired": true
+      },
+      "consumption": {
+        "mutations": 4,
+        "wallClockSeconds": 234.32445565098897,
+        "artifactBytes": 8607883
+      },
+      "previousNegative": {
+        "executionID": "gj5-xpa003-20260909-patch-stale",
+        "exitCode": 77,
+        "errorCode": "admissionDenied",
+        "ledgerBefore": 62,
+        "ledgerAfter": 62,
+        "ledgerUnchanged": true,
+        "newJobs": [],
+        "ownerZeroDispatchProofPresent": false
+      },
+      "negative": {
+        "executionID": "gj5-xpa003-20260909-patch-stale-r7",
+        "exitCode": 77,
+        "error": {
+          "attentionRequired": true,
+          "code": "admissionDenied",
+          "controlRequestRetryable": false,
+          "details": {
+            "executionId": "gj5-xpa003-20260909-patch-stale-r7",
+            "method": "agent.run",
+            "newDispatchCount": 0,
+            "phase": "preAdmission",
+            "wireCode": "admissionDenied"
+          },
+          "message": "typed plan preflight failed before authorization: workspace.revisionConflict:e0d4131e6973!=e145d3939161"
+        },
+        "ledgerBefore": 62,
+        "ledgerAfter": 62,
+        "ledgerUnchanged": true,
+        "newJobs": [],
+        "ownerZeroDispatchProofPresent": true,
+        "durableTerminalReadback": {
+          "state": "failed",
+          "failureCode": "admissionDenied",
+          "jobId": null,
+          "outcomeUnknown": false
+        },
+        "runtimeBuild": "TASK-XPA-003 r7; merged approval d4e68f2e; scoped refusal projection fix",
+        "sourceBaseRevision": "ecfcb587c39b7723c8a78b2eefbdf22f8e3d2554",
+        "coordinatorSourceSHA256": "ff65a722b19b7a7884c6d50273dfb75f203c9ca5ad662d52045363a31e009feb",
+        "binarySHA256": {
+          "Contents/MacOS/arkdeck": "4f608335bf67c031e9abec255d275bee3813d0d06312e148314e4c603c587c05",
+          "Contents/Helpers/ArkDeckAgent.app/Contents/MacOS/arkdeck-agentd": "f12b721e51ee8ad6a54752c0974b6aad0fa2eeaaea3b0f0fa9799cd6c86f0820",
+          "Contents/Helpers/ArkDeckAgent.app/Contents/MacOS/arkdeck-facade": "b645dc51b5ce88f5c75a4ddfe8d74668c91c4bb2bc871dcbcac165c094ff12f2"
+        }
+      },
+      "resolvedBlocker": {
+        "ownerTask": "TASK-XPA-003",
+        "code": "agentExecution.refusalProofDropped",
+        "detail": "Coordinator persists admissionDenied after confirming no accepted Job, but discards the typed reason and owner proof. CLI refusal lacks phase/newDispatchCount. Unchanged ledger alone is not counted as complete negative acceptance.",
+        "scopePR": "https://github.com/ArkDeck/ArkDeck/pull/1831",
+        "resolution": "PR #1831 merged; preserve typed refusal after owner verifies no accepted Job; r7 real Runtime rerun passed."
+      },
+      "acceptanceBuildNote": "Positive chain used r6; affected negative refusal path revalidated with r7 against the same Catalog digest and existing isolated workspace. No positive chain replay."
+    }
+  ],
+  "discipline": {
+    "rawDeviceCommands": 0,
+    "runtimeAuthorityRecordEdits": 0,
+    "unknownIntentReplays": 0,
+    "originalWorkspaceEdits": 0
+  },
+  "rawOutputs": "/private/tmp/xpa003-gj-20260909 (local only)"
+}

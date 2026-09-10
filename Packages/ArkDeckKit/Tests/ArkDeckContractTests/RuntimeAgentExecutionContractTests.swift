@@ -774,6 +774,54 @@ final class RuntimeAgentExecutionContractTests: XCTestCase {
     catch let error as AgentExecutionControlFailure { XCTAssertEqual(error.code, "invalidCursor") }
   }
 
+  func testCLIAdmissionRefusalRetainsOwnerProofAndDurableTerminalState() async throws {
+    engine = try makeEngine(fault: .init { boundary in
+      if boundary == .beforeAdmission {
+        throw RuntimeJobEngineError.rejected(.conflict, "fixture workspace revision changed")
+      }
+    })
+    let owner = try owner()
+    let server = try startServer(owner)
+    let args = ["agent", "run", "--execution-id", "execution-test", "--operation", "observe.device@1"]
+    let (code, document) = try cli(args, server: server)
+    XCTAssertEqual(code, 77)
+    let error = try object(XCTUnwrap(document["error"]))
+    XCTAssertEqual(error["code"], .string("admissionDenied"))
+    XCTAssertEqual(error["message"], .string("fixture workspace revision changed"))
+    let details = try object(XCTUnwrap(error["details"]))
+    XCTAssertEqual(details["phase"], .string("preAdmission"))
+    XCTAssertEqual(details["newDispatchCount"], .integer(0))
+    XCTAssertEqual(details["executionId"], .string("execution-test"))
+
+    let restarted = try self.owner()
+    let status = try object(await restarted.status("execution-test"))
+    XCTAssertEqual(status["state"], .string("failed"))
+    XCTAssertEqual(status["failureCode"], .string("admissionDenied"))
+    XCTAssertEqual(status["jobId"], .null)
+    let (again, _) = try cli(args, server: server)
+    XCTAssertEqual(again, 77)
+    let jobs = try await engine.listJobs()
+    XCTAssertTrue(jobs.isEmpty)
+    XCTAssertEqual(dispatcher.dispatchCount, 0)
+  }
+
+  func testCLIInterruptedAdmissionReceiptDoesNotClaimZeroDispatch() async throws {
+    engine = try makeEngine(fault: .init { boundary in
+      if boundary == .afterAdmission { throw AgentClientFixtureError.missingObject }
+    })
+    let server = try startServer(owner())
+    let (code, document) = try cli(
+      ["agent", "run", "--execution-id", "execution-test", "--operation", "observe.device@1"],
+      server: server)
+    XCTAssertNotEqual(code, 0)
+    let error = try object(XCTUnwrap(document["error"]))
+    let details = try object(error["details"] ?? .object([:]))
+    XCTAssertNil(details["phase"])
+    XCTAssertNil(details["newDispatchCount"])
+    let jobs = try await engine.listJobs()
+    XCTAssertEqual(jobs.count, 1, "an accepted Job must survive an interrupted receipt")
+  }
+
   func testLostAdmissionReceiptFindsTheSameJobAfterRestartAndBudgetExpiry() async throws {
     engine = try makeEngine(fault: .init { boundary in
       if boundary == .afterAdmission { throw AgentClientFixtureError.missingObject }

@@ -141,6 +141,59 @@ final class JobReadResourcesContractTests: XCTestCase {
     return values
   }
 
+  func testWarmReadProjectionStillObservesChangedBytesAndRejectsCorruptionOrMetadataMismatch() async throws {
+    var record = try seed("job-warm-read", timeline: ["before"])
+    _ = try await engine.jobReadSnapshot(jobID: record.jobID)
+    _ = try await page()
+    record.timeline = ["after"]
+    try save(record)
+    let changed = try await engine.jobReadSnapshot(jobID: record.jobID)
+    XCTAssertEqual(changed.record.timeline, ["after"])
+    let changedRows = try rows(await page(["includeTimeline": .bool(true)]))
+    XCTAssertEqual(changedRows.first?["timeline"], .object([
+      "kind": .string("inline"), "entries": .array([.string("after")])]))
+
+    let repository = try RuntimeJobRepository(stateDirectory: state)
+    // Same record bytes, conflicting current row metadata: a warm hit cannot
+    // bypass the existing row/record coherence guard.
+    try repository.updateJobState(jobID: record.jobID, state: "failed",
+      updatedAtUTC: date, recordData: record.durableData())
+    let mismatched = try await read("job.status", id: record.jobID)
+    XCTAssertEqual(mismatched.error?.code, "recordUnreadable")
+    do { _ = try await page(); XCTFail("list accepted mismatched row metadata") }
+    catch RuntimeJobEngineError.jobRecordUnreadable { }
+    try save(record)
+    _ = try await engine.jobReadSnapshot(jobID: record.jobID)
+
+    try repository.updateJobState(jobID: record.jobID, state: record.state,
+      updatedAtUTC: date, recordData: Data("not-json".utf8))
+    let corrupted = try await read("job.status", id: record.jobID)
+    XCTAssertEqual(corrupted.error?.code, "recordUnreadable")
+    do { _ = try await page(); XCTFail("list accepted corrupted current bytes") }
+    catch RuntimeJobEngineError.jobRecordUnreadable { }
+    try save(record)
+    let restored = try await engine.jobReadSnapshot(jobID: record.jobID)
+    XCTAssertEqual(restored.record.timeline, ["after"])
+    XCTAssertEqual(dispatcher.dispatchCount, 0)
+  }
+
+  func testReadProjectionRemainsFreshAfterWorkingSetExceedsCacheCapacity() async throws {
+    var first = try seed("job-cache-first", timeline: ["original"])
+    _ = try await engine.jobReadSnapshot(jobID: first.jobID)
+    for index in 0..<130 {
+      let record = try seed("job-cache-\(index)")
+      _ = try await engine.jobReadSnapshot(jobID: record.jobID)
+    }
+    first.timeline = ["changed after eviction"]
+    try save(first)
+    let current = try await engine.jobReadSnapshot(jobID: first.jobID)
+    XCTAssertEqual(current.record.timeline, first.timeline)
+    let newReader = try makeEngine()
+    let durable = try await newReader.jobReadSnapshot(jobID: first.jobID)
+    XCTAssertEqual(durable.record.timeline, first.timeline)
+    XCTAssertEqual(dispatcher.dispatchCount, 0)
+  }
+
   /// A refusal has to say which Job, and a store has to be enumerable.
   ///
   /// The read surface keeps failing on a record this build cannot decode — that

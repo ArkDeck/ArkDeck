@@ -10,6 +10,7 @@ dependencies = [
  "arkdeck-control",
  "arkdeck-platform",
  "arkdeck-provider-hdc",
+ "serde",
  "serde_json",
 ]
 

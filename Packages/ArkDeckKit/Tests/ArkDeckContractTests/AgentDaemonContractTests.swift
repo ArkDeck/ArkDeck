@@ -1444,6 +1444,32 @@ final class AgentDaemonContractTests: XCTestCase {
 
   // MARK: - Transport-free protocol negatives
 
+  func testRawXPCAdapterUsesCurrentEnvelopeErrorsAndRetainsTheAppJobGate() async throws {
+    let (handler, engine) = try makeStack()
+    let endpoint = AgentXPCEndpoint(handler: handler, appJobs: AgentXPCAppJobGate())
+    let frame = try ArkDeckAgentXPC.requestFrame(method: "health", requestID: "raw-xpc")
+    let original = try JSONDecoder().decode([String: JSONValue].self, from: frame)
+    let cases: [([String: JSONValue], String, String)] = [
+      (["arkdeckOrigin": .object(["foregroundConsole": .bool(true)])], "malformedFrame", ""),
+      (["protocolVersion": .string("0.0.0")], "unsupportedProtocolVersion", "raw-xpc"),
+      (["method": .string("unpublished.method")], "unknownMethod", "raw-xpc"),
+      (["method": .string("job.run"), "params": .object(["jobId": .string("JOB-UNOWNED")])],
+        "methodNotAllowlisted", "raw-xpc"),
+    ]
+    for (changes, code, id) in cases {
+      let fields = original.merging(changes) { _, new in new }
+      let response = await endpoint.responseFrame(try CanonicalJSONEncoders.canonical().encode(fields))
+      let decoded = try JSONDecoder().decode([String: JSONValue].self, from: response)
+      XCTAssertEqual(decoded["id"], .string(id))
+      XCTAssertEqual(decoded["ok"], .bool(false))
+      guard case .object(let error)? = decoded["error"] else { return XCTFail("missing refusal") }
+      XCTAssertEqual(error["code"], .string(code))
+      XCTAssertNil(error["details"], "the transport cannot issue an owner dispatch proof")
+    }
+    let jobs = try await engine.listJobs()
+    XCTAssertTrue(jobs.isEmpty)
+  }
+
   func testDefaultClientUsesTheOnlyCurrentHealthContract() async throws {
     let (handler, _) = try makeStack()
     let server = try startServer(handler)
@@ -5362,6 +5388,34 @@ final class HeadlessHDCServerHostContractTests: XCTestCase {
     }
   }
 
+  func testCancellingColdStartDoesNotLeaveTheOwnedListenerBehind() async throws {
+    let fixture = productsDirectory.appending(path: "ArkDeckFakeHDCFixture")
+    guard FileManager.default.isExecutableFile(atPath: fixture.path) else {
+      throw XCTSkip("ArkDeckFakeHDCFixture binary not built")
+    }
+    let port = try availableDaemonLoopbackPort()
+    let endpoint = HDCServerEndpointSelection(
+      endpoint: HDCServerEndpoint("127.0.0.1:\(port)"), source: .inheritedEnvironment,
+      childEnvironment: ["OHOS_HDC_SERVER_PORT": String(port)])
+    let executable = try resolvedExecutable(at: fixture)
+    let startup = Task {
+      try await HeadlessHDCServerHost.startTestFixture(executable: executable, endpoint: endpoint)
+    }
+    // The existing cold-start fixture delays binding for one second.
+    try await Task.sleep(for: .milliseconds(100))
+    startup.cancel()
+    do {
+      let unexpected = try await startup.value
+      await unexpected.stop()
+      XCTFail("cancelled startup must not publish a ready host")
+    } catch is CancellationError {
+      // The owning task has awaited process-group cleanup before returning.
+    }
+    try await Task.sleep(for: .milliseconds(1100))
+    XCTAssertFalse(HeadlessHDCServerHost.loopbackListenerIsReachable(endpoint: endpoint.endpoint),
+      "the cancelled startup's child must never publish an orphan listener")
+  }
+
   private func resolvedExecutable(at url: URL) throws -> ResolvedExecutable {
     let digest = SHA256.hash(data: try Data(contentsOf: url))
       .map { String(format: "%02x", $0) }.joined()
@@ -5375,5 +5429,37 @@ final class HeadlessHDCServerHostContractTests: XCTestCase {
       }
     #endif
     return Bundle.main.bundleURL
+  }
+}
+
+extension AgentDaemonContractTests {
+  func testPrivateSocketRejectsMissingPairingAndOriginDigestMismatch() throws {
+    let (handler, _) = try makeStack()
+    let directory = URL(filePath: "/private/tmp/xpa-private-\(UUID().uuidString.prefix(8))")
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let secret = String(repeating: "a", count: 64)
+    let configuration = try AgentFacadeConfiguration(socketURL: directory.appending(path: "s.sock"), secret: secret)
+    let privateServer = AgentDaemonServer(stateDirectory: stateDirectory, handler: handler,
+      nowUTC: { "2026-09-09T00:00:00Z" }, facade: configuration)
+    XCTAssertEqual(try privateServer.start(), .started)
+    defer { privateServer.stop() }
+    let request = try ArkDeckAgentXPC.requestFrame(method: "health", requestID: "private-health")
+    let pairing: JSONValue = .object(["arkdeckPairing": .integer(1), "secret": .string(secret)])
+    let origin: JSONValue = .object([
+      "arkdeckOrigin": .integer(1), "transport": .string("unixSocket"),
+      "foregroundConsole": .bool(false), "peerEUID": .integer(Int64(geteuid())),
+      "peerPID": .integer(Int64(getpid())), "frameSHA256": .string(SHA256Hex.string(of: request))])
+    let encoder = CanonicalJSONEncoders.canonical()
+    let preamble = try encoder.encode(pairing) + Data([10]) + encoder.encode(origin) + Data([10])
+    XCTAssertThrowsError(try exchangeRawFrames(socketPath: privateServer.socketURL.path,
+      payload: request + Data([10]), pieceBytes: 4096, expectedResponses: 1))
+    XCTAssertThrowsError(try exchangeRawFrames(socketPath: privateServer.socketURL.path,
+      payload: preamble + request + Data(" \n".utf8), pieceBytes: 4096, expectedResponses: 1))
+    let response = try exchangeRawFrames(socketPath: privateServer.socketURL.path,
+      payload: preamble + request + Data([10]), pieceBytes: 4096, expectedResponses: 1)
+    XCTAssertEqual(response.count, 1)
+    let fields = try JSONDecoder().decode([String: JSONValue].self, from: Data(response[0].utf8))
+    XCTAssertEqual(fields["ok"], .bool(true))
   }
 }

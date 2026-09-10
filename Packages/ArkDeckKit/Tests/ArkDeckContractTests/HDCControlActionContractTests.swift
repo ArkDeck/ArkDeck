@@ -405,6 +405,17 @@ final class HDCControlActionContractTests: XCTestCase {
   }
 
   func testUDSPeerClassifierRequiresForegroundControllingTTYForChallenge() async throws {
+    try await checkForegroundTerminalPeerGetsConsoleChallenge(facade: nil)
+  }
+
+  func testFacadePreservesForegroundConsoleChallengeAndRedirectedHAR() async throws {
+    guard let facade = ProcessInfo.processInfo.environment["ARKDECK_DAEMON_UNDER_TEST"] else {
+      throw XCTSkip("set ARKDECK_DAEMON_UNDER_TEST to run the facade origin/HAR contract")
+    }
+    try await checkForegroundTerminalPeerGetsConsoleChallenge(facade: facade)
+  }
+
+  private func checkForegroundTerminalPeerGetsConsoleChallenge(facade: String?) async throws {
     let capabilities = try RuntimeCapabilityStore(directoryURL: root.appending(path: "caps"))
     let dispatcher = RuntimeAgentExecutionContractTests.Dispatcher()
     let engine = try RuntimeJobEngine(
@@ -433,9 +444,51 @@ final class HDCControlActionContractTests: XCTestCase {
       engine: engine, capabilityStore: capabilities, providerIDs: [],
       nowUTC: { "2026-09-01T00:00:00Z" }, humanActionResources: resources,
       hdcControlActions: owner)
+    var pairing: AgentFacadeConfiguration?
+    var facadeProcess: Process?
+    let facadeSocket = root.appending(path: "control/agentd.sock")
+    defer {
+      if let facadeProcess, facadeProcess.isRunning {
+        facadeProcess.terminate(); facadeProcess.waitUntilExit()
+      }
+    }
+    if let facade {
+      // A transport-only child passes its inherited pairing to this test's
+      // real Swift listener/handler. Nothing is added to a public request.
+      let metadata = root.appending(path: "ephemeral-pairing.json")
+      let child = root.appending(path: "pairing-child")
+      try """
+        #!/usr/bin/python3
+        import json, os, sys
+        from pathlib import Path
+        secret = sys.stdin.readline().strip()
+        Path(os.environ['XPA_TEST_PAIRING']).write_text(json.dumps({
+            'socket': os.environ['ARKDECK_PRIVATE_SOCKET'], 'secret': secret}))
+        sys.stdin.read()
+        """.write(to: child, atomically: true, encoding: .utf8)
+      try FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: child.path)
+      let process = Process()
+      process.executableURL = URL(filePath: facade)
+      var environment = ProcessInfo.processInfo.environment.filter { !$0.key.hasPrefix("ARKDECK_") }
+      environment["ARKDECK_SWIFT_DAEMON"] = child.path
+      environment["ARKDECK_ENDPOINT"] = facadeSocket.path
+      environment["XPA_TEST_PAIRING"] = metadata.path
+      process.environment = environment
+      process.standardOutput = FileHandle.nullDevice
+      process.standardError = FileHandle.nullDevice
+      try process.run(); facadeProcess = process
+      let deadline = Date().addingTimeInterval(5)
+      while !FileManager.default.fileExists(atPath: metadata.path), process.isRunning, Date() < deadline {
+        try await Task.sleep(for: .milliseconds(10))
+      }
+      let fields = try JSONDecoder().decode([String: String].self, from: Data(contentsOf: metadata))
+      pairing = try AgentFacadeConfiguration(
+        socketURL: URL(filePath: XCTUnwrap(fields["socket"])), secret: XCTUnwrap(fields["secret"]))
+      try FileManager.default.removeItem(at: metadata)
+    }
     let server = AgentDaemonServer(
       stateDirectory: root.appending(path: "control"), handler: handler,
-      nowUTC: { "2026-09-01T00:00:00Z" })
+      nowUTC: { "2026-09-01T00:00:00Z" }, facade: pairing)
     _ = try server.start(); defer { server.stop() }
 
     let scriptURL = root.appending(path: "peer.py")
@@ -456,7 +509,7 @@ final class HDCControlActionContractTests: XCTestCase {
     func invoke(insidePTY: Bool) throws -> [String: JSONValue] {
       let resultURL = root.appending(path: "peer-result-\(UUID().uuidString).json")
       let process = Process()
-      let arguments = [scriptURL.path, server.socketURL.path, actionID, resume, resultURL.path]
+      let arguments = [scriptURL.path, facade == nil ? server.socketURL.path : facadeSocket.path, actionID, resume, resultURL.path]
       if insidePTY {
         process.executableURL = URL(filePath: "/usr/bin/script")
         process.arguments = ["-q", root.appending(path: "typescript-\(UUID().uuidString)").path,
@@ -483,6 +536,7 @@ final class HDCControlActionContractTests: XCTestCase {
     let redirected = try invoke(insidePTY: false)
     XCTAssertEqual(redirected["schemaVersion"], .string("arkdeck.human-action/1"))
     XCTAssertNil(redirected["challenge"])
+    XCTAssertEqual(redirected["reasonCode"], action["reasonCode"])
     let foreground = try invoke(insidePTY: true)
     XCTAssertEqual(foreground["schemaVersion"], .string("arkdeck.impact-approval-challenge/1"))
     XCTAssertEqual(foreground["interactionOrigin"], .string("interactiveConsole"))
