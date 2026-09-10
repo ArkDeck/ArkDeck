@@ -1,12 +1,15 @@
-//! Read-only host-store decoder candidates for TASK-XPA-012 differential work.
+//! Host-store decoders and explicit Rust owners for TASK-XPA-012.
 //!
-//! Document candidates consume bounded bytes; Trace inventory opens a fixed
-//! physical cache root read-only. Neither path writes or dispatches.
-//! The facade does not use this crate until the complete shadow/cutover gates pass.
-//! Filesystem, timestamp and Unicode validation parity remain migration gates;
-//! successful decoding here alone is not store admission.
+//! Differential adapters consume bounded bytes or read a physical fixture root.
+//! HistoryStore is a separate writer, used only by the explicitly configured
+//! development daemon. No decoder or inventory comparison performs a write.
 
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
+
+#[cfg(target_os = "macos")]
+mod history_owner;
+#[cfg(target_os = "macos")]
+pub use history_owner::HistoryStore;
 
 mod display_names;
 mod format_time;

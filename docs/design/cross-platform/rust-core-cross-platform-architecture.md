@@ -18,7 +18,7 @@
 2. **macOS 保留 SwiftUI App**，通过 launchd Mach service（XPC C API）访问 daemon；**Windows 用 WinUI 3 / Windows App SDK 2.x**，通过 user-private Named Pipe 访问同一 Rust daemon；CLI 改为单一 Rust 实现，两端同一二进制源码。
 3. **FFI 只允许一个 crate `arkdeck-contract-ffi`**，内容限定为确定性纯计算：canonical JSON/CBOR、digest、schema/文档校验、离线 journal/artifact index 解码、（按需）Viewer 大树索引。它没有任何 authority、I/O 或副作用；panic 在边界捕获并返回错误码。它是可选优化，不是架构依赖。
 4. **语言无关契约成为唯一事实源**：Catalog、JSON Schema、逐 method typed schema、状态机表、reason code、canonical vectors、CLI fixtures 全部放入 `spec/` 类目录，Rust 与 Swift/C# 都从它生成或直接消费；迁移期以 SVC 完成后的最新 Swift 单 v1 字节为 oracle、Rust 为新实现，通过 byte-for-byte differential 与只读 shadow 证明相等后再切换 owner。
-5. **迁移是 strangler，不是 big-bang**：第一刀是 Rust「控制面 façade」拥有 socket/XPC/pipe 并把未迁移方法转发给 Swift daemon；随后按 durable store 的 owner 逐个搬迁（host-only 存储 → artifact → admission/job/capability/recovery），provider 逐族搬迁，Swift 最终只剩 App 与客户端 SDK；Swift daemon/引擎/存储 target 的删除（XPA-017）只在 Rust CLI 与 App 都已脱钩（XPA-018/019）之后进行，仓库不经过「客户端链接已删模块」的中间态（r3）。每一步 macOS 都可发布、可通过 LaunchAgent 指回 Swift daemon 回滚，数据 schema 从 SVC 完成后的基线起在迁移期保持不变。
+5. **迁移是 strangler，不是 big-bang**：第一刀是 Rust「控制面 façade」拥有 socket/XPC/pipe 并把未迁移方法转发给 Swift daemon；随后按 durable store 的 owner 逐个搬迁（host-only 存储 → artifact → admission/job/capability/recovery），provider 逐族搬迁，Swift 最终只剩 App 与客户端 SDK；Swift daemon/引擎/存储 target 的删除（XPA-017）只在 Rust CLI 与 App 都已脱钩（XPA-018/019）之后进行，仓库不经过「客户端链接已删模块」的中间态（r3）。r10 按未发布产品在隔离开发根建设最终 Rust 链；不要求每一步可发布或切回 Swift，当前契约与安全边界保持，必要格式调整随实现 review。
 6. **Windows 从最薄的真实 GJ-1 walking skeleton 开始**（`arkdeck doctor` → `device candidates` → `target adopt` → `observe.device@1` → `capture.diagnostics@1` → 重启后可读），每个 PR 推进一个 hop，然后 GJ-2～GJ-5。（r8：Windows 阶段在 macOS 侧完成、GJ-1～5 在纯 Rust daemon 上 PASS（§J.5 G5）之后才开始。）
 
 淘汰理由摘要：方案 2（进程内 cdylib）把 authority 放进每个客户端进程，破坏「唯一 owner / 单写者」与 crash isolation，且沙箱 App 在结构上不能拥有设备副作用；方案 1（纯 daemon、零 FFI）与推荐方案只差一个可选的纯计算 kernel，差异在 Viewer/离线解析的跨平台一致性与性能，因此推荐方案吸收方案 1 为骨干、把 FFI 收窄为「无 authority 的纯函数」。详见 §C 决策矩阵。
@@ -469,42 +469,37 @@ flowchart TB
 
 ---
 
-## G. Persistence migration, cutover and rollback
+## G. Rust replacement and safe activation
 
-### G.1 Strangler 总路线（macOS）
+### G.1 macOS 开发路线（r10，随实现提交 review）
 
-```mermaid
-flowchart LR
-  SV["SVC-001..004 完成<br/>单 v1 Swift 基线"] --> S1["S1 单 v1 typed schemas + Rust 契约 kernel<br/>byte-for-byte differential<br/>XPA-001/002"]
-  S0["SPK-1 Swift baseline 测量"] --> S1
-  S1 --> S2["S2 Rust 控制面 façade<br/>拥有 UDS/XPC，转发一切给 Swift daemon<br/>XPA-003"]
-  S2 --> S3["S3 只读 shadow validation<br/>Rust 解码 durable 文件与 Swift 投影比对<br/>随 XPA-012 交付"]
-  S3 --> S4["S4 store owner 逐个搬迁<br/>host-only → artifact → authority(job/capability/recovery)<br/>XPA-012/013/014"]
-  S4 --> S5["S5 Swift 引擎降为 executor sidecar<br/>per-step typed permit<br/>XPA-014"]
-  S5 --> S6["S6 provider 逐族迁入 Rust<br/>analyzer/workspace → hdc → arkforge<br/>XPA-015/016/017"]
-  S6 --> S7["S7 移除 Swift daemon/引擎/存储<br/>Swift 只剩 App + ClientKit<br/>XPA-017/018/019"]
-  W1["Windows walking skeleton GJ-1<br/>XPA-002/004/005/006"] --> W2["Windows GJ-2..5<br/>XPA-008..011"]
-  S7 --> W1
-```
+ArkDeck 尚未 release，普通现有状态是可重建测试数据。保留已完成的 façade/IPC、
+对照语料、缺陷修复和历史 receipt；取消 7 日 nightly 等待、逐 store 同版本 Swift
+回滚和全量旧测试数据互读目标。nightly 继续作为后台回归，不参与开发日历准入。
+普通流程冲突按 PRODUCT-LOOP §2/§16 处理；本调整不自批 AC 或平台支持。
 
-每一步 macOS 都可发布：S2 之后的任何时刻，`arkdeck runtime service update --daemon <swift-binary>` 把 LaunchAgent 指回 Swift daemon 即回滚（`LaunchAgentService.swift` 已有 executable identity 校验与 receipt）。**回滚对象是同一 release、SVC 完成后的 Swift daemon**（r5）：daemon 从 App 包内嵌的 helper 安装（`ArkDeckRuntimeCommands.swift:1258` → `~/Library/Application Support/ArkDeck/Helpers/ArkDeckAgent.app`，receipt 记 `daemonSHA256`），App 与 daemon 按 release 成对。App 一旦改用 `xpc_connection`（§L.1 第 6 条），仍提供 `NSXPCListener`（`AgentXPCListener.swift:26`）的 Swift daemon 就无法为它服务——CLI 能回滚，更新后的 App 却断连。因此 XPA-003 必须在同一 PR 内把 Swift daemon 的 Mach service 监听器换成与 façade 相同的 raw libxpc 帧监听器，并把「新 App → 回滚后的 Swift daemon」列为回滚验收（XPC 契约测试 + App UI smoke），不只做 headless 演练；LaunchAgent 指向其它 release 的 daemon 时由 receipt/executable identity 检出并提示 `runtime service update`，不得静默挂起。
+1. A：隔离开发根内跑通 Rust host/artifact/Job 核心、HDC Observe/Diagnostics 与 CLI，
+   证明真实请求、持久化、重启、CAS/锁和原子写。
+2. B：按实际接口依赖补齐 Debug、native library、workspace/analyzer、ArkForge，
+   同步接入 ClientKit、性能和 soak。能直接实现 Rust 路径时不额外建设完整 Swift sidecar。
+3. C：实际使用方全部脱离后删除 Swift runtime/CLI 和临时 façade，再完成最终版本
+   GJ-1～5、App UI、安装签名、IPC 身份和恢复验证。Windows 随后推进，不宣称已支持。
 
-（r8）Windows walking skeleton（W1）从 S7 之后开始，不再与 S1 并行：共享 crates 先在 macOS 付清 differential 负担并在纯 Rust daemon 上取得 GJ-1～5 PASS，Windows 侧随后只做平台差异（named pipe、NTFS 原语、打包），不返工。
+开发中间状态不要求可发布。切换真实设备前仍必须停止旧执行、机械检查未决副作用，
+确保唯一有权 Runtime；新目录不能让同一设备的 unknown intent、reservation 或 outcome
+消失。无法证明安全时只继续 host/fake 开发，危险 dispatch 为零。
 
-### G.2 当前单 v1 基线互读（逐存储）
+### G.2 当前消费者、身份与数据边界
 
-| 存储 | SVC 完成后的基线 | 迁移期规则 | Rust 首次写入的前置 |
-|---|---|---|---|
-| SQLite `runtime-jobs.sqlite3` | SVC-002 最终 v1 布局、WAL、`synchronous=FULL`、`user_version` 守卫、`BEGIN IMMEDIATE` | Rust 用 `rusqlite` 打开同一基线文件，SQL/索引与 `user_version` 不漂移；不恢复旧迁移分支或 legacy 时间哨兵 | differential：Swift 与 Rust 对同一 DB 的 `listJobs` 分页（含 cursor）字节相等 |
-| journal JSONL | SVC-002 最终单 v1 canonical JSON + LF、tail cursor、torn-tail 修复 | Rust 写同一 schemaVersion 和键集合；fsync 纪律等价（macOS `F_FULLFSYNC`、Windows `FlushFileBuffers` + 目录句柄 flush） | 撕裂尾部穷举；Swift 读 Rust 写与反向 |
-| `job-record.json`、`manifest.json` | temp+fsync+rename+dirsync，sortedKeys pretty | 同；Windows 用 `MoveFileExW(MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH)`（SPK-5 验证原子性） | 字节相等（pretty 格式也要相等，因为 Swift 会 `sha256Hex` 记录） |
-| artifact `index.json` + payload verification + cleanup-debt | schema 1.0.0；32-hex ID；symlink 拒绝 | 不变 | 同上 |
-| capability doc + ledger | SVC-002 最终当前 RuntimeCapability 文档与 lineage/checkpoint 布局 | 精确保留链校验和 reservation/outcome 语义；不恢复旧 authority、旧 checkpoint 或迁移路径 | 当前 baseline 链校验与安全拒绝向量 |
-| recovery epoch doc | 1.0.0，1 MiB 上限 | 不变 | — |
-| 历史 Session/authority/evidence 与隔离开发数据 | SVC-002/003 规定的保留原始字节与隔离边界 | 不进入 Rust 当前 store，也不重新加入旧 reader/writer；未知结果仍不得清除、解释为安全或自动 replay | 当前格式正例及旧输入隔离/拒绝、零新 dispatch 负例 |
-| session-storage、targets、history filters、display names | JSON + lock 文件 | 不变 | — |
+| 数据 | 实现要求 | 验证 |
+|---|---|---|
+| History filter、显示名称、缓存及普通测试状态 | 可从独立目录重建，旧目录默认保留或明确归档；当前字段校验、CAS、锁及原子写保持有效 | 真正的 Rust 写入、重启读回、并发和关键崩溃窗口 |
+| 当前客户端与 durable 格式 | 仅作实现确需的最小改变，同步 schema、生成物、验证器及消费者；保持单一当前协议，不增加多代兼容框架 | 当前 API/CLI/UI 契约、严格字段、摘要和引用身份；现有 differential 留作快速回归 |
+| Raw Artifact、真实 intent/outcome、capability/recovery、历史 evidence | 不改写、不抹除、不因为测试项目解释为安全；切换前保留原始数据及必要安全事实 | 摘要/来源、intent-before-effect、单一 authority、unknown 不重放及 POL-RECOVERY-001 完整证明 |
 
-硬规则：**TASK-SVC-001..004 完成后，由 XPA-001 钉住最新 Swift 的唯一当前 v1 契约；此后到 XPA-017 之前禁止 schema/`user_version` 漂移和 durable 键集合变化**（r6）。冻结不约束 CHG-075 的前置清理，也不要求 Rust 移植历史多代 schema、旧 authority 或旧配置。Rust 写出的每种记录必须由该 post-SVC Swift strict decoder 读取，反向亦然；conformance 检查精确键集合并保留「多一键 → 拒绝」负例。需要修改字段时，先在同一当前契约下同步修改双方与全部向量并重新 pin，经相应范围 review 后才能切换；不能自行添加 tolerant reader、版本协商或兼容分支。回滚只回到同 release 的这个 Swift baseline。历史 raw evidence 不改写，隔离开发数据不接入新 Runtime；unknown lane 的拒绝和保留仍遵守 CHG-075 与 POL-RECOVERY-001。
+既有只读比较证明已覆盖的当前行为；只影响可重建旧数据或 Swift 偶然解析行为的新增差异
+不再自动阻塞迁移。影响当前产品契约、安全、摘要/引用或实际消费者的差异仍须修复。
+涉及 accepted AC/Core 的变动与实现一起提交正常维护者 review，不自行标 approved/verified。
 
 ### G.3 Shadow / differential 的白名单
 
@@ -516,22 +511,20 @@ flowchart LR
 - **outcomeUnknown lane**：不是切换阻断项，而是必须**原样承接**的 durable 状态。Rust owner 启动时读到 `waitingForRecovery`/`outcomeUnknown` job 保持不变，只允许 `job.reconcile` 读回或 POL-RECOVERY-001 的完整机械证明路径；绝不因 owner 更换而重放（AGENTS `:49-51`）。
 - **未决 intent**：由 preflight 排除；若崩溃窗口留下「intent 已落、无 outcome」，新 owner 按 journal 分类为 outcomeUnknown（与 `recoverActiveJobs` 语义相同）。
 - **recovery epoch**：epoch 文档是 owner 无关的 durable 事实；新 owner 继续从已有最高 epoch 计数。
-- **回滚**：同样的 preflight；Swift 用**post-SVC 基线的严格解码器**读回 Rust 写入的同版本、同键集合字节；不存在「Rust 追加字段、Swift 忽略」的路径（§G.2，r3）。
-- **备份**：切换前 `runtime service update` 自动做状态目录快照（macOS APFS `clonefile`，Windows 停机复制），记录快照 SHA-256 列表到 receipt；快照只用于取证与回滚，不是常规恢复路径。
+- **故障退出**：停止新执行并保留状态；开发版本可以修复后重启，不要求切回 Swift。任何真实设备不确定状态仍只能读回或按完整恢复证明推进。
+- **状态保留**：切换前保留或明确归档旧目录，必要时记录快照摘要；不得无差别删除，也不能把快照恢复当作真实设备副作用的常规恢复路径。
 
-### G.5 单 v1 实现互读与失败矩阵
+### G.5 当前执行链验证
 
 | 组合 | 期望 | 测试载体 |
 |---|---|---|
-| post-SVC Swift CLI（单 v1）→ Rust daemon | 全部通过最终单 v1 控制面黑盒契约；同输入同结果 | `ARKDECK_DAEMON_UNDER_TEST=<rust binary>` 参数化 |
-| 旧 App（NSXPC）→ Rust daemon | **不支持也不会发生**：daemon 从 App 包内嵌 helper 安装，App 与 daemon 按 release 成对；跨 release 配对由 receipt/executable identity 检出并提示 `runtime service update`（r5） | `LaunchAgentService` receipt 校验 + App 错误态 UI test |
-| 更新后的 App（`xpc_connection`）→ 回滚后的同 release Swift daemon（raw libxpc 帧监听器） | 与 façade 等价：`AgentXPCTransportContractTests` 黑盒子集全绿；App UI smoke（Overview/History）通过（r5，XPA-003 回滚验收） | 同上，`ARKDECK_DAEMON_UNDER_TEST=<swift binary>` |
-| Rust CLI → post-SVC Swift daemon（迁移期） | 同一单 v1 方法表全部工作；不设 macOS legacy 例外 | 同上反向 |
-| 旧版本/未知版本帧 → 当前 daemon | 结构化拒绝、dispatch 0，不协商、不重试旧方法 | SVC 单 v1 负向矩阵扩展到 Rust |
-| Windows 客户端 → Windows daemon | 同一当前单 v1 契约 | Windows CI |
-| crash-window | Rust owner 在 intent 落盘后、dispatch 前被 kill → 重启 outcomeUnknown；sidecar 被 kill 于 step 中 → owner 记 outcomeUnknown；owner 被 kill 于 admission 提交后 record 写前 → `restoreInitialAdmissionProjectionIfNeeded` 等价（`RuntimeRecoveryService.swift:520-585`） | Rust 版 `EngineCrashFixture`/`JournalCrashFixture` + 跨进程 kill 矩阵 |
-| 当前 schema/协议冻结与回滚 | 从 SVC-001..004 完成后的 baseline 起，迁移期只保留当前 v1 与精确字段集 | 断言 SQLite/current document 与 pinned baseline 一致；Swift/Rust 互读；额外键、旧代际输入拒绝；回滚至同 release 的 post-SVC Swift |
-| façade crash-window（XPA-003，r3） | 转发前被杀 → 客户端结构化传输错误，可证明零派发（Swift 未收到任何字节、journal 不变）；转发后回包前被杀，或 Swift daemon 中途被杀 → 客户端得到**不带** `details.phase`/`newDispatchCount` 证明的结构化中断错误，durable 状态以 Swift 已写内容为准（journal 完整可读，可能含 intent/outcome），façade 绝不重发已转发帧，客户端以 `job.status`/`job.list` 读回（`job.submit` 幂等键使重提安全） | 跨进程 kill 矩阵 + 私有 socket 字节计数断言；façade 不得伪造 `AgentDaemon.swift:4116-4125` 只由 named owner refusal 发出的零派发证明 |
+| 当前 Rust CLI / ClientKit → Rust daemon | 当前请求与完整响应正确，未实现能力明确 unavailable | 控制面黑盒、CLI argv、实际请求与重启读回 |
+| App 与配套 daemon 安装 | 签名、receipt 和 IPC 对端身份正确；不匹配给出明确错误 | 安装检查、IPC 负例、适用 App UI |
+| 旧版本/未知版本帧 | 结构化拒绝，零 dispatch，无协商或旧方法重试 | 单 v1 负向矩阵 |
+| host document crash-window | file sync 后 rename 前退出仍读旧文档；rename 后退出读完整新文档；锁可重新获取 | 实际子进程退出和重开，不是设备证据 |
+| Runtime intent/capability crash-window | intent 前后、consume 前后退出均 fail closed；unknown 不重放，必要安全事实保留 | 最终 Rust crash fixture 和实际恢复验证 |
+| 仍使用的 façade | 转发后中断没有伪造零派发证明，不自动重发 | 保留已完成 XPA-003 验证；有相关改动才重跑 |
+| Windows 客户端 → Windows daemon | 同一当前契约，完成平台验证后才声明支持 | macOS 完成后的 Windows 阶段 |
 
 ---
 
@@ -926,7 +919,7 @@ flowchart TD
 - 平台/GJ：macOS GJ-1 re-pass（daemon 重启后可查）。
 - 依赖：XPA-003。并行：Windows 链。
 - Reachability：façade 本地处理这些方法，不再转发；lock 文件与 JSON 形状不变。
-- AC：只读 shadow 期两端投影字节相等 ≥ 7 天 nightly；切换后 Swift 解码器读 Rust 写入通过；回滚演练。
+- AC：现有 shadow 保留为回归；Rust 实际拥有当前请求，写入后重启读回、锁/CAS/原子写通过；无 nightly 日历等待或旧 Swift 回滚要求。
 - 验证：differential、fault-injection（lock 争用、CAS 冲突）、UI test（Settings/History 筛选）。
 - 硬件：无（GJ-1 re-pass 用 DAYU200）。
 - Stop：两个进程同时持有同一 store lock。
@@ -1065,7 +1058,7 @@ flowchart TD
 | # | 风险 | 可能性/影响 | 触发信号 | 缓解 | 责任任务 |
 |---|---|---|---|---|---|
 | R1 | 迁移期出现两个副作用 writer（Swift 与 Rust 同时持有某 store） | 中/致命 | 同一 lock 文件被两进程打开；SQLite `SQLITE_BUSY` 频发 | store 级整体搬迁、lock 文件身份重验（复刻 `DurableFiles.swift:88-133`）、cutover preflight、结构测试禁止 Swift 在 XPA-013 后直接写 index | XPA-012/013/014 |
-| R2 | Rust 与 Swift 语义漂移（recovery/crash 长尾无向量） | 高/高 | differential 只覆盖读投影，crash 路径靠人工 | 先做只读 shadow ≥ 7 天；crash-window 四象限矩阵；`arkdeck-conformance` 生成撕裂尾部/状态机边集/permit 向量（ArkForge 已有模板） | XPA-005/014 |
+| R2 | Rust 与 Swift 语义漂移（recovery/crash 长尾无向量） | 高/高 | differential 只覆盖读投影，crash 路径靠人工 | 保留有界 shadow 回归；最终 Rust crash-window 矩阵；`arkdeck-conformance` 生成撕裂尾部/状态机边集/permit 向量（ArkForge 已有模板） | XPA-005/014 |
 | R3 | 沙箱 App 无法经 Rust 进程的 Mach service 通信，或 peer requirement API 不可用 | **已关闭**（SPK-2 于 2026-09-05 通过）/高 | SPK-2 失败 | 备选：保留一个极薄 Swift XPC 转发进程作为 App 专用桥（不含语义）；或 App 改用 `xpc_connection` 无 requirement + euid 校验 | SPK-2 → XPA-003 |
 | R4 | Windows HDC/USB 驱动、MotW、SmartScreen 让首次接入不可无人值守 | 高/中 | SPK-3 记录 | `DeviceAccessAdvisor` 只诊断不提权（Profile 禁令）；文案与 CLI `doctor` 指引；接受首次人工预算（PRODUCT-LOOP §14） | SPK-3/XPA-002 |
 | R5 | ArkForge AF-W1 真机不绿，Windows GJ-4 阻塞 | 中/高 | `ArkForge/TASKS.md:17` 未更新 | GJ-4 在 Windows 可后置；Windows 支持声明可先按 capability 范围（G3 允许 maintainer-accepted deferred），但 flash 不得标 supported | XPA-010 |

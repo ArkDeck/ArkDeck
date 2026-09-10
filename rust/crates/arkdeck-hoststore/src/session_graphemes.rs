@@ -75,6 +75,7 @@ pub(super) fn graphemes(value: &str) -> impl DoubleEndedIterator<Item = &str> {
     value.graphemes(true).flat_map(parts)
 }
 
+#[cfg(target_os = "macos")]
 pub(super) fn indices(value: &str) -> impl Iterator<Item = (usize, &str)> {
     let mut offset = 0;
     graphemes(value).map(move |part| {

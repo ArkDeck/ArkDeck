@@ -13,6 +13,7 @@ publish = false
 arkdeck-contract = { path = "crates/arkdeck-contract" }
 arkdeck-platform = { path = "crates/arkdeck-platform" }
 arkdeck-control = { path = "crates/arkdeck-control" }
+arkdeck-hoststore = { path = "crates/arkdeck-hoststore" }
 arkdeck-provider-hdc = { path = "crates/arkdeck-provider-hdc" }
 arkdeck-client = { path = "crates/arkdeck-client" }
 serde = { version = "=1.0.228", features = ["derive"] }

@@ -13,8 +13,27 @@ use std::sync::{
 use std::time::Duration;
 
 fn serve() -> Result<(), Box<dyn std::error::Error>> {
+    let development = std::env::var_os("ARKDECK_DEVELOPMENT_STATE_ROOT");
     #[cfg(target_os = "macos")]
-    if let Some(swift) = facade::swift_executable() {
+    let development_mode = development.is_some();
+    if development.is_some()
+        && [
+            "ARKDECK_SWIFT_DAEMON",
+            "ARKDECK_HDC_PATH",
+            "ARKDECK_HDC_SHA256",
+        ]
+        .iter()
+        .any(|key| std::env::var_os(key).is_some())
+    {
+        return Err(
+            "the isolated Rust development owner cannot pair a Swift daemon or configure HDC"
+                .into(),
+        );
+    }
+    #[cfg(target_os = "macos")]
+    if development.is_none()
+        && let Some(swift) = facade::swift_executable()
+    {
         return facade::serve(swift);
     }
     if std::env::args_os().len() != 1 {
@@ -24,8 +43,39 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         Some(path) => LocalEndpoint::new(path),
         None => default_user_endpoint()?,
     };
+    let host = host::Host::from_environment();
+    #[cfg(target_os = "macos")]
+    let host = if let Some(root) = development {
+        let root = std::path::PathBuf::from(root);
+        // LocalListener already authenticates the same-user peer. Require a
+        // separate socket beside the explicit development document, never the
+        // installed service endpoint or a caller-provided request path.
+        if endpoint.as_path().parent() != Some(root.as_path()) {
+            return Err("development endpoint must be directly inside its state root".into());
+        }
+        let installed =
+            std::path::PathBuf::from(std::env::var_os("HOME").ok_or("HOME unavailable")?)
+                .join("Library/Application Support/ArkDeck");
+        if root.starts_with(&installed) {
+            return Err("development state must be separate from installed ArkDeck state".into());
+        }
+        host.with_history(arkdeck_hoststore::HistoryStore::open(&root)?)
+    } else {
+        host
+    };
+    #[cfg(not(target_os = "macos"))]
+    if development.is_some() {
+        return Err("development host-store owner is not yet supported on this platform".into());
+    }
+    let control = Arc::new(Control::new(host)?);
+    #[cfg(target_os = "macos")]
+    let mut listener = if development_mode {
+        LocalListener::bind_facade(&endpoint)?
+    } else {
+        LocalListener::bind(&endpoint)?
+    };
+    #[cfg(not(target_os = "macos"))]
     let mut listener = LocalListener::bind(&endpoint)?;
-    let control = Arc::new(Control::new(host::Host::from_environment())?);
     let active = Arc::new(AtomicUsize::new(0));
     loop {
         let connection = match listener.accept() {

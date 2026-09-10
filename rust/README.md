@@ -1,4 +1,4 @@
-# Rust read-only foundation
+# Rust runtime development
 
 TASK-XPA-002 supplies a separate development daemon and the `doctor`,
 `operation list` and `device candidates` CLI leaves. It consumes the current
@@ -106,10 +106,35 @@ Registering Windows requires actual Windows tool/output provenance and a
 separately scoped integration change; see the
 [delivery record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/xpa-002-readonly-foundation.md).
 
+## Isolated macOS History owner
+
+The Rust daemon directly serves `history.filter.list/save/delete` when
+`ARKDECK_DEVELOPMENT_STATE_ROOT` names an existing physical `0700` directory and
+`ARKDECK_ENDPOINT` is directly inside it. The root must be separate from installed
+ArkDeck state. This mode refuses Swift pairing and HDC configuration, and a kernel
+directory lock prevents a second daemon. An interrupted daemon can restart on the
+same endpoint; saved generations persist. Installed Runtime ownership is unchanged.
+
+Use the existing CLI leaves against that endpoint:
+
+```sh
+cargo run -p arkdeck-cli -- --output json history filter list
+cargo run -p arkdeck-cli -- --output json history filter save --expected-generation 1 --search build
+cargo run -p arkdeck-cli -- --output json history filter delete --expected-generation 2
+```
+
+Use the generation actually returned by `list`. Conflicts require a fresh read;
+lost mutation replies report `outcomeUnknown` and are never automatically replayed.
+No old state is imported, rewritten or removed. Current response schemas include
+saved filters, tombstones, nullable identities and the existing owner error codes.
+From the repository root, `python3 rust/scripts/check-history-owner.py` checks the
+real daemon/CLI, restart, concurrent CAS, cross-process lock contention and unsafe
+records in disposable host roots. Candidate contract CI includes this check.
+
 ## Contract and ownership boundaries
 
 `arkdeck-contract` contains generated schemas, strict framing, canonical encoders
-and digest functions. `arkdeck-control` has transport-free read-only handlers.
+and digest functions. `arkdeck-control` has transport-free observation and local-resource handlers.
 `arkdeck-platform` owns the unsafe OS boundary; all other crates forbid unsafe
 code. `arkdeck-provider-hdc` lowers one fixed observation argv through that
 boundary. `arkdeck-client` owns same-connection health and refusal handling;

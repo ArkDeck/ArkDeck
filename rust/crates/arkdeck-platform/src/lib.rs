@@ -105,7 +105,7 @@ pub use macos_control::{PeerOrigin, listen_mach};
 #[cfg(target_os = "macos")]
 mod host_store;
 #[cfg(target_os = "macos")]
-pub use host_store::{HostDirectory, HostEntryKind, HostReadLock};
+pub use host_store::{DocumentPublishError, HostDirectory, HostEntryKind, HostReadLock};
 
 #[cfg(target_os = "macos")]
 mod host_text;

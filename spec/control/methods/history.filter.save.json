@@ -4,11 +4,17 @@
       "enum": [
         "conflict",
         "internalError",
+        "invalidInput",
         "invalidParams",
+        "ioFailure",
         "malformedFrame",
         "notFound",
+        "outcomeUnknown",
+        "quotaExceeded",
         "recordUnreadable",
         "rejected",
+        "resourceConflict",
+        "resourceNotFound",
         "unknownMethod",
         "unsupportedProtocolVersion",
         "workspaceReferenceNotFound"
@@ -16,7 +22,18 @@
     },
     "errorDetails": {
       "additionalProperties": false,
-      "properties": {},
+      "properties": {
+        "newDispatchCount": {
+          "type": "integer"
+        },
+        "phase": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "newDispatchCount",
+        "phase"
+      ],
       "type": "object"
     },
     "request": {
@@ -35,13 +52,19 @@
           "type": "string"
         },
         "sessionId": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "status": {
           "type": "string"
         },
         "targetId": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "timeRange": {
           "type": "string"
@@ -68,13 +91,19 @@
               "type": "string"
             },
             "sessionId": {
-              "type": "string"
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "status": {
               "type": "string"
             },
             "targetId": {
-              "type": "string"
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "timeRange": {
               "type": "string"
@@ -115,8 +144,8 @@
   "x-arkdeck-method": "history.filter.save",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 2,
-    "request": 4,
-    "result": 2
+    "error": 7,
+    "request": 11,
+    "result": 4
   }
 }

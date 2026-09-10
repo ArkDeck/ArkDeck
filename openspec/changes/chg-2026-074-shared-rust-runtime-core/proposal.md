@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-074-shared-rust-runtime-core
-revision: 9
-status: approved # 维护者 review + merge 本 proposal PR 后才生效；合入前任何 TASK-XPA 不开工，第一个实现 PR 只能在合入后声明
+revision: 10
+status: proposed # r9 approval remains historical; the r10 implementation delta requires maintainer review
 class: platform
 core_change_level: none
 owner: fuhanfeng
@@ -10,6 +10,17 @@ platforms: [macos, windows]
 ---
 
 # CHG-2026-074 — Shared Rust runtime core with native SwiftUI and WinUI 3 clients
+
+Revision 10 is delivered with the Rust History owner implementation. The user confirmed
+that ArkDeck is unreleased and ordinary existing data is rebuildable test state. It removes
+seven-nightly-day waiting, universal legacy interread and same-release Swift rollback goals;
+actual Rust requests, persistence, restart, lock/CAS and crash-window checks drive development.
+`tasks.md`, `design.md` and `verification.md` describe the runnable milestones and the scoped
+XPA-AC-1/9 adjustment. Existing corpus, fixes and historical receipts are preserved. Current
+contracts, digest/reference identity, Raw Artifact, real-device intent/outcome and authority/
+recovery safety are unchanged. A new root cannot bypass unresolved effects on the same device.
+This revision is proposed for maintainer review and carries no new approval or hardware claim.
+The existing tasks on protected main remain available under PRODUCT-LOOP §2/§16.
 
 > **This file does not approve itself.** The change is approved only if a human maintainer
 > reviews and merges this proposal PR into protected `main`. Nothing here creates authority:

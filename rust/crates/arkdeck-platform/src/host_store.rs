@@ -1,8 +1,8 @@
-//! Descriptor-relative, bounded, read-only snapshots for host-store migration.
-//! No file, directory or lock is created by this module.
+//! Descriptor-relative host-store access. Snapshot entry points never write;
+//! private document owners explicitly acquire locks and publish atomically.
 use std::ffi::{CStr, CString};
 use std::fs::{File, OpenOptions};
-use std::io::{self, Read};
+use std::io::{self, Read, Write};
 use std::os::fd::{AsRawFd, FromRawFd};
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
 use std::path::Path;
@@ -30,6 +30,17 @@ impl Ownership {
         }
     }
 }
+#[derive(Debug)]
+pub enum DocumentPublishError {
+    BeforePublication(io::Error),
+    OutcomeUnknown(io::Error),
+}
+impl From<io::Error> for DocumentPublishError {
+    fn from(error: io::Error) -> Self {
+        Self::BeforePublication(error)
+    }
+}
+
 pub struct HostReadLock {
     file: File,
 }
@@ -79,6 +90,115 @@ fn owned(file: &File, directory: bool, ownership: Ownership) -> io::Result<()> {
 }
 
 impl HostDirectory {
+    /// A private document owner's lock, shared across processes. Never unlink
+    /// the lock: replacing its inode would split the writer population.
+    pub fn lock_document(&self, name: &str) -> io::Result<HostReadLock> {
+        if !matches!(self.1, Ownership::Private) {
+            return Err(fail());
+        }
+        let name_c = segment(name)?;
+        let flags = libc::O_RDWR | libc::O_NOFOLLOW | libc::O_CLOEXEC | libc::O_NONBLOCK;
+        let mut fd = unsafe {
+            libc::openat(
+                self.0.as_raw_fd(),
+                name_c.as_ptr(),
+                flags | libc::O_CREAT | libc::O_EXCL,
+                0o600,
+            )
+        };
+        if fd < 0 && io::Error::last_os_error().kind() == io::ErrorKind::AlreadyExists {
+            fd = unsafe { libc::openat(self.0.as_raw_fd(), name_c.as_ptr(), flags) };
+        }
+        if fd < 0 {
+            return Err(io::Error::last_os_error());
+        }
+        let file = unsafe { File::from_raw_fd(fd) };
+        owned(&file, false, self.1)?;
+        loop {
+            if unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0 {
+                break;
+            }
+            let error = io::Error::last_os_error();
+            if error.kind() != io::ErrorKind::Interrupted {
+                return Err(error);
+            }
+        }
+        let lock = HostReadLock { file };
+        lock.validate_link(self, name)?;
+        Ok(lock)
+    }
+
+    /// Sync a fresh private file, atomically rename it, then sync the directory.
+    /// Errors after rename must be treated as uncertain publication by callers.
+    pub fn publish_document(
+        &self,
+        name: &str,
+        bytes: &[u8],
+        maximum: usize,
+    ) -> Result<(), DocumentPublishError> {
+        self.publish_with_checkpoint(name, bytes, maximum, |_| {})
+    }
+
+    fn publish_with_checkpoint(
+        &self,
+        name: &str,
+        bytes: &[u8],
+        maximum: usize,
+        checkpoint: impl Fn(&str),
+    ) -> Result<(), DocumentPublishError> {
+        if !matches!(self.1, Ownership::Private) || bytes.is_empty() || bytes.len() > maximum {
+            return Err(fail().into());
+        }
+        owned(&self.0, true, self.1)?;
+        let target = segment(name)?;
+        let nonce: String = crate::random_bytes::<16>()?
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect();
+        let temporary = segment(&format!(".{name}.{nonce}.part"))?;
+        let fd = unsafe {
+            libc::openat(
+                self.0.as_raw_fd(),
+                temporary.as_ptr(),
+                libc::O_WRONLY | libc::O_CREAT | libc::O_EXCL | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+                0o600,
+            )
+        };
+        if fd < 0 {
+            return Err(io::Error::last_os_error().into());
+        }
+        struct Remove<'a>(&'a File, CString);
+        impl Drop for Remove<'_> {
+            fn drop(&mut self) {
+                unsafe {
+                    libc::unlinkat(self.0.as_raw_fd(), self.1.as_ptr(), 0);
+                }
+            }
+        }
+        let temporary = Remove(&self.0, temporary);
+        let mut file = unsafe { File::from_raw_fd(fd) };
+        file.write_all(bytes)?;
+        file.sync_all()?;
+        checkpoint("beforeRename");
+        if unsafe {
+            libc::renameat(
+                self.0.as_raw_fd(),
+                temporary.1.as_ptr(),
+                self.0.as_raw_fd(),
+                target.as_ptr(),
+            )
+        } != 0
+        {
+            return Err(DocumentPublishError::OutcomeUnknown(
+                io::Error::last_os_error(),
+            ));
+        }
+        checkpoint("afterRename");
+        self.0
+            .sync_all()
+            .map_err(DocumentPublishError::OutcomeUnknown)
+    }
+
     pub fn open(path: &Path) -> io::Result<Self> {
         Self::open_root(path, false)
     }
@@ -351,5 +471,78 @@ impl HostDirectory {
         let lock = HostReadLock { file };
         lock.validate_link(self, name)?;
         Ok(Some(lock))
+    }
+}
+
+#[cfg(test)]
+mod publication_tests {
+    use super::*;
+    use std::{fs, os::unix::fs::DirBuilderExt, process::Command};
+
+    // This checkpoint hook is only reachable in the test executable. Production
+    // publication never reads failure-injection environment or caller inputs.
+    #[test]
+    fn abrupt_exit_child() {
+        let Some(path) = std::env::var_os("ARKDECK_TEST_PUBLICATION_ROOT") else {
+            return;
+        };
+        let stage = std::env::var("ARKDECK_TEST_PUBLICATION_STAGE").unwrap();
+        let root = HostDirectory::open(Path::new(&path)).unwrap();
+        let _lock = root.lock_document("document.lock").unwrap();
+        root.publish_with_checkpoint(
+            "document.json",
+            b"new-complete-document\n",
+            1024,
+            |checkpoint| {
+                if checkpoint == stage {
+                    std::process::exit(86);
+                }
+            },
+        )
+        .unwrap();
+        panic!("requested publication checkpoint was not reached");
+    }
+
+    #[test]
+    fn process_death_preserves_a_complete_old_or_new_document() {
+        for stage in ["beforeRename", "afterRename"] {
+            let nonce = crate::random_bytes::<16>().unwrap();
+            let path = std::env::temp_dir()
+                .canonicalize()
+                .unwrap()
+                .join(format!("publication-{:x}", u128::from_ne_bytes(nonce)));
+            fs::DirBuilder::new().mode(0o700).create(&path).unwrap();
+            let root = HostDirectory::open(&path).unwrap();
+            root.publish_document("document.json", b"old-complete-document\n", 1024)
+                .unwrap();
+            let result = Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "host_store::publication_tests::abrupt_exit_child",
+                ])
+                .env("ARKDECK_TEST_PUBLICATION_ROOT", &path)
+                .env("ARKDECK_TEST_PUBLICATION_STAGE", stage)
+                .output()
+                .unwrap();
+            assert_eq!(result.status.code(), Some(86), "{result:?}");
+            let reopened = HostDirectory::open(&path).unwrap();
+            let _lock = reopened.lock_document("document.lock").unwrap();
+            let expected = if stage == "beforeRename" {
+                b"old-complete-document\n"
+            } else {
+                b"new-complete-document\n"
+            };
+            assert_eq!(reopened.read("document.json", 1024).unwrap(), expected);
+            // The real lock was released by process death and a subsequent
+            // transaction remains possible, irrespective of an orphan .part.
+            reopened
+                .publish_document("document.json", b"recovered\n", 1024)
+                .unwrap();
+            assert_eq!(
+                reopened.read("document.json", 1024).unwrap(),
+                b"recovered\n"
+            );
+            fs::remove_dir_all(path).unwrap();
+        }
     }
 }

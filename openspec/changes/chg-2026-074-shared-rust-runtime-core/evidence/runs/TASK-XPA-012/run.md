@@ -1,8 +1,10 @@
 # TASK-XPA-012 — host-store shadow work
 
-Status: **in progress**. The Rust candidate is not installed or connected to the
-façade. No Swift store owner has been disabled. No qualifying nightly day,
-cutover, rollback, GJ-1 or hardware acceptance is claimed.
+Status: **in progress**. Rust now serves `history.filter.*` directly in an explicit
+isolated development root through its daemon and CLI. Installed Swift owners remain
+active for the installed product. This is host-only development, not installed
+cutover, GJ-1 or hardware acceptance. Nightly calendar counting and same-release
+Swift rollback are no longer development gates under the user's r10 route.
 
 ## Scope and baseline
 
@@ -15,8 +17,8 @@ source files and candidate binary. The pinned ArkTrace dependency revision is
 `e6e3133d410fbd7455df17c9486dcd369607e97f` in both Package.resolved files and the package manifest. Earlier immutable receipts retain their original dependency revisions.
 
 The implementation remains local on `agent/xpa-012-hoststore-shadow-20260910`.
-There is no implementation PR yet: the remaining harness coverage below must be
-completed before presenting it for review.
+There is no implementation PR yet. Existing shadow coverage is retained; current
+work implements actual Rust owners rather than expanding legacy parsing parity.
 
 ## Implemented comparisons
 
@@ -47,7 +49,7 @@ Swift oracle may initialize or reconcile only its isolated fixtures.
 | Session recovery | 44 | Typed hazards, guides, device mode, abandon records and compensation relationships |
 | Runtime audit records | 37 | Closed historical audit fields, Provider/Step labels and mutation consumption requirements |
 | Grapheme corpus batches | 3 | Unicode 16/17 official inputs and 54,660 generated Indic property combinations |
-| Trace cache | 420 | Actual Swift inventory, closed fields, duplicate keys, text encodings, dates/numbers, locks and unsafe entries |
+| Trace cache | 443 | Actual Swift inventory, closed fields, duplicate keys, text encodings, dates/numbers, locks and unsafe entries |
 
 The 105-case receipt is preserved unchanged in
 [local-shadow-20260910.json](local-shadow-20260910.json). It identifies itself as
@@ -77,7 +79,7 @@ unregistered Sessions, pinning, duplicate identity, unscoped content, corrupt or
 missing metadata, identity mismatch, and symlinks. Selected comparisons run Rust
 before Swift reconciliation and compare the resulting full status afterward.
 The Session filesystem entry point preserves owner/no-group-or-world-write and
-same-volume rules; the private Trace entry point keeps its stricter permissions.
+same-volume rules; Trace uses the published inventory reader's separate file and lock rules.
 
 Session date conversion preserves the frozen grammar, leap seconds, offsets up
 to ±23:59, arbitrary fractional precision with the current nanosecond truncation,
@@ -175,7 +177,8 @@ The upstream strict-field fix was approved by maintainer `lvye` at
 its focused tests and integration documentation from the previous pin. Its
 required CI passed. The downstream package manifest and both resolution files
 now select this reviewed reader. The adapter revision constant and pin assertions
-are synchronized; the independent App project pin awaits the scope review below.
+are synchronized. The independent App project pin now selects the same revision
+under the scope approval below.
 
 The same TASK-XPA-012 PR declares three exact adjacent paths under CHG-2026-076:
 `Packages/ArkDeckKit/Package.swift`, `Packages/ArkDeckKit/Package.resolved` and
@@ -194,29 +197,42 @@ prefix is accepted. This compatibility behavior is tested against the actual
 reader and the [published JSONDecoder source](https://github.com/swiftlang/swift-foundation/blob/swift-6.2-RELEASE/Sources/FoundationEssentials/JSON/JSONDecoder.swift);
 no snapshot bytes are rewritten on disk.
 
-The Xcode project file's current scope permits UI-test registration only.
-[ArkDeck scope PR #1840](https://github.com/ArkDeck/ArkDeck/pull/1840), commit
-`7f9949d5c3c3e146cd1b9725d51aa4c0bc784d5b`, requests only its ArkTrace revision
-replacement. Its committed SDD, unified common checks and path preflight passed;
-all selected hosted checks passed. Maintainer review/merge remains pending.
-The project pin is unchanged until that approval. Consequently the current
-complete-diff gate is not passing: its architecture/dependency pin assertions
-exposed the remaining App pin. No implementation PR is published in this state.
+The App project pin scope was approved by maintainer `lvye` at
+2026-09-10T13:50:52Z and merged at 13:50:58Z through
+[ArkDeck PR #1840](https://github.com/ArkDeck/ArkDeck/pull/1840), merge commit
+`86bc190ab6d0edabcec31ac9cd46b175cb64e19a`. The implementation branch was rebased
+onto that approved base before changing the project's single ArkTrace revision.
+The two previously failing dependency-consistency tests now pass.
 
-## Remaining work before harness review
+Twenty-three new filesystem vectors run Rust before Swift can normalize its
+isolated root permissions. Snapshots now include root/file modes, link counts
+and file identities in addition to bytes and symlink destinations. Trace
+inventory matches the published reader's readable directories/metadata and
+hardlink handling; its existing key/lease probes use O_RDWR without creation,
+truncation or content writes. Key locks enforce the actual 4096-byte bound,
+while leases do not invent that bound. Read-only locks, directories and symlinks
+are refused; missing locks and unreadable metadata remain active/unaccounted.
+The prior private and Session policies are preserved and their platform tests
+pass. The candidate also revalidates its physical root before returning.
 
-- After scope PR #1840 is reviewed and merged, update the independent App project pin and complete all dependency-consistency checks.
+## Remaining product work
 
-- Complete the remaining Trace filesystem compatibility checks.
-- Finalize the complete nightly corpus. The nightly job is wired locally but has not been pushed or run.
-- Run the final unified gate and committed preflight on the complete harness.
-
-After harness review/merge, seven actual scheduled nightly days must be matched
-to Actions provenance before owner cutover. Local runs, manual dispatch and
-retries cannot manufacture those days. Owner/CAS/crash-window work, UI assertions,
-GJ-1 re-pass and rollback evidence remain a later authorized cutover stage.
+The existing 1412-case shadow corpus is retained. New work prioritizes actual Rust
+owners for the remaining host/artifact/Job paths and their current consumers.
+There is no seven-day nightly prerequisite or same-release Swift rollback target.
+Installed activation and final GJ/UI acceptance remain pending; isolated host
+checks do not authorize device dispatch or erase unresolved real-device records.
 
 ## Validation so far
+
+- 1412 cases across 31 XCTest methods passed on the approved scope baseline.
+  Immutable receipt:
+  [local-shadow-trace-filesystem-20260910.json](local-shadow-trace-filesystem-20260910.json).
+  Log: `/private/tmp/xpa012-shadow-trace-filesystem.log`.
+- The 23 new filesystem vectors reproduced 16 assertion failures before the
+  candidate fix and then passed with all six Trace test methods. Both previously
+  failing App/package dependency tests, all seven platform filesystem/lock tests,
+  and all-target hoststore/platform Clippy also passed.
 
 - After synchronizing the adapter constant and pin assertions, all 1389 shadow
   cases across 30 XCTest methods passed again. Current immutable receipt:
@@ -225,7 +241,8 @@ GJ-1 re-pass and rollback evidence remain a later authorized cutover stage.
   structure receipt stays unchanged and records its earlier source snapshot.
 - The second unified run reached the full Swift suite and failed the old pin
   expectations in architecture/dependency assertions. Those expected revisions
-  were synchronized; the App project revision remains pending scope approval.
+  were synchronized afterward. The App scope approval and matching revision
+  were then completed as recorded above.
   Log: `/private/tmp/xpa012-shadow-trace-structure-final-gate.log`.
 
 - The first unified gate stopped at the design mirror pin assertion. The
@@ -341,3 +358,66 @@ Foundation normalizes `/private/tmp` after directory creation; fixture path
 handling was corrected without relaxing production guards. The Session timestamp
 test initially needed `@testable import ArkDeckStorage`; no production visibility
 or frozen Storage source was changed. No device operation was run.
+
+
+## Rust History owner development slice
+
+The completed pre-owner snapshot passed the full unified gate (exit 0), including
+Swift/App, published/candidate Rust checks, cargo deny and cargo vet. Log:
+`/private/tmp/xpa012-shadow-trace-filesystem-gate.log`. This result describes the
+shadow snapshot, not the subsequent owner implementation.
+
+The new slice directly serves History filter list/save/delete through the Rust
+control handler and CLI. `ARKDECK_DEVELOPMENT_STATE_ROOT` must name an existing
+physical private directory outside installed ArkDeck state, and `ARKDECK_ENDPOINT`
+must be directly inside it. Swift pairing and HDC configuration are refused in
+this mode. The directory transport lock prevents a second daemon and permits
+restart after process death; the per-document lock plus CAS serializes updates.
+The writer uses a fresh 0600 file, file sync, rename and directory sync. Errors
+with uncertain publication require read-back and are never retried automatically.
+
+`rust/scripts/check-history-owner.py` passed 18 real control exchanges plus CLI
+save/list/stale-generation checks. It kills and restarts the daemon on the same
+endpoint, checks concurrent CAS, an externally held lock, second-daemon refusal,
+delete/tombstone generations, orphan transactions, corrupt/link refusal and a
+real permission-induced write failure. All directories are disposable test-owned
+roots; device dispatch count is zero. Recorded exchanges supplement the three
+current method schemas (saved-list timestamp, nullable identities, owner errors).
+The schema generator retains the owner's existing failure vocabulary even when
+an individual recording does not encounter every filesystem crash window.
+
+Platform subprocess tests terminate at the actual pre-rename and post-rename
+checkpoints. A new process reads exactly the complete old or new document,
+reacquires the lock and publishes again. This proves process-crash behavior, not
+power-loss durability or hardware acceptance. Existing decoder regression tests
+remain unchanged.
+
+The unified entry completed common checks, the full Swift suite, App
+build-for-testing and design-system checks. Its Rust view initially failed because
+new tests imported History CLI fixtures outside the existing baseline input list.
+An attempted pin expansion passed a local Rust check, but automatic approval
+review rejected adding the baseline path to this task's scope. That expansion was
+reverted before publication. The original baseline remains byte-for-byte intact;
+new History argument tests live within the Rust test target, alongside the actual
+daemon/CLI integration checks. No existing corpus or test was removed.
+
+The final Rust recheck after that scope reduction passed both published and
+candidate views, including Clippy, all workspace tests, process self-test, the
+read-only control/CLI checks and 18 actual candidate History exchanges. Final log:
+`/private/tmp/xpa012-history-owner-final-rust.log`. Earlier logs:
+`/private/tmp/xpa012-history-owner-gate.log` and
+`/private/tmp/xpa012-history-owner-rust-gate.log`.
+Unaffected Swift/App lanes were not repeated after Rust test-input changes.
+SDD reported zero errors/warnings; cargo deny and cargo vet passed (26 audited
+dependencies). The implementation remains pending maintainer review and installed
+acceptance.
+
+
+PR [#1841](https://github.com/ArkDeck/ArkDeck/pull/1841) was created by the repository
+bot. Its initial Swift tests, App build, design-system and path/SDD checks passed.
+Linux and Windows Clippy found `session_graphemes::indices` unused because its
+consumers are macOS-only. The helper now uses the same macOS compilation guard;
+no lint suppression or consumer behavior changed. Local all-workspace/all-target
+Clippy passed for both `x86_64-unknown-linux-gnu` and `x86_64-pc-windows-msvc`, and
+macOS hoststore Clippy passed. These are compilation checks, not Windows support
+or device acceptance. Remote checks on the updated commit remain pending.

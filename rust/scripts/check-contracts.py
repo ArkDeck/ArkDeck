@@ -81,9 +81,9 @@ def materialize(destination: Path, inputs, info: dict, published_info: dict,
         encoding="utf-8", newline="\n")
 
 
-def commands(view: Path, output: Path) -> list[tuple[list[str], Path]]:
+def commands(view: Path, output: Path, *, owners: bool = False) -> list[tuple[list[str], Path]]:
     rust = view / "rust"
-    return [
+    result = [
         (["cargo", "clippy", "--workspace", "--all-targets", "--locked", "--", "-D", "warnings"], rust),
         (["cargo", "test", "--workspace", "--locked"], rust),
         (["cargo", "run", "--package", "arkdeck-platform", "--example", "windows_spk3",
@@ -92,6 +92,12 @@ def commands(view: Path, output: Path) -> list[tuple[list[str], Path]]:
         ([sys.executable, str(rust / "scripts/check-readonly.py"),
           "--bin-dir", str(rust / "target/debug"), "--output-dir", str(output / "recordings")], view),
     ]
+    # New current-owner schemas are candidate inputs until their reviewed pin is
+    # published. The old published-input view still tests its read-only surface.
+    if owners and sys.platform == "darwin":
+        result.append(([sys.executable, str(rust / "scripts/check-history-owner.py"),
+                        "--bin-dir", str(rust / "target/debug")], view))
+    return result
 
 
 def run_view(view: Path, output: Path, info: dict, published_info: dict, run=subprocess.run) -> None:
@@ -109,7 +115,7 @@ def run_view(view: Path, output: Path, info: dict, published_info: dict, run=sub
     environment = os.environ.copy()
     environment["CARGO_TARGET_DIR"] = str(view / "rust/target")
     try:
-        for argv, cwd in commands(view, output):
+        for argv, cwd in commands(view, output, owners=info["kind"] == "candidate"):
             print(f'+ [{info["kind"]}] ' + " ".join(argv), flush=True)
             record = {"argv": argv, "completed": False}
             provenance["commands"].append(record)

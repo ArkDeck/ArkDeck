@@ -4,12 +4,17 @@
       "enum": [
         "conflict",
         "internalError",
+        "invalidInput",
         "invalidParams",
+        "ioFailure",
         "malformedFrame",
         "notFound",
+        "outcomeUnknown",
+        "quotaExceeded",
         "recordUnreadable",
         "rejected",
         "resourceConflict",
+        "resourceNotFound",
         "unknownMethod",
         "unsupportedProtocolVersion",
         "workspaceReferenceNotFound"

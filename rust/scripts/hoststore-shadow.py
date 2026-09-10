@@ -5,8 +5,8 @@ Every store lives in a fresh test-owned temporary directory. Document snapshots
 reach Rust over stdin; Trace inventory reads the explicit isolated cache root.
 The runner never selects an installed Runtime or App cache.
 Receipts contain hashes and case names, never filter strings or snapshot bytes.
-A local run is not a nightly day or hardware evidence. Scheduled receipts must
-be matched to their actual Actions run before any cutover gate can consume them.
+A local run is not a nightly day or hardware evidence. Scheduled receipts retain
+their actual Actions provenance; calendar counts do not gate development ownership.
 """
 from __future__ import annotations
 

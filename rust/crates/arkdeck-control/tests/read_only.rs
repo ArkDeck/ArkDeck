@@ -1,5 +1,5 @@
 use arkdeck_contract::*;
-use arkdeck_control::{Control, HdcStatus, ReadOnlyHost};
+use arkdeck_control::{Control, HdcStatus, HostServices};
 use serde_json::{Value, json};
 use std::sync::{
     Arc,
@@ -9,7 +9,7 @@ use std::sync::{
 struct Host {
     reads: Arc<AtomicUsize>,
 }
-impl ReadOnlyHost for Host {
+impl HostServices for Host {
     fn observed_at(&self) -> String {
         "2026-09-01T00:00:00Z".into()
     }
