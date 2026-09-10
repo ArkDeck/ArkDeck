@@ -93,7 +93,7 @@ fn unknown_execution_is_never_invented_as_zero_execution_by_error_mapping() {
 }
 
 #[test]
-fn history_owner_failure_scope_and_lost_reply_are_preserved() {
+fn host_owner_failure_scope_and_lost_reply_are_preserved() {
     for (method, phase, expected) in [
         (
             "history.filter.save",
@@ -102,6 +102,17 @@ fn history_owner_failure_scope_and_lost_reply_are_preserved() {
         ),
         ("job.run", "historyFilterOwner", "internalError"),
         ("history.filter.save", "other", "internalError"),
+        (
+            "runtime.storage.root",
+            "runtimeStorageOwner",
+            "resourceConflict",
+        ),
+        (
+            "runtime.storage.policy",
+            "historyFilterOwner",
+            "internalError",
+        ),
+        ("job.run", "runtimeStorageOwner", "internalError"),
     ] {
         let error = CliError::from_client(
             ClientError::Remote(WireError {
@@ -115,16 +126,22 @@ fn history_owner_failure_scope_and_lost_reply_are_preserved() {
         );
         assert_eq!(error.code, expected);
     }
-    let interrupted = CliError::from_client(
-        ClientError::Transport(std::io::ErrorKind::BrokenPipe.into()),
+    for method in [
         "history.filter.save",
-    );
-    assert_eq!(interrupted.code, "outcomeUnknown");
-    assert!(!interrupted.details.contains_key("newDispatchCount"));
-    assert_eq!(
-        failure_envelope("history.filter.save", &interrupted, "ctl-test", true)["error"]["controlRequestRetryable"],
-        false
-    );
+        "runtime.storage.root",
+        "runtime.storage.policy",
+    ] {
+        let interrupted = CliError::from_client(
+            ClientError::Transport(std::io::ErrorKind::BrokenPipe.into()),
+            method,
+        );
+        assert_eq!(interrupted.code, "outcomeUnknown");
+        assert!(!interrupted.details.contains_key("newDispatchCount"));
+        assert_eq!(
+            failure_envelope(method, &interrupted, "ctl-test", true)["error"]["controlRequestRetryable"],
+            false
+        );
+    }
 }
 
 #[test]

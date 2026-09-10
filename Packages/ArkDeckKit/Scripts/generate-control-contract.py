@@ -77,6 +77,9 @@ HISTORY_OWNER_ERROR_CODES = [
     "invalidInput", "resourceConflict", "resourceNotFound", "recordUnreadable",
     "quotaExceeded", "ioFailure", "outcomeUnknown",
 ]
+STORAGE_OWNER_ERROR_CODES = [
+    "invalidInput", "resourceConflict", "recordUnreadable", "ioFailure", "outcomeUnknown",
+]
 MAXIMUM_SIGNATURES_PER_METHOD = 24
 MAXIMUM_SAMPLE_BYTES = 65536
 
@@ -198,6 +201,9 @@ def derive_method_schemas(source):
         codes = sorted({error["code"] for error in errors} | set(GENERIC_ERROR_CODES)
                        | (set(HISTORY_OWNER_ERROR_CODES) if method in {
                            "history.filter.list", "history.filter.save", "history.filter.delete"
+                       } else set())
+                       | (set(STORAGE_OWNER_ERROR_CODES) if method in {
+                           "runtime.storage.status", "runtime.storage.policy", "runtime.storage.root"
                        } else set()))
         schema = {
             "$schema": "https://json-schema.org/draft/2020-12/schema",

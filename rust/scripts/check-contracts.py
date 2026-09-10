@@ -97,6 +97,8 @@ def commands(view: Path, output: Path, *, owners: bool = False) -> list[tuple[li
     if owners and sys.platform == "darwin":
         result.append(([sys.executable, str(rust / "scripts/check-history-owner.py"),
                         "--bin-dir", str(rust / "target/debug")], view))
+        result.append(([sys.executable, str(rust / "scripts/check-session-owner.py"),
+                        "--bin-dir", str(rust / "target/debug")], view))
     return result
 
 

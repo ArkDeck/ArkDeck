@@ -46,6 +46,32 @@ pub struct HostReadLock {
 }
 
 impl HostReadLock {
+    /// Seal a private catalog's first durable publication without replacing
+    /// its permanent lock inode. A missing catalog after this mark is corrupt.
+    pub fn mark_catalog_initialized(&self, root: &HostDirectory, name: &str) -> io::Result<()> {
+        use std::os::unix::fs::FileExt;
+        if !matches!(root.1, Ownership::Private) {
+            return Err(fail());
+        }
+        self.validate_link(root, name)?;
+        match self.file.metadata()?.len() {
+            0 => {
+                self.file.write_all_at(&[0xA5], 0)?;
+            }
+            1 => {
+                let mut marker = [0];
+                self.file.read_exact_at(&mut marker, 0)?;
+                if marker != [0xA5] {
+                    return Err(fail());
+                }
+            }
+            _ => return Err(fail()),
+        }
+        self.file.sync_all()?;
+        root.0.sync_all()?;
+        self.validate_link(root, name)
+    }
+
     /// The advisory lock only covers this inode. A replacement at the same
     /// name must never be mistaken for the lock held by this snapshot.
     pub fn validate_link(&self, root: &HostDirectory, name: &str) -> io::Result<()> {
@@ -90,6 +116,70 @@ fn owned(file: &File, directory: bool, ownership: Ownership) -> io::Result<()> {
 }
 
 impl HostDirectory {
+    /// Check owner permissions and actual create/remove access (including ACLs)
+    /// before a Session root selection is published. No existing entry changes.
+    pub fn probe_writable(&self) -> io::Result<()> {
+        use std::os::fd::IntoRawFd;
+        if !matches!(self.1, Ownership::Private) {
+            return Err(fail());
+        }
+        owned(&self.0, true, self.1)?;
+        if self.0.metadata()?.mode() & 0o700 != 0o700 {
+            return Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "private root is not owner-writable",
+            ));
+        }
+        let nonce = u128::from_ne_bytes(crate::random_bytes::<16>()?);
+        let name = segment(&format!(".arkdeck-runtime-storage-probe-{nonce:032x}"))?;
+        // SAFETY: the descriptor and C string remain live, the name is one
+        // generated segment, and EXCL prevents replacing any existing entry.
+        let fd = unsafe {
+            libc::openat(
+                self.0.as_raw_fd(),
+                name.as_ptr(),
+                libc::O_WRONLY | libc::O_CREAT | libc::O_EXCL | libc::O_CLOEXEC | libc::O_NOFOLLOW,
+                0o600,
+            )
+        };
+        if fd < 0 {
+            return Err(io::Error::last_os_error());
+        }
+        // SAFETY: openat returned a new owned file descriptor.
+        let file = unsafe { File::from_raw_fd(fd) };
+        let descriptor = file.into_raw_fd();
+        // SAFETY: close is issued exactly once, including on EINTR.
+        let closed = unsafe { libc::close(descriptor) };
+        let close_error = (closed != 0).then(io::Error::last_os_error);
+        // SAFETY: unlink is relative to the retained directory and names only
+        // the unique empty probe created by this invocation.
+        let removed = unsafe { libc::unlinkat(self.0.as_raw_fd(), name.as_ptr(), 0) };
+        if let Some(error) = close_error {
+            return Err(error);
+        }
+        if removed != 0 {
+            return Err(io::Error::last_os_error());
+        }
+        Ok(())
+    }
+
+    /// Create or reopen a fixed private child without following a replaced
+    /// parent path. Existing directory permissions are never changed.
+    pub fn private_child(&self, name: &str) -> io::Result<Self> {
+        if !matches!(self.1, Ownership::Private) {
+            return Err(fail());
+        }
+        let name_c = segment(name)?;
+        if unsafe { libc::mkdirat(self.0.as_raw_fd(), name_c.as_ptr(), 0o700) } != 0
+            && io::Error::last_os_error().kind() != io::ErrorKind::AlreadyExists
+        {
+            return Err(io::Error::last_os_error());
+        }
+        let child = self.child(name)?;
+        self.0.sync_all()?;
+        Ok(child)
+    }
+
     /// A private document owner's lock, shared across processes. Never unlink
     /// the lock: replacing its inode would split the writer population.
     pub fn lock_document(&self, name: &str) -> io::Result<HostReadLock> {
@@ -413,6 +503,51 @@ impl HostDirectory {
             return Err(fail());
         }
         Ok(bytes)
+    }
+
+    /// Verify immutable payload bytes using bounded memory and a retained
+    /// descriptor. Both the linked inode and content timestamps must survive.
+    pub fn verify_payload(&self, name: &str, length: u64, digest: &str) -> io::Result<()> {
+        use sha2::{Digest, Sha256};
+        let file = self.open_at(name, 0)?;
+        owned(&file, false, self.1)?;
+        let before = file.metadata()?;
+        if before.len() != length {
+            return Err(fail());
+        }
+        let mut reader = &file;
+        let mut buffer = [0_u8; 65536];
+        let mut hashed = 0_u64;
+        let mut hash = Sha256::new();
+        loop {
+            let count = match reader.read(&mut buffer) {
+                Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
+                result => result?,
+            };
+            if count == 0 {
+                break;
+            }
+            hashed = hashed.checked_add(count as u64).ok_or_else(fail)?;
+            if hashed > length {
+                return Err(fail());
+            }
+            hash.update(&buffer[..count]);
+        }
+        let after = file.metadata()?;
+        let linked = self.stat_at(name)?;
+        if hashed != length
+            || format!("{:x}", hash.finalize()) != digest
+            || before.len() != after.len()
+            || before.mtime() != after.mtime()
+            || before.mtime_nsec() != after.mtime_nsec()
+            || before.ctime() != after.ctime()
+            || before.ctime_nsec() != after.ctime_nsec()
+            || before.dev() != linked.st_dev as u64
+            || before.ino() != linked.st_ino
+        {
+            return Err(fail());
+        }
+        Ok(())
     }
 
     /// Match ArkTrace's existing lock probe. O_RDWR is needed to preserve its

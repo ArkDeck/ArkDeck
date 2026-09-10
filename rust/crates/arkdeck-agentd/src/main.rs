@@ -15,7 +15,7 @@ use std::time::Duration;
 fn serve() -> Result<(), Box<dyn std::error::Error>> {
     let development = std::env::var_os("ARKDECK_DEVELOPMENT_STATE_ROOT");
     #[cfg(target_os = "macos")]
-    let development_mode = development.is_some();
+    let mut development_listener = None;
     if development.is_some()
         && [
             "ARKDECK_SWIFT_DAEMON",
@@ -59,7 +59,25 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         if root.starts_with(&installed) {
             return Err("development state must be separate from installed ArkDeck state".into());
         }
+        let directory = arkdeck_platform::HostDirectory::open(&root)?;
+        // Own the whole development root before creating or probing any store.
+        // A second daemon must not perturb a live owner's census on startup.
+        development_listener = Some(LocalListener::bind_facade(&endpoint)?);
+        for name in ["session-state", "sessions", "artifacts"] {
+            directory.private_child(name)?;
+        }
+        directory.validate_path(&root)?;
+        let artifacts = root.join("artifacts");
+        let sessions = arkdeck_hoststore::SessionStore::open(
+            &root.join("session-state"),
+            &root.join("sessions"),
+        )?
+        .isolated(&root, vec![artifacts.clone()])?;
         host.with_history(arkdeck_hoststore::HistoryStore::open(&root)?)
+            .with_storage(
+                sessions,
+                arkdeck_hoststore::ArtifactUsage::open(&artifacts, 8 * 1024 * 1024 * 1024)?,
+            )
     } else {
         host
     };
@@ -69,8 +87,8 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
     }
     let control = Arc::new(Control::new(host)?);
     #[cfg(target_os = "macos")]
-    let mut listener = if development_mode {
-        LocalListener::bind_facade(&endpoint)?
+    let mut listener = if let Some(listener) = development_listener {
+        listener
     } else {
         LocalListener::bind(&endpoint)?
     };

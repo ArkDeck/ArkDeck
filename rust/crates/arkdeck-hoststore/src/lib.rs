@@ -10,6 +10,14 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 mod history_owner;
 #[cfg(target_os = "macos")]
 pub use history_owner::HistoryStore;
+#[cfg(target_os = "macos")]
+mod session_owner;
+#[cfg(target_os = "macos")]
+pub use session_owner::SessionStore;
+#[cfg(target_os = "macos")]
+mod artifact_usage;
+#[cfg(target_os = "macos")]
+pub use artifact_usage::ArtifactUsage;
 
 mod display_names;
 mod format_time;
@@ -243,4 +251,4 @@ mod session_manifest;
 mod session_step_arguments;
 pub use session_graphemes::decode_graphemes;
 #[cfg(target_os = "macos")]
-pub use session_inventory::session_inventory;
+pub use session_inventory::{session_inventory, session_inventory_owned};
