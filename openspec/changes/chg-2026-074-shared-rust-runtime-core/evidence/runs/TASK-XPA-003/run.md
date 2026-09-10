@@ -741,3 +741,55 @@ its production fix is already on protected main through TASK-SVC-002 PR #1832.
 No new device operation is needed to submit this PR. The final local gate and
 path preflight are run against this submission before push; CI results remain
 subject to the remote exact-head checks.
+
+
+## Post-merge GJ-1 HAR completion and UI registration gap, 2026-09-10
+
+PR #1833 merged at `459f2b1757986ed9dd10eff71225ceeac7650ace`. The previously
+signed r8 helper pair has identical production source: the diff from its source
+`407c1925` contains only the two acceptance record files. Typed service update
+installed that pair, with the flash campaign closed, before this physical test.
+
+After the user unplugged USB and kept power connected, `device candidates`
+reported Offline with no adopted target on the observation. `agent run` for
+`observe.device@1`, execution `gj1-xpa003-20260910-har`, exited 75. Its stdout was
+discarded. The durable execution was waitingForHuman with no accepted Job. After
+the user reconnected USB, only that execution ID was used to retrieve status
+and the owner's HAR list. `human-action show` returned an identical resume
+reference, waiting status and newDispatchCount 0. Consuming the retrieved
+reference with `agent resume` exited 0 and completed Job
+`job-6126c3039a9a4a35bf30b8a15e6d6905`: succeeded, outcomeUnknown false,
+verified evidence, no blockers, target `TGT-958780b2ffb7`, binding revision 2.
+The final action is resolvedByFreshProbe. All three artifacts were read through
+the typed API and their full byte counts and SHA-256 matched. Only the digest
+metadata is recorded; sensitive artifact contents and resume references are not.
+
+The original GJ-1 observe/capture and this HAR Job remain readable with succeeded,
+verified results after typed rollback to the same-release standalone Swift
+helper. Together with the prior observe/capture evidence, GJ-1 is now
+REAL_DEVICE_PASS on Catalog digest `508783ac…`. The September 10 JSON record
+contains the supplemental provenance and exact metadata; no device mutation,
+flash or unknown-intent replay was used for this exercise.
+
+Real signed XPC probes against facade and same-release Swift both completed
+4 contract cases with zero errors, exit 0. These four-sample timings do not
+replace the previously recorded AC-5 benchmark. The quiet host load was 3.06
+on 8 cores before the UI attempt. The prepared App was Developer ID signed and
+the stock Runner executable digest was unchanged.
+
+The UI wrapper returned exit 0 / TEST EXECUTE SUCCEEDED, but xcresult summary
+reported totalTestCount 0. This is not a UI pass. Inspection found that
+`FacadeRollbackUITests.swift` is absent from the explicit Xcode project source
+membership. The actual scope checker refuses `ArkDeck.xcodeproj/project.pbxproj`
+under the current TASK-XPA-003 Allowed paths. Governance-only PR #1834 adds the
+minimal registration scope; all its selected checks pass. The project is not
+modified before that scope merges. AC-9 remains incomplete until both backend
+runs execute the actual Overview/History assertions with nonzero test counts.
+
+
+After the read-only rollback checks, typed update restored the published facade.
+The immediate startup read briefly reported socket_absent; the subsequent typed
+status is ready/health ok with no diagnostics, and `runtime service verify` for
+the HAR Job reports runtimeVerified true. The flash campaign remains closed.
+The supplemental record passes SDD (0 errors, 0 warnings, 121 acceptance IDs),
+JSON parsing and the unified gate's selected common checks. No UI pass is claimed.

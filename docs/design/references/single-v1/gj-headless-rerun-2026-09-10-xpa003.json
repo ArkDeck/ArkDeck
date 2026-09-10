@@ -2,7 +2,7 @@
   "schemaVersion": "arkdeck.gj-headless-rerun/1",
   "date": "2026-09-10",
   "catalogDigest": "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
-  "runbook": "docs/design/cli-golden-journey-headless-runbook.md \u00a75",
+  "runbook": "docs/design/cli-golden-journey-headless-runbook.md §§2, 2.1, 5",
   "journeys": [
     {
       "goldenJourney": "GJ-4",
@@ -93,6 +93,121 @@
         "state": "failed"
       },
       "sessionPublicationLimitation": "The initial publication failure shown above was repaired after PR #1832 merged. See sessionPublicationRepair for the subsequent typed retry and readback; the original flash execution and Artifact evidence remain unchanged."
+    },
+    {
+      "goldenJourney": "GJ-1",
+      "state": "REAL_DEVICE_PASS",
+      "evidenceKind": "redacted-metadata-derived-from-real-runtime",
+      "catalogDigest": "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+      "protectedMainBase": "459f2b1757986ed9dd10eff71225ceeac7650ace",
+      "runtimeBuild": "Signed r8 helpers built at 407c1925; production source matches merged main 459f2b17. Their only source-tree differences are the two acceptance record files.",
+      "runtimeExecutableSHA256": "f6c3dbf89797f9ee14c6e40e13366bff792aa7c7bc344ef40195d7be143cc504",
+      "pairedSwiftExecutableSHA256": "3b79288a407de8ea317562ce7a97e82e07dfc70c9c7bc64262ffff37d4a4392f",
+      "cliBuildIdentity": "sha256:34b3534cc92c1601551cd9b7bd00274a1088594daf4185b3650232c44ab3ffcf",
+      "positiveObserveAndCaptureRecord": "docs/design/references/single-v1/gj-headless-rerun-2026-09-09-xpa003.json",
+      "positiveJobs": [
+        {
+          "jobId": "job-57778758636d39059197893ac5ededac",
+          "executionID": "xpa003-gj1-20260909-observe",
+          "state": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "verifiedArtifactCount": 3,
+          "actualStepKinds": [
+            "probeHostTool",
+            "probeHDCServer",
+            "probeDevice",
+            "runApprovedRemoteRead"
+          ]
+        },
+        {
+          "jobId": "job-cdb2c3027f13febb2734ba41d29d3556",
+          "executionID": "xpa003-gj1-20260909-capture",
+          "state": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceBlockers": [],
+          "verifiedArtifactCount": 6,
+          "actualStepKinds": [
+            "probeDevice",
+            "runApprovedRemoteRead",
+            "preflightDeviceStorage",
+            "captureRemoteStdout"
+          ]
+        }
+      ],
+      "captureCompleteness": "complete",
+      "missingRequired": [],
+      "targetID": "TGT-958780b2ffb7",
+      "bindingRevisionBefore": 2,
+      "bindingRevisionAfter": 2,
+      "humanActions": [
+        {
+          "executionID": "gj1-xpa003-20260910-har",
+          "initialState": "waitingForHuman",
+          "reasonCode": "device.notObserved",
+          "initialExitCode": 75,
+          "initialStdoutDiscarded": true,
+          "recoveredUsingOnlyExecutionID": true,
+          "resumeReferenceMatched": true,
+          "newDispatchCountBeforeResume": 0,
+          "jobAcceptedBeforeResume": false,
+          "physicalDisconnectAndReconnectConfirmed": true,
+          "offlineAuthorizationState": "Offline",
+          "offlineAdoptedTargetId": null,
+          "resumeExitCode": 0,
+          "finalActionStatus": "resolvedByFreshProbe",
+          "finalExecutionState": "completed",
+          "jobId": "job-6126c3039a9a4a35bf30b8a15e6d6905",
+          "terminalState": "succeeded",
+          "outcomeUnknown": false,
+          "evidenceStatus": "verified",
+          "blockers": [],
+          "verifiedArtifacts": [
+            {
+              "name": "binding-snapshot.json",
+              "byteCount": 510,
+              "sha256": "e394be4d33c0ff99dd48b812bad94bc0b073874742627228ae2c0024681d68ff",
+              "verified": true
+            },
+            {
+              "name": "device-facts.json",
+              "byteCount": 438,
+              "sha256": "e0904d706cf68cb684cdfffb2b9dd8546edb4e62f9cde86ae8176de200e2079d",
+              "verified": true
+            },
+            {
+              "name": "tool-facts.json",
+              "byteCount": 240,
+              "sha256": "891102b413fd80a1faa55b2426c8a8331e5ff4aaca9cc1064f0dd48a3a0346bc",
+              "verified": true
+            }
+          ]
+        }
+      ],
+      "sameReleaseSwiftRestartReadback": [
+        {
+          "executionID": "xpa003-gj1-20260909-observe",
+          "jobId": "job-57778758636d39059197893ac5ededac",
+          "state": "succeeded",
+          "evidenceStatus": "verified",
+          "outcomeUnknown": false
+        },
+        {
+          "executionID": "xpa003-gj1-20260909-capture",
+          "jobId": "job-cdb2c3027f13febb2734ba41d29d3556",
+          "state": "succeeded",
+          "evidenceStatus": "verified",
+          "outcomeUnknown": false
+        },
+        {
+          "executionID": "gj1-xpa003-20260910-har",
+          "jobId": "job-6126c3039a9a4a35bf30b8a15e6d6905",
+          "state": "succeeded",
+          "evidenceStatus": "verified",
+          "outcomeUnknown": false
+        }
+      ],
+      "remaining": []
     }
   ],
   "cleanup": {
@@ -163,5 +278,40 @@
     "unaccountedSessionCountAfter": "1",
     "campaignClosed": true,
     "newFlashJobs": 0
+  },
+  "postMergeTransportAcceptance": {
+    "protectedMainCommit": "459f2b1757986ed9dd10eff71225ceeac7650ace",
+    "facadeXPCContract": {
+      "completedCaseCount": 4,
+      "contractMode": true,
+      "errors": [],
+      "p95ms": 17.4005,
+      "samples": 4
+    },
+    "sameReleaseSwiftXPCContract": {
+      "completedCaseCount": 4,
+      "contractMode": true,
+      "errors": [],
+      "p95ms": 11.178959,
+      "samples": 4
+    },
+    "sameReleaseSwiftSHA256": "7b68e827cbe83a155f4b962c119fbea9116fddf76a69b81cba10a2b776e48a74",
+    "xpcTimingNote": "Four-case correctness probes only; not AC-5 performance measurements.",
+    "uiSmoke": {
+      "state": "NOT_PASSED",
+      "commandExitCode": 0,
+      "executedTestCount": 0,
+      "reason": "The explicit Xcode test target does not register FacadeRollbackUITests.swift. No UI assertion was executed.",
+      "scopePR": "https://github.com/ArkDeck/ArkDeck/pull/1834"
+    },
+    "rawOutputs": "/private/tmp/xpa003-har-*.json and /private/tmp/xpa003-merged-*.json (local only)",
+    "finalService": {
+      "backend": "facade",
+      "ready": true,
+      "health": "ok",
+      "runtimeVerified": true,
+      "campaignClosed": true,
+      "diagnostics": []
+    }
   }
 }
