@@ -2,6 +2,7 @@ import XCTest
 
 /// Opt-in read-only smoke against the installed signed service, run once for
 /// the facade and once for its same-release Swift rollback. No fixture mode.
+/// Overview may run its normal approved read-only capability probe.
 @MainActor
 final class FacadeRollbackUITests: XCTestCase {
   override class func setUp() {
@@ -51,7 +52,7 @@ final class FacadeRollbackUITests: XCTestCase {
     waitForExpectations(timeout: 30)
 
     let evidence = XCTAttachment(
-      string: "Installed \(backend): production Overview and exact persisted History Job rendered without submitting an operation.")
+      string: "Installed \(backend): production Overview and exact persisted History Job rendered through the installed service.")
     evidence.name = "AC-9 installed service App smoke"
     evidence.lifetime = .keepAlways
     add(evidence)

@@ -190,7 +190,7 @@ Conventions shared by every task:
 
 ## TASK-XPA-003 — Rust control-plane façade on macOS with peer hardening
 
-- Status:in-progress（r8, 2026-09-09: its dependency is TASK-XPA-002's delivered macOS read-only foundation, SPK-2 passed on 2026-09-05 (r7, `evidence/runs/TASK-XPA-003/spk-2-run.md`) and the readiness pins below are instantiated; implementation started after packaging scope PR #1828. The Windows chain does not run alongside it: design §J.5, r8）
+- Status:done（2026-09-10: paired macOS facade implementation merged in #1833; the #1834 scope permits the final UI-test registration. XPA-AC-3/5/6/7 pass; the physical GJ-1 HAR and both facade/same-release Swift Overview/History UI runs pass, completing the task's XPA-AC-9 drill and GJ-1..5 on Catalog digest `508783ac…`. Final evidence and test registration are submitted together for maintainer review; this status is not an approval or verified designation. See `evidence/runs/TASK-XPA-003/run.md`）
 - Platform:macos
 - Requirements:ADR-0005 decisions 1–4 (transport, single-v1 frames, transport-free handler, single instance); no Core REQ edited
 - Acceptance:XPA-AC-3, XPA-AC-5, XPA-AC-6, XPA-AC-7

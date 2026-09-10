@@ -4,6 +4,24 @@ Date: 2026-09-09. Base and fetched `origin/main`:
 `2893280895b6d8a0520a9f9c4d274dcd52ed8f73` (#1827, r8).
 Branch: `agent/xpa-003-macos-facade-20260909`.
 
+## Completion summary, 2026-09-10
+
+Implementation PR #1833 and the narrow UI-registration scope PR #1834 are merged.
+The final follow-up is based on `93192f9e583befaafe1665788b0c1b11f762b3c6`.
+All task acceptance is now exercised: external single-v1 and origin-context
+contracts; unchanged +20% per-row IPC gate; peer-negative and both crash-window
+checks; GJ-1..5 on Catalog digest `508783ac…`; and actual App Overview/History
+smoke against facade and same-release Swift, 1 passed / 0 failed / 0 skipped each.
+The earlier chronology below retains failed attempts, including the zero-test UI
+selection; those attempts are not counted as passes.
+
+The September 9 and September 10 headless JSON records carry the exact Job IDs,
+build identities and provenance. No task acceptance remains outstanding. The
+maintainer's recorded L.1 item 3 decision keeps the SPK-2 anchor/team/identifier
+requirement without an added intermediate-certificate clause. The unrelated
+pre-existing unaccounted Session inventory remains unchanged; the separate
+TASK-SVC-002 publication repair was already merged as #1832.
+
 ## Scope exploration before #1828 (historical)
 
 Implementation has not started. The requested existing helper build/install delivery
@@ -793,3 +811,52 @@ status is ready/health ok with no diagnostics, and `runtime service verify` for
 the HAR Job reports runtimeVerified true. The flash campaign remains closed.
 The supplemental record passes SDD (0 errors, 0 warnings, 121 acceptance IDs),
 JSON parsing and the unified gate's selected common checks. No UI pass is claimed.
+
+
+## Registered App UI acceptance, 2026-09-10
+
+After PR #1834 merged at `93192f9e…`, the actual scope checker accepted both the
+Xcode project and the existing test source. The project change consists of four
+entries: build-file reference, Swift file reference, App Shell test group member,
+and the existing ArkDeckHDCUITests Sources member. No build setting, entitlement,
+product target or application behavior changes.
+
+The wrapper's build-only mode compiled FacadeRollbackUITests.swift; its test
+symbol is present in the linked bundle. App-only signing used the existing
+Developer ID identity and preserved the stock Runner executable digest.
+The following commands ran serially on a quiet host (load 4.43 and 3.90 on
+8 cores) with the exact persisted GJ-4 Job as the History filter:
+
+```bash
+ARKDECK_UI_TEST_DERIVED_DATA=/private/tmp/xpa003-ui-r8 \
+TEST_RUNNER_ARKDECK_FACADE_ROLLBACK_BACKEND=facade \
+TEST_RUNNER_ARKDECK_FACADE_ROLLBACK_JOB_ID=job-668735b572ec56dd44120abe9e428e36 \
+sh scripts/ci/run-ui-tests.sh --no-build \
+  -only-testing:ArkDeckHDCUITests/FacadeRollbackUITests
+# Repeat after typed runtime service update to the same-release Swift bundle,
+# with TEST_RUNNER_ARKDECK_FACADE_ROLLBACK_BACKEND=swift-rollback.
+```
+
+Both commands exited 0. Each xcresult summary reports Passed, totalTestCount 1,
+passedTests 1, failedTests 0, skippedTests 0. The assertions used production
+Overview and History, and matched the supplied exact Job ID. The September 10
+JSON records both result bundle paths and executable hashes. The Swift backend's
+signed XPC probe also completed all 4 contract cases with zero errors, exit 0.
+
+App Overview's normal capability refresh generated one `debug.template@1` Job
+per run, both readOnly/succeeded/verified with no blockers or unknown outcome.
+The Job count therefore increased from 65 to 67, not zero new Jobs. Those two
+Job IDs and actual step kinds are recorded. The test attachment originally said
+no operation was submitted; that wording and its comment were corrected after
+readback, with all UI assertions unchanged. No device mutation or flash occurred.
+
+Typed update restored the published facade after both runs. Final status is
+ready, health ok, diagnostics empty, flash campaign closed. No test Runner remains.
+The final follow-up unified local gate exited 0: all selected common checks,
+design-system tests and App build-for-testing passed. Swift and Rust lanes were
+not selected because this follow-up does not change those production sources;
+the full implementation gate is recorded above. SDD reports 0 errors, 0 warnings,
+121 acceptance IDs. Committed path preflight returns TASK-XPA-003, exit 0.
+Local logs: `/private/tmp/xpa003-completion-gate.log` and
+`/private/tmp/xpa003-completion-sdd.log`. The final metadata amendment is rechecked
+through the same unified entry point before push.

@@ -292,17 +292,75 @@
       "completedCaseCount": 4,
       "contractMode": true,
       "errors": [],
-      "p95ms": 11.178959,
+      "p95ms": 11.919208,
       "samples": 4
     },
     "sameReleaseSwiftSHA256": "7b68e827cbe83a155f4b962c119fbea9116fddf76a69b81cba10a2b776e48a74",
     "xpcTimingNote": "Four-case correctness probes only; not AC-5 performance measurements.",
     "uiSmoke": {
-      "state": "NOT_PASSED",
-      "commandExitCode": 0,
-      "executedTestCount": 0,
-      "reason": "The explicit Xcode test target does not register FacadeRollbackUITests.swift. No UI assertion was executed.",
-      "scopePR": "https://github.com/ArkDeck/ArkDeck/pull/1834"
+      "state": "PASS",
+      "scopePR": "https://github.com/ArkDeck/ArkDeck/pull/1834",
+      "scopeMergeCommit": "93192f9e583befaafe1665788b0c1b11f762b3c6",
+      "suite": "ArkDeckHDCUITests/FacadeRollbackUITests",
+      "selectedJobId": "job-668735b572ec56dd44120abe9e428e36",
+      "testedAppSHA256": "aeb357f2d174d3f5bb925c013ea0b5505ca6e6150aba7196f27208dfa13db4d9",
+      "testedTestBundleSHA256": "7ba3f158fdb3c7f867c1d0928c31265c5e40d26a610663ce45203e78bfbd889b",
+      "assertions": [
+        "production Overview status is visible",
+        "production History table is visible",
+        "History exact Job ID matches the supplied persisted Job"
+      ],
+      "runs": [
+        {
+          "backend": "facade",
+          "commandExitCode": 0,
+          "result": "Passed",
+          "totalTestCount": 1,
+          "passedTests": 1,
+          "failedTests": 0,
+          "skippedTests": 0,
+          "daemonSHA256": "f6c3dbf89797f9ee14c6e40e13366bff792aa7c7bc344ef40195d7be143cc504",
+          "xcresult": "/private/tmp/xpa003-ui-r8/Logs/Test/Test-ArkDeck-2026.09.10_15-15-11-+0800.xcresult"
+        },
+        {
+          "backend": "swift-rollback",
+          "commandExitCode": 0,
+          "result": "Passed",
+          "totalTestCount": 1,
+          "passedTests": 1,
+          "failedTests": 0,
+          "skippedTests": 0,
+          "daemonSHA256": "7b68e827cbe83a155f4b962c119fbea9116fddf76a69b81cba10a2b776e48a74",
+          "xcresult": "/private/tmp/xpa003-ui-r8/Logs/Test/Test-ArkDeck-2026.09.10_15-16-44-+0800.xcresult"
+        }
+      ],
+      "normalOverviewProbeJobs": [
+        {
+          "jobId": "job-e1d533b209b46fcd31106c93a3c735a8",
+          "operationReference": "debug.template@1",
+          "actualEffect": "readOnly",
+          "actualStepKinds": [
+            "probeDevice",
+            "runApprovedRemoteRead"
+          ],
+          "status": "verified",
+          "outcomeUnknown": false
+        },
+        {
+          "jobId": "job-143b14a61f323482fde06f5456b2adcd",
+          "operationReference": "debug.template@1",
+          "actualEffect": "readOnly",
+          "actualStepKinds": [
+            "probeDevice",
+            "runApprovedRemoteRead"
+          ],
+          "status": "verified",
+          "outcomeUnknown": false
+        }
+      ],
+      "jobCountBeforeUI": 65,
+      "jobCountAfterUI": 67,
+      "note": "App Overview performs its normal approved read-only probes. The test attachment wording was corrected after readback; UI assertions are unchanged."
     },
     "rawOutputs": "/private/tmp/xpa003-har-*.json and /private/tmp/xpa003-merged-*.json (local only)",
     "finalService": {
@@ -312,6 +370,13 @@
       "runtimeVerified": true,
       "campaignClosed": true,
       "diagnostics": []
+    },
+    "priorUIAttempt": {
+      "state": "NOT_PASSED",
+      "commandExitCode": 0,
+      "executedTestCount": 0,
+      "reason": "The explicit Xcode test target does not register FacadeRollbackUITests.swift. No UI assertion was executed.",
+      "scopePR": "https://github.com/ArkDeck/ArkDeck/pull/1834"
     }
   }
 }
