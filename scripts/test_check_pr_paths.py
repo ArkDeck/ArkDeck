@@ -1657,6 +1657,32 @@ class AutomationConfigTests(unittest.TestCase):
         ".python-version",
     )
     ANCHOR_PATTERNS = R1_ANCHOR_PATTERNS + DEC_004_ADDED_PATTERNS
+    # CHG-2026-076 (TASK-DSE-001): the surfaces a pull request can never add
+    # to its own Task in band — the CI trust root, the governance texts, the
+    # durable formats, device lowering and the admission/capability/recovery
+    # kernel. Exact-content anchor for the same reason as the table above.
+    NEVER_SELF_EXTEND_ANCHOR = (
+        "scripts/**",
+        ".github/**",
+        "AGENTS.md",
+        ".gitignore",
+        ".python-version",
+        "openspec/specs/**",
+        "openspec/constitution.md",
+        "openspec/governance/**",
+        "openspec/changes/archive/**",
+        "Catalog/**",
+        "**/*.entitlements",
+        "Packages/ArkDeckKit/LaunchAgents/**",
+        "Packages/ArkDeckKit/Sources/ArkDeckStorage/**",
+        "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DeviceProviders/**",
+        "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeJobEngine.swift",
+        "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeAdmissionService.swift",
+        "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeRecoveryService.swift",
+        "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AgentExecutionCoordinator.swift",
+        "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RockchipFlashAuthorization.swift",
+        "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AppProductCapabilityRegistry.swift",
+    )
 
     def taskless_context(self) -> check_pr_paths.PullRequestContext:
         return check_pr_paths.PullRequestContext(
@@ -1674,9 +1700,17 @@ class AutomationConfigTests(unittest.TestCase):
         config_path.write_text(text, encoding="utf-8")
         return config_path
 
-    def config_text(self, patterns: object) -> str:
+    def config_text(
+        self, patterns: object, never_self_extend: object = ("scripts/**",)
+    ) -> str:
         return json.dumps(
-            {"schema": check_pr_paths.CONFIG_SCHEMA, "sensitive_paths": patterns}
+            {
+                "schema": check_pr_paths.CONFIG_SCHEMA,
+                "sensitive_paths": patterns,
+                "never_self_extend": list(never_self_extend)
+                if isinstance(never_self_extend, tuple)
+                else never_self_extend,
+            }
         )
 
     def assert_config_error(self, expected: str, config_path: Path) -> None:
@@ -1689,6 +1723,45 @@ class AutomationConfigTests(unittest.TestCase):
             check_pr_paths.load_sensitive_patterns(),
             self.ANCHOR_PATTERNS,
         )
+        self.assertEqual(
+            check_pr_paths.load_never_self_extend_patterns(),
+            self.NEVER_SELF_EXTEND_ANCHOR,
+        )
+
+    def test_never_self_extend_shapes_each_fail_closed_on_every_load(self):
+        control = self.write_config(self.config_text(list(self.ANCHOR_PATTERNS)))
+        self.assertEqual(
+            check_pr_paths.load_never_self_extend_patterns(control), ("scripts/**",)
+        )
+        shapes = {
+            "missing key": json.dumps(
+                {
+                    "schema": check_pr_paths.CONFIG_SCHEMA,
+                    "sensitive_paths": list(self.ANCHOR_PATTERNS),
+                }
+            ),
+            "empty list": self.config_text(list(self.ANCHOR_PATTERNS), []),
+            "non-string entry": self.config_text(list(self.ANCHOR_PATTERNS), ["a/**", 3]),
+            "duplicate entry": self.config_text(
+                list(self.ANCHOR_PATTERNS), ["a/**", "a/**"]
+            ),
+            "old schema": json.dumps(
+                {
+                    "schema": "arkdeck-automation-config/v1",
+                    "sensitive_paths": list(self.ANCHOR_PATTERNS),
+                    "never_self_extend": ["scripts/**"],
+                }
+            ),
+        }
+        for shape, text in shapes.items():
+            with self.subTest(shape=shape):
+                config_path = self.write_config(text)
+                # Both loaders refuse, so the table cannot be skipped by a run
+                # that never reaches a scope extension.
+                with self.assertRaises(check_pr_paths.CheckError):
+                    check_pr_paths.load_sensitive_patterns(config_path)
+                with self.assertRaises(check_pr_paths.CheckError):
+                    check_pr_paths.load_never_self_extend_patterns(config_path)
 
     def test_malformed_configs_each_fail_closed_with_a_valid_control(self):
         control = self.write_config(self.config_text(list(self.ANCHOR_PATTERNS)))
@@ -2489,6 +2562,332 @@ class TrustBoundaryTests(unittest.TestCase):
             )
         self.assertEqual(exit_code, 0)
         self.assertEqual(buffer.getvalue().strip(), "901")
+
+
+class DeclaredScopeExtensionTests(unittest.TestCase):
+    """CHG-2026-076 / TASK-DSE-001: a bounded, declared, non-hideable extension.
+
+    A pull request may touch paths outside its Task's base-tree Allowed
+    paths only by adding them to the Task in the same change and declaring
+    each with a `Scope-Extension:` trailer; everything else keeps the
+    original refusal.
+    """
+
+    run_git = PullRequestPathTests.run_git
+    commit = PullRequestPathTests.commit
+    assert_error = PullRequestPathTests.assert_error
+
+    TASK_ID = "TASK-DSE-901"
+    BASE_ALLOWED = (
+        "- Allowed paths:\n"
+        "  - `openspec/changes/chg-dse/**`\n"
+        "  - `docs/a/**`\n"
+    )
+
+    def git_repo(self) -> Path:
+        temporary = tempfile.TemporaryDirectory(prefix="check-pr-dse-")
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        self.run_git(root, "init", "--quiet")
+        self.run_git(root, "config", "user.name", "Contract Test")
+        self.run_git(root, "config", "user.email", "contract@example.invalid")
+        return root
+
+    def write_task(self, root: Path, allowed_block: str) -> None:
+        change = root / "openspec" / "changes" / "chg-dse"
+        change.mkdir(parents=True, exist_ok=True)
+        (change / "tasks.md").write_text(
+            f"## {self.TASK_ID} — scope extension fixture\n{allowed_block}",
+            encoding="utf-8",
+        )
+
+    def write_file(self, root: Path, relative: str, text: str = "x\n") -> None:
+        target = root / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(text, encoding="utf-8")
+
+    def config(self, never_self_extend: list[str]) -> Path:
+        temporary = tempfile.TemporaryDirectory(prefix="dse-config-")
+        self.addCleanup(temporary.cleanup)
+        config_path = Path(temporary.name) / "automation_config.json"
+        config_path.write_text(
+            json.dumps(
+                {
+                    "schema": check_pr_paths.CONFIG_SCHEMA,
+                    "sensitive_paths": ["Packages/**"],
+                    "never_self_extend": never_self_extend,
+                }
+            ),
+            encoding="utf-8",
+        )
+        return config_path
+
+    def base_repo(self) -> tuple[Path, str]:
+        root = self.git_repo()
+        self.write_task(root, self.BASE_ALLOWED)
+        self.write_file(root, "docs/a/x.md")
+        self.write_file(root, "tools/build/keep.txt")
+        self.write_file(root, "tools/build/secret/key.txt")
+        self.write_file(root, "docs/a/sub/keep.txt")
+        return root, self.commit(root, "base")
+
+    def extend(
+        self,
+        root: Path,
+        added: tuple[str, ...],
+        files: tuple[str, ...],
+        *,
+        allowed_block: str | None = None,
+    ) -> str:
+        block = allowed_block
+        if block is None:
+            block = self.BASE_ALLOWED + "".join(f"  - `{pattern}`\n" for pattern in added)
+        self.write_task(root, block)
+        for relative in files:
+            self.write_file(root, relative, "changed\n")
+        return self.commit(root, "feat(TASK-DSE-901): use the extension")
+
+    def context(self, base_oid: str, head_oid: str, body: str):
+        return check_pr_paths.PullRequestContext(
+            title="feat(TASK-DSE-901): use the extension",
+            body=body,
+            head_ref="agent/dse-901",
+            base_oid=base_oid,
+            head_oid=head_oid,
+        )
+
+    def trailers(self, *patterns: str) -> str:
+        return "".join(f"Scope-Extension: {pattern}\n" for pattern in patterns)
+
+    def check(self, root: Path, base_oid: str, head_oid: str, body: str, config: Path | None = None):
+        changed = check_pr_paths.git_changed_paths(root, base_oid, head_oid)
+        if config is None:
+            return check_pr_paths.check_paths(root, self.context(base_oid, head_oid, body), changed)
+        return check_pr_paths.check_paths(
+            root, self.context(base_oid, head_oid, body), changed, config_path=config
+        )
+
+    def test_declared_extension_is_admitted_and_reported(self):
+        root, base_oid = self.base_repo()
+        head_oid = self.extend(root, ("tools/build/**",), ("tools/build/pack.sh", "docs/a/y.md"))
+        result = self.check(root, base_oid, head_oid, self.trailers("tools/build/**"))
+        self.assertEqual(result.task_id, self.TASK_ID)
+        self.assertEqual(result.scope_extension, ("tools/build/**",))
+        self.assertIn("tools/build/**", result.allowed_patterns)
+        summary = check_pr_paths.render_scope_extension_summary(result)
+        self.assertIn("Scope extension declared by TASK-DSE-901", summary)
+        self.assertIn("- `tools/build/**`", summary)
+        # An exact file path is bounded the same way: its parent must exist.
+        exact_oid = self.extend(root, ("tools/build/pack.sh",), ("tools/build/pack.sh",))
+        exact = self.check(root, base_oid, exact_oid, self.trailers("tools/build/pack.sh"))
+        self.assertEqual(exact.scope_extension, ("tools/build/pack.sh",))
+
+    def test_without_a_trailer_the_original_refusal_stands(self):
+        root, base_oid = self.base_repo()
+        head_oid = self.extend(root, ("tools/build/**",), ("tools/build/pack.sh",))
+        with self.assertRaises(check_pr_paths.CheckError) as caught:
+            self.check(root, base_oid, head_oid, "")
+        message = str(caught.exception)
+        self.assertIn("paths outside Allowed paths", message)
+        self.assertIn("tools/build/pack.sh", message)
+        self.assertNotIn("extension", message)
+
+    def test_trailers_must_equal_the_added_patterns(self):
+        root, base_oid = self.base_repo()
+        head_oid = self.extend(root, ("tools/build/**",), ("tools/build/pack.sh",))
+        self.assert_error(
+            "trailer without an addition: docs/b/**",
+            lambda: self.check(
+                root, base_oid, head_oid, self.trailers("tools/build/**", "docs/b/**")
+            ),
+        )
+        two = self.extend(
+            root, ("tools/build/**", "docs/a/**"), ("tools/build/pack.sh",),
+            allowed_block=self.BASE_ALLOWED + "  - `tools/build/**`\n  - `tools/build/secret/**`\n",
+        )
+        self.assert_error(
+            "added without a trailer: tools/build/secret/**",
+            lambda: self.check(root, base_oid, two, self.trailers("tools/build/**")),
+        )
+        self.assert_error(
+            "repeats tools/build/**",
+            lambda: self.check(
+                root, base_oid, head_oid, self.trailers("tools/build/**", "tools/build/**")
+            ),
+        )
+        self.assert_error(
+            "invalid pattern",
+            lambda: self.check(root, base_oid, head_oid, "Scope-Extension: tools/bu\u0131ld/**\n"),
+        )
+
+    def test_a_trailer_without_a_tasks_change_is_refused(self):
+        root, base_oid = self.base_repo()
+        self.write_file(root, "tools/build/pack.sh", "changed\n")
+        head_oid = self.commit(root, "feat(TASK-DSE-901): touch without adding")
+        self.assert_error(
+            "head tasks.md does not add",
+            lambda: self.check(root, base_oid, head_oid, self.trailers("tools/build/**")),
+        )
+
+    def test_removing_base_patterns_is_refused(self):
+        root, base_oid = self.base_repo()
+        head_oid = self.extend(
+            root, ("tools/build/**",), ("tools/build/pack.sh",),
+            allowed_block="- Allowed paths:\n  - `openspec/changes/chg-dse/**`\n  - `tools/build/**`\n",
+        )
+        self.assert_error(
+            "removes base-authorised Allowed paths: docs/a/**",
+            lambda: self.check(root, base_oid, head_oid, self.trailers("tools/build/**")),
+        )
+
+    def test_unbounded_patterns_are_refused(self):
+        root, base_oid = self.base_repo()
+        cases = {
+            "**": "unbounded",
+            "*": "unbounded",
+            "tools/**": "unbounded",
+            "/tools/build/**": "not a bounded repository path",
+            "tools/../build/**": "not a bounded repository path",
+            "nowhere/deep/**": "does not exist in the base tree",
+        }
+        for pattern, expected in cases.items():
+            with self.subTest(pattern=pattern):
+                head_oid = self.extend(root, (pattern,), ("tools/build/pack.sh",))
+                self.assert_error(
+                    expected,
+                    lambda: self.check(root, base_oid, head_oid, self.trailers(pattern)),
+                )
+
+    def test_never_self_extend_is_refused_in_both_directions(self):
+        root, base_oid = self.base_repo()
+        head_oid = self.extend(root, ("tools/build/**",), ("tools/build/pack.sh",))
+        # A kernel file inside the extended directory.
+        self.assert_error(
+            "overlaps never_self_extend entry tools/build/secret/**",
+            lambda: self.check(
+                root, base_oid, head_oid, self.trailers("tools/build/**"),
+                config=self.config(["tools/build/secret/**"]),
+            ),
+        )
+        # A kernel directory above the extended one.
+        self.assert_error(
+            "overlaps never_self_extend entry tools/**",
+            lambda: self.check(
+                root, base_oid, head_oid, self.trailers("tools/build/**"),
+                config=self.config(["tools/**"]),
+            ),
+        )
+        # An entry without a fixed prefix is matched against the admitted paths.
+        entitled = self.extend(
+            root, ("tools/build/**",), ("tools/build/app.entitlements",)
+        )
+        self.assert_error(
+            "overlaps never_self_extend entry **/*.entitlements",
+            lambda: self.check(
+                root, base_oid, entitled, self.trailers("tools/build/**"),
+                config=self.config(["**/*.entitlements"]),
+            ),
+        )
+        # Unrelated entries do not interfere.
+        result = self.check(
+            root, base_oid, head_oid, self.trailers("tools/build/**"),
+            config=self.config(["scripts/**", "docs/a/kernel.md"]),
+        )
+        self.assertEqual(result.scope_extension, ("tools/build/**",))
+
+    def test_limits_no_ops_and_uncovered_paths_are_refused(self):
+        root, base_oid = self.base_repo()
+        for index in range(9):
+            self.write_file(root, f"tools/build/d{index}/keep.txt")
+        wide_base = self.commit(root, "nine directories")
+        nine = tuple(f"tools/build/d{index}/**" for index in range(9))
+        head_oid = self.extend(root, nine, tuple(f"tools/build/d{index}/f.txt" for index in range(9)))
+        self.assert_error(
+            "declares 9 patterns; at most 8",
+            lambda: self.check(root, wide_base, head_oid, self.trailers(*nine)),
+        )
+        root, base_oid = self.base_repo()
+        noop = self.extend(root, ("docs/a/sub/**",), ("tools/build/pack.sh",))
+        self.assert_error(
+            "already covered by the base Allowed paths",
+            lambda: self.check(root, base_oid, noop, self.trailers("docs/a/sub/**")),
+        )
+        root, base_oid = self.base_repo()
+        partial = self.extend(
+            root, ("tools/build/secret/**",), ("tools/build/secret/f.txt", "tools/build/pack.sh")
+        )
+        self.assert_error(
+            "outside Allowed paths and the declared extension: tools/build/pack.sh",
+            lambda: self.check(root, base_oid, partial, self.trailers("tools/build/secret/**")),
+        )
+
+    def test_preflight_reads_the_commit_body_and_inferred_tasks_cannot_extend(self):
+        root, base_oid = self.base_repo()
+        self.write_task(root, self.BASE_ALLOWED + "  - `tools/build/**`\n")
+        self.write_file(root, "tools/build/pack.sh", "changed\n")
+        self.run_git(root, "add", "-A")
+        self.run_git(
+            root, "commit", "--quiet", "-m",
+            "feat(TASK-DSE-901): use the extension\n\nScope-Extension: tools/build/**\n",
+        )
+        head_oid = self.run_git(root, "rev-parse", "HEAD")
+        result = check_pr_paths.preflight_paths(root, base_oid, head_oid)
+        self.assertEqual(result.declaration_source, "explicit")
+        self.assertEqual(result.check.scope_extension, ("tools/build/**",))
+        # Event mode must see the same trailers in the PR body; without them
+        # the original refusal stands, so the two guards cannot disagree.
+        self.assert_error(
+            "paths outside Allowed paths",
+            lambda: self.check(root, base_oid, head_oid, "Task: TASK-DSE-901\n"),
+        )
+        # An inferred task can never carry an extension.
+        self.run_git(root, "commit", "--quiet", "--amend", "-m",
+                     "fix: use the extension\n\nScope-Extension: tools/build/**\n")
+        inferred_oid = self.run_git(root, "rev-parse", "HEAD")
+        self.assert_error(
+            "require an explicit Task ID",
+            lambda: check_pr_paths.preflight_paths(root, base_oid, inferred_oid),
+        )
+
+    def test_command_line_reports_and_writes_the_summary(self):
+        root, base_oid = self.base_repo()
+        self.write_task(root, self.BASE_ALLOWED + "  - `tools/build/**`\n")
+        self.write_file(root, "tools/build/pack.sh", "changed\n")
+        self.run_git(root, "add", "-A")
+        self.run_git(
+            root, "commit", "--quiet", "-m",
+            "feat(TASK-DSE-901): use the extension\n\nScope-Extension: tools/build/**\n",
+        )
+        head_oid = self.run_git(root, "rev-parse", "HEAD")
+        outside = tempfile.TemporaryDirectory(prefix="dse-summary-")
+        self.addCleanup(outside.cleanup)
+        summary = Path(outside.name) / "summary.md"
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            code = check_pr_paths.main([
+                "--repo-root", str(root), "--preflight",
+                "--base-revision", base_oid, "--head-revision", head_oid,
+                "--scope-extension-summary", str(summary),
+            ])
+        self.assertEqual(code, 0, stderr.getvalue())
+        self.assertEqual(stdout.getvalue().strip(), self.TASK_ID)
+        self.assertIn("SCOPE EXTENSION: TASK-DSE-901 adds 1 pattern(s): tools/build/**", stderr.getvalue())
+        self.assertIn("- `tools/build/**`", summary.read_text(encoding="utf-8"))
+        # No extension: the summary file is written empty, so a workflow can
+        # test it with `-s` without special-casing the absent block.
+        self.write_file(root, "docs/a/z.md", "more\n")
+        self.run_git(root, "add", "-A")
+        self.run_git(root, "commit", "--quiet", "-m", "feat(TASK-DSE-901): inside the base paths")
+        plain_oid = self.run_git(root, "rev-parse", "HEAD")
+        plain_err = io.StringIO()
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(plain_err):
+            code = check_pr_paths.main([
+                "--repo-root", str(root), "--preflight",
+                "--base-revision", head_oid, "--head-revision", plain_oid,
+                "--scope-extension-summary", str(summary),
+            ])
+        self.assertEqual(code, 0, plain_err.getvalue())
+        self.assertEqual(summary.read_text(encoding="utf-8"), "")
 
 
 if __name__ == "__main__":
