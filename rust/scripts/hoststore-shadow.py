@@ -36,6 +36,14 @@ STEP_KINDS = (
     "createWorkspaceCheckpoint", "runDeterministicAnalyzer",
 )
 EXPECTED = {
+    **{f"identity-published-{index}": "equal" for index in range(7)},
+    **{f"tool-ledger-{name}": "equal" for name in ("active", "pending", "outcome-succeeded", "outcome-failed", "outcome-failed-reason", "pending-maximum-generation")},
+    **{f"tool-ledger-{name}": "refused" for name in ("unordered-records", "pending-old-mismatch", "pending-new-missing", "pending-generation-mismatch",      "pending-action-invalid", "pending-old-unpinned", "pending-new-unpinned", "pending-outcome-paired",      "outcome-action-invalid", "outcome-result-invalid", "outcome-generation-mismatch", "outcome-old-missing",      "outcome-new-missing", "outcome-active-mismatch", "outcome-reason-invalid", "active-unavailable", "active-extra-owner")},
+    **{f"{prefix}-date-accepted-{index}": "equal" for prefix in ("bundle", "tool") for index in range(3)},
+    **{f"tool-{name}": "equal" for name in ("legacy-schema", "selection", "maximum-selection-generation")},
+    **{f"{prefix}-semantics-{name}": "refused" for prefix in ("bundle", "tool") for name in ("duplicate-record", "reference-prefix", "digest-uppercase", "digest-mismatch", "negative-bytes",      "oversize-bytes", "invalid-time", "time-overflow", "unknown-state", "available-generation", "removed-generation",      "removed-owners", "unknown-owner", "invalid-owner", "duplicate-owner", "too-many-owners", "schema-unknown")},
+    **{f"tool-semantics-{name}": "refused" for name in ("zero-bytes", "executable-digest", "quarantine-digest", "trust-unknown", "trust-empty-identifier",      "trust-long-team", "trust-control", "trust-unsigned-metadata", "trust-digest", "dependency-name", "dependency-digest",      "dependency-zero", "dependency-oversize", "dependency-quarantine", "dependency-trust", "dependency-duplicate",      "selection-zero", "selection-no-owner", "selection-unknown-tool", "selection-schema-one", "selection-pending-self",      "selection-outcome-self", "selection-extra")},
+    **{f"bundle-semantics-{name}": "refused" for name in ("zero-entries", "oversize-entries", "version-empty", "version-overflow", "version-control", "version-nonascii")},
     **{f"inventory-semantics-{name}": "equal" for name in ("valid", "effect-understated", "cancellation-understated", "binding-understated",      "unknown-kind", "unknown-effect", "unknown-cancellation", "unknown-binding", "unknown-disposition",      "unknown-certainty", "unknown-result", "executed-not-run", "skipped-confirmed", "skipped-valid",      "unknown-terminal", "failed-success", "failed-failed", "missing-binding", "unknown-binding-revision",      "negative-duration", "maximum-duration", "null-duration", "overflow-exit", "minimum-exit",      "source-without-trigger", "trigger-without-source", "duplicate-step", "standard-executed",      "standard-skipped-success", "standard-skipped-cancelled", "plan-executed", "plan-skipped")},
     **{f"inventory-audit-{name}": "equal" for name in (
         "readonly-hdc", "readonly-arkforge", "capability-hdc", "capability-arkforge", "hdc-label", "arkforge-label",
@@ -108,6 +116,14 @@ EXPECTED = {
     **{f"{kind}-extra-{level}-field": "refused" for kind in ("bundle", "tool") for level in ("record", "index")},
 }
 INPUTS = [
+    "rust/scripts/test_hoststore_shadow.py",
+    "Packages/ArkDeckKit/Scripts/run-swiftpm.sh",
+    "Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/HDCRegisteredToolIdentity.swift",
+    "Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/HDCReadOnlyProbeRegistry.swift",
+    "Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/HDCProduction.swift",
+    "Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/HDCSupervisorObservationProbeRegistry.swift",
+    "rust/deny.toml",
+    "rust/supply-chain/imports.lock",
     "rust/scripts/generate-swift-grapheme-tables.py",
     "rust/crates/arkdeck-hoststore/UNICODE-LICENSE",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/Unicode/GraphemeBreakTest-16.0.0.txt",
@@ -161,6 +177,81 @@ def source_hashes() -> dict[str, str]:
     return {path: digest((ROOT / path).read_bytes()) for path in sorted(paths)}
 
 
+def dependency_provenance(scratch: Path) -> dict:
+    """Verify the actual SwiftPM ArkTrace checkout against its frozen Git tree."""
+    pins = json.loads((ROOT / "Packages/ArkDeckKit/Package.resolved").read_bytes())["pins"]
+    pin = next(item for item in pins if item["identity"] == "arktrace")
+    state = json.loads((scratch / "workspace-state.json").read_bytes())
+    dependency = next(item for item in state["object"]["dependencies"]
+                      if item["packageRef"]["identity"] == "arktrace")
+    revision = pin["state"]["revision"]
+    subpath = dependency["subpath"]
+    if (not isinstance(subpath, str) or Path(subpath).name != subpath or subpath in (".", "..")
+            or dependency["packageRef"]["location"] != pin["location"]
+            or dependency["state"].get("name") != "sourceControlCheckout"
+            or dependency["state"]["checkoutState"]["revision"] != revision):
+        raise ValueError("ArkTrace resolved checkout does not match Package.resolved")
+    checkout = scratch / "checkouts" / subpath
+    if checkout.is_symlink():
+        raise ValueError("ArkTrace checkout must be a physical directory")
+    def git(*arguments: str) -> bytes:
+        return subprocess.check_output(["git", "-C", str(checkout), *arguments], timeout=30)
+    if git("rev-parse", "HEAD").decode().strip() != revision:
+        raise ValueError("ArkTrace actual HEAD differs from its resolved revision")
+    if git("status", "--porcelain", "--untracked-files=all", "--ignored"):
+        raise ValueError("ArkTrace checkout contains changes or untracked/ignored input")
+    entries = git("ls-tree", "-r", "-z", revision)
+    hashes = {}
+    for entry in entries.split(b"\0"):
+        if not entry:
+            continue
+        metadata, relative = entry.split(b"\t", 1)
+        mode, kind, object_id = metadata.split(b" ")
+        name = relative.decode("utf-8")
+        if kind != b"blob" or Path(name).is_absolute() or ".." in Path(name).parts:
+            raise ValueError("ArkTrace contains an unsupported tree entry")
+        path = checkout / name
+        if mode == b"120000":
+            if not path.is_symlink():
+                raise ValueError("ArkTrace tracked symlink changed kind")
+            data = os.readlink(path).encode("utf-8")
+        elif mode in (b"100644", b"100755") and path.is_file() and not path.is_symlink():
+            data = path.read_bytes()
+        else:
+            raise ValueError("ArkTrace tracked source changed kind")
+        # Check the actual bytes even when Git's index has assume-unchanged or
+        # skip-worktree flags. SHA-1 is Git's object identity here, not an audit
+        # signature; the receipt separately records SHA-256 for every file.
+        actual = hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest()
+        if actual != object_id.decode():
+            # Two upstream license files explicitly request CRLF checkouts.
+            # Read attributes from the pinned tree, not user/global overrides;
+            # no custom Git clean filter or executable is invoked.
+            attributes = git("check-attr", "--source=" + revision, "-z", "text", "eol", "filter",
+                             "working-tree-encoding", "--", name).split(b"\0")
+            values = {attributes[i + 1]: attributes[i + 2] for i in range(0, len(attributes) - 1, 3)}
+            if values != {b"text": b"set", b"eol": b"crlf", b"filter": b"unspecified",
+                          b"working-tree-encoding": b"unspecified"}:
+                raise ValueError("ArkTrace checkout bytes differ from the pinned Git tree")
+            normalized = data.replace(b"\r\n", b"\n")
+            normalized_id = hashlib.sha1(b"blob " + str(len(normalized)).encode() + b"\0" + normalized).hexdigest()
+            if normalized_id != object_id.decode():
+                raise ValueError("ArkTrace normalized checkout bytes differ from the pinned Git tree")
+        hashes[name] = digest(data)
+    return {"identity": "arktrace", "location": pin["location"], "revision": revision,
+            "sourceFiles": hashes,
+        "swiftDependencies": [dependency], "treeSHA256": digest(entries)}
+
+
+def swift_scratch_path() -> Path:
+    output = subprocess.check_output(["sh", "Packages/ArkDeckKit/Scripts/run-swiftpm.sh", "build", "--show-bin-path"],
+                                     cwd=ROOT, text=True, timeout=120).strip()
+    binary_directory = Path(output)
+    if not binary_directory.is_absolute():
+        raise ValueError("SwiftPM returned a nonabsolute binary directory")
+    return next(parent for parent in binary_directory.parents if (parent / "workspace-state.json").is_file())
+
+
 def validate_cases(directory: Path) -> list[dict]:
     files = sorted(directory.glob("*.json"))
     if {path.stem for path in files} != set(EXPECTED):
@@ -170,7 +261,7 @@ def validate_cases(directory: Path) -> list[dict]:
         case = json.loads(path.read_bytes())
         if set(case) != {"case", "store", "outcome", "inputSHA256", "projectionSHA256", "oracleBinarySHA256"}:
             raise ValueError("unexpected case shape")
-        expected_store = {"history": "history-filter", "bundle": "bundle-registry", "tool": "tool-registry", "names": "display-names", "session": "session-configuration", "trace": "trace-cache", "timestamp": "session-timestamp", "inventory": "session-storage", "graphemes": "session-graphemes"}[path.stem.split("-", 1)[0]]
+        expected_store = {"history": "history-filter", "bundle": "bundle-registry", "tool": "tool-registry", "names": "display-names", "session": "session-configuration", "trace": "trace-cache", "timestamp": "session-timestamp", "inventory": "session-storage", "graphemes": "session-graphemes", "identity": "tool-identity"}[path.stem.split("-", 1)[0]]
         if (case["case"] != path.stem or case["store"] != expected_store
                 or case["outcome"] != EXPECTED[path.stem]):
             raise ValueError("case identity or outcome mismatch")
@@ -202,14 +293,19 @@ def main() -> int:
         ["cargo", "metadata", "--format-version", "1", "--no-deps", "--locked"], cwd=ROOT / "rust"))
     binary = Path(metadata["target_directory"]) / "debug/arkdeck-hoststore"
     binary_hash = digest(binary.read_bytes())
+    subprocess.run(["sh", "Packages/ArkDeckKit/Scripts/run-swiftpm.sh", "build", "--build-tests", "--force-resolved-versions", "-j", "4"],
+                   cwd=ROOT, check=True, timeout=900)
+    scratch = swift_scratch_path()
+    dependency = dependency_provenance(scratch)
     with tempfile.TemporaryDirectory(prefix="arkdeck-shadow-results-") as results:
         env = dict(os.environ, ARKDECK_HOSTSTORE_SHADOW_BINARY=str(binary),
                    ARKDECK_HOSTSTORE_SHADOW_RESULTS=results)
-        subprocess.run(["sh", "Packages/ArkDeckKit/Scripts/run-swiftpm.sh", "test", "-j", "4",
+        subprocess.run(["sh", "Packages/ArkDeckKit/Scripts/run-swiftpm.sh", "test", "--skip-build", "--force-resolved-versions", "-j", "4",
                         "--filter", "HostStoreShadowContractTests|HostStoreTraceShadowTests"], cwd=ROOT, env=env,
                        check=True, timeout=900)
         cases = validate_cases(Path(results))
-    if source_hashes() != hashes or digest(binary.read_bytes()) != binary_hash:
+    if (source_hashes() != hashes or digest(binary.read_bytes()) != binary_hash
+            or dependency_provenance(scratch) != dependency):
         raise ValueError("source or binary changed during comparison; no receipt published")
     receipt = {
         "schemaVersion": "arkdeck.hoststore-shadow-run/1",
@@ -218,6 +314,7 @@ def main() -> int:
         "completedAtUTC": datetime.now(timezone.utc).isoformat(),
         "sourceCommit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
         "sourceFiles": hashes,
+        "swiftDependencies": [dependency],
         "sourceDirty": bool(subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT)),
         "sourceDiffSHA256": digest(subprocess.check_output(["git", "diff", "HEAD", "--binary"], cwd=ROOT)),
         "binarySHA256": binary_hash,

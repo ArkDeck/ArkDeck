@@ -138,6 +138,7 @@ final class HostStoreShadowContractTests: XCTestCase {
     let file = registryRoot.appending(path: "bundles.json")
     let read: () throws -> JSONValue = { .array(try store.list { _, rows in rows }) }
     try compareStore(name: "bundle-available", kind: "bundle-registry", file: file, read: read)
+    try compareRegistrySemantics(prefix: "bundle", kind: "bundle-registry", file: file, read: read)
     _ = try store.acquire(reference, expectedGeneration: "1", owner: .init(kind: .controlAction, id: "shadow-fixture"))
     try compareStore(name: "bundle-retained", kind: "bundle-registry", file: file, read: read)
     try store.release(reference, owner: .init(kind: .controlAction, id: "shadow-fixture"))
@@ -160,12 +161,119 @@ final class HostStoreShadowContractTests: XCTestCase {
     let file = registryRoot.appending(path: "tools.json")
     let read: () throws -> JSONValue = { .array(try store.list { _, rows in rows }) }
     try compareStore(name: "tool-available", kind: "tool-registry", file: file, read: read)
+    try compareRegistrySemantics(prefix: "tool", kind: "tool-registry", file: file, read: read)
     _ = try store.acquire(reference, expectedGeneration: "1", owner: .init(kind: .controlAction, id: "shadow-fixture"))
     try compareStore(name: "tool-retained", kind: "tool-registry", file: file, read: read)
     try store.release(reference, owner: .init(kind: .controlAction, id: "shadow-fixture"))
     _ = try store.remove(reference, expectedGeneration: "1")
     try compareStore(name: "tool-removed", kind: "tool-registry", file: file, read: read)
     try refuseExtraRegistryFields(kind: "tool-registry", prefix: "tool", file: file, read: read)
+  }
+
+  func testPublishedToolIdentityDiagnosticLookup() throws {
+    let known = "48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260"
+    let inputs = [known, "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83",
+      known.uppercased(), String(repeating: "0", count: 64), "", known + "\n", known + "\u{0}"]
+    for (index, sha256) in inputs.enumerated() {
+      let match = HeadlessHDCBootstrapIdentity.lookup(sha256: sha256)
+      XCTAssertEqual(match != nil, index < 2)
+      let identity: JSONValue = match.map { .object(["version": .string($0.version),
+        "profileReferences": .array($0.profileReferences.map(JSONValue.string))]) } ?? .null
+      let expected = try CanonicalJSONEncoders.canonical().encode(JSONValue.object(["identity": identity]))
+      let input = try JSONEncoder().encode(sha256)
+      let result = try rust(input, kind: "tool-identity")
+      XCTAssertEqual(result.status, 0)
+      let envelope = try XCTUnwrap(JSONSerialization.jsonObject(with: result.output) as? [String: Any])
+      let projection = try JSONSerialization.data(withJSONObject: XCTUnwrap(envelope["projection"]), options: [.sortedKeys])
+      XCTAssertEqual(projection, expected)
+      try record(name: "identity-published-\(index)", input: input, output: projection,
+        outcome: "equal", store: "tool-identity")
+    }
+  }
+
+  func testToolSelectionLedgerProjection() throws {
+    let registryRoot = root.appending(path: "selection-registry")
+    let store = BootstrapToolRegistry(owner: BootstrapBundleRegistry(root: registryRoot),
+      nowUTC: { "2026-09-10T01:02:03Z" })
+    let products = Bundle(for: Self.self).bundleURL.deletingLastPathComponent()
+    for name in ["ArkDeckFakeHDCFixture", "ArkDeckFakeHapSignerFixture"] {
+      let source = root.appending(path: name)
+      try FileManager.default.copyItem(at: products.appending(path: name), to: source)
+      _ = try store.register(file: source)
+    }
+    let file = registryRoot.appending(path: "tools.json")
+    let original = try Data(contentsOf: file)
+    let read: () throws -> JSONValue = { .array(try store.list { _, rows in rows }) }
+    let valid = ["active", "pending", "outcome-succeeded", "outcome-failed", "outcome-failed-reason", "pending-maximum-generation"]
+    let invalid = ["unordered-records", "pending-old-mismatch", "pending-new-missing", "pending-generation-mismatch",
+      "pending-action-invalid", "pending-old-unpinned", "pending-new-unpinned", "pending-outcome-paired",
+      "outcome-action-invalid", "outcome-result-invalid", "outcome-generation-mismatch", "outcome-old-missing",
+      "outcome-new-missing", "outcome-active-mismatch", "outcome-reason-invalid", "active-unavailable", "active-extra-owner"]
+    for name in valid + invalid {
+      var document = try XCTUnwrap(JSONSerialization.jsonObject(with: original) as? [String: Any])
+      var rows = try XCTUnwrap(document["records"] as? [[String: Any]])
+      XCTAssertEqual(rows.count, 2)
+      let old = try XCTUnwrap(rows[0]["reference"] as? String)
+      let new = try XCTUnwrap(rows[1]["reference"] as? String)
+      let missing = "tool:sha256:" + String(repeating: "0", count: 64)
+      let activeOwner: [String: Any] = ["kind": "activeSelection", "id": "runtime-hdc-selection"]
+      let actionOwner: [String: Any] = ["kind": "controlAction", "id": "fixture-action"]
+      let succeeded = name.hasPrefix("outcome-") && name != "outcome-failed" && name != "outcome-failed-reason"
+      let activeIndex = succeeded ? 1 : 0
+      rows[activeIndex]["references"] = [activeOwner]
+      var selection: [String: Any] = ["activeToolRef": succeeded ? new : old, "activeGeneration": UInt64(2)]
+      if name.hasPrefix("pending-") || name == "pending" {
+        rows[0]["references"] = [activeOwner, actionOwner]
+        rows[1]["references"] = [actionOwner]
+        var pending: [String: Any] = ["actionID": "fixture-action", "oldToolRef": old, "newToolRef": new,
+          "expectedActiveGeneration": UInt64(2)]
+        switch name {
+        case "pending-old-mismatch": pending["oldToolRef"] = new
+        case "pending-new-missing": pending["newToolRef"] = missing
+        case "pending-generation-mismatch": pending["expectedActiveGeneration"] = 1
+        case "pending-action-invalid": pending["actionID"] = "invalid:action"
+        case "pending-old-unpinned": rows[0]["references"] = [activeOwner]
+        case "pending-new-unpinned": rows[1]["references"] = [] as [[String: Any]]
+        case "pending-maximum-generation":
+          selection["activeGeneration"] = UInt64.max; pending["expectedActiveGeneration"] = UInt64.max
+        default: break
+        }
+        selection["pending"] = pending
+        if name == "pending-outcome-paired" {
+          selection["lastOutcome"] = ["actionID": "fixture-action", "oldToolRef": old, "newToolRef": new,
+            "activeGeneration": 2, "result": "failed"]
+        }
+      }
+      if name.hasPrefix("outcome-") {
+        var outcome: [String: Any] = ["actionID": "fixture-action", "oldToolRef": old, "newToolRef": new,
+          "activeGeneration": 2, "result": succeeded ? "succeeded" : "failed"]
+        switch name {
+        case "outcome-failed-reason": outcome["reasonCode"] = "fixture.failure"
+        case "outcome-action-invalid": outcome["actionID"] = "invalid:action"
+        case "outcome-result-invalid": outcome["result"] = "unknown"
+        case "outcome-generation-mismatch": outcome["activeGeneration"] = 1
+        case "outcome-old-missing": outcome["oldToolRef"] = missing
+        case "outcome-new-missing": outcome["newToolRef"] = missing
+        case "outcome-active-mismatch":
+          rows[0]["references"] = [activeOwner]; rows[1]["references"] = [] as [[String: Any]]
+          selection["activeToolRef"] = old
+        case "outcome-reason-invalid": outcome["reasonCode"] = "invalid:reason"
+        default: break
+        }
+        selection["lastOutcome"] = outcome
+      }
+      if name == "active-unavailable" { rows[0]["state"] = "removed"; rows[0]["generation"] = 2; rows[0]["references"] = [] as [[String: Any]] }
+      if name == "active-extra-owner" { rows[1]["references"] = [activeOwner] }
+      if name == "unordered-records" { rows.reverse() }
+      document["records"] = rows; document["selection"] = selection
+      let caseName = "tool-ledger-" + name
+      if valid.contains(name) {
+        try JSONSerialization.data(withJSONObject: document, options: [.sortedKeys, .withoutEscapingSlashes]).write(to: file)
+        try compareStore(name: caseName, kind: "tool-registry", file: file, read: read)
+      } else {
+        try compareRefusal(name: caseName, kind: "tool-registry", document: document, file: file, read: read)
+      }
+    }
   }
 
   func testDisplayNamesTargetTombstoneAndCandidate() throws {
@@ -1139,6 +1247,132 @@ final class HostStoreShadowContractTests: XCTestCase {
       XCTAssertEqual(try Data(contentsOf: file), bytes)
       try record(name: prefix + (nested ? "-extra-record-field" : "-extra-index-field"),
                  input: bytes, output: Data(), outcome: "refused", store: kind)
+    }
+    try original.write(to: file)
+  }
+
+  private func compareRegistrySemantics(
+    prefix: String, kind: String, file: URL, read: () throws -> JSONValue
+  ) throws {
+    let original = try Data(contentsOf: file)
+    let tool = prefix == "tool"
+    let common = ["duplicate-record", "reference-prefix", "digest-uppercase", "digest-mismatch", "negative-bytes",
+      "oversize-bytes", "invalid-time", "time-overflow", "unknown-state", "available-generation", "removed-generation",
+      "removed-owners", "unknown-owner", "invalid-owner", "duplicate-owner", "too-many-owners", "schema-unknown"]
+    let specific = tool ? ["zero-bytes", "executable-digest", "quarantine-digest", "trust-unknown", "trust-empty-identifier",
+      "trust-long-team", "trust-control", "trust-unsigned-metadata", "trust-digest", "dependency-name", "dependency-digest",
+      "dependency-zero", "dependency-oversize", "dependency-quarantine", "dependency-trust", "dependency-duplicate",
+      "selection-zero", "selection-no-owner", "selection-unknown-tool", "selection-schema-one", "selection-pending-self",
+      "selection-outcome-self", "selection-extra"]
+      : ["zero-entries", "oversize-entries", "version-empty", "version-overflow", "version-control", "version-nonascii"]
+    for name in common + specific {
+      var document = try XCTUnwrap(JSONSerialization.jsonObject(with: original) as? [String: Any])
+      var rows = try XCTUnwrap(document["records"] as? [[String: Any]])
+      var row = rows[0]
+      let digestKey = tool ? "contentDigest" : "digest"
+      let timeKey = tool ? "registeredAt" : "registeredAtUTC"
+      let owner: [String: Any] = ["kind": "job", "id": "fixture-owner"]
+      switch name {
+      case "reference-prefix": row["reference"] = "unknown:sha256:" + String(repeating: "a", count: 64)
+      case "digest-uppercase": row[digestKey] = String(repeating: "A", count: 64)
+      case "digest-mismatch": row[digestKey] = String(repeating: "0", count: 64)
+      case "negative-bytes": row["byteCount"] = -1
+      case "zero-bytes": row["byteCount"] = 0
+      case "oversize-bytes": row["byteCount"] = tool ? 268_435_457 : 1_073_741_825
+      case "invalid-time": row[timeKey] = "invalid"
+      case "time-overflow": row[timeKey] = "2026-09-10T01:02:03Z" + String(repeating: " ", count: 33)
+      case "unknown-state": row["state"] = "unknown"
+      case "available-generation": row["generation"] = 2
+      case "removed-generation": row["state"] = "removed"
+      case "removed-owners": row["state"] = "removed"; row["generation"] = 2; row["references"] = [owner]
+      case "unknown-owner": row["references"] = [["kind": "unknown", "id": "fixture-owner"]]
+      case "invalid-owner": row["references"] = [["kind": "job", "id": "contains:colon"]]
+      case "duplicate-owner": row["references"] = [owner, owner]
+      case "too-many-owners": row["references"] = (0...1024).map { ["kind": "job", "id": "owner-\($0)"] }
+      case "schema-unknown": document["schemaVersion"] = "unknown"
+      case "zero-entries": row["entryCount"] = 0
+      case "oversize-entries": row["entryCount"] = 4097
+      case "version-empty": row["version"] = ""
+      case "version-overflow": row["version"] = String(repeating: "a", count: 129)
+      case "version-control": row["version"] = "1\n"
+      case "version-nonascii": row["version"] = "版本"
+      case "executable-digest": row["executableSHA256"] = "invalid"
+      case "quarantine-digest": row["quarantineSHA256"] = "invalid"
+      default: break
+      }
+      if name.hasPrefix("trust-") {
+        var trust = try XCTUnwrap(row["trust"] as? [String: Any])
+        switch name {
+        case "trust-unknown": trust["signature"] = "unknown"
+        case "trust-empty-identifier": trust["identifier"] = ""
+        case "trust-long-team": trust["teamIdentifier"] = String(repeating: "a", count: 257)
+        case "trust-control": trust["identifier"] = "line\n"
+        case "trust-unsigned-metadata": trust = ["signature": "unsigned", "identifier": "unexpected"]
+        case "trust-digest": trust["codeDirectorySHA256"] = "invalid"
+        default: break
+        }
+        row["trust"] = trust
+      }
+      if name.hasPrefix("dependency-") {
+        var dependency: [String: Any] = ["name": "libusb_shared.dylib", "sha256": String(repeating: "a", count: 64),
+          "byteCount": 1, "trust": ["signature": "unsigned"]]
+        switch name {
+        case "dependency-name": dependency["name"] = "other.dylib"
+        case "dependency-digest": dependency["sha256"] = "invalid"
+        case "dependency-zero": dependency["byteCount"] = 0
+        case "dependency-oversize": dependency["byteCount"] = 33_554_433
+        case "dependency-quarantine": dependency["quarantineSHA256"] = "invalid"
+        case "dependency-trust": dependency["trust"] = ["signature": "invalid"]
+        default: break
+        }
+        row["dependencies"] = name == "dependency-duplicate" ? [dependency, dependency] : [dependency]
+      }
+      if name.hasPrefix("selection-") {
+        let reference = try XCTUnwrap(row["reference"] as? String)
+        row["references"] = [["kind": "activeSelection", "id": "runtime-hdc-selection"]]
+        var selection: [String: Any] = ["activeToolRef": reference, "activeGeneration": 1]
+        switch name {
+        case "selection-zero": selection["activeGeneration"] = 0
+        case "selection-no-owner": row["references"] = [] as [[String: Any]]
+        case "selection-unknown-tool": selection["activeToolRef"] = "tool:sha256:" + String(repeating: "0", count: 64)
+        case "selection-schema-one": document["schemaVersion"] = "arkdeck.bootstrap-tools/1"
+        case "selection-pending-self": selection["pending"] = ["actionID": "fixture-action", "oldToolRef": reference,
+          "newToolRef": reference, "expectedActiveGeneration": 1]
+        case "selection-outcome-self": selection["lastOutcome"] = ["actionID": "fixture-action", "oldToolRef": reference,
+          "newToolRef": reference, "activeGeneration": 1, "result": "succeeded"]
+        case "selection-extra": selection["extra"] = true
+        default: break
+        }
+        document["selection"] = selection
+      }
+      rows[0] = row
+      if name == "duplicate-record" { rows.append(row) }
+      document["records"] = rows
+      try compareRefusal(name: prefix + "-semantics-" + name, kind: kind, document: document, file: file, read: read)
+    }
+    // Date acceptance is exercised through the actual legacy Foundation reader.
+    for (index, timestamp) in ["2026-09-10T01:02:03+08:00", "2026-09-10T01:02:03Z", "2026-09-10T01:02:03Ztail"].enumerated() {
+      var document = try XCTUnwrap(JSONSerialization.jsonObject(with: original) as? [String: Any])
+      var rows = try XCTUnwrap(document["records"] as? [[String: Any]])
+      rows[0][tool ? "registeredAt" : "registeredAtUTC"] = timestamp
+      document["records"] = rows
+      try JSONSerialization.data(withJSONObject: document, options: [.sortedKeys, .withoutEscapingSlashes]).write(to: file)
+      try compareStore(name: prefix + "-date-accepted-" + String(index), kind: kind, file: file, read: read)
+    }
+    if tool {
+      for variant in ["legacy-schema", "selection", "maximum-selection-generation"] {
+        var document = try XCTUnwrap(JSONSerialization.jsonObject(with: original) as? [String: Any])
+        if variant == "legacy-schema" { document["schemaVersion"] = "arkdeck.bootstrap-tools/1" }
+        else {
+          var rows = try XCTUnwrap(document["records"] as? [[String: Any]])
+          rows[0]["references"] = [["kind": "activeSelection", "id": "runtime-hdc-selection"]]
+          document["records"] = rows
+          document["selection"] = ["activeToolRef": rows[0]["reference"]!,
+            "activeGeneration": variant == "maximum-selection-generation" ? UInt64.max : 1]
+        }
+        try JSONSerialization.data(withJSONObject: document, options: [.sortedKeys, .withoutEscapingSlashes]).write(to: file)
+        try compareStore(name: "tool-" + variant, kind: kind, file: file, read: read)
+      }
     }
     try original.write(to: file)
   }

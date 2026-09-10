@@ -31,8 +31,9 @@ Swift oracle may initialize or reconcile only its isolated fixtures.
 | --- | ---: | --- |
 | History filter | 19 | Durable bytes, list projection, generations, strict fields, enum/text refusal |
 | Display names | 24 | Target/candidate projections, tombstones, ordering, identity and staged-name consistency |
-| Bundle registry | 5 | Available/retained/removed metadata and extra-field refusal |
-| Tool registry | 5 | Unregistered-tool metadata and extra-field refusal |
+| Bundle registry | 31 | Available/retained/removed metadata, closed fields, reference/state/owner/bounds/time refusal |
+| Tool registry | 74 | Closed metadata, trust/dependency shape, legacy schema, active/pending/outcome selection ledger |
+| Published tool identity | 7 | Actual Swift diagnostic lookup of both existing published digests and unknown spellings |
 | Session configuration | 5 | Policy/custom-root/full-width values and strict canonical fields |
 | Session timestamps | 20 | Exact Swift Date Double bits or matching refusal |
 | Session status | 20 | Actual used/pinned bytes, counts, catalog generations and incomplete measurement |
@@ -105,16 +106,25 @@ requirements. Historical Runtime Provider audits are interpreted solely as
 stored data; the candidate cannot mint, reserve or consume authority. HDC keeps
 its existing closed field set, including the allowed cross-branch metadata keys.
 
+Registry semantic validation now covers both state/generation pairs, bounded and
+unique owners, reference identity, sorted unique records, legacy date parsing,
+version/trust/dependency constraints, and the full active/pending/outcome tool
+selection ledger. Two separately registered fixture executables exercise pending
+pins and successful/failed outcomes without executing either fixture. Published
+identity lookup mirrors the existing Swift diagnostic composition; it adds no
+Provider support declaration or admission authority. Content/signature
+revalidation remains part of the subsequent filesystem owner implementation;
+these registry comparisons cover metadata decoders and their projections.
+
 ## Remaining work before harness review
 
 - Complete complex Foundation canonical JSON coverage. Unsupported encoding branches still stop the entire
   comparison explicitly; they are never reported as corrupt or unaccounted
   Sessions.
 - Finish the Session scan failure matrix and root/configuration stability checks.
-- Complete History/display-name timestamp refusal, registry semantic validation,
-  published tool identity/selection and remaining Trace metadata compatibility.
-- Automate dependency checkout provenance verification and finalize the complete
-  nightly corpus. The nightly job is wired locally but has not been pushed or run.
+- Complete History/display-name timestamp refusal and remaining Trace metadata
+  compatibility.
+- Finalize the complete nightly corpus. The nightly job is wired locally but has not been pushed or run.
 - Run the final unified gate and committed preflight on the complete harness.
 
 After harness review/merge, seven actual scheduled nightly days must be matched
@@ -123,6 +133,17 @@ retries cannot manufacture those days. Owner/CAS/crash-window work, UI assertion
 GJ-1 re-pass and rollback evidence remain a later authorized cutover stage.
 
 ## Validation so far
+
+- The 713-case implementation passed the complete-diff unified gate (exit 0):
+  Swift full suite (2567 parallel tests plus six serialized timing/race tests),
+  App test build, design-system, published/candidate Rust contracts, cargo deny,
+  and cargo vet (26 audited). Log: `/private/tmp/xpa012-shadow-registry-gate.log`.
+
+- 713 cases across 22 XCTest methods passed, including expanded registry and
+  published-identity coverage. The immutable receipt is
+  [local-shadow-registry-20260910.json](local-shadow-registry-20260910.json).
+  It includes actual dependency source hashes and remains `cutoverEligible: false`.
+  Log: `/private/tmp/xpa012-shadow-registry-provenance-build.log`.
 
 - The 611-case implementation passed the complete-diff unified gate (exit 0):
   Swift full suite (2565 parallel tests plus six serialized timing/race tests),
@@ -136,9 +157,14 @@ GJ-1 re-pass and rollback evidence remain a later authorized cutover stage.
   [local-shadow-typed-manifests-20260910.json](local-shadow-typed-manifests-20260910.json).
   It retains `sourceDirty: true` and `cutoverEligible: false`.
   Log: `/private/tmp/xpa012-shadow-semantics-catalog.log`.
-- The actual SwiftPM ArkTrace checkout was read-only checked at the pinned
-  revision and had no tracked or untracked changes. Automated receipt checks
-  for that external source remain to be added.
+- The runner now verifies the actual SwiftPM ArkTrace checkout before and after
+  the comparisons. It requires the resolved revision and actual HEAD to match,
+  rejects dirty/untracked/ignored inputs, compares every tracked file with the
+  fixed Git tree, and records SHA-256 for all 370 checkout files. The two upstream
+  license files explicitly marked CRLF are verified with pinned-tree attributes
+  and their original checkout bytes are retained in the hash manifest.
+- Seven receipt/provenance integrity tests pass, including modified bytes hidden
+  behind a clean Git status, resolution mismatch and restricted CRLF conversion.
 
 - 579 cases across 19 XCTest methods passed after the Runtime audit field fix.
   Log: `/private/tmp/xpa012-shadow-runtime-audit-fixed.log`. Its source is superseded by the 611-case snapshot above.

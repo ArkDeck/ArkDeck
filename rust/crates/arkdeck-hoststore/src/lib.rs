@@ -15,7 +15,7 @@ pub use session_time::decode_session_timestamp;
 mod session;
 pub use session::decode_session_configuration;
 mod registry;
-pub use registry::{decode_bundles, decode_tools};
+pub use registry::{decode_bundles, decode_tool_identity, decode_tools};
 use serde_json::{Value, json};
 
 #[derive(Debug, PartialEq, Eq)]
