@@ -1,6 +1,6 @@
 {
   "catalogDigest": "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
-  "commit": "ee60e68667be050d05e13adb011a8f9fc9244072",
+  "commit": "a37097dd8f5e69a845833c474092c43702e22312",
   "contractIdentity": "8a662759721a2081e974306399997801246de4022047365c050107de5dce2912",
   "corpusFileCount": 97,
   "corpusMethodCounts": {
@@ -330,19 +330,19 @@
       "successes": 2
     },
     "runtime.storage.policy": {
-      "errors": 1,
-      "requests": 2,
-      "successes": 1
+      "errors": 2,
+      "requests": 4,
+      "successes": 2
     },
     "runtime.storage.root": {
-      "errors": 2,
-      "requests": 3,
-      "successes": 1
+      "errors": 3,
+      "requests": 6,
+      "successes": 3
     },
     "runtime.storage.status": {
       "errors": 1,
-      "requests": 2,
-      "successes": 1
+      "requests": 3,
+      "successes": 2
     },
     "runtime.tool.select": {
       "errors": 2,
@@ -491,16 +491,16 @@
     }
   },
   "corpusRecordCounts": {
-    "errors": 179,
-    "requests": 440,
-    "successes": 261
+    "errors": 181,
+    "requests": 446,
+    "successes": 265
   },
   "directoryDigests": {
     "Catalog/operations": "16671abf96551e9d5b9c3382fe4eb08f3fcd150cff68e7419634cd10ecda4bfd",
     "Catalog/profiles": "58ca1d970d40019ba2718646fde81fefda22533c5448e620217582e30f5d648f",
-    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "b82b4b7b82f655d8f66ba6dd53c6a78dd6e26526fcfefeb6f50b190152543889",
+    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "daf1d62485c8e238788c2d7f5ea9758f1350826643f13ca57bd82aa8bc0ae143",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC": "9ae93642e7b81bcea918469216711d7f6a17135a29cf021556ceef0f2f789196",
-    "spec/control/methods": "9824bde57f5c52dc688a6de4c331dd456a072d8759b137d4c2b6cb5b518160db"
+    "spec/control/methods": "76de4b447e95423bd48165259a8cf8aea58b59654905cb40e81f94c10e5ee604"
   },
   "files": {
     "Catalog/generated/effect-authorization-matrix.md": {
@@ -936,16 +936,16 @@
       "sha256": "651548df0929b61dc31e1a4574976c096ed18f4ec42afb067f6dc834f643a1ac"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/runtime.storage.policy.jsonl": {
-      "blob": "3768d699760e44c01eaa3a618f613b0efba9276f",
-      "sha256": "fc2951eb80d45765b299aafab30ce336088e75af56aaea2e4eaf29e1dad012d1"
+      "blob": "a00bb6ac05591ff65617a3d137afac0a45a1e568",
+      "sha256": "f178e1beba47d526ee535b7166300b625f113bf7e8ab03afffd8531f86930b77"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/runtime.storage.root.jsonl": {
-      "blob": "d4a972f99ba7ed0932e32a21f73b8c50ac19d17b",
-      "sha256": "85cfa364d3b6990fb90d19727e11b37c85c02eba1eb8d782d48cde76dbcdf7e7"
+      "blob": "170e6c8e96f3be8186f490274032d316db8746d6",
+      "sha256": "b3814354d41cfe241f4dc2924a4e247b2496ea80fdb4784a374440c0a2b7b0a8"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/runtime.storage.status.jsonl": {
-      "blob": "793b94526e2ea5bc1fa1a9bf33c67bbeb888acc6",
-      "sha256": "4a05dc6b73d8a5edafe2bfcddbf2866bb25087aff28990d8b89c372ad0805534"
+      "blob": "fd337ba721c856bf7ae455c85fcad94ecc81125a",
+      "sha256": "e1425a537fe2e6daeb04a5be452e502fbbe5ffdd76a8d422674f5b43a712262e"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/runtime.tool.select.jsonl": {
       "blob": "3b59e37efc2d22b3f6cffa051641b5ebb1164caf",
@@ -1500,16 +1500,16 @@
       "sha256": "be6778fd832c9aa1c6466c7ac79cd41f06db601d8fb18135a4fa15e74f867878"
     },
     "spec/control/methods/runtime.storage.policy.json": {
-      "blob": "4a8c008e0467339186abbead0f076b365a9fde5d",
-      "sha256": "4e4e13fe3f5201c015095b6867644ae01404ee2cf0102a86772a2235a0553d23"
+      "blob": "5025b3b5fff4254637b0328ba4137338c28bc81c",
+      "sha256": "fa15ca7573d2c975818b7af4e881a434d3a6713fe28f3785fe91326d992c0df2"
     },
     "spec/control/methods/runtime.storage.root.json": {
-      "blob": "ddb9ea06c38ac7c74fc625dd91620a1988cd74b4",
-      "sha256": "e4064c1f875bf7b28f6f3fb9fcbb601261da8fdb6bcbcb89d157411d78490e67"
+      "blob": "d0059122cf2672b49c602ad3eb22428137350280",
+      "sha256": "2268cdbc0cc4e14728d8c2e7811d2aa303bce123bdfb723ad5190296cfc82a20"
     },
     "spec/control/methods/runtime.storage.status.json": {
-      "blob": "0ee616ffc3dd230743f2520e94de2d0235ad4f8b",
-      "sha256": "74f075a6c4796e6a4200cfecb877454d63d381f2edb41a8a10bfc691c4f2cf33"
+      "blob": "672168ab42fbdb33a34d016efb4a8b2ce49e9356",
+      "sha256": "57eb90de25dbad28e071ba91319b01062f6f0b2eb7e9381a25056002e6864683"
     },
     "spec/control/methods/runtime.tool.select.json": {
       "blob": "44202fc748ff420b89167136e77d476e9e2cd395",
@@ -1628,7 +1628,7 @@
       "sha256": "155759d2eccc9183fff4eaa4244a5a99fe16d920cfc49058170c5bd4b29ca298"
     }
   },
-  "inputDigest": "b8b416e6286fffbbe09011ad8fcbe1327a0858e2ab73ca76c0525719c694ee8a",
+  "inputDigest": "2d1dc49277246d356b93d36c4833a6ba6776507fd8c8dc360540047491c94829",
   "kind": "development",
   "methodCount": 97,
   "protocolVersion": "1.0.0",
