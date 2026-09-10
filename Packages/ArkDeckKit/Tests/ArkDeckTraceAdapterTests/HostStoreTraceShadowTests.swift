@@ -7,6 +7,11 @@ import XCTest
 /// Actual Swift/Rust maintenance inventory over the same isolated filesystem.
 /// The fixture database is never executed or presented as a real parsed trace.
 final class HostStoreTraceShadowTests: XCTestCase {
+  private static let oracleBinarySHA256: String? = {
+    guard let file = Bundle(for: HostStoreTraceShadowTests.self).executableURL,
+      let bytes = try? Data(contentsOf: file) else { return nil }
+    return SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+  }()
   private var root: URL!
   private var cache: URL!
   private var binary: URL!
@@ -141,7 +146,8 @@ final class HostStoreTraceShadowTests: XCTestCase {
   private func record(_ name: String, input: Data, output: Data, outcome: String) throws {
     guard let path = ProcessInfo.processInfo.environment["ARKDECK_HOSTSTORE_SHADOW_RESULTS"] else { return }
     let report = ["case": name, "store": "trace-cache", "outcome": outcome,
-                  "inputSHA256": hash(input), "projectionSHA256": hash(output)]
+                  "inputSHA256": hash(input), "projectionSHA256": hash(output),
+                  "oracleBinarySHA256": try XCTUnwrap(Self.oracleBinarySHA256)]
     let bytes = try JSONSerialization.data(withJSONObject: report, options: [.sortedKeys])
     try bytes.write(to: URL(filePath: path).appending(path: name + ".json"), options: .withoutOverwriting)
   }

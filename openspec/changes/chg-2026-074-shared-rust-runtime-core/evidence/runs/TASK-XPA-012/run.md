@@ -174,3 +174,30 @@ The complete-diff unified gate after the Unicode adapter passed (exit 0):
 full Swift tests, App build-for-testing, design-system checks, Rust published
 and candidate checks, cargo deny, and cargo vet (25 audited). Log:
 `/private/tmp/xpa012-shadow-unicode-gate.log`. No installed Runtime was changed.
+
+### Session date and directory prerequisites (2026-09-10)
+
+Added the frozen Session timestamp grammar and Gregorian conversion, separate
+from the History/Trace formatter domains. Twenty real Swift/Rust vectors compare
+exact Double bit patterns or matching refusal: leap seconds, numeric offsets up
+to ±23:59, lowercase separators, fractional digits beyond nanosecond precision,
+reference epoch, historic Gregorian dates and year bounds. Conversion uses the
+macOS CoreFoundation Gregorian calendar in UTC, preserving the current owner's
+calendar behavior. The first test build failed because an internal Swift helper
+required `@testable import ArkDeckStorage`; the test import was corrected without
+changing production visibility or the frozen Storage module.
+
+The read-only filesystem adapter now has an explicit Session tree entry point:
+owner identity and no group/world write, with same-volume checks inherited by
+child directories and files. The private-cache entry point remains private.
+Five platform tests pass, including separate-process lock exclusion and the new
+read-permission/link refusal checks. All-target hoststore/platform Clippy passes.
+
+All 85 differential cases pass in
+`/private/tmp/xpa012-shadow-20260910-session-provenance.json` (log:
+`/private/tmp/xpa012-shadow-session-provenance.log`). Every case now pins its actual
+Swift XCTest executable; mixed oracle binaries are refused. The receipt records
+macOS, architecture, Swift, Rust and Xcode versions. Four receipt integrity tests
+pass. The new date vectors are prerequisites, not full Session status coverage:
+manifest validation, tree/catalog reconciliation and complete status comparison
+remain unfinished. The unified gate must be rerun after that implementation.

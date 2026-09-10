@@ -17,14 +17,22 @@ class ReceiptTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         for name, outcome in shadow.EXPECTED.items():
             store = {"history": "history-filter", "bundle": "bundle-registry",
-                     "tool": "tool-registry", "names": "display-names", "session": "session-configuration", "trace": "trace-cache"}[name.split("-", 1)[0]]
+                     "tool": "tool-registry", "names": "display-names", "session": "session-configuration", "trace": "trace-cache", "timestamp": "session-timestamp"}[name.split("-", 1)[0]]
             value = {"case": name, "store": store, "outcome": outcome,
-                     "inputSHA256": "a" * 64, "projectionSHA256": "b" * 64}
+                     "inputSHA256": "a" * 64, "projectionSHA256": "b" * 64, "oracleBinarySHA256": "c" * 64}
             (self.root / f"{name}.json").write_text(json.dumps(value))
 
     def test_requires_every_expected_case_exactly_once(self):
         self.assertEqual(len(shadow.validate_cases(self.root)), len(shadow.EXPECTED))
         (self.root / "history-maximum-generation.json").unlink()
+        with self.assertRaises(ValueError):
+            shadow.validate_cases(self.root)
+
+    def test_mixed_oracle_binaries_cannot_form_one_run(self):
+        path = self.root / "history-maximum-generation.json"
+        value = json.loads(path.read_text())
+        value["oracleBinarySHA256"] = "d" * 64
+        path.write_text(json.dumps(value))
         with self.assertRaises(ValueError):
             shadow.validate_cases(self.root)
 

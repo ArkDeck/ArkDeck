@@ -15,12 +15,15 @@ from datetime import datetime, timezone
 import hashlib
 import json
 import os
+import platform
 from pathlib import Path
 import subprocess
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 EXPECTED = {
+    **{f"timestamp-accepted-{i}": "equal" for i in range(10)},
+    **{f"timestamp-refused-{i}": "refused" for i in range(10)},
     **{f"history-{state}-{index}": "equal" for state in ("saved", "deleted") for index in range(3)},
     "history-maximum-generation": "equal",
     **{f"history-invalid-{name}": "refused" for name in (
@@ -93,16 +96,18 @@ def validate_cases(directory: Path) -> list[dict]:
     cases = []
     for path in files:
         case = json.loads(path.read_bytes())
-        if set(case) != {"case", "store", "outcome", "inputSHA256", "projectionSHA256"}:
+        if set(case) != {"case", "store", "outcome", "inputSHA256", "projectionSHA256", "oracleBinarySHA256"}:
             raise ValueError("unexpected case shape")
-        expected_store = {"history": "history-filter", "bundle": "bundle-registry", "tool": "tool-registry", "names": "display-names", "session": "session-configuration", "trace": "trace-cache"}[path.stem.split("-", 1)[0]]
+        expected_store = {"history": "history-filter", "bundle": "bundle-registry", "tool": "tool-registry", "names": "display-names", "session": "session-configuration", "trace": "trace-cache", "timestamp": "session-timestamp"}[path.stem.split("-", 1)[0]]
         if (case["case"] != path.stem or case["store"] != expected_store
                 or case["outcome"] != EXPECTED[path.stem]):
             raise ValueError("case identity or outcome mismatch")
-        for key in ("inputSHA256", "projectionSHA256"):
+        for key in ("inputSHA256", "projectionSHA256", "oracleBinarySHA256"):
             if len(case[key]) != 64 or any(c not in "0123456789abcdef" for c in case[key]):
                 raise ValueError("invalid digest")
         cases.append(case)
+    if len({case["oracleBinarySHA256"] for case in cases}) != 1:
+        raise ValueError("Swift oracle binary changed between cases")
     return cases
 
 
@@ -140,6 +145,17 @@ def main() -> int:
         "sourceDirty": bool(subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT)),
         "sourceDiffSHA256": digest(subprocess.check_output(["git", "diff", "HEAD", "--binary"], cwd=ROOT)),
         "binarySHA256": binary_hash,
+        "swiftOracleBinarySHA256": cases[0]["oracleBinarySHA256"],
+        "host": {"system": platform.system(), "version": platform.mac_ver()[0],
+                 "machine": platform.machine()},
+        "toolchains": {
+            "swift": subprocess.check_output([os.environ.get("ARKDECK_SWIFT_EXECUTABLE", "swift"), "--version"],
+                                             cwd=ROOT, text=True, timeout=30).strip(),
+            "rust": subprocess.check_output(["rustc", "--version", "--verbose"],
+                                            cwd=ROOT / "rust", text=True, timeout=30).strip(),
+            "xcode": subprocess.check_output(["xcodebuild", "-version"],
+                                             cwd=ROOT, text=True, timeout=30).strip(),
+        },
         "cases": cases,
         "coveredStores": ["history-filter", "bundle-registry", "tool-registry", "display-names", "session-configuration", "trace-cache"],
         "remainingStores": ["session-storage"],

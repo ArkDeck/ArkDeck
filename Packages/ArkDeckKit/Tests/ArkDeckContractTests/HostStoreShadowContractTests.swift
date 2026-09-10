@@ -1,3 +1,4 @@
+@testable import ArkDeckStorage
 import ArkDeckCore
 import Foundation
 import XCTest
@@ -9,6 +10,11 @@ import XCTest
 /// receives snapshot bytes over stdin. No installed daemon, target or Runtime
 /// state is used. Each comparison checks both durable bytes and read projection.
 final class HostStoreShadowContractTests: XCTestCase {
+  private static let oracleBinarySHA256: String? = {
+    guard let file = Bundle(for: HostStoreShadowContractTests.self).executableURL,
+      let bytes = try? Data(contentsOf: file) else { return nil }
+    return SHA256Hex.string(of: bytes)
+  }()
   private var root: URL!
   private var binary: URL!
 
@@ -251,6 +257,43 @@ final class HostStoreShadowContractTests: XCTestCase {
 
   }
 
+  func testSessionTimestampCalculationMatchesFrozenSwiftDecoder() throws {
+    let accepted = [
+      "2001-01-01T00:00:00Z", "2026-09-10T01:02:03.123456789123Z",
+      "2024-02-29T23:59:60.123+23:59", "2026-09-10t01:02:03z",
+      "0001-01-01T00:00:00Z", "9999-12-31T23:59:59.999999999Z",
+      "1582-10-10T00:00:00Z", "1500-02-28T00:00:00Z",
+      "2000-02-29T00:00:00-23:59", "2001-01-01T00:00:00.000000001Z",
+    ]
+    let refused = [
+      "0000-01-01T00:00:00Z", "2026-02-29T00:00:00Z", "2026-13-01T00:00:00Z",
+      "2026-09-10T24:00:00Z", "2026-09-10T01:60:00Z", "2026-09-10T01:02:61Z",
+      "2026-09-10T01:02:03+24:00", "2026-09-10T01:02:03.Z",
+      "2026-09-10T01:02:03Zextra", "2026-09-10T01:02:03+01:60",
+    ]
+    for (index, value) in accepted.enumerated() {
+      let date = try SessionManifestDocument.lockedTimestampDate(value, field: "shadow timestamp")
+      let input = try JSONEncoder().encode(value)
+      let result = try rust(input, kind: "session-timestamp")
+      XCTAssertEqual(result.status, 0, value)
+      let envelope = try XCTUnwrap(JSONSerialization.jsonObject(with: result.output) as? [String: Any])
+      let projection = try XCTUnwrap(envelope["projection"] as? [String: String])
+      XCTAssertEqual(projection["referenceSecondsBits"], String(date.timeIntervalSinceReferenceDate.bitPattern), value)
+      let output = try JSONSerialization.data(withJSONObject: projection, options: [.sortedKeys])
+      try record(name: "timestamp-accepted-\(index)", input: input, output: output,
+        outcome: "equal", store: "session-timestamp")
+    }
+    for (index, value) in refused.enumerated() {
+      XCTAssertThrowsError(try SessionManifestDocument.lockedTimestampDate(value, field: "shadow timestamp"), value)
+      let input = try JSONEncoder().encode(value)
+      let result = try rust(input, kind: "session-timestamp")
+      XCTAssertEqual(result.status, 65, value)
+      XCTAssertTrue(result.output.isEmpty)
+      try record(name: "timestamp-refused-\(index)", input: input, output: Data(),
+        outcome: "refused", store: "session-timestamp")
+    }
+  }
+
   func testSessionConfigurationPolicyRootAndRefusal() throws {
     let owner = root.appending(path: "owner")
     let sessions = root.appending(path: "sessions")
@@ -378,6 +421,7 @@ final class HostStoreShadowContractTests: XCTestCase {
     let report: [String: Any] = [
       "case": name, "store": store, "outcome": outcome,
       "inputSHA256": SHA256Hex.string(of: input), "projectionSHA256": SHA256Hex.string(of: output),
+      "oracleBinarySHA256": try XCTUnwrap(Self.oracleBinarySHA256),
     ]
     let data = try JSONSerialization.data(withJSONObject: report, options: [.sortedKeys])
     try data.write(to: URL(filePath: path).appending(path: name + ".json"), options: .withoutOverwriting)

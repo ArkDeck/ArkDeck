@@ -96,3 +96,43 @@ fn child_lock_probe() {
     let root = HostDirectory::open(&PathBuf::from(root)).unwrap();
     assert!(root.try_lock_existing("store.lock").unwrap().is_none());
 }
+
+#[test]
+fn session_tree_accepts_read_permissions_but_refuses_writable_or_linked_content() {
+    let fixture = Fixture::new();
+    fixture.file("record.json", b"session fixture");
+    fs::set_permissions(&fixture.0, fs::Permissions::from_mode(0o750)).unwrap();
+    fs::set_permissions(
+        fixture.0.join("record.json"),
+        fs::Permissions::from_mode(0o640),
+    )
+    .unwrap();
+    assert!(HostDirectory::open(&fixture.0).is_err());
+    let root = HostDirectory::open_session_tree(&fixture.0).unwrap();
+    assert_eq!(root.read("record.json", 100).unwrap(), b"session fixture");
+    assert_eq!(root.owned_kind_and_size("record.json").unwrap().1, 15);
+    fs::create_dir(fixture.0.join("child")).unwrap();
+    fs::set_permissions(fixture.0.join("child"), fs::Permissions::from_mode(0o755)).unwrap();
+    assert!(root.child("child").is_ok());
+    symlink(fixture.0.join("record.json"), fixture.0.join("alias")).unwrap();
+    assert!(root.owned_kind_and_size("alias").is_err());
+    assert!(root.read("alias", 100).is_err());
+    fs::hard_link(fixture.0.join("record.json"), fixture.0.join("hard")).unwrap();
+    assert!(root.owned_kind_and_size("hard").is_err());
+    fs::remove_file(fixture.0.join("hard")).unwrap();
+    for mode in [0o660, 0o606] {
+        fs::set_permissions(
+            fixture.0.join("record.json"),
+            fs::Permissions::from_mode(mode),
+        )
+        .unwrap();
+        assert!(root.owned_kind_and_size("record.json").is_err());
+        assert!(root.read("record.json", 100).is_err());
+    }
+    fs::set_permissions(&fixture.0, fs::Permissions::from_mode(0o770)).unwrap();
+    assert!(HostDirectory::open_session_tree(&fixture.0).is_err());
+    assert_eq!(
+        fs::read(fixture.0.join("record.json")).unwrap(),
+        b"session fixture"
+    );
+}
