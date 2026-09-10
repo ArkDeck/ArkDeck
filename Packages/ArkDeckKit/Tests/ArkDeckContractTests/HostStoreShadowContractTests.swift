@@ -1,6 +1,7 @@
 @testable import ArkDeckStorage
 import ArkDeckCore
 import Foundation
+import Darwin
 import XCTest
 
 @testable import ArkDeckWorkflows
@@ -257,6 +258,156 @@ final class HostStoreShadowContractTests: XCTestCase {
 
   }
 
+  func testSessionInventoryAndRetentionProjection() throws {
+    let owner = root.appending(path: "session-owner")
+    let sessions = root.appending(path: "session-tree")
+    let store = try RuntimeSessionStorageStore(ownerRoot: owner, defaultSessionsRoot: sessions)
+    _ = try store.updatePolicy(.init(totalQuotaBytes: 1_000_000, safetyMarginBytes: 100,
+      retentionDays: 7), expectedGeneration: 1)
+    let catalog = try SessionRetentionCatalog(sessionsRoot: sessions)
+    let config = owner.appending(path: "session-storage.json")
+    try compareSessionStatus("empty", store: store, config: config, sessions: sessions)
+    try FileManager.default.removeItem(at: sessions.appending(path: ".arkdeck-retention-catalog.json"))
+    try Data().write(to: sessions.appending(path: ".arkdeck-retention-catalog.lock"))
+    try compareSessionStatus("fresh-catalog", store: store, config: config, sessions: sessions, beforeReconciliation: true)
+    let first = try seedShadowSession(sessions: sessions, month: "01", id: "session-first",
+      timestamp: "2026-01-01T00:00:00.123456789Z", includeArtifacts: true)
+    try compareSessionStatus("unregistered", store: store, config: config, sessions: sessions)
+    try catalog.registerFinalizedSession(sessionRoot: first, retentionDays: 7, policyGeneration: 2)
+    try compareSessionStatus("registered", store: store, config: config, sessions: sessions)
+    _ = try catalog.updatePin(sessionID: "session-first", isPinned: true, expectedGeneration: 1)
+    try compareSessionStatus("pinned", store: store, config: config, sessions: sessions)
+    let second = try seedShadowSession(sessions: sessions, month: "02", id: "session-second",
+      timestamp: "2024-02-29T23:59:60.123+23:59")
+    try catalog.registerFinalizedSession(sessionRoot: second, retentionDays: 7, policyGeneration: 2)
+    try compareSessionStatus("leap-second", store: store, config: config, sessions: sessions)
+    let catalogFile = sessions.appending(path: ".arkdeck-retention-catalog.json")
+    let oldCatalog = try Data(contentsOf: catalogFile)
+    _ = try store.updatePolicy(.init(totalQuotaBytes: 1_000_000, safetyMarginBytes: 100,
+      retentionDays: 8), expectedGeneration: 2)
+    try oldCatalog.write(to: catalogFile)
+    try compareSessionStatus("reconcile-policy", store: store, config: config, sessions: sessions, beforeReconciliation: true)
+    let duplicateParent = sessions.appending(path: "2027/01")
+    try FileManager.default.createDirectory(at: duplicateParent, withIntermediateDirectories: true,
+      attributes: [.posixPermissions: 0o700])
+    let duplicate = duplicateParent.appending(path: "session-first")
+    try FileManager.default.copyItem(at: first, to: duplicate)
+    try compareSessionStatus("duplicate-identity", store: store, config: config, sessions: sessions)
+    try FileManager.default.removeItem(at: duplicate)
+    let backup = root.appending(path: "session-second-backup")
+    try FileManager.default.copyItem(at: second, to: backup)
+    try FileManager.default.removeItem(at: second)
+    try compareSessionStatus("reconcile-removed", store: store, config: config, sessions: sessions, beforeReconciliation: true)
+    try FileManager.default.copyItem(at: backup, to: second)
+    try catalog.registerFinalizedSession(sessionRoot: second, retentionDays: 8, policyGeneration: 3)
+    try Data("unscoped".utf8).write(to: sessions.appending(path: "loose.bin"))
+    try compareSessionStatus("unscoped", store: store, config: config, sessions: sessions)
+    try FileManager.default.removeItem(at: second)
+    try compareSessionStatus("unscoped-retains-missing", store: store, config: config, sessions: sessions, beforeReconciliation: true)
+    try FileManager.default.copyItem(at: backup, to: second)
+    let identity = first.appending(path: ".session-identity.json")
+    let originalIdentity = try Data(contentsOf: identity)
+    let mismatch: JSONValue = .object(["schemaVersion": .string("1.0.0"), "sessionId": .string("session-first"), "jobId": .string("job-mismatch")])
+    try CanonicalJSONEncoders.canonical().encode(mismatch).write(to: identity)
+    try compareSessionStatus("identity-mismatch", store: store, config: config, sessions: sessions)
+    try originalIdentity.write(to: identity)
+    let manifest = first.appending(path: "manifest.json")
+    let original = try Data(contentsOf: manifest)
+    for variant in ["artifact-hash-mismatch", "artifact-lineage-cycle", "artifact-invalid-path"] {
+      var document = try XCTUnwrap(JSONSerialization.jsonObject(with: original) as? [String: Any])
+      var artifacts = try XCTUnwrap(document["artifacts"] as? [[String: Any]])
+      switch variant {
+      case "artifact-hash-mismatch": artifacts[0]["sha256"] = String(repeating: "b", count: 64)
+      case "artifact-invalid-path": artifacts[0]["relativePath"] = "../payload.bin"
+      default:
+        artifacts[1]["derivedFrom"] = ["derived"]
+        artifacts[1]["origin"] = try DerivedArtifactProvenance(operation: "shadow.derive",
+          inputHashes: [try XCTUnwrap(artifacts[1]["sha256"] as? String)],
+          parameters: ["format": "text"], statistics: ["bytes": 15]).manifestOrigin()
+      }
+      document["artifacts"] = artifacts
+      try JSONSerialization.data(withJSONObject: document, options: [.sortedKeys, .withoutEscapingSlashes]).write(to: manifest)
+      try compareSessionStatus(variant, store: store, config: config, sessions: sessions)
+    }
+    try Data("{}".utf8).write(to: manifest)
+    try compareSessionStatus("corrupt-manifest", store: store, config: config, sessions: sessions)
+    try original.write(to: manifest)
+    let outside = root.appending(path: "original.bin")
+    try Data("original immutable fixture".utf8).write(to: outside)
+    let link = first.appending(path: "link")
+    try FileManager.default.createSymbolicLink(at: link, withDestinationURL: outside)
+    try compareSessionStatus("symlink", store: store, config: config, sessions: sessions)
+    try FileManager.default.removeItem(at: link)
+    let metadata = sessions.appending(path: ".arkdeck-retention-catalog.json")
+    var extra = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: metadata)) as? [String: Any])
+    extra["extra"] = true
+    try JSONSerialization.data(withJSONObject: extra, options: [.sortedKeys, .withoutEscapingSlashes]).write(to: metadata)
+    try compareSessionStatus("extra-catalog-field", store: store, config: config, sessions: sessions)
+    try Data("{}".utf8).write(to: metadata)
+    try compareSessionStatus("corrupt-catalog", store: store, config: config, sessions: sessions)
+    try FileManager.default.removeItem(at: metadata)
+    try compareSessionStatus("missing-catalog", store: store, config: config, sessions: sessions)
+  }
+
+  private func seedShadowSession(sessions: URL, month: String, id: String, timestamp: String, includeArtifacts: Bool = false) throws -> URL {
+    let directory = sessions.appending(path: "2026/" + month + "/" + id)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true,
+      attributes: [.posixPermissions: 0o700])
+    let identity: JSONValue = .object(["schemaVersion": .string("1.0.0"),
+      "sessionId": .string(id), "jobId": .string("job-" + id)])
+    try CanonicalJSONEncoders.canonical().encode(identity).write(to: directory.appending(path: ".session-identity.json"))
+    let payload = Data(repeating: 0x41, count: 33)
+    var artifacts: [ArtifactRecord] = []
+    if includeArtifacts {
+      let sourceHash = SHA256Hex.string(of: payload)
+      artifacts.append(try ArtifactRecord(id: "raw", role: .raw, origin: "shadow-fixture",
+        relativePath: "payload.bin", size: UInt64(payload.count), sha256: sourceHash))
+      let derived = Data("derived summary".utf8)
+      let provenance = try DerivedArtifactProvenance(operation: "shadow.derive", inputHashes: [sourceHash],
+        parameters: ["format": "text"], statistics: ["bytes": Int64(derived.count)])
+      artifacts.append(try ArtifactRecord(id: "derived", role: .derived, origin: provenance.manifestOrigin(),
+        relativePath: "derived.txt", size: UInt64(derived.count), sha256: SHA256Hex.string(of: derived),
+        mediaType: "text/plain", derivedFrom: ["raw"]))
+      try derived.write(to: directory.appending(path: "derived.txt"))
+    }
+    try SessionStorageFixtures.manifest(sessionID: id, jobID: "job-" + id, timestamp: timestamp, artifacts: artifacts)
+      .write(to: directory.appending(path: "manifest.json"))
+    try payload.write(to: directory.appending(path: "payload.bin"))
+    return directory
+  }
+
+  private func sessionSnapshot() throws -> Data {
+    var values: [[String: String]] = []
+    for path in try FileManager.default.subpathsOfDirectory(atPath: root.path).sorted() {
+      let file = root.appending(path: path)
+      let attributes = try FileManager.default.attributesOfItem(atPath: file.path)
+      let type = try XCTUnwrap(attributes[.type] as? FileAttributeType)
+      var row = ["path": path, "type": type.rawValue,
+        "mode": String(try XCTUnwrap(attributes[.posixPermissions] as? NSNumber).intValue)]
+      if type == .typeRegular { row["sha256"] = SHA256Hex.string(of: try Data(contentsOf: file)) }
+      if type == .typeSymbolicLink { row["link"] = try FileManager.default.destinationOfSymbolicLink(atPath: file.path) }
+      values.append(row)
+    }
+    return try JSONSerialization.data(withJSONObject: values, options: [.sortedKeys, .withoutEscapingSlashes])
+  }
+
+  private func compareSessionStatus(_ name: String, store: RuntimeSessionStorageStore, config: URL, sessions: URL, beforeReconciliation: Bool = false) throws {
+    // Swift may reconcile only these isolated fixtures. Rust then reads that
+    // concrete snapshot without rewriting the catalog, lock marker or payload.
+    let prepared = beforeReconciliation ? nil : try CanonicalJSONEncoders.canonical().encode(store.status().projection)
+    let before = try sessionSnapshot()
+    let physical = try XCTUnwrap(realpath(sessions.path, nil))
+    defer { free(physical) }
+    let result = try rust(Data(contentsOf: config), kind: "session-status", arguments: [String(cString: physical)])
+    XCTAssertEqual(result.status, 0, name)
+    let decoded = try JSONDecoder().decode(JSONValue.self, from: result.output)
+    let output = try CanonicalJSONEncoders.canonical().encode(decoded)
+    XCTAssertEqual(try sessionSnapshot(), before, name)
+    let expected = try prepared ?? CanonicalJSONEncoders.canonical().encode(store.status().projection)
+    XCTAssertEqual(output, expected, name)
+    try record(name: "inventory-" + name, input: before, output: output, outcome: "equal", store: "session-storage")
+  }
+
   func testSessionTimestampCalculationMatchesFrozenSwiftDecoder() throws {
     let accepted = [
       "2001-01-01T00:00:00Z", "2026-09-10T01:02:03.123456789123Z",
@@ -400,10 +551,10 @@ final class HostStoreShadowContractTests: XCTestCase {
     try record(name: name, input: original, output: projection, outcome: "equal", store: kind)
   }
 
-  private func rust(_ input: Data, kind: String = "history-filter") throws -> (status: Int32, output: Data) {
+  private func rust(_ input: Data, kind: String = "history-filter", arguments: [String] = []) throws -> (status: Int32, output: Data) {
     let process = Process()
     process.executableURL = binary
-    process.arguments = [kind]
+    process.arguments = [kind] + arguments
     let stdin = Pipe(), stdout = Pipe(), stderr = Pipe()
     process.standardInput = stdin; process.standardOutput = stdout; process.standardError = stderr
     try process.run()

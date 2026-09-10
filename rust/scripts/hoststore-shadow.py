@@ -22,6 +22,11 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 EXPECTED = {
+    **{f"inventory-{name}": "equal" for name in ("empty", "unregistered", "registered", "pinned", "leap-second",
+        "unscoped", "corrupt-manifest", "symlink", "corrupt-catalog", "missing-catalog",
+        "fresh-catalog", "reconcile-policy", "duplicate-identity", "reconcile-removed",
+        "unscoped-retains-missing", "identity-mismatch", "extra-catalog-field",
+        "artifact-hash-mismatch", "artifact-lineage-cycle", "artifact-invalid-path")},
     **{f"timestamp-accepted-{i}": "equal" for i in range(10)},
     **{f"timestamp-refused-{i}": "refused" for i in range(10)},
     **{f"history-{state}-{index}": "equal" for state in ("saved", "deleted") for index in range(3)},
@@ -46,6 +51,7 @@ EXPECTED = {
 INPUTS = [
     ".github/workflows/swift-slow-lanes.yml",
     "Packages/ArkDeckKit/Scripts/run-swiftpm.sh",
+    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/SessionStorage/SessionStorageFixtures.swift",
     "rust/scripts/test_hoststore_shadow.py",
     "rust/Cargo.lock", "rust/Cargo.toml", "rust/rust-toolchain.toml",
     "Packages/ArkDeckKit/Package.swift", "Packages/ArkDeckKit/Package.resolved",
@@ -98,7 +104,7 @@ def validate_cases(directory: Path) -> list[dict]:
         case = json.loads(path.read_bytes())
         if set(case) != {"case", "store", "outcome", "inputSHA256", "projectionSHA256", "oracleBinarySHA256"}:
             raise ValueError("unexpected case shape")
-        expected_store = {"history": "history-filter", "bundle": "bundle-registry", "tool": "tool-registry", "names": "display-names", "session": "session-configuration", "trace": "trace-cache", "timestamp": "session-timestamp"}[path.stem.split("-", 1)[0]]
+        expected_store = {"history": "history-filter", "bundle": "bundle-registry", "tool": "tool-registry", "names": "display-names", "session": "session-configuration", "trace": "trace-cache", "timestamp": "session-timestamp", "inventory": "session-storage"}[path.stem.split("-", 1)[0]]
         if (case["case"] != path.stem or case["store"] != expected_store
                 or case["outcome"] != EXPECTED[path.stem]):
             raise ValueError("case identity or outcome mismatch")
@@ -159,7 +165,7 @@ def main() -> int:
         "cases": cases,
         "coveredStores": ["history-filter", "bundle-registry", "tool-registry", "display-names", "session-configuration", "trace-cache"],
         "remainingStores": ["session-storage"],
-        "remainingCoverage": ["Session inventory/retention/full status", "full semantic refusal parity", "tool published identity/selection", "filesystem ownership and cutover"],
+        "remainingCoverage": ["complete Session manifest branches and scan failure matrix", "full semantic refusal parity", "tool published identity/selection", "filesystem ownership and cutover"],
         "cutoverEligible": False,
         # These are provenance hints, not trusted approval or seven-day proof.
         "actions": {key: os.environ.get(key) for key in (

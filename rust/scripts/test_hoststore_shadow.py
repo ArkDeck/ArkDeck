@@ -17,7 +17,7 @@ class ReceiptTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         for name, outcome in shadow.EXPECTED.items():
             store = {"history": "history-filter", "bundle": "bundle-registry",
-                     "tool": "tool-registry", "names": "display-names", "session": "session-configuration", "trace": "trace-cache", "timestamp": "session-timestamp"}[name.split("-", 1)[0]]
+                     "tool": "tool-registry", "names": "display-names", "session": "session-configuration", "trace": "trace-cache", "timestamp": "session-timestamp", "inventory": "session-storage"}[name.split("-", 1)[0]]
             value = {"case": name, "store": store, "outcome": outcome,
                      "inputSHA256": "a" * 64, "projectionSHA256": "b" * 64, "oracleBinarySHA256": "c" * 64}
             (self.root / f"{name}.json").write_text(json.dumps(value))

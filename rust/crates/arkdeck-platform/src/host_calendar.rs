@@ -32,6 +32,19 @@ unsafe extern "C" {
         bigger: usize,
         at: f64,
     ) -> Range;
+    fn CFCalendarAddComponents(
+        calendar: *const c_void,
+        at: *mut f64,
+        options: usize,
+        description: *const i8,
+        ...
+    ) -> u8;
+    fn CFCalendarDecomposeAbsoluteTime(
+        calendar: *const c_void,
+        at: f64,
+        description: *const i8,
+        ...
+    ) -> u8;
     fn CFRelease(object: *const c_void);
 }
 
@@ -108,5 +121,46 @@ pub fn host_gregorian_seconds(
             return None;
         }
         Some(seconds)
+    }
+}
+
+/// The current retention catalog adds Gregorian days in UTC and rejects dates
+/// that its four-digit-year formatter cannot publish.
+pub fn host_gregorian_add_days(at: f64, days: i32) -> Option<f64> {
+    if !at.is_finite() || days <= 0 {
+        return None;
+    }
+    // SAFETY: create-rule objects are guarded; C varargs match d (int) and
+    // y (int*) descriptors. No pointer escapes this function.
+    unsafe {
+        let calendar = CFCalendarCreateWithIdentifier(std::ptr::null(), kCFGregorianCalendar);
+        if calendar.is_null() {
+            return None;
+        }
+        let calendar = Owned(calendar);
+        let zone = CFTimeZoneCreateWithTimeIntervalFromGMT(std::ptr::null(), 0.0);
+        if zone.is_null() {
+            return None;
+        }
+        let zone = Owned(zone);
+        CFCalendarSetTimeZone(calendar.0.cast_mut(), zone.0);
+        let mut result = at;
+        if CFCalendarAddComponents(calendar.0, &mut result, 0, c"d".as_ptr(), days) == 0
+            || !result.is_finite()
+        {
+            return None;
+        }
+        let mut whole = result.floor();
+        if ((result - whole) * 1_000_000_000.0).round() == 1_000_000_000.0 {
+            whole += 1.0;
+        }
+        let mut year = 0_i32;
+        if CFCalendarDecomposeAbsoluteTime(calendar.0, whole, c"y".as_ptr(), &mut year as *mut i32)
+            == 0
+            || !(1..=9999).contains(&year)
+        {
+            return None;
+        }
+        Some(result)
     }
 }

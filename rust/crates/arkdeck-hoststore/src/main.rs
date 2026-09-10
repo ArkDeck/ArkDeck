@@ -4,6 +4,39 @@ use std::io::{self, Read, Write};
 fn main() {
     let args: Vec<_> = std::env::args().skip(1).collect();
     #[cfg(target_os = "macos")]
+    if args.len() == 2 && args[0] == "session-status" {
+        let mut input = Vec::new();
+        if io::stdin()
+            .take(64 * 1024 + 1)
+            .read_to_end(&mut input)
+            .is_err()
+        {
+            std::process::exit(74);
+        }
+        let projection =
+            match arkdeck_hoststore::session_inventory(&input, std::path::Path::new(&args[1])) {
+                Ok(value) => value,
+                Err(error) => {
+                    eprintln!(
+                        "{}",
+                        if error.kind() == io::ErrorKind::Unsupported {
+                            "Session shadow coverage incomplete"
+                        } else {
+                            "Session snapshot refused"
+                        }
+                    );
+                    std::process::exit(65);
+                }
+            };
+        let mut bytes =
+            arkdeck_contract::canonical_json(&projection).expect("string-valued counts");
+        bytes.push(b'\n');
+        if io::stdout().write_all(&bytes).is_err() {
+            std::process::exit(74);
+        }
+        return;
+    }
+    #[cfg(target_os = "macos")]
     if args.len() == 2 && args[0] == "trace-cache" {
         let projection = match arkdeck_hoststore::trace_inventory(std::path::Path::new(&args[1])) {
             Ok(projection) => projection,

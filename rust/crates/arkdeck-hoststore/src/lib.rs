@@ -223,3 +223,10 @@ mod tests {
 mod trace;
 #[cfg(target_os = "macos")]
 pub use trace::trace_inventory;
+
+#[cfg(target_os = "macos")]
+mod session_inventory;
+#[cfg(target_os = "macos")]
+mod session_manifest;
+#[cfg(target_os = "macos")]
+pub use session_inventory::session_inventory;

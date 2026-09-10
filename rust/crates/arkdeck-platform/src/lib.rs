@@ -115,4 +115,4 @@ pub use host_text::{host_canonical_text, host_control_character, host_whitespace
 #[cfg(target_os = "macos")]
 mod host_calendar;
 #[cfg(target_os = "macos")]
-pub use host_calendar::host_gregorian_seconds;
+pub use host_calendar::{host_gregorian_add_days, host_gregorian_seconds};

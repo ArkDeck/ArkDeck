@@ -1,203 +1,109 @@
-# TASK-XPA-012 host-store shadow implementation — 2026-09-10
+# TASK-XPA-012 — host-store shadow work
 
-Status: in progress. No owner switch or TASK-XPA-012 acceptance is claimed.
-Base: `eae27c6b97c2d9e5d67c8eee2d9353f2c0d38b93` (protected main).
-Branch: `agent/xpa-012-hoststore-shadow-20260910`.
-Readiness pins: the base above and RuntimeSessionStorageStore blob `5d4f994d33f8054c9cb6988aeaa94b0be7ce16ab`;
-the same real pins are in the Task section.
+Status: **in progress**. The Rust candidate is not installed or connected to the
+façade. No Swift store owner has been disabled. No qualifying nightly day,
+cutover, rollback, GJ-1 or hardware acceptance is claimed.
 
-## Delivered locally so far
+## Scope and baseline
 
-- An offline `arkdeck-hoststore` Rust crate consumes bounded snapshot bytes over
-  stdin and returns frozen document bytes plus read projections. It has no
-  transport, device, capability or filesystem writer and is not linked into
-  the facade. Only existing third-party dependencies are used.
-- Real Swift History, display-name and bootstrap bundle/tool owners create and
-  read isolated test stores. The harness compares their outputs with the Rust
-  decoder, replaces only the test copy with Rust-produced bytes, and reads it
-  back through the actual Swift owner. Tool fixtures are inspected, never run;
-  bundle trust injection applies only to non-executable test bytes.
-- History and display-name readers now reject extra/duplicate JSON keys rather
-  than silently dropping them. No CodingKey, schema, writer byte format, lock
-  name or permission changes. History's existing whitespace/order tolerance
-  remains. Both readers retain the original bytes on refusal.
-- The Python runner requires the complete declared case set and successful
-  Swift execution before exclusively publishing a digest-only receipt. It pins
-  relevant source and binary hashes and records actual timestamps/Actions
-  provenance hints. It cannot backdate a run or count a local run as a nightly.
-  Receipts explicitly say `cutoverEligible: false` and enumerate remaining work.
+The workflow scope supplement was reviewed and merged through
+[PR #1839](https://github.com/ArkDeck/ArkDeck/pull/1839) at
+`7b43ea0fabb697e5d0550df5d2a6b8264410362f`; see [scope.md](scope.md).
+The Task readiness pins retain the protected-main implementation baseline
+`eae27c6b97c2d9e5d67c8eee2d9353f2c0d38b93`. Each run additionally hashes its actual
+source files and candidate binary. The pinned ArkTrace dependency revision is
+`c85731b0f903261bd69cf789027774fde615c8de` in Package.resolved.
 
-## Actual checks and limits
+The implementation remains local on `agent/xpa-012-hoststore-shadow-20260910`.
+There is no implementation PR yet: the remaining harness coverage below must be
+completed before presenting it for review.
 
-| Check | Exit | Result |
-| --- | --- | --- |
-| `cargo test -p arkdeck-hoststore` in `rust/` | 0 | Two Rust decoder tests, including duplicate/extra/null fields and UInt64 bounds |
-| Initial Swift/Rust History differential | 1 | Positive byte/projection cases passed; two extra-field assertions exposed the Swift reader gap |
-| `run-swiftpm.sh test -j 4 --filter 'HostStoreShadowContractTests|RuntimeHistoryFilterStoreContractTests'` with Rust binary | 0 | Six tests passed after strict-reader fix |
-| `python3 rust/scripts/hoststore-shadow.py --output /private/tmp/xpa012-shadow-20260910-registries.json` | 0 | 19 cases: History + bundle/tool metadata/projections |
-| Same runner, `--output /private/tmp/xpa012-shadow-20260910-names.json` | 0 | 24 cases, five XCTest methods; adds target/candidate names and tombstones |
-| `python3 -m unittest discover -s rust/scripts -p test_hoststore_shadow.py` | 0 | Receipt completeness, store identity and outcome checks |
+## Implemented comparisons
 
-Local logs: `/private/tmp/xpa012-history-shadow.log`,
-`/private/tmp/xpa012-history-shadow-fixed.log`,
-`/private/tmp/xpa012-shadow-registries.log`, `/private/tmp/xpa012-shadow-names.log`.
-These are development host checks, not hardware or seven-day shadow evidence.
-The final unified gate is recorded when the complete implementation is ready.
+`rust/scripts/hoststore-shadow.py` runs the actual Swift store readers against
+Rust using fresh test-owned directories. Document candidates receive bounded
+snapshot bytes through stdin. Trace and Session inventory candidates read one
+explicit physical fixture root through descriptor-relative, no-follow access.
+All filesystem comparisons check snapshots before and after Rust reads. The
+Swift oracle may initialize or reconcile only its isolated fixtures.
 
-## Coverage still required before the harness PR
+| Surface | Cases | Current comparison |
+| --- | ---: | --- |
+| History filter | 19 | Durable bytes, list projection, generations, strict fields, enum/text refusal |
+| Display names | 24 | Target/candidate projections, tombstones, ordering, identity and staged-name consistency |
+| Bundle registry | 5 | Available/retained/removed metadata and extra-field refusal |
+| Tool registry | 5 | Unregistered-tool metadata and extra-field refusal |
+| Session configuration | 5 | Policy/custom-root/full-width values and strict canonical fields |
+| Session timestamps | 20 | Exact Swift Date Double bits or matching refusal |
+| Session status | 20 | Actual used/pinned bytes, counts, catalog generations and incomplete measurement |
+| Trace cache | 7 | Actual Swift adapter inventory, missing metadata, key/lease contention and unsafe entries |
 
-- Session storage/policy and Trace cache snapshots/projections.
-- Full semantic refusal parity (including timestamps, Unicode, sorted indexes,
-  identity validation), selected/published tool identity cases, and additional
-  nested/optional-key vectors. Current Rust decoders are not production admission.
-- Lock contention/CAS and filesystem boundary tests; the offline byte adapter
-  does not yet prove a future Rust store owner's lock or write discipline.
-- Complete input/source pinning, scheduled job integration and seven actual
-  nightly days. Local day count is zero. The complete implementation's unified
-  gate, preflight and PR remain outstanding.
+The 105-case receipt is preserved unchanged in
+[local-shadow-20260910.json](local-shadow-20260910.json). It identifies itself as
+an isolated host differential with `sourceDirty: true` and `cutoverEligible:
+false`; its per-file hashes describe the tested local snapshot. It contains no
+raw filter strings, display names, payload bytes or hardware claims. Each case
+pins the actual Swift XCTest executable; the runner rejects missing cases,
+unexpected outcomes, invalid hashes or mixed oracle binaries. macOS,
+architecture, Swift, Rust and Xcode versions are recorded.
 
-## Scope and review
+History and display-name Swift readers gained duplicate/extra-field checks to
+meet the frozen field-set requirement. Their writers and durable keys were not
+changed. macOS Unicode handling uses the same immutable CoreFoundation control
+and whitespace sets as Foundation. Canonical-equivalence keys match Swift String
+equality while preserving original durable spellings and embedded NUL in bounded
+candidate identifiers.
 
-The actual path checker refused `.github/workflows/swift-slow-lanes.yml` under
-012 while accepting the Rust crate/scripts and Swift tests. Scope-only PR
-[#1839](https://github.com/ArkDeck/ArkDeck/pull/1839) adds that one nightly path.
-It passed selected local checks and hosted checks and is open for maintainer
-review. No workflow is modified on this branch before that scope lands.
-The scoped two-PR harness/cutover delivery follows the current handoff request;
-no separate status/readiness PR is created.
+The Session scanner measures the actual tree, validates identity and supported
+manifest branches, joins the retention catalog, and predicts initialization,
+policy reconciliation and removal without writing. Cases cover registered and
+unregistered Sessions, pinning, duplicate identity, unscoped content, corrupt or
+missing metadata, identity mismatch, and symlinks. Selected comparisons run Rust
+before Swift reconciliation and compare the resulting full status afterward.
+The Session filesystem entry point preserves owner/no-group-or-world-write and
+same-volume rules; the private Trace entry point keeps its stricter permissions.
 
-## Cutover and hardware ledger
+Session date conversion preserves the frozen grammar, leap seconds, offsets up
+to ±23:59, arbitrary fractional precision with the current nanosecond truncation,
+and Gregorian calendar behavior. Manifest artifact checks include typed derived
+provenance, canonical Base64, path/size/hash constraints, source-hash matching,
+unique lineage and cycle detection. These only interpret fixture records; they
+confer no Runtime authority or tool trust.
 
-XPA-AC-1 is partial; XPA-AC-7 and XPA-AC-9 have not run for the owner change.
-Cutover preflight blocking/parked sets, snapshot receipt, rollback/App smoke,
-and GJ-1 re-pass are NOT_STARTED: this branch does not change ownership or
-install a daemon. No Runtime state, credentials, device binding or hardware
-evidence has been modified. There are no new device Job IDs. No higher task or
-Windows work has started. The current installed helper pair is not assumed;
-its typed service status must be read immediately before any authorized cutover.
+## Remaining work before harness review
 
+- Complete manifest Steps, parameters, compensations, confirmations, Runtime
+  Provider audit and recovery branches, plus complex Foundation canonical JSON.
+  Unsupported branches currently stop the entire comparison explicitly; they
+  are never reported as corrupt or unaccounted Sessions.
+- Finish the Session scan failure matrix and root/configuration stability checks.
+- Complete History/display-name timestamp refusal, registry semantic validation,
+  published tool identity/selection and remaining Trace metadata compatibility.
+- Verify actual dependency checkout provenance and finalize the complete nightly
+  corpus. The nightly job is wired locally but has not been pushed or run.
+- Run the final unified gate and committed preflight on the complete harness.
 
-## Continued implementation after scope merge
+After harness review/merge, seven actual scheduled nightly days must be matched
+to Actions provenance before owner cutover. Local runs, manual dispatch and
+retries cannot manufacture those days. Owner/CAS/crash-window work, UI assertions,
+GJ-1 re-pass and rollback evidence remain a later authorized cutover stage.
 
-PR #1839 merged by the maintainer at `7b43ea0fabb697e5d0550df5d2a6b8264410362f`.
-The local foundation checkpoint was rebased onto that main; it is not an
-implementation PR. The original 16-file development diff completed the unified
-local gate with exit 0 (`/private/tmp/xpa012-shadow-development-gate.log`): Swift
-suite, App build-for-testing, design-system checks, published/candidate Rust
-contract lanes, cargo deny and cargo vet (25 audited dependencies) passed.
-Subsequent implementation below requires its own final gate before submission.
+## Validation so far
 
-- Session configuration now compares actual policy/root/generation output and
-  exact document bytes, including Int64.max quota and extra-key rejection.
-  The 29-case wrapper run exited 0, `/private/tmp/xpa012-shadow-session.log`.
-  Full Session inventory/retention is still outstanding; configuration equality
-  does not claim full status parity. Swift status can mutate its retention
-  catalog, so it runs only in prepared isolated fixture roots.
-- A macOS descriptor-relative reader opens bounded files/directories and existing
-  locks without creating or writing them. Symlink/hardlink/permission refusal,
-  read/enumeration bounds, missing-lock non-creation and cross-process exclusion
-  pass in `cargo test -p arkdeck-platform --test host_store` (4 tests including
-  the child probe); clippy passed for hoststore/platform with all targets.
-- Rust Trace inventory reads the same isolated cache as the real ArkTrace
-  maintenance adapter. Empty, unaccounted, Ready/inactive, key contention,
-  lease contention, entry symlink and enumeration overflow comparisons pass.
-  The resulting complete wrapper run has 36 cases and eight XCTest methods,
-  exit 0; `/private/tmp/xpa012-shadow-trace-fixed2.log` and
-  `/private/tmp/xpa012-shadow-20260910-trace-fixed2.json`.
-- Earlier Trace fixture runs failed before inventory because Foundation only
-  canonicalizes `/private/tmp` to `/tmp` after the directory exists. A standalone
-  temporary-directory probe reproduced it. The fixture now standardizes after
-  creation and passes its POSIX physical root to Rust; no product path guard was
-  relaxed. The failed runs published no receipt.
+- 105 cases across 11 XCTest methods passed. Latest execution log:
+  `/private/tmp/xpa012-shadow-session-artifacts.log`.
+- Four receipt integrity tests, five filesystem/lock tests and hoststore/platform
+  all-target Clippy passed. One Clippy style finding was fixed using `as_chunks`.
+- Earlier full unified gates passed through the 65-case implementation, including
+  Swift, App build-for-testing, design-system and published/candidate Rust lanes,
+  cargo deny and cargo vet (25 audited).
+- The expanded Session implementation also passed the complete-diff unified
+  gate (exit 0), including all selected lanes and cargo vet (25 audited). Log:
+  `/private/tmp/xpa012-shadow-session-gate.log`.
 
-The Trace snapshot reader is not a purge implementation. Its acceptance still
-needs full Foundation timestamp spellings and metadata/permission failure
-parity. The pinned ArkTrace reader currently tolerates unknown metadata keys;
-this fact is not silently converted into strict-decoder acceptance. Session
-full status and the other semantic/owner gates above remain open. No daemon
-was installed, no production state was read or changed, and nightly day count
-remains zero.
-
-### Semantic refusal coverage and nightly wiring (2026-09-10)
-
-The real Swift/Rust differential now passes 49 named cases across nine XCTest
-methods, including 13 additional refusals: unsupported History enums, bounded
-search/identity fields, control characters, unordered/duplicate display-name
-indexes, and incomplete or mismatched staged target references. Every new
-refusal checks original document bytes remain unchanged. Receipt:
-`/private/tmp/xpa012-shadow-20260910-semantics.json`; log:
-`/private/tmp/xpa012-shadow-semantics.log`. After this run, a Clippy style finding
-was fixed without changing the condition; hoststore/platform all-target Clippy
-passes with warnings denied. Receipt completeness tests pass (3 tests).
-
-The scope supplement was merged in PR #1839. The authorized workflow now has
-an independent macOS shadow job using pinned toolchains and the repository's
-SwiftPM runner, with digest receipts and diagnostics archived for 90 days.
-Existing jobs, triggers and permissions are unchanged. This wiring is local
-and unpushed; no scheduled run or qualifying nightly day is claimed. Receipts
-still explicitly report incomplete coverage and `cutoverEligible: false`.
-The source manifest now also pins the workflow, SwiftPM runner and receipt tests.
-A fresh complete-diff unified gate remains required after implementation work.
-
-The expanded complete-diff unified local gate subsequently passed (exit 0),
-including full Swift tests, App build-for-testing, design-system checks,
-published/candidate Rust contract checks, cargo deny and cargo vet (25 audited).
-Log: `/private/tmp/xpa012-shadow-expanded-gate.log`.
-A new differential run after the Clippy and source-manifest edits passed all
-49 cases, with current source fingerprints in
-`/private/tmp/xpa012-shadow-20260910-expanded-final.json` (log beside it as
-`/private/tmp/xpa012-shadow-expanded-final.log`). These are local results;
-no nightly-day, owner-cutover, rollback or hardware acceptance claim is made.
-
-### Identity and Unicode parity (2026-09-10)
-
-The candidate now validates target identifiers, candidate/observation byte
-bounds, the Swift owner's newline-delimited composite-key collisions, display
-name bounds and boundary whitespace. macOS text predicates use the immutable
-CoreFoundation Cc/Cf and whitespace/newline sets, matching the Foundation owner
-without invoking any Swift process. Canonical-equivalence keys preserve Swift
-String duplicate detection and staged-name equality; persisted bytes retain
-the original spelling. Embedded NUL in bounded candidate identity is preserved,
-not silently truncated by a C-string conversion. The SDK's CFCharacterSet.h and
-CFString.h define the ABI and constants used by this read-only platform adapter.
-
-Actual differential runs passed 55 identity cases, then 62 Unicode cases and
-65 cases with canonical duplicates, staged equivalent spellings and embedded
-NUL. The latest receipt is
-`/private/tmp/xpa012-shadow-20260910-canonical.json`, with log
-`/private/tmp/xpa012-shadow-canonical.log`. All-target hoststore/platform Clippy
-passes with warnings denied; the three Rust hoststore unit tests and three
-receipt completeness tests also pass. These checks do not close the remaining
-Session inventory/retention, timestamp, registry semantics or cutover gates.
-
-The complete-diff unified gate after the Unicode adapter passed (exit 0):
-full Swift tests, App build-for-testing, design-system checks, Rust published
-and candidate checks, cargo deny, and cargo vet (25 audited). Log:
-`/private/tmp/xpa012-shadow-unicode-gate.log`. No installed Runtime was changed.
-
-### Session date and directory prerequisites (2026-09-10)
-
-Added the frozen Session timestamp grammar and Gregorian conversion, separate
-from the History/Trace formatter domains. Twenty real Swift/Rust vectors compare
-exact Double bit patterns or matching refusal: leap seconds, numeric offsets up
-to ±23:59, lowercase separators, fractional digits beyond nanosecond precision,
-reference epoch, historic Gregorian dates and year bounds. Conversion uses the
-macOS CoreFoundation Gregorian calendar in UTC, preserving the current owner's
-calendar behavior. The first test build failed because an internal Swift helper
-required `@testable import ArkDeckStorage`; the test import was corrected without
-changing production visibility or the frozen Storage module.
-
-The read-only filesystem adapter now has an explicit Session tree entry point:
-owner identity and no group/world write, with same-volume checks inherited by
-child directories and files. The private-cache entry point remains private.
-Five platform tests pass, including separate-process lock exclusion and the new
-read-permission/link refusal checks. All-target hoststore/platform Clippy passes.
-
-All 85 differential cases pass in
-`/private/tmp/xpa012-shadow-20260910-session-provenance.json` (log:
-`/private/tmp/xpa012-shadow-session-provenance.log`). Every case now pins its actual
-Swift XCTest executable; mixed oracle binaries are refused. The receipt records
-macOS, architecture, Swift, Rust and Xcode versions. Four receipt integrity tests
-pass. The new date vectors are prerequisites, not full Session status coverage:
-manifest validation, tree/catalog reconciliation and complete status comparison
-remain unfinished. The unified gate must be rerun after that implementation.
+Initial differential failures exposed extra-field acceptance in Swift and were
+fixed in the readers. Trace fixture initialization initially failed because
+Foundation normalizes `/private/tmp` after directory creation; fixture path
+handling was corrected without relaxing production guards. The Session timestamp
+test initially needed `@testable import ArkDeckStorage`; no production visibility
+or frozen Storage source was changed. No device operation was run.
