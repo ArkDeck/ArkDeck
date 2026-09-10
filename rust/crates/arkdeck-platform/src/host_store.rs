@@ -1,0 +1,213 @@
+//! Descriptor-relative, bounded, read-only snapshots for host-store migration.
+//! No file, directory or lock is created by this module.
+use std::ffi::{CStr, CString};
+use std::fs::{File, OpenOptions};
+use std::io::{self, Read};
+use std::os::fd::{AsRawFd, FromRawFd};
+use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
+use std::path::Path;
+
+pub struct HostDirectory(File);
+pub struct HostReadLock {
+    _file: File,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum HostEntryKind {
+    Directory,
+    Regular,
+    Other,
+}
+
+fn fail() -> io::Error {
+    io::Error::new(io::ErrorKind::InvalidData, "host snapshot refused")
+}
+fn segment(name: &str) -> io::Result<CString> {
+    if name.is_empty() || name == "." || name == ".." || name.contains('/') {
+        return Err(fail());
+    }
+    CString::new(name).map_err(|_| fail())
+}
+fn owned(file: &File, directory: bool) -> io::Result<()> {
+    let stat = file.metadata()?;
+    if stat.uid() != unsafe { libc::geteuid() }
+        || stat.mode() & 0o077 != 0
+        || (directory && !stat.is_dir())
+        || (!directory && (!stat.is_file() || stat.nlink() != 1))
+    {
+        return Err(fail());
+    }
+    Ok(())
+}
+
+impl HostDirectory {
+    pub fn open(path: &Path) -> io::Result<Self> {
+        if !path.is_absolute() || path.canonicalize()? != path {
+            return Err(fail());
+        }
+        let file = OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+            .open(path)?;
+        owned(&file, true)?;
+        Ok(Self(file))
+    }
+
+    pub fn child(&self, name: &str) -> io::Result<Self> {
+        let file = self.open_at(name, libc::O_DIRECTORY)?;
+        owned(&file, true)?;
+        Ok(Self(file))
+    }
+
+    fn open_at(&self, name: &str, flags: i32) -> io::Result<File> {
+        let name = segment(name)?;
+        let fd = unsafe {
+            libc::openat(
+                self.0.as_raw_fd(),
+                name.as_ptr(),
+                libc::O_RDONLY | libc::O_CLOEXEC | libc::O_NOFOLLOW | libc::O_NONBLOCK | flags,
+            )
+        };
+        if fd < 0 {
+            return Err(io::Error::last_os_error());
+        }
+        Ok(unsafe { File::from_raw_fd(fd) })
+    }
+
+    pub fn names(&self, maximum: usize) -> io::Result<Vec<String>> {
+        // A separate open description gives each enumeration its own offset.
+        let fd = unsafe {
+            libc::openat(
+                self.0.as_raw_fd(),
+                c".".as_ptr(),
+                libc::O_RDONLY | libc::O_DIRECTORY | libc::O_CLOEXEC | libc::O_NOFOLLOW,
+            )
+        };
+        if fd < 0 {
+            return Err(io::Error::last_os_error());
+        }
+        let directory = unsafe { libc::fdopendir(fd) };
+        if directory.is_null() {
+            let error = io::Error::last_os_error();
+            unsafe {
+                libc::close(fd);
+            }
+            return Err(error);
+        }
+        struct Close(*mut libc::DIR);
+        impl Drop for Close {
+            fn drop(&mut self) {
+                unsafe {
+                    libc::closedir(self.0);
+                }
+            }
+        }
+        let _close = Close(directory);
+        let mut names = Vec::new();
+        loop {
+            unsafe {
+                *libc::__error() = 0;
+            }
+            let entry = unsafe { libc::readdir(directory) };
+            if entry.is_null() {
+                if unsafe { *libc::__error() } != 0 {
+                    return Err(io::Error::last_os_error());
+                }
+                break;
+            }
+            let name = unsafe { CStr::from_ptr((*entry).d_name.as_ptr()) }
+                .to_str()
+                .map_err(|_| fail())?;
+            if name == "." || name == ".." {
+                continue;
+            }
+            if names.len() >= maximum {
+                return Err(fail());
+            }
+            names.push(name.to_owned());
+        }
+        names.sort();
+        Ok(names)
+    }
+
+    pub fn kind_and_size(&self, name: &str) -> io::Result<(HostEntryKind, i64)> {
+        let stat = self.stat_at(name)?;
+        let kind = match stat.st_mode & libc::S_IFMT {
+            libc::S_IFDIR => HostEntryKind::Directory,
+            libc::S_IFREG => HostEntryKind::Regular,
+            _ => HostEntryKind::Other,
+        };
+        Ok((kind, stat.st_size))
+    }
+
+    fn stat_at(&self, name: &str) -> io::Result<libc::stat> {
+        let name = segment(name)?;
+        let mut stat = std::mem::MaybeUninit::<libc::stat>::uninit();
+        if unsafe {
+            libc::fstatat(
+                self.0.as_raw_fd(),
+                name.as_ptr(),
+                stat.as_mut_ptr(),
+                libc::AT_SYMLINK_NOFOLLOW,
+            )
+        } != 0
+        {
+            return Err(io::Error::last_os_error());
+        }
+        Ok(unsafe { stat.assume_init() })
+    }
+
+    pub fn read(&self, name: &str, maximum: usize) -> io::Result<Vec<u8>> {
+        let file = self.open_at(name, 0)?;
+        owned(&file, false)?;
+        let before = file.metadata()?;
+        if before.len() > maximum as u64 {
+            return Err(fail());
+        }
+        let mut bytes = Vec::new();
+        (&file).take(maximum as u64 + 1).read_to_end(&mut bytes)?;
+        let after = file.metadata()?;
+        let linked = self.stat_at(name)?;
+        if bytes.len() > maximum
+            || bytes.len() as u64 != before.len()
+            || before.len() != after.len()
+            || before.mtime() != after.mtime()
+            || before.mtime_nsec() != after.mtime_nsec()
+            || before.ctime() != after.ctime()
+            || before.ctime_nsec() != after.ctime_nsec()
+            || before.dev() != linked.st_dev as u64
+            || before.ino() != linked.st_ino
+        {
+            return Err(fail());
+        }
+        Ok(bytes)
+    }
+
+    pub fn try_lock_existing(&self, name: &str) -> io::Result<Option<HostReadLock>> {
+        let file = match self.open_at(name, 0) {
+            Ok(file) => file,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+            Err(error) => return Err(error),
+        };
+        owned(&file, false)?;
+        loop {
+            if unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0 {
+                break;
+            }
+            let error = io::Error::last_os_error();
+            if error.kind() == io::ErrorKind::Interrupted {
+                continue;
+            }
+            if error.kind() == io::ErrorKind::WouldBlock {
+                return Ok(None);
+            }
+            return Err(error);
+        }
+        let held = file.metadata()?;
+        let linked = self.stat_at(name)?;
+        if held.dev() != linked.st_dev as u64 || held.ino() != linked.st_ino {
+            return Err(fail());
+        }
+        Ok(Some(HostReadLock { _file: file }))
+    }
+}

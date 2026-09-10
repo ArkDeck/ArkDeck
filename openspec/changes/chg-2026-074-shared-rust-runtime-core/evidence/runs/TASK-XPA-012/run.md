@@ -75,3 +75,102 @@ install a daemon. No Runtime state, credentials, device binding or hardware
 evidence has been modified. There are no new device Job IDs. No higher task or
 Windows work has started. The current installed helper pair is not assumed;
 its typed service status must be read immediately before any authorized cutover.
+
+
+## Continued implementation after scope merge
+
+PR #1839 merged by the maintainer at `7b43ea0fabb697e5d0550df5d2a6b8264410362f`.
+The local foundation checkpoint was rebased onto that main; it is not an
+implementation PR. The original 16-file development diff completed the unified
+local gate with exit 0 (`/private/tmp/xpa012-shadow-development-gate.log`): Swift
+suite, App build-for-testing, design-system checks, published/candidate Rust
+contract lanes, cargo deny and cargo vet (25 audited dependencies) passed.
+Subsequent implementation below requires its own final gate before submission.
+
+- Session configuration now compares actual policy/root/generation output and
+  exact document bytes, including Int64.max quota and extra-key rejection.
+  The 29-case wrapper run exited 0, `/private/tmp/xpa012-shadow-session.log`.
+  Full Session inventory/retention is still outstanding; configuration equality
+  does not claim full status parity. Swift status can mutate its retention
+  catalog, so it runs only in prepared isolated fixture roots.
+- A macOS descriptor-relative reader opens bounded files/directories and existing
+  locks without creating or writing them. Symlink/hardlink/permission refusal,
+  read/enumeration bounds, missing-lock non-creation and cross-process exclusion
+  pass in `cargo test -p arkdeck-platform --test host_store` (4 tests including
+  the child probe); clippy passed for hoststore/platform with all targets.
+- Rust Trace inventory reads the same isolated cache as the real ArkTrace
+  maintenance adapter. Empty, unaccounted, Ready/inactive, key contention,
+  lease contention, entry symlink and enumeration overflow comparisons pass.
+  The resulting complete wrapper run has 36 cases and eight XCTest methods,
+  exit 0; `/private/tmp/xpa012-shadow-trace-fixed2.log` and
+  `/private/tmp/xpa012-shadow-20260910-trace-fixed2.json`.
+- Earlier Trace fixture runs failed before inventory because Foundation only
+  canonicalizes `/private/tmp` to `/tmp` after the directory exists. A standalone
+  temporary-directory probe reproduced it. The fixture now standardizes after
+  creation and passes its POSIX physical root to Rust; no product path guard was
+  relaxed. The failed runs published no receipt.
+
+The Trace snapshot reader is not a purge implementation. Its acceptance still
+needs full Foundation timestamp spellings and metadata/permission failure
+parity. The pinned ArkTrace reader currently tolerates unknown metadata keys;
+this fact is not silently converted into strict-decoder acceptance. Session
+full status and the other semantic/owner gates above remain open. No daemon
+was installed, no production state was read or changed, and nightly day count
+remains zero.
+
+### Semantic refusal coverage and nightly wiring (2026-09-10)
+
+The real Swift/Rust differential now passes 49 named cases across nine XCTest
+methods, including 13 additional refusals: unsupported History enums, bounded
+search/identity fields, control characters, unordered/duplicate display-name
+indexes, and incomplete or mismatched staged target references. Every new
+refusal checks original document bytes remain unchanged. Receipt:
+`/private/tmp/xpa012-shadow-20260910-semantics.json`; log:
+`/private/tmp/xpa012-shadow-semantics.log`. After this run, a Clippy style finding
+was fixed without changing the condition; hoststore/platform all-target Clippy
+passes with warnings denied. Receipt completeness tests pass (3 tests).
+
+The scope supplement was merged in PR #1839. The authorized workflow now has
+an independent macOS shadow job using pinned toolchains and the repository's
+SwiftPM runner, with digest receipts and diagnostics archived for 90 days.
+Existing jobs, triggers and permissions are unchanged. This wiring is local
+and unpushed; no scheduled run or qualifying nightly day is claimed. Receipts
+still explicitly report incomplete coverage and `cutoverEligible: false`.
+The source manifest now also pins the workflow, SwiftPM runner and receipt tests.
+A fresh complete-diff unified gate remains required after implementation work.
+
+The expanded complete-diff unified local gate subsequently passed (exit 0),
+including full Swift tests, App build-for-testing, design-system checks,
+published/candidate Rust contract checks, cargo deny and cargo vet (25 audited).
+Log: `/private/tmp/xpa012-shadow-expanded-gate.log`.
+A new differential run after the Clippy and source-manifest edits passed all
+49 cases, with current source fingerprints in
+`/private/tmp/xpa012-shadow-20260910-expanded-final.json` (log beside it as
+`/private/tmp/xpa012-shadow-expanded-final.log`). These are local results;
+no nightly-day, owner-cutover, rollback or hardware acceptance claim is made.
+
+### Identity and Unicode parity (2026-09-10)
+
+The candidate now validates target identifiers, candidate/observation byte
+bounds, the Swift owner's newline-delimited composite-key collisions, display
+name bounds and boundary whitespace. macOS text predicates use the immutable
+CoreFoundation Cc/Cf and whitespace/newline sets, matching the Foundation owner
+without invoking any Swift process. Canonical-equivalence keys preserve Swift
+String duplicate detection and staged-name equality; persisted bytes retain
+the original spelling. Embedded NUL in bounded candidate identity is preserved,
+not silently truncated by a C-string conversion. The SDK's CFCharacterSet.h and
+CFString.h define the ABI and constants used by this read-only platform adapter.
+
+Actual differential runs passed 55 identity cases, then 62 Unicode cases and
+65 cases with canonical duplicates, staged equivalent spellings and embedded
+NUL. The latest receipt is
+`/private/tmp/xpa012-shadow-20260910-canonical.json`, with log
+`/private/tmp/xpa012-shadow-canonical.log`. All-target hoststore/platform Clippy
+passes with warnings denied; the three Rust hoststore unit tests and three
+receipt completeness tests also pass. These checks do not close the remaining
+Session inventory/retention, timestamp, registry semantics or cutover gates.
+
+The complete-diff unified gate after the Unicode adapter passed (exit 0):
+full Swift tests, App build-for-testing, design-system checks, Rust published
+and candidate checks, cargo deny, and cargo vet (25 audited). Log:
+`/private/tmp/xpa012-shadow-unicode-gate.log`. No installed Runtime was changed.

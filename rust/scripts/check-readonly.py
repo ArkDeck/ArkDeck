@@ -36,7 +36,7 @@ def assert_boundaries() -> None:
         "arkdeck-contract": set(),
         "arkdeck-platform": set(),
         "arkdeck-control": {"arkdeck-contract"},
-        "arkdeck-hoststore": {"arkdeck-contract"},
+        "arkdeck-hoststore": {"arkdeck-contract", "arkdeck-platform"},
         "arkdeck-provider-hdc": {"arkdeck-platform"},
         "arkdeck-client": {"arkdeck-contract", "arkdeck-platform"},
         "arkdeck-cli": {"arkdeck-contract", "arkdeck-client", "arkdeck-platform"},

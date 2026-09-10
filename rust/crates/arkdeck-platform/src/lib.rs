@@ -101,3 +101,13 @@ pub fn random_bytes<const N: usize>() -> io::Result<[u8; N]> {
 mod macos_control;
 #[cfg(target_os = "macos")]
 pub use macos_control::{PeerOrigin, listen_mach};
+
+#[cfg(target_os = "macos")]
+mod host_store;
+#[cfg(target_os = "macos")]
+pub use host_store::{HostDirectory, HostEntryKind, HostReadLock};
+
+#[cfg(target_os = "macos")]
+mod host_text;
+#[cfg(target_os = "macos")]
+pub use host_text::{host_canonical_text, host_control_character, host_whitespace_or_newline};

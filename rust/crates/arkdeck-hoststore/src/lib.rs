@@ -1,6 +1,7 @@
 //! Read-only host-store decoder candidates for TASK-XPA-012 differential work.
 //!
-//! These consume bounded snapshot bytes, never open a Runtime path or dispatch.
+//! Document candidates consume bounded bytes; Trace inventory opens a fixed
+//! physical cache root read-only. Neither path writes or dispatches.
 //! The facade does not use this crate until the complete shadow/cutover gates pass.
 //! Filesystem, timestamp and Unicode validation parity remain migration gates;
 //! successful decoding here alone is not store admission.
@@ -9,6 +10,8 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 mod display_names;
 pub use display_names::decode_display_names;
+mod session;
+pub use session::decode_session_configuration;
 mod registry;
 pub use registry::{decode_bundles, decode_tools};
 use serde_json::{Value, json};
@@ -45,6 +48,41 @@ struct HistoryDocument {
     query: Option<HistoryQuery>,
     #[serde(rename = "updatedAtUTC", skip_serializing_if = "Option::is_none")]
     updated_at_utc: Option<String>,
+}
+
+// Foundation String equality is canonically equivalent, so comparing a string
+// to its NFC spelling does not reject decomposed spellings. Preserve their bytes.
+#[cfg(target_os = "macos")]
+fn valid_host_text(value: &str, trimmed: bool, allow_tab: bool) -> bool {
+    use arkdeck_platform::{host_control_character, host_whitespace_or_newline};
+    (!trimmed
+        || (value
+            .chars()
+            .next()
+            .is_none_or(|c| !host_whitespace_or_newline(c))
+            && value
+                .chars()
+                .next_back()
+                .is_none_or(|c| !host_whitespace_or_newline(c))))
+        && value
+            .chars()
+            .all(|c| !host_control_character(c) || (allow_tab && c == '\t'))
+}
+
+// This candidate is a macOS migration. Do not silently substitute another
+// platform's Unicode tables for the Foundation owner being compared.
+#[cfg(not(target_os = "macos"))]
+fn valid_host_text(_: &str, _: bool, _: bool) -> bool {
+    false
+}
+
+#[cfg(target_os = "macos")]
+fn canonical_host_text(value: &str) -> Result<String, DecodeError> {
+    arkdeck_platform::host_canonical_text(value).ok_or(DecodeError::Shape)
+}
+#[cfg(not(target_os = "macos"))]
+fn canonical_host_text(_: &str) -> Result<String, DecodeError> {
+    Err(DecodeError::Shape)
 }
 
 pub struct DecodedStore {
@@ -85,6 +123,39 @@ pub fn decode_history(bytes: &[u8]) -> Result<DecodedStore, DecodeError> {
         || (doc.updated_at_utc.is_none() != (doc.generation == 1))
     {
         return Err(DecodeError::Header);
+    }
+    if let Some(q) = &doc.query
+        && (q.search.len() > 512
+            || ![
+                "all",
+                "active",
+                "needsAttention",
+                "succeeded",
+                "failed",
+                "interrupted",
+                "cancelled",
+            ]
+            .contains(&q.status.as_str())
+            || !["all", "execute", "planned", "simulated", "unknown"].contains(&q.mode.as_str())
+            || !["anyTime", "lastHour", "lastDay", "lastWeek"].contains(&q.time_range.as_str())
+            || ![
+                "all",
+                "flash",
+                "viewer",
+                "trace",
+                "diagnostics",
+                "debug",
+                "device",
+                "other",
+            ]
+            .contains(&q.activity.as_str())
+            || !valid_host_text(&q.search, false, true)
+            || [&q.session_id, &q.target_id]
+                .into_iter()
+                .flatten()
+                .any(|s| s.is_empty() || s.len() > 256 || !valid_host_text(s, true, false)))
+    {
+        return Err(DecodeError::Shape);
     }
     let query = doc.query.as_ref().map(|q| {
         json!({"search": q.search, "status": q.status, "mode": q.mode,
@@ -145,3 +216,8 @@ mod tests {
         );
     }
 }
+
+#[cfg(target_os = "macos")]
+mod trace;
+#[cfg(target_os = "macos")]
+pub use trace::trace_inventory;

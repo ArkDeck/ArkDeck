@@ -1,6 +1,19 @@
-use crate::{DecodeError, DecodedStore, roundtrip};
+use crate::{DecodeError, DecodedStore, canonical_host_text, roundtrip, valid_host_text};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use std::collections::HashSet;
+
+fn valid_name(value: &str) -> bool {
+    (1..=256).contains(&value.len()) && valid_host_text(value, true, false)
+}
+
+fn target_identifier(value: &str) -> bool {
+    (1..=128).contains(&value.len())
+        && value.as_bytes()[0].is_ascii_alphanumeric()
+        && value
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"-._".contains(&b))
+}
 
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -49,6 +62,19 @@ struct Document {
 pub fn decode_display_names(bytes: &[u8]) -> Result<DecodedStore, DecodeError> {
     let (doc, document) = roundtrip::<Document>(bytes, 512 * 1024, true)?;
     let candidates = doc.candidates.as_deref().unwrap_or_default();
+    let mut candidate_keys = HashSet::new();
+    let candidate_spellings = candidates
+        .iter()
+        .map(|r| canonical_host_text(&r.candidate))
+        .collect::<Result<Vec<_>, _>>()?;
+    for r in candidates {
+        if !candidate_keys.insert(canonical_host_text(&format!(
+            "{}\n{}",
+            r.candidate, r.observation_id
+        ))?) {
+            return Err(DecodeError::Shape);
+        }
+    }
     if doc.schema_version != "arkdeck.target-display-names/1"
         || doc.records.len() > 4096
         || candidates.len() > 4096
@@ -56,11 +82,48 @@ pub fn decode_display_names(bytes: &[u8]) -> Result<DecodedStore, DecodeError> {
             .records
             .iter()
             .any(|r| !(2..=i64::MAX as u64).contains(&r.generation))
+        || doc.records.iter().any(|r| {
+            !target_identifier(&r.target_id) || r.name.as_ref().is_some_and(|n| !valid_name(n))
+        })
+        || candidates.iter().any(|r| {
+            !valid_name(&r.name)
+                || !(1..=1024).contains(&r.candidate.len())
+                || !(1..=128).contains(&r.observation_id.len())
+        })
         || candidates
             .iter()
             .any(|r| !(2..=i64::MAX as u64).contains(&r.generation))
     {
         return Err(DecodeError::Header);
+    }
+    // Swift persists these indexes in UTF-8 order and rejects duplicates.
+    if doc
+        .records
+        .windows(2)
+        .any(|r| r[0].target_id >= r[1].target_id)
+        || candidates.windows(2).enumerate().any(|(i, r)| {
+            if candidate_spellings[i] == candidate_spellings[i + 1] {
+                r[0].observation_id >= r[1].observation_id
+            } else {
+                r[0].candidate >= r[1].candidate
+            }
+        })
+        || candidates.iter().any(
+            |r| match (&r.staged_target_id, r.staged_target_generation) {
+                (None, None) => false,
+                (Some(id), Some(generation)) => !doc.records.iter().any(|target| {
+                    target.target_id == *id
+                        && target.generation == generation
+                        && target.name.as_deref().is_some_and(|name| {
+                            matches!((canonical_host_text(name), canonical_host_text(&r.name)),
+                                (Ok(a), Ok(b)) if a == b)
+                        })
+                }),
+                _ => true,
+            },
+        )
+    {
+        return Err(DecodeError::Shape);
     }
     let targets: Vec<_> = doc.records.iter().map(|r| json!({
         "schemaVersion": "arkdeck.target-display-name/1", "targetId": r.target_id,

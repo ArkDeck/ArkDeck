@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Compare the Rust host-store candidates against the actual Swift store readers.
 
-Every store lives in a fresh test-owned temporary directory. The Rust process
-receives bytes over stdin, and cannot select or mutate a live Runtime path.
+Every store lives in a fresh test-owned temporary directory. Document snapshots
+reach Rust over stdin; Trace inventory reads the explicit isolated cache root.
+The runner never selects an installed Runtime or App cache.
 Receipts contain hashes and case names, never filter strings or snapshot bytes.
 A local run is not a nightly day or hardware evidence. Scheduled receipts must
 be matched to their actual Actions run before any cutover gate can consume them.
@@ -22,22 +23,43 @@ ROOT = Path(__file__).resolve().parents[2]
 EXPECTED = {
     **{f"history-{state}-{index}": "equal" for state in ("saved", "deleted") for index in range(3)},
     "history-maximum-generation": "equal",
+    **{f"history-invalid-{name}": "refused" for name in (
+        "status", "mode", "time-range", "activity", "search-bound", "search-control", "session-empty", "target-bound", "search-format-control", "session-leading-space")},
+    **{f"names-invalid-{name}": "refused" for name in (
+        "unordered-targets", "duplicate-target", "duplicate-candidate", "stage-unpaired", "stage-mismatch", "target-identifier", "candidate-empty", "candidate-bound",
+        "observation-empty", "observation-bound", "candidate-key-collision",
+        "name-empty", "name-bound", "name-space", "name-format-control", "canonical-duplicate-candidate")},
     "history-extra-query-field": "refused",
     "history-extra-document-field": "refused",
-    **{f"names-{state}": "equal" for state in ("targets", "tombstone", "candidate")},
+    **{f"trace-{state}": "equal" for state in ("empty", "unaccounted", "ready-inactive", "key-contended", "lease-contended")},
+    "trace-entry-symlink": "refused", "trace-entry-overflow": "refused",
+    **{f"session-{state}": "equal" for state in ("policy", "custom-root", "maximum-quota")},
+    "session-extra-policy-field": "refused", "session-extra-document-field": "refused",
+    **{f"names-{state}": "equal" for state in ("targets", "tombstone", "candidate", "decomposed-unicode", "canonical-stage", "embedded-null-candidate")},
     "names-extra-record-field": "refused", "names-extra-index-field": "refused",
     **{f"{kind}-{state}": "equal" for kind in ("bundle", "tool") for state in ("available", "retained", "removed")},
     **{f"{kind}-extra-{level}-field": "refused" for kind in ("bundle", "tool") for level in ("record", "index")},
 }
 INPUTS = [
-    "rust/Cargo.lock", "rust/rust-toolchain.toml",
+    ".github/workflows/swift-slow-lanes.yml",
+    "Packages/ArkDeckKit/Scripts/run-swiftpm.sh",
+    "rust/scripts/test_hoststore_shadow.py",
+    "rust/Cargo.lock", "rust/Cargo.toml", "rust/rust-toolchain.toml",
+    "Packages/ArkDeckKit/Package.swift", "Packages/ArkDeckKit/Package.resolved",
     "rust/crates/arkdeck-hoststore/Cargo.toml",
     "rust/crates/arkdeck-hoststore/src/lib.rs",
     "rust/crates/arkdeck-hoststore/src/main.rs",
     "rust/crates/arkdeck-hoststore/src/registry.rs",
+    "rust/crates/arkdeck-hoststore/src/session.rs",
+    "rust/crates/arkdeck-hoststore/src/trace.rs",
+    "rust/crates/arkdeck-platform/src/host_store.rs",
+    "Packages/ArkDeckKit/Sources/ArkDeckTraceAdapter/ArkDeckTraceConfiguration.swift",
+    "Packages/ArkDeckKit/Tests/ArkDeckTraceAdapterTests/HostStoreTraceShadowTests.swift",
     "rust/crates/arkdeck-hoststore/src/display_names.rs",
     "rust/scripts/hoststore-shadow.py",
     "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeHistoryFilterStore.swift",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeSessionStorageStore.swift",
+    "Packages/ArkDeckKit/Sources/ArkDeckStorage/SessionRetentionCatalog.swift",
     "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Bootstrap/RuntimeTargetDisplayNameStore.swift",
     "Packages/ArkDeckKit/Sources/ArkDeckCore/CanonicalDigests.swift",
     "Packages/ArkDeckKit/Sources/ArkDeckCore/ArkDeckHelperIdentity.swift",
@@ -54,7 +76,14 @@ def digest(data: bytes) -> str:
 
 
 def source_hashes() -> dict[str, str]:
-    return {path: digest((ROOT / path).read_bytes()) for path in INPUTS}
+    # Include transitive local implementations, not just the top-level decoders.
+    paths = set(INPUTS)
+    for module in ("ArkDeckCore", "ArkDeckStorage", "ArkDeckWorkflows", "ArkDeckBootstrap", "ArkDeckTraceAdapter"):
+        paths.update(str(path.relative_to(ROOT)) for path in
+                     (ROOT / "Packages/ArkDeckKit/Sources" / module).rglob("*.swift"))
+    paths.update(str(path.relative_to(ROOT)) for path in (ROOT / "rust/crates").rglob("*.rs"))
+    paths.update(str(path.relative_to(ROOT)) for path in (ROOT / "rust/crates").glob("*/Cargo.toml"))
+    return {path: digest((ROOT / path).read_bytes()) for path in sorted(paths)}
 
 
 def validate_cases(directory: Path) -> list[dict]:
@@ -66,7 +95,7 @@ def validate_cases(directory: Path) -> list[dict]:
         case = json.loads(path.read_bytes())
         if set(case) != {"case", "store", "outcome", "inputSHA256", "projectionSHA256"}:
             raise ValueError("unexpected case shape")
-        expected_store = {"history": "history-filter", "bundle": "bundle-registry", "tool": "tool-registry", "names": "display-names"}[path.stem.split("-", 1)[0]]
+        expected_store = {"history": "history-filter", "bundle": "bundle-registry", "tool": "tool-registry", "names": "display-names", "session": "session-configuration", "trace": "trace-cache"}[path.stem.split("-", 1)[0]]
         if (case["case"] != path.stem or case["store"] != expected_store
                 or case["outcome"] != EXPECTED[path.stem]):
             raise ValueError("case identity or outcome mismatch")
@@ -96,7 +125,7 @@ def main() -> int:
         env = dict(os.environ, ARKDECK_HOSTSTORE_SHADOW_BINARY=str(binary),
                    ARKDECK_HOSTSTORE_SHADOW_RESULTS=results)
         subprocess.run(["sh", "Packages/ArkDeckKit/Scripts/run-swiftpm.sh", "test", "-j", "4",
-                        "--filter", "HostStoreShadowContractTests"], cwd=ROOT, env=env,
+                        "--filter", "HostStoreShadowContractTests|HostStoreTraceShadowTests"], cwd=ROOT, env=env,
                        check=True, timeout=900)
         cases = validate_cases(Path(results))
     if source_hashes() != hashes or digest(binary.read_bytes()) != binary_hash:
@@ -108,11 +137,13 @@ def main() -> int:
         "completedAtUTC": datetime.now(timezone.utc).isoformat(),
         "sourceCommit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
         "sourceFiles": hashes,
+        "sourceDirty": bool(subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT)),
+        "sourceDiffSHA256": digest(subprocess.check_output(["git", "diff", "HEAD", "--binary"], cwd=ROOT)),
         "binarySHA256": binary_hash,
         "cases": cases,
-        "coveredStores": ["history-filter", "bundle-registry", "tool-registry", "display-names"],
-        "remainingStores": ["session-storage", "trace-cache"],
-        "remainingCoverage": ["full semantic refusal parity", "tool published identity/selection", "filesystem ownership and cutover"],
+        "coveredStores": ["history-filter", "bundle-registry", "tool-registry", "display-names", "session-configuration", "trace-cache"],
+        "remainingStores": ["session-storage"],
+        "remainingCoverage": ["Session inventory/retention/full status", "full semantic refusal parity", "tool published identity/selection", "filesystem ownership and cutover"],
         "cutoverEligible": False,
         # These are provenance hints, not trusted approval or seven-day proof.
         "actions": {key: os.environ.get(key) for key in (

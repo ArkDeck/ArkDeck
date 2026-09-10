@@ -1,14 +1,31 @@
-//! Offline differential adapter. Input/output are pipes, never Runtime paths.
+//! Offline differential adapter: document pipes or an explicit Trace fixture root.
 use std::io::{self, Read, Write};
 
 fn main() {
     let args: Vec<_> = std::env::args().skip(1).collect();
+    #[cfg(target_os = "macos")]
+    if args.len() == 2 && args[0] == "trace-cache" {
+        let projection = match arkdeck_hoststore::trace_inventory(std::path::Path::new(&args[1])) {
+            Ok(projection) => projection,
+            Err(_) => {
+                eprintln!("trace snapshot refused");
+                std::process::exit(65);
+            }
+        };
+        let mut bytes = arkdeck_contract::canonical_json(&projection).expect("bounded counts");
+        bytes.push(b'\n');
+        if io::stdout().write_all(&bytes).is_err() {
+            std::process::exit(74);
+        }
+        return;
+    }
     if args.len() != 1
         || ![
             "history-filter",
             "bundle-registry",
             "tool-registry",
             "display-names",
+            "session-configuration",
         ]
         .contains(&args[0].as_str())
     {
@@ -28,6 +45,7 @@ fn main() {
         "bundle-registry" => arkdeck_hoststore::decode_bundles(&input),
         "tool-registry" => arkdeck_hoststore::decode_tools(&input),
         "display-names" => arkdeck_hoststore::decode_display_names(&input),
+        "session-configuration" => arkdeck_hoststore::decode_session_configuration(&input),
         _ => unreachable!(),
     };
     let decoded = match result {
