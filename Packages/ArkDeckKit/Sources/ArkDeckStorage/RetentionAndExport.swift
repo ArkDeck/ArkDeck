@@ -739,6 +739,15 @@ package struct SessionDiagnosticExporter: Sendable {
     guard policy == .redact else { return (root, []) }
     var identifiers: Set<String> = []
     var identityKeyIdentifiers: Set<String> = []
+    // The Runtime producer names these fields; their values are identities,
+    // but the field names are public vocabulary. Legacy/free-form snapshots
+    // still treat every key as potentially identifying data.
+    let runtimeIdentityKeys: Set<String> = {
+      guard case .object(let tool)? = root["toolchain"],
+        tool["kind"] == .string("runtimeProvider")
+      else { return [] }
+      return ["targetId", "stableIdentitySHA256", "model", "firmware"]
+    }()
     let hasRealDeviceIdentity: Bool = {
       guard case .object(let target)? = root["originalTarget"],
         case .string(let kind)? = target["kind"]
@@ -749,7 +758,7 @@ package struct SessionDiagnosticExporter: Sendable {
       target["connectKey"] = redactScalar(target["connectKey"], identifiers: &identifiers)
       target["identitySnapshot"] = redactTree(
         target["identitySnapshot"], identifiers: &identifiers,
-        keyIdentifiers: &identityKeyIdentifiers)
+        keyIdentifiers: &identityKeyIdentifiers, structuralKeys: runtimeIdentityKeys)
       root["originalTarget"] = .object(target)
     }
     if case .array(let bindings)? = root["bindingHistory"] {
@@ -759,7 +768,7 @@ package struct SessionDiagnosticExporter: Sendable {
           object["connectKey"] = redactScalar(object["connectKey"], identifiers: &identifiers)
           object["identitySnapshot"] = redactTree(
             object["identitySnapshot"], identifiers: &identifiers,
-            keyIdentifiers: &identityKeyIdentifiers)
+            keyIdentifiers: &identityKeyIdentifiers, structuralKeys: runtimeIdentityKeys)
           object["evidence"] = redactTree(
             object["evidence"], identifiers: &identifiers,
             keyIdentifiers: &identityKeyIdentifiers)
@@ -784,7 +793,8 @@ package struct SessionDiagnosticExporter: Sendable {
   private func redactTree(
     _ value: JSONValue?,
     identifiers: inout Set<String>,
-    keyIdentifiers: inout Set<String>
+    keyIdentifiers: inout Set<String>,
+    structuralKeys: Set<String> = []
   ) -> JSONValue? {
     guard let value else { return nil }
     switch value {
@@ -801,6 +811,11 @@ package struct SessionDiagnosticExporter: Sendable {
     case .object(let object):
       var redacted: [String: JSONValue] = [:]
       for key in object.keys.sorted() {
+        if structuralKeys.contains(key) {
+          redacted[key] = redactTree(
+            object[key], identifiers: &identifiers, keyIdentifiers: &keyIdentifiers)!
+          continue
+        }
         // Arbitrary identity/evidence keys are redacted in the manifest and must also seed the
         // byte-level Artifact scrubber when the identifier appears nowhere as a value.
         keyIdentifiers.insert(key)
@@ -1028,6 +1043,10 @@ package struct SessionDiagnosticExporter: Sendable {
     "archivedAt", "originalTarget.kind", "originalTarget.transport",
     "bindingHistory.*.transport", "bindingHistory.*.confirmedBy",
     "bindingHistory.*.channelProtection", "toolchain.kind", "toolchain.sha256",
+    "toolchain.providerIdentity", "runtimeAuthority.kind", "runtimeAuthority.admittedAtUtc",
+    "runtimeAuthority.validUntilUtc", "runtimeAuthority.consumptionFingerprintSha256",
+    "runtimeAuthority.planDigest", "runtimeAuthority.stepSetDigest",
+    "runtimeAuthority.targetBindingDigest", "runtimeAuthority.artifactDigest",
     "toolchain.profileIdentifier", "toolchain.reportedVersion", "toolchain.pathSource",
     "toolchain.serverOwnership", "workflow.kind", "workflow.profileVersion", "steps.*.kind",
     "steps.*.effect", "steps.*.cancellation", "steps.*.bindingRequirement",

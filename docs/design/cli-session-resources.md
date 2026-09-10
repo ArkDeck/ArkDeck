@@ -33,3 +33,25 @@ The current v1 Session Manifest uses a closed confirmation actor object
 Runtime authority. Retired actor strings, authority unions and versioned
 Rockchip toolchain snapshots are refused. Export preserves source Artifact
 bytes and their lineage, while new manifests use only the current shape.
+
+Device Jobs can publish a Session from their own confirmed observation and
+Journal. The closed `runtimeProvider` toolchain records the original HDC or
+ArkForge version and digest, without inventing HDC server facts. Its required
+`runtimeAuthority` is audit metadata copied from the consumed admission record;
+it cannot authorize a later operation. Mutation rows require complete Runtime
+capability consumption correlation. Existing Runtime Step labels
+`runtimeE2Admission` (ArkForge flash) and `runtime-capability-admission` (HDC
+remote mutation) resolve only through that audit, not an invented UI confirmation.
+
+`arkdeck job reconcile` may retry a confirmed `sourceIntegrityFailed` Session
+publication only when the certain terminal Job already owns an entirely
+unbound pre-seal marker and its original Journal is complete. This retry
+performs no Provider dispatch. Repeated or restarted reconciliation returns
+the same receipt and catalog generation. Missing markers, partial seals,
+unknown outcomes and recovered Jobs remain ineligible for this retry.
+
+The new Manifest branch requires a reader containing this change. Publish live
+Sessions only after deploying the reviewed protected-main build; restoring an
+older reader after publishing this shape would leave it unable to read the
+new catalog entries. Original Job Artifacts remain in their own store; Session
+publication does not copy or claim their bytes.

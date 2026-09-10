@@ -64,6 +64,7 @@
       "items": { "$ref": "#/$defs/binding" }
     },
     "toolchain": { "$ref": "#/$defs/toolchain" },
+    "runtimeAuthority": { "$ref": "#/$defs/runtimeAuthority" },
     "workflow": { "$ref": "#/$defs/workflow" },
     "steps": {
       "type": "array",
@@ -107,6 +108,7 @@
   "allOf": [
     {
       "if": {
+        "not": { "$ref": "#/$defs/consumedRuntimeAuthority" },
         "properties": { "executionAuthority": { "const": "standardAgent" } },
         "required": ["executionAuthority"]
       },
@@ -152,6 +154,7 @@
     },
     {
       "if": {
+        "not": { "$ref": "#/$defs/consumedRuntimeAuthority" },
         "allOf": [
           {
             "properties": {
@@ -278,7 +281,7 @@
           "toolchain": {
             "allOf": [
               { "$ref": "#/$defs/toolchain" },
-              { "properties": { "kind": { "const": "hdc" } } }
+              { "properties": { "kind": { "enum": ["hdc", "runtimeProvider"] } } }
             ]
           }
         }
@@ -473,6 +476,34 @@
       "else": {
         "properties": { "archivedAt": { "type": "null" } }
       }
+    },
+    {
+      "if": {
+        "properties": {"toolchain": {"properties": {"kind": {"const": "runtimeProvider"}}, "required": ["kind"]}},
+        "required": ["toolchain"]
+      },
+      "then": {
+        "required": ["runtimeAuthority"],
+        "properties": {"executionMode": {"const": "execute"}},
+        "allOf": [
+          {
+            "if": {"properties": {"runtimeAuthority": {"properties": {"kind": {"const": "defaultReadOnlyPolicy"}}}}},
+            "then": {
+              "properties": {
+                "steps": {"items": {"properties": {"effect": {"not": {"enum": ["deviceMutation", "destructive"]}}}}},
+                "compensations": {
+                  "items": {
+                    "properties": {
+                      "descriptor": {"properties": {"effect": {"not": {"enum": ["deviceMutation", "destructive"]}}}}
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "else": {"properties": {"runtimeAuthority": false}}
     }
   ],
   "$defs": {
@@ -525,52 +556,136 @@
         "channelProtection": { "enum": ["encryptedVerified", "unverifiedAssumeUnprotected", "notApplicable"] }
       }
     },
-    "toolchain": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["kind"],
+    "consumedRuntimeAuthority": {
       "properties": {
-        "kind": { "enum": ["hdc", "none"] },
-        "source": { "type": "string", "minLength": 1 },
-        "path": { "type": "string", "minLength": 1 },
-        "sha256": { "$ref": "#/$defs/sha256" },
-        "clientVersion": { "type": "string", "minLength": 1 },
-        "serverVersion": { "type": "string", "minLength": 1 },
-        "daemonVersion": { "type": ["string", "null"] },
-        "endpoint": { "type": "string", "minLength": 1 },
-        "serverGeneration": { "type": "integer", "minimum": 0 },
-        "serverOwnership": { "enum": ["external", "arkDeckManaged", "unknown"] }
+        "toolchain": {"properties": {"kind": {"const": "runtimeProvider"}}, "required": ["kind"]},
+        "runtimeAuthority": {"properties": {"kind": {"const": "runtimeCapability"}}, "required": ["kind"]}
       },
-      "allOf": [
+      "required": ["toolchain", "runtimeAuthority"]
+    },
+    "runtimeAuthority": {
+      "oneOf": [
         {
-          "if": {
-            "properties": { "kind": { "const": "hdc" } },
-            "required": ["kind"]
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "reference",
+            "admittedAtUtc",
+            "validUntilUtc",
+            "consumptionFingerprintSha256",
+            "reservationId",
+            "useOrdinal",
+            "planDigest",
+            "stepSetDigest",
+            "targetBindingDigest",
+            "artifactDigest"
+          ],
+          "properties": {
+            "kind": {"const": "defaultReadOnlyPolicy"},
+            "reference": {"type": "string", "minLength": 1},
+            "admittedAtUtc": {"type": "string", "format": "date-time"},
+            "validUntilUtc": {"type": "null"},
+            "consumptionFingerprintSha256": {"type": "null"},
+            "reservationId": {"type": "null"},
+            "useOrdinal": {"type": "null"},
+            "planDigest": {"type": "null"},
+            "stepSetDigest": {"type": "null"},
+            "targetBindingDigest": {"type": "null"},
+            "artifactDigest": {"type": "null"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "reference",
+            "admittedAtUtc",
+            "validUntilUtc",
+            "consumptionFingerprintSha256",
+            "reservationId",
+            "useOrdinal",
+            "planDigest",
+            "stepSetDigest",
+            "targetBindingDigest",
+            "artifactDigest"
+          ],
+          "properties": {
+            "kind": {"const": "runtimeCapability"},
+            "reference": {"type": "string", "minLength": 1},
+            "admittedAtUtc": {"type": "string", "format": "date-time"},
+            "validUntilUtc": {"type": "string", "format": "date-time"},
+            "consumptionFingerprintSha256": {"$ref": "#/$defs/sha256"},
+            "reservationId": {"type": "string", "minLength": 1},
+            "useOrdinal": {"type": "integer", "minimum": 1},
+            "planDigest": {"$ref": "#/$defs/sha256"},
+            "stepSetDigest": {"$ref": "#/$defs/sha256"},
+            "targetBindingDigest": {"$ref": "#/$defs/sha256"},
+            "artifactDigest": {"oneOf": [{"$ref": "#/$defs/sha256"}, {"type": "null"}]}
+          }
+        }
+      ]
+    },
+    "toolchain": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind"],
+          "properties": {
+            "kind": {"enum": ["hdc", "none"]},
+            "source": {"type": "string", "minLength": 1},
+            "path": {"type": "string", "minLength": 1},
+            "sha256": {"$ref": "#/$defs/sha256"},
+            "clientVersion": {"type": "string", "minLength": 1},
+            "serverVersion": {"type": "string", "minLength": 1},
+            "daemonVersion": {"type": ["string", "null"]},
+            "endpoint": {"type": "string", "minLength": 1},
+            "serverGeneration": {"type": "integer", "minimum": 0},
+            "serverOwnership": {"enum": ["external", "arkDeckManaged", "unknown"]}
           },
-          "then": {
-            "required": [
-              "source",
-              "path",
-              "sha256",
-              "clientVersion",
-              "serverVersion",
-              "endpoint",
-              "serverGeneration",
-              "serverOwnership"
-            ]
-          },
-          "else": {
-            "properties": {
-              "source": false,
-              "path": false,
-              "sha256": false,
-              "clientVersion": false,
-              "serverVersion": false,
-              "daemonVersion": false,
-              "endpoint": false,
-              "serverGeneration": false,
-              "serverOwnership": false
+          "allOf": [
+            {
+              "if": {"properties": {"kind": {"const": "hdc"}}, "required": ["kind"]},
+              "then": {
+                "required": [
+                  "source",
+                  "path",
+                  "sha256",
+                  "clientVersion",
+                  "serverVersion",
+                  "endpoint",
+                  "serverGeneration",
+                  "serverOwnership"
+                ]
+              },
+              "else": {
+                "properties": {
+                  "source": false,
+                  "path": false,
+                  "sha256": false,
+                  "clientVersion": false,
+                  "serverVersion": false,
+                  "daemonVersion": false,
+                  "endpoint": false,
+                  "serverGeneration": false,
+                  "serverOwnership": false
+                }
+              }
             }
+          ]
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "providerIdentity", "profileIdentifier", "reportedVersion", "sha256"],
+          "properties": {
+            "kind": {"const": "runtimeProvider"},
+            "providerIdentity": {"enum": ["hdc", "arkforge"]},
+            "profileIdentifier": {"type": "string", "minLength": 1},
+            "reportedVersion": {"type": "string", "minLength": 1},
+            "sha256": {"$ref": "#/$defs/sha256"}
           }
         }
       ]

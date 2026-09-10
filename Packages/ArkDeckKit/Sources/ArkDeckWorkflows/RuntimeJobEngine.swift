@@ -6165,7 +6165,28 @@ public actor RuntimeJobEngine {
   private func reconcileOwned(jobID: String) async throws -> RuntimeJobStatus {
     if let existing = jobFailureFinalizations[jobID] { return try await existing.value }
     guard var runtime = jobs[jobID] else {
-      let record = try recordForRead(jobID: jobID)
+      var record = try recordForRead(jobID: jobID)
+      if let marker = record.sessionPublicationRecord, marker.isUnboundSourceFailure,
+        marker.sessionID == record.sessionID, marker.catalogDigest == record.catalogDigest,
+        !record.outcomeUnknown, JobState(rawValue: record.state)?.isTerminal == true
+      {
+        // A Session retry is not Job recovery. It only seals facts already
+        // owned by a certain terminal Job, and never reaches a Provider or
+        // the capability-lineage repair paths below.
+        let directory = jobDirectory(for: jobID)
+        let replay = try DurableJournalRecovery.inspect(
+          url: directory.appending(path: "journal.jsonl"))
+        var metadata = stat()
+        let proposalAbsent =
+          lstat(directory.appending(path: "session-manifest.proposal.json").path, &metadata) != 0
+          && errno == ENOENT
+        guard !replay.requiresRecovery, !replay.finalized,
+          replay.currentState?.rawValue == record.state,
+          proposalAbsent
+        else { return status(of: record) }
+        await publishTerminalSession(&record)
+        return status(of: record)
+      }
       try await repairTerminalSafeToReflashLineageIfNeeded(for: record)
       try await repairTerminalCancelledLineageIfNeeded(for: record)
       return status(of: record)
