@@ -186,7 +186,7 @@ fn decimal_integer(text: &str) -> Option<Value> {
     }
 }
 
-fn float_text(number: &Number) -> Result<String> {
+pub(super) fn float_text(number: &Number) -> Result<String> {
     // serde's audited shortest-roundtrip digit generator is reused; only the
     // Foundation presentation (fixed/scientific boundary and exponent sign/
     // minimum width) differs. No CLI integer limit is applied.

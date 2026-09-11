@@ -43,6 +43,79 @@ final class SessionCleanupContractTests: XCTestCase {
     try? FileManager.default.removeItem(at: root)
   }
 
+  func testCurrentSwiftOwnerReadsActualRustCleanupPreviewRecord() throws {
+    // These bytes were copied directly from the isolated Rust owner by
+    // rust/scripts/check-session-cleanup.py --record-store-copy. The Session
+    // inputs are explicitly simulated fixtures, not hardware evidence.
+    let fixture = URL(filePath: #filePath).deletingLastPathComponent()
+      .appending(path: "Fixtures/SessionStorage/rust-cleanup-ready.json")
+    let bytes = try Data(contentsOf: fixture)
+    let fields = try ControlFrameJSON.decodeObject(bytes.dropLast(), maximumBytes: 16 * 1_024 * 1_024)
+    guard case .string(let previewID)? = fields["previewID"] else {
+      return XCTFail("actual Rust record omitted preview identity")
+    }
+    let directory = root.appending(path: "rust-records", directoryHint: .isDirectory)
+    let records = try RuntimeSessionCleanupRecordStore(directory: directory)
+    let path = directory.appending(path: "cleanup-\(previewID).json")
+    try bytes.write(to: path)
+    try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: path.path)
+    let record = try records.load(previewID)
+    XCTAssertEqual(record.state, .ready)
+    XCTAssertEqual(record.result, .null)
+    XCTAssertEqual(record.preview, fields["preview"])
+    var encoded = try CanonicalJSONEncoders.canonical().encode(record)
+    encoded.append(0x0A)
+    XCTAssertEqual(encoded, bytes)
+  }
+
+  func testCurrentSwiftOwnerReadsActualRustExportPreviewRecord() throws {
+    // Copied from the real isolated Rust preview owner, not re-encoded by a
+    // fixture generator. Only simulated Session data is represented here.
+    let fixture = URL(filePath: #filePath).deletingLastPathComponent()
+      .appending(path: "Fixtures/SessionStorage/rust-export-ready.json")
+    let bytes = try Data(contentsOf: fixture)
+    let fields = try ControlFrameJSON.decodeObject(bytes.dropLast(), maximumBytes: 16 * 1_024 * 1_024)
+    guard case .string(let previewID)? = fields["previewID"] else {
+      return XCTFail("actual Rust record omitted preview identity")
+    }
+    let directory = root.appending(path: "rust-export-records", directoryHint: .isDirectory)
+    let records = try RuntimeSessionExportRecordStore(directory: directory)
+    let path = directory.appending(path: "export-\(previewID).json")
+    try bytes.write(to: path)
+    try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: path.path)
+    let record = try records.load(previewID)
+    XCTAssertEqual(record.state, .ready)
+    XCTAssertEqual(record.result, .null)
+    XCTAssertEqual(record.preview, fields["preview"])
+    var encoded = try CanonicalJSONEncoders.canonical().encode(record)
+    encoded.append(0x0A)
+    XCTAssertEqual(encoded, bytes)
+  }
+
+  func testCurrentSwiftOwnerReadsActualRustExportAppliedRecord() throws {
+    // Copied from the real isolated Rust apply owner, not re-encoded by a
+    // fixture generator. Only simulated Session data is represented here.
+    let fixture = URL(filePath: #filePath).deletingLastPathComponent()
+      .appending(path: "Fixtures/SessionStorage/rust-export-applied.json")
+    let bytes = try Data(contentsOf: fixture)
+    let fields = try ControlFrameJSON.decodeObject(bytes.dropLast(), maximumBytes: 16 * 1_024 * 1_024)
+    guard case .string(let previewID)? = fields["previewID"] else {
+      return XCTFail("actual Rust record omitted preview identity")
+    }
+    let directory = root.appending(path: "rust-export-records", directoryHint: .isDirectory)
+    let records = try RuntimeSessionExportRecordStore(directory: directory)
+    let path = directory.appending(path: "export-\(previewID).json")
+    try bytes.write(to: path)
+    try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: path.path)
+    let record = try records.load(previewID)
+    XCTAssertEqual(record.state, .applied)
+    XCTAssertEqual(record.result, fields["result"])
+    XCTAssertEqual(record.preview, fields["preview"])
+    var encoded = try CanonicalJSONEncoders.canonical().encode(record)
+    encoded.append(0x0A)
+    XCTAssertEqual(encoded, bytes)
+  }
+
   func testPreviewBindsArtifactsAndApplyRevalidatesActiveLeases() throws {
     let storage = try store()
     let target = try finalizedSession(

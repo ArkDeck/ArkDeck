@@ -12,6 +12,11 @@ const DOCUMENT: &str = "session-storage.json";
 const LOCK: &str = ".session-storage.lock";
 const MAXIMUM: usize = 64 * 1024;
 
+#[path = "session_cleanup_owner.rs"]
+mod cleanup;
+#[path = "session_export_owner.rs"]
+mod export;
+
 pub struct SessionStore {
     path: PathBuf,
     root: HostDirectory,
@@ -525,6 +530,54 @@ mod tests {
         params(
             json!({"expectedGeneration":generation,"totalQuotaBytes":"500000","safetyMarginBytes":"1000","retentionDays":"30"}),
         )
+    }
+    #[test]
+    fn cleanup_preview_is_durable_and_refuses_configuration_contention_or_unknown_content() {
+        use std::collections::BTreeSet;
+        let root = Root::new();
+        let store = root.open();
+        let now = crate::session_time::session_timestamp("2026-09-11T00:00:00Z").unwrap();
+        let preview = store.preview_cleanup(&BTreeSet::new(), now).unwrap();
+        assert_eq!(preview["sessions"], json!([]));
+        assert_eq!(preview["currentBytes"], "0");
+        assert_eq!(preview["generation"], "0");
+        let id = preview["previewId"].as_str().unwrap();
+        let owner = HostDirectory::open(&root.0.join("state")).unwrap();
+        let lock = owner.lock_document(LOCK).unwrap();
+        let records = crate::SessionCleanupRecords::open(
+            &root.0.join("state/session-cleanup-previews"),
+            &owner,
+            &lock,
+        )
+        .unwrap();
+        assert_eq!(records.load(id).unwrap().preview, preview);
+        assert_eq!(
+            store
+                .preview_cleanup(&BTreeSet::new(), now)
+                .unwrap_err()
+                .code,
+            "resourceConflict"
+        );
+        drop(records);
+        drop(lock);
+        fs::write(root.0.join("sessions/unaccounted"), b"retain this").unwrap();
+        assert_eq!(
+            store
+                .preview_cleanup(&BTreeSet::new(), now)
+                .unwrap_err()
+                .code,
+            "operationUnavailable"
+        );
+        assert_eq!(
+            fs::read(root.0.join("sessions/unaccounted")).unwrap(),
+            b"retain this"
+        );
+        assert_eq!(
+            fs::read_dir(root.0.join("state/session-cleanup-previews"))
+                .unwrap()
+                .count(),
+            1
+        );
     }
     #[test]
     fn initialized_readonly_root_cannot_be_selected_or_advance_configuration() {

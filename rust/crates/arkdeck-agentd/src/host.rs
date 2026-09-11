@@ -75,6 +75,83 @@ impl HostServices for Host {
             message: "Session owner is not configured".into(),
             details: None,
         })?;
+        if method == "session.export.apply" {
+            let invalid = || WireError {
+                code: "invalidParams".into(),
+                message: "Session export apply requires one exact preview tuple".into(),
+                details: None,
+            };
+            if params.len() != 2
+                || !params.contains_key("previewId")
+                || !params.contains_key("previewDigest")
+            {
+                return Err(invalid());
+            }
+            let id = params["previewId"].as_str().ok_or_else(invalid)?;
+            let digest = params["previewDigest"].as_str().ok_or_else(invalid)?;
+            return sessions.apply_export(id, digest, || {
+                SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .map(|n| n.as_secs_f64() - 978307200.0)
+                    .unwrap_or(f64::NAN)
+            });
+        }
+        if method == "session.export.preview" {
+            let invalid = || WireError {
+                code: "invalidParams".into(),
+                message: "Session export preview requires a Session and destination".into(),
+                details: None,
+            };
+            if params.keys().any(|key| {
+                !["sessionId", "destinationPath", "allowSensitive"].contains(&key.as_str())
+            }) {
+                return Err(invalid());
+            }
+            let id = params
+                .get("sessionId")
+                .and_then(serde_json::Value::as_str)
+                .ok_or_else(invalid)?;
+            let destination = params
+                .get("destinationPath")
+                .and_then(serde_json::Value::as_str)
+                .ok_or_else(invalid)?;
+            let sensitive = match params.get("allowSensitive") {
+                None => false,
+                Some(value) => value.as_bool().ok_or_else(invalid)?,
+            };
+            let now = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map_err(|_| WireError {
+                    code: "operationUnavailable".into(),
+                    message: "Runtime clock is unavailable".into(),
+                    details: None,
+                })?
+                .as_secs_f64()
+                - 978307200.0;
+            return sessions.preview_export(id, destination, sensitive, now);
+        }
+        if method == "session.cleanup.preview" {
+            if !params.is_empty() {
+                return Err(WireError {
+                    code: "invalidParams".into(),
+                    message: "Session cleanup preview accepts no parameters".into(),
+                    details: None,
+                });
+            }
+            // Stores are configured only by the isolated development composition
+            // root, whose daemon has no Job dispatch. Installed activation must
+            // supply the actual Job owner's active-session inventory.
+            let now = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map_err(|_| WireError {
+                    code: "operationUnavailable".into(),
+                    message: "Runtime clock is unavailable".into(),
+                    details: None,
+                })?
+                .as_secs_f64()
+                - 978307200.0;
+            return sessions.preview_cleanup(&std::collections::BTreeSet::new(), now);
+        }
         sessions.handle_resource(method, params)
     }
     #[cfg(target_os = "macos")]

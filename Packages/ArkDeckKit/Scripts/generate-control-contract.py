@@ -211,7 +211,8 @@ def derive_method_schemas(source):
                            "runtime.storage.status", "runtime.storage.policy", "runtime.storage.root"
                        } else set())
                        | (set(SESSION_OWNER_ERROR_CODES) if method in {
-                           "session.list", "session.show", "session.pin", "session.unpin"
+                           "session.list", "session.show", "session.pin", "session.unpin",
+                           "session.cleanup.preview", "session.export.preview", "session.export.apply"
                        } else set()))
         schema = {
             "$schema": "https://json-schema.org/draft/2020-12/schema",

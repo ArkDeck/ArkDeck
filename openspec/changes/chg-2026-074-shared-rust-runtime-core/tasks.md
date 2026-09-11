@@ -702,7 +702,7 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 
 ## TASK-XPA-012 — Move host-only durable stores to the Rust owner on macOS
 
-- Status:in-progress（2026-09-11: existing shadow regression retained; isolated Rust History, Session configuration and list/show/pin/unpin paths serve CLI/control with restart reads and immutable cursors; Session export/cleanup, other host stores and final integration acceptance pending）
+- Status:in-progress（2026-09-11: isolated Rust History, Session configuration, list/show/pin/unpin, cleanup preview and export preview/apply serve CLI/control; export preserves sources and durable repeat results. Cleanup apply, remaining host stores, installed integration and GJ-1 acceptance remain pending）
 - Platform:macos
 - Requirements:`session-artifact-storage` (storage owner), `docs/design/cli-runtime-storage.md:11-24`
 - Acceptance:XPA-AC-1, XPA-AC-7, XPA-AC-9; macOS GJ-1 re-pass
@@ -732,6 +732,9 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
   - `spec/control/methods/session.show.json`（declared scope extension: existing Session owner failure vocabulary）
   - `spec/control/methods/session.pin.json`（declared scope extension: existing generation-CAS and publication failure vocabulary）
   - `spec/control/methods/session.unpin.json`（declared scope extension: existing generation-CAS and publication failure vocabulary）
+  - `spec/control/methods/session.cleanup.preview.json`（declared scope extension: existing cleanup preview owner failures, backed by actual Swift and Rust recordings）
+  - `spec/control/methods/session.export.preview.json`（declared scope extension: existing export preview owner failures and nullable catalog accounting, backed by actual recordings）
+  - `spec/control/methods/session.export.apply.json`（declared scope extension: existing export apply owner failures and durable result responses, backed by actual recordings）
   - `.github/workflows/swift-slow-lanes.yml`（proposed scope supplement: add the host-only read-only shadow nightly job and archive its comparison receipts; preserve existing jobs, triggers, permissions and gates; effective only after maintainer merge）
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/**`（disable the Swift owner of these stores）
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/**`

@@ -270,3 +270,33 @@ fn history_cli_builds_complete_queries_and_rejects_invalid_options() {
     let help = parse(&["history", "filter", "save", "--help"].map(str::to_owned)).unwrap();
     assert!(help.help);
 }
+
+#[test]
+fn export_apply_requires_one_exact_preview_tuple_and_keeps_its_method_scope() {
+    let args = |values: &[&str]| values.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+    assert_eq!(
+        parse(&args(&["session", "export", "apply"]))
+            .unwrap_err()
+            .code,
+        "invalidInput"
+    );
+    let digest = "a".repeat(64);
+    let valid = args(&[
+        "session",
+        "export",
+        "apply",
+        "--preview-id",
+        "00000000-0000-0000-0000-000000000001",
+        "--preview-digest",
+        &digest,
+    ]);
+    let invocation = parse(&valid).unwrap();
+    assert_eq!(invocation.command, "session.export.apply");
+    assert_eq!(invocation.params.unwrap()["previewDigest"], digest);
+    let mut bad = valid.clone();
+    bad[4] = "bad".into();
+    assert_eq!(parse(&bad).unwrap_err().code, "invalidInput");
+    let mut extra = valid;
+    extra.extend(args(&["--allow-sensitive"]));
+    assert_eq!(parse(&extra).unwrap_err().code, "invalidOption");
+}

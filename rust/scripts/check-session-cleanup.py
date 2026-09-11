@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise actual isolated Rust Session resource RPC/CLI with simulated storage.
+"""Exercise actual isolated Rust Session cleanup preview RPC/CLI with simulated storage.
 
 These are host tests with fixture manifests, never device acceptance evidence.
 """
@@ -23,6 +23,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--bin-dir', type=Path, default=ROOT/'rust/target/debug')
     parser.add_argument('--record-frames', type=Path)
+    parser.add_argument('--record-store-copy', type=Path, help='preserve actual Rust preview record bytes for the current Swift decoder test')
     parser.add_argument('--cli-path', type=Path, help='also verify a current Swift CLI consumer against the Rust owner')
     args = parser.parse_args()
     daemon = (args.bin_dir/'arkdeck-agentd').resolve()
@@ -31,7 +32,7 @@ def main():
     identity = hashlib.sha256(json.dumps(registry,sort_keys=True,separators=(',',':')).encode()).hexdigest()
     rows=[]
     children=[]
-    with tempfile.TemporaryDirectory(prefix='arkdeck-session-resources-',dir='/private/tmp') as temporary:
+    with tempfile.TemporaryDirectory(prefix='arkdeck-session-cleanup-',dir='/private/tmp') as temporary:
         root=Path(temporary).resolve()
         endpoint=root/'a.sock'
         env={k:v for k,v in os.environ.items() if not k.startswith('ARKDECK_')}
@@ -95,85 +96,49 @@ def main():
             return path
         try:
             child=start()
-            first=session('session-first','07','2026-07-01T00:00:00.100Z');latest=session('session-latest','08')
-            session('session-z-subsecond','07','2026-07-01T00:00:00.900Z')
-            initial=result('session.list',{'pageSize':1})
-            assert initial['hasMore'] and initial['items'][0]['sessionId']=='session-latest',initial
-            assert initial['items'][0]['completedAtUtc']=='2026-08-01T00:00:00Z'
-            assert initial['items'][0]['expiresAtUtc']=='2026-10-30T00:00:00Z'
-            assert initial['items'][0]['sizeBytes']==str(sum(p.stat().st_size for p in latest.iterdir()))
-            assert [row['sessionId'] for row in command(['list'])['result']['items']]==['session-latest','session-first','session-z-subsecond']
-            cursor=initial['nextCursor']
-            refused('session.list',{'pageSize':2,'cursor':cursor},'invalidCursor')
-            refused('session.list',{'pageSize':0},'invalidInput')
-            refused('session.show',{'sessionId':'../escape'},'invalidInput')
-            refused('session.show',{'sessionId':'missing'},'resourceNotFound')
-            shown=command(['show','--session','session-latest'])['result']
-            assert shown==initial['items'][0]
-            pinned=command(['pin','--session','session-latest','--expected-generation','0'])['result']
-            assert pinned['generation']=='1' and pinned['pinned']
-            assert result('session.pin',{'sessionId':'session-latest','expectedGeneration':'1'})==pinned
-            refused('session.unpin',{'sessionId':'session-latest','expectedGeneration':'0'},'resourceConflict')
-            assert command(['unpin','--session','session-latest','--expected-generation','0'],65)['error']['code']=='resourceConflict'
+            first=session('session-first','07');latest=session('session-latest','08')
+            payload=b'private raw fixture content'
+            (first/'raw.bin').write_bytes(payload)
+            (first/'raw.bin').chmod(0o600)
+            manifest=json.loads((first/'manifest.json').read_text())
+            manifest['artifacts']=[{'id':'artifact-raw','role':'raw','origin':'fixture','relativePath':'raw.bin','size':len(payload),'sha256':hashlib.sha256(payload).hexdigest()}]
+            canonical_file(first/'manifest.json',manifest)
+            result('runtime.storage.policy',{'expectedGeneration':'1','totalQuotaBytes':'1024','safetyMarginBytes':'1023','retentionDays':'1'})
+            listed=result('session.list',{})
+            generation=listed['items'][0]['generation']
+            result('session.pin',{'sessionId':'session-latest','expectedGeneration':generation})
+            preview=result('session.cleanup.preview',{})
+            assert preview['confirmationRequired'] and preview['newDispatchCount']==0
+            assert [row['sessionId'] for row in preview['sessions']]==['session-first','session-latest']
+            assert preview['sessions'][0]['disposition']=='reclaim' and preview['sessions'][1]['reason']=='pinned'
+            assert preview['sessions'][0]['artifacts']==[{'artifactId':'artifact-raw','artifactDigest':hashlib.sha256(payload).hexdigest(),'byteCount':str(len(payload)),'role':'raw','privacy':'sensitive'}]
+            digest=preview['previewDigest'];unsigned={k:v for k,v in preview.items() if k!='previewDigest'}
+            assert digest==hashlib.sha256(json.dumps(unsigned,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+            record=root/'session-state/session-cleanup-previews'/('cleanup-'+preview['previewId']+'.json')
+            stored=record.read_bytes()
+            if args.record_store_copy:
+                args.record_store_copy.write_bytes(stored)
+            assert json.loads(stored)['state']=='ready' and json.loads(stored)['preview']==preview
+            assert command(['cleanup','preview'])['result']['schemaVersion']=='arkdeck.session-cleanup-preview/1'
             child.kill();child.wait(timeout=10);child=start()
-            assert result('session.show',{'sessionId':'session-latest'})==pinned
-            next_page=command(['list','--page-size','1','--cursor',cursor])['result']
-            assert next_page['snapshotRevision']==initial['snapshotRevision'] and next_page['hasMore']
-            assert next_page['items'][0]['sessionId']=='session-first' and next_page['items'][0]['generation']=='0'
-            unpinned=result('session.unpin',{'sessionId':'session-latest','expectedGeneration':'1'})
-            assert not unpinned['pinned'] and unpinned['generation']=='2'
-            # A registered but now unreadable unrelated leaf must not hide a
-            # healthy exact read. Global discovery and every pin still refuse.
-            first_manifest=(first/'manifest.json').read_bytes()
-            (first/'manifest.json').write_bytes(b'corrupt simulated manifest')
-            assert result('session.show',{'sessionId':'session-latest'})==unpinned
-            assert command(['show','--session','session-latest'])['result']==unpinned
-            refused('session.show',{'sessionId':'session-first'},'operationUnavailable')
-            refused('session.list',{},'operationUnavailable')
-            refused('session.pin',{'sessionId':'session-latest','expectedGeneration':'2'},'operationUnavailable')
-            (first/'manifest.json').write_bytes(first_manifest)
-            config_bytes=(root/'session-state/session-storage.json').read_bytes() if (root/'session-state/session-storage.json').exists() else None
-            catalog_path=root/'sessions/.arkdeck-retention-catalog.json'
-            before=catalog_path.read_bytes()
+            assert record.read_bytes()==stored
+            assert result('session.cleanup.preview',{})['sessions']==preview['sessions']
             descriptor=os.open(root/'session-state/.session-storage.lock',os.O_RDWR)
             try:
                 fcntl.flock(descriptor,fcntl.LOCK_EX|fcntl.LOCK_NB)
-                refused('session.pin',{'sessionId':'session-latest','expectedGeneration':'2'},'resourceConflict')
-                assert result('session.list',{'pageSize':1,'cursor':cursor})==next_page
+                refused('session.cleanup.preview',{},'resourceConflict')
             finally:os.close(descriptor)
-            assert catalog_path.read_bytes()==before
-            descriptor=os.open(root/'sessions/.arkdeck-retention-catalog.lock',os.O_RDWR)
-            try:
-                fcntl.flock(descriptor,fcntl.LOCK_EX|fcntl.LOCK_NB)
-                refused('session.pin',{'sessionId':'session-latest','expectedGeneration':'2'},'resourceConflict')
-            finally:os.close(descriptor)
-            assert catalog_path.read_bytes()==before
-            rogue=session('session-unregistered','09')
-            assert result('session.show',{'sessionId':'session-latest'})==unpinned
-            refused('session.list',{},'operationUnavailable')
-            refused('session.pin',{'sessionId':'session-latest','expectedGeneration':'2'},'operationUnavailable')
-            assert catalog_path.read_bytes()==before
-            shutil.rmtree(rogue)
-            duplicate=session('session-latest','06')
-            refused('session.show',{'sessionId':'session-latest'},'operationUnavailable')
-            shutil.rmtree(duplicate)
-            custom=root/'custom';custom.mkdir(mode=0o700)
-            result('runtime.storage.root',{'rootPath':str(custom),'expectedGeneration':'1'})
-            assert result('session.list',{})['items']==[]
-            refused('session.pin',{'sessionId':'session-latest','expectedGeneration':'2'},'resourceConflict')
-            assert command(['list','--page-size','1','--cursor',cursor])['result']==next_page
-            # The old cursor remains readable even if the current root vanishes.
-            shutil.rmtree(custom)
-            assert result('session.list',{'pageSize':1,'cursor':cursor})==next_page
-            refused('session.list',{},'recordUnreadable')
-            assert first.exists() and latest.exists()
-            assert config_bytes is None
+            refused('session.cleanup.preview',{'sessionId':'unexpected'},'invalidParams')
+            rogue=session('unregistered','09')
+            refused('session.cleanup.preview',{},'operationUnavailable')
+            assert first.exists() and latest.exists() and rogue.exists()
+            assert (first/'raw.bin').read_bytes()==payload
         finally:
             for child in children:
                 if child.poll() is None:child.terminate()
                 child.wait(timeout=10);child.stderr.close()
     if args.record_frames:
         args.record_frames.write_text(''.join(json.dumps(row,sort_keys=True,separators=(',',':'))+'\n' for row in rows))
-    print(f'PASS: isolated Rust Session resources, {len(rows)} actual control exchanges plus CLI, restart, CAS and immutable cursor checks')
+    print(f'PASS: isolated Rust Session cleanup previews, {len(rows)} actual control exchanges plus CLI, restart, pin protection and refusal checks')
 
 if __name__=='__main__':main()
