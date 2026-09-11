@@ -46,7 +46,7 @@ final class BootstrapInspectionControlContractTests: XCTestCase {
     }, nowUTC: { "2026-09-11T00:00:00Z" })
   }
 
-  private func handler(configured: Bool = true, record: Bool = true, existingUserRegistry: Bool = false) -> RuntimeControlPlaneHandler {
+  private func handler(configured: Bool = true, record: Bool = true, existingUserRegistry: Bool = false, registrationFailure: String? = nil) -> RuntimeControlPlaneHandler {
     let directory = registryRoot
     let tool: (@Sendable (String) async throws -> JSONValue)? = configured ? { @Sendable reference in
       let owner = try existingUserRegistry ? BootstrapBundleRegistry() : BootstrapBundleRegistry(root: directory)
@@ -64,19 +64,24 @@ final class BootstrapInspectionControlContractTests: XCTestCase {
     } : nil
     return RuntimeControlPlaneHandler(engine: engine, capabilityStore: capabilities,
       providerIDs: [], nowUTC: { "2026-09-11T00:00:00Z" }, targetStore: nil, bootstrap: nil,
+      bootstrapDevEcoRegistrar: configured ? { @Sendable path in
+        if let registrationFailure { throw AgentExecutionControlFailure(registrationFailure, "injected registration failure for error-mapping contract") }
+        return try BootstrapDevEcoToolchainRegistry(owner: Self.bundleRegistry(directory)).register(
+          root: URL(filePath: path, directoryHint: .isDirectory))
+      } : nil,
       bootstrapToolInspector: tool, bootstrapBundleInspector: bundle,
       artifactStore: nil, flashBundleImportDirectory: nil, flashBundleImportPolicy: .production,
       methodObserver: nil, frameObserver: record ? nil : { @Sendable _ in })
   }
 
   private func wire(_ method: String, _ params: [String: JSONValue],
-    configured: Bool = true, record: Bool = true, existingUserRegistry: Bool = false) async throws -> AgentWireProtocol.Response {
+    configured: Bool = true, record: Bool = true, existingUserRegistry: Bool = false, registrationFailure: String? = nil) async throws -> AgentWireProtocol.Response {
     let request: JSONValue = .object([
       "protocolVersion": .string(ArkDeckControlProtocol.currentVersion),
       "contractIdentity": .string(ArkDeckControlProtocol.contractIdentity),
       "id": .string("bootstrap-fixture"), "method": .string(method), "params": .object(params),
     ])
-    let reply = await handler(configured: configured, record: record, existingUserRegistry: existingUserRegistry).handleLine(
+    let reply = await handler(configured: configured, record: record, existingUserRegistry: existingUserRegistry, registrationFailure: registrationFailure).handleLine(
       try CanonicalJSONEncoders.canonical().encode(request))
     return try JSONDecoder().decode(AgentWireProtocol.Response.self, from: reply)
   }
@@ -189,6 +194,95 @@ final class BootstrapInspectionControlContractTests: XCTestCase {
     XCTAssertEqual(dispatcher.dispatchCount, 0)
     print("Rust HDC registry native Swift readback: " + String(decoding:
       try CanonicalJSONEncoders.canonical().encode(actual), as: UTF8.self))
+  }
+
+  func testDevEcoRegistrationProducerUsesNativeRootAndCanonicalVariants() async throws {
+    let source = "/Applications/DevEco-Studio.app/Contents"
+    guard FileManager.default.fileExists(atPath: source) else { throw XCTSkip("real DevEco app required") }
+    let sourceInfo = URL(filePath: source).appending(path: "Info.plist")
+    let sourceBefore = try Data(contentsOf: sourceInfo)
+    let params: [String: JSONValue] = ["kind": .string("deveco"), "root": .string(source)]
+    let first = try await wire("runtime.tool.register", params)
+    XCTAssertTrue(first.ok, "\(String(describing: first.error))")
+    let receipt = try XCTUnwrap(first.result)
+    let toolRef = try reference(receipt, "toolRef")
+    XCTAssertEqual(try object(receipt)["generation"], .string("1"))
+    let before = try snapshot()
+    for spelling in [source, source + "/"] {
+      let again = try await wire("runtime.tool.register", ["kind": .string("deveco"), "root": .string(spelling)])
+      XCTAssertTrue(again.ok, "\(String(describing: again.error))")
+      XCTAssertEqual(again.result, receipt)
+      XCTAssertEqual(try snapshot(), before)
+    }
+    // Foundation preserves an interior empty component in the registered identity.
+    assertFailure(try await wire("runtime.tool.register", ["kind": .string("deveco"),
+      "root": .string(source.replacingOccurrences(of: "/Contents", with: "//Contents"))]), "resourceConflict")
+    XCTAssertEqual(try snapshot(), before)
+    let inspected = try await wire("runtime.tool.inspect", ["tool": .string(toolRef)], record: false)
+    XCTAssertEqual(inspected.result, receipt)
+    let server = AgentDaemonServer(stateDirectory: root.appending(path: "control"), handler: handler(),
+      nowUTC: { "2026-09-11T00:00:00Z" })
+    _ = try server.start()
+    defer { server.stop() }
+    let process = Process()
+    process.executableURL = Bundle(for: Self.self).bundleURL.deletingLastPathComponent().appending(path: "arkdeck")
+    process.arguments = ["runtime", "tool", "register", "--kind", "deveco", "--root", source,
+      "--socket", server.socketURL.path, "--output", "json"]
+    let stdout = root.appending(path: "cli-register.json")
+    FileManager.default.createFile(atPath: stdout.path, contents: nil)
+    let handle = try FileHandle(forWritingTo: stdout)
+    process.standardOutput = handle
+    process.standardError = FileHandle.nullDevice
+    try process.run()
+    let deadline = Date().addingTimeInterval(30)
+    while process.isRunning && Date() < deadline { try await Task.sleep(for: .milliseconds(10)) }
+    if process.isRunning { process.terminate(); XCTFail("CLI registration timed out") }
+    process.waitUntilExit()
+    try handle.close()
+    XCTAssertEqual(process.terminationStatus, 0)
+    let envelope = try object(JSONDecoder().decode(JSONValue.self, from: Data(contentsOf: stdout)))
+    XCTAssertEqual(envelope["result"], receipt)
+    XCTAssertEqual(try snapshot(), before)
+    // A real local reference owner remains attached when registration repeats.
+    let referenced = try BootstrapDevEcoToolchainRegistry(owner: Self.bundleRegistry(registryRoot)).acquire(
+      toolRef, owner: BootstrapToolRegistry.ReferenceOwner(kind: .controlAction, id: "registration-contract-consumer"))
+    let referencedBefore = try snapshot()
+    let repeatWithOwner = try await wire("runtime.tool.register", params)
+    XCTAssertEqual(repeatWithOwner.result, referenced)
+    XCTAssertEqual(try snapshot(), referencedBefore)
+    XCTAssertEqual(try Data(contentsOf: sourceInfo), sourceBefore)
+    XCTAssertEqual(dispatcher.dispatchCount, 0)
+  }
+
+  func testDevEcoRegistrationProducerBoundsInputsAndOwnerFailures() async throws {
+    let source = "/Applications/DevEco-Studio.app/Contents"
+    for bad in ["relative", "/a/../b", "/a/./b", "/a\0b"] {
+      assertFailure(try await wire("runtime.tool.register", ["kind": .string("deveco"), "root": .string(bad)]), "invalidParams")
+    }
+    for bad: [String: JSONValue] in [[:], ["kind": .string("hdc"), "root": .string(source)],
+      ["kind": .string("deveco"), "root": .null],
+      ["kind": .string("deveco"), "root": .string(source), "extra": .bool(true)]] {
+      assertFailure(try await wire("runtime.tool.register", bad, record: false), "invalidParams")
+    }
+    XCTAssertFalse(FileManager.default.fileExists(atPath: registryRoot.path))
+    assertFailure(try await wire("runtime.tool.register", ["kind": .string("deveco"), "root": .string(source)], configured: false), "operationUnavailable")
+    assertFailure(try await wire("runtime.tool.register", ["kind": .string("deveco"), "root": .string("/private/tmp")]), "invalidInput")
+    assertFailure(try await wire("runtime.tool.register", ["kind": .string("deveco"),
+      "root": .string(root.appending(path: "missing.app/Contents").path)]), "fileIdentityChanged")
+    assertFailure(try await wire("runtime.tool.register", ["kind": .string("deveco"),
+      "root": .string(root.appending(path: "missing/Contents").path)]), "invalidInput")
+    try Data("corrupt".utf8).write(to: registryRoot.appending(path: "deveco-toolchains.json"))
+    assertFailure(try await wire("runtime.tool.register", ["kind": .string("deveco"), "root": .string(source)]), "recordUnreadable")
+    XCTAssertEqual(dispatcher.dispatchCount, 0)
+  }
+
+  func testDevEcoRegistrationProducerPreservesClassifiedFailuresAndUnknownOutcome() async throws {
+    let fields: [String: JSONValue] = ["kind": .string("deveco"), "root": .string("/Applications/DevEco-Studio.app/Contents")]
+    for code in ["invalidInput", "fileIdentityChanged", "resourceConflict", "admissionDenied", "recordUnreadable", "quotaExceeded", "ioFailure", "outcomeUnknown"] {
+      assertFailure(try await wire("runtime.tool.register", fields, registrationFailure: code), code)
+    }
+    assertFailure(try await wire("runtime.tool.register", fields, registrationFailure: "unclassified"), "outcomeUnknown")
+    XCTAssertFalse(FileManager.default.fileExists(atPath: registryRoot.path))
   }
 
   func testClosedReferenceValidationPrecedesOwnerAccess() async throws {
@@ -368,6 +462,48 @@ final class BootstrapInspectionControlContractTests: XCTestCase {
     XCTAssertEqual(dispatcher.dispatchCount, 0)
     // Only this opt-in fresh fixture survives teardown; no installed registry is used.
     print("Retained native bootstrap fixture: \(registryRoot.path)")
+  }
+
+  func testExplicitRustDevEcoRegistryIsReadBackWithoutWrites() throws {
+    let environment = ProcessInfo.processInfo.environment
+    guard let path = environment["ARKDECK_DEVECO_RUST_REGISTRY_ROOT"],
+      let expected = environment["ARKDECK_DEVECO_RUST_TOOL_REFERENCE"] else {
+      throw XCTSkip("requires an explicit existing Rust-written temporary registry and tool reference")
+    }
+    guard path.hasPrefix("/private/tmp/"), !path.utf8.contains(0),
+      !path.split(separator: "/").contains(where: { $0 == "." || $0 == ".." }),
+      expected.hasPrefix("toolchain:sha256:"),
+      expected.dropFirst("toolchain:sha256:".count).count == 64,
+      expected.dropFirst("toolchain:sha256:".count).allSatisfy({ "0123456789abcdef".contains($0) }) else {
+      throw AgentExecutionControlFailure("fixture", "readback requires a bounded temporary registry and exact DevEco reference")
+    }
+    let directory = URL(filePath: path, directoryHint: .isDirectory)
+    let attributes = try FileManager.default.attributesOfItem(atPath: directory.path)
+    guard attributes[.type] as? FileAttributeType == .typeDirectory else {
+      throw AgentExecutionControlFailure("fixture", "existing Rust registry root must be a directory")
+    }
+    for name in [".lock", "bundles.json", "deveco-toolchains.json"] {
+      let entry = try FileManager.default.attributesOfItem(atPath: directory.appending(path: name).path)
+      guard entry[.type] as? FileAttributeType == .typeRegular else {
+        throw AgentExecutionControlFailure("fixture", "existing Rust registry metadata must be regular files")
+      }
+    }
+    retainedRegistryRoot = directory
+    let before = try snapshot()
+    let owner = BootstrapBundleRegistry(root: directory)
+    let value = try BootstrapDevEcoToolchainRegistry(owner: owner).inspect(expected, existingStoreOnly: true)
+    let fields = try object(value)
+    XCTAssertEqual(fields["toolRef"], .string(expected))
+    XCTAssertEqual(fields["contentDigest"], .string(String(expected.dropFirst("toolchain:sha256:".count))))
+    XCTAssertEqual(fields["kind"], .string("deveco"))
+    XCTAssertEqual(fields["state"], .string("available"))
+    XCTAssertEqual(fields["generation"], .string("1"))
+    XCTAssertEqual(fields["selected"], .bool(false))
+    XCTAssertEqual(try snapshot(), before)
+    XCTAssertEqual(dispatcher.dispatchCount, 0)
+    // Emit only the actual native owner result, with no reconstructed projection.
+    let bytes = try CanonicalJSONEncoders.canonical().encode(value)
+    print("Rust DevEco registry native Swift readback: " + String(decoding: bytes, as: UTF8.self))
   }
 
   func testExistingSelectedHDCIsInspectedWithoutWritingItsRegistry() async throws {

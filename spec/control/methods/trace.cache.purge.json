@@ -135,7 +135,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Typed contract of the control-plane method `trace.cache.purge` on the single current protocol: the request parameters a caller may send, the result the Runtime answers with, and the structured error details it attaches to a refusal. Derived from frames recorded by a contract-test run; the committed corpus under Tests/ArkDeckContractTests/Fixtures/ControlFrames is validated against it.",
   "title": "arkdeck.control.method/trace.cache.purge",
-  "x-arkdeck-contractIdentity": "05a9f1ad8309a0cd23666bf00aa07eb4c04f317e882183f9aa612568faf64492",
+  "x-arkdeck-contractIdentity": "d1a9f8d57112b45acc463fa1b84a25be77c441c49d85071d328979fea0a59b1c",
   "x-arkdeck-method": "trace.cache.purge",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {

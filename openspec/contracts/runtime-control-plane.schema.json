@@ -5,7 +5,7 @@
       "additionalProperties": false,
       "properties": {
         "contractIdentity": {
-          "const": "05a9f1ad8309a0cd23666bf00aa07eb4c04f317e882183f9aa612568faf64492"
+          "const": "d1a9f8d57112b45acc463fa1b84a25be77c441c49d85071d328979fea0a59b1c"
         },
         "id": {
           "minLength": 1,
@@ -83,6 +83,7 @@
             "runtime.storage.root",
             "runtime.storage.status",
             "runtime.tool.inspect",
+            "runtime.tool.register",
             "runtime.tool.select",
             "session.cleanup.apply",
             "session.cleanup.preview",
@@ -216,7 +217,7 @@
   "title": "arkdeck.runtime-control-plane/1",
   "x-arkdeck-bundleVersion": "arkdeck.cli.contracts/1",
   "x-arkdeck-cliVersion": "0.1.0",
-  "x-arkdeck-contractIdentity": "05a9f1ad8309a0cd23666bf00aa07eb4c04f317e882183f9aa612568faf64492",
+  "x-arkdeck-contractIdentity": "d1a9f8d57112b45acc463fa1b84a25be77c441c49d85071d328979fea0a59b1c",
   "x-arkdeck-currentProtocolVersion": "1.0.0",
   "x-arkdeck-methodSchemaDirectory": "spec/control/methods",
   "x-arkdeck-methods": [
@@ -569,6 +570,11 @@
       "method": "runtime.tool.inspect",
       "published": true,
       "schema": "spec/control/methods/runtime.tool.inspect.json"
+    },
+    {
+      "method": "runtime.tool.register",
+      "published": true,
+      "schema": "spec/control/methods/runtime.tool.register.json"
     },
     {
       "method": "runtime.tool.select",

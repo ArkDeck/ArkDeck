@@ -538,6 +538,7 @@ enum CLIMachineContracts {
       "runtime.storage.status": .leaf("runtime.storage.status"),
       "runtime.tool.select": .leaf("runtime.tool.select"),
       "runtime.tool.inspect": .leaf("runtime.tool.inspect"),
+      "runtime.tool.register": .leaf("runtime.tool.register", note: "Only --kind deveco is served by this RPC; --kind hdc retains its in-process Bootstrap registration."),
       "runtime.bundle.inspect": .leaf("runtime.bundle.inspect"),
       "session.cleanup.apply": .leaf("session.cleanup.apply"),
       "session.cleanup.preview": .leaf("session.cleanup.preview"),
@@ -1037,13 +1038,17 @@ enum CLIMachineContracts {
         if leaf.options.contains(where: { $0.name == "--output" }), !leaf.outputModes.contains(.jsonl) {
           cases.append(("jsonlRefused", valid + ["--output", "jsonl"]))
         }
-        if !leaf.connectsToRuntime, !leaf.options.contains(where: { $0.name == "--endpoint" }) {
+        if (!leaf.connectsToRuntime || leaf.canonicalCommand == "runtime.tool.register"), !leaf.options.contains(where: { $0.name == "--endpoint" }) {
           cases.append(("endpointRefused", valid + ["--endpoint", "local"]))
         }
         if let compatibility = leaf.options.first(where: { $0.stability == .macosCompatibilityOnly }),
           case .value(_, let grammar) = compatibility.form
         {
           cases.append(("macosCompatibilityOption", valid + [compatibility.name, sample(for: grammar)]))
+        }
+        if leaf.canonicalCommand == "runtime.tool.register" {
+          cases.append(("devecoSocket", path + ["--kind", "deveco", "--root", "/Applications/DevEco-Studio.app/Contents", "--socket", "/private/tmp/arkdeck.sock"]))
+          cases.append(("hdcSocketRefused", valid + ["--socket", "/private/tmp/arkdeck.sock"]))
         }
         let parsed = CLIArgumentParser.parse(valid)
         guard case .success(let invocation) = parsed else {

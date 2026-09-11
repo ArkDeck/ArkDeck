@@ -199,7 +199,22 @@ The CLI uses the authenticated client boundary and validates the exact requested
 identity and returned projection. It cannot pass registry paths. The additive
 Swift RPC producers supply actual recording-backed candidate contracts; the old
 published pin remains unchanged until the reviewed contract merge is re-pinned.
-Registration, selection, write ownership and installed activation remain pending.
+The isolated Rust owner also accepts `runtime tool register --kind deveco --root
+<installed-app-Contents>`. It verifies native signed content without executing it,
+then publishes the existing Swift registry format under the shared Bootstrap
+lock. Re-registration preserves the reference and metadata; uncertain publication
+returns `outcomeUnknown` without replay. The current Swift registration CLI uses
+the typed RPC for DevEco. HDC registration, selection and installed activation
+remain pending.
+
+For an explicit native macOS check, build the candidate binaries in release mode
+and run `python3 rust/scripts/check-deveco-register.py --bin-dir <release-dir>
+--source-root /Applications/DevEco-Studio.app/Contents`. The harness retains a
+fresh temporary registry, checks restart/idempotence and verifies that installed
+Bootstrap metadata and source content remain unchanged. `--cli-path <swift-cli>`
+checks the Swift registration consumer against the Rust owner. Missing native
+content is reported as SKIP; this is separate from portable contract CI and is
+not device acceptance.
 
 `cargo build -p arkdeck-hoststore --example tool_registry_read` builds the local
 comparison adapter. Set `ARKDECK_TOOL_OWNER_BINARY` to it when running
@@ -240,8 +255,8 @@ waiting for the existing terminal-child and complete process-group proof. It
 resolves a transient `EPERM` only within the cleanup budget and before reaping;
 unproven groups, other signal errors and lost child ownership remain failures.
 
-The published pin has 97 methods; the candidate registry adds two Bootstrap
-inspection methods. Methods without a migrated host handler are structurally
+The published pin has 99 methods; the candidate registry adds DevEco Bootstrap
+registration. Methods without a migrated host handler are structurally
 understood and refused.
 There is no Runtime capability owner, recovery, journal, durable target store,
 device mutation, flash lowering, Swift replacement or production cutover here.

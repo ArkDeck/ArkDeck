@@ -75,6 +75,7 @@
     "runtime.storage.root",
     "runtime.storage.status",
     "runtime.tool.inspect",
+    "runtime.tool.register",
     "runtime.tool.select",
     "session.cleanup.apply",
     "session.cleanup.preview",

@@ -3615,10 +3615,11 @@
         "macos": "implemented"
       },
       "lifecycle": "current",
+      "note": "Only --kind deveco is served by this RPC; --kind hdc retains its in-process Bootstrap registration.",
       "requiredPlatforms": [
         "macos"
       ],
-      "source": "cli:runtime.tool.register",
+      "source": "daemon:runtime.tool.register",
       "targetClassification": "local",
       "targetCommand": "arkdeck runtime tool register --kind <hdc|deveco>"
     },
@@ -4637,8 +4638,8 @@
     "bySource": {
       "app": 68,
       "catalog": 30,
-      "cli": 57,
-      "daemon": 99
+      "cli": 56,
+      "daemon": 100
     },
     "entries": 254,
     "fullFunction": true

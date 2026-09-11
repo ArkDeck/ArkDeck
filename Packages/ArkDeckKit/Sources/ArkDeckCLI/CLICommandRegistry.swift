@@ -1223,13 +1223,12 @@ enum CLICommandRegistry {
     leaves: [
       CLILeafSpec(token: "register", canonicalCommand: "runtime.tool.register",
         summary: "register a bounded native tool or installed SDK root without selecting it",
-        options: [
+        options: runtimeClientOptions([
           CLIOptionSpec(name: "--kind", form: .value(placeholder: "hdc|deveco", grammar: .enumeration(["hdc", "deveco"])), summary: "closed host tool or toolchain role", isRequired: true),
           CLIOptionSpec(name: "--file", form: .value(placeholder: "absolute-path", grammar: .opaque), summary: "HDC executable source, used only during registration"),
           CLIOptionSpec(name: "--root", form: .value(placeholder: "absolute-path", grammar: .opaque), summary: "DevEco app Contents root, used only during registration"),
-          outputOption, jsonOption, controlRequestIDOption,
-        ],
-        mutuallyExclusive: [["--file", "--root"]]),
+        ]),
+        mutuallyExclusive: [["--file", "--root"]], connectsToRuntime: true),
       CLILeafSpec(token: "list", canonicalCommand: "runtime.tool.list",
         summary: "read an immutable snapshot of registered tool candidates",
         options: snapshotPageOptions + [outputOption, jsonOption, controlRequestIDOption]),

@@ -9,7 +9,7 @@ pub use read_only_resources::{
 };
 mod job_resources;
 mod session_resources;
-pub use bootstrap_resources::validate_bootstrap_response;
+pub use bootstrap_resources::{validate_bootstrap_request, validate_bootstrap_response};
 pub use session_resources::validate_session_response;
 mod trace_cache;
 pub use trace_cache::validate_trace_cache_response;
@@ -62,7 +62,7 @@ impl CliError {
             "quotaExceeded" => 69,
             "operationFailed" => 1,
             "clientTimeout" => 75,
-            "admissionDenied" => 77,
+            "admissionDenied" | "fileIdentityChanged" => 77,
             _ => 70,
         }
     }
@@ -71,7 +71,8 @@ impl CliError {
             ClientError::Transport(error) => Self::new(
                 if matches!(
                     method,
-                    "history.filter.save"
+                    "runtime.tool.register"
+                        | "history.filter.save"
                         | "history.filter.delete"
                         | "runtime.storage.policy"
                         | "runtime.storage.root"
@@ -139,15 +140,21 @@ impl CliError {
                         details.get("phase") == Some(&json!("sessionOwner"))
                             && details.get("newDispatchCount") == Some(&json!(0))
                     }));
-                let bootstrap_proof =
-                    matches!(method, "runtime.tool.inspect" | "runtime.bundle.inspect")
-                        && error.details.as_ref().is_some_and(|details| {
-                            details.get("phase") == Some(&json!("bootstrapRegistryOwner"))
-                                && details.get("newDispatchCount") == Some(&json!(0))
-                        });
+                let bootstrap_proof = matches!(
+                    method,
+                    "runtime.tool.inspect" | "runtime.bundle.inspect" | "runtime.tool.register"
+                ) && error.details.as_ref().is_some_and(|details| {
+                    details.get("phase") == Some(&json!("bootstrapRegistryOwner"))
+                        && details.get("newDispatchCount") == Some(&json!(0))
+                });
                 let host_proof = host_proof || bootstrap_proof;
                 let code = match error.code.as_str() {
                     "admissionDenied" if bootstrap_proof => "admissionDenied",
+                    "fileIdentityChanged"
+                        if bootstrap_proof && method == "runtime.tool.register" =>
+                    {
+                        "fileIdentityChanged"
+                    }
                     "invalidInput" if host_proof => "invalidInput",
                     "resourceConflict" if host_proof => "resourceConflict",
                     "resourceNotFound" if host_proof => "resourceNotFound",
@@ -248,6 +255,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                 | "--target"
                 | "--time"
                 | "--activity"
+                | "--kind"
+                | "--file"
                 | "--tool"
                 | "--bundle"
                 | "--operation"
@@ -343,6 +352,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["job", "timeline"] => "job.timeline",
         ["device", "candidates"] => "device.candidates",
         ["trace", "cache", "status"] => "trace.cache.status",
+        ["runtime", "tool", "register"] => "runtime.tool.register",
         ["runtime", "tool", "inspect"] => "runtime.tool.inspect",
         ["runtime", "bundle", "inspect"] => "runtime.bundle.inspect",
         ["runtime", "storage", "status"] => "runtime.storage.status",
@@ -392,6 +402,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ],
         "runtime.storage.root" => &["expectedGeneration", "rootPath", "resetToDefault"],
         "runtime.tool.inspect" => &["tool"],
+        "runtime.tool.register" => &["kind", "rootPath", "file"],
         "runtime.bundle.inspect" => &["bundle"],
         "operation.describe" | "operation.example" => &["operation"],
         "job.status" | "job.show" | "job.evidence" => &["jobId", "timeout"],
@@ -594,7 +605,16 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             "help renders human text only",
         ));
     }
-    bootstrap_resources::configure(command, &method_options, help)?;
+    if command == "runtime.tool.register"
+        && socket.is_some()
+        && method_options.get("kind") != Some(&json!("deveco"))
+    {
+        return Err(CliError::new(
+            "invalidOption",
+            "--socket is only available for DevEco registration",
+        ));
+    }
+    bootstrap_resources::configure(command, &mut method_options, help)?;
     let timeout_ms = read_only_resources::configure(command, &mut method_options, help)?;
     Ok(Invocation {
         command,
@@ -609,7 +629,10 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             Some(serde_json::from_value(json!({"deep":deep})).unwrap())
         } else if command.starts_with("history.filter.")
             || command.starts_with("runtime.storage.")
-            || matches!(command, "runtime.tool.inspect" | "runtime.bundle.inspect")
+            || matches!(
+                command,
+                "runtime.tool.inspect" | "runtime.bundle.inspect" | "runtime.tool.register"
+            )
             || command.starts_with("session.")
             || matches!(
                 command,

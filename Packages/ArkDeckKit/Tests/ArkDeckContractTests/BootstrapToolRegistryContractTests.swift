@@ -536,7 +536,10 @@ final class BootstrapToolRegistryContractTests: XCTestCase {
   func testCLIRegistryRejectsRootRawArgvAndEndpointForHDCRegistration() throws {
     let valid = ["runtime", "tool", "register", "--kind", "hdc", "--file", "/tmp/hdc", "--output", "json"]
     guard case .success(.dispatch(_, let leaf, _)) = CLIArgumentParser.parse(valid) else { return XCTFail("missing tool registration") }
-    XCTAssertFalse(leaf.connectsToRuntime)
+    XCTAssertTrue(leaf.connectsToRuntime, "the shared leaf may connect for DevEco registration")
+    guard case .success(.dispatch) = CLIArgumentParser.parse(["runtime", "tool", "register", "--kind", "deveco",
+      "--root", "/Applications/DevEco-Studio.app/Contents", "--socket", "/tmp/daemon"])
+    else { return XCTFail("DevEco registration must accept its Runtime socket") }
     for extra in [["--root", "/tmp/sdk"], ["--argv", "kill -r"], ["--socket", "/tmp/daemon"], ["--file", "/tmp/other"]] {
       if case .success = CLIArgumentParser.parse(valid + extra) { XCTFail("accepted \(extra)") }
     }
