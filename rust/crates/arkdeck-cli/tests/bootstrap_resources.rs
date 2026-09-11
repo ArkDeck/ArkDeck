@@ -7,6 +7,7 @@ fn existing_bootstrap_argv_fixtures_keep_their_dispatch_contract() {
         include_str!("../../../tests/fixtures/current-cli-argv/runtime.tool.inspect.json"),
         include_str!("../../../tests/fixtures/current-cli-argv/runtime.bundle.inspect.json"),
         include_str!("../../../tests/fixtures/current-cli-argv/runtime.bundle.list.json"),
+        include_str!("../../../tests/fixtures/current-cli-argv/runtime.bundle.remove.json"),
     ] {
         let corpus: Value = serde_json::from_str(corpus).unwrap();
         for case in corpus["cases"].as_array().unwrap() {
@@ -242,4 +243,266 @@ fn actual_bundle_pages_preserve_snapshot_and_validate_every_row() {
         pages > 0 && rows > 0,
         "actual producer must exercise bundle discovery"
     );
+}
+
+fn retirement(options: &[&str]) -> Result<arkdeck_cli::Invocation, arkdeck_cli::CliError> {
+    let argv = ["runtime", "bundle", "remove"]
+        .into_iter()
+        .chain(options.iter().copied())
+        .map(str::to_owned)
+        .collect::<Vec<_>>();
+    parse(&argv)
+}
+
+#[test]
+fn bundle_retirement_requires_exact_generation_text_and_reference() {
+    for generation in ["1", "2", "9223372036854775807"] {
+        let invocation =
+            retirement(&["--bundle", "sample", "--expected-generation", generation]).unwrap();
+        assert_eq!(invocation.method, "runtime.bundle.remove");
+        assert_eq!(
+            invocation.params.unwrap(),
+            json!({"bundle":"sample","expectedGeneration":generation})
+                .as_object()
+                .unwrap()
+                .clone()
+        );
+    }
+    for generation in ["0", "+1", "01", " 1", "-1", "1.0", "9223372036854775808"] {
+        assert_eq!(
+            retirement(&["--bundle", "sample", "--expected-generation", generation])
+                .unwrap_err()
+                .code,
+            "invalidOption"
+        );
+    }
+    for options in [
+        vec![],
+        vec!["--bundle", "sample"],
+        vec!["--expected-generation", "1"],
+        vec![
+            "--bundle",
+            "sample",
+            "--expected-generation",
+            "1",
+            "--page-size",
+            "1",
+        ],
+    ] {
+        assert_eq!(retirement(&options).unwrap_err().code, "invalidOption");
+    }
+    assert!(retirement(&["--help"]).unwrap().help);
+}
+
+#[test]
+fn retirement_preserves_only_proven_owner_failures_and_existing_protocol_refusals() {
+    use arkdeck_client::ClientError;
+    use arkdeck_contract::{ContractError, WireError};
+    for code in [
+        "invalidInput",
+        "resourceNotFound",
+        "resourceConflict",
+        "admissionDenied",
+        "recordUnreadable",
+        "quotaExceeded",
+        "operationUnavailable",
+        "outcomeUnknown",
+    ] {
+        if arkdeck_contract::METHODS.contains(&"runtime.bundle.remove") {
+            arkdeck_contract::validate_method_value(
+                "runtime.bundle.remove",
+                "errorCode",
+                &json!(code),
+            )
+            .unwrap();
+        }
+        let missing_proof = arkdeck_cli::CliError::from_client(
+            ClientError::Remote(WireError {
+                code: code.into(),
+                message: "owner refused without proof".into(),
+                details: None,
+            }),
+            "runtime.bundle.remove",
+        );
+        assert_eq!(missing_proof.code, "outcomeUnknown");
+        assert!(!missing_proof.details.contains_key("newDispatchCount"));
+        for (phase, count) in [
+            ("bootstrapRegistryOwner", 0),
+            ("bootstrapRegistryOwner", 1),
+            ("otherOwner", 0),
+        ] {
+            let mapped = arkdeck_cli::CliError::from_client(
+                ClientError::Remote(WireError {
+                    code: code.into(),
+                    message: "owner refused".into(),
+                    details: Some(
+                        json!({"phase":phase,"newDispatchCount":count})
+                            .as_object()
+                            .unwrap()
+                            .clone(),
+                    ),
+                }),
+                "runtime.bundle.remove",
+            );
+            assert_eq!(
+                mapped.code,
+                if phase == "bootstrapRegistryOwner" && count == 0 {
+                    code
+                } else {
+                    "outcomeUnknown"
+                }
+            );
+            assert_eq!(mapped.details["newDispatchCount"], count);
+        }
+    }
+    for (code, mapped) in [
+        ("unknownMethod", "controlMethodUnavailable"),
+        ("invalidParams", "invalidInput"),
+        ("malformedFrame", "protocolMalformed"),
+        ("unsupportedProtocolVersion", "protocolVersionUnsupported"),
+    ] {
+        assert_eq!(
+            arkdeck_cli::CliError::from_client(
+                ClientError::Remote(WireError {
+                    code: code.into(),
+                    message: "refused".into(),
+                    details: None
+                }),
+                "runtime.bundle.remove"
+            )
+            .code,
+            mapped
+        );
+    }
+    for error in [
+        ClientError::Transport(std::io::Error::from(std::io::ErrorKind::ConnectionReset)),
+        ClientError::Transport(std::io::Error::from(std::io::ErrorKind::TimedOut)),
+        ClientError::ConnectionUnusable,
+        ClientError::Contract(ContractError::SchemaMismatch),
+        ClientError::Contract(ContractError::Malformed),
+    ] {
+        let mapped = arkdeck_cli::CliError::from_client(error, "runtime.bundle.remove");
+        assert_eq!(mapped.code, "outcomeUnknown");
+        assert_eq!(mapped.exit_code(), 75);
+        assert!(!mapped.details.contains_key("newDispatchCount"));
+    }
+}
+
+#[test]
+fn actual_retirement_receipts_match_the_requested_bundle_and_retain_content() {
+    if !arkdeck_contract::METHODS.contains(&"runtime.bundle.remove") {
+        let inputs: Value = serde_json::from_str(arkdeck_contract::CONTRACT_INPUTS).unwrap();
+        assert_ne!(
+            inputs["kind"], "candidate",
+            "candidate must expose bundle retirement"
+        );
+        return;
+    }
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/runtime.bundle.remove.jsonl");
+    let corpus = std::fs::read_to_string(path).unwrap();
+    let mut receipts = 0;
+    for frame in corpus
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .filter(|v| v["ok"] == true)
+    {
+        let invocation = retirement(&[
+            "--bundle",
+            frame["params"]["bundle"].as_str().unwrap(),
+            "--expected-generation",
+            frame["params"]["expectedGeneration"].as_str().unwrap(),
+        ])
+        .unwrap();
+        let receipt = &frame["result"];
+        validate_bootstrap_response(&invocation, receipt).unwrap();
+        receipts += 1;
+        for (key, value) in [
+            ("state", json!("available")),
+            ("generation", json!("1")),
+            ("generation", json!("3")),
+            ("contentRetained", json!(false)),
+            ("contentDigest", json!("invalid")),
+            (
+                "bundleRef",
+                json!("bundle:sha256:".to_owned() + &"0".repeat(64)),
+            ),
+        ] {
+            let mut malformed = receipt.clone();
+            malformed[key] = value;
+            assert_eq!(
+                validate_bootstrap_response(&invocation, &malformed)
+                    .unwrap_err()
+                    .code,
+                "outcomeUnknown"
+            );
+        }
+    }
+    assert!(
+        receipts > 0,
+        "candidate must consume the actual native retirement receipt"
+    );
+}
+
+#[test]
+fn in_memory_lost_retirement_receipt_is_unknown_and_the_client_never_replays() {
+    use arkdeck_contract::{CATALOG_DIGEST, CONTRACT_IDENTITY, METHODS, PROTOCOL_VERSION};
+    use std::io::{Cursor, Read, Write};
+    use std::{cell::RefCell, rc::Rc};
+    if !METHODS.contains(&"runtime.bundle.remove") {
+        return;
+    }
+    struct Stream {
+        replies: Cursor<Vec<u8>>,
+        sent: Rc<RefCell<Vec<u8>>>,
+    }
+    impl Read for Stream {
+        fn read(&mut self, bytes: &mut [u8]) -> std::io::Result<usize> {
+            self.replies.read(bytes)
+        }
+    }
+    impl Write for Stream {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            self.sent.borrow_mut().extend(bytes);
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    let health = json!({"id":"health","ok":true,"result":{"status":"ok","protocolVersion":PROTOCOL_VERSION,"contractIdentity":CONTRACT_IDENTITY,"catalogDigest":CATALOG_DIGEST,"providers":[],"publishedMethods":METHODS}});
+    let mut reply = serde_json::to_vec(&health).unwrap();
+    reply.push(b'\n');
+    let sent = Rc::new(RefCell::new(Vec::new()));
+    let mut client = arkdeck_client::Client::new(Stream {
+        replies: Cursor::new(reply),
+        sent: sent.clone(),
+    });
+    let invocation = retirement(&[
+        "--bundle",
+        &("bundle:sha256:".to_owned() + &"a".repeat(64)),
+        "--expected-generation",
+        "1",
+    ])
+    .unwrap();
+    let error = client
+        .request("remove-once", invocation.method, invocation.params.clone())
+        .unwrap_err();
+    assert_eq!(
+        arkdeck_cli::CliError::from_client(error, invocation.method).code,
+        "outcomeUnknown"
+    );
+    let before = sent.borrow().clone();
+    let requests = String::from_utf8(before.clone())
+        .unwrap()
+        .lines()
+        .map(|line| serde_json::from_str::<Value>(line).unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(requests.len(), 2);
+    assert_eq!(requests[0]["method"], "health");
+    assert_eq!(requests[1]["method"], "runtime.bundle.remove");
+    assert!(matches!(
+        client.request("retry-refused", invocation.method, invocation.params),
+        Err(arkdeck_client::ClientError::ConnectionUnusable)
+    ));
+    assert_eq!(*sent.borrow(), before);
 }

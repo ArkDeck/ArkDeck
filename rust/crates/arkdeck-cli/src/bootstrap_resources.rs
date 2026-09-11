@@ -51,7 +51,7 @@ pub(crate) fn configure(
     }
     let key = match command {
         "runtime.tool.inspect" => "tool",
-        "runtime.bundle.inspect" => "bundle",
+        "runtime.bundle.inspect" | "runtime.bundle.remove" => "bundle",
         _ => return Ok(()),
     };
     if !help && params.get(key).and_then(Value::as_str).is_none() {
@@ -87,6 +87,22 @@ pub fn validate_bootstrap_request(invocation: &Invocation) -> Result<(), CliErro
 }
 
 pub fn validate_bootstrap_response(invocation: &Invocation, value: &Value) -> Result<(), CliError> {
+    validate_bootstrap_response_inner(invocation, value).map_err(|error| {
+        if invocation.command == "runtime.bundle.remove" {
+            CliError::new(
+                "outcomeUnknown",
+                "Runtime returned an inconsistent Bootstrap resource",
+            )
+        } else {
+            error
+        }
+    })
+}
+
+fn validate_bootstrap_response_inner(
+    invocation: &Invocation,
+    value: &Value,
+) -> Result<(), CliError> {
     if invocation.command == "runtime.bundle.list" {
         return validate_bundle_page(invocation, value);
     }
@@ -99,7 +115,7 @@ pub fn validate_bootstrap_response(invocation: &Invocation, value: &Value) -> Re
             "toolchain:sha256:",
             "arkdeck.deveco-toolchain-content/2",
         ),
-        "runtime.bundle.inspect" => (
+        "runtime.bundle.inspect" | "runtime.bundle.remove" => (
             "bundle",
             "bundleRef",
             "arkdeck.runtime-bundle/1",
@@ -144,6 +160,12 @@ pub fn validate_bootstrap_response(invocation: &Invocation, value: &Value) -> Re
             .ok_or_else(unreadable)?
     };
     validate_record(value, reference, output, schema, prefix, content_schema)?;
+    if invocation.command == "runtime.bundle.remove"
+        && (value["state"] != "removed" || value["generation"] != "2")
+    {
+        return Err(unreadable());
+    }
+
     if registering
         && (value["state"] != "available"
             || value["generation"] != "1"
@@ -288,4 +310,77 @@ fn validate_bundle_page(invocation: &Invocation, value: &Value) -> Result<(), Cl
         previous = Some(reference);
     }
     Ok(())
+}
+
+pub(crate) fn retirement_error(error: arkdeck_client::ClientError) -> CliError {
+    let mut result = match error {
+        arkdeck_client::ClientError::Remote(error) => {
+            let bounded = error.details.as_ref().is_some_and(|details| {
+                details.get("phase").and_then(Value::as_str) == Some("bootstrapRegistryOwner")
+                    && details.get("newDispatchCount").and_then(Value::as_u64) == Some(0)
+            });
+            let code = match error.code.as_str() {
+                "invalidInput" if bounded => "invalidInput",
+                "resourceNotFound" if bounded => "resourceNotFound",
+                "resourceConflict" if bounded => "resourceConflict",
+                "admissionDenied" if bounded => "admissionDenied",
+                "recordUnreadable" if bounded => "recordUnreadable",
+                "quotaExceeded" if bounded => "quotaExceeded",
+                "operationUnavailable" if bounded => "operationUnavailable",
+                "outcomeUnknown" if bounded => "outcomeUnknown",
+                "unsupportedProtocolVersion" => "protocolVersionUnsupported",
+                "malformedFrame" => "protocolMalformed",
+                "unknownMethod" => "controlMethodUnavailable",
+                "invalidParams" => "invalidInput",
+                "conflict" => "resourceConflict",
+                "notFound" => "resourceNotFound",
+                "rejected"
+                    if error.details.as_ref().is_some_and(|details| {
+                        details.get("phase").and_then(Value::as_str) == Some("preAdmission")
+                            && details.get("newDispatchCount").and_then(Value::as_u64) == Some(0)
+                    }) =>
+                {
+                    "admissionDenied"
+                }
+                "rejected" => "operationFailed",
+                "invalidInput"
+                | "resourceNotFound"
+                | "resourceConflict"
+                | "admissionDenied"
+                | "recordUnreadable"
+                | "quotaExceeded"
+                | "operationUnavailable"
+                | "outcomeUnknown" => "outcomeUnknown",
+                _ => "internalError",
+            };
+            let mut result = CliError::new(code, error.message);
+            result.details = error.details.unwrap_or_default();
+            result
+                .details
+                .insert("wireCode".into(), Value::String(error.code));
+            result
+        }
+        arkdeck_client::ClientError::Contract(
+            arkdeck_contract::ContractError::UnsupportedVersion
+            | arkdeck_contract::ContractError::ContractMismatch,
+        ) => CliError::new(
+            "protocolVersionUnsupported",
+            "client and Runtime must use the same current control contract",
+        ),
+        arkdeck_client::ClientError::Contract(arkdeck_contract::ContractError::UnknownMethod) => {
+            CliError::new(
+                "protocolMalformed",
+                "the local Runtime response does not conform to the current contract",
+            )
+        }
+        other => CliError::new(
+            "outcomeUnknown",
+            format!("bundle retirement has no verified receipt: {other}"),
+        ),
+    };
+    result.details.insert(
+        "method".into(),
+        Value::String("runtime.bundle.remove".into()),
+    );
+    result
 }

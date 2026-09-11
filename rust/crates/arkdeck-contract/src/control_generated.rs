@@ -4,7 +4,7 @@ pub const PROTOCOL_VERSION: &str = "1.0.0";
 pub const MAX_REQUEST_BYTES: usize = 4194304;
 pub const MAX_RESPONSE_BYTES: usize = 8388608;
 pub const CONTRACT_IDENTITY: &str =
-    "d1a9f8d57112b45acc463fa1b84a25be77c441c49d85071d328979fea0a59b1c";
+    "eb53eab3d4a05efddf7e1d3190d899aa82f800c5af82528f60f935fb23e48bc2";
 pub const SWIFT_BASELINE: &str = include_str!("../../../../spec/baselines/swift-single-v1.json");
 pub const CONTRACT_INPUTS: &str = SWIFT_BASELINE;
 pub const METHODS: &[&str] = &[
@@ -71,6 +71,7 @@ pub const METHODS: &[&str] = &[
     "operation.list",
     "recovery.flash-invocation.list",
     "runtime.bundle.inspect",
+    "runtime.bundle.list",
     "runtime.hdc.impact-preview",
     "runtime.hdc.restart",
     "runtime.hdc.status",
@@ -362,6 +363,10 @@ pub const METHOD_SCHEMAS: &[(&str, &str)] = &[
     (
         "runtime.bundle.inspect",
         include_str!("../../../../spec/control/methods/runtime.bundle.inspect.json"),
+    ),
+    (
+        "runtime.bundle.list",
+        include_str!("../../../../spec/control/methods/runtime.bundle.list.json"),
     ),
     (
         "runtime.hdc.impact-preview",

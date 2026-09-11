@@ -1209,9 +1209,9 @@ enum CLICommandRegistry {
         options: [bootstrapBundleRefOption, outputOption, jsonOption, controlRequestIDOption]),
       CLILeafSpec(token: "remove", canonicalCommand: "runtime.bundle.remove",
         summary: "retire an unreferenced bundle generation while retaining historical bytes",
-        options: [bootstrapBundleRefOption,
+        options: runtimeClientOptions([bootstrapBundleRefOption,
           CLIOptionSpec(name: "--expected-generation", form: .value(placeholder: "generation", grammar: .positiveInteger(1...Int.max)), summary: "exact available generation", isRequired: true),
-          outputOption, jsonOption, controlRequestIDOption]),
+          ]), connectsToRuntime: true),
     ])
 
   private static let bootstrapBundleRefOption = CLIOptionSpec(

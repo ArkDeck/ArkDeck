@@ -119,6 +119,7 @@ enum CLIControlMethodRegistry {
     "runtime.hdc.restart",
     "runtime.tool.register",
     "runtime.tool.select",
+    "runtime.bundle.remove",
     "control-action.list",
     "control-action.show",
     "control-action.reconcile",
@@ -255,6 +256,11 @@ enum CLIControlFailureMapper {
       evidence.phase == "bootstrapRegistryOwner", evidence.newDispatchCount == 0,
       ["invalidInput", "invalidCursor", "resourceConflict", "admissionDenied", "recordUnreadable",
         "operationUnavailable", "inputTooLarge"].contains(wireCode),
+      let code = CLIErrorCode(rawValue: wireCode) { return code }
+    if method == "runtime.bundle.remove",
+      evidence.phase == "bootstrapRegistryOwner", evidence.newDispatchCount == 0,
+      ["invalidInput", "resourceNotFound", "resourceConflict", "admissionDenied", "recordUnreadable",
+        "quotaExceeded", "outcomeUnknown", "operationUnavailable"].contains(wireCode),
       let code = CLIErrorCode(rawValue: wireCode) { return code }
     // Target display names are a Runtime-owned local resource. The owner can
     // prove exact CAS and validation failures without claiming that a lost

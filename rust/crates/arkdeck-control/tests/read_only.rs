@@ -116,6 +116,7 @@ fn every_unimplemented_method_is_refused_without_entering_the_host() {
             "operation.describe",
             "runtime.tool.register",
             "runtime.bundle.list",
+            "runtime.bundle.remove",
         ]
         .contains(method)
         {
@@ -418,5 +419,35 @@ fn bundle_list_structure_is_closed_and_unconfigured_owner_is_explicit() {
         assert_eq!(error.code, "operationUnavailable");
         assert_eq!(error.details.unwrap()["phase"], "bootstrapRegistryOwner");
     }
+    assert_eq!(reads.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn bundle_retirement_is_typed_and_unconfigured_owner_is_explicit() {
+    let (control, reads) = setup();
+    let method = "runtime.bundle.remove";
+    if !METHODS.contains(&method) {
+        return;
+    }
+    for params in [
+        json!({}),
+        json!({"bundle":null,"expectedGeneration":"1"}),
+        json!({"bundle":"invalid","expectedGeneration":1}),
+        json!({"bundle":"invalid","expectedGeneration":"1","path":"/tmp"}),
+    ] {
+        assert_eq!(
+            call(&control, method, params).outcome.unwrap_err().code,
+            "invalidParams"
+        );
+    }
+    let error = call(
+        &control,
+        method,
+        json!({"bundle":"invalid","expectedGeneration":"2"}),
+    )
+    .outcome
+    .unwrap_err();
+    assert_eq!(error.code, "operationUnavailable");
+    assert_eq!(error.details.unwrap()["phase"], "bootstrapRegistryOwner");
     assert_eq!(reads.load(Ordering::SeqCst), 0);
 }

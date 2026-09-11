@@ -67,6 +67,9 @@ impl CliError {
         }
     }
     pub fn from_client(error: ClientError, method: &str) -> Self {
+        if method == "runtime.bundle.remove" {
+            return bootstrap_resources::retirement_error(error);
+        }
         let mut result = match error {
             ClientError::Transport(error) => Self::new(
                 if matches!(
@@ -359,6 +362,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["runtime", "tool", "inspect"] => "runtime.tool.inspect",
         ["runtime", "bundle", "inspect"] => "runtime.bundle.inspect",
         ["runtime", "bundle", "list"] => "runtime.bundle.list",
+        ["runtime", "bundle", "remove"] => "runtime.bundle.remove",
         ["runtime", "storage", "status"] => "runtime.storage.status",
         ["runtime", "storage", "policy"] => "runtime.storage.policy",
         ["runtime", "storage", "root"] => "runtime.storage.root",
@@ -424,6 +428,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             "thread",
         ],
         "runtime.bundle.list" => &["pageSize", "cursor"],
+        "runtime.bundle.remove" => &["bundle", "expectedGeneration"],
         "session.list" => &["pageSize", "cursor"],
         "session.show" => &["sessionId"],
         "session.export.preview" => &["sessionId", "destinationPath", "allowSensitive"],
@@ -640,6 +645,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                     | "runtime.bundle.inspect"
                     | "runtime.tool.register"
                     | "runtime.bundle.list"
+                    | "runtime.bundle.remove"
             )
             || command.starts_with("session.")
             || matches!(

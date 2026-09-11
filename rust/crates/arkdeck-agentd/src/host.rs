@@ -129,6 +129,24 @@ impl HostServices for Host {
             .bundle_list(page_size, cursor)
     }
     #[cfg(target_os = "macos")]
+    fn bootstrap_bundle_remove(
+        &self,
+        reference: &str,
+        generation: &str,
+    ) -> Result<serde_json::Value, WireError> {
+        self.bootstrap
+            .as_ref()
+            .ok_or_else(|| WireError {
+                code: "operationUnavailable".into(),
+                message: "Bootstrap bundle retirement owner is not configured".into(),
+                details: Some(serde_json::Map::from_iter([
+                    ("phase".into(), serde_json::json!("bootstrapRegistryOwner")),
+                    ("newDispatchCount".into(), serde_json::json!(0)),
+                ])),
+            })?
+            .bundle_remove(reference, generation)
+    }
+    #[cfg(target_os = "macos")]
     fn bootstrap_inspect(
         &self,
         kind: arkdeck_control::BootstrapRegistryKind,

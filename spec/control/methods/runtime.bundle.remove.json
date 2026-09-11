@@ -1,0 +1,162 @@
+{
+  "$defs": {
+    "errorCode": {
+      "enum": [
+        "admissionDenied",
+        "conflict",
+        "internalError",
+        "invalidInput",
+        "invalidParams",
+        "malformedFrame",
+        "notFound",
+        "operationUnavailable",
+        "outcomeUnknown",
+        "quotaExceeded",
+        "recordUnreadable",
+        "rejected",
+        "resourceConflict",
+        "resourceNotFound",
+        "unknownMethod",
+        "unsupportedProtocolVersion",
+        "workspaceReferenceNotFound"
+      ]
+    },
+    "errorDetails": {
+      "additionalProperties": false,
+      "properties": {
+        "newDispatchCount": {
+          "type": "integer"
+        },
+        "phase": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "newDispatchCount",
+        "phase"
+      ],
+      "type": "object"
+    },
+    "request": {
+      "additionalProperties": false,
+      "properties": {
+        "bundle": {
+          "type": "string"
+        },
+        "expectedGeneration": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "bundle",
+        "expectedGeneration"
+      ],
+      "type": "object"
+    },
+    "result": {
+      "additionalProperties": false,
+      "properties": {
+        "bundleRef": {
+          "type": "string"
+        },
+        "byteCount": {
+          "type": "string"
+        },
+        "contentDigest": {
+          "type": "string"
+        },
+        "contentRetained": {
+          "type": "boolean"
+        },
+        "contentSchemaVersion": {
+          "type": "string"
+        },
+        "digestAlgorithm": {
+          "type": "string"
+        },
+        "entryCount": {
+          "type": "string"
+        },
+        "generation": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "platform": {
+          "type": "string"
+        },
+        "references": {
+          "type": "array"
+        },
+        "registeredAtUTC": {
+          "type": "string"
+        },
+        "schemaVersion": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "trust": {
+          "additionalProperties": false,
+          "properties": {
+            "executionAssessment": {
+              "type": "string"
+            },
+            "policy": {
+              "type": "string"
+            },
+            "signature": {
+              "type": "string"
+            },
+            "teamIdentifier": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "executionAssessment",
+            "policy",
+            "signature",
+            "teamIdentifier"
+          ],
+          "type": "object"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "bundleRef",
+        "byteCount",
+        "contentDigest",
+        "contentRetained",
+        "contentSchemaVersion",
+        "digestAlgorithm",
+        "entryCount",
+        "generation",
+        "kind",
+        "platform",
+        "references",
+        "registeredAtUTC",
+        "schemaVersion",
+        "state",
+        "trust",
+        "version"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://arkdeck.dev/schemas/control/methods/runtime.bundle.remove.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Typed contract of the control-plane method `runtime.bundle.remove` on the single current protocol: the request parameters a caller may send, the result the Runtime answers with, and the structured error details it attaches to a refusal. Derived from frames recorded by a contract-test run; the committed corpus under Tests/ArkDeckContractTests/Fixtures/ControlFrames is validated against it.",
+  "title": "arkdeck.control.method/runtime.bundle.remove",
+  "x-arkdeck-contractIdentity": "993f6b374b44dd5096e127d8f8d524063143dfb212f170de7b8a6aca935d53fe",
+  "x-arkdeck-method": "runtime.bundle.remove",
+  "x-arkdeck-protocolVersion": "1.0.0",
+  "x-arkdeck-sampleCounts": {
+    "error": 8,
+    "request": 10,
+    "result": 2
+  }
+}

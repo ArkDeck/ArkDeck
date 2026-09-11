@@ -1467,7 +1467,7 @@
     "summary": "revalidate the content and signature of an exact bundle reference"
   - "catalogOperation": null
     "command": "runtime.bundle.remove"
-    "connectsToRuntime": false
+    "connectsToRuntime": true
     "kind": "executable"
     "lifecycleStatus": "current"
     "mutuallyExclusive":
@@ -1522,6 +1522,15 @@
         "required": false
         "stability": "standard"
         "summary": "correlate this control-plane call; not a Job or request identity"
+      - "form": "value"
+        "grammar":
+          "kind": "opaque"
+        "name": "--socket"
+        "placeholder": "absolute-path"
+        "published": false
+        "required": false
+        "stability": "macosCompatibilityOnly"
+        "summary": "macOS-only compatibility alias for the local Runtime endpoint"
     "outputModes":
       - "human"
       - "json"
