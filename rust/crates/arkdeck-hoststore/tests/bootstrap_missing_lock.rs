@@ -1,5 +1,5 @@
 #![cfg(target_os = "macos")]
-use arkdeck_hoststore::{BundleRegistryReadStore, DevEcoRegistryReadStore, ToolRegistryReadStore};
+use arkdeck_hoststore::{BundleRegistryReadStore, DevEcoRegistryReadStore, ToolRegistryStore};
 use arkdeck_platform::HostDirectory;
 use serde_json::json;
 use std::{
@@ -97,7 +97,7 @@ missing_lock_test!(
 );
 missing_lock_test!(
     tool_missing_lock_and_index_differ_from_contention,
-    ToolRegistryReadStore,
+    ToolRegistryStore,
     "tool:sha256:",
     "tools.json",
     "arkdeck.bootstrap-tools/2"

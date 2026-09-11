@@ -141,6 +141,14 @@ pub use host_bootstrap_tree::{
 };
 
 #[cfg(target_os = "macos")]
+mod bootstrap_tool_capture;
+#[cfg(target_os = "macos")]
+pub use bootstrap_tool_capture::{
+    BootstrapToolCapture, BootstrapToolCaptureError, BootstrapToolPublication,
+    BootstrapToolPublishError,
+};
+
+#[cfg(target_os = "macos")]
 mod host_bundle_signature;
 #[cfg(target_os = "macos")]
 pub use host_bundle_signature::{bootstrap_bundle_version, validate_production_daemon_bundle};

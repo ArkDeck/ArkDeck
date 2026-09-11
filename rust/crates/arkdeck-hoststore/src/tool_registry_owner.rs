@@ -1,4 +1,4 @@
-//! Read-only owner for an existing initialized bootstrap Tool registry.
+//! Owner for Bootstrap Tool metadata and immutable registered content.
 //! Every returned row has undergone fresh content and native signing checks.
 //! This API neither selects tools nor admits execution.
 use crate::{
@@ -12,9 +12,9 @@ use std::{
     path::{Path, PathBuf},
 };
 const MAXIMUM_INDEX: usize = 4 * 1024 * 1024;
-pub struct ToolRegistryReadStore {
-    root: HostDirectory,
-    path: PathBuf,
+pub struct ToolRegistryStore {
+    pub(crate) root: HostDirectory,
+    pub(crate) path: PathBuf,
 }
 fn corrupt() -> io::Error {
     io::Error::new(
@@ -35,7 +35,7 @@ fn same_trust(record: &Value, trust: &NativeCodeSignature) -> bool {
         && record["teamIdentifier"].as_str() == trust.team_identifier.as_deref()
         && record["codeDirectorySHA256"].as_str() == trust.code_directory_sha256.as_deref()
 }
-fn matches(record: &Value, content: &ToolContent) -> bool {
+pub(crate) fn matches(record: &Value, content: &ToolContent) -> bool {
     record["contentDigest"] == content.digest
         && record["executableSHA256"] == content.sha256
         && record["byteCount"].as_u64() == Some(content.byte_count)
@@ -53,7 +53,7 @@ fn matches(record: &Value, content: &ToolContent) -> bool {
                 })
         })
 }
-impl ToolRegistryReadStore {
+impl ToolRegistryStore {
     /// Requires a pre-existing bootstrap store; initialization and registration
     /// remain separate owner operations. No directory or lock file is created.
     pub fn open_existing(path: &Path) -> io::Result<Self> {
@@ -187,7 +187,7 @@ mod tests {
                 .remove("quarantineSHA256");
         }
         write(&root, "tools.json", &index);
-        let store = ToolRegistryReadStore::open_existing(&root).unwrap();
+        let store = ToolRegistryStore::open_existing(&root).unwrap();
         let value = store.inspect(&reference).unwrap();
         assert_eq!(value["toolRef"], reference);
         assert_eq!(value["trust"]["executionAssessment"], "notPerformed");

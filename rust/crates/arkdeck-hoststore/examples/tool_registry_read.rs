@@ -8,8 +8,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Err("unexpected argument".into());
     }
     let rows =
-        arkdeck_hoststore::ToolRegistryReadStore::open_existing(std::path::Path::new(&root))?
-            .list()?;
+        arkdeck_hoststore::ToolRegistryStore::open_existing(std::path::Path::new(&root))?.list()?;
     let bytes = arkdeck_contract::canonical_json(&serde_json::Value::Array(rows))?;
     std::io::stdout().write_all(&bytes)?;
     Ok(())
