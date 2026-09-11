@@ -219,7 +219,7 @@ final class BootstrapBundleRegistryContractTests: XCTestCase {
     }
   }
 
-  func testCLIRegistryExposesOnlyTypedBootstrapInputsAndNoRuntimeEndpoint() throws {
+  func testCLIRegistryRoutesBundleListToRuntimeAndKeepsOtherBootstrapLeavesLocal() throws {
     for argv in [
       ["runtime", "bundle", "register", "--kind", "daemon-bundle", "--file", "/tmp/helper.app", "--output", "json"],
       ["runtime", "bundle", "list", "--page-size", "5", "--output", "json"],
@@ -227,8 +227,15 @@ final class BootstrapBundleRegistryContractTests: XCTestCase {
       ["runtime", "bundle", "remove", "--bundle", "bundle:sha256:" + String(repeating: "a", count: 64), "--expected-generation", "1"],
     ] {
       guard case .success(.dispatch(_, let leaf, _)) = CLIArgumentParser.parse(argv) else { XCTFail("registry rejected \(argv)"); continue }
-      XCTAssertFalse(leaf.connectsToRuntime)
-      if case .success = CLIArgumentParser.parse(argv + ["--socket", "/tmp/ignored.sock"]) { XCTFail("bootstrap accepted daemon endpoint") }
+      if leaf.canonicalCommand == "runtime.bundle.list" {
+        XCTAssertTrue(leaf.connectsToRuntime)
+        guard case .success(.dispatch(_, let connected, _)) = CLIArgumentParser.parse(
+          argv + ["--socket", "/tmp/runtime.sock"]) else { XCTFail("bundle list rejected Runtime endpoint"); continue }
+        XCTAssertEqual(connected.canonicalCommand, "runtime.bundle.list")
+      } else {
+        XCTAssertFalse(leaf.connectsToRuntime)
+        if case .success = CLIArgumentParser.parse(argv + ["--socket", "/tmp/ignored.sock"]) { XCTFail("local bootstrap accepted daemon endpoint") }
+      }
       if case .success = CLIArgumentParser.parse(argv + ["--root", "/tmp/ignored"]) { XCTFail("bundle accepted SDK root schema") }
     }
   }

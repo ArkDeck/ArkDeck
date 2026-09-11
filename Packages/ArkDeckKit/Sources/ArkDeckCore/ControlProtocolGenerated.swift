@@ -5,7 +5,7 @@ package enum ArkDeckControlProtocol {
   package static let currentVersion = "1.0.0"
   package static let maximumRequestFrameBytes = 4194304
   package static let maximumResponseFrameBytes = 8388608
-  package static let contractIdentity = "d1a9f8d57112b45acc463fa1b84a25be77c441c49d85071d328979fea0a59b1c"
+  package static let contractIdentity = "eb53eab3d4a05efddf7e1d3190d899aa82f800c5af82528f60f935fb23e48bc2"
   package static let methods: Set<String> = [
     "agent.abandon",
     "agent.list",
@@ -70,6 +70,7 @@ package enum ArkDeckControlProtocol {
     "operation.list",
     "recovery.flash-invocation.list",
     "runtime.bundle.inspect",
+    "runtime.bundle.list",
     "runtime.hdc.impact-preview",
     "runtime.hdc.restart",
     "runtime.hdc.status",

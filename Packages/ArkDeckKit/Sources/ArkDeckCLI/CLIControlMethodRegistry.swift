@@ -43,6 +43,7 @@ enum CLIControlMethodRegistry {
     "runtime.storage.status",
     "runtime.tool.inspect",
     "runtime.bundle.inspect",
+    "runtime.bundle.list",
     "session.list",
     "session.show",
     "operation.list",
@@ -247,6 +248,13 @@ enum CLIControlFailureMapper {
       evidence.phase == "bootstrapRegistryOwner", evidence.newDispatchCount == 0,
       ["invalidInput", "fileIdentityChanged", "resourceConflict", "admissionDenied", "recordUnreadable",
         "quotaExceeded", "ioFailure", "outcomeUnknown", "operationUnavailable"].contains(wireCode),
+      let code = CLIErrorCode(rawValue: wireCode) { return code }
+    // Discovery pages preserve registered resources; their private snapshots
+    // confer no execution authority and owner failures carry zero dispatch.
+    if method == "runtime.bundle.list",
+      evidence.phase == "bootstrapRegistryOwner", evidence.newDispatchCount == 0,
+      ["invalidInput", "invalidCursor", "resourceConflict", "admissionDenied", "recordUnreadable",
+        "operationUnavailable", "inputTooLarge"].contains(wireCode),
       let code = CLIErrorCode(rawValue: wireCode) { return code }
     // Target display names are a Runtime-owned local resource. The owner can
     // prove exact CAS and validation failures without claiming that a lost

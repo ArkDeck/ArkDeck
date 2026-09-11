@@ -85,6 +85,12 @@ SESSION_OWNER_ERROR_CODES = [
     "operationUnavailable", "inputTooLarge", "recordUnreadable", "quotaExceeded",
     "ioFailure", "outcomeUnknown",
 ]
+# Bundle discovery uses the same bounded snapshot owner; its page-size and
+# encoded-size failures remain possible even when native fixture rows are small.
+BUNDLE_LIST_OWNER_ERROR_CODES = [
+    "invalidInput", "invalidCursor", "resourceConflict", "admissionDenied",
+    "recordUnreadable", "operationUnavailable", "inputTooLarge",
+]
 MAXIMUM_SIGNATURES_PER_METHOD = 24
 MAXIMUM_SAMPLE_BYTES = 65536
 
@@ -213,7 +219,8 @@ def derive_method_schemas(source):
                        | (set(SESSION_OWNER_ERROR_CODES) if method in {
                            "session.list", "session.show", "session.pin", "session.unpin",
                            "session.cleanup.preview", "session.export.preview", "session.export.apply"
-                       } else set()))
+                       } else set())
+                       | (set(BUNDLE_LIST_OWNER_ERROR_CODES) if method == "runtime.bundle.list" else set()))
         schema = {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "$id": f"https://arkdeck.dev/schemas/control/methods/{method}.json",

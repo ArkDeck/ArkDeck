@@ -1,0 +1,196 @@
+{
+  "$defs": {
+    "errorCode": {
+      "enum": [
+        "admissionDenied",
+        "conflict",
+        "inputTooLarge",
+        "internalError",
+        "invalidCursor",
+        "invalidInput",
+        "invalidParams",
+        "malformedFrame",
+        "notFound",
+        "operationUnavailable",
+        "recordUnreadable",
+        "rejected",
+        "resourceConflict",
+        "unknownMethod",
+        "unsupportedProtocolVersion",
+        "workspaceReferenceNotFound"
+      ]
+    },
+    "errorDetails": {
+      "additionalProperties": false,
+      "properties": {
+        "newDispatchCount": {
+          "type": "integer"
+        },
+        "phase": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "newDispatchCount",
+        "phase"
+      ],
+      "type": "object"
+    },
+    "request": {
+      "additionalProperties": false,
+      "properties": {
+        "cursor": {
+          "type": "string"
+        },
+        "pageSize": {
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "result": {
+      "additionalProperties": false,
+      "properties": {
+        "hasMore": {
+          "type": "boolean"
+        },
+        "items": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "bundleRef": {
+                "type": "string"
+              },
+              "byteCount": {
+                "type": "string"
+              },
+              "contentDigest": {
+                "type": "string"
+              },
+              "contentRetained": {
+                "type": "boolean"
+              },
+              "contentSchemaVersion": {
+                "type": "string"
+              },
+              "digestAlgorithm": {
+                "type": "string"
+              },
+              "entryCount": {
+                "type": "string"
+              },
+              "generation": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "platform": {
+                "type": "string"
+              },
+              "references": {
+                "type": "array"
+              },
+              "registeredAtUTC": {
+                "type": "string"
+              },
+              "schemaVersion": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string"
+              },
+              "trust": {
+                "additionalProperties": false,
+                "properties": {
+                  "executionAssessment": {
+                    "type": "string"
+                  },
+                  "policy": {
+                    "type": "string"
+                  },
+                  "signature": {
+                    "type": "string"
+                  },
+                  "teamIdentifier": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "executionAssessment",
+                  "policy",
+                  "signature",
+                  "teamIdentifier"
+                ],
+                "type": "object"
+              },
+              "version": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "bundleRef",
+              "byteCount",
+              "contentDigest",
+              "contentRetained",
+              "contentSchemaVersion",
+              "digestAlgorithm",
+              "entryCount",
+              "generation",
+              "kind",
+              "platform",
+              "references",
+              "registeredAtUTC",
+              "schemaVersion",
+              "state",
+              "trust",
+              "version"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "nextCursor": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "order": {
+          "type": "string"
+        },
+        "pageKind": {
+          "type": "string"
+        },
+        "schemaVersion": {
+          "type": "string"
+        },
+        "snapshotRevision": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "hasMore",
+        "items",
+        "nextCursor",
+        "order",
+        "pageKind",
+        "schemaVersion",
+        "snapshotRevision"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://arkdeck.dev/schemas/control/methods/runtime.bundle.list.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Typed contract of the control-plane method `runtime.bundle.list` on the single current protocol: the request parameters a caller may send, the result the Runtime answers with, and the structured error details it attaches to a refusal. Derived from frames recorded by a contract-test run; the committed corpus under Tests/ArkDeckContractTests/Fixtures/ControlFrames is validated against it.",
+  "title": "arkdeck.control.method/runtime.bundle.list",
+  "x-arkdeck-contractIdentity": "eb53eab3d4a05efddf7e1d3190d899aa82f800c5af82528f60f935fb23e48bc2",
+  "x-arkdeck-method": "runtime.bundle.list",
+  "x-arkdeck-protocolVersion": "1.0.0",
+  "x-arkdeck-sampleCounts": {
+    "error": 9,
+    "request": 13,
+    "result": 4
+  }
+}

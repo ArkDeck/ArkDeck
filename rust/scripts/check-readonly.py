@@ -298,6 +298,8 @@ def main() -> None:
                     expected = ("rejected" if method not in SUPPORTED or method == "device.observations" else None)
                     if method in {"runtime.tool.inspect", "runtime.bundle.inspect", "operation.describe", "runtime.tool.register"}:
                         expected = "invalidParams"
+                    if method == "runtime.bundle.list":
+                        expected = "operationUnavailable"
                     exchange(endpoint, directory, rows, method, encode(request(registry, method, method)), method, expected)
                 wire_descriptor = exchange(endpoint, directory, rows, "descriptor-success",
                     encode(request(registry, "operation.describe", "descriptor-success", {"reference": reference})),

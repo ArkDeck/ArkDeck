@@ -8,9 +8,17 @@ extension RuntimeCLI {
   static func runBootstrapBundle(_ arguments: [String], registry supplied: BootstrapBundleRegistry? = nil) throws {
     guard let verb = arguments.first else { throw CLIError(exitCode: 64, message: "bundle subcommand is required") }
     var rest = Array(arguments.dropFirst())
-    let session = runtimeSession(&rest, command: "runtime.bundle.\(verb)", connectsToRuntime: false)
+    let listRPC = verb == "list" && supplied == nil
+    var session = runtimeSession(&rest, command: "runtime.bundle.\(verb)", connectsToRuntime: listRPC)
     do {
       let options = try CLIOptions(rest)
+      if listRPC {
+        let size = Int(options.value("--page-size") ?? "100") ?? 0
+        var fields: [String: JSONValue] = ["pageSize": .integer(Int64(size))]
+        if let cursor = options.value("--cursor") { fields["cursor"] = .string(cursor) }
+        session.emit(try session.request("runtime.bundle.list", fields))
+        return
+      }
       let registry = try supplied ?? BootstrapBundleRegistry(validateBundle: { candidate in
         _ = try LaunchAgentService.validateProductionDaemonBundle(
           candidate, fileManager: .default)
