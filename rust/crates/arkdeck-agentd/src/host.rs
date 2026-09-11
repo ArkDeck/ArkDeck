@@ -13,6 +13,8 @@ pub struct Host {
     #[cfg(target_os = "macos")]
     history: Option<arkdeck_hoststore::HistoryStore>,
     #[cfg(target_os = "macos")]
+    trace_cache: Option<arkdeck_hoststore::TraceCacheStore>,
+    #[cfg(target_os = "macos")]
     storage: Option<(
         arkdeck_hoststore::SessionStore,
         arkdeck_hoststore::ArtifactUsage,
@@ -22,6 +24,11 @@ pub struct Host {
 }
 
 impl Host {
+    #[cfg(target_os = "macos")]
+    pub fn with_trace_cache(mut self, cache: arkdeck_hoststore::TraceCacheStore) -> Self {
+        self.trace_cache = Some(cache);
+        self
+    }
     #[cfg(target_os = "macos")]
     pub fn with_storage(
         mut self,
@@ -56,6 +63,8 @@ impl Host {
             #[cfg(target_os = "macos")]
             history: None,
             #[cfg(target_os = "macos")]
+            trace_cache: None,
+            #[cfg(target_os = "macos")]
             storage: None,
             unavailable,
             generation: Mutex::new(0),
@@ -64,6 +73,17 @@ impl Host {
 }
 
 impl HostServices for Host {
+    #[cfg(target_os = "macos")]
+    fn trace_cache_status(&self) -> Result<serde_json::Value, WireError> {
+        self.trace_cache
+            .as_ref()
+            .ok_or_else(|| WireError {
+                code: "rejected".into(),
+                message: "Trace cache maintenance is not configured".into(),
+                details: None,
+            })?
+            .status()
+    }
     #[cfg(target_os = "macos")]
     fn session_resource(
         &self,

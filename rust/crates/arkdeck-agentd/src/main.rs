@@ -63,17 +63,19 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         // Own the whole development root before creating or probing any store.
         // A second daemon must not perturb a live owner's census on startup.
         development_listener = Some(LocalListener::bind_facade(&endpoint)?);
-        for name in ["session-state", "sessions", "artifacts"] {
+        for name in ["session-state", "sessions", "artifacts", "trace-cache"] {
             directory.private_child(name)?;
         }
         directory.validate_path(&root)?;
         let artifacts = root.join("artifacts");
+        let trace_cache = root.join("trace-cache");
         let sessions = arkdeck_hoststore::SessionStore::open(
             &root.join("session-state"),
             &root.join("sessions"),
         )?
-        .isolated(&root, vec![artifacts.clone()])?;
+        .isolated(&root, vec![artifacts.clone(), trace_cache.clone()])?;
         host.with_history(arkdeck_hoststore::HistoryStore::open(&root)?)
+            .with_trace_cache(arkdeck_hoststore::TraceCacheStore::open(&trace_cache)?)
             .with_storage(
                 sessions,
                 arkdeck_hoststore::ArtifactUsage::open(&artifacts, 8 * 1024 * 1024 * 1024)?,
