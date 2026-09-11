@@ -61,7 +61,10 @@
       "additionalProperties": false,
       "properties": {
         "artifactDigest": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "artifactId": {
           "type": "string"
@@ -70,7 +73,10 @@
           "additionalProperties": false,
           "properties": {
             "bindingRevision": {
-              "type": "integer"
+              "type": [
+                "integer",
+                "null"
+              ]
             },
             "stableIdentitySha256": {
               "type": [
@@ -108,7 +114,29 @@
           "type": "string"
         },
         "observationWindow": {
-          "type": "null"
+          "anyOf": [
+            {
+              "additionalProperties": false,
+              "properties": {
+                "endUtc": {
+                  "type": "string"
+                },
+                "startUtc": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "endUtc",
+                "startUtc"
+              ],
+              "type": "object"
+            },
+            {
+              "type": [
+                "null"
+              ]
+            }
+          ]
         },
         "owner": {
           "additionalProperties": false,
@@ -198,8 +226,8 @@
   "x-arkdeck-method": "artifact.inspect",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 4,
-    "request": 46,
-    "result": 42
+    "error": 2,
+    "request": 8,
+    "result": 6
   }
 }

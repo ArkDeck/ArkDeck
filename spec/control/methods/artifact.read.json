@@ -12,6 +12,7 @@
         "operationUnavailable",
         "recordUnreadable",
         "rejected",
+        "resourceNotFound",
         "sensitiveAccessDenied",
         "unknownMethod",
         "unsupportedProtocolVersion",
@@ -120,8 +121,8 @@
   "x-arkdeck-method": "artifact.read",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 22,
-    "request": 58,
-    "result": 36
+    "error": 8,
+    "request": 13,
+    "result": 5
   }
 }

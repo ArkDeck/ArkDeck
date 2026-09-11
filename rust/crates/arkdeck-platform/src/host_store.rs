@@ -713,6 +713,97 @@ impl HostDirectory {
         Ok(())
     }
 
+    /// Hash the entire immutable payload while retaining only the requested range.
+    /// No bytes escape until the held descriptor and named inode are revalidated.
+    pub fn verify_payload_range(
+        &self,
+        name: &str,
+        length: u64,
+        digest: &str,
+        offset: u64,
+        maximum: usize,
+    ) -> io::Result<Vec<u8>> {
+        self.verify_payload_range_checked(name, length, digest, offset, maximum, || {})
+    }
+
+    fn verify_payload_range_checked(
+        &self,
+        name: &str,
+        length: u64,
+        digest: &str,
+        offset: u64,
+        maximum: usize,
+        after_read: impl FnOnce(),
+    ) -> io::Result<Vec<u8>> {
+        use sha2::{Digest, Sha256};
+        if offset > length || maximum == 0 || maximum > 4_194_304 {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "Invalid Artifact range",
+            ));
+        }
+        let file = self.open_at(name, 0)?;
+        owned(&file, false, self.1)?;
+        let before = file.metadata()?;
+        if before.len() != length {
+            return Err(fail());
+        }
+        let end = offset + (length - offset).min(maximum as u64);
+        let mut bytes = Vec::with_capacity((end - offset) as usize);
+        let mut reader = &file;
+        let mut buffer = [0_u8; 65536];
+        let mut hashed = 0_u64;
+        let mut hash = Sha256::new();
+        loop {
+            let count = match reader.read(&mut buffer) {
+                Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
+                result => result?,
+            };
+            if count == 0 {
+                break;
+            }
+            let next = hashed.checked_add(count as u64).ok_or_else(fail)?;
+            if next > length {
+                return Err(fail());
+            }
+            let start = offset.max(hashed);
+            let stop = end.min(next);
+            if start < stop {
+                bytes.extend_from_slice(
+                    &buffer[(start - hashed) as usize..(stop - hashed) as usize],
+                );
+            }
+            hash.update(&buffer[..count]);
+            hashed = next;
+        }
+        after_read();
+        owned(&file, false, self.1)?;
+        let after = file.metadata()?;
+        let linked = self.stat_at(name)?;
+        if hashed != length
+            || format!("{:x}", hash.finalize()) != digest
+            || before.len() != after.len()
+            || before.mode() != after.mode()
+            || before.uid() != after.uid()
+            || before.nlink() != after.nlink()
+            || before.mtime() != after.mtime()
+            || before.mtime_nsec() != after.mtime_nsec()
+            || before.ctime() != after.ctime()
+            || before.ctime_nsec() != after.ctime_nsec()
+            || before.dev() != linked.st_dev as u64
+            || before.ino() != linked.st_ino
+            || before.mode() != linked.st_mode as u32
+            || before.len() != linked.st_size as u64
+            || before.mtime() != linked.st_mtime
+            || before.mtime_nsec() != linked.st_mtime_nsec
+            || before.ctime() != linked.st_ctime
+            || before.ctime_nsec() != linked.st_ctime_nsec
+        {
+            return Err(fail());
+        }
+        Ok(bytes)
+    }
+
     /// Match ArkTrace's existing lock probe. O_RDWR is needed to preserve its
     /// refusal of read-only lock files; no creation, truncation or write occurs.
     /// Key locks are bounded to 4096 bytes; entry leases have no size bound.
@@ -860,6 +951,44 @@ mod publication_tests {
                 b"recovered\n"
             );
             fs::remove_dir_all(path).unwrap();
+        }
+    }
+}
+
+#[cfg(test)]
+mod artifact_range_tests {
+    use super::*;
+    use std::{
+        fs,
+        os::unix::fs::{DirBuilderExt, PermissionsExt},
+    };
+    #[test]
+    fn artifact_range_refuses_mutation_and_replacement_at_read_checkpoint() {
+        for replace in [false, true] {
+            let nonce = crate::random_bytes::<16>().unwrap();
+            let path = std::env::temp_dir()
+                .canonicalize()
+                .unwrap()
+                .join(format!("artifact-range-{:x}", u128::from_ne_bytes(nonce)));
+            fs::DirBuilder::new().mode(0o700).create(&path).unwrap();
+            let payload = path.join("payload");
+            fs::write(&payload, b"abc").unwrap();
+            fs::set_permissions(&payload, fs::Permissions::from_mode(0o600)).unwrap();
+            let directory = HostDirectory::open(&path).unwrap();
+            let digest = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+            let result = directory.verify_payload_range_checked("payload", 3, digest, 0, 1, || {
+                if replace {
+                    fs::rename(&payload, path.join("retained-original")).unwrap();
+                    fs::write(&payload, b"abc").unwrap();
+                    fs::set_permissions(&payload, fs::Permissions::from_mode(0o600)).unwrap();
+                } else {
+                    fs::write(&payload, b"abd").unwrap();
+                }
+            });
+            assert!(
+                result.is_err(),
+                "changed identity or bytes must never return the captured range"
+            );
         }
     }
 }
