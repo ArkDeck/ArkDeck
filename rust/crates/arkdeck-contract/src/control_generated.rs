@@ -4,7 +4,7 @@ pub const PROTOCOL_VERSION: &str = "1.0.0";
 pub const MAX_REQUEST_BYTES: usize = 4194304;
 pub const MAX_RESPONSE_BYTES: usize = 8388608;
 pub const CONTRACT_IDENTITY: &str =
-    "05a9f1ad8309a0cd23666bf00aa07eb4c04f317e882183f9aa612568faf64492";
+    "d1a9f8d57112b45acc463fa1b84a25be77c441c49d85071d328979fea0a59b1c";
 pub const SWIFT_BASELINE: &str = include_str!("../../../../spec/baselines/swift-single-v1.json");
 pub const CONTRACT_INPUTS: &str = SWIFT_BASELINE;
 pub const METHODS: &[&str] = &[
@@ -78,6 +78,7 @@ pub const METHODS: &[&str] = &[
     "runtime.storage.root",
     "runtime.storage.status",
     "runtime.tool.inspect",
+    "runtime.tool.register",
     "runtime.tool.select",
     "session.cleanup.apply",
     "session.cleanup.preview",
@@ -389,6 +390,10 @@ pub const METHOD_SCHEMAS: &[(&str, &str)] = &[
     (
         "runtime.tool.inspect",
         include_str!("../../../../spec/control/methods/runtime.tool.inspect.json"),
+    ),
+    (
+        "runtime.tool.register",
+        include_str!("../../../../spec/control/methods/runtime.tool.register.json"),
     ),
     (
         "runtime.tool.select",

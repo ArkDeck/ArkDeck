@@ -1,5 +1,5 @@
-//! Fixed-root Bootstrap inventory and DevEco metadata registration. No
-//! selection, installation, process launch or execution authority is exposed.
+//! Fixed-root Bootstrap inventory, private list snapshots and DevEco metadata registration.
+//! No selection, installation, process launch or execution authority is exposed.
 use arkdeck_contract::WireError;
 use arkdeck_control::BootstrapRegistryKind;
 use arkdeck_hoststore::{BundleRegistryReadStore, DevEcoRegistryStore, ToolRegistryStore};
@@ -18,6 +18,9 @@ impl BootstrapReaders {
             bundles: BundleRegistryReadStore::open_existing(root)?,
             deveco: DevEcoRegistryStore::open_existing(root)?,
         })
+    }
+    pub fn bundle_list(&self, page_size: usize, cursor: Option<&str>) -> Result<Value, WireError> {
+        self.bundles.list_page(page_size, cursor)
     }
     pub fn inspect(
         &self,

@@ -103,6 +103,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
   private let bootstrapDevEcoRegistrar: (@Sendable (String) async throws -> JSONValue)?
   private let bootstrapToolInspector: (@Sendable (String) async throws -> JSONValue)?
   private let bootstrapBundleInspector: (@Sendable (String) async throws -> JSONValue)?
+  private let bootstrapBundleLister: (@Sendable (Int, String?) async throws -> JSONValue)?
   private let toolSelectionActions: RuntimeToolSelectionControlActionCoordinator?
   private let controlActions: RuntimeControlActionResourceCoordinator?
   private let artifactStore: RuntimeArtifactStore?
@@ -156,6 +157,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     bootstrapDevEcoRegistrar: (@Sendable (String) async throws -> JSONValue)? = nil,
     bootstrapToolInspector: (@Sendable (String) async throws -> JSONValue)? = nil,
     bootstrapBundleInspector: (@Sendable (String) async throws -> JSONValue)? = nil,
+    bootstrapBundleLister: (@Sendable (Int, String?) async throws -> JSONValue)? = nil,
     controlActions: RuntimeControlActionResourceCoordinator? = nil,
     artifactStore: RuntimeArtifactStore? = nil,
     historyFilterStore: RuntimeHistoryFilterStore? = nil,
@@ -188,6 +190,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
       bootstrapDevEcoRegistrar: bootstrapDevEcoRegistrar,
       bootstrapToolInspector: bootstrapToolInspector,
       bootstrapBundleInspector: bootstrapBundleInspector,
+      bootstrapBundleLister: bootstrapBundleLister,
       controlActions: controlActions,
       artifactStore: artifactStore,
       historyFilterStore: historyFilterStore,
@@ -226,6 +229,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     bootstrapDevEcoRegistrar: (@Sendable (String) async throws -> JSONValue)? = nil,
     bootstrapToolInspector: (@Sendable (String) async throws -> JSONValue)? = nil,
     bootstrapBundleInspector: (@Sendable (String) async throws -> JSONValue)? = nil,
+    bootstrapBundleLister: (@Sendable (Int, String?) async throws -> JSONValue)? = nil,
     controlActions: RuntimeControlActionResourceCoordinator? = nil,
     artifactStore: RuntimeArtifactStore?,
     historyFilterStore: RuntimeHistoryFilterStore? = nil,
@@ -263,6 +267,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     self.bootstrapDevEcoRegistrar = bootstrapDevEcoRegistrar
     self.bootstrapToolInspector = bootstrapToolInspector
     self.bootstrapBundleInspector = bootstrapBundleInspector
+    self.bootstrapBundleLister = bootstrapBundleLister
     self.controlActions = controlActions
     self.artifactStore = artifactStore
     self.historyFilterStore = historyFilterStore
@@ -350,6 +355,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
     case "runtime.tool.register":
       return await bootstrapRegistrationRequest(request)
 
+    case "runtime.bundle.list":
+      return await bootstrapBundleListRequest(request)
     case "runtime.tool.inspect", "runtime.bundle.inspect":
       return await bootstrapInspectionRequest(request)
     case "agent.run", "agent.status", "agent.list", "agent.abandon", "agent.resume":
@@ -2713,6 +2720,53 @@ public struct RuntimeControlPlaneHandler: Sendable {
     } catch {
       return failed("outcomeUnknown", "DevEco registration completed without a bounded receipt")
     }
+  }
+
+  // Host bootstrap reads consume only exact references, never registration paths.
+  private func bootstrapBundleListRequest(_ request: AgentWireProtocol.Request) async -> AgentWireProtocol.Response {
+    func failed(_ code: String, _ message: String) -> AgentWireProtocol.Response {
+      .init(id: request.id, ok: false, result: nil,
+        error: .init(code: code, message: message,
+          details: ["phase": .string("bootstrapRegistryOwner"), "newDispatchCount": .integer(0)]))
+    }
+    let fields = request.params ?? [:]
+    guard Set(fields.keys).isSubset(of: ["pageSize", "cursor"]) else {
+      return failed("invalidParams", "bundle list accepts only pageSize and cursor")
+    }
+    let size: Int
+    switch fields["pageSize"] {
+    case nil: size = 100
+    case .integer(let value)?:
+      guard let exact = Int(exactly: value) else { return failed("invalidParams", "pageSize must be an integer") }
+      size = exact
+    case .unsignedInteger(let value)?:
+      guard let exact = Int(exactly: value) else { return failed("invalidParams", "pageSize must be an integer") }
+      size = exact
+    default: return failed("invalidParams", "pageSize must be an integer")
+    }
+    let cursor: String?
+    switch fields["cursor"] {
+    case nil: cursor = nil
+    case .string(let value)?: cursor = value
+    default: return failed("invalidParams", "cursor must be a string")
+    }
+    guard let list = bootstrapBundleLister else {
+      return failed("operationUnavailable", "bootstrap bundle list owner is unavailable")
+    }
+    do {
+      // The owner verifies current inventory before range/cursor checks, and
+      // keeps the Bootstrap lock through immutable snapshot publication.
+      let value = try await list(size, cursor)
+      return .init(id: request.id, ok: true,
+        result: try RuntimeJobReadProjection.bounded(value,
+          maximumBytes: ArkDeckControlProtocol.maximumResponseFrameBytes - 4096), error: nil)
+    } catch let error as AgentExecutionControlFailure {
+      switch error.code {
+      case "resourceConflict", "admissionDenied", "invalidInput", "invalidCursor", "inputTooLarge", "operationUnavailable":
+        return failed(error.code, error.message)
+      default: return failed("recordUnreadable", "bundle inventory or snapshot is unreadable")
+      }
+    } catch { return failed("recordUnreadable", "bundle inventory or snapshot is unreadable") }
   }
 
   // Host bootstrap reads consume only exact references, never registration paths.

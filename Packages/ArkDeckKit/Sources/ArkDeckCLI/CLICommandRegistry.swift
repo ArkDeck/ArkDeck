@@ -1203,7 +1203,7 @@ enum CLICommandRegistry {
         ]),
       CLILeafSpec(token: "list", canonicalCommand: "runtime.bundle.list",
         summary: "read an immutable snapshot of registered bundle metadata",
-        options: snapshotPageOptions + [outputOption, jsonOption, controlRequestIDOption]),
+        options: runtimeClientOptions(snapshotPageOptions), connectsToRuntime: true),
       CLILeafSpec(token: "inspect", canonicalCommand: "runtime.bundle.inspect",
         summary: "revalidate the content and signature of an exact bundle reference",
         options: [bootstrapBundleRefOption, outputOption, jsonOption, controlRequestIDOption]),

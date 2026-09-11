@@ -142,7 +142,10 @@ impl CliError {
                     }));
                 let bootstrap_proof = matches!(
                     method,
-                    "runtime.tool.inspect" | "runtime.bundle.inspect" | "runtime.tool.register"
+                    "runtime.tool.inspect"
+                        | "runtime.bundle.inspect"
+                        | "runtime.tool.register"
+                        | "runtime.bundle.list"
                 ) && error.details.as_ref().is_some_and(|details| {
                     details.get("phase") == Some(&json!("bootstrapRegistryOwner"))
                         && details.get("newDispatchCount") == Some(&json!(0))
@@ -355,6 +358,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["runtime", "tool", "register"] => "runtime.tool.register",
         ["runtime", "tool", "inspect"] => "runtime.tool.inspect",
         ["runtime", "bundle", "inspect"] => "runtime.bundle.inspect",
+        ["runtime", "bundle", "list"] => "runtime.bundle.list",
         ["runtime", "storage", "status"] => "runtime.storage.status",
         ["runtime", "storage", "policy"] => "runtime.storage.policy",
         ["runtime", "storage", "root"] => "runtime.storage.root",
@@ -419,6 +423,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             "targetId",
             "thread",
         ],
+        "runtime.bundle.list" => &["pageSize", "cursor"],
         "session.list" => &["pageSize", "cursor"],
         "session.show" => &["sessionId"],
         "session.export.preview" => &["sessionId", "destinationPath", "allowSensitive"],
@@ -481,7 +486,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             .entry("allowSensitive")
             .or_insert(json!(false));
     }
-    if !help && command == "session.list" {
+    if !help && matches!(command, "session.list" | "runtime.bundle.list") {
         let size = method_options
             .get("pageSize")
             .map_or(Some(100), |value| {
@@ -631,7 +636,10 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             || command.starts_with("runtime.storage.")
             || matches!(
                 command,
-                "runtime.tool.inspect" | "runtime.bundle.inspect" | "runtime.tool.register"
+                "runtime.tool.inspect"
+                    | "runtime.bundle.inspect"
+                    | "runtime.tool.register"
+                    | "runtime.bundle.list"
             )
             || command.starts_with("session.")
             || matches!(

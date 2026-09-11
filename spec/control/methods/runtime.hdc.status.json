@@ -200,7 +200,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Typed contract of the control-plane method `runtime.hdc.status` on the single current protocol: the request parameters a caller may send, the result the Runtime answers with, and the structured error details it attaches to a refusal. Derived from frames recorded by a contract-test run; the committed corpus under Tests/ArkDeckContractTests/Fixtures/ControlFrames is validated against it.",
   "title": "arkdeck.control.method/runtime.hdc.status",
-  "x-arkdeck-contractIdentity": "d1a9f8d57112b45acc463fa1b84a25be77c441c49d85071d328979fea0a59b1c",
+  "x-arkdeck-contractIdentity": "eb53eab3d4a05efddf7e1d3190d899aa82f800c5af82528f60f935fb23e48bc2",
   "x-arkdeck-method": "runtime.hdc.status",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {

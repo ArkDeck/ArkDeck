@@ -35,6 +35,20 @@ pub trait HostServices: Send + Sync {
             details: None,
         })
     }
+    fn bootstrap_bundle_list(
+        &self,
+        _page_size: usize,
+        _cursor: Option<&str>,
+    ) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "operationUnavailable".into(),
+            message: "Bootstrap bundle list owner is not configured".into(),
+            details: Some(serde_json::Map::from_iter([
+                ("phase".into(), json!("bootstrapRegistryOwner")),
+                ("newDispatchCount".into(), json!(0)),
+            ])),
+        })
+    }
     fn bootstrap_inspect(
         &self,
         _kind: BootstrapRegistryKind,
@@ -322,6 +336,40 @@ impl<H: HostServices> Control<H> {
                             .host
                             .bootstrap_register_deveco(root.expect("validated root")),
                     });
+                }
+            }
+            "runtime.bundle.list" => {
+                let size = match params.get("pageSize") {
+                    None => Some(100),
+                    Some(value) => value.as_i64(),
+                };
+                let cursor = params.get("cursor");
+                let valid = params
+                    .keys()
+                    .all(|key| matches!(key.as_str(), "pageSize" | "cursor"))
+                    && size.is_some()
+                    && cursor.is_none_or(Value::is_string);
+                if !valid {
+                    Response {
+                        id: request.id.clone(),
+                        outcome: Err(WireError {
+                            code: "invalidParams".into(),
+                            message: "bundle list accepts only integer pageSize and string cursor"
+                                .into(),
+                            details: Some(serde_json::Map::from_iter([
+                                ("phase".into(), json!("bootstrapRegistryOwner")),
+                                ("newDispatchCount".into(), json!(0)),
+                            ])),
+                        }),
+                    }
+                } else {
+                    Response {
+                        id: request.id.clone(),
+                        outcome: self.host.bootstrap_bundle_list(
+                            usize::try_from(size.expect("checked integer")).unwrap_or(0),
+                            cursor.and_then(Value::as_str),
+                        ),
+                    }
                 }
             }
             "runtime.tool.inspect" | "runtime.bundle.inspect" => {

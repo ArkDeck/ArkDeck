@@ -115,6 +115,7 @@ fn every_unimplemented_method_is_refused_without_entering_the_host() {
             "runtime.bundle.inspect",
             "operation.describe",
             "runtime.tool.register",
+            "runtime.bundle.list",
         ]
         .contains(method)
         {
@@ -384,4 +385,38 @@ fn registration_lost_classified_receipts_preserve_uncertainty_after_one_owner_ca
         assert_eq!(error.details.as_ref().unwrap()["newDispatchCount"], 0);
         assert_eq!(calls.load(Ordering::SeqCst), 1);
     }
+}
+
+#[test]
+fn bundle_list_structure_is_closed_and_unconfigured_owner_is_explicit() {
+    let (control, reads) = setup();
+    let method = "runtime.bundle.list";
+    if !METHODS.contains(&method) {
+        let request = Request::new("test", method, Some(serde_json::Map::new()));
+        let frame = encode_frame(&request, MAX_REQUEST_BYTES).unwrap();
+        let reply: Value =
+            serde_json::from_slice(&control.handle_frame(&frame[..frame.len() - 1])).unwrap();
+        assert_eq!(reply["error"]["code"], "unknownMethod");
+        return;
+    }
+    for params in [
+        json!({"pageSize":null}),
+        json!({"pageSize":1.5}),
+        json!({"cursor":1}),
+        json!({"path":"/private/tmp/forbidden"}),
+    ] {
+        let error = call(&control, method, params).outcome.unwrap_err();
+        assert_eq!(error.code, "invalidParams");
+        assert_eq!(error.details.unwrap()["newDispatchCount"], 0);
+    }
+    for params in [
+        json!({}),
+        json!({"pageSize":1}),
+        json!({"pageSize":0,"cursor":"invalid"}),
+    ] {
+        let error = call(&control, method, params).outcome.unwrap_err();
+        assert_eq!(error.code, "operationUnavailable");
+        assert_eq!(error.details.unwrap()["phase"], "bootstrapRegistryOwner");
+    }
+    assert_eq!(reads.load(Ordering::SeqCst), 0);
 }

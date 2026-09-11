@@ -1471,6 +1471,19 @@ let startupTask = Task.detached {
         })
         return try owner.inspect(reference, existingStoreOnly: true)
       },
+      bootstrapBundleLister: { pageSize, cursor in
+        let owner = try BootstrapBundleRegistry(validateBundle: { candidate in
+          do {
+            _ = try LaunchAgentService.validateProductionDaemonBundle(candidate, fileManager: .default)
+          } catch {
+            throw AgentExecutionControlFailure("admissionDenied", "registered bundle failed the production helper trust policy")
+          }
+        })
+        return try owner.list { directory, items in
+          try RuntimeSnapshotPager(directory: directory).page(method: "runtime.bundle.list", filters: [:],
+            order: "bundleRef:asc", pageSize: pageSize, cursor: cursor, items: { items })
+        }
+      },
       controlActions: controlActions,
       artifactStore: artifactStore,
       historyFilterStore: historyFilterStore,

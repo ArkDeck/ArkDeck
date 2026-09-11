@@ -1331,7 +1331,7 @@
     "summary": "copy and verify a signed helper into the current-user bootstrap registry"
   - "catalogOperation": null
     "command": "runtime.bundle.list"
-    "connectsToRuntime": false
+    "connectsToRuntime": true
     "kind": "executable"
     "lifecycleStatus": "current"
     "mutuallyExclusive":
@@ -1387,6 +1387,15 @@
         "required": false
         "stability": "standard"
         "summary": "correlate this control-plane call; not a Job or request identity"
+      - "form": "value"
+        "grammar":
+          "kind": "opaque"
+        "name": "--socket"
+        "placeholder": "absolute-path"
+        "published": false
+        "required": false
+        "stability": "macosCompatibilityOnly"
+        "summary": "macOS-only compatibility alias for the local Runtime endpoint"
     "outputModes":
       - "human"
       - "json"

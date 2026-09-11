@@ -3292,6 +3292,22 @@
     },
     {
       "classification": "local",
+      "conformanceFixture": "argv/runtime.bundle.list.json",
+      "equivalentCommands": [],
+      "feature": "runtime.bundle.list",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "daemon:runtime.bundle.list",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck runtime bundle list"
+    },
+    {
+      "classification": "local",
       "conformanceFixture": "argv/runtime.bundle.register.json",
       "equivalentCommands": [],
       "feature": "runtime.bundle.register",
@@ -4630,7 +4646,7 @@
       "direct": 126,
       "generic": 1,
       "internal": 4,
-      "local": 88,
+      "local": 89,
       "platformService": 4,
       "presentation": 21,
       "refused": 10
@@ -4639,9 +4655,9 @@
       "app": 68,
       "catalog": 30,
       "cli": 56,
-      "daemon": 100
+      "daemon": 101
     },
-    "entries": 254,
+    "entries": 255,
     "fullFunction": true
   }
 }
