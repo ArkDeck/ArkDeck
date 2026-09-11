@@ -19,6 +19,10 @@ WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "agent-pr.yml"
 SDD_WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "sdd-guard.yml"
 SWIFT_WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "swift-ci.yml"
 RUST_WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "rust-ci.yml"
+RUST_POLICY_TOOLS_CACHE_KEY = (
+    "arkdeck-cargo-policy-tools-v1-${{ runner.os }}-${{ runner.arch }}"
+    "-cargo-deny-0.20.2-cargo-vet-0.10.2-${{ hashFiles('rust/rust-toolchain.toml') }}"
+)
 ARKFORGE_AUTH_PATH = REPOSITORY_ROOT / "scripts" / "ci" / "arkforge-package-auth.sh"
 EXPECTED_PATTERNS = ("agent/**", "!agent/host-loop/**")
 EXPECTED_PUSH_FLOW = '    branches: [main, "agent/**"]'
@@ -512,8 +516,29 @@ def validate_rust_ci_contract(text: str) -> None:
         "        run: python rust/scripts/test_contract_checks.py\n",
         "        working-directory: .\n"
         "        run: python rust/scripts/check-contracts.py\n",
+        # cargo-deny and cargo-vet are memoized between hosted runs. The memo
+        # must stay exact (one key naming both pinned versions and the pinned
+        # toolchain, no prefix fallback), be written only by protected main,
+        # and be read back against the pinned versions before either policy
+        # check runs, so a restored binary never stands in for the `--locked`
+        # install it replaces.
+        "      - name: Restore pinned dependency policy tools\n"
+        "        id: policy-tools\n"
+        "        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+        "      - name: Install pinned dependency policy tools\n"
+        "        if: steps.policy-tools.outputs.cache-hit != 'true'\n",
         "cargo install --locked --version 0.20.2 cargo-deny",
         "cargo install --locked --version 0.10.2 cargo-vet",
+        "      - name: Require the pinned dependency policy tool versions\n"
+        "        run: |\n",
+        "test \"$(cargo deny --version | tr -d '\\r')\" = \"cargo-deny 0.20.2\"",
+        "test \"$(cargo vet --version | tr -d '\\r')\" = \"cargo-vet 0.10.2\"",
+        "      - name: Save pinned dependency policy tools\n"
+        "        if: >-\n"
+        "          success() &&\n"
+        "          github.ref == 'refs/heads/main' &&\n"
+        "          steps.policy-tools.outputs.cache-hit != 'true'\n"
+        "        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
         "run: cargo deny --locked check",
         "run: cargo vet --locked --no-registry-suggestions",
         "run: git diff --exit-code -- Cargo.lock supply-chain",
@@ -533,10 +558,24 @@ def validate_rust_ci_contract(text: str) -> None:
         "continue-on-error:", "secrets.", "secrets[", "secrets: inherit",
         "contents: write", "id-token: write", "cargo vet init",
         "cargo vet regenerate", "cargo vet add-exemption", "|| true",
-        "--depth=", "--depth ",
+        "--depth=", "--depth ", "restore-keys:",
     ):
         if token in text:
             raise WorkflowContractError(f"Rust CI contains forbidden token: {token}")
+    if text.count(RUST_POLICY_TOOLS_CACHE_KEY) != 2:
+        raise WorkflowContractError(
+            "Rust CI must restore and save the policy tools under one exact key "
+            "naming both pinned versions and the pinned toolchain"
+        )
+    restore = text.index("      - name: Restore pinned dependency policy tools")
+    install = text.index("      - name: Install pinned dependency policy tools")
+    read_back = text.index("      - name: Require the pinned dependency policy tool versions")
+    save = text.index("      - name: Save pinned dependency policy tools")
+    if not (restore < install < read_back < save < text.index("run: cargo deny --locked check")):
+        raise WorkflowContractError(
+            "Rust CI must restore, install on a miss, read back the pinned versions "
+            "and save before the dependency policy checks"
+        )
     if text.index("run: cargo fetch --locked") > text.index("run: cargo vet --locked"):
         raise WorkflowContractError("Rust CI must fetch locked metadata before locked vet")
     if text.index("rustup toolchain install") > text.index(
@@ -765,6 +804,39 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
                 "run: python rust/scripts/generate-contract.py --check", "run: true"
             ),
             rust.replace("run: python rust/scripts/check-contracts.py", "run: true"),
+        )
+        for mutated in mutations:
+            with self.assertRaises(WorkflowContractError):
+                validate_rust_ci_contract(mutated)
+
+    def test_rust_policy_tool_cache_stays_exact_main_written_and_read_back(self) -> None:
+        rust = RUST_WORKFLOW_PATH.read_text(encoding="utf-8")
+        read_back_start = rust.index("      - name: Require the pinned dependency policy tool versions")
+        save_start = rust.index("      - name: Save pinned dependency policy tools")
+        read_back = rust[read_back_start:save_start]
+        mutations = (
+            # A restored binary must be read back against the pinned versions.
+            rust.replace(read_back, ""),
+            rust.replace('= "cargo-deny 0.20.2"', '= "cargo-deny 0.20.3"'),
+            rust.replace(read_back, "").replace(
+                "      - name: Dependency source, license, ban and advisory policy",
+                read_back + "      - name: Dependency source, license, ban and advisory policy",
+            ),
+            # Only protected main writes entries.
+            rust.replace("          github.ref == 'refs/heads/main' &&\n", ""),
+            rust.replace("github.ref == 'refs/heads/main'", "github.ref != ''"),
+            # One exact key on both sides, naming both pinned versions and the toolchain.
+            rust.replace("cargo-deny-0.20.2-cargo-vet-0.10.2", "cargo-deny-0.20.2-cargo-vet-0.10.3", 1),
+            rust.replace("-${{ hashFiles('rust/rust-toolchain.toml') }}", ""),
+            rust.replace(
+                "          key: arkdeck-cargo-policy-tools-v1",
+                "          restore-keys: arkdeck-cargo-policy-tools-v1-\n          key: arkdeck-cargo-policy-tools-v1",
+                1,
+            ),
+            # The install must stay the miss path of that memo, not disappear.
+            rust.replace("        if: steps.policy-tools.outputs.cache-hit != 'true'\n        run: |\n", "        run: |\n"),
+            rust.replace("actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9", "actions/cache/restore@v6"),
+            rust.replace("actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9", "actions/cache/save@v6"),
         )
         for mutated in mutations:
             with self.assertRaises(WorkflowContractError):

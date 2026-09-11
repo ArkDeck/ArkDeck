@@ -93,11 +93,51 @@ jobs:
         working-directory: .
         run: python rust/scripts/check-contracts.py
 
+      # cargo-deny and cargo-vet are the policy checkers, not the workspace,
+      # and compiling them from source on every run was the Swift CI critical
+      # path from the day this lane arrived (#1768): medians over the hosted
+      # runs of #1827..#1846 were 7.5 of the Windows job's 11.7 minutes, 4.8
+      # of macOS's 7.4 and 3.7 of Linux's 5.3. The cache below memoizes the
+      # output of the two `--locked` installs and nothing else: the key names
+      # both pinned versions and the pinned toolchain, there is no prefix
+      # fallback, only protected main writes entries (the Swift caches' trust
+      # rule), and the version read-back fails closed before either policy
+      # check can run against a binary that is not the pinned one.
+      - name: Restore pinned dependency policy tools
+        id: policy-tools
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
+        with:
+          path: |
+            ~/.cargo/bin/cargo-deny*
+            ~/.cargo/bin/cargo-vet*
+          key: arkdeck-cargo-policy-tools-v1-${{ runner.os }}-${{ runner.arch }}-cargo-deny-0.20.2-cargo-vet-0.10.2-${{ hashFiles('rust/rust-toolchain.toml') }}
+
       - name: Install pinned dependency policy tools
+        if: steps.policy-tools.outputs.cache-hit != 'true'
         run: |
           set -eu
           cargo install --locked --version 0.20.2 cargo-deny
           cargo install --locked --version 0.10.2 cargo-vet
+
+      - name: Require the pinned dependency policy tool versions
+        run: |
+          set -eu
+          cargo deny --version
+          cargo vet --version
+          test "$(cargo deny --version | tr -d '\r')" = "cargo-deny 0.20.2"
+          test "$(cargo vet --version | tr -d '\r')" = "cargo-vet 0.10.2"
+
+      - name: Save pinned dependency policy tools
+        if: >-
+          success() &&
+          github.ref == 'refs/heads/main' &&
+          steps.policy-tools.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
+        with:
+          path: |
+            ~/.cargo/bin/cargo-deny*
+            ~/.cargo/bin/cargo-vet*
+          key: arkdeck-cargo-policy-tools-v1-${{ runner.os }}-${{ runner.arch }}-cargo-deny-0.20.2-cargo-vet-0.10.2-${{ hashFiles('rust/rust-toolchain.toml') }}
 
       - name: Dependency source, license, ban and advisory policy
         run: cargo deny --locked check
