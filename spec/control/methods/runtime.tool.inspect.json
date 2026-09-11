@@ -173,7 +173,10 @@
                 "type": "string"
               },
               "quarantineSHA256": {
-                "type": "null"
+                "type": [
+                  "null",
+                  "string"
+                ]
               },
               "sha256": {
                 "type": "string"
@@ -182,7 +185,10 @@
                 "additionalProperties": false,
                 "properties": {
                   "codeDirectoryIdentitySHA256": {
-                    "type": "string"
+                    "type": [
+                      "null",
+                      "string"
+                    ]
                   },
                   "executionAssessment": {
                     "type": "string"
@@ -203,7 +209,10 @@
                     "type": "string"
                   },
                   "signingIdentifier": {
-                    "type": "string"
+                    "type": [
+                      "null",
+                      "string"
+                    ]
                   },
                   "teamIdentifier": {
                     "type": "null"
@@ -264,7 +273,10 @@
           "type": "string"
         },
         "quarantineSHA256": {
-          "type": "null"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "references": {
           "items": {
@@ -408,7 +420,7 @@
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
     "error": 67,
-    "request": 83,
-    "result": 16
+    "request": 85,
+    "result": 18
   }
 }

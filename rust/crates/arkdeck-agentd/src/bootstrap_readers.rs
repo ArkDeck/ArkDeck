@@ -67,6 +67,9 @@ impl BootstrapReaders {
             }
         })
     }
+    pub fn register_hdc(&self, source: &Path, now: &str) -> Result<Value, WireError> {
+        self.tools.register(source, now)
+    }
     pub fn register_deveco(&self, source: &Path, now: &str) -> Result<Value, WireError> {
         self.deveco.register(source, now)
     }

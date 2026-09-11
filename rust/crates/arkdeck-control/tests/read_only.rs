@@ -296,6 +296,13 @@ fn deveco_registration_is_closed_and_unpublished_views_never_reach_an_owner() {
     for params in [
         json!({}),
         json!({"kind":"hdc","root":"/A.app/Contents"}),
+        json!({"kind":"hdc","file":null}),
+        json!({"kind":"hdc","file":"relative"}),
+        json!({"kind":"hdc","file":"/tmp/../hdc"}),
+        json!({"kind":"hdc","file":"/tmp/./hdc"}),
+        json!({"kind":"hdc","file":"/tmp/hdc\0"}),
+        json!({"kind":"hdc","file":"/tmp/hdc","root":"/tmp"}),
+        json!({"kind":"hdc","file":"/tmp/hdc","registeredAtUTC":"2026-09-11T00:00:00Z"}),
         json!({"kind":"deveco","file":"/A.app/Contents"}),
         json!({"kind":"deveco","root":null}),
         json!({"kind":"deveco","root":"relative"}),
@@ -307,6 +314,16 @@ fn deveco_registration_is_closed_and_unpublished_views_never_reach_an_owner() {
         let error = call(&control, method, params).outcome.unwrap_err();
         assert_eq!(error.code, "invalidParams");
         assert_eq!(error.details.as_ref().unwrap()["newDispatchCount"], 0);
+    }
+    for file in ["/tmp/hdc", "/tmp/a b/hdc", "//tmp//hdc"] {
+        let error = call(&control, method, json!({"kind":"hdc","file":file}))
+            .outcome
+            .unwrap_err();
+        assert_eq!(error.code, "operationUnavailable");
+        assert_eq!(
+            error.details.as_ref().unwrap()["phase"],
+            "bootstrapRegistryOwner"
+        );
     }
     for root in ["/A.app/Contents", "/A.app/Contents/", "/A.app//Contents"] {
         let error = call(&control, method, json!({"kind":"deveco","root":root}))
@@ -337,54 +354,57 @@ fn registration_lost_classified_receipts_preserve_uncertainty_after_one_owner_ca
         fn observations(&self) -> Result<DeviceObservationsResult, WireError> {
             panic!("registration must not observe devices")
         }
+        fn bootstrap_register_hdc(&self, file: &str) -> Result<Value, WireError> {
+            self.bootstrap_register_deveco(file)
+        }
         fn bootstrap_register_deveco(&self, _: &str) -> Result<Value, WireError> {
             self.calls.fetch_add(1, Ordering::SeqCst);
             self.receipt.clone()
         }
     }
-    for receipt in [
-        Ok(json!({"invalidReceipt": true})),
-        Err(WireError {
-            code: "unclassified".into(),
-            message: "lost classification".into(),
-            details: None,
-        }),
-        Err(WireError {
-            code: "outcomeUnknown".into(),
-            message: "x".repeat(MAX_RESPONSE_BYTES),
-            details: None,
-        }),
+    for params in [
+        json!({"kind":"deveco","root":"/A.app/Contents"}),
+        json!({"kind":"hdc","file":"/tmp/hdc"}),
     ] {
-        let calls = Arc::new(AtomicUsize::new(0));
-        let control = Control::new(ReceiptFailureHost {
-            calls: Arc::clone(&calls),
-            receipt,
-        })
-        .unwrap();
-        let method = "runtime.tool.register";
-        if !METHODS.contains(&method) {
-            let request = Request::new("test", method, Some(serde_json::Map::new()));
-            let frame = encode_frame(&request, MAX_REQUEST_BYTES).unwrap();
-            let reply: Value =
-                serde_json::from_slice(&control.handle_frame(&frame[..frame.len() - 1])).unwrap();
-            assert_eq!(reply["error"]["code"], "unknownMethod");
-            assert_eq!(calls.load(Ordering::SeqCst), 0);
-            continue;
+        for receipt in [
+            Ok(json!({"invalidReceipt": true})),
+            Err(WireError {
+                code: "unclassified".into(),
+                message: "lost classification".into(),
+                details: None,
+            }),
+            Err(WireError {
+                code: "outcomeUnknown".into(),
+                message: "x".repeat(MAX_RESPONSE_BYTES),
+                details: None,
+            }),
+        ] {
+            let calls = Arc::new(AtomicUsize::new(0));
+            let control = Control::new(ReceiptFailureHost {
+                calls: Arc::clone(&calls),
+                receipt,
+            })
+            .unwrap();
+            let method = "runtime.tool.register";
+            if !METHODS.contains(&method) {
+                let request = Request::new("test", method, Some(serde_json::Map::new()));
+                let frame = encode_frame(&request, MAX_REQUEST_BYTES).unwrap();
+                let reply: Value =
+                    serde_json::from_slice(&control.handle_frame(&frame[..frame.len() - 1]))
+                        .unwrap();
+                assert_eq!(reply["error"]["code"], "unknownMethod");
+                assert_eq!(calls.load(Ordering::SeqCst), 0);
+                continue;
+            }
+            let error = call(&control, method, params.clone()).outcome.unwrap_err();
+            assert_eq!(error.code, "outcomeUnknown");
+            assert_eq!(
+                error.details.as_ref().unwrap()["phase"],
+                "bootstrapRegistryOwner"
+            );
+            assert_eq!(error.details.as_ref().unwrap()["newDispatchCount"], 0);
+            assert_eq!(calls.load(Ordering::SeqCst), 1);
         }
-        let error = call(
-            &control,
-            method,
-            json!({"kind":"deveco", "root":"/A.app/Contents"}),
-        )
-        .outcome
-        .unwrap_err();
-        assert_eq!(error.code, "outcomeUnknown");
-        assert_eq!(
-            error.details.as_ref().unwrap()["phase"],
-            "bootstrapRegistryOwner"
-        );
-        assert_eq!(error.details.as_ref().unwrap()["newDispatchCount"], 0);
-        assert_eq!(calls.load(Ordering::SeqCst), 1);
     }
 }
 

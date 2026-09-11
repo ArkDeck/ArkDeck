@@ -28,6 +28,16 @@ pub trait HostServices: Send + Sync {
             ])),
         })
     }
+    fn bootstrap_register_hdc(&self, _file: &str) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "operationUnavailable".into(),
+            message: "HDC registration owner is not configured".into(),
+            details: Some(serde_json::Map::from_iter([
+                ("phase".into(), json!("bootstrapRegistryOwner")),
+                ("newDispatchCount".into(), json!(0)),
+            ])),
+        })
+    }
     fn trace_cache_status(&self) -> Result<Value, WireError> {
         Err(WireError {
             code: "rejected".into(),
@@ -322,9 +332,14 @@ impl<H: HostServices> Control<H> {
                 "Trace cache status accepts no parameters",
             ),
             "runtime.tool.register" => {
-                let root = params.get("root").and_then(Value::as_str);
+                let kind = params.get("kind").and_then(Value::as_str);
+                let key = match kind {
+                    Some("hdc") => "file",
+                    _ => "root",
+                };
+                let root = params.get(key).and_then(Value::as_str);
                 if params.len() != 2
-                    || params.get("kind") != Some(&json!("deveco"))
+                    || !matches!(kind, Some("deveco" | "hdc"))
                     || !root.is_some_and(|path| {
                         path.starts_with('/')
                             && !path.as_bytes().contains(&0)
@@ -335,7 +350,7 @@ impl<H: HostServices> Control<H> {
                         id: request.id.clone(),
                         outcome: Err(WireError {
                             code: "invalidParams".into(),
-                            message: "DevEco registration requires kind and an absolute local root"
+                            message: "Tool registration requires kind and its absolute local path"
                                 .into(),
                             details: Some(serde_json::Map::from_iter([
                                 ("phase".into(), json!("bootstrapRegistryOwner")),
@@ -346,9 +361,13 @@ impl<H: HostServices> Control<H> {
                 } else {
                     return registration_response_bytes(Response {
                         id: request.id.clone(),
-                        outcome: self
-                            .host
-                            .bootstrap_register_deveco(root.expect("validated root")),
+                        outcome: if kind == Some("hdc") {
+                            self.host
+                                .bootstrap_register_hdc(root.expect("validated file"))
+                        } else {
+                            self.host
+                                .bootstrap_register_deveco(root.expect("validated root"))
+                        },
                     });
                 }
             }
@@ -706,7 +725,7 @@ fn registration_response_bytes(response: Response) -> Vec<u8> {
         id: response.id,
         outcome: Err(WireError {
             code: "outcomeUnknown".into(),
-            message: "DevEco registration did not return a bounded classified receipt".into(),
+            message: "Tool registration did not return a bounded classified receipt".into(),
             details: Some(serde_json::Map::from_iter([
                 ("phase".into(), json!("bootstrapRegistryOwner")),
                 ("newDispatchCount".into(), json!(0)),
