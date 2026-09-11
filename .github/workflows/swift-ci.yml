@@ -17,7 +17,8 @@ name: Swift CI
 # App lane compiles the app and UI-test bundle with build-for-testing, but never
 # launches a simulator or device. Cache
 # restores prefer an exact input hash, then fall back to the newest protected-
-# main cache for the same runner and toolchain; the build systems remain
+# main cache for the same runner and toolchain (the SwiftPM cache also for the
+# same runner image build, see the swift-tests job); the build systems remain
 # responsible for invalidating stale outputs after a partial restore.
 
 on:
@@ -122,15 +123,40 @@ jobs:
           ARKFORGE_DEPLOY_KEY: ${{ secrets.ARKFORGE_DEPLOY_KEY }}
         run: sh scripts/ci/arkforge-package-auth.sh setup
 
+      # llbuild re-runs a C compile when any discovered input changed identity,
+      # and the SDK modulemaps and headers every C file includes differ between
+      # runner image builds although the toolchain is the same Xcode 26.6.
+      # Measured over the swift-tests runs of #1827..#1851: a cache restored on
+      # the image build that saved it recompiled 0 C units; every cross-image
+      # restore recompiled all 257 (BoringSSL, NIO shims, Citadel), 1.2 minutes
+      # on the 3 vCPU runner. Image deployments take days and both builds serve
+      # jobs meanwhile, so about half of the runs in a rollout paid it.
+      # swift-driver keeps its own incremental record, so Swift targets were
+      # never affected. The image build therefore joins the cache key: exact
+      # inputs first, then the newest same-image protected-main entry, and
+      # last any same-toolchain entry, so a new image build starts from the
+      # Swift state rather than cold. The version is read in a step because
+      # the runner exports it to the process environment, not to the workflow
+      # env context.
+      - name: Record the runner image build
+        id: runner-image
+        run: |
+          set -eu
+          if [ -z "${ImageVersion:-}" ]; then
+            echo "::warning::ImageVersion is unset; the SwiftPM cache falls back to same-toolchain entries"
+          fi
+          printf 'version=%s\n' "${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
+
       - name: Restore trusted stable SwiftPM cache
         id: swift-build-cache
         continue-on-error: true
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
         with:
           path: ${{ runner.temp }}/arkdeck-swiftpm
-          key: arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
+          key: arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
           restore-keys: |
-            arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-
+            arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-
+            arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-image-${{ steps.runner-image.outputs.version }}-
             arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-
 
       - name: ArkDeckKit full test suite (8 workers)
@@ -155,7 +181,7 @@ jobs:
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
         with:
           path: ${{ runner.temp }}/arkdeck-swiftpm
-          key: arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
+          key: arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
 
   app-build:
     needs: plan
@@ -327,6 +353,6 @@ jobs:
             echo "- ArkDeckKit changes retain the full test suite; test-only changes do not rebuild the App."
             echo "- App/UI-test/project changes compile with build-for-testing; no simulator or device test is claimed."
             echo "- Design, App and Package changes run the @arkdeck/ds interaction tests after an exact npm ci."
-            echo "- Cache restore order is exact inputs, then the newest same-toolchain protected-main entry; only protected main writes new entries."
+            echo "- Cache restore order is exact inputs, then the newest protected-main entry for the same toolchain (SwiftPM: for the same runner image build first); only protected main writes new entries."
             echo "- A green CI result is validation evidence, not maintainer approval."
           } >> "$GITHUB_STEP_SUMMARY"
