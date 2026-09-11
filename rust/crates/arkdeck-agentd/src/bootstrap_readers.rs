@@ -1,4 +1,4 @@
-//! Fixed-root Bootstrap inventory, private list snapshots and DevEco metadata registration.
+//! Fixed-root Bootstrap inventory, list snapshots, DevEco registration and bundle metadata retirement.
 //! No selection, installation, process launch or execution authority is exposed.
 use arkdeck_contract::WireError;
 use arkdeck_control::BootstrapRegistryKind;
@@ -21,6 +21,9 @@ impl BootstrapReaders {
     }
     pub fn bundle_list(&self, page_size: usize, cursor: Option<&str>) -> Result<Value, WireError> {
         self.bundles.list_page(page_size, cursor)
+    }
+    pub fn bundle_remove(&self, reference: &str, generation: &str) -> Result<Value, WireError> {
+        self.bundles.retire(reference, generation)
     }
     pub fn inspect(
         &self,

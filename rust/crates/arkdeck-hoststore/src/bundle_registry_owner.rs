@@ -17,8 +17,8 @@ use std::{
 };
 const MAXIMUM_INDEX: usize = 4 * 1024 * 1024;
 pub struct BundleRegistryReadStore {
-    root: HostDirectory,
-    path: PathBuf,
+    pub(crate) root: HostDirectory,
+    pub(crate) path: PathBuf,
 }
 fn corrupt() -> io::Error {
     io::Error::new(
@@ -280,21 +280,7 @@ impl BundleRegistryReadStore {
             if reference.is_some_and(|value| record["reference"] != value) {
                 continue;
             }
-            let measured = BundleContent {
-                digest: record["digest"].as_str().ok_or_else(corrupt)?.to_owned(),
-                byte_count: record["byteCount"].as_u64().ok_or_else(corrupt)?,
-                entry_count: record["entryCount"].as_u64().ok_or_else(corrupt)? as usize,
-                version: record
-                    .get("version")
-                    .and_then(Value::as_str)
-                    .map(str::to_owned),
-            };
-            // The strict decoder already proved the digest is exactly 64 hex
-            // bytes. The content reader binds this root and every child inode.
-            verify_bundle_content(
-                &self.path.join(format!("bundle-{}.app", measured.digest)),
-                &measured,
-            )?;
+            self.verify_record(record)?;
         }
         Ok(decoded
             .projection
@@ -304,6 +290,23 @@ impl BundleRegistryReadStore {
             .filter(|row| reference.is_none_or(|value| row["bundleRef"] == value))
             .cloned()
             .collect())
+    }
+    pub(crate) fn verify_record(&self, record: &Value) -> io::Result<()> {
+        let measured = BundleContent {
+            digest: record["digest"].as_str().ok_or_else(corrupt)?.to_owned(),
+            byte_count: record["byteCount"].as_u64().ok_or_else(corrupt)?,
+            entry_count: record["entryCount"].as_u64().ok_or_else(corrupt)? as usize,
+            version: record
+                .get("version")
+                .and_then(Value::as_str)
+                .map(str::to_owned),
+        };
+        // The strict decoder already proved the digest is exactly 64 hex
+        // bytes. The content reader binds this root and every child inode.
+        verify_bundle_content(
+            &self.path.join(format!("bundle-{}.app", measured.digest)),
+            &measured,
+        )
     }
 }
 

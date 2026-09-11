@@ -5,7 +5,7 @@
       "additionalProperties": false,
       "properties": {
         "contractIdentity": {
-          "const": "eb53eab3d4a05efddf7e1d3190d899aa82f800c5af82528f60f935fb23e48bc2"
+          "const": "993f6b374b44dd5096e127d8f8d524063143dfb212f170de7b8a6aca935d53fe"
         },
         "id": {
           "minLength": 1,
@@ -77,6 +77,7 @@
             "recovery.flash-invocation.list",
             "runtime.bundle.inspect",
             "runtime.bundle.list",
+            "runtime.bundle.remove",
             "runtime.hdc.impact-preview",
             "runtime.hdc.restart",
             "runtime.hdc.status",
@@ -218,7 +219,7 @@
   "title": "arkdeck.runtime-control-plane/1",
   "x-arkdeck-bundleVersion": "arkdeck.cli.contracts/1",
   "x-arkdeck-cliVersion": "0.1.0",
-  "x-arkdeck-contractIdentity": "eb53eab3d4a05efddf7e1d3190d899aa82f800c5af82528f60f935fb23e48bc2",
+  "x-arkdeck-contractIdentity": "993f6b374b44dd5096e127d8f8d524063143dfb212f170de7b8a6aca935d53fe",
   "x-arkdeck-currentProtocolVersion": "1.0.0",
   "x-arkdeck-methodSchemaDirectory": "spec/control/methods",
   "x-arkdeck-methods": [
@@ -541,6 +542,11 @@
       "method": "runtime.bundle.list",
       "published": true,
       "schema": "spec/control/methods/runtime.bundle.list.json"
+    },
+    {
+      "method": "runtime.bundle.remove",
+      "published": true,
+      "schema": "spec/control/methods/runtime.bundle.remove.json"
     },
     {
       "method": "runtime.hdc.impact-preview",

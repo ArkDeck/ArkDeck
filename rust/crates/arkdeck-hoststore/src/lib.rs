@@ -308,6 +308,8 @@ pub mod bundle_content;
 #[cfg(target_os = "macos")]
 mod bundle_registry_owner;
 #[cfg(target_os = "macos")]
+mod bundle_retirement;
+#[cfg(target_os = "macos")]
 pub use bundle_registry_owner::BundleRegistryReadStore;
 
 #[cfg(target_os = "macos")]

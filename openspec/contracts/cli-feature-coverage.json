@@ -3334,7 +3334,7 @@
       "requiredPlatforms": [
         "macos"
       ],
-      "source": "cli:runtime.bundle.remove",
+      "source": "daemon:runtime.bundle.remove",
       "targetClassification": "local",
       "targetCommand": "arkdeck runtime bundle remove --bundle <bundle:sha256:digest> --expected-generation <generation>"
     },
@@ -4654,8 +4654,8 @@
     "bySource": {
       "app": 68,
       "catalog": 30,
-      "cli": 56,
-      "daemon": 101
+      "cli": 55,
+      "daemon": 102
     },
     "entries": 255,
     "fullFunction": true

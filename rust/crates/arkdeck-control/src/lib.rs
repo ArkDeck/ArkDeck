@@ -97,6 +97,20 @@ pub trait HostServices: Send + Sync {
             details: None,
         })
     }
+    fn bootstrap_bundle_remove(
+        &self,
+        _reference: &str,
+        _generation: &str,
+    ) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "operationUnavailable".into(),
+            message: "Bundle retirement owner is not configured".into(),
+            details: Some(serde_json::Map::from_iter([
+                ("phase".into(), json!("bootstrapRegistryOwner")),
+                ("newDispatchCount".into(), json!(0)),
+            ])),
+        })
+    }
     fn observed_at(&self) -> String;
     fn hdc_status(&self, deep: bool) -> HdcStatus;
     fn observations(&self) -> Result<DeviceObservationsResult, WireError>;
@@ -372,6 +386,30 @@ impl<H: HostServices> Control<H> {
                     }
                 }
             }
+            "runtime.bundle.remove" => {
+                let reference = params.get("bundle").and_then(Value::as_str);
+                let generation = params.get("expectedGeneration").and_then(Value::as_str);
+                let outcome = if let (2, Some(reference), Some(generation)) =
+                    (params.len(), reference, generation)
+                {
+                    self.host.bootstrap_bundle_remove(reference, generation)
+                } else {
+                    Err(WireError {
+                        code: "invalidParams".into(),
+                        message:
+                            "bundle retirement requires typed bundle and expectedGeneration strings"
+                                .into(),
+                        details: Some(serde_json::Map::from_iter([
+                            ("phase".into(), json!("bootstrapRegistryOwner")),
+                            ("newDispatchCount".into(), json!(0)),
+                        ])),
+                    })
+                };
+                Response {
+                    id: request.id.clone(),
+                    outcome,
+                }
+            }
             "runtime.tool.inspect" | "runtime.bundle.inspect" => {
                 let (key, kind, prefixes): (&str, BootstrapRegistryKind, &[&str]) =
                     if request.method == "runtime.tool.inspect" {
@@ -498,7 +536,7 @@ impl<H: HostServices> Control<H> {
             "warning",
             "catalog",
             "some published operations are unavailable with the current host configuration",
-            Some(json!({"unavailableOperationCount":count})),
+            Some(json!({ "unavailableOperationCount": count })),
         );
         add(
             "provider.noneRegistered",

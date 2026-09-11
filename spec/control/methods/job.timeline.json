@@ -115,7 +115,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "Typed contract of the control-plane method `job.timeline` on the single current protocol: the request parameters a caller may send, the result the Runtime answers with, and the structured error details it attaches to a refusal. Derived from frames recorded by a contract-test run; the committed corpus under Tests/ArkDeckContractTests/Fixtures/ControlFrames is validated against it.",
   "title": "arkdeck.control.method/job.timeline",
-  "x-arkdeck-contractIdentity": "eb53eab3d4a05efddf7e1d3190d899aa82f800c5af82528f60f935fb23e48bc2",
+  "x-arkdeck-contractIdentity": "993f6b374b44dd5096e127d8f8d524063143dfb212f170de7b8a6aca935d53fe",
   "x-arkdeck-method": "job.timeline",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {

@@ -296,7 +296,7 @@ def main() -> None:
                        ["job", "status", "--job", "JOB-unknown"], 1, "operationFailed")
                 for method in registry["methods"]:
                     expected = ("rejected" if method not in SUPPORTED or method == "device.observations" else None)
-                    if method in {"runtime.tool.inspect", "runtime.bundle.inspect", "operation.describe", "runtime.tool.register"}:
+                    if method in {"runtime.tool.inspect", "runtime.bundle.inspect", "operation.describe", "runtime.tool.register", "runtime.bundle.remove"}:
                         expected = "invalidParams"
                     if method == "runtime.bundle.list":
                         expected = "operationUnavailable"

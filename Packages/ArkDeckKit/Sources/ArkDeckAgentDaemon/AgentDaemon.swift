@@ -102,6 +102,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
   private let hdcControlActions: RuntimeHDCControlActionCoordinator?
   private let bootstrapDevEcoRegistrar: (@Sendable (String) async throws -> JSONValue)?
   private let bootstrapToolInspector: (@Sendable (String) async throws -> JSONValue)?
+  private let bootstrapBundleRetirer: (@Sendable (String, String) async throws -> JSONValue)?
   private let bootstrapBundleInspector: (@Sendable (String) async throws -> JSONValue)?
   private let bootstrapBundleLister: (@Sendable (Int, String?) async throws -> JSONValue)?
   private let toolSelectionActions: RuntimeToolSelectionControlActionCoordinator?
@@ -156,6 +157,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     toolSelectionActions: RuntimeToolSelectionControlActionCoordinator? = nil,
     bootstrapDevEcoRegistrar: (@Sendable (String) async throws -> JSONValue)? = nil,
     bootstrapToolInspector: (@Sendable (String) async throws -> JSONValue)? = nil,
+    bootstrapBundleRetirer: (@Sendable (String, String) async throws -> JSONValue)? = nil,
     bootstrapBundleInspector: (@Sendable (String) async throws -> JSONValue)? = nil,
     bootstrapBundleLister: (@Sendable (Int, String?) async throws -> JSONValue)? = nil,
     controlActions: RuntimeControlActionResourceCoordinator? = nil,
@@ -189,6 +191,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
       toolSelectionActions: toolSelectionActions,
       bootstrapDevEcoRegistrar: bootstrapDevEcoRegistrar,
       bootstrapToolInspector: bootstrapToolInspector,
+      bootstrapBundleRetirer: bootstrapBundleRetirer,
       bootstrapBundleInspector: bootstrapBundleInspector,
       bootstrapBundleLister: bootstrapBundleLister,
       controlActions: controlActions,
@@ -228,6 +231,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     toolSelectionActions: RuntimeToolSelectionControlActionCoordinator? = nil,
     bootstrapDevEcoRegistrar: (@Sendable (String) async throws -> JSONValue)? = nil,
     bootstrapToolInspector: (@Sendable (String) async throws -> JSONValue)? = nil,
+    bootstrapBundleRetirer: (@Sendable (String, String) async throws -> JSONValue)? = nil,
     bootstrapBundleInspector: (@Sendable (String) async throws -> JSONValue)? = nil,
     bootstrapBundleLister: (@Sendable (Int, String?) async throws -> JSONValue)? = nil,
     controlActions: RuntimeControlActionResourceCoordinator? = nil,
@@ -266,6 +270,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     self.toolSelectionActions = toolSelectionActions
     self.bootstrapDevEcoRegistrar = bootstrapDevEcoRegistrar
     self.bootstrapToolInspector = bootstrapToolInspector
+    self.bootstrapBundleRetirer = bootstrapBundleRetirer
     self.bootstrapBundleInspector = bootstrapBundleInspector
     self.bootstrapBundleLister = bootstrapBundleLister
     self.controlActions = controlActions
@@ -357,6 +362,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
 
     case "runtime.bundle.list":
       return await bootstrapBundleListRequest(request)
+    case "runtime.bundle.remove":
+      return await bootstrapBundleRetirementRequest(request)
     case "runtime.tool.inspect", "runtime.bundle.inspect":
       return await bootstrapInspectionRequest(request)
     case "agent.run", "agent.status", "agent.list", "agent.abandon", "agent.resume":
@@ -2767,6 +2774,43 @@ public struct RuntimeControlPlaneHandler: Sendable {
       default: return failed("recordUnreadable", "bundle inventory or snapshot is unreadable")
       }
     } catch { return failed("recordUnreadable", "bundle inventory or snapshot is unreadable") }
+  }
+
+  // Host bootstrap reads consume only exact references, never registration paths.
+  // Retirement changes registry metadata only; immutable bundle bytes remain retained.
+  private func bootstrapBundleRetirementRequest(_ request: AgentWireProtocol.Request) async -> AgentWireProtocol.Response {
+    func failed(_ code: String, _ message: String) -> AgentWireProtocol.Response {
+      .init(id: request.id, ok: false, result: nil,
+        error: .init(code: code, message: message,
+          details: ["phase": .string("bootstrapRegistryOwner"), "newDispatchCount": .integer(0)]))
+    }
+    let fields = request.params ?? [:]
+    guard Set(fields.keys) == ["bundle", "expectedGeneration"],
+      case .string(let reference)? = fields["bundle"],
+      case .string(let generation)? = fields["expectedGeneration"] else {
+      return failed("invalidParams", "bundle retirement requires typed bundle and expectedGeneration strings")
+    }
+    guard let retire = bootstrapBundleRetirer else {
+      return failed("operationUnavailable", "bootstrap bundle retirement is unavailable")
+    }
+    do {
+      let result = try await retire(reference, generation)
+      // An oversized result follows a possible publication: never call it a safe refusal.
+      guard let bounded = try? RuntimeJobReadProjection.bounded(result,
+        maximumBytes: ArkDeckControlProtocol.maximumResponseFrameBytes - 4096) else {
+        return failed("outcomeUnknown", "bundle retirement completed but its receipt could not be bounded")
+      }
+      return .init(id: request.id, ok: true, result: bounded, error: nil)
+    } catch let error as AgentExecutionControlFailure {
+      switch error.code {
+      case "invalidInput", "resourceNotFound", "resourceConflict", "admissionDenied",
+        "recordUnreadable", "quotaExceeded", "outcomeUnknown":
+        return failed(error.code, error.message)
+      default: return failed("outcomeUnknown", "bundle retirement outcome is uncertain; inspect the exact reference")
+      }
+    } catch {
+      return failed("outcomeUnknown", "bundle retirement outcome is uncertain; inspect the exact reference")
+    }
   }
 
   // Host bootstrap reads consume only exact references, never registration paths.

@@ -91,6 +91,10 @@ BUNDLE_LIST_OWNER_ERROR_CODES = [
     "invalidInput", "invalidCursor", "resourceConflict", "admissionDenied",
     "recordUnreadable", "operationUnavailable", "inputTooLarge",
 ]
+BUNDLE_RETIREMENT_OWNER_ERROR_CODES = [
+    "invalidInput", "resourceNotFound", "resourceConflict", "admissionDenied",
+    "recordUnreadable", "quotaExceeded", "outcomeUnknown", "operationUnavailable",
+]
 MAXIMUM_SIGNATURES_PER_METHOD = 24
 MAXIMUM_SAMPLE_BYTES = 65536
 
@@ -220,7 +224,8 @@ def derive_method_schemas(source):
                            "session.list", "session.show", "session.pin", "session.unpin",
                            "session.cleanup.preview", "session.export.preview", "session.export.apply"
                        } else set())
-                       | (set(BUNDLE_LIST_OWNER_ERROR_CODES) if method == "runtime.bundle.list" else set()))
+                       | (set(BUNDLE_LIST_OWNER_ERROR_CODES) if method == "runtime.bundle.list" else set())
+                       | (set(BUNDLE_RETIREMENT_OWNER_ERROR_CODES) if method == "runtime.bundle.remove" else set()))
         schema = {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "$id": f"https://arkdeck.dev/schemas/control/methods/{method}.json",

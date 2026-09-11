@@ -77,10 +77,13 @@ fn exercise(delay: Delay, bounded: bool) {
                 let _ = stream.get_mut().write_all(&bytes);
             }
         }
-        // Closing the client after the rejected second call must yield EOF,
-        // not another health/business frame on the authenticated connection.
+        // Closing a timed-out client with unread response bytes may yield
+        // ConnectionReset on Linux rather than EOF. Neither permits another
+        // health/business frame on the authenticated connection.
         let mut extra = Vec::new();
-        stream.read_to_end(&mut extra).unwrap();
+        if let Err(error) = stream.read_to_end(&mut extra) {
+            assert_eq!(error.kind(), io::ErrorKind::ConnectionReset);
+        }
         assert!(extra.is_empty(), "an expired request was replayed");
         methods
     });

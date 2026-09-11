@@ -702,7 +702,7 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 
 ## TASK-XPA-012 — Move host-only durable stores to the Rust owner on macOS
 
-- Status:in-progress（2026-09-11: isolated Rust History, Session resources/export, Trace cache status and Bootstrap inspection and DevEco registration serve CLI/control; Bundle list also serves immutable pages through the Rust owner with native cross-language cursor checks; writes preserve their frozen formats and reads verify existing native content. an independent HDC capture/registration library also preserves native bytes and passes strict Swift readback. Cleanup apply, HDC registration RPC integration, remaining host-store writes, installed integration and GJ-1 acceptance remain pending）
+- Status:in-progress（2026-09-11: isolated Rust History, Session resources/export, Trace cache status and Bootstrap inspection and DevEco registration serve CLI/control; Bundle list also serves immutable pages through the Rust owner with native cross-language cursor checks; Bundle retirement connects exact-reference metadata retirement to its Rust owner while retaining immutable content; writes preserve their frozen formats and reads verify existing native content. an independent HDC capture/registration library also preserves native bytes and passes strict Swift readback. Cleanup apply, HDC registration RPC integration, remaining host-store writes, installed integration and GJ-1 acceptance remain pending）
 - Platform:macos
 - Requirements:`session-artifact-storage` (storage owner), `docs/design/cli-runtime-storage.md:11-24`
 - Acceptance:XPA-AC-1, XPA-AC-7, XPA-AC-9; macOS GJ-1 re-pass
@@ -711,7 +711,7 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 
   ```yaml pins
   - path: main
-    commit: b34b8be804555d8f93b3d7e9eced9936486cbd76
+    commit: ccde4a2e87b69edf7aaa422f678b7aeef359e17f
   - path: Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeSessionStorageStore.swift
     blob: 5d4f994d33f8054c9cb6988aeaa94b0be7ce16ab
   ```
