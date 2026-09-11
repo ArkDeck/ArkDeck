@@ -19,6 +19,7 @@ fn correlation() -> io::Result<String> {
 }
 
 fn execute(invocation: &Invocation, id: &str) -> Result<Value, CliError> {
+    arkdeck_cli::validate_read_only_request(invocation)?;
     let endpoint = match invocation
         .socket
         .clone()
@@ -55,14 +56,18 @@ fn execute(invocation: &Invocation, id: &str) -> Result<Value, CliError> {
         authenticode_sha256: std::env::var("ARKDECK_DAEMON_SIGNER_SHA256").ok(),
         package_family: std::env::var("ARKDECK_DAEMON_PACKAGE_FAMILY").ok(),
     };
-    let mut client = Client::connect(&endpoint, &identity, Duration::from_secs(20))
-        .map_err(|error| CliError::from_client(error, invocation.method))?;
-    let result = client
-        .request(id, invocation.method, invocation.params.clone())
-        .map_err(|error| CliError::from_client(error, invocation.method))?;
+    let request = if let Some(timeout_ms) = invocation.timeout_ms {
+        Client::connect_bounded(&endpoint, &identity, Duration::from_millis(timeout_ms))
+            .and_then(|mut client| client.request(id, invocation.method, invocation.params.clone()))
+    } else {
+        Client::connect(&endpoint, &identity, Duration::from_secs(20))
+            .and_then(|mut client| client.request(id, invocation.method, invocation.params.clone()))
+    };
+    let result = request.map_err(|error| CliError::from_client(error, invocation.method))?;
     arkdeck_cli::validate_session_response(invocation, &result)?;
     arkdeck_cli::validate_trace_cache_response(invocation, &result)?;
     arkdeck_cli::validate_bootstrap_response(invocation, &result)?;
+    let result = arkdeck_cli::project_read_only_response(invocation, result)?;
     if invocation.command == "doctor" {
         if result["schemaVersion"] != "arkdeck.doctor-report/1" || !result["ready"].is_boolean() {
             return Err(CliError::new(
@@ -125,7 +130,7 @@ fn main() -> std::process::ExitCode {
     };
     if invocation.help {
         println!(
-            "ArkDeck commands:\n  doctor [--deep] [--require-healthy]\n  operation list\n  device candidates\n  trace cache status\n  history filter list\n  history filter save --expected-generation <n> [--search <text>] [--status <status>] [--mode <mode>] [--session <id>] [--target <id>] [--time <range>] [--activity <activity>]\n  history filter delete --expected-generation <n>\n  runtime tool inspect --tool <reference>\n  runtime bundle inspect --bundle <reference>\n  runtime storage status\n  runtime storage policy --expected-generation <n> --total-quota-bytes <bytes> --safety-margin-bytes <bytes> --retention-days <days>\n  runtime storage root --expected-generation <n> (--root <path> | --default)\n  session list [--page-size <n>] [--cursor <cursor>]\n  session show --session <id>\n  session pin|unpin --session <id> --expected-generation <n>\n  session cleanup preview\n  session export preview --session <id> --destination <path> [--allow-sensitive]\n  session export apply --preview-id <uuid> --preview-digest <sha256>\n\nOptions: --output human|json, --control-request-id <id>\nA private local Runtime must be running. Windows requires the installed daemon identity."
+            "ArkDeck commands:\n  doctor [--deep] [--require-healthy]\n  operation list\n  operation describe|example --operation <reference>\n  job status|show|evidence --job <id> [--timeout <duration>]\n  job timeline --job <id> [--page-size <n>] [--cursor <cursor>] [--timeout <duration>]\n  job list [--page-size <n>] [--cursor <cursor>] [--order <order>] [--include-current] [--include-timeline] [--state <state>] [--operation <reference>] [--target <id>] [--thread <id>] [--timeout <duration>]\n  device candidates\n  trace cache status\n  history filter list\n  history filter save --expected-generation <n> [--search <text>] [--status <status>] [--mode <mode>] [--session <id>] [--target <id>] [--time <range>] [--activity <activity>]\n  history filter delete --expected-generation <n>\n  runtime tool inspect --tool <reference>\n  runtime bundle inspect --bundle <reference>\n  runtime storage status\n  runtime storage policy --expected-generation <n> --total-quota-bytes <bytes> --safety-margin-bytes <bytes> --retention-days <days>\n  runtime storage root --expected-generation <n> (--root <path> | --default)\n  session list [--page-size <n>] [--cursor <cursor>]\n  session show --session <id>\n  session pin|unpin --session <id> --expected-generation <n>\n  session cleanup preview\n  session export preview --session <id> --destination <path> [--allow-sensitive]\n  session export apply --preview-id <uuid> --preview-digest <sha256>\n\nOptions: --output human|json, --control-request-id <id>\nA private local Runtime must be running. Windows requires the installed daemon identity."
         );
         return 0.into();
     }
@@ -135,6 +140,17 @@ fn main() -> std::process::ExitCode {
         .unwrap_or(&fallback_id);
     match execute(&invocation, id) {
         Ok(result) => {
+            // Evidence is a successful query even when verification needs attention.
+            // Only the validated Runtime status determines its process exit code.
+            let exit: u8 = if invocation.command == "job.evidence" {
+                match result["status"].as_str() {
+                    Some("verified") => 0,
+                    Some("resultNotReady") => 75,
+                    _ => 2,
+                }
+            } else {
+                0
+            };
             if invocation.json {
                 if write_document(&success_envelope(invocation.command, result, id)).is_err() {
                     return 74.into();
@@ -145,7 +161,7 @@ fn main() -> std::process::ExitCode {
                     serde_json::to_string_pretty(&result).expect("validated result")
                 );
             }
-            0.into()
+            exit.into()
         }
         Err(error) => {
             if invocation.json {

@@ -50,6 +50,9 @@
             "string"
           ]
         },
+        "operation": {
+          "type": "string"
+        },
         "order": {
           "type": "string"
         },
@@ -58,6 +61,15 @@
             "integer",
             "string"
           ]
+        },
+        "state": {
+          "type": "string"
+        },
+        "target": {
+          "type": "string"
+        },
+        "thread": {
+          "type": "string"
         }
       },
       "type": "object"
@@ -259,7 +271,10 @@
                 "type": "string"
               },
               "threadId": {
-                "type": "null"
+                "type": [
+                  "null",
+                  "string"
+                ]
               },
               "timeline": {
                 "anyOf": [
@@ -272,12 +287,17 @@
                         },
                         "type": "array"
                       },
+                      "jobId": {
+                        "type": "string"
+                      },
                       "kind": {
+                        "type": "string"
+                      },
+                      "method": {
                         "type": "string"
                       }
                     },
                     "required": [
-                      "entries",
                       "kind"
                     ],
                     "type": "object"
@@ -293,7 +313,10 @@
                 "type": "boolean"
               },
               "workspaceKind": {
-                "type": "string"
+                "type": [
+                  "null",
+                  "string"
+                ]
               }
             },
             "required": [
@@ -367,8 +390,8 @@
   "x-arkdeck-method": "job.list",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 22,
-    "request": 66,
-    "result": 44
+    "error": 37,
+    "request": 57,
+    "result": 20
   }
 }

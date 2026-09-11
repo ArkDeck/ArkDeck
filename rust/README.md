@@ -258,3 +258,14 @@ Updating the pin uses `python scripts/generate-contract.py --write
 --baseline-revision <published-commit>` after publication. Keep `origin/main`
 available locally so publication ancestry can be checked. Generation and host
 conformance remain separate from actual device acceptance.
+
+The Rust read-only CLI also accepts `operation describe|example --operation <reference>`
+and `job status|show|evidence|timeline --job <id> [--timeout <duration>]`,
+plus `job list` with current pagination and string filters. It consumes current Runtime
+facts, validates the returned identity/publication/nextAction relationships and
+preserves uncertain outcomes. The Rust control owner serves descriptors from the
+compiled Catalog while retaining actual Provider availability; its Job status
+backend remains unavailable pending the Job owner. Job reads share one total
+deadline; timeline returns one validated page and evidence retains the Runtime
+verification status and its 0/75/2 exit code. These additions do not retire
+the Swift CLI.

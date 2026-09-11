@@ -3,6 +3,11 @@ use arkdeck_client::ClientError;
 use arkdeck_contract::{ContractError, PROTOCOL_VERSION, canonical_json};
 use serde_json::{Map, Value, json};
 mod bootstrap_resources;
+mod read_only_resources;
+pub use read_only_resources::{
+    project_read_only_response, validate_read_only_request, validate_read_only_response,
+};
+mod job_resources;
 mod session_resources;
 pub use bootstrap_resources::validate_bootstrap_response;
 pub use session_resources::validate_session_response;
@@ -19,6 +24,7 @@ pub struct Invocation {
     pub require_healthy: bool,
     pub control_request_id: Option<String>,
     pub socket: Option<String>,
+    pub timeout_ms: Option<u64>,
 }
 
 #[derive(Debug, Clone)]
@@ -160,6 +166,9 @@ impl CliError {
                     "recordUnreadable" => "recordUnreadable",
                     "workspaceReferenceNotFound" => "workspaceReferenceNotFound",
                     "invalidInput" if proof => "invalidInput",
+                    "invalidCursor" if proof && matches!(method, "job.list" | "job.timeline") => {
+                        "invalidCursor"
+                    }
                     "resourceConflict" if proof => "resourceConflict",
                     "rejected" if proof => "admissionDenied",
                     "rejected" => "operationFailed",
@@ -211,6 +220,14 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                 "--allow-sensitive" => {
                     method_options.insert("allowSensitive".into(), json!(true));
                 }
+                "--include-current" | "--include-timeline" => {
+                    let key = if argument == "--include-current" {
+                        "includeCurrent"
+                    } else {
+                        "includeTimeline"
+                    };
+                    method_options.insert(key.into(), json!(true));
+                }
                 "--default" => {
                     method_options.insert("resetToDefault".into(), json!(true));
                 }
@@ -232,7 +249,13 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                 | "--time"
                 | "--activity"
                 | "--tool"
-                | "--bundle" => {
+                | "--bundle"
+                | "--operation"
+                | "--job"
+                | "--order"
+                | "--state"
+                | "--thread"
+                | "--timeout" => {
                     index += 1;
                     let value = argv
                         .get(index)
@@ -250,6 +273,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                         "--total-quota-bytes" => "totalQuotaBytes",
                         "--safety-margin-bytes" => "safetyMarginBytes",
                         "--retention-days" => "retentionDays",
+                        "--job" => "jobId",
                         "--session" => "sessionId",
                         "--target" => "targetId",
                         "--time" => "timeRange",
@@ -310,6 +334,13 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
     let command = match positional.as_slice() {
         ["doctor"] => "doctor",
         ["operation", "list"] => "operation.list",
+        ["operation", "describe"] => "operation.describe",
+        ["operation", "example"] => "operation.example",
+        ["job", "status"] => "job.status",
+        ["job", "list"] => "job.list",
+        ["job", "show"] => "job.show",
+        ["job", "evidence"] => "job.evidence",
+        ["job", "timeline"] => "job.timeline",
         ["device", "candidates"] => "device.candidates",
         ["trace", "cache", "status"] => "trace.cache.status",
         ["runtime", "tool", "inspect"] => "runtime.tool.inspect",
@@ -362,6 +393,21 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         "runtime.storage.root" => &["expectedGeneration", "rootPath", "resetToDefault"],
         "runtime.tool.inspect" => &["tool"],
         "runtime.bundle.inspect" => &["bundle"],
+        "operation.describe" | "operation.example" => &["operation"],
+        "job.status" | "job.show" | "job.evidence" => &["jobId", "timeout"],
+        "job.timeline" => &["jobId", "pageSize", "cursor", "timeout"],
+        "job.list" => &[
+            "pageSize",
+            "cursor",
+            "order",
+            "includeCurrent",
+            "includeTimeline",
+            "timeout",
+            "state",
+            "operation",
+            "targetId",
+            "thread",
+        ],
         "session.list" => &["pageSize", "cursor"],
         "session.show" => &["sessionId"],
         "session.export.preview" => &["sessionId", "destinationPath", "allowSensitive"],
@@ -549,10 +595,13 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ));
     }
     bootstrap_resources::configure(command, &method_options, help)?;
+    let timeout_ms = read_only_resources::configure(command, &mut method_options, help)?;
     Ok(Invocation {
         command,
         method: if command == "device.candidates" {
             "device.observations"
+        } else if command == "operation.example" {
+            "operation.describe"
         } else {
             command
         },
@@ -562,6 +611,16 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             || command.starts_with("runtime.storage.")
             || matches!(command, "runtime.tool.inspect" | "runtime.bundle.inspect")
             || command.starts_with("session.")
+            || matches!(
+                command,
+                "operation.describe"
+                    | "operation.example"
+                    | "job.status"
+                    | "job.list"
+                    | "job.show"
+                    | "job.evidence"
+                    | "job.timeline"
+            )
         {
             Some(method_options)
         } else {
@@ -572,6 +631,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         require_healthy,
         control_request_id: id,
         socket,
+        timeout_ms,
     })
 }
 

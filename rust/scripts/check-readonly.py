@@ -189,7 +189,7 @@ def validate_completed(directory: Path, rows: list, registry: dict) -> dict:
             method = row.get("method")
             if kind == "cli.jsonl":
                 counts["cliEnvelopes"] += 1
-                method = {"doctor": "doctor", "operation.list": "operation.list",
+                method = {"doctor": "doctor", "operation.list": "operation.list", "operation.describe": "operation.describe",
                           "device.candidates": "device.observations"}.get(value["command"])
             else:
                 counts["controlResponses"] += 1
@@ -280,12 +280,33 @@ def main() -> None:
                     ("candidates", ["device", "candidates"], 1, "operationFailed"),
                 ]:
                     invoke(cli, directory, rows, environment, name, command, code, error)
+                operations = invoke(cli, directory, rows, environment, "descriptor-source",
+                                    ["operation", "list"], 0)["result"]
+                reference = operations[0]["reference"]
+                descriptor = invoke(cli, directory, rows, environment, "descriptor",
+                                    ["operation", "describe", "--operation", reference], 0)
+                assert descriptor["result"]["reference"] == reference
+                assert descriptor["result"]["availability"] == "unavailable"
+                example = invoke(cli, directory, rows, environment, "example",
+                                 ["operation", "example", "--operation", reference], 0)
+                assert example["result"] == descriptor["result"]["exampleRequest"]
+                invoke(cli, directory, rows, environment, "descriptor-missing",
+                       ["operation", "describe", "--operation", "unknown@1"], 65, "resourceNotFound")
+                invoke(cli, directory, rows, environment, "job-unknown",
+                       ["job", "status", "--job", "JOB-unknown"], 1, "operationFailed")
                 for method in registry["methods"]:
                     expected = ("rejected" if method not in SUPPORTED or method == "device.observations" else None)
-                    if method in {"runtime.tool.inspect", "runtime.bundle.inspect"}:
+                    if method in {"runtime.tool.inspect", "runtime.bundle.inspect", "operation.describe"}:
                         expected = "invalidParams"
                     exchange(endpoint, directory, rows, method, encode(request(registry, method, method)), method, expected)
+                wire_descriptor = exchange(endpoint, directory, rows, "descriptor-success",
+                    encode(request(registry, "operation.describe", "descriptor-success", {"reference": reference})),
+                    "operation.describe")
+                assert wire_descriptor["result"] == descriptor["result"]
                 for name, method, params, error in [
+                    ("descriptor-not-found", "operation.describe", {"reference": "unknown@1"}, "notFound"),
+                    ("descriptor-bad-type", "operation.describe", {"reference": 1}, "invalidParams"),
+                    ("descriptor-extra", "operation.describe", {"reference": reference, "extra": True}, "invalidParams"),
                     ("bad-deep", "doctor", {"deep": "true"}, "invalidParams"),
                     ("bad-health", "health", {"extra": True}, "invalidParams"),
                     ("bad-list", "operation.list", {"extra": True}, "invalidParams"),

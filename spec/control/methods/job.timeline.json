@@ -4,6 +4,7 @@
       "enum": [
         "conflict",
         "internalError",
+        "invalidCursor",
         "invalidInput",
         "invalidParams",
         "malformedFrame",

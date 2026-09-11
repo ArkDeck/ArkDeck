@@ -1,0 +1,134 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "job",
+        "status",
+        "--job",
+        "sample"
+      ],
+      "expected": {
+        "command": "job.status",
+        "handlerArguments": [
+          "job",
+          "status",
+          "--job",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "job",
+        "status",
+        "--help"
+      ],
+      "expected": {
+        "command": "job.status",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "job",
+        "status",
+        "--job",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "job.status",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "job",
+        "status",
+        "--job",
+        "sample",
+        "--job",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "job.status",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "job",
+        "status"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "job.status",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "job",
+        "status",
+        "--job",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "job.status",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "job",
+        "status",
+        "--job",
+        "sample",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "job.status",
+        "handlerArguments": [
+          "job",
+          "status",
+          "--job",
+          "sample",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "job.status",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "job",
+    "status"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}
