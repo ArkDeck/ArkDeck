@@ -7,6 +7,7 @@ use arkdeck_contract::{
     validate_method_value,
 };
 use serde_json::{Value, json};
+mod operation_description;
 
 /// The composition root supplies local resources and device observations.
 /// This interface provides no device mutation or authority administration.
@@ -180,6 +181,40 @@ impl<H: HostServices> Control<H> {
                 "invalidParams",
                 "operation.list accepts no parameters",
             ),
+            "operation.describe" => {
+                if params.len() != 1 || !params.get("reference").is_some_and(Value::is_string) {
+                    Response::failure(
+                        &request.id,
+                        "invalidParams",
+                        "an exact operation reference is required",
+                    )
+                } else {
+                    let reference = params["reference"].as_str().expect("checked reference");
+                    match self
+                        .operations
+                        .as_array()
+                        .expect("Catalog operations")
+                        .iter()
+                        .find(|v| v["reference"] == reference)
+                    {
+                        None => Response::failure(
+                            &request.id,
+                            "notFound",
+                            "operation reference does not exist",
+                        ),
+                        Some(availability) => {
+                            match operation_description::describe(reference, availability) {
+                                Ok(Some(result)) => Response::success(&request.id, result),
+                                _ => Response::failure(
+                                    &request.id,
+                                    "internalError",
+                                    "Catalog descriptor could not be projected",
+                                ),
+                            }
+                        }
+                    }
+                }
+            }
             "doctor" => {
                 if params.keys().any(|k| k != "deep") {
                     Response::failure(

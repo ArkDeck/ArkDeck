@@ -113,6 +113,7 @@ fn every_unimplemented_method_is_refused_without_entering_the_host() {
             "device.observations",
             "runtime.tool.inspect",
             "runtime.bundle.inspect",
+            "operation.describe",
         ]
         .contains(method)
         {
@@ -128,6 +129,17 @@ fn every_unimplemented_method_is_refused_without_entering_the_host() {
 fn semantic_invalid_requests_do_not_trigger_observation_or_capability_paths() {
     let (control, reads) = setup();
     for (method, params, code) in [
+        ("operation.describe", json!({}), "invalidParams"),
+        (
+            "operation.describe",
+            json!({"reference": 1}),
+            "invalidParams",
+        ),
+        (
+            "operation.describe",
+            json!({"reference": "unknown@1"}),
+            "notFound",
+        ),
         ("doctor", json!({"deep":"true"}), "invalidParams"),
         ("doctor", json!({"unknown":true}), "invalidParams"),
         ("health", json!({"padding":"x"}), "invalidParams"),

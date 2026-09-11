@@ -8,7 +8,9 @@ use arkdeck_platform::{LocalConnection, LocalEndpoint, ServerIdentity};
 use serde_json::{Map, Value};
 use std::fmt;
 use std::io::{self, BufReader, Read, Write};
-use std::time::Duration;
+use std::time::{Duration, Instant};
+mod bounded;
+pub use bounded::BoundedConnection;
 
 #[derive(Debug)]
 pub enum ClientError {
@@ -45,6 +47,7 @@ pub struct Client<S: Read + Write> {
     stream: BufReader<S>,
     verified: bool,
     unusable: bool,
+    deadline: Option<Instant>,
 }
 
 impl Client<LocalConnection> {
@@ -68,6 +71,7 @@ impl<S: Read + Write> Client<S> {
             stream: BufReader::new(stream),
             verified: false,
             unusable: false,
+            deadline: None,
         }
     }
 
@@ -95,22 +99,31 @@ impl<S: Read + Write> Client<S> {
     }
 
     fn request_inner(&mut self, request: Request) -> Result<Value, ClientError> {
+        self.check_deadline()?;
         if !self.verified {
             let health = self.exchange(&Request::new("health", "health", None))?;
             validate_health(&health)?;
             self.verified = true;
         }
-        self.exchange(&request)?
-            .outcome
-            .map_err(ClientError::Remote)
+        let response = self.exchange(&request)?;
+        self.check_deadline()?;
+        response.outcome.map_err(ClientError::Remote)
     }
 
     fn exchange(&mut self, request: &Request) -> Result<Response, ClientError> {
+        self.check_deadline()?;
         let frame = encode_frame(request, MAX_REQUEST_BYTES)?;
         self.stream.get_mut().write_all(&frame)?;
         self.stream.get_mut().flush()?;
         let payload = read_frame(&mut self.stream, MAX_RESPONSE_BYTES)?;
         Ok(decode_response(&payload, &request.id, &request.method)?)
+    }
+
+    fn check_deadline(&self) -> io::Result<()> {
+        if let Some(deadline) = self.deadline {
+            bounded::remaining(deadline)?;
+        }
+        Ok(())
     }
 }
 

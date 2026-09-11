@@ -1014,22 +1014,26 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 
 ## TASK-XPA-018 — Rust CLI full parity and Swift CLI retirement
 
-- Status:blocked
+- Status:in-progress（2026-09-11: the continuous Rust CLI foundation serves operation describe/example and consumes current Job queries with bounded deadlines; full leaf parity, export, Swift retirement and GJ acceptance remain pending）
 - Platform:macos（r8: the Rust CLI becomes the only CLI on Windows when that side starts）
 - Requirements:CLI-REQ-001..025, `docs/design/arkdeck-cli-product-spec.md` §14/§15/§18
 - Acceptance:XPA-AC-3; `cli-feature-coverage.json` `fullFunction` on both platforms
 - Depends on:TASK-XPA-002's macOS read-only foundation（continuous: the Rust CLI's read-only leaves, r8）, TASK-XPA-016（final: every leaf, including the macOS in-process compatibility leaves, is served by the Rust daemon or tombstoned per CLI spec §12; r3 — previously the final dependency was TASK-XPA-017, which is the wrong way round because `ArkDeckCLI` links the modules TASK-XPA-017 deletes）
-- Readiness input pins（非载体示例）:
+- Readiness input pins（protected-main input for continuous CLI parity）:
 
-  ```yaml pin-example
+  ```yaml pins
+  - path: main
+    commit: b315f371d188f6e0cf14e4d356bb0f50507fb80d
   - path: openspec/contracts/cli-command-registry.yaml
-    blob: <40-hex git OID>
+    blob: 594f4f03efbc1b30a83ecb1b3aed208baa6ebc74
   ```
 
 - Applicable failure patterns:AF-004, AF-006, AF-010
 - Production reachability:`arkdeck` (Rust) → same wire methods; `maintainer contracts export` produced by Rust must equal the published bundle before the fact source flips
 - Trusted fact sources:219 argv fixtures, envelope/page/nextAction samples and the published contract bundle are the oracle until parity, then Rust becomes the oracle
 - Allowed paths:
+  - `spec/control/methods/job.timeline.json`（declared scope extension: existing invalid-cursor refusal backed by actual Swift producer recordings）
+  - `spec/control/methods/job.list.json`（declared scope extension: current typed filters and result branches backed by actual Swift producer recordings）
   - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`
   - `rust/**`
   - `Packages/ArkDeckKit/**`（Swift CLI removal）

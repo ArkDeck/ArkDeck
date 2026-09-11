@@ -62,11 +62,14 @@ final class JobReadResourcesContractTests: XCTestCase {
     return try values.map(object)
   }
   @discardableResult
-  private func seed(_ id: String, at: String? = nil, status: String = "succeeded", timeline: [String] = []) throws -> RuntimeJobRecord {
+  private func seed(_ id: String, at: String? = nil, status: String = "succeeded", timeline: [String] = [],
+    target: String = "TGT-fixture", operation: String = "observe.device", thread: String? = nil
+  ) throws -> RuntimeJobRecord {
     let request = try RuntimeOperationRequest(requestID: "req-\(id)", idempotencyKey: "idem-\(id)",
-      target: DurableTargetReference(targetID: "TGT-fixture", expectedBindingRevision: 1),
-      operation: RuntimeOperationReference(id: "observe.device", version: 1), inputs: ["privateInput": .string("private-input-value")])
-    var record = RuntimeJobRecord(jobID: id, request: request, operationReference: "observe.device@1",
+      target: DurableTargetReference(targetID: target, expectedBindingRevision: 1),
+      operation: RuntimeOperationReference(id: operation, version: 1), inputs: ["privateInput": .string("private-input-value")],
+      clientContext: thread.map { RuntimeClientContext(clientName: "job-list-oracle", threadID: $0) })
+    var record = RuntimeJobRecord(jobID: id, request: request, operationReference: "\(operation)@1",
       catalogDigest: RuntimeOperationCatalog.catalogDigest, providerID: "hdc", createdAtUTC: at ?? date,
       actualEffect: "readOnly", admissionEvidence: nil, materializedPlanDigest: String(repeating: "a", count: 64),
       materializedStableTargetIdentitySHA256: nil, materializedBindingRevision: 1)
@@ -607,6 +610,81 @@ final class JobReadResourcesContractTests: XCTestCase {
     XCTAssertEqual(dispatcher.dispatchCount, dispatchesAfterFirstRun)
   }
 
+  /// Records the actual control-plane producer, including filters previously
+  /// exercised only through direct engine calls. Fixture ledger rows grant no
+  /// execution authority, and every read must leave dispatch count at zero.
+  func testJobListFilterProducerFramesAndBoundedRefusals() async throws {
+    try seed("job-filter-a", thread: "thread-a")
+    try seed("job-filter-b", status: "failed", target: "TGT-other", operation: "observe.server", thread: "thread-b")
+    try seed("job-filter-c", thread: "thread-a")
+    let handler = RuntimeControlPlaneHandler(engine: engine, capabilityStore: capabilities,
+      providerIDs: ["hdc"], nowUTC: { "2026-08-31T12:00:00Z" }, targetStore: targets, artifactStore: artifacts)
+    func list(_ params: [String: JSONValue]) async throws -> AgentWireProtocol.Response {
+      await handler.handleFrame(try PortableCanonicalJSON.canonicalBytes(.object([
+        "protocolVersion": .string(ArkDeckControlProtocol.currentVersion),
+        "contractIdentity": .string(ArkDeckControlProtocol.contractIdentity),
+        "id": .string("job-list-filter-oracle"), "method": .string("job.list"), "params": .object(params),
+      ])))
+    }
+    for (key, value, expected): (String, String, [String]) in [
+      ("state", "failed", ["job-filter-b"]),
+      ("operation", "observe.server@1", ["job-filter-b"]),
+      ("target", "TGT-other", ["job-filter-b"]),
+      ("thread", "thread-a", ["job-filter-a", "job-filter-c"]),
+      ("operation", "observe.absent@1", []), ("target", "TGT-absent", []), ("thread", "thread-absent", []),
+    ] {
+      let response = try await list([key: .string(value)])
+      XCTAssertTrue(response.ok, response.error?.message ?? key)
+      XCTAssertEqual(try rows(object(XCTUnwrap(response.result))).map { $0["jobId"] }, expected.map(JSONValue.string))
+    }
+    let filters: [String: JSONValue] = ["state": .string("succeeded"), "operation": .string("observe.device@1"),
+      "target": .string("TGT-fixture"), "thread": .string("thread-a"), "pageSize": .integer(1)]
+    let first = try await list(filters)
+    XCTAssertTrue(first.ok)
+    let firstPage = try object(XCTUnwrap(first.result))
+    let cursor = try XCTUnwrap(firstPage["nextCursor"])
+    let next = try await list(filters.merging(["cursor": cursor]) { _, new in new })
+    XCTAssertTrue(next.ok)
+    XCTAssertEqual(try rows(object(XCTUnwrap(next.result))).map { $0["jobId"] }, [.string("job-filter-c")])
+    for (key, value) in [("state", "failed"), ("operation", "observe.server@1"),
+      ("target", "TGT-other"), ("thread", "thread-b")] {
+      let refused = try await list(filters.merging(["cursor": cursor, key: .string(value)]) { _, new in new })
+      XCTAssertEqual(refused.error?.code, "invalidCursor", key)
+    }
+    for key in ["state", "operation", "target", "thread"] {
+      for value: JSONValue in [.integer(1), .null, .string(""), .string(String(repeating: "x", count: 257)),
+        .string("contains\nnewline"), .string("contains\u{7f}delete")] {
+        let refused = try await list([key: value])
+        XCTAssertEqual(refused.error?.code, "invalidInput", key)
+      }
+    }
+    let unknownState = try await list(["state": .string("unpublished-state")])
+    XCTAssertEqual(unknownState.error?.code, "invalidInput")
+    for params: [String: JSONValue] in [
+      ["order": .string("wrong")], ["pageSize": .integer(0)], ["pageSize": .integer(1001)],
+      ["includeCurrent": .string("true")], ["includeTimeline": .string("true")],
+    ] {
+      let refused = try await list(params)
+      XCTAssertEqual(refused.error?.code, "invalidInput")
+    }
+    for token in ["", "malformed-token", String(repeating: "x", count: 2049)] {
+      let refused = try await list(["cursor": .string(token)])
+      XCTAssertEqual(refused.error?.code, "invalidCursor")
+    }
+    try seed("job-filter-large-timeline", timeline: [String(repeating: "x", count: 270_000)], thread: "thread-large")
+    let largeTimeline = try await list(["thread": .string("thread-large"), "includeTimeline": .bool(true)])
+    XCTAssertTrue(largeTimeline.ok)
+    XCTAssertEqual(try rows(object(XCTUnwrap(largeTimeline.result))).first?["timeline"], .object([
+      "kind": .string("snapshotPages"), "jobId": .string("job-filter-large-timeline"), "method": .string("job.timeline"),
+    ]))
+    let corrupted = try seed("job-filter-corrupt")
+    try RuntimeJobRepository(stateDirectory: state).updateJobState(jobID: corrupted.jobID,
+      state: corrupted.state, updatedAtUTC: date, recordData: Data("not-json".utf8))
+    let refused = try await list(["state": .string("succeeded")])
+    XCTAssertEqual(refused.error?.code, "recordUnreadable")
+    XCTAssertEqual(dispatcher.dispatchCount, 0)
+  }
+
   func testFixedJobSnapshotUsesTimeThenASCIIIdentityAndSurvivesUpdatesAndRestart() async throws {
     try seed("job-z", at: "2026-08-31T12:00:00Z")
     var changing = try seed("job-b", at: "2026-08-31T12:00:00.100Z", status: "queued")
@@ -1046,6 +1124,106 @@ final class JobReadResourcesContractTests: XCTestCase {
     let unreadable = try cli(["job", "result", "--job", "job-cleanup"])
     XCTAssertEqual(unreadable.1["ok"], .bool(false)); XCTAssertNil(unreadable.1["result"])
     XCTAssertEqual(try object(XCTUnwrap(unreadable.1["error"]))["code"], .string("recordUnreadable"))
+    XCTAssertEqual(dispatcher.dispatchCount, 0)
+  }
+
+  /// Actual handler and CLI responses cover continuation rows that the old
+  /// single-page timeline corpus could not demonstrate. No operation is run.
+  func testTimelineProducerFramesPreserveSegmentsAndBoundCursors() async throws {
+    let original = String(repeating: "e\u{301}中🙂", count: 12_000)
+    var record = try seed("job-timeline-segments", timeline: [original, "", "last entry"])
+    try seed("job-timeline-foreign", timeline: ["foreign entry"])
+    try seed("job-timeline-empty")
+    let handler = RuntimeControlPlaneHandler(engine: engine, capabilityStore: capabilities,
+      providerIDs: ["hdc"], nowUTC: { "2026-08-31T12:00:00Z" }, targetStore: targets, artifactStore: artifacts)
+    func timeline(_ params: [String: JSONValue]) async throws -> AgentWireProtocol.Response {
+      await handler.handleFrame(try PortableCanonicalJSON.canonicalBytes(.object([
+        "protocolVersion": .string(ArkDeckControlProtocol.currentVersion),
+        "contractIdentity": .string(ArkDeckControlProtocol.contractIdentity),
+        "id": .string("job-timeline-oracle"), "method": .string("job.timeline"), "params": .object(params),
+      ])))
+    }
+    var cursor: JSONValue?
+    var firstCursor: JSONValue?
+    var revision: JSONValue?
+    var reconstructed = ["", "", ""]
+    var parts: [JSONValue] = [], lastParts: [JSONValue] = []
+    var pageCount = 0
+    repeat {
+      var params: [String: JSONValue] = ["jobId": .string(record.jobID), "pageSize": .integer(1)]
+      if let cursor { params["cursor"] = cursor }
+      let response = try await timeline(params)
+      XCTAssertTrue(response.ok, response.error?.message ?? "timeline refused")
+      let fields = try object(XCTUnwrap(response.result))
+      XCTAssertEqual(fields["order"], .string("entryIndexAscPartIndexAsc"))
+      let values = try rows(fields)
+      XCTAssertEqual(values.count, 1)
+      if let revision { XCTAssertEqual(fields["snapshotRevision"], revision) }
+      else { revision = fields["snapshotRevision"] }
+      for row in values {
+        let index = try XCTUnwrap(CLIJobEventPage.decimal(row["entryIndex"]))
+        let text = try XCTUnwrap(CLIJobEventPage.string(row["text"]))
+        XCTAssertLessThanOrEqual(text.utf8.count, 64 * 1024)
+        reconstructed[Int(index)] += text
+        parts.append(try XCTUnwrap(row["partIndex"]))
+        lastParts.append(try XCTUnwrap(row["lastPart"]))
+      }
+      cursor = fields["nextCursor"] == .null ? nil : fields["nextCursor"]
+      XCTAssertEqual(fields["hasMore"], .bool(cursor != nil))
+      pageCount += 1
+      if pageCount == 1 {
+        firstCursor = cursor
+        record.timeline = ["new current timeline"]
+        try save(record)
+      }
+      XCTAssertLessThanOrEqual(pageCount, 4)
+    } while cursor != nil && pageCount < 5
+    XCTAssertNil(cursor)
+    XCTAssertEqual(pageCount, 4)
+    XCTAssertEqual(parts, [.string("0"), .string("1"), .string("0"), .string("0")])
+    XCTAssertEqual(lastParts, [.bool(false), .bool(true), .bool(true), .bool(true)])
+    XCTAssertEqual(Array(reconstructed[0].utf8), Array(original.utf8))
+    XCTAssertEqual(Array(reconstructed.dropFirst()), ["", "last entry"])
+
+    // The real CLI can start on a continuation whose first row is part 1.
+    // It must consume the existing snapshot rather than the changed record.
+    try startServer()
+    let token = try XCTUnwrap(CLIJobEventPage.string(firstCursor))
+    let continued = try cli(["job", "timeline", "--job", record.jobID, "--page-size", "1", "--cursor", token])
+    XCTAssertEqual(continued.0, 0)
+    let continuedPage = try object(XCTUnwrap(continued.1["result"]))
+    XCTAssertEqual(continuedPage["snapshotRevision"], revision)
+    XCTAssertEqual(try rows(continuedPage).first?["partIndex"], .string("1"))
+
+    let empty = try await timeline(["jobId": .string("job-timeline-empty")])
+    XCTAssertTrue(empty.ok)
+    XCTAssertEqual(try object(XCTUnwrap(empty.result))["items"], .array([]))
+    let listPage = try await page(["pageSize": .integer(1)])
+    let listCursor = try XCTUnwrap(listPage["nextCursor"])
+    for params: [String: JSONValue] in [
+      ["jobId": .string("job-timeline-foreign"), "pageSize": .integer(1), "cursor": .string(token)],
+      ["jobId": .string(record.jobID), "pageSize": .integer(2), "cursor": .string(token)],
+      ["jobId": .string(record.jobID), "pageSize": .integer(1), "cursor": listCursor],
+      ["jobId": .string(record.jobID), "cursor": .string("")],
+      ["jobId": .string(record.jobID), "cursor": .string("malformed-token")],
+    ] {
+      let response = try await timeline(params)
+      XCTAssertEqual(response.error?.code, "invalidCursor")
+    }
+    for params: [String: JSONValue] in [
+      ["jobId": .string(record.jobID), "pageSize": .integer(0)],
+      ["jobId": .string(record.jobID), "pageSize": .integer(1001)],
+      ["jobId": .string("bad/job")],
+    ] {
+      let response = try await timeline(params)
+      XCTAssertEqual(response.error?.code, "invalidInput")
+    }
+    let missing = try await timeline(["jobId": .string("job-timeline-missing")])
+    XCTAssertEqual(missing.error?.code, "notFound")
+    try RuntimeJobRepository(stateDirectory: state).updateJobState(jobID: record.jobID, state: record.state,
+      updatedAtUTC: date, recordData: Data("not-json".utf8))
+    let unreadable = try await timeline(["jobId": .string(record.jobID), "pageSize": .integer(1), "cursor": .string(token)])
+    XCTAssertEqual(unreadable.error?.code, "recordUnreadable")
     XCTAssertEqual(dispatcher.dispatchCount, 0)
   }
 
