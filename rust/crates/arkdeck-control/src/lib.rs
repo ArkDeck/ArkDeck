@@ -11,6 +11,13 @@ use serde_json::{Value, json};
 /// The composition root supplies local resources and device observations.
 /// This interface provides no device mutation or authority administration.
 pub trait HostServices: Send + Sync {
+    fn trace_cache_status(&self) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "rejected".into(),
+            message: "Trace cache owner is not configured".into(),
+            details: None,
+        })
+    }
     fn session_resource(
         &self,
         _method: &str,
@@ -211,6 +218,15 @@ impl<H: HostServices> Control<H> {
                     }
                 }
             }
+            "trace.cache.status" if params.is_empty() => Response {
+                id: request.id.clone(),
+                outcome: self.host.trace_cache_status(),
+            },
+            "trace.cache.status" => Response::failure(
+                &request.id,
+                "invalidParams",
+                "Trace cache status accepts no parameters",
+            ),
             "history.filter.list" | "history.filter.save" | "history.filter.delete" => Response {
                 id: request.id.clone(),
                 outcome: self.host.history_filter(&request.method, &params),

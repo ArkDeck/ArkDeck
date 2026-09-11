@@ -189,6 +189,18 @@ records in disposable host roots. Candidate contract CI includes this check.
 
 ## Contract and ownership boundaries
 
+The isolated macOS host also serves `trace cache status` from its fixed
+`trace-cache` directory. It reports actual byte counts and respects the existing
+key locks and entry leases; unaccounted entries remain active. Callers cannot
+pass a cache path, and Session root selection excludes this cache directory.
+Unsafe entries or a replaced root refuse the read. `trace cache purge`, database
+preparation and installed cache ownership remain pending.
+
+Run `python3 rust/scripts/check-trace-cache-owner.py` after building the binaries
+to check real RPC/CLI status, lease contention, restart and namespace refusals.
+Use `--cli-path Packages/ArkDeckKit/.build/debug/arkdeck` for the current Swift
+CLI consumer. The harness uses temporary host fixtures and performs no purge.
+
 `arkdeck-contract` contains generated schemas, strict framing, canonical encoders
 and digest functions. `arkdeck-control` has transport-free observation and local-resource handlers.
 `arkdeck-platform` owns the unsafe OS boundary; all other crates forbid unsafe

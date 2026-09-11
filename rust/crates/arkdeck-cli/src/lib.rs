@@ -4,6 +4,8 @@ use arkdeck_contract::{ContractError, PROTOCOL_VERSION, canonical_json};
 use serde_json::{Map, Value, json};
 mod session_resources;
 pub use session_resources::validate_session_response;
+mod trace_cache;
+pub use trace_cache::validate_trace_cache_response;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Invocation {
@@ -297,6 +299,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["doctor"] => "doctor",
         ["operation", "list"] => "operation.list",
         ["device", "candidates"] => "device.candidates",
+        ["trace", "cache", "status"] => "trace.cache.status",
         ["runtime", "storage", "status"] => "runtime.storage.status",
         ["runtime", "storage", "policy"] => "runtime.storage.policy",
         ["runtime", "storage", "root"] => "runtime.storage.root",
@@ -314,7 +317,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         _ => {
             return Err(CliError::new(
                 "invalidCommand",
-                "available commands: doctor, operation list, device candidates, history filter list|save|delete, runtime storage status|policy|root, session list|show|pin|unpin, session cleanup preview, session export preview|apply",
+                "available commands: doctor, operation list, device candidates, trace cache status, history filter list|save|delete, runtime storage status|policy|root, session list|show|pin|unpin, session cleanup preview, session export preview|apply",
             ));
         }
     };

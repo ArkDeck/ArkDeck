@@ -274,6 +274,10 @@ mod tests {
 mod trace;
 #[cfg(target_os = "macos")]
 pub use trace::trace_inventory;
+#[cfg(target_os = "macos")]
+mod trace_owner;
+#[cfg(target_os = "macos")]
+pub use trace_owner::TraceCacheStore;
 
 mod session_graphemes;
 #[cfg(target_os = "macos")]
