@@ -13,8 +13,10 @@ extension RuntimeCLI {
   ) throws {
     guard let verb = arguments.first else { throw CLIError(exitCode: 64, message: "tool subcommand is required") }
     var rest = Array(arguments.dropFirst())
+    let initialOptions = try CLIOptions(rest)
+    let devecoRPC = verb == "register" && initialOptions.value("--kind") == "deveco" && suppliedDevEco == nil
     var session = runtimeSession(
-      &rest, command: "runtime.tool.\(verb)", connectsToRuntime: verb == "select")
+      &rest, command: "runtime.tool.\(verb)", connectsToRuntime: verb == "select" || devecoRPC)
     do {
       let options = try CLIOptions(rest)
       if verb == "select" {
@@ -44,6 +46,14 @@ extension RuntimeCLI {
         }
 
         session.emit(try session.request("runtime.tool.select", fields))
+        return
+      }
+      if devecoRPC {
+        guard options.value("--file") == nil, let path = options.value("--root"),
+          path.hasPrefix("/"), !path.utf8.contains(0),
+          !path.split(separator: "/").contains(where: { $0 == "." || $0 == ".." })
+        else { throw session.fail(.invalidInput, "DevEco registration requires only an absolute --root") }
+        session.emit(try session.request("runtime.tool.register", ["kind": .string("deveco"), "root": .string(path)]))
         return
       }
       let registry = try supplied ?? BootstrapToolRegistry(knownIdentity: { sha256 in

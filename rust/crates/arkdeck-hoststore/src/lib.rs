@@ -319,7 +319,7 @@ mod deveco_content;
 #[cfg(target_os = "macos")]
 mod deveco_registry_owner;
 #[cfg(target_os = "macos")]
-pub use deveco_registry_owner::DevEcoRegistryReadStore;
+pub use deveco_registry_owner::DevEcoRegistryStore;
 
 #[cfg(target_os = "macos")]
 mod artifact_read_owner;

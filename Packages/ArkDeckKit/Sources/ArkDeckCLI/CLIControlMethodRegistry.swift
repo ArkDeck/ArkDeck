@@ -116,6 +116,7 @@ enum CLIControlMethodRegistry {
     // survive a lost response even though lifecycle dispatch remains zero.
     "runtime.hdc.impact-preview",
     "runtime.hdc.restart",
+    "runtime.tool.register",
     "runtime.tool.select",
     "control-action.list",
     "control-action.show",
@@ -239,6 +240,13 @@ enum CLIControlFailureMapper {
       evidence.phase == "importOwner", evidence.newDispatchCount == 0,
       ["resourceConflict", "invalidInput", "operationUnavailable", "inputTooLarge",
         "invalidCursor", "idempotencyConflict", "resourceNotFound", "artifactIntegrityFailed", "quotaExceeded"].contains(wireCode),
+      let code = CLIErrorCode(rawValue: wireCode) { return code }
+    // Registration may publish metadata despite zero device dispatch. Preserve
+    // its explicit owner failures, especially uncertain host publication.
+    if method == "runtime.tool.register",
+      evidence.phase == "bootstrapRegistryOwner", evidence.newDispatchCount == 0,
+      ["invalidInput", "fileIdentityChanged", "resourceConflict", "admissionDenied", "recordUnreadable",
+        "quotaExceeded", "ioFailure", "outcomeUnknown", "operationUnavailable"].contains(wireCode),
       let code = CLIErrorCode(rawValue: wireCode) { return code }
     // Target display names are a Runtime-owned local resource. The owner can
     // prove exact CAS and validation failures without claiming that a lost

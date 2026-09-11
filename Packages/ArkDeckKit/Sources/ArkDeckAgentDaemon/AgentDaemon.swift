@@ -100,6 +100,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
   private let hdcRuntimeDiagnostics: HDCManagedRuntimeDiagnostics?
   private let hdcStatusObserver: (any HDCStatusObserving)?
   private let hdcControlActions: RuntimeHDCControlActionCoordinator?
+  private let bootstrapDevEcoRegistrar: (@Sendable (String) async throws -> JSONValue)?
   private let bootstrapToolInspector: (@Sendable (String) async throws -> JSONValue)?
   private let bootstrapBundleInspector: (@Sendable (String) async throws -> JSONValue)?
   private let toolSelectionActions: RuntimeToolSelectionControlActionCoordinator?
@@ -152,6 +153,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     hdcStatusObserver: (any HDCStatusObserving)? = nil,
     hdcControlActions: RuntimeHDCControlActionCoordinator? = nil,
     toolSelectionActions: RuntimeToolSelectionControlActionCoordinator? = nil,
+    bootstrapDevEcoRegistrar: (@Sendable (String) async throws -> JSONValue)? = nil,
     bootstrapToolInspector: (@Sendable (String) async throws -> JSONValue)? = nil,
     bootstrapBundleInspector: (@Sendable (String) async throws -> JSONValue)? = nil,
     controlActions: RuntimeControlActionResourceCoordinator? = nil,
@@ -183,6 +185,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
       hdcStatusObserver: hdcStatusObserver,
       hdcControlActions: hdcControlActions,
       toolSelectionActions: toolSelectionActions,
+      bootstrapDevEcoRegistrar: bootstrapDevEcoRegistrar,
       bootstrapToolInspector: bootstrapToolInspector,
       bootstrapBundleInspector: bootstrapBundleInspector,
       controlActions: controlActions,
@@ -220,6 +223,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     hdcStatusObserver: (any HDCStatusObserving)? = nil,
     hdcControlActions: RuntimeHDCControlActionCoordinator? = nil,
     toolSelectionActions: RuntimeToolSelectionControlActionCoordinator? = nil,
+    bootstrapDevEcoRegistrar: (@Sendable (String) async throws -> JSONValue)? = nil,
     bootstrapToolInspector: (@Sendable (String) async throws -> JSONValue)? = nil,
     bootstrapBundleInspector: (@Sendable (String) async throws -> JSONValue)? = nil,
     controlActions: RuntimeControlActionResourceCoordinator? = nil,
@@ -256,6 +260,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     self.hdcStatusObserver = hdcStatusObserver
     self.hdcControlActions = hdcControlActions
     self.toolSelectionActions = toolSelectionActions
+    self.bootstrapDevEcoRegistrar = bootstrapDevEcoRegistrar
     self.bootstrapToolInspector = bootstrapToolInspector
     self.bootstrapBundleInspector = bootstrapBundleInspector
     self.controlActions = controlActions
@@ -342,6 +347,9 @@ public struct RuntimeControlPlaneHandler: Sendable {
       return await jobLifecycleRequest(request)
     }
     switch request.method {
+    case "runtime.tool.register":
+      return await bootstrapRegistrationRequest(request)
+
     case "runtime.tool.inspect", "runtime.bundle.inspect":
       return await bootstrapInspectionRequest(request)
     case "agent.run", "agent.status", "agent.list", "agent.abandon", "agent.resume":
@@ -2665,6 +2673,46 @@ public struct RuntimeControlPlaneHandler: Sendable {
           "phase": .string("workspacePresetOwner"),
           "newDispatchCount": .integer(0),
         ]))
+  }
+
+  // Registration writes local registry metadata but never selects or executes
+  // a tool. Zero device dispatch is not proof of zero host publication.
+  private func bootstrapRegistrationRequest(_ request: AgentWireProtocol.Request) async -> AgentWireProtocol.Response {
+    func failed(_ code: String, _ message: String) -> AgentWireProtocol.Response {
+      .init(id: request.id, ok: false, result: nil,
+        error: .init(code: code, message: message,
+          details: ["phase": .string("bootstrapRegistryOwner"), "newDispatchCount": .integer(0)]))
+    }
+    let fields = request.params ?? [:]
+    guard Set(fields.keys) == ["kind", "root"], fields["kind"] == .string("deveco"),
+      case .string(let root)? = fields["root"], root.hasPrefix("/"), !root.utf8.contains(0),
+      !root.split(separator: "/").contains(where: { $0 == "." || $0 == ".." }) else {
+      return failed("invalidParams", "DevEco registration requires only kind deveco and an absolute local root")
+    }
+    guard let register = bootstrapDevEcoRegistrar else {
+      return failed("operationUnavailable", "DevEco registration owner is unavailable")
+    }
+    let result: JSONValue
+    do {
+      result = try await register(root)
+    } catch let error as AgentExecutionControlFailure {
+      switch error.code {
+      case "invalidInput", "fileIdentityChanged", "resourceConflict", "admissionDenied", "recordUnreadable",
+        "quotaExceeded", "ioFailure", "outcomeUnknown":
+        return failed(error.code, error.message)
+      default:
+        return failed("outcomeUnknown", "DevEco registration did not return a classified publication outcome")
+      }
+    } catch {
+      return failed("outcomeUnknown", "DevEco registration publication outcome is unknown")
+    }
+    do {
+      return .init(id: request.id, ok: true,
+        result: try RuntimeJobReadProjection.bounded(result,
+          maximumBytes: ArkDeckControlProtocol.maximumResponseFrameBytes - 4096), error: nil)
+    } catch {
+      return failed("outcomeUnknown", "DevEco registration completed without a bounded receipt")
+    }
   }
 
   // Host bootstrap reads consume only exact references, never registration paths.

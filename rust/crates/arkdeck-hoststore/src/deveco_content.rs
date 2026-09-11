@@ -72,7 +72,7 @@ struct SdkData {
     platform_version: String,
     version: String,
 }
-fn inspect_root(path: &Path) -> io::Result<Record> {
+pub(crate) fn inspect_root(path: &Path) -> io::Result<Record> {
     let root = DevEcoRoot::open(path)?;
     let facts = &root.identity;
     let root_identity = RootIdentity {
@@ -160,17 +160,20 @@ fn inspect_root(path: &Path) -> io::Result<Record> {
 }
 pub(crate) fn verify(record: &Record) -> io::Result<()> {
     let measured = inspect_root(Path::new(&record.root.path))?;
-    if measured.reference != record.reference
-        || measured.content_digest != record.content_digest
-        || measured.root != record.root
-        || measured.product_version != record.product_version
-        || measured.build_number != record.build_number
-        || measured.sdk_version != record.sdk_version
-        || measured.api_version != record.api_version
-        || measured.bundle_trust != record.bundle_trust
-        || measured.children != record.children
-    {
+    if !matches_record(record, &measured) {
         return Err(unreadable());
     }
     Ok(())
+}
+
+pub(crate) fn matches_record(record: &Record, measured: &Record) -> bool {
+    measured.reference == record.reference
+        && measured.content_digest == record.content_digest
+        && measured.root == record.root
+        && measured.product_version == record.product_version
+        && measured.build_number == record.build_number
+        && measured.sdk_version == record.sdk_version
+        && measured.api_version == record.api_version
+        && measured.bundle_trust == record.bundle_trust
+        && measured.children == record.children
 }

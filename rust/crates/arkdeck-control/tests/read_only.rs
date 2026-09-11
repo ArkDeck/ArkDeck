@@ -40,7 +40,7 @@ fn setup() -> (Control<Host>, Arc<AtomicUsize>) {
         reads,
     )
 }
-fn call(control: &Control<Host>, method: &str, params: Value) -> Response {
+fn call<H: HostServices>(control: &Control<H>, method: &str, params: Value) -> Response {
     let request = Request::new("test", method, params.as_object().cloned());
     let frame = encode_frame(&request, MAX_REQUEST_BYTES).unwrap();
     let response = control.handle_frame(&frame[..frame.len() - 1]);
@@ -114,6 +114,7 @@ fn every_unimplemented_method_is_refused_without_entering_the_host() {
             "runtime.tool.inspect",
             "runtime.bundle.inspect",
             "operation.describe",
+            "runtime.tool.register",
         ]
         .contains(method)
         {
@@ -275,4 +276,112 @@ fn bootstrap_reads_validate_before_owner_and_refuse_an_unconfigured_owner() {
         assert_eq!(error.code, "operationUnavailable");
     }
     assert_eq!(reads.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn deveco_registration_is_closed_and_unpublished_views_never_reach_an_owner() {
+    let (control, reads) = setup();
+    let method = "runtime.tool.register";
+    if !METHODS.contains(&method) {
+        let request = Request::new("test", method, Some(serde_json::Map::new()));
+        let frame = encode_frame(&request, MAX_REQUEST_BYTES).unwrap();
+        let reply: Value =
+            serde_json::from_slice(&control.handle_frame(&frame[..frame.len() - 1])).unwrap();
+        assert_eq!(reply["error"]["code"], "unknownMethod");
+        assert_eq!(reads.load(Ordering::SeqCst), 0);
+        return;
+    }
+    for params in [
+        json!({}),
+        json!({"kind":"hdc","root":"/A.app/Contents"}),
+        json!({"kind":"deveco","file":"/A.app/Contents"}),
+        json!({"kind":"deveco","root":null}),
+        json!({"kind":"deveco","root":"relative"}),
+        json!({"kind":"deveco","root":"/A.app/../Contents"}),
+        json!({"kind":"deveco","root":"/A.app/./Contents"}),
+        json!({"kind":"deveco","root":"/A.app/Contents\0"}),
+        json!({"kind":"deveco","root":"/A.app/Contents","registeredAtUTC":"2026-09-11T00:00:00Z"}),
+    ] {
+        let error = call(&control, method, params).outcome.unwrap_err();
+        assert_eq!(error.code, "invalidParams");
+        assert_eq!(error.details.as_ref().unwrap()["newDispatchCount"], 0);
+    }
+    for root in ["/A.app/Contents", "/A.app/Contents/", "/A.app//Contents"] {
+        let error = call(&control, method, json!({"kind":"deveco","root":root}))
+            .outcome
+            .unwrap_err();
+        assert_eq!(error.code, "operationUnavailable");
+        assert_eq!(
+            error.details.as_ref().unwrap()["phase"],
+            "bootstrapRegistryOwner"
+        );
+    }
+    assert_eq!(reads.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn registration_lost_classified_receipts_preserve_uncertainty_after_one_owner_call() {
+    struct ReceiptFailureHost {
+        calls: Arc<AtomicUsize>,
+        receipt: Result<Value, WireError>,
+    }
+    impl HostServices for ReceiptFailureHost {
+        fn observed_at(&self) -> String {
+            "2026-09-11T00:00:00Z".into()
+        }
+        fn hdc_status(&self, deep: bool) -> HdcStatus {
+            HdcStatus::unavailable(deep, "hdc.notConfigured")
+        }
+        fn observations(&self) -> Result<DeviceObservationsResult, WireError> {
+            panic!("registration must not observe devices")
+        }
+        fn bootstrap_register_deveco(&self, _: &str) -> Result<Value, WireError> {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            self.receipt.clone()
+        }
+    }
+    for receipt in [
+        Ok(json!({"invalidReceipt": true})),
+        Err(WireError {
+            code: "unclassified".into(),
+            message: "lost classification".into(),
+            details: None,
+        }),
+        Err(WireError {
+            code: "outcomeUnknown".into(),
+            message: "x".repeat(MAX_RESPONSE_BYTES),
+            details: None,
+        }),
+    ] {
+        let calls = Arc::new(AtomicUsize::new(0));
+        let control = Control::new(ReceiptFailureHost {
+            calls: Arc::clone(&calls),
+            receipt,
+        })
+        .unwrap();
+        let method = "runtime.tool.register";
+        if !METHODS.contains(&method) {
+            let request = Request::new("test", method, Some(serde_json::Map::new()));
+            let frame = encode_frame(&request, MAX_REQUEST_BYTES).unwrap();
+            let reply: Value =
+                serde_json::from_slice(&control.handle_frame(&frame[..frame.len() - 1])).unwrap();
+            assert_eq!(reply["error"]["code"], "unknownMethod");
+            assert_eq!(calls.load(Ordering::SeqCst), 0);
+            continue;
+        }
+        let error = call(
+            &control,
+            method,
+            json!({"kind":"deveco", "root":"/A.app/Contents"}),
+        )
+        .outcome
+        .unwrap_err();
+        assert_eq!(error.code, "outcomeUnknown");
+        assert_eq!(
+            error.details.as_ref().unwrap()["phase"],
+            "bootstrapRegistryOwner"
+        );
+        assert_eq!(error.details.as_ref().unwrap()["newDispatchCount"], 0);
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+    }
 }

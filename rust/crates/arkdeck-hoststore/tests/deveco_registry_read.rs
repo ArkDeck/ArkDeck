@@ -1,5 +1,5 @@
 #![cfg(target_os = "macos")]
-use arkdeck_hoststore::{DevEcoRegistryReadStore, decode_deveco_toolchains};
+use arkdeck_hoststore::{DevEcoRegistryStore, decode_deveco_toolchains};
 use serde_json::{Value, json};
 use std::{
     fs, io,
@@ -64,7 +64,7 @@ fn frozen_metadata_refuses_schema_drift_and_preserves_removed_external_root_sema
 #[test]
 fn existing_owner_does_not_initialize_or_resolve_removed_content_and_shares_lock() {
     let root = Root::new();
-    let store = DevEcoRegistryReadStore::open_existing(&root.0).unwrap();
+    let store = DevEcoRegistryStore::open_existing(&root.0).unwrap();
     assert!(store.list().is_err());
     assert_eq!(fs::read_dir(&root.0).unwrap().count(), 0);
     root.write(".lock", &json!(null));
@@ -119,7 +119,7 @@ fn actual_registered_deveco_matches_swift_inspect_without_index_or_directory_cha
         .unwrap()
         .map(|e| e.unwrap().file_name())
         .collect::<std::collections::BTreeSet<_>>();
-    let store = DevEcoRegistryReadStore::open_existing(&root).unwrap();
+    let store = DevEcoRegistryStore::open_existing(&root).unwrap();
     let rows = store.list().unwrap();
     assert!(!rows.is_empty());
     assert!(rows.iter().any(|r| r["state"] == "available"));

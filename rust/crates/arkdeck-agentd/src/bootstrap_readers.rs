@@ -1,22 +1,22 @@
-//! Fixed-root, read-only bootstrap inventory composition. No registration,
-//! selection, install, process launch or execution authority is exposed here.
+//! Fixed-root Bootstrap inventory and DevEco metadata registration. No
+//! selection, installation, process launch or execution authority is exposed.
 use arkdeck_contract::WireError;
 use arkdeck_control::BootstrapRegistryKind;
-use arkdeck_hoststore::{BundleRegistryReadStore, DevEcoRegistryReadStore, ToolRegistryStore};
+use arkdeck_hoststore::{BundleRegistryReadStore, DevEcoRegistryStore, ToolRegistryStore};
 use serde_json::Value;
 use std::{io, path::Path};
 
 pub struct BootstrapReaders {
     tools: ToolRegistryStore,
     bundles: BundleRegistryReadStore,
-    deveco: DevEcoRegistryReadStore,
+    deveco: DevEcoRegistryStore,
 }
 impl BootstrapReaders {
     pub fn open_existing(root: &Path) -> io::Result<Self> {
         Ok(Self {
             tools: ToolRegistryStore::open_existing(root)?,
             bundles: BundleRegistryReadStore::open_existing(root)?,
-            deveco: DevEcoRegistryReadStore::open_existing(root)?,
+            deveco: DevEcoRegistryStore::open_existing(root)?,
         })
     }
     pub fn inspect(
@@ -60,5 +60,8 @@ impl BootstrapReaders {
                 ])),
             }
         })
+    }
+    pub fn register_deveco(&self, source: &Path, now: &str) -> Result<Value, WireError> {
+        self.deveco.register(source, now)
     }
 }

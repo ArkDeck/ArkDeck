@@ -1443,6 +1443,11 @@ let startupTask = Task.detached {
         daemonVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String),
       hdcControlActions: hdcControlActions,
       toolSelectionActions: toolSelectionActions,
+      bootstrapDevEcoRegistrar: { path in
+        let owner = try BootstrapBundleRegistry()
+        return try BootstrapDevEcoToolchainRegistry(owner: owner).register(
+          root: URL(filePath: path, directoryHint: .isDirectory))
+      },
       bootstrapToolInspector: { reference in
         let owner = try BootstrapBundleRegistry()
         if reference.hasPrefix("toolchain:sha256:") {

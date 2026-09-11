@@ -18,6 +18,16 @@ pub enum BootstrapRegistryKind {
 }
 
 pub trait HostServices: Send + Sync {
+    fn bootstrap_register_deveco(&self, _root: &str) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "operationUnavailable".into(),
+            message: "DevEco registration owner is not configured".into(),
+            details: Some(serde_json::Map::from_iter([
+                ("phase".into(), json!("bootstrapRegistryOwner")),
+                ("newDispatchCount".into(), json!(0)),
+            ])),
+        })
+    }
     fn trace_cache_status(&self) -> Result<Value, WireError> {
         Err(WireError {
             code: "rejected".into(),
@@ -283,6 +293,37 @@ impl<H: HostServices> Control<H> {
                 "invalidParams",
                 "Trace cache status accepts no parameters",
             ),
+            "runtime.tool.register" => {
+                let root = params.get("root").and_then(Value::as_str);
+                if params.len() != 2
+                    || params.get("kind") != Some(&json!("deveco"))
+                    || !root.is_some_and(|path| {
+                        path.starts_with('/')
+                            && !path.as_bytes().contains(&0)
+                            && !path.split('/').any(|part| matches!(part, "." | ".."))
+                    })
+                {
+                    Response {
+                        id: request.id.clone(),
+                        outcome: Err(WireError {
+                            code: "invalidParams".into(),
+                            message: "DevEco registration requires kind and an absolute local root"
+                                .into(),
+                            details: Some(serde_json::Map::from_iter([
+                                ("phase".into(), json!("bootstrapRegistryOwner")),
+                                ("newDispatchCount".into(), json!(0)),
+                            ])),
+                        }),
+                    }
+                } else {
+                    return registration_response_bytes(Response {
+                        id: request.id.clone(),
+                        outcome: self
+                            .host
+                            .bootstrap_register_deveco(root.expect("validated root")),
+                    });
+                }
+            }
             "runtime.tool.inspect" | "runtime.bundle.inspect" => {
                 let (key, kind, prefixes): (&str, BootstrapRegistryKind, &[&str]) =
                     if request.method == "runtime.tool.inspect" {
@@ -557,6 +598,35 @@ fn frame_id(bytes: &[u8]) -> String {
         .and_then(|v| v["id"].as_str().map(str::to_owned))
         .filter(|id| !id.is_empty() && id.len() <= 128 && id.chars().all(|c| c >= '\u{20}'))
         .unwrap_or_else(|| "-".into())
+}
+
+// The registration owner may already have published host metadata. Losing its
+// classified receipt must preserve uncertainty, including schema/encoding failure.
+fn registration_response_bytes(response: Response) -> Vec<u8> {
+    let method = "runtime.tool.register";
+    let conforms = match &response.outcome {
+        Ok(value) => validate_method_value(method, "result", value).is_ok(),
+        Err(error) => {
+            validate_method_value(method, "errorCode", &json!(error.code)).is_ok()
+                && error.details.as_ref().is_none_or(|details| {
+                    validate_method_value(method, "errorDetails", &json!(details)).is_ok()
+                })
+        }
+    };
+    if conforms && let Ok(bytes) = encode_frame(&response.value(), MAX_RESPONSE_BYTES) {
+        return bytes;
+    }
+    response_bytes(Response {
+        id: response.id,
+        outcome: Err(WireError {
+            code: "outcomeUnknown".into(),
+            message: "DevEco registration did not return a bounded classified receipt".into(),
+            details: Some(serde_json::Map::from_iter([
+                ("phase".into(), json!("bootstrapRegistryOwner")),
+                ("newDispatchCount".into(), json!(0)),
+            ])),
+        }),
+    })
 }
 
 fn response_bytes(response: Response) -> Vec<u8> {

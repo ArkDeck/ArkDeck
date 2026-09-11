@@ -341,6 +341,15 @@ enum CLIArgumentParser {
       index += 1
     }
 
+    // The shared registration leaf connects only for the DevEco kind.
+    if leaf.canonicalCommand == "runtime.tool.register",
+      provided["--kind"] != "deveco", provided.keys.contains("--socket") {
+      return .failure(CLIRegistryError(code: .invalidOption,
+        message: "HDC registration does not accept --socket",
+        details: ["command": .string(leaf.canonicalCommand), "option": .string("--socket")],
+        command: leaf.canonicalCommand))
+    }
+
     if state.sawHelp {
       if let refusal = helpIsNotMachineReadable(state) { return .failure(refusal) }
       return .success(.leafHelp(path: path, leaf: leaf))

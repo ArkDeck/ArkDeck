@@ -1,5 +1,5 @@
 #![cfg(target_os = "macos")]
-use arkdeck_hoststore::{BundleRegistryReadStore, DevEcoRegistryReadStore, ToolRegistryStore};
+use arkdeck_hoststore::{BundleRegistryReadStore, DevEcoRegistryStore, ToolRegistryStore};
 use arkdeck_platform::HostDirectory;
 use serde_json::json;
 use std::{
@@ -104,7 +104,7 @@ missing_lock_test!(
 );
 missing_lock_test!(
     deveco_missing_lock_and_index_differ_from_contention,
-    DevEcoRegistryReadStore,
+    DevEcoRegistryStore,
     "toolchain:sha256:",
     "deveco-toolchains.json",
     "arkdeck.bootstrap-deveco-toolchains/1"
