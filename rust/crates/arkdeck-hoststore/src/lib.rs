@@ -289,3 +289,32 @@ mod session_step_arguments;
 pub use session_graphemes::decode_graphemes;
 #[cfg(target_os = "macos")]
 pub use session_inventory::{session_inventory, session_inventory_owned};
+
+#[cfg(target_os = "macos")]
+mod tool_content;
+#[cfg(target_os = "macos")]
+pub mod tool_macho;
+#[cfg(target_os = "macos")]
+pub use tool_content::{ToolContent, ToolDependency, inspect_tool_content};
+#[cfg(target_os = "macos")]
+mod tool_registry_owner;
+#[cfg(target_os = "macos")]
+pub use tool_registry_owner::ToolRegistryReadStore;
+
+#[cfg(target_os = "macos")]
+pub mod bundle_content;
+#[cfg(target_os = "macos")]
+mod bundle_registry_owner;
+#[cfg(target_os = "macos")]
+pub use bundle_registry_owner::BundleRegistryReadStore;
+
+#[cfg(target_os = "macos")]
+mod deveco_registry;
+#[cfg(target_os = "macos")]
+pub use deveco_registry::decode_deveco_toolchains;
+#[cfg(target_os = "macos")]
+mod deveco_content;
+#[cfg(target_os = "macos")]
+mod deveco_registry_owner;
+#[cfg(target_os = "macos")]
+pub use deveco_registry_owner::DevEcoRegistryReadStore;

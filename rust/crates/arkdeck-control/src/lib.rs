@@ -10,6 +10,12 @@ use serde_json::{Value, json};
 
 /// The composition root supplies local resources and device observations.
 /// This interface provides no device mutation or authority administration.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BootstrapRegistryKind {
+    Tool,
+    Bundle,
+}
+
 pub trait HostServices: Send + Sync {
     fn trace_cache_status(&self) -> Result<Value, WireError> {
         Err(WireError {
@@ -18,6 +24,21 @@ pub trait HostServices: Send + Sync {
             details: None,
         })
     }
+    fn bootstrap_inspect(
+        &self,
+        _kind: BootstrapRegistryKind,
+        _reference: &str,
+    ) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "operationUnavailable".into(),
+            message: "Bootstrap read owner is not configured".into(),
+            details: Some(serde_json::Map::from_iter([
+                ("phase".into(), json!("bootstrapRegistryOwner")),
+                ("newDispatchCount".into(), json!(0)),
+            ])),
+        })
+    }
+
     fn session_resource(
         &self,
         _method: &str,
@@ -227,6 +248,50 @@ impl<H: HostServices> Control<H> {
                 "invalidParams",
                 "Trace cache status accepts no parameters",
             ),
+            "runtime.tool.inspect" | "runtime.bundle.inspect" => {
+                let (key, kind, prefixes): (&str, BootstrapRegistryKind, &[&str]) =
+                    if request.method == "runtime.tool.inspect" {
+                        (
+                            "tool",
+                            BootstrapRegistryKind::Tool,
+                            &["tool:sha256:", "toolchain:sha256:"],
+                        )
+                    } else {
+                        ("bundle", BootstrapRegistryKind::Bundle, &["bundle:sha256:"])
+                    };
+                let reference = params.get(key).and_then(Value::as_str);
+                if params.len() != 1
+                    || !reference.is_some_and(|reference| {
+                        prefixes.iter().any(|prefix| {
+                            reference.strip_prefix(prefix).is_some_and(|digest| {
+                                digest.len() == 64
+                                    && digest.bytes().all(|byte| {
+                                        byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)
+                                    })
+                            })
+                        })
+                    })
+                {
+                    Response {
+                        id: request.id.clone(),
+                        outcome: Err(WireError {
+                            code: "invalidParams".into(),
+                            message: "one exact bootstrap resource reference is required".into(),
+                            details: Some(serde_json::Map::from_iter([
+                                ("phase".into(), json!("bootstrapRegistryOwner")),
+                                ("newDispatchCount".into(), json!(0)),
+                            ])),
+                        }),
+                    }
+                } else {
+                    Response {
+                        id: request.id.clone(),
+                        outcome: self
+                            .host
+                            .bootstrap_inspect(kind, reference.expect("checked reference")),
+                    }
+                }
+            }
             "history.filter.list" | "history.filter.save" | "history.filter.delete" => Response {
                 id: request.id.clone(),
                 outcome: self.host.history_filter(&request.method, &params),

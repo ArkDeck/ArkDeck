@@ -41,6 +41,8 @@ enum CLIControlMethodRegistry {
     "doctor",
     "runtime.hdc.status",
     "runtime.storage.status",
+    "runtime.tool.inspect",
+    "runtime.bundle.inspect",
     "session.list",
     "session.show",
     "operation.list",

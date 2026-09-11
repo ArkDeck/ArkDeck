@@ -106,7 +106,16 @@ fn operation_descriptors_and_unconfigured_doctor_match_the_current_swift_outputs
 fn every_unimplemented_method_is_refused_without_entering_the_host() {
     let (control, reads) = setup();
     for method in METHODS {
-        if ["health", "doctor", "operation.list", "device.observations"].contains(method) {
+        if [
+            "health",
+            "doctor",
+            "operation.list",
+            "device.observations",
+            "runtime.tool.inspect",
+            "runtime.bundle.inspect",
+        ]
+        .contains(method)
+        {
             continue;
         }
         let response = call(&control, method, json!({}));
@@ -207,6 +216,51 @@ fn malformed_wrong_contract_and_unknown_methods_fail_before_host_entry() {
         let response: Value = serde_json::from_slice(&reply).unwrap();
         assert_eq!(response["ok"], false);
         assert_eq!(response["error"]["code"], code);
+    }
+    assert_eq!(reads.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn bootstrap_reads_validate_before_owner_and_refuse_an_unconfigured_owner() {
+    let (control, reads) = setup();
+    for (method, key, prefix) in [
+        ("runtime.tool.inspect", "tool", "tool:sha256:"),
+        ("runtime.bundle.inspect", "bundle", "bundle:sha256:"),
+    ] {
+        if !METHODS.contains(&method) {
+            // A published input view predating this additive RPC must still
+            // refuse it. Candidate views below exercise its complete handler.
+            let request = Request::new("test", method, Some(serde_json::Map::new()));
+            let frame = encode_frame(&request, MAX_REQUEST_BYTES).unwrap();
+            let reply: Value =
+                serde_json::from_slice(&control.handle_frame(&frame[..frame.len() - 1])).unwrap();
+            assert_eq!(reply["error"]["code"], "unknownMethod");
+            continue;
+        }
+        for params in [
+            json!({}),
+            json!({key:1}),
+            json!({key:"bad"}),
+            json!({key:format!("{prefix}{}", "0".repeat(64)),"path":"/tmp"}),
+        ] {
+            let error = call(&control, method, params).outcome.unwrap_err();
+            assert_eq!(error.code, "invalidParams");
+            assert_eq!(
+                error.details,
+                Some(serde_json::Map::from_iter([
+                    ("phase".into(), json!("bootstrapRegistryOwner")),
+                    ("newDispatchCount".into(), json!(0))
+                ]))
+            );
+        }
+        let error = call(
+            &control,
+            method,
+            json!({key:format!("{prefix}{}", "0".repeat(64))}),
+        )
+        .outcome
+        .unwrap_err();
+        assert_eq!(error.code, "operationUnavailable");
     }
     assert_eq!(reads.load(Ordering::SeqCst), 0);
 }

@@ -5,7 +5,7 @@
       "additionalProperties": false,
       "properties": {
         "contractIdentity": {
-          "const": "8a662759721a2081e974306399997801246de4022047365c050107de5dce2912"
+          "const": "05a9f1ad8309a0cd23666bf00aa07eb4c04f317e882183f9aa612568faf64492"
         },
         "id": {
           "minLength": 1,
@@ -75,12 +75,14 @@
             "operation.describe",
             "operation.list",
             "recovery.flash-invocation.list",
+            "runtime.bundle.inspect",
             "runtime.hdc.impact-preview",
             "runtime.hdc.restart",
             "runtime.hdc.status",
             "runtime.storage.policy",
             "runtime.storage.root",
             "runtime.storage.status",
+            "runtime.tool.inspect",
             "runtime.tool.select",
             "session.cleanup.apply",
             "session.cleanup.preview",
@@ -214,7 +216,7 @@
   "title": "arkdeck.runtime-control-plane/1",
   "x-arkdeck-bundleVersion": "arkdeck.cli.contracts/1",
   "x-arkdeck-cliVersion": "0.1.0",
-  "x-arkdeck-contractIdentity": "8a662759721a2081e974306399997801246de4022047365c050107de5dce2912",
+  "x-arkdeck-contractIdentity": "05a9f1ad8309a0cd23666bf00aa07eb4c04f317e882183f9aa612568faf64492",
   "x-arkdeck-currentProtocolVersion": "1.0.0",
   "x-arkdeck-methodSchemaDirectory": "spec/control/methods",
   "x-arkdeck-methods": [
@@ -529,6 +531,11 @@
       "schema": "spec/control/methods/recovery.flash-invocation.list.json"
     },
     {
+      "method": "runtime.bundle.inspect",
+      "published": true,
+      "schema": "spec/control/methods/runtime.bundle.inspect.json"
+    },
+    {
       "method": "runtime.hdc.impact-preview",
       "published": true,
       "schema": "spec/control/methods/runtime.hdc.impact-preview.json"
@@ -557,6 +564,11 @@
       "method": "runtime.storage.status",
       "published": true,
       "schema": "spec/control/methods/runtime.storage.status.json"
+    },
+    {
+      "method": "runtime.tool.inspect",
+      "published": true,
+      "schema": "spec/control/methods/runtime.tool.inspect.json"
     },
     {
       "method": "runtime.tool.select",

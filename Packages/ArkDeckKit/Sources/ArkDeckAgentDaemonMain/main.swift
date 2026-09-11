@@ -1443,6 +1443,29 @@ let startupTask = Task.detached {
         daemonVersion: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String),
       hdcControlActions: hdcControlActions,
       toolSelectionActions: toolSelectionActions,
+      bootstrapToolInspector: { reference in
+        let owner = try BootstrapBundleRegistry()
+        if reference.hasPrefix("toolchain:sha256:") {
+          return try BootstrapDevEcoToolchainRegistry(owner: owner).inspect(
+            reference, existingStoreOnly: true)
+        }
+        return try BootstrapToolRegistry(owner: owner, knownIdentity: { sha256 in
+          HeadlessHDCBootstrapIdentity.lookup(sha256: sha256).map {
+            BootstrapToolRegistry.PublishedIdentity(
+              version: $0.version, profileReferences: $0.profileReferences)
+          }
+        }).inspect(reference, existingStoreOnly: true)
+      },
+      bootstrapBundleInspector: { reference in
+        let owner = try BootstrapBundleRegistry(validateBundle: { candidate in
+          do {
+            _ = try LaunchAgentService.validateProductionDaemonBundle(candidate, fileManager: .default)
+          } catch {
+            throw AgentExecutionControlFailure("admissionDenied", "registered bundle failed the production helper trust policy")
+          }
+        })
+        return try owner.inspect(reference, existingStoreOnly: true)
+      },
       controlActions: controlActions,
       artifactStore: artifactStore,
       historyFilterStore: historyFilterStore,

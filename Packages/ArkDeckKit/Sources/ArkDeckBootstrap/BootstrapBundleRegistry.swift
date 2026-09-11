@@ -152,9 +152,11 @@ package final class BootstrapBundleRegistry {
     }
   }
 
-  package func inspect(_ reference: String) throws -> JSONValue {
-    try locked { directory in
-      let record = try find(reference, in: readIndex(directory))
+  /// RPC inspection requires an already published owner, lock and index; local
+  /// bootstrap callers retain their existing lazy-initialization behavior.
+  package func inspect(_ reference: String, existingStoreOnly: Bool = false) throws -> JSONValue {
+    try locked(create: !existingStoreOnly) { directory in
+      let record = try find(reference, in: readIndex(directory, create: !existingStoreOnly))
       try verify(record, directory: directory)
       return record.value
     }
@@ -256,17 +258,18 @@ package final class BootstrapBundleRegistry {
   /// All bootstrap resource families serialize through this owner. Establish
   /// the durable bundle index before another family writes anything, so a
   /// genuinely missing index is never confused with a fresh independent store.
-  package func withSharedStore<T>(_ body: (Int32, URL) throws -> T) throws -> T {
-    try locked { directory in
-      _ = try readIndex(directory)
+  /// `create: false` is the no-initialization path used by read-only control RPCs.
+  package func withSharedStore<T>(create: Bool = true, _ body: (Int32, URL) throws -> T) throws -> T {
+    try locked(create: create) { directory in
+      _ = try readIndex(directory, create: create)
       return try body(directory, root)
     }
   }
 
-  private func locked<T>(_ body: (Int32) throws -> T) throws -> T {
-    let directory = try Files.openDirectory(root, create: true, privateLeaf: true)
+  private func locked<T>(create: Bool = true, _ body: (Int32) throws -> T) throws -> T {
+    let directory = try Files.openDirectory(root, create: create, privateLeaf: true)
     defer { close(directory) }
-    let lock = openat(directory, ".lock", O_RDWR | O_CREAT | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK, 0o600)
+    let lock = openat(directory, ".lock", O_RDWR | (create ? O_CREAT : 0) | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK, 0o600)
     guard lock >= 0 else { throw Files.failure("recordUnreadable", "cannot open bootstrap owner lock") }
     defer { close(lock) }
     let identity = try Files.status(lock)
@@ -350,9 +353,9 @@ package final class BootstrapBundleRegistry {
     return text
   }
 
-  private func readIndex(_ directory: Int32) throws -> Index {
+  private func readIndex(_ directory: Int32, create: Bool = true) throws -> Index {
     let fd = openat(directory, "bundles.json", O_RDONLY | O_NONBLOCK | O_NOFOLLOW | O_CLOEXEC)
-    if fd < 0, errno == ENOENT {
+    if fd < 0, errno == ENOENT, create {
       // An empty index is durable before the first staging copy. A missing
       // index beside retained bytes could have contained live dependencies;
       // it is corruption, never an empty inventory or adoptable orphan.

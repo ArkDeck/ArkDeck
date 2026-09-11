@@ -747,9 +747,28 @@ impl HostDirectory {
     }
 
     pub fn try_lock_existing(&self, name: &str) -> io::Result<Option<HostReadLock>> {
-        let file = match self.open_at(name, 0) {
+        self.try_lock_existing_impl(name, true, libc::O_RDONLY)
+    }
+
+    /// Never creates a lock file. Missing files remain NotFound; only an
+    /// existing exclusive lock held by another owner returns None. Bootstrap
+    /// opens its lock read/write, matching the existing Swift owner without
+    /// changing the file or broadening ordinary snapshot readers.
+    pub fn try_lock_existing_strict(&self, name: &str) -> io::Result<Option<HostReadLock>> {
+        self.try_lock_existing_impl(name, false, libc::O_RDWR)
+    }
+
+    fn try_lock_existing_impl(
+        &self,
+        name: &str,
+        allow_missing: bool,
+        access: i32,
+    ) -> io::Result<Option<HostReadLock>> {
+        let file = match self.open_at_access(name, 0, access) {
             Ok(file) => file,
-            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+            Err(error) if allow_missing && error.kind() == io::ErrorKind::NotFound => {
+                return Ok(None);
+            }
             Err(error) => return Err(error),
         };
         owned(&file, false, self.1)?;

@@ -100,6 +100,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
   private let hdcRuntimeDiagnostics: HDCManagedRuntimeDiagnostics?
   private let hdcStatusObserver: (any HDCStatusObserving)?
   private let hdcControlActions: RuntimeHDCControlActionCoordinator?
+  private let bootstrapToolInspector: (@Sendable (String) async throws -> JSONValue)?
+  private let bootstrapBundleInspector: (@Sendable (String) async throws -> JSONValue)?
   private let toolSelectionActions: RuntimeToolSelectionControlActionCoordinator?
   private let controlActions: RuntimeControlActionResourceCoordinator?
   private let artifactStore: RuntimeArtifactStore?
@@ -150,6 +152,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
     hdcStatusObserver: (any HDCStatusObserving)? = nil,
     hdcControlActions: RuntimeHDCControlActionCoordinator? = nil,
     toolSelectionActions: RuntimeToolSelectionControlActionCoordinator? = nil,
+    bootstrapToolInspector: (@Sendable (String) async throws -> JSONValue)? = nil,
+    bootstrapBundleInspector: (@Sendable (String) async throws -> JSONValue)? = nil,
     controlActions: RuntimeControlActionResourceCoordinator? = nil,
     artifactStore: RuntimeArtifactStore? = nil,
     historyFilterStore: RuntimeHistoryFilterStore? = nil,
@@ -179,6 +183,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
       hdcStatusObserver: hdcStatusObserver,
       hdcControlActions: hdcControlActions,
       toolSelectionActions: toolSelectionActions,
+      bootstrapToolInspector: bootstrapToolInspector,
+      bootstrapBundleInspector: bootstrapBundleInspector,
       controlActions: controlActions,
       artifactStore: artifactStore,
       historyFilterStore: historyFilterStore,
@@ -214,6 +220,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
     hdcStatusObserver: (any HDCStatusObserving)? = nil,
     hdcControlActions: RuntimeHDCControlActionCoordinator? = nil,
     toolSelectionActions: RuntimeToolSelectionControlActionCoordinator? = nil,
+    bootstrapToolInspector: (@Sendable (String) async throws -> JSONValue)? = nil,
+    bootstrapBundleInspector: (@Sendable (String) async throws -> JSONValue)? = nil,
     controlActions: RuntimeControlActionResourceCoordinator? = nil,
     artifactStore: RuntimeArtifactStore?,
     historyFilterStore: RuntimeHistoryFilterStore? = nil,
@@ -248,6 +256,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
     self.hdcStatusObserver = hdcStatusObserver
     self.hdcControlActions = hdcControlActions
     self.toolSelectionActions = toolSelectionActions
+    self.bootstrapToolInspector = bootstrapToolInspector
+    self.bootstrapBundleInspector = bootstrapBundleInspector
     self.controlActions = controlActions
     self.artifactStore = artifactStore
     self.historyFilterStore = historyFilterStore
@@ -332,6 +342,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
       return await jobLifecycleRequest(request)
     }
     switch request.method {
+    case "runtime.tool.inspect", "runtime.bundle.inspect":
+      return await bootstrapInspectionRequest(request)
     case "agent.run", "agent.status", "agent.list", "agent.abandon", "agent.resume":
       return await agentExecutionRequest(request)
     case "human-action.list", "human-action.show", "human-action.resume":
@@ -2653,6 +2665,44 @@ public struct RuntimeControlPlaneHandler: Sendable {
           "phase": .string("workspacePresetOwner"),
           "newDispatchCount": .integer(0),
         ]))
+  }
+
+  // Host bootstrap reads consume only exact references, never registration paths.
+  private func bootstrapInspectionRequest(_ request: AgentWireProtocol.Request) async -> AgentWireProtocol.Response {
+    func failed(_ code: String, _ message: String) -> AgentWireProtocol.Response {
+      .init(id: request.id, ok: false, result: nil,
+        error: .init(code: code, message: message,
+          details: ["phase": .string("bootstrapRegistryOwner"), "newDispatchCount": .integer(0)]))
+    }
+    let tool = request.method == "runtime.tool.inspect"
+    let key = tool ? "tool" : "bundle"
+    let fields = request.params ?? [:]
+    guard Set(fields.keys) == [key], case .string(let reference)? = fields[key] else {
+      return failed("invalidParams", "bootstrap inspection requires one exact typed reference")
+    }
+    let prefixes = tool ? ["tool:sha256:", "toolchain:sha256:"] : ["bundle:sha256:"]
+    guard prefixes.contains(where: { reference.hasPrefix($0)
+      && SHA256Hex.isLowercaseSHA256(String(reference.dropFirst($0.count))) }) else {
+      return failed("invalidParams", "bootstrap inspection requires a content-addressed reference")
+    }
+    guard let inspect = tool ? bootstrapToolInspector : bootstrapBundleInspector else {
+      return failed("operationUnavailable", "bootstrap registry inspection is unavailable")
+    }
+    do {
+      let result = try await inspect(reference)
+      return .init(id: request.id, ok: true,
+        result: try RuntimeJobReadProjection.bounded(result,
+          maximumBytes: ArkDeckControlProtocol.maximumResponseFrameBytes - 4096), error: nil)
+    } catch let error as AgentExecutionControlFailure {
+      switch error.code {
+      case "resourceNotFound", "resourceConflict", "admissionDenied":
+        return failed(error.code, error.message)
+      default:
+        return failed("recordUnreadable", "bootstrap registry content, metadata or owner is unreadable")
+      }
+    } catch {
+      return failed("recordUnreadable", "bootstrap registry content, metadata or owner is unreadable")
+    }
   }
 
   // MARK: device observations (§6.1, §8.5)

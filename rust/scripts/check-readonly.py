@@ -282,6 +282,8 @@ def main() -> None:
                     invoke(cli, directory, rows, environment, name, command, code, error)
                 for method in registry["methods"]:
                     expected = ("rejected" if method not in SUPPORTED or method == "device.observations" else None)
+                    if method in {"runtime.tool.inspect", "runtime.bundle.inspect"}:
+                        expected = "invalidParams"
                     exchange(endpoint, directory, rows, method, encode(request(registry, method, method)), method, expected)
                 for name, method, params, error in [
                     ("bad-deep", "doctor", {"deep": "true"}, "invalidParams"),

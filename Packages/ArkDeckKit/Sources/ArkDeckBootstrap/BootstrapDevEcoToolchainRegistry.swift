@@ -171,9 +171,9 @@ package final class BootstrapDevEcoToolchainRegistry: @unchecked Sendable {
     }
   }
 
-  package func inspect(_ reference: String) throws -> JSONValue {
-    try owner.withSharedStore { directory, _ in
-      let record = try find(reference, in: readIndex(directory))
+  package func inspect(_ reference: String, existingStoreOnly: Bool = false) throws -> JSONValue {
+    try owner.withSharedStore(create: !existingStoreOnly) { directory, _ in
+      let record = try find(reference, in: readIndex(directory, create: !existingStoreOnly))
       if record.state == "available" { try verify(record) }
       return value(record)
     }
@@ -658,10 +658,10 @@ package final class BootstrapDevEcoToolchainRegistry: @unchecked Sendable {
     index.records[index.records.firstIndex { $0.reference == record.reference }!] = record
   }
 
-  private func readIndex(_ directory: Int32) throws -> Index {
+  private func readIndex(_ directory: Int32, create: Bool = true) throws -> Index {
     let fd = openat(
       directory, Self.indexName, O_RDONLY | O_NONBLOCK | O_NOFOLLOW | O_CLOEXEC)
-    if fd < 0, errno == ENOENT {
+    if fd < 0, errno == ENOENT, create {
       let initial = Index()
       try saveIndex(initial, directory: directory, root: nil)
       return initial
