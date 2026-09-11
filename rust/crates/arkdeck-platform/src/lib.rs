@@ -16,6 +16,12 @@ mod unix;
 mod windows;
 
 pub use process::{ProcessLimits, ProcessOutput, VerifiedTool};
+#[cfg(target_os = "macos")]
+mod host_signature;
+#[cfg(target_os = "macos")]
+pub use host_signature::{
+    NativeCodeSignature, inspect_deveco_publisher_signature, inspect_native_code_signature,
+};
 #[cfg(unix)]
 pub use unix::{LocalConnection, LocalListener, LoopbackServerLease, default_user_endpoint};
 #[cfg(windows)]
@@ -126,3 +132,24 @@ pub use host_calendar::{
 mod host_date_formatter;
 #[cfg(target_os = "macos")]
 pub use host_date_formatter::host_legacy_iso8601;
+
+#[cfg(target_os = "macos")]
+mod host_bootstrap_tree;
+#[cfg(target_os = "macos")]
+pub use host_bootstrap_tree::{
+    BootstrapEntry, BootstrapTree, default_bootstrap_registry_root, inspect_bootstrap_tree,
+};
+
+#[cfg(target_os = "macos")]
+mod host_bundle_signature;
+#[cfg(target_os = "macos")]
+pub use host_bundle_signature::{bootstrap_bundle_version, validate_production_daemon_bundle};
+
+#[cfg(target_os = "macos")]
+mod host_deveco_files;
+#[cfg(target_os = "macos")]
+pub use host_deveco_files::{DevEcoFileFacts, DevEcoFileRead, DevEcoRole, DevEcoRoot};
+#[cfg(target_os = "macos")]
+mod host_deveco_resources;
+#[cfg(target_os = "macos")]
+pub use host_deveco_resources::{DEVECO_RESOURCE_PATHS, verify_deveco_resource_envelope};

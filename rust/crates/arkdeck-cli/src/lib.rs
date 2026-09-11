@@ -2,7 +2,9 @@
 use arkdeck_client::ClientError;
 use arkdeck_contract::{ContractError, PROTOCOL_VERSION, canonical_json};
 use serde_json::{Map, Value, json};
+mod bootstrap_resources;
 mod session_resources;
+pub use bootstrap_resources::validate_bootstrap_response;
 pub use session_resources::validate_session_response;
 mod trace_cache;
 pub use trace_cache::validate_trace_cache_response;
@@ -131,7 +133,15 @@ impl CliError {
                         details.get("phase") == Some(&json!("sessionOwner"))
                             && details.get("newDispatchCount") == Some(&json!(0))
                     }));
+                let bootstrap_proof =
+                    matches!(method, "runtime.tool.inspect" | "runtime.bundle.inspect")
+                        && error.details.as_ref().is_some_and(|details| {
+                            details.get("phase") == Some(&json!("bootstrapRegistryOwner"))
+                                && details.get("newDispatchCount") == Some(&json!(0))
+                        });
+                let host_proof = host_proof || bootstrap_proof;
                 let code = match error.code.as_str() {
+                    "admissionDenied" if bootstrap_proof => "admissionDenied",
                     "invalidInput" if host_proof => "invalidInput",
                     "resourceConflict" if host_proof => "resourceConflict",
                     "resourceNotFound" if host_proof => "resourceNotFound",
@@ -220,7 +230,9 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                 | "--session"
                 | "--target"
                 | "--time"
-                | "--activity" => {
+                | "--activity"
+                | "--tool"
+                | "--bundle" => {
                     index += 1;
                     let value = argv
                         .get(index)
@@ -300,6 +312,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["operation", "list"] => "operation.list",
         ["device", "candidates"] => "device.candidates",
         ["trace", "cache", "status"] => "trace.cache.status",
+        ["runtime", "tool", "inspect"] => "runtime.tool.inspect",
+        ["runtime", "bundle", "inspect"] => "runtime.bundle.inspect",
         ["runtime", "storage", "status"] => "runtime.storage.status",
         ["runtime", "storage", "policy"] => "runtime.storage.policy",
         ["runtime", "storage", "root"] => "runtime.storage.root",
@@ -346,6 +360,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             "retentionDays",
         ],
         "runtime.storage.root" => &["expectedGeneration", "rootPath", "resetToDefault"],
+        "runtime.tool.inspect" => &["tool"],
+        "runtime.bundle.inspect" => &["bundle"],
         "session.list" => &["pageSize", "cursor"],
         "session.show" => &["sessionId"],
         "session.export.preview" => &["sessionId", "destinationPath", "allowSensitive"],
@@ -532,6 +548,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             "help renders human text only",
         ));
     }
+    bootstrap_resources::configure(command, &method_options, help)?;
     Ok(Invocation {
         command,
         method: if command == "device.candidates" {
@@ -543,6 +560,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             Some(serde_json::from_value(json!({"deep":deep})).unwrap())
         } else if command.starts_with("history.filter.")
             || command.starts_with("runtime.storage.")
+            || matches!(command, "runtime.tool.inspect" | "runtime.bundle.inspect")
             || command.starts_with("session.")
         {
             Some(method_options)

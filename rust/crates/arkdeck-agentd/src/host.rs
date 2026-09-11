@@ -9,6 +9,8 @@ use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub struct Host {
+    #[cfg(target_os = "macos")]
+    bootstrap: Option<crate::bootstrap_readers::BootstrapReaders>,
     provider: Option<HdcReadOnlyProvider>,
     #[cfg(target_os = "macos")]
     history: Option<arkdeck_hoststore::HistoryStore>,
@@ -29,6 +31,14 @@ impl Host {
         self.trace_cache = Some(cache);
         self
     }
+    #[cfg(target_os = "macos")]
+    pub fn with_bootstrap(mut self, root: &std::path::Path) -> io::Result<Self> {
+        self.bootstrap = Some(crate::bootstrap_readers::BootstrapReaders::open_existing(
+            root,
+        )?);
+        Ok(self)
+    }
+
     #[cfg(target_os = "macos")]
     pub fn with_storage(
         mut self,
@@ -59,6 +69,8 @@ impl Host {
             _ => (None, "hdc.toolConfigurationIncomplete"),
         };
         Self {
+            #[cfg(target_os = "macos")]
+            bootstrap: None,
             provider,
             #[cfg(target_os = "macos")]
             history: None,
@@ -84,6 +96,25 @@ impl HostServices for Host {
             })?
             .status()
     }
+    #[cfg(target_os = "macos")]
+    fn bootstrap_inspect(
+        &self,
+        kind: arkdeck_control::BootstrapRegistryKind,
+        reference: &str,
+    ) -> Result<serde_json::Value, WireError> {
+        self.bootstrap
+            .as_ref()
+            .ok_or_else(|| WireError {
+                code: "operationUnavailable".into(),
+                message: "Bootstrap read owner is not configured".into(),
+                details: Some(serde_json::Map::from_iter([
+                    ("phase".into(), serde_json::json!("bootstrapRegistryOwner")),
+                    ("newDispatchCount".into(), serde_json::json!(0)),
+                ])),
+            })?
+            .inspect(kind, reference)
+    }
+
     #[cfg(target_os = "macos")]
     fn session_resource(
         &self,

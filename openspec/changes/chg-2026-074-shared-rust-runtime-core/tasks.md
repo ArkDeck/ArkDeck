@@ -702,7 +702,7 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 
 ## TASK-XPA-012 — Move host-only durable stores to the Rust owner on macOS
 
-- Status:in-progress（2026-09-11: isolated Rust History, Session configuration, list/show/pin/unpin, cleanup preview and export preview/apply serve CLI/control; export preserves sources and durable repeat results. Cleanup apply, remaining host stores, installed integration and GJ-1 acceptance remain pending）
+- Status:in-progress（2026-09-11: isolated Rust History, Session resources/export, Trace cache status and Bootstrap inspection serve CLI/control; writes preserve their frozen formats and reads verify existing native content. Cleanup apply, remaining host-store writes, installed integration and GJ-1 acceptance remain pending）
 - Platform:macos
 - Requirements:`session-artifact-storage` (storage owner), `docs/design/cli-runtime-storage.md:11-24`
 - Acceptance:XPA-AC-1, XPA-AC-7, XPA-AC-9; macOS GJ-1 re-pass
@@ -720,6 +720,12 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 - Production reachability:the Rust daemon owns session storage, history filters, display names, trace cache, tool/bundle registry and storage policy; develop against an explicit isolated root, then detach Swift consumers before installed activation. The first slice serves `history.filter.*` directly without a Swift child.
 - Trusted fact sources:generation-CAS documents under the same lock discipline; ordinary saved filters and display preferences may be rebuilt. These local preferences confer no device authority.
 - Allowed paths:
+  - `Packages/ArkDeckKit/Sources/ArkDeckCLI/CLIMachineContracts.swift`（declared scope extension: map additive inspection RPCs to their existing CLI leaves）
+  - `openspec/contracts/cli-feature-coverage.json`（declared scope extension: export the two new inspection RPC coverage entries）
+  - `Packages/ArkDeckKit/Sources/ArkDeckCLI/CLIControlMethodRegistry.swift`（declared scope extension: classify the two additive Bootstrap inspection methods as read-only）
+  - `Packages/ArkDeckKit/Contracts/control-protocol.json`（declared scope extension: add typed read-only Bootstrap inspection methods）
+  - `spec/control/methods/*.json`（declared scope extension: new Bootstrap inspection schemas from native recordings and identity-only refresh of existing methods）
+  - `openspec/contracts/runtime-control-plane.schema.json`（declared scope extension: export the same additive Bootstrap inspection contracts）
   - `Packages/ArkDeckKit/Package.swift`（declared scope extension: pin the reviewed ArkTrace strict metadata reader; no dependency product or target changes）
   - `Packages/ArkDeckKit/Package.resolved`（declared scope extension: pin the reviewed ArkTrace strict metadata reader; no dependency product or target changes）
   - `ArkDeck.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved`（declared scope extension: pin the reviewed ArkTrace strict metadata reader; no dependency product or target changes）

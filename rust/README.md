@@ -187,6 +187,24 @@ From the repository root, `python3 rust/scripts/check-history-owner.py` checks t
 real daemon/CLI, restart, concurrent CAS, cross-process lock contention and unsafe
 records in disposable host roots. Candidate contract CI includes this check.
 
+The isolated macOS Runtime also serves `runtime tool inspect --tool <reference>`
+and `runtime bundle inspect --bundle <reference>`. Tool references include the
+existing HDC and DevEco toolchain families. The host opens existing Bootstrap
+indexes below its fixed `bootstrap` directory and rechecks native content under
+the shared registry lock. Reads preserve indexes, retained bytes, quarantine and
+selection; execution assessment remains `notPerformed`. Session root selection
+excludes the Bootstrap directory.
+
+The CLI uses the authenticated client boundary and validates the exact requested
+identity and returned projection. It cannot pass registry paths. The additive
+Swift RPC producers supply actual recording-backed candidate contracts; the old
+published pin remains unchanged until the reviewed contract merge is re-pinned.
+Registration, selection, write ownership and installed activation remain pending.
+
+`cargo build -p arkdeck-hoststore --example tool_registry_read` builds the local
+comparison adapter. Set `ARKDECK_TOOL_OWNER_BINARY` to it when running
+`BootstrapToolRustOwnerTests` to compare a real Swift registration with Rust.
+
 ## Contract and ownership boundaries
 
 The isolated macOS host also serves `trace cache status` from its fixed
@@ -214,8 +232,9 @@ waiting for the existing terminal-child and complete process-group proof. It
 resolves a transient `EPERM` only within the cleanup budget and before reaping;
 unproven groups, other signal errors and lost child ownership remain failures.
 
-The full 97-method contract remains the current single-v1 registry; methods
-without a migrated host handler are structurally understood and refused.
+The published pin has 97 methods; the candidate registry adds two Bootstrap
+inspection methods. Methods without a migrated host handler are structurally
+understood and refused.
 There is no Runtime capability owner, recovery, journal, durable target store,
 device mutation, flash lowering, Swift replacement or production cutover here.
 Unknown or incomplete outcomes never acquire invented zero-dispatch evidence.

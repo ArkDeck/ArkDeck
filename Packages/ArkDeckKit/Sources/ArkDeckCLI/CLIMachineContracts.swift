@@ -537,6 +537,8 @@ enum CLIMachineContracts {
       "runtime.storage.root": .leaf("runtime.storage.root"),
       "runtime.storage.status": .leaf("runtime.storage.status"),
       "runtime.tool.select": .leaf("runtime.tool.select"),
+      "runtime.tool.inspect": .leaf("runtime.tool.inspect"),
+      "runtime.bundle.inspect": .leaf("runtime.bundle.inspect"),
       "session.cleanup.apply": .leaf("session.cleanup.apply"),
       "session.cleanup.preview": .leaf("session.cleanup.preview"),
       "session.export.apply": .leaf("session.export.apply"),

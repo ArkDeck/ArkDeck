@@ -186,9 +186,9 @@ package final class BootstrapToolRegistry {
     }
   }
 
-  package func inspect(_ reference: String) throws -> JSONValue {
-    try owner.withSharedStore { directory, root in
-      let index = try readIndex(directory)
+  package func inspect(_ reference: String, existingStoreOnly: Bool = false) throws -> JSONValue {
+    try owner.withSharedStore(create: !existingStoreOnly) { directory, root in
+      let index = try readIndex(directory, create: !existingStoreOnly)
       let record = try find(reference, in: index)
       try verify(record, directory: directory, root: root)
       return value(record, in: index)
@@ -597,9 +597,9 @@ package final class BootstrapToolRegistry {
     return bytes
   }
 
-  private func readIndex(_ directory: Int32) throws -> Index {
+  private func readIndex(_ directory: Int32, create: Bool = true) throws -> Index {
     let fd = openat(directory, "tools.json", O_RDONLY | O_NONBLOCK | O_NOFOLLOW | O_CLOEXEC)
-    if fd < 0, errno == ENOENT {
+    if fd < 0, errno == ENOENT, create {
       let names = try Files.names(directory)
       guard !names.contains(where: { $0.hasPrefix("tool-") || $0.hasPrefix(".tool-") }) else {
         throw Files.failure("recordUnreadable", "tool index is missing beside retained tool state")

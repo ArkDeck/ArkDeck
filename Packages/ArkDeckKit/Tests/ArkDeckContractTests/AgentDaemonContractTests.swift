@@ -1470,6 +1470,37 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertTrue(jobs.isEmpty)
   }
 
+  /// Health reports this build's actual protocol registry and registered
+  /// provider adapters; it never probes hardware or dispatches an operation.
+  func testHealthProducerFramesUseCurrentRegistryWithEmptyAndHDCProviders() async throws {
+    let dispatcher = RuntimeAgentExecutionContractTests.Dispatcher()
+    let registries = [
+      DeviceProviderRegistry(providers: []),
+      DeviceProviderRegistry(providers: [HDCObservationProviderAdapter(factsPort: FactsPort())]),
+    ]
+    for (index, providers) in registries.enumerated() {
+      let root = stateDirectory.appending(path: "health-registry-\(index)")
+      let capabilities = try RuntimeCapabilityStore(directoryURL: root.appending(path: "capabilities"))
+      let engine = try RuntimeJobEngine(configuration: .init(stateDirectory: root.appending(path: "engine")),
+        providers: providers, dispatcher: dispatcher, capabilityStore: capabilities,
+        nowUTC: { "2026-09-11T00:00:00Z" })
+      let handler = RuntimeControlPlaneHandler(engine: engine, capabilityStore: capabilities,
+        providerIDs: providers.registeredProviderIDs, nowUTC: { "2026-09-11T00:00:00Z" })
+      let response = try await request(handler, method: "health")
+      XCTAssertTrue(response.ok, response.error?.message ?? "health refused")
+      guard case .object(let fields)? = response.result else { return XCTFail("missing health object") }
+      XCTAssertEqual(fields["protocolVersion"], .string(ArkDeckControlProtocol.currentVersion))
+      XCTAssertEqual(fields["contractIdentity"], .string(ArkDeckControlProtocol.contractIdentity))
+      XCTAssertEqual(fields["publishedMethods"], .array(ArkDeckControlProtocol.methods.sorted().map(JSONValue.string)))
+      XCTAssertEqual(fields["catalogDigest"], .string(RuntimeOperationCatalog.catalogDigest))
+      XCTAssertEqual(fields["providers"], .array(providers.registeredProviderIDs.map(JSONValue.string)))
+      XCTAssertEqual(providers.registeredProviderIDs, index == 0 ? [] : ["hdc"])
+      let jobs = try await engine.listJobs()
+      XCTAssertTrue(jobs.isEmpty)
+    }
+    XCTAssertEqual(dispatcher.dispatchCount, 0)
+  }
+
   func testDefaultClientUsesTheOnlyCurrentHealthContract() async throws {
     let (handler, _) = try makeStack()
     let server = try startServer(handler)

@@ -3286,7 +3286,7 @@
       "requiredPlatforms": [
         "macos"
       ],
-      "source": "cli:runtime.bundle.inspect",
+      "source": "daemon:runtime.bundle.inspect",
       "targetClassification": "local",
       "targetCommand": "arkdeck runtime bundle inspect --bundle <bundle:sha256:digest>"
     },
@@ -3602,7 +3602,7 @@
       "requiredPlatforms": [
         "macos"
       ],
-      "source": "cli:runtime.tool.inspect",
+      "source": "daemon:runtime.tool.inspect",
       "targetClassification": "local",
       "targetCommand": "arkdeck runtime tool inspect --tool <tool-reference>"
     },
@@ -4637,8 +4637,8 @@
     "bySource": {
       "app": 68,
       "catalog": 30,
-      "cli": 59,
-      "daemon": 97
+      "cli": 57,
+      "daemon": 99
     },
     "entries": 254,
     "fullFunction": true
