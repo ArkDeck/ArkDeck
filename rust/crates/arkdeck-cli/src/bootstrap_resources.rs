@@ -15,28 +15,29 @@ pub(crate) fn configure(
         let kind = params.get("kind").and_then(Value::as_str).ok_or_else(|| {
             CliError::new("invalidOption", "runtime.tool.register requires --kind")
         })?;
-        if kind == "hdc" {
-            return Err(CliError::new(
-                "controlMethodUnavailable",
-                "HDC registration is not supported by this CLI",
-            ));
-        }
-        if kind != "deveco" {
-            return Err(CliError::new(
-                "invalidOption",
-                "kind must name a supported host tool role",
-            ));
-        }
-        if params.contains_key("file") {
+        let (option, wire_key, other) = match kind {
+            "deveco" => ("rootPath", "root", "file"),
+            "hdc" => ("file", "file", "rootPath"),
+            _ => {
+                return Err(CliError::new(
+                    "invalidOption",
+                    "kind must name a supported host tool role",
+                ));
+            }
+        };
+        if params.contains_key(other) {
             return Err(CliError::new(
                 "invalidInput",
-                "DevEco registration requires only --root",
+                "registration accepts only the path for its tool kind",
             ));
         }
-        let root = params
-            .remove("rootPath")
-            .ok_or_else(|| CliError::new("invalidInput", "DevEco registration requires --root"))?;
-        if !root.as_str().is_some_and(|s| {
+        let path = params.remove(option).ok_or_else(|| {
+            CliError::new(
+                "invalidInput",
+                "registration requires the path for its tool kind",
+            )
+        })?;
+        if !path.as_str().is_some_and(|s| {
             s.starts_with('/')
                 && !s.contains('\0')
                 && !s.split('/').any(|part| part == "." || part == "..")
@@ -46,7 +47,7 @@ pub(crate) fn configure(
                 "tool registration paths must be canonical absolute local paths",
             ));
         }
-        params.insert("root".into(), root);
+        params.insert(wire_key.into(), path);
         return Ok(());
     }
     let key = match command {
@@ -70,7 +71,25 @@ pub fn validate_bootstrap_request(invocation: &Invocation) -> Result<(), CliErro
     if !arkdeck_contract::METHODS.contains(&invocation.method) {
         return Err(CliError::new(
             "controlMethodUnavailable",
-            "DevEco registration is not published in this CLI contract",
+            "Tool registration is not published in this CLI contract",
+        ));
+    }
+    if invocation
+        .params
+        .as_ref()
+        .and_then(|p| p.get("kind"))
+        .and_then(Value::as_str)
+        == Some("hdc")
+        && arkdeck_contract::validate_method_value(
+            invocation.method,
+            "request",
+            &serde_json::json!({"kind":"hdc","file":"/hdc"}),
+        )
+        .is_err()
+    {
+        return Err(CliError::new(
+            "controlMethodUnavailable",
+            "HDC registration is not published in this CLI contract",
         ));
     }
     arkdeck_contract::validate_method_value(
@@ -88,7 +107,10 @@ pub fn validate_bootstrap_request(invocation: &Invocation) -> Result<(), CliErro
 
 pub fn validate_bootstrap_response(invocation: &Invocation, value: &Value) -> Result<(), CliError> {
     validate_bootstrap_response_inner(invocation, value).map_err(|error| {
-        if invocation.command == "runtime.bundle.remove" {
+        if matches!(
+            invocation.command,
+            "runtime.bundle.remove" | "runtime.tool.register"
+        ) {
             CliError::new(
                 "outcomeUnknown",
                 "Runtime returned an inconsistent Bootstrap resource",
@@ -108,6 +130,22 @@ fn validate_bootstrap_response_inner(
     }
     let registering = invocation.command == "runtime.tool.register";
     let (input, output, schema, prefix, content_schema) = match invocation.command {
+        "runtime.tool.register"
+            if invocation
+                .params
+                .as_ref()
+                .and_then(|p| p.get("kind"))
+                .and_then(Value::as_str)
+                == Some("hdc") =>
+        {
+            (
+                "file",
+                "toolRef",
+                "arkdeck.runtime-tool/1",
+                "tool:sha256:",
+                "arkdeck.tool-content/1",
+            )
+        }
         "runtime.tool.register" => (
             "root",
             "toolRef",
@@ -169,8 +207,9 @@ fn validate_bootstrap_response_inner(
     if registering
         && (value["state"] != "available"
             || value["generation"] != "1"
-            || value["selected"] != false
-            || value["source"] != "registeredRoot")
+            || (prefix == "toolchain:sha256:"
+                && (value["selected"] != false || value["source"] != "registeredRoot"))
+            || (prefix == "tool:sha256:" && value["source"] != "registeredCopy"))
     {
         return Err(unreadable());
     }

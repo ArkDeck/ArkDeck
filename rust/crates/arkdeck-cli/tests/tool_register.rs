@@ -29,7 +29,7 @@ fn recordings() -> Vec<Value> {
         .collect()
 }
 #[test]
-fn current_argv_is_retained_but_hdc_is_explicitly_unsupported() {
+fn current_argv_is_retained_with_rust_hdc_transport_support() {
     let fixture: Value = serde_json::from_str(include_str!(
         "../../../tests/fixtures/current-cli-argv/runtime.tool.register.json"
     ))
@@ -44,10 +44,14 @@ fn current_argv_is_retained_but_hdc_is_explicitly_unsupported() {
         let parsed = parse(&argv);
         if !cfg!(target_os = "macos") && argv.iter().any(|v| v == "--socket") {
             assert_eq!(parsed.unwrap_err().code, "unsupportedOnPlatform");
+        } else if argv.windows(2).any(|p| p == ["--kind", "hdc"])
+            && (argv.iter().any(|v| v == "--socket") || case["name"] == "valid")
+        {
+            // Swift's parser defers the missing file to its local handler;
+            // Rust rejects it before contacting the Runtime.
+            assert_eq!(parsed.unwrap_err().code, "invalidInput");
         } else if case["expected"]["outcome"] == "failure" {
             assert_eq!(parsed.unwrap_err().code, case["expected"]["code"], "{case}");
-        } else if argv.windows(2).any(|p| p == ["--kind", "hdc"]) {
-            assert_eq!(parsed.unwrap_err().code, "controlMethodUnavailable");
         } else {
             assert_eq!(parsed.unwrap().command, "runtime.tool.register");
         }
@@ -124,7 +128,10 @@ fn actual_registration_projection_has_content_identity_without_selection() {
         return;
     }
     let mut count = 0;
-    for frame in recordings().into_iter().filter(|v| v["ok"] == true) {
+    for frame in recordings()
+        .into_iter()
+        .filter(|v| v["ok"] == true && v["params"]["kind"] == "deveco")
+    {
         let parsed = invocation(frame["params"]["root"].as_str().unwrap());
         validate_bootstrap_request(&parsed).unwrap();
         validate_bootstrap_response(&parsed, &frame["result"]).unwrap();
@@ -143,7 +150,7 @@ fn actual_registration_projection_has_content_identity_without_selection() {
             bad[key] = value;
             assert_eq!(
                 validate_bootstrap_response(&parsed, &bad).unwrap_err().code,
-                "recordUnreadable",
+                "outcomeUnknown",
                 "{key}"
             );
         }
@@ -176,6 +183,9 @@ mod endpoint {
         path
     }
     fn command(root: &str, socket: &std::path::Path) -> std::process::Command {
+        command_kind("deveco", root, socket)
+    }
+    fn command_kind(kind: &str, root: &str, socket: &std::path::Path) -> std::process::Command {
         let mut command = std::process::Command::new(env!("CARGO_BIN_EXE_arkdeck"));
         command
             .args([
@@ -183,8 +193,8 @@ mod endpoint {
                 "tool",
                 "register",
                 "--kind",
-                "deveco",
-                "--root",
+                kind,
+                if kind == "hdc" { "--file" } else { "--root" },
                 root,
                 "--output",
                 "json",
@@ -217,6 +227,13 @@ mod endpoint {
         std::fs::remove_dir(dir).unwrap();
     }
     fn run(root: &str, response: Option<Value>) -> (std::process::Output, Vec<Value>) {
+        run_kind("deveco", root, response)
+    }
+    fn run_kind(
+        kind: &str,
+        root: &str,
+        response: Option<Value>,
+    ) -> (std::process::Output, Vec<Value>) {
         let dir = directory();
         let path = dir.join("socket");
         let mut listener = LocalListener::bind(&LocalEndpoint::new(&path)).unwrap();
@@ -253,7 +270,7 @@ mod endpoint {
             assert!(extra.is_empty(), "registration replayed");
             requests
         });
-        let output = command(root, &path).output().unwrap();
+        let output = command_kind(kind, root, &path).output().unwrap();
         let requests = server.join().unwrap();
         std::fs::remove_dir(dir).unwrap();
         (output, requests)
@@ -292,7 +309,10 @@ mod endpoint {
         if !supported() {
             return;
         }
-        for frame in recordings().into_iter().filter(|v| v["ok"] == true) {
+        for frame in recordings()
+            .into_iter()
+            .filter(|v| v["ok"] == true && v["params"]["kind"] == "deveco")
+        {
             let root = frame["params"]["root"].as_str().unwrap();
             let (output, requests) = run(
                 root,
@@ -315,5 +335,109 @@ mod endpoint {
         let doc: Value = serde_json::from_slice(&output.stdout).unwrap();
         assert_eq!(doc["error"]["code"], "outcomeUnknown");
         assert!(doc.get("result").is_none());
+    }
+    #[test]
+    fn hdc_receipts_and_lost_or_inconsistent_responses_never_replay() {
+        if !hdc_supported() {
+            return;
+        }
+        let frames: Vec<_> = recordings()
+            .into_iter()
+            .filter(|v| v["ok"] == true && v["params"]["kind"] == "hdc")
+            .collect();
+        assert!(
+            !frames.is_empty(),
+            "candidate must contain real HDC producer responses"
+        );
+        for frame in frames {
+            let file = frame["params"]["file"].as_str().unwrap();
+            let receipt = json!({"id":"register-cli","ok":true,"result":frame["result"]});
+            let (output, requests) = run_kind("hdc", file, Some(receipt.clone()));
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stdout)
+            );
+            assert_eq!(requests.len(), 2);
+            assert_eq!(requests[1]["params"], frame["params"]);
+            let mut bad = receipt.clone();
+            bad["result"]["contentDigest"] = json!("0".repeat(64));
+            let mut wrong_id = receipt.clone();
+            wrong_id["id"] = json!("foreign");
+            for response in [
+                None,
+                Some(bad),
+                Some(wrong_id),
+                Some(json!({"invalid":true})),
+            ] {
+                let (output, requests) = run_kind("hdc", file, response);
+                assert_eq!(requests.len(), 2);
+                assert_eq!(output.status.code(), Some(75));
+                let doc: Value = serde_json::from_slice(&output.stdout).unwrap();
+                assert_eq!(doc["error"]["code"], "outcomeUnknown");
+                assert!(doc.get("result").is_none());
+            }
+        }
+    }
+}
+
+fn hdc_supported() -> bool {
+    supported()
+        && arkdeck_contract::validate_method_value(
+            "runtime.tool.register",
+            "request",
+            &json!({"kind":"hdc","file":"/hdc"}),
+        )
+        .is_ok()
+}
+#[test]
+fn hdc_request_rejects_wrong_kind_path_and_caller_owned_fields() {
+    for file in ["/tmp/hdc", "/tmp/a b/hdc", "//tmp//hdc"] {
+        let invocation = parse(&args(&[
+            "runtime", "tool", "register", "--kind", "hdc", "--file", file,
+        ]))
+        .unwrap();
+        assert_eq!(
+            invocation.params,
+            Some(
+                json!({"kind":"hdc","file":file})
+                    .as_object()
+                    .unwrap()
+                    .clone()
+            )
+        );
+        let result = validate_bootstrap_request(&invocation);
+        if hdc_supported() {
+            result.unwrap();
+        } else {
+            assert_eq!(result.unwrap_err().code, "controlMethodUnavailable");
+        }
+    }
+    for file in [
+        "relative",
+        "~/hdc",
+        "file:///tmp/hdc",
+        "/tmp/../hdc",
+        "/tmp/./hdc",
+        "/tmp/\0hdc",
+    ] {
+        assert_eq!(
+            parse(&args(&[
+                "runtime", "tool", "register", "--kind", "hdc", "--file", file
+            ]))
+            .unwrap_err()
+            .code,
+            "invalidInput"
+        );
+    }
+    for extra in [
+        vec![],
+        vec!["--root", "/tmp/root"],
+        vec!["--file", "/tmp/a", "--root", "/tmp/root"],
+        vec!["--file", "/tmp/a", "--file", "/tmp/b"],
+    ] {
+        let mut argv = args(&["runtime", "tool", "register", "--kind", "hdc"]);
+        argv.extend(args(&extra));
+        assert!(parse(&argv).is_err());
     }
 }

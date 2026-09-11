@@ -615,15 +615,6 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             "help renders human text only",
         ));
     }
-    if command == "runtime.tool.register"
-        && socket.is_some()
-        && method_options.get("kind") != Some(&json!("deveco"))
-    {
-        return Err(CliError::new(
-            "invalidOption",
-            "--socket is only available for DevEco registration",
-        ));
-    }
     bootstrap_resources::configure(command, &mut method_options, help)?;
     let timeout_ms = read_only_resources::configure(command, &mut method_options, help)?;
     Ok(Invocation {

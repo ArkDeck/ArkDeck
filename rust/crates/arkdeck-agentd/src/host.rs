@@ -100,6 +100,20 @@ impl HostServices for Host {
             .register_deveco(std::path::Path::new(source), &utc_now())
     }
     #[cfg(target_os = "macos")]
+    fn bootstrap_register_hdc(&self, source: &str) -> Result<serde_json::Value, WireError> {
+        self.bootstrap
+            .as_ref()
+            .ok_or_else(|| WireError {
+                code: "operationUnavailable".into(),
+                message: "HDC registration owner is not configured".into(),
+                details: Some(serde_json::Map::from_iter([
+                    ("phase".into(), serde_json::json!("bootstrapRegistryOwner")),
+                    ("newDispatchCount".into(), serde_json::json!(0)),
+                ])),
+            })?
+            .register_hdc(std::path::Path::new(source), &utc_now())
+    }
+    #[cfg(target_os = "macos")]
     fn trace_cache_status(&self) -> Result<serde_json::Value, WireError> {
         self.trace_cache
             .as_ref()

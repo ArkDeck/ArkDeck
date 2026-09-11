@@ -702,7 +702,7 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 
 ## TASK-XPA-012 — Move host-only durable stores to the Rust owner on macOS
 
-- Status:in-progress（2026-09-11: isolated Rust History, Session resources/export, Trace cache status and Bootstrap inspection and DevEco registration serve CLI/control; Bundle list also serves immutable pages through the Rust owner with native cross-language cursor checks; Bundle retirement connects exact-reference metadata retirement to its Rust owner while retaining immutable content; writes preserve their frozen formats and reads verify existing native content. an independent HDC capture/registration library also preserves native bytes and passes strict Swift readback. Cleanup apply, HDC registration RPC integration, remaining host-store writes, installed integration and GJ-1 acceptance remain pending）
+- Status:in-progress（2026-09-11: isolated Rust History, Session resources/export, Trace cache status and Bootstrap inspection and DevEco registration serve CLI/control; Bundle list also serves immutable pages through the Rust owner with native cross-language cursor checks; Bundle retirement connects exact-reference metadata retirement to its Rust owner while retaining immutable content; writes preserve their frozen formats and reads verify existing native content. the HDC capture/registration library preserves native bytes and passes strict Swift readback; the Rust CLI HDC registration RPC phase is under review with isolated process/restart validation. Cleanup apply, remaining host-store writes, installed integration and GJ-1 acceptance remain pending）
 - Platform:macos
 - Requirements:`session-artifact-storage` (storage owner), `docs/design/cli-runtime-storage.md:11-24`
 - Acceptance:XPA-AC-1, XPA-AC-7, XPA-AC-9; macOS GJ-1 re-pass
@@ -779,6 +779,7 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 
 ### Notes / handoff
 
+- HDC RPC phase: `rust/**` connects the existing capture/registration owner to the Rust CLI and typed handler. The existing `spec/control/methods/*.json` inspection/registration scope and `Packages/ArkDeckKit/Tests/**` cover the actual HDC producer schemas and corpora, including native nullable/quarantine fields needed for restart inspect. The published-main pin refresh uses its existing exact path. No new Allowed paths are added, so this phase carries no Scope-Extension trailers. The four DevEco-only Swift CLI/export scope notes above are not HDC authorization; those files and the Swift CLI behavior remain unchanged. This phase does not complete TASK-XPA-012 or activate the installed owner.
 - Stop condition: two processes holding the same store lock.
 - Size: M.
 
