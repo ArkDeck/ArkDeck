@@ -702,7 +702,7 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 
 ## TASK-XPA-012 — Move host-only durable stores to the Rust owner on macOS
 
-- Status:in-progress（2026-09-11: isolated Rust History, Session resources/export, Trace cache status and Bootstrap inspection serve CLI/control; writes preserve their frozen formats and reads verify existing native content. Cleanup apply, remaining host-store writes, installed integration and GJ-1 acceptance remain pending）
+- Status:in-progress（2026-09-11: isolated Rust History, Session resources/export, Trace cache status and Bootstrap inspection serve CLI/control; writes preserve their frozen formats and reads verify existing native content. an independent HDC capture/registration library also preserves native bytes and passes strict Swift readback. Cleanup apply, registration RPC integration, remaining host-store writes, installed integration and GJ-1 acceptance remain pending）
 - Platform:macos
 - Requirements:`session-artifact-storage` (storage owner), `docs/design/cli-runtime-storage.md:11-24`
 - Acceptance:XPA-AC-1, XPA-AC-7, XPA-AC-9; macOS GJ-1 re-pass
@@ -711,7 +711,7 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 
   ```yaml pins
   - path: main
-    commit: eae27c6b97c2d9e5d67c8eee2d9353f2c0d38b93
+    commit: b315f371d188f6e0cf14e4d356bb0f50507fb80d
   - path: Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeSessionStorageStore.swift
     blob: 5d4f994d33f8054c9cb6988aeaa94b0be7ce16ab
   ```

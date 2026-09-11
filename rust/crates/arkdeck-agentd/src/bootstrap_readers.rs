@@ -2,19 +2,19 @@
 //! selection, install, process launch or execution authority is exposed here.
 use arkdeck_contract::WireError;
 use arkdeck_control::BootstrapRegistryKind;
-use arkdeck_hoststore::{BundleRegistryReadStore, DevEcoRegistryReadStore, ToolRegistryReadStore};
+use arkdeck_hoststore::{BundleRegistryReadStore, DevEcoRegistryReadStore, ToolRegistryStore};
 use serde_json::Value;
 use std::{io, path::Path};
 
 pub struct BootstrapReaders {
-    tools: ToolRegistryReadStore,
+    tools: ToolRegistryStore,
     bundles: BundleRegistryReadStore,
     deveco: DevEcoRegistryReadStore,
 }
 impl BootstrapReaders {
     pub fn open_existing(root: &Path) -> io::Result<Self> {
         Ok(Self {
-            tools: ToolRegistryReadStore::open_existing(root)?,
+            tools: ToolRegistryStore::open_existing(root)?,
             bundles: BundleRegistryReadStore::open_existing(root)?,
             deveco: DevEcoRegistryReadStore::open_existing(root)?,
         })

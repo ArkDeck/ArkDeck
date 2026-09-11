@@ -117,6 +117,80 @@ final class BootstrapInspectionControlContractTests: XCTestCase {
     XCTAssertEqual(dispatcher.dispatchCount, 0, file: file, line: line)
   }
 
+  func testExplicitRustHDCRegistryMatchesNativeSwiftReadbackWithoutWrites() throws {
+    let environment = ProcessInfo.processInfo.environment
+    guard let path = environment["ARKDECK_HDC_RUST_REGISTRY_ROOT"],
+      let expectedReference = environment["ARKDECK_HDC_RUST_TOOL_REFERENCE"],
+      let receiptPath = environment["ARKDECK_HDC_RUST_RECEIPT_PATH"] else {
+      throw XCTSkip("requires an existing isolated Rust HDC registry and its actual producer receipt")
+    }
+    func physicalSystemAlias(_ path: String) -> String {
+      for prefix in ["/tmp", "/var", "/etc"] where path == prefix || path.hasPrefix(prefix + "/") {
+        return "/private" + path
+      }
+      return path
+    }
+    let temporary = physicalSystemAlias(FileManager.default.temporaryDirectory.resolvingSymlinksInPath().path)
+    let directory = URL(filePath: path, directoryHint: .isDirectory)
+    guard path.hasPrefix("/private/tmp/") || path.hasPrefix(temporary + "/"),
+      !path.utf8.contains(0), !path.split(separator: "/").contains(where: { $0 == "." || $0 == ".." }),
+      physicalSystemAlias(directory.resolvingSymlinksInPath().path) == directory.path,
+      expectedReference.hasPrefix("tool:sha256:"),
+      expectedReference.dropFirst("tool:sha256:".count).count == 64,
+      expectedReference.dropFirst("tool:sha256:".count).allSatisfy({ "0123456789abcdef".contains($0) }),
+      receiptPath.hasPrefix("/private/tmp/"), !receiptPath.utf8.contains(0),
+      !receiptPath.split(separator: "/").contains(where: { $0 == "." || $0 == ".." }) else {
+      throw AgentExecutionControlFailure("fixture", "HDC readback requires exact temporary inputs")
+    }
+    for name in [".lock", "bundles.json", "tools.json"] {
+      let entry = try FileManager.default.attributesOfItem(atPath: directory.appending(path: name).path)
+      guard entry[.type] as? FileAttributeType == .typeRegular else {
+        throw AgentExecutionControlFailure("fixture", "Rust registry metadata must already exist as regular files")
+      }
+    }
+    let receipt = try object(JSONDecoder().decode(JSONValue.self,
+      from: Data(contentsOf: URL(filePath: receiptPath))))
+    XCTAssertEqual(receipt["bootstrapRoot"], .string(directory.path))
+    XCTAssertEqual(receipt["deviceAcceptance"], .bool(false))
+    let expected = try XCTUnwrap(receipt["result"])
+    XCTAssertEqual(try object(expected)["toolRef"], .string(expectedReference))
+    func retainedMetadata() throws -> [String: String] {
+      let enumerator = try XCTUnwrap(FileManager.default.enumerator(at: directory,
+        includingPropertiesForKeys: [.isRegularFileKey]))
+      var members = [directory]
+      for case let entry as URL in enumerator {
+        guard members.count < 300 else { throw AgentExecutionControlFailure("fixture", "readback registry exceeds its entry bound") }
+        members.append(entry)
+      }
+      var result: [String: String] = [:]
+      for entry in members {
+        var status = stat()
+        guard lstat(entry.path, &status) == 0,
+          status.st_mode & S_IFMT == S_IFREG || status.st_mode & S_IFMT == S_IFDIR else {
+          throw AgentExecutionControlFailure("fixture", "readback registry contains an unsafe entry")
+        }
+        let bytes = status.st_mode & S_IFMT == S_IFREG
+          ? try SHA256Hex.string(of: Data(contentsOf: entry)) : "directory"
+        let identity = "\(status.st_dev):\(status.st_ino):\(status.st_mode):\(status.st_uid):\(status.st_gid):\(status.st_nlink):\(status.st_size)"
+        let times = "\(status.st_mtimespec.tv_sec):\(status.st_mtimespec.tv_nsec):\(status.st_ctimespec.tv_sec):\(status.st_ctimespec.tv_nsec)"
+        result[String(entry.path.dropFirst(directory.path.count))] = identity + ":" + times + ":" + bytes
+      }
+      return result
+    }
+    let before = try retainedMetadata()
+    let tools = BootstrapToolRegistry(owner: BootstrapBundleRegistry(root: directory), knownIdentity: { sha256 in
+      HeadlessHDCBootstrapIdentity.lookup(sha256: sha256).map {
+        BootstrapToolRegistry.PublishedIdentity(version: $0.version, profileReferences: $0.profileReferences)
+      }
+    })
+    let actual = try tools.inspect(expectedReference, existingStoreOnly: true)
+    XCTAssertEqual(actual, expected)
+    XCTAssertEqual(try retainedMetadata(), before)
+    XCTAssertEqual(dispatcher.dispatchCount, 0)
+    print("Rust HDC registry native Swift readback: " + String(decoding:
+      try CanonicalJSONEncoders.canonical().encode(actual), as: UTF8.self))
+  }
+
   func testClosedReferenceValidationPrecedesOwnerAccess() async throws {
     for (method, key, prefix) in [
       ("runtime.tool.inspect", "tool", "tool:sha256:"),
