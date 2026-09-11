@@ -85,6 +85,27 @@ job to roughly 4 minutes on Windows, 2.5 on macOS and 1.5 on Linux, and
 returns the Swift CI critical path to `swift-tests`. The branch run of the PR
 that carries this change does not see a hit; only `main` writes.
 
+## Observed on the branch run (miss path)
+
+Swift CI run 34551074896 on head `468aadf3` (rebased on `main` `22cf5d29`
+after #1849 re-pinned the export frames; the earlier run on `59da01fa` failed
+every rust host at `Workspace tests` with "the committed Swift baseline is
+stale against origin/main for 6 file(s)", before any of the new steps, which
+is the known re-pin gap and not this change):
+
+| host | job | restore | install | read-back | save |
+| --- | ---: | --- | ---: | --- | --- |
+| windows-latest | 13.4 min | miss | 7.9 min | `cargo-deny 0.20.2`, `cargo-vet 0.10.2` | skipped (not main) |
+| macos-26 | 9.3 min | miss | 4.9 min | same | skipped |
+| ubuntu-latest | 5.4 min | miss | 3.7 min | same | skipped |
+
+The restore step reported the resolved key, for example
+`arkdeck-cargo-policy-tools-v1-Windows-X64-cargo-deny-0.20.2-cargo-vet-0.10.2-a71250ad…`,
+so `runner.os`, `runner.arch` and `hashFiles` evaluate inside the reusable
+workflow as intended. The hit path can only be observed after this merges:
+the first selected `main` run writes the three entries, the run after it
+restores them.
+
 ## Observed but not changed here
 
 - The repository's Actions cache is at its 10 GB cap (10,300,155,948 bytes in
