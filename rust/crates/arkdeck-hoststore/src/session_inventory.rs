@@ -12,6 +12,13 @@ use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 use std::{io, path::Path};
 
+#[path = "session_cleanup_inventory.rs"]
+mod cleanup;
+pub use cleanup::{CleanupSession, CleanupSnapshot, session_cleanup_snapshot};
+#[path = "session_export_inventory.rs"]
+mod export;
+pub use export::{SessionExportSnapshot, session_export_snapshot};
+
 const METADATA: &str = ".arkdeck-retention-catalog.json";
 const LOCK: &str = ".arkdeck-retention-catalog.lock";
 fn invalid() -> io::Error {
@@ -49,7 +56,9 @@ struct Catalog {
 }
 struct Scanned {
     manifest: ManifestSummary,
+    manifest_bytes: u64,
     bytes: u64,
+    location: [String; 3],
 }
 #[derive(Default)]
 struct Tree {
@@ -92,7 +101,12 @@ fn unknown(tree: &mut Tree, parent: &HostDirectory, name: &str, display: String)
         add(tree, bytes);
     }
 }
-fn scan_session(parent: &HostDirectory, name: &str) -> io::Result<Scanned> {
+fn scan_session(
+    parent: &HostDirectory,
+    year: &str,
+    month: &str,
+    name: &str,
+) -> io::Result<Scanned> {
     let root = parent.child(name)?;
     let bytes = root.read(".session-identity.json", 4096)?;
     let (identity, canonical) =
@@ -113,8 +127,14 @@ fn scan_session(parent: &HostDirectory, name: &str) -> io::Result<Scanned> {
     if manifest.session_id != name || manifest.job_id != identity.job_id {
         return Err(invalid());
     }
+    let manifest_bytes = bytes.len() as u64;
     let bytes = measure_directory(&root)?;
-    Ok(Scanned { manifest, bytes })
+    Ok(Scanned {
+        manifest,
+        manifest_bytes,
+        bytes,
+        location: [year.into(), month.into(), name.into()],
+    })
 }
 fn scan(root: &HostDirectory) -> io::Result<Tree> {
     let mut tree = Tree::default();
@@ -152,7 +172,7 @@ fn scan(root: &HostDirectory) -> io::Result<Tree> {
             for name in month_root.names(usize::MAX)? {
                 tree.observed.push(name.clone());
                 let result = if identifier(&name) {
-                    scan_session(&month_root, &name)
+                    scan_session(&month_root, &year, &month, &name)
                 } else {
                     Err(invalid())
                 };
@@ -284,7 +304,16 @@ pub(crate) fn session_resource_rows(
             &format!("Session catalog contains unaccounted content: {summary}"),
         ));
     }
-    if retained.len() != document.entries.len() {
+    if document.entries.iter().any(|entry| {
+        !retained
+            .iter()
+            .any(|row| row.manifest.session_id == entry.session_id)
+            && !(scoped
+                && unknown.iter().any(|reference| {
+                    reference == &entry.session_id
+                        || reference.ends_with(&format!("/{}", entry.session_id))
+                }))
+    }) {
         return Err(unreadable(invalid()));
     }
     let configuration = decode_session_configuration(configuration)

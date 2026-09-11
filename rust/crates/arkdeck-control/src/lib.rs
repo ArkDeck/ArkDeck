@@ -215,7 +215,13 @@ impl<H: HostServices> Control<H> {
                 id: request.id.clone(),
                 outcome: self.host.history_filter(&request.method, &params),
             },
-            "session.list" | "session.show" | "session.pin" | "session.unpin" => Response {
+            "session.list"
+            | "session.show"
+            | "session.pin"
+            | "session.unpin"
+            | "session.cleanup.preview"
+            | "session.export.preview"
+            | "session.export.apply" => Response {
                 id: request.id.clone(),
                 outcome: self.host.session_resource(&request.method, &params),
             },

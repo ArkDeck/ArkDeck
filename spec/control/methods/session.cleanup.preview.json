@@ -3,13 +3,21 @@
     "errorCode": {
       "enum": [
         "conflict",
+        "inputTooLarge",
         "internalError",
+        "invalidCursor",
+        "invalidInput",
         "invalidParams",
+        "ioFailure",
         "malformedFrame",
         "notFound",
         "operationUnavailable",
+        "outcomeUnknown",
+        "quotaExceeded",
         "recordUnreadable",
         "rejected",
+        "resourceConflict",
+        "resourceNotFound",
         "unknownMethod",
         "unsupportedProtocolVersion",
         "workspaceReferenceNotFound"
@@ -92,6 +100,34 @@
                 "type": "boolean"
               },
               "artifacts": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "artifactDigest": {
+                      "type": "string"
+                    },
+                    "artifactId": {
+                      "type": "string"
+                    },
+                    "byteCount": {
+                      "type": "string"
+                    },
+                    "privacy": {
+                      "type": "string"
+                    },
+                    "role": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "artifactDigest",
+                    "artifactId",
+                    "byteCount",
+                    "privacy",
+                    "role"
+                  ],
+                  "type": "object"
+                },
                 "type": "array"
               },
               "disposition": {
@@ -157,8 +193,8 @@
   "x-arkdeck-method": "session.cleanup.preview",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 2,
-    "request": 4,
-    "result": 2
+    "error": 3,
+    "request": 6,
+    "result": 3
   }
 }

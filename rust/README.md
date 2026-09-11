@@ -38,8 +38,8 @@ Each runs clippy, the full test suite, native process checks, binary builds and
 the same black-box check. Candidate generation stays in its temporary view;
 it cannot update the published pin. Both views replay every recorded shape and
 verify their exact input hashes, directory membership and per-method counts.
-The pin at `50dd15e97f84ebca87df8763700af66a6136b890` covers 96 methods and
-416 recorded shapes (248 successes and 168 errors). Re-pin with
+The current pin and recorded shape count are in
+`spec/baselines/swift-single-v1.json`. Re-pin with
 `python scripts/generate-contract.py --write --baseline-revision <commit>`
 whenever a merged Swift change edits a consumed input; the corpus parity tests
 refuse a stale pin.
@@ -132,7 +132,7 @@ Custom Session roots must stay inside the development root and disjoint from
 state and immutable Artifacts. Artifact indexed usage is verified before Session
 configuration mutation, including retained payload identity and SHA-256. Unknown Session bytes
 remain visible as incomplete measurement; corrupt or lost initialized catalogs
-are preserved for inspection. Artifact publication and Session export/cleanup
+are preserved for inspection. Artifact publication and installed activation
 are still pending migration.
 
 Run `python3 rust/scripts/check-session-owner.py` after building the binaries for
@@ -154,7 +154,30 @@ it never rescans. Ordering uses the published completion timestamp, with Session
 ID ordering for ties, so hidden fractional seconds cannot create an invalid page.
 `python3 rust/scripts/check-session-resources.py` verifies the actual owner and CLI;
 `--cli-path Packages/ArkDeckKit/.build/debug/arkdeck` checks the current Swift CLI
-against the same Rust owner. Export, cleanup and installed activation are pending.
+against the same Rust owner.
+
+The same isolated daemon also serves these existing commands:
+
+```sh
+arkdeck session cleanup preview
+arkdeck session export preview --session <id> --destination <new-directory>
+arkdeck session export apply --preview-id <id> --preview-digest <sha256>
+```
+
+Export preview excludes raw/partial Artifacts by default; add `--allow-sensitive`
+only to the preview when those bytes are intended for export. Apply binds that
+choice to the exact preview tuple, revalidates source and destination, and
+publishes into a new directory without replacing an existing destination.
+Completed retries return the stored result. An uncertain publication remains
+non-replayable across restart. Source Sessions are preserved.
+
+Cleanup preview shows the quota plan, including pinned/active protection, and
+refuses incomplete inventories. This development daemon has no active jobs;
+installed integration must supply the actual Job owner's active-session set.
+Cleanup apply remains unavailable. The process harnesses
+`rust/scripts/check-session-export.py` and `rust/scripts/check-session-cleanup.py`
+exercise the real daemon/control/CLI paths with newly created host fixtures;
+both accept `--cli-path` to check the current Swift CLI consumer.
 
 Use the generation actually returned by `list`. Conflicts require a fresh read;
 lost mutation replies report `outcomeUnknown` and are never automatically replayed.
@@ -179,8 +202,8 @@ waiting for the existing terminal-child and complete process-group proof. It
 resolves a transient `EPERM` only within the cleanup budget and before reaping;
 unproven groups, other signal errors and lost child ownership remain failures.
 
-The full 96-method contract remains the current single-v1 registry; the other
-92 methods are structurally understood and refused before a host handler.
+The full 97-method contract remains the current single-v1 registry; methods
+without a migrated host handler are structurally understood and refused.
 There is no Runtime capability owner, recovery, journal, durable target store,
 device mutation, flash lowering, Swift replacement or production cutover here.
 Unknown or incomplete outcomes never acquire invented zero-dispatch evidence.

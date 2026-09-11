@@ -17,9 +17,40 @@ mod snapshot_pager;
 #[cfg(target_os = "macos")]
 pub use session_owner::SessionStore;
 #[cfg(target_os = "macos")]
+mod session_cleanup_plan;
+#[cfg(target_os = "macos")]
+pub use session_cleanup_plan::{CleanupCandidate, CleanupPlan, plan_session_cleanup};
+#[cfg(target_os = "macos")]
+mod session_cleanup_records;
+#[cfg(target_os = "macos")]
+pub use session_cleanup_records::{
+    CleanupRecord, CleanupState, SessionCleanupRecords, SessionExportRecords,
+};
+#[cfg(target_os = "macos")]
+mod session_export_destination;
+#[cfg(target_os = "macos")]
+pub use session_export_destination::session_export_destination_facts;
+#[cfg(target_os = "macos")]
+pub use session_inventory::{CleanupSession, CleanupSnapshot, session_cleanup_snapshot};
+#[cfg(target_os = "macos")]
+pub use session_inventory::{SessionExportSnapshot, session_export_snapshot};
+#[cfg(target_os = "macos")]
 mod artifact_usage;
 #[cfg(target_os = "macos")]
 pub use artifact_usage::ArtifactUsage;
+
+#[cfg(target_os = "macos")]
+mod session_export_artifacts;
+#[cfg(target_os = "macos")]
+pub use session_export_artifacts::{
+    ExportArtifactMeasurement, PlannedExportArtifact, PreparedSessionExport,
+};
+#[cfg(target_os = "macos")]
+mod session_export_manifest;
+#[cfg(target_os = "macos")]
+pub use session_export_manifest::{RedactedSessionManifest, redact_session_manifest_fields};
+mod session_export_redaction;
+pub use session_export_redaction::SessionExportRedactor;
 
 mod display_names;
 mod format_time;

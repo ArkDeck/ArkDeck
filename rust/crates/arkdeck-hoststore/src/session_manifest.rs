@@ -19,6 +19,7 @@ pub(super) struct ManifestSummary {
     pub session_id: String,
     pub job_id: String,
     pub completed_at: f64,
+    pub artifacts: Vec<Value>,
 }
 
 pub(super) fn identifier(value: &str) -> bool {
@@ -400,10 +401,11 @@ pub(super) fn decode_manifest(bytes: &[u8]) -> Result<ManifestSummary> {
         session_id: session_id.to_owned(),
         job_id: job_id.to_owned(),
         completed_at,
+        artifacts: array(doc, "artifacts")?.clone(),
     })
 }
 
-fn relative_path(value: &str) -> bool {
+pub(super) fn relative_path(value: &str) -> bool {
     let b = value.as_bytes();
     !value.is_empty()
         && value.len() <= 1024
@@ -418,7 +420,7 @@ fn relative_path(value: &str) -> bool {
                     .all(|c| c as u32 > 0x1f && c != '\u{7f}' && !"<>:\"/\\|?*".contains(c))
         })
 }
-fn base64(text: &str) -> Result<Vec<u8>> {
+pub(super) fn base64(text: &str) -> Result<Vec<u8>> {
     let input = text.as_bytes();
     require(!input.is_empty() && input.len().is_multiple_of(4) && input.len() <= 21848)?;
     let digit = |b| -> Result<u32> {

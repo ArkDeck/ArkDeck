@@ -3,13 +3,21 @@
     "errorCode": {
       "enum": [
         "conflict",
+        "inputTooLarge",
         "internalError",
+        "invalidCursor",
+        "invalidInput",
         "invalidParams",
+        "ioFailure",
         "malformedFrame",
         "notFound",
         "operationUnavailable",
+        "outcomeUnknown",
+        "quotaExceeded",
         "recordUnreadable",
         "rejected",
+        "resourceConflict",
+        "resourceNotFound",
         "unknownMethod",
         "unsupportedProtocolVersion",
         "workspaceReferenceNotFound"
@@ -268,8 +276,8 @@
   "x-arkdeck-method": "session.export.preview",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 2,
-    "request": 4,
-    "result": 2
+    "error": 6,
+    "request": 12,
+    "result": 6
   }
 }

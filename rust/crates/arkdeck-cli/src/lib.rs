@@ -118,7 +118,13 @@ impl CliError {
                 let host_proof = host_proof
                     || (matches!(
                         method,
-                        "session.list" | "session.show" | "session.pin" | "session.unpin"
+                        "session.list"
+                            | "session.show"
+                            | "session.pin"
+                            | "session.unpin"
+                            | "session.cleanup.preview"
+                            | "session.export.preview"
+                            | "session.export.apply"
                     ) && error.details.as_ref().is_some_and(|details| {
                         details.get("phase") == Some(&json!("sessionOwner"))
                             && details.get("newDispatchCount") == Some(&json!(0))
@@ -190,6 +196,9 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                 "--help" | "-h" => help = true,
                 "--deep" => deep = true,
                 "--require-healthy" => require_healthy = true,
+                "--allow-sensitive" => {
+                    method_options.insert("allowSensitive".into(), json!(true));
+                }
                 "--default" => {
                     method_options.insert("resetToDefault".into(), json!(true));
                 }
@@ -197,6 +206,9 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                 | "--page-size"
                 | "--cursor"
                 | "--root"
+                | "--destination"
+                | "--preview-id"
+                | "--preview-digest"
                 | "--total-quota-bytes"
                 | "--safety-margin-bytes"
                 | "--retention-days"
@@ -218,6 +230,9 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                         "--expected-generation" => "expectedGeneration",
                         "--page-size" => "pageSize",
                         "--root" => "rootPath",
+                        "--destination" => "destinationPath",
+                        "--preview-id" => "previewId",
+                        "--preview-digest" => "previewDigest",
                         "--total-quota-bytes" => "totalQuotaBytes",
                         "--safety-margin-bytes" => "safetyMarginBytes",
                         "--retention-days" => "retentionDays",
@@ -289,6 +304,9 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["session", "show"] => "session.show",
         ["session", "pin"] => "session.pin",
         ["session", "unpin"] => "session.unpin",
+        ["session", "cleanup", "preview"] => "session.cleanup.preview",
+        ["session", "export", "preview"] => "session.export.preview",
+        ["session", "export", "apply"] => "session.export.apply",
         ["history", "filter", "list"] => "history.filter.list",
         ["history", "filter", "save"] => "history.filter.save",
         ["history", "filter", "delete"] => "history.filter.delete",
@@ -296,7 +314,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         _ => {
             return Err(CliError::new(
                 "invalidCommand",
-                "available commands: doctor, operation list, device candidates, history filter list|save|delete, runtime storage status|policy|root, session list|show|pin|unpin",
+                "available commands: doctor, operation list, device candidates, history filter list|save|delete, runtime storage status|policy|root, session list|show|pin|unpin, session cleanup preview, session export preview|apply",
             ));
         }
     };
@@ -327,6 +345,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         "runtime.storage.root" => &["expectedGeneration", "rootPath", "resetToDefault"],
         "session.list" => &["pageSize", "cursor"],
         "session.show" => &["sessionId"],
+        "session.export.preview" => &["sessionId", "destinationPath", "allowSensitive"],
+        "session.export.apply" => &["previewId", "previewDigest"],
         "session.pin" | "session.unpin" => &["sessionId", "expectedGeneration"],
         _ => &[],
     };
@@ -356,6 +376,34 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             "invalidOption",
             "Session command requires --session",
         ));
+    }
+    if !help
+        && command == "session.export.apply"
+        && (!method_options
+            .get("previewId")
+            .and_then(Value::as_str)
+            .is_some_and(session_resources::uuid)
+            || !method_options
+                .get("previewDigest")
+                .is_some_and(session_resources::digest))
+    {
+        return Err(CliError::new(
+            "invalidInput",
+            "Session export apply requires an exact preview tuple",
+        ));
+    }
+    if !help && command == "session.export.preview" {
+        if !method_options.contains_key("sessionId")
+            || !method_options.contains_key("destinationPath")
+        {
+            return Err(CliError::new(
+                "invalidOption",
+                "Session export preview requires --session and --destination",
+            ));
+        }
+        method_options
+            .entry("allowSensitive")
+            .or_insert(json!(false));
     }
     if !help && command == "session.list" {
         let size = method_options

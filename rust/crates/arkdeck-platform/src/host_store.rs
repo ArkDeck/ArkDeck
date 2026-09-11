@@ -8,24 +8,37 @@ use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
 use std::path::Path;
 
 pub struct HostDirectory(File, Ownership);
+#[path = "host_export.rs"]
+mod export;
+pub use export::{ExportPublishError, ExportStaging, HostExportCapacity};
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct HostDirectoryFacts {
+    pub device: u64,
+    pub inode: u64,
+    /// A dev-unverified fallback is only a same-mount grouping key. It cannot
+    /// prove a later export claim survived an unmount/remount.
+    pub volume_identity: String,
+}
 
 #[derive(Clone, Copy)]
 enum Ownership {
     Private,
     TraceInventory,
+    ExportParent,
     SessionTree { device: u64 },
 }
 impl Ownership {
     fn mode_mask(self) -> u32 {
         match self {
             Self::Private => 0o077,
-            Self::TraceInventory => 0,
+            Self::TraceInventory | Self::ExportParent => 0,
             Self::SessionTree { .. } => 0o022,
         }
     }
     fn same_volume(self, device: u64) -> bool {
         match self {
-            Self::Private | Self::TraceInventory => true,
+            Self::Private | Self::TraceInventory | Self::ExportParent => true,
             Self::SessionTree { device: root } => root == device,
         }
     }
@@ -116,6 +129,70 @@ fn owned(file: &File, directory: bool, ownership: Ownership) -> io::Result<()> {
 }
 
 impl HostDirectory {
+    /// Observe the held descriptor using the current Swift volume-identity
+    /// format. No caller-provided volume fact is accepted.
+    pub fn export_facts(&self) -> io::Result<HostDirectoryFacts> {
+        owned(&self.0, true, self.1)?;
+        let metadata = self.0.metadata()?;
+        let device = u64::from(metadata.dev() as u32);
+        let mut attributes = libc::attrlist {
+            bitmapcount: libc::ATTR_BIT_MAP_COUNT,
+            reserved: 0,
+            commonattr: 0,
+            volattr: libc::ATTR_VOL_UUID,
+            dirattr: 0,
+            fileattr: 0,
+            forkattr: 0,
+        };
+        let mut buffer = [0_u8; 20];
+        // SAFETY: attributes names a single fixed-size volume UUID; buffer
+        // has room for the length word plus all 16 UUID bytes.
+        let result = unsafe {
+            libc::fgetattrlist(
+                self.0.as_raw_fd(),
+                (&mut attributes as *mut libc::attrlist).cast(),
+                buffer.as_mut_ptr().cast(),
+                buffer.len(),
+                0,
+            )
+        };
+        let volume_identity = if result == 0
+            && u32::from_ne_bytes(buffer[..4].try_into().map_err(|_| fail())?) == 20
+        {
+            let hex: String = buffer[4..].iter().map(|b| format!("{b:02x}")).collect();
+            format!(
+                "uuid:{}-{}-{}-{}-{}",
+                &hex[..8],
+                &hex[8..12],
+                &hex[12..16],
+                &hex[16..20],
+                &hex[20..]
+            )
+        } else {
+            format!("dev-unverified:{device}")
+        };
+        Ok(HostDirectoryFacts {
+            device,
+            inode: metadata.ino(),
+            volume_identity,
+        })
+    }
+
+    /// An export parent is an existing owned physical directory. Unlike
+    /// Runtime records it can be an ordinary user directory with public read
+    /// bits; this entry point does not grant document publication or locking.
+    pub fn open_export_parent(path: &Path) -> io::Result<Self> {
+        if !path.is_absolute() || path.canonicalize()? != path {
+            return Err(fail());
+        }
+        let file = OpenOptions::new()
+            .read(true)
+            .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
+            .open(path)?;
+        owned(&file, true, Ownership::ExportParent)?;
+        Ok(Self(file, Ownership::ExportParent))
+    }
+
     /// Metadata of a private regular document, resolved relative to the held
     /// directory. Snapshot retention uses this instead of trusting path stats.
     pub fn document_metadata(&self, name: &str) -> io::Result<std::fs::Metadata> {
@@ -540,6 +617,55 @@ impl HostDirectory {
             return Err(fail());
         }
         Ok(bytes)
+    }
+
+    /// Name an optional export Journal using bounded memory and a retained
+    /// descriptor. Absence is distinct from a failed or unsafe read; the linked
+    /// inode and content timestamps must survive the complete read.
+    pub fn optional_document_digest(&self, name: &str, maximum: u64) -> io::Result<Option<String>> {
+        use sha2::{Digest, Sha256};
+        let file = match self.open_at(name, 0) {
+            Ok(file) => file,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+            Err(error) => return Err(error),
+        };
+        owned(&file, false, self.1)?;
+        let before = file.metadata()?;
+        if before.len() > maximum {
+            return Err(fail());
+        }
+        let mut reader = &file;
+        let mut buffer = [0_u8; 65536];
+        let mut count = 0_u64;
+        let mut digest = Sha256::new();
+        loop {
+            let read = match reader.read(&mut buffer) {
+                Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+                result => result?,
+            };
+            if read == 0 {
+                break;
+            }
+            count = count.checked_add(read as u64).ok_or_else(fail)?;
+            if count > before.len() || count > maximum {
+                return Err(fail());
+            }
+            digest.update(&buffer[..read]);
+        }
+        let after = file.metadata()?;
+        let linked = self.stat_at(name)?;
+        if count != before.len()
+            || before.len() != after.len()
+            || before.mtime() != after.mtime()
+            || before.mtime_nsec() != after.mtime_nsec()
+            || before.ctime() != after.ctime()
+            || before.ctime_nsec() != after.ctime_nsec()
+            || before.dev() != linked.st_dev as u64
+            || before.ino() != linked.st_ino
+        {
+            return Err(fail());
+        }
+        Ok(Some(format!("{:x}", digest.finalize())))
     }
 
     /// Verify immutable payload bytes using bounded memory and a retained
