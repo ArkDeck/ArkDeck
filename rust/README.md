@@ -205,6 +205,14 @@ Registration, selection, write ownership and installed activation remain pending
 comparison adapter. Set `ARKDECK_TOOL_OWNER_BINARY` to it when running
 `BootstrapToolRustOwnerTests` to compare a real Swift registration with Rust.
 
+The macOS `ArtifactReadStore` library lists, inspects and reads existing Job
+Artifact publications with full-payload digest verification and bounded range
+allocation. Typed inspect/read result conversion matches actual Swift producer
+recordings, including missing content and observation windows. It preserves the
+frozen index format and never writes verification caches. Runtime routing, Job
+existence checks, import leases and Artifact write ownership remain pending.
+`python3 rust/scripts/check-artifact-read-owner.py` runs its targeted host checks.
+
 ## Contract and ownership boundaries
 
 The isolated macOS host also serves `trace cache status` from its fixed

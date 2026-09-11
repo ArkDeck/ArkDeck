@@ -405,6 +405,62 @@ final class ArtifactResourcesContractTests: XCTestCase {
     let jobs = try await engine.listJobs(); XCTAssertEqual(jobs.count, 1); XCTAssertEqual(dispatcher.dispatchCount, 0)
   }
 
+  func testMissingArtifactWireInspectionPreservesNullDigestAndRefusesRead() async throws {
+    let job = try seedJob("job-missing-wire")
+    let missing = try await artifacts.recordMissing(
+      jobID: job.id, sessionID: "fixture-session", stepID: "fixture-step",
+      name: "missing.txt", mediaType: "text/plain", privacy: .standard,
+      retentionClass: .default, sourceOperation: "observe.device@1", providerID: "hdc",
+      bindingSnapshot: .init(targetID: "TGT-fixture", bindingRevision: 1, stableIdentitySHA256: nil),
+      reason: "fixture product unavailable")
+    let fields: [String: JSONValue] = ["owner": job.value, "artifactId": .string(missing.artifactID)]
+    let inspected = try await wire("artifact.inspect", fields)
+    XCTAssertTrue(inspected.0.ok)
+    let metadata = try ArtifactResourceProjection(XCTUnwrap(inspected.0.result))
+    let value = try object(metadata.value)
+    XCTAssertEqual(value["artifactDigest"], .null)
+    XCTAssertEqual(value["status"], .string("missing"))
+    XCTAssertEqual(value["lease"], .null)
+    let read = try await wire("artifact.read", fields)
+    XCTAssertFalse(read.0.ok)
+    XCTAssertEqual(read.0.error?.code, "resourceNotFound")
+    XCTAssertNil(read.0.result)
+    XCTAssertEqual(dispatcher.dispatchCount, 0)
+  }
+
+  func testObservationWindowWireInspectionAndBoundedReadsPreserveProducerMetadata() async throws {
+    let job = try seedJob("job-window-wire")
+    let bytes = Data("fixture-content".utf8)
+    let product = try await artifacts.publish(.init(
+      jobID: job.id, sessionID: "fixture-session", stepID: "fixture-step",
+      name: "window.txt", mediaType: "text/plain", privacy: .standard,
+      retentionClass: .default, sourceOperation: "observe.device@1", providerID: "hdc",
+      bindingSnapshot: .init(targetID: "TGT-fixture", bindingRevision: nil, stableIdentitySHA256: nil),
+      contents: bytes,
+      observationWindow: .init(startUTC: now, endUTC: "2026-09-01T00:00:01Z")))
+    let fields: [String: JSONValue] = ["owner": job.value, "artifactId": .string(product.artifactID)]
+    let inspected = try await wire("artifact.inspect", fields)
+    XCTAssertTrue(inspected.0.ok)
+    let metadata = try ArtifactResourceProjection(XCTUnwrap(inspected.0.result))
+    let value = try object(metadata.value)
+    XCTAssertEqual(try object(XCTUnwrap(value["binding"]))["bindingRevision"], .null)
+    XCTAssertEqual(value["observationWindow"], .object([
+      "startUtc": .string(now), "endUtc": .string("2026-09-01T00:00:01Z")]))
+    XCTAssertEqual(value["artifactDigest"], .string(SHA256Hex.string(of: bytes)))
+    for (offset, maximum) in [(0, 4), (4, 32), (bytes.count, 1)] {
+      var rangeFields = fields
+      rangeFields["offset"] = .integer(Int64(offset))
+      rangeFields["maxBytes"] = .integer(Int64(maximum))
+      let response = try await wire("artifact.read", rangeFields)
+      XCTAssertTrue(response.0.ok)
+      let range = try ArtifactReadProjection(XCTUnwrap(response.0.result))
+      XCTAssertEqual(range.bytes, bytes.subdata(in: offset..<min(bytes.count, offset + maximum)))
+      XCTAssertEqual(range.digest, product.sha256)
+      XCTAssertEqual(range.totalByteCount, bytes.count)
+    }
+    XCTAssertEqual(dispatcher.dispatchCount, 0)
+  }
+
   func testFourMiBSlashHeavyRangeFitsFrameAndRawUsesIdenticalValidatedBytes() async throws {
     let bytes = Data([0x50,0x4b,3,4]) + Data(repeating: 0xff, count: 4_194_304)
     let (input, id) = try await imported(bytes: bytes)

@@ -778,22 +778,26 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 
 ## TASK-XPA-013 — Move the artifact store to the Rust owner on macOS
 
-- Status:blocked
+- Status:in-progress（2026-09-11: isolated Job Artifact read library and current inspect/read projections are implemented; Runtime routing, writes, owner cutover and GJ acceptance remain pending）
 - Platform:macos
 - Requirements:POL-ARTIFACT-001, POL-PRIVACY-001, POL-STORAGE-001, ADR-0007 decisions 1–7
 - Acceptance:XPA-AC-1, XPA-AC-7, XPA-AC-9, XPA-AC-10; macOS GJ-1/2/3 re-pass
 - Depends on:TASK-XPA-012
-- Readiness input pins（非载体示例）:
+- Readiness input pins（published producer input for the read-library phase）:
 
-  ```yaml pin-example
+  ```yaml pins
+  - path: main
+    commit: b315f371d188f6e0cf14e4d356bb0f50507fb80d
   - path: Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Artifacts/RuntimeArtifactStore.swift
-    blob: <40-hex git OID>
+    blob: 5cb2dd20d089617cf042cde6c041fca23ced071b
   ```
 
 - Applicable failure patterns:AF-004, AF-005, AF-011, AF-018
 - Production reachability:import/lease/read/export/quota/retention/cleanup-debt served by Rust; the Swift engine publishes through a private `artifact.publish` method authenticated by the pairing secret; GC only reclaims expired, unreferenced, unpinned entries
 - Trusted fact sources:artifact identity and payload verification document unchanged; quota refuses new work and never evicts
 - Allowed paths:
+  - `spec/control/methods/artifact.inspect.json`（declared scope extension: existing nullable digest/revision and observation window recorded from the actual Swift producer）
+  - `spec/control/methods/artifact.read.json`（declared scope extension: preserve existing resourceNotFound and integrity refusals from actual Swift producer recordings）
   - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`
   - `rust/**`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/**`（engine publish path only）

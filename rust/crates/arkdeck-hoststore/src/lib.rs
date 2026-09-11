@@ -318,3 +318,16 @@ mod deveco_content;
 mod deveco_registry_owner;
 #[cfg(target_os = "macos")]
 pub use deveco_registry_owner::DevEcoRegistryReadStore;
+
+#[cfg(target_os = "macos")]
+mod artifact_read_owner;
+#[cfg(target_os = "macos")]
+pub use artifact_read_owner::{
+    ArtifactReadPage, ArtifactReadRange, ArtifactReadSnapshot, ArtifactReadStore,
+    MAX_ARTIFACT_READ_BYTES,
+};
+
+#[cfg(target_os = "macos")]
+mod artifact_projection;
+#[cfg(target_os = "macos")]
+pub use artifact_projection::{ArtifactInspectRequest, ArtifactReadRequest};

@@ -183,6 +183,31 @@ fn metadata(value: &Value) -> io::Result<()> {
     }
     Ok(())
 }
+/// Shared frozen index validation for inventory accounting and read owners.
+pub(crate) fn decode_index(bytes: &[u8], job_id: &str) -> io::Result<Vec<Value>> {
+    let document: Value = arkdeck_contract::strict_json(bytes).map_err(|_| invalid())?;
+    object(&document, &["schemaVersion", "artifacts"], &[])?;
+    if document["schemaVersion"] != "1.0.0" {
+        return Err(invalid());
+    }
+    let rows = document["artifacts"].as_array().ok_or_else(invalid)?;
+    let mut ids = HashSet::new();
+    let mut names = HashSet::new();
+    for row in rows {
+        metadata(row)?;
+        let id = text(row, "artifactID")?;
+        let name = crate::canonical_host_text(text(row, "name")?).map_err(|_| invalid())?;
+        if text(row, "jobID")? != job_id
+            || !artifact_id(id)
+            || !ids.insert(id)
+            || !names.insert(name)
+        {
+            return Err(invalid());
+        }
+    }
+    Ok(rows.clone())
+}
+
 impl ArtifactUsage {
     pub fn open(path: &Path, quota: u64) -> io::Result<Self> {
         if quota == 0 || quota > i64::MAX as u64 {
@@ -223,28 +248,11 @@ impl ArtifactUsage {
                 Err(e) if e.kind() == io::ErrorKind::NotFound => continue,
                 Err(e) => return Err(e),
             };
-            let document: Value = arkdeck_contract::strict_json(&index).map_err(|_| invalid())?;
-            object(&document, &["schemaVersion", "artifacts"], &[])?;
-            if document["schemaVersion"] != "1.0.0" {
-                return Err(invalid());
-            }
-            let mut ids = HashSet::new();
-            let mut artifact_names = HashSet::new();
-            for row in document["artifacts"].as_array().ok_or_else(invalid)? {
-                metadata(row)?;
-                let id = text(row, "artifactID")?;
-                let name_key =
-                    crate::canonical_host_text(text(row, "name")?).map_err(|_| invalid())?;
-                if text(row, "jobID")? != name
-                    || !artifact_id(id)
-                    || !ids.insert(id)
-                    || !artifact_names.insert(name_key)
-                {
-                    return Err(invalid());
-                }
+            for row in decode_index(&index, name)? {
                 if row["status"].get("published").is_some() {
+                    let id = text(&row, "artifactID")?;
                     let count = row["byteCount"].as_u64().ok_or_else(invalid)?;
-                    job.verify_payload(id, count, text(row, "sha256")?)?;
+                    job.verify_payload(id, count, text(&row, "sha256")?)?;
                     used = used
                         .checked_add(count)
                         .filter(|n| *n <= i64::MAX as u64)
