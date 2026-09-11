@@ -19,6 +19,11 @@ WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "agent-pr.yml"
 SDD_WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "sdd-guard.yml"
 SWIFT_WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "swift-ci.yml"
 RUST_WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "rust-ci.yml"
+SWIFTPM_CACHE_KEY = (
+    "          key: arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6"
+    "-image-${{ steps.runner-image.outputs.version }}"
+    "-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}\n"
+)
 RUST_POLICY_TOOLS_CACHE_KEY = (
     "arkdeck-cargo-policy-tools-v1-${{ runner.os }}-${{ runner.arch }}"
     "-cargo-deny-0.20.2-cargo-vet-0.10.2-${{ hashFiles('rust/rust-toolchain.toml') }}"
@@ -380,10 +385,23 @@ def validate_automatic_check_contract(
         "DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer",
         "ARKDECK_SWIFTPM_CACHE_ROOT: ${{ runner.temp }}/arkdeck-swiftpm",
         "python3 Packages/ArkDeckKit/Scripts/test_run_swiftpm.py",
+        # The SwiftPM cache is keyed by runner image build: a C compile is
+        # invalidated by SDK inputs that differ between image builds, so a
+        # cross-image restore recompiles every C unit. Restore order is exact
+        # inputs, newest same-image entry, then any same-toolchain entry, and
+        # the version comes from a step because the runner exports it to the
+        # process environment, not to the workflow env context.
+        "      - name: Record the runner image build\n"
+        "        id: runner-image\n",
+        "printf 'version=%s\\n' \"${ImageVersion:-unknown}\" >> \"$GITHUB_OUTPUT\"",
         "actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+        SWIFTPM_CACHE_KEY,
         "          restore-keys: |\n"
         "            arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-"
+        "image-${{ steps.runner-image.outputs.version }}-"
         "${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-\n"
+        "            arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-"
+        "image-${{ steps.runner-image.outputs.version }}-\n"
         "            arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-\n",
         "sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh",
         "--num-workers 8",
@@ -455,6 +473,16 @@ def validate_automatic_check_contract(
             raise WorkflowContractError(
                 f"Swift test job missing contract token: {token}"
             )
+    if swift_tests_job.count(SWIFTPM_CACHE_KEY) != 2:
+        raise WorkflowContractError(
+            "Swift test job must restore and save the SwiftPM cache under one exact key"
+        )
+    if swift_tests_job.index("        id: runner-image\n") > swift_tests_job.index(
+        "        id: swift-build-cache\n"
+    ):
+        raise WorkflowContractError(
+            "Swift test job must record the runner image build before restoring the cache"
+        )
     for token in required_app_build:
         if token not in app_build_job:
             raise WorkflowContractError(
@@ -1011,6 +1039,33 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
                 swift.replace(
                     "            arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-\n",
                     "",
+                ),
+            ),
+            (
+                "SwiftPM cache not keyed by runner image build",
+                agent,
+                sdd,
+                swift.replace("-image-${{ steps.runner-image.outputs.version }}", ""),
+            ),
+            (
+                "SwiftPM cache saved under a different key than restored",
+                agent,
+                sdd,
+                swift.replace(
+                    "-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}",
+                    "-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.ref }}",
+                    1,
+                ),
+            ),
+            (
+                "runner image build recorded after the cache restore",
+                agent,
+                sdd,
+                swift.replace(
+                    "        id: runner-image\n", "        id: runner-image-late\n"
+                ).replace(
+                    "        id: swift-build-cache\n",
+                    "        id: swift-build-cache\n      - id: runner-image\n        run: true\n",
                 ),
             ),
             (
