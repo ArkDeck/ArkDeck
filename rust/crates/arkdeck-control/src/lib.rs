@@ -28,6 +28,9 @@ pub trait HostServices: Send + Sync {
             ])),
         })
     }
+    fn job_resource(&self, _method: &str, _params: &serde_json::Map<String, Value>) -> Result<Value, WireError> {
+        Err(WireError { code: "rejected".into(), message: "The Job owner is not configured".into(), details: None })
+    }
     fn bootstrap_register_deveco(&self, _root: &str) -> Result<Value, WireError> {
         Err(WireError {
             code: "operationUnavailable".into(),
@@ -602,6 +605,10 @@ impl<H: HostServices> Control<H> {
             "history.filter.list" | "history.filter.save" | "history.filter.delete" => Response {
                 id: request.id.clone(),
                 outcome: self.host.history_filter(&request.method, &params),
+            },
+            "job.list" | "job.status" | "job.show" | "job.timeline" => Response {
+                id: request.id.clone(),
+                outcome: self.host.job_resource(&request.method, &params),
             },
             "session.list"
             | "session.show"

@@ -10,6 +10,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 pub struct Host {
     #[cfg(target_os = "macos")]
+    jobs: Option<arkdeck_hoststore::JobStore>,
+    #[cfg(target_os = "macos")]
     bootstrap: Option<crate::bootstrap_readers::BootstrapReaders>,
     provider: Option<HdcReadOnlyProvider>,
     #[cfg(target_os = "macos")]
@@ -26,6 +28,11 @@ pub struct Host {
 }
 
 impl Host {
+    #[cfg(target_os = "macos")]
+    pub fn with_jobs(mut self, jobs: arkdeck_hoststore::JobStore) -> Self {
+        self.jobs = Some(jobs);
+        self
+    }
     #[cfg(target_os = "macos")]
     pub fn with_trace_cache(mut self, cache: arkdeck_hoststore::TraceCacheStore) -> Self {
         self.trace_cache = Some(cache);
@@ -70,6 +77,8 @@ impl Host {
         };
         Self {
             #[cfg(target_os = "macos")]
+            jobs: None,
+            #[cfg(target_os = "macos")]
             bootstrap: None,
             provider,
             #[cfg(target_os = "macos")]
@@ -87,17 +96,20 @@ impl Host {
 impl HostServices for Host {
     #[cfg(target_os = "macos")]
     fn bootstrap_register_bundle(&self, source: &str) -> Result<serde_json::Value, WireError> {
-        self.bootstrap
-            .as_ref()
-            .ok_or_else(|| WireError {
-                code: "operationUnavailable".into(),
-                message: "Bundle registration owner is not configured".into(),
-                details: Some(serde_json::Map::from_iter([
-                    ("phase".into(), serde_json::json!("bootstrapRegistryOwner")),
-                    ("newDispatchCount".into(), serde_json::json!(0)),
-                ])),
-            })?
-            .register_bundle(std::path::Path::new(source), &utc_now())
+        self.bootstrap.as_ref().ok_or_else(|| WireError {
+            code: "operationUnavailable".into(),
+            message: "Bundle registration owner is not configured".into(),
+            details: Some(serde_json::Map::from_iter([
+                ("phase".into(), serde_json::json!("bootstrapRegistryOwner")),
+                ("newDispatchCount".into(), serde_json::json!(0)),
+            ])),
+        })?.register_bundle(std::path::Path::new(source), &utc_now())
+    }
+    #[cfg(target_os = "macos")]
+    fn job_resource(&self, method: &str, params: &serde_json::Map<String, serde_json::Value>) -> Result<serde_json::Value, WireError> {
+        self.jobs.as_ref().ok_or_else(|| WireError {
+            code: "rejected".into(), message: "The Job owner is not configured".into(), details: None,
+        })?.handle_resource(method, params)
     }
     #[cfg(target_os = "macos")]
     fn bootstrap_register_deveco(&self, source: &str) -> Result<serde_json::Value, WireError> {

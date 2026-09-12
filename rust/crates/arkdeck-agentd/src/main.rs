@@ -71,6 +71,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             "artifacts",
             "trace-cache",
             "bootstrap",
+            "jobs-state",
         ] {
             directory.private_child(name)?;
         }
@@ -93,6 +94,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
                 arkdeck_hoststore::ArtifactUsage::open(&artifacts, 8 * 1024 * 1024 * 1024)?,
             )
             .with_bootstrap(&bootstrap)?
+            .with_jobs(arkdeck_hoststore::JobStore::open(&root.join("jobs-state"))?)
     } else {
         host
     };
