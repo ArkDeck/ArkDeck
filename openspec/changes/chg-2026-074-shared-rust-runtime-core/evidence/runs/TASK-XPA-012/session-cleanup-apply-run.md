@@ -30,7 +30,48 @@ returns `outcomeUnknown`; restart never replays that preview. Applied previews
 return their exact stored receipts. CLI transport, schema and semantic failures
 for apply remain unknown and do not enable automatic replay.
 
-## Current validation
+## Current published-main integration
+
+The new isolated candidate `agent/xpa012-session-apply-current-20260912` merges
+published main `4e2a615e421e6174a4a50e2c8110196d77ce7007` into frozen Session
+commit `aa8b9c9d4bbb706c050e8b2953c2102ce57e2f07`. The original worktree and
+branch remain unchanged while the main integration task verifies them.
+The three conflicts preserve both Artifact export and Session cleanup in CLI
+help/platform exports, and regenerate the complete v2 checkout manifest
+(105 methods, 583 recorded shapes). Current Target and Job events remain present;
+no Trace maintenance file or behavior is added.
+
+With `CARGO_BUILD_JOBS=2`, this new candidate passed 4 platform Session removal,
+53 Session owner, 6 Job owner, 2 Host, 13 CLI unit, 11 current-surface and 8
+Artifact CLI integration tests. Debug Rust daemon/CLI build and five-package
+Clippy with `--all-targets -- -D warnings` passed. Its actual Rust daemon/CLI
+process harness passed 27 control exchanges plus CLI calls. Fresh original
+replies, durable output and executable provenance are retained in
+`session-cleanup-4e2a615e-process-macos-20260912/`; command/result logs are
+`/private/tmp/xpa012-session-current-4e2a615e-targeted-20260912.log` and
+`/private/tmp/xpa012-session-current-4e2a615e-process-20260912.log`.
+
+The complete local unified gate passed with exit 0 on this combined candidate
+(`/private/tmp/xpa012-session-cleanup-unified-r2.log`): selected Swift, design-system
+and Rust lanes, published/candidate contract checks, dependency deny and vet.
+App build was not selected for this diff. Final commit scope preflight is run
+before push. The earlier 11 native tests and Swift CLI consumer result below
+remain historical validation of the frozen source. The native producer/readback test, input
+fixtures and Session owner/removal/harness files are byte-identical; exact
+SHA-256 comparisons are recorded in
+`session-cleanup-4e2a615e-source-equivalence.json`. These results complement the complete combined-candidate gate above.
+
+The original frozen candidate's first full-gate run did **not** pass. The
+existing `BootstrapInspectionControlContractTests/testDevEcoRegistrationProducerUsesNativeRootAndCanonicalVariants` exceeded its
+30-second CLI timeout, then terminated the process (status 15) and observed an
+empty JSON output. New Session tests had no failure. The original gate log is
+`/private/tmp/xpa012-session-cleanup-unified-r1.log`. An independent rerun of the
+unchanged existing test passed in 11.905 seconds with the original 30-second
+limit (`/private/tmp/xpa012-session-deveco-timeout-recheck-r1.log`). The new
+combined candidate then passed its complete unified gate. No timeout, assertion
+or acceptance condition was relaxed.
+
+## Frozen candidate validation (aa8b9c9d)
 
 The Session-only candidate is based on approved main
 `1fd85b931fdef1416d41baebfe8bad0cf8d32b5e`, on branch
@@ -91,7 +132,7 @@ The existing checked-in `rust-cleanup-applied.json` fixtures remain unchanged.
 All Session storage inputs are isolated host fixtures, not hardware evidence.
 
 The apply schema includes success receipts derived from the original native
-method frames and existing method corpus. The v2 checkout manifest contains
+method frames and existing method corpus. At that frozen revision the v2 checkout manifest contained
 105 methods and 582 recorded shapes. The published view continues to use the
 merge-base with `origin/main`; no baseline-revision override or Scope-Extension
 is used. Installed activation, device execution and overall Task012 completion
