@@ -100,7 +100,10 @@ pub(crate) fn inspect_root(path: &Path) -> io::Result<Record> {
     if sha256_hex(&product_bytes) != children[0].sha256
         || sha256_hex(&sdk_bytes) != children[1].sha256
     {
-        return Err(unreadable());
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            arkdeck_platform::DevEcoIdentityChanged,
+        ));
     }
     let product: ProductInfo =
         serde_json::from_value(strict_json(&product_bytes).map_err(|_| unreadable())?)

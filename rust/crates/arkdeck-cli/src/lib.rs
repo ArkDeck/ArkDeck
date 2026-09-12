@@ -67,8 +67,8 @@ impl CliError {
         }
     }
     pub fn from_client(error: ClientError, method: &str) -> Self {
-        if method == "runtime.bundle.remove" {
-            return bootstrap_resources::retirement_error(error);
+        if matches!(method, "runtime.bundle.remove" | "runtime.tool.remove") {
+            return bootstrap_resources::retirement_error(error, method);
         }
         let mut result = match error {
             ClientError::Transport(error) => Self::new(
@@ -149,6 +149,7 @@ impl CliError {
                         | "runtime.bundle.inspect"
                         | "runtime.tool.register"
                         | "runtime.bundle.list"
+                        | "runtime.tool.list"
                 ) && error.details.as_ref().is_some_and(|details| {
                     details.get("phase") == Some(&json!("bootstrapRegistryOwner"))
                         && details.get("newDispatchCount") == Some(&json!(0))
@@ -157,7 +158,8 @@ impl CliError {
                 let code = match error.code.as_str() {
                     "admissionDenied" if bootstrap_proof => "admissionDenied",
                     "fileIdentityChanged"
-                        if bootstrap_proof && method == "runtime.tool.register" =>
+                        if bootstrap_proof
+                            && matches!(method, "runtime.tool.register" | "runtime.tool.list") =>
                     {
                         "fileIdentityChanged"
                     }
@@ -176,6 +178,9 @@ impl CliError {
                     "invalidParams" => "invalidInput",
                     "conflict" => "resourceConflict",
                     "notFound" => "resourceNotFound",
+                    "recordUnreadable" if method == "runtime.tool.list" && !bootstrap_proof => {
+                        "internalError"
+                    }
                     "recordUnreadable" => "recordUnreadable",
                     "workspaceReferenceNotFound" => "workspaceReferenceNotFound",
                     "invalidInput" if proof => "invalidInput",
@@ -359,6 +364,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["device", "candidates"] => "device.candidates",
         ["trace", "cache", "status"] => "trace.cache.status",
         ["runtime", "tool", "register"] => "runtime.tool.register",
+        ["runtime", "tool", "list"] => "runtime.tool.list",
+        ["runtime", "tool", "remove"] => "runtime.tool.remove",
         ["runtime", "tool", "inspect"] => "runtime.tool.inspect",
         ["runtime", "bundle", "inspect"] => "runtime.bundle.inspect",
         ["runtime", "bundle", "list"] => "runtime.bundle.list",
@@ -409,6 +416,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             "retentionDays",
         ],
         "runtime.storage.root" => &["expectedGeneration", "rootPath", "resetToDefault"],
+        "runtime.tool.remove" => &["tool", "expectedGeneration"],
         "runtime.tool.inspect" => &["tool"],
         "runtime.tool.register" => &["kind", "rootPath", "file"],
         "runtime.bundle.inspect" => &["bundle"],
@@ -427,7 +435,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             "targetId",
             "thread",
         ],
-        "runtime.bundle.list" => &["pageSize", "cursor"],
+        "runtime.bundle.list" | "runtime.tool.list" => &["pageSize", "cursor"],
         "runtime.bundle.remove" => &["bundle", "expectedGeneration"],
         "session.list" => &["pageSize", "cursor"],
         "session.show" => &["sessionId"],
@@ -491,7 +499,12 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             .entry("allowSensitive")
             .or_insert(json!(false));
     }
-    if !help && matches!(command, "session.list" | "runtime.bundle.list") {
+    if !help
+        && matches!(
+            command,
+            "session.list" | "runtime.bundle.list" | "runtime.tool.list"
+        )
+    {
         let size = method_options
             .get("pageSize")
             .map_or(Some(100), |value| {
@@ -635,7 +648,9 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                 "runtime.tool.inspect"
                     | "runtime.bundle.inspect"
                     | "runtime.tool.register"
+                    | "runtime.tool.remove"
                     | "runtime.bundle.list"
+                    | "runtime.tool.list"
                     | "runtime.bundle.remove"
             )
             || command.starts_with("session.")

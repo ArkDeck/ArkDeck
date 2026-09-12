@@ -113,6 +113,10 @@ def commands(view: Path, output: Path, *, owners: bool = False) -> list[tuple[li
                         "--bin-dir", str(rust / "target/debug")], view))
         result.append(([sys.executable, str(rust / "scripts/check-hdc-register.py"),
                         "--bin-dir", str(rust / "target/debug")], view))
+        result.append(([sys.executable, str(rust / "scripts/check-tool-list.py"),
+                        "--bin-dir", str(rust / "target/debug")], view))
+        result.append(([sys.executable, str(rust / "scripts/check-tool-retirement.py"),
+                        "--bin-dir", str(rust / "target/debug")], view))
     return result
 
 

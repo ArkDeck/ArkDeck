@@ -1468,6 +1468,18 @@ let startupTask = Task.detached {
         })
         return try owner.remove(reference, expectedGeneration: generation)
       },
+      bootstrapToolRetirer: { reference, generation in
+        let owner = try BootstrapToolRegistry(knownIdentity: { sha256 in
+          HeadlessHDCBootstrapIdentity.lookup(sha256: sha256).map {
+            BootstrapToolRegistry.PublishedIdentity(version: $0.version, profileReferences: $0.profileReferences)
+          }
+        })
+        if reference.hasPrefix("toolchain:sha256:") {
+          return try BootstrapDevEcoToolchainRegistry(owner: owner.sharedOwner)
+            .remove(reference, expectedGeneration: generation)
+        }
+        return try owner.remove(reference, expectedGeneration: generation)
+      },
       bootstrapBundleInspector: { reference in
         let owner = try BootstrapBundleRegistry(validateBundle: { candidate in
           do {
@@ -1490,6 +1502,23 @@ let startupTask = Task.detached {
           try RuntimeSnapshotPager(directory: directory).page(method: "runtime.bundle.list", filters: [:],
             order: "bundleRef:asc", pageSize: pageSize, cursor: cursor, items: { items })
         }
+      },
+      bootstrapToolLister: { pageSize, cursor in
+        let owner = try BootstrapToolRegistry(knownIdentity: { sha256 in
+          HeadlessHDCBootstrapIdentity.lookup(sha256: sha256).map {
+            BootstrapToolRegistry.PublishedIdentity(version: $0.version, profileReferences: $0.profileReferences)
+          }
+        })
+        let inventory = try BootstrapDevEcoToolchainRegistry(owner: owner.sharedOwner).combinedInventory(with: owner)
+        let items = try inventory.values.sorted { left, right in
+          guard case .object(let leftFields) = left, case .string(let leftRef)? = leftFields["toolRef"],
+            case .object(let rightFields) = right, case .string(let rightRef)? = rightFields["toolRef"]
+          else { throw AgentExecutionControlFailure("recordUnreadable", "tool inventory contains a malformed reference") }
+          return leftRef < rightRef
+        }
+        return try RuntimeSnapshotPager(directory: inventory.snapshotDirectory).page(
+          method: "runtime.tool.list", filters: [:], order: "toolRef:asc",
+          pageSize: pageSize, cursor: cursor, items: { items })
       },
       controlActions: controlActions,
       artifactStore: artifactStore,

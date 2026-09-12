@@ -156,7 +156,10 @@ pub use host_bundle_signature::{bootstrap_bundle_version, validate_production_da
 #[cfg(target_os = "macos")]
 mod host_deveco_files;
 #[cfg(target_os = "macos")]
-pub use host_deveco_files::{DevEcoFileFacts, DevEcoFileRead, DevEcoRole, DevEcoRoot};
+pub use host_deveco_files::{
+    DevEcoFileFacts, DevEcoFileRead, DevEcoIdentityChanged, DevEcoInputTooLarge, DevEcoRole,
+    DevEcoRoot,
+};
 #[cfg(target_os = "macos")]
 mod host_deveco_resources;
 #[cfg(target_os = "macos")]

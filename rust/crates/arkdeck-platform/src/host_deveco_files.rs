@@ -87,11 +87,24 @@ pub struct DevEcoRoot {
     path: PathBuf,
     pub identity: DevEcoFileFacts,
 }
+#[derive(Debug)]
+pub struct DevEcoIdentityChanged;
+impl std::fmt::Display for DevEcoIdentityChanged {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("DevEco root or child identity changed or is unreadable")
+    }
+}
+impl std::error::Error for DevEcoIdentityChanged {}
+#[derive(Debug)]
+pub struct DevEcoInputTooLarge;
+impl std::fmt::Display for DevEcoInputTooLarge {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("DevEco file exceeds its size bound")
+    }
+}
+impl std::error::Error for DevEcoInputTooLarge {}
 fn invalid() -> io::Error {
-    io::Error::new(
-        io::ErrorKind::InvalidData,
-        "DevEco root or child identity changed or is unreadable",
-    )
+    io::Error::new(io::ErrorKind::InvalidData, DevEcoIdentityChanged)
 }
 fn denied() -> io::Error {
     io::Error::new(
@@ -239,8 +252,13 @@ impl DevEcoRoot {
         (&file)
             .take(role.maximum() as u64 + 1)
             .read_to_end(&mut bytes)?;
+        if bytes.len() > role.maximum() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                DevEcoInputTooLarge,
+            ));
+        }
         if bytes.len() as u64 != facts.byte_count
-            || bytes.len() > role.maximum()
             || DevEcoFileFacts::from(file.metadata()?) != facts
             || DevEcoFileFacts::from(child(&parent, name, false)?.metadata()?) != facts
         {

@@ -95,6 +95,14 @@ BUNDLE_RETIREMENT_OWNER_ERROR_CODES = [
     "invalidInput", "resourceNotFound", "resourceConflict", "admissionDenied",
     "recordUnreadable", "quotaExceeded", "outcomeUnknown", "operationUnavailable",
 ]
+TOOL_RETIREMENT_OWNER_ERROR_CODES = [
+    "invalidInput", "resourceNotFound", "resourceConflict", "admissionDenied",
+    "recordUnreadable", "quotaExceeded", "ioFailure", "fileIdentityChanged", "inputTooLarge", "outcomeUnknown", "operationUnavailable",
+]
+TOOL_LIST_OWNER_ERROR_CODES = [
+    "invalidInput", "invalidCursor", "resourceConflict", "admissionDenied",
+    "recordUnreadable", "operationUnavailable", "inputTooLarge", "fileIdentityChanged", "ioFailure", "outcomeUnknown",
+]
 MAXIMUM_SIGNATURES_PER_METHOD = 24
 MAXIMUM_SAMPLE_BYTES = 65536
 
@@ -225,7 +233,9 @@ def derive_method_schemas(source):
                            "session.cleanup.preview", "session.export.preview", "session.export.apply"
                        } else set())
                        | (set(BUNDLE_LIST_OWNER_ERROR_CODES) if method == "runtime.bundle.list" else set())
-                       | (set(BUNDLE_RETIREMENT_OWNER_ERROR_CODES) if method == "runtime.bundle.remove" else set()))
+                       | (set(BUNDLE_RETIREMENT_OWNER_ERROR_CODES) if method == "runtime.bundle.remove" else set())
+                       | (set(TOOL_RETIREMENT_OWNER_ERROR_CODES) if method == "runtime.tool.remove" else set())
+                       | (set(TOOL_LIST_OWNER_ERROR_CODES) if method == "runtime.tool.list" else set()))
         schema = {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "$id": f"https://arkdeck.dev/schemas/control/methods/{method}.json",
@@ -255,6 +265,18 @@ def derive_method_schemas(source):
                 "errorDetails": infer(details, closed=True) if details else {"type": "object", "additionalProperties": False, "properties": {}},
             },
         }
+        if method in {"runtime.tool.list", "runtime.tool.remove"} and results:
+            # Both leaves return the existing Tool projection. Preserve its
+            # native optional trust/dependency/selection fields from actual
+            # inspection recordings, including shapes outside this phase's
+            # permitted host fixtures. Never manufacture a producer frame.
+            inspection = load_frames(FRAME_CORPUS_DIRECTORY / "runtime.tool.inspect.jsonl")
+            projections = [frame["result"] for frame, _ in inspection if frame["ok"]]
+            if method == "runtime.tool.list":
+                projections += [row for result in results for row in result["items"]]
+                schema["$defs"]["result"]["properties"]["items"]["items"] = infer(projections, closed=True)
+            else:
+                schema["$defs"]["result"] = infer(projections + results, closed=True)
         (METHOD_SCHEMA_DIRECTORY / f"{method}.json").write_text(
             json.dumps(schema, indent=2, sort_keys=True, ensure_ascii=False) + "\n")
         # The committed corpus: the smallest frame of every distinct request and

@@ -538,6 +538,8 @@ enum CLIMachineContracts {
       "runtime.storage.status": .leaf("runtime.storage.status"),
       "runtime.tool.select": .leaf("runtime.tool.select"),
       "runtime.tool.inspect": .leaf("runtime.tool.inspect"),
+      "runtime.tool.list": .leaf("runtime.tool.list"),
+      "runtime.tool.remove": .leaf("runtime.tool.remove"),
       "runtime.tool.register": .leaf("runtime.tool.register", note: "Only --kind deveco is served by this RPC; --kind hdc retains its in-process Bootstrap registration."),
       "runtime.bundle.inspect": .leaf("runtime.bundle.inspect"),
       "runtime.bundle.list": .leaf("runtime.bundle.list"),

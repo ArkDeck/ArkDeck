@@ -3,7 +3,7 @@
 use arkdeck_client::{Client, ClientError};
 use arkdeck_contract::{
     CATALOG_DIGEST, CONTRACT_IDENTITY, MAX_REQUEST_BYTES, MAX_RESPONSE_BYTES, METHODS,
-    PROTOCOL_VERSION, encode_frame,
+    PROTOCOL_VERSION, encode_frame, validate_method_value,
 };
 use arkdeck_platform::{LocalEndpoint, LocalListener, ServerIdentity, read_frame};
 use serde_json::{Value, json};
@@ -26,6 +26,10 @@ enum Delay {
 }
 
 fn exercise(delay: Delay, bounded: bool) {
+    // Initialize the contract cache before timing transport delays. Otherwise
+    // cold schema parsing can exhaust the health budget before the pair fixture
+    // reaches the business request it is meant to test.
+    validate_method_value("health", "result", &health()["result"]).unwrap();
     let suffix = arkdeck_platform::random_bytes::<8>().unwrap();
     let root = std::env::temp_dir().canonicalize().unwrap().join(format!(
         "deadline-{}",

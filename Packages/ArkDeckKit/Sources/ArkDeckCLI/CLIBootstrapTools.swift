@@ -16,7 +16,7 @@ extension RuntimeCLI {
     let initialOptions = try CLIOptions(rest)
     let devecoRPC = verb == "register" && initialOptions.value("--kind") == "deveco" && suppliedDevEco == nil
     var session = runtimeSession(
-      &rest, command: "runtime.tool.\(verb)", connectsToRuntime: verb == "select" || devecoRPC)
+      &rest, command: "runtime.tool.\(verb)", connectsToRuntime: verb == "select" || devecoRPC || (["list", "remove"].contains(verb) && supplied == nil && suppliedDevEco == nil))
     do {
       let options = try CLIOptions(rest)
       if verb == "select" {
@@ -54,6 +54,22 @@ extension RuntimeCLI {
           !path.split(separator: "/").contains(where: { $0 == "." || $0 == ".." })
         else { throw session.fail(.invalidInput, "DevEco registration requires only an absolute --root") }
         session.emit(try session.request("runtime.tool.register", ["kind": .string("deveco"), "root": .string(path)]))
+        return
+      }
+      if verb == "list", supplied == nil, suppliedDevEco == nil {
+        let size = Int(options.value("--page-size") ?? "100") ?? 0
+        var fields: [String: JSONValue] = ["pageSize": .integer(Int64(size))]
+        if let cursor = options.value("--cursor") { fields["cursor"] = .string(cursor) }
+        session.emit(try session.request("runtime.tool.list", fields))
+        return
+      }
+      if verb == "remove", supplied == nil, suppliedDevEco == nil {
+        guard let reference = options.value("--tool"), let generation = options.value("--expected-generation") else {
+          throw session.fail(.invalidInput, "remove requires exact --tool and --expected-generation")
+        }
+        session.emit(try session.request("runtime.tool.remove", [
+          "tool": .string(reference), "expectedGeneration": .string(generation),
+        ]))
         return
       }
       let registry = try supplied ?? BootstrapToolRegistry(knownIdentity: { sha256 in

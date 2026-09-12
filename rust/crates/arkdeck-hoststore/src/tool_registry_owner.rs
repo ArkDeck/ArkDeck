@@ -85,16 +85,7 @@ impl ToolRegistryStore {
             if reference.is_some_and(|r| record["reference"] != r) {
                 continue;
             }
-            let digest = record["contentDigest"].as_str().ok_or_else(corrupt)?;
-            // The strict decoder proved the digest consists of exactly 64 hex bytes.
-            let name = format!("tool-{digest}.hdc");
-            let path = self.path.join(&name);
-            let held = self.root.child(&name)?;
-            let measured = inspect_tool_content(&path)?;
-            if !matches(record, &measured) {
-                return Err(corrupt());
-            }
-            held.validate_path(&path)?;
+            self.verify_record(record)?;
         }
         if self.root.read("tools.json", MAXIMUM_INDEX)? != bytes
             || self.root.read("bundles.json", MAXIMUM_INDEX)? != bundles
@@ -111,6 +102,18 @@ impl ToolRegistryStore {
             .filter(|v| reference.is_none_or(|r| v["toolRef"] == r))
             .cloned()
             .collect())
+    }
+    pub(crate) fn verify_record(&self, record: &Value) -> io::Result<()> {
+        let digest = record["contentDigest"].as_str().ok_or_else(corrupt)?;
+        // The strict decoder proved this is exactly 64 lower-case hex bytes.
+        let name = format!("tool-{digest}.hdc");
+        let path = self.path.join(&name);
+        let held = self.root.child(&name)?;
+        let measured = inspect_tool_content(&path)?;
+        if !matches(record, &measured) {
+            return Err(corrupt());
+        }
+        held.validate_path(&path)
     }
     pub fn inspect(&self, reference: &str) -> io::Result<Value> {
         if !reference.strip_prefix("tool:sha256:").is_some_and(|s| {

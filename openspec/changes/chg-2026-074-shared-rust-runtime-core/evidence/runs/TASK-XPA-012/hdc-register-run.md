@@ -2,7 +2,8 @@
 
 Integration base: protected main `b315f371`. This independently reviewable
 capture and registration library phase preserves the existing owner format.
-Integration with the preceding DevEco registration RPC slice is pending.
+Integration with the DevEco registration RPC slice and the Rust CLI/Runtime
+connection merged in PR #1860 at `d00e4ec`; see [the RPC validation](hdc-rpc-run.md).
 
 The Rust storage owner captures the HDC executable and its fixed optional
 `libusb_shared.dylib` dependency into its own private staging directory. It
@@ -69,9 +70,10 @@ Log: `/private/tmp/xpa012-hdc-register-full-gate.log`, SHA-256
 Contract recordings:
 `rust/target/readonly-check/5d7b826049df4e819201414fe35f8cc1`.
 
-## Pending integration
+## Integration status (updated 2026-09-12)
 
-Typed HDC registration RPC and both CLI consumers, actual producer-derived
-wire contract inputs and end-to-end registration process validation are pending. This is isolated host work;
+Typed HDC registration RPC, the Rust CLI consumer, actual producer-derived
+contracts and isolated process validation merged in PR #1860. The Swift HDC
+registration consumer retains its existing in-process path. This is isolated host work;
 installed activation, Session deletion, Runtime authority and device acceptance
 are not completed by these tests. TASK-XPA-012 remains in progress.

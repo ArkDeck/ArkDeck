@@ -43,6 +43,7 @@ enum CLIControlMethodRegistry {
     "runtime.storage.status",
     "runtime.tool.inspect",
     "runtime.bundle.inspect",
+    "runtime.tool.list",
     "runtime.bundle.list",
     "session.list",
     "session.show",
@@ -119,6 +120,7 @@ enum CLIControlMethodRegistry {
     "runtime.hdc.restart",
     "runtime.tool.register",
     "runtime.tool.select",
+    "runtime.tool.remove",
     "runtime.bundle.remove",
     "control-action.list",
     "control-action.show",
@@ -252,10 +254,20 @@ enum CLIControlFailureMapper {
       let code = CLIErrorCode(rawValue: wireCode) { return code }
     // Discovery pages preserve registered resources; their private snapshots
     // confer no execution authority and owner failures carry zero dispatch.
+    if method == "runtime.tool.list",
+      evidence.phase == "bootstrapRegistryOwner", evidence.newDispatchCount == 0,
+      ["invalidInput", "invalidCursor", "resourceConflict", "admissionDenied", "recordUnreadable",
+        "operationUnavailable", "inputTooLarge", "fileIdentityChanged", "ioFailure", "outcomeUnknown"].contains(wireCode),
+      let code = CLIErrorCode(rawValue: wireCode) { return code }
     if method == "runtime.bundle.list",
       evidence.phase == "bootstrapRegistryOwner", evidence.newDispatchCount == 0,
       ["invalidInput", "invalidCursor", "resourceConflict", "admissionDenied", "recordUnreadable",
         "operationUnavailable", "inputTooLarge"].contains(wireCode),
+      let code = CLIErrorCode(rawValue: wireCode) { return code }
+    if method == "runtime.tool.remove",
+      evidence.phase == "bootstrapRegistryOwner", evidence.newDispatchCount == 0,
+      ["invalidInput", "resourceNotFound", "resourceConflict", "admissionDenied", "recordUnreadable",
+        "quotaExceeded", "ioFailure", "fileIdentityChanged", "inputTooLarge", "outcomeUnknown", "operationUnavailable"].contains(wireCode),
       let code = CLIErrorCode(rawValue: wireCode) { return code }
     if method == "runtime.bundle.remove",
       evidence.phase == "bootstrapRegistryOwner", evidence.newDispatchCount == 0,

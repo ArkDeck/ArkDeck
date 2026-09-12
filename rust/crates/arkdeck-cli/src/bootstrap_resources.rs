@@ -51,7 +51,7 @@ pub(crate) fn configure(
         return Ok(());
     }
     let key = match command {
-        "runtime.tool.inspect" => "tool",
+        "runtime.tool.inspect" | "runtime.tool.remove" => "tool",
         "runtime.bundle.inspect" | "runtime.bundle.remove" => "bundle",
         _ => return Ok(()),
     };
@@ -109,7 +109,7 @@ pub fn validate_bootstrap_response(invocation: &Invocation, value: &Value) -> Re
     validate_bootstrap_response_inner(invocation, value).map_err(|error| {
         if matches!(
             invocation.command,
-            "runtime.bundle.remove" | "runtime.tool.register"
+            "runtime.bundle.remove" | "runtime.tool.remove" | "runtime.tool.register"
         ) {
             CliError::new(
                 "outcomeUnknown",
@@ -127,6 +127,9 @@ fn validate_bootstrap_response_inner(
 ) -> Result<(), CliError> {
     if invocation.command == "runtime.bundle.list" {
         return validate_bundle_page(invocation, value);
+    }
+    if invocation.command == "runtime.tool.list" {
+        return validate_tool_page(invocation, value);
     }
     let registering = invocation.command == "runtime.tool.register";
     let (input, output, schema, prefix, content_schema) = match invocation.command {
@@ -160,7 +163,7 @@ fn validate_bootstrap_response_inner(
             "bundle:sha256:",
             "arkdeck.bundle-content/1",
         ),
-        "runtime.tool.inspect"
+        "runtime.tool.inspect" | "runtime.tool.remove"
             if invocation
                 .params
                 .as_ref()
@@ -176,7 +179,7 @@ fn validate_bootstrap_response_inner(
                 "arkdeck.deveco-toolchain-content/2",
             )
         }
-        "runtime.tool.inspect" => (
+        "runtime.tool.inspect" | "runtime.tool.remove" => (
             "tool",
             "toolRef",
             "arkdeck.runtime-tool/1",
@@ -198,6 +201,15 @@ fn validate_bootstrap_response_inner(
             .ok_or_else(unreadable)?
     };
     validate_record(value, reference, output, schema, prefix, content_schema)?;
+    if invocation.command == "runtime.tool.remove"
+        && (value["state"] != "removed"
+            || value["generation"] != "2"
+            || !value["references"].as_array().is_some_and(Vec::is_empty)
+            || value["selected"] != false
+            || !value["activeSelectionGeneration"].is_null())
+    {
+        return Err(unreadable());
+    }
     if invocation.command == "runtime.bundle.remove"
         && (value["state"] != "removed" || value["generation"] != "2")
     {
@@ -351,7 +363,90 @@ fn validate_bundle_page(invocation: &Invocation, value: &Value) -> Result<(), Cl
     Ok(())
 }
 
-pub(crate) fn retirement_error(error: arkdeck_client::ClientError) -> CliError {
+fn validate_tool_page(invocation: &Invocation, value: &Value) -> Result<(), CliError> {
+    arkdeck_contract::validate_method_value(invocation.method, "result", value)
+        .map_err(|_| unreadable())?;
+    let keys = [
+        "schemaVersion",
+        "pageKind",
+        "items",
+        "order",
+        "snapshotRevision",
+        "hasMore",
+        "nextCursor",
+    ];
+    let fields = value.as_object().ok_or_else(unreadable)?;
+    if fields.len() != keys.len()
+        || keys.iter().any(|key| !fields.contains_key(*key))
+        || value["schemaVersion"] != "arkdeck.cli.page/1"
+        || value["pageKind"] != "snapshot"
+        || value["order"] != "toolRef:asc"
+    {
+        return Err(unreadable());
+    }
+    let revision = value["snapshotRevision"]
+        .as_str()
+        .filter(|v| uuid(v))
+        .ok_or_else(unreadable)?;
+    let rows = value["items"].as_array().ok_or_else(unreadable)?;
+    let params = invocation.params.as_ref().ok_or_else(unreadable)?;
+    let size = params
+        .get("pageSize")
+        .and_then(Value::as_u64)
+        .filter(|n| (1..=1000).contains(n))
+        .ok_or_else(unreadable)?;
+    if rows.len() as u64 > size {
+        return Err(unreadable());
+    }
+    if let Some(cursor) = params.get("cursor") {
+        let (prefix, token) = cursor
+            .as_str()
+            .and_then(|v| v.split_once('.'))
+            .ok_or_else(unreadable)?;
+        if prefix != revision || !uuid(token) {
+            return Err(unreadable());
+        }
+    }
+    match value["hasMore"].as_bool() {
+        Some(true) => {
+            let cursor = value["nextCursor"].as_str().ok_or_else(unreadable)?;
+            let (prefix, token) = cursor.split_once('.').ok_or_else(unreadable)?;
+            if rows.is_empty()
+                || prefix != revision
+                || !uuid(token)
+                || params.get("cursor").and_then(Value::as_str) == Some(cursor)
+            {
+                return Err(unreadable());
+            }
+        }
+        Some(false) if value["nextCursor"].is_null() => (),
+        _ => return Err(unreadable()),
+    }
+    let mut prior: Option<&str> = None;
+    for row in rows {
+        let reference = row["toolRef"].as_str().ok_or_else(unreadable)?;
+        let (prefix, content_schema) = if reference.starts_with("toolchain:sha256:") {
+            ("toolchain:sha256:", "arkdeck.deveco-toolchain-content/2")
+        } else {
+            ("tool:sha256:", "arkdeck.tool-content/1")
+        };
+        validate_record(
+            row,
+            reference,
+            "toolRef",
+            "arkdeck.runtime-tool/1",
+            prefix,
+            content_schema,
+        )?;
+        if prior.is_some_and(|previous| previous >= reference) {
+            return Err(unreadable());
+        }
+        prior = Some(reference);
+    }
+    Ok(())
+}
+
+pub(crate) fn retirement_error(error: arkdeck_client::ClientError, method: &str) -> CliError {
     let mut result = match error {
         arkdeck_client::ClientError::Remote(error) => {
             let bounded = error.details.as_ref().is_some_and(|details| {
@@ -364,6 +459,11 @@ pub(crate) fn retirement_error(error: arkdeck_client::ClientError) -> CliError {
                 "resourceConflict" if bounded => "resourceConflict",
                 "admissionDenied" if bounded => "admissionDenied",
                 "recordUnreadable" if bounded => "recordUnreadable",
+                "ioFailure" if bounded && method == "runtime.tool.remove" => "ioFailure",
+                "fileIdentityChanged" if bounded && method == "runtime.tool.remove" => {
+                    "fileIdentityChanged"
+                }
+                "inputTooLarge" if bounded && method == "runtime.tool.remove" => "inputTooLarge",
                 "quotaExceeded" if bounded => "quotaExceeded",
                 "operationUnavailable" if bounded => "operationUnavailable",
                 "outcomeUnknown" if bounded => "outcomeUnknown",
@@ -387,6 +487,9 @@ pub(crate) fn retirement_error(error: arkdeck_client::ClientError) -> CliError {
                 | "resourceConflict"
                 | "admissionDenied"
                 | "recordUnreadable"
+                | "ioFailure"
+                | "fileIdentityChanged"
+                | "inputTooLarge"
                 | "quotaExceeded"
                 | "operationUnavailable"
                 | "outcomeUnknown" => "outcomeUnknown",
@@ -414,12 +517,11 @@ pub(crate) fn retirement_error(error: arkdeck_client::ClientError) -> CliError {
         }
         other => CliError::new(
             "outcomeUnknown",
-            format!("bundle retirement has no verified receipt: {other}"),
+            format!("{method} has no verified receipt: {other}"),
         ),
     };
-    result.details.insert(
-        "method".into(),
-        Value::String("runtime.bundle.remove".into()),
-    );
+    result
+        .details
+        .insert("method".into(), Value::String(method.into()));
     result
 }

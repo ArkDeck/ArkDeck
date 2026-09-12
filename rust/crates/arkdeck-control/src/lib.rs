@@ -121,6 +121,34 @@ pub trait HostServices: Send + Sync {
             ])),
         })
     }
+    fn bootstrap_tool_remove(
+        &self,
+        _reference: &str,
+        _generation: &str,
+    ) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "operationUnavailable".into(),
+            message: "Tool retirement owner is not configured".into(),
+            details: Some(serde_json::Map::from_iter([
+                ("phase".into(), json!("bootstrapRegistryOwner")),
+                ("newDispatchCount".into(), json!(0)),
+            ])),
+        })
+    }
+    fn bootstrap_tool_list(
+        &self,
+        _page_size: usize,
+        _cursor: Option<&str>,
+    ) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "operationUnavailable".into(),
+            message: "Bootstrap bundle list owner is not configured".into(),
+            details: Some(serde_json::Map::from_iter([
+                ("phase".into(), json!("bootstrapRegistryOwner")),
+                ("newDispatchCount".into(), json!(0)),
+            ])),
+        })
+    }
     fn observed_at(&self) -> String;
     fn hdc_status(&self, deep: bool) -> HdcStatus;
     fn observations(&self) -> Result<DeviceObservationsResult, WireError>;
@@ -359,16 +387,53 @@ impl<H: HostServices> Control<H> {
                         }),
                     }
                 } else {
-                    return registration_response_bytes(Response {
-                        id: request.id.clone(),
-                        outcome: if kind == Some("hdc") {
-                            self.host
-                                .bootstrap_register_hdc(root.expect("validated file"))
-                        } else {
-                            self.host
-                                .bootstrap_register_deveco(root.expect("validated root"))
+                    return bootstrap_mutation_response_bytes(
+                        "runtime.tool.register",
+                        Response {
+                            id: request.id.clone(),
+                            outcome: if kind == Some("hdc") {
+                                self.host
+                                    .bootstrap_register_hdc(root.expect("validated file"))
+                            } else {
+                                self.host
+                                    .bootstrap_register_deveco(root.expect("validated root"))
+                            },
                         },
-                    });
+                    );
+                }
+            }
+            "runtime.tool.list" => {
+                let size = match params.get("pageSize") {
+                    None => Some(100),
+                    Some(value) => value.as_i64(),
+                };
+                let cursor = params.get("cursor");
+                let valid = params
+                    .keys()
+                    .all(|key| matches!(key.as_str(), "pageSize" | "cursor"))
+                    && size.is_some()
+                    && cursor.is_none_or(Value::is_string);
+                if !valid {
+                    Response {
+                        id: request.id.clone(),
+                        outcome: Err(WireError {
+                            code: "invalidParams".into(),
+                            message: "tool list accepts only integer pageSize and string cursor"
+                                .into(),
+                            details: Some(serde_json::Map::from_iter([
+                                ("phase".into(), json!("bootstrapRegistryOwner")),
+                                ("newDispatchCount".into(), json!(0)),
+                            ])),
+                        }),
+                    }
+                } else {
+                    Response {
+                        id: request.id.clone(),
+                        outcome: self.host.bootstrap_tool_list(
+                            usize::try_from(size.expect("checked integer")).unwrap_or(0),
+                            cursor.and_then(Value::as_str),
+                        ),
+                    }
                 }
             }
             "runtime.bundle.list" => {
@@ -417,6 +482,30 @@ impl<H: HostServices> Control<H> {
                         code: "invalidParams".into(),
                         message:
                             "bundle retirement requires typed bundle and expectedGeneration strings"
+                                .into(),
+                        details: Some(serde_json::Map::from_iter([
+                            ("phase".into(), json!("bootstrapRegistryOwner")),
+                            ("newDispatchCount".into(), json!(0)),
+                        ])),
+                    })
+                };
+                Response {
+                    id: request.id.clone(),
+                    outcome,
+                }
+            }
+            "runtime.tool.remove" => {
+                let reference = params.get("tool").and_then(Value::as_str);
+                let generation = params.get("expectedGeneration").and_then(Value::as_str);
+                let outcome = if let (2, Some(reference), Some(generation)) =
+                    (params.len(), reference, generation)
+                {
+                    self.host.bootstrap_tool_remove(reference, generation)
+                } else {
+                    Err(WireError {
+                        code: "invalidParams".into(),
+                        message:
+                            "tool retirement requires typed tool and expectedGeneration strings"
                                 .into(),
                         details: Some(serde_json::Map::from_iter([
                             ("phase".into(), json!("bootstrapRegistryOwner")),
@@ -499,6 +588,9 @@ impl<H: HostServices> Control<H> {
                 "this method is unavailable in the read-only Rust foundation",
             ),
         };
+        if request.method == "runtime.tool.remove" {
+            return bootstrap_mutation_response_bytes(&request.method, response);
+        }
         let conforms = match &response.outcome {
             Ok(result) => validate_method_value(&request.method, "result", result).is_ok(),
             Err(error) => {
@@ -705,10 +797,9 @@ fn frame_id(bytes: &[u8]) -> String {
         .unwrap_or_else(|| "-".into())
 }
 
-// The registration owner may already have published host metadata. Losing its
+// The Bootstrap owner may already have published host metadata. Losing its
 // classified receipt must preserve uncertainty, including schema/encoding failure.
-fn registration_response_bytes(response: Response) -> Vec<u8> {
-    let method = "runtime.tool.register";
+fn bootstrap_mutation_response_bytes(method: &str, response: Response) -> Vec<u8> {
     let conforms = match &response.outcome {
         Ok(value) => validate_method_value(method, "result", value).is_ok(),
         Err(error) => {
@@ -725,7 +816,7 @@ fn registration_response_bytes(response: Response) -> Vec<u8> {
         id: response.id,
         outcome: Err(WireError {
             code: "outcomeUnknown".into(),
-            message: "Tool registration did not return a bounded classified receipt".into(),
+            message: "Bootstrap mutation did not return a bounded classified receipt".into(),
             details: Some(serde_json::Map::from_iter([
                 ("phase".into(), json!("bootstrapRegistryOwner")),
                 ("newDispatchCount".into(), json!(0)),
