@@ -1,6 +1,7 @@
 # Job event metadata reader — macOS, 2026-09-12
 
-TASK-XPA-014 remains in progress. The branch uses protected main `0dad7599` after the ArkForge pin update #1868.
+TASK-XPA-014 remains in progress. The branch uses protected main `84d7107f`, including the ArkForge pin update #1868
+and the stable Rust toolchain change #1867.
 Job/Artifact reads merged in #1863 at `f92acd36` after its `522085ed` head passed
 all required CI. This event slice still requires maintainer review.
 
@@ -75,3 +76,9 @@ After the additional #1868 rebase, the checkout contract manifest is unchanged.
 The final latest-main gate also passed all selected lanes, with 2,632 Swift tests
 plus identity and serial viewer checks, both Rust contract views, real process
 checks, deny and vet. Log: `/private/tmp/xpa014-events-main-unified-gate-r3.log`.
+
+The subsequent #1867 rebase changes no compiled Package/Rust crate source, Cargo
+lock, dependency policy or contract byte relative to the fully tested `86013547`
+head (`git diff --exit-code` checked those complete paths). The selected stable
+compiler is still `rustc 1.98.1 (48a229cea 2026-09-01)`. The checkout generator and
+final Task014 preflight passed after rebase; required CI runs on the new head.
