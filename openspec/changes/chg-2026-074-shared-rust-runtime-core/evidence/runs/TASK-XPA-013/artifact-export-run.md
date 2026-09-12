@@ -23,10 +23,12 @@ unchanged. Import-owned exports await the complete Import owner.
 
 ## Validation completed
 
-Warnings-denied workspace Clippy, platform export tests (including actual child
-SIGKILL publication windows), Artifact read/export owner tests and actual CLI
-transport tests passed on Rust 1.98.1. Log:
-`/private/tmp/xpa013-export-main-targeted.log`.
+Warnings-denied workspace Clippy, 24 Artifact read/export owner tests and eight
+CLI Artifact tests passed on Rust 1.98.1. Log:
+`/private/tmp/xpa013-export-main-targeted.log`. The corrected platform filter
+`host_store::file_export::tests` passed all eight tests, including actual child
+SIGKILL publication windows; its subprocess helper is intentionally ignored when
+run directly. Log: `/private/tmp/xpa013-export-main-platform-r2.log`.
 
 The current Swift producer passed two targeted contract tests. It records a real
 source-created Job/Artifact export, missing owner/Artifact refusals and the existing
