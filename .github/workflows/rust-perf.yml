@@ -67,8 +67,11 @@ concurrency:
 jobs:
   harness-tests:
     # Percentile maths, the stability verdict, the resident-set split, the
-    # threshold comparison and the redaction gate: no build, no daemon.
-    runs-on: macos-26
+    # threshold comparison and the redaction gate: no build, no daemon. Pure
+    # Python with the one Darwin clock assertion skipping itself elsewhere,
+    # so it runs on Linux and leaves the five concurrent macOS slots a Free
+    # plan has to the lanes that need Xcode.
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - name: Checkout default branch with runner Git
@@ -84,11 +87,22 @@ jobs:
         run: python3 -m unittest discover -s bench -t .
 
   microbenchmarks:
-    # The pre-merge lane, run on every push to an agent branch and on main.
-    # Ratio mode against the calibration workload measured in the same run,
-    # +20% per design section I.2: a runner that is uniformly slower moves both
-    # numbers and reads as no change.
-    if: github.event_name == 'push'
+    # The merge lane, run on every push to main. Ratio mode against the
+    # calibration workload measured in the same run, +20% per design section
+    # I.2: a runner that is uniformly slower moves both numbers and reads as
+    # no change.
+    #
+    # Until 2026-09-12 this lane also ran on every agent-branch push that
+    # touched the measured sources. Over the 30 merges of #1844..#1873 that
+    # was 34 macOS jobs and 185 of the 856 runner-minutes those merges cost,
+    # the single largest item, for an advisory verdict that never gates; and
+    # every such push then held 4 or 5 of the 5 concurrent macOS jobs a Free
+    # plan has, so overlapping pushes queued each other's merge-gate lanes
+    # for 3 to 9 minutes (#1855). Measuring the merged tree gives the same
+    # regression signal one step later without that contention. A branch
+    # can still be measured by hand with `python3 -m bench capture` per
+    # scripts/bench/README.md.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: harness-tests
     runs-on: macos-26
     # Measured locally (warm build, release): three runs at the reduced PR
@@ -109,6 +123,22 @@ jobs:
         env:
           ARKFORGE_DEPLOY_KEY: ${{ secrets.ARKFORGE_DEPLOY_KEY }}
         run: sh scripts/ci/arkforge-package-auth.sh setup
+      - name: Record the runner image build
+        # The SwiftPM build directory is only fully reusable on the runner
+        # image build that produced it: llbuild re-runs every C compile whose
+        # SDK inputs changed identity, and those differ between image builds
+        # (swift-ci.yml's swift-tests job records the measurement). The key
+        # therefore names the image build, with a same-toolchain fallback so
+        # a new image build starts from the Swift state instead of cold. The
+        # version is read in a step because the runner exports it to the
+        # process environment, not to the workflow env context.
+        id: runner-image
+        run: |
+          set -eu
+          if [ -z "${ImageVersion:-}" ]; then
+            echo "::warning::ImageVersion is unset; the release SwiftPM cache falls back to same-toolchain entries"
+          fi
+          printf 'version=%s\n' "${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
       - name: Restore the release SwiftPM cache
         # Same shape as swift-ci.yml's trusted stable cache, under its own key:
         # this lane builds release objects, the test lane builds debug ones,
@@ -119,9 +149,10 @@ jobs:
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
         with:
           path: ${{ runner.temp }}/arkdeck-swiftpm
-          key: arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
+          key: arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
           restore-keys: |
-            arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-
+            arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-
+            arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-image-${{ steps.runner-image.outputs.version }}-
             arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-
       - name: Build the measured executables
         # Every run-swiftpm.sh call, the --show-bin-path lookup included, must
@@ -147,7 +178,7 @@ jobs:
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
         with:
           path: ${{ runner.temp }}/arkdeck-swiftpm
-          key: arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
+          key: arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
       - name: Capture a candidate baseline
         # Every run-swiftpm.sh call, the --show-bin-path lookup included, must
         # see the cache root the restore populated. Step level, because the
@@ -222,6 +253,22 @@ jobs:
         env:
           ARKFORGE_DEPLOY_KEY: ${{ secrets.ARKFORGE_DEPLOY_KEY }}
         run: sh scripts/ci/arkforge-package-auth.sh setup
+      - name: Record the runner image build
+        # The SwiftPM build directory is only fully reusable on the runner
+        # image build that produced it: llbuild re-runs every C compile whose
+        # SDK inputs changed identity, and those differ between image builds
+        # (swift-ci.yml's swift-tests job records the measurement). The key
+        # therefore names the image build, with a same-toolchain fallback so
+        # a new image build starts from the Swift state instead of cold. The
+        # version is read in a step because the runner exports it to the
+        # process environment, not to the workflow env context.
+        id: runner-image
+        run: |
+          set -eu
+          if [ -z "${ImageVersion:-}" ]; then
+            echo "::warning::ImageVersion is unset; the release SwiftPM cache falls back to same-toolchain entries"
+          fi
+          printf 'version=%s\n' "${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
       - name: Restore the release SwiftPM cache
         # Same shape as swift-ci.yml's trusted stable cache, under its own key:
         # this lane builds release objects, the test lane builds debug ones,
@@ -232,9 +279,10 @@ jobs:
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
         with:
           path: ${{ runner.temp }}/arkdeck-swiftpm
-          key: arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
+          key: arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
           restore-keys: |
-            arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-
+            arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-
+            arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-image-${{ steps.runner-image.outputs.version }}-
             arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-
       - name: Build the measured executables
         # Every run-swiftpm.sh call, the --show-bin-path lookup included, must
@@ -260,7 +308,7 @@ jobs:
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
         with:
           path: ${{ runner.temp }}/arkdeck-swiftpm
-          key: arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
+          key: arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
       - name: Capture a candidate baseline
         # Every run-swiftpm.sh call, the --show-bin-path lookup included, must
         # see the cache root the restore populated. Step level, because the
@@ -327,6 +375,22 @@ jobs:
         env:
           ARKFORGE_DEPLOY_KEY: ${{ secrets.ARKFORGE_DEPLOY_KEY }}
         run: sh scripts/ci/arkforge-package-auth.sh setup
+      - name: Record the runner image build
+        # The SwiftPM build directory is only fully reusable on the runner
+        # image build that produced it: llbuild re-runs every C compile whose
+        # SDK inputs changed identity, and those differ between image builds
+        # (swift-ci.yml's swift-tests job records the measurement). The key
+        # therefore names the image build, with a same-toolchain fallback so
+        # a new image build starts from the Swift state instead of cold. The
+        # version is read in a step because the runner exports it to the
+        # process environment, not to the workflow env context.
+        id: runner-image
+        run: |
+          set -eu
+          if [ -z "${ImageVersion:-}" ]; then
+            echo "::warning::ImageVersion is unset; the release SwiftPM cache falls back to same-toolchain entries"
+          fi
+          printf 'version=%s\n' "${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
       - name: Restore the release SwiftPM cache
         # Restore only: this job builds one product and must not publish a
         # partial cache the other lanes would then prefer as the newest.
@@ -335,9 +399,10 @@ jobs:
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
         with:
           path: ${{ runner.temp }}/arkdeck-swiftpm
-          key: arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
+          key: arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
           restore-keys: |
-            arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-
+            arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-
+            arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-image-${{ steps.runner-image.outputs.version }}-
             arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-
       - name: Build the soak fixture
         # Every run-swiftpm.sh call, the --show-bin-path lookup included, must
