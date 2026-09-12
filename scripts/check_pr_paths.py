@@ -9,6 +9,15 @@ requires an explicit Task in the final commit subject; the Agent PR workflow
 may use ``--infer-task`` only as a fail-closed fallback when exactly one
 base-tree active Task covers the complete diff.
 
+Every mode compares the head against its merge-base with the base it was
+given (``origin/main`` in the preflight, the pull request's base in event
+and API mode), never against that base directly: ``resolve_merge_base``.
+A branch left behind by an advanced main is therefore judged on what it
+changed since it branched, not on what main merged since, and needs no
+rebase to be read; a base substituted off the head's history resolves to
+their last common trunk commit, where nothing the head added is hidden.
+The base tree that supplies Task definitions is that same merge-base.
+
 A vertical change that introduces a new OpenSpec Task is not allowed to use
 that head-only Task as authority.  Instead, its commit must declare one
 base-tree active Task that covers every production/test path.  The guard may
@@ -46,7 +55,7 @@ import re
 import subprocess
 import sys
 import unicodedata
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Iterable, Sequence
 
@@ -309,33 +318,46 @@ def load_pull_request_context(event_path: Path) -> PullRequestContext:
     return context
 
 
-def assert_base_is_ancestor(repo_root: Path, context: PullRequestContext) -> None:
-    """Refuse a base that is not an ancestor of the head being reviewed.
+def resolve_merge_base(repo_root: Path, base_oid: str, head_oid: str) -> str:
+    """The commit the guard compares the head against: its merge-base with base.
 
-    `git diff base..head` reports what head has that base lacks. Point base
-    at a side branch that already carries the offending file and the file
-    drops out of the diff entirely — measured live, the offending PR then
-    passed. A base off the head's own history is either that substitution or
-    a branch left behind by an advanced main; both are answered by rebasing.
+    `git diff base..head` reports what head has that base lacks, so whatever
+    stands in for base decides the diff. Two shapes of base used to break it.
+    A base off the head's own history hid files: point it at a side branch
+    that already carries the offending file and the file drops out of the
+    diff entirely — measured live, the offending PR then passed. And a base
+    that was only an advanced main charged the pull request with every path
+    main had merged since the branch point, reversed, so a branch had to be
+    rebased before the guard would read it at all. The guard used to refuse
+    both by requiring base to be an ancestor of head.
+
+    Comparing at the merge-base answers both without the rebase. It is the
+    commit the head actually grew from, a property of the head's own history
+    that later merges to main do not move; and a side branch that never
+    joined the head resolves to their last common trunk commit, where the
+    offending file is new again. When base already is an ancestor of head
+    the merge-base is base itself and nothing changes. Commits that share no
+    history fail closed: there is no diff to judge.
     """
     completed = subprocess.run(
-        [
-            "git",
-            "-C",
-            str(repo_root),
-            "merge-base",
-            "--is-ancestor",
-            context.base_oid,
-            context.head_oid,
-        ],
+        ["git", "-C", str(repo_root), "merge-base", "--", base_oid, head_oid],
         check=False,
         capture_output=True,
     )
     if completed.returncode != 0:
+        stderr = completed.stderr.decode("utf-8", errors="replace").strip()
+        detail = f": {stderr}" if stderr else ""
         raise CheckError(
-            f"pull_request base {context.base_oid} is not an ancestor of head "
-            f"{context.head_oid}; rebase the branch on the base commit"
+            f"pull_request base {base_oid} and head {head_oid} share no history, "
+            f"so the guard cannot tell what the pull request changes{detail}"
         )
+    merge_base = completed.stdout.decode("utf-8", errors="replace").strip()
+    if not FULL_OID_RE.fullmatch(merge_base):
+        raise CheckError(
+            f"git merge-base {base_oid} {head_oid} returned an unexpected "
+            f"result: {merge_base!r}"
+        )
+    return merge_base.lower()
 
 
 def _positive_integer(value: object, field: str) -> int:
@@ -1562,6 +1584,11 @@ def preflight_paths(
     config_path: Path = CONFIG_PATH,
 ) -> PreflightResult:
     title, body = git_commit_declaration_text(repo_root, head_oid)
+    # The one-time bootstrap tuple names the exact old main it was cut for and
+    # expires when main moves away from it, so it is matched on the base as
+    # given. Everything else compares at the merge-base.
+    given_base_oid = base_oid
+    base_oid = resolve_merge_base(repo_root, base_oid, head_oid)
     declaration_context = PullRequestContext(
         title=title,
         body=body,
@@ -1572,7 +1599,6 @@ def preflight_paths(
         base_oid=base_oid,
         head_oid=head_oid,
     )
-    assert_base_is_ancestor(repo_root, declaration_context)
     changed_paths = git_changed_paths(repo_root, base_oid, head_oid)
     if not changed_paths:
         raise CheckError(
@@ -1607,7 +1633,7 @@ def preflight_paths(
             title=title,
             body=body,
             head_ref=head_ref,
-            base_oid=base_oid,
+            base_oid=given_base_oid,
             head_oid=head_oid,
         )
         bootstrap = one_time_bootstrap_result(
@@ -1816,7 +1842,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             if args.identity_only:
                 raise CheckError("--identity-only is valid only with --pull-request")
             context = load_pull_request_context(args.event)
-            assert_base_is_ancestor(repo_root, context)
         else:
             expectations = _required_pull_request_expectations(args)
             pull_request = _load_json(args.pull_request, "pull_request API response")
@@ -1831,10 +1856,21 @@ def main(argv: Sequence[str] | None = None) -> int:
                 print(_positive_integer(pull_request.get("number"), "number"))
                 return 0
 
+        # Identity above pins which commits the guard may compare; the
+        # comparison itself is at their merge-base. The bootstrap fuse alone
+        # keeps the base as given, because it names the exact old main it was
+        # cut for and must stay blown once main has moved away from it.
+        given_context = context
+        context = replace(
+            context,
+            base_oid=resolve_merge_base(
+                repo_root, context.base_oid, context.head_oid
+            ),
+        )
         changed_paths = git_changed_paths(repo_root, context.base_oid, context.head_oid)
         bootstrap_matched = False
         if args.allow_bootstrap:
-            bootstrap_result = one_time_bootstrap_result(context, changed_paths)
+            bootstrap_result = one_time_bootstrap_result(given_context, changed_paths)
             if bootstrap_result is not None:
                 result = bootstrap_result
                 bootstrap_matched = True
