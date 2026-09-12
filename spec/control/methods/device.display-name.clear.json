@@ -5,8 +5,11 @@
         "conflict",
         "internalError",
         "invalidParams",
+        "ioFailure",
         "malformedFrame",
         "notFound",
+        "outcomeUnknown",
+        "quotaExceeded",
         "recordUnreadable",
         "rejected",
         "resourceConflict",
@@ -35,10 +38,7 @@
         }
       },
       "required": [
-        "candidate",
         "newDispatchCount",
-        "observationGeneration",
-        "observationId",
         "phase"
       ],
       "type": "object"
@@ -99,8 +99,8 @@
   "x-arkdeck-method": "device.display-name.clear",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 4,
-    "request": 6,
+    "error": 7,
+    "request": 9,
     "result": 2
   }
 }

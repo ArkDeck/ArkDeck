@@ -40,30 +40,61 @@ execution route. No installed state is selected.
 - `Fixtures/TargetNames/rust-display-names.json` was copied from the actual Rust
   owner test output; the Swift reader regression consumes these bytes directly.
 
-## Coordinated integration checks pending
+## Native and process integration checks
 
-No Swift/App rebuild was started in this isolated worktree; the root agent owns
-those serialized builds and the repository unified gate. Current producer capture
-must include these AgentDaemonContractTests filters:
+The implementation is based independently on protected main `a3b384d3`, including
+Bundle registration and the checkout manifest v2 generator. It does not include
+the unmerged Job/Artifact read PR. The shared CLI duration parser is exposed
+within the crate for the existing Target timeout options.
 
-- testTargetDisplayNameIsADurableCASResourceSeparateFromIdentity
-- testTargetDisplayNameRejectsUnknownTargetsInvalidNamesAndNonCanonicalGenerations
-- testCandidateDisplayNameProducerCapturesExactTupleAndRefusals
-- testTargetDisplayNameProducerRecordsCorruptDocumentRefusal
-- testDisplayNameProducerRecordsRealSaveSyscallFailures
-- testDisplayNameProducerRecordsCountAndByteQuotaRefusals
-- testCurrentSwiftDisplayNameOwnerReadsActualRustTombstone
+The seven Target/name Swift tests and the alias reconciliation producer passed
+in the serialized native validation view. The actual Rust-produced tombstone was
+read and advanced by Swift without rewriting its original bytes. Rust read both
+Swift-created Target exports, including the complete alias proof chain, without
+changing `targets.json`. Logs: `/private/tmp/xpa-native-union-swift-r1.log`,
+`/private/tmp/xpa012-target-swift-store-r1.log` and
+`/private/tmp/xpa012-target-swift-alias-r1.log`.
 
-`ARKDECK_CONTROL_FRAME_LOG` records actual handler frames. Set
-`ARKDECK_SWIFT_TARGET_COPY` for the first filter to export the actual synthetic
-Swift Target/name documents. Set `ARKDECK_SWIFT_TARGET_ALIAS_COPY` when running
-RockchipTargetAliasReconciliationContractTests/
-testCompleteLaterFlashAppendsRelationWithoutRewritingUnknownJobOrTargets to export
-actual alias-chain fixture bytes. The ignored Rust
-`actual_swift_target_document_is_read_by_rust_without_rewriting_binding` test
-requires `ARKDECK_SWIFT_TARGET_STORE` set to either actual export and `--ignored`.
-The published contract pin is unchanged. Regenerate the candidate's four name
-method schemas from the recorded existing Swift error paths before running
-`check-target-resources.py` for both CLIs and the unified gate. The current
-checked-in method schemas do not yet represent every existing Swift name-owner
-failure and must not be treated as completed wire acceptance.
+The process checker passed with both the actual Rust CLI and current Swift CLI
+against the actual Rust daemon. Both runs verify exact generation receipts,
+stale set/clear refusal, forged fields, unknown target/candidate refusal, restart
+persistence, clear tombstones and unchanged binding bytes. Logs:
+`/private/tmp/xpa012-target-rust-cli-r2.log` and
+`/private/tmp/xpa012-target-swift-cli-r2.log`.
+
+The first process run exposed an unrecorded existing Swift stale-set refusal:
+`target.display-name.set` lacked `resourceConflict` in its method schema. The
+native CAS test now records that actual response as well as stale clear; its
+rerun passed (`/private/tmp/xpa012-target-stale-set-swift-r1.log`). The four name
+method schemas are regenerated from existing corpus plus unchanged native
+producer frames, including actual quota and save-syscall failures. No synthetic
+Rust response substitutes for a native producer response.
+
+Raw recordings and source hashes are retained under
+`target-producer-frames-macos-20260912/`. One valid raw JSON frame contains a
+Unicode line separator in an invalid name; the schema generator uses Unicode
+`splitlines`, so that frame is retained in raw evidence but excluded from the
+selected derivation input. Other native cases cover the same `invalidInput` code.
+The checkout manifest now describes 105 methods and 576 shapes. The published
+contract view remains the verified protected-main merge base under merged #1866.
+
+## Final gate
+
+The initial full Swift lane hit an unchanged 400 ms admission/wait timing test:
+under concurrent load its mutation response had not arrived before the deadline,
+so the CLI correctly reported `outcomeUnknown` rather than the test's expected
+post-admission `clientTimeout`. The same build and unchanged test passed alone
+in 0.842 seconds. The final gate is repeated with four Swift workers, preserving
+the complete suite and the test's own concurrent Job-run assertion. Logs:
+`/private/tmp/xpa012-target-main-unified-gate-r1.log` and
+`/private/tmp/xpa012-target-timeout-isolated-r1.log`.
+
+The complete four-worker unified gate passed on the independent `a3b384d3`
+view: common checks, 83 design-system tests, 2,632 Swift tests plus the serial
+identity and five viewer-scale tests, App build-for-testing, Rust workspace and
+both contract views, deny and vet. Log:
+`/private/tmp/xpa012-target-main-unified-gate-r2.log`. Main then incorporated
+#1863 at `f92acd36`; final integration and verification on that base are pending.
+Installed
+activation, target adoption and independent USB identity proof, warm presentation
+and confirmed Job observation sources remain in the migration's later slices.

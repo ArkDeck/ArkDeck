@@ -6,10 +6,14 @@
         "internalError",
         "invalidInput",
         "invalidParams",
+        "ioFailure",
         "malformedFrame",
         "notFound",
+        "outcomeUnknown",
+        "quotaExceeded",
         "recordUnreadable",
         "rejected",
+        "resourceConflict",
         "unknownMethod",
         "unsupportedProtocolVersion",
         "workspaceReferenceNotFound"
@@ -18,8 +22,17 @@
     "errorDetails": {
       "additionalProperties": false,
       "properties": {
+        "candidate": {
+          "type": "string"
+        },
         "newDispatchCount": {
           "type": "integer"
+        },
+        "observationGeneration": {
+          "type": "string"
+        },
+        "observationId": {
+          "type": "string"
         },
         "phase": {
           "type": "string"
@@ -90,8 +103,8 @@
   "x-arkdeck-method": "device.display-name.set",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 4,
-    "request": 8,
-    "result": 4
+    "error": 8,
+    "request": 10,
+    "result": 2
   }
 }

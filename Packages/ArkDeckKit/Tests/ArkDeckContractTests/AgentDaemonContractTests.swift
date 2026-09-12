@@ -369,6 +369,16 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertEqual(setFields["name"], .string("Lab device"))
     XCTAssertEqual(setFields["generation"], .string("2"))
 
+    let staleSet = try await targetRequest(
+      handler, method: "target.display-name.set",
+      params: [
+        "targetId": .string(adopted.targetID),
+        "expectedGeneration": .string("1"),
+        "name": .string("Stale write"),
+      ])
+    XCTAssertEqual(staleSet.error?.code, "resourceConflict")
+    XCTAssertEqual(staleSet.error?.details?["newDispatchCount"], .integer(0))
+
     let stale = try await targetRequest(
       handler, method: "target.display-name.clear",
       params: [
