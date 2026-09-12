@@ -1,0 +1,18 @@
+{
+  "base": "551ce5d4",
+  "files": [
+    {
+      "source": "/private/tmp/arkdeck-xpa014-job-events-20260912/Packages/ArkDeckKit/Tests/ArkDeckContractTests/JobReadResourcesContractTests.swift",
+      "destination": "Packages/ArkDeckKit/Tests/ArkDeckContractTests/JobReadResourcesContractTests.swift",
+      "sha256": "bcceb692c65e0852b27b73d4d3cf805b25c6a62721eeb8a76629eeb6171ca80e"
+    },
+    {
+      "source": "/private/tmp/arkdeck-xpa014-job-events-20260912/Packages/ArkDeckKit/Tests/ArkDeckContractTests/JournalRecoveryContractTests.swift",
+      "destination": "Packages/ArkDeckKit/Tests/ArkDeckContractTests/JournalRecoveryContractTests.swift",
+      "sha256": "8192e6f440f584e2c9f871ccda7753533237ad4d24da4a673ea91e5489ec6332"
+    }
+  ],
+  "rawFramesSha256": "f5cd08214e580512b39547c7a1277b4801798ca3ee2915de42e7a9df8ad03065",
+  "selectedFramesSha256": "0015567e9f0a232b3886962c13124bbe1749014a738b316d1f61528bc35c17a5",
+  "selectedMethod": "job.events"
+}
