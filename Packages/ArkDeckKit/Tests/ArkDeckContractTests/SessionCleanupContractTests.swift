@@ -280,8 +280,10 @@ final class SessionCleanupContractTests: XCTestCase {
   func testCurrentSwiftOwnerReadsActualRustCleanupAppliedRecord() throws {
     // Direct bytes from the Rust cleanup owner after deleting only simulated
     // Session fixtures. This is format interoperability, not hardware evidence.
-    let fixture = URL(filePath: #filePath).deletingLastPathComponent()
-      .appending(path: "Fixtures/SessionStorage/rust-cleanup-applied.json")
+    let fixture = ProcessInfo.processInfo.environment["ARKDECK_CLEANUP_APPLIED_RECORD_FIXTURE"]
+      .map { URL(filePath: $0) }
+      ?? URL(filePath: #filePath).deletingLastPathComponent()
+        .appending(path: "Fixtures/SessionStorage/rust-cleanup-applied.json")
     let bytes = try Data(contentsOf: fixture)
     let fields = try ControlFrameJSON.decodeObject(bytes.dropLast(), maximumBytes: 16 * 1_024 * 1_024)
     guard case .string(let id)? = fields["previewID"] else { return XCTFail("missing preview identity") }

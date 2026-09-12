@@ -32,76 +32,67 @@ for apply remain unknown and do not enable automatic replay.
 
 ## Current validation
 
-The isolated branch is `agent/xpa012-session-apply-main-20260912`, based on the
-published Job/Artifact owner merge and rebased onto `0dad7599` to preserve the
-new ArkForge pin. The frozen apply implementation was reused
-from `d602ca6329a3caa1a8523fa75813683ee88057bc` and composed with that actual owner.
+The Session-only candidate is based on approved main
+`1fd85b931fdef1416d41baebfe8bad0cf8d32b5e`, on branch
+`agent/xpa012-session-apply-main-20260912`. Additive conflict resolution preserves
+current Target resources, Job events and journal support. The original Session
+implementation was preserved at `28ccbc13633b043bb6b1b56b222a9d673fba27f1` and
+in `/private/tmp/xpa012-maintenance-before-combine-20260912.bundle` before rebase.
+This candidate contains no Trace maintenance implementation.
 
-- Session host-store library: 53 passed, including 7 cleanup apply tests for
-  active/pin retention, manifest Job association, tuple/expiry/policy drift,
-  proven zero-unlink stale release, interrupted intent, missing result,
-  anchored unsafe-content/root replacement, restart receipt and empty plan.
-- Job owner integration: 6 passed, including the complete activity census,
-  malformed row refusal, indexed durable-history retention and orphan/unsafe
-  Job directory refusal before the action is entered.
-- Daemon Host: 2 passed with actual JobStore instances, including missing owner
-  refusal, replaced database refusal and preview/apply reachability.
-- CLI: 8 Session unit tests and all 11 current-surface integration tests passed,
-  including exact tuple correlation and non-retryable lost/malformed replies.
-- Descriptor-relative removal: 4 tests passed using the already compiled
-  platform test binary with the correct `session_removal` filter. These cover
-  actual first-unlink failure, neighbor preservation, unsafe links/permissions,
-  byte or membership drift and replaced ancestors. Log:
-  `/private/tmp/xpa012-session-apply-platform-r1.log`.
-- The Rust daemon and CLI debug build passed. Targeted output is retained at
-  `/private/tmp/xpa012-session-apply-targeted-r1.log` (the initial dependency
-  compilation lines precede that captured log).
-- Actual process harness passed: 27 control exchanges plus Rust CLI commands,
-  with nondefault manifest association, default identity, running Job,
-  terminal unknown outcome, retained durable history, Job drift conflict,
-  orphan and unsupported row refusals before deletion, pinned retention,
-  exact removed Artifact identity/accounting and restart receipt equality.
-  Log: `/private/tmp/xpa012-session-apply-process-r1.log`; exact recorded replies:
-  `/private/tmp/xpa012-session-apply-process-frames-r1.jsonl`; actual durable
-  result: `/private/tmp/xpa012-session-apply-process-applied-r1.json`.
-- Rust formatting, Python harness syntax, generated-checkout contract check,
-  and diff whitespace checks passed.
+The following focused checks passed on the Session-only candidate:
 
-## Native producer provenance
+- 4 platform Session removal tests: first-unlink faults, unsafe links/modes,
+  changed bytes/membership, replaced ancestors and neighbor preservation.
+- 53 Session host-store tests: active/pin retention, manifest Job association,
+  tuple/expiry/policy drift, zero-unlink stale release, interrupted intent,
+  missing results, root replacement, restart receipts and empty plans.
+- 6 actual Job owner integration tests, including unreadable records,
+  indexed durable-history retention and orphan/unsafe directory refusal.
+- 2 daemon Host tests, 13 CLI unit tests and 11 current-surface integration
+  tests, including receipt correlation and unknown-noReplay behavior.
+- Debug daemon/CLI build and five-package Clippy with
+  `--all-targets -- -D warnings` (platform, hoststore, control, agentd, CLI).
+- 11 current Swift `SessionCleanupContractTests`, including native producer
+  success/refusal/partial-result frames and strict readback of a freshly
+  captured actual Rust applied record. The readback test's optional
+  `ARKDECK_CLEANUP_APPLIED_RECORD_FIXTURE` input preserves the frozen fixture.
+- Current Swift CLI product build, followed by separate Rust CLI and Swift CLI
+  runs against the Session-only Rust daemon. Each passed 27 actual RPC
+  exchanges plus CLI commands, including default/nondefault manifest Job
+  identity, active/unknown/durable-history retention, drift, orphan/unsupported
+  row refusals, exact Artifact accounting and restart receipt equality.
+- Rust formatting, Python syntax, generated-checkout contract and whitespace
+  checks. The final complete unified gate is owned by the main integration
+  agent; it is not represented by these targeted checks.
 
-The four current Swift producer/readback tests previously passed in the
-coordinated native run, with zero failures in
-`/private/tmp/xpa-native-union-swift-r1.log`:
+Exact commands/results are recorded in:
 
-- `testCurrentSwiftOwnerReadsActualRustCleanupAppliedRecord`
-- `testCleanupApplyProducerRecordsExactTupleAndArtifactReceipt`
-- `testCleanupApplyProducerRecordsPartialDeletionAndRefusesReplay`
-- `testCleanupApplyProducerRecordsUnavailableAndUnreadableOwners`
+- `/private/tmp/xpa012-session-only-current-targeted-20260912.log`
+- `/private/tmp/xpa012-session-native-current-20260912.log`
+- `/private/tmp/xpa012-session-swift-cli-build-current-20260912.log`
+- `/private/tmp/xpa012-session-only-current-rust-cli-20260912.log`
+- `/private/tmp/xpa012-session-only-current-swift-cli-20260912.log`
 
-`session-cleanup-producer-frames-macos-20260912/` retains the complete original
-combined recording, nine original `session.cleanup.apply` lines, and provenance
-with SHA-256 values and the exact producer-source hashes. These hashes match the
-unchanged Swift test and Rust-applied-record fixture in this branch. Derivation
-used only these nine lines plus the method's existing corpus, without rewriting
-fields or pulling unrelated methods into this change. The checkout manifest uses
-version 2 and contains 105 methods and 580 recorded shapes; the published view
-continues to use the merge-base with `origin/main`.
+## Raw producer and consumer provenance
 
-The checked-in `rust-cleanup-applied.json` fixtures remain unmodified output
-from the original real Rust owner test; simulated Session inputs are not
-hardware evidence. Set `ARKDECK_CLEANUP_RECORD_COPY` when running the cleanup
-owner test to preserve another actual record. The process harness also accepts
-`--record-applied-copy`, `--record-store-copy`, `--record-frames` and `--cli-path`.
+`session-cleanup-producer-current-macos-20260912/` retains the complete original
+current native recording (10 lines), its nine unchanged `session.cleanup.apply`
+lines, current Rust/Swift CLI control recordings, fresh actual Rust durable
+output, and the exact raw applied record consumed by the current Swift decoder.
+Its provenance records input, source and executable SHA-256 values. Selection
+copies whole original lines; no fields or owner records are rewritten.
 
-## Coordinated remaining checks
+`session-cleanup-producer-frames-macos-20260912/` separately retains the earlier
+native combined recording and source provenance from the original checkpoint.
+The optional current readback input changes the test source hash, so that older
+hash describes its recorded source revision rather than the new test file.
+The existing checked-in `rust-cleanup-applied.json` fixtures remain unchanged.
+All Session storage inputs are isolated host fixtures, not hardware evidence.
 
-Warnings-denied Clippy passed for platform, host-store, control, daemon and CLI
-with `--all-targets -- -D warnings`; log:
-`/private/tmp/xpa012-session-apply-clippy-r1.log`. The first platform
-filter `host_session_removal` selected zero tests; the four-test result above
-comes from the subsequent correct `session_removal` run without a new build.
-Current Swift CLI process consumption and the final unified Swift/App gate
-remain with the main agent. Scope preflight passed for TASK-XPA-012 on
-`0dad7599`; all changed paths are already allowed and no Scope-Extension trailer
-is needed. No installed activation, real-device
-execution, replay, Task completion or new scope authorization is claimed here.
+The apply schema includes success receipts derived from the original native
+method frames and existing method corpus. The v2 checkout manifest contains
+105 methods and 582 recorded shapes. The published view continues to use the
+merge-base with `origin/main`; no baseline-revision override or Scope-Extension
+is used. Installed activation, device execution and overall Task012 completion
+remain outside this slice.

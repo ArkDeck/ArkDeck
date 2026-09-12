@@ -1,0 +1,82 @@
+{
+  "kind": "isolated host producer/consumer interoperability; no device evidence",
+  "baseRevision": "1fd85b931fdef1416d41baebfe8bad0cf8d32b5e",
+  "nativeRawPath": "/private/tmp/xpa012-session-native-current-20260912/control-frames-76583.jsonl",
+  "nativeRawSHA256": "2f56a92da612f7f55eabbfa7f3c2ed67a7a8ebfa47d8e7d36f50eb39b8eeef5a",
+  "selectedMethod": "session.cleanup.apply",
+  "selectedLineCount": 9,
+  "selection": "original complete lines, unchanged bytes and fields",
+  "sources": [
+    {
+      "path": "Packages/ArkDeckKit/Tests/ArkDeckContractTests/SessionCleanupContractTests.swift",
+      "sha256": "b8ae1d008784ad8c94e3e049b137b2af749afbf8b7edf242474dd00120424924"
+    },
+    {
+      "path": "Packages/ArkDeckKit/Contracts/control-protocol.json",
+      "sha256": "d32c42ebf54e4798adadeb40ddeb12a5e04f741bbb6cf3c01b29d94187027c4f"
+    },
+    {
+      "path": "rust/crates/arkdeck-hoststore/src/session_cleanup_owner.rs",
+      "sha256": "f5c43959d930f9d388be67110086d005c00b812c0800140f87fac93dbf600803"
+    },
+    {
+      "path": "rust/crates/arkdeck-hoststore/src/session_cleanup_inventory.rs",
+      "sha256": "edc2c38677698fcf14bc2b65cd332659da31a3bdf856a2139b3224c386d00067"
+    },
+    {
+      "path": "rust/crates/arkdeck-hoststore/src/job_owner.rs",
+      "sha256": "da48f63f152a995883607f9f96e719d62462d0bcee83355f06a0fbf0660aead0"
+    },
+    {
+      "path": "rust/scripts/check-session-cleanup.py",
+      "sha256": "2392e9a33bd74b41388fe5550bbe6cc2d3039b2c9b39eb09898324ae287305db"
+    }
+  ],
+  "files": [
+    {
+      "path": "control-frames-76583.jsonl",
+      "sha256": "2f56a92da612f7f55eabbfa7f3c2ed67a7a8ebfa47d8e7d36f50eb39b8eeef5a"
+    },
+    {
+      "path": "native-readback-rust-cleanup-applied.json",
+      "sha256": "f6963f72661fec5beaa6f4ffba1a48ecf2b01a7d9115ffcb3205492defc4e3a0"
+    },
+    {
+      "path": "rust-cleanup-applied.json",
+      "sha256": "b7bdfef97fdfe48ac99e5703cb86bf0b1c211b67374284fbe0edf438fd52a7b2"
+    },
+    {
+      "path": "rust-cli-control-frames.jsonl",
+      "sha256": "0de17185212ee3e2914a782fc2f1787f398c8e4c04ae8c82daef7d9fb2de7d7e"
+    },
+    {
+      "path": "session.cleanup.apply.jsonl",
+      "sha256": "e3a28628ebfe3128b2cb593299433c05a190a10c9254d027a1843b27606c77ba"
+    },
+    {
+      "path": "swift-cli-control-frames.jsonl",
+      "sha256": "d63d5510dfe5709bb39a60f611c46b2ff4474c8c52a74ca68fd0682647e8af39"
+    }
+  ],
+  "executables": [
+    {
+      "path": "/private/tmp/arkdeck-xpa012-session-apply-main-20260912/rust/target/debug/arkdeck-agentd",
+      "sha256": "c0acc49d5da7026c045bf29c756d43629056ef3f01f3cbf308ab4241f3a580d3"
+    },
+    {
+      "path": "/private/tmp/arkdeck-xpa012-session-apply-main-20260912/rust/target/debug/arkdeck",
+      "sha256": "d03da8712bc75ac76e86442eff4ec891b55643c0c7da38b52ceccc266404634a"
+    },
+    {
+      "path": "/Users/fuhanfeng/Library/Caches/com.arkdeck.ArkDeck/SwiftPM/ArkDeckKit/build/arm64-apple-macosx/debug/arkdeck",
+      "sha256": "479a5b13cc15f8983c7759e59d670c96b0ad6aa503c31f6c1b9fdc90d19f7911"
+    }
+  ],
+  "logs": [
+    "/private/tmp/xpa012-session-native-current-20260912.log",
+    "/private/tmp/xpa012-session-swift-cli-build-current-20260912.log",
+    "/private/tmp/xpa012-session-only-current-targeted-20260912.log",
+    "/private/tmp/xpa012-session-only-current-rust-cli-20260912.log",
+    "/private/tmp/xpa012-session-only-current-swift-cli-20260912.log"
+  ]
+}
