@@ -187,6 +187,16 @@ def check(output_root: Path) -> Path:
     output.mkdir(parents=True, exist_ok=False)
     failures = []
     source_digest = rust_digest(ROOT / "rust")
+    # When the working inputs are byte-identical to the published base (the
+    # merge-base with origin/main), the published view would be the checkout
+    # this lane already linted and tested at top level, and the candidate
+    # view runs the same native checks on the same inputs plus its own.
+    # Building the same sources twice proved nothing more, at 1 to 1.7
+    # minutes per host (the parity step was 2.0, 3.4 and 1.2 minutes on the
+    # three hosted runners over #1844..#1873), so the published view is
+    # recorded as covered and the checks run once. Any drift keeps both
+    # views: that is the case the published view exists for.
+    published_covered = current_info["inputDigest"] == published_info["inputDigest"]
     # A short task-owned path also bounds Cargo's native Windows build paths.
     temporary_root = ROOT / "rust/target/contract-check"
     temporary_root.mkdir(parents=True, exist_ok=True)
@@ -195,8 +205,17 @@ def check(output_root: Path) -> Path:
         copy_rust(ROOT / "rust", rust_source)
         if rust_digest(rust_source) != source_digest:
             raise ValueError("Rust sources changed while taking the validation snapshot")
-        for name, inputs, info in [("published", published, published_info),
-                                   ("candidate", current, current_info)]:
+        views = [("published", published, published_info), ("candidate", current, current_info)]
+        if published_covered:
+            views = views[1:]
+            write_json(output / "published/provenance.json", {
+                "schemaVersion": "arkdeck.rust-contract-check/1", "kind": "host-test",
+                "inputKind": published_info["kind"], "inputDigest": published_info["inputDigest"],
+                "publishedBaselineCommit": published_info["commit"],
+                "sourceRevision": current_info["sourceRevision"],
+                "deviceAcceptance": False, "completed": True, "result": "covered",
+                "coveredBy": "candidate", "commands": []})
+        for name, inputs, info in views:
             view = Path(directory) / name
             try:
                 materialize(view, inputs, info, published_info, rust_source, catalogs[name])
@@ -217,8 +236,9 @@ def check(output_root: Path) -> Path:
         "deviceAcceptance": False, "publishedBaselineCommit": published_info["commit"],
         "sourceRustDigest": source_digest,
         "catalogGeneratorSHA256": contract.sha(catalog_bytes),
-        "candidateInputDigest": current_info["inputDigest"], "completed": not failures,
-        "failures": failures,
+        "candidateInputDigest": current_info["inputDigest"],
+        "publishedView": "covered-by-candidate" if published_covered else "run",
+        "completed": not failures, "failures": failures,
     })
     if failures:
         raise ValueError(f"contract checks failed: {failures}; recordings: {output}")
