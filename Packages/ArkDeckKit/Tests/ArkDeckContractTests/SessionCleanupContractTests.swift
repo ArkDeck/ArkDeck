@@ -2,6 +2,8 @@ import Darwin
 import Foundation
 import XCTest
 
+@testable import ArkDeckAgentDaemon
+@testable import ArkDeckRuntime
 @testable import ArkDeckCore
 @testable import ArkDeckStorage
 @testable import ArkDeckWorkflows
@@ -30,6 +32,8 @@ final class SessionCleanupContractTests: XCTestCase {
   private var root: URL!
   private var ownerRoot: URL!
   private var sessionsRoot: URL!
+  private var engine: RuntimeJobEngine!
+  private var capabilities: RuntimeCapabilityStore!
   private let now = ISO8601Timestamps.parseCanonicalPlain("2026-09-02T00:00:00Z")!
 
   override func setUpWithError() throws {
@@ -37,9 +41,17 @@ final class SessionCleanupContractTests: XCTestCase {
     ownerRoot = root.appending(path: "owner", directoryHint: .isDirectory)
     sessionsRoot = root.appending(path: "sessions", directoryHint: .isDirectory)
     try ownerDirectory(root)
+    capabilities = try RuntimeCapabilityStore(directoryURL: root.appending(path: "capabilities"))
+    engine = try RuntimeJobEngine(
+      configuration: .init(stateDirectory: root.appending(path: "engine")),
+      providers: DeviceProviderRegistry(providers: []),
+      dispatcher: RuntimeAgentExecutionContractTests.Dispatcher(), capabilityStore: capabilities,
+      nowUTC: { "2026-09-02T00:00:00Z" })
   }
 
   override func tearDownWithError() throws {
+    engine = nil
+    capabilities = nil
     try? FileManager.default.removeItem(at: root)
   }
 
@@ -263,6 +275,123 @@ final class SessionCleanupContractTests: XCTestCase {
     }
     XCTAssertEqual(deletes.value, 0)
     XCTAssertTrue(FileManager.default.fileExists(atPath: target.path))
+  }
+
+  func testCurrentSwiftOwnerReadsActualRustCleanupAppliedRecord() throws {
+    // Direct bytes from the Rust cleanup owner after deleting only simulated
+    // Session fixtures. This is format interoperability, not hardware evidence.
+    let fixture = ProcessInfo.processInfo.environment["ARKDECK_CLEANUP_APPLIED_RECORD_FIXTURE"]
+      .map { URL(filePath: $0) }
+      ?? URL(filePath: #filePath).deletingLastPathComponent()
+        .appending(path: "Fixtures/SessionStorage/rust-cleanup-applied.json")
+    let bytes = try Data(contentsOf: fixture)
+    let fields = try ControlFrameJSON.decodeObject(bytes.dropLast(), maximumBytes: 16 * 1_024 * 1_024)
+    guard case .string(let id)? = fields["previewID"] else { return XCTFail("missing preview identity") }
+    let directory = root.appending(path: "rust-cleanup-applied", directoryHint: .isDirectory)
+    let records = try RuntimeSessionCleanupRecordStore(directory: directory)
+    try ownerFile(bytes, at: directory.appending(path: "cleanup-\(id).json"))
+    let record = try records.load(id)
+    XCTAssertEqual(record.state, .applied)
+    XCTAssertEqual(record.preview, fields["preview"])
+    XCTAssertEqual(record.result, fields["result"])
+    var encoded = try CanonicalJSONEncoders.canonical().encode(record)
+    encoded.append(0x0A)
+    XCTAssertEqual(encoded, bytes)
+  }
+
+  func testCleanupApplyProducerRecordsExactTupleAndArtifactReceipt() async throws {
+    let storage = try store()
+    let target = try finalizedSession(
+      id: "session-producer", month: "01", timestamp: "2020-01-01T00:00:00Z", artifact: true)
+    _ = try storage.updatePolicy(
+      .init(totalQuotaBytes: 1_024, safetyMarginBytes: 1_023, retentionDays: 1), expectedGeneration: 1)
+    let previewResponse = try await wire("session.cleanup.preview", params: [:], storage: storage)
+    XCTAssertTrue(previewResponse.ok)
+    let preview = try object(previewResponse.result)
+    let (id, digest) = try tuple(preview)
+    let invalid = try await wire("session.cleanup.apply", params: [
+      "previewId": .string("malformed"), "previewDigest": .string(digest),
+    ], storage: storage)
+    XCTAssertEqual(invalid.error?.code, "invalidInput")
+    let missing = try await wire("session.cleanup.apply", params: [
+      "previewId": .string("00000000-0000-0000-0000-000000000099"),
+      "previewDigest": .string(digest),
+    ], storage: storage)
+    XCTAssertEqual(missing.error?.code, "resourceNotFound")
+    let conflict = try await wire("session.cleanup.apply", params: [
+      "previewId": .string(id), "previewDigest": .string(String(repeating: "f", count: 64)),
+    ], storage: storage)
+    XCTAssertEqual(conflict.error?.code, "resourceConflict")
+    XCTAssertTrue(FileManager.default.fileExists(atPath: target.path))
+    let params: [String: JSONValue] = ["previewId": .string(id), "previewDigest": .string(digest)]
+    let response = try await wire("session.cleanup.apply", params: params, storage: storage)
+    XCTAssertTrue(response.ok)
+    let result = try object(response.result)
+    XCTAssertEqual(result["removedSessionIds"], .array([.string("session-producer")]))
+    guard case .array(let artifacts)? = result["removedArtifacts"], artifacts.count == 1 else {
+      return XCTFail("cleanup producer omitted the removed Artifact identity")
+    }
+    XCTAssertEqual(try object(artifacts[0])["artifactId"], .string("artifact-raw"))
+    XCTAssertEqual(result["newDispatchCount"], .integer(0))
+    XCTAssertFalse(FileManager.default.fileExists(atPath: target.path))
+    let replay = try await wire("session.cleanup.apply", params: params, storage: try store())
+    XCTAssertEqual(replay.result, response.result)
+  }
+
+  func testCleanupApplyProducerRecordsPartialDeletionAndRefusesReplay() async throws {
+    let deletes = Counter()
+    let storage = try store(controller: SessionRetentionController(
+      faultInjector: SessionStorageFaultInjector { point in
+        if point == .retentionBeforeDelete, deletes.increment() == 2 { throw FixtureFailure.io }
+      }))
+    let first = try finalizedSession(id: "session-first", month: "01", timestamp: "2020-01-01T00:00:00Z")
+    let second = try finalizedSession(id: "session-second", month: "02", timestamp: "2021-01-01T00:00:00Z")
+    _ = try storage.updatePolicy(
+      .init(totalQuotaBytes: 1_024, safetyMarginBytes: 1_023, retentionDays: 1), expectedGeneration: 1)
+    let preview = try object(storage.previewSessionCleanup(activeSessionIDs: []))
+    let (id, digest) = try tuple(preview)
+    let params: [String: JSONValue] = ["previewId": .string(id), "previewDigest": .string(digest)]
+    let response = try await wire("session.cleanup.apply", params: params, storage: storage)
+    XCTAssertEqual(response.error?.code, "outcomeUnknown")
+    XCTAssertEqual(response.error?.details?["newDispatchCount"], .integer(0))
+    let restarted = try await wire("session.cleanup.apply", params: params, storage: try store())
+    XCTAssertEqual(restarted.error?.code, "outcomeUnknown")
+    XCTAssertEqual(deletes.value, 2)
+    XCTAssertFalse(FileManager.default.fileExists(atPath: first.path))
+    XCTAssertTrue(FileManager.default.fileExists(atPath: second.path))
+  }
+
+  func testCleanupApplyProducerRecordsUnavailableAndUnreadableOwners() async throws {
+    let tuple: [String: JSONValue] = [
+      "previewId": .string("00000000-0000-0000-0000-000000000099"),
+      "previewDigest": .string(String(repeating: "a", count: 64)),
+    ]
+    let unavailable = try await wire("session.cleanup.apply", params: tuple, storage: nil)
+    XCTAssertEqual(unavailable.error?.code, "operationUnavailable")
+    let storage = try store()
+    let preview = try object(storage.previewSessionCleanup(activeSessionIDs: []))
+    let (id, digest) = try self.tuple(preview)
+    try Data("corrupt fixture record".utf8).write(to:
+      ownerRoot.appending(path: "session-cleanup-previews/cleanup-\(id).json"))
+    let unreadable = try await wire("session.cleanup.apply", params: [
+      "previewId": .string(id), "previewDigest": .string(digest),
+    ], storage: storage)
+    XCTAssertEqual(unreadable.error?.code, "recordUnreadable")
+  }
+
+  private func wire(
+    _ method: String, params: [String: JSONValue], storage: RuntimeSessionStorageStore?
+  ) async throws -> AgentWireProtocol.Response {
+    let handler = RuntimeControlPlaneHandler(
+      engine: engine, capabilityStore: capabilities, providerIDs: [],
+      nowUTC: { "2026-09-02T00:00:00Z" }, runtimeSessionStorage: storage)
+    let request: JSONValue = .object([
+      "protocolVersion": .string(ArkDeckControlProtocol.currentVersion),
+      "contractIdentity": .string(ArkDeckControlProtocol.contractIdentity),
+      "id": .string("session-cleanup-producer"), "method": .string(method), "params": .object(params),
+    ])
+    let response = await handler.handleLine(try CanonicalJSONEncoders.canonical().encode(request))
+    return try JSONDecoder().decode(AgentWireProtocol.Response.self, from: response)
   }
 
   private func store(

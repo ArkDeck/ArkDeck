@@ -25,28 +25,194 @@ pub fn session_cleanup_snapshot(
     path: &Path,
     active_session_ids: &BTreeSet<String>,
 ) -> Result<CleanupSnapshot, WireError> {
-    let unreadable = |_| {
-        failure(
-            "recordUnreadable",
-            "Session cleanup inventory is inconsistent",
-        )
-    };
-    if !active_session_ids.iter().all(|id| identifier(id)) {
-        return Err(unreadable(invalid()));
-    }
-    // Reconcile policy and registration through the existing owner. Unknown
-    // content must produce the same actionable refusal as Session discovery.
-    session_resource_rows(configuration, path, None, None)?;
-    let root = HostDirectory::open_session_tree(path).map_err(unreadable)?;
-    let owner = HostDirectory::open(path).map_err(unreadable)?;
-    let lock = owner.lock_document(LOCK).map_err(|error| {
-        if error.kind() == io::ErrorKind::WouldBlock {
-            failure("resourceConflict", "Session catalog is being updated")
-        } else {
-            unreadable(error)
+    Ok(CleanupTransaction::open(configuration, path, active_session_ids)?.snapshot)
+}
+
+pub(crate) struct CleanupTransaction {
+    root: HostDirectory,
+    owner: HostDirectory,
+    lock: arkdeck_platform::HostReadLock,
+    path: std::path::PathBuf,
+    configuration: Vec<u8>,
+    active: BTreeSet<String>,
+    document: Catalog,
+    tree: Tree,
+    pub snapshot: CleanupSnapshot,
+}
+fn unreadable(_: impl std::fmt::Debug) -> WireError {
+    failure(
+        "recordUnreadable",
+        "Session cleanup inventory is inconsistent",
+    )
+}
+fn stale(_: impl std::fmt::Debug) -> WireError {
+    failure(
+        "resourceConflict",
+        "Session cleanup snapshot changed; create a fresh preview",
+    )
+}
+impl CleanupTransaction {
+    pub fn open(
+        configuration: &[u8],
+        path: &Path,
+        active: &BTreeSet<String>,
+    ) -> Result<Self, WireError> {
+        if !active.iter().all(|id| identifier(id)) {
+            return Err(unreadable(invalid()));
         }
-    })?;
-    let document = catalog(&root).ok_or_else(|| unreadable(invalid()))?;
+        session_resource_rows(configuration, path, None, None)?;
+        let root = HostDirectory::open_session_tree(path).map_err(unreadable)?;
+        let owner = HostDirectory::open(path).map_err(unreadable)?;
+        let lock = owner.lock_document(LOCK).map_err(|error| {
+            if error.kind() == io::ErrorKind::WouldBlock {
+                stale(error)
+            } else {
+                unreadable(error)
+            }
+        })?;
+        let document = catalog(&root).ok_or_else(|| unreadable(invalid()))?;
+        let tree = scan(&root).map_err(unreadable)?;
+        let snapshot = snapshot(configuration, &document, &tree, active)?;
+        lock.validate_link(&owner, LOCK).map_err(unreadable)?;
+        root.validate_path(path).map_err(unreadable)?;
+        Ok(Self {
+            root,
+            owner,
+            lock,
+            path: path.into(),
+            configuration: configuration.into(),
+            active: active.clone(),
+            document,
+            tree,
+            snapshot,
+        })
+    }
+    pub fn prepare(
+        &self,
+        ids: &BTreeSet<String>,
+    ) -> Result<Vec<arkdeck_platform::PreparedSessionRemoval>, WireError> {
+        let mut removals = Vec::new();
+        for id in ids {
+            let row = self
+                .tree
+                .sessions
+                .iter()
+                .find(|row| &row.manifest.session_id == id)
+                .ok_or_else(|| stale(invalid()))?;
+            let prepared = self
+                .root
+                .prepare_session_removal(&row.location)
+                .map_err(unreadable)?;
+            if prepared.byte_count() != row.bytes {
+                return Err(stale(invalid()));
+            }
+            removals.push(prepared);
+        }
+        Ok(removals)
+    }
+    /// This boundary proves no deletion has begun when a stale snapshot refuses.
+    pub fn revalidate(
+        &self,
+        removals: &[arkdeck_platform::PreparedSessionRemoval],
+    ) -> Result<(), WireError> {
+        self.lock.validate_link(&self.owner, LOCK).map_err(stale)?;
+        self.root.validate_path(&self.path).map_err(stale)?;
+        let document = catalog(&self.root).ok_or_else(|| stale(invalid()))?;
+        let tree = scan(&self.root).map_err(stale)?;
+        if snapshot(&self.configuration, &document, &tree, &self.active).map_err(stale)?
+            != self.snapshot
+            || tree
+                .sessions
+                .iter()
+                .map(|r| (&r.manifest.session_id, &r.location))
+                .collect::<Vec<_>>()
+                != self
+                    .tree
+                    .sessions
+                    .iter()
+                    .map(|r| (&r.manifest.session_id, &r.location))
+                    .collect::<Vec<_>>()
+        {
+            return Err(stale(invalid()));
+        }
+        for removal in removals {
+            removal.validate().map_err(stale)?;
+        }
+        Ok(())
+    }
+    /// Every failure after entry is outcomeUnknown, including catalog publication.
+    pub fn remove(
+        mut self,
+        ids: &BTreeSet<String>,
+        removals: Vec<arkdeck_platform::PreparedSessionRemoval>,
+    ) -> Result<CleanupSnapshot, WireError> {
+        let unknown = |_| {
+            failure(
+                "outcomeUnknown",
+                "Session cleanup outcome is uncertain; this preview cannot be retried",
+            )
+        };
+        self.revalidate(&removals).map_err(|_| unknown(invalid()))?;
+        for removal in removals {
+            removal.remove(&self.path).map_err(unknown)?;
+        }
+        self.document
+            .entries
+            .retain(|entry| !ids.contains(&entry.session_id));
+        if !ids.is_empty() {
+            self.document.generation = self
+                .document
+                .generation
+                .checked_add(1)
+                .filter(|n| *n <= i64::MAX as u64)
+                .ok_or_else(|| unknown(invalid()))?;
+            self.document
+                .entries
+                .sort_by(|a, b| a.session_id.cmp(&b.session_id));
+            let bytes = serde_json::to_vec(
+                &serde_json::to_value(&self.document).map_err(|_| unknown(invalid()))?,
+            )
+            .map_err(|_| unknown(invalid()))?;
+            self.lock
+                .validate_link(&self.owner, LOCK)
+                .map_err(unknown)?;
+            self.root.validate_path(&self.path).map_err(unknown)?;
+            self.owner
+                .publish_document(METADATA, &bytes, 16 * 1024 * 1024)
+                .map_err(|_| unknown(invalid()))?;
+            if self.root.read(METADATA, 16 * 1024 * 1024).ok().as_ref() != Some(&bytes) {
+                return Err(unknown(invalid()));
+            }
+        }
+        let tree = scan(&self.root).map_err(unknown)?;
+        let after = snapshot(&self.configuration, &self.document, &tree, &self.active)
+            .map_err(|_| unknown(invalid()))?;
+        let mut expected = self.snapshot.clone();
+        expected.generation = self.document.generation;
+        expected
+            .sessions
+            .retain(|row| !ids.contains(&row.candidate.session_id));
+        expected.current_bytes = expected
+            .sessions
+            .iter()
+            .try_fold(0u64, |sum, row| sum.checked_add(row.candidate.size_bytes))
+            .ok_or_else(|| unknown(invalid()))?;
+        if expected != after {
+            return Err(unknown(invalid()));
+        }
+        self.lock
+            .validate_link(&self.owner, LOCK)
+            .map_err(unknown)?;
+        self.root.validate_path(&self.path).map_err(unknown)?;
+        Ok(after)
+    }
+}
+fn snapshot(
+    configuration: &[u8],
+    document: &Catalog,
+    tree: &Tree,
+    active_session_ids: &BTreeSet<String>,
+) -> Result<CleanupSnapshot, WireError> {
     let config = decode_session_configuration(configuration)
         .map_err(|_| unreadable(invalid()))?
         .projection;
@@ -59,7 +225,6 @@ pub fn session_cleanup_snapshot(
     let policy_generation = number(&config["generation"])?;
     let days = i32::try_from(number(&config["policy"]["retentionDays"])?)
         .map_err(|_| unreadable(invalid()))?;
-    let tree = scan(&root).map_err(unreadable)?;
     if document.generation > i64::MAX as u64
         || tree.bytes > i64::MAX as u64
         || tree.incomplete
@@ -71,7 +236,7 @@ pub fn session_cleanup_snapshot(
         return Err(unreadable(invalid()));
     }
     let mut sessions = Vec::new();
-    for row in tree.sessions {
+    for row in &tree.sessions {
         let entry = document
             .entries
             .iter()
@@ -86,22 +251,21 @@ pub fn session_cleanup_snapshot(
         {
             return Err(unreadable(invalid()));
         }
-        let active_lease = active_session_ids.contains(&row.manifest.session_id);
+        let active_lease = active_session_ids.contains(&row.manifest.session_id)
+            || active_session_ids.contains(&format!("session-{}", row.manifest.job_id));
         sessions.push(CleanupSession {
             candidate: CleanupCandidate {
-                session_id: row.manifest.session_id,
+                session_id: row.manifest.session_id.clone(),
                 size_bytes: row.bytes,
                 completed_at: row.manifest.completed_at,
                 expires_at,
                 pinned: entry.is_pinned,
                 active_lease,
             },
-            artifact_records: row.manifest.artifacts,
+            artifact_records: row.manifest.artifacts.clone(),
         });
     }
     sessions.sort_by(|a, b| a.candidate.session_id.cmp(&b.candidate.session_id));
-    lock.validate_link(&owner, LOCK).map_err(unreadable)?;
-    root.validate_path(path).map_err(unreadable)?;
     Ok(CleanupSnapshot {
         generation: document.generation,
         policy_generation,

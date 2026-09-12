@@ -114,6 +114,7 @@ mod host_store;
 pub use host_store::{
     DocumentPublishError, ExportPublishError, ExportStaging, FileExportStaging, HostDirectory,
     HostDirectoryFacts, HostEntryKind, HostExportCapacity, HostJournal, HostReadLock,
+    PreparedSessionRemoval,
 };
 
 #[cfg(target_os = "macos")]

@@ -1,0 +1,22 @@
+{
+  "sourceBaseline": "551ce5d4",
+  "rawSource": "/private/tmp/xpa-native-frames-20260912-r1/control-frames-1700.jsonl",
+  "rawSHA256": "f5cd08214e580512b39547c7a1277b4801798ca3ee2915de42e7a9df8ad03065",
+  "selectedMethod": "session.cleanup.apply",
+  "selectedSHA256": "cbb460a85c4306a89d492774f2675219e96efb30571a4fb0e9e1ed97ca99694f",
+  "selectedCount": 9,
+  "selection": "Exact original newline-delimited bytes with matching method; no fields rewritten. Raw combined recording retained.",
+  "producerSources": [
+    {
+      "source": "/private/tmp/arkdeck-xpa012-session-apply-20260912/Packages/ArkDeckKit/Tests/ArkDeckContractTests/SessionCleanupContractTests.swift",
+      "destination": "Packages/ArkDeckKit/Tests/ArkDeckContractTests/SessionCleanupContractTests.swift",
+      "sha256": "2fb48bbc6451c52b5f89542249ab0324e0df1489bc5c9265f4725cf0cecd5250"
+    },
+    {
+      "source": "/private/tmp/arkdeck-xpa012-session-apply-20260912/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/SessionStorage/rust-cleanup-applied.json",
+      "destination": "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/SessionStorage/rust-cleanup-applied.json",
+      "sha256": "4cb9a4eef6e79fccf1621994422c73e2e4733c64790b5d2d574883225bcd8071"
+    }
+  ],
+  "nativeTestLog": "/private/tmp/xpa-native-union-swift-r1.log"
+}

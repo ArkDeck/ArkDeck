@@ -1,0 +1,27 @@
+{
+  "kind": "isolated Rust daemon/CLI Session interoperability; no device evidence",
+  "publishedBase": "4e2a615e421e6174a4a50e2c8110196d77ce7007",
+  "sourceRevisionBeforeEvidence": "2e3a4abce249b6ea3953c4e7ccaa234866ba82c1",
+  "buildJobs": 2,
+  "files": [
+    {
+      "path": "control-frames.jsonl",
+      "sha256": "cb0c2ae282a0f5cf126d713c6b4fa88b05db6986f1ff89234105191a77c385ec"
+    },
+    {
+      "path": "rust-cleanup-applied.json",
+      "sha256": "4a42861d6876bb654b60b5d667edf8127cc737f58ee11f10f734c02dcb87d00f"
+    }
+  ],
+  "executables": [
+    {
+      "path": "/private/tmp/arkdeck-xpa012-session-apply-current-20260912/rust/target/debug/arkdeck-agentd",
+      "sha256": "17f76b2bc01de20653b775fb18abae082af4397851b6cd41c7e33c5bb10c0ceb"
+    },
+    {
+      "path": "/private/tmp/arkdeck-xpa012-session-apply-current-20260912/rust/target/debug/arkdeck",
+      "sha256": "64f29c40641487eb6cb905041063668632848cfecb45a5c9a486672d32a7b146"
+    }
+  ],
+  "log": "/private/tmp/xpa012-session-current-4e2a615e-process-20260912.log"
+}

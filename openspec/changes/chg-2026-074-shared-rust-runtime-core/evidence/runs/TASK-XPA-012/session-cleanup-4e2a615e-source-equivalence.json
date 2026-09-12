@@ -1,0 +1,35 @@
+{
+  "frozenRevision": "aa8b9c9d4bbb706c050e8b2953c2102ce57e2f07",
+  "integratedPublishedRevision": "4e2a615e421e6174a4a50e2c8110196d77ce7007",
+  "nativeValidation": "prior aa8b9c9d validation retained; no Swift rerun in this integration",
+  "unchangedSources": [
+    {
+      "path": "Packages/ArkDeckKit/Tests/ArkDeckContractTests/SessionCleanupContractTests.swift",
+      "sha256": "b8ae1d008784ad8c94e3e049b137b2af749afbf8b7edf242474dd00120424924"
+    },
+    {
+      "path": "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/SessionStorage/rust-cleanup-applied.json",
+      "sha256": "4cb9a4eef6e79fccf1621994422c73e2e4733c64790b5d2d574883225bcd8071"
+    },
+    {
+      "path": "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/session.cleanup.apply.jsonl",
+      "sha256": "02906b0fac8f8c89a941243c2325a5b275ab0a326fe69f79f30980616a404718"
+    },
+    {
+      "path": "rust/crates/arkdeck-hoststore/src/session_cleanup_owner.rs",
+      "sha256": "f5c43959d930f9d388be67110086d005c00b812c0800140f87fac93dbf600803"
+    },
+    {
+      "path": "rust/crates/arkdeck-hoststore/src/session_cleanup_inventory.rs",
+      "sha256": "edc2c38677698fcf14bc2b65cd332659da31a3bdf856a2139b3224c386d00067"
+    },
+    {
+      "path": "rust/crates/arkdeck-platform/src/host_session_removal.rs",
+      "sha256": "c33178f0a2acecee13de9610778aa4836821b9260d4d4fbec7616a462ffbc119"
+    },
+    {
+      "path": "rust/scripts/check-session-cleanup.py",
+      "sha256": "2392e9a33bd74b41388fe5550bbe6cc2d3039b2c9b39eb09898324ae287305db"
+    }
+  ]
+}
