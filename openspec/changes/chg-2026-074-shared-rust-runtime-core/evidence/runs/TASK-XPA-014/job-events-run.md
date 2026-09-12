@@ -2,7 +2,7 @@
 
 TASK-XPA-014 remains in progress. The branch uses protected main `f92acd36`, which merged
 Job/Artifact reads in #1863 after its `522085ed` head passed all required CI. This
-event slice still requires its own final validation and maintainer review.
+event slice passed its final local validation and still requires maintainer review.
 
 ## Behavior
 
@@ -50,7 +50,24 @@ fixtures and do not establish hardware acceptance.
 
 On rebased Rust 1.98.1 binaries, the four owner tests, two CLI tests and actual
 process checker passed again. Logs: `/private/tmp/xpa014-events-rebase-targeted.log`
-and `/private/tmp/xpa014-events-rebase-process.log`. The final unified gate remains
-pending before submitting this slice. Journal/SQLite writers, complete stored Job
-authority validators, watch/wait CLI behavior, execution coordination and installed
-owner cutover remain separate necessary migration work.
+and `/private/tmp/xpa014-events-rebase-process.log`. The final unified gate passed
+on the rebased checkout: common checks, 83 design-system tests, 2,632 Swift parallel
+tests plus one identity and five serial viewer checks, Rust workspace and both
+contract views, actual process checks, locked deny and vet. The App build lane was
+not selected by this diff. Log: `/private/tmp/xpa014-events-main-unified-gate-r2.log`.
+
+Journal/SQLite writers, complete stored Job authority validators, watch/wait CLI
+behavior, execution coordination and installed owner cutover remain separate
+necessary migration work.
+
+## Full-gate fixture timing
+
+The first full Swift lane hit an unchanged FakeHDC semantic matrix: its normal
+`unknown` reply timed out under the two-second budget and therefore correctly
+received a failure classification instead of the expected completed unknown
+output. The same build/test passed alone in 0.832 seconds. Completed-exit samples
+now have a ten-second scheduling allowance; the actual hang case retains its
+200 ms timeout and every semantic, exit-code and output assertion is unchanged.
+This changes test fixture budgets only. Logs:
+`/private/tmp/xpa014-events-main-unified-gate-r1.log` and
+`/private/tmp/xpa014-events-fault-matrix-isolated.log`.
