@@ -11,9 +11,9 @@ entitlements="$5"
 case "$mode" in debug|release) ;; *) exit 64 ;; esac
 rust_root="$(cd "$(dirname "$0")/.." && pwd)"
 if [ "$mode" = release ]; then
-  (cd "$rust_root" && cargo +1.98.1 build --locked --release -p arkdeck-agentd)
+  (cd "$rust_root" && cargo build --locked --release -p arkdeck-agentd)
 else
-  (cd "$rust_root" && cargo +1.98.1 build --locked -p arkdeck-agentd)
+  (cd "$rust_root" && cargo build --locked -p arkdeck-agentd)
 fi
 mkdir -p "$(dirname "$rollback_bundle")"
 cp -R "$daemon_bundle" "$rollback_bundle"
