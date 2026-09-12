@@ -2,6 +2,8 @@
 use arkdeck_client::ClientError;
 use arkdeck_contract::{ContractError, PROTOCOL_VERSION, canonical_json};
 use serde_json::{Map, Value, json};
+mod artifact_resources;
+pub use artifact_resources::{artifact_bytes, validate_artifact_metadata, validate_artifact_read};
 mod bootstrap_resources;
 mod read_only_resources;
 pub use read_only_resources::{
@@ -20,6 +22,7 @@ pub struct Invocation {
     pub method: &'static str,
     pub params: Option<Map<String, Value>>,
     pub json: bool,
+    pub raw: bool,
     pub help: bool,
     pub require_healthy: bool,
     pub control_request_id: Option<String>,
@@ -56,13 +59,13 @@ impl CliError {
             | "controlMethodUnavailable"
             | "healthRequirementFailed" => 69,
             "operationUnavailable" => 69,
-            "recordUnreadable" => 2,
+            "recordUnreadable" | "artifactIntegrityFailed" => 2,
             "ioFailure" => 74,
             "outcomeUnknown" => 75,
             "quotaExceeded" => 69,
             "operationFailed" => 1,
             "clientTimeout" => 75,
-            "admissionDenied" | "fileIdentityChanged" => 77,
+            "admissionDenied" | "fileIdentityChanged" | "sensitiveAccessDenied" => 77,
             _ => 70,
         }
     }
@@ -156,8 +159,15 @@ impl CliError {
                     details.get("phase") == Some(&json!("bootstrapRegistryOwner"))
                         && details.get("newDispatchCount") == Some(&json!(0))
                 });
-                let host_proof = host_proof || bootstrap_proof;
+                let artifact_proof = matches!(method, "artifact.inspect" | "artifact.read")
+                    && error.details.as_ref().is_some_and(|d| {
+                        d.get("phase") == Some(&json!("artifactOwner"))
+                            && d.get("newDispatchCount") == Some(&json!(0))
+                    });
+                let host_proof = host_proof || bootstrap_proof || artifact_proof;
                 let code = match error.code.as_str() {
+                    "artifactIntegrityFailed" if artifact_proof => "artifactIntegrityFailed",
+                    "sensitiveAccessDenied" if artifact_proof => "sensitiveAccessDenied",
                     "admissionDenied" if bootstrap_proof => "admissionDenied",
                     "fileIdentityChanged"
                         if bootstrap_proof
@@ -228,6 +238,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
     let mut seen = std::collections::BTreeSet::new();
     let (mut mode, mut id, mut socket) = (None, None, None);
     let (mut deep, mut require_healthy, mut help) = (false, false, false);
+    let mut raw = false;
     let mut index = 0;
     while index < argv.len() {
         let argument = &argv[index];
@@ -241,6 +252,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             match argument.as_str() {
                 "--help" | "-h" => help = true,
                 "--deep" => deep = true,
+                "--raw" => raw = true,
                 "--require-healthy" => require_healthy = true,
                 "--allow-sensitive" => {
                     method_options.insert("allowSensitive".into(), json!(true));
@@ -278,6 +290,10 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                 | "--tool"
                 | "--bundle"
                 | "--operation"
+                | "--artifact"
+                | "--import"
+                | "--offset"
+                | "--max-bytes"
                 | "--job"
                 | "--order"
                 | "--state"
@@ -301,6 +317,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                         "--safety-margin-bytes" => "safetyMarginBytes",
                         "--retention-days" => "retentionDays",
                         "--job" => "jobId",
+                        "--artifact" => "artifactId",
+                        "--max-bytes" => "maxBytes",
                         "--session" => "sessionId",
                         "--target" => "targetId",
                         "--time" => "timeRange",
@@ -359,6 +377,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         index += 1;
     }
     let command = match positional.as_slice() {
+        ["artifact", "inspect"] => "artifact.inspect",
+        ["artifact", "read"] => "artifact.read",
         ["doctor"] => "doctor",
         ["operation", "list"] => "operation.list",
         ["operation", "describe"] => "operation.describe",
@@ -399,6 +419,12 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             ));
         }
     };
+    if raw && command != "artifact.read" {
+        return Err(CliError::new(
+            "invalidOption",
+            "--raw belongs to artifact read",
+        ));
+    }
     if command != "doctor" && (deep || require_healthy) {
         return Err(CliError::new(
             "invalidOption",
@@ -406,6 +432,16 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ));
     }
     let allowed: &[&str] = match command {
+        "artifact.inspect" => &["jobId", "import", "artifactId", "timeout"],
+        "artifact.read" => &[
+            "jobId",
+            "import",
+            "artifactId",
+            "offset",
+            "maxBytes",
+            "allowSensitive",
+            "timeout",
+        ],
         "history.filter.save" => &[
             "expectedGeneration",
             "search",
@@ -638,7 +674,9 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ));
     }
     bootstrap_resources::configure(command, &mut method_options, help)?;
-    let timeout_ms = read_only_resources::configure(command, &mut method_options, help)?;
+    let artifact_timeout = artifact_resources::configure(command, &mut method_options, help)?;
+    let timeout_ms =
+        read_only_resources::configure(command, &mut method_options, help)?.or(artifact_timeout);
     Ok(Invocation {
         command,
         method: if command == "device.candidates" {
@@ -663,6 +701,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                     | "runtime.tool.list"
                     | "runtime.bundle.remove"
             )
+            || command.starts_with("artifact.")
             || command.starts_with("session.")
             || matches!(
                 command,
@@ -680,6 +719,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             None
         },
         json: mode.as_deref() == Some("json"),
+        raw,
         help,
         require_healthy,
         control_request_id: id,

@@ -10,7 +10,7 @@ pub(super) fn invalid() -> CliError {
 fn identifier(s: &str) -> bool {
     valid_correlation(s) && !s.contains(':')
 }
-fn duration(s: &str) -> Option<u64> {
+pub(super) fn duration(s: &str) -> Option<u64> {
     for (suffix, scale) in [("ms", 1), ("s", 1000), ("m", 60_000), ("h", 3_600_000)] {
         if let Some(n) = s.strip_suffix(suffix) {
             if n.is_empty() || n.starts_with('0') || !n.bytes().all(|b| b.is_ascii_digit()) {

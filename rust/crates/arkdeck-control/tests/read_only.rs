@@ -107,6 +107,8 @@ fn every_unimplemented_method_is_refused_without_entering_the_host() {
     let (control, reads) = setup();
     for method in METHODS {
         if [
+            "artifact.inspect",
+            "artifact.read",
             "health",
             "doctor",
             "operation.list",
@@ -597,4 +599,47 @@ fn bundle_registration_rejects_caller_authority_and_observes_nothing() {
     .unwrap_err();
     assert_eq!(error.code, "operationUnavailable");
     assert_eq!(reads.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn artifact_methods_report_unconfigured_owner_and_route_exact_typed_parameters() {
+    let (control, reads) = setup();
+    for method in ["artifact.inspect", "artifact.read"] {
+        let failure = call(
+            &control,
+            method,
+            json!({"owner":{"kind":"job","id":"JOB-1"},"artifactId":"ART-1"}),
+        )
+        .outcome
+        .unwrap_err();
+        assert_eq!(failure.code, "operationUnavailable");
+        assert_eq!(failure.details.unwrap()["phase"], "artifactOwner");
+    }
+    assert_eq!(reads.load(Ordering::SeqCst), 0);
+    struct ArtifactHost;
+    impl HostServices for ArtifactHost {
+        fn observed_at(&self) -> String {
+            "2026-09-12T00:00:00Z".into()
+        }
+        fn hdc_status(&self, _: bool) -> HdcStatus {
+            panic!("Artifact query entered HDC")
+        }
+        fn observations(&self) -> Result<DeviceObservationsResult, WireError> {
+            panic!("Artifact query entered HDC")
+        }
+        fn artifact_resource(
+            &self,
+            method: &str,
+            params: &serde_json::Map<String, Value>,
+        ) -> Result<Value, WireError> {
+            assert_eq!(method, "artifact.read");
+            assert_eq!(params,&json!({"owner":{"kind":"job","id":"JOB-1"},"artifactId":"ART-1","offset":2,"maxBytes":3,"allowSensitive":false}).as_object().unwrap().clone());
+            Ok(
+                json!({"artifactId":"ART-1","artifactDigest":"a".repeat(64),"offset":2,"nextOffset":5,"totalByteCount":5,"byteCount":3,"base64":"YWJj","eof":true}),
+            )
+        }
+    }
+    let control = Control::new(ArtifactHost).unwrap();
+    let result = call(&control,"artifact.read",json!({"owner":{"kind":"job","id":"JOB-1"},"artifactId":"ART-1","offset":2,"maxBytes":3,"allowSensitive":false})).outcome.unwrap();
+    assert_eq!(result["base64"], "YWJj");
 }

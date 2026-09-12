@@ -568,6 +568,46 @@ final class ArtifactResourcesContractTests: XCTestCase {
     XCTAssertEqual(try ArtifactResourceProjection(metadata).digest, SHA256Hex.string(of: bytes))
   }
 
+  func testArtifactInspectionRequiresExistingJobAndArtifactOwners() async throws {
+    let orphan = try owner("job", "job-orphan-artifact")
+    let orphanedArtifact = try await publish(orphan)
+    let missingJob = try await wire("artifact.inspect", [
+      "owner": orphan.value, "artifactId": .string(orphanedArtifact.artifactID),
+    ])
+    XCTAssertEqual(missingJob.0.error?.code, "resourceNotFound")
+    XCTAssertEqual(missingJob.0.error?.details?["phase"], .string("artifactOwner"))
+    let existing = try seedJob("job-without-artifact")
+    let missingArtifact = try await wire("artifact.inspect", [
+      "owner": existing.value, "artifactId": .string("ART-not-published"),
+    ])
+    XCTAssertEqual(missingArtifact.0.error?.code, "resourceNotFound")
+  }
+
+  func testRustArtifactOwnerCurrentFixture() async throws {
+    let owner = try seedJob("job-rust-artifact")
+    let artifact = try await publish(owner, bytes: Data("native fixture bytes\n".utf8))
+    var samples: [JSONValue] = []
+    for method in ["artifact.inspect", "artifact.read"] {
+      let params: [String: JSONValue] = ["owner": owner.value, "artifactId": .string(artifact.artifactID)]
+      let response = try await wire(method, params).0
+      XCTAssertTrue(response.ok, String(describing: response.error))
+      samples.append(.object(["method": .string(method), "params": .object(params),
+        "result": try XCTUnwrap(response.result)]))
+    }
+    guard let output = ProcessInfo.processInfo.environment["ARKDECK_RUST_ARTIFACT_FIXTURE_OUTPUT"] else { return }
+    let destination = URL(fileURLWithPath: output, isDirectory: true)
+    guard destination.path.hasPrefix("/private/tmp/"), !FileManager.default.fileExists(atPath: destination.path) else {
+      throw Failure.fixture
+    }
+    try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: false,
+      attributes: [.posixPermissions: 0o700])
+    // All fixture writes completed above; copy both owners from this quiescent
+    // test only. No installed state or real-device evidence enters this fixture.
+    try FileManager.default.copyItem(at: root.appending(path: "engine"), to: destination.appending(path: "jobs-state"))
+    try FileManager.default.copyItem(at: root.appending(path: "artifacts"), to: destination.appending(path: "artifacts"))
+    try PortableCanonicalJSON.canonicalBytes(.array(samples)).write(to: destination.appending(path: "swift-results.json"))
+  }
+
   func testSourceMutationAndRetiredJobOnlyWireFailClosed() async throws {
     let job = try seedJob(); let bytes = Data("immutable".utf8); let product = try await publish(job, bytes: bytes)
     let retired = try await wire("artifact.list", ["owner": job.value], version: "2.0.0")
@@ -579,6 +619,8 @@ final class ArtifactResourcesContractTests: XCTestCase {
     let path = root.appending(path: "artifacts/\(job.id)/\(product.artifactID)")
     XCTAssertEqual(chmod(path.path, 0o600), 0)
     try Data(repeating: 0x78, count: bytes.count).write(to: path)
+    let inspect = try await wire("artifact.inspect", ["owner": job.value, "artifactId": .string(product.artifactID)])
+    XCTAssertEqual(inspect.0.error?.code, "artifactIntegrityFailed")
     let read = try await wire("artifact.read", ["owner": job.value, "artifactId": .string(product.artifactID)])
     XCTAssertEqual(read.0.error?.code, "artifactIntegrityFailed")
     let output = try exportDirectory()

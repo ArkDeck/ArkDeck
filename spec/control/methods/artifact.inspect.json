@@ -2,6 +2,7 @@
   "$defs": {
     "errorCode": {
       "enum": [
+        "artifactIntegrityFailed",
         "conflict",
         "internalError",
         "invalidInput",
@@ -11,6 +12,7 @@
         "operationUnavailable",
         "recordUnreadable",
         "rejected",
+        "resourceNotFound",
         "unknownMethod",
         "unsupportedProtocolVersion",
         "workspaceReferenceNotFound"
@@ -226,8 +228,8 @@
   "x-arkdeck-method": "artifact.inspect",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 2,
-    "request": 8,
-    "result": 6
+    "error": 5,
+    "request": 12,
+    "result": 7
   }
 }

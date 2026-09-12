@@ -104,7 +104,7 @@ pub(super) fn validate_show(id: &str, value: &Value) -> Result<(), CliError> {
 
 // The producer sorts parsed Dates, not their textual timezone/fraction spelling.
 // Use Date's 2001 reference epoch and floating-point seconds for the same order.
-fn date_seconds(value: &Value) -> Option<f64> {
+pub(super) fn date_seconds(value: &Value) -> Option<f64> {
     if !date(value) {
         return None;
     }

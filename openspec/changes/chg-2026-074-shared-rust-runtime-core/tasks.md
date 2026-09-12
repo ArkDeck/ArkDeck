@@ -841,7 +841,7 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 
 ## TASK-XPA-014 — Move admission, job store, capability and recovery to Rust with the Swift engine as executor sidecar
 
-- Status:blocked
+- Status:in-progress
 - Platform:macos
 - Requirements:REQ-JOB-001, REQ-JOB-006, REQ-WF-004, POL-AGENT-002, POL-RECOVERY-001, POL-MODE-001, POL-TARGET-001
 - Acceptance:XPA-AC-1, XPA-AC-2, XPA-AC-4, XPA-AC-7, XPA-AC-9; macOS GJ-1..5 re-pass
@@ -861,6 +861,8 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 - Allowed paths:
   - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`
   - `rust/**`
+  - `spec/control/methods/artifact.inspect.json`（Job-backed Artifact read routing: actual Swift missing-owner/integrity refusals）
+  - `spec/baselines/swift-single-v1.json`（refresh the current checkout manifest; the published test view remains the protected-main merge base）
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/**`
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemon/**`
   - `Packages/ArkDeckKit/Sources/ArkDeckAgentDaemonMain/**`
@@ -897,6 +899,7 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 ### Notes / handoff
 
 - Stop condition: any step dispatched without a durable intent; two owners writing SQLite.
+- SQLite/read phase (2026-09-12): Rust reads the unchanged v1 SQLite Job index for list/status/show/timeline and gates Artifact inspect/read through the same Job owner. Actual current Swift fixture replies match Rust daemon/CLI across restart. Unknown record fields refuse; authority, execution, capability, journal and recovery writers remain pending. See `evidence/runs/TASK-XPA-014/job-artifact-read-run.md`.
 - Size: L.
 
 ## TASK-XPA-015 — Port analyzer and workspace providers to Rust (shared with Windows)

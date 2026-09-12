@@ -415,12 +415,23 @@ fn actual_swift_inspect_recording_is_reproduced_from_verified_fixture_content() 
             continue;
         }
         let fixture = Fixture::new();
-        // Exact bytes from ArtifactResourcesContractTests.publish, not a newly
-        // invented recording. The corpus digest binds this fixture reconstruction.
+        // Each successful native producer owns its exact payload. Adding a
+        // new digest requires its source fixture bytes, never a replacement hash.
+        let bytes: &[u8] = if row["result"]["status"] == "missing" {
+            b""
+        } else {
+            [
+                b"fixture-content".as_slice(),
+                b"native fixture bytes\n".as_slice(),
+            ]
+            .into_iter()
+            .find(|bytes| row["result"]["artifactDigest"] == sha256_hex(bytes))
+            .expect("a native inspect producer's complete fixture bytes are required")
+        };
         install_corpus_publication(
             &fixture,
             metadata_from_inspect_projection(&row["result"]),
-            b"fixture-content",
+            bytes,
         );
         let request =
             ArtifactInspectRequest::from_params(row["params"].as_object().unwrap()).unwrap();
@@ -732,4 +743,134 @@ fn inspect_and_read_validate_selected_projection_without_applying_list_sort_to_o
         "cw=="
     );
     assert!(store.list("JOB-1").is_err());
+}
+
+#[test]
+fn rpc_requires_the_job_owner_before_inspecting_or_reading_payloads() {
+    use arkdeck_contract::WireError;
+    use std::cell::Cell;
+    let mut fixture = Fixture::new();
+    let id = fixture.add("rpc", b"bounded-rpc");
+    let store = fixture.store();
+    let params = json!({"owner":{"kind":"job","id":"JOB-1"},"artifactId":id});
+    let calls = Cell::new(0);
+    let existing = |job: &str| {
+        assert_eq!(job, "JOB-1");
+        calls.set(calls.get() + 1);
+        Ok(())
+    };
+    assert_eq!(
+        store
+            .handle_resource("artifact.inspect", params.as_object().unwrap(), existing)
+            .unwrap()["artifactId"],
+        id
+    );
+    assert_eq!(
+        store
+            .handle_resource("artifact.read", params.as_object().unwrap(), existing)
+            .unwrap()["totalByteCount"],
+        11
+    );
+    assert_eq!(calls.get(), 2);
+    let denied = store
+        .handle_resource("artifact.read", params.as_object().unwrap(), |_| {
+            Err(WireError {
+                code: "resourceNotFound".into(),
+                message: "missing Job".into(),
+                details: None,
+            })
+        })
+        .unwrap_err();
+    assert_eq!(denied.code, "resourceNotFound");
+    assert_eq!(denied.details.unwrap()["phase"], "artifactOwner");
+    for code in ["recordUnreadable", "internalError", "outcomeUnknown"] {
+        assert_eq!(
+            store
+                .handle_resource("artifact.inspect", params.as_object().unwrap(), |_| Err(
+                    WireError {
+                        code: code.into(),
+                        message: "unreadable Job".into(),
+                        details: None,
+                    }
+                ))
+                .unwrap_err()
+                .code,
+            "recordUnreadable"
+        );
+    }
+    // Even a corrupt payload must not substitute for Job ownership discovery.
+    fs::set_permissions(
+        fixture.root.join("JOB-1").join(&id),
+        fs::Permissions::from_mode(0o600),
+    )
+    .unwrap();
+    fs::write(fixture.root.join("JOB-1").join(&id), b"changed-rpc").unwrap();
+    fs::set_permissions(
+        fixture.root.join("JOB-1").join(&id),
+        fs::Permissions::from_mode(0o400),
+    )
+    .unwrap();
+    assert_eq!(
+        store
+            .handle_resource("artifact.inspect", params.as_object().unwrap(), existing)
+            .unwrap_err()
+            .code,
+        "artifactIntegrityFailed"
+    );
+}
+
+#[test]
+fn rpc_refusals_preserve_the_artifact_owner_error_contract() {
+    let mut fixture = Fixture::new();
+    let id = fixture.add("sensitive-rpc", b"sensitive");
+    fixture.rows[0]["privacy"] = json!("sensitive");
+    fixture.save();
+    let store = fixture.store();
+    for (method, params, code) in [
+        (
+            "artifact.read",
+            json!({"owner":{"kind":"job","id":"JOB-1"},"artifactId":id}),
+            "sensitiveAccessDenied",
+        ),
+        (
+            "artifact.read",
+            json!({"owner":{"kind":"job","id":"JOB-1"},"artifactId":"missing"}),
+            "resourceNotFound",
+        ),
+        (
+            "artifact.read",
+            json!({"owner":{"kind":"job","id":"JOB-1"},"artifactId":id,"maxBytes":0}),
+            "invalidInput",
+        ),
+        (
+            "artifact.inspect",
+            json!({"owner":{"kind":"import","id":"imp-00000000-0000-0000-0000-000000000000"},"artifactId":id}),
+            "operationUnavailable",
+        ),
+        (
+            "artifact.inspect",
+            json!({"owner":{"kind":"job","id":"../JOB-1"},"artifactId":id}),
+            "invalidInput",
+        ),
+    ] {
+        let error = store
+            .handle_resource(method, params.as_object().unwrap(), |_| Ok(()))
+            .unwrap_err();
+        assert_eq!(error.code, code);
+        assert_eq!(error.details.unwrap()["newDispatchCount"], 0);
+    }
+    for params in [
+        json!({}),
+        json!({"owner":{"kind":"job","id":"JOB-1"},"artifactId":id,"path":"/tmp"}),
+    ] {
+        assert_eq!(
+            store
+                .handle_resource("artifact.inspect", params.as_object().unwrap(), |_| panic!(
+                    "malformed request entered Job owner"
+                ))
+                .unwrap_err()
+                .code,
+            "invalidInput"
+        );
+    }
 }

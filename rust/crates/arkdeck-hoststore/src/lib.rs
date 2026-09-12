@@ -7,6 +7,17 @@
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 #[cfg(target_os = "macos")]
+mod job_owner;
+#[cfg(target_os = "macos")]
+mod job_record;
+#[cfg(target_os = "macos")]
+mod job_repository;
+#[cfg(target_os = "macos")]
+pub use job_owner::JobStore;
+#[cfg(target_os = "macos")]
+pub use job_record::JobRecord;
+
+#[cfg(target_os = "macos")]
 mod history_owner;
 #[cfg(target_os = "macos")]
 pub use history_owner::HistoryStore;
@@ -341,3 +352,6 @@ pub use artifact_read_owner::{
 mod artifact_projection;
 #[cfg(target_os = "macos")]
 pub use artifact_projection::{ArtifactInspectRequest, ArtifactReadRequest};
+
+#[cfg(target_os = "macos")]
+mod artifact_resources;

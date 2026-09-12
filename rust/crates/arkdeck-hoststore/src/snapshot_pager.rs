@@ -103,6 +103,18 @@ impl SnapshotPager {
         cursor: Option<&str>,
         items: impl FnOnce() -> Result<Vec<Value>, WireError>,
     ) -> Result<Value, WireError> {
+        self.page_filtered(method, &json!({}), order, page_size, cursor, items)
+    }
+
+    pub(crate) fn page_filtered(
+        &self,
+        method: &str,
+        filters: &Value,
+        order: &str,
+        page_size: usize,
+        cursor: Option<&str>,
+        items: impl FnOnce() -> Result<Vec<Value>, WireError>,
+    ) -> Result<Value, WireError> {
         if !(1..=1000).contains(&page_size) {
             return Err(failure(
                 "invalidInput",
@@ -110,7 +122,7 @@ impl SnapshotPager {
             ));
         }
         let query = canonical_json(
-            &json!({"method":method,"filters":{},"order":order,"pageSize":page_size}),
+            &json!({"method":method,"filters":filters,"order":order,"pageSize":page_size}),
         )
         .map_err(unreadable)?;
         let digest = sha256_hex(&query);

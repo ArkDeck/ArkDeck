@@ -85,6 +85,46 @@ final class JobReadResourcesContractTests: XCTestCase {
     try RuntimeJobRepository(stateDirectory: state).updateJobState(jobID: record.jobID, state: record.state,
       updatedAtUTC: date, recordData: record.durableData())
   }
+
+  /// Produce a disposable current SQLite fixture and native read responses for
+  /// the Rust owner migration. No device, capability or journal is fabricated.
+  func testRustJobOwnerCurrentSQLiteFixture() async throws {
+    try seed("job-rust-a", timeline: ["native producer", "completed"])
+    try seed("job-rust-b", status: "waitingForRecovery", timeline: ["outcome unknown; never replay"])
+    let requests: [(String, [String: JSONValue])] = [
+      ("job.status", ["jobId": .string("job-rust-a")]),
+      ("job.show", ["jobId": .string("job-rust-a")]),
+      ("job.status", ["jobId": .string("job-rust-b")]),
+      ("job.list", ["includeTimeline": .bool(true)]),
+      ("job.timeline", ["jobId": .string("job-rust-a")]),
+    ]
+    let handler = RuntimeControlPlaneHandler(engine: engine, capabilityStore: capabilities,
+      providerIDs: ["hdc"], nowUTC: { "2026-08-31T12:00:00Z" }, targetStore: targets, artifactStore: artifacts)
+    var responses: [JSONValue] = []
+    for (method, params) in requests {
+      let response = await handler.handleFrame(try PortableCanonicalJSON.canonicalBytes(.object([
+        "protocolVersion": .string(ArkDeckControlProtocol.currentVersion),
+        "contractIdentity": .string(ArkDeckControlProtocol.contractIdentity),
+        "id": .string("rust-job-owner-oracle"), "method": .string(method), "params": .object(params),
+      ])))
+      XCTAssertTrue(response.ok, "\(method): \(String(describing: response.error))")
+      responses.append(.object(["method": .string(method), "params": .object(params),
+        "result": try XCTUnwrap(response.result)]))
+    }
+    guard let output = ProcessInfo.processInfo.environment["ARKDECK_RUST_JOB_FIXTURE_OUTPUT"] else { return }
+    let destination = URL(fileURLWithPath: output, isDirectory: true)
+    XCTAssertTrue(destination.path.hasPrefix("/private/tmp/"))
+    guard destination.path.hasPrefix("/private/tmp/"), !FileManager.default.fileExists(atPath: destination.path) else {
+      throw FixtureError.missing
+    }
+    try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: false,
+      attributes: [.posixPermissions: 0o700])
+    // The fixture is quiescent: all seed transactions and read responses above
+    // finished. Preserve the complete SQLite/WAL/SHM set without checkpointing
+    // or changing any bytes in the producer's state directory.
+    try FileManager.default.copyItem(at: state, to: destination.appending(path: "jobs-state"))
+    try PortableCanonicalJSON.canonicalBytes(.array(responses)).write(to: destination.appending(path: "swift-results.json"))
+  }
   private func page(_ params: [String: JSONValue] = [:]) async throws -> [String: JSONValue] {
     try object(await engine.jobListSnapshot(RuntimeJobListQuery(params)))
   }
