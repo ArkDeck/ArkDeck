@@ -137,3 +137,5 @@ method frames and existing method corpus. At that frozen revision the v2 checkou
 merge-base with `origin/main`; no baseline-revision override or Scope-Extension
 is used. Installed activation, device execution and overall Task012 completion
 remain outside this slice.
+
+Before push, the candidate also integrates main `d71ab48f` (#1878). That upstream delta changes only `rust/README.md`, `rust/scripts/check-contracts.py` and `rust/scripts/test_contract_checks.py`; product sources, schemas and fixtures are byte-identical to the full-gate-tested candidate above. The updated contract harness passed all 32 regression tests, and contract generation check passed (`/private/tmp/xpa-session-contract-harness-d71.log`). The complete product gate is retained from base `4e2a615e`; it was not redundantly rebuilt for this script-only integration.
