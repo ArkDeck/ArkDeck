@@ -11,6 +11,9 @@ change approved 前保持 blocked;approved 后每任务另需独立 readiness PR
 
 ## TASK-AIN-001 — 治理文档面同步(host-only)
 
+- Maintenance scope:补充根 `AGENTS.md` 的按需指南拆分与 `scripts/README.md` 目录索引维护。
+  下列四个新增路径须先经维护者 review/merge 进入 protected `main`，后续文档实现 PR 才可使用；
+  不改变设备安全、Runtime authority、验收或审批语义，原有 done 历史与 evidence 保持不变。
 - Status:done
 - Done:2026-07-22;实现经 #287 合入 main(merge commit `c0d5253389faf8f9e90bceea5dd2c02fec83710b`);done recheck 于合入版 `4621a73001e53277cfb5ca0d718c76145e8f4ac9` 复验:AIN-DOC-001 grep 残留 0、guard 0/0/111;evidence = `evidence/runs/TASK-AIN-001/run.md`
 - Platform:macos
@@ -19,6 +22,10 @@ change approved 前保持 blocked;approved 后每任务另需独立 readiness PR
 - Depends on:none(change approved 后)
 - Allowed paths:
   - `AGENTS.md`
+  - `scripts/agent-guides/acceptance.md`
+  - `scripts/agent-guides/contributing.md`
+  - `scripts/agent-guides/instructions.md`
+  - `scripts/README.md`
   - `openspec/governance/enforcement.md`
   - `openspec/verification/policy.md`
   - `openspec/verification/hardware-matrix.md`(仅序言的执行模型表述)
