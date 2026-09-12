@@ -296,9 +296,9 @@ def main() -> None:
                        ["job", "status", "--job", "JOB-unknown"], 1, "operationFailed")
                 for method in registry["methods"]:
                     expected = ("rejected" if method not in SUPPORTED or method == "device.observations" else None)
-                    if method in {"runtime.tool.inspect", "runtime.bundle.inspect", "operation.describe", "runtime.tool.register", "runtime.bundle.remove"}:
+                    if method in {"runtime.tool.inspect", "runtime.bundle.inspect", "operation.describe", "runtime.tool.register", "runtime.bundle.remove", "runtime.tool.remove"}:
                         expected = "invalidParams"
-                    if method == "runtime.bundle.list":
+                    if method in {"runtime.bundle.list", "runtime.tool.list"}:
                         expected = "operationUnavailable"
                     exchange(endpoint, directory, rows, method, encode(request(registry, method, method)), method, expected)
                 wire_descriptor = exchange(endpoint, directory, rows, "descriptor-success",

@@ -1,0 +1,436 @@
+{
+  "$defs": {
+    "errorCode": {
+      "enum": [
+        "admissionDenied",
+        "conflict",
+        "fileIdentityChanged",
+        "inputTooLarge",
+        "internalError",
+        "invalidInput",
+        "invalidParams",
+        "ioFailure",
+        "malformedFrame",
+        "notFound",
+        "operationUnavailable",
+        "outcomeUnknown",
+        "quotaExceeded",
+        "recordUnreadable",
+        "rejected",
+        "resourceConflict",
+        "resourceNotFound",
+        "unknownMethod",
+        "unsupportedProtocolVersion",
+        "workspaceReferenceNotFound"
+      ]
+    },
+    "errorDetails": {
+      "additionalProperties": false,
+      "properties": {
+        "newDispatchCount": {
+          "type": "integer"
+        },
+        "phase": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "newDispatchCount",
+        "phase"
+      ],
+      "type": "object"
+    },
+    "request": {
+      "additionalProperties": false,
+      "properties": {
+        "expectedGeneration": {
+          "type": "string"
+        },
+        "tool": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "expectedGeneration",
+        "tool"
+      ],
+      "type": "object"
+    },
+    "result": {
+      "additionalProperties": false,
+      "properties": {
+        "activeSelectionGeneration": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "apiVersion": {
+          "type": "string"
+        },
+        "buildNumber": {
+          "type": "string"
+        },
+        "byteCount": {
+          "type": "string"
+        },
+        "childTools": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "byteCount": {
+                "type": "string"
+              },
+              "executable": {
+                "type": "boolean"
+              },
+              "role": {
+                "type": "string"
+              },
+              "sha256": {
+                "type": "string"
+              },
+              "trust": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "codeDirectoryIdentitySHA256": {
+                        "type": "string"
+                      },
+                      "executionAssessment": {
+                        "type": "string"
+                      },
+                      "platformTrust": {
+                        "type": "string"
+                      },
+                      "policy": {
+                        "type": "string"
+                      },
+                      "profileReferences": {
+                        "type": "array"
+                      },
+                      "registeredIdentity": {
+                        "type": "boolean"
+                      },
+                      "signature": {
+                        "type": "string"
+                      },
+                      "signingIdentifier": {
+                        "type": "string"
+                      },
+                      "teamIdentifier": {
+                        "type": "string"
+                      },
+                      "toolVersion": {
+                        "type": "null"
+                      },
+                      "versionSource": {
+                        "type": "null"
+                      }
+                    },
+                    "required": [
+                      "codeDirectoryIdentitySHA256",
+                      "executionAssessment",
+                      "platformTrust",
+                      "policy",
+                      "profileReferences",
+                      "registeredIdentity",
+                      "signature",
+                      "signingIdentifier",
+                      "teamIdentifier",
+                      "toolVersion",
+                      "versionSource"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "type": [
+                      "null"
+                    ]
+                  }
+                ]
+              }
+            },
+            "required": [
+              "byteCount",
+              "executable",
+              "role",
+              "sha256",
+              "trust"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "contentDigest": {
+          "type": "string"
+        },
+        "contentRetained": {
+          "type": "boolean"
+        },
+        "contentSchemaVersion": {
+          "type": "string"
+        },
+        "dependencies": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "byteCount": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "quarantineSHA256": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "sha256": {
+                "type": "string"
+              },
+              "trust": {
+                "additionalProperties": false,
+                "properties": {
+                  "codeDirectoryIdentitySHA256": {
+                    "type": [
+                      "null",
+                      "string"
+                    ]
+                  },
+                  "executionAssessment": {
+                    "type": "string"
+                  },
+                  "platformTrust": {
+                    "type": "string"
+                  },
+                  "policy": {
+                    "type": "string"
+                  },
+                  "profileReferences": {
+                    "type": "array"
+                  },
+                  "registeredIdentity": {
+                    "type": "boolean"
+                  },
+                  "signature": {
+                    "type": "string"
+                  },
+                  "signingIdentifier": {
+                    "type": [
+                      "null",
+                      "string"
+                    ]
+                  },
+                  "teamIdentifier": {
+                    "type": "null"
+                  },
+                  "toolVersion": {
+                    "type": "null"
+                  },
+                  "versionSource": {
+                    "type": "null"
+                  }
+                },
+                "required": [
+                  "codeDirectoryIdentitySHA256",
+                  "executionAssessment",
+                  "platformTrust",
+                  "policy",
+                  "profileReferences",
+                  "registeredIdentity",
+                  "signature",
+                  "signingIdentifier",
+                  "teamIdentifier",
+                  "toolVersion",
+                  "versionSource"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "byteCount",
+              "name",
+              "quarantineSHA256",
+              "sha256",
+              "trust"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "dependencyLayout": {
+          "type": "string"
+        },
+        "digestAlgorithm": {
+          "type": "string"
+        },
+        "executableSHA256": {
+          "type": "string"
+        },
+        "generation": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "platform": {
+          "type": "string"
+        },
+        "productVersion": {
+          "type": "string"
+        },
+        "quarantineSHA256": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "references": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "kind"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "registeredAt": {
+          "type": "string"
+        },
+        "relocatable": {
+          "type": "boolean"
+        },
+        "schemaVersion": {
+          "type": "string"
+        },
+        "sdkVersion": {
+          "type": "string"
+        },
+        "selected": {
+          "type": "boolean"
+        },
+        "source": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "toolRef": {
+          "type": "string"
+        },
+        "trust": {
+          "additionalProperties": false,
+          "properties": {
+            "codeDirectoryIdentitySHA256": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "executionAssessment": {
+              "type": "string"
+            },
+            "platformTrust": {
+              "type": "string"
+            },
+            "policy": {
+              "type": "string"
+            },
+            "profileReferences": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "registeredIdentity": {
+              "type": "boolean"
+            },
+            "signature": {
+              "type": "string"
+            },
+            "signingIdentifier": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "teamIdentifier": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "toolVersion": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "versionSource": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "required": [
+            "codeDirectoryIdentitySHA256",
+            "executionAssessment",
+            "platformTrust",
+            "policy",
+            "profileReferences",
+            "registeredIdentity",
+            "signature",
+            "signingIdentifier",
+            "teamIdentifier",
+            "toolVersion",
+            "versionSource"
+          ],
+          "type": "object"
+        }
+      },
+      "required": [
+        "contentDigest",
+        "contentRetained",
+        "contentSchemaVersion",
+        "digestAlgorithm",
+        "generation",
+        "kind",
+        "platform",
+        "references",
+        "schemaVersion",
+        "selected",
+        "source",
+        "state",
+        "toolRef",
+        "trust"
+      ],
+      "type": "object"
+    }
+  },
+  "$id": "https://arkdeck.dev/schemas/control/methods/runtime.tool.remove.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "Typed contract of the control-plane method `runtime.tool.remove` on the single current protocol: the request parameters a caller may send, the result the Runtime answers with, and the structured error details it attaches to a refusal. Derived from frames recorded by a contract-test run; the committed corpus under Tests/ArkDeckContractTests/Fixtures/ControlFrames is validated against it.",
+  "title": "arkdeck.control.method/runtime.tool.remove",
+  "x-arkdeck-contractIdentity": "7d2b21e1e0f8af9710a4fda16e1866fe7f18ab03484da85dee23ec7a90d797ab",
+  "x-arkdeck-method": "runtime.tool.remove",
+  "x-arkdeck-protocolVersion": "1.0.0",
+  "x-arkdeck-sampleCounts": {
+    "error": 6,
+    "request": 10,
+    "result": 4
+  }
+}

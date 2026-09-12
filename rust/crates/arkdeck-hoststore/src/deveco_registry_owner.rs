@@ -18,8 +18,8 @@ const EMPTY_BUNDLES: &[u8] = b"{\"records\":[],\"schemaVersion\":\"arkdeck.boots
 const EMPTY_DEVECO: &[u8] =
     b"{\"records\":[],\"schemaVersion\":\"arkdeck.bootstrap-deveco-toolchains/1\"}";
 pub struct DevEcoRegistryStore {
-    root: HostDirectory,
-    path: PathBuf,
+    pub(crate) root: HostDirectory,
+    pub(crate) path: PathBuf,
 }
 fn corrupt() -> io::Error {
     io::Error::new(

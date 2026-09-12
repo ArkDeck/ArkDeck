@@ -297,9 +297,13 @@ pub mod tool_macho;
 #[cfg(target_os = "macos")]
 pub use tool_content::{ToolContent, ToolDependency, inspect_tool_content};
 #[cfg(target_os = "macos")]
+mod tool_list_owner;
+#[cfg(target_os = "macos")]
 mod tool_registration;
 #[cfg(target_os = "macos")]
 mod tool_registry_owner;
+#[cfg(target_os = "macos")]
+mod tool_retirement;
 #[cfg(target_os = "macos")]
 pub use tool_registry_owner::ToolRegistryStore;
 

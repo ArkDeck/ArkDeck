@@ -3624,6 +3624,22 @@
     },
     {
       "classification": "local",
+      "conformanceFixture": "argv/runtime.tool.list.json",
+      "equivalentCommands": [],
+      "feature": "runtime.tool.list",
+      "implementationStatusByPlatform": {
+        "macos": "implemented"
+      },
+      "lifecycle": "current",
+      "requiredPlatforms": [
+        "macos"
+      ],
+      "source": "daemon:runtime.tool.list",
+      "targetClassification": "local",
+      "targetCommand": "arkdeck runtime tool list"
+    },
+    {
+      "classification": "local",
       "conformanceFixture": "argv/runtime.tool.register.json",
       "equivalentCommands": [],
       "feature": "runtime.tool.register",
@@ -3651,7 +3667,7 @@
       "requiredPlatforms": [
         "macos"
       ],
-      "source": "cli:runtime.tool.remove",
+      "source": "daemon:runtime.tool.remove",
       "targetClassification": "local",
       "targetCommand": "arkdeck runtime tool remove --tool <tool-reference> --expected-generation <generation>"
     },
@@ -4646,7 +4662,7 @@
       "direct": 126,
       "generic": 1,
       "internal": 4,
-      "local": 89,
+      "local": 90,
       "platformService": 4,
       "presentation": 21,
       "refused": 10
@@ -4654,10 +4670,10 @@
     "bySource": {
       "app": 68,
       "catalog": 30,
-      "cli": 55,
-      "daemon": 102
+      "cli": 54,
+      "daemon": 104
     },
-    "entries": 255,
+    "entries": 256,
     "fullFunction": true
   }
 }

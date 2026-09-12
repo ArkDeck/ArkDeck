@@ -111,6 +111,8 @@ fn every_unimplemented_method_is_refused_without_entering_the_host() {
             "doctor",
             "operation.list",
             "device.observations",
+            "runtime.tool.list",
+            "runtime.tool.remove",
             "runtime.tool.inspect",
             "runtime.bundle.inspect",
             "operation.describe",
@@ -339,7 +341,7 @@ fn deveco_registration_is_closed_and_unpublished_views_never_reach_an_owner() {
 }
 
 #[test]
-fn registration_lost_classified_receipts_preserve_uncertainty_after_one_owner_call() {
+fn bootstrap_mutation_lost_classified_receipts_preserve_uncertainty_after_one_owner_call() {
     struct ReceiptFailureHost {
         calls: Arc<AtomicUsize>,
         receipt: Result<Value, WireError>,
@@ -357,14 +359,31 @@ fn registration_lost_classified_receipts_preserve_uncertainty_after_one_owner_ca
         fn bootstrap_register_hdc(&self, file: &str) -> Result<Value, WireError> {
             self.bootstrap_register_deveco(file)
         }
+        fn bootstrap_tool_remove(&self, reference: &str, _: &str) -> Result<Value, WireError> {
+            self.bootstrap_register_deveco(reference)
+        }
         fn bootstrap_register_deveco(&self, _: &str) -> Result<Value, WireError> {
             self.calls.fetch_add(1, Ordering::SeqCst);
             self.receipt.clone()
         }
     }
-    for params in [
-        json!({"kind":"deveco","root":"/A.app/Contents"}),
-        json!({"kind":"hdc","file":"/tmp/hdc"}),
+    for (method, params) in [
+        (
+            "runtime.tool.register",
+            json!({"kind":"deveco","root":"/A.app/Contents"}),
+        ),
+        (
+            "runtime.tool.register",
+            json!({"kind":"hdc","file":"/tmp/hdc"}),
+        ),
+        (
+            "runtime.tool.remove",
+            json!({"tool":"tool:sha256:a", "expectedGeneration":"1"}),
+        ),
+        (
+            "runtime.tool.remove",
+            json!({"tool":"toolchain:sha256:b", "expectedGeneration":"1"}),
+        ),
     ] {
         for receipt in [
             Ok(json!({"invalidReceipt": true})),
@@ -385,7 +404,6 @@ fn registration_lost_classified_receipts_preserve_uncertainty_after_one_owner_ca
                 receipt,
             })
             .unwrap();
-            let method = "runtime.tool.register";
             if !METHODS.contains(&method) {
                 let request = Request::new("test", method, Some(serde_json::Map::new()));
                 let frame = encode_frame(&request, MAX_REQUEST_BYTES).unwrap();
@@ -469,5 +487,69 @@ fn bundle_retirement_is_typed_and_unconfigured_owner_is_explicit() {
     .unwrap_err();
     assert_eq!(error.code, "operationUnavailable");
     assert_eq!(error.details.unwrap()["phase"], "bootstrapRegistryOwner");
+    assert_eq!(reads.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn tool_retirement_is_typed_and_unconfigured_owner_is_explicit() {
+    let (control, reads) = setup();
+    let method = "runtime.tool.remove";
+    if !METHODS.contains(&method) {
+        return;
+    }
+    for params in [
+        json!({}),
+        json!({"tool":null,"expectedGeneration":"1"}),
+        json!({"tool":"invalid","expectedGeneration":1}),
+        json!({"tool":"invalid","expectedGeneration":"1","path":"/tmp"}),
+    ] {
+        assert_eq!(
+            call(&control, method, params).outcome.unwrap_err().code,
+            "invalidParams"
+        );
+    }
+    let error = call(
+        &control,
+        method,
+        json!({"tool":"invalid","expectedGeneration":"2"}),
+    )
+    .outcome
+    .unwrap_err();
+    assert_eq!(error.code, "operationUnavailable");
+    assert_eq!(error.details.unwrap()["phase"], "bootstrapRegistryOwner");
+    assert_eq!(reads.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn tool_list_structure_is_closed_and_unconfigured_owner_is_explicit() {
+    let (control, reads) = setup();
+    let method = "runtime.tool.list";
+    if !METHODS.contains(&method) {
+        let request = Request::new("test", method, Some(serde_json::Map::new()));
+        let frame = encode_frame(&request, MAX_REQUEST_BYTES).unwrap();
+        let reply: Value =
+            serde_json::from_slice(&control.handle_frame(&frame[..frame.len() - 1])).unwrap();
+        assert_eq!(reply["error"]["code"], "unknownMethod");
+        return;
+    }
+    for params in [
+        json!({"pageSize":null}),
+        json!({"pageSize":1.5}),
+        json!({"cursor":1}),
+        json!({"path":"/private/tmp/forbidden"}),
+    ] {
+        let error = call(&control, method, params).outcome.unwrap_err();
+        assert_eq!(error.code, "invalidParams");
+        assert_eq!(error.details.unwrap()["newDispatchCount"], 0);
+    }
+    for params in [
+        json!({}),
+        json!({"pageSize":1}),
+        json!({"pageSize":0,"cursor":"invalid"}),
+    ] {
+        let error = call(&control, method, params).outcome.unwrap_err();
+        assert_eq!(error.code, "operationUnavailable");
+        assert_eq!(error.details.unwrap()["phase"], "bootstrapRegistryOwner");
+    }
     assert_eq!(reads.load(Ordering::SeqCst), 0);
 }

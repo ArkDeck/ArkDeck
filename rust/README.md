@@ -204,8 +204,22 @@ The isolated Rust owner also accepts `runtime tool register --kind deveco --root
 then publishes the existing Swift registry format under the shared Bootstrap
 lock. Re-registration preserves the reference and metadata; uncertain publication
 returns `outcomeUnknown` without replay. The current Swift registration CLI uses
-the typed RPC for DevEco. HDC registration, selection and installed activation
-remain pending.
+the typed RPC for DevEco. Rust HDC registration through the same typed method
+merged in PR #1860 (`d00e4ec`); the Swift HDC registration path remains in process.
+Selection and installed activation remain pending.
+
+The existing `runtime tool list` and `runtime tool remove` leaves now use typed
+Runtime calls in both CLI consumers. The Rust owner merges HDC and DevEco
+inventory into immutable `toolRef:asc` pages, validates current native content
+before continuation, and preserves restart/cursor behavior. Retirement accepts
+an exact reference and expected generation `1`, rejects retained references,
+keeps content unchanged, and returns the same generation `2` receipt on repeat.
+A missing or inconsistent publication receipt is `outcomeUnknown`, with no replay.
+Run `rust/scripts/check-tool-list.py` and `rust/scripts/check-tool-retirement.py`
+with the configured Python interpreter against candidate binaries. Both use
+fresh temporary registries; `--native-registry` copies an explicit temporary
+Swift-produced registry to cover DevEco alongside HDC, and `--cli-path` selects
+the Swift consumer. These checks do not activate the installed Runtime.
 
 For an explicit native macOS check, build the candidate binaries in release mode
 and run `python3 rust/scripts/check-deveco-register.py --bin-dir <release-dir>
@@ -255,8 +269,8 @@ waiting for the existing terminal-child and complete process-group proof. It
 resolves a transient `EPERM` only within the cleanup budget and before reaping;
 unproven groups, other signal errors and lost child ownership remain failures.
 
-The published pin has 99 methods; the candidate registry adds DevEco Bootstrap
-registration. Methods without a migrated host handler are structurally
+The published pin has 102 methods at `d00e4ec`; the 104-method candidate registry
+adds Tool list and metadata retirement. Methods without a migrated host handler are structurally
 understood and refused.
 There is no Runtime capability owner, recovery, journal, durable target store,
 device mutation, flash lowering, Swift replacement or production cutover here.

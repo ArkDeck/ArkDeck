@@ -103,8 +103,10 @@ public struct RuntimeControlPlaneHandler: Sendable {
   private let bootstrapDevEcoRegistrar: (@Sendable (String) async throws -> JSONValue)?
   private let bootstrapToolInspector: (@Sendable (String) async throws -> JSONValue)?
   private let bootstrapBundleRetirer: (@Sendable (String, String) async throws -> JSONValue)?
+  private let bootstrapToolRetirer: (@Sendable (String, String) async throws -> JSONValue)?
   private let bootstrapBundleInspector: (@Sendable (String) async throws -> JSONValue)?
   private let bootstrapBundleLister: (@Sendable (Int, String?) async throws -> JSONValue)?
+  private let bootstrapToolLister: (@Sendable (Int, String?) async throws -> JSONValue)?
   private let toolSelectionActions: RuntimeToolSelectionControlActionCoordinator?
   private let controlActions: RuntimeControlActionResourceCoordinator?
   private let artifactStore: RuntimeArtifactStore?
@@ -158,8 +160,10 @@ public struct RuntimeControlPlaneHandler: Sendable {
     bootstrapDevEcoRegistrar: (@Sendable (String) async throws -> JSONValue)? = nil,
     bootstrapToolInspector: (@Sendable (String) async throws -> JSONValue)? = nil,
     bootstrapBundleRetirer: (@Sendable (String, String) async throws -> JSONValue)? = nil,
+    bootstrapToolRetirer: (@Sendable (String, String) async throws -> JSONValue)? = nil,
     bootstrapBundleInspector: (@Sendable (String) async throws -> JSONValue)? = nil,
     bootstrapBundleLister: (@Sendable (Int, String?) async throws -> JSONValue)? = nil,
+    bootstrapToolLister: (@Sendable (Int, String?) async throws -> JSONValue)? = nil,
     controlActions: RuntimeControlActionResourceCoordinator? = nil,
     artifactStore: RuntimeArtifactStore? = nil,
     historyFilterStore: RuntimeHistoryFilterStore? = nil,
@@ -192,8 +196,10 @@ public struct RuntimeControlPlaneHandler: Sendable {
       bootstrapDevEcoRegistrar: bootstrapDevEcoRegistrar,
       bootstrapToolInspector: bootstrapToolInspector,
       bootstrapBundleRetirer: bootstrapBundleRetirer,
+      bootstrapToolRetirer: bootstrapToolRetirer,
       bootstrapBundleInspector: bootstrapBundleInspector,
       bootstrapBundleLister: bootstrapBundleLister,
+      bootstrapToolLister: bootstrapToolLister,
       controlActions: controlActions,
       artifactStore: artifactStore,
       historyFilterStore: historyFilterStore,
@@ -232,8 +238,10 @@ public struct RuntimeControlPlaneHandler: Sendable {
     bootstrapDevEcoRegistrar: (@Sendable (String) async throws -> JSONValue)? = nil,
     bootstrapToolInspector: (@Sendable (String) async throws -> JSONValue)? = nil,
     bootstrapBundleRetirer: (@Sendable (String, String) async throws -> JSONValue)? = nil,
+    bootstrapToolRetirer: (@Sendable (String, String) async throws -> JSONValue)? = nil,
     bootstrapBundleInspector: (@Sendable (String) async throws -> JSONValue)? = nil,
     bootstrapBundleLister: (@Sendable (Int, String?) async throws -> JSONValue)? = nil,
+    bootstrapToolLister: (@Sendable (Int, String?) async throws -> JSONValue)? = nil,
     controlActions: RuntimeControlActionResourceCoordinator? = nil,
     artifactStore: RuntimeArtifactStore?,
     historyFilterStore: RuntimeHistoryFilterStore? = nil,
@@ -271,8 +279,10 @@ public struct RuntimeControlPlaneHandler: Sendable {
     self.bootstrapDevEcoRegistrar = bootstrapDevEcoRegistrar
     self.bootstrapToolInspector = bootstrapToolInspector
     self.bootstrapBundleRetirer = bootstrapBundleRetirer
+    self.bootstrapToolRetirer = bootstrapToolRetirer
     self.bootstrapBundleInspector = bootstrapBundleInspector
     self.bootstrapBundleLister = bootstrapBundleLister
+    self.bootstrapToolLister = bootstrapToolLister
     self.controlActions = controlActions
     self.artifactStore = artifactStore
     self.historyFilterStore = historyFilterStore
@@ -357,6 +367,10 @@ public struct RuntimeControlPlaneHandler: Sendable {
       return await jobLifecycleRequest(request)
     }
     switch request.method {
+    case "runtime.tool.remove":
+      return await bootstrapToolRetirementRequest(request)
+    case "runtime.tool.list":
+      return await bootstrapToolListRequest(request)
     case "runtime.tool.register":
       return await bootstrapRegistrationRequest(request)
 
@@ -2689,6 +2703,42 @@ public struct RuntimeControlPlaneHandler: Sendable {
         ]))
   }
 
+  // Retirement changes registry metadata only; registered content remains intact.
+  private func bootstrapToolRetirementRequest(_ request: AgentWireProtocol.Request) async -> AgentWireProtocol.Response {
+    func failed(_ code: String, _ message: String) -> AgentWireProtocol.Response {
+      .init(id: request.id, ok: false, result: nil,
+        error: .init(code: code, message: message,
+          details: ["phase": .string("bootstrapRegistryOwner"), "newDispatchCount": .integer(0)]))
+    }
+    let fields = request.params ?? [:]
+    guard Set(fields.keys) == ["tool", "expectedGeneration"],
+      case .string(let reference)? = fields["tool"],
+      case .string(let generation)? = fields["expectedGeneration"] else {
+      return failed("invalidParams", "tool retirement requires typed tool and expectedGeneration strings")
+    }
+    guard let retire = bootstrapToolRetirer else {
+      return failed("operationUnavailable", "bootstrap tool retirement is unavailable")
+    }
+    do {
+      let result = try await retire(reference, generation)
+      // An oversized result follows a possible publication: never call it a safe refusal.
+      guard let bounded = try? RuntimeJobReadProjection.bounded(result,
+        maximumBytes: ArkDeckControlProtocol.maximumResponseFrameBytes - 4096) else {
+        return failed("outcomeUnknown", "tool retirement completed but its receipt could not be bounded")
+      }
+      return .init(id: request.id, ok: true, result: bounded, error: nil)
+    } catch let error as AgentExecutionControlFailure {
+      switch error.code {
+      case "invalidInput", "resourceNotFound", "resourceConflict", "admissionDenied",
+        "recordUnreadable", "quotaExceeded", "ioFailure", "fileIdentityChanged", "inputTooLarge", "outcomeUnknown":
+        return failed(error.code, error.message)
+      default: return failed("outcomeUnknown", "tool retirement outcome is uncertain; inspect the exact reference")
+      }
+    } catch {
+      return failed("outcomeUnknown", "tool retirement outcome is uncertain; inspect the exact reference")
+    }
+  }
+
   // Registration writes local registry metadata but never selects or executes
   // a tool. Zero device dispatch is not proof of zero host publication.
   private func bootstrapRegistrationRequest(_ request: AgentWireProtocol.Request) async -> AgentWireProtocol.Response {
@@ -2729,7 +2779,52 @@ public struct RuntimeControlPlaneHandler: Sendable {
     }
   }
 
-  // Host bootstrap reads consume only exact references, never registration paths.
+  // Discovery reads current verified inventory before serving its immutable page.
+  private func bootstrapToolListRequest(_ request: AgentWireProtocol.Request) async -> AgentWireProtocol.Response {
+    func failed(_ code: String, _ message: String) -> AgentWireProtocol.Response {
+      .init(id: request.id, ok: false, result: nil,
+        error: .init(code: code, message: message,
+          details: ["phase": .string("bootstrapRegistryOwner"), "newDispatchCount": .integer(0)]))
+    }
+    let fields = request.params ?? [:]
+    guard Set(fields.keys).isSubset(of: ["pageSize", "cursor"]) else {
+      return failed("invalidParams", "tool list accepts only pageSize and cursor")
+    }
+    let size: Int
+    switch fields["pageSize"] {
+    case nil: size = 100
+    case .integer(let value)?:
+      guard let exact = Int(exactly: value) else { return failed("invalidParams", "pageSize must be an integer") }
+      size = exact
+    case .unsignedInteger(let value)?:
+      guard let exact = Int(exactly: value) else { return failed("invalidParams", "pageSize must be an integer") }
+      size = exact
+    default: return failed("invalidParams", "pageSize must be an integer")
+    }
+    let cursor: String?
+    switch fields["cursor"] {
+    case nil: cursor = nil
+    case .string(let value)?: cursor = value
+    default: return failed("invalidParams", "cursor must be a string")
+    }
+    guard let list = bootstrapToolLister else {
+      return failed("operationUnavailable", "bootstrap tool list owner is unavailable")
+    }
+    do {
+      // Preserve current inventory validation before range/cursor checks.
+      let value = try await list(size, cursor)
+      return .init(id: request.id, ok: true,
+        result: try RuntimeJobReadProjection.bounded(value,
+          maximumBytes: ArkDeckControlProtocol.maximumResponseFrameBytes - 4096), error: nil)
+    } catch let error as AgentExecutionControlFailure {
+      switch error.code {
+      case "resourceConflict", "admissionDenied", "invalidInput", "invalidCursor", "inputTooLarge", "fileIdentityChanged", "ioFailure", "outcomeUnknown", "operationUnavailable":
+        return failed(error.code, error.message)
+      default: return failed("recordUnreadable", "tool inventory or snapshot is unreadable")
+      }
+    } catch { return failed("recordUnreadable", "tool inventory or snapshot is unreadable") }
+  }
+
   private func bootstrapBundleListRequest(_ request: AgentWireProtocol.Request) async -> AgentWireProtocol.Response {
     func failed(_ code: String, _ message: String) -> AgentWireProtocol.Response {
       .init(id: request.id, ok: false, result: nil,
