@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
-"""Verify the published Swift input pin independently of candidate files.
+"""Generate and verify the Rust contract bindings from this checkout's Swift inputs.
 
---write requires a commit in origin/main history. --check reads immutable Git
-objects, verifies the complete pin and compares generated Rust without writing.
-Candidate conformance is checked separately by check-contracts.py in isolation.
-Neither input view is a hardware acceptance certificate.
+The committed manifest `spec/baselines/swift-single-v1.json` describes the
+contract inputs of the checkout it is committed in. --write regenerates it and
+the Rust bindings from the working tree; --check fails when either differs from
+such a regeneration, so a change that edits a consumed input regenerates in the
+same change. Nothing here compares the checkout with another commit. The
+published-versus-candidate comparison lives in check-contracts.py, whose
+published inputs come from the merge-base with origin/main (`published_base`),
+never from a committed pointer. Neither input view is a hardware acceptance
+certificate.
 """
 from __future__ import annotations
 
@@ -23,6 +28,7 @@ METHODS = "spec/control/methods"
 CORPUS = "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames"
 BASELINE = ROOT / "spec/baselines/swift-single-v1.json"
 GENERATED = ROOT / "rust/crates/arkdeck-contract/src/control_generated.rs"
+BASE_REF = "origin/main"
 INPUTS = [
     REGISTRY,
     "Packages/ArkDeckKit/Sources/ArkDeckCore/ControlProtocolGenerated.swift",
@@ -79,14 +85,45 @@ class ContractInputs:
         return json.loads(self.files[path])
 
 
+def base_reference() -> str:
+    """The reference that names protected main, fetched shallowly if the checkout lacks it."""
+    def resolves(reference: str) -> bool:
+        return subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--verify", "--quiet", reference],
+                              capture_output=True, check=False).returncode == 0
+
+    if resolves(BASE_REF):
+        return BASE_REF
+    # A shallow or detached CI checkout may not carry the ref yet.
+    subprocess.run(["git", "-C", str(ROOT), "fetch", "--depth=1", "origin", "main"],
+                   capture_output=True, check=False)
+    for reference in (BASE_REF, "FETCH_HEAD"):
+        if resolves(reference):
+            return reference
+    raise ValueError(f"{BASE_REF} is unavailable, so the published baseline cannot be "
+                     "established; fetch main and re-run")
+
+
+def published_base() -> str:
+    """The commit whose inputs are the published baseline: the merge-base with origin/main.
+
+    It is a property of this branch's history alone. Later merges to main do not
+    move it, so no branch is invalidated by work that lands elsewhere.
+    """
+    try:
+        return git("merge-base", base_reference(), "HEAD").decode().strip()
+    except subprocess.CalledProcessError as error:
+        raise ValueError(f"HEAD shares no history with {BASE_REF}, so the published "
+                         "baseline cannot be established") from error
+
+
 def published_inputs(commit: str) -> ContractInputs:
-    """Read path types, membership and bytes from Git, never from the worktree."""
+    """Read path types, membership and bytes from Git at a main commit, never from the worktree."""
     if not isinstance(commit, str) or not re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", commit):
-        raise ValueError("published pin requires a full immutable commit ID")
+        raise ValueError("published inputs require a full immutable commit ID")
     resolved = git("rev-parse", "--verify", "--end-of-options", commit + "^{commit}").decode().strip()
     if resolved != commit:
-        raise ValueError("published pin requires a full immutable commit ID")
-    subprocess.check_call(["git", "-C", str(ROOT), "merge-base", "--is-ancestor", commit, "origin/main"])
+        raise ValueError("published inputs require a full immutable commit ID")
+    subprocess.check_call(["git", "-C", str(ROOT), "merge-base", "--is-ancestor", commit, base_reference()])
     files, blobs, directories = {}, {}, set()
     for path in INPUTS:
         kind = git("cat-file", "-t", f"{commit}:{path}").decode().strip()
@@ -181,9 +218,16 @@ def describe_inputs(inputs: ContractInputs) -> dict:
     }
 
 
-def baseline(commit: str, inputs: ContractInputs | None = None) -> dict:
-    return {"schemaVersion": "arkdeck.swift-development-baseline/1", "kind": "development",
-            "commit": commit, **describe_inputs(inputs or published_inputs(commit))}
+def baseline(inputs: ContractInputs, commit: str | None = None) -> dict:
+    """Describe development inputs.
+
+    `commit` is provenance for a view generated from an immutable main commit.
+    The committed checkout manifest describes the working tree and carries none:
+    it cannot name the commit it is part of, and it needs no other.
+    """
+    provenance = {} if commit is None else {"commit": commit}
+    return {"schemaVersion": "arkdeck.swift-development-baseline/2", "kind": "development",
+            **provenance, **describe_inputs(inputs)}
 
 
 def candidate(inputs: ContractInputs, published_commit: str, source_revision: str) -> dict:
@@ -349,43 +393,49 @@ def formatted(content: str) -> str:
     ).decode("utf-8")
 
 
-def published_outputs(commit: str) -> tuple[ContractInputs, dict, dict[Path, str]]:
-    inputs = published_inputs(commit)
-    info = baseline(commit, inputs)
-    return inputs, info, {
+def outputs(info: dict, inputs: ContractInputs) -> dict[Path, str]:
+    return {
         BASELINE: json.dumps(info, indent=2, sort_keys=True) + "\n",
         GENERATED: formatted(generate(info, inputs)),
     }
 
 
-def verify_published() -> tuple[ContractInputs, dict]:
-    commit = json.loads(BASELINE.read_bytes())["commit"]
-    inputs, info, outputs = published_outputs(commit)
-    for path, content in outputs.items():
+def checkout_outputs() -> tuple[ContractInputs, dict, dict[Path, str]]:
+    """The manifest and bindings a regeneration from this working tree produces."""
+    inputs = working_inputs()
+    info = baseline(inputs)
+    return inputs, info, outputs(info, inputs)
+
+
+def verify_checkout() -> tuple[ContractInputs, dict]:
+    """The committed manifest and bindings must equal a regeneration from this checkout."""
+    inputs, info, expected = checkout_outputs()
+    for path, content in expected.items():
         if not path.exists() or path.read_bytes() != content.encode():
-            raise ValueError(f"generated input drift: {path.relative_to(ROOT)}")
+            raise ValueError(f"generated input drift: {path.relative_to(ROOT)}; the checkout's "
+                             "contract inputs changed without regeneration, run "
+                             "`python rust/scripts/generate-contract.py --write` in the same change")
     return inputs, info
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     modes = parser.add_mutually_exclusive_group(required=True)
-    modes.add_argument("--write", action="store_true")
-    modes.add_argument("--check", action="store_true")
-    parser.add_argument("--baseline-revision")
+    modes.add_argument("--write", action="store_true",
+                       help="regenerate the manifest and Rust bindings from this checkout")
+    modes.add_argument("--check", action="store_true",
+                       help="verify the committed manifest and bindings equal a regeneration")
     args = parser.parse_args()
     if args.write:
-        if not args.baseline_revision:
-            parser.error("--write requires --baseline-revision (the protected-main Swift commit)")
-        commit = git("rev-parse", "--verify", "--end-of-options", args.baseline_revision + "^{commit}").decode().strip()
-        _, info, outputs = published_outputs(commit)
-        for path, content in outputs.items():
+        _, info, expected = checkout_outputs()
+        for path, content in expected.items():
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(content, encoding="utf-8", newline="\n")
     else:
-        _, info = verify_published()
-    print(f'Swift published development baseline {info["commit"]}: {info["methodCount"]} methods, '
-          f'{info["corpusRecordCounts"]["requests"]} recorded shapes')
+        _, info = verify_checkout()
+    print(f'Swift development baseline of this checkout: {info["methodCount"]} methods, '
+          f'{info["corpusRecordCounts"]["requests"]} recorded shapes, '
+          f'contract identity {info["contractIdentity"][:12]}')
 
 
 if __name__ == "__main__":

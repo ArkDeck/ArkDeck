@@ -77,8 +77,9 @@ def input_metadata(registry: dict) -> dict:
     inputs = json.loads(contents)
     published = read_json(BASELINE)
     assert published["kind"] == "development"
-    assert published["schemaVersion"] == "arkdeck.swift-development-baseline/1"
-    published_commit = published["commit"]
+    assert published["schemaVersion"] == "arkdeck.swift-development-baseline/2"
+    # A view materialized from a main commit names it; a bare checkout manifest has none.
+    published_commit = published.get("commit")
     if path == CANDIDATE_INPUTS:
         assert inputs["kind"] == "candidate"
         assert inputs["schemaVersion"] == "arkdeck.swift-candidate-inputs/1"
@@ -86,7 +87,7 @@ def input_metadata(registry: dict) -> dict:
         assert inputs["publishedBaselineCommit"] == published_commit
     else:
         assert inputs["kind"] == "development"
-        assert inputs["schemaVersion"] == "arkdeck.swift-development-baseline/1"
+        assert inputs["schemaVersion"] == "arkdeck.swift-development-baseline/2"
     identity = contract_identity(registry)
     assert inputs["contractIdentity"] == identity
     assert inputs["protocolVersion"] == registry["currentVersion"]

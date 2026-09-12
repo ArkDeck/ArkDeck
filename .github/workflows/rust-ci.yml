@@ -57,7 +57,9 @@ jobs:
           rustc --version
           cargo --version
 
-      - name: Verify generated contract inputs against the pinned Swift commit
+      # The manifest and bindings describe this checkout; a regeneration must
+      # reproduce them byte for byte. No other commit is consulted.
+      - name: Verify generated contract inputs match the checkout
         working-directory: .
         run: python rust/scripts/generate-contract.py --check
 
@@ -67,20 +69,20 @@ jobs:
       - name: Fetch the locked dependency graph for all host platforms
         run: cargo fetch --locked
 
-      # The contract steps around these read Git objects at the pinned Swift
-      # commit or regenerate their own candidate view under rust/target. These
-      # two steps are the only ones that compile and run the checkout itself,
-      # so without them a red workspace reaches main behind a green lane.
+      # The contract steps around these regenerate from the checkout or build
+      # their own source views under rust/target. These two steps are the only
+      # ones that compile and run the checkout itself, so without them a red
+      # workspace reaches main behind a green lane.
       - name: Lint the workspace, its tests and its examples
         run: cargo clippy --workspace --all-targets -- -D warnings
 
-      # Wrapped: two `corpus_parity` cases assert the checkout equals the
-      # pinned Swift baseline, and the pin can only name a commit already in
-      # origin/main, so on a branch that changes a recorded frame the assertion
-      # is false until that branch merges. The wrapper runs the workspace tests
-      # when the checkout matches the pin, and otherwise proves the pin is
-      # current against main and leaves the candidate view to
-      # check-contracts.py below.
+      # Wrapped: two `corpus_parity` cases assert the checkout equals its
+      # committed manifest. The wrapper names an edited-but-not-regenerated
+      # input with the regenerate command before the tests run; it never
+      # compares the checkout with origin/main, so a merge elsewhere cannot
+      # turn this branch red. Published-versus-candidate parity is
+      # check-contracts.py below, whose published inputs come from the
+      # merge-base with main.
       - name: Workspace tests
         working-directory: .
         run: python rust/scripts/workspace-tests.py

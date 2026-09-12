@@ -533,9 +533,13 @@ fn source_schema_and_corpus_files_match_the_selected_input_manifest() {
     assert_eq!(published["kind"], "development");
     assert_eq!(
         published["schemaVersion"],
-        "arkdeck.swift-development-baseline/1"
+        "arkdeck.swift-development-baseline/2"
     );
-    assert_git_object_id(&published["commit"]);
+    // A manifest materialized from a main commit names it. The committed
+    // checkout manifest describes the working tree and carries no commit.
+    if let Some(commit) = published.get("commit") {
+        assert_git_object_id(commit);
+    }
     match inputs["kind"].as_str().unwrap() {
         "development" => assert_eq!(CONTRACT_INPUTS, SWIFT_BASELINE),
         "candidate" => {
