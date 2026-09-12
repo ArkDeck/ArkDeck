@@ -11,12 +11,10 @@
         "notFound",
         "operationFailed",
         "operationUnavailable",
-        "outcomeUnknown",
         "recordUnreadable",
         "rejected",
         "resourceConflict",
         "resourceNotFound",
-        "sensitiveAccessDenied",
         "unknownMethod",
         "unsupportedProtocolVersion",
         "workspaceReferenceNotFound"
@@ -134,8 +132,8 @@
   "x-arkdeck-method": "artifact.export",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 16,
-    "request": 26,
-    "result": 10
+    "error": 7,
+    "request": 9,
+    "result": 2
   }
 }

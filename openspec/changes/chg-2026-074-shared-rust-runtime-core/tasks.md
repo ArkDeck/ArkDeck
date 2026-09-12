@@ -808,6 +808,7 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
   - `spec/control/methods/artifact.inspect.json`（declared scope extension: existing nullable digest/revision and observation window recorded from the actual Swift producer）
   - `spec/control/methods/artifact.read.json`（declared scope extension: preserve existing resourceNotFound and integrity refusals from actual Swift producer recordings）
   - `spec/control/methods/artifact.export.json`（declared scope extension: preserve the existing missing-owner and pre-publication operationFailed refusals from the Swift producer）
+  - `spec/baselines/swift-single-v1.json`（declared scope extension: refresh the checkout manifest for native Artifact export schemas and corpus）
   - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`
   - `rust/**`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/**`（engine publish path only）
