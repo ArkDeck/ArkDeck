@@ -110,6 +110,23 @@ impl CliError {
         if matches!(method, "runtime.bundle.remove" | "runtime.tool.remove") {
             return bootstrap_resources::retirement_error(error, method);
         }
+        if method == "session.cleanup.apply"
+            && matches!(
+                error,
+                ClientError::Transport(_)
+                    | ClientError::Contract(_)
+                    | ClientError::ConnectionUnusable
+            )
+        {
+            let mut result = Self::new(
+                "outcomeUnknown",
+                "Session cleanup response is unconfirmed; no request was replayed",
+            );
+            result
+                .details
+                .insert("method".into(), Value::String(method.into()));
+            return result;
+        }
         let mut result = match error {
             ClientError::Transport(error) => Self::new(
                 if matches!(
@@ -178,6 +195,7 @@ impl CliError {
                             | "session.pin"
                             | "session.unpin"
                             | "session.cleanup.preview"
+                            | "session.cleanup.apply"
                             | "session.export.preview"
                             | "session.export.apply"
                     ) && error.details.as_ref().is_some_and(|details| {
@@ -486,6 +504,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["session", "pin"] => "session.pin",
         ["session", "unpin"] => "session.unpin",
         ["session", "cleanup", "preview"] => "session.cleanup.preview",
+        ["session", "cleanup", "apply"] => "session.cleanup.apply",
         ["session", "export", "preview"] => "session.export.preview",
         ["session", "export", "apply"] => "session.export.apply",
         ["history", "filter", "list"] => "history.filter.list",
@@ -495,7 +514,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         _ => {
             return Err(CliError::new(
                 "invalidCommand",
-                "available commands: doctor, operation list, target list|show, target display-name set|clear, device display-name set|clear, device candidates, trace cache status, history filter list|save|delete, runtime storage status|policy|root, session list|show|pin|unpin, session cleanup preview, session export preview|apply",
+                "available commands: doctor, operation list, target list|show, target display-name set|clear, device display-name set|clear, device candidates, trace cache status, history filter list|save|delete, runtime storage status|policy|root, session list|show|pin|unpin, session cleanup preview|apply, session export preview|apply",
             ));
         }
     };
@@ -605,7 +624,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         "session.list" => &["pageSize", "cursor"],
         "session.show" => &["sessionId"],
         "session.export.preview" => &["sessionId", "destinationPath", "allowSensitive"],
-        "session.export.apply" => &["previewId", "previewDigest"],
+        "session.export.apply" | "session.cleanup.apply" => &["previewId", "previewDigest"],
         "session.pin" | "session.unpin" => &["sessionId", "expectedGeneration"],
         _ => &[],
     };
@@ -637,7 +656,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ));
     }
     if !help
-        && command == "session.export.apply"
+        && matches!(command, "session.export.apply" | "session.cleanup.apply")
         && (!method_options
             .get("previewId")
             .and_then(Value::as_str)
@@ -648,7 +667,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
     {
         return Err(CliError::new(
             "invalidInput",
-            "Session export apply requires an exact preview tuple",
+            "Session apply requires an exact preview tuple",
         ));
     }
     if !help && command == "session.export.preview" {

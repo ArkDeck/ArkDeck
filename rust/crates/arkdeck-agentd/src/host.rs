@@ -529,36 +529,59 @@ impl HostServices for Host {
                 - 978307200.0;
             return sessions.preview_export(id, destination, sensitive, now);
         }
-        if method == "session.cleanup.preview" {
-            if !params.is_empty() {
-                return Err(WireError {
-                    code: "invalidParams".into(),
-                    message: "Session cleanup preview accepts no parameters".into(),
-                    details: None,
-                });
-            }
-            // A retained nonterminal/unknown Job protects its Session even in
-            // the read-only development Runtime. Missing activity is a refusal.
-            let now = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map_err(|_| WireError {
-                    code: "operationUnavailable".into(),
-                    message: "Runtime clock is unavailable".into(),
-                    details: None,
-                })?
-                .as_secs_f64()
-                - 978307200.0;
-            return self
-                .jobs
-                .as_ref()
-                .ok_or_else(|| WireError {
-                    code: "operationUnavailable".into(),
-                    message: "Job activity owner is not configured".into(),
-                    details: None,
-                })?
-                .with_active_sessions(|active| sessions.preview_cleanup(active, now));
+        if matches!(method, "session.cleanup.preview" | "session.cleanup.apply") {
+            let invalid = || WireError {
+                code: "invalidParams".into(),
+                message: "Session cleanup requires the exact method parameters".into(),
+                details: None,
+            };
+            let tuple = if method == "session.cleanup.apply" {
+                if params.len() != 2 {
+                    return Err(invalid());
+                }
+                Some((
+                    params
+                        .get("previewId")
+                        .and_then(serde_json::Value::as_str)
+                        .ok_or_else(invalid)?,
+                    params
+                        .get("previewDigest")
+                        .and_then(serde_json::Value::as_str)
+                        .ok_or_else(invalid)?,
+                ))
+            } else {
+                if !params.is_empty() {
+                    return Err(invalid());
+                }
+                None
+            };
+            let jobs = self.jobs.as_ref().ok_or_else(|| WireError {
+                code: "operationUnavailable".into(),
+                message: "Session cleanup requires the Job owner's active Session inventory".into(),
+                details: Some(serde_json::Map::from_iter([
+                    ("phase".into(), serde_json::json!("sessionOwner")),
+                    ("newDispatchCount".into(), serde_json::json!(0)),
+                ])),
+            })?;
+            jobs.with_active_sessions(|active| {
+                let now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .map(|value| value.as_secs_f64() - 978307200.0)
+                    .unwrap_or(f64::NAN);
+                if let Some((id, digest)) = tuple {
+                    sessions.apply_cleanup(id, digest, active, || {
+                        SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .map(|value| value.as_secs_f64() - 978307200.0)
+                            .unwrap_or(f64::NAN)
+                    })
+                } else {
+                    sessions.preview_cleanup(active, now)
+                }
+            })
+        } else {
+            sessions.handle_resource(method, params)
         }
-        sessions.handle_resource(method, params)
     }
     #[cfg(target_os = "macos")]
     fn runtime_storage(
@@ -853,5 +876,96 @@ mod tests {
         assert_eq!(timestamp(0), "1970-01-01T00:00:00Z");
         assert_eq!(timestamp(1_709_251_199), "2024-02-29T23:59:59Z");
         assert_eq!(timestamp(1_709_251_200), "2024-03-01T00:00:00Z");
+    }
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod session_activity_tests {
+    use super::*;
+    use std::{fs, os::unix::fs::DirBuilderExt};
+    struct Fixture(std::path::PathBuf);
+    impl Fixture {
+        fn new() -> Self {
+            let root = std::env::temp_dir()
+                .canonicalize()
+                .unwrap()
+                .join(format!("host-cleanup-{}", fresh_id().unwrap()));
+            for name in ["state", "sessions", "artifacts", "jobs"] {
+                fs::DirBuilder::new()
+                    .recursive(true)
+                    .mode(0o700)
+                    .create(root.join(name))
+                    .unwrap();
+            }
+            Self(root)
+        }
+        fn host(&self) -> Host {
+            Host::from_environment().with_storage(
+                arkdeck_hoststore::SessionStore::open(
+                    &self.0.join("state"),
+                    &self.0.join("sessions"),
+                )
+                .unwrap(),
+                arkdeck_hoststore::ArtifactUsage::open(&self.0.join("artifacts"), 1024).unwrap(),
+            )
+        }
+    }
+    impl Drop for Fixture {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+    #[test]
+    fn cleanup_requires_activity_owner_and_propagates_unreadable_job_inventory() {
+        let fixture = Fixture::new();
+        let params = serde_json::Map::new();
+        assert_eq!(
+            fixture
+                .host()
+                .session_resource("session.cleanup.preview", &params)
+                .unwrap_err()
+                .code,
+            "operationUnavailable"
+        );
+        assert!(!fixture.0.join("state/session-cleanup-previews").exists());
+        let unavailable = fixture
+            .host()
+            .with_jobs(arkdeck_hoststore::JobStore::open(&fixture.0.join("jobs")).unwrap());
+        fs::rename(
+            fixture.0.join("jobs/runtime-jobs.sqlite3"),
+            fixture.0.join("jobs/replaced.sqlite3"),
+        )
+        .unwrap();
+        assert_eq!(
+            unavailable
+                .session_resource("session.cleanup.preview", &params)
+                .unwrap_err()
+                .code,
+            "recordUnreadable"
+        );
+        assert!(!fixture.0.join("state/session-cleanup-previews").exists());
+    }
+    #[test]
+    fn preview_and_apply_use_the_actual_job_owner_and_refuse_when_it_is_missing() {
+        let fixture = Fixture::new();
+        let host = fixture
+            .host()
+            .with_jobs(arkdeck_hoststore::JobStore::open(&fixture.0.join("jobs")).unwrap());
+        let preview = host
+            .session_resource("session.cleanup.preview", &serde_json::Map::new())
+            .unwrap();
+        let params = serde_json::json!({"previewId":preview["previewId"], "previewDigest":preview["previewDigest"]});
+        let result = host
+            .session_resource("session.cleanup.apply", params.as_object().unwrap())
+            .unwrap();
+        assert_eq!(result["removedSessionIds"], serde_json::json!([]));
+        let absent = fixture.host();
+        assert_eq!(
+            absent
+                .session_resource("session.cleanup.apply", params.as_object().unwrap())
+                .unwrap_err()
+                .code,
+            "operationUnavailable"
+        );
     }
 }

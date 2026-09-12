@@ -14,6 +14,7 @@ use std::{io, path::Path};
 
 #[path = "session_cleanup_inventory.rs"]
 mod cleanup;
+pub(crate) use cleanup::CleanupTransaction;
 pub use cleanup::{CleanupSession, CleanupSnapshot, session_cleanup_snapshot};
 #[path = "session_export_inventory.rs"]
 mod export;

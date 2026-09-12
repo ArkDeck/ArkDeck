@@ -300,3 +300,74 @@ fn export_apply_requires_one_exact_preview_tuple_and_keeps_its_method_scope() {
     extra.extend(args(&["--allow-sensitive"]));
     assert_eq!(parse(&extra).unwrap_err().code, "invalidOption");
 }
+
+#[test]
+fn cleanup_apply_requires_one_exact_preview_tuple_and_keeps_its_method_scope() {
+    let args = |values: &[&str]| values.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+    assert_eq!(
+        parse(&args(&["session", "cleanup", "apply"]))
+            .unwrap_err()
+            .code,
+        "invalidInput"
+    );
+    let digest = "a".repeat(64);
+    let valid = args(&[
+        "session",
+        "cleanup",
+        "apply",
+        "--preview-id",
+        "00000000-0000-0000-0000-000000000001",
+        "--preview-digest",
+        &digest,
+    ]);
+    let invocation = parse(&valid).unwrap();
+    assert_eq!(invocation.command, "session.cleanup.apply");
+    assert_eq!(invocation.params.unwrap()["previewDigest"], digest);
+    let mut bad = valid.clone();
+    bad[4] = "bad".into();
+    assert_eq!(parse(&bad).unwrap_err().code, "invalidInput");
+    let mut extra = valid;
+    extra.extend(args(&["--allow-sensitive"]));
+    assert_eq!(parse(&extra).unwrap_err().code, "invalidOption");
+}
+
+#[test]
+fn cleanup_apply_unconfirmed_reply_is_unknown_and_never_retryable() {
+    for error in [
+        ClientError::Transport(std::io::ErrorKind::BrokenPipe.into()),
+        ClientError::Transport(std::io::ErrorKind::TimedOut.into()),
+        ClientError::ConnectionUnusable,
+        ClientError::Contract(arkdeck_contract::ContractError::SchemaMismatch),
+    ] {
+        let error = CliError::from_client(error, "session.cleanup.apply");
+        assert_eq!(error.code, "outcomeUnknown");
+        assert!(!error.details.contains_key("newDispatchCount"));
+        assert_eq!(
+            failure_envelope("session.cleanup.apply", &error, "ctl-fixture", true)["error"]["controlRequestRetryable"],
+            false
+        );
+    }
+    for code in [
+        "resourceConflict",
+        "resourceNotFound",
+        "invalidInput",
+        "recordUnreadable",
+        "operationUnavailable",
+        "outcomeUnknown",
+    ] {
+        let error = CliError::from_client(
+            ClientError::Remote(WireError {
+                code: code.into(),
+                message: "fixture".into(),
+                details: Some(
+                    json!({"phase":"sessionOwner", "newDispatchCount":0})
+                        .as_object()
+                        .unwrap()
+                        .clone(),
+                ),
+            }),
+            "session.cleanup.apply",
+        );
+        assert_eq!(error.code, code);
+    }
+}

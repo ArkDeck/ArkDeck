@@ -701,6 +701,7 @@ impl<H: HostServices> Control<H> {
             | "session.pin"
             | "session.unpin"
             | "session.cleanup.preview"
+            | "session.cleanup.apply"
             | "session.export.preview"
             | "session.export.apply" => Response {
                 id: request.id.clone(),

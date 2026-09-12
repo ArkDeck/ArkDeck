@@ -93,6 +93,24 @@ fn row(value: &Value) -> Result<(&str, u64, &str), CliError> {
     Ok((id, generation, completed))
 }
 pub fn validate_session_response(invocation: &Invocation, value: &Value) -> Result<(), CliError> {
+    if invocation.command == "session.cleanup.apply" {
+        let validate = || {
+            cleanup_result(value)?;
+            let params = invocation.params.as_ref().ok_or_else(failure)?;
+            if params.get("previewId") != value.get("previewId")
+                || params.get("previewDigest") != value.get("previewDigest")
+            {
+                return Err(failure());
+            }
+            Ok(())
+        };
+        return validate().map_err(|_| {
+            CliError::new(
+                "outcomeUnknown",
+                "Session cleanup result is unconfirmed; no request was replayed",
+            )
+        });
+    }
     if invocation.command == "session.export.apply" {
         return export_result(value);
     }
@@ -719,5 +737,146 @@ mod export_result_tests {
         let mut value = actual();
         value["sourceArtifactIds"] = json!(["artifact-raw"]);
         assert!(export_result(&value).is_err());
+    }
+}
+
+fn cleanup_result(value: &Value) -> Result<(), CliError> {
+    if !exact(
+        value,
+        &[
+            "schemaVersion",
+            "previewId",
+            "previewDigest",
+            "generation",
+            "resultGeneration",
+            "appliedAtUtc",
+            "removedSessionIds",
+            "removedArtifacts",
+            "reclaimedBytes",
+            "remainingBytes",
+            "newDispatchCount",
+        ],
+    ) || value["schemaVersion"] != "arkdeck.session-cleanup-result/1"
+        || !value["previewId"].as_str().is_some_and(uuid)
+        || !digest(&value["previewDigest"])
+        || !value["appliedAtUtc"].as_str().is_some_and(plain_date)
+        || value["newDispatchCount"] != 0
+    {
+        return Err(failure());
+    }
+    let generation = decimal(&value["generation"]).ok_or_else(failure)?;
+    let result_generation = decimal(&value["resultGeneration"]).ok_or_else(failure)?;
+    let reclaimed = decimal(&value["reclaimedBytes"]).ok_or_else(failure)?;
+    let remaining = decimal(&value["remainingBytes"]).ok_or_else(failure)?;
+    if reclaimed
+        .checked_add(remaining)
+        .is_none_or(|n| n > i64::MAX as u64)
+    {
+        return Err(failure());
+    }
+    let mut removed = BTreeSet::new();
+    let mut prior = None;
+    for id in value["removedSessionIds"].as_array().ok_or_else(failure)? {
+        let id = id
+            .as_str()
+            .filter(|s| valid_correlation(s))
+            .ok_or_else(failure)?;
+        if prior.is_some_and(|p| p >= id) || !removed.insert(id) {
+            return Err(failure());
+        }
+        prior = Some(id);
+    }
+    if if removed.is_empty() {
+        result_generation != generation || reclaimed != 0
+    } else {
+        generation.checked_add(1) != Some(result_generation) || reclaimed == 0
+    } {
+        return Err(failure());
+    }
+    let mut prior = None;
+    for artifact in value["removedArtifacts"].as_array().ok_or_else(failure)? {
+        if !exact(artifact, &["sessionId", "artifactId", "artifactDigest"])
+            || !digest(&artifact["artifactDigest"])
+        {
+            return Err(failure());
+        }
+        let session = artifact["sessionId"]
+            .as_str()
+            .filter(|id| removed.contains(id))
+            .ok_or_else(failure)?;
+        let id = artifact["artifactId"]
+            .as_str()
+            .filter(|s| valid_correlation(s))
+            .ok_or_else(failure)?;
+        let key = (session, id);
+        if prior.is_some_and(|p| p >= key) {
+            return Err(failure());
+        }
+        prior = Some(key);
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod cleanup_result_tests {
+    use super::*;
+    use serde_json::json;
+    fn actual() -> Value {
+        serde_json::from_str::<Value>(include_str!(
+            "../../../tests/fixtures/session-cleanup/rust-cleanup-applied.json"
+        ))
+        .unwrap()["result"]
+            .clone()
+    }
+    #[test]
+    fn actual_applied_record_result_is_valid_and_semantic_corruption_refuses() {
+        assert!(cleanup_result(&actual()).is_ok());
+        for (key, replacement) in [
+            ("previewId", json!("invalid")),
+            ("previewDigest", json!("bad")),
+            ("appliedAtUtc", json!("2026-02-30T00:00:00Z")),
+            ("resultGeneration", json!("0")),
+            ("reclaimedBytes", json!("0")),
+            ("remainingBytes", json!("01")),
+            ("removedSessionIds", json!(["z", "a"])),
+            ("removedSessionIds", json!([])),
+            ("newDispatchCount", json!(1)),
+            (
+                "removedArtifacts",
+                json!([{"sessionId":"other", "artifactId":"a", "artifactDigest":"a".repeat(64)}]),
+            ),
+        ] {
+            let mut value = actual();
+            value[key] = replacement;
+            assert!(cleanup_result(&value).is_err(), "{key}");
+        }
+        let mut duplicate = actual();
+        let row = duplicate["removedArtifacts"][0].clone();
+        duplicate["removedArtifacts"]
+            .as_array_mut()
+            .unwrap()
+            .push(row);
+        assert!(cleanup_result(&duplicate).is_err());
+    }
+    #[test]
+    fn response_must_match_the_requested_preview_tuple() {
+        let result = actual();
+        let invocation = crate::parse(
+            &[
+                "session",
+                "cleanup",
+                "apply",
+                "--preview-id",
+                result["previewId"].as_str().unwrap(),
+                "--preview-digest",
+                result["previewDigest"].as_str().unwrap(),
+            ]
+            .map(str::to_owned),
+        )
+        .unwrap();
+        assert!(validate_session_response(&invocation, &result).is_ok());
+        let mut other = result;
+        other["previewDigest"] = json!("f".repeat(64));
+        assert!(validate_session_response(&invocation, &other).is_err());
     }
 }
