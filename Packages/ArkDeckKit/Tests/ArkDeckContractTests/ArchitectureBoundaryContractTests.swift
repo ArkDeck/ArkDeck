@@ -130,7 +130,7 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
       contentsOf: packageRoot().appending(path: "Package.swift"), encoding: .utf8)
     XCTAssertTrue(manifest.contains("ArkForgeProtocol"))
     XCTAssertTrue(manifest.contains("ArkForgeClient"))
-    XCTAssertTrue(manifest.contains("3f5b48cd7247f7e4304bb4f9d8a158f4feda5a92"))
+    XCTAssertTrue(manifest.contains("eee578720c5bae76b2574a6aaf25b536bc491c86"))
     XCTAssertFalse(
       FileManager.default.fileExists(
         atPath: packageRoot().appending(path: "Sources/ArkForgeIPC").path),

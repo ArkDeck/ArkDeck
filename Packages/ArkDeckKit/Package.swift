@@ -44,7 +44,7 @@ let package = Package(
       exact: "1.15.0"),
     .package(
       url: "https://github.com/ArkDeck/ArkForge.git",
-      revision: "3f5b48cd7247f7e4304bb4f9d8a158f4feda5a92"),
+      revision: "eee578720c5bae76b2574a6aaf25b536bc491c86"),
     .package(
       url: "https://github.com/ArkDeck/ArkTrace.git",
       revision: "e6e3133d410fbd7455df17c9486dcd369607e97f"),

@@ -1,12 +1,12 @@
 {
-  "originHash" : "ca171f102cfd2648198a50a944dd2ae961854553e8779e21dd9f7c4a4cd38778",
+  "originHash" : "5db3e84e1c012e68cad4dd4722ac5519a2cc3bde5f5e045957fc020b63aa7178",
   "pins" : [
     {
       "identity" : "arkforge",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/ArkDeck/ArkForge.git",
       "state" : {
-        "revision" : "3f5b48cd7247f7e4304bb4f9d8a158f4feda5a92"
+        "revision" : "eee578720c5bae76b2574a6aaf25b536bc491c86"
       }
     },
     {
