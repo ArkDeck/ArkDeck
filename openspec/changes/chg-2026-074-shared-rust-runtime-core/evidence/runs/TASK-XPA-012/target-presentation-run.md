@@ -42,10 +42,10 @@ execution route. No installed state is selected.
 
 ## Native and process integration checks
 
-The implementation is based independently on protected main `a3b384d3`, including
-Bundle registration and the checkout manifest v2 generator. It does not include
-the unmerged Job/Artifact read PR. The shared CLI duration parser is exposed
-within the crate for the existing Target timeout options.
+The implementation now uses protected main `f92acd36`, preserving merged
+Job/Artifact reads, Bundle registration and the checkout manifest v2 generator.
+Target timeout options use main's shared CLI duration parser. The original
+independent validation view used `a3b384d3`.
 
 The seven Target/name Swift tests and the alias reconciliation producer passed
 in the serialized native validation view. The actual Rust-produced tombstone was
@@ -75,8 +75,12 @@ Raw recordings and source hashes are retained under
 Unicode line separator in an invalid name; the schema generator uses Unicode
 `splitlines`, so that frame is retained in raw evidence but excluded from the
 selected derivation input. Other native cases cover the same `invalidInput` code.
-The checkout manifest now describes 105 methods and 576 shapes. The published
+After integrating #1863, the checkout manifest describes 105 methods and 580 shapes. The published
 contract view remains the verified protected-main merge base under merged #1866.
+
+The current Task already lists the method-schema and checkout-manifest paths;
+this phase records existing native display-name behavior within the host-store
+migration scope and adds no Allowed-path pattern.
 
 ## Final gate
 
@@ -94,7 +98,8 @@ view: common checks, 83 design-system tests, 2,632 Swift tests plus the serial
 identity and five viewer-scale tests, App build-for-testing, Rust workspace and
 both contract views, deny and vet. Log:
 `/private/tmp/xpa012-target-main-unified-gate-r2.log`. Main then incorporated
-#1863 at `f92acd36`; final integration and verification on that base are pending.
+#1863 at `f92acd36`; integration is complete and all affected Rust targets compile.
+The final unified verification on this new base is pending.
 Installed
 activation, target adoption and independent USB identity proof, warm presentation
 and confirmed Job observation sources remain in the migration's later slices.
