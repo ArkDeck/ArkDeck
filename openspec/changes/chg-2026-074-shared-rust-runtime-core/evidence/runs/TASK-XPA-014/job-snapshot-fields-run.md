@@ -1,6 +1,6 @@
 # Current Job snapshot field reader — 2026-09-12
 
-Task: TASK-XPA-014. Base: protected main `1fd85b93`.
+Task: TASK-XPA-014. Current base: protected main `4e2a615e`.
 
 Current Swift Jobs can carry private evidence, Trace, recovery and Session publication fields. The earlier Rust reader refused these entire snapshots and reported every supported Job as having no publication marker. This change preserves the current closed nested field shapes and historical admission correlation while projecting the producer's actual Session publication fact. Receipt precedes failure; an invalid receipt or uncertain failure stays outcomeUnknown. Private root paths and stored action arguments do not escape the public Job response.
 
@@ -16,4 +16,4 @@ These are read-only historical records. The reader does not create or consume a 
 
 Logs: `/private/tmp/xpa014-job-publication-native-r1.log`, `/private/tmp/xpa014-job-records-native-owner-r1.log`, `/private/tmp/xpa014-job-records-process-published-r1.log`, `/private/tmp/xpa014-job-records-process-failed-r1.log`, `/private/tmp/xpa014-job-records-clippy-r1.log`.
 
-The complete local unified repository gate passed with exit 0 on base `1fd85b93` (`/private/tmp/xpa014-job-records-unified-r1.log`), including all selected lanes, published/candidate contract checks, dependency deny and vet. The planner did not select App build. After the maintainer merged Export and CI updates, the candidate was mechanically checked against main `4e2a615e`: the complete merge is conflict-free. Final commit scope preflight is run against the refreshed main before push. No source changes to Swift production code or contract schemas are needed for this read-only compatibility repair.
+The complete local unified repository gate passed with exit 0 on the final combined candidate based on `4e2a615e` (`/private/tmp/xpa014-job-records-unified-r2.log`), including selected Swift, design-system and Rust lanes, published/candidate contract checks, dependency deny and vet. App build was not selected. The earlier gate on base `1fd85b93` also passed (`/private/tmp/xpa014-job-records-unified-r1.log`). The current candidate retains published Artifact export and the updated CI configuration; native producer sources and fixtures are unchanged. Final commit scope preflight runs before push. No Swift production or contract schema change belongs to this read-only compatibility repair.

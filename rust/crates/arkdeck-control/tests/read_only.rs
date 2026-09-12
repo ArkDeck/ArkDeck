@@ -107,6 +107,7 @@ fn every_unimplemented_method_is_refused_without_entering_the_host() {
     let (control, reads) = setup();
     for method in METHODS {
         if [
+            "artifact.export",
             "artifact.inspect",
             "artifact.read",
             "health",
@@ -617,7 +618,7 @@ fn bundle_registration_rejects_caller_authority_and_observes_nothing() {
 #[test]
 fn artifact_methods_report_unconfigured_owner_and_route_exact_typed_parameters() {
     let (control, reads) = setup();
-    for method in ["artifact.inspect", "artifact.read"] {
+    for method in ["artifact.inspect", "artifact.read", "artifact.export"] {
         let failure = call(
             &control,
             method,

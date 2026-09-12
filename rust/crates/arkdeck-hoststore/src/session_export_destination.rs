@@ -8,7 +8,7 @@ use std::{
     path::{Component, Path, PathBuf},
 };
 
-fn physical(path: &Path) -> Result<PathBuf, WireError> {
+pub(crate) fn physical(path: &Path) -> Result<PathBuf, WireError> {
     let mut clean = PathBuf::from("/");
     for component in path.components() {
         match component {

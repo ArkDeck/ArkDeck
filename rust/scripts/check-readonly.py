@@ -299,7 +299,7 @@ def main() -> None:
                     expected = ("rejected" if method not in SUPPORTED or method == "device.observations" else None)
                     if method in {"runtime.tool.inspect", "runtime.bundle.inspect", "operation.describe", "runtime.tool.register", "runtime.bundle.remove", "runtime.tool.remove", "runtime.bundle.register"}:
                         expected = "invalidParams"
-                    if method in {"runtime.bundle.list", "runtime.tool.list", "artifact.inspect", "artifact.read"}:
+                    if method in {"runtime.bundle.list", "runtime.tool.list", "artifact.inspect", "artifact.read", "artifact.export"}:
                         expected = "operationUnavailable"
                     if method in {"target.list", "target.show", "target.display-name.set", "target.display-name.clear", "device.display-name.set", "device.display-name.clear"}:
                         expected = "internalError"
