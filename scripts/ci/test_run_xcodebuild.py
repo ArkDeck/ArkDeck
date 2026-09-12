@@ -149,6 +149,9 @@ class RunXcodebuildTests(unittest.TestCase):
             temporary / "repo", "let value = 1\n", 1_700_000_000
         )
         cache_root = temporary / "cache root"
+        stale_index = cache_root / "DerivedData/Index.noindex/DataStore"
+        stale_index.mkdir(parents=True)
+        (stale_index / "record").write_bytes(b"old index data")
         result = self.invoke(
             script, cache_root, self.make_fake_xcodebuild(temporary)
         )
@@ -179,6 +182,8 @@ class RunXcodebuildTests(unittest.TestCase):
         self.assertIn("ONLY_ACTIVE_ARCH=YES", arguments)
         self.assertIn("COMPILATION_CACHE_ENABLE_CACHING=YES", arguments)
         self.assertIn("COMPILATION_CACHE_ENABLE_DIAGNOSTIC_REMARKS=YES", arguments)
+        self.assertIn("COMPILER_INDEX_STORE_ENABLE=NO", arguments)
+        self.assertFalse((cache_root / "DerivedData/Index.noindex").exists())
         self.assertIn("CODE_SIGNING_ALLOWED=NO", arguments)
         self.assertNotIn("-jobs", arguments)
         self.assertIn("SWIFT_OPTIMIZATION_LEVEL=-Onone", arguments)
@@ -240,6 +245,7 @@ class RunXcodebuildTests(unittest.TestCase):
         self.assertIn("ONLY_ACTIVE_ARCH=YES", arguments)
         self.assertIn("-onlyUsePackageVersionsFromResolvedFile", arguments)
         self.assertIn("COMPILATION_CACHE_ENABLE_CACHING=YES", arguments)
+        self.assertIn("COMPILER_INDEX_STORE_ENABLE=NO", arguments)
         self.assertIn("-showBuildTimingSummary", arguments)
         self.assertEqual(arguments[-1], "build")
         for prefix in ("CODE_SIGN", "DEVELOPMENT_TEAM=", "SWIFT_OPTIMIZATION_LEVEL=",
