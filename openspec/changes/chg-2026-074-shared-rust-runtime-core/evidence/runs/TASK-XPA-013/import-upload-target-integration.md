@@ -1,8 +1,8 @@
 # Import upload Target integration seam — 2026-09-12
 
 This is an integration proposal, not a configured owner or acceptance result.
-The Import upload candidate is based on Artifact export candidate `4d1c1cf9`,
-whose protected-main base is `f92acd36`. The separately validated Target candidate
+The Import upload candidate is based on Artifact export candidate `cfbb2598`,
+whose protected-main base is `0dad7599`. The separately validated Target candidate
 `2f849a24` has not been treated as published input or modified by this slice.
 
 The daemon currently passes an `operationUnavailable` resolver to

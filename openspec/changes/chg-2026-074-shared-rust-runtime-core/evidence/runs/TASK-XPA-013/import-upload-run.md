@@ -1,9 +1,11 @@
 # Import upload owner — macOS, 2026-09-12
 
 TASK-XPA-013 remains in progress. This bounded slice preserves the interrupted
-Import implementation as checkpoint `4bb8c79b`, then rebases that slice to Artifact
-export candidate `4d1c1cf9` as `71111349`. The candidate's actual protected-main
-base is `f92acd36`; export and Import candidates are not published Runtime owners.
+Import implementation as checkpoint `4bb8c79b`. It was first rebased to Artifact
+export candidate `4d1c1cf9`, then the two Import-only commits were rebased to the
+latest export candidate `cfbb2598` as `07521366` and `bded46c5`. The actual
+protected-main base for this candidate is `0dad7599`; none of the pending export
+or Import commits are treated as a published Runtime owner.
 
 ## Behavior and limits
 
@@ -58,16 +60,38 @@ rerun Swift or infer a new Swift pass from those hashes. The six schemas retain
 the published corpus and add actual native success/error shapes. The checkout
 manifest was regenerated with `python3 rust/scripts/generate-contract.py --write`
 (v2 checkout mode, no baseline revision); `--check` reports 105 methods and
-597 recorded shapes.
+597 recorded shapes. All 46 retained/native frames across the six Import schemas
+also passed independent JSON Schema validation.
 
 ## Validation and outstanding checks
 
-The first targeted Rust owner run passed 12 tests plus one ignored helper invoked
-by the parent test. It covered five actual SIGKILL windows: after begin checkpoint,
-partial chunk, chunk sync, append checkpoint and abort checkpoint. The test
-explicitly checks process signal 9 before reopening the owner. Final post-review
-Rust CLI/contract/owner/process checks are pending below and will replace this
-interim result before the local checkpoint is delivered.
+The final post-review targeted run on the `cfbb2598` export candidate passed:
+
+- 13 Import owner tests, including current Swift durable-fixture parity and five
+  actual SIGKILL windows: after begin checkpoint, partial chunk, chunk sync, append
+  checkpoint and abort checkpoint. The one ignored helper is invoked by the parent
+  test in each window, and signal 9 is explicitly asserted before owner reopening.
+- 5 strict Import contract tests, 8 CLI tests (including 41 byte-identical current
+  native argv cases, bounded lost-reply rediscovery and unknown-commit no replay),
+  and all 15 control routing/refusal tests.
+- `cargo clippy --offline --locked --workspace --all-targets -- -D warnings`,
+  `cargo build --offline --locked --workspace --bins`, formatting check and the
+  checkout generator check.
+- The actual `rust/scripts/check-import-upload-owner.py` daemon/CLI process test.
+  It restores private filesystem modes around byte-identical Swift snapshots,
+  confirms initial read/begin parity without record rewrites and refuses a new
+  request while Target resolution is absent. Its proxy drops exactly one real
+  successful append reply after publication and asserts the sequence
+  `inspect → append → inspect → commit` with the same request/Import identities.
+  Only one append is sent; the committed prefix reaches 4,096 bytes. The pending
+  commit owner refuses. Restart reads the same prefix, source modification refuses,
+  and abort persists an irreversible generation-2 tombstone before staging removal.
+  Commit/release/reference inspection leave records and payloads unchanged.
+
+The full command output is retained as `import-upload-rust-targeted.log`, copied
+from `/private/tmp/xpa013-import-main-targeted-r2.log`; SHA-256 is
+`363c892aa1a38f47c7981c423a77f50d5031e1b8fb645158adbb1e1901b5f941`.
+Only documentation changed after this test batch.
 
 Swift, App, performance checks and the final unified repository gate are reserved
 for the parent task's serialized validation. No push, PR or merge is performed by
@@ -75,11 +99,11 @@ this slice. These are local host fixtures, never real-device evidence.
 
 ## Scope against the actual base
 
-Against protected-main `f92acd36`, the combined export-plus-Import candidate needs
+Against protected-main `0dad7599`, the combined export-plus-Import candidate needs
 exact declarations for `spec/control/methods/artifact.export.json`, the six
 `spec/control/methods/artifact.import.{begin,append,abort,inspect,inspection,release}.json`
 paths, and `spec/baselines/swift-single-v1.json`: eight bounded paths total.
-Against export candidate `4d1c1cf9`, only the six Import schema declarations are
+Against export candidate `cfbb2598`, only the six Import schema declarations are
 new. These declarations do not establish maintainer approval; the final parent
 integration must recompute them against its actual base. Other changed Rust,
 Swift test/fixture and change-evidence paths were already in TASK-XPA-013 scope.
