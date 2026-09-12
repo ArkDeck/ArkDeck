@@ -1,6 +1,6 @@
 # Import upload Target owner integration — 2026-09-12
 
-The upload-only PR is based on published main `1fd85b931fdef1416d41baebfe8bad0cf8d32b5e`, which includes the Target owner from #1870. The former integration proposal has now been implemented through that existing owner. The current PR does not include the separate Export candidate or the HAP publication prototype at `708dab9a`.
+The merged upload PR candidate includes published main `4e2a615e421e6174a4a50e2c8110196d77ce7007`, including the Target owner from #1870 and Artifact export from #1874. The former integration proposal has now been implemented through that existing owner. The Import diff retains the published Export implementation and excludes the HAP publication prototype at `708dab9a`.
 
 `TargetStore::resolve_import_binding(&ImportIntent)` uses the owner's existing locked transaction and strict `TargetDocument` decoder. It finds the exact durable Target ID and requires the intent revision to match before returning a typed `ImportBinding`. It neither modifies Target binding/alias documents nor accepts wire-supplied binding, connect key, observation, capability, or validation facts. The daemon composes this method directly into the Import owner's new-request resolver; existing exact request identities remain rediscoverable without resolving a new binding.
 

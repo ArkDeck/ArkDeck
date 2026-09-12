@@ -1,5 +1,7 @@
 # Import upload on current main — 2026-09-12
 
+Historical report for frozen candidate `37cb41e6` on base `1fd85b93`. The subsequent merge with published main is documented in `import-upload-main-integration.md`; this earlier test run is not relabeled as a result on the merged tree.
+
 Base: `1fd85b931fdef1416d41baebfe8bad0cf8d32b5e` (published Target #1870 and Job events included). This is the independently deliverable upload phase of TASK-XPA-013. It does not complete Artifact publication, reference/release ownership, installed-owner cutover or hardware/GJ acceptance.
 
 ## Delivered scope and branch value

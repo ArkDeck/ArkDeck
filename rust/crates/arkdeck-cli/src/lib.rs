@@ -4,7 +4,10 @@ use arkdeck_contract::{ContractError, PROTOCOL_VERSION, canonical_json};
 use serde_json::{Map, Value, json};
 mod artifact_resources;
 mod import_resources;
-pub use artifact_resources::{artifact_bytes, validate_artifact_metadata, validate_artifact_read};
+pub use artifact_resources::{
+    artifact_bytes, artifact_export_params, validate_artifact_export, validate_artifact_metadata,
+    validate_artifact_read,
+};
 pub use import_resources::execute_import;
 mod bootstrap_resources;
 mod read_only_resources;
@@ -96,6 +99,14 @@ impl CliError {
         if target_resources::is_mutation(method) {
             return target_resources::client_error(error, method);
         }
+        if method == "artifact.export" && !matches!(error, ClientError::Remote(_)) {
+            let mut result = Self::new(
+                "outcomeUnknown",
+                "Artifact export response is unconfirmed; inspect the exact destination before retrying",
+            );
+            result.details.insert("method".into(), json!(method));
+            return result;
+        }
         if matches!(method, "runtime.bundle.remove" | "runtime.tool.remove") {
             return bootstrap_resources::retirement_error(error, method);
         }
@@ -185,11 +196,13 @@ impl CliError {
                     details.get("phase") == Some(&json!("bootstrapRegistryOwner"))
                         && details.get("newDispatchCount") == Some(&json!(0))
                 });
-                let artifact_proof = matches!(method, "artifact.inspect" | "artifact.read")
-                    && error.details.as_ref().is_some_and(|d| {
-                        d.get("phase") == Some(&json!("artifactOwner"))
-                            && d.get("newDispatchCount") == Some(&json!(0))
-                    });
+                let artifact_proof = matches!(
+                    method,
+                    "artifact.inspect" | "artifact.read" | "artifact.export"
+                ) && error.details.as_ref().is_some_and(|d| {
+                    d.get("phase") == Some(&json!("artifactOwner"))
+                        && d.get("newDispatchCount") == Some(&json!(0))
+                });
                 let import_proof = method.starts_with("artifact.import.")
                     && error.details.as_ref().is_some_and(|d| {
                         d.get("phase") == Some(&json!("importOwner"))
@@ -200,6 +213,7 @@ impl CliError {
                     "artifactIntegrityFailed" if artifact_proof || import_proof => {
                         "artifactIntegrityFailed"
                     }
+                    "operationFailed" if artifact_proof => "operationFailed",
                     "sensitiveAccessDenied" if artifact_proof => "sensitiveAccessDenied",
                     "admissionDenied" if bootstrap_proof => "admissionDenied",
                     "fileIdentityChanged"
@@ -290,6 +304,9 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                 "--help" | "-h" => help = true,
                 "--deep" => deep = true,
                 "--raw" => raw = true,
+                "--overwrite" => {
+                    method_options.insert("overwrite".into(), json!(true));
+                }
                 "--require-healthy" => require_healthy = true,
                 "--allow-sensitive" => {
                     method_options.insert("allowSensitive".into(), json!(true));
@@ -434,6 +451,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["artifact", "import", "inspect"] => "artifact.import.inspect",
         ["artifact", "inspect"] => "artifact.inspect",
         ["artifact", "read"] => "artifact.read",
+        ["artifact", "export"] => "artifact.export",
         ["doctor"] => "doctor",
         ["operation", "list"] => "operation.list",
         ["operation", "describe"] => "operation.describe",
@@ -525,6 +543,15 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             "timeout",
         ],
         "artifact.inspect" => &["jobId", "import", "artifactId", "timeout"],
+        "artifact.export" => &[
+            "jobId",
+            "import",
+            "artifactId",
+            "destinationPath",
+            "overwrite",
+            "allowSensitive",
+            "timeout",
+        ],
         "artifact.read" => &[
             "jobId",
             "import",

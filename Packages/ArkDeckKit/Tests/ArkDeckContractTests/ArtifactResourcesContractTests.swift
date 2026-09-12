@@ -587,8 +587,10 @@ final class ArtifactResourcesContractTests: XCTestCase {
     let owner = try seedJob("job-rust-artifact")
     let artifact = try await publish(owner, bytes: Data("native fixture bytes\n".utf8))
     var samples: [JSONValue] = []
-    for method in ["artifact.inspect", "artifact.read"] {
-      let params: [String: JSONValue] = ["owner": owner.value, "artifactId": .string(artifact.artifactID)]
+    let exported = try exportDirectory()
+    for method in ["artifact.inspect", "artifact.read", "artifact.export"] {
+      var params: [String: JSONValue] = ["owner": owner.value, "artifactId": .string(artifact.artifactID)]
+      if method == "artifact.export" { params["destinationDirectory"] = .string(exported.path) }
       let response = try await wire(method, params).0
       XCTAssertTrue(response.ok, String(describing: response.error))
       samples.append(.object(["method": .string(method), "params": .object(params),
@@ -627,6 +629,36 @@ final class ArtifactResourcesContractTests: XCTestCase {
     let exported = try await wire("artifact.export", ["owner": job.value, "artifactId": .string(product.artifactID), "destinationDirectory": .string(output.path)])
     XCTAssertEqual(exported.0.error?.code, "artifactIntegrityFailed")
     XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: output.path), [])
+  }
+
+  func testExportMissingOwnerAndBeforePublicationFailureKeepOriginalWireErrors() async throws {
+    let destination = try exportDirectory()
+    let missingOwner = try await wire("artifact.export", [
+      "owner": try owner("job", "job-export-not-present").value,
+      "artifactId": .string("ART-not-present"),
+      "destinationDirectory": .string(destination.path),
+    ])
+    XCTAssertEqual(missingOwner.0.error?.code, "resourceNotFound")
+    let job = try seedJob("job-export-refusals")
+    let missingArtifact = try await wire("artifact.export", [
+      "owner": job.value, "artifactId": .string("ART-not-present"),
+      "destinationDirectory": .string(destination.path),
+    ])
+    XCTAssertEqual(missingArtifact.0.error?.code, "resourceNotFound")
+    let product = try await publish(job, bytes: Data("before-publication-fixture".utf8))
+    let before = try store(fault: { point in
+      if point == .beforePublication { throw Failure.fixture }
+    })
+    handler = RuntimeControlPlaneHandler(engine: engine, capabilityStore: capabilities, providerIDs: [],
+      nowUTC: { "2026-09-01T00:00:00Z" }, artifactStore: before)
+    let failed = try await wire("artifact.export", [
+      "owner": job.value, "artifactId": .string(product.artifactID),
+      "destinationDirectory": .string(destination.path),
+    ])
+    XCTAssertEqual(failed.0.error?.code, "operationFailed")
+    XCTAssertEqual(failed.0.error?.details?["phase"], .string("artifactOwner"))
+    XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: destination.path), [])
+    XCTAssertEqual(dispatcher.dispatchCount, 0)
   }
 
   func testCLIReportsUncertainHostPublicationDespiteZeroDeviceDispatch() async throws {

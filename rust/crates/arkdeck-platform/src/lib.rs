@@ -112,9 +112,9 @@ pub use macos_control::{PeerOrigin, listen_mach};
 mod host_store;
 #[cfg(target_os = "macos")]
 pub use host_store::{
-    DocumentPublishError, ExportPublishError, ExportStaging, HostDirectory, HostDirectoryFacts,
-    HostEntryKind, HostExportCapacity, HostImportSource, HostJournal, HostReadLock, HostUploadFile,
-    UploadChunkCheckpoint, UploadWritePoint,
+    DocumentPublishError, ExportPublishError, ExportStaging, FileExportStaging, HostDirectory,
+    HostDirectoryFacts, HostEntryKind, HostExportCapacity, HostImportSource, HostJournal,
+    HostReadLock, HostUploadFile, UploadChunkCheckpoint, UploadWritePoint,
 };
 
 #[cfg(target_os = "macos")]

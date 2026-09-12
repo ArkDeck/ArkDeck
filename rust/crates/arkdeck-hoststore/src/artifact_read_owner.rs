@@ -1,5 +1,6 @@
-//! Read-only Job Artifact owner. No publication, import leases, quota mutation,
-//! snapshot persistence or payload-verification-document writes occur here.
+//! Read-only Job Artifact source owner. Explicit export only writes the caller's
+//! external destination. Artifact publication, import leases, quota mutation,
+//! snapshot persistence and payload-verification-document writes stay separate.
 use crate::artifact_usage::decode_index;
 use arkdeck_platform::HostDirectory;
 use serde_json::Value;
@@ -13,7 +14,8 @@ pub const MAX_ARTIFACT_READ_BYTES: usize = 4_194_304;
 
 pub struct ArtifactReadStore {
     root: HostDirectory,
-    path: PathBuf,
+    pub(crate) path: PathBuf,
+    pub(crate) export_lock: std::sync::Mutex<()>,
 }
 
 /// An in-memory immutable snapshot; it is deliberately not a Runtime wire cursor.
@@ -93,10 +95,11 @@ impl ArtifactReadStore {
         Ok(Self {
             root: HostDirectory::open(path)?,
             path: path.into(),
+            export_lock: std::sync::Mutex::new(()),
         })
     }
 
-    fn index(&self, id: &str) -> io::Result<(HostDirectory, Vec<u8>, Vec<Value>)> {
+    pub(crate) fn index(&self, id: &str) -> io::Result<(HostDirectory, Vec<u8>, Vec<Value>)> {
         if !job_id(id) {
             return Err(invalid_input());
         }
@@ -119,7 +122,7 @@ impl ArtifactReadStore {
         Ok((job, bytes, rows))
     }
 
-    fn unchanged(&self, id: &str, job: &HostDirectory, index: &[u8]) -> io::Result<()> {
+    pub(crate) fn unchanged(&self, id: &str, job: &HostDirectory, index: &[u8]) -> io::Result<()> {
         match job.read("index.json", MAX_INDEX) {
             Ok(current) if !index.is_empty() && current == index => (),
             Err(error) if index.is_empty() && error.kind() == io::ErrorKind::NotFound => (),

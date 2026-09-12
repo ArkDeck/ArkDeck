@@ -373,3 +373,8 @@ mod artifact_resources;
 mod import_upload;
 #[cfg(target_os = "macos")]
 pub use import_upload::{ImportBinding, ImportUploadFault, ImportUploadStore};
+
+#[cfg(target_os = "macos")]
+mod artifact_export;
+#[cfg(target_os = "macos")]
+pub use artifact_export::ArtifactExportRequest;

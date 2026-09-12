@@ -45,14 +45,15 @@ class RunSwiftPMTests(unittest.TestCase):
         return script, source
 
     def invoke(
-        self, *arguments: str, exit_code: str = "0"
+        self, *arguments: str, exit_code: str = "0", cache_root: Path | None = None
     ) -> tuple[subprocess.CompletedProcess[str], Path]:
         temporary = self.enterContext(tempfile.TemporaryDirectory())
         temporary_path = Path(temporary)
         script, _ = self.make_runner_repo(
             temporary_path / "repo", "public let value = 1\n", 1_700_000_000
         )
-        cache_root = temporary_path / "cache root"
+        if cache_root is None:
+            cache_root = temporary_path / "cache root"
         environment = os.environ.copy()
         environment.update(
             {
@@ -91,6 +92,7 @@ class RunSwiftPMTests(unittest.TestCase):
                 "-Werror",
                 "-Xswiftc",
                 "DeprecatedDeclaration",
+                "--disable-index-store",
                 "--target",
                 "ArkDeckCore",
             ],
@@ -120,6 +122,22 @@ class RunSwiftPMTests(unittest.TestCase):
         self.assertTrue((cache_root / "build.lock").is_file())
         self.assertIn(f"ArkDeck SwiftPM cache: {canonical_cache_root}", result.stderr)
         self.assertIn("ArkDeck API-baseline scratch: ", result.stderr)
+
+    def test_stale_index_store_is_removed_from_the_owned_scratch_only(self) -> None:
+        temporary_path = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        cache_root = temporary_path / "cache"
+        stale = cache_root / "build/arm64-apple-macosx/debug/index/store/v5"
+        stale.mkdir(parents=True)
+        (stale / "record").write_bytes(b"old index data")
+        kept = cache_root / "build/checkouts/some-dependency/index"
+        kept.mkdir(parents=True)
+        (kept / "README").write_bytes(b"a dependency directory that happens to be named index")
+        result, _ = self.invoke("build", cache_root=cache_root)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse((cache_root / "build/arm64-apple-macosx/debug/index").exists())
+        self.assertTrue((kept / "README").is_file())
+        self.assertIn("--disable-index-store", result.stdout.splitlines())
 
     def test_test_arguments_and_swift_exit_status_are_preserved(self) -> None:
         result, _ = self.invoke(

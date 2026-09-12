@@ -71,10 +71,19 @@ def main():
 
         process = start()
         try:
+            export_path = None
             for sample in samples:
-                reply = request(sample["method"], sample["params"])
+                params = dict(sample["params"])
+                expected = dict(sample["result"])
+                if sample["method"] == "artifact.export":
+                    destination = root / "rpc-exports"
+                    destination.mkdir(mode=0o700)
+                    params["destinationDirectory"] = str(destination)
+                    export_path = destination / Path(expected["exportedPath"]).name
+                    expected["exportedPath"] = str(export_path)
+                reply = request(sample["method"], params)
                 assert reply["ok"], reply
-                actual, expected = reply["result"], sample["result"]
+                actual = reply["result"]
                 if "items" in expected:
                     assert actual["items"] == expected["items"], (sample["method"], actual, expected)
                 else:
@@ -95,6 +104,23 @@ def main():
                 assert raw.stdout == base64.b64decode(expected["base64"])
                 missing = request("artifact.inspect", {**reference, "owner": {"kind": "job", "id": "absent"}})
                 assert missing["error"]["code"] == "resourceNotFound", missing
+            if export_path:
+                expected_bytes = base64.b64decode(next(item["result"]["base64"] for item in samples if item["method"] == "artifact.read"))
+                assert export_path.read_bytes() == expected_bytes
+                cli_destination = root / "cli-exports"
+                cli_destination.mkdir(mode=0o700)
+                command = [str(cli), "artifact", "export", *owner_options, "--destination", str(cli_destination), "--socket", str(endpoint), "--output", "json"]
+                exported = subprocess.run(command, capture_output=True, timeout=10)
+                assert exported.returncode == 0, (exported.stdout, exported.stderr)
+                receipt = json.loads(exported.stdout)["result"]
+                assert Path(receipt["exportedPath"]).read_bytes() == expected_bytes
+                assert receipt["overwritten"] is False
+                conflict = subprocess.run(command, capture_output=True, timeout=10)
+                assert conflict.returncode != 0
+                assert json.loads(conflict.stdout)["error"]["code"] == "resourceConflict"
+                overwritten = subprocess.run(command + ["--overwrite"], capture_output=True, timeout=10)
+                assert overwritten.returncode == 0, (overwritten.stdout, overwritten.stderr)
+                assert json.loads(overwritten.stdout)["result"]["overwritten"] is True
             # The second owner must refuse without rewriting the live SQLite.
             other = subprocess.run([str(daemon)], env=env, capture_output=True, timeout=5)
             assert other.returncode != 0
@@ -103,12 +129,15 @@ def main():
             process.terminate(); process.wait(timeout=5)
             process = start()
             for sample in samples:
+                if sample["method"] == "artifact.export":
+                    assert export_path.read_bytes() == expected_bytes
+                    continue
                 reply = request(sample["method"], sample["params"])
                 assert reply["ok"], reply
                 expected = sample["result"]
                 assert (reply["result"]["items"] == expected["items"]) if "items" in expected else (reply["result"] == expected)
             assert (root / "jobs-state/runtime-jobs.sqlite3").read_bytes() == before
-            print(json.dumps({"status": "PASS", "producer": "Swift current SQLite and RPC", "samples": len(samples), "cliProcesses": len(commands) + int(artifact_mode), "restart": True, "secondOwnerRefused": True, "deviceDispatchCount": 0}))
+            print(json.dumps({"status": "PASS", "producer": "Swift current SQLite and RPC", "samples": len(samples), "cliProcesses": len(commands) + int(artifact_mode) + 3 * int(export_path is not None), "restart": True, "secondOwnerRefused": True, "deviceDispatchCount": 0}))
         finally:
             if process.poll() is None:
                 process.terminate(); process.wait(timeout=5)

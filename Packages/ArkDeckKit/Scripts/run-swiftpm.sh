@@ -208,6 +208,18 @@ fi
 printf 'ArkDeck SwiftPM cache: %s\n' "$cache_root" >&2
 printf 'ArkDeck SwiftPM worktree: %s\n' "$repo_root" >&2
 
+# Nothing reads the index store this runner used to write: no editor opens the
+# mirror, and no script consumes index data. Indexing while building costs
+# compile time on every changed file and, at 261 MB of a 2.0 GB debug scratch,
+# about an eighth of the CI cache upload and download. The stale store from
+# earlier builds is removed so a restored cache stops carrying it; the build
+# never reads it back, and the runner owns only its arm64 build directory.
+for stale_index in "$scratch_path"/arm64-apple-macosx/*/index; do
+  if [ -d "$stale_index" ]; then
+    rm -rf "$stale_index"
+  fi
+done
+
 exec "$swift_executable" "$swift_command" \
   --arch arm64 \
   --package-path "$stable_package" \
@@ -215,4 +227,5 @@ exec "$swift_executable" "$swift_command" \
   --cache-path "$dependency_cache" \
   -Xswiftc -Werror \
   -Xswiftc DeprecatedDeclaration \
+  --disable-index-store \
   "$@"

@@ -1,0 +1,344 @@
+   Compiling version_check v0.9.4
+   Compiling typenum v1.20.1
+   Compiling generic-array v0.14.7
+   Compiling libc v0.2.189
+   Compiling crypto-common v0.1.6
+   Compiling proc-macro2 v1.0.106
+   Compiling cfg-if v1.0.4
+   Compiling cpufeatures v0.2.17
+   Compiling unicode-ident v1.0.18
+   Compiling quote v1.0.47
+   Compiling serde_core v1.0.228
+   Compiling block-buffer v0.10.4
+   Compiling inout v0.1.4
+   Compiling subtle v2.6.1
+   Compiling zmij v1.0.21
+   Compiling universal-hash v0.5.1
+   Compiling cipher v0.4.4
+   Compiling digest v0.10.7
+   Compiling syn v2.0.119
+   Compiling serde v1.0.228
+   Compiling opaque-debug v0.3.1
+   Compiling serde_json v1.0.151
+   Compiling polyval v0.6.2
+   Compiling serde_derive v1.0.228
+   Compiling sha2 v0.10.9
+   Compiling memchr v2.8.3
+   Compiling arkdeck-platform v0.1.0 (/private/tmp/arkdeck-xpa013-import-upload-main-20260912/rust/crates/arkdeck-platform)
+   Compiling itoa v1.0.15
+   Compiling ghash v0.5.1
+   Compiling aes v0.8.4
+   Compiling ctr v0.9.2
+   Compiling aead v0.5.2
+   Compiling aes-gcm v0.10.3
+   Compiling arkdeck-contract v0.1.0 (/private/tmp/arkdeck-xpa013-import-upload-main-20260912/rust/crates/arkdeck-contract)
+   Compiling unicode-segmentation v1.13.3
+   Compiling arkdeck-hoststore v0.1.0 (/private/tmp/arkdeck-xpa013-import-upload-main-20260912/rust/crates/arkdeck-hoststore)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 32.45s
+     Running tests/artifact_read_owner.rs (target/debug/deps/artifact_read_owner-9456a3006025ad66)
+
+running 24 tests
+test absent_index_is_empty_but_payload_length_and_hard_link_identity_are_checked ... ok
+test digest_corruption_outside_requested_range_and_linked_payloads_are_refused ... ok
+test invalid_creation_time_cannot_be_published_as_a_sorted_snapshot ... ok
+test export_refusals_do_not_create_destination_or_modify_artifacts ... ok
+test frozen_derived_provenance_is_preserved_and_extra_nested_fields_are_refused ... ok
+test inspect_and_read_validate_selected_projection_without_applying_list_sort_to_other_rows ... ok
+test production_projection_preserves_nulls_and_observation_without_inventing_fields ... ok
+test missing_and_truncated_remain_inspectable_without_claiming_readable_content ... ok
+test pagination_orders_instants_across_timezones_and_fractional_spellings ... ok
+test malformed_projection_metadata_never_returns_inspect_or_read_wire_bytes ... ok
+test rpc_refusals_preserve_the_artifact_owner_error_contract ... ok
+test actual_swift_read_recording_is_reproduced_and_sensitive_opt_in_is_preserved ... ok
+test rpc_requires_the_job_owner_before_inspecting_or_reading_payloads ... ok
+test sensitive_opt_in_and_invalid_ranges_fail_before_content_return ... ok
+test explicit_export_preserves_source_and_binds_receipt_to_safe_destination ... ok
+test actual_swift_inspect_recording_is_reproduced_from_verified_fixture_content ... ok
+test wire_request_inputs_are_closed_typed_and_never_accept_paths_or_import_owners ... ok
+test unicode_equivalent_names_and_corrupt_unselected_rows_fail_closed ... ok
+test snapshot_pagination_is_stable_after_index_changes_and_has_bounded_arguments ... ok
+test read_wire_uses_standard_base64_and_exact_offset_tail_and_eof ... ok
+test strict_index_refuses_extra_keys_foreign_identity_duplicates_and_malformed_json ... ok
+test range_crosses_stream_chunk_and_eof_without_changing_durable_bytes ... ok
+test read_wire_defaults_to_one_mib_and_inspect_response_has_a_total_byte_bound ... ok
+test four_mib_slash_heavy_read_stays_inside_current_response_bound ... ok
+
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.91s
+
+     Running tests/import_target.rs (target/debug/deps/import_target-dd1b4df57f390454)
+
+running 4 tests
+test native_alias_requires_real_route_owner_for_hdc_imports_but_keeps_other_kind_semantics ... ok
+test missing_stale_or_injected_authority_never_creates_an_import ... ok
+test malformed_alias_history_and_linked_target_files_fail_closed ... ok
+test native_target_owner_resolves_each_import_kind_without_rewriting_binding ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.22s
+
+     Running tests/import_upload.rs (target/debug/deps/import_upload-edcbe33ac002b905)
+
+running 14 tests
+test begin_requires_runtime_binding_and_conflicting_metadata_never_changes_existing_owner ... ok
+test one_owner_and_private_directory_bindings_prevent_foreign_writes ... ok
+test sigkill_upload_helper ... ignored, subprocess fixture invoked by sigkill_upload_recovery_uses_only_durable_checkpoints
+test native_swift_upload_snapshot_reopens_and_resumes_without_rewriting_prior_records ... ok
+test exact_upload_identity_survives_restart_and_append_retry_without_changing_generation ... ok
+test begin_and_abort_crash_windows_remain_discoverable_and_cannot_resurrect_an_upload ... ok
+test staging_quota_is_declared_capacity_and_never_evicts_an_existing_owner ... ok
+test concurrent_appends_have_one_committed_prefix_and_trusted_app_provenance_stays_scoped ... ok
+test workspace_patch_keeps_the_owner_resolved_nullable_binding_snapshot ... ok
+test linked_or_corrupt_staging_and_foreign_identity_maps_fail_without_touching_raw_bytes ... ok
+test partial_and_synced_chunks_recover_only_the_uncommitted_suffix ... ok
+test strict_records_refuse_unknown_fields_bad_chunk_state_and_linked_checkpoints ... ok
+test sigkill_upload_recovery_uses_only_durable_checkpoints ... ok
+test maximum_chunk_checkpoint_refuses_more_metadata_and_preserves_staged_bytes ... ok
+
+test result: ok. 13 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.61s
+
+   Compiling libc v0.2.189
+   Compiling digest v0.10.7
+   Compiling serde_json v1.0.151
+   Compiling cpufeatures v0.2.17
+   Compiling sha2 v0.10.9
+   Compiling hmac v0.12.1
+   Compiling arkdeck-contract v0.1.0 (/private/tmp/arkdeck-xpa013-import-upload-main-20260912/rust/crates/arkdeck-contract)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 10.35s
+     Running tests/imports.rs (target/debug/deps/imports-b5775bbb7d6ea254)
+
+running 5 tests
+test import_timestamps_compare_instants_and_refuse_ambiguous_timezones ... ok
+test actual_swift_reference_inspections_preserve_unknown_outcome_blockers ... ok
+test closed_intent_counts_and_registered_kind_bounds_are_preserved ... ok
+test actual_swift_upload_and_terminal_projections_keep_exact_metadata_identity ... ok
+test canonical_bounded_chunk_encoding_rejects_padding_and_length_ambiguity ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.44s
+
+   Compiling arkdeck-contract v0.1.0 (/private/tmp/arkdeck-xpa013-import-upload-main-20260912/rust/crates/arkdeck-contract)
+   Compiling arkdeck-client v0.1.0 (/private/tmp/arkdeck-xpa013-import-upload-main-20260912/rust/crates/arkdeck-client)
+   Compiling arkdeck-cli v0.1.0 (/private/tmp/arkdeck-xpa013-import-upload-main-20260912/rust/crates/arkdeck-cli)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 13.09s
+     Running unittests src/lib.rs (target/debug/deps/arkdeck_cli-6f5d9b5a7124c9e8)
+
+running 11 tests
+test target_resources::tests::exact_target_and_candidate_options_map_to_current_methods ... ok
+test target_resources::tests::candidate_clear_receipt_is_bound_and_lost_reply_is_never_retryable ... ok
+test session_resources::export_result_tests::included_excluded_overlap_is_never_emitted_as_a_valid_result ... ok
+test session_resources::cleanup_tests::checks_digest_even_when_the_wire_shape_is_valid ... ok
+test target_resources::tests::stale_generation_missing_identity_extra_facts_and_bad_names_are_rejected_locally ... ok
+test trace_cache::tests::existing_status_command_is_closed_and_counts_must_reconcile ... ok
+test target_resources::tests::name_receipts_must_match_exact_resource_tuple_and_next_generation ... ok
+test session_resources::export_tests::accepts_actual_owner_record_and_rejects_tampering ... ok
+test session_resources::cleanup_tests::signed_but_inconsistent_or_unsafe_previews_are_refused ... ok
+test session_resources::export_result_tests::actual_result_is_accepted_but_inconsistent_context_is_refused ... ok
+test session_resources::export_tests::rejects_signed_invalid_source_accounting_and_privacy ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/main.rs (target/debug/deps/arkdeck-3786d4a53cc821e0)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/artifact_resources.rs (target/debug/deps/artifact_resources-8c325ff415138231)
+
+running 8 tests
+test base64_rejects_noncanonical_padding_and_unbounded_allocations ... ok
+test artifact_refusals_keep_owner_evidence_and_current_exit_codes ... ok
+test artifact_cli_keeps_the_published_argv_contract ... ok
+test export_requires_explicit_destination_and_exact_inspected_receipt ... ok
+test actual_swift_ranges_require_selected_metadata_and_requested_bounds ... ok
+test actual_swift_metadata_is_accepted_and_mismatched_identity_is_refused ... ok
+test endpoint::executable_inspects_then_reads_once_and_raw_is_the_validated_range ... ok
+test endpoint::export_executable_sends_once_and_never_replays_unknown_or_malformed_receipts ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.68s
+
+     Running tests/bootstrap_resources.rs (target/debug/deps/bootstrap_resources-75d02560c704e3eb)
+
+running 16 tests
+test bundle_list_maps_only_bounded_bootstrap_owner_errors ... ok
+test bundle_list_options_use_typed_bounded_pages_and_keep_cursor_opaque ... ok
+test bundle_retirement_requires_exact_generation_text_and_reference ... ok
+test existing_bootstrap_argv_fixtures_keep_their_dispatch_contract ... ok
+test retirement_preserves_only_proven_owner_failures_and_existing_protocol_refusals ... ok
+test in_memory_tool_retirement_lost_receipt_cannot_replay ... ok
+test in_memory_lost_retirement_receipt_is_unknown_and_the_client_never_replays ... ok
+test actual_retirement_receipts_match_the_requested_bundle_and_retain_content ... ok
+test actual_bundle_pages_preserve_snapshot_and_validate_every_row ... ok
+test tool_list_uses_typed_page_size_and_keeps_cursor_opaque ... ok
+test tool_list_keeps_readonly_connection_and_owner_error_policy ... ok
+test actual_tool_retirement_receipts_preserve_both_content_models ... ok
+test actual_bootstrap_producer_results_preserve_exact_identity_and_no_execution_assessment ... ok
+test tool_retirement_keeps_exact_typed_generation_and_both_reference_families ... ok
+test tool_retirement_owner_errors_require_exact_proof_and_match_the_schema ... ok
+test actual_tool_list_pages_validate_every_mixed_family_record_and_snapshot ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/bundle_registration.rs (target/debug/deps/bundle_registration-6cc4a8783e036e41)
+
+running 2 tests
+test registration_only_sends_kind_and_file_and_keeps_published_method_gate ... ok
+test actual_swift_fixture_receipts_keep_identity_and_map_invalid_receipts_to_unknown ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/current_surface.rs (target/debug/deps/current_surface-fbe5e098f3de6ddf)
+
+running 9 tests
+test machine_envelope_uses_current_versions_and_canonical_bytes ... ok
+test export_apply_requires_one_exact_preview_tuple_and_keeps_its_method_scope ... ok
+test doctor_flags_correlation_and_duplicate_flags_are_strict ... ok
+test session_cli_requires_exact_identity_and_preserves_zero_catalog_generation ... ok
+test host_owner_failure_scope_and_lost_reply_are_preserved ... ok
+test history_cli_builds_complete_queries_and_rejects_invalid_options ... ok
+test unknown_execution_is_never_invented_as_zero_execution_by_error_mapping ... ok
+test session_client_refuses_invalid_rows_and_partial_or_mixed_pages ... ok
+test current_argv_fixture_families_replay_without_a_device ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/import_resources.rs (target/debug/deps/import_resources-88b6a94be4c89507)
+
+running 8 tests
+test import_owner_errors_remain_distinct_and_lost_mutation_responses_are_unknown ... ok
+test upload::missing_runtime_target_owner_does_not_begin_and_native_name_is_canonicalized ... ok
+test upload::unconfirmed_append_recovery_is_bounded_and_does_not_create_new_identity ... ok
+test imports_keep_current_swift_leaf_argv_and_inspect_uses_reference_inspection ... ok
+test upload::unknown_commit_is_inspected_once_and_never_replayed ... ok
+test upload::corrupted_recovery_changed_source_and_other_owner_never_continue_upload ... ok
+test upload::abort_and_inspection_validate_exact_requested_owner ... ok
+test upload::lost_begin_and_append_replies_rediscover_only_the_exact_committed_prefix ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.71s
+
+     Running tests/job_events.rs (target/debug/deps/job_events-d3f14af96ef172c5)
+
+running 2 tests
+test unary_events_argv_matches_current_swift_and_preserves_exclusive_cursor ... ok
+test native_event_pages_are_checked_before_emission ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+
+     Running tests/read_only_resources.rs (target/debug/deps/read_only_resources-e81ee3de0af14f1a)
+
+running 20 tests
+test bad_identity_timeout_and_cross_leaf_options_are_refused ... ok
+test current_recorded_job_lists_and_details_are_returned_verbatim ... ok
+test endpoint::timeline_invalid_cursor_requires_current_schema_and_zero_dispatch_proof ... ok
+test evidence_consumes_all_recorded_results_and_rejects_inconsistent_verification ... ok
+test endpoint::executable_queries_same_connection_and_preserves_snapshot_and_refusal ... ok
+test job_list_refuses_partial_or_cross_snapshot_pages_and_orders_dates_as_instants ... ok
+test job_read_options_are_typed_and_leaf_specific ... ok
+test job_show_refuses_changed_references_and_incomplete_timeline ... ok
+test published_argv_fixtures_replay ... ok
+test examples_consume_the_runtime_descriptor_without_local_substitution ... ok
+test published_results_are_consumed_without_inventing_facts ... ok
+test timeline_recorded_pages_are_verbatim_and_options_are_bounded ... ok
+test timeline_segments_are_canonical_contiguous_and_bounded_in_utf8_bytes ... ok
+test unknown_outcomes_stay_query_results_and_false_next_actions_fail_closed ... ok
+test endpoint::evidence_attention_keeps_successful_result_and_never_replays ... ok
+test endpoint::recorded_filtered_pages_and_long_timeline_references_stay_single_queries ... ok
+test endpoint::job_list_and_show_processes_query_once_preserve_facts_and_never_follow_references ... ok
+test endpoint::timeline_processes_keep_one_page_and_reject_invalid_cursor_without_replay ... ok
+test endpoint::job_timeout_is_shared_by_health_and_status_and_emits_no_snapshot_or_replay ... ok
+test endpoint::evidence_timeout_is_shared_by_health_and_query_and_emits_no_snapshot_or_replay ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.45s
+
+     Running tests/tool_register.rs (target/debug/deps/tool_register-2064a8da5d93bea9)
+
+running 8 tests
+test current_argv_is_retained_with_rust_hdc_transport_support ... ok
+test endpoint::unpublished_registration_opens_no_connection ... ok
+test hdc_request_rejects_wrong_kind_path_and_caller_owned_fields ... ok
+test actual_registration_projection_has_content_identity_without_selection ... ok
+test paths_match_swift_local_grammar_and_request_is_closed_before_connect ... ok
+test endpoint::real_producer_responses_are_one_typed_request_and_lost_reply_is_unknown ... ok
+test endpoint::actual_owner_refusals_preserve_failure_and_never_retry_registration ... ok
+test endpoint::hdc_receipts_and_lost_or_inconsistent_responses_never_replay ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.85s
+
+   Doc-tests arkdeck_cli
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Compiling sha2 v0.10.9
+   Compiling arkdeck-contract v0.1.0 (/private/tmp/arkdeck-xpa013-import-upload-main-20260912/rust/crates/arkdeck-contract)
+   Compiling arkdeck-control v0.1.0 (/private/tmp/arkdeck-xpa013-import-upload-main-20260912/rust/crates/arkdeck-control)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.85s
+     Running tests/read_only.rs (target/debug/deps/read_only-420cd255aad2e44c)
+
+running 15 tests
+test bundle_retirement_is_typed_and_unconfigured_owner_is_explicit ... ok
+test bundle_list_structure_is_closed_and_unconfigured_owner_is_explicit ... ok
+test accepted_observation_uses_the_host_once_and_preserves_its_complete_projection ... ok
+test bootstrap_reads_validate_before_owner_and_refuse_an_unconfigured_owner ... ok
+test deveco_registration_is_closed_and_unpublished_views_never_reach_an_owner ... ok
+test bundle_registration_rejects_caller_authority_and_observes_nothing ... ok
+test import_upload_methods_use_only_the_typed_import_owner ... ok
+test malformed_wrong_contract_and_unknown_methods_fail_before_host_entry ... ok
+test operation_descriptors_and_unconfigured_doctor_match_the_current_swift_outputs ... ok
+test artifact_methods_report_unconfigured_owner_and_route_exact_typed_parameters ... ok
+test semantic_invalid_requests_do_not_trigger_observation_or_capability_paths ... ok
+test every_unimplemented_method_is_refused_without_entering_the_host ... ok
+test tool_list_structure_is_closed_and_unconfigured_owner_is_explicit ... ok
+test tool_retirement_is_typed_and_unconfigured_owner_is_explicit ... ok
+test bootstrap_mutation_lost_classified_receipts_preserve_uncertainty_after_one_owner_call ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.60s
+
+    Checking typenum v1.20.1
+    Checking subtle v2.6.1
+    Checking libc v0.2.189
+    Checking cpufeatures v0.2.17
+    Checking generic-array v0.14.7
+    Checking cfg-if v1.0.4
+    Checking serde_core v1.0.228
+    Checking crypto-common v0.1.6
+    Checking block-buffer v0.10.4
+    Checking digest v0.10.7
+    Checking sha2 v0.10.9
+    Checking zmij v1.0.21
+    Checking itoa v1.0.15
+    Checking memchr v2.8.3
+   Compiling arkdeck-platform v0.1.0 (/private/tmp/arkdeck-xpa013-import-upload-main-20260912/rust/crates/arkdeck-platform)
+    Checking serde_json v1.0.151
+    Checking serde v1.0.228
+    Checking arkdeck-contract v0.1.0 (/private/tmp/arkdeck-xpa013-import-upload-main-20260912/rust/crates/arkdeck-contract)
+    Checking inout v0.1.4
+    Checking cipher v0.4.4
+    Checking universal-hash v0.5.1
+    Checking opaque-debug v0.3.1
+    Checking polyval v0.6.2
+    Checking ghash v0.5.1
+    Checking aes v0.8.4
+    Checking ctr v0.9.2
+    Checking aead v0.5.2
+    Checking unicode-segmentation v1.13.3
+    Checking aes-gcm v0.10.3
+    Checking arkdeck-client v0.1.0 (/private/tmp/arkdeck-xpa013-import-upload-main-20260912/rust/crates/arkdeck-client)
+    Checking hmac v0.12.1
+    Checking arkdeck-hoststore v0.1.0 (/private/tmp/arkdeck-xpa013-import-upload-main-20260912/rust/crates/arkdeck-hoststore)
+    Checking arkdeck-cli v0.1.0 (/private/tmp/arkdeck-xpa013-import-upload-main-20260912/rust/crates/arkdeck-cli)
+    Checking arkdeck-provider-hdc v0.1.0 (/private/tmp/arkdeck-xpa013-import-upload-main-20260912/rust/crates/arkdeck-provider-hdc)
+    Checking arkdeck-control v0.1.0 (/private/tmp/arkdeck-xpa013-import-upload-main-20260912/rust/crates/arkdeck-control)
+   Compiling arkdeck-agentd v0.1.0 (/private/tmp/arkdeck-xpa013-import-upload-main-20260912/rust/crates/arkdeck-agentd)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 18.88s
+   Compiling sha2 v0.10.9
+   Compiling arkdeck-agentd v0.1.0 (/private/tmp/arkdeck-xpa013-import-upload-main-20260912/rust/crates/arkdeck-agentd)
+   Compiling arkdeck-contract v0.1.0 (/private/tmp/arkdeck-xpa013-import-upload-main-20260912/rust/crates/arkdeck-contract)
+   Compiling arkdeck-platform v0.1.0 (/private/tmp/arkdeck-xpa013-import-upload-main-20260912/rust/crates/arkdeck-platform)
+   Compiling arkdeck-client v0.1.0 (/private/tmp/arkdeck-xpa013-import-upload-main-20260912/rust/crates/arkdeck-client)
+   Compiling arkdeck-hoststore v0.1.0 (/private/tmp/arkdeck-xpa013-import-upload-main-20260912/rust/crates/arkdeck-hoststore)
+   Compiling arkdeck-cli v0.1.0 (/private/tmp/arkdeck-xpa013-import-upload-main-20260912/rust/crates/arkdeck-cli)
+   Compiling arkdeck-provider-hdc v0.1.0 (/private/tmp/arkdeck-xpa013-import-upload-main-20260912/rust/crates/arkdeck-provider-hdc)
+   Compiling arkdeck-control v0.1.0 (/private/tmp/arkdeck-xpa013-import-upload-main-20260912/rust/crates/arkdeck-control)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 18.62s
+PASS: native upload/Target fixture parity, new CLI upload through actual direct Target binding, lost-append reply inspect/resume, restart, source identity, abort tombstone and unavailable publication/alias-route/reference seams; no device dispatch
+Swift development baseline of this checkout: 105 methods, 599 recorded shapes, contract identity 1d7d101e83fe
