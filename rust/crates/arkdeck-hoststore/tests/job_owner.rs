@@ -58,6 +58,182 @@ impl Drop for Root {
 fn record(id: &str, state: &str) -> Value {
     json!({"jobID":id, "request":{"documentType":"runtime-operation-request", "schemaVersion":"1.0.0", "requestId":format!("req-{id}"), "idempotencyKey":format!("idem-{id}"), "target":{"targetId":"TGT-fixture", "expectedBindingRevision":1}, "operation":{"id":"observe.device", "version":1}, "inputs":{"privateInput":"private-input-value"}, "requestedOutputs":["derivedArtifacts"]}, "operationReference":"observe.device@1", "catalogDigest":arkdeck_contract::CATALOG_DIGEST, "providerID":"hdc", "createdAtUTC":"2026-08-31T12:00:00Z", "actualEffect":"readOnly", "materializedPlanDigest":"a".repeat(64), "materializedBindingRevision":1, "state":state, "outcomeUnknown":state=="waitingForRecovery", "timeline":["created", "completed"], "actualStepKinds":[], "skipReasons":{}})
 }
+
+fn publication_marker() -> Value {
+    json!({"sessionID":"session-job-private", "catalogDigest":arkdeck_contract::CATALOG_DIGEST,
+        "policyGeneration":"0", "root":{"path":"/private/fixture-session-root","device":"0","inode":"0","volumeIdentity":""},
+        "relativeSessionPath":"", "claims":[], "phase":"awaitingStorage"})
+}
+
+#[test]
+fn historical_capability_correlation_is_checked_without_granting_execution() {
+    let mut value = record("job-private", "waitingForRecovery");
+    value["originalSubmissionRequest"] = value["request"].clone();
+    value["request"]["authorization"] = json!({"capabilityId":"CAP-RT-SNAPSHOT-FIXTURE"});
+    value["admissionEvidence"] = json!({"kind":"runtimeCapability","reference":"CAP-RT-SNAPSHOT-FIXTURE",
+        "admittedAtUTC":"2026-08-31T12:00:00Z","validUntilUTC":"2026-08-31T12:05:00Z",
+        "consumptionFingerprintSHA256":"c".repeat(64),"runtimeCapabilityCorrelation":{
+            "reservationID":"idem-job-private","useOrdinal":1,"planDigestSHA256":"a".repeat(64),
+            "stepSetDigestSHA256":"d".repeat(64),"targetBindingDigestSHA256":arkdeck_contract::sha256_hex(b"-\n1")}});
+    let decode = |v: &Value| arkdeck_hoststore::JobRecord::decode(&serde_json::to_vec(v).unwrap());
+    assert_eq!(decode(&value).unwrap().value().unwrap(), value);
+    for mutation in [
+        "original",
+        "authorization",
+        "reservation",
+        "ordinal",
+        "plan",
+        "binding",
+        "fingerprint",
+        "kind",
+        "nested",
+    ] {
+        let mut changed = value.clone();
+        match mutation {
+            "original" => {
+                changed
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("originalSubmissionRequest");
+            }
+            "authorization" => {
+                changed["request"]["authorization"]["capabilityId"] = json!("CAP-RT-OTHER")
+            }
+            "reservation" => {
+                changed["admissionEvidence"]["runtimeCapabilityCorrelation"]["reservationID"] =
+                    json!("other")
+            }
+            "ordinal" => {
+                changed["admissionEvidence"]["runtimeCapabilityCorrelation"]["useOrdinal"] =
+                    json!(0)
+            }
+            "plan" => {
+                changed["admissionEvidence"]["runtimeCapabilityCorrelation"]["planDigestSHA256"] =
+                    json!("e".repeat(64))
+            }
+            "binding" => {
+                changed["admissionEvidence"]["runtimeCapabilityCorrelation"]["targetBindingDigestSHA256"] =
+                    json!("e".repeat(64))
+            }
+            "fingerprint" => {
+                changed["admissionEvidence"]["consumptionFingerprintSHA256"] = Value::Null
+            }
+            "kind" => changed["admissionEvidence"]["kind"] = json!("defaultReadOnlyPolicy"),
+            "nested" => {
+                changed["admissionEvidence"]["runtimeCapabilityCorrelation"]["futureAuthority"] =
+                    json!(true)
+            }
+            _ => unreachable!(),
+        }
+        assert!(decode(&changed).is_err(), "{mutation}");
+    }
+}
+
+#[test]
+fn private_snapshot_fields_roundtrip_but_do_not_escape_job_show() {
+    let root = Root::initialized();
+    root.seed("job-private", "succeeded", 1);
+    let mut value = record("job-private", "succeeded");
+    value["sessionPublicationRecord"] = publication_marker();
+    value["recoveryStepID"] = json!("private-step");
+    value["recoveryIntentEventID"] = json!("private-intent");
+    value["recoveryAction"] =
+        json!({"kind":"hdc.observeTool","arguments":{"privateArgument":"private-value"}});
+    value["evidenceObservation"] = json!({"providerID":"hdc","toolVersion":"fixture","toolSHA256":"c".repeat(64),
+        "confirmationMethod":"machineReadback","preflightSteps":[{"stepID":"inspect","stepKind":"observe","outcomeAtUTC":"2026-08-31T12:00:00Z"}]});
+    value["traceProbeBefore"] = json!({"targetID":"TGT-fixture","bindingRevision":1,"adapterDisposition":"unavailable",
+        "supportedTags":[],"tools":[{"tool":"fixture","disposition":"probeFailed"}],"parameters":[{"name":"private-param","state":"unreadable"}]});
+    let encoded = serde_json::to_vec(&value).unwrap();
+    root.db()
+        .execute(
+            "UPDATE runtime_job SET initial_record_json = ?",
+            &[Sql::Blob(encoded)],
+        )
+        .unwrap();
+    let before = fs::read(root.0.join("runtime-jobs.sqlite3")).unwrap();
+    let store = JobStore::open(&root.0).unwrap();
+    assert_eq!(
+        store.read_snapshot("job-private").unwrap().value().unwrap(),
+        value
+    );
+    let show = handle(&store, "job.show", json!({"jobId":"job-private"})).unwrap();
+    assert_eq!(show["job"]["sessionPublication"]["state"], "pending");
+    assert_eq!(
+        show["job"]["sessionPublication"]["reasonCode"],
+        "waitingForStorage"
+    );
+    let wire = serde_json::to_string(&show).unwrap();
+    for private in [
+        "private-step",
+        "private-intent",
+        "privateArgument",
+        "private-param",
+        "/private/fixture-session-root",
+        "sessionPublicationRecord",
+        "evidenceObservation",
+    ] {
+        assert!(!wire.contains(private), "{private}");
+    }
+    drop(store);
+    assert_eq!(
+        fs::read(root.0.join("runtime-jobs.sqlite3")).unwrap(),
+        before
+    );
+    for pointer in [
+        "/sessionPublicationRecord/root",
+        "/recoveryAction",
+        "/evidenceObservation/preflightSteps/0",
+        "/traceProbeBefore/tools/0",
+        "/traceProbeBefore/parameters/0",
+    ] {
+        let mut changed = value.clone();
+        changed
+            .pointer_mut(pointer)
+            .unwrap()
+            .as_object_mut()
+            .unwrap()
+            .insert("unknownField".into(), json!(true));
+        assert!(
+            arkdeck_hoststore::JobRecord::decode(&serde_json::to_vec(&changed).unwrap()).is_err(),
+            "{pointer}"
+        );
+    }
+}
+
+#[test]
+fn publication_receipt_precedes_failure_and_uncertainty_never_becomes_failure() {
+    let root = Root::initialized();
+    root.seed("job-private", "succeeded", 1);
+    let mut marker = publication_marker();
+    marker["failure"] = json!({"code":"sourceIntegrityFailed","certainty":"confirmed","detail":"private diagnostic"});
+    let mut cases = vec![(marker.clone(), "failed", json!("sourceIntegrityFailed"))];
+    marker["failure"]["certainty"] = json!("outcomeUnknown");
+    cases.push((
+        marker.clone(),
+        "outcomeUnknown",
+        json!("publicationUncertain"),
+    ));
+    marker["receipt"] = json!({"manifestSHA256":"d".repeat(64),"catalogGeneration":u64::MAX.to_string(),"publishedAtUTC":"2026-08-31T12:00:00Z"});
+    cases.push((marker.clone(), "published", Value::Null));
+    marker["receipt"]["catalogGeneration"] = json!("018");
+    cases.push((marker, "outcomeUnknown", json!("publicationUncertain")));
+    for (marker, state, reason) in cases {
+        let mut value = record("job-private", "succeeded");
+        value["sessionPublicationRecord"] = marker;
+        root.db()
+            .execute(
+                "UPDATE runtime_job SET initial_record_json = ?",
+                &[Sql::Blob(serde_json::to_vec(&value).unwrap())],
+            )
+            .unwrap();
+        let store = JobStore::open(&root.0).unwrap();
+        let status = handle(&store, "job.status", json!({"jobId":"job-private"})).unwrap();
+        assert_eq!(status["sessionPublication"]["state"], state);
+        assert_eq!(status["sessionPublication"]["reasonCode"], reason);
+        assert_eq!(status["nextAction"]["kind"], "readResult");
+        drop(store);
+    }
+}
 fn handle(
     store: &JobStore,
     method: &str,

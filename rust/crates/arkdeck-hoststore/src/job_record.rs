@@ -51,7 +51,7 @@ pub(super) fn terminal(state: &str) -> bool {
     ]
     .contains(&state)
 }
-fn digest(value: &str) -> bool {
+pub(super) fn digest(value: &str) -> bool {
     value.len() == 64
         && value
             .bytes()
@@ -101,6 +101,31 @@ pub struct JobRecord {
     unknown: bool,
     #[serde(rename = "operationFailure", skip_serializing_if = "Option::is_none")]
     operation_failure: Option<Value>,
+    #[serde(rename = "recoveryStepID", skip_serializing_if = "Option::is_none")]
+    recovery_step: Option<String>,
+    #[serde(rename = "recoveryAction", skip_serializing_if = "Option::is_none")]
+    recovery_action: Option<Value>,
+    #[serde(
+        rename = "recoveryIntentEventID",
+        skip_serializing_if = "Option::is_none"
+    )]
+    recovery_intent: Option<String>,
+    #[serde(rename = "evidencePreflight", skip_serializing_if = "Option::is_none")]
+    evidence_preflight: Option<Value>,
+    #[serde(
+        rename = "evidenceObservation",
+        skip_serializing_if = "Option::is_none"
+    )]
+    evidence_observation: Option<Value>,
+    #[serde(rename = "traceProbeBefore", skip_serializing_if = "Option::is_none")]
+    trace_before: Option<Value>,
+    #[serde(rename = "traceProbeAfter", skip_serializing_if = "Option::is_none")]
+    trace_after: Option<Value>,
+    #[serde(
+        rename = "sessionPublicationRecord",
+        skip_serializing_if = "Option::is_none"
+    )]
+    session_publication: Option<Value>,
     pub timeline: Vec<String>,
     #[serde(rename = "actualStepKinds", skip_serializing_if = "Option::is_none")]
     step_kinds: Option<Vec<String>>,
@@ -126,7 +151,7 @@ pub struct JobRecord {
     residues: Option<i64>,
 }
 
-fn closed<'a>(
+pub(super) fn closed<'a>(
     value: &'a Value,
     required: &[&str],
     optional: &[&str],
@@ -224,10 +249,14 @@ fn request(value: &Value) -> Result<(), WireError> {
             return Err(unreadable(()));
         }
     }
-    // Capability-bearing records require the migrated authority correlation
-    // validator. They are deliberately refused by this read-only slice.
-    if value.get("authorization").is_some() {
-        return Err(unreadable(()));
+    if let Some(authorization) = value.get("authorization") {
+        closed(authorization, &["capabilityId"], &[])?;
+        if !authorization["capabilityId"].as_str().is_some_and(|s| {
+            let count = crate::session_graphemes::graphemes(s).take(129).count();
+            s.starts_with("CAP-RT-") && (8..=128).contains(&count)
+        }) {
+            return Err(unreadable(()));
+        }
     }
     Ok(())
 }
@@ -237,16 +266,29 @@ impl JobRecord {
         self.unknown || !terminal(&self.state)
     }
     pub(super) fn from_row(row: &JobRow) -> Result<Self, WireError> {
-        let value = strict_json(&row.record).map_err(unreadable)?;
-        let record: Self = serde_json::from_value(value.clone()).map_err(unreadable)?;
-        if serde_json::to_value(&record).map_err(unreadable)? != value
-            || record.job_id != row.id
+        let record = Self::decode(&row.record)?;
+        if record.job_id != row.id
             || record.state != row.state
             || record.created != row.created
             || record.request["idempotencyKey"] != row.idempotency_key
             || row.version < 1
             || !digest(&row.request_hash)
             || order_key(&row.updated).is_err()
+        {
+            return Err(unreadable(()));
+        }
+        Ok(record)
+    }
+
+    /// Decode an existing snapshot without opening a store, claiming ownership,
+    /// authorizing an action, or changing any bytes. SQLite callers additionally
+    /// check the index correlation in `from_row`.
+    pub fn decode(bytes: &[u8]) -> Result<Self, WireError> {
+        let value = strict_json(bytes).map_err(unreadable)?;
+        let record: Self = serde_json::from_value(value.clone()).map_err(unreadable)?;
+        if serde_json::to_value(&record).map_err(unreadable)? != value
+            || !identifier(&record.job_id)
+            || order_key(&record.created).is_err()
             || !STATES.contains(&record.state.as_str())
             || !digest(&record.catalog)
             || !identifier(&record.provider)
@@ -279,37 +321,33 @@ impl JobRecord {
         {
             order_key(date).map_err(unreadable)?;
         }
-        if let Some(admission) = &record.admission {
-            let admission = closed(
-                admission,
-                &["kind", "reference", "admittedAtUTC"],
-                &["validUntilUTC"],
-            )?;
-            if admission["kind"] != "defaultReadOnlyPolicy" || !admission["reference"].is_string() {
-                return Err(unreadable(()));
+        record.validate_historical_admission()?;
+        for (value, validate) in [
+            (
+                &record.recovery_action,
+                super::job_record_fields::persisted_action as fn(&Value) -> Result<(), WireError>,
+            ),
+            (
+                &record.evidence_preflight,
+                super::job_record_fields::preflight,
+            ),
+            (
+                &record.evidence_observation,
+                super::job_record_fields::observation,
+            ),
+            (&record.trace_before, super::job_record_fields::trace_probe),
+            (&record.trace_after, super::job_record_fields::trace_probe),
+            (
+                &record.session_publication,
+                super::job_record_fields::publication,
+            ),
+        ] {
+            if let Some(value) = value {
+                validate(value)?;
             }
-            order_key(
-                admission["admittedAtUTC"]
-                    .as_str()
-                    .ok_or_else(|| unreadable(()))?,
-            )
-            .map_err(unreadable)?;
         }
         if let Some(failure) = &record.operation_failure {
-            let fields = closed(
-                failure,
-                &[
-                    "schemaVersion",
-                    "code",
-                    "category",
-                    "retryability",
-                    "recovery",
-                ],
-                &[],
-            )?;
-            if fields.values().any(|v| !v.is_string()) {
-                return Err(unreadable(()));
-            }
+            super::job_record_fields::operation_failure(failure)?;
         }
         if let Some(ring) = &record.ring {
             closed(ring, &["anchor", "ringHeldAnchor"], &[])?;
@@ -339,6 +377,55 @@ impl JobRecord {
         Ok(record)
     }
 
+    fn validate_historical_admission(&self) -> Result<(), WireError> {
+        // RuntimeJobRecord's strict decoder checks this durable correlation.
+        // It is historical provenance, not a currently usable capability.
+        if self.request.get("authorization").is_some() && self.original_request.is_none() {
+            return Err(unreadable(()));
+        }
+        let Some(evidence) = &self.admission else {
+            return Ok(());
+        };
+        super::job_record_fields::admission(evidence)?;
+        let capability = evidence["kind"] == "runtimeCapability";
+        if capability != evidence.get("runtimeCapabilityCorrelation").is_some()
+            || capability != evidence.get("consumptionFingerprintSHA256").is_some()
+            || (capability
+                && (evidence.get("validUntilUTC").is_none() || self.original_request.is_none()))
+        {
+            return Err(unreadable(()));
+        }
+        if let Some(correlation) = evidence.get("runtimeCapabilityCorrelation") {
+            let binding = arkdeck_contract::sha256_hex(
+                format!(
+                    "{}\n{}",
+                    self.identity.as_deref().unwrap_or("-"),
+                    self.binding.map_or_else(|| "-".into(), |n| n.to_string())
+                )
+                .as_bytes(),
+            );
+            if evidence["reference"] != self.request["authorization"]["capabilityId"]
+                || correlation["reservationID"] != self.request["idempotencyKey"]
+                || correlation["useOrdinal"].as_i64().is_none_or(|n| n <= 0)
+                || correlation["planDigestSHA256"].as_str() != self.plan.as_deref()
+                || !correlation["planDigestSHA256"].as_str().is_some_and(digest)
+                || !correlation["stepSetDigestSHA256"]
+                    .as_str()
+                    .is_some_and(digest)
+                || correlation["targetBindingDigestSHA256"] != binding
+                || correlation
+                    .get("artifactSHA256")
+                    .is_some_and(|v| !v.as_str().is_some_and(digest))
+                || !evidence["consumptionFingerprintSHA256"]
+                    .as_str()
+                    .is_some_and(digest)
+            {
+                return Err(unreadable(()));
+            }
+        }
+        Ok(())
+    }
+
     pub fn value(&self) -> Result<Value, WireError> {
         serde_json::to_value(self).map_err(unreadable)
     }
@@ -362,7 +449,7 @@ impl JobRecord {
             "workspaceKind":self.workspace(), "actualEffect":self.effect,
             "createdAtUtc":self.created, "startedAtUtc":self.started, "finishedAtUtc":self.finished,
             "supersededByRecoveryEpochId":null, "recoveryEpochId":null, "resolvedByTargetAliasResolutionId":null,
-            "sessionPublication":{"state":"unavailable", "manifestSha256":null, "catalogGeneration":null, "reasonCode":"noCurrentPublicationRecord"},
+            "sessionPublication":super::job_record_fields::publication_fact(self.session_publication.as_ref()),
             "failure":self.failure_projection(), "processProgress":null, "nextAction":next
         })
     }
