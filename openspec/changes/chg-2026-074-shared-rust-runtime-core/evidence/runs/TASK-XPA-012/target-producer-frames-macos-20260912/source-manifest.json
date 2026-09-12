@@ -1,0 +1,51 @@
+{
+  "base": "551ce5d4",
+  "files": [
+    {
+      "source": "/private/tmp/arkdeck-xpa012-target-owner-20260912/Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Bootstrap/DeviceBootstrap.swift",
+      "destination": "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Bootstrap/DeviceBootstrap.swift",
+      "sha256": "15426fac268d8af346c10ee70e0eb2367eef8cb7cc5661eec16dff62a520e44a"
+    },
+    {
+      "source": "/private/tmp/arkdeck-xpa012-target-owner-20260912/Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Bootstrap/RuntimeTargetDisplayNameStore.swift",
+      "destination": "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Bootstrap/RuntimeTargetDisplayNameStore.swift",
+      "sha256": "62683617629be15902171c8a47480d3869c9c781e778028ae3f0134ea68ea25f"
+    },
+    {
+      "source": "/private/tmp/arkdeck-xpa012-target-owner-20260912/Packages/ArkDeckKit/Tests/ArkDeckContractTests/AgentDaemonContractTests.swift",
+      "destination": "Packages/ArkDeckKit/Tests/ArkDeckContractTests/AgentDaemonContractTests.swift",
+      "sha256": "c4ae0a83b629dd8c3a4729267b2f95be544ab861d8dc68ed395a07f33e2b2365"
+    },
+    {
+      "source": "/private/tmp/arkdeck-xpa012-target-owner-20260912/Packages/ArkDeckKit/Tests/ArkDeckContractTests/RockchipTargetAliasReconciliationContractTests.swift",
+      "destination": "Packages/ArkDeckKit/Tests/ArkDeckContractTests/RockchipTargetAliasReconciliationContractTests.swift",
+      "sha256": "1c9b4b180be7df37d2bee8e65c15e34d881e33a5e68e767e1245378300fa0e6b"
+    },
+    {
+      "source": "/private/tmp/arkdeck-xpa012-target-owner-20260912/Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/TargetNames/rust-display-names.json",
+      "destination": "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/TargetNames/rust-display-names.json",
+      "sha256": "43a1960d7bbb21be00330605a00c70fe65e081512694cdf84904f11ed3c0b2d8"
+    }
+  ],
+  "rawFramesSha256": "f5cd08214e580512b39547c7a1277b4801798ca3ee2915de42e7a9df8ad03065",
+  "selectedMethods": [
+    "device.display-name.clear",
+    "device.display-name.set",
+    "target.display-name.clear",
+    "target.display-name.set"
+  ],
+  "framesExcludedFromDerivation": [
+    {
+      "rawLfLine": 30,
+      "method": "target.display-name.set",
+      "reason": "Valid JSON includes a Unicode line separator that the schema generator splits; raw bytes are retained and other native invalidInput cases cover this error."
+    }
+  ],
+  "staleSetCapture": {
+    "base": "a3b384d3",
+    "source": "Packages/ArkDeckKit/Tests/ArkDeckContractTests/AgentDaemonContractTests.swift",
+    "sourceSha256": "82fea049eb6f14a716e2df4291c98e3e4d2cde8cf7000e1f4a7e09f834863304",
+    "frameSha256": "ebdac800b1dc8b7febdfd7a68cbcff455d708ef436549bcb498f5c9dbf25610d",
+    "log": "/private/tmp/xpa012-target-stale-set-swift-r1.log"
+  }
+}

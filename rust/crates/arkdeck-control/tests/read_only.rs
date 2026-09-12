@@ -128,7 +128,20 @@ fn every_unimplemented_method_is_refused_without_entering_the_host() {
             continue;
         }
         let response = call(&control, method, json!({}));
-        assert_eq!(response.outcome.unwrap_err().code, "rejected", "{method}");
+        let expected = if matches!(
+            *method,
+            "target.list"
+                | "target.show"
+                | "target.display-name.set"
+                | "target.display-name.clear"
+                | "device.display-name.set"
+                | "device.display-name.clear"
+        ) {
+            "internalError"
+        } else {
+            "rejected"
+        };
+        assert_eq!(response.outcome.unwrap_err().code, expected, "{method}");
     }
     assert_eq!(reads.load(Ordering::SeqCst), 0);
 }

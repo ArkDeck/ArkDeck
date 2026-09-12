@@ -360,3 +360,27 @@ and unchanged Journal, SQLite and key bytes. The six additional publisher-trust
 entries use only the user-authorized fixed releases and their publication days;
 see `supply-chain/README.md`. Journal writes, watch/wait CLI behavior, full stored
 Job authority validators and installed owner cutover remain pending.
+
+## Target presentation owner (TASK-XPA-012)
+
+The explicitly isolated development composition owns `targets-state/` and serves
+`target list`, `target show`, `target display-name set|clear`, and
+`device display-name set|clear`. Target bindings and alias history are validated
+and read without rewriting `targets.json`; local names use the current Swift
+`target-display-names.json` format, private descriptor-anchored locks and atomic
+publication. Target names survive restart; candidate names require the current
+Runtime observation reference and expire on refresh or restart. A lost or invalid
+name-write reply is `outcomeUnknown`; the CLI never replays it.
+
+Candidate observations come from the configured HDC read-only provider. This
+phase cannot produce independent USB attachment proof, adopt a target, select an
+execution route, or write binding/alias history. `target.show` leaves the absent
+Bootstrap warm presentation and confirmed Job-observation sources as `null`.
+Existing adopted names can be projected onto actually observed provider addresses.
+
+`rust/scripts/check-target-resources.py --swift-target-store <fixture-directory>`
+checks actual Rust endpoint/CLI behavior from bytes exported by the Swift contract
+producer; `--cli-path` selects a current Swift consumer. The fixture is explicitly
+simulated host-test data. Run it after current Swift producer recording and schema
+generation; it checks typed refusals as well as CAS, restart and binding-byte
+preservation. No hardware acceptance is claimed by this harness.

@@ -68,6 +68,15 @@ final class RockchipTargetAliasReconciliationContractTests: XCTestCase {
       try fixture.reconciler.reconcileIfProven(), resolution,
       "a later Flash with the same exact identities must reuse the durable relation")
     XCTAssertEqual(try fixture.targetStore.aliasResolutions(), [resolution])
+    if let destination = ProcessInfo.processInfo.environment["ARKDECK_SWIFT_TARGET_ALIAS_COPY"] {
+      // Existing simulated reconciliation owner output, without re-encoding.
+      let output = URL(filePath: destination)
+      try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+      for name in ["targets.json", "target-display-names.json"] {
+        try Data(contentsOf: fixture.stateDirectory.appending(path: "targets").appending(path: name))
+          .write(to: output.appending(path: name))
+      }
+    }
 
     let admission = try RuntimeAdmissionService(stateDirectory: fixture.stateDirectory)
     _ = try admission.admit(

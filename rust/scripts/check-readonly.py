@@ -301,6 +301,8 @@ def main() -> None:
                         expected = "invalidParams"
                     if method in {"runtime.bundle.list", "runtime.tool.list", "artifact.inspect", "artifact.read"}:
                         expected = "operationUnavailable"
+                    if method in {"target.list", "target.show", "target.display-name.set", "target.display-name.clear", "device.display-name.set", "device.display-name.clear"}:
+                        expected = "internalError"
                     exchange(endpoint, directory, rows, method, encode(request(registry, method, method)), method, expected)
                 wire_descriptor = exchange(endpoint, directory, rows, "descriptor-success",
                     encode(request(registry, "operation.describe", "descriptor-success", {"reference": reference})),

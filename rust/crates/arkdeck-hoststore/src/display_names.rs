@@ -3,11 +3,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashSet;
 
-fn valid_name(value: &str) -> bool {
+pub(super) fn valid_name(value: &str) -> bool {
     (1..=256).contains(&value.len()) && valid_host_text(value, true, false)
 }
 
-fn target_identifier(value: &str) -> bool {
+pub(super) fn target_identifier(value: &str) -> bool {
     (1..=128).contains(&value.len())
         && value.as_bytes()[0].is_ascii_alphanumeric()
         && value
@@ -15,51 +15,52 @@ fn target_identifier(value: &str) -> bool {
             .all(|b| b.is_ascii_alphanumeric() || b"-._".contains(&b))
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-struct Record {
+pub(super) struct Record {
     #[serde(rename = "targetID")]
-    target_id: String,
-    generation: u64,
+    pub target_id: String,
+    pub generation: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
-    name: Option<String>,
+    pub name: Option<String>,
     #[serde(rename = "updatedAtUTC")]
-    updated_at: String,
+    pub updated_at: String,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-struct Candidate {
-    candidate: String,
+pub(super) struct Candidate {
+    pub candidate: String,
     #[serde(rename = "observationID")]
-    observation_id: String,
-    generation: u64,
-    name: String,
+    pub observation_id: String,
+    pub generation: u64,
+    pub name: String,
     #[serde(rename = "updatedAtUTC")]
-    updated_at: String,
+    pub updated_at: String,
     #[serde(rename = "stagedTargetID", skip_serializing_if = "Option::is_none")]
-    staged_target_id: Option<String>,
+    pub staged_target_id: Option<String>,
     #[serde(
         rename = "stagedTargetGeneration",
         skip_serializing_if = "Option::is_none"
     )]
-    staged_target_generation: Option<u64>,
+    pub staged_target_generation: Option<u64>,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-struct Document {
+pub(super) struct Document {
     #[serde(rename = "schemaVersion")]
-    schema_version: String,
-    records: Vec<Record>,
+    pub schema_version: String,
+    pub records: Vec<Record>,
     #[serde(rename = "candidateRecords", skip_serializing_if = "Option::is_none")]
-    candidates: Option<Vec<Candidate>>,
+    pub candidates: Option<Vec<Candidate>>,
 }
 
 /// Projects each persisted target/candidate at its persisted generation. Stale
 /// observation requests and missing-target defaults need separate query inputs;
 /// this snapshot decoder does not assert those query semantics are migrated.
 pub fn decode_display_names(bytes: &[u8]) -> Result<DecodedStore, DecodeError> {
+    arkdeck_contract::strict_json(bytes).map_err(|_| DecodeError::Shape)?;
     let (doc, document) = roundtrip::<Document>(bytes, 512 * 1024, true)?;
     let candidates = doc.candidates.as_deref().unwrap_or_default();
     let mut candidate_keys = HashSet::new();

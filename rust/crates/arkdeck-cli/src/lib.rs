@@ -14,6 +14,8 @@ mod job_resources;
 mod session_resources;
 pub use bootstrap_resources::{validate_bootstrap_request, validate_bootstrap_response};
 pub use session_resources::validate_session_response;
+mod target_resources;
+pub use target_resources::validate_target_response;
 mod trace_cache;
 pub use trace_cache::validate_trace_cache_response;
 
@@ -71,6 +73,9 @@ impl CliError {
         }
     }
     pub fn from_client(error: ClientError, method: &str) -> Self {
+        if target_resources::is_mutation(method) {
+            return target_resources::client_error(error, method);
+        }
         if matches!(method, "runtime.bundle.remove" | "runtime.tool.remove") {
             return bootstrap_resources::retirement_error(error, method);
         }
@@ -272,7 +277,11 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                 "--default" => {
                     method_options.insert("resetToDefault".into(), json!(true));
                 }
-                "--expected-generation"
+                "--name"
+                | "--candidate"
+                | "--observation"
+                | "--observation-generation"
+                | "--expected-generation"
                 | "--page-size"
                 | "--cursor"
                 | "--root"
@@ -312,6 +321,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                             CliError::new("invalidOption", "the option requires a value")
                         })?;
                     let key = match argument.as_str() {
+                        "--observation" => "observationId",
+                        "--observation-generation" => "observationGeneration",
                         "--expected-generation" => "expectedGeneration",
                         "--page-size" => "pageSize",
                         "--root" => "rootPath",
@@ -396,6 +407,12 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["job", "timeline"] => "job.timeline",
         ["job", "events"] => "job.events",
         ["device", "candidates"] => "device.candidates",
+        ["target", "list"] => "target.list",
+        ["target", "show"] => "target.show",
+        ["target", "display-name", "set"] => "target.display-name.set",
+        ["target", "display-name", "clear"] => "target.display-name.clear",
+        ["device", "display-name", "set"] => "device.display-name.set",
+        ["device", "display-name", "clear"] => "device.display-name.clear",
         ["trace", "cache", "status"] => "trace.cache.status",
         ["runtime", "tool", "register"] => "runtime.tool.register",
         ["runtime", "tool", "list"] => "runtime.tool.list",
@@ -422,7 +439,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         _ => {
             return Err(CliError::new(
                 "invalidCommand",
-                "available commands: doctor, operation list, device candidates, trace cache status, history filter list|save|delete, runtime storage status|policy|root, session list|show|pin|unpin, session cleanup preview, session export preview|apply",
+                "available commands: doctor, operation list, target list|show, target display-name set|clear, device display-name set|clear, device candidates, trace cache status, history filter list|save|delete, runtime storage status|policy|root, session list|show|pin|unpin, session cleanup preview, session export preview|apply",
             ));
         }
     };
@@ -439,6 +456,23 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ));
     }
     let allowed: &[&str] = match command {
+        "target.list" => &["timeout"],
+        "target.show" => &["targetId", "timeout"],
+        "target.display-name.set" => &["targetId", "expectedGeneration", "name", "timeout"],
+        "target.display-name.clear" => &["targetId", "expectedGeneration", "timeout"],
+        "device.display-name.set" => &[
+            "candidate",
+            "observationId",
+            "observationGeneration",
+            "name",
+            "timeout",
+        ],
+        "device.display-name.clear" => &[
+            "candidate",
+            "observationId",
+            "observationGeneration",
+            "timeout",
+        ],
         "artifact.inspect" => &["jobId", "import", "artifactId", "timeout"],
         "artifact.read" => &[
             "jobId",
@@ -683,8 +717,10 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
     }
     bootstrap_resources::configure(command, &mut method_options, help)?;
     let artifact_timeout = artifact_resources::configure(command, &mut method_options, help)?;
-    let timeout_ms =
-        read_only_resources::configure(command, &mut method_options, help)?.or(artifact_timeout);
+    let target_timeout = target_resources::configure(command, &mut method_options, help)?;
+    let timeout_ms = read_only_resources::configure(command, &mut method_options, help)?
+        .or(artifact_timeout)
+        .or(target_timeout);
     Ok(Invocation {
         command,
         method: if command == "device.candidates" {
@@ -710,6 +746,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                     | "runtime.bundle.remove"
             )
             || command.starts_with("artifact.")
+            || command.starts_with("target.")
+            || command.starts_with("device.display-name.")
             || command.starts_with("session.")
             || matches!(
                 command,

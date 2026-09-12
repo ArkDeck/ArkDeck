@@ -369,6 +369,16 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertEqual(setFields["name"], .string("Lab device"))
     XCTAssertEqual(setFields["generation"], .string("2"))
 
+    let staleSet = try await targetRequest(
+      handler, method: "target.display-name.set",
+      params: [
+        "targetId": .string(adopted.targetID),
+        "expectedGeneration": .string("1"),
+        "name": .string("Stale write"),
+      ])
+    XCTAssertEqual(staleSet.error?.code, "resourceConflict")
+    XCTAssertEqual(staleSet.error?.details?["newDispatchCount"], .integer(0))
+
     let stale = try await targetRequest(
       handler, method: "target.display-name.clear",
       params: [
@@ -405,6 +415,15 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertEqual(
       try reloaded.find(targetID: adopted.targetID), adopted,
       "presentation mutations must not rewrite target identity or binding")
+    if let destination = ProcessInfo.processInfo.environment["ARKDECK_SWIFT_TARGET_COPY"] {
+      // Copy actual Swift owner bytes from this synthetic contract fixture.
+      // This export is format evidence, never hardware acceptance.
+      let output = URL(filePath: destination)
+      try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+      for name in ["targets.json", "target-display-names.json"] {
+        try Data(contentsOf: directory.appending(path: name)).write(to: output.appending(path: name))
+      }
+    }
   }
 
   func testTargetDisplayNameRejectsUnknownTargetsInvalidNamesAndNonCanonicalGenerations()
@@ -485,6 +504,182 @@ final class AgentDaemonContractTests: XCTestCase {
     }
     XCTAssertEqual(clearResult["name"], .null)
     XCTAssertEqual(clearResult["generation"], .string("3"))
+  }
+
+  func testCurrentSwiftDisplayNameOwnerReadsActualRustTombstone() throws {
+    let fixture = URL(filePath: #filePath).deletingLastPathComponent()
+      .appending(path: "Fixtures/TargetNames/rust-display-names.json")
+    let directory = stateDirectory.appending(path: "rust-display-name-reader", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true,
+      attributes: [.posixPermissions: 0o700])
+    let document = directory.appending(path: "target-display-names.json")
+    let bytes = try Data(contentsOf: fixture)
+    try bytes.write(to: document)
+    try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: document.path)
+    let owner = RuntimeTargetDisplayNameStore(rootURL: directory)
+    let record = try owner.read(targetID: "target-fixture")
+    XCTAssertEqual(record.generation, 3)
+    XCTAssertNil(record.name)
+    XCTAssertEqual(record.updatedAtUTC, "2026-09-12T00:00:00Z")
+    XCTAssertEqual(try Data(contentsOf: document), bytes, "reading the actual Rust bytes must not rewrite them")
+    let updated = try owner.set(targetID: "target-fixture", expectedGeneration: 3, name: "Swift reader")
+    XCTAssertEqual(updated.generation, 4)
+  }
+
+  func testCandidateDisplayNameProducerCapturesExactTupleAndRefusals() async throws {
+    let directory = stateDirectory.appending(path: "candidate-name-producer", directoryHint: .isDirectory)
+    let port = TargetObservationCoordinatorContractTests.Port()
+    let targets = try RuntimeTargetStore(directoryURL: directory)
+    let owner = TargetObservationCoordinator(
+      observation: port, targetStore: targets, usbRelations: { [] },
+      nowUTC: { "2026-09-12T00:00:00Z" })
+    let (handler, _) = try makeStack(targetStore: targets, targetObservations: owner)
+    let snapshot = try await owner.snapshot()
+    let row = try XCTUnwrap(snapshot.observations.first)
+    var parameters: [String: JSONValue] = [
+      "candidate": .string(row.candidate.connectKey), "observationId": .string(row.observationID),
+      "observationGeneration": .string(String(snapshot.generation)), "name": .string("Fixture name"),
+    ]
+    let set = try await targetRequest(handler, method: "device.display-name.set", params: parameters)
+    XCTAssertTrue(set.ok)
+    let staleSet = try await targetRequest(handler, method: "device.display-name.set", params: parameters)
+    XCTAssertEqual(staleSet.error?.code, "resourceConflict")
+    parameters.removeValue(forKey: "name")
+    let staleClear = try await targetRequest(handler, method: "device.display-name.clear", params: parameters)
+    XCTAssertEqual(staleClear.error?.code, "resourceConflict")
+    parameters["observationGeneration"] = .string(String(snapshot.generation + 1))
+    let clear = try await targetRequest(handler, method: "device.display-name.clear", params: parameters)
+    XCTAssertTrue(clear.ok)
+    parameters["observationGeneration"] = .string(String(snapshot.generation + 2))
+    parameters["name"] = .string(" invalid")
+    let invalid = try await targetRequest(handler, method: "device.display-name.set", params: parameters)
+    XCTAssertEqual(invalid.error?.code, "invalidInput")
+    try Data("invalid-json".utf8).write(to: directory.appending(path: "target-display-names.json"))
+    parameters["name"] = .string("Valid")
+    let corruptSet = try await targetRequest(handler, method: "device.display-name.set", params: parameters)
+    XCTAssertEqual(corruptSet.error?.code, "recordUnreadable")
+    parameters.removeValue(forKey: "name")
+    let corruptClear = try await targetRequest(handler, method: "device.display-name.clear", params: parameters)
+    XCTAssertEqual(corruptClear.error?.code, "recordUnreadable")
+  }
+
+  func testTargetDisplayNameProducerRecordsCorruptDocumentRefusal() async throws {
+    let directory = stateDirectory.appending(path: "target-name-corrupt-producer", directoryHint: .isDirectory)
+    let targets = try RuntimeTargetStore(directoryURL: directory)
+    let record = try targets.adopt(stableIdentitySHA256: String(repeating: "a", count: 64),
+      connectKey: "synthetic-target-name-fixture", toolVersion: "fixture", nowUTC: "2026-09-12T00:00:00Z").record
+    let (handler, _) = try makeStack(targetStore: targets)
+    try Data("invalid-json".utf8).write(to: directory.appending(path: "target-display-names.json"))
+    for method in ["target.display-name.set", "target.display-name.clear"] {
+      var parameters: [String: JSONValue] = ["targetId": .string(record.targetID), "expectedGeneration": .string("1")]
+      if method.hasSuffix(".set") { parameters["name"] = .string("Valid") }
+      let response = try await targetRequest(handler, method: method, params: parameters)
+      XCTAssertEqual(response.error?.code, "recordUnreadable")
+      XCTAssertEqual(response.error?.details?["newDispatchCount"], .integer(0))
+    }
+  }
+
+  func testDisplayNameProducerRecordsRealSaveSyscallFailures() async throws {
+    for candidate in [false, true] {
+      for verb in ["set", "clear"] {
+        for expected in ["ioFailure", "outcomeUnknown"] {
+          let directory = stateDirectory.appending(path: "name-save-fault-\(UUID().uuidString)", directoryHint: .isDirectory)
+          let targets = try RuntimeTargetStore(directoryURL: directory, displayNameTestSaveHook: { point, root in
+            if expected == "ioFailure", point == .beforeCreate {
+              XCTAssertEqual(Darwin.fchmod(root, 0o500), 0)
+            } else if expected == "outcomeUnknown", point == .beforePublish {
+              // The actual rename syscall must refuse a directory destination.
+              XCTAssertEqual(Darwin.unlinkat(root, "target-display-names.json", 0), 0)
+              XCTAssertEqual(Darwin.mkdirat(root, "target-display-names.json", 0o700), 0)
+            }
+          })
+          defer { _ = Darwin.chmod(directory.path, 0o700) }
+          let port = TargetObservationCoordinatorContractTests.Port()
+          let owner = TargetObservationCoordinator(observation: port, targetStore: targets,
+            usbRelations: { [] }, nowUTC: { "2026-09-12T00:00:00Z" })
+          var parameters: [String: JSONValue]
+          if candidate {
+            let snapshot = try await owner.snapshot()
+            let row = try XCTUnwrap(snapshot.observations.first)
+            parameters = ["candidate": .string(row.candidate.connectKey), "observationId": .string(row.observationID),
+              "observationGeneration": .string(String(snapshot.generation))]
+          } else {
+            let record = try targets.adopt(stableIdentitySHA256: String(repeating: "a", count: 64),
+              connectKey: "synthetic-save-fault", toolVersion: "fixture", nowUTC: "2026-09-12T00:00:00Z").record
+            parameters = ["targetId": .string(record.targetID), "expectedGeneration": .string("1")]
+          }
+          if verb == "set" { parameters["name"] = .string("Fixture") }
+          let (handler, _) = try makeStack(targetStore: targets, targetObservations: owner)
+          let response = try await targetRequest(handler,
+            method: "\(candidate ? "device" : "target").display-name.\(verb)", params: parameters)
+          XCTAssertEqual(response.error?.code, expected)
+          XCTAssertEqual(response.error?.details?["newDispatchCount"], .integer(0))
+        }
+      }
+    }
+  }
+
+  func testDisplayNameProducerRecordsCountAndByteQuotaRefusals() async throws {
+    for candidate in [false, true] {
+      for verb in ["set", "clear"] {
+        let directory = stateDirectory.appending(path: "name-quota-\(UUID().uuidString)", directoryHint: .isDirectory)
+        let targets = try RuntimeTargetStore(directoryURL: directory)
+        let port = TargetObservationCoordinatorContractTests.Port()
+        if candidate && verb == "clear" { port.setDuplicate() }
+        let owner = TargetObservationCoordinator(observation: port, targetStore: targets,
+          usbRelations: { [] }, nowUTC: { "2026-09-12T00:00:00Z" })
+        var parameters: [String: JSONValue]
+        var candidateRecords: [[String: Any]] = []
+        if candidate {
+          let snapshot = try await owner.snapshot()
+          let row = try XCTUnwrap(snapshot.observations.first)
+          var generation = snapshot.generation
+          if verb == "clear" {
+            for _ in 0..<8 {
+              generation = try await owner.clearDisplayName(TargetObservationReference(
+                candidate: row.candidate.connectKey, observationID: row.observationID,
+                generation: generation)).generation
+            }
+            let kept = try XCTUnwrap(snapshot.observations.last)
+            XCTAssertNotEqual(kept.observationID, row.observationID)
+            candidateRecords = [["candidate": kept.candidate.connectKey, "observationID": kept.observationID,
+              "generation": generation, "name": "Kept", "updatedAtUTC": "2026-09-12T00:00:00Z"]]
+          }
+          parameters = ["candidate": .string(row.candidate.connectKey), "observationId": .string(row.observationID),
+            "observationGeneration": .string(String(generation))]
+        } else {
+          let record = try targets.adopt(stableIdentitySHA256: String(repeating: "a", count: 64),
+            connectKey: "synthetic-quota", toolVersion: "fixture", nowUTC: "2026-09-12T00:00:00Z").record
+          parameters = ["targetId": .string(record.targetID), "expectedGeneration": .string("1")]
+        }
+        if verb == "set" { parameters["name"] = .string(String(repeating: "n", count: 256)) }
+        var records: [[String: Any]] = (0..<(candidate ? 3000 : 4096)).map { index in
+          ["targetID": String(format: "target-fixture-%04d", index), "generation": 2, "updatedAtUTC": "2026-09-12T00:00:00Z"]
+        }
+        let encode: ([[String: Any]]) throws -> Data = { rows in
+          try JSONSerialization.data(withJSONObject: ["schemaVersion": "arkdeck.target-display-names/1", "records": rows, "candidateRecords": candidateRecords], options: [.sortedKeys, .withoutEscapingSlashes])
+        }
+        if candidate {
+          // A valid near-bound input, then the real owner save exceeds its byte limit.
+          var remaining = 512 * 1024 - (verb == "clear" ? 0 : 20) - (try encode(records).count)
+          for index in records.indices where remaining > 10 {
+            let length = min(256, remaining - 10)
+            records[index]["name"] = String(repeating: "x", count: length)
+            remaining -= length + 10
+          }
+          // At generation 9, clear advances the other active record to 10.
+          // Its extra digit crosses the valid input's exact byte bound.
+        }
+        let document = try encode(records)
+        XCTAssertLessThanOrEqual(document.count, 512 * 1024)
+        try document.write(to: directory.appending(path: "target-display-names.json"))
+        let (handler, _) = try makeStack(targetStore: targets, targetObservations: owner)
+        let response = try await targetRequest(handler,
+          method: "\(candidate ? "device" : "target").display-name.\(verb)", params: parameters)
+        XCTAssertEqual(response.error?.code, "quotaExceeded")
+        XCTAssertEqual(response.error?.details?["newDispatchCount"], .integer(0))
+      }
+    }
   }
 
   func testCLIHistoryFilterUsesOneRuntimeOwnedCASResource() throws {
