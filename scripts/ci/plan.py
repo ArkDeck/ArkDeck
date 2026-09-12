@@ -493,18 +493,18 @@ def local_commands(repo_root: pathlib.Path, plan: CIPlan) -> tuple[tuple[str, ..
                 # vet --locked freezes cargo metadata too. Fetch the complete
                 # graph first, including dependencies for other host targets.
                 ("cargo", "fetch", "--locked"),
-                # Every other rust check reads Git objects at the pinned Swift
-                # commit or regenerates its own candidate view under
-                # rust/target, so none of them compiles the checkout. Clippy
-                # and the workspace tests are the only lane members that do.
+                # Every other rust check regenerates from the checkout or
+                # builds its own source views under rust/target, so none of
+                # them compiles the checkout. Clippy and the workspace tests
+                # are the only lane members that do.
                 #
                 # The workspace tests go through a wrapper because two
-                # `corpus_parity` cases assert the checkout equals the pin, and
-                # the pin can only name a commit already in origin/main. On a
-                # branch that changes a recorded frame that assertion is false
-                # until the branch merges, so the wrapper asks the two
-                # questions separately: whether the pin is current against
-                # main, and whether the Rust code replays the contract.
+                # `corpus_parity` cases assert the checkout equals its
+                # committed manifest. The wrapper names an input that was
+                # edited without regenerating before the tests run; it never
+                # compares the checkout with origin/main. Published-versus-
+                # candidate parity is check-contracts.py, whose published
+                # inputs come from the merge-base with main.
                 ("cargo", "clippy", "--workspace", "--all-targets", "--", "-D", "warnings"),
                 (sys.executable, "rust/scripts/workspace-tests.py"),
                 (sys.executable, "rust/scripts/test_contract_checks.py"),

@@ -1,10 +1,11 @@
 # Rust runtime development
 
 TASK-XPA-002 supplies a separate development daemon and the `doctor`,
-`operation list` and `device candidates` CLI leaves. It consumes the current
-protected-main Swift contract pinned in
-[`spec/baselines/swift-single-v1.json`](../spec/baselines/swift-single-v1.json).
-This pin is a development baseline. SVC release acceptance, Windows platform
+`operation list` and `device candidates` CLI leaves. It consumes the Swift
+contract of this checkout, described by the committed manifest
+[`spec/baselines/swift-single-v1.json`](../spec/baselines/swift-single-v1.json)
+and the generated bindings, both regenerated from the working tree. The
+manifest is a development baseline. SVC release acceptance, Windows platform
 acceptance and production Runtime migration remain separate requirements.
 
 ## Build and check
@@ -22,9 +23,10 @@ python scripts/check-contracts.py
 ```
 
 Clippy and the workspace tests are the only checks that compile this checkout.
-Every other check reads Git objects at the pinned commit or regenerates its own
-source view, so a workspace that does not build, or whose tests fail, passes
-them all.
+`generate-contract.py --check` regenerates the manifest and bindings from the
+checkout and requires no difference; `check-contracts.py` builds its own
+source views. A workspace that does not build, or whose tests fail, passes
+those two.
 
 The Python checks require Python 3.11+ with `PyYAML==6.0.3` and
 `jsonschema==4.26.0`. The repository's unified planner also runs these checks,
@@ -33,16 +35,18 @@ The committed policy combines imported source audits with nine bounded publisher
 trust entries and no exemptions. Both dependency checks must pass.
 
 The shared runner checks two independent temporary source views: current Rust
-against the published Git inputs, and current Rust against the candidate inputs.
-Each runs clippy, the full test suite, native process checks, binary builds and
-the same black-box check. Candidate generation stays in its temporary view;
-it cannot update the published pin. Both views replay every recorded shape and
+against the published inputs read from Git at the merge-base with `origin/main`,
+and current Rust against this checkout's candidate inputs. Each runs clippy,
+the full test suite, native process checks, binary builds and the same
+black-box check. Candidate generation stays in its temporary view; it cannot
+update the committed manifest. Both views replay every recorded shape and
 verify their exact input hashes, directory membership and per-method counts.
-The current pin and recorded shape count are in
-`spec/baselines/swift-single-v1.json`. Re-pin with
-`python scripts/generate-contract.py --write --baseline-revision <commit>`
-whenever a merged Swift change edits a consumed input; the corpus parity tests
-refuse a stale pin.
+The recorded shape count is in `spec/baselines/swift-single-v1.json`. A change
+that edits a consumed input runs `python scripts/generate-contract.py --write`
+in that same change; `--check` and the corpus parity tests refuse a checkout
+whose inputs and manifest disagree. Nothing compares the manifest with
+`origin/main`, so a merge elsewhere never invalidates a branch, and the
+published view moves only when a branch rebases.
 
 Method schema definitions are checked recursively before values are evaluated,
 including alternatives and absent properties. Unknown keywords, unsupported
@@ -197,8 +201,8 @@ excludes the Bootstrap directory.
 
 The CLI uses the authenticated client boundary and validates the exact requested
 identity and returned projection. It cannot pass registry paths. The additive
-Swift RPC producers supply actual recording-backed candidate contracts; the old
-published pin remains unchanged until the reviewed contract merge is re-pinned.
+Swift RPC producers supply actual recording-backed contracts, regenerated into
+the manifest by the same change.
 The isolated Rust owner also accepts `runtime tool register --kind deveco --root
 <installed-app-Contents>`. It verifies native signed content without executing it,
 then publishes the existing Swift registry format under the shared Bootstrap
@@ -269,9 +273,8 @@ waiting for the existing terminal-child and complete process-group proof. It
 resolves a transient `EPERM` only within the cleanup budget and before reaping;
 unproven groups, other signal errors and lost child ownership remain failures.
 
-The published pin has 102 methods at `d00e4ec`; the 104-method candidate registry
-adds Tool list and metadata retirement. Methods without a migrated host handler are structurally
-understood and refused.
+The manifest lists every registry method. Methods without a migrated host
+handler are structurally understood and refused.
 There is no Runtime capability owner, recovery, journal, durable target store,
 device mutation, flash lowering, Swift replacement or production cutover here.
 Unknown or incomplete outcomes never acquire invented zero-dispatch evidence.
@@ -282,19 +285,22 @@ its existing binary64 spelling below `1e-4` and above the Int64 fast path. Swift
 currently emits `1e-6` and `1e+20` where RFC 8785 would use decimal notation.
 Native Swift boundary vectors pin that known difference; this phase does not
 claim universal RFC 8785 conformity or change Swift semantics independently.
-The generated baseline records every consumed schema, corpus, source and fixture
-digest. `generate-contract.py --check` reconstructs that pin and its generated
-bindings from immutable Git objects and verifies the commit is in `origin/main`
-history. Candidate files can differ; `check-contracts.py` must also pass against
-those current inputs. Unsupported schema vocabulary, stale Catalog output and
-native Swift oracle source drift remain failures. A candidate manifest is always
-marked `candidate` and names its source revision and input digest separately from
-the published commit. No runtime protocol negotiation or version fallback is added.
+The generated manifest records every consumed schema, corpus, source and fixture
+digest of this checkout. `generate-contract.py --check` regenerates the manifest
+and bindings from the working tree and verifies both are byte-identical; it
+consults no other commit. `check-contracts.py` reads the published inputs from
+Git at the merge-base with `origin/main` and must pass against them and against
+the checkout's current inputs. Unsupported schema vocabulary, stale Catalog
+output and native Swift oracle source drift remain failures. A candidate
+manifest is always marked `candidate` and names its source revision, input
+digest and published base commit; the committed checkout manifest names no
+commit, because it cannot name the one it is part of. No runtime protocol
+negotiation or version fallback is added.
 
-Updating the pin uses `python scripts/generate-contract.py --write
---baseline-revision <published-commit>` after publication. Keep `origin/main`
-available locally so publication ancestry can be checked. Generation and host
-conformance remain separate from actual device acceptance.
+Updating the manifest is `python scripts/generate-contract.py --write` in the
+change that edits an input. Keep `origin/main` available locally so
+`check-contracts.py` can find the merge-base. Generation and host conformance
+remain separate from actual device acceptance.
 
 The Rust read-only CLI also accepts `operation describe|example --operation <reference>`
 and `job status|show|evidence|timeline --job <id> [--timeout <duration>]`,

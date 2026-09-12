@@ -1,6 +1,5 @@
 {
   "catalogDigest": "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
-  "commit": "9558c7d60429ac1c286125e04e4d972026e5ca36",
   "contractIdentity": "1d7d101e83fe005f364c1e9273968b64d744c815eb39bc82d43a307ce046b633",
   "corpusFileCount": 105,
   "corpusMethodCounts": {
@@ -1736,5 +1735,5 @@
   "kind": "development",
   "methodCount": 105,
   "protocolVersion": "1.0.0",
-  "schemaVersion": "arkdeck.swift-development-baseline/1"
+  "schemaVersion": "arkdeck.swift-development-baseline/2"
 }

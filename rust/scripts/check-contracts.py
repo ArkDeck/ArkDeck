@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Run equal Rust conformance checks on published and candidate Swift inputs.
 
-Only temporary, task-owned source views are generated. The checkout's pin and
-generated Rust remain unchanged. Both views use the current Rust implementation;
-they are independent host tests, never installed Runtime or device acceptance.
+The published inputs are read from Git at the merge-base with origin/main; the
+candidate inputs are this checkout's. Only temporary, task-owned source views
+are generated. The checkout's manifest and generated Rust remain unchanged.
+Both views use the current Rust implementation; they are independent host
+tests, never installed Runtime or device acceptance.
 """
 from __future__ import annotations
 
@@ -92,8 +94,8 @@ def commands(view: Path, output: Path, *, owners: bool = False) -> list[tuple[li
         ([sys.executable, str(rust / "scripts/check-readonly.py"),
           "--bin-dir", str(rust / "target/debug"), "--output-dir", str(output / "recordings")], view),
     ]
-    # New current-owner schemas are candidate inputs until their reviewed pin is
-    # published. The old published-input view still tests its read-only surface.
+    # New current-owner schemas are candidate inputs until they merge. The
+    # merge-base published view still tests its read-only surface.
     if owners and sys.platform == "darwin":
         result.append(([sys.executable, str(rust / "scripts/check-history-owner.py"),
                         "--bin-dir", str(rust / "target/debug")], view))
@@ -163,10 +165,13 @@ def verify_current_cli_argv() -> None:
 
 def check(output_root: Path) -> Path:
     verify_current_cli_argv()
-    published, published_info = contract.verify_published()
+    contract.verify_checkout()
+    published_commit = contract.published_base()
+    published = contract.published_inputs(published_commit)
+    published_info = contract.baseline(published, published_commit)
     current = contract.working_inputs()
     current_info = contract.candidate(
-        current, published_info["commit"], contract.git("rev-parse", "HEAD").decode().strip())
+        current, published_commit, contract.git("rev-parse", "HEAD").decode().strip())
     # Unsupported candidate vocabulary or stale current Catalog output remains a
     # failure. Regeneration in isolation must not hide a stale committed Catalog.
     contract.generate(current_info, current)
@@ -206,7 +211,7 @@ def check(output_root: Path) -> Path:
         failures.append({"view": "source", "error": "Rust sources changed during validation"})
     if catalog_path.read_bytes() != catalog_bytes:
         failures.append({"view": "source", "error": "Catalog generator changed during validation"})
-    contract.verify_published()
+    contract.verify_checkout()
     write_json(output / "summary.json", {
         "schemaVersion": "arkdeck.rust-dual-contract-check/1", "kind": "host-test",
         "deviceAcceptance": False, "publishedBaselineCommit": published_info["commit"],

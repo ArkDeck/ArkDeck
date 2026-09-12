@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Regression checks for publication proof and isolated candidate conformance."""
+"""Regression checks for the checkout manifest, the merge-base published view and candidate isolation."""
 from __future__ import annotations
 
+import contextlib
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -22,6 +24,11 @@ runner = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = runner
 SPEC.loader.exec_module(runner)
 contract = runner.contract
+WORKSPACE_SPEC = importlib.util.spec_from_file_location(
+    "arkdeck_workspace_tests", SCRIPT.with_name("workspace-tests.py"))
+workspace = importlib.util.module_from_spec(WORKSPACE_SPEC)
+sys.modules[WORKSPACE_SPEC.name] = workspace
+WORKSPACE_SPEC.loader.exec_module(workspace)
 
 
 class ContractChecksTests(unittest.TestCase):
@@ -31,6 +38,7 @@ class ContractChecksTests(unittest.TestCase):
         self.root = Path(self.temporary.name)
         for module, key, value in [
             (runner, "ROOT", self.root), (contract, "ROOT", self.root),
+            (workspace, "REPO_ROOT", self.root),
             (contract, "BASELINE", self.root / "spec/baselines/swift-single-v1.json"),
             (contract, "GENERATED", self.root / "rust/crates/arkdeck-contract/src/control_generated.rs"),
             # Rust formatting is exercised by the real generation check. These
@@ -73,9 +81,11 @@ class ContractChecksTests(unittest.TestCase):
                  "commit", "-qm", "Published test inputs")
         self.git("update-ref", "refs/remotes/origin/main", "HEAD")
         self.commit = self.git("rev-parse", "HEAD").decode().strip()
-        self.published, self.info, outputs = contract.published_outputs(self.commit)
+        self.inputs, self.info, outputs = contract.checkout_outputs()
         for path, text in outputs.items():
             self.write(path.relative_to(self.root).as_posix(), text.encode())
+        self.published = contract.published_inputs(self.commit)
+        self.published_info = contract.baseline(self.published, self.commit)
 
     def write(self, name, value):
         path = self.root / name
@@ -95,10 +105,23 @@ class ContractChecksTests(unittest.TestCase):
         current = contract.working_inputs()
         return current, contract.candidate(current, self.commit, self.commit)
 
-    def test_candidate_changes_pass_published_check_without_rewriting_pin(self):
+    def test_checkout_manifest_describes_the_working_tree_without_a_commit(self):
+        self.assertEqual(self.info["kind"], "development")
+        self.assertEqual(self.info["schemaVersion"], "arkdeck.swift-development-baseline/2")
+        self.assertNotIn("commit", self.info)
+        self.assertEqual(self.published_info["commit"], self.commit)
+        self.assertEqual({key: value for key, value in self.published_info.items() if key != "commit"},
+                         self.info)
+        inputs, info = contract.verify_checkout()
+        self.assertEqual(info, self.info)
+        self.assertEqual(inputs.files, self.inputs.files)
+
+    def test_edited_inputs_fail_the_checkout_check_until_regenerated_in_place(self):
         before = contract.BASELINE.read_bytes()
         current, info = self.change_candidate()
-        contract.verify_published()
+        with self.assertRaisesRegex(ValueError, "generated input drift.*--write"):
+            contract.verify_checkout()
+        self.assertEqual(contract.BASELINE.read_bytes(), before)
         generated = contract.generate(info, current)
         self.assertIn("candidate_only", generated)
         self.assertIn("swift-candidate-inputs.json", generated)
@@ -107,7 +130,53 @@ class ContractChecksTests(unittest.TestCase):
         self.assertEqual(info["publishedBaselineCommit"], self.commit)
         self.assertEqual(info["corpusRecordCounts"], {"requests": 5, "successes": 5, "errors": 0})
         self.assertEqual(info["corpusMethodCounts"]["health"]["requests"], 2)
-        self.assertEqual(contract.BASELINE.read_bytes(), before)
+        # --write regenerates from the working tree; no commit is consulted or named.
+        _, regenerated, outputs = contract.checkout_outputs()
+        for path, text in outputs.items():
+            path.write_text(text, encoding="utf-8", newline="\n")
+        _, verified = contract.verify_checkout()
+        self.assertEqual(verified, regenerated)
+        self.assertNotIn("commit", verified)
+        self.assertEqual(verified["corpusMethodCounts"]["health"]["requests"], 2)
+        self.assertNotEqual(contract.BASELINE.read_bytes(), before)
+
+    def test_check_refuses_a_checkout_whose_inputs_were_edited_without_regeneration(self):
+        self.change_candidate()
+        with patch.object(runner, "run_view", lambda *arguments, **keywords: self.fail("no view may run")):
+            with self.assertRaisesRegex(ValueError, "generated input drift"):
+                runner.check(self.root / "outputs")
+
+    def test_check_summary_names_the_merge_base_as_the_published_baseline(self):
+        with patch.object(runner, "run_view", lambda view, output, info, published_info: None):
+            output = runner.check(self.root / "outputs")
+        summary = json.loads((output / "summary.json").read_bytes())
+        self.assertEqual(summary["publishedBaselineCommit"], self.commit)
+        self.assertTrue(summary["completed"])
+        self.assertEqual(summary["failures"], [])
+
+    def test_workspace_tests_run_cargo_only_when_the_checkout_matches_its_manifest(self):
+        calls = []
+
+        def run(argv, *, cwd, check):
+            self.assertFalse(check)
+            calls.append((tuple(argv), cwd))
+            return subprocess.CompletedProcess(argv, 7)
+
+        self.assertEqual(workspace.main(run=run, generator=contract), 7)
+        self.assertEqual(calls, [(("cargo", "test", "--workspace"), self.root / "rust")])
+        calls.clear()
+        self.change_candidate()
+        with contextlib.redirect_stderr(io.StringIO()) as stderr:
+            self.assertEqual(workspace.main(run=run, generator=contract), 1)
+        self.assertEqual(calls, [])
+        self.assertIn("--write", stderr.getvalue())
+        _, _, outputs = contract.checkout_outputs()
+        for path, text in outputs.items():
+            path.write_text(text, encoding="utf-8", newline="\n")
+        # The publication reference is irrelevant to this check.
+        self.git("update-ref", "-d", "refs/remotes/origin/main")
+        self.assertEqual(workspace.main(run=run, generator=contract), 7)
+        self.assertEqual(len(calls), 1)
 
     def test_candidate_new_keywords_stay_isolated_from_the_published_baseline(self):
         before_pin = contract.BASELINE.read_bytes()
@@ -137,11 +206,11 @@ class ContractChecksTests(unittest.TestCase):
         })
         current = contract.working_inputs()
         candidate = contract.candidate(current, self.commit, self.commit)
-        contract.verify_published()
         view = self.root / "candidate-view"
-        runner.materialize(view, current, candidate, self.info)
+        runner.materialize(view, current, candidate, self.published_info)
         self.assertEqual(json.loads((view / name).read_bytes())["$defs"]["result"], result_schema)
-        self.assertEqual((view / "spec/baselines/swift-single-v1.json").read_bytes(), before_pin)
+        self.assertEqual(json.loads((view / "spec/baselines/swift-single-v1.json").read_bytes()),
+                         self.published_info)
         generated = (view / "rust/crates/arkdeck-contract/src/control_generated.rs").read_text()
         self.assertIn("swift-candidate-inputs.json", generated)
         self.assertEqual(contract.BASELINE.read_bytes(), before_pin)
@@ -165,40 +234,46 @@ class ContractChecksTests(unittest.TestCase):
                 candidate = contract.candidate(current, self.commit, self.commit)
                 with self.assertRaises(ValueError):
                     contract.generate(candidate, current)
-                contract.verify_published()
 
-    def test_published_path_types_and_membership_do_not_depend_on_worktree(self):
+    def test_published_inputs_come_from_git_and_never_from_the_worktree(self):
         shutil.rmtree(self.root / contract.CORPUS)
         self.write(contract.CORPUS, b"candidate replaced directory\n")
-        inputs, info = contract.verify_published()
+        inputs = contract.published_inputs(self.commit)
         self.assertIn(contract.CORPUS, inputs.directories)
-        self.assertEqual(info, self.info)
-        with self.assertRaisesRegex(ValueError, "method/file set drift"):
-            contract.describe_inputs(contract.working_inputs())
+        self.assertEqual(contract.baseline(inputs, self.commit), self.published_info)
+        for check in (lambda: contract.describe_inputs(contract.working_inputs()), contract.verify_checkout):
+            with self.assertRaisesRegex(ValueError, "method/file set drift"):
+                check()
 
-    def test_unpublished_commit_cannot_be_used_as_a_pin(self):
+    def test_published_base_is_the_merge_base_with_main_and_never_the_branch_head(self):
         self.change_candidate()
         self.git("add", ".")
         self.git("-c", "user.name=Contract test", "-c", "user.email=contract@example.invalid",
                  "commit", "-qm", "Unpublished candidate")
         candidate_commit = self.git("rev-parse", "HEAD").decode().strip()
+        self.assertNotEqual(candidate_commit, self.commit)
+        self.assertEqual(contract.published_base(), self.commit)
         with self.assertRaises(subprocess.CalledProcessError):
-            contract.published_outputs(candidate_commit)
-        contract.verify_published()
+            contract.published_inputs(candidate_commit)
+        self.assertEqual(contract.baseline(contract.published_inputs(self.commit), self.commit),
+                         self.published_info)
 
     def test_missing_publication_reference_fails_closed(self):
         self.git("update-ref", "-d", "refs/remotes/origin/main")
-        with self.assertRaises(subprocess.CalledProcessError):
-            contract.verify_published()
+        with self.assertRaisesRegex(ValueError, "origin/main is unavailable"):
+            contract.published_base()
+        with self.assertRaisesRegex(ValueError, "origin/main is unavailable"):
+            contract.published_inputs(self.commit)
+        # The checkout check needs no publication reference at all.
+        contract.verify_checkout()
 
-    def test_moving_references_and_abbreviations_cannot_replace_immutable_pin(self):
+    def test_moving_references_and_abbreviations_cannot_name_published_inputs(self):
         for reference in ("origin/main", "HEAD", self.commit[:12], self.commit.upper()):
             with self.subTest(reference=reference):
-                self.write(contract.BASELINE.relative_to(self.root), {**self.info, "commit": reference})
                 with self.assertRaisesRegex(ValueError, "full immutable commit"):
-                    contract.verify_published()
+                    contract.published_inputs(reference)
 
-    def test_pin_hash_blob_membership_and_counts_tampering_is_rejected(self):
+    def test_manifest_hash_blob_membership_and_counts_tampering_is_rejected(self):
         before = contract.BASELINE.read_bytes()
         for field in ("sha256", "blob", "directory", "membership", "counts"):
             with self.subTest(field=field):
@@ -213,13 +288,13 @@ class ContractChecksTests(unittest.TestCase):
                     info["corpusRecordCounts"]["requests"] = 1
                 self.write(contract.BASELINE.relative_to(self.root), info)
                 with self.assertRaisesRegex(ValueError, "generated input drift"):
-                    contract.verify_published()
+                    contract.verify_checkout()
                 contract.BASELINE.write_bytes(before)
 
-    def test_stale_published_rust_generation_is_rejected(self):
+    def test_stale_generated_rust_bindings_are_rejected(self):
         contract.GENERATED.write_bytes(contract.GENERATED.read_bytes() + b"// stale\n")
         with self.assertRaisesRegex(ValueError, "generated input drift"):
-            contract.verify_published()
+            contract.verify_checkout()
 
     def test_candidate_unknown_vocabulary_and_unclosed_method_set_are_rejected(self):
         current, info = self.change_candidate()
@@ -253,11 +328,13 @@ class ContractChecksTests(unittest.TestCase):
     def test_input_views_keep_the_published_pin_and_consume_distinct_schema_bytes(self):
         current, candidate = self.change_candidate()
         before = contract.BASELINE.read_bytes()
-        for name, inputs, info in [("published", self.published, self.info), ("candidate", current, candidate)]:
+        for name, inputs, info in [("published", self.published, self.published_info),
+                                   ("candidate", current, candidate)]:
             view = self.root / name
-            runner.materialize(view, inputs, info, self.info)
+            runner.materialize(view, inputs, info, self.published_info)
             pin = view / "spec/baselines/swift-single-v1.json"
-            self.assertEqual(pin.read_bytes(), before)
+            self.assertEqual(json.loads(pin.read_bytes()), self.published_info)
+            self.assertEqual(json.loads(pin.read_bytes())["commit"], self.commit)
             schema = f"{contract.METHODS}/health.json"
             self.assertEqual((view / schema).read_bytes(), inputs.files[schema])
             candidate_file = view / "spec/baselines/swift-candidate-inputs.json"
@@ -295,8 +372,9 @@ class ContractChecksTests(unittest.TestCase):
                 output = self.root / f"failure-{fail_at}"
                 with patch.dict(os.environ, {"CARGO_TARGET_DIR": "/unrelated/shared/target"}):
                     with self.assertRaises(subprocess.CalledProcessError):
-                        runner.run_view(self.root / "view", output, self.info, self.info, run=run)
+                        runner.run_view(self.root / "view", output, self.info, self.published_info, run=run)
                 provenance = json.loads((output / "provenance.json").read_bytes())
+                self.assertEqual(provenance["publishedBaselineCommit"], self.commit)
                 self.assertFalse(provenance["completed"])
                 self.assertFalse(provenance["deviceAcceptance"])
                 self.assertEqual(provenance["result"], "fail")

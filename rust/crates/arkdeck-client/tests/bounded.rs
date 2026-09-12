@@ -11,6 +11,20 @@ use std::io::{self, BufReader, Read, Write};
 use std::os::unix::fs::DirBuilderExt;
 use std::time::{Duration, Instant};
 
+// The fixtures decide their outcomes by whole seconds of margin, not by the
+// scheduler. Each `Delay::Pair` response waits RESPONSE_DELAY, and the client
+// budget sits between one and two of them: one response fits, two do not. The
+// earlier 250 ms / 400 ms pairing left a 150 ms window that the hosted macOS
+// runner lost twice in one day (a per-IO read timing out, and a health reply
+// exhausting the shared budget before the status request was sent).
+const RESPONSE_DELAY: Duration = Duration::from_secs(2);
+const CLIENT_BUDGET: Duration = Duration::from_secs(3);
+// Eight chunks at this interval outlast the budget, so a partial read that
+// renewed the deadline would let the chunked reply complete.
+const CHUNK_INTERVAL: Duration = Duration::from_millis(500);
+// Only bounds a hung fixture; it must outlast every client-side wait below.
+const SERVER_READ_TIMEOUT: Duration = Duration::from_secs(15);
+
 fn health() -> Value {
     json!({"id":"health","ok":true,"result":{"status":"ok","protocolVersion":PROTOCOL_VERSION,
         "contractIdentity":CONTRACT_IDENTITY,"catalogDigest":CATALOG_DIGEST,
@@ -48,7 +62,7 @@ fn exercise(delay: Delay, bounded: bool) {
         let mut stream = BufReader::new(listener.accept().unwrap());
         stream
             .get_ref()
-            .set_read_timeout(Some(Duration::from_secs(2)))
+            .set_read_timeout(Some(SERVER_READ_TIMEOUT))
             .unwrap();
         let mut methods = Vec::new();
         for (index, response) in [
@@ -64,7 +78,7 @@ fn exercise(delay: Delay, bounded: bool) {
             methods.push(serde_json::from_slice::<Value>(&frame).unwrap()["method"].clone());
             let bytes = encode_frame(&response, MAX_RESPONSE_BYTES).unwrap();
             if matches!(delay, Delay::Pair) {
-                std::thread::sleep(Duration::from_millis(250));
+                std::thread::sleep(RESPONSE_DELAY);
             }
             let chunked = matches!(
                 (delay, index),
@@ -72,7 +86,7 @@ fn exercise(delay: Delay, bounded: bool) {
             );
             if chunked {
                 for chunk in bytes.chunks(bytes.len().div_ceil(8)) {
-                    std::thread::sleep(Duration::from_millis(100));
+                    std::thread::sleep(CHUNK_INTERVAL);
                     if stream.get_mut().write_all(chunk).is_err() {
                         break;
                     }
@@ -95,13 +109,12 @@ fn exercise(delay: Delay, bounded: bool) {
     let request = || Some(serde_json::from_value(json!({"jobId":"JOB-missing"})).unwrap());
     let identity = ServerIdentity::new("unused-on-unix");
     if bounded {
-        let mut client =
-            Client::connect_bounded(&endpoint, &identity, Duration::from_millis(400)).unwrap();
+        let mut client = Client::connect_bounded(&endpoint, &identity, CLIENT_BUDGET).unwrap();
         let result = client.request("one", "job.status", request());
         if matches!(delay, Delay::None) {
             assert!(matches!(result, Err(ClientError::Remote(_))));
             // A completed response does not renew the original client's budget.
-            std::thread::sleep(Duration::from_millis(450));
+            std::thread::sleep(CLIENT_BUDGET + Duration::from_secs(1));
             assert!(matches!(client.request("two", "job.status", request()),
                 Err(ClientError::Transport(ref e)) if e.kind() == io::ErrorKind::TimedOut));
         } else {
@@ -110,8 +123,10 @@ fn exercise(delay: Delay, bounded: bool) {
                 if matches!(e.kind(), io::ErrorKind::TimedOut | io::ErrorKind::WouldBlock)),
                 "{result:?}"
             );
+            // A deadline restarted by the status request would expire only
+            // after RESPONSE_DELAY + CLIENT_BUDGET.
             assert!(
-                start.elapsed() < Duration::from_millis(750),
+                start.elapsed() < RESPONSE_DELAY + CLIENT_BUDGET,
                 "deadline was renewed"
             );
         }
@@ -122,12 +137,12 @@ fn exercise(delay: Delay, bounded: bool) {
         drop(client);
     } else {
         // Existing callers retain a fresh per-IO timeout, including health.
-        let mut client = Client::connect(&endpoint, &identity, Duration::from_millis(400)).unwrap();
+        let mut client = Client::connect(&endpoint, &identity, CLIENT_BUDGET).unwrap();
         assert!(matches!(
             client.request("one", "job.status", request()),
             Err(ClientError::Remote(_))
         ));
-        assert!(start.elapsed() >= Duration::from_millis(500));
+        assert!(start.elapsed() >= 2 * RESPONSE_DELAY);
         drop(client);
     }
     let methods = server.join().unwrap();
