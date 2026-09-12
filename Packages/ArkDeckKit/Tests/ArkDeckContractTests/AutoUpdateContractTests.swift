@@ -713,7 +713,7 @@ final class AutoUpdateContractTests: XCTestCase {
     let package = try String(
       contentsOf: repository.appending(path: "Packages/ArkDeckKit/Package.swift"),
       encoding: .utf8)
-    let arkForgeRevision = "3f5b48cd7247f7e4304bb4f9d8a158f4feda5a92"
+    let arkForgeRevision = "eee578720c5bae76b2574a6aaf25b536bc491c86"
     let arkTraceRevision = "e6e3133d410fbd7455df17c9486dcd369607e97f"
     XCTAssertEqual(
       package.components(separatedBy: ".package(").count - 1, 7,
