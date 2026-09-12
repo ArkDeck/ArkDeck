@@ -56,7 +56,12 @@ pub(crate) fn configure(
     fields: &mut Map<String, Value>,
     help: bool,
 ) -> Result<Option<u64>, CliError> {
-    if help || !matches!(command, "artifact.inspect" | "artifact.read") {
+    if help
+        || !matches!(
+            command,
+            "artifact.inspect" | "artifact.read" | "artifact.export"
+        )
+    {
         return Ok(None);
     }
     let job = fields.remove("jobId");
@@ -114,6 +119,23 @@ pub(crate) fn configure(
             fields.insert(key.into(), json!(n));
         }
         fields.entry("allowSensitive").or_insert(json!(false));
+    }
+    if command == "artifact.export" {
+        let destination = fields.remove("destinationPath").ok_or_else(|| {
+            CliError::new("invalidOption", "Artifact export requires --destination")
+        })?;
+        if !destination
+            .as_str()
+            .is_some_and(|s| !s.is_empty() && s.len() <= 4096 && !s.chars().any(char::is_control))
+        {
+            return Err(CliError::new(
+                "invalidInput",
+                "Artifact export destination is malformed",
+            ));
+        }
+        fields.insert("destinationDirectory".into(), destination);
+        fields.entry("allowSensitive").or_insert(json!(false));
+        fields.entry("overwrite").or_insert(json!(false));
     }
     let timeout = fields.remove("timeout").unwrap_or(json!("1h"));
     crate::read_only_resources::duration(timeout.as_str().unwrap_or_default())
@@ -259,6 +281,102 @@ pub fn validate_artifact_read(
         || bytes.len() as u64 > params["maxBytes"].as_u64().ok_or_else(invalid)?
     {
         return Err(invalid());
+    }
+    Ok(())
+}
+
+fn export_destination(input: &str) -> Result<String, CliError> {
+    use std::path::{Component, Path, PathBuf};
+    let invalid = || {
+        CliError::new(
+            "invalidInput",
+            "Artifact export destination must be a bounded local directory",
+        )
+    };
+    if input.is_empty() || input.len() > 4096 || input.chars().any(char::is_control) {
+        return Err(invalid());
+    }
+    let path = if Path::new(input).is_absolute() {
+        PathBuf::from(input)
+    } else {
+        std::env::current_dir().map_err(|_| invalid())?.join(input)
+    };
+    let mut clean = PathBuf::from("/");
+    for component in path.components() {
+        match component {
+            Component::RootDir | Component::CurDir => {}
+            Component::ParentDir => {
+                clean.pop();
+            }
+            Component::Normal(value) => clean.push(value),
+            Component::Prefix(_) => return Err(invalid()),
+        }
+    }
+    for prefix in ["/tmp", "/var", "/etc"] {
+        if let Ok(tail) = clean.strip_prefix(prefix) {
+            clean = Path::new("/private")
+                .join(prefix.trim_start_matches('/'))
+                .join(tail);
+            break;
+        }
+    }
+    let text = clean
+        .to_str()
+        .filter(|s| s.len() <= 4096)
+        .ok_or_else(invalid)?;
+    Ok(text.into())
+}
+/// Resolve the user's explicit local destination without probing or creating it.
+/// The owner still authenticates the directory and performs all publication.
+pub fn artifact_export_params(invocation: &Invocation) -> Result<Map<String, Value>, CliError> {
+    let mut params = invocation.params.clone().ok_or_else(invalid)?;
+    let input = params
+        .get("destinationDirectory")
+        .and_then(Value::as_str)
+        .ok_or_else(invalid)?;
+    let destination = export_destination(input)?;
+    params.insert("destinationDirectory".into(), json!(destination));
+    Ok(params)
+}
+pub fn validate_artifact_export(
+    invocation: &Invocation,
+    metadata: &Value,
+    value: &Value,
+) -> Result<(), CliError> {
+    let uncertain = || {
+        CliError::new(
+            "outcomeUnknown",
+            "Artifact export receipt is inconsistent; inspect the exact destination before retrying",
+        )
+    };
+    let params = artifact_export_params(invocation).map_err(|_| uncertain())?;
+    validate_artifact_metadata(&params, metadata).map_err(|_| uncertain())?;
+    arkdeck_contract::validate_method_value("artifact.export", "result", value)
+        .map_err(|_| uncertain())?;
+    let safe_name = metadata["name"]
+        .as_str()
+        .ok_or_else(uncertain)?
+        .replace('/', "_")
+        .replace("..", "_");
+    let directory = params["destinationDirectory"]
+        .as_str()
+        .ok_or_else(uncertain)?
+        .trim_end_matches('/');
+    let path = format!(
+        "{directory}/{}-{safe_name}",
+        metadata["artifactId"].as_str().ok_or_else(uncertain)?
+    );
+    if value["schemaVersion"] != "arkdeck.artifact-export/1"
+        || metadata["status"] != "published"
+        || value["owner"] != metadata["owner"]
+        || value["artifactId"] != metadata["artifactId"]
+        || value["artifactDigest"] != metadata["artifactDigest"]
+        || value["byteCount"] != metadata["byteCount"]
+        || value["privacy"] != metadata["privacy"]
+        || value["exportedPath"] != path
+        || (value["overwritten"] == true && params["overwrite"] != true)
+    {
+        return Err(uncertain());
     }
     Ok(())
 }

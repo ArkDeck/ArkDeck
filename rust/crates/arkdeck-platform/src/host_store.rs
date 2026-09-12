@@ -14,6 +14,9 @@ pub use journal::HostJournal;
 #[path = "host_export.rs"]
 mod export;
 pub use export::{ExportPublishError, ExportStaging, HostExportCapacity};
+#[path = "host_file_export.rs"]
+mod file_export;
+pub use file_export::FileExportStaging;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HostDirectoryFacts {

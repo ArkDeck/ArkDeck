@@ -368,3 +368,8 @@ pub use artifact_projection::{ArtifactInspectRequest, ArtifactReadRequest};
 
 #[cfg(target_os = "macos")]
 mod artifact_resources;
+
+#[cfg(target_os = "macos")]
+mod artifact_export;
+#[cfg(target_os = "macos")]
+pub use artifact_export::ArtifactExportRequest;

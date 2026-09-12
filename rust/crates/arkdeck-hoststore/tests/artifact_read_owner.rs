@@ -874,3 +874,159 @@ fn rpc_refusals_preserve_the_artifact_owner_error_contract() {
         );
     }
 }
+
+#[test]
+fn explicit_export_preserves_source_and_binds_receipt_to_safe_destination() {
+    let mut fixture = Fixture::new();
+    let bytes = b"exact Artifact export bytes";
+    let id = fixture.add("folder/../fixture.txt", bytes);
+    let output = fixture.root.parent().unwrap().join(format!(
+        "output-{}",
+        fixture.root.file_name().unwrap().to_str().unwrap()
+    ));
+    fs::DirBuilder::new().mode(0o700).create(&output).unwrap();
+    let index = fs::read(fixture.root.join("JOB-1/index.json")).unwrap();
+    let params = json!({"owner":{"kind":"job","id":"JOB-1"},"artifactId":id,"destinationDirectory":output.join("../").join(output.file_name().unwrap())});
+    let store = fixture.store();
+    let receipt = store
+        .handle_resource("artifact.export", params.as_object().unwrap(), |_| Ok(()))
+        .unwrap();
+    let expected = output.join(format!("{id}-folder___fixture.txt"));
+    assert_eq!(
+        receipt,
+        json!({"schemaVersion":"arkdeck.artifact-export/1","owner":{"kind":"job","id":"JOB-1"},"artifactId":id,"artifactDigest":sha256_hex(bytes),"byteCount":bytes.len(),"privacy":"standard","exportedPath":expected,"overwritten":false})
+    );
+    arkdeck_contract::validate_method_value("artifact.export", "result", &receipt).unwrap();
+    assert_eq!(fs::read(&expected).unwrap(), bytes);
+    assert_eq!(
+        fs::metadata(&expected).unwrap().permissions().mode() & 0o777,
+        0o600
+    );
+    assert_eq!(
+        fs::read(fixture.root.join("JOB-1/index.json")).unwrap(),
+        index
+    );
+    assert_eq!(
+        fs::read(fixture.root.join("JOB-1").join(&id)).unwrap(),
+        bytes
+    );
+    assert_eq!(
+        store
+            .handle_resource("artifact.export", params.as_object().unwrap(), |_| Ok(()))
+            .unwrap_err()
+            .code,
+        "resourceConflict"
+    );
+    let mut overwrite = params;
+    overwrite["overwrite"] = json!(true);
+    assert_eq!(
+        store
+            .handle_resource(
+                "artifact.export",
+                overwrite.as_object().unwrap(),
+                |_| Ok(())
+            )
+            .unwrap()["overwritten"],
+        true
+    );
+    // Reopening the source owner does not replay exports or adopt old staging.
+    let before = fs::read_dir(&output)
+        .unwrap()
+        .map(|v| v.unwrap().file_name())
+        .collect::<Vec<_>>();
+    let reopened = fixture.store();
+    reopened.inspect("JOB-1", &id).unwrap();
+    assert_eq!(
+        fs::read_dir(&output)
+            .unwrap()
+            .map(|v| v.unwrap().file_name())
+            .collect::<Vec<_>>(),
+        before
+    );
+    fs::remove_dir_all(output).unwrap();
+}
+
+#[test]
+fn export_refusals_do_not_create_destination_or_modify_artifacts() {
+    let mut fixture = Fixture::new();
+    let id = fixture.add("private.txt", b"sensitive fixture");
+    fixture.rows[0]["privacy"] = json!("sensitive");
+    fixture.save();
+    let output = fixture.root.parent().unwrap().join(format!(
+        "output-{}",
+        fixture.root.file_name().unwrap().to_str().unwrap()
+    ));
+    fs::DirBuilder::new().mode(0o700).create(&output).unwrap();
+    let params =
+        json!({"owner":{"kind":"job","id":"JOB-1"},"artifactId":id,"destinationDirectory":output});
+    let store = fixture.store();
+    assert_eq!(
+        store
+            .handle_resource("artifact.export", params.as_object().unwrap(), |_| Ok(()))
+            .unwrap_err()
+            .code,
+        "sensitiveAccessDenied"
+    );
+    let mut allowed = params.clone();
+    allowed["allowSensitive"] = json!(true);
+    let no_job = store
+        .handle_resource("artifact.export", allowed.as_object().unwrap(), |_| {
+            Err(arkdeck_contract::WireError {
+                code: "resourceNotFound".into(),
+                message: "missing Job".into(),
+                details: None,
+            })
+        })
+        .unwrap_err();
+    assert_eq!(no_job.code, "resourceNotFound");
+    for (key, value, code) in [
+        (
+            "destinationDirectory",
+            json!(fixture.root.join("JOB-1")),
+            "invalidInput",
+        ),
+        ("destinationDirectory", json!("relative"), "invalidInput"),
+        (
+            "destinationDirectory",
+            json!(output.join("missing")),
+            "invalidInput",
+        ),
+        (
+            "destinationDirectory",
+            json!("/tmp/with\ncontrol"),
+            "invalidInput",
+        ),
+        ("overwrite", json!("true"), "invalidInput"),
+        ("extra", json!(true), "invalidInput"),
+        ("artifactId", json!("not-present"), "resourceNotFound"),
+        (
+            "owner",
+            json!({"kind":"import","id":"imp-00000000-0000-0000-0000-000000000000"}),
+            "operationUnavailable",
+        ),
+    ] {
+        let mut invalid = allowed.clone();
+        invalid[key] = value;
+        assert_eq!(
+            store
+                .handle_resource("artifact.export", invalid.as_object().unwrap(), |_| Ok(()))
+                .unwrap_err()
+                .code,
+            code,
+            "{key}"
+        );
+    }
+    assert_eq!(fs::read_dir(&output).unwrap().count(), 0);
+    let source = fixture.root.join("JOB-1").join(&id);
+    fs::set_permissions(&source, fs::Permissions::from_mode(0o600)).unwrap();
+    fs::write(&source, b"corrupt fixture!!").unwrap();
+    assert_eq!(
+        store
+            .handle_resource("artifact.export", allowed.as_object().unwrap(), |_| Ok(()))
+            .unwrap_err()
+            .code,
+        "artifactIntegrityFailed"
+    );
+    assert_eq!(fs::read_dir(&output).unwrap().count(), 0);
+    fs::remove_dir(output).unwrap();
+}

@@ -1,0 +1,12 @@
+{
+  "base": "f92acd36",
+  "source": "Packages/ArkDeckKit/Tests/ArkDeckContractTests/ArtifactResourcesContractTests.swift",
+  "sourceSha256": "45e254364d5095581534896cfa1721ed4fd1dacd8837f856de490d18318c8420",
+  "frames": [
+    {
+      "name": "control-frames-39186.jsonl",
+      "sha256": "1cffc2925c120a50a3e23433161b2f1ee79dba479e883ed39de623efaeaba889"
+    }
+  ],
+  "log": "/private/tmp/xpa013-export-native-swift-r2.log"
+}

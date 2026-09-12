@@ -1,6 +1,8 @@
 use arkdeck_cli::{
     CliError, artifact_bytes, parse, validate_artifact_metadata, validate_artifact_read,
 };
+#[cfg(target_os = "macos")]
+use arkdeck_cli::{artifact_export_params, validate_artifact_export};
 use serde_json::{Value, json};
 fn invocation(verb: &str, job: &str, artifact: &str, options: &[&str]) -> arkdeck_cli::Invocation {
     let mut args = vec!["artifact", verb, "--job", job, "--artifact", artifact];
@@ -17,7 +19,7 @@ fn corpus(method: &str) -> Vec<Value> {
 }
 #[test]
 fn artifact_cli_keeps_the_published_argv_contract() {
-    for method in ["artifact.inspect", "artifact.read"] {
+    for method in ["artifact.inspect", "artifact.read", "artifact.export"] {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(format!(
             "../../tests/fixtures/current-cli-argv/{method}.json"
         ));
@@ -229,6 +231,95 @@ fn artifact_refusals_keep_owner_evidence_and_current_exit_codes() {
 }
 
 #[cfg(target_os = "macos")]
+fn export_receipt(metadata: &Value, directory: &str) -> Value {
+    let name = metadata["name"]
+        .as_str()
+        .unwrap()
+        .replace('/', "_")
+        .replace("..", "_");
+    json!({"schemaVersion":"arkdeck.artifact-export/1", "owner":metadata["owner"],
+        "artifactId":metadata["artifactId"], "artifactDigest":metadata["artifactDigest"],
+        "byteCount":metadata["byteCount"], "privacy":metadata["privacy"],
+        "exportedPath":format!("{directory}/{}-{name}", metadata["artifactId"].as_str().unwrap()), "overwritten":false})
+}
+#[cfg(target_os = "macos")]
+#[test]
+fn export_requires_explicit_destination_and_exact_inspected_receipt() {
+    let mut metadata = corpus("artifact.inspect")
+        .into_iter()
+        .find(|r| {
+            r["ok"] == true
+                && r["result"]["status"] == "published"
+                && r["result"]["owner"]["kind"] == "job"
+        })
+        .unwrap()["result"]
+        .clone();
+    metadata["name"] = json!("folder/../fixture.txt");
+    let inv = invocation(
+        "export",
+        metadata["owner"]["id"].as_str().unwrap(),
+        metadata["artifactId"].as_str().unwrap(),
+        &["--destination", "/tmp/fixture/../output"],
+    );
+    let expected = "/private/tmp/output";
+    let params = artifact_export_params(&inv).unwrap();
+    assert_eq!(params["destinationDirectory"], expected);
+    assert_eq!(params["overwrite"], false);
+    assert_eq!(params["allowSensitive"], false);
+    let result = export_receipt(&metadata, expected);
+    validate_artifact_export(&inv, &metadata, &result).unwrap();
+    for (key, value) in [
+        ("artifactId", json!("ART-other")),
+        ("artifactDigest", json!("a".repeat(64))),
+        ("byteCount", json!(1_000_000)),
+        ("owner", json!({"kind":"job","id":"job-other"})),
+        ("exportedPath", json!("/private/tmp/output/other")),
+        ("overwritten", json!(true)),
+        ("privacy", json!("other")),
+        ("schemaVersion", json!("other")),
+        ("extra", json!(true)),
+    ] {
+        let mut bad = result.clone();
+        bad[key] = value;
+        let error = validate_artifact_export(&inv, &metadata, &bad).unwrap_err();
+        assert_eq!(error.code, "outcomeUnknown", "{key}");
+        assert_eq!(error.exit_code(), 75);
+    }
+    for options in [
+        vec![],
+        vec!["--destination", ""],
+        vec!["--destination", "out", "--raw"],
+        vec!["--destination", "out", "--offset", "1"],
+    ] {
+        let mut args = vec![
+            "artifact",
+            "export",
+            "--job",
+            "JOB-1",
+            "--artifact",
+            "ART-1",
+        ];
+        args.extend(options);
+        assert!(parse(&args.into_iter().map(str::to_owned).collect::<Vec<_>>()).is_err());
+    }
+    for code in ["operationFailed", "outcomeUnknown", "resourceConflict"] {
+        let wire = arkdeck_contract::WireError {
+            code: code.into(),
+            message: "fixture".into(),
+            details: Some(
+                json!({"phase":"artifactOwner","newDispatchCount":0})
+                    .as_object()
+                    .unwrap()
+                    .clone(),
+            ),
+        };
+        let error =
+            CliError::from_client(arkdeck_client::ClientError::Remote(wire), "artifact.export");
+        assert_eq!(error.code, code);
+    }
+}
+
+#[cfg(target_os = "macos")]
 mod endpoint {
     use super::*;
     use arkdeck_contract::{
@@ -265,6 +356,9 @@ mod endpoint {
                 let request: Value = serde_json::from_slice(&bytes).unwrap();
                 let reply = json!({"id":request["id"],"ok":true,"result":result});
                 requests.push(request);
+                if result == json!({"fixtureDisconnect": true}) {
+                    return requests;
+                }
                 stream
                     .get_mut()
                     .write_all(&encode_frame(&reply, MAX_RESPONSE_BYTES).unwrap())
@@ -357,5 +451,75 @@ mod endpoint {
         let error: Value = serde_json::from_slice(&output.stdout).unwrap();
         assert_eq!(error["error"]["code"], "recordUnreadable");
         assert!(error.get("result").is_none());
+    }
+
+    #[test]
+    fn export_executable_sends_once_and_never_replays_unknown_or_malformed_receipts() {
+        let metadata = corpus("artifact.inspect")
+            .into_iter()
+            .find(|r| {
+                r["ok"] == true
+                    && r["result"]["status"] == "published"
+                    && r["result"]["owner"]["kind"] == "job"
+            })
+            .unwrap()["result"]
+            .clone();
+        let args = [
+            "artifact",
+            "export",
+            "--job",
+            metadata["owner"]["id"].as_str().unwrap(),
+            "--artifact",
+            metadata["artifactId"].as_str().unwrap(),
+            "--destination",
+            "/tmp/artifact-cli-export-output",
+            "--allow-sensitive",
+            "--overwrite",
+        ];
+        let receipt = export_receipt(&metadata, "/private/tmp/artifact-cli-export-output");
+        let (output, requests) = run(&args, vec![metadata.clone(), receipt.clone()]);
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stdout)
+        );
+        assert_eq!(
+            serde_json::from_slice::<Value>(&output.stdout).unwrap()["result"],
+            receipt
+        );
+        assert_eq!(
+            requests
+                .iter()
+                .map(|r| r["method"].as_str().unwrap())
+                .collect::<Vec<_>>(),
+            ["health", "artifact.inspect", "artifact.export"]
+        );
+        assert_eq!(
+            requests[2]["params"]["destinationDirectory"],
+            "/private/tmp/artifact-cli-export-output"
+        );
+        assert_eq!(requests[2]["params"]["overwrite"], true);
+        assert_eq!(requests[2]["params"]["allowSensitive"], true);
+        let mut mismatched = receipt.clone();
+        mismatched["artifactDigest"] = json!("a".repeat(64));
+        let mut malformed = receipt;
+        malformed["byteCount"] = json!("broken");
+        for answer in [mismatched, malformed, json!({"fixtureDisconnect":true})] {
+            let (output, requests) = run(&args, vec![metadata.clone(), answer]);
+            assert_eq!(output.status.code(), Some(75));
+            assert_eq!(requests.len(), 3);
+            let envelope: Value = serde_json::from_slice(&output.stdout).unwrap();
+            assert_eq!(envelope["error"]["code"], "outcomeUnknown");
+            assert!(envelope.get("result").is_none());
+        }
+        let mut wrong = metadata.clone();
+        wrong["owner"]["id"] = json!("JOB-other");
+        let (output, requests) = run(&args, vec![wrong, json!({"fixtureDisconnect":true})]);
+        assert_eq!(output.status.code(), Some(2));
+        assert_eq!(
+            requests.len(),
+            2,
+            "bad inspect must refuse before destination publication"
+        );
     }
 }
