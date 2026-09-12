@@ -10,7 +10,8 @@ acceptance and production Runtime migration remain separate requirements.
 
 ## Build and check
 
-From `rust/`, rustup selects the committed Rust 1.98.1 toolchain:
+From `rust/`, rustup selects the committed toolchain, the `stable` channel in
+`rust-toolchain.toml`:
 
 ```sh
 cargo fmt --all --check

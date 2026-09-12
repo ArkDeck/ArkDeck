@@ -265,7 +265,7 @@ requirement of that task's rollback acceptance.
 
 ```bash
 # from the evidence directory of TASK-XPA-003; replace __SPK2_ROOT__ in the plists
-cargo +1.98.0 build --release --manifest-path spk-2/listener/Cargo.toml
+cargo build --release --manifest-path spk-2/listener/Cargo.toml
 codesign --force --sign "Developer ID Application: <team>" --identifier com.arkdeck.spk2-listener \
   --options runtime target/release/spk2-listener
 sh spk-2/client/build.sh <spk2-root>          # builds and signs the six client variants

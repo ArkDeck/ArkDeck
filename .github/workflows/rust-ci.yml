@@ -101,10 +101,14 @@ jobs:
       # runs of #1827..#1846 were 7.5 of the Windows job's 11.7 minutes, 4.8
       # of macOS's 7.4 and 3.7 of Linux's 5.3. The cache below memoizes the
       # output of the two `--locked` installs and nothing else: the key names
-      # both pinned versions and the pinned toolchain, there is no prefix
-      # fallback, only protected main writes entries (the Swift caches' trust
-      # rule), and the version read-back fails closed before either policy
-      # check can run against a binary that is not the pinned one.
+      # both pinned versions and the committed toolchain file, there is no
+      # prefix fallback, only protected main writes entries (the Swift caches'
+      # trust rule), and the version read-back fails closed before either
+      # policy check can run against a binary that is not the pinned one. The
+      # toolchain file names the `stable` channel, so the key moves when that
+      # file changes, not when stable advances; the two tools are standalone
+      # binaries that do not depend on the rustc that built them, so an entry
+      # built by an earlier stable stays valid.
       - name: Restore pinned dependency policy tools
         id: policy-tools
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
