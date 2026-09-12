@@ -807,6 +807,7 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 - Allowed paths:
   - `spec/control/methods/artifact.inspect.json`（declared scope extension: existing nullable digest/revision and observation window recorded from the actual Swift producer）
   - `spec/control/methods/artifact.read.json`（declared scope extension: preserve existing resourceNotFound and integrity refusals from actual Swift producer recordings）
+  - `spec/control/methods/artifact.export.json`（declared scope extension: preserve the existing missing-owner and pre-publication operationFailed refusals from the Swift producer）
   - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`
   - `rust/**`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/**`（engine publish path only）
@@ -837,6 +838,7 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 
 ### Notes / handoff
 
+- Explicit export phase (2026-09-12): the Rust Artifact source owner, typed handler and CLI now export a verified Job Artifact into an explicit external directory, retaining the existing overwrite metadata comparison, exclusive create, sensitive-content permission and receipt. Fixed-memory descriptor copying, full sync, readback, owner revalidation and destination directory sync preserve the publication boundary. SIGKILL before/after rename and CLI malformed/disconnected responses never replay or adopt old staging files. This phase does not publish new Artifacts, activate the installed owner or complete import/lease/quota/GC migration.
 - Size: L.
 
 ## TASK-XPA-014 — Move admission, job store, capability and recovery to Rust with the Swift engine as executor sidecar

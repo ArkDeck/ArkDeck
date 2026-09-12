@@ -1,11 +1,13 @@
 //! Artifact RPC routing. Job existence always comes from the Runtime Job owner,
 //! never from a payload directory or a caller-provided inventory.
-use crate::{ArtifactInspectRequest, ArtifactReadRequest, ArtifactReadStore};
+use crate::{
+    ArtifactExportRequest, ArtifactInspectRequest, ArtifactReadRequest, ArtifactReadStore,
+};
 use arkdeck_contract::WireError;
 use serde_json::{Map, Value, json};
 use std::io;
 
-fn failure(code: &str, message: &str) -> WireError {
+pub(crate) fn failure(code: &str, message: &str) -> WireError {
     WireError {
         code: code.into(),
         message: message.into(),
@@ -15,7 +17,7 @@ fn failure(code: &str, message: &str) -> WireError {
         ])),
     }
 }
-fn map_error(error: io::Error) -> WireError {
+pub(crate) fn map_error(error: io::Error) -> WireError {
     match error.kind() {
         io::ErrorKind::InvalidInput => failure(
             "invalidInput",
@@ -43,6 +45,20 @@ fn map_error(error: io::Error) -> WireError {
         _ => failure("recordUnreadable", "Artifact resource is unreadable"),
     }
 }
+enum ResourceRequest {
+    Inspect(ArtifactInspectRequest),
+    Read(ArtifactReadRequest),
+    Export(ArtifactExportRequest),
+}
+impl ResourceRequest {
+    fn reference(&self) -> &ArtifactInspectRequest {
+        match self {
+            Self::Inspect(reference) => reference,
+            Self::Read(request) => request.reference(),
+            Self::Export(request) => request.reference(),
+        }
+    }
+}
 impl ArtifactReadStore {
     /// `require_job` must capture the actual Job owner's validated persisted or
     /// current record. It is deliberately mandatory even for inspect, and is
@@ -53,15 +69,16 @@ impl ArtifactReadStore {
         params: &Map<String, Value>,
         require_job: impl FnOnce(&str) -> Result<(), WireError>,
     ) -> Result<Value, WireError> {
-        let (reference, read) = match method {
-            "artifact.inspect" => (
+        let request = match method {
+            "artifact.inspect" => ResourceRequest::Inspect(
                 ArtifactInspectRequest::from_params(params).map_err(map_error)?,
-                None,
             ),
             "artifact.read" => {
-                let request = ArtifactReadRequest::from_params(params).map_err(map_error)?;
-                (request.reference().clone(), Some(request))
+                ResourceRequest::Read(ArtifactReadRequest::from_params(params).map_err(map_error)?)
             }
+            "artifact.export" => ResourceRequest::Export(
+                ArtifactExportRequest::from_params(params).map_err(map_error)?,
+            ),
             _ => {
                 return Err(failure(
                     "unknownMethod",
@@ -69,7 +86,7 @@ impl ArtifactReadStore {
                 ));
             }
         };
-        require_job(reference.job_id()).map_err(|error| {
+        require_job(request.reference().job_id()).map_err(|error| {
             // Only Job-owner existence and availability classifications cross
             // this boundary; all corruption/refusal details remain local.
             match error.code.as_str() {
@@ -82,10 +99,10 @@ impl ArtifactReadStore {
                 _ => failure("recordUnreadable", "Artifact Job owner is unreadable"),
             }
         })?;
-        match read {
-            Some(request) => self.read_wire(&request),
-            None => self.inspect_wire(&reference),
+        match request {
+            ResourceRequest::Read(request) => self.read_wire(&request).map_err(map_error),
+            ResourceRequest::Inspect(reference) => self.inspect_wire(&reference).map_err(map_error),
+            ResourceRequest::Export(request) => self.export_wire(&request),
         }
-        .map_err(map_error)
     }
 }

@@ -169,7 +169,10 @@ fn date(value: &Value) -> Option<f64> {
 
 // Only consumes metadata obtained by this store; not a public testimony-to-trust
 // converter. The durable decoder has already checked its exact nested key sets.
-fn inspect_result(metadata: &Value, request: &ArtifactInspectRequest) -> io::Result<Value> {
+pub(crate) fn inspect_result(
+    metadata: &Value,
+    request: &ArtifactInspectRequest,
+) -> io::Result<Value> {
     let binding = &metadata["bindingSnapshot"];
     let retention = &metadata["retention"];
     let status = if metadata["status"].get("published").is_some() {
