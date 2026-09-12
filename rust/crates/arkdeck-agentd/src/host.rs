@@ -158,7 +158,12 @@ impl HostServices for Host {
         self.imports
             .as_ref()
             .ok_or_else(unavailable)?
-            .handle_resource(method, params, &utc_now(), false, |_| Err(unavailable()))
+            .handle_resource(method, params, &utc_now(), false, |intent| {
+                self.targets
+                    .as_ref()
+                    .ok_or_else(unavailable)?
+                    .resolve_import_binding(intent)
+            })
     }
 
     #[cfg(target_os = "macos")]

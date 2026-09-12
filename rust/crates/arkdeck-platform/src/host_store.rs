@@ -10,7 +10,9 @@ use std::path::Path;
 pub struct HostDirectory(File, Ownership);
 #[path = "host_import_upload.rs"]
 mod import_upload;
-pub use import_upload::{HostImportSource, HostUploadFile, UploadChunkCheckpoint, UploadWritePoint};
+pub use import_upload::{
+    HostImportSource, HostUploadFile, UploadChunkCheckpoint, UploadWritePoint,
+};
 #[path = "host_journal.rs"]
 mod journal;
 pub use journal::HostJournal;

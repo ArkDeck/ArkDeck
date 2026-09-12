@@ -1,5 +1,7 @@
 # Import upload owner — macOS, 2026-09-12
 
+Historical validation record for the upload checkpoint before Target integration. Current PR base, scope and validation are recorded in `import-upload-current-main.md`; this old run is retained as evidence, not relabeled as a current-head pass.
+
 TASK-XPA-013 remains in progress. This bounded slice preserves the interrupted
 Import implementation as checkpoint `4bb8c79b`. It was first rebased to Artifact
 export candidate `4d1c1cf9`, then the two Import-only commits were rebased to the

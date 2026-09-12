@@ -191,6 +191,65 @@ impl TargetStore {
         }
         Ok(value)
     }
+    /// Resolve only existing durable Target authority for a new Import intent.
+    /// No wire input supplies a binding, route, observation or inspected fact.
+    pub fn resolve_import_binding(
+        &self,
+        intent: &arkdeck_contract::ImportIntent,
+    ) -> Result<crate::ImportBinding, WireError> {
+        let phase = "importOwner";
+        intent
+            .validate()
+            .map_err(|_| failure("invalidInput", "Invalid Import intent", phase))?;
+        let mut binding = None;
+        self.transaction(phase, |document, _| {
+            let target = document
+                .targets
+                .iter()
+                .find(|target| {
+                    target.target_id == intent.target_id
+                        && target.binding_revision == intent.binding_revision
+                })
+                .ok_or_else(|| {
+                    failure(
+                        "resourceConflict",
+                        "The exact Target binding is no longer current",
+                        phase,
+                    )
+                })?;
+            let mut resolved = crate::ImportBinding {
+                target_id: target.target_id.clone(),
+                binding_revision: None,
+                stable_identity_sha256: None,
+            };
+            match intent.kind.as_str() {
+                "workspace-patch" => {}
+                "flash-bundle" => {
+                    resolved.binding_revision = Some(target.binding_revision);
+                    resolved.stable_identity_sha256 = Some(target.identity.clone());
+                }
+                "hap" | "native-library" => {
+                    if document.has_hdc_alias(&target.target_id) {
+                        return Err(failure(
+                            "operationUnavailable",
+                            "Import requires the configured live alias route owner",
+                            phase,
+                        ));
+                    }
+                    // Swift hdcExecutionRoute uses the exact adopted connect key
+                    // for a Target without a proven alias, independently of live
+                    // candidate observations. Physical identity is not this hash.
+                    resolved.binding_revision = Some(target.binding_revision);
+                    resolved.stable_identity_sha256 =
+                        Some(arkdeck_contract::sha256_hex(target.connect_key.as_bytes()));
+                }
+                _ => return Err(failure("invalidInput", "Invalid Import kind", phase)),
+            }
+            binding = Some(resolved);
+            Ok((Value::Null, false))
+        })?;
+        binding.ok_or_else(|| unreadable(phase))
+    }
     pub fn handle(
         &self,
         method: &str,

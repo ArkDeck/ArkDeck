@@ -844,7 +844,7 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 
 ### Notes / handoff
 
-- Import upload phase (2026-09-12): the candidate resumes current Swift upload records through Rust begin/append/abort/inspect, durable chunk checkpoints and bounded CLI rediscovery. New daemon begin remains unavailable until the actual Target owner supplies each kind's binding; commit, release and Job-reference inspection remain unavailable until their complete owners join. Unknown commit responses are inspected once and never replayed. See `evidence/runs/TASK-XPA-013/import-upload-run.md` and `import-upload-target-integration.md`; this slice does not complete TASK-XPA-013 or activate the installed owner.
+- Import upload phase (2026-09-12): the candidate resumes current Swift upload records through Rust begin/append/abort/inspect, durable chunk checkpoints and bounded CLI rediscovery. New daemon begin now resolves the published Target owner: workspace-patch/flash retain their existing snapshots and HAP/native-library use the exact adopted HDC route digest when no canonical alias exists. Canonical alias HDC routes, commit, release and Job-reference inspection remain unavailable until their complete owners join. Unknown commit responses are inspected once and never replayed. See `evidence/runs/TASK-XPA-013/import-upload-run.md` and `import-upload-target-integration.md`; this slice does not complete TASK-XPA-013 or activate the installed owner.
 - Size: L.
 
 ## TASK-XPA-014 — Move admission, job store, capability and recovery to Rust with the Swift engine as executor sidecar

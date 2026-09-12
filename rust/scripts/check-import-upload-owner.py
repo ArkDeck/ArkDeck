@@ -19,6 +19,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = ROOT / 'rust/tests/fixtures/import-upload-current'
+TARGET_FIXTURE = ROOT / 'rust/tests/fixtures/import-target-current'
 
 
 def main():
@@ -42,6 +43,12 @@ def main():
         for path in (root / 'artifacts').rglob('*'):
             path.chmod(0o700 if path.is_dir() else 0o600)
         (root / 'artifacts').chmod(0o700)
+        shutil.copytree(TARGET_FIXTURE / 'direct', root / 'targets-state')
+        for path in (root / 'targets-state').iterdir():
+            path.chmod(0o600)
+        (root / 'targets-state').chmod(0o700)
+        target_bytes = (root / 'targets-state/targets.json').read_bytes()
+        actual_target = json.loads(target_bytes)['targets'][0]
         source = root / 'fixture.hap'
         shutil.copyfile(FIXTURE / 'fixture.hap', source)
         env = {key: value for key, value in os.environ.items() if not key.startswith('ARKDECK_')}
@@ -96,7 +103,7 @@ def main():
             assert checkpoint.read_bytes() == before
             new_metadata = {**expected['metadata'], 'importRequestId': 'requires-target-owner'}
             refusal = exchange('artifact.import.begin', new_metadata)
-            assert refusal['error']['code'] == 'operationUnavailable', refusal
+            assert refusal['error']['code'] == 'resourceConflict', refusal
             assert not checkpoint.with_name(hashlib.sha256(b'requires-target-owner').hexdigest() + '.json').exists()
 
             # This proxy forwards the real owner's health and typed requests,
@@ -183,7 +190,45 @@ def main():
             assert command(['artifact', 'import', 'abort', '--import-request-id', request_id, '--expected-generation', '1'])['result'] == aborted
             assert exchange('artifact.import.begin', expected['metadata'])['result'] == aborted
             assert exchange('artifact.import.inspect', {'importId': imported})['result'] == aborted
-            print('PASS: Swift fixture parity, real CLI lost-reply rediscovery, restart, source identity, abort tombstone and unavailable authority seams; no device dispatch')
+            # A new CLI upload resolves the actual Target owner. The committed
+            # fixture document deliberately gives physical identity and connect
+            # key different digests, proving the binding uses the HDC route.
+            shutil.copyfile(FIXTURE / 'fixture.hap', source)
+            fresh_request = 'actual-target-new-upload'
+            fresh = command(['artifact', 'import', 'hap', '--import-request-id', fresh_request,
+                             '--target', actual_target['targetID'], '--file', str(source)], 69)
+            assert fresh['error']['code'] == 'operationUnavailable', fresh  # commit owner remains absent
+            discovered = exchange('artifact.import.inspect', {'importRequestId': fresh_request})['result']
+            fresh_id = discovered['importId']
+            assert discovered['state'] == 'inProgress' and discovered['nextOffset'] == '4096', discovered
+            record_path = root / 'artifacts/.imports-v1/records' / (hashlib.sha256(fresh_request.encode()).hexdigest() + '.json')
+            record = json.loads(record_path.read_bytes())
+            assert record['binding'] == {'targetID': actual_target['targetID'], 'bindingRevision': actual_target['bindingRevision'],
+                'stableIdentitySHA256': hashlib.sha256(actual_target['connectKey'].encode()).hexdigest()}, record
+            assert record['binding']['stableIdentitySHA256'] != actual_target['stablePhysicalIdentitySHA256']
+            assert (root / 'artifacts/.imports-v1/payloads' / (fresh_id + '.stage')).read_bytes() == source.read_bytes()
+            assert (root / 'targets-state/targets.json').read_bytes() == target_bytes
+            child.terminate()
+            child.wait(timeout=10)
+            child = start()
+            assert exchange('artifact.import.inspect', {'importRequestId': fresh_request})['result'] == discovered
+            assert command(['artifact', 'import', 'abort', '--import-request-id', fresh_request,
+                            '--expected-generation', '1'])['result']['state'] == 'aborted'
+            # A proven alias cannot borrow the presentation digest or a stale
+            # fallback in place of the not-yet-composed live route owner.
+            child.terminate()
+            child.wait(timeout=10)
+            for name in ['targets.json', 'target-display-names.json']:
+                shutil.copyfile(TARGET_FIXTURE / 'alias' / name, root / 'targets-state' / name)
+                (root / 'targets-state' / name).chmod(0o600)
+            alias_target = json.loads((TARGET_FIXTURE / 'alias/targets.json').read_bytes())['targets'][0]
+            child = start()
+            alias_metadata = {**expected['metadata'], 'importRequestId': 'requires-alias-route-owner',
+                              'targetId': alias_target['targetID'], 'bindingRevision': str(alias_target['bindingRevision'])}
+            refusal = exchange('artifact.import.begin', alias_metadata)
+            assert refusal['error']['code'] == 'operationUnavailable', refusal
+            assert not checkpoint.with_name(hashlib.sha256(b'requires-alias-route-owner').hexdigest() + '.json').exists()
+            print('PASS: native upload/Target fixture parity, new CLI upload through actual direct Target binding, lost-append reply inspect/resume, restart, source identity, abort tombstone and unavailable publication/alias-route/reference seams; no device dispatch')
         finally:
             stopping.set()
             if worker:

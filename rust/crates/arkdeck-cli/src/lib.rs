@@ -4,8 +4,8 @@ use arkdeck_contract::{ContractError, PROTOCOL_VERSION, canonical_json};
 use serde_json::{Map, Value, json};
 mod artifact_resources;
 mod import_resources;
-pub use import_resources::execute_import;
 pub use artifact_resources::{artifact_bytes, validate_artifact_metadata, validate_artifact_read};
+pub use import_resources::execute_import;
 mod bootstrap_resources;
 mod read_only_resources;
 pub use read_only_resources::{
@@ -197,7 +197,9 @@ impl CliError {
                     });
                 let host_proof = host_proof || bootstrap_proof || artifact_proof || import_proof;
                 let code = match error.code.as_str() {
-                    "artifactIntegrityFailed" if artifact_proof || import_proof => "artifactIntegrityFailed",
+                    "artifactIntegrityFailed" if artifact_proof || import_proof => {
+                        "artifactIntegrityFailed"
+                    }
                     "sensitiveAccessDenied" if artifact_proof => "sensitiveAccessDenied",
                     "admissionDenied" if bootstrap_proof => "admissionDenied",
                     "fileIdentityChanged"
