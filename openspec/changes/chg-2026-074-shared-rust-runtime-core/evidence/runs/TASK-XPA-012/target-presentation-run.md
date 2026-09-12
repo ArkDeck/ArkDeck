@@ -42,7 +42,7 @@ execution route. No installed state is selected.
 
 ## Native and process integration checks
 
-The implementation now uses protected main `f92acd36`, preserving merged
+The implementation now uses protected main `84d7107f`, preserving merged
 Job/Artifact reads, Bundle registration and the checkout manifest v2 generator.
 Target timeout options use main's shared CLI duration parser. The original
 independent validation view used `a3b384d3`.
@@ -99,7 +99,17 @@ identity and five viewer-scale tests, App build-for-testing, Rust workspace and
 both contract views, deny and vet. Log:
 `/private/tmp/xpa012-target-main-unified-gate-r2.log`. Main then incorporated
 #1863 at `f92acd36`; integration is complete and all affected Rust targets compile.
-The final unified verification on this new base is pending.
-Installed
-activation, target adoption and independent USB identity proof, warm presentation
+Installed activation, target adoption and independent USB identity proof, warm presentation
 and confirmed Job observation sources remain in the migration's later slices.
+
+The additional #1868 ArkForge pin update rebased without conflicts. The `f92acd36`
+gate r3 was intentionally stopped before completion. The complete gate on
+`0dad7599` then passed: common checks, 83 design-system tests, 2,635 Swift tests
+plus identity and five serial viewer checks, App build-for-testing, Rust workspace,
+both contract views and process checks, deny and vet. Log:
+`/private/tmp/xpa012-target-main-unified-gate-r4.log`.
+
+The #1867 stable-toolchain rebase changes no compiled Swift/Rust crate source,
+lock, dependency policy or contract bytes relative to the fully tested Target
+head. Stable remains Rust 1.98.1. Generator and final Task012 preflight are checked
+after the final commit; latest-head CI validates the submitted rebase.
