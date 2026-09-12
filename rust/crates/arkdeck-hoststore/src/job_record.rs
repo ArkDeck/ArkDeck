@@ -216,13 +216,12 @@ fn request(value: &Value) -> Result<(), WireError> {
         {
             return Err(unreadable(()));
         }
-        if let Some(provenance) = context.get("provenance") {
-            if provenance
+        if let Some(provenance) = context.get("provenance")
+            && provenance
                 .as_object()
                 .is_none_or(|m| m.values().any(|v| !v.is_string()))
-            {
-                return Err(unreadable(()));
-            }
+        {
+            return Err(unreadable(()));
         }
     }
     // Capability-bearing records require the migrated authority correlation
@@ -234,6 +233,9 @@ fn request(value: &Value) -> Result<(), WireError> {
 }
 
 impl JobRecord {
+    pub(super) fn requires_session_retention(&self) -> bool {
+        self.unknown || !terminal(&self.state)
+    }
     pub(super) fn from_row(row: &JobRow) -> Result<Self, WireError> {
         let value = strict_json(&row.record).map_err(unreadable)?;
         let record: Self = serde_json::from_value(value.clone()).map_err(unreadable)?;

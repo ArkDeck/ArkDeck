@@ -85,9 +85,15 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         )?
         .isolated(
             &root,
-            vec![artifacts.clone(), trace_cache.clone(), bootstrap.clone()],
+            vec![
+                artifacts.clone(),
+                trace_cache.clone(),
+                bootstrap.clone(),
+                root.join("jobs-state"),
+            ],
         )?;
         host.with_history(arkdeck_hoststore::HistoryStore::open(&root)?)
+            .with_artifacts(arkdeck_hoststore::ArtifactReadStore::open(&artifacts)?)
             .with_trace_cache(arkdeck_hoststore::TraceCacheStore::open(&trace_cache)?)
             .with_storage(
                 sessions,

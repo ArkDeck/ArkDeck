@@ -352,3 +352,6 @@ pub use artifact_read_owner::{
 mod artifact_projection;
 #[cfg(target_os = "macos")]
 pub use artifact_projection::{ArtifactInspectRequest, ArtifactReadRequest};
+
+#[cfg(target_os = "macos")]
+mod artifact_resources;

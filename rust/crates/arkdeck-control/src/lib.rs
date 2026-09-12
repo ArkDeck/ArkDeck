@@ -18,6 +18,32 @@ pub enum BootstrapRegistryKind {
 }
 
 pub trait HostServices: Send + Sync {
+    fn artifact_resource(
+        &self,
+        _method: &str,
+        _params: &serde_json::Map<String, Value>,
+    ) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "operationUnavailable".into(),
+            message: "Artifact owner is not configured".into(),
+            details: Some(serde_json::Map::from_iter([
+                ("phase".into(), json!("artifactOwner")),
+                ("newDispatchCount".into(), json!(0)),
+            ])),
+        })
+    }
+
+    fn job_resource(
+        &self,
+        _method: &str,
+        _params: &serde_json::Map<String, Value>,
+    ) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "rejected".into(),
+            message: "The Job owner is not configured".into(),
+            details: None,
+        })
+    }
     fn bootstrap_register_bundle(&self, _file: &str) -> Result<Value, WireError> {
         Err(WireError {
             code: "operationUnavailable".into(),
@@ -27,9 +53,6 @@ pub trait HostServices: Send + Sync {
                 ("newDispatchCount".into(), json!(0)),
             ])),
         })
-    }
-    fn job_resource(&self, _method: &str, _params: &serde_json::Map<String, Value>) -> Result<Value, WireError> {
-        Err(WireError { code: "rejected".into(), message: "The Job owner is not configured".into(), details: None })
     }
     fn bootstrap_register_deveco(&self, _root: &str) -> Result<Value, WireError> {
         Err(WireError {
@@ -609,6 +632,10 @@ impl<H: HostServices> Control<H> {
             "job.list" | "job.status" | "job.show" | "job.timeline" => Response {
                 id: request.id.clone(),
                 outcome: self.host.job_resource(&request.method, &params),
+            },
+            "artifact.inspect" | "artifact.read" => Response {
+                id: request.id.clone(),
+                outcome: self.host.artifact_resource(&request.method, &params),
             },
             "session.list"
             | "session.show"

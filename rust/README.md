@@ -242,9 +242,17 @@ The macOS `ArtifactReadStore` library lists, inspects and reads existing Job
 Artifact publications with full-payload digest verification and bounded range
 allocation. Typed inspect/read result conversion matches actual Swift producer
 recordings, including missing content and observation windows. It preserves the
-frozen index format and never writes verification caches. Runtime routing, Job
-existence checks, import leases and Artifact write ownership remain pending.
-`python3 rust/scripts/check-artifact-read-owner.py` runs its targeted host checks.
+frozen index format and never writes verification caches. The current
+`artifact.inspect` and `artifact.read` RPC handler requires a successful Job-owner
+snapshot callback before touching content. The Rust CLI uses the existing
+`artifact inspect|read --job <id> --artifact <id>` commands; reads first inspect
+metadata, then bind one bounded range to its owner, digest, length and offset.
+`--allow-sensitive`, `--raw` and a bounded `--timeout` preserve the current CLI
+behavior. The development Host composes the Job read owner and refuses requests
+when it is unavailable; import leases, Artifact writes and installed owner cutover remain
+pending. `python3 rust/scripts/check-artifact-read-owner.py` runs the read-library
+checks; `cargo test -p arkdeck-cli --test artifact_resources` checks current
+producer metadata, argv, raw encoding and failure classifications.
 
 ## Contract and ownership boundaries
 
@@ -307,8 +315,23 @@ and `job status|show|evidence|timeline --job <id> [--timeout <duration>]`,
 plus `job list` with current pagination and string filters. It consumes current Runtime
 facts, validates the returned identity/publication/nextAction relationships and
 preserves uncertain outcomes. The Rust control owner serves descriptors from the
-compiled Catalog while retaining actual Provider availability; its Job status
-backend remains unavailable pending the Job owner. Job reads share one total
+compiled Catalog while retaining actual Provider availability. Job reads share one total
 deadline; timeline returns one validated page and evidence retains the Runtime
 verification status and its 0/75/2 exit code. These additions do not retire
 the Swift CLI.
+
+The macOS development daemon reads the frozen v1 SQLite Job index through a
+serialized, bounded connection. `job list`, `job status`, `job show`, and
+`job timeline` use immutable paged snapshots. Artifact inspect/read first resolves
+the Job from this owner; orphan artifact directories do not establish ownership.
+Session cleanup preview holds a complete Job activity census and retains parked
+unknown outcomes. This read phase refuses unsupported optional authority and
+recovery fields until their validators are ported. It does not admit or execute
+Jobs, alter existing SQLite records, or recover journals.
+
+`rust/scripts/check-job-read-owner.py` compares actual Rust daemon and CLI results
+with explicitly generated temporary Swift Job/Artifact fixtures and verifies
+restart persistence and a second owner refusal. The fixture-producing contract
+tests are `testRustJobOwnerCurrentSQLiteFixture` and
+`testRustArtifactOwnerCurrentFixture`; set `ARKDECK_RUST_JOB_FIXTURE_OUTPUT` or
+`ARKDECK_RUST_ARTIFACT_FIXTURE_OUTPUT` to a new temporary output path.

@@ -185,6 +185,50 @@ fn unsupported_layout_and_missing_index_are_preserved() {
         "a lost initialized index must not become empty history"
     );
     assert!(!root.0.join("runtime-jobs.sqlite3").exists());
+    let root = Root::new();
+    fs::write(root.0.join("unsettled-intent.json"), b"retained").unwrap();
+    assert!(JobStore::open(&root.0).is_err());
+    assert!(!root.0.join("runtime-jobs.sqlite3").exists());
+    assert_eq!(
+        fs::read(root.0.join("unsettled-intent.json")).unwrap(),
+        b"retained"
+    );
+}
+
+#[test]
+fn active_session_census_retains_unknown_outcomes_and_refuses_unreadable_rows() {
+    let root = Root::initialized();
+    root.seed("parked", "waitingForRecovery", 1);
+    root.seed("finished", "succeeded", 2);
+    root.seed("running", "running", 3);
+    let store = JobStore::open(&root.0).unwrap();
+    store
+        .with_active_sessions(|active| {
+            assert_eq!(
+                active.iter().map(String::as_str).collect::<Vec<_>>(),
+                vec!["session-parked", "session-running"]
+            );
+            Ok(())
+        })
+        .unwrap();
+    drop(store);
+    root.db()
+        .execute(
+            "UPDATE runtime_job SET initial_record_json = ? WHERE job_id = ?",
+            &[Sql::Blob(b"{}".to_vec()), Sql::Text("finished".into())],
+        )
+        .unwrap();
+    let store = JobStore::open(&root.0).unwrap();
+    let mut invoked = false;
+    assert!(
+        store
+            .with_active_sessions(|_| {
+                invoked = true;
+                Ok(())
+            })
+            .is_err()
+    );
+    assert!(!invoked, "an incomplete census cannot reach cleanup");
 }
 
 #[test]

@@ -140,6 +140,13 @@ impl JobRepository {
                 if !root.read(LOCK, 1)?.is_empty() {
                     return Err(corrupt());
                 }
+                if root
+                    .names(3)?
+                    .iter()
+                    .any(|name| ![LOCK, "jobs"].contains(&name.as_str()))
+                {
+                    return Err(corrupt());
+                }
                 match root.child("jobs") {
                     Ok(jobs) if jobs.names(1)?.is_empty() => (),
                     Err(e) if e.kind() == io::ErrorKind::NotFound => (),

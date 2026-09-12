@@ -15,6 +15,7 @@ pub struct JobStore {
     repository: JobRepository,
     path: PathBuf,
     root: HostDirectory,
+    activity: std::sync::Mutex<()>,
 }
 impl JobStore {
     pub fn open(path: &Path) -> io::Result<Self> {
@@ -25,7 +26,27 @@ impl JobStore {
             repository,
             path: path.into(),
             root,
+            activity: std::sync::Mutex::new(()),
         })
+    }
+
+    /// Keep the complete Job activity census stable through a Session owner's
+    /// preview/apply turn. Every future Job writer must acquire this same guard.
+    /// Unreadable or unsupported records prevent reclamation; absence of an
+    /// activity owner must never be interpreted as an empty active set.
+    pub fn with_active_sessions<R>(
+        &self,
+        action: impl FnOnce(&std::collections::BTreeSet<String>) -> Result<R, WireError>,
+    ) -> Result<R, WireError> {
+        let _guard = self.activity.lock().map_err(unreadable)?;
+        let mut active = std::collections::BTreeSet::new();
+        for row in self.repository.rows(None).map_err(unreadable)? {
+            let record = JobRecord::from_row(&row)?;
+            if record.requires_session_retention() {
+                active.insert(format!("session-{}", record.job_id));
+            }
+        }
+        action(&active)
     }
 
     pub fn read_snapshot(&self, id: &str) -> Result<JobRecord, WireError> {
