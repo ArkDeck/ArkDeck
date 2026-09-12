@@ -179,6 +179,30 @@ fn begin_requires_runtime_binding_and_conflicting_metadata_never_changes_existin
     assert_eq!(denied.code, "operationUnavailable");
     assert!(names(&fixture.imports().join("records")).is_empty());
     assert!(names(&fixture.imports().join("payloads")).is_empty());
+    for (revision, identity) in [
+        (None, Some("a".repeat(64))),
+        (Some(8), Some("a".repeat(64))),
+        (Some(7), None),
+    ] {
+        let denied = store
+            .handle_resource(
+                "artifact.import.begin",
+                metadata.as_object().unwrap(),
+                NOW,
+                false,
+                |intent| {
+                    Ok(ImportBinding {
+                        target_id: intent.target_id.clone(),
+                        binding_revision: revision,
+                        stable_identity_sha256: identity,
+                    })
+                },
+            )
+            .unwrap_err();
+        assert_eq!(denied.code, "resourceConflict");
+        assert!(names(&fixture.imports().join("records")).is_empty());
+        assert!(names(&fixture.imports().join("payloads")).is_empty());
+    }
     let initial = call(&store, "begin", metadata.clone()).unwrap();
     let before = fs::read(fixture.record("one-owner")).unwrap();
     let mut other = metadata.clone();
@@ -204,6 +228,35 @@ fn begin_requires_runtime_binding_and_conflicting_metadata_never_changes_existin
     assert_eq!(
         call(&store, "begin", injected).unwrap_err().code,
         "invalidInput"
+    );
+}
+#[test]
+fn workspace_patch_keeps_the_owner_resolved_nullable_binding_snapshot() {
+    let fixture = Fixture::new();
+    let store = fixture.store();
+    let mut metadata = fixture.metadata("patch-binding", b"diff");
+    metadata["kind"] = json!("workspace-patch");
+    metadata["name"] = json!("fixture.patch");
+    let result = store
+        .handle_resource(
+            "artifact.import.begin",
+            metadata.as_object().unwrap(),
+            NOW,
+            false,
+            |intent| {
+                assert_eq!(intent.binding_revision, 7);
+                Ok(ImportBinding {
+                    target_id: intent.target_id.clone(),
+                    binding_revision: None,
+                    stable_identity_sha256: None,
+                })
+            },
+        )
+        .unwrap();
+    assert_eq!(result["metadata"]["bindingRevision"], "7");
+    assert_eq!(
+        read(&fixture.record("patch-binding"))["binding"],
+        json!({"targetID":"TGT-fixture"})
     );
 }
 #[test]
@@ -664,7 +717,12 @@ fn sigkill_upload_recovery_uses_only_durable_checkpoints() {
         let _ = child.kill();
         let status = child.wait().unwrap();
         assert!(reached, "child failed before {window}: {status}");
-        assert!(!status.success());
+        use std::os::unix::process::ExitStatusExt;
+        assert_eq!(
+            status.signal(),
+            Some(9),
+            "expected actual SIGKILL at {window}"
+        );
         let store = fixture.store();
         let request = if window == "AfterBeginCheckpoint" {
             "killed-begin"
@@ -703,42 +761,94 @@ fn native_swift_upload_snapshot_reopens_and_resumes_without_rewriting_prior_reco
     use std::os::unix::fs::PermissionsExt;
     fn copy(source: &Path, destination: &Path) {
         for entry in fs::read_dir(source).unwrap() {
-            let entry = entry.unwrap(); let dest = destination.join(entry.file_name());
+            let entry = entry.unwrap();
+            let dest = destination.join(entry.file_name());
             if entry.file_type().unwrap().is_dir() {
-                fs::DirBuilder::new().mode(0o700).create(&dest).unwrap(); copy(&entry.path(), &dest);
+                fs::DirBuilder::new().mode(0o700).create(&dest).unwrap();
+                copy(&entry.path(), &dest);
             } else {
-                fs::copy(entry.path(), &dest).unwrap(); fs::set_permissions(&dest, fs::Permissions::from_mode(0o600)).unwrap();
+                fs::copy(entry.path(), &dest).unwrap();
+                fs::set_permissions(&dest, fs::Permissions::from_mode(0o600)).unwrap();
             }
         }
     }
     let fixture = Fixture::new();
-    let native = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/import-upload-current");
+    let native =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/import-upload-current");
     copy(&native.join("artifacts"), &fixture.artifacts);
-    let samples: Vec<Value> = serde_json::from_slice(&fs::read(native.join("swift-results.json")).unwrap()).unwrap();
-    let expected = &samples.iter().find(|sample| sample["method"] == "artifact.import.inspect").unwrap()["result"];
-    let aborted = &samples.iter().find(|sample| sample["method"] == "artifact.import.abort").unwrap()["result"];
+    let samples: Vec<Value> =
+        serde_json::from_slice(&fs::read(native.join("swift-results.json")).unwrap()).unwrap();
+    let expected = &samples
+        .iter()
+        .find(|sample| sample["method"] == "artifact.import.inspect")
+        .unwrap()["result"];
+    let aborted = &samples
+        .iter()
+        .find(|sample| sample["method"] == "artifact.import.abort")
+        .unwrap()["result"];
     let before = fs::read(fixture.record("rust-import-upload")).unwrap();
     let store = fixture.store();
-    let actual = call(&store, "inspect", json!({"importRequestId":"rust-import-upload"})).unwrap();
+    let actual = call(
+        &store,
+        "inspect",
+        json!({"importRequestId":"rust-import-upload"}),
+    )
+    .unwrap();
     assert_eq!(&actual, expected);
-    assert_eq!(call(&store, "inspect", json!({"importId":expected["importId"]})).unwrap(), actual);
-    assert_eq!(call(&store, "begin", expected["metadata"].clone()).unwrap(), actual);
-    assert_eq!(call(&store, "inspect", json!({"importRequestId":"rust-import-aborted"})).unwrap(), *aborted);
-    assert_eq!(fs::read(fixture.record("rust-import-upload")).unwrap(), before);
+    assert_eq!(
+        call(&store, "inspect", json!({"importId":expected["importId"]})).unwrap(),
+        actual
+    );
+    assert_eq!(
+        call(&store, "begin", expected["metadata"].clone()).unwrap(),
+        actual
+    );
+    assert_eq!(
+        call(
+            &store,
+            "inspect",
+            json!({"importRequestId":"rust-import-aborted"})
+        )
+        .unwrap(),
+        *aborted
+    );
+    assert_eq!(
+        fs::read(fixture.record("rust-import-upload")).unwrap(),
+        before
+    );
     let id = expected["importId"].as_str().unwrap();
     let bytes = fs::read(native.join("fixture.hap")).unwrap();
     assert_eq!(fs::read(fixture.stage(id)).unwrap(), &bytes[..2048]);
     let result = append(&store, id, 2048, &bytes[2048..]).unwrap();
-    assert_eq!(result["nextOffset"], "4096"); assert_eq!(result["generation"], "1"); assert_eq!(result["metadata"], expected["metadata"]);
+    assert_eq!(result["nextOffset"], "4096");
+    assert_eq!(result["generation"], "1");
+    assert_eq!(result["metadata"], expected["metadata"]);
     assert_eq!(fs::read(fixture.stage(id)).unwrap(), bytes);
     let saved: Value = read(&fixture.record("rust-import-upload"));
     assert_eq!(saved["schemaVersion"], "arkdeck.runtime-import/1");
-    assert_eq!(saved["intent"], read(&native.join(format!("artifacts/.imports-v1/records/{}.json", sha256_hex(b"rust-import-upload"))))["intent"]);
+    assert_eq!(
+        saved["intent"],
+        read(&native.join(format!(
+            "artifacts/.imports-v1/records/{}.json",
+            sha256_hex(b"rust-import-upload")
+        )))["intent"]
+    );
     let records = fs::read(fixture.record("rust-import-upload")).unwrap();
     for verb in ["commit", "release", "inspection"] {
-        assert_eq!(call(&store, verb, json!({"importId":id,"generation":"1"})).unwrap_err().code, "operationUnavailable");
-        assert_eq!(fs::read(fixture.record("rust-import-upload")).unwrap(), records);
+        assert_eq!(
+            call(&store, verb, json!({"importId":id,"generation":"1"}))
+                .unwrap_err()
+                .code,
+            "operationUnavailable"
+        );
+        assert_eq!(
+            fs::read(fixture.record("rust-import-upload")).unwrap(),
+            records
+        );
     }
     drop(store);
-    assert_eq!(call(&fixture.store(), "inspect", json!({"importId":id})).unwrap(), result);
+    assert_eq!(
+        call(&fixture.store(), "inspect", json!({"importId":id})).unwrap(),
+        result
+    );
 }

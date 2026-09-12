@@ -215,26 +215,27 @@ pub fn execute_import(
             )
         })?;
         if let Some(existing) = &existing
-            && existing.intent != intent {
-                let old = &existing.intent;
-                return Err(
-                    if old.kind == intent.kind
-                        && old.target_id == intent.target_id
-                        && old.name == intent.name
-                        && old.device_profile == intent.device_profile
-                        && (old.sha256 != intent.sha256 || old.byte_count != intent.byte_count)
-                    {
-                        CliError::new(
-                            "artifactIntegrityFailed",
-                            "Import source changed; staged data remains under its original identity",
-                        )
-                    } else {
-                        CliError::new(
-                            "idempotencyConflict",
-                            "Import request identity names different metadata",
-                        )
-                    },
-                );
+            && existing.intent != intent
+        {
+            let old = &existing.intent;
+            return Err(
+                if old.kind == intent.kind
+                    && old.target_id == intent.target_id
+                    && old.name == intent.name
+                    && old.device_profile == intent.device_profile
+                    && (old.sha256 != intent.sha256 || old.byte_count != intent.byte_count)
+                {
+                    CliError::new(
+                        "artifactIntegrityFailed",
+                        "Import source changed; staged data remains under its original identity",
+                    )
+                } else {
+                    CliError::new(
+                        "idempotencyConflict",
+                        "Import request identity names different metadata",
+                    )
+                },
+            );
         }
         let metadata = || {
             intent
@@ -322,18 +323,20 @@ pub fn execute_import(
                 .as_object()
                 .expect("commit")
                 .clone();
-            current = match send("artifact.import.commit", params.clone()) {
+            current = match send("artifact.import.commit", params) {
                 Ok(value) => projection(value)?,
                 Err(error) if uncertain(&error) => {
                     let recovered = projection(send("artifact.import.inspect", selector())?)?;
                     if recovered.id != owner || recovered.intent != intent {
                         return Err(invalid());
                     }
+                    // A durable prefix does not prove publication failed. The
+                    // publication owner has not joined this migration, so an
+                    // unknown commit is inspected once and never replayed.
                     if matches!(recovered.state.as_str(), "inProgress" | "committing") {
-                        projection(send("artifact.import.commit", params)?)?
-                    } else {
-                        recovered
+                        return Err(error);
                     }
+                    recovered
                 }
                 Err(error) => return Err(error),
             };

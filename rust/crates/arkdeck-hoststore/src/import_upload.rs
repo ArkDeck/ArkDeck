@@ -506,6 +506,20 @@ impl ImportUploadStore {
         if !binding.valid(&intent) {
             return Err(unreadable("binding"));
         }
+        // Keep the frozen optional-field decoder for existing snapshots, but
+        // never publish a new lifetime without an exact owner-resolved binding.
+        let complete = if intent.kind == "workspace-patch" {
+            binding.binding_revision.is_none() && binding.stable_identity_sha256.is_none()
+        } else {
+            binding.binding_revision == Some(intent.binding_revision)
+                && binding.stable_identity_sha256.is_some()
+        };
+        if !complete {
+            return Err(failure(
+                "resourceConflict",
+                "Import requires the exact current Target binding and stable identity",
+            ));
+        }
         let mut count = 0;
         let mut staged = 0u64;
         self.visit(|item| {

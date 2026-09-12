@@ -135,7 +135,9 @@ fn import_timestamps_compare_instants_and_refuse_ambiguous_timezones() {
 fn actual_swift_reference_inspections_preserve_unknown_outcome_blockers() {
     let mut count = 0;
     for row in corpus("inspection") {
-        if row["ok"] != true { continue; }
+        if row["ok"] != true {
+            continue;
+        }
         let value = row["result"].clone();
         let imported = arkdeck_contract::validate_import_inspection(&value).unwrap();
         assert_eq!(imported.value, value["import"]);
@@ -147,7 +149,8 @@ fn actual_swift_reference_inspections_preserve_unknown_outcome_blockers() {
             json!({"state":"clear","activeJobIds":[],"outcomeUnknownJobIds":[],"activeMaterializationCount":"1"}),
             json!({"state":"referenced","activeJobIds":[],"outcomeUnknownJobIds":[],"activeMaterializationCount":"1025"}),
         ] {
-            let mut bad = value.clone(); bad["references"] = replacement;
+            let mut bad = value.clone();
+            bad["references"] = replacement;
             assert!(arkdeck_contract::validate_import_inspection(&bad).is_err());
         }
     }

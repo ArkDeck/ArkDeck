@@ -126,7 +126,7 @@ def main():
                                     if not line:
                                         break
                                     request = json.loads(line)
-                                    forwarded.append(request['method'])
+                                    forwarded.append(request)
                                     upstream.sendall(line)
                                     reply = outgoing.readline(8 * 1024 * 1024 + 1)
                                     if request['method'] == 'artifact.import.append' and not dropped:
@@ -143,9 +143,15 @@ def main():
             result = command(['artifact', 'import', 'hap', '--import-request-id', request_id,
                               '--target', expected['metadata']['targetId'], '--file', str(source)], 69, proxy_path)
             assert result['error']['code'] == 'operationUnavailable', result
-            assert forwarded.count('artifact.import.append') == 1, forwarded
-            assert forwarded.count('artifact.import.inspect') == 2, forwarded
-            assert forwarded.count('artifact.import.commit') == 1, forwarded
+            imports = [request for request in forwarded if request['method'].startswith('artifact.import.')]
+            assert [request['method'] for request in imports] == [
+                'artifact.import.inspect', 'artifact.import.append',
+                'artifact.import.inspect', 'artifact.import.commit'], imports
+            assert imports[0]['params'] == imports[2]['params'] == {'importRequestId': request_id}, imports
+            assert imports[1]['params']['importId'] == imported and imports[1]['params']['offset'] == '2048', imports
+            assert imports[1]['params']['generation'] == '1' and imports[1]['params']['byteCount'] == '2048', imports
+            assert imports[3]['params'] == {'importId': imported, 'generation': '1'}, imports
+            assert not any(request['method'] == 'target.show' for request in forwarded), forwarded
             assert stage.read_bytes() == source.read_bytes()
             uploaded = exchange('artifact.import.inspect', {'importId': imported})['result']
             assert uploaded['nextOffset'] == '4096' and uploaded['generation'] == '1'

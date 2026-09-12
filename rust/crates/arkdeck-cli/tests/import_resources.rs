@@ -304,6 +304,46 @@ mod upload {
         assert_eq!(inspect, 3);
     }
     #[test]
+    fn unknown_commit_is_inspected_once_and_never_replayed() {
+        for state in ["inProgress", "committing"] {
+            let source = Source::new("fixture.hap", b"abcdefgh".to_vec());
+            let intent = source.intent();
+            let mut methods = Vec::new();
+            let error = execute_import(&source.invocation("hap"), |method, params, _| {
+                methods.push(method.to_owned());
+                match method {
+                    "artifact.import.inspect" => {
+                        assert_eq!(params["importRequestId"], "request");
+                        let mut value = resource(&intent, 8);
+                        value["state"] = json!(state);
+                        Ok(value)
+                    }
+                    "artifact.import.commit" => {
+                        assert_eq!(
+                            params["importId"],
+                            "imp-00000000-0000-4000-8000-000000000001"
+                        );
+                        Err(CliError::new(
+                            "outcomeUnknown",
+                            "publication reply was lost",
+                        ))
+                    }
+                    _ => panic!("unexpected mutation {method}"),
+                }
+            })
+            .unwrap_err();
+            assert_eq!(error.code, "outcomeUnknown");
+            assert_eq!(
+                methods,
+                vec![
+                    "artifact.import.inspect",
+                    "artifact.import.commit",
+                    "artifact.import.inspect"
+                ]
+            );
+        }
+    }
+    #[test]
     fn missing_runtime_target_owner_does_not_begin_and_native_name_is_canonicalized() {
         let source = Source::new(
             "ART-0123456789abcdef0123456789abcdef-libfixture.so",
