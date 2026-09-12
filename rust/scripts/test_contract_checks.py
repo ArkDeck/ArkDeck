@@ -137,6 +137,16 @@ class ContractChecksTests(unittest.TestCase):
     def git(self, *args):
         return subprocess.check_output(["git", "-C", str(self.root), *args], stderr=subprocess.PIPE)
 
+    def drift_and_regenerate(self):
+        # Edit an input and regenerate in place, the way a change that adds a
+        # recorded frame ships: the checkout manifest then describes the
+        # edited inputs while the merge-base still holds the published ones.
+        current, info = self.change_candidate()
+        _, _, outputs = contract.checkout_outputs()
+        for path, text in outputs.items():
+            self.write(path.relative_to(self.root).as_posix(), text.encode())
+        return current, info
+
     def change_candidate(self):
         name = f"{contract.METHODS}/health.json"
         schema = json.loads((self.root / name).read_bytes())
@@ -423,6 +433,7 @@ class ContractChecksTests(unittest.TestCase):
                 self.assertEqual(len(calls), fail_at + 1)
 
     def test_failure_in_either_view_cannot_leave_combined_check_green(self):
+        self.drift_and_regenerate()
         for failing_view in ("development", "candidate"):
             with self.subTest(view=failing_view):
                 calls = []
@@ -438,6 +449,7 @@ class ContractChecksTests(unittest.TestCase):
                 self.assertEqual(calls, ["development", "candidate"])
 
     def test_both_views_use_one_source_snapshot_and_report_concurrent_edits(self):
+        self.drift_and_regenerate()
         calls = []
         source = self.root / "rust/scripts/check-readonly.py"
         original = source.read_bytes()
@@ -455,6 +467,54 @@ class ContractChecksTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "Rust sources changed.*Catalog generator changed"):
                 runner.check(self.root / "outputs")
         self.assertEqual(calls, ["development", "candidate"])
+
+    def test_identical_inputs_run_the_native_checks_once_and_record_the_coverage(self):
+        calls = []
+
+        def check_view(view, output, info, published_info):
+            calls.append(info["kind"])
+            self.assertEqual(info["inputDigest"], published_info["inputDigest"])
+            write = runner.write_json
+            write(output / "provenance.json", {"completed": True, "result": "pass"})
+
+        outputs = self.root / "outputs"
+        with patch.object(runner, "run_view", check_view):
+            runner.check(outputs)
+        self.assertEqual(calls, ["candidate"])
+        (run,) = outputs.iterdir()
+        summary = json.loads((run / "summary.json").read_bytes())
+        self.assertTrue(summary["completed"])
+        self.assertEqual(summary["publishedView"], "covered-by-candidate")
+        published = json.loads((run / "published/provenance.json").read_bytes())
+        self.assertEqual(published["result"], "covered")
+        self.assertEqual(published["coveredBy"], "candidate")
+        self.assertEqual(published["inputKind"], "development")
+        self.assertEqual(published["inputDigest"], self.info["inputDigest"])
+        self.assertEqual(published["commands"], [])
+        self.assertFalse(published["deviceAcceptance"])
+
+    def test_identical_inputs_still_fail_when_the_candidate_view_fails(self):
+        def check_view(view, output, info, published_info):
+            raise ValueError("expected candidate failure")
+
+        with patch.object(runner, "run_view", check_view):
+            with self.assertRaisesRegex(ValueError, "contract checks failed"):
+                runner.check(self.root / "outputs")
+
+    def test_drifted_inputs_keep_both_views_and_record_the_published_run(self):
+        self.drift_and_regenerate()
+        calls = []
+
+        def check_view(view, output, info, published_info):
+            calls.append(info["kind"])
+            runner.write_json(output / "provenance.json", {"completed": True, "result": "pass"})
+
+        outputs = self.root / "outputs"
+        with patch.object(runner, "run_view", check_view):
+            runner.check(outputs)
+        self.assertEqual(calls, ["development", "candidate"])
+        (run,) = outputs.iterdir()
+        self.assertEqual(json.loads((run / "summary.json").read_bytes())["publishedView"], "run")
 
     def test_stale_candidate_catalog_output_cannot_be_hidden_by_isolation(self):
         self.write("rust/crates/arkdeck-contract/src/catalog_generated.rs", b"// stale\n")
