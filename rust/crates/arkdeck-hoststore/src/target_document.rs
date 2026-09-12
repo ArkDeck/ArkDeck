@@ -105,6 +105,15 @@ impl TargetDocument {
             .map(|t| t.target_id.clone())
             .collect()
     }
+    /// A canonical HDC route with a proven alias also needs the live route
+    /// observation owner. Import must not substitute the presentation digest.
+    pub fn has_hdc_alias(&self, target_id: &str) -> bool {
+        self.resolutions
+            .as_deref()
+            .unwrap_or_default()
+            .iter()
+            .any(|r| r.canonical == target_id)
+    }
     pub fn candidate_target(&self, key: &str) -> Option<&TargetRecord> {
         let direct = self.targets.iter().find(|t| matches!((crate::canonical_host_text(&t.connect_key),crate::canonical_host_text(key)),(Ok(a),Ok(b)) if a==b))?;
         let id = self

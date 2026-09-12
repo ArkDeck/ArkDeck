@@ -1,0 +1,25 @@
+{
+  "recordingDirectory": "/private/tmp/xpa013-import-readonly-candidate-r2",
+  "schemaVersion": "arkdeck.rust-readonly-host-check/1",
+  "kind": "host-test",
+  "result": "PASS",
+  "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "deviceAcceptance": false,
+  "windowsInstalledDaemonAcceptance": false,
+  "allRecordingsCompletedBeforeValidation": true,
+  "baseline": null,
+  "publishedBaselineCommit": null,
+  "inputKind": "development",
+  "inputDigest": "825b3b3d4de2ec11f77788de3e97214305e936cfc22025dd3c43bc527264c26b",
+  "inputManifestSHA256": "fa5ad38c3b4dd3dbff30c6ba90634cf18a2c4be35a6b3b31033d57be97d37691",
+  "contractIdentity": "1d7d101e83fe005f364c1e9273968b64d744c815eb39bc82d43a307ce046b633",
+  "counts": {
+    "controlResponses": 124,
+    "cliEnvelopes": 12,
+    "validRequests": 115
+  },
+  "binaries": {
+    "arkdeck": "9994be2cb87ba369c1e3b9b853bcc3bab8eea74ef60b2bdd5417f4f2648dee9a",
+    "arkdeck-agentd": "ef8962954df8a853ea6bcf3c7961474e76e2970c14224a60cf51b81ae9a7f00a"
+  }
+}

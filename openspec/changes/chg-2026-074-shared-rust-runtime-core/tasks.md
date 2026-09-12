@@ -809,6 +809,12 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
   - `spec/control/methods/artifact.read.json`（declared scope extension: preserve existing resourceNotFound and integrity refusals from actual Swift producer recordings）
   - `spec/control/methods/artifact.export.json`（declared scope extension: preserve the existing missing-owner and pre-publication operationFailed refusals from the Swift producer）
   - `spec/baselines/swift-single-v1.json`（declared scope extension: refresh the checkout manifest for native Artifact export schemas and corpus）
+  - `spec/control/methods/artifact.import.begin.json`（declared scope extension: existing Swift Import upload and unavailable-owner error frames）
+  - `spec/control/methods/artifact.import.append.json`（declared scope extension: existing Swift Import upload and unavailable-owner error frames）
+  - `spec/control/methods/artifact.import.abort.json`（declared scope extension: existing Swift Import upload and unavailable-owner error frames）
+  - `spec/control/methods/artifact.import.inspect.json`（declared scope extension: existing Swift Import upload and unavailable-owner error frames）
+  - `spec/control/methods/artifact.import.inspection.json`（declared scope extension: existing Swift Import upload and unavailable-owner error frames）
+  - `spec/control/methods/artifact.import.release.json`（declared scope extension: existing Swift Import upload and unavailable-owner error frames）
   - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`
   - `rust/**`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/**`（engine publish path only）
@@ -840,6 +846,7 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 ### Notes / handoff
 
 - Explicit export phase (2026-09-12): the Rust Artifact source owner, typed handler and CLI now export a verified Job Artifact into an explicit external directory, retaining the existing overwrite metadata comparison, exclusive create, sensitive-content permission and receipt. Fixed-memory descriptor copying, full sync, readback, owner revalidation and destination directory sync preserve the publication boundary. SIGKILL before/after rename and CLI malformed/disconnected responses never replay or adopt old staging files. This phase does not publish new Artifacts, activate the installed owner or complete import/lease/quota/GC migration.
+- Import upload phase (2026-09-12): the candidate resumes current Swift upload records through Rust begin/append/abort/inspect, durable chunk checkpoints and bounded CLI rediscovery. New daemon begin now resolves the published Target owner: workspace-patch/flash retain their existing snapshots and HAP/native-library use the exact adopted HDC route digest when no canonical alias exists. Canonical alias HDC routes, commit, release and Job-reference inspection remain unavailable until their complete owners join. Unknown commit responses are inspected once and never replayed. See `evidence/runs/TASK-XPA-013/import-upload-run.md` and `import-upload-target-integration.md`; this slice does not complete TASK-XPA-013 or activate the installed owner.
 - Size: L.
 
 ## TASK-XPA-014 — Move admission, job store, capability and recovery to Rust with the Swift engine as executor sidecar

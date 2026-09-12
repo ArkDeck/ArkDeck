@@ -1,0 +1,25 @@
+{
+  "purpose": "Existing actual Swift host-only Target producer output reused for Rust Import owner composition. Not hardware evidence. Original source bytes unchanged.",
+  "files": [
+    {
+      "file": "direct/targets.json",
+      "source": "/private/tmp/xpa-target-native-r1/targets.json",
+      "sha256": "6d558839e94438bd4f5f932c87e57ce31198ae457a81449a1f466edba177d923"
+    },
+    {
+      "file": "direct/target-display-names.json",
+      "source": "/private/tmp/xpa-target-native-r1/target-display-names.json",
+      "sha256": "1820b82b1bcdbf04f6e08798ac2321309dddf10f6d8ad631b5dedb3adf452b94"
+    },
+    {
+      "file": "alias/targets.json",
+      "source": "/private/tmp/xpa-target-alias-native-r1/targets.json",
+      "sha256": "2363798c0e5d75ebef8be77a25172b8a51f874c5f4ad61489ca0d207a84d06b7"
+    },
+    {
+      "file": "alias/target-display-names.json",
+      "source": "/private/tmp/xpa-target-alias-native-r1/target-display-names.json",
+      "sha256": "75b50df5a3c0623ccfd44fb9f522003c4dfafb7e07a98a34f91ce96b8150d36d"
+    }
+  ]
+}

@@ -108,6 +108,13 @@ fn every_unimplemented_method_is_refused_without_entering_the_host() {
     for method in METHODS {
         if [
             "artifact.export",
+            "artifact.import.begin",
+            "artifact.import.append",
+            "artifact.import.abort",
+            "artifact.import.inspect",
+            "artifact.import.inspection",
+            "artifact.import.commit",
+            "artifact.import.release",
             "artifact.inspect",
             "artifact.read",
             "health",
@@ -656,4 +663,71 @@ fn artifact_methods_report_unconfigured_owner_and_route_exact_typed_parameters()
     let control = Control::new(ArtifactHost).unwrap();
     let result = call(&control,"artifact.read",json!({"owner":{"kind":"job","id":"JOB-1"},"artifactId":"ART-1","offset":2,"maxBytes":3,"allowSensitive":false})).outcome.unwrap();
     assert_eq!(result["base64"], "YWJj");
+}
+
+#[test]
+fn import_upload_methods_use_only_the_typed_import_owner() {
+    struct ImportHost;
+    impl HostServices for ImportHost {
+        fn observed_at(&self) -> String {
+            panic!("Import read the unrelated clock")
+        }
+        fn hdc_status(&self, _: bool) -> HdcStatus {
+            panic!("Import touched HDC")
+        }
+        fn observations(&self) -> Result<DeviceObservationsResult, WireError> {
+            panic!("Import touched device observations")
+        }
+        fn import_resource(
+            &self,
+            method: &str,
+            params: &serde_json::Map<String, Value>,
+        ) -> Result<Value, WireError> {
+            assert!(method.starts_with("artifact.import."));
+            assert_eq!(params.get("importRequestId").unwrap(), "stable-request");
+            Err(WireError {
+                code: "operationUnavailable".into(),
+                message: "Target/publication/reference owner missing".into(),
+                details: Some(
+                    json!({"phase":"importOwner","newDispatchCount":0})
+                        .as_object()
+                        .unwrap()
+                        .clone(),
+                ),
+            })
+        }
+    }
+    let control = Control::new(ImportHost).unwrap();
+    for method in [
+        "artifact.import.begin",
+        "artifact.import.append",
+        "artifact.import.abort",
+        "artifact.import.inspect",
+        "artifact.import.inspection",
+        "artifact.import.commit",
+        "artifact.import.release",
+    ] {
+        let response = call(
+            &control,
+            method,
+            json!({"importRequestId":"stable-request"}),
+        )
+        .outcome
+        .unwrap_err();
+        // The published view keeps its old vocabulary until the actual Swift
+        // producer supplement merges; candidate inputs expose the owner refusal.
+        let available =
+            validate_method_value(method, "errorCode", &json!("operationUnavailable")).is_ok();
+        assert_eq!(
+            response.code,
+            if available {
+                "operationUnavailable"
+            } else {
+                "internalError"
+            }
+        );
+        if available {
+            assert_eq!(response.details.unwrap()["phase"], "importOwner");
+        }
+    }
 }

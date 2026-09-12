@@ -4,12 +4,14 @@
       "enum": [
         "admissionDenied",
         "conflict",
+        "idempotencyConflict",
         "internalError",
         "invalidInput",
         "invalidParams",
         "malformedFrame",
         "notFound",
         "operationUnavailable",
+        "quotaExceeded",
         "recordUnreadable",
         "rejected",
         "resourceConflict",
@@ -198,8 +200,8 @@
   "x-arkdeck-method": "artifact.import.begin",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 24,
-    "request": 72,
-    "result": 48
+    "error": 8,
+    "request": 12,
+    "result": 4
   }
 }

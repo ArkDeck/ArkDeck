@@ -1,0 +1,132 @@
+Running cargo test --offline --locked -p arkdeck-hoststore --test import_upload -- --test-threads=4
+   Compiling arkdeck-platform v0.1.0 (/private/tmp/arkdeck-xpa013-artifact-runtime-20260912/rust/crates/arkdeck-platform)
+   Compiling arkdeck-contract v0.1.0 (/private/tmp/arkdeck-xpa013-artifact-runtime-20260912/rust/crates/arkdeck-contract)
+   Compiling arkdeck-hoststore v0.1.0 (/private/tmp/arkdeck-xpa013-artifact-runtime-20260912/rust/crates/arkdeck-hoststore)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.89s
+     Running tests/import_upload.rs (target/debug/deps/import_upload-672ee8b3314a3868)
+
+running 14 tests
+test begin_requires_runtime_binding_and_conflicting_metadata_never_changes_existing_owner ... ok
+test exact_upload_identity_survives_restart_and_append_retry_without_changing_generation ... ok
+test begin_and_abort_crash_windows_remain_discoverable_and_cannot_resurrect_an_upload ... ok
+test concurrent_appends_have_one_committed_prefix_and_trusted_app_provenance_stays_scoped ... ok
+test native_swift_upload_snapshot_reopens_and_resumes_without_rewriting_prior_records ... ok
+test one_owner_and_private_directory_bindings_prevent_foreign_writes ... ok
+test sigkill_upload_helper ... ignored, subprocess fixture invoked by sigkill_upload_recovery_uses_only_durable_checkpoints
+test linked_or_corrupt_staging_and_foreign_identity_maps_fail_without_touching_raw_bytes ... ok
+test staging_quota_is_declared_capacity_and_never_evicts_an_existing_owner ... ok
+test partial_and_synced_chunks_recover_only_the_uncommitted_suffix ... ok
+test workspace_patch_keeps_the_owner_resolved_nullable_binding_snapshot ... ok
+test strict_records_refuse_unknown_fields_bad_chunk_state_and_linked_checkpoints ... ok
+test sigkill_upload_recovery_uses_only_durable_checkpoints ... ok
+test maximum_chunk_checkpoint_refuses_more_metadata_and_preserves_staged_bytes ... ok
+
+test result: ok. 13 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 2.49s
+
+Running cargo test --offline --locked -p arkdeck-contract --test imports
+   Compiling libc v0.2.189
+   Compiling subtle v2.6.1
+   Compiling serde_json v1.0.151
+   Compiling digest v0.10.7
+   Compiling hmac v0.12.1
+   Compiling cpufeatures v0.2.17
+   Compiling sha2 v0.10.9
+   Compiling arkdeck-contract v0.1.0 (/private/tmp/arkdeck-xpa013-artifact-runtime-20260912/rust/crates/arkdeck-contract)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.75s
+     Running tests/imports.rs (target/debug/deps/imports-b5775bbb7d6ea254)
+
+running 5 tests
+test import_timestamps_compare_instants_and_refuse_ambiguous_timezones ... ok
+test closed_intent_counts_and_registered_kind_bounds_are_preserved ... ok
+test actual_swift_reference_inspections_preserve_unknown_outcome_blockers ... ok
+test actual_swift_upload_and_terminal_projections_keep_exact_metadata_identity ... ok
+test canonical_bounded_chunk_encoding_rejects_padding_and_length_ambiguity ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.39s
+
+Running cargo test --offline --locked -p arkdeck-cli --test import_resources
+   Compiling arkdeck-contract v0.1.0 (/private/tmp/arkdeck-xpa013-artifact-runtime-20260912/rust/crates/arkdeck-contract)
+   Compiling arkdeck-client v0.1.0 (/private/tmp/arkdeck-xpa013-artifact-runtime-20260912/rust/crates/arkdeck-client)
+   Compiling arkdeck-cli v0.1.0 (/private/tmp/arkdeck-xpa013-artifact-runtime-20260912/rust/crates/arkdeck-cli)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.14s
+     Running tests/import_resources.rs (target/debug/deps/import_resources-88b6a94be4c89507)
+
+running 8 tests
+test import_owner_errors_remain_distinct_and_lost_mutation_responses_are_unknown ... ok
+test imports_keep_current_swift_leaf_argv_and_inspect_uses_reference_inspection ... ok
+test upload::missing_runtime_target_owner_does_not_begin_and_native_name_is_canonicalized ... ok
+test upload::unconfirmed_append_recovery_is_bounded_and_does_not_create_new_identity ... ok
+test upload::unknown_commit_is_inspected_once_and_never_replayed ... ok
+test upload::corrupted_recovery_changed_source_and_other_owner_never_continue_upload ... ok
+test upload::abort_and_inspection_validate_exact_requested_owner ... ok
+test upload::lost_begin_and_append_replies_rediscover_only_the_exact_committed_prefix ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.64s
+
+Running cargo test --offline --locked -p arkdeck-control --test read_only
+   Compiling sha2 v0.10.9
+   Compiling arkdeck-contract v0.1.0 (/private/tmp/arkdeck-xpa013-artifact-runtime-20260912/rust/crates/arkdeck-contract)
+   Compiling arkdeck-control v0.1.0 (/private/tmp/arkdeck-xpa013-artifact-runtime-20260912/rust/crates/arkdeck-control)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.91s
+     Running tests/read_only.rs (target/debug/deps/read_only-420cd255aad2e44c)
+
+running 15 tests
+test bundle_retirement_is_typed_and_unconfigured_owner_is_explicit ... ok
+test bootstrap_reads_validate_before_owner_and_refuse_an_unconfigured_owner ... ok
+test accepted_observation_uses_the_host_once_and_preserves_its_complete_projection ... ok
+test deveco_registration_is_closed_and_unpublished_views_never_reach_an_owner ... ok
+test bundle_registration_rejects_caller_authority_and_observes_nothing ... ok
+test bundle_list_structure_is_closed_and_unconfigured_owner_is_explicit ... ok
+test import_upload_methods_use_only_the_typed_import_owner ... ok
+test artifact_methods_report_unconfigured_owner_and_route_exact_typed_parameters ... ok
+test malformed_wrong_contract_and_unknown_methods_fail_before_host_entry ... ok
+test semantic_invalid_requests_do_not_trigger_observation_or_capability_paths ... ok
+test every_unimplemented_method_is_refused_without_entering_the_host ... ok
+test tool_list_structure_is_closed_and_unconfigured_owner_is_explicit ... ok
+test operation_descriptors_and_unconfigured_doctor_match_the_current_swift_outputs ... ok
+test tool_retirement_is_typed_and_unconfigured_owner_is_explicit ... ok
+test bootstrap_mutation_lost_classified_receipts_preserve_uncertainty_after_one_owner_call ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.76s
+
+Running cargo clippy --offline --locked --workspace --all-targets -- -D warnings
+    Checking typenum v1.20.1
+    Checking subtle v2.6.1
+    Checking cfg-if v1.0.4
+    Checking libc v0.2.189
+    Checking serde_core v1.0.228
+    Checking zmij v1.0.21
+    Checking itoa v1.0.15
+    Checking memchr v2.8.3
+   Compiling arkdeck-platform v0.1.0 (/private/tmp/arkdeck-xpa013-artifact-runtime-20260912/rust/crates/arkdeck-platform)
+    Checking unicode-segmentation v1.13.3
+   Compiling arkdeck-agentd v0.1.0 (/private/tmp/arkdeck-xpa013-artifact-runtime-20260912/rust/crates/arkdeck-agentd)
+    Checking cpufeatures v0.2.17
+    Checking generic-array v0.14.7
+    Checking block-buffer v0.10.4
+    Checking crypto-common v0.1.6
+    Checking digest v0.10.7
+    Checking sha2 v0.10.9
+    Checking hmac v0.12.1
+    Checking serde_json v1.0.151
+    Checking serde v1.0.228
+    Checking arkdeck-provider-hdc v0.1.0 (/private/tmp/arkdeck-xpa013-artifact-runtime-20260912/rust/crates/arkdeck-provider-hdc)
+    Checking arkdeck-contract v0.1.0 (/private/tmp/arkdeck-xpa013-artifact-runtime-20260912/rust/crates/arkdeck-contract)
+    Checking arkdeck-hoststore v0.1.0 (/private/tmp/arkdeck-xpa013-artifact-runtime-20260912/rust/crates/arkdeck-hoststore)
+    Checking arkdeck-client v0.1.0 (/private/tmp/arkdeck-xpa013-artifact-runtime-20260912/rust/crates/arkdeck-client)
+    Checking arkdeck-control v0.1.0 (/private/tmp/arkdeck-xpa013-artifact-runtime-20260912/rust/crates/arkdeck-control)
+    Checking arkdeck-cli v0.1.0 (/private/tmp/arkdeck-xpa013-artifact-runtime-20260912/rust/crates/arkdeck-cli)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 11.36s
+Running cargo build --offline --locked --workspace --bins
+   Compiling arkdeck-agentd v0.1.0 (/private/tmp/arkdeck-xpa013-artifact-runtime-20260912/rust/crates/arkdeck-agentd)
+   Compiling sha2 v0.10.9
+   Compiling arkdeck-platform v0.1.0 (/private/tmp/arkdeck-xpa013-artifact-runtime-20260912/rust/crates/arkdeck-platform)
+   Compiling arkdeck-contract v0.1.0 (/private/tmp/arkdeck-xpa013-artifact-runtime-20260912/rust/crates/arkdeck-contract)
+   Compiling arkdeck-provider-hdc v0.1.0 (/private/tmp/arkdeck-xpa013-artifact-runtime-20260912/rust/crates/arkdeck-provider-hdc)
+   Compiling arkdeck-hoststore v0.1.0 (/private/tmp/arkdeck-xpa013-artifact-runtime-20260912/rust/crates/arkdeck-hoststore)
+   Compiling arkdeck-client v0.1.0 (/private/tmp/arkdeck-xpa013-artifact-runtime-20260912/rust/crates/arkdeck-client)
+   Compiling arkdeck-control v0.1.0 (/private/tmp/arkdeck-xpa013-artifact-runtime-20260912/rust/crates/arkdeck-control)
+   Compiling arkdeck-cli v0.1.0 (/private/tmp/arkdeck-xpa013-artifact-runtime-20260912/rust/crates/arkdeck-cli)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 13.09s
+Running python3 /private/tmp/arkdeck-xpa013-artifact-runtime-20260912/rust/scripts/check-import-upload-owner.py
+PASS: Swift fixture parity, real CLI lost-reply rediscovery, restart, source identity, abort tombstone and unavailable authority seams; no device dispatch

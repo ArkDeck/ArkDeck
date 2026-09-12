@@ -18,6 +18,21 @@ pub enum BootstrapRegistryKind {
 }
 
 pub trait HostServices: Send + Sync {
+    fn import_resource(
+        &self,
+        _method: &str,
+        _params: &serde_json::Map<String, Value>,
+    ) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "operationUnavailable".into(),
+            message: "Import owner services are unavailable".into(),
+            details: Some(serde_json::Map::from_iter([
+                ("phase".into(), json!("importOwner")),
+                ("newDispatchCount".into(), json!(0)),
+            ])),
+        })
+    }
+
     fn target_resource(
         &self,
         _method: &str,
@@ -670,6 +685,16 @@ impl<H: HostServices> Control<H> {
             "artifact.inspect" | "artifact.read" | "artifact.export" => Response {
                 id: request.id.clone(),
                 outcome: self.host.artifact_resource(&request.method, &params),
+            },
+            "artifact.import.begin"
+            | "artifact.import.append"
+            | "artifact.import.abort"
+            | "artifact.import.inspect"
+            | "artifact.import.inspection"
+            | "artifact.import.commit"
+            | "artifact.import.release" => Response {
+                id: request.id.clone(),
+                outcome: self.host.import_resource(&request.method, &params),
             },
             "session.list"
             | "session.show"

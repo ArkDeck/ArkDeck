@@ -98,6 +98,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             &root.join("targets-state"),
         )?)
         .with_history(arkdeck_hoststore::HistoryStore::open(&root)?)
+        .with_imports(arkdeck_hoststore::ImportUploadStore::open(&artifacts)?)
         .with_artifacts(arkdeck_hoststore::ArtifactReadStore::open(&artifacts)?)
         .with_trace_cache(arkdeck_hoststore::TraceCacheStore::open(&trace_cache)?)
         .with_storage(

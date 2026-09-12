@@ -372,6 +372,11 @@ pub use artifact_projection::{ArtifactInspectRequest, ArtifactReadRequest};
 mod artifact_resources;
 
 #[cfg(target_os = "macos")]
+mod import_upload;
+#[cfg(target_os = "macos")]
+pub use import_upload::{ImportBinding, ImportUploadFault, ImportUploadStore};
+
+#[cfg(target_os = "macos")]
 mod artifact_export;
 #[cfg(target_os = "macos")]
 pub use artifact_export::ArtifactExportRequest;

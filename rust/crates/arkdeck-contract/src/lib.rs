@@ -5,6 +5,13 @@ mod catalog_generated;
 mod cbor;
 mod control_generated;
 mod framing;
+mod imports;
+pub use imports::{
+    IMPORT_MAX_CHUNK_BYTES, IMPORT_MAX_CHUNKS, IMPORT_MAX_RECORD_BYTES, IMPORT_MAX_RECORDS,
+    IMPORT_STAGING_QUOTA, ImportIntent, ImportProjection, decode_import_chunk, encode_import_chunk,
+    import_decimal, import_digest, import_id, import_identifier, import_timestamp,
+    validate_import_inspection, validate_import_release,
+};
 mod schema;
 
 pub use canonical::{canonical_json, sha256_hex};

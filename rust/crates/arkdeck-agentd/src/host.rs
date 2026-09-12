@@ -16,6 +16,8 @@ struct ObservationState {
 
 pub struct Host {
     #[cfg(target_os = "macos")]
+    imports: Option<arkdeck_hoststore::ImportUploadStore>,
+    #[cfg(target_os = "macos")]
     targets: Option<arkdeck_hoststore::TargetStore>,
     #[cfg(target_os = "macos")]
     artifacts: Option<arkdeck_hoststore::ArtifactReadStore>,
@@ -38,6 +40,12 @@ pub struct Host {
 }
 
 impl Host {
+    #[cfg(target_os = "macos")]
+    pub fn with_imports(mut self, imports: arkdeck_hoststore::ImportUploadStore) -> Self {
+        self.imports = Some(imports);
+        self
+    }
+
     #[cfg(target_os = "macos")]
     pub fn with_targets(mut self, targets: arkdeck_hoststore::TargetStore) -> Self {
         self.targets = Some(targets);
@@ -109,6 +117,8 @@ impl Host {
         };
         Self {
             #[cfg(target_os = "macos")]
+            imports: None,
+            #[cfg(target_os = "macos")]
             targets: None,
             #[cfg(target_os = "macos")]
             artifacts: None,
@@ -130,6 +140,32 @@ impl Host {
 }
 
 impl HostServices for Host {
+    #[cfg(target_os = "macos")]
+    fn import_resource(
+        &self,
+        method: &str,
+        params: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<serde_json::Value, WireError> {
+        let unavailable = || WireError {
+            code: "operationUnavailable".into(),
+            message: "Import requires the Runtime Target owner and publication services".into(),
+            details: Some(serde_json::Map::from_iter([
+                ("phase".into(), serde_json::json!("importOwner")),
+                ("newDispatchCount".into(), serde_json::json!(0)),
+            ])),
+        };
+        // Local control clients never inherit the App's trusted transport provenance.
+        self.imports
+            .as_ref()
+            .ok_or_else(unavailable)?
+            .handle_resource(method, params, &utc_now(), false, |intent| {
+                self.targets
+                    .as_ref()
+                    .ok_or_else(unavailable)?
+                    .resolve_import_binding(intent)
+            })
+    }
+
     #[cfg(target_os = "macos")]
     fn target_resource(
         &self,

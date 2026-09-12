@@ -1,0 +1,13 @@
+{
+  "schemaVersion" : "1.0.0",
+  "targets" : [
+    {
+      "adoptedAtUTC" : "2026-09-01T00:00:00Z",
+      "bindingRevision" : 1,
+      "connectKey" : "display-name-device",
+      "stablePhysicalIdentitySHA256" : "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "targetID" : "TGT-dddddddddddd",
+      "toolVersion" : "3.2.0f"
+    }
+  ]
+}
