@@ -29,6 +29,27 @@ BASELINE = ROOT / "spec/baselines/swift-single-v1.json"
 CANDIDATE_INPUTS = ROOT / "spec/baselines/swift-candidate-inputs.json"
 REGISTRY = ROOT / "Packages/ArkDeckKit/Contracts/control-protocol.json"
 SUPPORTED = {"health", "doctor", "operation.list", "device.observations"}
+# Only these methods reach the Import owner. Import list remains unimplemented.
+IMPORT_OWNER_METHODS = frozenset({
+    "artifact.import.begin", "artifact.import.append", "artifact.import.abort",
+    "artifact.import.inspect", "artifact.import.inspection", "artifact.import.release",
+    "artifact.import.commit",
+})
+
+
+def missing_import_owner_error(method: str) -> str:
+    assert method in IMPORT_OWNER_METHODS, f"not an Import owner route: {method}"
+    schema = read_json(ROOT / "spec/control/methods" / f"{method}.json")
+    definitions = schema["$defs"]
+    code = jsonschema.Draft202012Validator({"$defs": definitions, "$ref": "#/$defs/errorCode"})
+    details = jsonschema.Draft202012Validator({"$defs": definitions, "$ref": "#/$defs/errorDetails"})
+    # Both contract views execute the same Rust source. Control validates the
+    # owner's exact refusal against that view before writing a response; older
+    # schemas normalize a nonconforming refusal to internalError.
+    if code.is_valid("operationUnavailable") and details.is_valid({"phase": "importOwner", "newDispatchCount": 0}):
+        return "operationUnavailable"
+    code.validate("internalError")
+    return "internalError"
 
 
 def assert_boundaries() -> None:
@@ -303,6 +324,8 @@ def main() -> None:
                         expected = "operationUnavailable"
                     if method in {"target.list", "target.show", "target.display-name.set", "target.display-name.clear", "device.display-name.set", "device.display-name.clear"}:
                         expected = "internalError"
+                    if method in IMPORT_OWNER_METHODS:
+                        expected = missing_import_owner_error(method)
                     exchange(endpoint, directory, rows, method, encode(request(registry, method, method)), method, expected)
                 wire_descriptor = exchange(endpoint, directory, rows, "descriptor-success",
                     encode(request(registry, "operation.describe", "descriptor-success", {"reference": reference})),

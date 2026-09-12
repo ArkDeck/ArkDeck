@@ -34,8 +34,24 @@ The real daemon/CLI harness passed: native upload and Target fixture compatibili
 
 Raw log: `import-upload-main-integration-rust.log`; SHA-256 `21ea7c16a36e598abd48db226ee392c631b7de7e34db53dbf86a1b4095456adf`. Earlier native producer byte/source proofs are retained under `native-import-producer-macos-20260912` and `rust/tests/fixtures/import-target-current`; no native evidence was regenerated, fabricated or relabeled as a new Swift run in this integration.
 
-## Remaining parent-owned final steps
+## Final integration gate
 
 The final scope declaration contains exactly six existing Import schema paths: `spec/control/methods/artifact.import.begin.json`, `.append.json`, `.abort.json`, `.inspect.json`, `.inspection.json`, and `.release.json` (each expanded to its full filename in the commit trailers). Main already authorizes `spec/baselines/swift-single-v1.json`; it is therefore omitted from new Scope-Extension declarations. Final scope preflight runs against the current main after the local merge commit.
 
-No Swift/App build, unified full gate, push, PR creation or merge-to-main was performed by this subtask. The parent schedules the new candidate's final full gate separately; the original worktree's result must not be presented as a gate on this merged tree.
+The complete local unified gate on this combined candidate passed with exit 0 (`/private/tmp/xpa013-import-upload-unified-r2.log`): selected Swift, design-system and Rust lanes, both published/candidate contract views, dependency deny and vet. App build was not selected. The script correction below was included in the tested worktree; no Rust source changed during the final gate. Final commit scope preflight runs before push. The original worktree's failed r1 result remains separately identified below.
+
+## Strict missing-owner expectations in both contract views
+
+The original frozen Import full gate r1 **failed** in `check-readonly.py`: its old loop expected `rejected` for `artifact.import.abort`. The retained actual published response was `internalError`, while the actual candidate response was `operationUnavailable` with `phase: importOwner` and `newDispatchCount: 0`. Both views run the candidate Rust source, but the published method schema did not admit that owner refusal. Control correctly replaced the nonconforming response with `internalError`. This failure does not invalidate the separate 145-test merged-tree batch above and is not reported as a passing full gate.
+
+The harness now identifies exactly seven routed Import methods and derives one expected code from each view's exported error code and error details schemas. It does not accept either code indiscriminately, alter Runtime behavior, or relax a schema. `artifact.import.list` remains unimplemented and expects `rejected`.
+
+| Method suffix | Published schema expectation | Candidate schema expectation |
+| --- | --- | --- |
+| begin, append, commit | operationUnavailable | operationUnavailable |
+| abort, inspect, inspection, release | internalError | operationUnavailable |
+| list | rejected | rejected |
+
+The actual candidate daemon/CLI readonly check passed with 124 Control responses, 12 CLI envelopes and 115 valid requests. It reused the already-tested merged Rust binaries; no recompilation or Swift build was needed for this Python-only correction. All raw responses were recorded before strict schema validation. The eight Import request/response pairs, both original abort refusal pairs, exact method schema hashes/definitions and candidate summary are retained in `import-readonly-contract-views-r2/`. The complete recording directory is `/private/tmp/xpa013-import-readonly-candidate-r2`; log `/private/tmp/xpa013-import-readonly-candidate-r2.log`.
+
+`python3 rust/scripts/test_contract_checks.py` passed all 30 tests (60.493 seconds), including the regression for distinct published/candidate expectations, the unimplemented list boundary, refusal-details validation and rejection of an invalid normalization fallback. The subsequent complete r2 gate also passed both actual published/candidate executions; the records are under `rust/target/readonly-check/bb1168e171344948be5ef35646b59241`. Runtime and schema validation remained unchanged.

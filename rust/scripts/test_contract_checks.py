@@ -31,6 +31,48 @@ sys.modules[WORKSPACE_SPEC.name] = workspace
 WORKSPACE_SPEC.loader.exec_module(workspace)
 
 
+READONLY_SPEC = importlib.util.spec_from_file_location(
+    "arkdeck_readonly_checks", SCRIPT.with_name("check-readonly.py"))
+readonly = importlib.util.module_from_spec(READONLY_SPEC)
+READONLY_SPEC.loader.exec_module(readonly)
+
+
+class ReadOnlyImportExpectationTests(unittest.TestCase):
+    def test_each_view_selects_one_exact_refusal_and_preserves_unimplemented_list(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            directory = root / "spec/control/methods"
+            directory.mkdir(parents=True)
+            # Begin/append/commit already permitted the owner refusal in the
+            # published view. The other four gain it from native Import frames.
+            published_available = {"artifact.import.begin", "artifact.import.append", "artifact.import.commit"}
+            for candidate in (False, True):
+                for method in readonly.IMPORT_OWNER_METHODS:
+                    available = candidate or method in published_available
+                    schema = {"$defs": {
+                        "errorCode": {"enum": ["internalError"] + (["operationUnavailable"] if available else [])},
+                        "errorDetails": {"type": "object", "additionalProperties": False,
+                            "properties": {"phase": {"const": "importOwner"}, "newDispatchCount": {"const": 0}},
+                            "required": ["phase", "newDispatchCount"]},
+                    }}
+                    (directory / f"{method}.json").write_text(json.dumps(schema))
+                    with patch.object(readonly, "ROOT", root), self.subTest(candidate=candidate, method=method):
+                        self.assertEqual(readonly.missing_import_owner_error(method),
+                                         "operationUnavailable" if available else "internalError")
+            with self.assertRaises(AssertionError):
+                readonly.missing_import_owner_error("artifact.import.list")
+            # A code alone is insufficient if the view rejects the owner details.
+            schema["$defs"]["errorDetails"] = {"type": "object", "additionalProperties": False}
+            path = directory / "artifact.import.commit.json"
+            path.write_text(json.dumps(schema))
+            with patch.object(readonly, "ROOT", root):
+                self.assertEqual(readonly.missing_import_owner_error("artifact.import.commit"), "internalError")
+                schema["$defs"]["errorCode"] = {"enum": ["operationUnavailable"]}
+                path.write_text(json.dumps(schema))
+                with self.assertRaises(jsonschema.ValidationError):
+                    readonly.missing_import_owner_error("artifact.import.commit")
+
+
 class ContractChecksTests(unittest.TestCase):
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory(prefix="arkdeck-contract-tests-")

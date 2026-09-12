@@ -1,0 +1,688 @@
+{
+  "kind": "host-test",
+  "deviceAcceptance": false,
+  "publishedBase": "4e2a615e421e6174a4a50e2c8110196d77ce7007",
+  "candidateRuntimeCommit": "11844791a7db8684fc6c22112435602996021954",
+  "originalFullGate": "/private/tmp/xpa013-import-upload-unified-r1.log",
+  "files": [
+    {
+      "source": "/private/tmp/xpa013-import-readonly-candidate-r2/042-artifact.import.inspection.request.bin",
+      "file": "candidate-r2/042-artifact.import.inspection.request.bin",
+      "sha256": "4d720f94f1a1adb6b9511acef8792449e150ec2248dd2931796ebc2c9b1f46a0"
+    },
+    {
+      "source": "/private/tmp/xpa013-import-readonly-candidate-r2/043-artifact.import.inspection.response.jsonl",
+      "file": "candidate-r2/043-artifact.import.inspection.response.jsonl",
+      "sha256": "fb4c25141ba4ef441ce6407d07da8c350361a11b0aecf6ae393ceaffbc7358a2"
+    },
+    {
+      "source": "/private/tmp/xpa013-import-readonly-candidate-r2/039-artifact.import.commit.response.jsonl",
+      "file": "candidate-r2/039-artifact.import.commit.response.jsonl",
+      "sha256": "dc0814f792d7dffd4f50a4220efda10909807adc24f45bf1b5e5c352e6ed9fad"
+    },
+    {
+      "source": "/private/tmp/xpa013-import-readonly-candidate-r2/041-artifact.import.inspect.response.jsonl",
+      "file": "candidate-r2/041-artifact.import.inspect.response.jsonl",
+      "sha256": "f898d28af669f59f90e3f9b9a7c8a31902d51b6e71eece5c574d39d107e61f35"
+    },
+    {
+      "source": "/private/tmp/xpa013-import-readonly-candidate-r2/038-artifact.import.commit.request.bin",
+      "file": "candidate-r2/038-artifact.import.commit.request.bin",
+      "sha256": "9d4c47b62e516b399dffa46e2b1a55a5a5aa6fc47c31ba629914fe4e0519dd3a"
+    },
+    {
+      "source": "/private/tmp/xpa013-import-readonly-candidate-r2/044-artifact.import.list.request.bin",
+      "file": "candidate-r2/044-artifact.import.list.request.bin",
+      "sha256": "a9dafa044bc737bbf2fc5d7b664e100fcf4454de78db1b574158ec500816856c"
+    },
+    {
+      "source": "/private/tmp/xpa013-import-readonly-candidate-r2/033-artifact.import.abort.response.jsonl",
+      "file": "candidate-r2/033-artifact.import.abort.response.jsonl",
+      "sha256": "25eb8410c8883c4c77173de7381dde058a8f8059c0c509b2d095accfd2eba45d"
+    },
+    {
+      "source": "/private/tmp/xpa013-import-readonly-candidate-r2/034-artifact.import.append.request.bin",
+      "file": "candidate-r2/034-artifact.import.append.request.bin",
+      "sha256": "daf5177bce34c58d8fa0bed558b2fb4d773a702a47d4aabd5a0f3e4550b5ac3a"
+    },
+    {
+      "source": "/private/tmp/xpa013-import-readonly-candidate-r2/036-artifact.import.begin.request.bin",
+      "file": "candidate-r2/036-artifact.import.begin.request.bin",
+      "sha256": "6a9df886fae24f895a2df9e7fd46e486a06fe08cdcf9630dc82abaa14e7063d0"
+    },
+    {
+      "source": "/private/tmp/xpa013-import-readonly-candidate-r2/046-artifact.import.release.request.bin",
+      "file": "candidate-r2/046-artifact.import.release.request.bin",
+      "sha256": "96092bdf34ae97e12045cbc9f3cc48a5d39b6aaeb513a3b7e54e1c132a131774"
+    },
+    {
+      "source": "/private/tmp/xpa013-import-readonly-candidate-r2/035-artifact.import.append.response.jsonl",
+      "file": "candidate-r2/035-artifact.import.append.response.jsonl",
+      "sha256": "6a0f3919b09350cb20257bba5536628be6e536f94845b5dc57d0ae8f02cc4ac2"
+    },
+    {
+      "source": "/private/tmp/xpa013-import-readonly-candidate-r2/040-artifact.import.inspect.request.bin",
+      "file": "candidate-r2/040-artifact.import.inspect.request.bin",
+      "sha256": "bdc0114c97102d0b07e3baf0eaedd67e0e49bcf2e7c2874a188557326df41af2"
+    },
+    {
+      "source": "/private/tmp/xpa013-import-readonly-candidate-r2/047-artifact.import.release.response.jsonl",
+      "file": "candidate-r2/047-artifact.import.release.response.jsonl",
+      "sha256": "e22c72ded709ba7be32c3cbd25c9e7a707cbfe0389a251fb44abc3a71adae42e"
+    },
+    {
+      "source": "/private/tmp/xpa013-import-readonly-candidate-r2/032-artifact.import.abort.request.bin",
+      "file": "candidate-r2/032-artifact.import.abort.request.bin",
+      "sha256": "311a61483d73ea13f38d8fdac1a8794b86e98bd5311175e5b91dff9bb232ceaf"
+    },
+    {
+      "source": "/private/tmp/xpa013-import-readonly-candidate-r2/037-artifact.import.begin.response.jsonl",
+      "file": "candidate-r2/037-artifact.import.begin.response.jsonl",
+      "sha256": "11fd334bfd9bac0251b7d62e797c00832688b70e99086fa8063cfbfaec508fc1"
+    },
+    {
+      "source": "/private/tmp/xpa013-import-readonly-candidate-r2/045-artifact.import.list.response.jsonl",
+      "file": "candidate-r2/045-artifact.import.list.response.jsonl",
+      "sha256": "e9806647082e656ae7614e95a2843e4e81fbc523bb4c4c2017bf7eeef2af8d1b"
+    },
+    {
+      "source": "/private/tmp/arkdeck-xpa013-artifact-runtime-20260912/rust/target/readonly-check/fc19b1b497574b6a8aea77cb68d2c2cb/published/recordings/033-artifact.import.abort.response.jsonl",
+      "file": "published-r1/033-artifact.import.abort.response.jsonl",
+      "sha256": "631c6713db56be152754a778592965d36abf5cd5ea6f54c61400a3b6a1726069"
+    },
+    {
+      "source": "/private/tmp/arkdeck-xpa013-artifact-runtime-20260912/rust/target/readonly-check/fc19b1b497574b6a8aea77cb68d2c2cb/published/recordings/032-artifact.import.abort.request.bin",
+      "file": "published-r1/032-artifact.import.abort.request.bin",
+      "sha256": "311a61483d73ea13f38d8fdac1a8794b86e98bd5311175e5b91dff9bb232ceaf"
+    },
+    {
+      "source": "/private/tmp/arkdeck-xpa013-artifact-runtime-20260912/rust/target/readonly-check/fc19b1b497574b6a8aea77cb68d2c2cb/candidate/recordings/033-artifact.import.abort.response.jsonl",
+      "file": "candidate-r1/033-artifact.import.abort.response.jsonl",
+      "sha256": "25eb8410c8883c4c77173de7381dde058a8f8059c0c509b2d095accfd2eba45d"
+    },
+    {
+      "source": "/private/tmp/arkdeck-xpa013-artifact-runtime-20260912/rust/target/readonly-check/fc19b1b497574b6a8aea77cb68d2c2cb/candidate/recordings/032-artifact.import.abort.request.bin",
+      "file": "candidate-r1/032-artifact.import.abort.request.bin",
+      "sha256": "311a61483d73ea13f38d8fdac1a8794b86e98bd5311175e5b91dff9bb232ceaf"
+    }
+  ],
+  "schemas": [
+    {
+      "method": "artifact.import.begin",
+      "published": {
+        "schemaSHA256": "b29fcf99d34decd73b1cb4828e65e898cbe5b5b5943d04933d8134acf1e9992e",
+        "errorCode": {
+          "enum": [
+            "admissionDenied",
+            "conflict",
+            "internalError",
+            "invalidInput",
+            "invalidParams",
+            "malformedFrame",
+            "notFound",
+            "operationUnavailable",
+            "recordUnreadable",
+            "rejected",
+            "resourceConflict",
+            "unknownMethod",
+            "unsupportedProtocolVersion",
+            "workspaceReferenceNotFound"
+          ]
+        },
+        "errorDetails": {
+          "additionalProperties": false,
+          "properties": {
+            "newDispatchCount": {
+              "type": "integer"
+            },
+            "phase": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "newDispatchCount",
+            "phase"
+          ],
+          "type": "object"
+        }
+      },
+      "candidate": {
+        "schemaSHA256": "e31c9703121ac96de9fd3f493b3765d7074097ed95ebe5bc999163f2dbc522dd",
+        "errorCode": {
+          "enum": [
+            "admissionDenied",
+            "conflict",
+            "idempotencyConflict",
+            "internalError",
+            "invalidInput",
+            "invalidParams",
+            "malformedFrame",
+            "notFound",
+            "operationUnavailable",
+            "quotaExceeded",
+            "recordUnreadable",
+            "rejected",
+            "resourceConflict",
+            "unknownMethod",
+            "unsupportedProtocolVersion",
+            "workspaceReferenceNotFound"
+          ]
+        },
+        "errorDetails": {
+          "additionalProperties": false,
+          "properties": {
+            "newDispatchCount": {
+              "type": "integer"
+            },
+            "phase": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "newDispatchCount",
+            "phase"
+          ],
+          "type": "object"
+        }
+      }
+    },
+    {
+      "method": "artifact.import.append",
+      "published": {
+        "schemaSHA256": "f916213b51cd8adf626e3bed233c8efeb88168ac8dd14f5fc9e1c8ee6aab7701",
+        "errorCode": {
+          "enum": [
+            "admissionDenied",
+            "conflict",
+            "internalError",
+            "invalidInput",
+            "invalidParams",
+            "malformedFrame",
+            "notFound",
+            "operationUnavailable",
+            "recordUnreadable",
+            "rejected",
+            "resourceConflict",
+            "unknownMethod",
+            "unsupportedProtocolVersion",
+            "workspaceReferenceNotFound"
+          ]
+        },
+        "errorDetails": {
+          "additionalProperties": false,
+          "properties": {
+            "newDispatchCount": {
+              "type": "integer"
+            },
+            "phase": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "newDispatchCount",
+            "phase"
+          ],
+          "type": "object"
+        }
+      },
+      "candidate": {
+        "schemaSHA256": "888d5b50cfb4da7c7ecbfae00ab02742583b3c5e174d5ccbe55bc94f7a6d15c4",
+        "errorCode": {
+          "enum": [
+            "admissionDenied",
+            "artifactIntegrityFailed",
+            "conflict",
+            "internalError",
+            "invalidInput",
+            "invalidParams",
+            "malformedFrame",
+            "notFound",
+            "operationUnavailable",
+            "quotaExceeded",
+            "recordUnreadable",
+            "rejected",
+            "resourceConflict",
+            "resourceNotFound",
+            "unknownMethod",
+            "unsupportedProtocolVersion",
+            "workspaceReferenceNotFound"
+          ]
+        },
+        "errorDetails": {
+          "additionalProperties": false,
+          "properties": {
+            "newDispatchCount": {
+              "type": "integer"
+            },
+            "phase": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "newDispatchCount",
+            "phase"
+          ],
+          "type": "object"
+        }
+      }
+    },
+    {
+      "method": "artifact.import.abort",
+      "published": {
+        "schemaSHA256": "a22166274f5a857f0add0b5d9e64c00a347ede3fbc889c70238e1ad74f139dbe",
+        "errorCode": {
+          "enum": [
+            "admissionDenied",
+            "conflict",
+            "internalError",
+            "invalidInput",
+            "invalidParams",
+            "malformedFrame",
+            "notFound",
+            "recordUnreadable",
+            "rejected",
+            "unknownMethod",
+            "unsupportedProtocolVersion",
+            "workspaceReferenceNotFound"
+          ]
+        },
+        "errorDetails": {
+          "additionalProperties": false,
+          "properties": {
+            "newDispatchCount": {
+              "type": "integer"
+            },
+            "phase": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "newDispatchCount",
+            "phase"
+          ],
+          "type": "object"
+        }
+      },
+      "candidate": {
+        "schemaSHA256": "d14a97e0b94072f9b2f730a211bc79ff379f3b6235a0b68a4346315a1e88b373",
+        "errorCode": {
+          "enum": [
+            "admissionDenied",
+            "conflict",
+            "internalError",
+            "invalidInput",
+            "invalidParams",
+            "malformedFrame",
+            "notFound",
+            "operationUnavailable",
+            "recordUnreadable",
+            "rejected",
+            "resourceConflict",
+            "resourceNotFound",
+            "unknownMethod",
+            "unsupportedProtocolVersion",
+            "workspaceReferenceNotFound"
+          ]
+        },
+        "errorDetails": {
+          "additionalProperties": false,
+          "properties": {
+            "newDispatchCount": {
+              "type": "integer"
+            },
+            "phase": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "newDispatchCount",
+            "phase"
+          ],
+          "type": "object"
+        }
+      }
+    },
+    {
+      "method": "artifact.import.inspect",
+      "published": {
+        "schemaSHA256": "80ad5583e9ab121ec874e2a86fe8e0bb7e2959a50384cafd7a2c29d5fd8e8a4a",
+        "errorCode": {
+          "enum": [
+            "conflict",
+            "internalError",
+            "invalidInput",
+            "invalidParams",
+            "malformedFrame",
+            "notFound",
+            "recordUnreadable",
+            "rejected",
+            "resourceNotFound",
+            "unknownMethod",
+            "unsupportedProtocolVersion",
+            "workspaceReferenceNotFound"
+          ]
+        },
+        "errorDetails": {
+          "additionalProperties": false,
+          "properties": {
+            "newDispatchCount": {
+              "type": "integer"
+            },
+            "phase": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "newDispatchCount",
+            "phase"
+          ],
+          "type": "object"
+        }
+      },
+      "candidate": {
+        "schemaSHA256": "b2d5133ea4edcf927ef71857afeea275efe136b3d90fb6dd2b766a46ad3d0698",
+        "errorCode": {
+          "enum": [
+            "conflict",
+            "internalError",
+            "invalidInput",
+            "invalidParams",
+            "malformedFrame",
+            "notFound",
+            "operationUnavailable",
+            "recordUnreadable",
+            "rejected",
+            "resourceNotFound",
+            "unknownMethod",
+            "unsupportedProtocolVersion",
+            "workspaceReferenceNotFound"
+          ]
+        },
+        "errorDetails": {
+          "additionalProperties": false,
+          "properties": {
+            "newDispatchCount": {
+              "type": "integer"
+            },
+            "phase": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "newDispatchCount",
+            "phase"
+          ],
+          "type": "object"
+        }
+      }
+    },
+    {
+      "method": "artifact.import.inspection",
+      "published": {
+        "schemaSHA256": "5eada7151107d7dc29c0cf1ee06f98e2238370f17768340c5a8c1ab13a30bfd8",
+        "errorCode": {
+          "enum": [
+            "conflict",
+            "internalError",
+            "invalidInput",
+            "invalidParams",
+            "malformedFrame",
+            "notFound",
+            "recordUnreadable",
+            "rejected",
+            "unknownMethod",
+            "unsupportedProtocolVersion",
+            "workspaceReferenceNotFound"
+          ]
+        },
+        "errorDetails": {
+          "additionalProperties": false,
+          "properties": {
+            "newDispatchCount": {
+              "type": "integer"
+            },
+            "phase": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "newDispatchCount",
+            "phase"
+          ],
+          "type": "object"
+        }
+      },
+      "candidate": {
+        "schemaSHA256": "1ecabe8435e70b8cfe88a2e609c8c569973222f50d0510c5b8a8caf32bcd3341",
+        "errorCode": {
+          "enum": [
+            "conflict",
+            "internalError",
+            "invalidInput",
+            "invalidParams",
+            "malformedFrame",
+            "notFound",
+            "operationUnavailable",
+            "recordUnreadable",
+            "rejected",
+            "unknownMethod",
+            "unsupportedProtocolVersion",
+            "workspaceReferenceNotFound"
+          ]
+        },
+        "errorDetails": {
+          "additionalProperties": false,
+          "properties": {
+            "newDispatchCount": {
+              "type": "integer"
+            },
+            "phase": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "newDispatchCount",
+            "phase"
+          ],
+          "type": "object"
+        }
+      }
+    },
+    {
+      "method": "artifact.import.release",
+      "published": {
+        "schemaSHA256": "3d861be4d21d98e4820eabfab0eb2b8c2f3a4dbe162fd07811615c350b825423",
+        "errorCode": {
+          "enum": [
+            "conflict",
+            "internalError",
+            "invalidInput",
+            "invalidParams",
+            "malformedFrame",
+            "notFound",
+            "recordUnreadable",
+            "rejected",
+            "resourceConflict",
+            "unknownMethod",
+            "unsupportedProtocolVersion",
+            "workspaceReferenceNotFound"
+          ]
+        },
+        "errorDetails": {
+          "additionalProperties": false,
+          "properties": {
+            "newDispatchCount": {
+              "type": "integer"
+            },
+            "phase": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "newDispatchCount",
+            "phase"
+          ],
+          "type": "object"
+        }
+      },
+      "candidate": {
+        "schemaSHA256": "e1dab01d428a9e7d1a8d3f28d7b19df65f40c0d05f33d33f5d66f8a9ac306a9a",
+        "errorCode": {
+          "enum": [
+            "conflict",
+            "internalError",
+            "invalidInput",
+            "invalidParams",
+            "malformedFrame",
+            "notFound",
+            "operationUnavailable",
+            "recordUnreadable",
+            "rejected",
+            "resourceConflict",
+            "unknownMethod",
+            "unsupportedProtocolVersion",
+            "workspaceReferenceNotFound"
+          ]
+        },
+        "errorDetails": {
+          "additionalProperties": false,
+          "properties": {
+            "newDispatchCount": {
+              "type": "integer"
+            },
+            "phase": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "newDispatchCount",
+            "phase"
+          ],
+          "type": "object"
+        }
+      }
+    },
+    {
+      "method": "artifact.import.commit",
+      "published": {
+        "schemaSHA256": "b81cb339825fd78384d453732ced50c2c2cbd2479682f3b471f39db9ab9b76be",
+        "errorCode": {
+          "enum": [
+            "admissionDenied",
+            "conflict",
+            "internalError",
+            "invalidInput",
+            "invalidParams",
+            "malformedFrame",
+            "notFound",
+            "operationUnavailable",
+            "recordUnreadable",
+            "rejected",
+            "unknownMethod",
+            "unsupportedProtocolVersion",
+            "workspaceReferenceNotFound"
+          ]
+        },
+        "errorDetails": {
+          "additionalProperties": false,
+          "properties": {
+            "newDispatchCount": {
+              "type": "integer"
+            },
+            "phase": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "newDispatchCount",
+            "phase"
+          ],
+          "type": "object"
+        }
+      },
+      "candidate": {
+        "schemaSHA256": "b81cb339825fd78384d453732ced50c2c2cbd2479682f3b471f39db9ab9b76be",
+        "errorCode": {
+          "enum": [
+            "admissionDenied",
+            "conflict",
+            "internalError",
+            "invalidInput",
+            "invalidParams",
+            "malformedFrame",
+            "notFound",
+            "operationUnavailable",
+            "recordUnreadable",
+            "rejected",
+            "unknownMethod",
+            "unsupportedProtocolVersion",
+            "workspaceReferenceNotFound"
+          ]
+        },
+        "errorDetails": {
+          "additionalProperties": false,
+          "properties": {
+            "newDispatchCount": {
+              "type": "integer"
+            },
+            "phase": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "newDispatchCount",
+            "phase"
+          ],
+          "type": "object"
+        }
+      }
+    },
+    {
+      "method": "artifact.import.list",
+      "published": {
+        "schemaSHA256": "9b76d3f1f8d99a1d3ca5cb4364a7bd9778f107848f20b3715e69afd6b670b243",
+        "errorCode": {
+          "enum": [
+            "conflict",
+            "internalError",
+            "invalidParams",
+            "malformedFrame",
+            "notFound",
+            "recordUnreadable",
+            "rejected",
+            "unknownMethod",
+            "unsupportedProtocolVersion",
+            "workspaceReferenceNotFound"
+          ]
+        },
+        "errorDetails": {
+          "additionalProperties": false,
+          "properties": {},
+          "type": "object"
+        }
+      },
+      "candidate": {
+        "schemaSHA256": "9b76d3f1f8d99a1d3ca5cb4364a7bd9778f107848f20b3715e69afd6b670b243",
+        "errorCode": {
+          "enum": [
+            "conflict",
+            "internalError",
+            "invalidParams",
+            "malformedFrame",
+            "notFound",
+            "recordUnreadable",
+            "rejected",
+            "unknownMethod",
+            "unsupportedProtocolVersion",
+            "workspaceReferenceNotFound"
+          ]
+        },
+        "errorDetails": {
+          "additionalProperties": false,
+          "properties": {},
+          "type": "object"
+        }
+      }
+    }
+  ]
+}
