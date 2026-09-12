@@ -65,6 +65,12 @@ modify the application or installed Bootstrap state.
   matching Bundle list. After that one-line harness fix, the Rust tail passed in
   `unified-gate-rust-resume.log`. Source hashes verified that the previously passed
   Swift/App/common/workspace inputs were unchanged, so their results were reused.
+- Hosted macOS CI exposed a cold-cache setup race in the existing bounded-client
+  test: parsing all method schemas could consume the 400 ms budget before the
+  intended business request. The fixture initializes that cache before timing;
+  production deadlines, delay lengths and all timeout/no-replay assertions are
+  unchanged. All four bounded-client cases pass, and the common/Rust gate is
+  rerun with unchanged Swift/App/design-system results retained.
 
 Python is fixed to `/private/tmp/xpa012-hdc-rpc-venv/bin/python3`, verified with
 `PyYAML==6.0.3` and `jsonschema==4.26.0`. `ARKDECK_PYTHON` and `PATH` keep every
