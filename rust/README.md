@@ -66,7 +66,10 @@ They match the whole string, including its end; no general regex engine is used.
 The black-box check starts only its own daemon with a unique endpoint and HDC
 configuration removed. It saves the actual outputs, input manifests and provenance
 under `target/readonly-check/<run>/{published,candidate}/`
-and validates schemas after all commands finish and the daemon exits. On Unix it
+and validates schemas after all commands finish and the daemon exits. When the
+checkout's inputs are byte-identical to the published pin, the published view
+is recorded as covered by the candidate view (`publishedView` in
+`summary.json`) and the native checks run once; any drift runs both views. On Unix it
 records every current method, malformed frames and the three CLI leaves. On
 Windows an unsigned build must refuse the actual daemon identity before sending
 frames. Positive installed-daemon authentication and DAYU200 acceptance require
