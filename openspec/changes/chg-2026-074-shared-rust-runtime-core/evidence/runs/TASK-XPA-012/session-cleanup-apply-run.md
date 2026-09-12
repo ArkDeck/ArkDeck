@@ -30,10 +30,11 @@ returns `outcomeUnknown`; restart never replays that preview. Applied previews
 return their exact stored receipts. CLI transport, schema and semantic failures
 for apply remain unknown and do not enable automatic replay.
 
-## Current validation on f92acd36
+## Current validation
 
 The isolated branch is `agent/xpa012-session-apply-main-20260912`, based on the
-published Job/Artifact owner merge. The frozen apply implementation was reused
+published Job/Artifact owner merge and rebased onto `0dad7599` to preserve the
+new ArkForge pin. The frozen apply implementation was reused
 from `d602ca6329a3caa1a8523fa75813683ee88057bc` and composed with that actual owner.
 
 - Session host-store library: 53 passed, including 7 cleanup apply tests for
@@ -47,6 +48,11 @@ from `d602ca6329a3caa1a8523fa75813683ee88057bc` and composed with that actual ow
   refusal, replaced database refusal and preview/apply reachability.
 - CLI: 8 Session unit tests and all 11 current-surface integration tests passed,
   including exact tuple correlation and non-retryable lost/malformed replies.
+- Descriptor-relative removal: 4 tests passed using the already compiled
+  platform test binary with the correct `session_removal` filter. These cover
+  actual first-unlink failure, neighbor preservation, unsafe links/permissions,
+  byte or membership drift and replaced ancestors. Log:
+  `/private/tmp/xpa012-session-apply-platform-r1.log`.
 - The Rust daemon and CLI debug build passed. Targeted output is retained at
   `/private/tmp/xpa012-session-apply-targeted-r1.log` (the initial dependency
   compilation lines precede that captured log).
@@ -89,9 +95,11 @@ owner test to preserve another actual record. The process harness also accepts
 
 ## Coordinated remaining checks
 
-Descriptor-removal tests and warnings-denied Clippy await the shared build
-schedule. The first platform filter `host_session_removal` selected zero tests;
-the correct filter is `session_removal`, and no platform pass is claimed from
-that empty run. Current Swift CLI process consumption and the final unified
-Swift/App gate remain with the main agent. No installed activation, real-device
+Warnings-denied Clippy awaits the shared build schedule. The first platform
+filter `host_session_removal` selected zero tests; the four-test result above
+comes from the subsequent correct `session_removal` run without a new build.
+Current Swift CLI process consumption and the final unified Swift/App gate
+remain with the main agent. Scope preflight passed for TASK-XPA-012 on
+`0dad7599`; all changed paths are already allowed and no Scope-Extension trailer
+is needed. No installed activation, real-device
 execution, replay, Task completion or new scope authorization is claimed here.
