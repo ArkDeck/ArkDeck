@@ -1465,6 +1465,9 @@ final class HDCSupervisorContractTests: XCTestCase {
     let runner = HDCProcessCommandRunner(
       semanticProfile: fixtureSemanticProfile(candidate: candidate))
     let endpoint = try HDCServerEndpointSelector.select(explicitEndpoint: "127.0.0.1:18710")
+    // These samples assert completed process semantics. Allow host scheduling
+    // headroom; the dedicated hang sample below owns the 200 ms timeout check.
+    let semanticSampleTimeout: TimeInterval = 10
     let expected: [([String], HDCCommandSemanticResult)] = [
       (["uninstall", "com.example.waterflowdemo"], .success),
       (["unauthorized"], .failure(.unauthorized)),
@@ -1478,7 +1481,7 @@ final class HDCSupervisorContractTests: XCTestCase {
     for (arguments, semantic) in expected {
       let result = try await runner.execute(
         HDCProcessCommand(
-          toolchain: candidate, endpoint: endpoint, arguments: arguments, timeout: 2))
+          toolchain: candidate, endpoint: endpoint, arguments: arguments, timeout: semanticSampleTimeout))
       XCTAssertEqual(result.execution.termination, .exited(0), arguments.description)
       XCTAssertEqual(result.semantic, semantic, arguments.description)
       if arguments.first == "uninstall" {
@@ -1491,7 +1494,7 @@ final class HDCSupervisorContractTests: XCTestCase {
 
     let crash = try await runner.execute(
       HDCProcessCommand(
-        toolchain: candidate, endpoint: endpoint, arguments: ["crash"], timeout: 2))
+        toolchain: candidate, endpoint: endpoint, arguments: ["crash"], timeout: semanticSampleTimeout))
     XCTAssertEqual(crash.execution.termination, .exited(23))
     guard case .failure = crash.semantic else {
       return XCTFail("crash cannot be a semantic success")
@@ -1499,7 +1502,7 @@ final class HDCSupervisorContractTests: XCTestCase {
 
     let slow = try await runner.execute(
       HDCProcessCommand(
-        toolchain: candidate, endpoint: endpoint, arguments: ["slow"], timeout: 2))
+        toolchain: candidate, endpoint: endpoint, arguments: ["slow"], timeout: semanticSampleTimeout))
     XCTAssertEqual(slow.execution.termination, .exited(0))
     XCTAssertEqual(slow.semantic, .failure(.offline))
 

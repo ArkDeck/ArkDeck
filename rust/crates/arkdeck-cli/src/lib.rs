@@ -9,6 +9,7 @@ mod read_only_resources;
 pub use read_only_resources::{
     project_read_only_response, validate_read_only_request, validate_read_only_response,
 };
+mod job_events;
 mod job_resources;
 mod session_resources;
 pub use bootstrap_resources::{validate_bootstrap_request, validate_bootstrap_response};
@@ -201,7 +202,10 @@ impl CliError {
                     "recordUnreadable" => "recordUnreadable",
                     "workspaceReferenceNotFound" => "workspaceReferenceNotFound",
                     "invalidInput" if proof => "invalidInput",
-                    "invalidCursor" if proof && matches!(method, "job.list" | "job.timeline") => {
+                    "invalidCursor"
+                        if proof
+                            && matches!(method, "job.list" | "job.timeline" | "job.events") =>
+                    {
                         "invalidCursor"
                     }
                     "resourceConflict" if proof => "resourceConflict",
@@ -298,6 +302,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                 | "--order"
                 | "--state"
                 | "--thread"
+                | "--after-cursor"
                 | "--timeout" => {
                     index += 1;
                     let value = argv
@@ -317,6 +322,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                         "--safety-margin-bytes" => "safetyMarginBytes",
                         "--retention-days" => "retentionDays",
                         "--job" => "jobId",
+                        "--after-cursor" => "afterCursor",
                         "--artifact" => "artifactId",
                         "--max-bytes" => "maxBytes",
                         "--session" => "sessionId",
@@ -388,6 +394,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["job", "show"] => "job.show",
         ["job", "evidence"] => "job.evidence",
         ["job", "timeline"] => "job.timeline",
+        ["job", "events"] => "job.events",
         ["device", "candidates"] => "device.candidates",
         ["trace", "cache", "status"] => "trace.cache.status",
         ["runtime", "tool", "register"] => "runtime.tool.register",
@@ -468,6 +475,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         "operation.describe" | "operation.example" => &["operation"],
         "job.status" | "job.show" | "job.evidence" => &["jobId", "timeout"],
         "job.timeline" => &["jobId", "pageSize", "cursor", "timeout"],
+        "job.events" => &["jobId", "pageSize", "afterCursor", "timeout"],
         "job.list" => &[
             "pageSize",
             "cursor",
@@ -712,6 +720,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                     | "job.show"
                     | "job.evidence"
                     | "job.timeline"
+                    | "job.events"
             )
         {
             Some(method_options)

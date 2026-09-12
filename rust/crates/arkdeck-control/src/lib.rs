@@ -629,7 +629,7 @@ impl<H: HostServices> Control<H> {
                 id: request.id.clone(),
                 outcome: self.host.history_filter(&request.method, &params),
             },
-            "job.list" | "job.status" | "job.show" | "job.timeline" => Response {
+            "job.list" | "job.status" | "job.show" | "job.timeline" | "job.events" => Response {
                 id: request.id.clone(),
                 outcome: self.host.job_resource(&request.method, &params),
             },

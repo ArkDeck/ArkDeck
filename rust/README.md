@@ -32,7 +32,7 @@ those two.
 The Python checks require Python 3.11+ with `PyYAML==6.0.3` and
 `jsonschema==4.26.0`. The repository's unified planner also runs these checks,
 `cargo deny` and `cargo vet`; see [dependency policy](supply-chain/README.md).
-The committed policy combines imported source audits with nine bounded publisher
+The committed policy combines imported source audits with fifteen bounded publisher
 trust entries and no exemptions. Both dependency checks must pass.
 
 The shared runner checks two independent temporary source views: current Rust
@@ -284,7 +284,7 @@ unproven groups, other signal errors and lost child ownership remain failures.
 
 The manifest lists every registry method. Methods without a migrated host
 handler are structurally understood and refused.
-There is no Runtime capability owner, recovery, journal, durable target store,
+There is no Runtime capability owner, recovery, journal writer, durable target store,
 device mutation, flash lowering, Swift replacement or production cutover here.
 Unknown or incomplete outcomes never acquire invented zero-dispatch evidence.
 
@@ -336,3 +336,27 @@ restart persistence and a second owner refusal. The fixture-producing contract
 tests are `testRustJobOwnerCurrentSQLiteFixture` and
 `testRustArtifactOwnerCurrentFixture`; set `ARKDECK_RUST_JOB_FIXTURE_OUTPUT` or
 `ARKDECK_RUST_ARTIFACT_FIXTURE_OUTPUT` to a new temporary output path.
+
+## Job event metadata reader
+
+The isolated macOS Job owner serves `job.events`; the Rust CLI accepts
+`job events --job <id> [--page-size <n>] [--after-cursor <cursor>]` with a bounded
+optional timeout. It validates the current nineteen closed Journal event kinds
+and returns metadata only. Unknown fields, corrupt complete lines, replaced
+inodes, malformed sequences and forged cursors are refused. An interrupted final
+append becomes visible only after its complete line is published.
+
+The existing `jec1` AES-256-GCM cursor format binds the Job, inode and generation,
+origin, predecessor and high-water offsets. Swift and Rust can resume each
+other's actual cursors on the same source-created journal; cursors survive daemon
+restart without rewriting Journal or SQLite records. A private 32-byte cursor
+key is created durably only for a first page; resuming without it refuses. These
+cursors confer no Runtime execution or recovery authority. Reads are bounded to
+16 MiB per record, 64 KiB buffers, 1 MiB per page and at most 1,000 events.
+
+`rust/scripts/check-job-events.py` accepts an explicit private temporary Swift
+fixture and verifies actual daemon/CLI paging, cursor forgery refusal, restart
+and unchanged Journal, SQLite and key bytes. The six additional publisher-trust
+entries use only the user-authorized fixed releases and their publication days;
+see `supply-chain/README.md`. Journal writes, watch/wait CLI behavior, full stored
+Job authority validators and installed owner cutover remain pending.

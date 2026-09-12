@@ -173,6 +173,13 @@ final class JournalRecoveryContractTests: XCTestCase {
   }
 
   func testLockedJournalContractCoversEveryClosedEventKind() throws {
+    if let output = ProcessInfo.processInfo.environment["ARKDECK_RUST_JOURNAL_FIXTURE_OUTPUT"] {
+      guard output.hasPrefix("/private/tmp/"), !FileManager.default.fileExists(atPath: output) else { throw NSError(domain: "fixture", code: 1) }
+      var bytes = try JournalRecoveryFixtures.data(named: "all-event-kinds.jsonl")
+      bytes.append(10)
+      try bytes.write(to: URL(filePath: output))
+    }
+
     let data = try JournalRecoveryFixtures.data(named: "all-event-kinds.jsonl")
     let lines = data.split(separator: 0x0A)
     let events = try lines.map { try JournalEventCodec.decode(Data($0)) }

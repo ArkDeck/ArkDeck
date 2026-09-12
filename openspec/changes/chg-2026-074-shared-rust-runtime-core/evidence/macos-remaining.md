@@ -1,6 +1,6 @@
 # Remaining macOS Rust implementation
 
-Updated 2026-09-12 against protected main `a3b384d3`. This list tracks implementation
+Updated 2026-09-12 against protected main `f92acd36`. This list tracks implementation
 and review, not published activation or hardware acceptance. Windows product work
 and real-device acceptance are outside this goal.
 
@@ -16,8 +16,8 @@ and real-device acceptance are outside this goal.
 | XPA-017 | Not ready for retirement | ArkForge, final signed packaging/installation, detach actual clients/measurement then retire replaced Swift targets |
 
 Bundle PR #1862 is merged. Job/Artifact PR [#1863](https://github.com/ArkDeck/ArkDeck/pull/1863)
-is rebased onto `a3b384d3`; the full local gate and actual Swift-fixture process
-checks passed. Remote checks for the rebased head are pending. Cleanup apply, target display names, Artifact export
+is merged at `f92acd36` after its full local gate, actual Swift-fixture process
+checks and required latest-head CI passed. Cleanup apply, target display names, Artifact export
 and upload, and Job events are prepared in isolated worktrees. The original signed Library Bundle capture
 validation was previously refused by automatic approval review; its exact native
 positive tests remain unexecuted, and unsigned fixtures do not replace them.
