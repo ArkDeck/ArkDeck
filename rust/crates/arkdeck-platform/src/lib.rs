@@ -154,6 +154,14 @@ mod host_bundle_signature;
 pub use host_bundle_signature::{bootstrap_bundle_version, validate_production_daemon_bundle};
 
 #[cfg(target_os = "macos")]
+mod bootstrap_bundle_capture;
+#[cfg(target_os = "macos")]
+pub use bootstrap_bundle_capture::{
+    BootstrapBundleCapture, BootstrapBundleCaptureError, BootstrapBundlePublication,
+    BootstrapBundlePublishError,
+};
+
+#[cfg(target_os = "macos")]
 mod host_deveco_files;
 #[cfg(target_os = "macos")]
 pub use host_deveco_files::{

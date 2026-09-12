@@ -77,6 +77,9 @@ impl BootstrapReaders {
             }
         })
     }
+    pub fn register_bundle(&self, source: &Path, now: &str) -> Result<Value, WireError> {
+        self.bundles.register(source, now)
+    }
     pub fn register_hdc(&self, source: &Path, now: &str) -> Result<Value, WireError> {
         self.tools.register(source, now)
     }

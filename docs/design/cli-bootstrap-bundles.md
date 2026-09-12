@@ -66,6 +66,21 @@ a separate container registry. Typed service update remains pending on its
 shared impact preview/control-action/HAR integration because replacing the
 daemon can interrupt its HDC child. No real-device acceptance is claimed here.
 
+## Rust owner migration
+
+The Rust CLI sends the same `runtime bundle register --kind daemon-bundle
+--file /absolute/Bundle.app` request through the additive typed
+`runtime.bundle.register` RPC. The request contains only `kind` and `file`;
+clock, digest, trust and publication state belong to the Runtime owner. During
+the isolated macOS migration, `--socket` selects the explicit candidate Runtime.
+The Swift bootstrap CLI retains its current local registration behavior.
+
+The Rust owner serializes registration with Bundle discovery/retirement and
+Tool registration, preserves the frozen index and content address, and validates
+native production trust before any record can be published. A lost or invalid
+response is `outcomeUnknown` and is never automatically replayed. This additive
+RPC does not install a helper or activate the candidate as the installed owner.
+
 ## Native HDC candidates
 
 The same store owner also exposes four local tool commands, without requiring

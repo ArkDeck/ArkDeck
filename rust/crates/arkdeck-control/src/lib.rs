@@ -18,6 +18,16 @@ pub enum BootstrapRegistryKind {
 }
 
 pub trait HostServices: Send + Sync {
+    fn bootstrap_register_bundle(&self, _file: &str) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "operationUnavailable".into(),
+            message: "Bundle registration owner is not configured".into(),
+            details: Some(serde_json::Map::from_iter([
+                ("phase".into(), json!("bootstrapRegistryOwner")),
+                ("newDispatchCount".into(), json!(0)),
+            ])),
+        })
+    }
     fn bootstrap_register_deveco(&self, _root: &str) -> Result<Value, WireError> {
         Err(WireError {
             code: "operationUnavailable".into(),
@@ -359,6 +369,33 @@ impl<H: HostServices> Control<H> {
                 "invalidParams",
                 "Trace cache status accepts no parameters",
             ),
+            "runtime.bundle.register" => {
+                let file = params.get("file").and_then(Value::as_str);
+                if params.len() != 2
+                    || params.get("kind") != Some(&json!("daemon-bundle"))
+                    || !file.is_some_and(|path| {
+                        path.starts_with('/')
+                            && path.len() <= 16_384
+                            && !path.contains('\0')
+                            && !path.split('/').any(|part| matches!(part, "." | ".."))
+                    })
+                {
+                    Response { id: request.id.clone(), outcome: Err(WireError {
+                        code: "invalidParams".into(), message: "Bundle registration requires kind daemon-bundle and an absolute local file".into(),
+                        details: Some(serde_json::Map::from_iter([("phase".into(), json!("bootstrapRegistryOwner")), ("newDispatchCount".into(), json!(0))])),
+                    }) }
+                } else {
+                    return bootstrap_mutation_response_bytes(
+                        "runtime.bundle.register",
+                        Response {
+                            id: request.id.clone(),
+                            outcome: self
+                                .host
+                                .bootstrap_register_bundle(file.expect("validated file")),
+                        },
+                    );
+                }
+            }
             "runtime.tool.register" => {
                 let kind = params.get("kind").and_then(Value::as_str);
                 let key = match kind {

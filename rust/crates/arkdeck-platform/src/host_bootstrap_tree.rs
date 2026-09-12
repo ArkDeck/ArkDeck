@@ -156,7 +156,7 @@ fn refusal() -> io::Error {
         "bootstrap content identity is unsafe, changed or unbounded",
     )
 }
-fn quarantine(file: &File) -> io::Result<Option<Vec<u8>>> {
+pub(super) fn quarantine(file: &File) -> io::Result<Option<Vec<u8>>> {
     // SAFETY: descriptor is held; attribute name and bounded buffers live through each call.
     let size = unsafe {
         libc::fgetxattr(
@@ -213,7 +213,7 @@ fn insert_name(
     result.push(name.to_owned());
     Ok(())
 }
-fn names(file: &File) -> io::Result<Vec<String>> {
+pub(super) fn names(file: &File) -> io::Result<Vec<String>> {
     // SAFETY: a fresh open description avoids sharing directory enumeration offsets.
     let fd = unsafe {
         libc::openat(

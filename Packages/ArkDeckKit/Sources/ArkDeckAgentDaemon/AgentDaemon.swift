@@ -102,6 +102,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
   private let hdcControlActions: RuntimeHDCControlActionCoordinator?
   private let bootstrapDevEcoRegistrar: (@Sendable (String) async throws -> JSONValue)?
   private let bootstrapToolInspector: (@Sendable (String) async throws -> JSONValue)?
+  private let bootstrapBundleRegistrar: (@Sendable (String) async throws -> JSONValue)?
   private let bootstrapBundleRetirer: (@Sendable (String, String) async throws -> JSONValue)?
   private let bootstrapToolRetirer: (@Sendable (String, String) async throws -> JSONValue)?
   private let bootstrapBundleInspector: (@Sendable (String) async throws -> JSONValue)?
@@ -159,6 +160,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     toolSelectionActions: RuntimeToolSelectionControlActionCoordinator? = nil,
     bootstrapDevEcoRegistrar: (@Sendable (String) async throws -> JSONValue)? = nil,
     bootstrapToolInspector: (@Sendable (String) async throws -> JSONValue)? = nil,
+    bootstrapBundleRegistrar: (@Sendable (String) async throws -> JSONValue)? = nil,
     bootstrapBundleRetirer: (@Sendable (String, String) async throws -> JSONValue)? = nil,
     bootstrapToolRetirer: (@Sendable (String, String) async throws -> JSONValue)? = nil,
     bootstrapBundleInspector: (@Sendable (String) async throws -> JSONValue)? = nil,
@@ -195,6 +197,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
       toolSelectionActions: toolSelectionActions,
       bootstrapDevEcoRegistrar: bootstrapDevEcoRegistrar,
       bootstrapToolInspector: bootstrapToolInspector,
+      bootstrapBundleRegistrar: bootstrapBundleRegistrar,
       bootstrapBundleRetirer: bootstrapBundleRetirer,
       bootstrapToolRetirer: bootstrapToolRetirer,
       bootstrapBundleInspector: bootstrapBundleInspector,
@@ -237,6 +240,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     toolSelectionActions: RuntimeToolSelectionControlActionCoordinator? = nil,
     bootstrapDevEcoRegistrar: (@Sendable (String) async throws -> JSONValue)? = nil,
     bootstrapToolInspector: (@Sendable (String) async throws -> JSONValue)? = nil,
+    bootstrapBundleRegistrar: (@Sendable (String) async throws -> JSONValue)? = nil,
     bootstrapBundleRetirer: (@Sendable (String, String) async throws -> JSONValue)? = nil,
     bootstrapToolRetirer: (@Sendable (String, String) async throws -> JSONValue)? = nil,
     bootstrapBundleInspector: (@Sendable (String) async throws -> JSONValue)? = nil,
@@ -278,6 +282,7 @@ public struct RuntimeControlPlaneHandler: Sendable {
     self.toolSelectionActions = toolSelectionActions
     self.bootstrapDevEcoRegistrar = bootstrapDevEcoRegistrar
     self.bootstrapToolInspector = bootstrapToolInspector
+    self.bootstrapBundleRegistrar = bootstrapBundleRegistrar
     self.bootstrapBundleRetirer = bootstrapBundleRetirer
     self.bootstrapToolRetirer = bootstrapToolRetirer
     self.bootstrapBundleInspector = bootstrapBundleInspector
@@ -374,6 +379,8 @@ public struct RuntimeControlPlaneHandler: Sendable {
     case "runtime.tool.register":
       return await bootstrapRegistrationRequest(request)
 
+    case "runtime.bundle.register":
+      return await bootstrapBundleRegistrationRequest(request)
     case "runtime.bundle.list":
       return await bootstrapBundleListRequest(request)
     case "runtime.bundle.remove":
@@ -2777,6 +2784,37 @@ public struct RuntimeControlPlaneHandler: Sendable {
     } catch {
       return failed("outcomeUnknown", "DevEco registration completed without a bounded receipt")
     }
+  }
+
+  // The Bundle owner copies immutable local bytes before its receipt; no
+  // service installation, selection or execution is requested by this method.
+  private func bootstrapBundleRegistrationRequest(_ request: AgentWireProtocol.Request) async -> AgentWireProtocol.Response {
+    func failed(_ code: String, _ message: String) -> AgentWireProtocol.Response {
+      .init(id: request.id, ok: false, result: nil, error: .init(code: code, message: message,
+        details: ["phase": .string("bootstrapRegistryOwner"), "newDispatchCount": .integer(0)]))
+    }
+    let fields = request.params ?? [:]
+    guard Set(fields.keys) == ["kind", "file"], fields["kind"] == .string("daemon-bundle"),
+      case .string(let path)? = fields["file"], path.hasPrefix("/"), path.utf8.count <= 16_384,
+      !path.utf8.contains(0), !path.split(separator: "/").contains(where: { $0 == "." || $0 == ".." }) else {
+      return failed("invalidParams", "Bundle registration requires kind daemon-bundle and an absolute local file")
+    }
+    guard let register = bootstrapBundleRegistrar else {
+      return failed("operationUnavailable", "Bundle registration owner is unavailable")
+    }
+    do {
+      let result = try await register(path)
+      do {
+        return .init(id: request.id, ok: true, result: try RuntimeJobReadProjection.bounded(result,
+          maximumBytes: ArkDeckControlProtocol.maximumResponseFrameBytes - 4096), error: nil)
+      } catch { return failed("outcomeUnknown", "Bundle registration completed without a bounded receipt") }
+    } catch let error as AgentExecutionControlFailure {
+      switch error.code {
+      case "invalidInput", "fileIdentityChanged", "resourceConflict", "admissionDenied", "recordUnreadable",
+        "quotaExceeded", "inputTooLarge", "ioFailure", "outcomeUnknown": return failed(error.code, error.message)
+      default: return failed("outcomeUnknown", "Bundle registration did not return a classified publication outcome")
+      }
+    } catch { return failed("outcomeUnknown", "Bundle registration publication outcome is unknown") }
   }
 
   // Discovery reads current verified inventory before serving its immutable page.

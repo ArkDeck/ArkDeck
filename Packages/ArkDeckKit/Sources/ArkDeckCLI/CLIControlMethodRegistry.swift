@@ -119,6 +119,7 @@ enum CLIControlMethodRegistry {
     "runtime.hdc.impact-preview",
     "runtime.hdc.restart",
     "runtime.tool.register",
+    "runtime.bundle.register",
     "runtime.tool.select",
     "runtime.tool.remove",
     "runtime.bundle.remove",
@@ -247,7 +248,7 @@ enum CLIControlFailureMapper {
       let code = CLIErrorCode(rawValue: wireCode) { return code }
     // Registration may publish metadata despite zero device dispatch. Preserve
     // its explicit owner failures, especially uncertain host publication.
-    if method == "runtime.tool.register",
+    if ["runtime.tool.register", "runtime.bundle.register"].contains(method),
       evidence.phase == "bootstrapRegistryOwner", evidence.newDispatchCount == 0,
       ["invalidInput", "fileIdentityChanged", "resourceConflict", "admissionDenied", "recordUnreadable",
         "quotaExceeded", "ioFailure", "outcomeUnknown", "operationUnavailable"].contains(wireCode),

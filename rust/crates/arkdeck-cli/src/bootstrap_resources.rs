@@ -8,6 +8,39 @@ pub(crate) fn configure(
     params: &mut Map<String, Value>,
     help: bool,
 ) -> Result<(), CliError> {
+    if command == "runtime.bundle.register" {
+        if help {
+            return Ok(());
+        }
+        if params.get("kind").is_none() {
+            return Err(CliError::new(
+                "invalidOption",
+                "Bundle registration requires --kind",
+            ));
+        }
+        if params.get("kind").and_then(Value::as_str) != Some("daemon-bundle") {
+            return Err(CliError::new(
+                "invalidOption",
+                "Bundle kind must be daemon-bundle",
+            ));
+        }
+        if !params
+            .get("file")
+            .and_then(Value::as_str)
+            .is_some_and(|path| {
+                path.starts_with('/')
+                    && path.len() <= 16_384
+                    && !path.contains('\0')
+                    && !path.split('/').any(|part| matches!(part, "." | ".."))
+            })
+        {
+            return Err(CliError::new(
+                "invalidInput",
+                "Bundle registration requires an absolute local --file",
+            ));
+        }
+        return Ok(());
+    }
     if command == "runtime.tool.register" {
         if help {
             return Ok(());
@@ -65,7 +98,10 @@ pub(crate) fn configure(
 }
 /// Registration must be a method in this compiled contract before any connection.
 pub fn validate_bootstrap_request(invocation: &Invocation) -> Result<(), CliError> {
-    if invocation.command != "runtime.tool.register" {
+    if !matches!(
+        invocation.command,
+        "runtime.tool.register" | "runtime.bundle.register"
+    ) {
         return Ok(());
     }
     if !arkdeck_contract::METHODS.contains(&invocation.method) {
@@ -109,7 +145,10 @@ pub fn validate_bootstrap_response(invocation: &Invocation, value: &Value) -> Re
     validate_bootstrap_response_inner(invocation, value).map_err(|error| {
         if matches!(
             invocation.command,
-            "runtime.bundle.remove" | "runtime.tool.remove" | "runtime.tool.register"
+            "runtime.bundle.remove"
+                | "runtime.tool.remove"
+                | "runtime.tool.register"
+                | "runtime.bundle.register"
         ) {
             CliError::new(
                 "outcomeUnknown",
@@ -131,7 +170,10 @@ fn validate_bootstrap_response_inner(
     if invocation.command == "runtime.tool.list" {
         return validate_tool_page(invocation, value);
     }
-    let registering = invocation.command == "runtime.tool.register";
+    let registering = matches!(
+        invocation.command,
+        "runtime.tool.register" | "runtime.bundle.register"
+    );
     let (input, output, schema, prefix, content_schema) = match invocation.command {
         "runtime.tool.register"
             if invocation
@@ -156,7 +198,7 @@ fn validate_bootstrap_response_inner(
             "toolchain:sha256:",
             "arkdeck.deveco-toolchain-content/2",
         ),
-        "runtime.bundle.inspect" | "runtime.bundle.remove" => (
+        "runtime.bundle.inspect" | "runtime.bundle.remove" | "runtime.bundle.register" => (
             "bundle",
             "bundleRef",
             "arkdeck.runtime-bundle/1",
@@ -191,7 +233,7 @@ fn validate_bootstrap_response_inner(
     arkdeck_contract::validate_method_value(invocation.method, "result", value)
         .map_err(|_| unreadable())?;
     let reference = if registering {
-        value["toolRef"].as_str().ok_or_else(unreadable)?
+        value[output].as_str().ok_or_else(unreadable)?
     } else {
         invocation
             .params

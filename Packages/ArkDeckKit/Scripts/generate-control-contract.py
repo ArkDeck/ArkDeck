@@ -265,6 +265,13 @@ def derive_method_schemas(source):
                 "errorDetails": infer(details, closed=True) if details else {"type": "object", "additionalProperties": False, "properties": {}},
             },
         }
+        if method == "runtime.bundle.register" and results:
+            # Registration returns the same frozen Bundle projection, including
+            # previously acquired references on idempotent registration. Reuse
+            # actual inspection results without inventing registration frames.
+            inspection = load_frames(FRAME_CORPUS_DIRECTORY / "runtime.bundle.inspect.jsonl")
+            projections = [frame["result"] for frame, _ in inspection if frame["ok"]]
+            schema["$defs"]["result"] = infer(projections + results, closed=True)
         if method in {"runtime.tool.list", "runtime.tool.remove"} and results:
             # Both leaves return the existing Tool projection. Preserve its
             # native optional trust/dependency/selection fields from actual

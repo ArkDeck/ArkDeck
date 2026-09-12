@@ -310,6 +310,8 @@ pub use tool_registry_owner::ToolRegistryStore;
 #[cfg(target_os = "macos")]
 pub mod bundle_content;
 #[cfg(target_os = "macos")]
+mod bundle_registration;
+#[cfg(target_os = "macos")]
 mod bundle_registry_owner;
 #[cfg(target_os = "macos")]
 mod bundle_retirement;

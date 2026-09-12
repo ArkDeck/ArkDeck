@@ -75,6 +75,7 @@ impl CliError {
                 if matches!(
                     method,
                     "runtime.tool.register"
+                        | "runtime.bundle.register"
                         | "history.filter.save"
                         | "history.filter.delete"
                         | "runtime.storage.policy"
@@ -148,6 +149,7 @@ impl CliError {
                     "runtime.tool.inspect"
                         | "runtime.bundle.inspect"
                         | "runtime.tool.register"
+                        | "runtime.bundle.register"
                         | "runtime.bundle.list"
                         | "runtime.tool.list"
                 ) && error.details.as_ref().is_some_and(|details| {
@@ -159,7 +161,12 @@ impl CliError {
                     "admissionDenied" if bootstrap_proof => "admissionDenied",
                     "fileIdentityChanged"
                         if bootstrap_proof
-                            && matches!(method, "runtime.tool.register" | "runtime.tool.list") =>
+                            && matches!(
+                                method,
+                                "runtime.tool.register"
+                                    | "runtime.bundle.register"
+                                    | "runtime.tool.list"
+                            ) =>
                     {
                         "fileIdentityChanged"
                     }
@@ -367,6 +374,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["runtime", "tool", "list"] => "runtime.tool.list",
         ["runtime", "tool", "remove"] => "runtime.tool.remove",
         ["runtime", "tool", "inspect"] => "runtime.tool.inspect",
+        ["runtime", "bundle", "register"] => "runtime.bundle.register",
         ["runtime", "bundle", "inspect"] => "runtime.bundle.inspect",
         ["runtime", "bundle", "list"] => "runtime.bundle.list",
         ["runtime", "bundle", "remove"] => "runtime.bundle.remove",
@@ -419,6 +427,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         "runtime.tool.remove" => &["tool", "expectedGeneration"],
         "runtime.tool.inspect" => &["tool"],
         "runtime.tool.register" => &["kind", "rootPath", "file"],
+        "runtime.bundle.register" => &["kind", "file"],
         "runtime.bundle.inspect" => &["bundle"],
         "operation.describe" | "operation.example" => &["operation"],
         "job.status" | "job.show" | "job.evidence" => &["jobId", "timeout"],
@@ -648,6 +657,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                 "runtime.tool.inspect"
                     | "runtime.bundle.inspect"
                     | "runtime.tool.register"
+                    | "runtime.bundle.register"
                     | "runtime.tool.remove"
                     | "runtime.bundle.list"
                     | "runtime.tool.list"
