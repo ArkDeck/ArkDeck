@@ -290,7 +290,7 @@ public final class RuntimeTargetStore: @unchecked Sendable {
 
   private let url: URL
   private let lockURL: URL
-  private let displayNames: RuntimeTargetDisplayNameStore
+  private var displayNames: RuntimeTargetDisplayNameStore
   private let queue = DispatchQueue(label: "arkdeck.target-store")
   private let routeObservationNow: @Sendable () -> Date
   private let routeObservationFreshnessSeconds: TimeInterval = 5
@@ -314,6 +314,17 @@ public final class RuntimeTargetStore: @unchecked Sendable {
     let activeTargetIDs = Set(try activeTargets().map(\.targetID))
     try displayNames.reconcileAfterRuntimeRestart(activeTargetIDs: activeTargetIDs)
   }
+
+  #if DEBUG
+    package convenience init(
+      directoryURL: URL,
+      displayNameTestSaveHook: @escaping @Sendable (RuntimeTargetDisplayNameStore.TestSavePoint, Int32) -> Void
+    ) throws {
+      try self.init(directoryURL: directoryURL)
+      self.displayNames = RuntimeTargetDisplayNameStore(
+        rootURL: directoryURL, testSaveHook: displayNameTestSaveHook)
+    }
+  #endif
 
   /// Publishes one provider-verified candidate snapshot for live route
   /// selection. This is deliberately memory-only: it cannot create, rewrite

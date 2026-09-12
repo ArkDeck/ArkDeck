@@ -18,6 +18,29 @@ pub enum BootstrapRegistryKind {
 }
 
 pub trait HostServices: Send + Sync {
+    fn target_resource(
+        &self,
+        _method: &str,
+        _params: &serde_json::Map<String, Value>,
+    ) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "internalError".into(),
+            message: "Target owner is not configured".into(),
+            details: None,
+        })
+    }
+    fn candidate_display_name(
+        &self,
+        _method: &str,
+        _params: &serde_json::Map<String, Value>,
+    ) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "internalError".into(),
+            message: "Target observation owner is not configured".into(),
+            details: None,
+        })
+    }
+
     fn artifact_resource(
         &self,
         _method: &str,
@@ -347,6 +370,17 @@ impl<H: HostServices> Control<H> {
                     )
                 }
             }
+            "target.list"
+            | "target.show"
+            | "target.display-name.set"
+            | "target.display-name.clear" => Response {
+                id: request.id.clone(),
+                outcome: self.host.target_resource(&request.method, &params),
+            },
+            "device.display-name.set" | "device.display-name.clear" => Response {
+                id: request.id.clone(),
+                outcome: self.host.candidate_display_name(&request.method, &params),
+            },
             "device.observations" => {
                 if params.keys().any(|k| k != "following") {
                     observation_failure(

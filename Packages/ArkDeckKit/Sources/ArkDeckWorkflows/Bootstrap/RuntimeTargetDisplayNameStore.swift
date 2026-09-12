@@ -95,6 +95,21 @@ package final class RuntimeTargetDisplayNameStore: @unchecked Sendable {
   private let rootURL: URL
   private let nowUTC: @Sendable () -> String
 
+  #if DEBUG
+    package enum TestSavePoint: Sendable, Equatable { case beforeCreate, beforePublish }
+    private var testSaveHook: (@Sendable (TestSavePoint, Int32) -> Void)?
+
+    /// Available only to debug/test construction. Faults affect the real
+    /// filesystem; ordinary save guards classify the resulting syscall failure.
+    package convenience init(
+      rootURL: URL,
+      testSaveHook: @escaping @Sendable (TestSavePoint, Int32) -> Void
+    ) {
+      self.init(rootURL: rootURL)
+      self.testSaveHook = testSaveHook
+    }
+  #endif
+
   package init(
     rootURL: URL,
     nowUTC: @escaping @Sendable () -> String = {
@@ -587,6 +602,9 @@ package final class RuntimeTargetDisplayNameStore: @unchecked Sendable {
       throw RuntimeTargetDisplayNameFailure(
         "quotaExceeded", "target display-name document exceeds its byte bound")
     }
+    #if DEBUG
+      testSaveHook?(.beforeCreate, root)
+    #endif
     let temporaryName = ".target-display-names.\(UUID().uuidString.lowercased()).part"
     let descriptor = Darwin.openat(
       root, temporaryName,
@@ -619,6 +637,9 @@ package final class RuntimeTargetDisplayNameStore: @unchecked Sendable {
         "ioFailure", "target display-name transaction cannot be synchronized")
     }
     descriptorOpen = false
+    #if DEBUG
+      testSaveHook?(.beforePublish, root)
+    #endif
     guard renameat(root, temporaryName, root, Self.documentName) == 0,
       Darwin.fsync(root) == 0
     else {

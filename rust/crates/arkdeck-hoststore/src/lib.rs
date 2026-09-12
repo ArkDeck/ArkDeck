@@ -70,6 +70,12 @@ pub use session_export_manifest::{RedactedSessionManifest, redact_session_manife
 mod session_export_redaction;
 pub use session_export_redaction::SessionExportRedactor;
 
+#[cfg(target_os = "macos")]
+mod target_document;
+#[cfg(target_os = "macos")]
+mod target_owner;
+#[cfg(target_os = "macos")]
+pub use target_owner::{ObservationReference, TargetStore};
 mod display_names;
 mod format_time;
 pub use display_names::decode_display_names;

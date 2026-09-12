@@ -72,6 +72,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             "trace-cache",
             "bootstrap",
             "jobs-state",
+            "targets-state",
         ] {
             directory.private_child(name)?;
         }
@@ -90,17 +91,21 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
                 trace_cache.clone(),
                 bootstrap.clone(),
                 root.join("jobs-state"),
+                root.join("targets-state"),
             ],
         )?;
-        host.with_history(arkdeck_hoststore::HistoryStore::open(&root)?)
-            .with_artifacts(arkdeck_hoststore::ArtifactReadStore::open(&artifacts)?)
-            .with_trace_cache(arkdeck_hoststore::TraceCacheStore::open(&trace_cache)?)
-            .with_storage(
-                sessions,
-                arkdeck_hoststore::ArtifactUsage::open(&artifacts, 8 * 1024 * 1024 * 1024)?,
-            )
-            .with_bootstrap(&bootstrap)?
-            .with_jobs(arkdeck_hoststore::JobStore::open(&root.join("jobs-state"))?)
+        host.with_targets(arkdeck_hoststore::TargetStore::open(
+            &root.join("targets-state"),
+        )?)
+        .with_history(arkdeck_hoststore::HistoryStore::open(&root)?)
+        .with_artifacts(arkdeck_hoststore::ArtifactReadStore::open(&artifacts)?)
+        .with_trace_cache(arkdeck_hoststore::TraceCacheStore::open(&trace_cache)?)
+        .with_storage(
+            sessions,
+            arkdeck_hoststore::ArtifactUsage::open(&artifacts, 8 * 1024 * 1024 * 1024)?,
+        )
+        .with_bootstrap(&bootstrap)?
+        .with_jobs(arkdeck_hoststore::JobStore::open(&root.join("jobs-state"))?)
     } else {
         host
     };

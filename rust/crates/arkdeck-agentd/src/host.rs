@@ -8,7 +8,15 @@ use std::io;
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+#[derive(Default)]
+struct ObservationState {
+    generation: u64,
+    snapshot: Option<DeviceObservationsResult>,
+}
+
 pub struct Host {
+    #[cfg(target_os = "macos")]
+    targets: Option<arkdeck_hoststore::TargetStore>,
     #[cfg(target_os = "macos")]
     artifacts: Option<arkdeck_hoststore::ArtifactReadStore>,
     #[cfg(target_os = "macos")]
@@ -26,10 +34,15 @@ pub struct Host {
         arkdeck_hoststore::ArtifactUsage,
     )>,
     unavailable: &'static str,
-    generation: Mutex<u64>,
+    observations: Mutex<ObservationState>,
 }
 
 impl Host {
+    #[cfg(target_os = "macos")]
+    pub fn with_targets(mut self, targets: arkdeck_hoststore::TargetStore) -> Self {
+        self.targets = Some(targets);
+        self
+    }
     #[cfg(target_os = "macos")]
     pub fn with_jobs(mut self, jobs: arkdeck_hoststore::JobStore) -> Self {
         self.jobs = Some(jobs);
@@ -96,6 +109,8 @@ impl Host {
         };
         Self {
             #[cfg(target_os = "macos")]
+            targets: None,
+            #[cfg(target_os = "macos")]
             artifacts: None,
             #[cfg(target_os = "macos")]
             jobs: None,
@@ -109,12 +124,133 @@ impl Host {
             #[cfg(target_os = "macos")]
             storage: None,
             unavailable,
-            generation: Mutex::new(0),
+            observations: Mutex::new(ObservationState::default()),
         }
     }
 }
 
 impl HostServices for Host {
+    #[cfg(target_os = "macos")]
+    fn target_resource(
+        &self,
+        method: &str,
+        params: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<serde_json::Value, WireError> {
+        self.targets
+            .as_ref()
+            .ok_or_else(|| WireError {
+                code: "internalError".into(),
+                message: "Target owner is not configured".into(),
+                details: None,
+            })?
+            .handle(method, params, &utc_now())
+    }
+    #[cfg(target_os = "macos")]
+    fn candidate_display_name(
+        &self,
+        method: &str,
+        params: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<serde_json::Value, WireError> {
+        let fail = |code: &str, message: &str| WireError {
+            code: code.into(),
+            message: message.into(),
+            details: Some(serde_json::Map::from_iter([
+                (
+                    "phase".into(),
+                    serde_json::json!("candidateDisplayNameOwner"),
+                ),
+                ("newDispatchCount".into(), serde_json::json!(0)),
+            ])),
+        };
+        let targets = self
+            .targets
+            .as_ref()
+            .ok_or_else(|| fail("internalError", "Target owner is not configured"))?;
+        let set = method == "device.display-name.set";
+        let keys: &[&str] = if set {
+            &[
+                "candidate",
+                "observationId",
+                "observationGeneration",
+                "name",
+            ]
+        } else {
+            &["candidate", "observationId", "observationGeneration"]
+        };
+        if params.len() != keys.len()
+            || keys
+                .iter()
+                .any(|k| !params.get(*k).is_some_and(serde_json::Value::is_string))
+        {
+            return Err(fail(
+                "invalidParams",
+                "Candidate name requires exact typed parameters",
+            ));
+        }
+        let generation_text = params["observationGeneration"].as_str().unwrap();
+        let generation = generation_text
+            .parse::<u64>()
+            .ok()
+            .filter(|n| (1..=i64::MAX as u64).contains(n) && n.to_string() == generation_text)
+            .ok_or_else(|| {
+                fail(
+                    "invalidInput",
+                    "Observation generation must be canonical and positive",
+                )
+            })?;
+        let reference = arkdeck_hoststore::ObservationReference {
+            candidate: params["candidate"].as_str().unwrap().into(),
+            observation_id: params["observationId"].as_str().unwrap().into(),
+            generation,
+        };
+        let mut state = self
+            .observations
+            .lock()
+            .map_err(|_| fail("recordUnreadable", "Observation state is unavailable"))?;
+        let snapshot = state
+            .snapshot
+            .as_ref()
+            .ok_or_else(|| fail("resourceConflict", "No current observation snapshot exists"))?;
+        let active: Vec<_> = snapshot
+            .observations
+            .iter()
+            .map(|row| arkdeck_hoststore::ObservationReference {
+                candidate: row.candidate_key.clone(),
+                observation_id: row.observation_id.clone(),
+                generation: state.generation,
+            })
+            .collect();
+        let result = targets.mutate_candidate(
+            &reference,
+            &active,
+            params.get("name").and_then(serde_json::Value::as_str),
+            &utc_now(),
+        );
+        match result {
+            Ok(value) => {
+                let next = generation + 1;
+                state.generation = next;
+                let snapshot = state.snapshot.as_mut().expect("retained snapshot");
+                snapshot.snapshot_generation = next.to_string();
+                for row in &mut snapshot.observations {
+                    if row.adopted_target_id.is_none() {
+                        row.display_name_generation = next.to_string();
+                    }
+                    if row.observation_id == reference.observation_id {
+                        row.display_name = value["name"].as_str().map(str::to_owned);
+                    }
+                }
+                Ok(value)
+            }
+            Err(error) => {
+                if error.code == "outcomeUnknown" {
+                    state.snapshot = None;
+                }
+                Err(error)
+            }
+        }
+    }
+
     #[cfg(target_os = "macos")]
     fn artifact_resource(
         &self,
@@ -463,23 +599,47 @@ impl HostServices for Host {
             return Err(fail(self.unavailable));
         };
         // Serialize refreshes, so generations order the actual completed reads.
-        let mut generation = self
-            .generation
+        let mut state = self
+            .observations
             .lock()
             .map_err(|_| fail("the observation generation is unavailable"))?;
+        state.snapshot = None;
+        #[cfg(target_os = "macos")]
+        if let Some(targets) = &self.targets {
+            targets.expire_candidates()?;
+        }
         let mut candidates = provider
             .list_candidates()
             .map_err(|error| fail(&format!("{}: {error}", error.classification())))?;
-        let next = generation
+        let next = state
+            .generation
             .checked_add(1)
+            .filter(|n| *n <= i64::MAX as u64)
             .ok_or_else(|| fail("the observation generation is exhausted"))?;
         candidates.sort_by(|a, b| {
             a.connect_key
                 .cmp(&b.connect_key)
                 .then_with(|| a.state.cmp(&b.state))
         });
+        #[cfg(target_os = "macos")]
+        let presentations = self
+            .targets
+            .as_ref()
+            .map(|targets| {
+                targets.candidate_presentations(
+                    &candidates
+                        .iter()
+                        .map(|c| c.connect_key.clone())
+                        .collect::<Vec<_>>(),
+                )
+            })
+            .transpose()?;
         let mut observations = Vec::with_capacity(candidates.len());
         for candidate in candidates {
+            #[cfg(target_os = "macos")]
+            let presentation = presentations
+                .as_ref()
+                .and_then(|rows| rows.get(&candidate.connect_key));
             observations.push(DeviceObservationsResultObservationsItem {
                 candidate_key: candidate.connect_key,
                 authorization_state: candidate.state,
@@ -488,22 +648,42 @@ impl HostServices for Host {
                     fresh_id().map_err(|_| fail("observation identity entropy is unavailable"))?
                 ),
                 observation_continuity: "generationScoped".into(),
+                #[cfg(target_os = "macos")]
+                display_name_generation: presentation
+                    .and_then(|v| v["displayNameGeneration"].as_str())
+                    .map_or_else(|| next.to_string(), str::to_owned),
+                #[cfg(not(target_os = "macos"))]
                 display_name_generation: next.to_string(),
+                #[cfg(target_os = "macos")]
+                adopted_target_id: presentation
+                    .and_then(|v| v["targetId"].as_str())
+                    .map(str::to_owned),
+                #[cfg(not(target_os = "macos"))]
                 adopted_target_id: None,
+                #[cfg(target_os = "macos")]
+                binding_revision: presentation.and_then(|v| v["bindingRevision"].as_i64()),
+                #[cfg(not(target_os = "macos"))]
                 binding_revision: None,
+                #[cfg(target_os = "macos")]
+                display_name: presentation
+                    .and_then(|v| v["displayName"].as_str())
+                    .map(str::to_owned),
+                #[cfg(not(target_os = "macos"))]
                 display_name: None,
                 device_information: None,
                 observed_facts: (),
             });
         }
-        *generation = next;
-        Ok(DeviceObservationsResult {
+        state.generation = next;
+        let snapshot = DeviceObservationsResult {
             schema_version: "arkdeck.device-observations/1".into(),
             snapshot_generation: next.to_string(),
             observed_at_utc: utc_now(),
             health: "current".into(),
             observations,
-        })
+        };
+        state.snapshot = Some(snapshot.clone());
+        Ok(snapshot)
     }
 }
 
@@ -557,6 +737,81 @@ fn timestamp(seconds: u64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn candidate_name_owner_uses_only_runtime_snapshot_and_advances_cas() {
+        use serde_json::json;
+        use std::{fs, os::unix::fs::DirBuilderExt};
+        let path = std::env::temp_dir()
+            .canonicalize()
+            .unwrap()
+            .join(format!("candidate-host-{}", fresh_id().unwrap()));
+        fs::DirBuilder::new().mode(0o700).create(&path).unwrap();
+        let mut host = Host::from_environment()
+            .with_targets(arkdeck_hoststore::TargetStore::open(&path).unwrap());
+        host.provider = None; // Explicitly simulated in-memory snapshot; no transport is reachable.
+        let params = json!({"candidate":"fixture-serial","observationId":"obs-fixture","observationGeneration":"1","name":"Bench"});
+        assert_eq!(
+            host.candidate_display_name("device.display-name.set", params.as_object().unwrap())
+                .unwrap_err()
+                .code,
+            "resourceConflict"
+        );
+        let snapshot:DeviceObservationsResult=serde_json::from_value(json!({"schemaVersion":"arkdeck.device-observations/1","snapshotGeneration":"1","observedAtUtc":"2026-09-12T00:00:00Z","health":"current","observations":[{"candidateKey":"fixture-serial","authorizationState":"Connected","observationId":"obs-fixture","observationContinuity":"generationScoped","displayNameGeneration":"1","adoptedTargetId":null,"bindingRevision":null,"displayName":null,"deviceInformation":null,"observedFacts":null}]})).unwrap();
+        *host.observations.lock().unwrap() = ObservationState {
+            generation: 1,
+            snapshot: Some(snapshot),
+        };
+        let reply = host
+            .candidate_display_name("device.display-name.set", params.as_object().unwrap())
+            .unwrap();
+        assert_eq!(reply["generation"], "2");
+        assert_eq!(
+            host.observations
+                .lock()
+                .unwrap()
+                .snapshot
+                .as_ref()
+                .unwrap()
+                .observations[0]
+                .display_name
+                .as_deref(),
+            Some("Bench")
+        );
+        assert_eq!(
+            host.candidate_display_name("device.display-name.set", params.as_object().unwrap())
+                .unwrap_err()
+                .code,
+            "resourceConflict"
+        );
+        let mut forged = params.clone();
+        forged["observationGeneration"] = json!("2");
+        forged["freshFacts"] = json!({"connected":true});
+        assert_eq!(
+            host.candidate_display_name("device.display-name.set", forged.as_object().unwrap())
+                .unwrap_err()
+                .code,
+            "invalidParams"
+        );
+        let clear = json!({"candidate":"fixture-serial","observationId":"obs-fixture","observationGeneration":"2"});
+        assert_eq!(
+            host.candidate_display_name("device.display-name.clear", clear.as_object().unwrap())
+                .unwrap()["generation"],
+            "3"
+        );
+        drop(host);
+        let restarted = Host::from_environment()
+            .with_targets(arkdeck_hoststore::TargetStore::open(&path).unwrap());
+        assert_eq!(
+            restarted
+                .candidate_display_name("device.display-name.clear", clear.as_object().unwrap())
+                .unwrap_err()
+                .code,
+            "resourceConflict"
+        );
+        drop(restarted);
+        fs::remove_dir_all(path).unwrap();
+    }
     #[test]
     fn utc_spelling_and_leap_day() {
         assert_eq!(timestamp(0), "1970-01-01T00:00:00Z");
