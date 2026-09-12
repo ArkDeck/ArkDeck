@@ -1,0 +1,20 @@
+{
+  "kind": "actual Swift Job/Session owners with existing simulated provider; no hardware acceptance",
+  "sourceFixture": "/private/tmp/xpa-job-publication-native-r1",
+  "sourceBase": "1fd85b931fdef1416d41baebfe8bad0cf8d32b5e",
+  "producer": "RuntimeDeviceSessionPublicationContractTests/testRustJobPublicationSnapshotsCurrentFixture",
+  "files": {
+    "published/job-record.json": "44d7b30a70a7d99ffc829e676fedc40a70c678ae07a0d582d72831bea48c1d3d",
+    "published/show.json": "3fd3779e46a0178ac300b87e6223298f6b57a952d587ba7c1dd27cfaa36455e7",
+    "published/swift-results.json": "68dd7a63a88c413e8254ec08e880ca0892289d47bdb2100033912350566e002e",
+    "failed/job-record.json": "e952ba227e3c1da2da11612f61d668d6d200d578d8c80aec63d6db281184db43",
+    "failed/show.json": "f0c5bb12340145170c874a8f5d3493cebd007edbada016f4df42edc738e19556",
+    "failed/swift-results.json": "68392767857bf4b336df13a8390e7c00fe29a2ad1304bc59219c1976cbf67bc6"
+  },
+  "producerSources": {
+    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/RuntimeDeviceSessionPublicationContractTests.swift": "ae4c799d2ab7efaf30f803952fc943a0c46aad05c594e07efbc0c217fce67183",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeJobRecord.swift": "f7d597fece8c99b71c25a77b587a8bcb0b90ae9a86d9bb5325a53fe4a13b6384",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeSessionPublication.swift": "7cd77ff57982bf2e7625ec586af9db6c196da4df296afad3106e1cbbbdc1678d",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeJobReadProjection.swift": "6a98b43e5d902bb0eb9c8218c6cec0d159dcad01c250fa5fc533e96db1269805"
+  }
+}

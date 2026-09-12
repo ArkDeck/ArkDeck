@@ -79,7 +79,14 @@ def main():
                     assert actual["items"] == expected["items"], (sample["method"], actual, expected)
                 else:
                     assert actual == expected, (sample["method"], actual, expected)
-            commands = [["job", "list"], ["job", "show", "--job", "job-rust-a"], ["job", "status", "--job", "job-rust-b"], ["job", "timeline", "--job", "job-rust-a"]]
+            # Use actual producer Job IDs, including runtime-minted publication
+            # Jobs. Never synthesize a missing Job or assume fixture identities.
+            job_ids = sorted({sample["params"]["jobId"] for sample in samples
+                              if "jobId" in sample["params"]})
+            commands = [["job", "list"]] + [
+                ["job", leaf, "--job", job_id]
+                for job_id in job_ids for leaf in ("show", "status", "timeline")
+            ]
             if artifact_mode:
                 reference = samples[0]["params"]
                 owner_options = ["--job", reference["owner"]["id"], "--artifact", reference["artifactId"]]

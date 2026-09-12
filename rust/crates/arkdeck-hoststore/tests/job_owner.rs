@@ -66,6 +66,67 @@ fn publication_marker() -> Value {
 }
 
 #[test]
+fn native_swift_publication_snapshots_preserve_records_and_public_results() {
+    let fixtures = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../tests/fixtures/job-publication-current");
+    for name in ["published", "failed"] {
+        let bytes = fs::read(fixtures.join(name).join("job-record.json")).unwrap();
+        let value: Value = serde_json::from_slice(&bytes).unwrap();
+        let expected: Value =
+            serde_json::from_slice(&fs::read(fixtures.join(name).join("show.json")).unwrap())
+                .unwrap();
+        let record = arkdeck_hoststore::JobRecord::decode(&bytes).unwrap();
+        assert_eq!(record.value().unwrap(), value, "{name}");
+        let id = value["jobID"].as_str().unwrap();
+        let date = value["createdAtUTC"].as_str().unwrap();
+        assert_eq!(date, "2026-07-29T00:00:00Z");
+        let seconds = arkdeck_platform::host_gregorian_seconds(2026, 7, 29, 0, 0, 0).unwrap();
+        let key = format!("{:016x}", seconds.to_bits() ^ (1 << 63));
+        let root = Root::initialized();
+        root.db()
+            .execute(
+                "INSERT INTO runtime_job VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                &[
+                    Sql::Text(id.into()),
+                    Sql::Text(value["request"]["idempotencyKey"].as_str().unwrap().into()),
+                    Sql::Text(arkdeck_contract::sha256_hex(
+                        &serde_json::to_vec(&value["request"]).unwrap(),
+                    )),
+                    Sql::Text(value["state"].as_str().unwrap().into()),
+                    Sql::Integer(1),
+                    Sql::Text(date.into()),
+                    Sql::Text(key),
+                    Sql::Text(date.into()),
+                    Sql::Integer(1),
+                    Sql::Blob(bytes.clone()),
+                ],
+            )
+            .unwrap();
+        let before = fs::read(root.0.join("runtime-jobs.sqlite3")).unwrap();
+        let store = JobStore::open(&root.0).unwrap();
+        assert_eq!(store.read_snapshot(id).unwrap().value().unwrap(), value);
+        let result = handle(&store, "job.show", json!({"jobId":id})).unwrap();
+        assert_eq!(result, expected, "native {name} projection");
+        assert_eq!(result["job"]["state"], "succeeded");
+        assert_eq!(result["job"]["sessionPublication"]["state"], name);
+        drop(store);
+        assert_eq!(
+            fs::read(root.0.join("runtime-jobs.sqlite3")).unwrap(),
+            before
+        );
+        assert_eq!(
+            fs::read(fixtures.join(name).join("job-record.json")).unwrap(),
+            bytes
+        );
+        let mut changed = value;
+        changed["sessionPublicationRecord"]["root"]["unexpected"] = json!(true);
+        assert!(
+            arkdeck_hoststore::JobRecord::decode(&serde_json::to_vec(&changed).unwrap()).is_err()
+        );
+    }
+}
+
+#[test]
 fn historical_capability_correlation_is_checked_without_granting_execution() {
     let mut value = record("job-private", "waitingForRecovery");
     value["originalSubmissionRequest"] = value["request"].clone();
