@@ -1633,6 +1633,65 @@ class PullRequestPathTests(unittest.TestCase):
         )
 
 
+    def test_one_time_bootstrap_matches_the_base_as_given_not_the_merge_base(self):
+        """A branch cut from the pinned base cannot revive the fuse after main moves.
+
+        The guard compares at the merge-base, and a branch cut from the pinned
+        old main keeps that OID as its merge-base for ever. The fuse therefore
+        matches the base the guard was handed, main's tip: once that moved
+        away, nothing matches again.
+        """
+        temporary, root, base_oid = self.make_repo(None)
+        self.addCleanup(temporary.cleanup)
+        original_base = check_pr_paths.BOOTSTRAP_EXCEPTION_BASE_OID
+        check_pr_paths.BOOTSTRAP_EXCEPTION_BASE_OID = base_oid
+        self.addCleanup(
+            setattr,
+            check_pr_paths,
+            "BOOTSTRAP_EXCEPTION_BASE_OID",
+            original_base,
+        )
+        self.run_git(
+            root,
+            "checkout",
+            "--quiet",
+            "-b",
+            check_pr_paths.BOOTSTRAP_EXCEPTION_HEAD_REF,
+        )
+        for relative in check_pr_paths.BOOTSTRAP_EXCEPTION_PATHS:
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("bootstrap\n", encoding="utf-8")
+        head_oid = self.commit(root, "fix: bootstrap preflight")
+        self.run_git(root, "checkout", "--quiet", "-")
+        (root / "README.md").write_text("main moved on\n", encoding="utf-8")
+        advanced_main = self.commit(root, "main moved on")
+
+        self.assertEqual(
+            check_pr_paths.resolve_merge_base(root, advanced_main, head_oid),
+            base_oid,
+        )
+        self.assert_error(
+            "found no base-tree active task",
+            lambda: check_pr_paths.preflight_paths(
+                root,
+                advanced_main,
+                head_oid,
+                head_ref=check_pr_paths.BOOTSTRAP_EXCEPTION_HEAD_REF,
+                allow_bootstrap=True,
+            ),
+        )
+        # Handed the pinned base itself, the tuple still matches.
+        result = check_pr_paths.preflight_paths(
+            root,
+            base_oid,
+            head_oid,
+            head_ref=check_pr_paths.BOOTSTRAP_EXCEPTION_HEAD_REF,
+            allow_bootstrap=True,
+        )
+        self.assertEqual(result.declaration_source, "bootstrap")
+
+
 class AutomationConfigTests(unittest.TestCase):
     """TASK-DEC-001: the sensitive-path table is data, loaded fail-closed."""
 
@@ -2018,8 +2077,57 @@ class TrustBoundaryTests(unittest.TestCase):
 
     # --- B-H4: the compared base cannot be chosen by the pull request ---
 
-    def test_a_base_off_the_head_history_is_refused(self):
-        root = self.git_repo()
+    def event_mode_run(
+        self, root: Path, base_oid: str, head_oid: str
+    ) -> tuple[int, str]:
+        """Drive main() in event mode over a pull_request payload.
+
+        The payload lives outside the fixture repository so a later
+        `git add -A` in the same test cannot sweep it into a commit.
+        """
+        payload_directory = Path(tempfile.mkdtemp(prefix="check-pr-event-"))
+        self.addCleanup(shutil.rmtree, payload_directory, ignore_errors=True)
+        event = payload_directory / "event.json"
+        event.write_text(
+            json.dumps(
+                {
+                    "pull_request": {
+                        "state": "open",
+                        "merged": False,
+                        "title": "docs: governance update",
+                        "body": None,
+                        "base": {
+                            "ref": "main",
+                            "sha": base_oid,
+                            "repo": {"full_name": "ArkDeck/ArkDeck"},
+                        },
+                        "head": {
+                            "ref": "agent/docs",
+                            "sha": head_oid,
+                            "repo": {"full_name": "ArkDeck/ArkDeck"},
+                        },
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+        completed = subprocess.run(
+            [
+                sys.executable,
+                str(Path(__file__).resolve().parent / "check_pr_paths.py"),
+                "--repo-root",
+                str(root),
+                "--event",
+                str(event),
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        return completed.returncode, completed.stderr + completed.stdout
+
+    def substituted_base_fixture(self, root: Path) -> tuple[str, str, str]:
+        """A head adding scripts/reach.py, and a side branch carrying the same file."""
         (root / "docs").mkdir()
         (root / "docs" / "note.md").write_text("note\n", encoding="utf-8")
         true_base = self.commit(root, "root")
@@ -2032,91 +2140,130 @@ class TrustBoundaryTests(unittest.TestCase):
         (root / "scripts" / "reach.py").write_text("reach\n", encoding="utf-8")
         side_oid = self.commit(root, "side branch carrying the same file")
         self.run_git(root, "checkout", "--quiet", "-")
+        return true_base, head_oid, side_oid
 
-        # The substitution works on the diff: against the side branch the
+    def test_the_compared_base_is_the_merge_base_with_the_head(self):
+        root = self.git_repo()
+        true_base, head_oid, side_oid = self.substituted_base_fixture(root)
+
+        # The substitution works on a raw diff: against the side branch the
         # offending file is not "new", so it vanishes from the comparison.
         self.assertEqual(
             check_pr_paths.git_changed_paths(root, side_oid, head_oid), ()
         )
+        # Resolving the compared base first takes that choice away: the side
+        # branch never joined the head, so the two meet at the true base,
+        # where the file is new again.
+        compared = check_pr_paths.resolve_merge_base(root, side_oid, head_oid)
+        self.assertEqual(compared, true_base)
         self.assertIn(
             "scripts/reach.py",
-            check_pr_paths.git_changed_paths(root, true_base, head_oid),
+            check_pr_paths.git_changed_paths(root, compared, head_oid),
         )
+        # A base already on the head's history is its own merge-base.
+        self.assertEqual(
+            check_pr_paths.resolve_merge_base(root, true_base, head_oid),
+            true_base,
+        )
+
+    def test_a_base_sharing_no_history_with_the_head_fails_closed(self):
+        root = self.git_repo()
+        (root / "docs").mkdir()
+        (root / "docs" / "note.md").write_text("note\n", encoding="utf-8")
+        head_oid = self.commit(root, "root")
+        self.run_git(root, "checkout", "--quiet", "--orphan", "unrelated")
+        (root / "docs" / "note.md").write_text("elsewhere\n", encoding="utf-8")
+        orphan_oid = self.commit(root, "unrelated root")
 
         self.assert_error(
-            "is not an ancestor of head",
-            lambda: check_pr_paths.assert_base_is_ancestor(
-                root, self.trust_context(side_oid, head_oid)
-            ),
-        )
-        check_pr_paths.assert_base_is_ancestor(
-            root, self.trust_context(true_base, head_oid)
+            "share no history",
+            lambda: check_pr_paths.resolve_merge_base(root, orphan_oid, head_oid),
         )
 
-    def test_event_mode_run_refuses_a_substituted_base(self):
-        """Drives main(), so unhooking the gate is what turns this red.
+    def test_event_mode_run_compares_a_substituted_base_at_the_merge_base(self):
+        """Drives main(), so unhooking the resolution is what turns this red.
 
         Asserting on the helper alone would leave the call site free to
         disappear — the shape this repository has been bitten by before.
         """
         root = self.git_repo()
+        true_base, head_oid, side_oid = self.substituted_base_fixture(root)
+
+        # The side branch no longer hides the file: compared at the
+        # merge-base, the offending path is charged to the head either way.
+        for base_oid in (side_oid, true_base):
+            with self.subTest(base_oid=base_oid):
+                code, output = self.event_mode_run(root, base_oid, head_oid)
+                self.assertEqual(code, 1, output)
+                self.assertIn("touches sensitive paths: scripts/reach.py", output)
+
+    def test_a_branch_behind_an_advanced_main_is_judged_on_its_own_changes(self):
+        """Main moved on after the branch point; no rebase is needed.
+
+        Compared against main's tip directly, main's own sensitive change
+        would be charged to a docs-only pull request, reversed. Compared at
+        the merge-base it is not the pull request's. The converse holds too:
+        a head adding the same sensitive file main added cannot hide behind
+        main's copy, because at the merge-base the file is still new.
+        """
+        root = self.git_repo()
         (root / "docs").mkdir()
         (root / "docs" / "note.md").write_text("note\n", encoding="utf-8")
-        true_base = self.commit(root, "root")
+        branch_point = self.commit(root, "root")
+        self.run_git(root, "checkout", "--quiet", "-b", "agent/docs")
+        (root / "docs" / "note.md").write_text("note, revised\n", encoding="utf-8")
+        docs_head = self.commit(root, "docs: revise the note")
+        self.run_git(root, "checkout", "--quiet", "-")
         (root / "scripts").mkdir()
         (root / "scripts" / "reach.py").write_text("reach\n", encoding="utf-8")
-        head_oid = self.commit(root, "offending")
-        self.run_git(root, "checkout", "--quiet", "-b", "side", true_base)
-        (root / "scripts").mkdir(exist_ok=True)
-        (root / "scripts" / "reach.py").write_text("reach\n", encoding="utf-8")
-        side_oid = self.commit(root, "side branch carrying the same file")
-        self.run_git(root, "checkout", "--quiet", "-")
+        advanced_main = self.commit(root, "main moved on with a sensitive change")
 
-        def run(base_oid: str) -> tuple[int, str]:
-            event = root / "event.json"
-            event.write_text(
-                json.dumps(
-                    {
-                        "pull_request": {
-                            "state": "open",
-                            "merged": False,
-                            "title": "docs: governance update",
-                            "body": None,
-                            "base": {
-                                "ref": "main",
-                                "sha": base_oid,
-                                "repo": {"full_name": "ArkDeck/ArkDeck"},
-                            },
-                            "head": {
-                                "ref": "agent/docs",
-                                "sha": head_oid,
-                                "repo": {"full_name": "ArkDeck/ArkDeck"},
-                            },
-                        }
-                    }
-                ),
-                encoding="utf-8",
-            )
-            completed = subprocess.run(
+        self.assertEqual(
+            check_pr_paths.resolve_merge_base(root, advanced_main, docs_head),
+            branch_point,
+        )
+        # Against the advanced tip the raw diff reports main's file as the
+        # pull request's; at the merge-base only the note is reported.
+        self.assertIn(
+            "scripts/reach.py",
+            check_pr_paths.git_changed_paths(root, advanced_main, docs_head),
+        )
+        self.assertEqual(
+            check_pr_paths.git_changed_paths(root, branch_point, docs_head),
+            ("docs/note.md",),
+        )
+
+        code, output = self.event_mode_run(root, advanced_main, docs_head)
+        self.assertEqual(code, 0, output)
+        self.assertIn("task=none (docs/governance-only); changed_paths=1", output)
+
+        stderr = io.StringIO()
+        stdout = io.StringIO()
+        with contextlib.redirect_stderr(stderr), contextlib.redirect_stdout(stdout):
+            exit_code = check_pr_paths.main(
                 [
-                    sys.executable,
-                    str(Path(__file__).resolve().parent / "check_pr_paths.py"),
                     "--repo-root",
                     str(root),
-                    "--event",
-                    str(event),
-                ],
-                check=False,
-                capture_output=True,
-                text=True,
+                    "--preflight",
+                    "--base-revision",
+                    advanced_main,
+                    "--head-revision",
+                    docs_head,
+                ]
             )
-            return completed.returncode, completed.stderr + completed.stdout
+        self.assertEqual(exit_code, 0, stderr.getvalue())
+        self.assertEqual(stdout.getvalue().strip(), "none")
 
-        code, output = run(side_oid)
-        self.assertEqual(code, 1, output)
-        self.assertIn("is not an ancestor of head", output)
-
-        code, output = run(true_base)
+        self.run_git(root, "checkout", "--quiet", "-b", "agent/reach", branch_point)
+        (root / "scripts").mkdir(exist_ok=True)
+        (root / "scripts" / "reach.py").write_text("reach\n", encoding="utf-8")
+        reach_head = self.commit(root, "offending")
+        # Byte-identical to main's copy, so a raw diff against the advanced
+        # tip is empty; the merge-base comparison still names the file.
+        self.assertEqual(
+            check_pr_paths.git_changed_paths(root, advanced_main, reach_head), ()
+        )
+        code, output = self.event_mode_run(root, advanced_main, reach_head)
         self.assertEqual(code, 1, output)
         self.assertIn("touches sensitive paths: scripts/reach.py", output)
 
