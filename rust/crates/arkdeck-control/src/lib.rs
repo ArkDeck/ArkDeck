@@ -667,7 +667,7 @@ impl<H: HostServices> Control<H> {
                 id: request.id.clone(),
                 outcome: self.host.job_resource(&request.method, &params),
             },
-            "artifact.inspect" | "artifact.read" => Response {
+            "artifact.inspect" | "artifact.read" | "artifact.export" => Response {
                 id: request.id.clone(),
                 outcome: self.host.artifact_resource(&request.method, &params),
             },

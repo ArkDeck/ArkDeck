@@ -123,6 +123,10 @@ module_cache=$cache_root/ModuleCache
 lock_path=$cache_root/build.lock
 ignored_paths=$cache_root/ignored-paths
 mkdir -p "$derived_data" "$source_packages" "$package_cache" "$module_cache"
+# No editor opens this DerivedData and nothing reads its index store, so the
+# build passes COMPILER_INDEX_STORE_ENABLE=NO below; the store earlier builds
+# wrote is removed so a restored cache stops carrying it.
+rm -rf "$derived_data/Index.noindex"
 
 if [ "$lock_held" -eq 0 ]; then
   if [ "$configuration" = Release ]; then
@@ -190,4 +194,5 @@ exec env \
   ONLY_ACTIVE_ARCH=YES \
   COMPILATION_CACHE_ENABLE_CACHING=YES \
   COMPILATION_CACHE_ENABLE_DIAGNOSTIC_REMARKS=YES \
+  COMPILER_INDEX_STORE_ENABLE=NO \
   "$@"
