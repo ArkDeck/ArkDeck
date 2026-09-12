@@ -3315,10 +3315,11 @@
         "macos": "implemented"
       },
       "lifecycle": "current",
+      "note": "The Rust CLI uses this typed RPC; the Swift bootstrap CLI retains its local registration owner.",
       "requiredPlatforms": [
         "macos"
       ],
-      "source": "cli:runtime.bundle.register",
+      "source": "daemon:runtime.bundle.register",
       "targetClassification": "local",
       "targetCommand": "arkdeck runtime bundle register --kind <daemon-bundle> --file <absolute-path>"
     },
@@ -4670,8 +4671,8 @@
     "bySource": {
       "app": 68,
       "catalog": 30,
-      "cli": 54,
-      "daemon": 104
+      "cli": 53,
+      "daemon": 105
     },
     "entries": 256,
     "fullFunction": true

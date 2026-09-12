@@ -89,7 +89,7 @@ impl BundleRegistryReadStore {
     }
     /// Optional Runtime composition helper: create only a fixed private leaf
     /// below an already existing private state directory. Registry metadata is
-    /// still initialized only by the first paged list, never by construction.
+    /// still initialized only by a paged list or registration, never by construction.
     pub fn open_or_create(path: &Path) -> io::Result<Self> {
         match Self::open_existing(path) {
             Ok(store) => Ok(store),
@@ -209,7 +209,7 @@ impl BundleRegistryReadStore {
             .map_err(|_| wire_error(corrupt()))?;
         result
     }
-    fn validate_index(&self, bytes: &[u8], identity: &Metadata) -> io::Result<()> {
+    pub(crate) fn validate_index(&self, bytes: &[u8], identity: &Metadata) -> io::Result<()> {
         if self.root.read("bundles.json", MAXIMUM_INDEX)? != bytes
             || !same_document(identity, &self.root.document_metadata("bundles.json")?)
         {

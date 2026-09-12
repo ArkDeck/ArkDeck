@@ -541,6 +541,7 @@ enum CLIMachineContracts {
       "runtime.tool.list": .leaf("runtime.tool.list"),
       "runtime.tool.remove": .leaf("runtime.tool.remove"),
       "runtime.tool.register": .leaf("runtime.tool.register", note: "Only --kind deveco is served by this RPC; --kind hdc retains its in-process Bootstrap registration."),
+      "runtime.bundle.register": .leaf("runtime.bundle.register", note: "The Rust CLI uses this typed RPC; the Swift bootstrap CLI retains its local registration owner."),
       "runtime.bundle.inspect": .leaf("runtime.bundle.inspect"),
       "runtime.bundle.list": .leaf("runtime.bundle.list"),
       "runtime.bundle.remove": .leaf("runtime.bundle.remove"),

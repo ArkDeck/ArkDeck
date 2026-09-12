@@ -4,7 +4,7 @@ pub const PROTOCOL_VERSION: &str = "1.0.0";
 pub const MAX_REQUEST_BYTES: usize = 4194304;
 pub const MAX_RESPONSE_BYTES: usize = 8388608;
 pub const CONTRACT_IDENTITY: &str =
-    "993f6b374b44dd5096e127d8f8d524063143dfb212f170de7b8a6aca935d53fe";
+    "7d2b21e1e0f8af9710a4fda16e1866fe7f18ab03484da85dee23ec7a90d797ab";
 pub const SWIFT_BASELINE: &str = include_str!("../../../../spec/baselines/swift-single-v1.json");
 pub const CONTRACT_INPUTS: &str = SWIFT_BASELINE;
 pub const METHODS: &[&str] = &[
@@ -80,7 +80,9 @@ pub const METHODS: &[&str] = &[
     "runtime.storage.root",
     "runtime.storage.status",
     "runtime.tool.inspect",
+    "runtime.tool.list",
     "runtime.tool.register",
+    "runtime.tool.remove",
     "runtime.tool.select",
     "session.cleanup.apply",
     "session.cleanup.preview",
@@ -402,8 +404,16 @@ pub const METHOD_SCHEMAS: &[(&str, &str)] = &[
         include_str!("../../../../spec/control/methods/runtime.tool.inspect.json"),
     ),
     (
+        "runtime.tool.list",
+        include_str!("../../../../spec/control/methods/runtime.tool.list.json"),
+    ),
+    (
         "runtime.tool.register",
         include_str!("../../../../spec/control/methods/runtime.tool.register.json"),
+    ),
+    (
+        "runtime.tool.remove",
+        include_str!("../../../../spec/control/methods/runtime.tool.remove.json"),
     ),
     (
         "runtime.tool.select",
@@ -525,10 +535,7 @@ pub const METHOD_SCHEMAS: &[(&str, &str)] = &[
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct HealthRequest {
-    #[serde(rename = "padding", skip_serializing_if = "Option::is_none")]
-    pub padding: Option<String>,
-}
+pub struct HealthRequest {}
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]

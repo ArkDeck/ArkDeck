@@ -69,6 +69,7 @@
     "recovery.flash-invocation.list",
     "runtime.bundle.inspect",
     "runtime.bundle.list",
+    "runtime.bundle.register",
     "runtime.bundle.remove",
     "runtime.hdc.impact-preview",
     "runtime.hdc.restart",

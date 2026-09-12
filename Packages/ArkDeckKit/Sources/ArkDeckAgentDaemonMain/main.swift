@@ -1461,6 +1461,13 @@ let startupTask = Task.detached {
           }
         }).inspect(reference, existingStoreOnly: true)
       },
+      bootstrapBundleRegistrar: { path in
+        let owner = try BootstrapBundleRegistry(validateBundle: { candidate in
+          do { _ = try LaunchAgentService.validateProductionDaemonBundle(candidate, fileManager: .default) }
+          catch { throw AgentExecutionControlFailure("admissionDenied", "registered Bundle failed the production helper trust policy") }
+        })
+        return try owner.register(file: URL(filePath: path, directoryHint: .isDirectory))
+      },
       bootstrapBundleRetirer: { reference, generation in
         let owner = try BootstrapBundleRegistry(validateBundle: { candidate in
           do { _ = try LaunchAgentService.validateProductionDaemonBundle(candidate, fileManager: .default) }

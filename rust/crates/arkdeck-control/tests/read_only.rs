@@ -115,6 +115,7 @@ fn every_unimplemented_method_is_refused_without_entering_the_host() {
             "runtime.tool.remove",
             "runtime.tool.inspect",
             "runtime.bundle.inspect",
+            "runtime.bundle.register",
             "operation.describe",
             "runtime.tool.register",
             "runtime.bundle.list",
@@ -356,6 +357,9 @@ fn bootstrap_mutation_lost_classified_receipts_preserve_uncertainty_after_one_ow
         fn observations(&self) -> Result<DeviceObservationsResult, WireError> {
             panic!("registration must not observe devices")
         }
+        fn bootstrap_register_bundle(&self, file: &str) -> Result<Value, WireError> {
+            self.bootstrap_register_deveco(file)
+        }
         fn bootstrap_register_hdc(&self, file: &str) -> Result<Value, WireError> {
             self.bootstrap_register_deveco(file)
         }
@@ -368,6 +372,10 @@ fn bootstrap_mutation_lost_classified_receipts_preserve_uncertainty_after_one_ow
         }
     }
     for (method, params) in [
+        (
+            "runtime.bundle.register",
+            json!({"kind":"daemon-bundle","file":"/Source.app"}),
+        ),
         (
             "runtime.tool.register",
             json!({"kind":"deveco","root":"/A.app/Contents"}),
@@ -551,5 +559,42 @@ fn tool_list_structure_is_closed_and_unconfigured_owner_is_explicit() {
         assert_eq!(error.code, "operationUnavailable");
         assert_eq!(error.details.unwrap()["phase"], "bootstrapRegistryOwner");
     }
+    assert_eq!(reads.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn bundle_registration_rejects_caller_authority_and_observes_nothing() {
+    let (control, reads) = setup();
+    let method = "runtime.bundle.register";
+    if !METHODS.contains(&method) {
+        let request = Request::new("test", method, Some(serde_json::Map::new()));
+        let frame = encode_frame(&request, MAX_REQUEST_BYTES).unwrap();
+        let reply: Value =
+            serde_json::from_slice(&control.handle_frame(&frame[..frame.len() - 1])).unwrap();
+        assert_eq!(reply["error"]["code"], "unknownMethod");
+        assert_eq!(reads.load(Ordering::SeqCst), 0);
+        return;
+    }
+    for params in [
+        json!({}),
+        json!({"kind":"hdc","file":"/Source.app"}),
+        json!({"kind":"daemon-bundle","file":"relative.app"}),
+        json!({"kind":"daemon-bundle","file":"/tmp/../Source.app"}),
+        json!({"kind":"daemon-bundle","file":"/Source.app","digest":"caller-digest"}),
+        json!({"kind":"daemon-bundle","file":"/Source.app","registeredAtUTC":"2026-09-12T00:00:00Z"}),
+        json!({"kind":"daemon-bundle","file":"/Source.app","capability":"caller-authority"}),
+    ] {
+        let error = call(&control, method, params).outcome.unwrap_err();
+        assert_eq!(error.code, "invalidParams");
+        assert_eq!(error.details.as_ref().unwrap()["newDispatchCount"], 0);
+    }
+    let error = call(
+        &control,
+        method,
+        json!({"kind":"daemon-bundle","file":"/Source.app"}),
+    )
+    .outcome
+    .unwrap_err();
+    assert_eq!(error.code, "operationUnavailable");
     assert_eq!(reads.load(Ordering::SeqCst), 0);
 }
