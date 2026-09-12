@@ -1,8 +1,8 @@
 # Job event metadata reader — macOS, 2026-09-12
 
-TASK-XPA-014 remains in progress. The branch uses protected main `f92acd36`, which merged
-Job/Artifact reads in #1863 after its `522085ed` head passed all required CI. This
-event slice passed its final local validation and still requires maintainer review.
+TASK-XPA-014 remains in progress. The branch uses protected main `0dad7599` after the ArkForge pin update #1868.
+Job/Artifact reads merged in #1863 at `f92acd36` after its `522085ed` head passed
+all required CI. This event slice still requires maintainer review.
 
 ## Behavior
 
@@ -50,8 +50,7 @@ fixtures and do not establish hardware acceptance.
 
 On rebased Rust 1.98.1 binaries, the four owner tests, two CLI tests and actual
 process checker passed again. Logs: `/private/tmp/xpa014-events-rebase-targeted.log`
-and `/private/tmp/xpa014-events-rebase-process.log`. The final unified gate passed
-on the rebased checkout: common checks, 83 design-system tests, 2,632 Swift parallel
+and `/private/tmp/xpa014-events-rebase-process.log`. The unified gate passed on the `f92acd36` checkout: common checks, 83 design-system tests, 2,632 Swift parallel
 tests plus one identity and five serial viewer checks, Rust workspace and both
 contract views, actual process checks, locked deny and vet. The App build lane was
 not selected by this diff. Log: `/private/tmp/xpa014-events-main-unified-gate-r2.log`.
@@ -71,3 +70,8 @@ now have a ten-second scheduling allowance; the actual hang case retains its
 This changes test fixture budgets only. Logs:
 `/private/tmp/xpa014-events-main-unified-gate-r1.log` and
 `/private/tmp/xpa014-events-fault-matrix-isolated.log`.
+
+After the additional #1868 rebase, the checkout contract manifest is unchanged.
+The final latest-main gate also passed all selected lanes, with 2,632 Swift tests
+plus identity and serial viewer checks, both Rust contract views, real process
+checks, deny and vet. Log: `/private/tmp/xpa014-events-main-unified-gate-r3.log`.
