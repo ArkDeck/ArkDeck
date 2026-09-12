@@ -93,11 +93,30 @@ def main():
                     with socket.socket(socket.AF_UNIX) as connection:
                         connection.settimeout(1)
                         connection.connect(str(endpoint))
-                    return child, endpoint
+                    break
                 except OSError:
                     pass
             time.sleep(.02)
-        raise AssertionError("temporary daemon did not bind")
+        else:
+            raise AssertionError("temporary daemon did not bind")
+        # The development daemon binds its socket before it creates and opens
+        # the state children (bootstrap included), so a connect only proves the
+        # listener exists. Requests are served once every store is open, so one
+        # health round trip is the readiness signal, as in the sibling owner
+        # checks. Callers seed <state>/bootstrap right after start(); without
+        # this the corrupt/quota fixtures raced the daemon's mkdir. The probe is
+        # readiness only and is not recorded as evidence.
+        request = {"protocolVersion": contract["currentVersion"], "contractIdentity": identity,
+                   "id": "hdc-ready", "method": "health"}
+        with socket.socket(socket.AF_UNIX) as connection:
+            connection.settimeout(30)
+            connection.connect(str(endpoint))
+            connection.sendall(canonical(request) + b"\n")
+            with connection.makefile("rb") as reader:
+                response = json.loads(reader.readline(common.MAX_RESPONSE_BYTES + 1))
+        check(response.get("id") == request["id"] and response.get("ok") is True,
+              f"temporary daemon did not finish initializing: {response}")
+        return child, endpoint
 
     def command(endpoint, arguments, code=None):
         remaining = min(30, deadline - time.monotonic())
