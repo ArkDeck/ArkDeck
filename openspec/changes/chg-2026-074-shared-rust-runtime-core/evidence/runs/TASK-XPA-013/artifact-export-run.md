@@ -1,6 +1,6 @@
 # Artifact export owner — macOS, 2026-09-12
 
-TASK-XPA-013 remains in progress. This slice uses protected main `0dad7599` (including #1868) and
+TASK-XPA-013 remains in progress. This slice uses protected main `1fd85b93` (including #1869, #1870 and #1873) and
 its actual SQLite Job/Artifact read owner. It serves the existing `artifact.export`
 RPC and `artifact export` CLI leaf for explicit Job-owned payload export.
 
@@ -48,12 +48,12 @@ Log: `/private/tmp/xpa013-export-main-process.log`.
 The current CLI argv fixture for export is copied byte-for-byte into the same
 packaged test-fixture directory used by main's inspect/read tests, so both
 published and candidate Rust views can verify it. The checkout manifest uses
-v2 under merged #1866 and describes 105 methods/579 shapes; its published test
+v2 under merged #1866 and describes 105 methods/581 shapes; its published test
 view remains the verified protected-main merge base.
 
 ## Final gate and remaining work
 
-The final unified repository gate and commit preflight are pending. The exact
+The earlier complete unified gate on base `84d7107f` passed (log: `/private/tmp/xpa013-export-main-unified-gate-r1.log`). After rebase onto `1fd85b93`, all 24 Artifact owner tests and eight CLI tests passed again (`/private/tmp/xpa013-export-latest-targeted-r1.log`). The new combined source retains Target and Job events. Its fresh complete unified gate passed with exit 0 (`/private/tmp/xpa013-export-latest-unified-r2.log`), including the selected Swift, design-system, Rust and published/candidate contract lanes. The planner did not select App build for this diff. Final commit preflight is run immediately before push. The exact
 Scope-Extension paths are `spec/control/methods/artifact.export.json` (native
 refusals) and `spec/baselines/swift-single-v1.json` (checkout input manifest).
 These declarations do not establish maintainer approval. Artifact publication,
