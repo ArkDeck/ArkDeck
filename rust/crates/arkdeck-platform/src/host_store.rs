@@ -11,6 +11,9 @@ pub struct HostDirectory(File, Ownership);
 #[path = "host_journal.rs"]
 mod journal;
 pub use journal::HostJournal;
+#[path = "host_session_removal.rs"]
+mod session_removal;
+pub use session_removal::PreparedSessionRemoval;
 #[path = "host_export.rs"]
 mod export;
 pub use export::{ExportPublishError, ExportStaging, HostExportCapacity};

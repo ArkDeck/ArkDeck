@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise actual isolated Rust Session cleanup preview RPC/CLI with simulated storage.
+"""Exercise actual isolated Rust Session cleanup preview/apply RPC/CLI with simulated storage.
 
 These are host tests with fixture manifests, never device acceptance evidence.
 """
@@ -24,6 +24,7 @@ def main():
     parser.add_argument('--bin-dir', type=Path, default=ROOT/'rust/target/debug')
     parser.add_argument('--record-frames', type=Path)
     parser.add_argument('--record-store-copy', type=Path, help='preserve actual Rust preview record bytes for the current Swift decoder test')
+    parser.add_argument('--record-applied-copy', type=Path, help='preserve actual Rust applied record bytes for the current Swift decoder test')
     parser.add_argument('--cli-path', type=Path, help='also verify a current Swift CLI consumer against the Rust owner')
     args = parser.parse_args()
     daemon = (args.bin_dir/'arkdeck-agentd').resolve()
@@ -129,16 +130,33 @@ def main():
                 refused('session.cleanup.preview',{},'resourceConflict')
             finally:os.close(descriptor)
             refused('session.cleanup.preview',{'sessionId':'unexpected'},'invalidParams')
+            tuple_params={'previewId':preview['previewId'],'previewDigest':preview['previewDigest']}
+            refused('session.cleanup.apply',dict(tuple_params,previewDigest='f'*64),'resourceConflict')
+            assert first.exists() and latest.exists() and (first/'raw.bin').read_bytes()==payload
+            applied=command(['cleanup','apply','--preview-id',preview['previewId'],'--preview-digest',preview['previewDigest']])['result']
+            assert applied['removedSessionIds']==['session-first'] and applied['newDispatchCount']==0,applied
+            assert applied['removedArtifacts']==[{'sessionId':'session-first','artifactId':'artifact-raw','artifactDigest':hashlib.sha256(payload).hexdigest()}],applied
+            assert applied['reclaimedBytes']==preview['reclaimBytes'] and applied['remainingBytes']==preview['projectedBytes']
+            assert int(applied['resultGeneration'])==int(preview['generation'])+1
+            assert not first.exists() and latest.exists()
+            stored_applied=record.read_bytes()
+            assert json.loads(stored_applied)['state']=='applied' and json.loads(stored_applied)['result']==applied
+            if args.record_applied_copy:
+                args.record_applied_copy.write_bytes(stored_applied)
+            child.kill();child.wait(timeout=10);child=start()
+            assert record.read_bytes()==stored_applied
+            assert result('session.cleanup.apply',tuple_params)==applied
+            assert command(['cleanup','apply','--preview-id',preview['previewId'],'--preview-digest',preview['previewDigest']])['result']==applied
+            assert not first.exists() and latest.exists()
             rogue=session('unregistered','09')
             refused('session.cleanup.preview',{},'operationUnavailable')
-            assert first.exists() and latest.exists() and rogue.exists()
-            assert (first/'raw.bin').read_bytes()==payload
+            assert not first.exists() and latest.exists() and rogue.exists()
         finally:
             for child in children:
                 if child.poll() is None:child.terminate()
                 child.wait(timeout=10);child.stderr.close()
     if args.record_frames:
         args.record_frames.write_text(''.join(json.dumps(row,sort_keys=True,separators=(',',':'))+'\n' for row in rows))
-    print(f'PASS: isolated Rust Session cleanup previews, {len(rows)} actual control exchanges plus CLI, restart, pin protection and refusal checks')
+    print(f'PASS: isolated Rust Session cleanup preview/apply, {len(rows)} actual control exchanges plus CLI, durable restart receipts, pin protection and refusal checks')
 
 if __name__=='__main__':main()

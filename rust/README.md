@@ -165,6 +165,7 @@ The same isolated daemon also serves these existing commands:
 
 ```sh
 arkdeck session cleanup preview
+arkdeck session cleanup apply --preview-id <id> --preview-digest <sha256>
 arkdeck session export preview --session <id> --destination <new-directory>
 arkdeck session export apply --preview-id <id> --preview-digest <sha256>
 ```
@@ -177,9 +178,13 @@ Completed retries return the stored result. An uncertain publication remains
 non-replayable across restart. Source Sessions are preserved.
 
 Cleanup preview shows the quota plan, including pinned/active protection, and
-refuses incomplete inventories. This development daemon has no active jobs;
-installed integration must supply the actual Job owner's active-session set.
-Cleanup apply remains unavailable. The process harnesses
+refuses incomplete inventories. Preview and apply require the Job owner's activity
+guard; an absent or unreadable Job inventory never means an empty active set.
+The guard remains held through exact preview comparison, applying-intent publication,
+descriptor-relative deletion, catalog reconciliation and durable result publication.
+A stale preview refuses before deletion. An interrupted applying record returns
+`outcomeUnknown` across restart and never replays; completed retries return the stored
+receipt. The process harnesses
 `rust/scripts/check-session-export.py` and `rust/scripts/check-session-cleanup.py`
 exercise the real daemon/control/CLI paths with newly created host fixtures;
 both accept `--cli-path` to check the current Swift CLI consumer.
