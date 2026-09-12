@@ -95,7 +95,9 @@ owner test to preserve another actual record. The process harness also accepts
 
 ## Coordinated remaining checks
 
-Warnings-denied Clippy awaits the shared build schedule. The first platform
+Warnings-denied Clippy passed for platform, host-store, control, daemon and CLI
+with `--all-targets -- -D warnings`; log:
+`/private/tmp/xpa012-session-apply-clippy-r1.log`. The first platform
 filter `host_session_removal` selected zero tests; the four-test result above
 comes from the subsequent correct `session_removal` run without a new build.
 Current Swift CLI process consumption and the final unified Swift/App gate
