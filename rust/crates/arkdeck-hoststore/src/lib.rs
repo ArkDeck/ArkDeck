@@ -11,6 +11,8 @@ mod job_owner;
 #[cfg(target_os = "macos")]
 mod job_record;
 #[cfg(target_os = "macos")]
+mod job_record_fields;
+#[cfg(target_os = "macos")]
 mod job_repository;
 #[cfg(target_os = "macos")]
 pub use job_owner::JobStore;

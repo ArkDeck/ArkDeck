@@ -35,6 +35,62 @@ final class RuntimeDeviceSessionPublicationContractTests: XCTestCase {
           path: "2026/07/session-\(job.jobID)/manifest.json")))
   }
 
+  /// Export actual current Swift owner snapshots from the existing isolated
+  /// provider fixture. These bytes prove storage/reader parity, not hardware
+  /// acceptance, fresh device facts or Runtime execution authority.
+  func testRustJobPublicationSnapshotsCurrentFixture() async throws {
+    let output = ProcessInfo.processInfo.environment["ARKDECK_RUST_JOB_PUBLICATION_FIXTURE"]
+    let destination = output.map { URL(fileURLWithPath: $0, isDirectory: true) }
+    if let destination {
+      guard destination.path.hasPrefix("/private/tmp/"),
+        !FileManager.default.fileExists(atPath: destination.path)
+      else { throw CocoaError(.fileWriteFileExists) }
+      try FileManager.default.createDirectory(
+        at: destination, withIntermediateDirectories: false,
+        attributes: [.posixPermissions: 0o700])
+    }
+    for refused in [false, true] {
+      let name = refused ? "failed" : "published"
+      let harness = try DevicePublicationHarness(
+        root: root.appending(path: name), firstPublicationRefused: refused)
+      let job = try await harness.run()
+      XCTAssertEqual(job.state, "succeeded")
+      XCTAssertEqual(job.sessionPublication.state, refused ? .failed : .published)
+      let directory = harness.state.appending(path: "jobs/\(job.jobID)")
+      guard case .readable(let record) = RuntimeJobRecord.state(in: directory) else {
+        return XCTFail("actual Swift Job producer left no readable snapshot")
+      }
+      XCTAssertNotNil(record.admissionEvidence)
+      XCTAssertNotNil(record.evidencePreflight)
+      XCTAssertNotNil(record.evidenceObservation)
+      XCTAssertNotNil(record.sessionPublicationRecord)
+      let bytes = try Data(contentsOf: directory.appending(path: "job-record.json"))
+      XCTAssertEqual(try record.durableData(), bytes)
+      let show = try RuntimeJobReadProjection.show(record, status: job)
+      if let destination {
+        let sample = destination.appending(path: name, directoryHint: .isDirectory)
+        try FileManager.default.createDirectory(
+          at: sample, withIntermediateDirectories: false,
+          attributes: [.posixPermissions: 0o700])
+        try bytes.write(to: sample.appending(path: "job-record.json"))
+        try PortableCanonicalJSON.canonicalBytes(show).write(to: sample.appending(path: "show.json"))
+        let responses: JSONValue = .array([
+          .object(["method": .string("job.show"),
+            "params": .object(["jobId": .string(job.jobID)]), "result": show]),
+          .object(["method": .string("job.status"),
+            "params": .object(["jobId": .string(job.jobID)]),
+            "result": try RuntimeJobReadProjection.status(job)]),
+        ])
+        try PortableCanonicalJSON.canonicalBytes(responses).write(
+          to: sample.appending(path: "swift-results.json"))
+        // All owner transactions above have completed. Copy the complete SQLite
+        // family without checkpointing or modifying the producer's bytes.
+        try FileManager.default.copyItem(
+          at: harness.state, to: sample.appending(path: "jobs-state"))
+      }
+    }
+  }
+
   func testDefaultExportRedactsDeviceIdentityAndRemainsReadable() async throws {
     let harness = try DevicePublicationHarness(root: root)
     let job = try await harness.run()
