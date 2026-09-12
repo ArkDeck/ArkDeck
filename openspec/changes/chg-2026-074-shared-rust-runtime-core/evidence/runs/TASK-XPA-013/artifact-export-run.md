@@ -1,6 +1,6 @@
 # Artifact export owner — macOS, 2026-09-12
 
-TASK-XPA-013 remains in progress. This slice uses protected main `f92acd36` and
+TASK-XPA-013 remains in progress. This slice uses protected main `0dad7599` (including #1868) and
 its actual SQLite Job/Artifact read owner. It serves the existing `artifact.export`
 RPC and `artifact export` CLI leaf for explicit Job-owned payload export.
 
