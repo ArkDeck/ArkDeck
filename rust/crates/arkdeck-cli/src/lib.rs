@@ -3,6 +3,8 @@ use arkdeck_client::ClientError;
 use arkdeck_contract::{ContractError, PROTOCOL_VERSION, canonical_json};
 use serde_json::{Map, Value, json};
 mod artifact_resources;
+mod import_resources;
+pub use import_resources::execute_import;
 pub use artifact_resources::{artifact_bytes, validate_artifact_metadata, validate_artifact_read};
 mod bootstrap_resources;
 mod read_only_resources;
@@ -54,6 +56,7 @@ impl CliError {
             | "invalidCursor"
             | "inputTooLarge"
             | "resourceConflict"
+            | "idempotencyConflict"
             | "resourceNotFound"
             | "workspaceReferenceNotFound" => 65,
             "runtimeUnavailable"
@@ -73,6 +76,23 @@ impl CliError {
         }
     }
     pub fn from_client(error: ClientError, method: &str) -> Self {
+        if matches!(
+            method,
+            "artifact.import.begin"
+                | "artifact.import.append"
+                | "artifact.import.abort"
+                | "artifact.import.commit"
+                | "artifact.import.release"
+        ) && !matches!(error, ClientError::Remote(_))
+        {
+            let mut result = Self::new(
+                "outcomeUnknown",
+                "Import response is unconfirmed; inspect the same request identity before continuing",
+            );
+            result.details.insert("method".into(), json!(method));
+            return result;
+        }
+
         if target_resources::is_mutation(method) {
             return target_resources::client_error(error, method);
         }
@@ -170,9 +190,14 @@ impl CliError {
                         d.get("phase") == Some(&json!("artifactOwner"))
                             && d.get("newDispatchCount") == Some(&json!(0))
                     });
-                let host_proof = host_proof || bootstrap_proof || artifact_proof;
+                let import_proof = method.starts_with("artifact.import.")
+                    && error.details.as_ref().is_some_and(|d| {
+                        d.get("phase") == Some(&json!("importOwner"))
+                            && d.get("newDispatchCount") == Some(&json!(0))
+                    });
+                let host_proof = host_proof || bootstrap_proof || artifact_proof || import_proof;
                 let code = match error.code.as_str() {
-                    "artifactIntegrityFailed" if artifact_proof => "artifactIntegrityFailed",
+                    "artifactIntegrityFailed" if artifact_proof || import_proof => "artifactIntegrityFailed",
                     "sensitiveAccessDenied" if artifact_proof => "sensitiveAccessDenied",
                     "admissionDenied" if bootstrap_proof => "admissionDenied",
                     "fileIdentityChanged"
@@ -186,6 +211,7 @@ impl CliError {
                     {
                         "fileIdentityChanged"
                     }
+                    "idempotencyConflict" if import_proof => "idempotencyConflict",
                     "invalidInput" if host_proof => "invalidInput",
                     "resourceConflict" if host_proof => "resourceConflict",
                     "resourceNotFound" if host_proof => "resourceNotFound",
@@ -277,7 +303,9 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                 "--default" => {
                     method_options.insert("resetToDefault".into(), json!(true));
                 }
-                "--name"
+                "--import-request-id"
+                | "--device-profile"
+                | "--name"
                 | "--candidate"
                 | "--observation"
                 | "--observation-generation"
@@ -324,6 +352,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                         "--observation" => "observationId",
                         "--observation-generation" => "observationGeneration",
                         "--expected-generation" => "expectedGeneration",
+                        "--import-request-id" => "importRequestId",
+                        "--device-profile" => "deviceProfile",
                         "--page-size" => "pageSize",
                         "--root" => "rootPath",
                         "--destination" => "destinationPath",
@@ -394,6 +424,12 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         index += 1;
     }
     let command = match positional.as_slice() {
+        ["artifact", "import", "hap"] => "artifact.import.hap",
+        ["artifact", "import", "workspace-patch"] => "artifact.import.workspace-patch",
+        ["artifact", "import", "native-library"] => "artifact.import.native-library",
+        ["artifact", "import", "flash-bundle"] => "artifact.import.flash-bundle",
+        ["artifact", "import", "abort"] => "artifact.import.abort",
+        ["artifact", "import", "inspect"] => "artifact.import.inspect",
         ["artifact", "inspect"] => "artifact.inspect",
         ["artifact", "read"] => "artifact.read",
         ["doctor"] => "doctor",
@@ -456,6 +492,19 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ));
     }
     let allowed: &[&str] = match command {
+        "artifact.import.hap"
+        | "artifact.import.native-library"
+        | "artifact.import.workspace-patch" => &["importRequestId", "targetId", "file", "timeout"],
+        "artifact.import.flash-bundle" => &[
+            "importRequestId",
+            "targetId",
+            "file",
+            "deviceProfile",
+            "timeout",
+        ],
+        "artifact.import.abort" => &["importRequestId", "expectedGeneration", "timeout"],
+        "artifact.import.inspect" => &["importRequestId", "import", "timeout"],
+
         "target.list" => &["timeout"],
         "target.show" => &["targetId", "timeout"],
         "target.display-name.set" => &["targetId", "expectedGeneration", "name", "timeout"],
@@ -716,15 +765,21 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ));
     }
     bootstrap_resources::configure(command, &mut method_options, help)?;
+    let import_timeout = import_resources::configure(command, &mut method_options, help)?;
     let artifact_timeout = artifact_resources::configure(command, &mut method_options, help)?;
     let target_timeout = target_resources::configure(command, &mut method_options, help)?;
     let timeout_ms = read_only_resources::configure(command, &mut method_options, help)?
+        .or(import_timeout)
         .or(artifact_timeout)
         .or(target_timeout);
     Ok(Invocation {
         command,
         method: if command == "device.candidates" {
             "device.observations"
+        } else if command == "artifact.import.inspect" {
+            "artifact.import.inspection"
+        } else if command.starts_with("artifact.import.") && command != "artifact.import.abort" {
+            "artifact.import.begin"
         } else if command == "operation.example" {
             "operation.describe"
         } else {

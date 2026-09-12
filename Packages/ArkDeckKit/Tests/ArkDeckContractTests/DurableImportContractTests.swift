@@ -105,6 +105,99 @@ final class DurableImportContractTests: XCTestCase {
     return (process.terminationStatus, try object(CLIStrictJSON.decode(Data(contentsOf: output))))
   }
 
+  func testRustImportUploadCurrentFixtureAndUnavailableOwners() async throws {
+    try startServer()
+    let configured = try XCTUnwrap(handler)
+    let capabilities = try RuntimeCapabilityStore(directoryURL: root.appending(path: "unconfigured-capabilities"))
+    let unavailable = RuntimeControlPlaneHandler(engine: engine, capabilityStore: capabilities, providerIDs: [],
+      nowUTC: { "2026-09-01T00:00:00Z" })
+    var samples: [JSONValue] = []
+    func send(_ method: String, _ params: [String: JSONValue], code: String? = nil,
+      owner: RuntimeControlPlaneHandler? = nil) async throws -> JSONValue? {
+      let request = try ArkDeckAgentXPC.requestFrame(method: method, params: params, requestID: "rust-import-fixture")
+      let bytes = await (owner ?? configured).handleLine(request)
+      let response = try JSONDecoder().decode(AgentWireProtocol.Response.self, from: bytes)
+      XCTAssertEqual(response.error?.code, code)
+      if let result = response.result {
+        samples.append(.object(["method": .string(method), "params": .object(params), "result": result]))
+      }
+      return response.result
+    }
+    let metadata = try object(intent("rust-import-upload").projection)
+    let beginValue = try await send("artifact.import.begin", metadata)
+    let began = try ArtifactImportProjection(XCTUnwrap(beginValue))
+    let half = hap.prefix(2048)
+    let appendFields: [String: JSONValue] = ["importId": .string(began.id), "generation": .string("1"),
+      "offset": .string("0"), "byteCount": .string(String(half.count)),
+      "sha256": .string(SHA256Hex.string(of: half)), "base64": .string(half.base64EncodedString())]
+    _ = try await send("artifact.import.append", appendFields)
+    _ = try await send("artifact.import.inspect", ["importRequestId": .string("rust-import-upload")])
+    var changed = metadata; changed["name"] = .string("another.hap")
+    _ = try await send("artifact.import.begin", changed, code: "idempotencyConflict")
+    var corrupt = appendFields; corrupt["sha256"] = .string(String(repeating: "0", count: 64))
+    _ = try await send("artifact.import.append", corrupt, code: "artifactIntegrityFailed")
+    let missing = "imp-00000000-0000-0000-0000-000000000001"
+    var absentAppend = appendFields; absentAppend["importId"] = .string(missing)
+    _ = try await send("artifact.import.append", absentAppend, code: "resourceNotFound")
+    _ = try await send("artifact.import.abort", ["importRequestId": .string("missing-import"), "generation": .string("1")], code: "resourceNotFound")
+    _ = try await send("artifact.import.abort", ["importRequestId": .string("rust-import-upload"), "generation": .string("9")], code: "resourceConflict")
+    for (method, params) in [
+      ("artifact.import.begin", metadata), ("artifact.import.append", appendFields),
+      ("artifact.import.abort", ["importRequestId": .string("rust-import-upload"), "generation": .string("1")]),
+      ("artifact.import.inspect", ["importId": .string(began.id)]),
+      ("artifact.import.inspection", ["importId": .string(began.id)]),
+      ("artifact.import.commit", ["importId": .string(began.id), "generation": .string("1")]),
+      ("artifact.import.release", ["importId": .string(began.id), "generation": .string("2")]),
+    ] { _ = try await send(method, params, code: "operationUnavailable", owner: unavailable) }
+    let abortMetadata = try object(intent("rust-import-aborted").projection)
+    _ = try await send("artifact.import.begin", abortMetadata)
+    _ = try await send("artifact.import.abort", ["importRequestId": .string("rust-import-aborted"), "generation": .string("1")])
+    XCTAssertEqual(dispatcher.dispatchCount, 0)
+    guard let output = ProcessInfo.processInfo.environment["ARKDECK_RUST_IMPORT_FIXTURE_OUTPUT"] else { return }
+    let destination = URL(fileURLWithPath: output, isDirectory: true)
+    guard destination.path.hasPrefix("/private/tmp/"), !FileManager.default.fileExists(atPath: destination.path) else { throw FixtureError.missing }
+    try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+    try FileManager.default.copyItem(at: root.appending(path: "artifacts"), to: destination.appending(path: "artifacts"))
+    try PortableCanonicalJSON.canonicalBytes(.array(samples)).write(to: destination.appending(path: "swift-results.json"))
+    try hap.write(to: destination.appending(path: "fixture.hap"))
+  }
+
+  func testRustImportUploadQuotaFrames() async throws {
+    try startServer()
+    let bytes = Data(repeating: 0x61, count: 16_385)
+    let metadata = try intent("rust-import-chunk-quota", bytes: bytes)
+    _ = try await artifacts.beginImport(metadata, binding: binding)
+    // A valid maximal checkpoint keeps this test bounded: 16,384 historical
+    // one-byte chunks are fixture state, then the actual owner enforces its quota.
+    var stored = try await artifacts.inspectImport(requestID: metadata.importRequestID)
+    let one = Data([0x61]); let digest = SHA256Hex.string(of: one)
+    stored.chunks = (0..<16_384).map { RuntimeImportChunk(offset: $0, byteCount: 1, sha256: digest) }
+    stored.nextOffset = 16_384
+    let directory = root.appending(path: "artifacts/.imports-v1")
+    let checkpoint = directory.appending(path: "records/\(SHA256Hex.string(of: Data(metadata.importRequestID.utf8))).json")
+    try DurableFileWriter.createOrReplaceAtomically(destination: checkpoint, data: CanonicalJSONEncoders.canonical().encode(stored))
+    let stage = directory.appending(path: "payloads/\(stored.importID).stage")
+    try bytes.prefix(16_384).write(to: stage)
+    try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: stage.path)
+    try restartImportDaemon()
+    let owner = try XCTUnwrap(handler)
+    func refusal(_ method: String, _ params: [String: JSONValue]) async throws {
+      let request = try ArkDeckAgentXPC.requestFrame(method: method, params: params, requestID: "rust-import-quota")
+      let response = try JSONDecoder().decode(AgentWireProtocol.Response.self, from: await owner.handleLine(request))
+      XCTAssertEqual(response.error?.code, "quotaExceeded")
+    }
+    try await refusal("artifact.import.append", ["importId": .string(stored.importID), "generation": .string("1"),
+      "offset": .string("16384"), "byteCount": .string("1"), "sha256": .string(digest), "base64": .string(one.base64EncodedString())])
+    let remaining = 8 * 1024 * 1024 * 1024 - bytes.count
+    let full = try ArtifactImportIntent(["schemaVersion": .string(ArtifactImportIntent.schemaVersion),
+      "importRequestId": .string("rust-import-capacity"), "kind": .string("flash-bundle"), "targetId": .string(target.targetID),
+      "bindingRevision": .string(String(target.bindingRevision)), "deviceProfile": .string("dayu200"),
+      "name": .string("images.tar.gz"), "byteCount": .string(String(remaining)), "sha256": .string(String(repeating: "a", count: 64))])
+    _ = try await artifacts.beginImport(full, binding: binding)
+    try await refusal("artifact.import.begin", object(intent("rust-import-over-capacity").projection))
+    XCTAssertEqual(dispatcher.dispatchCount, 0)
+  }
+
   func testAppAndCLIUseTheSameTypedImportWithoutSharingUploadOwnership() async throws {
     try startServer()
     let endpoint = AgentXPCEndpoint(handler: try XCTUnwrap(handler), appJobs: AgentXPCAppJobGate())

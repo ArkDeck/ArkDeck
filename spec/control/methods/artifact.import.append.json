@@ -3,6 +3,7 @@
     "errorCode": {
       "enum": [
         "admissionDenied",
+        "artifactIntegrityFailed",
         "conflict",
         "internalError",
         "invalidInput",
@@ -10,9 +11,11 @@
         "malformedFrame",
         "notFound",
         "operationUnavailable",
+        "quotaExceeded",
         "recordUnreadable",
         "rejected",
         "resourceConflict",
+        "resourceNotFound",
         "unknownMethod",
         "unsupportedProtocolVersion",
         "workspaceReferenceNotFound"
@@ -186,8 +189,8 @@
   "x-arkdeck-method": "artifact.import.append",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 10,
-    "request": 60,
-    "result": 50
+    "error": 7,
+    "request": 10,
+    "result": 3
   }
 }

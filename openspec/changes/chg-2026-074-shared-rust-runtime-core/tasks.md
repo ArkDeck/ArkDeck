@@ -807,6 +807,13 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 - Allowed paths:
   - `spec/control/methods/artifact.inspect.json`（declared scope extension: existing nullable digest/revision and observation window recorded from the actual Swift producer）
   - `spec/control/methods/artifact.read.json`（declared scope extension: preserve existing resourceNotFound and integrity refusals from actual Swift producer recordings）
+  - `spec/baselines/swift-single-v1.json`（declared scope extension: refresh the checkout manifest for native Import upload schemas and corpus）
+  - `spec/control/methods/artifact.import.begin.json`（declared scope extension: existing Swift Import upload and unavailable-owner error frames）
+  - `spec/control/methods/artifact.import.append.json`（declared scope extension: existing Swift Import upload and unavailable-owner error frames）
+  - `spec/control/methods/artifact.import.abort.json`（declared scope extension: existing Swift Import upload and unavailable-owner error frames）
+  - `spec/control/methods/artifact.import.inspect.json`（declared scope extension: existing Swift Import upload and unavailable-owner error frames）
+  - `spec/control/methods/artifact.import.inspection.json`（declared scope extension: existing Swift Import upload and unavailable-owner error frames）
+  - `spec/control/methods/artifact.import.release.json`（declared scope extension: existing Swift Import upload and unavailable-owner error frames）
   - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`
   - `rust/**`
   - `Packages/ArkDeckKit/Sources/ArkDeckWorkflows/**`（engine publish path only）

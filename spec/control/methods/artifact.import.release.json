@@ -8,6 +8,7 @@
         "invalidParams",
         "malformedFrame",
         "notFound",
+        "operationUnavailable",
         "recordUnreadable",
         "rejected",
         "resourceConflict",
@@ -135,8 +136,8 @@
   "x-arkdeck-method": "artifact.import.release",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 4,
-    "request": 8,
-    "result": 4
+    "error": 3,
+    "request": 4,
+    "result": 1
   }
 }

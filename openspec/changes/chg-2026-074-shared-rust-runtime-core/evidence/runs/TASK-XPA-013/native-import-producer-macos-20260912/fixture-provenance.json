@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "arkdeck.rust-import-native-fixture/1",
+  "kind": "hostOnlySwiftProducer",
+  "producerTests": [
+    "DurableImportContractTests.testRustImportUploadCurrentFixtureAndUnavailableOwners",
+    "DurableImportContractTests.testRustImportUploadQuotaFrames"
+  ],
+  "swiftSourceManifest": "union-source-manifest.json",
+  "swiftSourceManifestSha256": "c0aa2e771e763b6c3a2fae59a766b375d00e37717c6e72583cb6231019850560",
+  "rawFramesSha256": "f5cd08214e580512b39547c7a1277b4801798ca3ee2915de42e7a9df8ad03065",
+  "swiftLogSha256": "a8c01f538b06744ad12d219ec400dd9a32b79076f6590e3270a7037a5190bfd2",
+  "files": {
+    "artifacts/.imports-v1/identities/imp-b522c443-34c0-4009-9632-05eaeca618a9.json": "79d977e7e77ee78bdc692231ca72dba8c0110b95d13266b0368e6e84d14adb44",
+    "artifacts/.imports-v1/identities/imp-dcb7943f-d934-43da-b290-65d0066cae35.json": "cb1cf72a43ded4d1dbaf9f6c4ef798aa72e22a014fa5b70d42b69fdf11c432ba",
+    "artifacts/.imports-v1/payloads/imp-dcb7943f-d934-43da-b290-65d0066cae35.stage": "7bd630e3a9e10785bec667023d0257f6fc138081489a20ef766e519639cd363d",
+    "artifacts/.imports-v1/records/7fc7da249ba203421a7397b17a9688f3451d41163fc2f43a383414a17ca34f13.json": "c5aae6874e01559d042b7faa8cc6bbe4215974426183f645a07eca2cced4ec94",
+    "artifacts/.imports-v1/records/820b32aa8487dc3a30d8c271b9277068d791f76f8fad5be8d4a3b9a9f0d9dac9.json": "fa2215f0c42712e09788bd0b4795cafd79a5096cf9bf51d4ce807f5f64a5cf7f",
+    "fixture.hap": "399a301718f951e835b8630ac1666120b96eefb28da9e37f568596a227a9b67a",
+    "swift-results.json": "1ca1a9cc24926032c490e05bdb78c3ff6722f5e9ea2dcf063ab88062dc811726"
+  }
+}
