@@ -587,8 +587,10 @@ final class ArtifactResourcesContractTests: XCTestCase {
     let owner = try seedJob("job-rust-artifact")
     let artifact = try await publish(owner, bytes: Data("native fixture bytes\n".utf8))
     var samples: [JSONValue] = []
-    for method in ["artifact.inspect", "artifact.read"] {
-      let params: [String: JSONValue] = ["owner": owner.value, "artifactId": .string(artifact.artifactID)]
+    let exported = try exportDirectory()
+    for method in ["artifact.inspect", "artifact.read", "artifact.export"] {
+      var params: [String: JSONValue] = ["owner": owner.value, "artifactId": .string(artifact.artifactID)]
+      if method == "artifact.export" { params["destinationDirectory"] = .string(exported.path) }
       let response = try await wire(method, params).0
       XCTAssertTrue(response.ok, String(describing: response.error))
       samples.append(.object(["method": .string(method), "params": .object(params),
