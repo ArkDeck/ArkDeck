@@ -39,10 +39,32 @@ impl JobStore {
         action: impl FnOnce(&std::collections::BTreeSet<String>) -> Result<R, WireError>,
     ) -> Result<R, WireError> {
         let _guard = self.activity.lock().map_err(unreadable)?;
+        self.root.validate_path(&self.path).map_err(unreadable)?;
+        let rows = self.repository.rows(None).map_err(unreadable)?;
+        let indexed: std::collections::BTreeSet<_> =
+            rows.iter().map(|row| row.id.as_str()).collect();
+        // Until journal reconciliation is migrated, an indexed Job directory
+        // may carry later or uncertain durable effects absent from the SQLite
+        // snapshot. Keep it, even when the indexed state is terminal. Orphaned
+        // and unsafe entries cannot be explained by a complete Job census.
+        let retained_history = match self.root.child("jobs") {
+            Ok(jobs) => {
+                let names = jobs.names(100_000).map_err(unreadable)?;
+                for name in &names {
+                    if !indexed.contains(name.as_str()) {
+                        return Err(unreadable(()));
+                    }
+                    jobs.child(name).map_err(unreadable)?;
+                }
+                names.into_iter().collect::<std::collections::BTreeSet<_>>()
+            }
+            Err(error) if error.kind() == io::ErrorKind::NotFound => Default::default(),
+            Err(error) => return Err(unreadable(error)),
+        };
         let mut active = std::collections::BTreeSet::new();
-        for row in self.repository.rows(None).map_err(unreadable)? {
-            let record = JobRecord::from_row(&row)?;
-            if record.requires_session_retention() {
+        for row in &rows {
+            let record = JobRecord::from_row(row)?;
+            if record.requires_session_retention() || retained_history.contains(&record.job_id) {
                 active.insert(format!("session-{}", record.job_id));
             }
         }

@@ -232,6 +232,58 @@ fn active_session_census_retains_unknown_outcomes_and_refuses_unreadable_rows() 
 }
 
 #[test]
+fn activity_census_retains_durable_history_and_refuses_orphaned_or_unsafe_jobs() {
+    use std::os::unix::fs::DirBuilderExt;
+    let root = Root::initialized();
+    root.seed("finished", "succeeded", 1);
+    let history = root.0.join("jobs/finished");
+    fs::DirBuilder::new()
+        .recursive(true)
+        .mode(0o700)
+        .create(&history)
+        .unwrap();
+    fs::write(history.join("journal.jsonl"), b"unknown retained history").unwrap();
+    let store = JobStore::open(&root.0).unwrap();
+    store
+        .with_active_sessions(|active| {
+            assert_eq!(
+                active.iter().map(String::as_str).collect::<Vec<_>>(),
+                vec!["session-finished"]
+            );
+            Ok(())
+        })
+        .unwrap();
+    let orphan = root.0.join("jobs/unindexed");
+    fs::DirBuilder::new().mode(0o700).create(&orphan).unwrap();
+    let mut invoked = false;
+    assert_eq!(
+        store
+            .with_active_sessions(|_| {
+                invoked = true;
+                Ok(())
+            })
+            .unwrap_err()
+            .code,
+        "recordUnreadable"
+    );
+    assert!(!invoked);
+    fs::remove_dir(orphan).unwrap();
+    fs::set_permissions(&history, fs::Permissions::from_mode(0o777)).unwrap();
+    assert_eq!(
+        store
+            .with_active_sessions(|_| {
+                invoked = true;
+                Ok(())
+            })
+            .unwrap_err()
+            .code,
+        "recordUnreadable"
+    );
+    assert!(!invoked);
+    fs::set_permissions(history, fs::Permissions::from_mode(0o700)).unwrap();
+}
+
+#[test]
 fn sqlite_refuses_symlinks_and_multi_statement_input() {
     let root = Root::initialized();
     assert!(root.db().query("SELECT 1; SELECT 2", &[], 1024).is_err());

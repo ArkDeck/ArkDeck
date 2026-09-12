@@ -4,12 +4,16 @@
       "enum": [
         "conflict",
         "internalError",
+        "invalidInput",
         "invalidParams",
         "malformedFrame",
         "notFound",
         "operationUnavailable",
+        "outcomeUnknown",
         "recordUnreadable",
         "rejected",
+        "resourceConflict",
+        "resourceNotFound",
         "unknownMethod",
         "unsupportedProtocolVersion",
         "workspaceReferenceNotFound"
@@ -68,6 +72,26 @@
           "type": "string"
         },
         "removedArtifacts": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "artifactDigest": {
+                "type": "string"
+              },
+              "artifactId": {
+                "type": "string"
+              },
+              "sessionId": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "artifactDigest",
+              "artifactId",
+              "sessionId"
+            ],
+            "type": "object"
+          },
           "type": "array"
         },
         "removedSessionIds": {
@@ -107,8 +131,8 @@
   "x-arkdeck-method": "session.cleanup.apply",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 2,
-    "request": 6,
-    "result": 4
+    "error": 8,
+    "request": 11,
+    "result": 3
   }
 }

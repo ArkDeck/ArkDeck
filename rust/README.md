@@ -179,7 +179,11 @@ non-replayable across restart. Source Sessions are preserved.
 
 Cleanup preview shows the quota plan, including pinned/active protection, and
 refuses incomplete inventories. Preview and apply require the Job owner's activity
-guard; an absent or unreadable Job inventory never means an empty active set.
+guard directly through the configured `JobStore`. An absent or unreadable Job
+inventory never means an empty active set. Both manifest Session identities and
+`session-{jobId}` associations are protected. An unindexed or unsafe Job directory
+refuses cleanup; indexed durable history is retained until its outcome can be
+interpreted by the migrated Job owner.
 The guard remains held through exact preview comparison, applying-intent publication,
 descriptor-relative deletion, catalog reconciliation and durable result publication.
 A stale preview refuses before deletion. An interrupted applying record returns
@@ -330,8 +334,8 @@ The macOS development daemon reads the frozen v1 SQLite Job index through a
 serialized, bounded connection. `job list`, `job status`, `job show`, and
 `job timeline` use immutable paged snapshots. Artifact inspect/read first resolves
 the Job from this owner; orphan artifact directories do not establish ownership.
-Session cleanup preview holds a complete Job activity census and retains parked
-unknown outcomes. This read phase refuses unsupported optional authority and
+Session cleanup preview/apply hold the complete Job activity census and retain
+parked unknown outcomes and uninterpreted durable history. This read phase refuses unsupported optional authority and
 recovery fields until their validators are ported. It does not admit or execute
 Jobs, alter existing SQLite records, or recover journals.
 
