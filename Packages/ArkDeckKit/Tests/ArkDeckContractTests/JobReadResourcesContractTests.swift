@@ -125,6 +125,70 @@ final class JobReadResourcesContractTests: XCTestCase {
     try FileManager.default.copyItem(at: state, to: destination.appending(path: "jobs-state"))
     try PortableCanonicalJSON.canonicalBytes(.array(responses)).write(to: destination.appending(path: "swift-results.json"))
   }
+  func testRustJobEventsCurrentFixture() async throws {
+    let id = "job-rust-events"
+    try seed(id)
+    let output = ProcessInfo.processInfo.environment["ARKDECK_RUST_EVENT_FIXTURE_OUTPUT"]
+    var retainedState = state
+    if let output {
+      let destination = URL(fileURLWithPath: output, isDirectory: true)
+      guard destination.path.hasPrefix("/private/tmp/"), !FileManager.default.fileExists(atPath: destination.path) else {
+        throw FixtureError.missing
+      }
+      try FileManager.default.createDirectory(at: destination, withIntermediateDirectories: false,
+        attributes: [.posixPermissions: 0o700])
+      retainedState = destination.appending(path: "jobs-state")
+      try FileManager.default.copyItem(at: state, to: retainedState)
+      try Data("arkdeck.job-events-interop-fixture/1".utf8).write(to: destination.appending(path: "fixture-kind"))
+    }
+    let journal = try FileDurableJournal(url: retainedState.appending(path: "jobs/\(id)/journal.jsonl"))
+    try journal.appendAndSynchronize(.jobCreated(eventID: "created", sequence: 0,
+      sessionID: "session-\(id)", jobID: id, timestamp: date, executionMode: "execute"))
+    for n in 1...4 {
+      try journal.appendAndSynchronize(JournalEvent(eventID: "event-\(n)", sequence: n,
+        sessionID: "session-\(id)", jobID: id, timestamp: date, kind: .warning,
+        payload: ["code": .string("fixture"), "message": .string("sensitive fixture payload"), "details": .object([:])]))
+    }
+    let fixtureEngine = try RuntimeJobEngine(configuration: .init(stateDirectory: retainedState),
+      providers: DeviceProviderRegistry(providers: []), dispatcher: dispatcher,
+      capabilityStore: capabilities, artifactStore: artifacts, nowUTC: { "2026-08-31T12:00:00Z" })
+    let handler = RuntimeControlPlaneHandler(engine: fixtureEngine, capabilityStore: capabilities,
+      providerIDs: [], nowUTC: { "2026-08-31T12:00:00Z" }, artifactStore: artifacts)
+    var samples: [JSONValue] = []
+    var cursor: JSONValue?
+    for size in [2, 3, 100] {
+      var params: [String: JSONValue] = ["jobId": .string(id), "pageSize": .integer(Int64(size))]
+      if let cursor { params["afterCursor"] = cursor }
+      let response = await handler.handleFrame(try PortableCanonicalJSON.canonicalBytes(.object([
+        "protocolVersion": .string(ArkDeckControlProtocol.currentVersion), "contractIdentity": .string(ArkDeckControlProtocol.contractIdentity),
+        "id": .string("rust-event-owner-oracle"), "method": .string("job.events"), "params": .object(params),
+      ])))
+      XCTAssertTrue(response.ok, String(describing: response.error))
+      let value = try XCTUnwrap(response.result)
+      let parsed = try CLIJobEventPage(value, jobID: id, maximumItems: size)
+      XCTAssertEqual(parsed.rows.count, size == 100 ? 0 : size)
+      samples.append(.object(["method": .string("job.events"), "params": .object(params), "result": value]))
+      cursor = .string(parsed.nextCursor)
+    }
+    if let output {
+      try PortableCanonicalJSON.canonicalBytes(.array(samples)).write(to: URL(filePath: output).appending(path: "swift-results.json"))
+    }
+  }
+
+  func testCurrentSwiftEventsReadActualRustCursor() throws {
+    guard let output = ProcessInfo.processInfo.environment["ARKDECK_RUST_EVENT_FIXTURE_OUTPUT"] else { return }
+    let directory = URL(filePath: output)
+    guard directory.path.hasPrefix("/private/tmp/"),
+      try String(contentsOf: directory.appending(path: "fixture-kind"), encoding: .utf8) == "arkdeck.job-events-interop-fixture/1"
+    else { throw FixtureError.missing }
+    let result = try object(CLIStrictJSON.decode(Data(contentsOf: directory.appending(path: "rust-results.json"))))
+    guard case .string(let cursor)? = result["nextCursor"] else { throw FixtureError.missing }
+    let page = try CLIJobEventPage(JournalEventPages.page(directory: directory.appending(path: "jobs-state/jobs/job-rust-events"),
+      jobID: "job-rust-events", sessionID: "session-job-rust-events", afterCursor: cursor, pageSize: 100),
+      jobID: "job-rust-events", maximumItems: 100)
+    XCTAssertEqual(page.rows.map { $0["eventId"] }, [.string("event-2"), .string("event-3"), .string("event-4")])
+  }
+
   private func page(_ params: [String: JSONValue] = [:]) async throws -> [String: JSONValue] {
     try object(await engine.jobListSnapshot(RuntimeJobListQuery(params)))
   }

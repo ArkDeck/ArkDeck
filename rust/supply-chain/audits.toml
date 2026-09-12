@@ -3,12 +3,40 @@
 
 [audits]
 
+[[trusted.aead]]
+criteria = "safe-to-deploy"
+user-id = 267 # Tony Arcieri (tarcieri)
+start = "2023-04-02"
+end = "2023-04-03"
+notes = "User-authorized on 2026-09-12 for TASK-XPA-014 Job event cursor interoperability. Only aead 0.5.2's recorded UTC publication day is covered; deny.toml and Cargo.lock require its exact version and checksum. Publisher provenance is not a source audit. No future window or automatic renewal; prior trust windows are unchanged."
+
+[[trusted.aes]]
+criteria = "safe-to-deploy"
+user-id = 267 # Tony Arcieri (tarcieri)
+start = "2024-02-13"
+end = "2024-02-14"
+notes = "User-authorized on 2026-09-12 for TASK-XPA-014 Job event cursor interoperability. Only aes 0.8.4's recorded UTC publication day is covered; deny.toml and Cargo.lock require its exact version and checksum. Publisher provenance is not a source audit. No future window or automatic renewal; prior trust windows are unchanged."
+
+[[trusted.aes-gcm]]
+criteria = "safe-to-deploy"
+user-id = 267 # Tony Arcieri (tarcieri)
+start = "2023-09-21"
+end = "2023-09-22"
+notes = "User-authorized on 2026-09-12 for TASK-XPA-014 Job event cursor interoperability. Only aes-gcm 0.10.3's recorded UTC publication day is covered; deny.toml and Cargo.lock require its exact version and checksum. Publisher provenance is not a source audit. No future window or automatic renewal; prior trust windows are unchanged."
+
 [[trusted.cpufeatures]]
 criteria = "safe-to-deploy"
 user-id = 267 # Tony Arcieri (tarcieri)
 start = "2025-01-25"
 end = "2025-01-26"
 notes = "User-authorized bounded publisher trust for TASK-XPA-002 / PR #1768. Only the recorded UTC publication day is covered; deny.toml and Cargo.lock additionally require the exact reviewed version and checksum. This is publisher provenance, not a source audit; no future publishing window or automatic renewal."
+
+[[trusted.ctr]]
+criteria = "safe-to-deploy"
+user-id = 5059 # Artyom Pavlov (newpavlov)
+start = "2022-09-30"
+end = "2022-10-01"
+notes = "User-authorized on 2026-09-12 for TASK-XPA-014 Job event cursor interoperability. Only ctr 0.9.2's recorded UTC publication day is covered; deny.toml and Cargo.lock require its exact version and checksum. Publisher provenance is not a source audit. No future window or automatic renewal; prior trust windows are unchanged."
 
 [[trusted.digest]]
 criteria = "safe-to-deploy"
@@ -24,6 +52,13 @@ start = "2023-03-28"
 end = "2023-03-29"
 notes = "User-authorized bounded publisher trust for TASK-XPA-002 / PR #1768. Only the recorded UTC publication day is covered; deny.toml and Cargo.lock additionally require the exact reviewed version and checksum. This is publisher provenance, not a source audit; no future publishing window or automatic renewal."
 
+[[trusted.ghash]]
+criteria = "safe-to-deploy"
+user-id = 267 # Tony Arcieri (tarcieri)
+start = "2024-03-03"
+end = "2024-03-04"
+notes = "User-authorized on 2026-09-12 for TASK-XPA-014 Job event cursor interoperability. Only ghash 0.5.1's recorded UTC publication day is covered; deny.toml and Cargo.lock require its exact version and checksum. Publisher provenance is not a source audit. No future window or automatic renewal; prior trust windows are unchanged."
+
 [[trusted.libc]]
 criteria = "safe-to-deploy"
 user-id = 55123 # rust-lang-owner
@@ -37,6 +72,13 @@ user-id = 189 # Andrew Gallant (BurntSushi)
 start = "2026-07-08"
 end = "2026-07-09"
 notes = "User-authorized bounded publisher trust for TASK-XPA-002 / PR #1768. Only the recorded UTC publication day is covered; deny.toml and Cargo.lock additionally require the exact reviewed version and checksum. This is publisher provenance, not a source audit; no future publishing window or automatic renewal."
+
+[[trusted.polyval]]
+criteria = "safe-to-deploy"
+user-id = 267 # Tony Arcieri (tarcieri)
+start = "2024-03-03"
+end = "2024-03-04"
+notes = "User-authorized on 2026-09-12 for TASK-XPA-014 Job event cursor interoperability. Only polyval 0.6.2's recorded UTC publication day is covered; deny.toml and Cargo.lock require its exact version and checksum. Publisher provenance is not a source audit. No future window or automatic renewal; prior trust windows are unchanged."
 
 [[trusted.serde_json]]
 criteria = "safe-to-deploy"

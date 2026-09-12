@@ -32,7 +32,7 @@ those two.
 The Python checks require Python 3.11+ with `PyYAML==6.0.3` and
 `jsonschema==4.26.0`. The repository's unified planner also runs these checks,
 `cargo deny` and `cargo vet`; see [dependency policy](supply-chain/README.md).
-The committed policy combines imported source audits with nine bounded publisher
+The committed policy combines imported source audits with fifteen bounded publisher
 trust entries and no exemptions. Both dependency checks must pass.
 
 The shared runner checks two independent temporary source views: current Rust

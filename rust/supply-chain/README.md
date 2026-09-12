@@ -29,7 +29,7 @@ The locked `zmij 1.0.21` uses a complete imported source-audit chain: [Mozilla f
 This compatible pin replaces 1.0.23 and uses the imported source audits without
 requiring publisher trust or an exemption for `zmij`.
 
-Nine locked dependencies without a complete imported `safe-to-deploy` source-audit
+The original nine locked dependencies without a complete imported `safe-to-deploy` source-audit
 chain use the bounded publisher trust rules in `audits.toml`. These rules were
 explicitly authorized for PR #1768 and are part of its reviewable diff. There are
 no exemptions or locally certified source audits. A successful cargo-vet check
@@ -38,7 +38,7 @@ completion of a source audit for these nine releases.
 
 Each link below is the crates.io version API checked against the checksum in
 `Cargo.lock`. The numeric publisher ID and UTC publication day are registry facts;
-trusting them for this release is the policy decision. All nine versions were
+trusting them for this release is the policy decision. All original nine versions were
 reported as not yanked when rechecked on 2026-09-08.
 
 | Locked release | Publisher / crates.io ID | Authorized UTC `[start, end)` | Use and review concern |
@@ -74,3 +74,15 @@ Do not run `cargo vet init`, add exemptions, regenerate exemptions, or widen a
 publisher window merely to make the check green. Dependency additions, version
 changes and trust-policy changes are explicit PR review items. CI only consumes
 the committed lock and policy.
+
+## Job event cursor dependencies
+
+On 2026-09-12 the user explicitly authorized six additional bounded publisher
+trust entries for TASK-XPA-014: `aead 0.5.2`, `aes 0.8.4`, `aes-gcm 0.10.3`,
+`ctr 0.9.2`, `ghash 0.5.1`, and `polyval 0.6.2`. Each entry covers only that
+crate's UTC publication day; exact versions and checksums remain required.
+No original trust window is widened and no exemption or local source audit is
+added. These packages preserve Swift's AES-256-GCM presentation cursor format;
+they are not admission or device authority. The checked registry facts, dates,
+checksums, missing source-audit chains, and explicit authorization are recorded
+in `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-014/job-events-dependency-review.md`.

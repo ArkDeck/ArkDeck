@@ -73,7 +73,9 @@ impl JobStore {
         if method == "job.list" {
             return self.list(params);
         }
-        let allowed: &[&str] = if method == "job.timeline" {
+        let allowed: &[&str] = if method == "job.events" {
+            &["jobId", "pageSize", "afterCursor"]
+        } else if method == "job.timeline" {
             &["jobId", "pageSize", "cursor"]
         } else {
             &["jobId"]
@@ -88,6 +90,20 @@ impl JobStore {
             .ok_or_else(|| failure("invalidInput", "An exact Job identity is required"))?;
         let record = self.read_snapshot(id)?;
         let result = match method {
+            "job.events" => {
+                let mut paging = params.clone();
+                if let Some(value) = paging.remove("afterCursor") {
+                    paging.insert("cursor".into(), value);
+                }
+                let (size, cursor) = pagination(&paging)?;
+                crate::job_events::page(
+                    &self.path.join("jobs").join(id),
+                    id,
+                    &format!("session-{id}"),
+                    cursor,
+                    size,
+                )?
+            }
             "job.status" => record.status(),
             "job.show" => record.show(),
             "job.timeline" => {

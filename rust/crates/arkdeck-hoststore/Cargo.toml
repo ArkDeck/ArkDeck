@@ -13,5 +13,8 @@ serde.workspace = true
 serde_json = { workspace = true, features = ["raw_value"] }
 unicode-segmentation.workspace = true
 
+[target.'cfg(target_os = "macos")'.dependencies]
+aes-gcm = { version = "=0.10.3", default-features = false, features = ["aes", "alloc"] }
+
 [lints]
 workspace = true

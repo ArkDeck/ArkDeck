@@ -18,6 +18,13 @@ pub use job_owner::JobStore;
 pub use job_record::JobRecord;
 
 #[cfg(target_os = "macos")]
+mod job_events;
+#[cfg(target_os = "macos")]
+mod job_journal;
+#[cfg(target_os = "macos")]
+pub use job_journal::{JOURNAL_KINDS, JournalEvent};
+
+#[cfg(target_os = "macos")]
 mod history_owner;
 #[cfg(target_os = "macos")]
 pub use history_owner::HistoryStore;

@@ -40,6 +40,7 @@ pub(crate) fn configure(
                 | "job.show"
                 | "job.evidence"
                 | "job.timeline"
+                | "job.events"
         )
     {
         return Ok(None);
@@ -77,6 +78,9 @@ pub(crate) fn configure(
                 "an exact Job identity is required",
             ));
         }
+    }
+    if command == "job.events" {
+        crate::job_events::configure(fields)?;
     }
     if command == "job.timeline" {
         crate::job_resources::configure_list(fields)?;
@@ -242,6 +246,7 @@ pub fn validate_read_only_request(invocation: &Invocation) -> Result<(), CliErro
             | "job.show"
             | "job.evidence"
             | "job.timeline"
+            | "job.events"
     ) {
         arkdeck_contract::validate_method_value(
             invocation.method,
@@ -268,6 +273,7 @@ pub fn validate_read_only_response(invocation: &Invocation, v: &Value) -> Result
             | "job.show"
             | "job.evidence"
             | "job.timeline"
+            | "job.events"
     ) {
         return Ok(());
     }
@@ -287,6 +293,9 @@ pub fn validate_read_only_response(invocation: &Invocation, v: &Value) -> Result
     }
     if invocation.command == "job.list" {
         return crate::job_resources::validate_list(params, v);
+    }
+    if invocation.command == "job.events" {
+        return crate::job_events::validate(params, v);
     }
     if invocation.command == "job.timeline" {
         return crate::job_resources::validate_timeline_page(params, v);

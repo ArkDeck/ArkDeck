@@ -8,6 +8,9 @@ use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
 use std::path::Path;
 
 pub struct HostDirectory(File, Ownership);
+#[path = "host_journal.rs"]
+mod journal;
+pub use journal::HostJournal;
 #[path = "host_export.rs"]
 mod export;
 pub use export::{ExportPublishError, ExportStaging, HostExportCapacity};
