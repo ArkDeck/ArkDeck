@@ -2,6 +2,8 @@
 mod bootstrap_readers;
 #[cfg(target_os = "macos")]
 mod facade;
+#[cfg(target_os = "macos")]
+mod facade_owners;
 mod host;
 
 use arkdeck_contract::MAX_REQUEST_BYTES;

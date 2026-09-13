@@ -788,7 +788,7 @@ pub fn fresh_id() -> io::Result<String> {
     ))
 }
 
-fn utc_now() -> String {
+pub(crate) fn utc_now() -> String {
     timestamp(
         SystemTime::now()
             .duration_since(UNIX_EPOCH)

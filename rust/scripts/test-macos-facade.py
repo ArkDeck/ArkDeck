@@ -17,8 +17,12 @@ import time
 import unittest
 import fcntl
 
-DAEMON = Path(os.environ['ARKDECK_DAEMON_UNDER_TEST']).resolve()
-IDENTITY = '8a662759721a2081e974306399997801246de4022047365c050107de5dce2912'
+# check-contracts.py runs this from its own source view, whose build is beside it.
+DAEMON = Path(os.environ.get('ARKDECK_DAEMON_UNDER_TEST') or Path(__file__).resolve().parents[1] / 'target/debug/arkdeck-agentd').resolve()
+# The facade validates every frame against this checkout's contract before
+# forwarding or serving it, so the identity is derived, never pinned here.
+REGISTRY = json.loads((Path(__file__).resolve().parents[2] / 'Packages/ArkDeckKit/Contracts/control-protocol.json').read_bytes())
+IDENTITY = hashlib.sha256(json.dumps(REGISTRY, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
 FRAME = json.dumps(dict(protocolVersion='1.0.0', contractIdentity=IDENTITY, id='host-test', method='health'), separators=(',', ':')).encode()
 RESPONSE = b' { "id" : "host-test", "ok" : true, "result" : {} } \n'
 FIXTURE = r'''#!/usr/bin/env python3
@@ -125,5 +129,30 @@ class FacadeTests(unittest.TestCase):
             p.communicate(timeout=5);self.assertEqual(p.returncode,0)
             self.assertEqual(self.rows()[-1]['origin']['foregroundConsole'],not redirected)
             os.close(master);os.close(slave)
+    def test_history_filter_is_owned_here_and_never_forwarded(self):
+        # TASK-XPA-012: the facade serves this host-only store from the paired
+        # authority's state directory; only other methods reach the authority.
+        link={}
+        def connect():
+            link['socket']=self.start();link['reader']=link['socket'].makefile('rb')
+        def ask(method,params):
+            frame=dict(protocolVersion='1.0.0',contractIdentity=IDENTITY,id='host-owner',method=method,params=params)
+            link['socket'].sendall(json.dumps(frame).encode()+b'\n')
+            return json.loads(link['reader'].readline())
+        query=dict(search='x',status='all',mode='all',sessionId=None,targetId=None,timeRange='anyTime',activity='all')
+        connect()
+        self.assertEqual(ask('history.filter.list',{})['result']['generation'],'1')
+        self.assertEqual(ask('history.filter.save',dict(query,expectedGeneration='1'))['result']['generation'],'2')
+        self.process.kill();self.process.wait(timeout=5);time.sleep(.1)
+        connect()
+        self.assertEqual(ask('history.filter.list',{})['result']['filters'][0]['query']['search'],'x')
+        stale=ask('history.filter.save',dict(query,expectedGeneration='1'))['error']
+        self.assertEqual((stale['code'],stale['details']['newDispatchCount']),('resourceConflict',0))
+        self.assertEqual(ask('history.filter.delete',dict(expectedGeneration='2'))['result']['generation'],'3')
+        self.assertEqual(self.rows(),[])
+        link['socket'].sendall(FRAME+b'\n');self.assertEqual(link['reader'].readline(),RESPONSE)
+        self.assertEqual(len(self.wait_rows()),1)
+        document=json.loads((self.root/'history-filter.json').read_bytes())
+        self.assertEqual((document['schemaVersion'],document['generation']),('arkdeck.history-filter-store/1',3))
 
 if __name__=='__main__': unittest.main()

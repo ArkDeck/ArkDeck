@@ -1411,7 +1411,10 @@ let startupTask = Task.detached {
         ComposedLanePlanPreviewer(lane: lane, profileID: profileID, providers: providers)
       }
     }
-    let historyFilterStore = RuntimeHistoryFilterStore(rootURL: resolvedStateDirectory)
+    // Behind the paired Rust transport the facade owns this store; opening it
+    // here too would put two processes behind one lock (TASK-XPA-012).
+    let historyFilterStore = AgentFacadeHostOwnership.historyFilterStore(
+      stateDirectory: resolvedStateDirectory, facade: inheritedFacade)
     let traceCacheDirectory =
       resolvedStateDirectory.standardizedFileURL == defaultStateDirectory.standardizedFileURL
       ? ArkDeckTraceConfiguration.appContainerCachesDirectory()

@@ -121,6 +121,9 @@ def commands(view: Path, output: Path, *, owners: bool = False) -> list[tuple[li
                         "--bin-dir", str(rust / "target/debug")], view))
         result.append(([sys.executable, str(rust / "scripts/check-tool-retirement.py"),
                         "--bin-dir", str(rust / "target/debug")], view))
+        # The facade's transport and its locally owned stores, against a fixture
+        # authority; the real Swift pair needs SwiftPM products and runs apart.
+        result.append(([sys.executable, str(rust / "scripts/test-macos-facade.py")], view))
     return result
 
 
