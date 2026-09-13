@@ -78,7 +78,10 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         }
         directory.validate_path(&root)?;
         let artifacts = root.join("artifacts");
-        let trace_cache = root.join("trace-cache");
+        let trace_parent = directory.child("trace-cache")?;
+        trace_parent.private_child("traces")?;
+        trace_parent.private_child("staging")?;
+        let trace_cache = root.join("trace-cache/traces");
         let bootstrap = root.join("bootstrap");
         let sessions = arkdeck_hoststore::SessionStore::open(
             &root.join("session-state"),
@@ -88,7 +91,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             &root,
             vec![
                 artifacts.clone(),
-                trace_cache.clone(),
+                root.join("trace-cache"),
                 bootstrap.clone(),
                 root.join("jobs-state"),
                 root.join("targets-state"),

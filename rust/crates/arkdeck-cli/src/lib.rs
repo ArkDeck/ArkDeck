@@ -110,7 +110,7 @@ impl CliError {
         if matches!(method, "runtime.bundle.remove" | "runtime.tool.remove") {
             return bootstrap_resources::retirement_error(error, method);
         }
-        if method == "session.cleanup.apply"
+        if matches!(method, "session.cleanup.apply" | "trace.cache.purge")
             && matches!(
                 error,
                 ClientError::Transport(_)
@@ -120,7 +120,11 @@ impl CliError {
         {
             let mut result = Self::new(
                 "outcomeUnknown",
-                "Session cleanup response is unconfirmed; no request was replayed",
+                if method == "trace.cache.purge" {
+                    "Trace cache purge response is unconfirmed; no request was replayed"
+                } else {
+                    "Session cleanup response is unconfirmed; no request was replayed"
+                },
             );
             result
                 .details
@@ -133,6 +137,7 @@ impl CliError {
                     method,
                     "runtime.tool.register"
                         | "runtime.bundle.register"
+                        | "trace.cache.purge"
                         | "history.filter.save"
                         | "history.filter.delete"
                         | "runtime.storage.policy"
@@ -226,7 +231,14 @@ impl CliError {
                         d.get("phase") == Some(&json!("importOwner"))
                             && d.get("newDispatchCount") == Some(&json!(0))
                     });
-                let host_proof = host_proof || bootstrap_proof || artifact_proof || import_proof;
+                let trace_proof = matches!(method, "trace.cache.status" | "trace.cache.purge")
+                    && error.details.as_ref().is_some_and(|d| {
+                        d.get("phase") == Some(&json!("traceCacheOwner"))
+                            && d.get("newDispatchCount") == Some(&json!(0))
+                            && d.get("purgeScope") == Some(&json!("inactiveDerivedDatabases"))
+                    });
+                let host_proof =
+                    host_proof || bootstrap_proof || artifact_proof || import_proof || trace_proof;
                 let code = match error.code.as_str() {
                     "artifactIntegrityFailed" if artifact_proof || import_proof => {
                         "artifactIntegrityFailed"
@@ -488,6 +500,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["device", "display-name", "set"] => "device.display-name.set",
         ["device", "display-name", "clear"] => "device.display-name.clear",
         ["trace", "cache", "status"] => "trace.cache.status",
+        ["trace", "cache", "purge"] => "trace.cache.purge",
         ["runtime", "tool", "register"] => "runtime.tool.register",
         ["runtime", "tool", "list"] => "runtime.tool.list",
         ["runtime", "tool", "remove"] => "runtime.tool.remove",
@@ -514,7 +527,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         _ => {
             return Err(CliError::new(
                 "invalidCommand",
-                "available commands: doctor, operation list, target list|show, target display-name set|clear, device display-name set|clear, device candidates, trace cache status, history filter list|save|delete, runtime storage status|policy|root, session list|show|pin|unpin, session cleanup preview|apply, session export preview|apply",
+                "available commands: doctor, operation list, target list|show, target display-name set|clear, device display-name set|clear, device candidates, trace cache status|purge, history filter list|save|delete, runtime storage status|policy|root, session list|show|pin|unpin, session cleanup preview|apply, session export preview|apply",
             ));
         }
     };

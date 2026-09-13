@@ -1030,3 +1030,109 @@ fn export_refusals_do_not_create_destination_or_modify_artifacts() {
     assert_eq!(fs::read_dir(&output).unwrap().count(), 0);
     fs::remove_dir(output).unwrap();
 }
+
+#[test]
+fn trace_retention_uses_complete_artifact_and_import_census() {
+    let fixture = Fixture::new();
+    fs::remove_dir(fixture.root.join("JOB-1")).unwrap();
+    let store = fixture.store();
+    assert!(!store.with_trace_retention(|retain| retain).unwrap());
+    for relative in ["JOB-1", "unknown-namespace"] {
+        let directory = fixture.root.join(relative);
+        fs::DirBuilder::new()
+            .mode(0o700)
+            .create(&directory)
+            .unwrap();
+        assert!(store.with_trace_retention(|retain| retain).unwrap());
+        fs::remove_dir(directory).unwrap();
+    }
+    // The Import owner's idle skeleton never retains Trace data; any upload
+    // record, identity, payload or unrecognised member does.
+    let imports = fixture.root.join(".imports-v1");
+    for relative in ["records", "identities", "payloads"] {
+        fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(imports.join(relative))
+            .unwrap();
+    }
+    let owner_lock = imports.join(".owner.lock");
+    fs::write(&owner_lock, b"").unwrap();
+    fs::set_permissions(&owner_lock, fs::Permissions::from_mode(0o600)).unwrap();
+    assert!(!store.with_trace_retention(|retain| retain).unwrap());
+    for relative in [
+        "records/upload.json",
+        "identities/upload",
+        "payloads/upload/chunk",
+        "stray.json",
+    ] {
+        let retained = imports.join(relative);
+        fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(retained.parent().unwrap())
+            .unwrap();
+        fs::write(&retained, b"retained upload state").unwrap();
+        fs::set_permissions(&retained, fs::Permissions::from_mode(0o600)).unwrap();
+        assert!(
+            store.with_trace_retention(|retain| retain).unwrap(),
+            "{relative}"
+        );
+        fs::remove_file(&retained).unwrap();
+        if relative == "payloads/upload/chunk" {
+            fs::remove_dir(retained.parent().unwrap()).unwrap();
+        }
+    }
+    let unknown = imports.join("staging");
+    fs::DirBuilder::new().mode(0o700).create(&unknown).unwrap();
+    assert!(store.with_trace_retention(|retain| retain).unwrap());
+    fs::remove_dir(&unknown).unwrap();
+    assert!(!store.with_trace_retention(|retain| retain).unwrap());
+    fs::remove_dir_all(&imports).unwrap();
+    let debt = fixture.root.join("cleanup-debt.json");
+    fs::write(&debt, b"uninterpreted retained state").unwrap();
+    fs::set_permissions(&debt, fs::Permissions::from_mode(0o600)).unwrap();
+    assert!(store.with_trace_retention(|retain| retain).unwrap());
+    assert_eq!(fs::read(debt).unwrap(), b"uninterpreted retained state");
+}
+
+#[test]
+fn trace_retention_refuses_corrupt_indices_and_unsafe_nested_imports_before_action() {
+    for failure in ["index", "symlink", "hardlink", "permissions", "depth"] {
+        let fixture = Fixture::new();
+        let nested = fixture.root.join(".imports-v1/upload");
+        fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(&nested)
+            .unwrap();
+        let payload = nested.join("payload");
+        fs::write(&payload, b"retain").unwrap();
+        fs::set_permissions(&payload, fs::Permissions::from_mode(0o600)).unwrap();
+        match failure {
+            "index" => fixture.write_index(b"{}".to_vec()),
+            "symlink" => symlink(&payload, nested.join("link")).unwrap(),
+            "hardlink" => fs::hard_link(&payload, nested.join("link")).unwrap(),
+            "permissions" => {
+                fs::set_permissions(&payload, fs::Permissions::from_mode(0o666)).unwrap()
+            }
+            _ => fs::DirBuilder::new()
+                .recursive(true)
+                .mode(0o700)
+                .create(nested.join("a/b/c/d/e/f/g/h/i"))
+                .unwrap(),
+        }
+        let mut called = false;
+        assert!(
+            fixture
+                .store()
+                .with_trace_retention(|_| {
+                    called = true;
+                })
+                .is_err(),
+            "{failure}"
+        );
+        assert!(!called, "{failure} cannot reach Trace deletion");
+        assert_eq!(fs::read(payload).unwrap(), b"retain");
+    }
+}

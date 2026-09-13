@@ -2,7 +2,7 @@
 //! external destination. Artifact publication, import leases, quota mutation,
 //! snapshot persistence and payload-verification-document writes stay separate.
 use crate::artifact_usage::decode_index;
-use arkdeck_platform::HostDirectory;
+use arkdeck_platform::{HostDirectory, HostEntryKind};
 use serde_json::Value;
 use std::{
     io,
@@ -10,12 +10,16 @@ use std::{
 };
 
 const MAX_INDEX: usize = 16 * 1024 * 1024;
+const IMPORT_NAMESPACE: &str = ".imports-v1";
+const IMPORT_OWNER_LOCK: &str = ".owner.lock";
+const IMPORT_SKELETON: [&str; 3] = ["records", "identities", "payloads"];
 pub const MAX_ARTIFACT_READ_BYTES: usize = 4_194_304;
 
 pub struct ArtifactReadStore {
     root: HostDirectory,
     pub(crate) path: PathBuf,
     pub(crate) export_lock: std::sync::Mutex<()>,
+    trace_retention: std::sync::Mutex<()>,
 }
 
 /// An in-memory immutable snapshot; it is deliberately not a Runtime wire cursor.
@@ -96,6 +100,7 @@ impl ArtifactReadStore {
             root: HostDirectory::open(path)?,
             path: path.into(),
             export_lock: std::sync::Mutex::new(()),
+            trace_retention: std::sync::Mutex::new(()),
         })
     }
 
@@ -145,6 +150,98 @@ impl ArtifactReadStore {
         }
         self.unchanged(job_id, &job, &index)?;
         Ok(rows)
+    }
+
+    /// Keep the real Artifact census guarded through Trace maintenance. The
+    /// read owner cannot yet prove any retained reference inactive, including
+    /// cleanup debt, so any Job directory, unknown namespace or retained file
+    /// preserves every Trace entry. The Import owner creates its empty
+    /// `.imports-v1` skeleton at startup; that namespace retains Trace data
+    /// only while it holds an upload record, identity or payload, or anything
+    /// this owner does not recognise. Future Artifact writers must join this
+    /// guard before publication.
+    pub fn with_trace_retention<R>(&self, action: impl FnOnce(bool) -> R) -> io::Result<R> {
+        let _guard = self.trace_retention.lock().map_err(|_| corrupt())?;
+        self.root.validate_path(&self.path)?;
+        let names = self.root.names(4096)?;
+        let mut retain_all = false;
+        for name in &names {
+            if name == IMPORT_NAMESPACE
+                && self.root.owned_kind_and_size(name)?.0 == HostEntryKind::Directory
+            {
+                retain_all |= Self::import_namespace_retains(&self.root.child(name)?)?;
+            } else {
+                retain_all = true;
+            }
+        }
+        let mut visited = 0;
+        Self::inspect_retained_tree(&self.root, 0, &mut visited)?;
+        // Validate supported Job indices rather than hiding corrupt known
+        // metadata behind a nonempty-directory signal. Unknown namespaces are
+        // retained, never decoded into a guessed inactive interpretation.
+        for name in &names {
+            if job_id(name) && self.root.owned_kind_and_size(name)?.0 == HostEntryKind::Directory {
+                let job = self.root.child(name)?;
+                match job.read("index.json", MAX_INDEX) {
+                    Ok(bytes) => {
+                        decode_index(&bytes, name)?;
+                    }
+                    Err(error) if error.kind() == io::ErrorKind::NotFound => (),
+                    Err(error) => return Err(error),
+                }
+            }
+        }
+        if self.root.names(4096)? != names {
+            return Err(corrupt());
+        }
+        self.root.validate_path(&self.path)?;
+        let result = action(retain_all);
+        self.root.validate_path(&self.path)?;
+        Ok(result)
+    }
+
+    /// The idle Import skeleton is `records`, `identities` and `payloads`
+    /// beside the owner lock. Any member of those directories, and any other
+    /// entry, is retained state this read owner cannot interpret.
+    fn import_namespace_retains(imports: &HostDirectory) -> io::Result<bool> {
+        let mut retained = false;
+        for name in imports.names(4096)? {
+            match imports.owned_kind_and_size(&name)?.0 {
+                HostEntryKind::Directory if IMPORT_SKELETON.contains(&name.as_str()) => {
+                    retained |= !imports.child(&name)?.names(4096)?.is_empty();
+                }
+                HostEntryKind::Regular if name == IMPORT_OWNER_LOCK => (),
+                HostEntryKind::Other => return Err(corrupt()),
+                _ => retained = true,
+            }
+        }
+        Ok(retained)
+    }
+
+    fn inspect_retained_tree(
+        directory: &HostDirectory,
+        depth: usize,
+        visited: &mut usize,
+    ) -> io::Result<()> {
+        for name in directory.names(4096)? {
+            *visited += 1;
+            if *visited > 4096 {
+                return Err(corrupt());
+            }
+            match directory.owned_kind_and_size(&name)?.0 {
+                HostEntryKind::Directory => {
+                    if depth >= 8 {
+                        return Err(corrupt());
+                    }
+                    Self::inspect_retained_tree(&directory.child(&name)?, depth + 1, visited)?;
+                }
+                HostEntryKind::Regular => {
+                    directory.document_metadata(&name)?;
+                }
+                HostEntryKind::Other => return Err(corrupt()),
+            }
+        }
+        Ok(())
     }
 
     pub fn list(&self, job_id: &str) -> io::Result<ArtifactReadSnapshot> {

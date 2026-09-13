@@ -96,7 +96,9 @@ struct Metadata {
 
 // Decode dictionary members in Foundation's first-key-wins order while
 // retaining the original numeric tokens for the integer compatibility path.
-struct FirstFields(std::collections::BTreeMap<String, Box<serde_json::value::RawValue>>);
+pub(super) struct FirstFields(
+    pub(super) std::collections::BTreeMap<String, Box<serde_json::value::RawValue>>,
+);
 impl<'de> Deserialize<'de> for FirstFields {
     fn deserialize<D: serde::Deserializer<'de>>(decoder: D) -> Result<Self, D::Error> {
         struct FieldsVisitor;
@@ -137,7 +139,7 @@ fn metadata_snapshot(bytes: &[u8]) -> Option<Metadata> {
     serde_json::from_slice(&serde_json::to_vec(&fields).ok()?).ok()
 }
 
-fn json_text(bytes: &[u8]) -> Option<String> {
+pub(super) fn json_text(bytes: &[u8]) -> Option<String> {
     // JSONDecoder recognizes UTF-8, UTF-16 and UTF-32 from a BOM or the
     // leading ASCII JSON code unit. Conversion changes only this read snapshot.
     let (width, big_endian, skip) = if bytes.starts_with(&[0, 0, 0xfe, 0xff]) {
@@ -385,4 +387,67 @@ pub fn trace_inventory(path: &Path) -> io::Result<Value> {
         "totalByteCount": total.to_string(), "activeEntryCount": active,
         "inactiveEntryCount": count - active, "purgeScope": "inactiveDerivedDatabases"}),
     )
+}
+
+pub(super) struct TraceEntry {
+    pub trace: String,
+    pub parser: String,
+    pub identity: (u64, u64),
+    pub valid: bool,
+    pub last_accessed: f64,
+}
+
+/// Selection reuses the exact pinned metadata decoder used by inventory. The
+/// maintenance owner still reacquires all leases and rebinds each directory.
+pub(super) fn maintenance_entries(path: &Path) -> io::Result<Vec<TraceEntry>> {
+    let root = HostDirectory::open_trace_inventory(path)?;
+    let mut entries = Vec::new();
+    for trace in root.names(4096)? {
+        if !hex(&trace) || root.kind_and_size(&trace)?.0 != HostEntryKind::Directory {
+            continue;
+        }
+        let trace_root = root.child(&trace)?;
+        let remaining = 4096usize
+            .checked_sub(entries.len())
+            .filter(|n| *n > 0)
+            .ok_or_else(invalid)?;
+        for parser in trace_root.names(remaining)? {
+            if !hex(&parser) || trace_root.kind_and_size(&parser)?.0 != HostEntryKind::Directory {
+                continue;
+            }
+            let entry = trace_root.child(&parser)?;
+            let metadata = entry
+                .read("metadata.json", 16_384)
+                .ok()
+                .and_then(|b| metadata_snapshot(&b))
+                .filter(|m| {
+                    m.key.trace_sha256 == trace
+                        && m.key.parser_key == parser
+                        && crate::format_time::valid_format_timestamp(&m.created_at)
+                        && crate::format_time::valid_format_timestamp(&m.last_accessed_at)
+                        && entry
+                            .kind_and_size("database.sqlite")
+                            .is_ok_and(|(kind, size)| {
+                                kind == HostEntryKind::Regular && size == m.database_byte_count
+                            })
+                });
+            entries.push(TraceEntry {
+                trace: trace.clone(),
+                parser,
+                identity: entry.directory_identity()?,
+                valid: metadata.is_some(),
+                last_accessed: metadata
+                    .and_then(|m| crate::format_time::format_timestamp_seconds(&m.last_accessed_at))
+                    .unwrap_or(f64::NEG_INFINITY),
+            });
+        }
+    }
+    entries.sort_by(|a, b| {
+        a.last_accessed
+            .total_cmp(&b.last_accessed)
+            .then_with(|| a.trace.cmp(&b.trace))
+            .then_with(|| a.parser.cmp(&b.parser))
+    });
+    root.validate_path(path)?;
+    Ok(entries)
 }
