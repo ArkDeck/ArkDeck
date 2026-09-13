@@ -47,6 +47,7 @@ fn published_argv_fixtures_replay() {
         include_str!("../../../tests/fixtures/current-cli-argv/job.show.json"),
         include_str!("../../../tests/fixtures/current-cli-argv/job.evidence.json"),
         include_str!("../../../tests/fixtures/current-cli-argv/job.timeline.json"),
+        include_str!("../../../tests/fixtures/current-cli-argv/job.plan.json"),
     ] {
         let doc: Value = serde_json::from_str(corpus).unwrap();
         for case in doc["cases"].as_array().unwrap() {

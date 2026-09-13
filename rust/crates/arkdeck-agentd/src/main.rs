@@ -112,6 +112,16 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         )
         .with_bootstrap(&bootstrap)?
         .with_jobs(arkdeck_hoststore::JobStore::open(&root.join("jobs-state"))?)
+        // As the Swift daemon: an analyzer is configured only by naming its
+        // executable, and a named path that is not one fails startup.
+        .with_planning(
+            &root,
+            std::env::var_os("ARKDECK_ANALYZER_PATH")
+                .map(|path| {
+                    arkdeck_hoststore::AnalyzerProfile::crash_signature(std::path::Path::new(&path))
+                })
+                .transpose()?,
+        )
     } else {
         host
     };

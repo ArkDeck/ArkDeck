@@ -15,7 +15,9 @@ pub use read_only_resources::{
     project_read_only_response, validate_read_only_request, validate_read_only_response,
 };
 mod job_events;
+mod job_plan;
 mod job_resources;
+pub use job_plan::{job_plan_params, validate_plan};
 mod session_resources;
 pub use bootstrap_resources::{validate_bootstrap_request, validate_bootstrap_response};
 pub use session_resources::validate_session_response;
@@ -278,6 +280,13 @@ impl CliError {
                     }
                     "recordUnreadable" => "recordUnreadable",
                     "workspaceReferenceNotFound" => "workspaceReferenceNotFound",
+                    // A plan's typed refusals carry the same pre-admission
+                    // proof as the Swift CLI requires before keeping them.
+                    "operationUnavailable" if proof && method == "job.plan" => {
+                        "operationUnavailable"
+                    }
+                    "inputTooLarge" if proof && method == "job.plan" => "inputTooLarge",
+                    "admissionDenied" if proof && method == "job.plan" => "admissionDenied",
                     "invalidInput" if proof => "invalidInput",
                     "invalidCursor"
                         if proof
@@ -389,6 +398,11 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                 | "--state"
                 | "--thread"
                 | "--after-cursor"
+                | "--request-file"
+                | "--inputs-file"
+                | "--expected-binding-revision"
+                | "--request-id"
+                | "--idempotency-key"
                 | "--timeout" => {
                     index += 1;
                     let value = argv
@@ -418,6 +432,11 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                         "--session" => "sessionId",
                         "--target" => "targetId",
                         "--time" => "timeRange",
+                        "--request-file" => "requestFile",
+                        "--inputs-file" => "inputsFile",
+                        "--expected-binding-revision" => "expectedBindingRevision",
+                        "--request-id" => "requestId",
+                        "--idempotency-key" => "idempotencyKey",
                         other => &other[2..],
                     };
                     method_options.insert(key.to_owned(), json!(value));
@@ -492,6 +511,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["job", "evidence"] => "job.evidence",
         ["job", "timeline"] => "job.timeline",
         ["job", "events"] => "job.events",
+        ["job", "plan"] => "job.plan",
         ["device", "candidates"] => "device.candidates",
         ["target", "list"] => "target.list",
         ["target", "show"] => "target.show",
@@ -617,6 +637,16 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         "runtime.bundle.register" => &["kind", "file"],
         "runtime.bundle.inspect" => &["bundle"],
         "operation.describe" | "operation.example" => &["operation"],
+        "job.plan" => &[
+            "requestFile",
+            "targetId",
+            "operation",
+            "inputsFile",
+            "expectedBindingRevision",
+            "requestId",
+            "idempotencyKey",
+            "timeout",
+        ],
         "job.status" | "job.show" | "job.evidence" => &["jobId", "timeout"],
         "job.timeline" => &["jobId", "pageSize", "cursor", "timeout"],
         "job.events" => &["jobId", "pageSize", "afterCursor", "timeout"],
@@ -829,10 +859,12 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
     let import_timeout = import_resources::configure(command, &mut method_options, help)?;
     let artifact_timeout = artifact_resources::configure(command, &mut method_options, help)?;
     let target_timeout = target_resources::configure(command, &mut method_options, help)?;
+    let plan_timeout = job_plan::configure(command, &mut method_options, help)?;
     let timeout_ms = read_only_resources::configure(command, &mut method_options, help)?
         .or(import_timeout)
         .or(artifact_timeout)
-        .or(target_timeout);
+        .or(target_timeout)
+        .or(plan_timeout);
     Ok(Invocation {
         command,
         method: if command == "device.candidates" {
@@ -875,6 +907,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                     | "job.evidence"
                     | "job.timeline"
                     | "job.events"
+                    | "job.plan"
             )
         {
             Some(method_options)

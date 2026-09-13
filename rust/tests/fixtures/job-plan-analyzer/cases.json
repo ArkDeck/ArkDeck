@@ -1,0 +1,1300 @@
+[
+  {
+    "name" : "planned",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "ok" : true,
+      "result" : {
+        "authorizationPolicy" : "defaultReadOnly",
+        "bindingRevision" : null,
+        "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+        "dispatchDisposition" : "notDispatched",
+        "effectiveEffect" : "hostOnly",
+        "executionMode" : "planOnly",
+        "inputs" : {
+          "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e"
+        },
+        "jobAdmitted" : false,
+        "materializedPlanDigest" : "76388482fbbe9a8387c9cb4b8f7338431ad849010a13a5968e1575e05e41af2d",
+        "operation" : "analyzer.extract-crash-signature@1",
+        "providerAdmissionBlocker" : null,
+        "providerId" : "analyzer",
+        "requestFingerprintSha256" : "de3394eabb8b01c75aefbd6baa75d0e21beabb09c57012081388a97c088b05c0",
+        "schemaVersion" : "arkdeck.job-plan/1",
+        "stableIdentitySha256" : null,
+        "steps" : [
+          {
+            "binding" : "none",
+            "cancellation" : "immediate",
+            "effect" : "hostOnly",
+            "kind" : "runDeterministicAnalyzer",
+            "optional" : false,
+            "stepId" : "extract-crash-signature"
+          }
+        ],
+        "targetId" : "TGT-ORACLE"
+      }
+    }
+  },
+  {
+    "name" : "plannedWithClientContext",
+    "params" : {
+      "requestJson" : "{\"clientContext\":{\"clientName\":\"oracle\",\"provenance\":{\"arkdeck.threadId\":\"thread-oracle\"}},\"idempotencyKey\":\"idem-oracle-context-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-context\",\"requestedOutputs\":[\"analysisReport\",\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "ok" : true,
+      "result" : {
+        "authorizationPolicy" : "defaultReadOnly",
+        "bindingRevision" : null,
+        "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+        "dispatchDisposition" : "notDispatched",
+        "effectiveEffect" : "hostOnly",
+        "executionMode" : "planOnly",
+        "inputs" : {
+          "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e"
+        },
+        "jobAdmitted" : false,
+        "materializedPlanDigest" : "76388482fbbe9a8387c9cb4b8f7338431ad849010a13a5968e1575e05e41af2d",
+        "operation" : "analyzer.extract-crash-signature@1",
+        "providerAdmissionBlocker" : null,
+        "providerId" : "analyzer",
+        "requestFingerprintSha256" : "2ef22606c46d16760e4385d96972464fa78f632754c6c9d0e0b941676ce7ad6d",
+        "schemaVersion" : "arkdeck.job-plan/1",
+        "stableIdentitySha256" : null,
+        "steps" : [
+          {
+            "binding" : "none",
+            "cancellation" : "immediate",
+            "effect" : "hostOnly",
+            "kind" : "runDeterministicAnalyzer",
+            "optional" : false,
+            "stepId" : "extract-crash-signature"
+          }
+        ],
+        "targetId" : "TGT-ORACLE"
+      }
+    }
+  },
+  {
+    "name" : "extraParameter",
+    "params" : {
+      "extra" : true,
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "the target Job request accepts exactly one bounded requestJson"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "missingRequestJson",
+    "params" : {
+
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "the target Job request accepts exactly one bounded requestJson"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "emptyRequestJson",
+    "params" : {
+      "requestJson" : ""
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "requestJson must be a non-empty typed request document"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "requestTooLarge",
+    "requestJsonSpaces" : 1048577,
+    "response" : {
+      "error" : {
+        "code" : "inputTooLarge",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "request exceeds 1048576 bytes"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "malformedJSON",
+    "params" : {
+      "requestJson" : "{\"schemaVersion\":"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "malformed or duplicate-key JSON"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "duplicateKey",
+    "params" : {
+      "requestJson" : "{\"schemaVersion\":\"1.0.0\",\"schemaVersion\":\"1.0.0\"}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "malformed or duplicate-key JSON"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "notAnObject",
+    "params" : {
+      "requestJson" : "[]"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "undecodable current request: DecodingError.typeMismatch: expected value of type Dictionary<String, Any>. Debug description: Expected to decode Dictionary<String, Any> but found an array instead."
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "topLevelString",
+    "params" : {
+      "requestJson" : "\"request\""
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "undecodable current request: DecodingError.typeMismatch: expected value of type Dictionary<String, Any>. Debug description: Expected to decode Dictionary<String, Any> but found a string instead."
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "topLevelNumber",
+    "params" : {
+      "requestJson" : "7"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "undecodable current request: DecodingError.typeMismatch: expected value of type Dictionary<String, Any>. Debug description: Expected to decode Dictionary<String, Any> but found number instead."
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "topLevelBool",
+    "params" : {
+      "requestJson" : "true"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "undecodable current request: DecodingError.typeMismatch: expected value of type Dictionary<String, Any>. Debug description: Expected to decode Dictionary<String, Any> but found bool instead."
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "topLevelNull",
+    "params" : {
+      "requestJson" : "null"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "undecodable current request: DecodingError.valueNotFound: Expected value of type Dictionary<String, Any> but found null instead. Debug description: Cannot get keyed decoding container -- found null value instead"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "wrongSchemaVersion",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"2.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "operationUnavailable",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "schemaVersion must be exactly \"1.0.0\""
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "wrongDocumentType",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-job\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "expected runtime-operation-request"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "governanceField",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"},\"taskId\":\"TASK-XPA-014\"}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "repository governance fields are not runtime fields; use PublishedOperationBundleManifest for build provenance"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "retiredAuthority",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"standingAuthorization\":true,\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "admissionDenied",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "retired authority fields cannot enter the current Runtime contract"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "unknownField",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"extra\":\"x\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "unknown field in the current Runtime contract"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "unknownNestedField",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"extra\":1,\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "unknown field in the current Runtime contract"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "malformedReviewedPlanDigest",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"reviewedPlanDigest\":\"ABC\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "reviewedPlanDigest must be a lowercase SHA-256 precondition"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "missingRequestId",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "$.requestId is required (an identifier string)"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "malformedTarget",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":\"TGT-ORACLE\"}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "$.target is malformed (an object carrying targetId)"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "shortIdempotencyKey",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"short\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "idempotency key must be at least 8 characters"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "malformedRequestId",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"-req\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "identifier must be 1..128 ASCII [A-Za-z0-9._-] starting alphanumeric"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "malformedOperationId",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"Analyzer\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "operationUnavailable",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "malformed operation id"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "capability",
+    "params" : {
+      "requestJson" : "{\"authorization\":{\"capabilityId\":\"CAP-RT-ORACLE\"},\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "planOnly does not accept or consume a Runtime capability"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "unknownOperation",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.no-such-operation\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "operationUnavailable",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "operation analyzer.no-such-operation@1 is not in the catalog"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "unversionedOperation",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\"},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "operationUnavailable",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "operation analyzer.extract-crash-signature is not in the catalog"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "missingInput",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "required input sourceArtifactRef is absent"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "undeclaredInput",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"extraInput\":\"x\",\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "input extraInput is not declared by analyzer.extract-crash-signature@1"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "wrongInputType",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":7},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "input sourceArtifactRef has the wrong type for analyzer.extract-crash-signature@1"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "executableInputKey",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"argv\":\"x\",\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "input key would carry an executable surface"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "inputsNotObject",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":\"x\",\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "undecodable current request: DecodingError.typeMismatch: expected value of type Dictionary<String, Any>. Path: inputs. Debug description: Expected to decode Dictionary<String, Any> but found a string instead."
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "inputsNull",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":null,\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "required input sourceArtifactRef is absent"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "inputKeyNotCamelCase",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"SourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "input keys must be lowerCamelCase ASCII"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "requestedOutputsNotArray",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"requestedOutputs\":\"derivedArtifacts\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "undecodable current request: DecodingError.typeMismatch: expected value of type Array<Any>. Path: requestedOutputs. Debug description: Expected to decode Array<Any> but found a string instead."
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "requestedOutputUnknown",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"requestedOutputs\":[\"everything\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "undecodable current request: DecodingError.dataCorrupted: Data was corrupted. Path: requestedOutputs[0]. Debug description: Cannot initialize RuntimeRequestedOutput from invalid String value everything"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "requestedOutputsDuplicate",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"requestedOutputs\":[\"derivedArtifacts\",\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "requested outputs must be unique, at most 8"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "authorizationNotObject",
+    "params" : {
+      "requestJson" : "{\"authorization\":\"CAP-RT-ORACLE\",\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "undecodable current request: DecodingError.typeMismatch: expected value of type Dictionary<String, Any>. Path: authorization. Debug description: Expected to decode Dictionary<String, Any> but found a string instead."
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "authorizationWithoutCapability",
+    "params" : {
+      "requestJson" : "{\"authorization\":{},\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "undecodable current request: DecodingError.keyNotFound: Key 'capabilityId' not found in keyed decoding container. Path: authorization. Debug description: No value associated with key CodingKeys(stringValue: \"capabilityId\", intValue: nil) (\"capabilityId\")."
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "capabilityMalformed",
+    "params" : {
+      "requestJson" : "{\"authorization\":{\"capabilityId\":\"CAP-ORACLE\"},\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "admissionDenied",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "authorization must reference a runtime capability (CAP-RT-...)"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "clientContextNotObject",
+    "params" : {
+      "requestJson" : "{\"clientContext\":\"oracle\",\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "undecodable current request: DecodingError.typeMismatch: expected value of type Dictionary<String, Any>. Path: clientContext. Debug description: Expected to decode Dictionary<String, Any> but found a string instead."
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "clientNameNotString",
+    "params" : {
+      "requestJson" : "{\"clientContext\":{\"clientName\":7},\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "undecodable current request: DecodingError.typeMismatch: expected value of type String. Path: clientContext.clientName. Debug description: Expected to decode String but found number instead."
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "clientNameEmpty",
+    "params" : {
+      "requestJson" : "{\"clientContext\":{\"clientName\":\"\"},\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "client name must be 1..128 characters"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "provenanceValueNotString",
+    "params" : {
+      "requestJson" : "{\"clientContext\":{\"provenance\":{\"origin\":1}},\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "undecodable current request: DecodingError.typeMismatch: expected value of type String. Path: clientContext.provenance.origin. Debug description: Expected to decode String but found number instead."
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "threadIdMalformed",
+    "params" : {
+      "requestJson" : "{\"clientContext\":{\"provenance\":{\"arkdeck.threadId\":\"-thread\"}},\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "thread id must be 1..64 characters of [A-Za-z0-9._-]"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "bindingRevisionZero",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":0,\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "binding revision must be >= 1"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "bindingRevisionFraction",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1.5,\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "$.target is malformed (an object carrying targetId)"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "inputsArray",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":[],\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "undecodable current request: DecodingError.typeMismatch: expected value of type Dictionary<String, Any>. Path: inputs. Debug description: Expected to decode Dictionary<String, Any> but found an array instead."
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "requestedOutputsObject",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"requestedOutputs\":{\"derivedArtifacts\":true},\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "undecodable current request: DecodingError.typeMismatch: expected value of type Array<Any>. Path: requestedOutputs. Debug description: Expected to decode Array<Any> but found a dictionary instead."
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "requestedOutputItemNotString",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"requestedOutputs\":[7],\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "undecodable current request: DecodingError.typeMismatch: expected value of type String. Path: requestedOutputs[0]. Debug description: Expected to decode String but found number instead."
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "requestedOutputItemNull",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"requestedOutputs\":[null],\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "undecodable current request: DecodingError.valueNotFound: Expected value of type String but found null instead. Path: requestedOutputs[0]. Debug description: Cannot get value of type String -- found null value instead"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "capabilityIdNotString",
+    "params" : {
+      "requestJson" : "{\"authorization\":{\"capabilityId\":7},\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "undecodable current request: DecodingError.typeMismatch: expected value of type String. Path: authorization.capabilityId. Debug description: Expected to decode String but found number instead."
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "capabilityIdNull",
+    "params" : {
+      "requestJson" : "{\"authorization\":{\"capabilityId\":null},\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "undecodable current request: DecodingError.valueNotFound: Expected value of type String but found null instead. Path: authorization.capabilityId. Debug description: Cannot get value of type String -- found null value instead"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "provenanceNotObject",
+    "params" : {
+      "requestJson" : "{\"clientContext\":{\"provenance\":\"origin\"},\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "undecodable current request: DecodingError.typeMismatch: expected value of type Dictionary<String, Any>. Path: clientContext.provenance. Debug description: Expected to decode Dictionary<String, Any> but found a string instead."
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "provenanceValueNull",
+    "params" : {
+      "requestJson" : "{\"clientContext\":{\"provenance\":{\"origin\":null}},\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "undecodable current request: DecodingError.valueNotFound: Expected value of type String but found null instead. Path: clientContext.provenance.origin. Debug description: Cannot get value of type String -- found null value instead"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "plannedWithEmptyClientContext",
+    "params" : {
+      "requestJson" : "{\"clientContext\":{},\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "ok" : true,
+      "result" : {
+        "authorizationPolicy" : "defaultReadOnly",
+        "bindingRevision" : null,
+        "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+        "dispatchDisposition" : "notDispatched",
+        "effectiveEffect" : "hostOnly",
+        "executionMode" : "planOnly",
+        "inputs" : {
+          "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e"
+        },
+        "jobAdmitted" : false,
+        "materializedPlanDigest" : "76388482fbbe9a8387c9cb4b8f7338431ad849010a13a5968e1575e05e41af2d",
+        "operation" : "analyzer.extract-crash-signature@1",
+        "providerAdmissionBlocker" : null,
+        "providerId" : "analyzer",
+        "requestFingerprintSha256" : "7103c8ba5683cdb3e379a03ba35bf447b60aa0ddf1dddbf1f9886d144061ed45",
+        "schemaVersion" : "arkdeck.job-plan/1",
+        "stableIdentitySha256" : null,
+        "steps" : [
+          {
+            "binding" : "none",
+            "cancellation" : "immediate",
+            "effect" : "hostOnly",
+            "kind" : "runDeterministicAnalyzer",
+            "optional" : false,
+            "stepId" : "extract-crash-signature"
+          }
+        ],
+        "targetId" : "TGT-ORACLE"
+      }
+    }
+  },
+  {
+    "name" : "plannedWithoutRequestedOutputs",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"requestedOutputs\":[],\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "ok" : true,
+      "result" : {
+        "authorizationPolicy" : "defaultReadOnly",
+        "bindingRevision" : null,
+        "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+        "dispatchDisposition" : "notDispatched",
+        "effectiveEffect" : "hostOnly",
+        "executionMode" : "planOnly",
+        "inputs" : {
+          "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e"
+        },
+        "jobAdmitted" : false,
+        "materializedPlanDigest" : "76388482fbbe9a8387c9cb4b8f7338431ad849010a13a5968e1575e05e41af2d",
+        "operation" : "analyzer.extract-crash-signature@1",
+        "providerAdmissionBlocker" : null,
+        "providerId" : "analyzer",
+        "requestFingerprintSha256" : "58e228dcb26614eb74ea93a45c59ef8e796c91eda4df7e7a30fa9c43c47825b5",
+        "schemaVersion" : "arkdeck.job-plan/1",
+        "stableIdentitySha256" : null,
+        "steps" : [
+          {
+            "binding" : "none",
+            "cancellation" : "immediate",
+            "effect" : "hostOnly",
+            "kind" : "runDeterministicAnalyzer",
+            "optional" : false,
+            "stepId" : "extract-crash-signature"
+          }
+        ],
+        "targetId" : "TGT-ORACLE"
+      }
+    }
+  },
+  {
+    "name" : "operationVersionZero",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":0},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "operationUnavailable",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "operation version must be >= 1"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "pinnedBindingRevision",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":3,\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "analyzer.extract-crash-signature@1 is host-only: a request must not pin a binding revision"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "malformedLease",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v2:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "analyzer source artifact Artifact lease is not resolvable: artifactNotFound(\"malformed Artifact lease\")"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "missingArtifact",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-00000000000000000000000000000000\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "analyzer source artifact Artifact lease is not resolvable: artifactNotFound(\"ART-00000000000000000000000000000000\")"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "missingJob",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-absent:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "analyzer source artifact Artifact lease is not resolvable: artifactNotFound(\"ART-cf645cc2f23c16cf9965b179bcb35b5e\")"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "malformedLeaseJob",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job.oracle:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "analyzer source artifact Artifact lease is not resolvable: ioFailure(\"malformed job identifier\")"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "malformedImportLease",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:imp-oracle:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "Import input references are malformed"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "foreignTarget",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-OTHER\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "analyzer source artifact Artifact lease is not resolvable: rejected(ArkDeckRuntime.RuntimeOperationErrorCode.invalidInput, \"Artifact lease target/binding/identity does not match the materialized request\")"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "emptySource",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-24be29d93f921d13584e7be5ca071f2a\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "typed plan preflight failed before authorization: analyzer input Artifact bytes do not match their lease"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "engine" : "unconfigured",
+    "name" : "unconfiguredAnalyzer",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "analyzer.extract-crash-signature@1 is runtime unavailable: analyzer.profileUnavailable"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "mutation" : "analyzerDrift",
+    "name" : "analyzerDrift",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "analyzer.extract-crash-signature@1 is runtime unavailable: analyzer.toolIdentityDrift"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "mutation" : "payloadTampered",
+    "name" : "payloadTampered",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "analyzer source artifact Artifact lease is not resolvable: indexCorrupted(\"artifact payload digest or identity drifted\")"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "mutation" : "payloadMissing",
+    "name" : "payloadMissing",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-plan-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-plan\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "analyzer source artifact Artifact lease is not resolvable: indexCorrupted(\"artifact payload is missing, linked or unreadable (errno 2)\")"
+      },
+      "ok" : false
+    }
+  }
+]
