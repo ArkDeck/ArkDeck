@@ -1,0 +1,495 @@
+{
+  "pinnedRevision": "e6e3133d410fbd7455df17c9486dcd369607e97f",
+  "packageResolvedSHA256": "bec7456cb3034e915ebaea4895b23cbf27ee9e8231fe93e9df27270ddc8e1858",
+  "producerSHA256": "8ff8d90071c8ab63623ae0adc5ffc294e86c6273c5fb6565e82dcb85adc4cd05",
+  "nativeSources": [
+    {
+      "path": "Sources/ArkTraceAnalysis/TraceAgentQuery.swift",
+      "sha256": "2f7dafdff6619a13cbad12a12dd44626b2e7fc7fcfafff3748ae21d24fa2089c"
+    },
+    {
+      "path": "Sources/ArkTraceAnalysis/TraceContext.swift",
+      "sha256": "58ff1e5185f312225e9b01feeb129f7518caad4f2884af6c06c573652fd4f024"
+    },
+    {
+      "path": "Sources/ArkTraceAnalysis/TraceDeterministicAnalysis.swift",
+      "sha256": "9c14f7ced8fa6b32e23980d267a964ecbc42c33f54d9c96e4dbc67b88ea9ab44"
+    },
+    {
+      "path": "Sources/ArkTraceAnalysis/TraceSummary.swift",
+      "sha256": "6509cba0dee7a895ee73d51f5a846b2ae16d35ce19bf8ab8bbcf63e9b8674db6"
+    },
+    {
+      "path": "Sources/ArkTraceAnalysis/TraceViewerAnalysis.swift",
+      "sha256": "8ed0244eff68d67745ca1f3f5ef87d37299a66116ea0455d8d28949edc715965"
+    },
+    {
+      "path": "Sources/ArkTraceAppSupport/AppDistribution.swift",
+      "sha256": "16b75f985a9aa03c90871a3549770a081f65702a2161cee453b1ac311fc0d830"
+    },
+    {
+      "path": "Sources/ArkTraceAppSupport/TraceBundledParserResolver.swift",
+      "sha256": "2666bc9b57326482623bde872acb3d8898821b060029ddcb559cb44f436119f0"
+    },
+    {
+      "path": "Sources/ArkTraceAppSupport/TraceDocumentController.swift",
+      "sha256": "9b57fb3ff108ce78601aeef59e34a1982a3ca76463c21513b39dcdb99d276e65"
+    },
+    {
+      "path": "Sources/ArkTraceAppSupport/TraceOfflineInspectionService.swift",
+      "sha256": "7f5ce182e257908f31a0e0303e8aaf4f0e091d56fd76d88f88079d3f5fa9d69f"
+    },
+    {
+      "path": "Sources/ArkTraceAppSupport/TraceProductConfiguration.swift",
+      "sha256": "fb52b6feb681f2d0fcfb13fb6c8f8a3bb8d07337841622baf744976423d85d39"
+    },
+    {
+      "path": "Sources/ArkTraceAppSupport/TraceRecentDocuments.swift",
+      "sha256": "c4580cceac63eca693951a56b336d4bcfcf2a8236a48f3c45d19324e44dca622"
+    },
+    {
+      "path": "Sources/ArkTraceAppSupport/TraceShortcutCatalog.swift",
+      "sha256": "abd4309e5c29547dc167dd92e024efd3aee52f3c144d382b558e5b29d7fb2d9e"
+    },
+    {
+      "path": "Sources/ArkTraceAppSupport/TraceViewStateStore.swift",
+      "sha256": "6e64a50a50b080bc217b376a9cf8d419639faa21b9675eb034d94b12c821777b"
+    },
+    {
+      "path": "Sources/ArkTraceCLI/CLIApplication.swift",
+      "sha256": "868843d5f4d0dce6c0253e5948a9d87add7fb4d87c4050028a89b087dca48f31"
+    },
+    {
+      "path": "Sources/ArkTraceCLI/CLIExecutableIdentity.swift",
+      "sha256": "6f4854ef2ca653b74fd0376da8f2d20ac78e41152a4a917696e11001cf88bf45"
+    },
+    {
+      "path": "Sources/ArkTraceCLI/CLILicenseResources.swift",
+      "sha256": "09ae936aa81644fd545caa61154e2df20668485f800fe0d23915a9c519e5b897"
+    },
+    {
+      "path": "Sources/ArkTraceCLI/CLIModels.swift",
+      "sha256": "8c7dd63b96f2c463dfe69c1a6eecd663a2a4e4f0b9a9bc1ff25b102edd6cea3b"
+    },
+    {
+      "path": "Sources/ArkTraceCLI/CLIOperationDeadline.swift",
+      "sha256": "1cb3b952a043d5ea65a118a2ceb2b3d0bbd524ee856f3cb9a0af79e6a4da46aa"
+    },
+    {
+      "path": "Sources/ArkTraceCLI/CLIParser.swift",
+      "sha256": "0612f8fd23f5bbb4f009f391b11612914df46997826170d78870f4f56e510d67"
+    },
+    {
+      "path": "Sources/ArkTraceCLI/CLIPresentation.swift",
+      "sha256": "7e8fcc3bf5a6cdaaf383635434137828d1352b3885b0d8ac2b702acb7ab629c6"
+    },
+    {
+      "path": "Sources/ArkTraceCLI/CLIProductionCommandExecutor.swift",
+      "sha256": "030b4072eeae1416b9f3a926b4794e655618ddac5c676266a4d992002edba7b9"
+    },
+    {
+      "path": "Sources/ArkTraceCLI/CLIResourceLocator.swift",
+      "sha256": "4a2a81d878576fa585a3c21e698aff0feb2f9bb9a284ccc2dc49761523c6be6f"
+    },
+    {
+      "path": "Sources/ArkTraceCLI/CLISignalMonitor.swift",
+      "sha256": "562d349dfe0ca3f9d0c3514f4f8d304dea041e03d90c67f342e2d431791e4719"
+    },
+    {
+      "path": "Sources/ArkTraceCLI/MachineContract.swift",
+      "sha256": "029a6b3dd3bece0b78f34d2890f63ae785f4c6cedc89665f58de5638aa2c7df2"
+    },
+    {
+      "path": "Sources/ArkTraceCLIResourceFixtures/ArkTraceCLIResourceFixtures.swift",
+      "sha256": "4732007f7b1127d8b8aa4a1c48a9816357d8fb47cb7efca6c165351372fb29ed"
+    },
+    {
+      "path": "Sources/ArkTraceCapture/TraceCapture.swift",
+      "sha256": "e28244a3fb1fcebe580858b7fb3065c0a0d3eeb2b771f127b2d9637758900967"
+    },
+    {
+      "path": "Sources/ArkTraceCore/Error/ArkTraceError.swift",
+      "sha256": "87a640f446c7beb6956bf20a97895c112747905903d42292d958244386c3332a"
+    },
+    {
+      "path": "Sources/ArkTraceCore/IO/BoundedRegularFile.swift",
+      "sha256": "92de6bbe41f069ca4f5aa89eb455f23dcbea97252b0a161e886498db34ad18c5"
+    },
+    {
+      "path": "Sources/ArkTraceCore/IO/LowercaseHex.swift",
+      "sha256": "69cec497498af6fa21032a5b44dce728767e0d10afd2b24aeb7dd4cc67d93981"
+    },
+    {
+      "path": "Sources/ArkTraceCore/Model/ArkTraceProduct.swift",
+      "sha256": "3a03742adfe8e77e03717a0adae7b648211a5860472c4b677eca6553d988eeb2"
+    },
+    {
+      "path": "Sources/ArkTraceCore/Model/IdentityGrammar.swift",
+      "sha256": "e9d1aeb53abeb97cfe52c77315b4ec90917e7ced43795763c54d912f575a9ddd"
+    },
+    {
+      "path": "Sources/ArkTraceCore/Model/TraceEventModels.swift",
+      "sha256": "9d7c4bc7d3c3c5f6ab8b84174517009dd7bc2f7ad390cfc5a520602c4c0ad3a7"
+    },
+    {
+      "path": "Sources/ArkTraceCore/Model/TraceIdentity.swift",
+      "sha256": "dcd28332106930e329da70e6c68c72379f88262556392cedb10de9e57a33d765"
+    },
+    {
+      "path": "Sources/ArkTraceCore/Model/TraceModels.swift",
+      "sha256": "2c23b95eac7fe9d26ff8c828240526d4b7ab0806d34412891bf820ac47467802"
+    },
+    {
+      "path": "Sources/ArkTraceCore/Model/TraceViewerModels.swift",
+      "sha256": "c6f327208da8e22022fb108da54125deeb1942f59aaf528d818610091e60b72e"
+    },
+    {
+      "path": "Sources/ArkTraceCore/Parser/TraceParser.swift",
+      "sha256": "46d89163d8c5b4ee99ce82454360fe2f466ea870845943a431e5829c4a7792e6"
+    },
+    {
+      "path": "Sources/ArkTraceCore/Performance/TracePerformanceMetrics.swift",
+      "sha256": "fe1a7e923e09e278c10c49bc856085793374405a3d33c04b16ec061d0dea7e6f"
+    },
+    {
+      "path": "Sources/ArkTraceCore/Query/TraceAgentQuery.swift",
+      "sha256": "52029a979f44fff677cfc72f3d0cfb5771832a7d5a674cc7541001a352f6980a"
+    },
+    {
+      "path": "Sources/ArkTraceCore/Query/TraceArgumentQuery.swift",
+      "sha256": "40659ee9effb339dcf769e3326b05fab21b7856917a2138132bf0b8148d49331"
+    },
+    {
+      "path": "Sources/ArkTraceCore/Query/TraceDensity.swift",
+      "sha256": "2928b0c00f05efd0a7a9dd93c671037f3cba0651efbdf8e89aaef40cb2a0725d"
+    },
+    {
+      "path": "Sources/ArkTraceCore/Query/TraceEventQueries.swift",
+      "sha256": "64e9dce79e3bb74534539e360750a0ef1fed4403ea1abc040c732b44f16d01d8"
+    },
+    {
+      "path": "Sources/ArkTraceCore/Query/TraceFrameQuery.swift",
+      "sha256": "e992da92933a843d4cec33d29f7b79ce280504f086f9ddc0775fb507938731dc"
+    },
+    {
+      "path": "Sources/ArkTraceCore/Query/TraceQueries.swift",
+      "sha256": "11f809f3b9c5e9871c72a658831ddbbd06604411281bd6a34fddddf0573cc770"
+    },
+    {
+      "path": "Sources/ArkTraceCore/Time/TraceTime.swift",
+      "sha256": "97551780e087ae8a7ecd03462993adff6cfe97bc1b29d3c25d74536a200a8c6f"
+    },
+    {
+      "path": "Sources/ArkTraceParser/TraceStreamerManifest.swift",
+      "sha256": "5dd5b227954141de5e92a49c1ab632114f780a364d5476479debf0c1b6e70866"
+    },
+    {
+      "path": "Sources/ArkTraceParser/TraceStreamerProcessParser.swift",
+      "sha256": "b1c2dcc3c5a450975ffdf9b5faeefa8464340b118985e97bc3ab17d3b7b7e657"
+    },
+    {
+      "path": "Sources/ArkTraceParser/TraceStreamerProgressScanner.swift",
+      "sha256": "5d58e6a308ad39286c2e112c0b9ac95998c21d61cd5ba67848d5fdb1bba4e36f"
+    },
+    {
+      "path": "Sources/ArkTraceRendering/TimelineAnnotations.swift",
+      "sha256": "8ca7fe808486bb727df285c5563b1f9d10a189482c0f2309c923ca9f37284f24"
+    },
+    {
+      "path": "Sources/ArkTraceRendering/TimelineColorPalette.swift",
+      "sha256": "86af0ba5ce3e89248b7106c07dcf7c77d715e17a652e51129966a057ac1630d0"
+    },
+    {
+      "path": "Sources/ArkTraceRendering/TimelineGeometry.swift",
+      "sha256": "1b290c0a4e5ce8c960d192867ad84eb506783f5701a09ce61ba0fc181fc858b5"
+    },
+    {
+      "path": "Sources/ArkTraceRendering/TimelineModels.swift",
+      "sha256": "0e03bbe5e36de89838fffc719bfb69cdbbd5473379ff2559f00884aa3dd858d8"
+    },
+    {
+      "path": "Sources/ArkTraceRendering/TimelineNSView.swift",
+      "sha256": "b2df54572adcf6e3d5087c652b3f3854d3dd5c918c131f517198e782b3de44f9"
+    },
+    {
+      "path": "Sources/ArkTraceRendering/TimelineSnapshotLoader.swift",
+      "sha256": "82a14cd03a73dcc3bab077f385abcd2559d64b3b895ed47b30d06441c97556b7"
+    },
+    {
+      "path": "Sources/ArkTraceRuntime/BoundedSnapshotReader.swift",
+      "sha256": "8e5da37961111f86f12b77baac397e05e19feb9ad31e8c9e1294349de8bed23f"
+    },
+    {
+      "path": "Sources/ArkTraceRuntime/TraceCache.swift",
+      "sha256": "77be1b3c530acef48462a9b5fbf758802a1b349e680e96e8a0ba62ca5a1507e8"
+    },
+    {
+      "path": "Sources/ArkTraceRuntime/TraceSession.swift",
+      "sha256": "f224f67738fad58dc87e0b4baa05fa510677c891b5c657e9b2ebecfa1a16f4df"
+    },
+    {
+      "path": "Sources/ArkTraceStore/SQLiteTraceRepository.swift",
+      "sha256": "e4945427c17d0c478bc77d23e169427e3c24a48d6783ba12ea55eadd1956d4ad"
+    },
+    {
+      "path": "Sources/ArkTraceStore/TraceDatabase.swift",
+      "sha256": "6c4e7a2b8afa0b8146b2a3fec86717dbd22f7ff81fd209420cc729dfa25ca7e0"
+    },
+    {
+      "path": "Sources/ArkTraceStore/TraceDatabaseStagingPreparer.swift",
+      "sha256": "4c3779da3f8f2c4edfb79dc9f5807c7a669a8f94b755d3d21d6898ab5bfa815a"
+    },
+    {
+      "path": "Sources/ArkTraceStore/TraceEventIntersection.swift",
+      "sha256": "f8578ac034ba9802b1d9648d948a911e5a51d3143de253d476bc79e16fbb1fe8"
+    },
+    {
+      "path": "Sources/ArkTraceStore/TraceSchemaAdapter.swift",
+      "sha256": "d42782dff7a801a00fecac7e177c30f1f655dac2ad7d5300726767023370370f"
+    },
+    {
+      "path": "Sources/arktrace/ArkTraceMain.swift",
+      "sha256": "dd46445a1de813b96990cfb985ec6cac0faa1d11f141194f4769b8813a04cbb0"
+    }
+  ],
+  "moduleObjects": [
+    {
+      "path": "/Users/fuhanfeng/Dropbox/Code/Github/ArkDeck/.claude/worktrees/arkdeck-campaign-entry-point-1651e3/Packages/ArkDeckKit/.build/arm64-apple-macosx/debug/ArkTraceCore.build/ArkTraceError.swift.o",
+      "sha256": "a8cedf20a5d62eb6ed71db597be6e42783b8e8f4d3a3ab698525863813f00c65"
+    },
+    {
+      "path": "/Users/fuhanfeng/Dropbox/Code/Github/ArkDeck/.claude/worktrees/arkdeck-campaign-entry-point-1651e3/Packages/ArkDeckKit/.build/arm64-apple-macosx/debug/ArkTraceCore.build/ArkTraceProduct.swift.o",
+      "sha256": "6d0ba53ac109ed07d61377cb8edf58d1c93ecca3b34687d949f7ef59b811fcda"
+    },
+    {
+      "path": "/Users/fuhanfeng/Dropbox/Code/Github/ArkDeck/.claude/worktrees/arkdeck-campaign-entry-point-1651e3/Packages/ArkDeckKit/.build/arm64-apple-macosx/debug/ArkTraceCore.build/BoundedRegularFile.swift.o",
+      "sha256": "4aa0a2e650d8a7a65f8ed99180cd15ac9fce9144f4ed51507be94905923a536b"
+    },
+    {
+      "path": "/Users/fuhanfeng/Dropbox/Code/Github/ArkDeck/.claude/worktrees/arkdeck-campaign-entry-point-1651e3/Packages/ArkDeckKit/.build/arm64-apple-macosx/debug/ArkTraceCore.build/IdentityGrammar.swift.o",
+      "sha256": "e44e8785ca76a7686603421c4acc839708bee7932214f2d6243db6d8e12c1b57"
+    },
+    {
+      "path": "/Users/fuhanfeng/Dropbox/Code/Github/ArkDeck/.claude/worktrees/arkdeck-campaign-entry-point-1651e3/Packages/ArkDeckKit/.build/arm64-apple-macosx/debug/ArkTraceCore.build/LowercaseHex.swift.o",
+      "sha256": "9e4a00f4ccc07fecd2f6f649966d46bf5a33ce9d05d9a5262e73b07fea9c6773"
+    },
+    {
+      "path": "/Users/fuhanfeng/Dropbox/Code/Github/ArkDeck/.claude/worktrees/arkdeck-campaign-entry-point-1651e3/Packages/ArkDeckKit/.build/arm64-apple-macosx/debug/ArkTraceCore.build/TraceAgentQuery.swift.o",
+      "sha256": "37ef0302612cb0bd0a94b77e53a5624f34963a8bbee9ff8cb376d0472f4ae858"
+    },
+    {
+      "path": "/Users/fuhanfeng/Dropbox/Code/Github/ArkDeck/.claude/worktrees/arkdeck-campaign-entry-point-1651e3/Packages/ArkDeckKit/.build/arm64-apple-macosx/debug/ArkTraceCore.build/TraceArgumentQuery.swift.o",
+      "sha256": "1a856128984d7d0d2e578dbf82c67a034b98539b61cdc2bdf3ecd188193559de"
+    },
+    {
+      "path": "/Users/fuhanfeng/Dropbox/Code/Github/ArkDeck/.claude/worktrees/arkdeck-campaign-entry-point-1651e3/Packages/ArkDeckKit/.build/arm64-apple-macosx/debug/ArkTraceCore.build/TraceDensity.swift.o",
+      "sha256": "9e66d2bae68d8c5e72a7f49a8ae57fabe6ee48f9ef79295089a30fd6dc8b8924"
+    },
+    {
+      "path": "/Users/fuhanfeng/Dropbox/Code/Github/ArkDeck/.claude/worktrees/arkdeck-campaign-entry-point-1651e3/Packages/ArkDeckKit/.build/arm64-apple-macosx/debug/ArkTraceCore.build/TraceEventModels.swift.o",
+      "sha256": "ead58605028ee6f6a7b61f6a6390ceac92d533096d5d70df082bde9fb49b00f3"
+    },
+    {
+      "path": "/Users/fuhanfeng/Dropbox/Code/Github/ArkDeck/.claude/worktrees/arkdeck-campaign-entry-point-1651e3/Packages/ArkDeckKit/.build/arm64-apple-macosx/debug/ArkTraceCore.build/TraceEventQueries.swift.o",
+      "sha256": "38a8881b14d796452ae2ec4eb79a60c727fc78a2bcf5728e26a7a1dbc6ea9ddc"
+    },
+    {
+      "path": "/Users/fuhanfeng/Dropbox/Code/Github/ArkDeck/.claude/worktrees/arkdeck-campaign-entry-point-1651e3/Packages/ArkDeckKit/.build/arm64-apple-macosx/debug/ArkTraceCore.build/TraceFrameQuery.swift.o",
+      "sha256": "0c9d3a954599aaf04f2a11f45d765f23d59e73c2b107930debaa31eec7a5d82a"
+    },
+    {
+      "path": "/Users/fuhanfeng/Dropbox/Code/Github/ArkDeck/.claude/worktrees/arkdeck-campaign-entry-point-1651e3/Packages/ArkDeckKit/.build/arm64-apple-macosx/debug/ArkTraceCore.build/TraceIdentity.swift.o",
+      "sha256": "b36202f0881b8831eacb5044f634dbb862932a8f60d7e2c16adc268ee1f414c7"
+    },
+    {
+      "path": "/Users/fuhanfeng/Dropbox/Code/Github/ArkDeck/.claude/worktrees/arkdeck-campaign-entry-point-1651e3/Packages/ArkDeckKit/.build/arm64-apple-macosx/debug/ArkTraceCore.build/TraceModels.swift.o",
+      "sha256": "cef1e7bd3b2f2cc231e40bb31e621678d0156a5a804ecee393008429ec6ab0da"
+    },
+    {
+      "path": "/Users/fuhanfeng/Dropbox/Code/Github/ArkDeck/.claude/worktrees/arkdeck-campaign-entry-point-1651e3/Packages/ArkDeckKit/.build/arm64-apple-macosx/debug/ArkTraceCore.build/TraceParser.swift.o",
+      "sha256": "d4caf7920f3f8fef18dda76ee8ab77841ede9095f36f0b7c34e27999adc95b26"
+    },
+    {
+      "path": "/Users/fuhanfeng/Dropbox/Code/Github/ArkDeck/.claude/worktrees/arkdeck-campaign-entry-point-1651e3/Packages/ArkDeckKit/.build/arm64-apple-macosx/debug/ArkTraceCore.build/TracePerformanceMetrics.swift.o",
+      "sha256": "516d3add3bf5c67feecd1c3bd6658a129093fd9ac1e4d6af2d8702432ce70fba"
+    },
+    {
+      "path": "/Users/fuhanfeng/Dropbox/Code/Github/ArkDeck/.claude/worktrees/arkdeck-campaign-entry-point-1651e3/Packages/ArkDeckKit/.build/arm64-apple-macosx/debug/ArkTraceCore.build/TraceQueries.swift.o",
+      "sha256": "a7ecf74a0d939b351bbfb66bebc2944520ce433c364ecad5c99b84cfefeb0603"
+    },
+    {
+      "path": "/Users/fuhanfeng/Dropbox/Code/Github/ArkDeck/.claude/worktrees/arkdeck-campaign-entry-point-1651e3/Packages/ArkDeckKit/.build/arm64-apple-macosx/debug/ArkTraceCore.build/TraceTime.swift.o",
+      "sha256": "85bb177f38f5e44907192b4426a30e2f9dff89bb827e51615f1525d56f99ecd6"
+    },
+    {
+      "path": "/Users/fuhanfeng/Dropbox/Code/Github/ArkDeck/.claude/worktrees/arkdeck-campaign-entry-point-1651e3/Packages/ArkDeckKit/.build/arm64-apple-macosx/debug/ArkTraceCore.build/TraceViewerModels.swift.o",
+      "sha256": "ac343be343fcdf508923e65c908328f62c0b2dea02ca8b1d1df4341c7752939c"
+    },
+    {
+      "path": "/Users/fuhanfeng/Dropbox/Code/Github/ArkDeck/.claude/worktrees/arkdeck-campaign-entry-point-1651e3/Packages/ArkDeckKit/.build/arm64-apple-macosx/debug/ArkTraceParser.build/TraceStreamerManifest.swift.o",
+      "sha256": "ff47d9bb86734443b2eace2906fce501e2fdc5493afe31e4d46c782bfcb25f87"
+    },
+    {
+      "path": "/Users/fuhanfeng/Dropbox/Code/Github/ArkDeck/.claude/worktrees/arkdeck-campaign-entry-point-1651e3/Packages/ArkDeckKit/.build/arm64-apple-macosx/debug/ArkTraceParser.build/TraceStreamerProcessParser.swift.o",
+      "sha256": "c6c10fa64f63a45730618ec049b09c653f0cb8bf6669445bb2921d3d67176dd4"
+    },
+    {
+      "path": "/Users/fuhanfeng/Dropbox/Code/Github/ArkDeck/.claude/worktrees/arkdeck-campaign-entry-point-1651e3/Packages/ArkDeckKit/.build/arm64-apple-macosx/debug/ArkTraceParser.build/TraceStreamerProgressScanner.swift.o",
+      "sha256": "d75a29fadf514703c8089f19ff857b3d63ee0f4d315828bb355b51b342af0d39"
+    },
+    {
+      "path": "/Users/fuhanfeng/Dropbox/Code/Github/ArkDeck/.claude/worktrees/arkdeck-campaign-entry-point-1651e3/Packages/ArkDeckKit/.build/arm64-apple-macosx/debug/ArkTraceStore.build/SQLiteTraceRepository.swift.o",
+      "sha256": "7cec9a8c93f86a486b119032882ac03d9153bbf2a695dcf85027f470cd444065"
+    },
+    {
+      "path": "/Users/fuhanfeng/Dropbox/Code/Github/ArkDeck/.claude/worktrees/arkdeck-campaign-entry-point-1651e3/Packages/ArkDeckKit/.build/arm64-apple-macosx/debug/ArkTraceStore.build/TraceDatabase.swift.o",
+      "sha256": "24e4644609d1080c2b96c1ec371f081554995fd44569375782c4d303395ea712"
+    },
+    {
+      "path": "/Users/fuhanfeng/Dropbox/Code/Github/ArkDeck/.claude/worktrees/arkdeck-campaign-entry-point-1651e3/Packages/ArkDeckKit/.build/arm64-apple-macosx/debug/ArkTraceStore.build/TraceDatabaseStagingPreparer.swift.o",
+      "sha256": "cc46f4634f35a89e2be02742f0c3b1fea15bb5add68ff90af65a972470a0c7dd"
+    },
+    {
+      "path": "/Users/fuhanfeng/Dropbox/Code/Github/ArkDeck/.claude/worktrees/arkdeck-campaign-entry-point-1651e3/Packages/ArkDeckKit/.build/arm64-apple-macosx/debug/ArkTraceStore.build/TraceEventIntersection.swift.o",
+      "sha256": "ada2546c63f71276889420984327fe36611fa093ca360fdeecb492b78ecc33d8"
+    },
+    {
+      "path": "/Users/fuhanfeng/Dropbox/Code/Github/ArkDeck/.claude/worktrees/arkdeck-campaign-entry-point-1651e3/Packages/ArkDeckKit/.build/arm64-apple-macosx/debug/ArkTraceStore.build/TraceSchemaAdapter.swift.o",
+      "sha256": "d38058b4fb6e894570a7083d865b6f64816489d86bd161efd42f89538ccdef8f"
+    },
+    {
+      "path": "/Users/fuhanfeng/Dropbox/Code/Github/ArkDeck/.claude/worktrees/arkdeck-campaign-entry-point-1651e3/Packages/ArkDeckKit/.build/arm64-apple-macosx/debug/ArkTraceRuntime.build/BoundedSnapshotReader.swift.o",
+      "sha256": "7c3bac875c22fde3db70d06c95497d0fe7afc608a190610e951b66a151500bca"
+    },
+    {
+      "path": "/Users/fuhanfeng/Dropbox/Code/Github/ArkDeck/.claude/worktrees/arkdeck-campaign-entry-point-1651e3/Packages/ArkDeckKit/.build/arm64-apple-macosx/debug/ArkTraceRuntime.build/TraceCache.swift.o",
+      "sha256": "c1818b697359a68ecef5a5d52a937bc911b0f358e299dde58232b02f2b9811f3"
+    },
+    {
+      "path": "/Users/fuhanfeng/Dropbox/Code/Github/ArkDeck/.claude/worktrees/arkdeck-campaign-entry-point-1651e3/Packages/ArkDeckKit/.build/arm64-apple-macosx/debug/ArkTraceRuntime.build/TraceSession.swift.o",
+      "sha256": "2fe153e694024337c425c4e544a6becb95ea73d79972d083390857547253071d"
+    }
+  ],
+  "fixtureFiles": [
+    {
+      "path": "rust/original.htrace",
+      "sha256": "baa98e1169fba0247c8e36fdc9a777520d40bcea5fb330d2d528bfca0116ab90",
+      "device": 16777233,
+      "inode": 207346547
+    },
+    {
+      "path": "rust/trace-cache/staging/.owners/session-63E51518-0CDC-4AE2-A4E8-3CD027ABC636.json",
+      "sha256": "343b5432128f8e1586a40343d4e93b7eb7bddaa52eef5745611b14d3081e2795",
+      "device": 16777233,
+      "inode": 207346570
+    },
+    {
+      "path": "rust/trace-cache/staging/.owners/session-63E51518-0CDC-4AE2-A4E8-3CD027ABC636.lock",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "device": 16777233,
+      "inode": 207346565
+    },
+    {
+      "path": "rust/trace-cache/staging/session-63E51518-0CDC-4AE2-A4E8-3CD027ABC636/private.sqlite",
+      "sha256": "737f92598c63ea4dfd30f029f817d945799d9001206e307a2694aec3840fb276",
+      "device": 16777233,
+      "inode": 207346571
+    },
+    {
+      "path": "rust/trace-cache/traces/.leases/cbcfcf3b8450d671fb357de58b8aa5229dbb0784ef07e1dd498cf0ccab7afe81.lease",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "device": 16777233,
+      "inode": 207346563
+    },
+    {
+      "path": "rust/trace-cache/traces/.locks/cbcfcf3b8450d671fb357de58b8aa5229dbb0784ef07e1dd498cf0ccab7afe81.lock",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "device": 16777233,
+      "inode": 207346561
+    },
+    {
+      "path": "rust/trace-cache/traces/.staging/.owners/entry-367F0B0E-88B5-4B97-A5F6-7CDB93BFB07C.json",
+      "sha256": "ac88e24087f72b75e944b5fb76b4301920f7860f0ef8a9d4075d4d836f29b3f3",
+      "device": 16777233,
+      "inode": 207346559
+    },
+    {
+      "path": "rust/trace-cache/traces/.staging/.owners/entry-367F0B0E-88B5-4B97-A5F6-7CDB93BFB07C.lock",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "device": 16777233,
+      "inode": 207346550
+    },
+    {
+      "path": "rust/trace-cache/traces/baa98e1169fba0247c8e36fdc9a777520d40bcea5fb330d2d528bfca0116ab90/9ce31948952ca140b5d38c351960da0f35b5a4f6e89cf329a40373f13366e00c/database.sqlite",
+      "sha256": "d05dd7ab6b3ee93ee577cd83bd70688e50d8efa2e8fb062044ff0b0e7837e65f",
+      "device": 16777233,
+      "inode": 207346556
+    },
+    {
+      "path": "rust/trace-cache/traces/baa98e1169fba0247c8e36fdc9a777520d40bcea5fb330d2d528bfca0116ab90/9ce31948952ca140b5d38c351960da0f35b5a4f6e89cf329a40373f13366e00c/metadata.json",
+      "sha256": "810d996184e2f243946552e3bd6b7956411eeecaad4faac6ae2dd69055d1f942",
+      "device": 16777233,
+      "inode": 207346557
+    },
+    {
+      "path": "swift/original.htrace",
+      "sha256": "baa98e1169fba0247c8e36fdc9a777520d40bcea5fb330d2d528bfca0116ab90",
+      "device": 16777233,
+      "inode": 207346575
+    },
+    {
+      "path": "swift/trace-cache/staging/.owners/session-FA68694C-125F-4178-912B-33FEF359C6F9.json",
+      "sha256": "e2a0d87e850b49584ff7cb40a8d483e4d18161db4eeaaf5ee5eddc48001bbb12",
+      "device": 16777233,
+      "inode": 207346598
+    },
+    {
+      "path": "swift/trace-cache/staging/.owners/session-FA68694C-125F-4178-912B-33FEF359C6F9.lock",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "device": 16777233,
+      "inode": 207346593
+    },
+    {
+      "path": "swift/trace-cache/staging/session-FA68694C-125F-4178-912B-33FEF359C6F9/private.sqlite",
+      "sha256": "737f92598c63ea4dfd30f029f817d945799d9001206e307a2694aec3840fb276",
+      "device": 16777233,
+      "inode": 207346599
+    },
+    {
+      "path": "swift/trace-cache/traces/.leases/cbcfcf3b8450d671fb357de58b8aa5229dbb0784ef07e1dd498cf0ccab7afe81.lease",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "device": 16777233,
+      "inode": 207346591
+    },
+    {
+      "path": "swift/trace-cache/traces/.locks/cbcfcf3b8450d671fb357de58b8aa5229dbb0784ef07e1dd498cf0ccab7afe81.lock",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "device": 16777233,
+      "inode": 207346589
+    },
+    {
+      "path": "swift/trace-cache/traces/.staging/.owners/entry-4EFD5B6A-EC3A-4264-835E-08C8C47667AD.json",
+      "sha256": "4271a351b098e6294009dd1a7cdd8a5c25a8c2d134c60cb5d485fe06750bc0c0",
+      "device": 16777233,
+      "inode": 207346587
+    },
+    {
+      "path": "swift/trace-cache/traces/.staging/.owners/entry-4EFD5B6A-EC3A-4264-835E-08C8C47667AD.lock",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "device": 16777233,
+      "inode": 207346578
+    },
+    {
+      "path": "swift/trace-cache/traces/baa98e1169fba0247c8e36fdc9a777520d40bcea5fb330d2d528bfca0116ab90/9ce31948952ca140b5d38c351960da0f35b5a4f6e89cf329a40373f13366e00c/database.sqlite",
+      "sha256": "d05dd7ab6b3ee93ee577cd83bd70688e50d8efa2e8fb062044ff0b0e7837e65f",
+      "device": 16777233,
+      "inode": 207346584
+    },
+    {
+      "path": "swift/trace-cache/traces/baa98e1169fba0247c8e36fdc9a777520d40bcea5fb330d2d528bfca0116ab90/9ce31948952ca140b5d38c351960da0f35b5a4f6e89cf329a40373f13366e00c/metadata.json",
+      "sha256": "810d996184e2f243946552e3bd6b7956411eeecaad4faac6ae2dd69055d1f942",
+      "device": 16777233,
+      "inode": 207346585
+    }
+  ]
+}

@@ -269,17 +269,35 @@ producer metadata, argv, raw encoding and failure classifications.
 
 ## Contract and ownership boundaries
 
-The isolated macOS host also serves `trace cache status` from its fixed
-`trace-cache` directory. It reports actual byte counts and respects the existing
-key locks and entry leases; unaccounted entries remain active. Callers cannot
-pass a cache path, and Session root selection excludes this cache directory.
-Unsafe entries or a replaced root refuse the read. `trace cache purge`, database
-preparation and installed cache ownership remain pending.
+The isolated macOS host serves `trace cache status` and `trace cache purge` from
+its fixed `trace-cache/traces` directory, with private staging in the sibling
+`trace-cache/staging`. Inventory reports actual byte counts and respects the
+existing key locks and entry leases; unaccounted entries remain active.
+Purge also requires existing owner evidence and a complete guarded Job and
+Artifact census. Unreconciled Job history, any retained Artifact namespace or
+file, and any upload record, identity or payload in the Import namespace
+preserve all cache entries and private residuals; the Import owner's idle
+`.imports-v1` skeleton alone does not. Unsafe or unreadable owners refuse
+maintenance before any deletion. An inactive census permits only inode-bound
+derived cache quarantine/removal under the existing leases. Original Trace
+Artifacts remain untouched. Callers cannot pass a cache path, Session root
+selection excludes the entire cache parent, and uncertain CLI results never
+replay purge. Database preparation and installed cache ownership remain pending.
+The paired native receipt requires ArkTrace with the directory-hinted owner
+target fix (ArkTrace PR #25); the previously pinned `e6e3133d` skips every
+Ready entry, so parity checks against it record that mismatch rather than pass.
 
 Run `python3 rust/scripts/check-trace-cache-owner.py` after building the binaries
-to check real RPC/CLI status, lease contention, restart and namespace refusals.
+to check real RPC/CLI status and purge, retention, lease contention, restart,
+namespace refusals and original Artifact preservation.
 Use `--cli-path Packages/ArkDeckKit/.build/debug/arkdeck` for the current Swift
-CLI consumer. The harness uses temporary host fixtures and performs no purge.
+CLI consumer. The harness uses only temporary host fixtures. For a current
+native owner/metadata fixture, run `produce-trace-maintenance-fixture.py` against
+the pinned SwiftPM objects during the coordinated native build window, then
+pass its new directory using `--native-fixture`. The producer uses synthetic
+database bytes, retains provenance, and compares the complete Rust purge receipt
+with the paired native ArkTrace receipt; it does not establish parser or device
+acceptance.
 
 `arkdeck-contract` contains generated schemas, strict framing, canonical encoders
 and digest functions. `arkdeck-control` has transport-free observation and local-resource handlers.
