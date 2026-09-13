@@ -1,4 +1,7 @@
-//! macOS transport facade. No handlers, durable owners, retries or response cache.
+//! macOS transport facade. Frames are forwarded to the paired Swift authority
+//! without retries, rewriting or a response cache, except the host-only stores
+//! the facade owns itself (`facade_owners`, TASK-XPA-012), which never reach it.
+use crate::facade_owners::FacadeOwners;
 use arkdeck_contract::{
     ContractError, MAX_REQUEST_BYTES, MAX_RESPONSE_BYTES, Response, decode_request, encode_frame,
     sha256_hex, strict_json,
@@ -58,9 +61,10 @@ fn failure(id: &str, code: &str, message: &str) -> Vec<u8> {
     )
     .expect("bounded transport refusal")
 }
-fn validate(frame: &[u8]) -> Result<String, Vec<u8>> {
+/// The request id and method of a current frame, or its structural refusal.
+fn validate(frame: &[u8]) -> Result<(String, String), Vec<u8>> {
     match decode_request(frame) {
-        Ok(request) => Ok(request.id),
+        Ok(request) => Ok((request.id, request.method)),
         Err(error) => {
             let (code, message) = match error {
                 ContractError::UnsupportedVersion => (
@@ -176,6 +180,9 @@ pub fn serve(swift: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
         .recursive(true)
         .mode(0o700)
         .create(parent)?;
+    // The public socket's directory is the paired authority's state
+    // directory: passed below as --state-dir, or Swift's installed default.
+    let owners = Arc::new(FacadeOwners::new(parent.to_owned())?);
     let mut listener = LocalListener::bind_facade(&LocalEndpoint::new(public.clone()))?;
     let nonce = random_bytes::<16>()?
         .iter()
@@ -234,14 +241,20 @@ pub fn serve(swift: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     });
     if std::env::var_os("ARKDECK_ENDPOINT").is_none() {
         let forwarder = Arc::clone(&forwarder);
+        let owners = Arc::clone(&owners);
         listen_mach(
             "com.arkdeck.agentd",
             APP_REQUIREMENT,
             Box::new(move |frame, peer| {
-                let id = match validate(frame) {
-                    Ok(id) => id,
+                let (id, method) = match validate(frame) {
+                    Ok(request) => request,
                     Err(reply) => return reply,
                 };
+                // Every locally owned method is on the App's XPC allowlist
+                // without further gating (Swift AgentXPCEndpoint.admission).
+                if let Some(reply) = owners.handle(&method, frame) {
+                    return reply;
+                }
                 match forwarder
                     .connect()
                     .and_then(|mut private| exchange(&mut private, frame, peer, "appXPC"))
@@ -272,6 +285,7 @@ pub fn serve(swift: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
         }
         let active = Arc::clone(&active);
         let forwarder = Arc::clone(&forwarder);
+        let owners = Arc::clone(&owners);
         std::thread::spawn(move || {
             struct Active(Arc<AtomicUsize>);
             impl Drop for Active {
@@ -297,8 +311,8 @@ pub fn serve(swift: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
                     }
                     Err(_) => return,
                 };
-                let id = match validate(&frame) {
-                    Ok(id) => id,
+                let (id, method) = match validate(&frame) {
+                    Ok(request) => request,
                     Err(reply) => {
                         if client.get_mut().write_all(&reply).is_err() {
                             return;
@@ -306,6 +320,12 @@ pub fn serve(swift: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
                         continue;
                     }
                 };
+                if let Some(reply) = owners.handle(&method, &frame) {
+                    if client.get_mut().write_all(&reply).is_err() {
+                        return;
+                    }
+                    continue;
+                }
                 let peer = match client.get_ref().origin() {
                     Ok(peer) => peer,
                     Err(_) => return,

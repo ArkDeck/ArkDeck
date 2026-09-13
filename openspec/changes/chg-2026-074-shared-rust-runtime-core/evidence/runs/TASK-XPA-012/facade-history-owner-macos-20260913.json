@@ -1,0 +1,44 @@
+{
+  "checks": [
+    "pair.list.initial",
+    "pair.swiftCli.save",
+    "pair.rustCli.readsSave",
+    "pair.staleGeneration",
+    "pair.concurrentReadsQueue",
+    "pair.foreignLockRefused",
+    "pair.foreignLockWroteNothing",
+    "pair.forwardedHealth",
+    "pair.authorityServedForwardedFrames",
+    "pair.authorityNeverSawOwnedFrames",
+    "standalone.readsFacadeDocument",
+    "standalone.save",
+    "standalone.recorderSeesOwnedFrames",
+    "pair.readsStandaloneDocument",
+    "pair.delete",
+    "pair.swiftCliReadsDelete",
+    "pair2.authorityNeverSawOwnedFrames",
+    "noOrphanTransactions",
+    "finalDocument"
+  ],
+  "deviceDispatchCount": 0,
+  "facadeSHA256": "cd8bbadb704f32cf493f9e7fe58635a48bfe5f2d3c4ac034c938e0eaf3bb3576",
+  "kind": "isolated-host-test",
+  "phases": {
+    "pair-1": {
+      "authorityFrames": 6,
+      "ownedFramesAtAuthority": 0
+    },
+    "pair-2": {
+      "authorityFrames": 4,
+      "ownedFramesAtAuthority": 0
+    },
+    "standalone": {
+      "authorityFrames": 5,
+      "ownedFramesAtAuthority": 2
+    }
+  },
+  "result": "PASS",
+  "rustCliSHA256": "fec6141125ca9a2ef499461ea6852c5cd7591f538b70fe39af71b521b8fae9bd",
+  "swiftCliSHA256": "129ab416fb984c783172de05eb80158d8b3e41fa1595a8141991afd5660eb652",
+  "swiftDaemonSHA256": "9eefe9267434b2155461a3fa4f8cbbf8eb26a8cc4d4ae271748cba98273fcccf"
+}

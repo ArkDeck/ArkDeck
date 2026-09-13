@@ -414,3 +414,27 @@ producer; `--cli-path` selects a current Swift consumer. The fixture is explicit
 simulated host-test data. Run it after current Swift producer recording and schema
 generation; it checks typed refusals as well as CAS, restart and binding-byte
 preservation. No hardware acceptance is claimed by this harness.
+
+## macOS facade host owners (TASK-XPA-012)
+
+The installed facade pair now serves `history.filter.list/save/delete` itself.
+`arkdeck-facade` opens the History filter document in the paired authority's
+state directory (the public socket's directory: `--state-dir` in development,
+`~/Library/Application Support/ArkDeck/Agentd` when installed) and never
+forwards those frames; the Swift daemon composed behind a facade
+(`AgentFacadeHostOwnership`) no longer opens that store, so one process owns
+its lock. A standalone Swift daemon keeps its own owner over the same file and
+format. Requests inside the facade queue on one in-process guard, as the Swift
+owner's blocking lock did; another process holding the lock is refused with
+`resourceConflict`. Every other method is still forwarded unchanged.
+
+`ARKDECK_DAEMON_UNDER_TEST=target/debug/arkdeck-agentd python3
+scripts/test-macos-facade.py` checks the transport against a fixture authority,
+including that History filter frames never reach it.
+`python3 rust/scripts/check-facade-host-owners.py` (from the repository root,
+after building both Rust binaries and the SwiftPM `arkdeck-agentd` and `arkdeck`
+debug products) runs the real pair: both CLIs, restart, a foreign lock holder,
+concurrent reads, the Swift daemon's own control-frame log, and a standalone
+Swift daemon over the same directory in between as the positive control.
+Swift children get a disposable `CFFIXED_USER_HOME`, so nothing installed is
+opened. Installed activation follows the normal helper update.

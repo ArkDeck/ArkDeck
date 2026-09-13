@@ -737,6 +737,41 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertEqual(try RuntimeHistoryFilterStore(rootURL: stateDirectory).read().generation, 3)
   }
 
+  /// Behind the paired Rust transport the History filter has one owner, the
+  /// facade: the authority composed behind it never opens the store, so the
+  /// two processes never share its lock (TASK-XPA-012).
+  func testFacadeCompositionLeavesTheHistoryFilterStoreToTheTransport() async throws {
+    let pairing = try AgentFacadeConfiguration(
+      socketURL: stateDirectory.appending(path: "paired.sock"),
+      secret: String(repeating: "a", count: 64))
+    XCTAssertNotNil(
+      AgentFacadeHostOwnership.historyFilterStore(stateDirectory: stateDirectory, facade: nil))
+    let filters = AgentFacadeHostOwnership.historyFilterStore(
+      stateDirectory: stateDirectory, facade: pairing)
+    XCTAssertNil(filters)
+    let (handler, _) = try makeStack(historyFilterStore: filters)
+    let params: [String: [String: JSONValue]] = [
+      "history.filter.list": [:],
+      "history.filter.save": [
+        "expectedGeneration": .string("1"), "search": .string(""), "status": .string("all"),
+        "mode": .string("all"), "sessionId": .null, "targetId": .null,
+        "timeRange": .string("anyTime"), "activity": .string("all"),
+      ],
+      "history.filter.delete": ["expectedGeneration": .string("1")],
+    ]
+    XCTAssertEqual(Set(params.keys), AgentFacadeHostOwnership.methods)
+    for method in AgentFacadeHostOwnership.methods.sorted() {
+      let response = try await request(handler, method: method, params: params[method])
+      XCTAssertFalse(response.ok, method)
+    }
+    for name in ["history-filter.json", ".history-filter.lock"] {
+      XCTAssertFalse(
+        FileManager.default.fileExists(atPath: stateDirectory.appending(path: name).path), name)
+    }
+    // The App reaches each locally owned method through the facade's XPC door.
+    XCTAssertTrue(AgentFacadeHostOwnership.methods.isSubset(of: ArkDeckAgentXPC.forwardableMethods))
+  }
+
   func testCLICandidateDisplayNameUsesExactObservationCASAndMigratesOnAdopt() async throws {
     let port = TargetObservationCoordinatorContractTests.Port()
     let targets = try RuntimeTargetStore(
