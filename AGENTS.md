@@ -78,5 +78,10 @@ python3 scripts/ci/plan.py \
 可信 base 不可得时选择全部车道。`--filter`/`--skip-build` 仅用于开发反馈。
 通过后，仅因新改动、失败或未解决风险扩大或重复测试。未执行检查及原因如实写入交付说明。
 
+protected `main` 的 required status checks 是 SDD Guard 的 `guard` 与 Swift CI 的 `swift` 聚合
+job（后者始终上报，被选中的车道任一失败即失败）。这是 GitHub 分支保护设置而非仓内文件，
+用 `gh api repos/ArkDeck/ArkDeck/branches/main/protection/required_status_checks/contexts`
+核对；两者缺一，CI 红就挡不住合入。CI 绿只表示验证通过，不构成维护者批准。
+
 使用用户指定或任务所需的 skill，读取 `SKILL.md` 后仅加载相关 references；用户明确要求优先于 skill 流程建议。
 若指令导致暂停，链接具体文件、引用条款并说明缺口，区分要求与自身解释。

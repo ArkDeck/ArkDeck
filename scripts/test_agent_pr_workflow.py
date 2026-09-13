@@ -363,6 +363,13 @@ def validate_automatic_check_contract(
         raise WorkflowContractError(
             "Swift CI must report its stable check instead of skipping the workflow"
         )
+    if (
+        "concurrency:\n  group: swift-ci-${{ github.ref }}\n"
+        "  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}\n"
+    ) not in swift_text:
+        raise WorkflowContractError(
+            "Swift CI must cancel superseded branch runs and finish every main run"
+        )
 
     plan_job = _job_block(swift_text, "plan")
     swift_tests_job = _job_block(swift_text, "swift-tests")
@@ -1092,6 +1099,15 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
                 swift.replace(
                     "            arkdeck-swiftpm-v2-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-\n",
                     "",
+                ),
+            ),
+            (
+                "superseded main run cancelled",
+                agent,
+                sdd,
+                swift.replace(
+                    "  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}\n",
+                    "  cancel-in-progress: true\n",
                 ),
             ),
             (
