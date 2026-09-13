@@ -28,9 +28,16 @@ on:
 permissions:
   contents: read
 
+# A newer push to the same branch supersedes the run in flight, so branch
+# runs cancel. Runs on main do not: cancelling one when the next merge
+# arrives within its first minutes left 3 of the 30 merges #1844..#1873
+# with no validation of their own commit, no cache entry and a `cancelled`
+# status on main (#1850, #1854, #1866), while the merge that displaced them
+# was validated only as a whole. Finishing a superseded main run costs the
+# runner minutes it had left, nothing more.
 concurrency:
   group: swift-ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   plan:
