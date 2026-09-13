@@ -435,6 +435,41 @@ pretty-print probe, an admission scenario and the index facts it leaves.
 `tests/job_store_writer.rs` reproduces it. Re-record from Swift with
 `ARKDECK_RUST_JOB_STORE_RECORD=/private/tmp/<new>`.
 
+## Job plan (TASK-XPA-014)
+
+The isolated development composition answers `job.plan` as Swift
+`RuntimeJobEngine.planOnly` does for `analyzer.extract-crash-signature@1`, the one
+operation this Runtime materializes so far. `OperationRequest::decode` reads the
+current request as Swift's codec does: closed members, governance and
+retired-authority refusals, then the typed members in Swift's order with Swift's
+own messages, Foundation's `DecodingError` descriptions included. Its canonical
+bytes give Swift's request fingerprint. After the catalog's typed input rules the
+planner checks the pinned analyzer (named by `ARKDECK_ANALYZER_PATH`, as for the
+Swift daemon), resolves the source Artifact lease as
+`RuntimeArtifactStore.resolveLease` does (the payload opened through no link and
+hashed, refusals spelled as Swift interpolates them), re-reads its bytes as the
+analyzer action does, and digests the materialized plan document. Nothing is
+admitted, journaled or dispatched, and every refusal carries
+`{"phase": "preAdmission", "newDispatchCount": 0}`. Unlike Swift, planning writes
+nothing: no Job directory for a missing lease, no payload-verification cache, no
+resealed payload. Every other operation, an imported Artifact lease and a Runtime
+debug attempt permit are refused with `rejected` before anything is materialized.
+
+`arkdeck job plan` sends `--request-file` verbatim or builds the current request
+from `--target`, `--operation` and `--inputs-file`, applies the catalog's binding
+rule to `--expected-binding-revision` as the Swift CLI does, and accepts only a
+complete `arkdeck.job-plan/1` projection of an unadmitted plan.
+
+`rust/tests/fixtures/job-plan-analyzer/` is the oracle Swift
+`JobPlanAnalyzerOracleContractTests` records under the fixed physical root
+`/private/tmp/arkdeck-job-plan-oracle`, because the plan digest covers the source
+Artifact's absolute path: 71 requests, four of them planned. `tests/job_plan.rs`
+rebuilds the recorded store at that root and reproduces every answer. Re-record
+from Swift with `ARKDECK_RUST_JOB_PLAN_RECORD=/private/tmp/<new>`.
+`scripts/check-job-plan.py` runs the standalone Swift daemon and the Rust owner in
+turn over one state root and compares every answer over the socket and through
+both CLIs.
+
 ## Target presentation owner (TASK-XPA-012)
 
 The explicitly isolated development composition owns `targets-state/` and serves

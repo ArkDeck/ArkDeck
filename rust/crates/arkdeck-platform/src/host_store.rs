@@ -60,6 +60,19 @@ impl Ownership {
         }
     }
 }
+/// How a stored payload compares with the length and digest it was published
+/// with, in the classes Swift `RuntimeArtifactStore.validateStoredPayload`
+/// distinguishes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PayloadCheck {
+    /// Opening it without following a link failed with this OS error number.
+    Unopenable(i32),
+    /// Not a private single-link regular file of the published length.
+    TypeOrSize,
+    /// The hashed bytes, or the file's identity while hashing, differ.
+    DigestOrIdentity,
+    Verified,
+}
 #[derive(Debug)]
 pub enum DocumentPublishError {
     BeforePublication(io::Error),
@@ -748,6 +761,66 @@ impl HostDirectory {
             return Err(fail());
         }
         Ok(())
+    }
+
+    /// Classify an immutable payload as Swift
+    /// `RuntimeArtifactStore.validateStoredPayload` classifies its refusals:
+    /// it cannot be opened without following a link, it is not a private
+    /// single-link regular file of the published length, or its bytes or its
+    /// identity changed while they were hashed. Never follows a link.
+    pub fn check_payload(&self, name: &str, length: u64, digest: &str) -> io::Result<PayloadCheck> {
+        use sha2::{Digest, Sha256};
+        let file = match self.open_at(name, 0) {
+            Ok(file) => file,
+            Err(error) => {
+                return error
+                    .raw_os_error()
+                    .map(PayloadCheck::Unopenable)
+                    .ok_or(error);
+            }
+        };
+        let before = file.metadata()?;
+        if owned(&file, false, self.1).is_err() || before.len() != length {
+            return Ok(PayloadCheck::TypeOrSize);
+        }
+        let mut reader = &file;
+        let mut buffer = [0_u8; 65536];
+        let mut hashed = 0_u64;
+        let mut hash = Sha256::new();
+        loop {
+            let count = match reader.read(&mut buffer) {
+                Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
+                result => result?,
+            };
+            if count == 0 {
+                break;
+            }
+            hashed = hashed.saturating_add(count as u64);
+            if hashed > length {
+                return Ok(PayloadCheck::DigestOrIdentity);
+            }
+            hash.update(&buffer[..count]);
+        }
+        let after = file.metadata()?;
+        let Ok(linked) = self.stat_at(name) else {
+            return Ok(PayloadCheck::DigestOrIdentity);
+        };
+        Ok(
+            if hashed != length
+                || format!("{:x}", hash.finalize()) != digest
+                || before.len() != after.len()
+                || before.mtime() != after.mtime()
+                || before.mtime_nsec() != after.mtime_nsec()
+                || before.ctime() != after.ctime()
+                || before.ctime_nsec() != after.ctime_nsec()
+                || before.dev() != linked.st_dev as u64
+                || before.ino() != linked.st_ino
+            {
+                PayloadCheck::DigestOrIdentity
+            } else {
+                PayloadCheck::Verified
+            },
+        )
     }
 
     /// Hash the entire immutable payload while retaining only the requested range.

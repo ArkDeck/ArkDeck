@@ -82,6 +82,15 @@ pub trait HostServices: Send + Sync {
             details: None,
         })
     }
+    /// `job.plan` materializes without admitting. A host without a Job
+    /// planner answers as the read-only foundation always has.
+    fn job_plan(&self, _params: &serde_json::Map<String, Value>) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "rejected".into(),
+            message: "this method is unavailable in the read-only Rust foundation".into(),
+            details: None,
+        })
+    }
     fn bootstrap_register_bundle(&self, _file: &str) -> Result<Value, WireError> {
         Err(WireError {
             code: "operationUnavailable".into(),
@@ -697,6 +706,10 @@ impl<H: HostServices> Control<H> {
             "job.list" | "job.status" | "job.show" | "job.timeline" | "job.events" => Response {
                 id: request.id.clone(),
                 outcome: self.host.job_resource(&request.method, &params),
+            },
+            "job.plan" => Response {
+                id: request.id.clone(),
+                outcome: self.host.job_plan(&params),
             },
             "artifact.inspect" | "artifact.read" | "artifact.export" => Response {
                 id: request.id.clone(),

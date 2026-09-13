@@ -24,6 +24,11 @@ pub struct Host {
     #[cfg(target_os = "macos")]
     jobs: Option<arkdeck_hoststore::JobStore>,
     #[cfg(target_os = "macos")]
+    planning: Option<(
+        std::path::PathBuf,
+        Option<arkdeck_hoststore::AnalyzerProfile>,
+    )>,
+    #[cfg(target_os = "macos")]
     bootstrap: Option<crate::bootstrap_readers::BootstrapReaders>,
     provider: Option<HdcReadOnlyProvider>,
     #[cfg(target_os = "macos")]
@@ -54,6 +59,17 @@ impl Host {
     #[cfg(target_os = "macos")]
     pub fn with_jobs(mut self, jobs: arkdeck_hoststore::JobStore) -> Self {
         self.jobs = Some(jobs);
+        self
+    }
+    /// `job.plan` reads the Artifact owner, the configured analyzer and the
+    /// state root's Runtime debug attempt permits.
+    #[cfg(target_os = "macos")]
+    pub fn with_planning(
+        mut self,
+        state_root: &std::path::Path,
+        analyzer: Option<arkdeck_hoststore::AnalyzerProfile>,
+    ) -> Self {
+        self.planning = Some((state_root.to_owned(), analyzer));
         self
     }
     #[cfg(target_os = "macos")]
@@ -124,6 +140,8 @@ impl Host {
             artifacts: None,
             #[cfg(target_os = "macos")]
             jobs: None,
+            #[cfg(target_os = "macos")]
+            planning: None,
             #[cfg(target_os = "macos")]
             bootstrap: None,
             provider,
@@ -318,6 +336,34 @@ impl HostServices for Host {
                 details: None,
             })?
             .handle_resource(method, params)
+    }
+    #[cfg(target_os = "macos")]
+    fn job_plan(
+        &self,
+        params: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<serde_json::Value, WireError> {
+        let Some((state_root, analyzer)) = &self.planning else {
+            return Err(WireError {
+                code: "rejected".into(),
+                message: "this method is unavailable in the read-only Rust foundation".into(),
+                details: None,
+            });
+        };
+        arkdeck_hoststore::JobPlanner {
+            artifacts: self.artifacts.as_ref(),
+            analyzer: analyzer.as_ref(),
+            state_root,
+        }
+        .handle(params)
+        // Planning never admits: every refusal is pre-admission with zero dispatch.
+        .map_err(|refusal| WireError {
+            code: refusal.code.into(),
+            message: refusal.message,
+            details: Some(serde_json::Map::from_iter([
+                ("phase".into(), serde_json::json!("preAdmission")),
+                ("newDispatchCount".into(), serde_json::json!(0)),
+            ])),
+        })
     }
     #[cfg(target_os = "macos")]
     fn bootstrap_register_bundle(&self, source: &str) -> Result<serde_json::Value, WireError> {

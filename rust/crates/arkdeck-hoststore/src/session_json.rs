@@ -338,6 +338,21 @@ pub(super) fn encode_pretty(value: &Value) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
+/// Foundation `JSONValue` decoding of a caller's document, without requiring
+/// its canonical spelling: member names are unique under canonical equivalence
+/// (Swift `StrictJSONDuplicateValidator`) and numbers follow `JSONValue`'s
+/// Int64, UInt64, then Double order. Nothing is re-encoded.
+#[cfg(target_os = "macos")]
+pub(super) fn parse_foundation(bytes: &[u8]) -> Result<Value> {
+    let mut reader = Reader { bytes, position: 0 };
+    let value = reader.value(0)?;
+    reader.whitespace();
+    if reader.position != bytes.len() {
+        return Err(DecodeError::Shape);
+    }
+    Ok(value)
+}
+
 pub(super) fn parse(bytes: &[u8]) -> Result<Value> {
     if bytes.is_empty() || bytes.len() > 16 * 1024 * 1024 {
         return Err(DecodeError::Size);

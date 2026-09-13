@@ -20,6 +20,16 @@ pub use job_owner::JobStore;
 pub use job_record::JobRecord;
 #[cfg(target_os = "macos")]
 pub use job_repository::{AdmissionVerdict, JobWriteError};
+#[cfg(target_os = "macos")]
+mod job_plan;
+#[cfg(target_os = "macos")]
+pub use job_plan::{AnalyzerProfile, JobPlanner, PlanRefusal};
+#[cfg(target_os = "macos")]
+mod operation_catalog;
+#[cfg(target_os = "macos")]
+mod operation_request;
+#[cfg(target_os = "macos")]
+pub use operation_request::{OperationRequest, RequestErrorCode, RequestRejection};
 
 #[cfg(target_os = "macos")]
 mod job_events;

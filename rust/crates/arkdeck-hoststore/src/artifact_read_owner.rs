@@ -2,7 +2,7 @@
 //! external destination. Artifact publication, import leases, quota mutation,
 //! snapshot persistence and payload-verification-document writes stay separate.
 use crate::artifact_usage::decode_index;
-use arkdeck_platform::{HostDirectory, HostEntryKind};
+use arkdeck_platform::{HostDirectory, HostEntryKind, PayloadCheck};
 use serde_json::Value;
 use std::{
     io,
@@ -44,6 +44,40 @@ pub struct ArtifactReadRange {
     pub total_byte_count: u64,
     pub eof: bool,
     pub bytes: Vec<u8>,
+}
+
+/// A published Job Artifact a lease names, resolved as Swift
+/// `RuntimeArtifactStore.resolveLease` resolves it.
+pub(crate) struct LeasedArtifact {
+    pub(crate) job_id: String,
+    pub(crate) artifact_id: String,
+    pub(crate) row: Value,
+    pub(crate) path: PathBuf,
+}
+
+/// Swift's interpolation of a `String`: quoted, with its escapes.
+pub(crate) fn swift_string(text: &str) -> String {
+    let mut quoted = String::with_capacity(text.len() + 2);
+    quoted.push('"');
+    for character in text.chars() {
+        match character {
+            '"' => quoted.push_str("\\\""),
+            '\\' => quoted.push_str("\\\\"),
+            '\n' => quoted.push_str("\\n"),
+            '\r' => quoted.push_str("\\r"),
+            '\t' => quoted.push_str("\\t"),
+            '\0' => quoted.push_str("\\0"),
+            other => quoted.push(other),
+        }
+    }
+    quoted.push('"');
+    quoted
+}
+
+/// Swift's interpolation of a `RuntimeArtifactError`, which has no
+/// description of its own: the case name and its quoted payload.
+fn swift_artifact_error(case: &str, payload: &str) -> String {
+    format!("{case}({})", swift_string(payload))
 }
 
 fn invalid_input() -> io::Error {
@@ -272,6 +306,95 @@ impl ArtifactReadStore {
             .into_iter()
             .find(|row| row["artifactID"] == artifact_id)
             .ok_or_else(not_found)
+    }
+
+    /// Swift `RuntimeArtifactStore.resolveLease` for a Job Artifact: the
+    /// published row and the payload path the Artifact store names, the
+    /// payload opened through no link and hashed. A refusal is the
+    /// `RuntimeArtifactError` Swift throws, spelled as Swift interpolates it,
+    /// because Swift planning reports that spelling. Unlike Swift, a missing
+    /// Job directory is not created and a verified payload is not resealed.
+    /// Import leases belong to the Import owner and are not resolved here.
+    pub(crate) fn lease(&self, reference: &str) -> Result<LeasedArtifact, String> {
+        let parts: Vec<&str> = reference.split(':').collect();
+        if parts.len() != 3 || parts[0] != "lease-v1" {
+            return Err(swift_artifact_error(
+                "artifactNotFound",
+                "malformed Artifact lease",
+            ));
+        }
+        let (job_id, artifact_id) = (parts[1], parts[2]);
+        // Swift `directory(for:)`.
+        if job_id.is_empty()
+            || job_id.len() > 128
+            || !job_id
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || b"-_".contains(&byte))
+        {
+            return Err(swift_artifact_error(
+                "ioFailure",
+                "malformed job identifier",
+            ));
+        }
+        if job_id.starts_with("imp-") {
+            return Err("an Import lease is resolved by the Import owner".into());
+        }
+        let unreadable = || swift_artifact_error("indexCorrupted", "artifact index is unreadable");
+        let absent = || swift_artifact_error("artifactNotFound", artifact_id);
+        let (job, index, rows) = match self.index(job_id) {
+            Ok(found) => found,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Err(absent()),
+            Err(_) => return Err(unreadable()),
+        };
+        let row = rows
+            .into_iter()
+            .find(|row| row["artifactID"] == artifact_id)
+            .ok_or_else(absent)?;
+        let digest = row["sha256"]
+            .as_str()
+            .filter(|digest| digest.len() == 64 && row["status"].get("published").is_some())
+            .ok_or_else(|| {
+                swift_artifact_error("artifactNotFound", "Artifact lease is not readable")
+            })?;
+        let length = row["byteCount"].as_u64().ok_or_else(unreadable)?;
+        let drifted = |detail: &str| Err(swift_artifact_error("indexCorrupted", detail));
+        match job.check_payload(artifact_id, length, digest) {
+            Ok(PayloadCheck::Verified) => (),
+            Ok(PayloadCheck::Unopenable(errno)) => {
+                return drifted(&format!(
+                    "artifact payload is missing, linked or unreadable (errno {errno})"
+                ));
+            }
+            Ok(PayloadCheck::TypeOrSize) => {
+                return drifted("artifact payload type or size drifted");
+            }
+            Ok(PayloadCheck::DigestOrIdentity) | Err(_) => {
+                return drifted("artifact payload digest or identity drifted");
+            }
+        }
+        self.unchanged(job_id, &job, &index)
+            .map_err(|_| unreadable())?;
+        Ok(LeasedArtifact {
+            job_id: job_id.to_owned(),
+            artifact_id: artifact_id.to_owned(),
+            path: self.path.join(job_id).join(artifact_id),
+            row,
+        })
+    }
+
+    /// Whether a leased payload still holds exactly its published bytes, read
+    /// through no link; Swift's analyzer action re-reads them before lowering.
+    pub(crate) fn payload_matches(&self, leased: &LeasedArtifact) -> bool {
+        let (Some(length), Some(digest)) = (
+            leased.row["byteCount"].as_u64(),
+            leased.row["sha256"].as_str(),
+        ) else {
+            return false;
+        };
+        self.root
+            .child(&leased.job_id)
+            .and_then(|job| job.check_payload(&leased.artifact_id, length, digest))
+            .is_ok_and(|check| check == PayloadCheck::Verified)
     }
 
     pub fn read(
