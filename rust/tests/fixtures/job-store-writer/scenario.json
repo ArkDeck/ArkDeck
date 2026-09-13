@@ -1,0 +1,63 @@
+[
+  {
+    "op" : "admit",
+    "record" : "records\/admitted-a.json",
+    "requestHash" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "verdict" : "admitted"
+  },
+  {
+    "op" : "admit",
+    "record" : "records\/admitted-b.json",
+    "requestHash" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "verdict" : "admitted"
+  },
+  {
+    "op" : "admit",
+    "record" : "records\/admitted-a.json",
+    "requestHash" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "verdict" : {
+      "duplicate" : "job-a9fda911411280791d18df748a6d3d84"
+    }
+  },
+  {
+    "op" : "admit",
+    "record" : "records\/admitted-a.json",
+    "requestHash" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "verdict" : "conflict"
+  },
+  {
+    "idempotencyKey" : "idem-device-session",
+    "op" : "lookup",
+    "requestHash" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "verdict" : {
+      "duplicate" : "job-a9fda911411280791d18df748a6d3d84"
+    }
+  },
+  {
+    "idempotencyKey" : "idem-device-session",
+    "op" : "lookup",
+    "requestHash" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "verdict" : "conflict"
+  },
+  {
+    "idempotencyKey" : "idem-absent",
+    "op" : "lookup",
+    "requestHash" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "verdict" : "admitted"
+  },
+  {
+    "at" : "2026-07-29T00:00:03Z",
+    "op" : "persist",
+    "record" : "records\/running-a.json"
+  },
+  {
+    "at" : "2026-07-29T00:00:04Z",
+    "op" : "persist",
+    "record" : "records\/unknown-b.json"
+  },
+  {
+    "at" : "2026-07-29T00:00:05Z",
+    "op" : "persist",
+    "record" : "records\/published-a.json"
+  }
+]

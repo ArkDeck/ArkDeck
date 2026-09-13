@@ -1,0 +1,65 @@
+{
+  "actualEffect" : "readOnly",
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-07-29T00:00:00Z",
+    "kind" : "defaultReadOnlyPolicy",
+    "reference" : "default-read-only-policy"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-07-29T00:00:00Z",
+  "jobID" : "job-a9fda911411280791d18df748a6d3d84",
+  "materializedBindingRevision" : 7,
+  "materializedPlanDigest" : "28f12b19d3b7f0779392465f3b8adec0dee809edd6ba9056057a317fc27da57d",
+  "materializedStableTargetIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+  "operationReference" : "observe.device@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-device-session",
+    "inputs" : {
+
+    },
+    "operation" : {
+      "id" : "observe.device",
+      "version" : 1
+    },
+    "requestId" : "req-device-session",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 7,
+      "targetId" : "TGT-PUBLICATION"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "hdc",
+  "request" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-device-session",
+    "inputs" : {
+
+    },
+    "operation" : {
+      "id" : "observe.device",
+      "version" : 1
+    },
+    "requestId" : "req-device-session",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 7,
+      "targetId" : "TGT-PUBLICATION"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "state" : "preflight",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight"
+  ]
+}

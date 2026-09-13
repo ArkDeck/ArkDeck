@@ -416,6 +416,25 @@ job_journal_writer` must reproduce both from the same records, and
 `JournalRustWriterParityContractTests` holds Swift to the same bytes. Re-record
 from Swift with `ARKDECK_RUST_JOURNAL_WRITER_RECORD=/private/tmp/<new>`.
 
+## Job index and record writers (TASK-XPA-014)
+
+`arkdeck_hoststore::JobStore::open_owner` opens a state root for the Rust Job
+owner. `admit` commits an idempotent admission to the unchanged v1 `runtime_job`
+index: a known idempotency key answers with its Job or a conflict, and a new key
+takes the next admission sequence at version 1 with the exact initial record
+bytes. `persist` checks that the index row describes the record, publishes
+`jobs/<jobID>/job-record.json` atomically and then advances the row's state,
+update time, version and record bytes. `JobRecord::durable_bytes` spells a
+record as Swift's `JSONEncoder([.sortedKeys, .prettyPrinted])`. The owner and the
+reader inspect a store read-only only when its shared-memory index exists, as
+Swift does. No daemon path admits Jobs yet.
+
+`rust/tests/fixtures/job-store-writer/` is the oracle Swift
+`JobStoreRustWriterParityContractTests` records: records, a Foundation
+pretty-print probe, an admission scenario and the index facts it leaves.
+`tests/job_store_writer.rs` reproduces it. Re-record from Swift with
+`ARKDECK_RUST_JOB_STORE_RECORD=/private/tmp/<new>`.
+
 ## Target presentation owner (TASK-XPA-012)
 
 The explicitly isolated development composition owns `targets-state/` and serves
