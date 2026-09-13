@@ -498,6 +498,22 @@ impl JobRecord {
     pub(super) fn outcome_unknown(&self) -> bool {
         self.unknown
     }
+    pub(super) fn finished_at(&self) -> Option<&str> {
+        self.finished.as_deref()
+    }
+    pub(super) fn operation_failure(&self) -> Option<&Value> {
+        self.operation_failure.as_ref()
+    }
+    pub(super) fn evidence_observation(&self) -> Option<&Value> {
+        self.evidence_observation.as_ref()
+    }
+    /// The ownership marker of this Job's Session publication, if any.
+    pub(super) fn session_publication(&self) -> Option<&Value> {
+        self.session_publication.as_ref()
+    }
+    pub(super) fn set_session_publication(&mut self, marker: Value) {
+        self.session_publication = Some(marker);
+    }
     /// Whether the record carries evidence this Runtime does not project yet:
     /// a device observation, a Trace probe or ring and screen facts.
     pub(super) fn carries_device_evidence(&self) -> bool {

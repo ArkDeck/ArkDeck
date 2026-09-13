@@ -580,6 +580,41 @@ the six Job reads of an absent Job and the two reads of open options
 byte for byte. `scripts/check-job-run.py` compares both reads and both CLIs'
 `job result`, and has the Swift daemon read the result of every Rust-run Job.
 
+## Session publication (TASK-XPA-014)
+
+The isolated development composition publishes a Session for every terminal
+Job it runs, as the standalone Swift daemon's `RuntimeSessionPublicationWriter`
+does, through the Session owner it already holds. Once a Job's terminal record
+is durable, `SessionPublisher` reads the storage status (which initializes a
+missing catalog), claims metadata and finalization headroom on the Sessions
+volume, and composes the Manifest from the Job's record and Journal alone: a
+host target, no toolchain, the typed steps with the tuples their outcomes
+prove, and no copied Artifacts. It then writes the proposal beside the Job,
+appends the Journal's `finalized` record, creates the Session once
+(`yyyy/mm/session-<job>`, its identity document created exclusively), copies
+the Journal byte for byte, appends the outcome audit, publishes `manifest.json`
+write-once (`RENAME_EXCL`) under the Session's terminal lock and every Artifact
+publication shard, and registers the catalog entry before it releases the
+claim. The Job record keeps Swift's ownership marker at one more index version:
+the receipt once the catalog holds the entry, `awaitingStorage` when the volume
+has no room, a confirmed failure otherwise; reads report the publication fact
+from it. A parked Job, whose outcome is unknown, publishes nothing. As in
+Swift, a restart never resumes a publication and nothing retries one;
+reconciliation stays unported (L.1 item 13).
+
+`rust/tests/fixtures/job-publication-analyzer/` is the oracle Swift
+`JobRunAnalyzerOracleContractTests.testSwiftPublishesTheSharedAnalyzerSessions`
+records with the standalone daemon's writer over a Sessions root and storage
+owner of its own: six Jobs (a success and a failure published, a parked Job, a
+full volume, a Session path something else already holds, a source removed
+before its run), each Job record's volume, device, inode and claim generation
+kept as labels. `tests/job_publication.rs` reproduces every answer, read, index
+row, Job file, Artifact, Session file and catalog, and every entry's mode, byte
+for byte. Re-record from Swift with
+`ARKDECK_RUST_JOB_PUBLICATION_RECORD=/private/tmp/<new>`. `scripts/check-job-run.py`
+compares both owners' publications and has a Swift daemon list and show every
+Rust-published Session.
+
 ## Target presentation owner (TASK-XPA-012)
 
 The explicitly isolated development composition owns `targets-state/` and serves
