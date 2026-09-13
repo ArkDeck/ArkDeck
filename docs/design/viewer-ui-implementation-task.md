@@ -3,7 +3,7 @@
 > 类型：产品实现 brief，不是新的 OpenSpec Task、Readiness Task 或批准载体。
 >
 > 归属：复用 protected `main` 已存在的 `TASK-AIN-021`。本文件不改变该 Task
-> 的状态、Acceptance、Allowed paths，也不修改设计稿版本号。
+> 的状态、Acceptance，也不修改设计稿版本号。
 >
 > 2026-08-25 状态：本实现任务已闭合。本文件第 3 节以后保留为历史实现与验收上下文，
 > 不是当前产品差距清单。当前 SwiftUI 实现及其本地化、accessibility identifiers 是产品
@@ -302,7 +302,7 @@ contracts、Safety policy、历史 OpenSpec Task 状态或无关页面；发现�
 
 ### 最终闸与真实运行
 
-实现 PR push 前运行仓库统一入口和路径预检：
+实现 PR push 前运行仓库统一入口：
 
 ```bash
 python3 scripts/ci/plan.py \
@@ -312,12 +312,6 @@ python3 scripts/ci/plan.py \
   --merge-base \
   --include-worktree \
   --run-local
-
-python3 scripts/check_pr_paths.py \
-  --repo-root . \
-  --preflight \
-  --base-revision origin/main \
-  --head-revision HEAD
 ```
 
 真机可用时，Runtime 腿优先使用 `arkdeck agent run` 执行当前 Catalog digest 的

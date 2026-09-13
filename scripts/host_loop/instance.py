@@ -50,7 +50,7 @@ ENVELOPE_OPEN_MARKER = "<!-- arkdeck-pr-envelope:v1 -->"
 ENVELOPE_CLOSE_MARKER = "<!-- /arkdeck-pr-envelope -->"
 ENVELOPE_RUNTIME_ID = "host-loop/1"
 
-# The task-id grammar. `check_pr_paths.py` carries the fourth copy of this
+# The task-id grammar. `agent_pr_identity.py` carries the fourth copy of this
 # text; it sits outside this package and `test_token_parity.py` guards the two
 # against drift.
 TASK_TOKEN_TEXT = r"TASK-[A-Z0-9]+(?:-[A-Z0-9]+)*-[0-9]{3}[A-Z]?"

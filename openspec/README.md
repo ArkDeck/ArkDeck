@@ -122,8 +122,9 @@ AND SHALL NOT 派发任何 deviceMutation 或 destructive step。
    `PRODUCT-LOOP.md` §3 安全条件)才进入 change package 流程;
 4. 真实运行结果随交付 PR 如实记录(simulation/fake 不得记为真实设备结果);
    不能在实现中放宽 Constitution 安全不变量;
-5. 通过 `agent/**` 分支 → PR → 维护者 review 合入。产品 PR 的任务声明仅作
-   `check_pr_paths` 路径护栏,不触发治理连锁义务(见 `PRODUCT-LOOP.md` §16)。
+5. 通过 `agent/**` 分支 → PR → 维护者 review 合入。commit subject 里的 Task ID 只作
+   追溯写进 PR 正文,不触发被声明任务的治理连锁义务;仓内没有按路径放行的机器门
+   (`check_pr_paths` 路径护栏已由 CHG-2026-077 退役,见 `PRODUCT-LOOP.md` §16)。
 
 > 兼容注记(2026-07-30):原步骤 2「选择 ready 任务」与步骤 4「更新 tasks.md
 > 状态」自产品闭环优先阶段起对产品工作不再适用,仅在安全内核治理 change 内保留。

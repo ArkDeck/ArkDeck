@@ -397,10 +397,9 @@ class RoundOutcomes(unittest.TestCase):
     def test_green_checks_reach_checksGreen_without_merge_language(self):
         remote = FakeRemote()
         fake = FakeApi(pulls=[pull(21)])
-        # both required checks must be present AND terminal-successful
+        # the required check must be present AND terminal-successful
         fake.check_runs = [
             {"name": "guard", "status": "completed", "conclusion": "success"},
-            {"name": "allowed-paths", "status": "completed", "conclusion": "success"},
             {"name": "swift", "status": "completed", "conclusion": "success"},
         ]
         api = api_port(fake)
@@ -414,7 +413,7 @@ class RoundOutcomes(unittest.TestCase):
         fake = FakeApi(pulls=[pull(21)])
         fake.check_runs = [
             {"name": "guard", "status": "completed", "conclusion": "success"},
-            {"name": "allowed-paths", "status": "completed", "conclusion": "failure"},
+            {"name": "guard", "status": "completed", "conclusion": "failure"},
         ]
         w = build_worker(remote, api_port(fake))
         result = w.run_once([candidate()], "CHG-X", MAIN, state(), truth())
@@ -441,14 +440,12 @@ class RoundOutcomes(unittest.TestCase):
         observed.add(w.run_once([candidate()], "CHG-X", MAIN, state(), truth()).state)
         fake = FakeApi(pulls=[pull(21)])
         fake.check_runs = [{"name": "guard", "status": "completed", "conclusion": "success"},
-                           {"name": "allowed-paths", "status": "completed",
+                           {"name": "guard", "status": "completed",
                             "conclusion": "failure"}]
         observed.add(build_worker(FakeRemote(), api_port(fake)).run_once(
             [candidate()], "CHG-X", MAIN, state(), truth()).state)
         fake = FakeApi(pulls=[pull(21)])
-        fake.check_runs = [{"name": "guard", "status": "completed", "conclusion": "success"},
-                           {"name": "allowed-paths", "status": "completed",
-                            "conclusion": "success"}]
+        fake.check_runs = [{"name": "guard", "status": "completed", "conclusion": "success"}]
         observed.add(build_worker(FakeRemote(), api_port(fake)).run_once(
             [candidate()], "CHG-X", MAIN, state(), truth()).state)
         self.assertEqual(observed, {
@@ -533,16 +530,20 @@ class CreateIntentDurability(unittest.TestCase):
 
 
 class CheckDispatch(unittest.TestCase):
-    """Reserved PRs need a deliberate `edited` to obtain allowed-paths (F1/option B)."""
+    """Reserved PRs whose required check has not executed yet get exactly one
+    deliberate `edited` (F1/option B). Until CHG-2026-077 the push head always
+    needed it, because `allowed-paths` was only ever `skipped` there; now it is
+    needed only while `guard` has not executed successfully.
+    """
 
     def _worker(self, remote, fake):
         return build_worker(remote, api_port(fake))
 
-    def test_missing_allowed_paths_triggers_one_body_update(self):
+    def test_an_unexecuted_required_check_triggers_one_body_update(self):
         remote = FakeRemote()
         fake = FakeApi(pulls=[pull(21)])
-        fake.check_runs = [{"name": "guard", "status": "completed",
-                            "conclusion": "success"}]
+        fake.check_runs = [{"name": "guard", "status": "in_progress",
+                            "conclusion": None}]
         w = self._worker(remote, fake)
         w.run_once([candidate()], "CHG-X", MAIN, state(), truth())
         patches = [c for c in fake.calls if c[0] == "PATCH" and "/pulls/" in c[1]]
@@ -553,14 +554,13 @@ class CheckDispatch(unittest.TestCase):
         """Required checks that have genuinely executed need no dispatch.
 
         Note the distinction the previous version missed: "present" is not
-        "executed". A skipped run named allowed-paths is present and does NOT
-        satisfy the gate; only a completed success does.
+        "executed". A skipped run under a required name is present and does
+        NOT satisfy the gate; only a completed success does.
         """
         remote = FakeRemote()
         fake = FakeApi(pulls=[pull(21)])
         fake.check_runs = [
             {"name": "guard", "status": "completed", "conclusion": "success"},
-            {"name": "allowed-paths", "status": "completed", "conclusion": "success"},
         ]
         w = self._worker(remote, fake)
         result = w.run_once([candidate()], "CHG-X", MAIN, state(), truth())
@@ -569,12 +569,11 @@ class CheckDispatch(unittest.TestCase):
         self.assertEqual(result.state, WorkerState.CHECKS_GREEN)
 
     def test_a_skipped_stub_still_triggers_exactly_one_dispatch(self):
-        """The push run's skipped stub must not be mistaken for an executed check."""
+        """A skipped stub under the required name is not an executed check."""
         remote = FakeRemote()
         fake = FakeApi(pulls=[pull(21)])
         fake.check_runs = [
-            {"name": "guard", "status": "completed", "conclusion": "success"},
-            {"name": "allowed-paths", "status": "completed", "conclusion": "skipped"},
+            {"name": "guard", "status": "completed", "conclusion": "skipped"},
         ]
         first = self._worker(remote, fake).run_once(
             [candidate()], "CHG-X", MAIN, state(), truth())
@@ -676,7 +675,9 @@ class CheckDispatch(unittest.TestCase):
     def test_marker_is_never_nested(self):
         remote = FakeRemote()
         fake = FakeApi(pulls=[pull(21)])
-        fake.check_runs = [{"name": "guard", "status": "completed", "conclusion": "success"}]
+        # A head whose required check is still in flight is the one that
+        # gets a dispatch; an executed guard is green and dispatches nothing.
+        fake.check_runs = [{"name": "guard", "status": "in_progress", "conclusion": None}]
         mgr, _clock = manager(remote)
         w = Worker(api_port(fake), mgr,
                    change_approved=lambda c: True, done_tasks=lambda: frozenset(),
@@ -815,8 +816,7 @@ class MultiRoundLifecycle(unittest.TestCase):
                             f"round two must not collide with its own lease: {r2.detail}")
         self.assertEqual(r2.state, WorkerState.PR_OPEN)
         fake.check_runs = [
-            {"name": "guard", "status": "completed", "conclusion": "success"},
-            {"name": "allowed-paths", "status": "completed", "conclusion": "success"}]
+            {"name": "guard", "status": "completed", "conclusion": "success"}]
         r3 = build().run_once([candidate()], "CHG-X", MAIN, state(), tr())
         self.assertEqual(r3.state, WorkerState.CHECKS_GREEN)
 
@@ -931,16 +931,14 @@ class AuditRegressions(unittest.TestCase):
         in-flight run carrying a stale success conclusion would satisfy.
         """
         runs = [{"name": "guard", "status": "completed", "conclusion": "success"},
-                {"name": "allowed-paths", "status": "in_progress",
+                {"name": "guard", "status": "in_progress",
                  "conclusion": "success"}]
-        self.assertEqual(worker_mod.required_verdicts(runs)["allowed-paths"],
+        self.assertEqual(worker_mod.required_verdicts(runs)["guard"],
                          "pending")
         self.assertEqual(classify_checks(runs), "pending")
 
     def test_a_queued_required_run_is_pending_not_failed(self):
-        runs = [{"name": "guard", "status": "queued", "conclusion": None},
-                {"name": "allowed-paths", "status": "completed",
-                 "conclusion": "success"}]
+        runs = [{"name": "guard", "status": "queued", "conclusion": None}]
         self.assertEqual(worker_mod.required_verdicts(runs)["guard"], "pending")
 
     # --- C: a foreign lease OID must never enter the cursor -----------------
@@ -982,8 +980,7 @@ class AuditRegressions(unittest.TestCase):
     def test_the_round_survives_main_advancing(self):
         """main drifts several times an hour here; identity must not follow it."""
         remote, _fake, _clock, _mgr, build, tr = self._rig(
-            [{"name": "guard", "status": "completed", "conclusion": "success"},
-             {"name": "allowed-paths", "status": "completed", "conclusion": "skipped"}])
+            [{"name": "guard", "status": "in_progress", "conclusion": None}])
         first = build().run_once([candidate()], "CHG-X", MAIN, state(), tr())
         self.assertEqual(first.state, WorkerState.PR_OPEN)
         advanced = "e" * 40
@@ -1047,7 +1044,7 @@ class CheckClassification(unittest.TestCase):
     def test_empty_check_set_is_pending_not_green(self):
         self.assertEqual(classify_checks([]), "pending")
         self.assertEqual(worker_mod.unsatisfied_required_checks([]),
-                         ("allowed-paths", "guard"))
+                         ("guard",))
 
     def test_incomplete_run_is_pending(self):
         self.assertEqual(
@@ -1060,41 +1057,44 @@ class CheckClassification(unittest.TestCase):
             "failed")
 
     def test_skipped_required_check_is_pending_not_green(self):
-        """The exact set sdd-guard.yml leaves on a host-loop push head.
+        """A skipped conclusion on the required name is not an executed check.
 
-        Recorded in this change's own evidence (d2-identity-staging.md:161):
-        allowed-paths is `skipped` on push and only `success` on the `edited`
-        run. The previous assertion locked in the opposite — it asserted that a
-        skipped conclusion counts as green — which is how a head whose MECH-004
-        path contract was never evaluated could be handed back as CHECKS_GREEN.
+        Recorded in this change's own evidence (d2-identity-staging.md:161)
+        while `allowed-paths` was required: it was `skipped` on push and only
+        `success` on the `edited` run. The previous assertion locked in the
+        opposite — it asserted that a skipped conclusion counts as green —
+        which is how a head whose required contract was never evaluated could
+        be handed back as CHECKS_GREEN. Since CHG-2026-077 the only required
+        name is `guard`, so an executed push-head guard is green on its own.
         """
+        skipped_only = [
+            {"name": "guard", "status": "completed", "conclusion": "skipped"},
+        ]
+        self.assertEqual(classify_checks(skipped_only), "pending")
+        self.assertEqual(worker_mod.unsatisfied_required_checks(skipped_only),
+                         ("guard",))
+        self.assertEqual(worker_mod.required_verdicts(skipped_only),
+                         {"guard": "pending"})
         push_only = [
             {"name": "guard", "status": "completed", "conclusion": "success"},
-            {"name": "allowed-paths", "status": "completed", "conclusion": "skipped"},
         ]
-        self.assertEqual(classify_checks(push_only), "pending")
-        self.assertEqual(worker_mod.unsatisfied_required_checks(push_only),
-                         ("allowed-paths",))
-        self.assertEqual(worker_mod.required_verdicts(push_only),
-                         {"guard": "success", "allowed-paths": "pending"})
+        self.assertEqual(classify_checks(push_only), "green")
+        self.assertEqual(worker_mod.unsatisfied_required_checks(push_only), ())
 
     def test_an_executed_success_on_the_edited_run_promotes_to_green(self):
         both_runs = [
+            {"name": "guard", "status": "completed", "conclusion": "skipped"},
             {"name": "guard", "status": "completed", "conclusion": "success"},
-            {"name": "allowed-paths", "status": "completed", "conclusion": "skipped"},
-            {"name": "allowed-paths", "status": "completed", "conclusion": "success"},
         ]
         self.assertEqual(classify_checks(both_runs), "green")
         self.assertEqual(worker_mod.unsatisfied_required_checks(both_runs), ())
 
     def test_neutral_on_a_required_name_is_also_pending(self):
-        runs = [{"name": "guard", "status": "completed", "conclusion": "success"},
-                {"name": "allowed-paths", "status": "completed", "conclusion": "neutral"}]
+        runs = [{"name": "guard", "status": "completed", "conclusion": "neutral"}]
         self.assertEqual(classify_checks(runs), "pending")
 
     def test_skipped_on_a_NON_required_run_is_not_a_failure(self):
         runs = [{"name": "guard", "status": "completed", "conclusion": "success"},
-                {"name": "allowed-paths", "status": "completed", "conclusion": "success"},
                 {"name": "swift", "status": "completed", "conclusion": "skipped"}]
         self.assertEqual(classify_checks(runs), "green")
 
@@ -1105,29 +1105,26 @@ class CheckClassification(unittest.TestCase):
         non-required failure scan, silently ignoring a red Swift run.
         """
         runs = [{"name": "guard", "status": "completed", "conclusion": "success"},
-                {"name": "allowed-paths", "status": "completed", "conclusion": "success"},
                 {"name": "swift", "status": "completed", "conclusion": "failure"}]
         self.assertEqual(classify_checks(runs), "failed")
         self.assertEqual(worker_mod.unsatisfied_required_checks(runs), ())
 
     def test_a_pending_non_required_run_keeps_the_round_pending(self):
         runs = [{"name": "guard", "status": "completed", "conclusion": "success"},
-                {"name": "allowed-paths", "status": "completed", "conclusion": "success"},
                 {"name": "swift", "status": "in_progress", "conclusion": None}]
         self.assertEqual(classify_checks(runs), "pending")
 
     def test_an_unknown_extra_run_cannot_contribute_greenness(self):
-        runs = [{"name": "guard", "status": "completed", "conclusion": "success"},
-                {"name": "some-other-check", "status": "completed",
+        runs = [{"name": "some-other-check", "status": "completed",
                  "conclusion": "success"}]
         self.assertEqual(worker_mod.unsatisfied_required_checks(runs),
-                         ("allowed-paths",))
+                         ("guard",))
         self.assertEqual(classify_checks(runs), "pending")
 
     def test_mixed_pending_wins_over_success(self):
         self.assertEqual(classify_checks([
             {"name": "guard", "status": "completed", "conclusion": "success"},
-            {"name": "allowed-paths", "status": "queued", "conclusion": None},
+            {"name": "guard", "status": "queued", "conclusion": None},
         ]), "pending")
 
     def test_action_required_is_failed(self):

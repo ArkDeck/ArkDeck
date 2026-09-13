@@ -2,8 +2,10 @@
 #
 # Guards the seam that produced the divergence: pr_envelope carried its own
 # narrower copy of the task token, so 14 of 46 active task headers rendered
-# unusable while MECH-004 accepted them. These tests fail if the two
-# definitions ever drift apart again.
+# unusable while MECH-004 accepted them. The MECH-004 grammar now lives in
+# scripts/agent_pr_identity.py (CHG-2026-077 retired the path guard and kept
+# its identity half). These tests fail if the two definitions ever drift
+# apart again.
 
 import importlib.util
 import pathlib
@@ -18,11 +20,11 @@ if str(SCRIPTS_DIR) not in sys.path:
 
 from host_loop import pr_envelope as pr_envelope_module  # noqa: E402
 
-_PARITY_MODULE_NAME = "_check_pr_paths_for_parity"
+_PARITY_MODULE_NAME = "_agent_pr_identity_for_parity"
 
 
-def _load_check_pr_paths():
-    """Load scripts/check_pr_paths.py as a module without importing scripts/ as a package.
+def _load_agent_pr_identity():
+    """Load scripts/agent_pr_identity.py as a module without importing scripts/ as a package.
 
     The module must be registered in sys.modules *before* exec_module: dataclass
     field introspection resolves the defining module by name, and a module that
@@ -30,7 +32,7 @@ def _load_check_pr_paths():
     """
     if _PARITY_MODULE_NAME in sys.modules:
         return sys.modules[_PARITY_MODULE_NAME]
-    path = pathlib.Path(__file__).resolve().parents[1] / "check_pr_paths.py"
+    path = pathlib.Path(__file__).resolve().parents[1] / "agent_pr_identity.py"
     spec = importlib.util.spec_from_file_location(_PARITY_MODULE_NAME, path)
     module = importlib.util.module_from_spec(spec)
     sys.modules[_PARITY_MODULE_NAME] = module
@@ -46,7 +48,7 @@ class TaskTokenParityTests(unittest.TestCase):
     """The envelope token must stay byte-identical to the MECH-004 token."""
 
     def test_token_text_is_byte_identical_to_mech004(self):
-        mech = _load_check_pr_paths()
+        mech = _load_agent_pr_identity()
         self.assertEqual(
             pr_envelope_module.TASK_TOKEN_TEXT,
             mech.TASK_TOKEN_TEXT,

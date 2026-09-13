@@ -2,8 +2,8 @@
 
 > 类型：产品一致性核对任务 brief，不是新的 OpenSpec Task、Readiness Task 或批准载体。
 >
-> 归属：复用 protected `main` 已存在的 `TASK-AIN-021` 作为路径护栏。本文件不改变该
-> Task 的状态、Acceptance、Allowed paths，不新增治理流程，也不重启已退役的
+> 归属：复用 protected `main` 已存在的 `TASK-AIN-021` 作为追溯声明。本文件不改变该
+> Task 的状态、Acceptance，不新增治理流程，也不重启已退役的
 > Automation/task 平面（CHG-2026-064）。
 >
 > 执行形态：**可重复执行的核对回合**。每轮以执行时的 reviewed `main` commit 为基线，
@@ -141,9 +141,9 @@ C-DUP 的收敛取舍）单列，不静默改。
 
 ## 9. 交付纪律
 
-- 分支 `agent/*`；commit 与 PR 声明 `TASK-AIN-021`；push 前用 base-tree 的
-  `scripts/check_pr_paths.py --preflight` 覆盖完整 diff。
-- 不得在核对 PR 里修改 TASK-AIN-021 定义或扩张 Allowed paths；不发布新
+- 分支 `agent/*`；commit 与 PR 声明 `TASK-AIN-021`（只作追溯；路径护栏已由
+  CHG-2026-077 退役，不需要 preflight）。
+- 不得在核对 PR 里修改 TASK-AIN-021 定义；不发布新
   operation/provider/profile，不改 Runtime admission、Catalog digest 或设备命令
   lowering。
 - PR 摘要用英文；以 draft PR 交维护者审查，合入不替代剩余真机验收。

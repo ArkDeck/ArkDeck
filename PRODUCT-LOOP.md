@@ -894,10 +894,10 @@ NOT 请求用户批准缺失的证明。`outcomeUnknown` 永远不得自动重�
 - Rockchip Runtime Provider;
 - Bounded AI Debug Loop。
 
-CI 机械说明:`scripts/check_pr_paths.py` 的任务声明只是**路径护栏**,不是治理仪式。
-产品 PR 声明一个 base 上已存在、allowed paths 覆盖其改动的 active 任务
-(如 `TASK-BER-002`、`TASK-DHA-001` 覆盖 `Packages/ArkDeckKit/**`)即可;
-该声明不触发被声明任务的 readiness/verification/archive 连锁义务。
+CI 机械说明:产品 PR 不需要为改动路径找一个 active 任务——`check_pr_paths.py`
+路径护栏已由 CHG-2026-077 退役,改动范围由维护者在真实 diff 上 review;Task 的
+Allowed paths 只是作者预计触及范围的规划声明。commit subject 里的 Task ID 只作追溯
+写进 PR 正文;该声明不触发被声明任务的 readiness/verification/archive 连锁义务。
 
 ---
 

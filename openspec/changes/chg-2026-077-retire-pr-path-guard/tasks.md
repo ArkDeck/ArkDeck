@@ -13,7 +13,7 @@
 
 ## TASK-RPG-001 — Retire the PR allowed-paths guard
 
-- Status:ready
+- Status:done（2026-09-13: delivered in one PR — the three deletions, `scripts/agent_pr_identity.py` and its tests, both workflows, the workflow contract, the host_loop required set and tests, the documentation list and the live probe in `evidence/runs/TASK-RPG-001/run.md`; the maintainer's merge of that PR confirms decisions 1–3 of the proposal）
 - Platform:macos（repository tooling; runs on every hosted runner）
 - Decision grade:D1
 - Requirements/AC:RPG-AC-01, RPG-AC-02, RPG-AC-03, RPG-AC-04, RPG-AC-05

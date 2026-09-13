@@ -766,8 +766,7 @@ class NoCursorIssueMeansNoIssueWrite(unittest.TestCase):
 
         remote = FakeRemote()
         fake = FakeApi(pulls=[pull(21)], check_runs=[
-            {"name": "guard", "status": "completed", "conclusion": "success"},
-            {"name": "allowed-paths", "status": "completed", "conclusion": "success"}])
+            {"name": "guard", "status": "completed", "conclusion": "success"}])
         mgr, _clock = manager(remote, run="host-loop/worker")
         worker = Worker(
             api_port(fake), mgr, change_approved=lambda c: True,
@@ -795,8 +794,7 @@ class NoCursorIssueMeansNoIssueWrite(unittest.TestCase):
 
         remote = FakeRemote()
         fake = FakeApi(pulls=[pull(21)], check_runs=[
-            {"name": "guard", "status": "completed", "conclusion": "success"},
-            {"name": "allowed-paths", "status": "completed", "conclusion": "success"}])
+            {"name": "guard", "status": "completed", "conclusion": "success"}])
         mgr, _clock = manager(remote, run="host-loop/worker")
         worker = Worker(
             api_port(fake), mgr, change_approved=lambda c: True,

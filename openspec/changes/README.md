@@ -30,7 +30,7 @@ proposed → approved → implementing → verified → archived
 ```text
 openspec/changes/<change-id>/
 ├── proposal.md          # why/what、change class、范围(涉及的 Requirement/AC 清单)、平台影响
-├── tasks.md             # 任务清单与状态(ready/in_progress/done/blocked),每任务含范围、allowed paths、验证方式
+├── tasks.md             # 任务清单与状态(ready/in_progress/done/blocked),每任务含范围、预计触及路径(Allowed paths,规划声明,CI 不校验)、验证方式
 ├── verification.md      # 每个 AC 的验证方法、所需 evidence 与结论
 └── evidence/            # run 记录与产物(按 task 分子目录;格式轻量,如实分类 simulation/real)
 ```

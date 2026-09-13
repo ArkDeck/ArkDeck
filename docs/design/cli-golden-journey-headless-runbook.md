@@ -557,21 +557,22 @@ fixture 类别，不能证明真实 Runtime 已通过相同链路。
 
 App 呈现不套用 §0 的四态——四态属于 Journey。按测试逐条记 `pass` / `fail` / `未执行`，
 附完整调用命令与 `xcresult` 路径。任何 App 侧失败按 §0 的产品缺陷规则处理：报
-`BLOCKED_BY_PRODUCT_DEFECT`，用**原实现 Task 的 ID 与 Allowed paths** 提修复 PR，
-合入后再验，不把代码修复塞进 TASK-SVC-005 的文档/evidence 权限。
+`BLOCKED_BY_PRODUCT_DEFECT`，用**原实现 Task 的 ID** 提修复 PR，
+合入后再验，不把代码修复混进 TASK-SVC-005 的验收 PR。
 
 ## 7. 记录模板与落点
 
 每条 Journey 一个对象（脱敏：只留 SHA-256、jobId、executionId、计数与 UTC 时间，不留
 connectKey、序列号、原始输出）。
 
-**落点由执行本轮的 Task 决定。** 记录必须写进该验收 PR 所声明 Task 在可信 base 上的
-Allowed paths；其他 Task 拥有更宽路径不自动扩大本 Task 范围。
+**落点由执行本轮的 Task 决定。** 记录写进该验收 PR 所声明 Task 的 evidence/文档目录
+（Task 的 Allowed paths 是预计范围的规划声明，CHG-2026-077 起不再由 CI 校验）；其他
+Task 的目录不混用。
 
 - 本轮（TASK-SVC-005）落在 `docs/design/references/single-v1/gj-headless-rerun-<date>.json`。
 - 历史记录留在原处不动：`docs/design/references/v1.6-goal/gj-headless-rerun-2026-09-02.json`
   是 TASK-AIN-021 落的（#1701、#1707），不要为了统一路径去搬它。
-- 换成别的 Task 执行时，先按同样方法确认落点在那个 Task 的 Allowed paths 内，再开跑。
+- 换成别的 Task 执行时，落点改到那个 Task 的目录，再开跑。
 
 记录形状如下；所有示例 ID、digest、revision、时间和计数均替换为实际读回值：
 
@@ -625,7 +626,7 @@ operation 每个一行，记录总数及不可用原因，让
 
 本轮在 `TASK-SVC-005` 的同一验收 PR 中交付真实运行元数据、`evidence/runs/TASK-SVC-005/run.md`、
 SVC-AC-01～10 结果和 Swift 契约基线。覆盖摘要使用本次读取的 operation 总数作分母。
-按任务的 base-tree Allowed paths 做 preflight；不沿用 TASK-AIN-021 的历史文档写入范围。
+不做路径 preflight（护栏已由 CHG-2026-077 退役）；不沿用 TASK-AIN-021 的历史文档写入范围。
 任何一条为 `BLOCKED_BY_PRODUCT_DEFECT` 时，把脱敏后的失败原文、Runtime 引用与复现 argv
 写进记录，并由原实现 Task 交付完整调用链修复；没有适用范围时提出最小具体补充。
 不因单个 Journey、fixture 或 App assertion 通过修改整项 change 的批准或验证状态。
