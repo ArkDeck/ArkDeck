@@ -91,7 +91,8 @@ readiness 声明"交付形态与观察点逐项对应"但未逐点走通取证�
 
 ### Automation status
 
-`partiallyMechanized`。CHG-2026-028 的 PR allowed-paths diff 校验机械关闭"无意混装"
+`semanticReview`。CHG-2026-028 的 PR allowed-paths diff 校验（CHG-2026-077 已退役该校验，
+范围现由维护者在真实 diff 上 review）曾机械关闭"无意混装"
 与"状态 PR 夹带实现"两类形态，其边界在
 CHG-2026-028 `proposal.md`（blob `d7718251c074f3b23bb32f8703c863efc9912245`）
 中被如实登记为 guard-rail 而非安全边界；"消费者是否枚举完整"仍是语义判断。
@@ -372,7 +373,7 @@ pin 用截断前缀；状态 PR 夹带实现或实现 PR 夹带状态翻转；PR
 ### Automation status
 
 `partiallyMechanized`。CHG-2026-028 将三方 revision 同步、结构化 pins 全 hash 与
-PR allowed-paths diff 三面转为机器可判定；载体与内容是否**如实**仍靠 review。
+PR allowed-paths diff 三面转为机器可判定（第三面已由 CHG-2026-077 退役，范围由 review 承担）；载体与内容是否**如实**仍靠 review。
 
 ### Currency
 
@@ -1018,7 +1019,7 @@ bytes；对外部环境（runner 镜像、工具链版本、外部工具能力�
 
 ### Automation status
 
-`partiallyMechanized`。CHG-2026-028 的 PR allowed-paths diff 是近似防线，它关闭的是
+`semanticReview`。CHG-2026-028 的 PR allowed-paths diff 曾是近似防线（CHG-2026-077 已退役），它关闭的是
 无意混装，不防并发写同一文件。
 
 ### Currency

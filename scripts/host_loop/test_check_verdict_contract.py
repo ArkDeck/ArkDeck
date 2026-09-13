@@ -45,8 +45,17 @@ from host_loop.worker import (  # noqa: E402
     unsatisfied_required_checks,
 )
 
-REQUIRED = REQUIRED_PR_CHECKS[0]
-OTHER_REQUIRED = REQUIRED_PR_CHECKS[1]
+# Production requires exactly one name since CHG-2026-077 retired the
+# `allowed-paths` check. The table below is a contract over the verdict
+# FUNCTION, and its multi-name invariants (an absent sibling is pending, green
+# needs every name, no asymmetry across names) only mean something with at
+# least two required names — so every table class runs under a two-name
+# fixture set patched into the module, and ProductionRequiredSet pins the real
+# one. The functions read REQUIRED_PR_CHECKS at call time, which is what makes
+# the patch effective.
+REQUIRED = "guard"
+OTHER_REQUIRED = "other-required"
+FIXTURE_REQUIRED_SET = (REQUIRED, OTHER_REQUIRED)
 NON_REQUIRED = "swift"
 
 # GitHub's documented conclusion values, plus the absent case.
@@ -64,7 +73,18 @@ def _satisfied(runs, name=REQUIRED):
     return required_verdicts(runs)[name]
 
 
-class SingleRunTable(unittest.TestCase):
+class _TwoNameTable(unittest.TestCase):
+    """Runs the verdict functions under FIXTURE_REQUIRED_SET."""
+
+    def setUp(self):
+        self._production_set = worker_mod.REQUIRED_PR_CHECKS
+        worker_mod.REQUIRED_PR_CHECKS = FIXTURE_REQUIRED_SET
+
+    def tearDown(self):
+        worker_mod.REQUIRED_PR_CHECKS = self._production_set
+
+
+class SingleRunTable(_TwoNameTable):
     """One run per required name: the verdict is decided by status+conclusion."""
 
     def test_completed_success_is_the_only_satisfying_shape(self):
@@ -91,10 +111,10 @@ class SingleRunTable(unittest.TestCase):
     def test_an_empty_set_leaves_every_required_name_pending(self):
         self.assertEqual(set(required_verdicts([]).values()), {"pending"})
         self.assertEqual(unsatisfied_required_checks([]),
-                         tuple(sorted(REQUIRED_PR_CHECKS)))
+                         tuple(sorted(FIXTURE_REQUIRED_SET)))
 
 
-class FailureDominatesTable(unittest.TestCase):
+class FailureDominatesTable(_TwoNameTable):
     """Invariant 1: one executed failure on a required name decides the verdict.
 
     This is the direction v3 got wrong. `guard` runs in BOTH suites — sdd-guard's
@@ -189,7 +209,7 @@ class FailureDominatesTable(unittest.TestCase):
                          "the verdict must not depend on arrival order")
 
 
-class NoAsymmetryTable(unittest.TestCase):
+class NoAsymmetryTable(_TwoNameTable):
     """Invariant 2: requiring a check may only ever make the gate stricter."""
 
     def test_the_same_pair_is_not_green_on_required_and_failed_on_non_required(self):
@@ -246,7 +266,7 @@ class NoAsymmetryTable(unittest.TestCase):
                                         strictness[as_non_required])
 
 
-class NonRequiredTable(unittest.TestCase):
+class NonRequiredTable(_TwoNameTable):
     """Non-required runs can fail or delay a round, order-independently."""
 
     def test_a_failed_non_required_run_fails_the_round_in_any_position(self):
@@ -275,42 +295,72 @@ class NonRequiredTable(unittest.TestCase):
         self.assertEqual(classify_checks(runs), "pending")
 
 
-class GreenIsExactlyAllRequiredExecutedSuccessfully(unittest.TestCase):
+class GreenIsExactlyAllRequiredExecutedSuccessfully(_TwoNameTable):
     def test_green_requires_every_required_name(self):
         self.assertEqual(classify_checks([run(REQUIRED)]), "pending")
         self.assertEqual(
             classify_checks([run(REQUIRED), run(OTHER_REQUIRED)]), "green")
 
-    def test_the_documented_push_only_shape_is_pending(self):
-        """The shape this change's own evidence records for a push head."""
-        runs = [run("guard", conclusion="success"),
-                run("allowed-paths", conclusion="skipped")]
+    def test_a_push_only_head_under_the_fixture_set_is_pending(self):
+        """Under two names a head that executed only one of them is pending."""
+        runs = [run(REQUIRED, conclusion="success"),
+                run(OTHER_REQUIRED, conclusion="skipped")]
         self.assertEqual(classify_checks(runs), "pending")
-        self.assertEqual(unsatisfied_required_checks(runs), ("allowed-paths",))
+        self.assertEqual(unsatisfied_required_checks(runs), (OTHER_REQUIRED,))
 
-    def test_the_documented_push_plus_edited_shape_is_green(self):
-        runs = [run("guard", conclusion="success"),
-                run("guard", conclusion="success"),
-                run("allowed-paths", conclusion="skipped"),
-                run("allowed-paths", conclusion="success"),
+    def test_an_executed_success_on_the_edited_run_promotes_to_green(self):
+        runs = [run(REQUIRED, conclusion="success"),
+                run(REQUIRED, conclusion="success"),
+                run(OTHER_REQUIRED, conclusion="skipped"),
+                run(OTHER_REQUIRED, conclusion="success"),
                 run("swift", conclusion="success")]
         self.assertEqual(classify_checks(runs), "green")
 
+
+class ProductionRequiredSet(unittest.TestCase):
+    """The real required set, unpatched: exactly `guard` since CHG-2026-077."""
+
+    def test_production_requires_exactly_guard(self):
+        self.assertEqual(REQUIRED_PR_CHECKS, ("guard",))
+        self.assertEqual(worker_mod.REQUIRED_PR_CHECKS, ("guard",))
+
+    def test_a_push_head_with_an_executed_guard_is_green(self):
+        """No second name means no dispatch is needed for a green head."""
+        runs = [run("guard", conclusion="success")]
+        self.assertEqual(classify_checks(runs), "green")
+        self.assertEqual(unsatisfied_required_checks(runs), ())
+        self.assertEqual(required_verdicts(runs), {"guard": "success"})
+
     def test_the_edited_guard_run_can_still_fail_the_round(self):
-        """The whole point of the r1 fix: that run must be able to fail."""
+        """The whole point of the r1 fix: the merge-ref run must be able to fail."""
         runs = [run("guard", conclusion="success"),      # push suite
-                run("guard", conclusion="failure"),      # pull_request suite
-                run("allowed-paths", conclusion="skipped"),
-                run("allowed-paths", conclusion="success")]
+                run("guard", conclusion="failure")]      # pull_request suite
         self.assertEqual(classify_checks(runs), "failed")
 
+    def test_an_inflight_edited_guard_run_keeps_the_round_pending(self):
+        runs = [run("guard", conclusion="success"),
+                run("guard", status="in_progress", conclusion=None)]
+        self.assertEqual(classify_checks(runs), "pending")
+        self.assertEqual(unsatisfied_required_checks(runs), ("guard",))
 
-class VerdictSurfaceIsTotal(unittest.TestCase):
+    def test_a_run_under_the_retired_name_is_an_ordinary_non_required_run(self):
+        """A head cut before the retirement may still carry `allowed-paths`
+        runs: they satisfy nothing, a skipped one is benign and a failed one
+        fails the round like any other non-required failure."""
+        self.assertEqual(unsatisfied_required_checks([run("allowed-paths")]),
+                         ("guard",))
+        self.assertEqual(classify_checks(
+            [run("guard"), run("allowed-paths", conclusion="skipped")]), "green")
+        self.assertEqual(classify_checks(
+            [run("guard"), run("allowed-paths", conclusion="failure")]), "failed")
+
+
+class VerdictSurfaceIsTotal(_TwoNameTable):
     def test_every_required_name_appears_in_the_mapping(self):
         for runs in ([], [run(REQUIRED)], [run("unrelated")]):
             with self.subTest(runs=len(runs)):
                 self.assertEqual(set(required_verdicts(runs)),
-                                 set(REQUIRED_PR_CHECKS))
+                                 set(FIXTURE_REQUIRED_SET))
 
     def test_only_three_verdict_values_are_possible(self):
         for conclusion in ALL_CONCLUSIONS:

@@ -10,6 +10,11 @@ name: Agent PR
 # pull_request runs caused by a GITHUB_TOKEN-created/updated PR behind a
 # manual approval gate, so routine create/synchronize validation stays in
 # this exact-head push run.
+#
+# This workflow reads no diff and no Task definition. The PR allowed-paths
+# guard that used to preflight every push here was retired by CHG-2026-077:
+# scope is reviewed on the real diff by the maintainer, and the `Task:` line
+# below is traceability copied from the final commit subject, not a lookup.
 
 on:
   push:
@@ -42,20 +47,15 @@ jobs:
         run: |
           set -eu
           TASK_ID=$(
-            python scripts/check_pr_paths.py \
+            python scripts/agent_pr_identity.py \
               --repo-root "$GITHUB_WORKSPACE" \
-              --preflight \
-              --base-revision origin/main \
-              --head-revision "$HEAD_SHA" \
-              --expected-head-ref "$BRANCH" \
-              --allow-bootstrap \
-              --infer-task
+              --commit-task "$HEAD_SHA"
           )
           case "$TASK_ID" in
-            none|bootstrap|TASK-*)
+            none|TASK-*)
               ;;
             *)
-              echo "::error::preflight returned an invalid task declaration"
+              echo "::error::commit task read-back returned an invalid token"
               exit 1
               ;;
           esac
@@ -67,7 +67,7 @@ jobs:
             -f "head=$GITHUB_REPOSITORY_OWNER:$BRANCH" \
             -f per_page=100 > "$CANDIDATES"
           PR_NUMBER=$(
-            python scripts/check_pr_paths.py \
+            python scripts/agent_pr_identity.py \
               --repo-root "$GITHUB_WORKSPACE" \
               --pull-list "$CANDIDATES" \
               --allow-zero
@@ -76,14 +76,8 @@ jobs:
             TITLE=$(git log -1 --pretty=%s)
             BODY="$RUNNER_TEMP/pull-request-body.md"
             : > "$BODY"
-            if [ "$TASK_ID" = "bootstrap" ]; then
-              printf 'Bootstrap exception: maintainer-authorized one-time base/head/path tuple; it expires when this PR changes `main`.\n\n' >> "$BODY"
-            elif [ "$TASK_ID" != "none" ]; then
+            if [ "$TASK_ID" != "none" ]; then
               printf 'Task: %s\n\n' "$TASK_ID" >> "$BODY"
-              # A declared scope extension travels with the Task so the
-              # event-mode guard reads the trailers the preflight read.
-              git log -1 --pretty=%b "$HEAD_SHA" | grep -E '^[[:space:]]*Scope-Extension:' >> "$BODY" || true
-              printf '\n' >> "$BODY"
             fi
             printf 'Agent-drafted change from `%s`.\n\n- Review per AGENTS.md authority order; approval by the human CODEOWNER constitutes the governance decision.\n- Required exact-head checks are attached by push workflows.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n' "$BRANCH" >> "$BODY"
             gh pr create \
@@ -101,7 +95,7 @@ jobs:
             -f "head=$GITHUB_REPOSITORY_OWNER:$BRANCH" \
             -f per_page=100 > "$CANDIDATES"
           PR_NUMBER=$(
-            python scripts/check_pr_paths.py \
+            python scripts/agent_pr_identity.py \
               --repo-root "$GITHUB_WORKSPACE" \
               --pull-list "$CANDIDATES"
           )
@@ -116,10 +110,9 @@ jobs:
           gh api --method GET \
             "/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" > "$PULL_REQUEST"
           VALIDATED_NUMBER=$(
-            python scripts/check_pr_paths.py \
+            python scripts/agent_pr_identity.py \
               --repo-root "$GITHUB_WORKSPACE" \
               --pull-request "$PULL_REQUEST" \
-              --identity-only \
               --expected-repository "$GITHUB_REPOSITORY" \
               --expected-number "$PR_NUMBER" \
               --expected-base-ref main \
@@ -132,69 +125,3 @@ jobs:
             exit 1
           fi
           echo "pr-number=$VALIDATED_NUMBER" >> "$GITHUB_OUTPUT"
-
-  allowed-paths:
-    needs: open-pr
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      pull-requests: read
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1 (Node 24)
-        with:
-          fetch-depth: 0
-
-      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0 (Node 24)
-        with:
-          python-version: "3.x"
-
-      - name: PR allowed-paths contract tests
-        run: python scripts/test_check_pr_paths.py
-
-      - name: Validate exact PR and declared task paths
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ needs.open-pr.outputs.pr-number }}
-          HEAD_REF: ${{ github.ref_name }}
-          HEAD_SHA: ${{ github.sha }}
-        run: |
-          set -eu
-          case "$PR_NUMBER" in
-            ""|*[!0-9]*)
-              echo "::error::open-pr output is not a numeric PR number"
-              exit 1
-              ;;
-          esac
-          CANDIDATES="$RUNNER_TEMP/pull-candidates-validation.json"
-          gh api --method GET --paginate --slurp \
-            "/repos/$GITHUB_REPOSITORY/pulls" \
-            -f state=open \
-            -f "head=$GITHUB_REPOSITORY_OWNER:$HEAD_REF" \
-            -f per_page=100 > "$CANDIDATES"
-          CURRENT_NUMBER=$(
-            python scripts/check_pr_paths.py \
-              --repo-root "$GITHUB_WORKSPACE" \
-              --pull-list "$CANDIDATES"
-          )
-          if [ "$CURRENT_NUMBER" != "$PR_NUMBER" ]; then
-            echo "::error::open PR identity changed between workflow jobs"
-            exit 1
-          fi
-          PULL_REQUEST="$RUNNER_TEMP/pull-request.json"
-          gh api --method GET \
-            "/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER" > "$PULL_REQUEST"
-          python scripts/check_pr_paths.py \
-            --repo-root "$GITHUB_WORKSPACE" \
-            --pull-request "$PULL_REQUEST" \
-            --expected-repository "$GITHUB_REPOSITORY" \
-            --expected-number "$PR_NUMBER" \
-            --expected-base-ref main \
-            --expected-head-ref "$HEAD_REF" \
-            --expected-head-oid "$HEAD_SHA" \
-            --expected-author 'github-actions[bot]' \
-            --allow-bootstrap \
-            --scope-extension-summary "$RUNNER_TEMP/scope-extension.md"
-          if [ -s "$RUNNER_TEMP/scope-extension.md" ]; then
-            cat "$RUNNER_TEMP/scope-extension.md" >> "$GITHUB_STEP_SUMMARY"
-          fi

@@ -65,9 +65,10 @@ TERMINAL_NO_DISPATCH = frozenset(
 )
 
 # Checks that must exist on a task PR head before the round may call them green.
-# `allowed-paths` is the MECH-004 path contract; `guard` is the SDD consistency
-# check. Both are produced by sdd-guard.yml.
-REQUIRED_PR_CHECKS = ("guard", "allowed-paths")
+# `guard` is the SDD consistency check produced by sdd-guard.yml. The MECH-004
+# `allowed-paths` path contract used to be the second name; CHG-2026-077 retired
+# it, so a push head whose guard executed successfully is green on its own.
+REQUIRED_PR_CHECKS = ("guard",)
 
 # Marker appended to the human-text half of the envelope body to make a check
 # dispatch update a real byte change. It never appears inside the machine block.
@@ -257,8 +258,9 @@ class Worker:
         self._render_body = render_body
         self._now = now
         # A per-second token is not enough: two rounds in the same second render
-        # byte-identical bodies, GitHub emits no `edited`, and allowed-paths never
-        # runs. The counter guarantees a distinct body per dispatch.
+        # byte-identical bodies, GitHub emits no `edited`, and the merge-ref
+        # guard run never fires. The counter guarantees a distinct body per
+        # dispatch.
         self._dispatch_counter = 0
         self._dispatch_token = dispatch_token or self._default_dispatch_token
         # Derived, never supplied: the lease manager owns this identity. A
@@ -529,10 +531,10 @@ class Worker:
 
         # --- required checks, guarded by a persisted dispatch fact -----------
         # Gated on the DURABLE fact, not on a name being absent. Absence was the
-        # wrong trigger: the push run already publishes a `skipped` run named
-        # `allowed-paths`, so nothing ever looked absent and the
-        # `pull_request: edited` run that actually executes allowed-paths never
-        # fired in production.
+        # wrong trigger: while `allowed-paths` was required, the push run
+        # already published a `skipped` run under that name, so nothing ever
+        # looked absent and the `pull_request: edited` run never fired in
+        # production.
         checks = self._api.list_check_runs(head_oid)
         if (unsatisfied_required_checks(checks)
                 and held.record.checks_dispatched_head != head_oid):

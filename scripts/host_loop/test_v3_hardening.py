@@ -63,8 +63,7 @@ from host_loop.transport import (  # noqa: E402
 from host_loop import worker as worker_mod  # noqa: E402
 from host_loop.worker import Worker, WorkerState  # noqa: E402
 
-GREEN = [{"name": "guard", "status": "completed", "conclusion": "success"},
-         {"name": "allowed-paths", "status": "completed", "conclusion": "success"}]
+GREEN = [{"name": "guard", "status": "completed", "conclusion": "success"}]
 
 
 # ------------------------------------------------- HIGH (3): terminal fence

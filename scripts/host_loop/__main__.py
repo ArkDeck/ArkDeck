@@ -106,8 +106,9 @@ _FIELD_RE = {
 _HARDWARE_YES = frozenset({"yes", "true", "required", "是", "需要", "必需"})
 _HARDWARE_NO = frozenset({"no", "false", "none", "否", "不需要", "无"})
 # The task-field grammar has one closed colon class. `status`, `hardware` and
-# `grade` already accept both spellings, and `check_pr_paths` applies the same
-# class to `Allowed paths`; keeping the two discovery-only fields aligned avoids
+# `grade` already accept both spellings, and `Allowed paths` follows the same
+# class (the retired path guard read it that way too); keeping the two
+# discovery-only fields aligned avoids
 # silently hiding an otherwise valid task from the host loop.
 _DEPENDS_RE = re.compile(r"^-[ \t]*Depends on[:：]" + _GAP + r"([^\n]*)$",
                          re.MULTILINE)

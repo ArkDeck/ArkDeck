@@ -33,7 +33,8 @@
 
   写明每项被信任的事实由谁生产、绑定到哪个目标/revision、调用方能否同时构造
   该事实与其证明。填写本行不使调用方自报字段升级为可信事实。
-- Allowed paths:
+- Allowed paths:(预计触及范围的规划声明;CI 不按它放行或拒绝,触及表外路径无需 scope PR;
+  `scripts/host_loop` 只把它当作自动领取的前提)
   - `path/**`
 - Forbidden paths:
   - `openspec/constitution.md`

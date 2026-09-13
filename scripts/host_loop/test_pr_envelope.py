@@ -18,16 +18,13 @@ REPO_ROOT = SCRIPTS_DIR.parent
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
-import check_pr_paths  # noqa: E402
 from host_loop import pr_envelope  # noqa: E402
 
 
-# A synthetic base worked here only while check_pr_paths read its allowlist
-# from the working tree; it now resolves the base tree out of git
-# (TASK-DEC-004), so a fabricated base is a fail-closed error rather than an
-# unused string. HEAD stays the one commit guaranteed to exist even in the
-# depth-1 clone CI checks out. The head OID is never resolved and must
-# differ from the base, which the envelope contract requires.
+# HEAD is the one commit guaranteed to exist even in the depth-1 clone CI
+# checks out, so the base OID stays real rather than fabricated. The head OID
+# is never resolved and must differ from the base, which the envelope
+# contract requires.
 BASE_OID = subprocess.run(
     ["git", "-C", str(REPO_ROOT), "rev-parse", "HEAD"],
     check=True,
@@ -43,26 +40,11 @@ from host_loop.test_support import first_task_id, live_sample_change  # noqa: E4
 CHANGE_ID = live_sample_change(REPO_ROOT)
 
 
-def _task_with_literal_allowed_path() -> tuple[str, str]:
-    """A sampled task plus one wildcard-free allowed path of its own.
-
-    The MECH-004 end-to-end below runs check_paths against the real repo,
-    so the changed file must fall inside the sampled task's declared
-    surface; a literal beats synthesising a name from a glob.
-    """
-    definitions = check_pr_paths.load_task_definitions(REPO_ROOT)
-    for task_id in sorted(definitions):
-        task = definitions[task_id]
-        if not task.tasks_file.match(f"*/{CHANGE_ID.lower()}/tasks.md"):
-            continue
-        patterns = check_pr_paths.extract_allowed_patterns(REPO_ROOT, task)
-        literals = [p for p in patterns if "*" not in p]
-        if literals:
-            return task_id, literals[0]
-    raise AssertionError(f"{CHANGE_ID} offers no task with a literal allowed path")
-
-
-TASK_ID, TASK_LITERAL_PATH = _task_with_literal_allowed_path()
+# The sampled change's first task header. Until CHG-2026-077 this sampled a
+# task with a literal Allowed path so the retired path guard could be run
+# end-to-end against the real repository; the envelope contract itself only
+# needs a task that appears exactly once in the change's tasks.md.
+TASK_ID = first_task_id(REPO_ROOT, CHANGE_ID)
 
 
 class EnvelopeContractTests(unittest.TestCase):
@@ -495,36 +477,6 @@ class EnvelopeContractTests(unittest.TestCase):
             "exactly one front-matter id",
             lambda: pr_envelope.validate_envelope(self.envelope(), root),
         )
-
-    def test_mech_004_reads_task_and_allowed_paths_from_complete_envelope(self):
-        rendered = self.render()
-        context = check_pr_paths.PullRequestContext(
-            title="feat: implement envelope contract",
-            body=rendered,
-            head_ref="agent/hlr-envelope-contract",
-            base_oid=BASE_OID,
-            head_oid=HEAD_OID,
-        )
-        self.assertEqual(check_pr_paths.resolve_task_declaration(context), TASK_ID)
-        changed = (TASK_LITERAL_PATH,)
-        result = check_pr_paths.check_paths(REPO_ROOT, context, changed)
-        self.assertEqual(result.task_id, TASK_ID)
-        self.assertEqual(result.changed_paths, changed)
-
-        proposal = self.envelope(
-            pr_type="proposal",
-            task="none",
-            decision_grade="D1",
-            evidence=("none: proposal registration has no task run",),
-        )
-        proposal_context = check_pr_paths.PullRequestContext(
-            title="docs: propose change",
-            body=self.render(proposal),
-            head_ref="agent/propose-change",
-            base_oid=BASE_OID,
-            head_oid=HEAD_OID,
-        )
-        self.assertIsNone(check_pr_paths.resolve_task_declaration(proposal_context))
 
     def test_template_has_exact_order_and_no_provider_attribution(self):
         template = (

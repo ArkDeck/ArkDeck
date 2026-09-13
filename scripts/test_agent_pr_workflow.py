@@ -218,6 +218,27 @@ def extract_pull_request_types(text: str) -> tuple[str, ...]:
     return tuple(match.group(1).split(", "))
 
 
+def extract_job_names(text: str) -> tuple[str, ...]:
+    """Top-level job names in order; the jobs mapping must be canonical."""
+    lines = _meaningful_lines(text)
+    jobs_indexes = [index for index, (_, line) in enumerate(lines) if line == "jobs:"]
+    if len(jobs_indexes) != 1:
+        raise WorkflowContractError(
+            f"expected exactly one top-level jobs block, found {len(jobs_indexes)}"
+        )
+    start, end = _closed_child_block(lines, jobs_indexes[0], 0)
+    name_re = re.compile(r"^  ([a-z][a-z0-9-]*):$")
+    names: list[str] = []
+    for number, line in lines[start:end]:
+        if _indent(line) != 2:
+            continue
+        match = name_re.fullmatch(line)
+        if match is None:
+            raise WorkflowContractError(f"line {number}: invalid job entry")
+        names.append(match.group(1))
+    return tuple(names)
+
+
 def _job_block(text: str, job_name: str) -> str:
     raw_lines = text.splitlines()
     indexes = [
@@ -247,66 +268,61 @@ def validate_automatic_check_contract(
     if agent_text.count("permissions: {}") != 1:
         raise WorkflowContractError("Agent PR must deny permissions at workflow scope")
     open_job = _job_block(agent_text, "open-pr")
-    allowed_job = _job_block(agent_text, "allowed-paths")
+    if extract_job_names(agent_text) != ("open-pr",):
+        raise WorkflowContractError(
+            "Agent PR must declare exactly one job, open-pr; the allowed-paths "
+            "job was retired by CHG-2026-077"
+        )
     required_open = (
         "    permissions:\n      contents: read\n      pull-requests: write\n",
         "    outputs:\n      pr-number: ${{ steps.validate.outputs.pr-number }}\n",
         "          fetch-depth: 0\n",
-        "--preflight",
-        "--base-revision origin/main",
-        '--head-revision "$HEAD_SHA"',
-        '--expected-head-ref "$BRANCH"',
-        "--allow-bootstrap",
-        "--infer-task",
-        'none|bootstrap|TASK-*)',
-        'if [ "$TASK_ID" = "bootstrap" ]; then',
-        "maintainer-authorized one-time base/head/path tuple",
+        "python scripts/agent_pr_identity.py",
+        '--commit-task "$HEAD_SHA"',
+        'none|TASK-*)',
         'if [ "$TASK_ID" != "none" ]; then',
         "printf 'Task: %s\\n\\n' \"$TASK_ID\" >> \"$BODY\"",
-        "grep -E '^[[:space:]]*Scope-Extension:' >> \"$BODY\" || true",
         "gh api --method GET --paginate --slurp",
         "--pull-list \"$CANDIDATES\"",
-        "--identity-only",
-        "--expected-author 'github-actions[bot]'",
-        'echo "pr-number=$VALIDATED_NUMBER" >> "$GITHUB_OUTPUT"',
-    )
-    required_allowed = (
-        "    needs: open-pr\n",
-        "    permissions:\n      contents: read\n      pull-requests: read\n",
-        "PR_NUMBER: ${{ needs.open-pr.outputs.pr-number }}",
-        "gh api --method GET --paginate --slurp",
-        "--pull-list \"$CANDIDATES\"",
-        'if [ "$CURRENT_NUMBER" != "$PR_NUMBER" ]; then',
-        '"/repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER"',
+        "--allow-zero",
         "--pull-request \"$PULL_REQUEST\"",
         "--expected-head-oid \"$HEAD_SHA\"",
-        "--allow-bootstrap",
-        '--scope-extension-summary "$RUNNER_TEMP/scope-extension.md"',
-        'cat "$RUNNER_TEMP/scope-extension.md" >> "$GITHUB_STEP_SUMMARY"',
+        "--expected-author 'github-actions[bot]'",
+        'if [ "$VALIDATED_NUMBER" != "$PR_NUMBER" ]; then',
+        'echo "pr-number=$VALIDATED_NUMBER" >> "$GITHUB_OUTPUT"',
     )
     for token in required_open:
         if token not in open_job:
             raise WorkflowContractError(f"open-pr job missing contract token: {token}")
-    for token in required_allowed:
-        if token not in allowed_job:
-            raise WorkflowContractError(
-                f"allowed-paths job missing contract token: {token}"
-            )
-    preflight_index = open_job.index("--preflight")
+    task_read_index = open_job.index("--commit-task")
     task_body_index = open_job.index("printf 'Task: %s\\n\\n'")
-    create_index = open_job.index("gh pr create")
-    if not preflight_index < task_body_index < create_index:
+    create_index = open_job.index("--body-file")
+    if not task_read_index < task_body_index < create_index:
         raise WorkflowContractError(
-            "Agent PR must preflight and write Task before creating the PR"
+            "Agent PR must read the commit Task and write it before creating the PR"
         )
-    extension_body_index = open_job.index("Scope-Extension:")
-    if not task_body_index < extension_body_index < create_index:
+    if open_job.rindex("--allow-zero") > create_index:
         raise WorkflowContractError(
-            "Agent PR must copy Scope-Extension trailers after Task and before creating the PR"
+            "Agent PR may tolerate zero candidates only before creating the PR"
         )
-    if agent_text.count("--allow-bootstrap") != 2:
+    # The PR allowed-paths guard was retired by CHG-2026-077. Its names must
+    # not come back into either workflow without this contract being rewritten
+    # on purpose.
+    for retired in (
+        "check_pr_paths",
+        "automation_config",
+        "--preflight",
+        "--infer-task",
+        "--allow-bootstrap",
+        "Scope-Extension",
+    ):
+        if retired in agent_text or retired in sdd_text:
+            raise WorkflowContractError(f"retired path-guard token present: {retired}")
+    if "  allowed-paths:\n" in sdd_text:
+        raise WorkflowContractError("SDD Guard must not declare an allowed-paths job")
+    if "python3 scripts/test_agent_pr_identity.py" not in _job_block(sdd_text, "guard"):
         raise WorkflowContractError(
-            "one-time bootstrap must be wired exactly once per Agent PR job"
+            "SDD Guard must run the Agent PR identity helper contract tests"
         )
 
     allowed_swift_secret = "${{ secrets.ARKFORGE_DEPLOY_KEY }}"
@@ -906,11 +922,48 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
         sdd = SDD_WORKFLOW_PATH.read_text(encoding="utf-8")
         swift = SWIFT_WORKFLOW_PATH.read_text(encoding="utf-8")
         cases = (
-            ("missing dependency", agent.replace("    needs: open-pr\n", ""), sdd, swift),
             (
-                "write validation",
+                "second job",
+                agent + "  allowed-paths:\n    needs: open-pr\n    runs-on: ubuntu-latest\n",
+                sdd,
+                swift,
+            ),
+            (
+                "open-pr without write",
                 agent.replace(
-                    "      pull-requests: read\n", "      pull-requests: write\n"
+                    "      pull-requests: write\n", "      pull-requests: read\n"
+                ),
+                sdd,
+                swift,
+            ),
+            (
+                "retired guard script",
+                agent.replace(
+                    "python scripts/agent_pr_identity.py",
+                    "python scripts/check_pr_paths.py",
+                ),
+                sdd,
+                swift,
+            ),
+            (
+                "retired job in SDD Guard",
+                agent,
+                sdd + "  allowed-paths:\n    runs-on: ubuntu-latest\n",
+                swift,
+            ),
+            (
+                "identity tests dropped from guard",
+                agent,
+                sdd.replace(
+                    "        run: python3 scripts/test_agent_pr_identity.py\n", ""
+                ),
+                swift,
+            ),
+            (
+                "Task line dropped",
+                agent.replace(
+                    "printf 'Task: %s\\n\\n' \"$TASK_ID\" >> \"$BODY\"\n",
+                    "true\n",
                 ),
                 sdd,
                 swift,

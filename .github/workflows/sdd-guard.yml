@@ -8,7 +8,8 @@ on:
     branches: [main, "agent/**"]
   pull_request:
     # Routine bot opened/synchronize checks run in the exact-head Agent PR
-    # push workflow. Human metadata changes still revalidate from base.
+    # push workflow. reopened/edited re-run guard on the merge ref; the host
+    # loop's check dispatch (an edited body) relies on that run existing.
     types: [reopened, edited]
 
 permissions:
@@ -59,6 +60,12 @@ jobs:
       - name: SDD checker contract tests
         run: python3 scripts/test_check_sdd.py
 
+      # The Agent PR workflow runs scripts/agent_pr_identity.py without an
+      # install step; its contract suite is stdlib-only and runs here so a
+      # regression in the identity checks turns the required check red.
+      - name: Agent PR identity helper contract tests
+        run: python3 scripts/test_agent_pr_identity.py
+
       - name: host-loop contract suite
         working-directory: scripts
         run: python3 -m unittest discover -s host_loop -t .
@@ -94,30 +101,3 @@ jobs:
 
       - name: "@arkdeck/ds tokens match docs/design"
         run: node docs/design/arkdeck-ds/scripts/check-tokens.mjs
-
-  allowed-paths:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Checkout exact revision and main with runner Git
-        env:
-          ARKDECK_CI_REF: ${{ github.ref }}
-          ARKDECK_CI_SHA: ${{ github.sha }}
-        run: |
-          set -eu
-          git init .
-          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
-          git fetch --no-tags --prune origin \
-            "+refs/heads/main:refs/remotes/origin/main" \
-            "+${ARKDECK_CI_REF}:refs/remotes/origin/ci"
-          git checkout --detach refs/remotes/origin/ci
-          test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"
-
-      - name: PR allowed-paths contract tests
-        run: python3 scripts/test_check_pr_paths.py
-
-      - name: Check PR diff against declared task
-        # Read untrusted title/body/head-ref from GitHub's JSON event file inside
-        # Python. Never interpolate those fields into the host shell.
-        run: python3 scripts/check_pr_paths.py --repo-root "$GITHUB_WORKSPACE" --event "$GITHUB_EVENT_PATH"
