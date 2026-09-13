@@ -104,7 +104,7 @@ arkdeck artifact export \
 从 ArkDeck 锁定的 ArkTrace revision 构建 helper，并读取 SwiftPM 实际输出目录：
 
 ```bash
-git -C <ArkTrace-checkout> checkout e6e3133d410fbd7455df17c9486dcd369607e97f
+git -C <ArkTrace-checkout> checkout 9172c9525f954ec397e0555d7d03cd4367f3efcf
 swift build --package-path <ArkTrace-checkout> --product arktrace
 swift build --package-path <ArkTrace-checkout> --show-bin-path
 ```

@@ -13,7 +13,7 @@
 | TraceStreamer version | `4.3.7` |
 | Binary architecture | Mach-O `arm64` |
 | Unsigned binary SHA-256 | `0665e04e4abf2c2b60e173f6c666cb91844557c85d45386a03962e56804fa55a` |
-| Source lock | ArkTrace `e6e3133d410fbd7455df17c9486dcd369607e97f` 的 `ThirdParty/TraceStreamer/source-lock.json` |
+| Source lock | ArkTrace `9172c9525f954ec397e0555d7d03cd4367f3efcf` 的 `ThirdParty/TraceStreamer/source-lock.json` |
 | ArkDeck packaging manifest | `Packages/ArkDeckKit/ThirdParty/TraceStreamer/macx/manifest.json` |
 
 ArkTrace 的 `source-lock.json` 同时锁定 13 个源依赖和 GN/Ninja 两个构建工具的 URL、
@@ -77,7 +77,7 @@ ArkDeck 不保留 TraceStreamer 构建脚本、source lock 或 patch 副本。�
 固定 ArkTrace revision 中执行：
 
 ```bash
-git -C <ArkTrace-checkout> checkout e6e3133d410fbd7455df17c9486dcd369607e97f
+git -C <ArkTrace-checkout> checkout 9172c9525f954ec397e0555d7d03cd4367f3efcf
 <ArkTrace-checkout>/scripts/verify_trace_streamer_lock.sh
 <ArkTrace-checkout>/scripts/build_trace_streamer.sh
 ```
