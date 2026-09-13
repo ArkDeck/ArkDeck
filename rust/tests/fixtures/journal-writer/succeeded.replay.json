@@ -1,0 +1,26 @@
+{
+  "currentState" : "succeeded",
+  "eventCount" : 11,
+  "executionAuthority" : "standardAgent",
+  "executionMode" : "execute",
+  "finalized" : false,
+  "hasTornTail" : false,
+  "lastConfirmedStepId" : "finalize-session",
+  "lastDurableSequence" : 10,
+  "lastReconcileOutcomeCertainty" : null,
+  "latestBindingRevision" : null,
+  "outstandingIntents" : [
+
+  ],
+  "pendingAbandonment" : null,
+  "requiredAbandonmentHazards" : [
+
+  ],
+  "requiresRecovery" : false,
+  "requiresUnknownFinalizedOutcome" : false,
+  "resourceReleaseAuthorized" : false,
+  "schemaVersion" : "1.0.0",
+  "unknownOutcomes" : [
+
+  ]
+}

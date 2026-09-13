@@ -15,7 +15,7 @@ pub use import_upload::{
 };
 #[path = "host_journal.rs"]
 mod journal;
-pub use journal::HostJournal;
+pub use journal::{HostJournal, HostJournalAppender, JournalAppendError, JournalWritePoint};
 #[path = "host_session_removal.rs"]
 mod session_removal;
 pub use session_removal::PreparedSessionRemoval;

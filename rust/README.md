@@ -391,6 +391,31 @@ entries use only the user-authorized fixed releases and their publication days;
 see `supply-chain/README.md`. Journal writes, watch/wait CLI behavior, full stored
 Job authority validators and installed owner cutover remain pending.
 
+## Job journal writer (TASK-XPA-014)
+
+`arkdeck_hoststore::JournalWriter` appends to a Job directory's current
+`journal.jsonl` with the Swift journal's discipline: every append holds the
+directory's `.manifest.lock`, refuses after terminal `manifest.json`
+publication, stays bound to the journal inode it opened, validates the record
+with the closed per-event decoder and the Swift replay/append rules
+(`JournalReplay.validate` and `JournalAppendValidationState`, ported as one state
+machine for all 19 kinds), and returns only after fsync + `F_FULLFSYNC` of the
+file and fsync of the directory. An unchanged file rechecks only its last record;
+any external change forces a full replay first. A torn tail is cut back only
+behind a durable `jobCreated` and before terminal publication. A failure after
+the write began is `OutcomeUnknown` and poisons the writer until it is reopened.
+`job_journal_events` spells the engine's eight record kinds exactly as Swift's
+factories do. The writer records whatever its caller decides; it holds no Job
+authority, and no daemon path uses it yet.
+
+`rust/tests/fixtures/journal-writer/` is the shared oracle: four scenarios
+(succeeded, outcome unknown with reconcile, confirmed compensation, plan-only)
+as Swift `FileDurableJournal` writes them, with the facts
+`DurableJournalRecovery.inspect` derives. `cargo test -p arkdeck-hoststore
+job_journal_writer` must reproduce both from the same records, and
+`JournalRustWriterParityContractTests` holds Swift to the same bytes. Re-record
+from Swift with `ARKDECK_RUST_JOURNAL_WRITER_RECORD=/private/tmp/<new>`.
+
 ## Target presentation owner (TASK-XPA-012)
 
 The explicitly isolated development composition owns `targets-state/` and serves

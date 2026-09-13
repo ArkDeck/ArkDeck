@@ -853,7 +853,7 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 
 ## TASK-XPA-014 — Move admission, job store, capability and recovery to Rust with the Swift engine as executor sidecar
 
-- Status:in-progress
+- Status:in-progress（2026-09-13: Rust reads the v1 SQLite Job index, Job events and stored records, and writes current journal records under the Swift replay/append discipline; admission, plan, SQLite writes, capability, recovery, execution coordination and GJ acceptance remain pending）
 - Platform:macos
 - Requirements:REQ-JOB-001, REQ-JOB-006, REQ-WF-004, POL-AGENT-002, POL-RECOVERY-001, POL-MODE-001, POL-TARGET-001
 - Acceptance:XPA-AC-1, XPA-AC-2, XPA-AC-4, XPA-AC-7, XPA-AC-9; macOS GJ-1..5 re-pass
@@ -912,6 +912,7 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 
 - Stop condition: any step dispatched without a durable intent; two owners writing SQLite.
 - SQLite/read phase (2026-09-12): Rust reads the unchanged v1 SQLite Job index for list/status/show/timeline and gates Artifact inspect/read through the same Job owner. Actual current Swift fixture replies match Rust daemon/CLI across restart. Unknown record fields refuse; authority, execution, capability, journal and recovery writers remain pending. See `evidence/runs/TASK-XPA-014/job-artifact-read-run.md`.
+- Journal writer phase (2026-09-13): `JournalWriter` (hoststore) over `HostJournalAppender` (platform) appends current `journal.jsonl` records with the Swift discipline — `.manifest.lock`, terminal-Manifest refusal, bound inode, fsync + `F_FULLFSYNC` then directory fsync, last-record cursor with full replay on any external change, torn-tail repair only behind a durable `jobCreated`, poisoning after an unproven write — and the `JournalReplay.validate`/`JournalAppendValidationState` rules ported as one state machine for all 19 kinds. A committed oracle recorded from Swift `FileDurableJournal` (four scenarios, bytes plus `DurableJournalRecovery` facts) must be reproduced byte for byte by both writers, and each side repairs and continues the shared bytes. No daemon path writes journals yet; the replay facts are recorded data, not recovery decisions (ADR-0009 decisions 2/4 stay unported). See `evidence/runs/TASK-XPA-014/journal-writer-run.md`.
 - Size: L.
 
 ## TASK-XPA-015 — Port analyzer and workspace providers to Rust (shared with Windows)

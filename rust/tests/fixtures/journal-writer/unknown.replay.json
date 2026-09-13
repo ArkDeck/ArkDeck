@@ -1,0 +1,33 @@
+{
+  "currentState" : "waitingForRecovery",
+  "eventCount" : 10,
+  "executionAuthority" : "standardAgent",
+  "executionMode" : "execute",
+  "finalized" : false,
+  "hasTornTail" : false,
+  "lastConfirmedStepId" : null,
+  "lastDurableSequence" : 9,
+  "lastReconcileOutcomeCertainty" : "outcomeUnknown",
+  "latestBindingRevision" : null,
+  "outstandingIntents" : [
+
+  ],
+  "pendingAbandonment" : null,
+  "requiredAbandonmentHazards" : [
+    "unresolved-deviceMutation-intent:reboot-device:evt-03"
+  ],
+  "requiresRecovery" : true,
+  "requiresUnknownFinalizedOutcome" : false,
+  "resourceReleaseAuthorized" : false,
+  "schemaVersion" : "1.0.0",
+  "unknownOutcomes" : [
+    {
+      "attempt" : 1,
+      "correlatedIntentEventId" : "evt-03",
+      "effect" : "deviceMutation",
+      "eventId" : "evt-04",
+      "isCompensation" : false,
+      "stepId" : "reboot-device"
+    }
+  ]
+}
