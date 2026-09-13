@@ -118,18 +118,26 @@ changed for parity.
   field for field. The pre-purge inventory is 1 entry, 1,267 bytes, in both.
 - Unified local gate: see the final section.
 
+## Pinned parity after the ArkTrace merge (2026-09-13)
+
+ArkTrace PR #25 merged as `9172c9525f954ec397e0555d7d03cd4367f3efcf`. On the ArkDeck pin-bump candidate
+(branch `agent/arktrace-pin-9172c952-20260913`, the #1791 file set) `swift build --target ArkTraceRuntime`
+fetched the checkout at that revision, and the official producer
+`rust/scripts/produce-trace-maintenance-fixture.py --swift-build <checkout build> --fixture
+/private/tmp/xpa012-trace-native-pinned-20260913-r1` seeded and reported: the native purge removed one
+derived entry and one private residual. `rust/scripts/check-trace-cache-owner.py --native-fixture` then ran
+the Rust daemon and CLI on the paired tree: PASS, 21 control exchanges, and `pinned-9172c952/rust-purge.json`
+equals `pinned-9172c952/swift-expected-purge.json` field for field; `pinned-9172c952/provenance.json` lists
+the pinned revision, the native source hashes and the module objects. The installed Swift daemon keeps the
+`e6e3133d` purge until that pin bump merges and a paired helper is rebuilt.
+
 ## Remaining TASK-XPA-012 work
 
-- Bump the ArkDeck ArkTrace pin to the reviewed merge of ArkTrace PR #25 in a
-  separate dependency PR (the #1791 file set), then re-run
-  `produce-trace-maintenance-fixture.py` and `--native-fixture` against the
-  pinned SwiftPM checkout so the parity record carries pinned provenance. Until
-  then the installed Swift daemon's purge keeps reporting every Ready entry as
-  skipped.
-- Trace database preparation, remaining tool selection writes, installed
-  host-store composition (the façade serving these stores while the Swift
-  daemon stops opening them), the isolated-root to installed switch under the
-  §G.4 preflight, and the GJ-1 headless re-pass.
+- Merge the pin bump (`agent/arktrace-pin-9172c952-20260913`); the pinned parity above already covers the
+  re-run, so no further Trace parity work waits on it.
+- Trace database preparation, remaining tool selection writes, installed host-store composition (the
+  façade serving these stores while the Swift daemon stops opening them), the isolated-root to installed
+  switch under the §G.4 preflight, and the GJ-1 headless re-pass.
 
 ## Unified local gate
 
