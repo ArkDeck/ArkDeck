@@ -1,0 +1,25 @@
+{
+  "kind": "Swift RuntimeJobRecord, RuntimeAdmissionService and RuntimeJobRepository owners on synthetic records; no hardware acceptance",
+  "sourceFixture": "/private/tmp/xpa014-job-store-oracle-r1",
+  "sourceBase": "dfdb6b68721c769e2a07e7a952aa1331cb92ed87",
+  "producer": "JobStoreRustWriterParityContractTests/testSwiftWritesTheSharedJobStoreOracle (ARKDECK_RUST_JOB_STORE_RECORD)",
+  "files": {
+    "format-probe.json": "c3eb92ed30dfa94eb3ae3721737d0e77cc08b6a1fa8de695561c42dcb3eda5ac",
+    "index.json": "c8cd33b3265064821c4c9a58a70c39d9fa84a03d537cf3f14e34900336a46ee7",
+    "records/admitted-a.json": "9244bd646b233bb7a29d047bdbbac1b6c8d2b87e9170f8e1243f3c3e2a0f32f5",
+    "records/admitted-b.json": "f744b6a5d96e8ee0f7bcea75c903e29314b043313b10ff02cd4e95da5ef9f52f",
+    "records/published-a.json": "44d7b30a70a7d99ffc829e676fedc40a70c678ae07a0d582d72831bea48c1d3d",
+    "records/running-a.json": "a25f9ee32430dee7291fe59b6fdb84b38f56809d565094d60dadf0323f07910e",
+    "records/unknown-b.json": "229bfef9d41d357d96c208102cb302f96efe2723d34fd9c7ed3a66d3917db74d",
+    "scenario.json": "e346b25353583d17c85e5ccc83a5cfec55c69c38c2059b6c7227d2c699f1e767"
+  },
+  "producerSources": {
+    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/JobStoreRustWriterParityContractTests.swift": "638a7f608d4e7e7d1a0e615ca802d0ad02a68f4d9f078907342ea98ece44794f",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeJobRecord.swift": "f7d597fece8c99b71c25a77b587a8bcb0b90ae9a86d9bb5325a53fe4a13b6384",
+    "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/RuntimeAdmissionService.swift": "05e361230fab0a3861d3b1fc74d4ef1f6499f93d4a3a12d2bcaf6029406c5568",
+    "Packages/ArkDeckKit/Sources/ArkDeckStorage/RuntimeJobRepository.swift": "6f8990e9fb7513f1dcdc4210cbe76b6ecf6b5ff006eb1db589055136ed5e15ac",
+    "Packages/ArkDeckKit/Sources/ArkDeckStorage/DurableFiles.swift": "cbad31d1e3612b5fa04b4eeaca324c09506b2a9f19ca7f16d583177bdb687dcb",
+    "rust/tests/fixtures/job-publication-current/published/job-record.json": "44d7b30a70a7d99ffc829e676fedc40a70c678ae07a0d582d72831bea48c1d3d",
+    "rust/tests/fixtures/job-publication-current/failed/job-record.json": "e952ba227e3c1da2da11612f61d668d6d200d578d8c80aec63d6db281184db43"
+  }
+}

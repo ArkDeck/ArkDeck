@@ -270,6 +270,74 @@ pub(super) fn encode(value: &Value) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
+/// Foundation JSONEncoder with `[.sortedKeys, .prettyPrinted]`, the spelling of
+/// Swift `RuntimeJobRecord.durableData()`: two-space indentation, `" : "`, an
+/// empty container as its open bracket, a blank line and its close, an escaped
+/// solidus and no trailing newline. Keys and numbers are spelled as `encode`.
+#[cfg(target_os = "macos")]
+pub(super) fn encode_pretty(value: &Value) -> Result<Vec<u8>> {
+    fn string(text: &str, output: &mut Vec<u8>) -> Result<()> {
+        // serde escapes Foundation's set (quote, backslash, C0 controls with
+        // the short forms and lowercase \u00xx) except the solidus.
+        for byte in serde_json::to_vec(text).map_err(|_| DecodeError::Shape)? {
+            if byte == b'/' {
+                output.push(b'\\');
+            }
+            output.push(byte);
+        }
+        Ok(())
+    }
+    fn line(output: &mut Vec<u8>, depth: usize) {
+        output.push(b'\n');
+        output.resize(output.len() + 2 * depth, b' ');
+    }
+    fn write(value: &Value, depth: usize, output: &mut Vec<u8>) -> Result<()> {
+        match value {
+            Value::Array(values) => {
+                output.push(b'[');
+                for (index, value) in values.iter().enumerate() {
+                    if index > 0 {
+                        output.push(b',');
+                    }
+                    line(output, depth + 1);
+                    write(value, depth + 1, output)?;
+                }
+                if values.is_empty() {
+                    output.push(b'\n');
+                }
+                line(output, depth);
+                output.push(b']');
+            }
+            Value::Object(fields) => {
+                let mut keys: Vec<&String> = fields.keys().collect();
+                keys.sort_unstable();
+                output.push(b'{');
+                for (index, key) in keys.iter().enumerate() {
+                    if index > 0 {
+                        output.push(b',');
+                    }
+                    line(output, depth + 1);
+                    string(key, output)?;
+                    output.extend_from_slice(b" : ");
+                    write(&fields[key.as_str()], depth + 1, output)?;
+                }
+                if fields.is_empty() {
+                    output.push(b'\n');
+                }
+                line(output, depth);
+                output.push(b'}');
+            }
+            Value::String(text) => string(text, output)?,
+            Value::Number(n) if !n.is_i64() && !n.is_u64() => output.extend(float_text(n)?.bytes()),
+            _ => output.extend(serde_json::to_vec(value).map_err(|_| DecodeError::Shape)?),
+        }
+        Ok(())
+    }
+    let mut bytes = Vec::new();
+    write(value, 0, &mut bytes)?;
+    Ok(bytes)
+}
+
 pub(super) fn parse(bytes: &[u8]) -> Result<Value> {
     if bytes.is_empty() || bytes.len() > 16 * 1024 * 1024 {
         return Err(DecodeError::Size);
@@ -290,4 +358,46 @@ pub fn decode_session_json(bytes: &[u8]) -> Result<DecodedStore> {
         projection: json!({"canonicalSHA256": arkdeck_contract::sha256_hex(&document)}),
         document,
     })
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod tests {
+    use super::encode_pretty;
+    use serde_json::{Value, json};
+
+    #[test]
+    fn pretty_spelling_matches_foundation() {
+        // Printed by Foundation JSONEncoder([.sortedKeys, .prettyPrinted]).
+        let cases = [
+            (json!({}), "{\n\n}"),
+            (json!([]), "[\n\n]"),
+            (
+                json!({"b": {}, "a": [], "c": [[], {}, [1]]}),
+                "{\n  \"a\" : [\n\n  ],\n  \"b\" : {\n\n  },\n  \"c\" : [\n    [\n\n    ],\n    {\n\n    },\n    [\n      1\n    ]\n  ]\n}",
+            ),
+            (
+                json!({"a/b": ["x/y", "\u{7}\u{1f}\u{7f}", "\n\t\r\u{8}\u{c}", "\"\\", "\u{2028}"]}),
+                "{\n  \"a\\/b\" : [\n    \"x\\/y\",\n    \"\\u0007\\u001f\u{7f}\",\n    \"\\n\\t\\r\\b\\f\",\n    \"\\\"\\\\\",\n    \"\u{2028}\"\n  ]\n}",
+            ),
+            (
+                json!([1.0e-7, 1.0e21, 1.0e16, 1.0e15, 0.5, -0.0, 5e-324, 1, -1]),
+                "[\n  1e-07,\n  1e+21,\n  1e+16,\n  1000000000000000,\n  0.5,\n  -0,\n  5e-324,\n  1,\n  -1\n]",
+            ),
+        ];
+        for (value, expected) in cases {
+            let bytes = encode_pretty(&value).unwrap();
+            assert_eq!(String::from_utf8(bytes).unwrap(), expected);
+        }
+    }
+
+    #[test]
+    fn pretty_spelling_reproduces_the_swift_probe() {
+        let bytes = std::fs::read(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../tests/fixtures/job-store-writer/format-probe.json"
+        ))
+        .unwrap();
+        let value: Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(encode_pretty(&value).unwrap(), bytes);
+    }
 }

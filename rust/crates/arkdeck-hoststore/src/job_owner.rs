@@ -1,10 +1,12 @@
 //! Runtime-owned Job discovery. A read-only SQLite snapshot supplies Job
 //! identity and state; presentation cursors retain immutable query results.
-use crate::job_record::{JobRecord, STATES, failure, unreadable};
-use crate::job_repository::{JobRepository, identifier};
+use crate::job_record::{JobRecord, STATES, digest, failure, unreadable};
+use crate::job_repository::{
+    AdmissionVerdict, JobRepository, JobWriteError, identifier, order_key,
+};
 use crate::snapshot_pager::SnapshotPager;
 use arkdeck_contract::WireError;
-use arkdeck_platform::HostDirectory;
+use arkdeck_platform::{DocumentPublishError, HostDirectory};
 use serde_json::{Map, Value, json};
 use std::{
     io,
@@ -17,10 +19,31 @@ pub struct JobStore {
     root: HostDirectory,
     activity: std::sync::Mutex<()>,
 }
+const RECORD_BOUND: usize = 16 * 1024 * 1024;
+
+fn guard_unavailable() -> JobWriteError {
+    JobWriteError::Refused(io::Error::other("The Job activity guard is unavailable"))
+}
+
 impl JobStore {
     pub fn open(path: &Path) -> io::Result<Self> {
+        Self::open_with(path, JobRepository::open)
+    }
+
+    /// The Rust Job owner's store: the same census and readers, plus the
+    /// admission index and `job-record.json` writers. Only a state root this
+    /// process owns is opened this way; a paired Swift daemon keeps its own
+    /// Job owner, and the exclusive owner lock refuses a second one.
+    pub fn open_owner(path: &Path) -> io::Result<Self> {
+        Self::open_with(path, JobRepository::open_owner)
+    }
+
+    fn open_with(
+        path: &Path,
+        repository: impl FnOnce(&Path) -> io::Result<JobRepository>,
+    ) -> io::Result<Self> {
         let root = HostDirectory::open(path)?;
-        let repository = JobRepository::open(path)?;
+        let repository = repository(path)?;
         root.private_child("cli-job-snapshots")?;
         Ok(Self {
             repository,
@@ -28,6 +51,113 @@ impl JobStore {
             root,
             activity: std::sync::Mutex::new(()),
         })
+    }
+
+    /// Swift RuntimeAdmissionService.lookup.
+    pub fn lookup(
+        &self,
+        idempotency_key: &str,
+        request_hash: &str,
+    ) -> Result<AdmissionVerdict, JobWriteError> {
+        self.repository
+            .lookup(idempotency_key, request_hash)
+            .map_err(JobWriteError::Refused)
+    }
+
+    /// Swift RuntimeAdmissionService.admit: the idempotency identity, Job
+    /// identity, initial state and exact initial record bytes commit in one
+    /// transaction. The caller starts the Job's journal only after `Admitted`.
+    pub fn admit(
+        &self,
+        record: &JobRecord,
+        request_hash: &str,
+    ) -> Result<AdmissionVerdict, JobWriteError> {
+        if !digest(request_hash) {
+            return Err(JobWriteError::Invalid(
+                "The admission request hash is not a SHA-256 digest",
+            ));
+        }
+        let (key, bytes) = self.writable_record(record)?;
+        let _guard = self.activity.lock().map_err(|_| guard_unavailable())?;
+        self.root
+            .validate_path(&self.path)
+            .map_err(JobWriteError::Refused)?;
+        self.repository.admit(
+            &record.job_id,
+            key,
+            request_hash,
+            &record.state,
+            record.created(),
+            &bytes,
+        )
+    }
+
+    /// Swift RuntimeJobEngine.persistRuntimeRecord: publish
+    /// `jobs/<jobID>/job-record.json` atomically, then advance the index row
+    /// with the same bytes. An index row must already describe this Job; once
+    /// the record is published, an index failure is an uncertain outcome.
+    pub fn persist(&self, record: &JobRecord, updated_at: &str) -> Result<(), JobWriteError> {
+        if order_key(updated_at).is_err() {
+            return Err(JobWriteError::Invalid(
+                "The Job update time is not a Runtime timestamp",
+            ));
+        }
+        let (key, bytes) = self.writable_record(record)?;
+        let _guard = self.activity.lock().map_err(|_| guard_unavailable())?;
+        self.root
+            .validate_path(&self.path)
+            .map_err(JobWriteError::Refused)?;
+        self.repository
+            .describes(&record.job_id, key, record.created())
+            .map_err(JobWriteError::Refused)?;
+        let directory = self
+            .root
+            .private_child("jobs")
+            .and_then(|jobs| jobs.private_child(&record.job_id))
+            .map_err(JobWriteError::Refused)?;
+        directory
+            .publish_document("job-record.json", &bytes, RECORD_BOUND)
+            .map_err(|error| match error {
+                DocumentPublishError::BeforePublication(error) => JobWriteError::Refused(error),
+                DocumentPublishError::OutcomeUnknown(error) => JobWriteError::OutcomeUnknown(error),
+            })?;
+        self.repository
+            .update(
+                &record.job_id,
+                key,
+                record.created(),
+                &record.state,
+                updated_at,
+                &bytes,
+            )
+            .map_err(|error| match error {
+                JobWriteError::Refused(error) | JobWriteError::OutcomeUnknown(error) => {
+                    JobWriteError::OutcomeUnknown(error)
+                }
+                JobWriteError::Invalid(message) => JobWriteError::OutcomeUnknown(io::Error::new(
+                    io::ErrorKind::InvalidInput,
+                    message,
+                )),
+            })
+    }
+
+    fn writable_record<'a>(
+        &self,
+        record: &'a JobRecord,
+    ) -> Result<(&'a str, Vec<u8>), JobWriteError> {
+        if !self.repository.writable() {
+            return Err(JobWriteError::Refused(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                "The Job store was opened for reading",
+            )));
+        }
+        let key = record.idempotency_key().ok_or(JobWriteError::Invalid(
+            "The Job record has no idempotency key",
+        ))?;
+        let bytes = record.durable_bytes().map_err(|_| {
+            JobWriteError::Invalid("The Job record is not a current durable record")
+        })?;
+        Ok((key, bytes))
     }
 
     /// Keep the complete Job activity census stable through a Session owner's

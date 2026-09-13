@@ -18,6 +18,8 @@ mod job_repository;
 pub use job_owner::JobStore;
 #[cfg(target_os = "macos")]
 pub use job_record::JobRecord;
+#[cfg(target_os = "macos")]
+pub use job_repository::{AdmissionVerdict, JobWriteError};
 
 #[cfg(target_os = "macos")]
 mod job_events;

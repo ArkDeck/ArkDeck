@@ -429,6 +429,24 @@ impl JobRecord {
     pub fn value(&self) -> Result<Value, WireError> {
         serde_json::to_value(self).map_err(unreadable)
     }
+    /// The `job-record.json` and `initial_record_json` bytes Swift
+    /// `RuntimeJobRecord.durableData()` writes for this record. They must
+    /// decode to this same record, so no writer stores what a strict reader
+    /// would refuse.
+    pub fn durable_bytes(&self) -> Result<Vec<u8>, WireError> {
+        let value = self.value()?;
+        let bytes = crate::session_json::encode_pretty(&value).map_err(unreadable)?;
+        if Self::decode(&bytes)?.value()? != value {
+            return Err(unreadable(()));
+        }
+        Ok(bytes)
+    }
+    pub(super) fn created(&self) -> &str {
+        &self.created
+    }
+    pub(super) fn idempotency_key(&self) -> Option<&str> {
+        self.request["idempotencyKey"].as_str()
+    }
     pub(super) fn status(&self) -> Value {
         let uncertain =
             self.unknown || ["waitingForRecovery", "reconciling"].contains(&self.state.as_str());
