@@ -362,6 +362,33 @@ impl HostServices for Host {
             .register_hdc(std::path::Path::new(source), &utc_now())
     }
     #[cfg(target_os = "macos")]
+    fn trace_cache_purge(&self) -> Result<serde_json::Value, WireError> {
+        // An unconfigured owner is a deterministic refusal with zero dispatch,
+        // the same answer `trace.cache.status` gives; `outcomeUnknown` is
+        // reserved for a census or maintenance failure once owners exist.
+        let unconfigured = || WireError {
+            code: "rejected".into(),
+            message: "Trace cache owner is not configured".into(),
+            details: None,
+        };
+        let cache = self.trace_cache.as_ref().ok_or_else(unconfigured)?;
+        let jobs = self.jobs.as_ref().ok_or_else(unconfigured)?;
+        let artifacts = self.artifacts.as_ref().ok_or_else(unconfigured)?;
+        let refuse = || {
+            arkdeck_hoststore::TraceCacheStore::purge_refusal(
+                "Trace cache or authoritative Job/Artifact retention owner is unavailable",
+            )
+        };
+        jobs.with_active_sessions(|active| {
+            artifacts
+                .with_trace_retention(|retain_artifacts| {
+                    cache.purge(retain_artifacts || !active.is_empty())
+                })
+                .map_err(|_| refuse())?
+        })
+        .map_err(|_| refuse())
+    }
+    #[cfg(target_os = "macos")]
     fn trace_cache_status(&self) -> Result<serde_json::Value, WireError> {
         self.trace_cache
             .as_ref()

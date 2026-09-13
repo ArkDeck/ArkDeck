@@ -1,0 +1,17 @@
+{
+  "arkTraceBaseRevision": "e6e3133d410fbd7455df17c9486dcd369607e97f",
+  "arkTraceFixRevision": "ef541c7c53be4b8ca747fd634cf67bbec067eae6",
+  "arkTraceFixBranch": "agent/trace-cache-purge-directory-hint-20260913",
+  "arkTraceFixPullRequest": "https://github.com/ArkDeck/ArkTrace/pull/25",
+  "arkTraceSourcePatchSHA256": "0aae6fbe02a186f4a363e1316bb4b194157d22dc8ecc2f3cd450540d253fe9ac",
+  "producerSource": "rust/tests/fixtures/trace-maintenance/produce-native.swift",
+  "producerSourceSHA256": "8ff8d90071c8ab63623ae0adc5ffc294e86c6273c5fb6565e82dcb85adc4cd05",
+  "producerLink": "xcrun swiftc -parse-as-library -package-name workspace -I <build>/Modules produce-native.swift <ArkTraceCore|Parser|Store|Runtime .swift.o> -lsqlite3",
+  "nativeObjects": "ArkTrace scripts/run-swiftpm.sh debug build of the fix worktree (arm64-apple-macosx/debug), copied to /private/tmp/arktrace-fixed-build-20260913 before linking",
+  "fixtureRoot": "/private/tmp/xpa012-trace-native-fixed-20260913-r5",
+  "fixtureKind": "native ArkTrace owner and metadata; synthetic host database; no device evidence",
+  "rustDaemon": "rust/target/debug/arkdeck-agentd built from this candidate",
+  "rustHarness": "rust/scripts/check-trace-cache-owner.py --native-fixture <fixtureRoot>",
+  "result": "swift-expected-purge.json and rust-purge.json are equal field for field; 21 control exchanges plus CLI calls passed",
+  "notPinned": "This fixture is not built from the ArkDeck Package.resolved pin; the pinned re-run follows the ArkTrace merge and pin bump."
+}

@@ -19,6 +19,9 @@ pub use journal::HostJournal;
 #[path = "host_session_removal.rs"]
 mod session_removal;
 pub use session_removal::PreparedSessionRemoval;
+#[path = "host_trace_removal.rs"]
+mod trace_removal;
+pub use trace_removal::PreparedTraceRemoval;
 #[path = "host_export.rs"]
 mod export;
 pub use export::{ExportPublishError, ExportStaging, HostExportCapacity};
@@ -143,6 +146,26 @@ fn owned(file: &File, directory: bool, ownership: Ownership) -> io::Result<()> {
 }
 
 impl HostDirectory {
+    pub fn directory_identity(&self) -> io::Result<(u64, u64)> {
+        owned(&self.0, true, self.1)?;
+        let metadata = self.0.metadata()?;
+        Ok((metadata.dev(), metadata.ino()))
+    }
+
+    /// Removing a now-empty cache grouping directory never traverses contents.
+    pub fn remove_empty_directory(&self, name: &str, expected: (u64, u64)) -> io::Result<()> {
+        if !matches!(self.1, Ownership::Private)
+            || self.child(name)?.directory_identity()? != expected
+        {
+            return Err(fail());
+        }
+        let name = segment(name)?;
+        if unsafe { libc::unlinkat(self.0.as_raw_fd(), name.as_ptr(), libc::AT_REMOVEDIR) } != 0 {
+            return Err(io::Error::last_os_error());
+        }
+        self.0.sync_all()
+    }
+
     /// Observe the held descriptor using the current Swift volume-identity
     /// format. No caller-provided volume fact is accepted.
     pub fn export_facts(&self) -> io::Result<HostDirectoryFacts> {

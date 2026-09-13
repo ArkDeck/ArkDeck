@@ -112,6 +112,13 @@ pub trait HostServices: Send + Sync {
             ])),
         })
     }
+    fn trace_cache_purge(&self) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "rejected".into(),
+            message: "Trace cache owner is not configured".into(),
+            details: None,
+        })
+    }
     fn trace_cache_status(&self) -> Result<Value, WireError> {
         Err(WireError {
             code: "rejected".into(),
@@ -435,6 +442,15 @@ impl<H: HostServices> Control<H> {
                     }
                 }
             }
+            "trace.cache.purge" if params.is_empty() => Response {
+                id: request.id.clone(),
+                outcome: self.host.trace_cache_purge(),
+            },
+            "trace.cache.purge" => Response::failure(
+                &request.id,
+                "invalidParams",
+                "Trace cache purge accepts no parameters",
+            ),
             "trace.cache.status" if params.is_empty() => Response {
                 id: request.id.clone(),
                 outcome: self.host.trace_cache_status(),
