@@ -1,0 +1,75 @@
+{
+  "actualEffect" : "hostOnly",
+  "actualStepKinds" : [
+    "runDeterministicAnalyzer"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "kind" : "defaultReadOnlyPolicy",
+    "reference" : "default-read-only-policy"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-694e2d635c9fbaa2c85da51afdac73fa",
+  "materializedPlanDigest" : "3e7911b2dfce0734f9b867ae8ee711e58029df0f64fc74ccb4ac173c5e6ac01f",
+  "operationReference" : "analyzer.extract-crash-signature@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-run-answered-0001",
+    "inputs" : {
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-de6b658824f09ec9eab7d91e4a056b4b"
+    },
+    "operation" : {
+      "id" : "analyzer.extract-crash-signature",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-run-answered",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "analyzer",
+  "request" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-run-answered-0001",
+    "inputs" : {
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-de6b658824f09ec9eab7d91e4a056b4b"
+    },
+    "operation" : {
+      "id" : "analyzer.extract-crash-signature",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-run-answered",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "succeeded",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "intent extract-crash-signature",
+    "verified extract-crash-signature [\"analyzerRef\", \"analyzerVersion\", \"derivedByteCount\", \"derivedSha256\", \"sourceArtifactId\", \"sourceByteCount\", \"sourceSha256\", \"truncated\"]",
+    "artifact crash-signature.json -> ART-f8f43a480dd8410377a33fcf44d7a891",
+    "running->finalizing",
+    "reason: steps-complete",
+    "finalizing->succeeded",
+    "reason: finalized"
+  ]
+}

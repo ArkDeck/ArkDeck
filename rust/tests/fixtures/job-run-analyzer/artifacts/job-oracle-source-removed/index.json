@@ -1,0 +1,35 @@
+{
+  "artifacts" : [
+    {
+      "artifactID" : "ART-842f42e540d62f5b9282bc821e6e8751",
+      "bindingSnapshot" : {
+        "bindingRevision" : 3,
+        "stableIdentitySHA256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "targetID" : "TGT-ORACLE"
+      },
+      "byteCount" : 32,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-oracle-source-removed",
+      "mediaType" : "text\/plain",
+      "name" : "crash-log-sourceRemoved.txt",
+      "privacy" : "standard",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "HTASK-JOBRUNORACLE",
+      "sha256" : "9dd74c5950a558507ee8af22c8d083ff8b7794cf20c39d8d3761127b8541b30e",
+      "sourceOperation" : "capture.diagnostics@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "capture-crash-log"
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

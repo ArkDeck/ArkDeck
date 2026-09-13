@@ -15,7 +15,15 @@ mod unix;
 #[cfg(windows)]
 mod windows;
 
+#[cfg(target_os = "macos")]
+pub use process::{
+    AnalyzerExecution, AnalyzerLimits, AnalyzerRunError, AnalyzerTermination, VerifiedSource,
+};
 pub use process::{ProcessLimits, ProcessOutput, VerifiedTool};
+#[cfg(unix)]
+mod account;
+#[cfg(unix)]
+pub use account::runtime_home;
 #[cfg(target_os = "macos")]
 mod host_signature;
 #[cfg(target_os = "macos")]

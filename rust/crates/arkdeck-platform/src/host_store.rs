@@ -453,6 +453,21 @@ impl HostDirectory {
             .map_err(DocumentPublishError::OutcomeUnknown)
     }
 
+    /// Swift `RuntimeArtifactStore.validateStoredPayload`'s seal: an owned,
+    /// single-link regular payload, opened through no link, becomes owner
+    /// read-only.
+    pub fn seal_document(&self, name: &str) -> io::Result<()> {
+        if !matches!(self.1, Ownership::Private) {
+            return Err(fail());
+        }
+        let file = self.open_at(name, 0)?;
+        owned(&file, false, self.1)?;
+        if unsafe { libc::fchmod(file.as_raw_fd(), 0o400) } != 0 {
+            return Err(io::Error::last_os_error());
+        }
+        file.sync_all()
+    }
+
     pub fn open(path: &Path) -> io::Result<Self> {
         Self::open_root(path, false)
     }

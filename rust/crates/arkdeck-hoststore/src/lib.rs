@@ -29,6 +29,14 @@ mod job_admission;
 #[cfg(target_os = "macos")]
 pub use job_admission::{AdmissionRefusal, JobAdmitter, runtime_now};
 #[cfg(target_os = "macos")]
+mod analyzer_output;
+#[cfg(target_os = "macos")]
+mod artifact_publication;
+#[cfg(target_os = "macos")]
+mod job_run;
+#[cfg(target_os = "macos")]
+pub use job_run::{JobRunner, RunRefusal, runtime_precise_now};
+#[cfg(target_os = "macos")]
 mod operation_catalog;
 #[cfg(target_os = "macos")]
 mod operation_request;

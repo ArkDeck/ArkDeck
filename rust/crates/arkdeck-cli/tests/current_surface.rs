@@ -100,7 +100,9 @@ fn host_owner_failure_scope_and_lost_reply_are_preserved() {
             "historyFilterOwner",
             "resourceConflict",
         ),
-        ("job.run", "historyFilterOwner", "internalError"),
+        // Another owner's proof proves nothing about a run: `job.run` is
+        // mutation-capable, so without its own proof the outcome is unknown.
+        ("job.run", "historyFilterOwner", "outcomeUnknown"),
         ("history.filter.save", "other", "internalError"),
         (
             "runtime.storage.root",
@@ -112,7 +114,7 @@ fn host_owner_failure_scope_and_lost_reply_are_preserved() {
             "historyFilterOwner",
             "internalError",
         ),
-        ("job.run", "runtimeStorageOwner", "internalError"),
+        ("job.run", "runtimeStorageOwner", "outcomeUnknown"),
     ] {
         let error = CliError::from_client(
             ClientError::Remote(WireError {

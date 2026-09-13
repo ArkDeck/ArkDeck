@@ -674,6 +674,14 @@ mod macos_process;
 #[cfg(target_os = "macos")]
 use macos_process::spawn;
 
+#[cfg(target_os = "macos")]
+#[path = "analyzer_process.rs"]
+mod analyzer_process;
+#[cfg(target_os = "macos")]
+pub use analyzer_process::{
+    AnalyzerExecution, AnalyzerLimits, AnalyzerRunError, AnalyzerTermination, VerifiedSource,
+};
+
 #[cfg(test)]
 mod tests {
     use super::*;

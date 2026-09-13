@@ -1,0 +1,81 @@
+{
+  "actualEffect" : "hostOnly",
+  "actualStepKinds" : [
+    "runDeterministicAnalyzer"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "kind" : "defaultReadOnlyPolicy",
+    "reference" : "default-read-only-policy"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-d4003151a9cd95b0a57170d0a7b97a24",
+  "materializedPlanDigest" : "071330cda8264a1cf10722511b28db214f6e0a09b85ab6f7f37ce0c0c627d8a8",
+  "operationFailure" : {
+    "category" : "execution",
+    "code" : "executionFailed",
+    "recovery" : "inspectJob",
+    "retryability" : "runtimeDecisionRequired",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "analyzer.extract-crash-signature@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-run-nonZeroExit-0001",
+    "inputs" : {
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-a3da1aa8914c208f7381a32a1248d8bf"
+    },
+    "operation" : {
+      "id" : "analyzer.extract-crash-signature",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-run-nonZeroExit",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "analyzer",
+  "request" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-run-nonZeroExit-0001",
+    "inputs" : {
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-a3da1aa8914c208f7381a32a1248d8bf"
+    },
+    "operation" : {
+      "id" : "analyzer.extract-crash-signature",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-run-nonZeroExit",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "failed",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "intent extract-crash-signature",
+    "failed extract-crash-signature: analyzer.failed: crash-signature@1 exited 3",
+    "running->finalizing",
+    "reason: analyzer.failed: crash-signature@1 exited 3",
+    "finalizing->failed",
+    "reason: analyzer.failed: crash-signature@1 exited 3"
+  ]
+}

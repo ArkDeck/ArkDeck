@@ -138,6 +138,20 @@ impl ArtifactReadStore {
         })
     }
 
+    pub(crate) fn root(&self) -> &HostDirectory {
+        &self.root
+    }
+
+    /// Swift `directory(for:)`: a Job's private Artifact directory, created
+    /// on first use under the root this owner opened.
+    pub(crate) fn job_directory(&self, id: &str) -> io::Result<HostDirectory> {
+        if !job_id(id) {
+            return Err(invalid_input());
+        }
+        self.root.validate_path(&self.path)?;
+        self.root.private_child(id)
+    }
+
     pub(crate) fn index(&self, id: &str) -> io::Result<(HostDirectory, Vec<u8>, Vec<Value>)> {
         if !job_id(id) {
             return Err(invalid_input());

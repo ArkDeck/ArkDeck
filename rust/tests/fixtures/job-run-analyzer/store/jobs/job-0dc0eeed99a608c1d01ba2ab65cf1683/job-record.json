@@ -1,0 +1,81 @@
+{
+  "actualEffect" : "hostOnly",
+  "actualStepKinds" : [
+    "runDeterministicAnalyzer"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "kind" : "defaultReadOnlyPolicy",
+    "reference" : "default-read-only-policy"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-0dc0eeed99a608c1d01ba2ab65cf1683",
+  "materializedPlanDigest" : "ba9894201ddc12423474e003ff708cdbf48e84c7a879c0dae36fa1242b4db743",
+  "operationFailure" : {
+    "category" : "execution",
+    "code" : "executionFailed",
+    "recovery" : "inspectJob",
+    "retryability" : "runtimeDecisionRequired",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "analyzer.extract-crash-signature@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-run-undecodableEntry-0001",
+    "inputs" : {
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-ca3959565e454aae8fc6febcc3dedad1"
+    },
+    "operation" : {
+      "id" : "analyzer.extract-crash-signature",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-run-undecodableEntry",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "analyzer",
+  "request" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-run-undecodableEntry-0001",
+    "inputs" : {
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-ca3959565e454aae8fc6febcc3dedad1"
+    },
+    "operation" : {
+      "id" : "analyzer.extract-crash-signature",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-run-undecodableEntry",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "failed",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "intent extract-crash-signature",
+    "failed extract-crash-signature: analyzer.schemaMismatch: crash-signature@1 produced JSON outside its versioned schema",
+    "running->finalizing",
+    "reason: analyzer.schemaMismatch: crash-signature@1 produced JSON outside its versioned schema",
+    "finalizing->failed",
+    "reason: analyzer.schemaMismatch: crash-signature@1 produced JSON outside its versioned schema"
+  ]
+}

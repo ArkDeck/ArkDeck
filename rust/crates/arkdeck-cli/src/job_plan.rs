@@ -263,10 +263,11 @@ pub fn validate_acceptance(value: &Value) -> Result<(), CliError> {
     Ok(())
 }
 
-/// Swift `CLIControlFailureMapper` for the mutation-capable `job.submit`: a
-/// refusal keeps its code only with the pre-admission zero-dispatch proof;
-/// any reply that cannot prove nothing was admitted is an unknown outcome.
-pub(crate) fn submit_error(error: ClientError) -> CliError {
+/// Swift `CLIControlFailureMapper` for the mutation-capable `job.submit` and
+/// `job.run`: a refusal keeps its code only with the pre-admission
+/// zero-dispatch proof; any reply that cannot prove nothing was admitted or
+/// dispatched is an unknown outcome.
+pub(crate) fn mutation_error(error: ClientError, method: &str) -> CliError {
     let wire = match error {
         ClientError::Remote(wire) => wire,
         ClientError::Contract(
@@ -280,9 +281,13 @@ pub(crate) fn submit_error(error: ClientError) -> CliError {
         _ => {
             let mut result = CliError::new(
                 "outcomeUnknown",
-                "the Job submission reply is unconfirmed; submit the same request again to learn its Job",
+                if method == "job.submit" {
+                    "the Job submission reply is unconfirmed; submit the same request again to learn its Job"
+                } else {
+                    "the Job run reply is unconfirmed; read the Job with job status instead of running it again"
+                },
             );
-            result.details.insert("method".into(), json!("job.submit"));
+            result.details.insert("method".into(), json!(method));
             return result;
         }
     };
@@ -310,8 +315,26 @@ pub(crate) fn submit_error(error: ClientError) -> CliError {
     let mut result = CliError::new(code, wire.message);
     result.details = wire.details.unwrap_or_default();
     result.details.insert("wireCode".into(), json!(wire.code));
-    result.details.insert("method".into(), json!("job.submit"));
+    result.details.insert("method".into(), json!(method));
     result
+}
+
+/// Swift `RuntimeCLI.terminalJobExit`: once a run's status is emitted, an
+/// unknown outcome exits 75, since it needs reconciliation and never a
+/// replay, and a failed, cancelled or interrupted Job exits 1.
+pub fn run_exit(status: &Value) -> Option<(u8, &'static str)> {
+    if status["outcomeUnknown"] == true {
+        return Some((
+            75,
+            "job outcome is unknown: reconcile it; the original effect is never replayed",
+        ));
+    }
+    match status["state"].as_str()? {
+        "failed" => Some((1, "job terminal state is failed")),
+        "cancelled" => Some((1, "job terminal state is cancelled")),
+        "interrupted" => Some((1, "job terminal state is interrupted")),
+        _ => None,
+    }
 }
 
 /// Swift `CLIJobLifecycleValidation.validatePlan`: the complete
