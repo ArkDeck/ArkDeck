@@ -1,9 +1,12 @@
-//! `job plan`: the current typed request, planned by the Runtime and never
-//! admitted or dispatched. `--request-file` passes a complete document through
-//! verbatim; the flag form wraps typed inputs in a request envelope as the
-//! Swift CLI does. Either way the Runtime, not this CLI, validates the request.
+//! `job plan` and `job submit`: the current typed request, planned by the
+//! Runtime without admission, or admitted idempotently without dispatch.
+//! `--request-file` passes a complete document through verbatim; the flag form
+//! wraps typed inputs in a request envelope as the Swift CLI does. Either way
+//! the Runtime, not this CLI, validates the request.
 use crate::read_only_resources::{duration, keys};
 use crate::{CliError, Invocation};
+use arkdeck_client::ClientError;
+use arkdeck_contract::ContractError;
 use serde_json::{Map, Value, json};
 
 /// Every flag-form field is exclusive with a complete request document.
@@ -40,14 +43,31 @@ fn usage(message: impl Into<String>) -> CliError {
     CliError::new("invalidOption", message)
 }
 
-/// Parse-time `job plan` checks. Returns the client deadline, 30 s unless
-/// `--timeout` names another bounded one.
+fn subcommand(command: &str) -> &'static str {
+    if command == "job.submit" {
+        "job submit"
+    } else {
+        "job plan"
+    }
+}
+
+/// Swift `AgentExecutionIntent.validIdentifier`.
+fn valid_identifier(id: &str) -> bool {
+    (1..=128).contains(&id.len())
+        && id.as_bytes()[0].is_ascii_alphanumeric()
+        && id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || b"._-".contains(&byte))
+}
+
+/// Parse-time `job plan` and `job submit` checks. Returns the client deadline,
+/// 30 s unless `--timeout` names another bounded one.
 pub(super) fn configure(
     command: &str,
     fields: &mut Map<String, Value>,
     help: bool,
 ) -> Result<Option<u64>, CliError> {
-    if help || command != "job.plan" {
+    if help || !matches!(command, "job.plan" | "job.submit") {
         return Ok(None);
     }
     if fields.contains_key("requestFile")
@@ -58,7 +78,8 @@ pub(super) fn configure(
         let mut names = ["--request-file", option];
         names.sort_unstable();
         return Err(usage(format!(
-            "`job plan` accepts only one of {}",
+            "`{}` accepts only one of {}",
+            subcommand(command),
             names.join(", ")
         )));
     }
@@ -108,12 +129,12 @@ fn catalog_binding(id: &str, version: Option<i64>) -> Option<String> {
 
 /// The document the flag form sends: Swift `operationRequestJSON` over
 /// `RuntimeOperationRequest.operatorFlagForm`.
-fn flag_form(fields: &Map<String, Value>) -> Result<String, CliError> {
+fn flag_form(fields: &Map<String, Value>, subcommand: &str) -> Result<String, CliError> {
     let text = |key: &str| fields.get(key).and_then(Value::as_str);
     let (Some(target), Some(reference)) = (text("targetId"), text("operation")) else {
-        return Err(usage(
-            "job plan requires --target <id> --operation <reference> [--inputs-file <typed-inputs.json>], or --request-file <path>",
-        ));
+        return Err(usage(format!(
+            "{subcommand} requires --target <id> --operation <reference> [--inputs-file <typed-inputs.json>], or --request-file <path>"
+        )));
     };
     let (operation, version) = match reference.split_once('@') {
         None => (reference, None),
@@ -193,17 +214,104 @@ fn flag_form(fields: &Map<String, Value>) -> Result<String, CliError> {
     .to_string())
 }
 
-/// The `job.plan` parameters: exactly the request document, read from
-/// `--request-file` verbatim or built from the flag form.
-pub fn job_plan_params(invocation: &Invocation) -> Result<Map<String, Value>, CliError> {
+fn request_params(invocation: &Invocation) -> Result<Map<String, Value>, CliError> {
     let fields = invocation.params.clone().unwrap_or_default();
     let document = match fields.get("requestFile").and_then(Value::as_str) {
         Some(path) => {
             std::fs::read_to_string(path).map_err(|_| usage(format!("cannot read {path}")))?
         }
-        None => flag_form(&fields)?,
+        None => flag_form(&fields, subcommand(invocation.command))?,
     };
     Ok(Map::from_iter([("requestJson".into(), json!(document))]))
+}
+
+/// The `job.plan` parameters: exactly the request document, read from
+/// `--request-file` verbatim or built from the flag form.
+pub fn job_plan_params(invocation: &Invocation) -> Result<Map<String, Value>, CliError> {
+    request_params(invocation)
+}
+
+/// The `job.submit` parameters, built exactly as `job plan` builds them.
+pub fn job_submit_params(invocation: &Invocation) -> Result<Map<String, Value>, CliError> {
+    request_params(invocation)
+}
+
+/// Swift `generatesItsOwnIdempotencyKey`: a flag-form submit without a caller
+/// key uses a generated one, which a retry cannot repeat.
+pub fn generates_identity(invocation: &Invocation) -> bool {
+    invocation.params.as_ref().is_some_and(|fields| {
+        !fields.contains_key("idempotencyKey") && !fields.contains_key("requestFile")
+    })
+}
+
+/// Swift `CLIJobLifecycleValidation.validateAcceptance`: an idempotent
+/// acceptance that dispatched nothing.
+pub fn validate_acceptance(value: &Value) -> Result<(), CliError> {
+    if !keys(
+        value,
+        &["schemaVersion", "jobId", "deduplicated", "newDispatchCount"],
+    ) || value["schemaVersion"] != "arkdeck.job-acceptance/1"
+        || !value["jobId"].as_str().is_some_and(valid_identifier)
+        || !value["deduplicated"].is_boolean()
+        || value["newDispatchCount"].as_i64() != Some(0)
+    {
+        return Err(CliError::new(
+            "recordUnreadable",
+            "the Runtime returned an invalid target Job acceptance",
+        ));
+    }
+    Ok(())
+}
+
+/// Swift `CLIControlFailureMapper` for the mutation-capable `job.submit`: a
+/// refusal keeps its code only with the pre-admission zero-dispatch proof;
+/// any reply that cannot prove nothing was admitted is an unknown outcome.
+pub(crate) fn submit_error(error: ClientError) -> CliError {
+    let wire = match error {
+        ClientError::Remote(wire) => wire,
+        ClientError::Contract(
+            ContractError::UnsupportedVersion | ContractError::ContractMismatch,
+        ) => {
+            return CliError::new(
+                "protocolVersionUnsupported",
+                "client and Runtime must use the same current control contract",
+            );
+        }
+        _ => {
+            let mut result = CliError::new(
+                "outcomeUnknown",
+                "the Job submission reply is unconfirmed; submit the same request again to learn its Job",
+            );
+            result.details.insert("method".into(), json!("job.submit"));
+            return result;
+        }
+    };
+    let proof = wire.details.as_ref().is_some_and(|details| {
+        details.get("phase") == Some(&json!("preAdmission"))
+            && details.get("newDispatchCount") == Some(&json!(0))
+    });
+    let code = match (wire.code.as_str(), proof) {
+        ("invalidInput", true) | ("invalidParams", _) => "invalidInput",
+        ("inputTooLarge", true) => "inputTooLarge",
+        ("operationUnavailable", true) => "operationUnavailable",
+        ("idempotencyConflict", true) => "idempotencyConflict",
+        ("reviewedPlanMismatch", true) => "reviewedPlanMismatch",
+        ("admissionDenied" | "rejected", true) => "admissionDenied",
+        ("resourceConflict", true) | ("conflict", _) => "resourceConflict",
+        ("resourceNotFound", true) | ("notFound", _) => "resourceNotFound",
+        ("recordUnreadable", _) => "recordUnreadable",
+        ("workspaceReferenceNotFound", _) => "workspaceReferenceNotFound",
+        ("unsupportedProtocolVersion", _) => "protocolVersionUnsupported",
+        ("malformedFrame", _) => "protocolMalformed",
+        ("unknownMethod", _) => "controlMethodUnavailable",
+        (_, true) => "internalError",
+        (_, false) => "outcomeUnknown",
+    };
+    let mut result = CliError::new(code, wire.message);
+    result.details = wire.details.unwrap_or_default();
+    result.details.insert("wireCode".into(), json!(wire.code));
+    result.details.insert("method".into(), json!("job.submit"));
+    result
 }
 
 /// Swift `CLIJobLifecycleValidation.validatePlan`: the complete
@@ -220,14 +328,7 @@ pub fn validate_plan(value: &Value) -> Result<(), CliError> {
     };
     let named = |value: &Value| value.as_str().is_some_and(|text| !text.is_empty());
     let effect = |value: &Value| value.as_str().is_some_and(|text| EFFECTS.contains(&text));
-    // Swift `AgentExecutionIntent.validIdentifier`.
-    let target = value["targetId"].as_str().is_some_and(|id| {
-        (1..=128).contains(&id.len())
-            && id.as_bytes()[0].is_ascii_alphanumeric()
-            && id
-                .bytes()
-                .all(|byte| byte.is_ascii_alphanumeric() || b"._-".contains(&byte))
-    });
+    let target = value["targetId"].as_str().is_some_and(valid_identifier);
     if !keys(value, &PLAN_KEYS)
         || value["schemaVersion"] != "arkdeck.job-plan/1"
         || value["executionMode"] != "planOnly"

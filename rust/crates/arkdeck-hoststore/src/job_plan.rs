@@ -118,31 +118,37 @@ pub struct JobPlanner<'a> {
     pub state_root: &'a Path,
 }
 
+/// Swift's Job lifecycle `requestJSON()`: exactly one non-empty `requestJson`
+/// of at most 4 MiB.
+pub(crate) fn request_json(params: &Map<String, Value>) -> Result<&str, PlanRefusal> {
+    if params.len() != 1 || !params.contains_key("requestJson") {
+        return Err(refusal(
+            "invalidInput",
+            "the target Job request accepts exactly one bounded requestJson",
+        ));
+    }
+    let Some(text) = params["requestJson"]
+        .as_str()
+        .filter(|text| !text.is_empty())
+    else {
+        return Err(refusal(
+            "invalidInput",
+            "requestJson must be a non-empty typed request document",
+        ));
+    };
+    if text.len() > MAXIMUM_REQUEST_JSON_BYTES {
+        return Err(refusal(
+            "inputTooLarge",
+            "requestJson exceeds the target control request bound",
+        ));
+    }
+    Ok(text)
+}
+
 impl JobPlanner<'_> {
     /// The `job.plan` control parameters: exactly one bounded `requestJson`.
     pub fn handle(&self, params: &Map<String, Value>) -> Result<Value, PlanRefusal> {
-        if params.len() != 1 || !params.contains_key("requestJson") {
-            return Err(refusal(
-                "invalidInput",
-                "the target Job request accepts exactly one bounded requestJson",
-            ));
-        }
-        let Some(text) = params["requestJson"]
-            .as_str()
-            .filter(|text| !text.is_empty())
-        else {
-            return Err(refusal(
-                "invalidInput",
-                "requestJson must be a non-empty typed request document",
-            ));
-        };
-        if text.len() > MAXIMUM_REQUEST_JSON_BYTES {
-            return Err(refusal(
-                "inputTooLarge",
-                "requestJson exceeds the target control request bound",
-            ));
-        }
-        self.plan(text.as_bytes())
+        self.plan(request_json(params)?.as_bytes())
     }
 
     pub fn plan(&self, request_json: &[u8]) -> Result<Value, PlanRefusal> {
@@ -154,30 +160,11 @@ impl JobPlanner<'_> {
                 "planOnly does not accept or consume a Runtime capability",
             ));
         }
-        let Some(descriptor) =
-            CatalogOperation::lookup(&request.operation_id, request.operation_version)
-        else {
-            return Err(refusal(
-                "operationUnavailable",
-                format!("operation {} is not in the catalog", request.reference()),
-            ));
-        };
-        let reference = descriptor.reference();
-        if !MATERIALIZED.contains(&reference.as_str()) {
-            return Err(refusal(
-                "rejected",
-                format!("{reference} is not materialized by the Rust Runtime yet"),
-            ));
-        }
-        descriptor
-            .validate_inputs(&request.inputs)
-            .map_err(|failure| match failure {
-                InputRefusal::Invalid(message) => refusal("invalidInput", message),
-                InputRefusal::Unsupported(message) => refusal("rejected", message),
-            })?;
+        let descriptor = Self::descriptor(&request)?;
+        Self::validate_inputs(&request, descriptor)?;
         let fingerprint = request.fingerprint();
-        self.refuse_import_leases(&request, descriptor)?;
-        let digest = self.materialize(&request, descriptor)?;
+        let digest = self.materialized_digest(&request, descriptor)?;
+        let reference = descriptor.reference();
         let effect = descriptor.effective_effect(&request.inputs);
         let steps: Vec<Value> = descriptor
             .steps
@@ -208,6 +195,55 @@ impl JobPlanner<'_> {
             "jobAdmitted": false,
             "dispatchDisposition": "notDispatched",
         }))
+    }
+
+    /// The exact catalog operation a request names, when this Runtime
+    /// materializes it; every other operation is refused before its inputs
+    /// are judged.
+    pub(crate) fn descriptor(
+        request: &OperationRequest,
+    ) -> Result<&'static CatalogOperation, PlanRefusal> {
+        let Some(descriptor) =
+            CatalogOperation::lookup(&request.operation_id, request.operation_version)
+        else {
+            return Err(refusal(
+                "operationUnavailable",
+                format!("operation {} is not in the catalog", request.reference()),
+            ));
+        };
+        let reference = descriptor.reference();
+        if !MATERIALIZED.contains(&reference.as_str()) {
+            return Err(refusal(
+                "rejected",
+                format!("{reference} is not materialized by the Rust Runtime yet"),
+            ));
+        }
+        Ok(descriptor)
+    }
+
+    /// Swift `validateInputs`; a catalog constraint this validator does not
+    /// evaluate is refused rather than skipped.
+    pub(crate) fn validate_inputs(
+        request: &OperationRequest,
+        descriptor: &CatalogOperation,
+    ) -> Result<(), PlanRefusal> {
+        descriptor
+            .validate_inputs(&request.inputs)
+            .map_err(|failure| match failure {
+                InputRefusal::Invalid(message) => refusal("invalidInput", message),
+                InputRefusal::Unsupported(message) => refusal("rejected", message),
+            })
+    }
+
+    /// Swift's Import holds, then `materializeTypedPlanBeforeAuthorization`:
+    /// the digest of the materialized plan document.
+    pub(crate) fn materialized_digest(
+        &self,
+        request: &OperationRequest,
+        descriptor: &CatalogOperation,
+    ) -> Result<String, PlanRefusal> {
+        self.refuse_import_leases(request, descriptor)?;
+        self.materialize(request, descriptor)
     }
 
     /// Swift `RuntimeImportLeaseReference.inputs`: a malformed Import lease is

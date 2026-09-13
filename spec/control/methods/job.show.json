@@ -280,7 +280,10 @@
               "type": "string"
             },
             "threadId": {
-              "type": "null"
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "waitingForHuman": {
               "type": "boolean"
@@ -361,11 +364,11 @@
                   "properties": {
                     "arkdeck.continuedFromJob": {
                       "type": "string"
+                    },
+                    "arkdeck.threadId": {
+                      "type": "string"
                     }
                   },
-                  "required": [
-                    "arkdeck.continuedFromJob"
-                  ],
                   "type": "object"
                 }
               },
@@ -552,8 +555,8 @@
   "x-arkdeck-method": "job.show",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 8,
-    "request": 54,
-    "result": 46
+    "error": 2,
+    "request": 19,
+    "result": 17
   }
 }

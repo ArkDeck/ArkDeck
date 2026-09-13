@@ -365,6 +365,44 @@ impl HostServices for Host {
             ])),
         })
     }
+    /// `job.submit` admits into the Job owner the planner materializes for.
+    #[cfg(target_os = "macos")]
+    fn job_submit(
+        &self,
+        params: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<serde_json::Value, WireError> {
+        let (Some((state_root, analyzer)), Some(jobs)) = (&self.planning, &self.jobs) else {
+            return Err(WireError {
+                code: "rejected".into(),
+                message: "this method is unavailable in the read-only Rust foundation".into(),
+                details: None,
+            });
+        };
+        arkdeck_hoststore::JobAdmitter {
+            planner: arkdeck_hoststore::JobPlanner {
+                artifacts: self.artifacts.as_ref(),
+                analyzer: analyzer.as_ref(),
+                state_root,
+            },
+            jobs,
+            now: arkdeck_hoststore::runtime_now,
+        }
+        .handle(params)
+        // A refusal before the admission point proves zero dispatch; Swift
+        // attaches empty details to any later failure.
+        .map_err(|refusal| WireError {
+            code: refusal.code.into(),
+            message: refusal.message,
+            details: Some(if refusal.proven {
+                serde_json::Map::from_iter([
+                    ("phase".into(), serde_json::json!("preAdmission")),
+                    ("newDispatchCount".into(), serde_json::json!(0)),
+                ])
+            } else {
+                serde_json::Map::new()
+            }),
+        })
+    }
     #[cfg(target_os = "macos")]
     fn bootstrap_register_bundle(&self, source: &str) -> Result<serde_json::Value, WireError> {
         self.bootstrap

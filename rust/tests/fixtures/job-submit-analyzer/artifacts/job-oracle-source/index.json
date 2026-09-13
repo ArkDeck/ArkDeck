@@ -1,0 +1,35 @@
+{
+  "artifacts" : [
+    {
+      "artifactID" : "ART-cf645cc2f23c16cf9965b179bcb35b5e",
+      "bindingSnapshot" : {
+        "bindingRevision" : 3,
+        "stableIdentitySHA256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "targetID" : "TGT-ORACLE"
+      },
+      "byteCount" : 30,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-oracle-source",
+      "mediaType" : "text\/plain",
+      "name" : "crash-log.txt",
+      "privacy" : "standard",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "HTASK-JOBSUBMITORACLE",
+      "sha256" : "d00960e959e3e9e022f914b985cf9d834e5800b17ecab4c07a29834b211c5035",
+      "sourceOperation" : "capture.diagnostics@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "capture-crash-log"
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

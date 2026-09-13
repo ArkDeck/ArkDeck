@@ -447,6 +447,63 @@ impl JobRecord {
     pub(super) fn idempotency_key(&self) -> Option<&str> {
         self.request["idempotencyKey"].as_str()
     }
+    pub(super) fn catalog_digest(&self) -> &str {
+        &self.catalog
+    }
+    pub(super) fn plan_digest(&self) -> Option<&str> {
+        self.plan.as_deref()
+    }
+    /// The record Swift `submitOwned` builds for a Job admitted under the
+    /// default read-only policy: the caller's request is both the execution
+    /// and the original submission request, the plan is the materialized one,
+    /// and the Job has left `queued` for `preflight`.
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn admitted(
+        job_id: &str,
+        request: Value,
+        operation: &str,
+        catalog: &str,
+        provider: &str,
+        created: &str,
+        effect: &str,
+        admission: Value,
+        plan: &str,
+    ) -> Self {
+        Self {
+            job_id: job_id.into(),
+            original_request: Some(request.clone()),
+            request,
+            operation: operation.into(),
+            catalog: catalog.into(),
+            provider: provider.into(),
+            created: created.into(),
+            effect: Some(effect.into()),
+            admission: Some(admission),
+            plan: Some(plan.into()),
+            identity: None,
+            binding: None,
+            state: "preflight".into(),
+            unknown: false,
+            operation_failure: None,
+            recovery_step: None,
+            recovery_action: None,
+            recovery_intent: None,
+            evidence_preflight: None,
+            evidence_observation: None,
+            trace_before: None,
+            trace_after: None,
+            session_publication: None,
+            timeline: vec!["jobCreated".into(), "queued->preflight".into()],
+            step_kinds: None,
+            started: None,
+            first_evidence: None,
+            finished: None,
+            ring: None,
+            screen: None,
+            skip_reasons: Default::default(),
+            residues: None,
+        }
+    }
     pub(super) fn status(&self) -> Value {
         let uncertain =
             self.unknown || ["waitingForRecovery", "reconciling"].contains(&self.state.as_str());

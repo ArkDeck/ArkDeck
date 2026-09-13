@@ -1,0 +1,568 @@
+{
+  "job-19068673bce19fa55ee6207e00812877" : {
+    "job.show" : {
+      "ok" : true,
+      "result" : {
+        "actualStepKinds" : null,
+        "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+        "events" : {
+          "jobId" : "job-19068673bce19fa55ee6207e00812877",
+          "method" : "job.events"
+        },
+        "evidence" : {
+          "jobId" : "job-19068673bce19fa55ee6207e00812877",
+          "method" : "job.evidence"
+        },
+        "job" : {
+          "actualEffect" : "hostOnly",
+          "createdAtUtc" : "2026-09-14T00:00:00Z",
+          "executionMode" : "execute",
+          "failure" : null,
+          "finishedAtUtc" : null,
+          "jobId" : "job-19068673bce19fa55ee6207e00812877",
+          "nextAction" : {
+            "kind" : "wait",
+            "owner" : {
+              "id" : "job-19068673bce19fa55ee6207e00812877",
+              "kind" : "job"
+            },
+            "reasonCode" : "job.running",
+            "resource" : {
+              "id" : "job-19068673bce19fa55ee6207e00812877",
+              "kind" : "job"
+            },
+            "retryAfter" : "250ms"
+          },
+          "operation" : "analyzer.extract-crash-signature@1",
+          "outcome" : "preflight",
+          "outcomeUnknown" : false,
+          "outstandingResidueCount" : 0,
+          "processProgress" : null,
+          "recoveryEpochId" : null,
+          "resolvedByTargetAliasResolutionId" : null,
+          "schemaVersion" : "arkdeck.job-status/1",
+          "sessionId" : "session-job-19068673bce19fa55ee6207e00812877",
+          "sessionPublication" : {
+            "catalogGeneration" : null,
+            "manifestSha256" : null,
+            "reasonCode" : "noCurrentPublicationRecord",
+            "state" : "unavailable"
+          },
+          "startedAtUtc" : null,
+          "state" : "preflight",
+          "supersededByRecoveryEpochId" : null,
+          "targetId" : "TGT-ORACLE",
+          "threadId" : null,
+          "waitingForHuman" : false,
+          "workspaceKind" : "diagnostics"
+        },
+        "materializedBindingRevision" : null,
+        "materializedPlanDigest" : "1a81f0369a4a00246cc1c63879df9511e856858fd5697fbb94c8b9c9fda739f8",
+        "materializedStableIdentitySha256" : null,
+        "providerId" : "analyzer",
+        "request" : {
+          "documentType" : "runtime-operation-request",
+          "idempotencyKey" : "idem-oracle-submit-b-0001",
+          "inputs" : {
+            "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e"
+          },
+          "operation" : {
+            "id" : "analyzer.extract-crash-signature",
+            "version" : 1
+          },
+          "requestId" : "req-oracle-submit-b",
+          "requestedOutputs" : [
+            "derivedArtifacts"
+          ],
+          "schemaVersion" : "1.0.0",
+          "target" : {
+            "targetId" : "TGT-ORACLE"
+          }
+        },
+        "ringCoverage" : null,
+        "schemaVersion" : "arkdeck.job/1",
+        "screenSequence" : null,
+        "timeline" : {
+          "entries" : [
+            "jobCreated",
+            "queued->preflight"
+          ],
+          "kind" : "inline"
+        }
+      }
+    },
+    "job.status" : {
+      "ok" : true,
+      "result" : {
+        "actualEffect" : "hostOnly",
+        "createdAtUtc" : "2026-09-14T00:00:00Z",
+        "executionMode" : "execute",
+        "failure" : null,
+        "finishedAtUtc" : null,
+        "jobId" : "job-19068673bce19fa55ee6207e00812877",
+        "nextAction" : {
+          "kind" : "wait",
+          "owner" : {
+            "id" : "job-19068673bce19fa55ee6207e00812877",
+            "kind" : "job"
+          },
+          "reasonCode" : "job.running",
+          "resource" : {
+            "id" : "job-19068673bce19fa55ee6207e00812877",
+            "kind" : "job"
+          },
+          "retryAfter" : "250ms"
+        },
+        "operation" : "analyzer.extract-crash-signature@1",
+        "outcome" : "preflight",
+        "outcomeUnknown" : false,
+        "outstandingResidueCount" : 0,
+        "processProgress" : null,
+        "recoveryEpochId" : null,
+        "resolvedByTargetAliasResolutionId" : null,
+        "schemaVersion" : "arkdeck.job-status/1",
+        "sessionId" : "session-job-19068673bce19fa55ee6207e00812877",
+        "sessionPublication" : {
+          "catalogGeneration" : null,
+          "manifestSha256" : null,
+          "reasonCode" : "noCurrentPublicationRecord",
+          "state" : "unavailable"
+        },
+        "startedAtUtc" : null,
+        "state" : "preflight",
+        "supersededByRecoveryEpochId" : null,
+        "targetId" : "TGT-ORACLE",
+        "threadId" : null,
+        "waitingForHuman" : false,
+        "workspaceKind" : "diagnostics"
+      }
+    }
+  },
+  "job-784851134c779544a6094593216ee759" : {
+    "job.show" : {
+      "ok" : true,
+      "result" : {
+        "actualStepKinds" : null,
+        "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+        "events" : {
+          "jobId" : "job-784851134c779544a6094593216ee759",
+          "method" : "job.events"
+        },
+        "evidence" : {
+          "jobId" : "job-784851134c779544a6094593216ee759",
+          "method" : "job.evidence"
+        },
+        "job" : {
+          "actualEffect" : "hostOnly",
+          "createdAtUtc" : "2026-09-14T00:00:00Z",
+          "executionMode" : "execute",
+          "failure" : null,
+          "finishedAtUtc" : null,
+          "jobId" : "job-784851134c779544a6094593216ee759",
+          "nextAction" : {
+            "kind" : "wait",
+            "owner" : {
+              "id" : "job-784851134c779544a6094593216ee759",
+              "kind" : "job"
+            },
+            "reasonCode" : "job.running",
+            "resource" : {
+              "id" : "job-784851134c779544a6094593216ee759",
+              "kind" : "job"
+            },
+            "retryAfter" : "250ms"
+          },
+          "operation" : "analyzer.extract-crash-signature@1",
+          "outcome" : "preflight",
+          "outcomeUnknown" : false,
+          "outstandingResidueCount" : 0,
+          "processProgress" : null,
+          "recoveryEpochId" : null,
+          "resolvedByTargetAliasResolutionId" : null,
+          "schemaVersion" : "arkdeck.job-status/1",
+          "sessionId" : "session-job-784851134c779544a6094593216ee759",
+          "sessionPublication" : {
+            "catalogGeneration" : null,
+            "manifestSha256" : null,
+            "reasonCode" : "noCurrentPublicationRecord",
+            "state" : "unavailable"
+          },
+          "startedAtUtc" : null,
+          "state" : "preflight",
+          "supersededByRecoveryEpochId" : null,
+          "targetId" : "TGT-ORACLE",
+          "threadId" : null,
+          "waitingForHuman" : false,
+          "workspaceKind" : "diagnostics"
+        },
+        "materializedBindingRevision" : null,
+        "materializedPlanDigest" : "1a81f0369a4a00246cc1c63879df9511e856858fd5697fbb94c8b9c9fda739f8",
+        "materializedStableIdentitySha256" : null,
+        "providerId" : "analyzer",
+        "request" : {
+          "authorization" : {
+            "capabilityId" : "CAP-RT-ORACLE-D"
+          },
+          "documentType" : "runtime-operation-request",
+          "idempotencyKey" : "idem-oracle-submit-d-0001",
+          "inputs" : {
+            "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e"
+          },
+          "operation" : {
+            "id" : "analyzer.extract-crash-signature",
+            "version" : 1
+          },
+          "requestId" : "req-oracle-submit-d",
+          "requestedOutputs" : [
+            "derivedArtifacts"
+          ],
+          "schemaVersion" : "1.0.0",
+          "target" : {
+            "targetId" : "TGT-ORACLE"
+          }
+        },
+        "ringCoverage" : null,
+        "schemaVersion" : "arkdeck.job/1",
+        "screenSequence" : null,
+        "timeline" : {
+          "entries" : [
+            "jobCreated",
+            "queued->preflight"
+          ],
+          "kind" : "inline"
+        }
+      }
+    },
+    "job.status" : {
+      "ok" : true,
+      "result" : {
+        "actualEffect" : "hostOnly",
+        "createdAtUtc" : "2026-09-14T00:00:00Z",
+        "executionMode" : "execute",
+        "failure" : null,
+        "finishedAtUtc" : null,
+        "jobId" : "job-784851134c779544a6094593216ee759",
+        "nextAction" : {
+          "kind" : "wait",
+          "owner" : {
+            "id" : "job-784851134c779544a6094593216ee759",
+            "kind" : "job"
+          },
+          "reasonCode" : "job.running",
+          "resource" : {
+            "id" : "job-784851134c779544a6094593216ee759",
+            "kind" : "job"
+          },
+          "retryAfter" : "250ms"
+        },
+        "operation" : "analyzer.extract-crash-signature@1",
+        "outcome" : "preflight",
+        "outcomeUnknown" : false,
+        "outstandingResidueCount" : 0,
+        "processProgress" : null,
+        "recoveryEpochId" : null,
+        "resolvedByTargetAliasResolutionId" : null,
+        "schemaVersion" : "arkdeck.job-status/1",
+        "sessionId" : "session-job-784851134c779544a6094593216ee759",
+        "sessionPublication" : {
+          "catalogGeneration" : null,
+          "manifestSha256" : null,
+          "reasonCode" : "noCurrentPublicationRecord",
+          "state" : "unavailable"
+        },
+        "startedAtUtc" : null,
+        "state" : "preflight",
+        "supersededByRecoveryEpochId" : null,
+        "targetId" : "TGT-ORACLE",
+        "threadId" : null,
+        "waitingForHuman" : false,
+        "workspaceKind" : "diagnostics"
+      }
+    }
+  },
+  "job-c410a0cd501276830e1a2091883a1098" : {
+    "job.show" : {
+      "ok" : true,
+      "result" : {
+        "actualStepKinds" : null,
+        "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+        "events" : {
+          "jobId" : "job-c410a0cd501276830e1a2091883a1098",
+          "method" : "job.events"
+        },
+        "evidence" : {
+          "jobId" : "job-c410a0cd501276830e1a2091883a1098",
+          "method" : "job.evidence"
+        },
+        "job" : {
+          "actualEffect" : "hostOnly",
+          "createdAtUtc" : "2026-09-14T00:00:00Z",
+          "executionMode" : "execute",
+          "failure" : null,
+          "finishedAtUtc" : null,
+          "jobId" : "job-c410a0cd501276830e1a2091883a1098",
+          "nextAction" : {
+            "kind" : "wait",
+            "owner" : {
+              "id" : "job-c410a0cd501276830e1a2091883a1098",
+              "kind" : "job"
+            },
+            "reasonCode" : "job.running",
+            "resource" : {
+              "id" : "job-c410a0cd501276830e1a2091883a1098",
+              "kind" : "job"
+            },
+            "retryAfter" : "250ms"
+          },
+          "operation" : "analyzer.extract-crash-signature@1",
+          "outcome" : "preflight",
+          "outcomeUnknown" : false,
+          "outstandingResidueCount" : 0,
+          "processProgress" : null,
+          "recoveryEpochId" : null,
+          "resolvedByTargetAliasResolutionId" : null,
+          "schemaVersion" : "arkdeck.job-status/1",
+          "sessionId" : "session-job-c410a0cd501276830e1a2091883a1098",
+          "sessionPublication" : {
+            "catalogGeneration" : null,
+            "manifestSha256" : null,
+            "reasonCode" : "noCurrentPublicationRecord",
+            "state" : "unavailable"
+          },
+          "startedAtUtc" : null,
+          "state" : "preflight",
+          "supersededByRecoveryEpochId" : null,
+          "targetId" : "TGT-ORACLE",
+          "threadId" : "thread-oracle",
+          "waitingForHuman" : false,
+          "workspaceKind" : "diagnostics"
+        },
+        "materializedBindingRevision" : null,
+        "materializedPlanDigest" : "1a81f0369a4a00246cc1c63879df9511e856858fd5697fbb94c8b9c9fda739f8",
+        "materializedStableIdentitySha256" : null,
+        "providerId" : "analyzer",
+        "request" : {
+          "clientContext" : {
+            "clientName" : "oracle",
+            "provenance" : {
+              "arkdeck.threadId" : "thread-oracle"
+            }
+          },
+          "documentType" : "runtime-operation-request",
+          "idempotencyKey" : "idem-oracle-submit-e-0001",
+          "inputs" : {
+            "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e"
+          },
+          "operation" : {
+            "id" : "analyzer.extract-crash-signature",
+            "version" : 1
+          },
+          "requestId" : "req-oracle-submit-e",
+          "requestedOutputs" : [
+            "analysisReport",
+            "derivedArtifacts"
+          ],
+          "schemaVersion" : "1.0.0",
+          "target" : {
+            "targetId" : "TGT-ORACLE"
+          }
+        },
+        "ringCoverage" : null,
+        "schemaVersion" : "arkdeck.job/1",
+        "screenSequence" : null,
+        "timeline" : {
+          "entries" : [
+            "jobCreated",
+            "queued->preflight"
+          ],
+          "kind" : "inline"
+        }
+      }
+    },
+    "job.status" : {
+      "ok" : true,
+      "result" : {
+        "actualEffect" : "hostOnly",
+        "createdAtUtc" : "2026-09-14T00:00:00Z",
+        "executionMode" : "execute",
+        "failure" : null,
+        "finishedAtUtc" : null,
+        "jobId" : "job-c410a0cd501276830e1a2091883a1098",
+        "nextAction" : {
+          "kind" : "wait",
+          "owner" : {
+            "id" : "job-c410a0cd501276830e1a2091883a1098",
+            "kind" : "job"
+          },
+          "reasonCode" : "job.running",
+          "resource" : {
+            "id" : "job-c410a0cd501276830e1a2091883a1098",
+            "kind" : "job"
+          },
+          "retryAfter" : "250ms"
+        },
+        "operation" : "analyzer.extract-crash-signature@1",
+        "outcome" : "preflight",
+        "outcomeUnknown" : false,
+        "outstandingResidueCount" : 0,
+        "processProgress" : null,
+        "recoveryEpochId" : null,
+        "resolvedByTargetAliasResolutionId" : null,
+        "schemaVersion" : "arkdeck.job-status/1",
+        "sessionId" : "session-job-c410a0cd501276830e1a2091883a1098",
+        "sessionPublication" : {
+          "catalogGeneration" : null,
+          "manifestSha256" : null,
+          "reasonCode" : "noCurrentPublicationRecord",
+          "state" : "unavailable"
+        },
+        "startedAtUtc" : null,
+        "state" : "preflight",
+        "supersededByRecoveryEpochId" : null,
+        "targetId" : "TGT-ORACLE",
+        "threadId" : "thread-oracle",
+        "waitingForHuman" : false,
+        "workspaceKind" : "diagnostics"
+      }
+    }
+  },
+  "job-d65aafabb1a7a56843cc0faef4ef072e" : {
+    "job.show" : {
+      "ok" : true,
+      "result" : {
+        "actualStepKinds" : null,
+        "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+        "events" : {
+          "jobId" : "job-d65aafabb1a7a56843cc0faef4ef072e",
+          "method" : "job.events"
+        },
+        "evidence" : {
+          "jobId" : "job-d65aafabb1a7a56843cc0faef4ef072e",
+          "method" : "job.evidence"
+        },
+        "job" : {
+          "actualEffect" : "hostOnly",
+          "createdAtUtc" : "2026-09-14T00:00:00Z",
+          "executionMode" : "execute",
+          "failure" : null,
+          "finishedAtUtc" : null,
+          "jobId" : "job-d65aafabb1a7a56843cc0faef4ef072e",
+          "nextAction" : {
+            "kind" : "wait",
+            "owner" : {
+              "id" : "job-d65aafabb1a7a56843cc0faef4ef072e",
+              "kind" : "job"
+            },
+            "reasonCode" : "job.running",
+            "resource" : {
+              "id" : "job-d65aafabb1a7a56843cc0faef4ef072e",
+              "kind" : "job"
+            },
+            "retryAfter" : "250ms"
+          },
+          "operation" : "analyzer.extract-crash-signature@1",
+          "outcome" : "preflight",
+          "outcomeUnknown" : false,
+          "outstandingResidueCount" : 0,
+          "processProgress" : null,
+          "recoveryEpochId" : null,
+          "resolvedByTargetAliasResolutionId" : null,
+          "schemaVersion" : "arkdeck.job-status/1",
+          "sessionId" : "session-job-d65aafabb1a7a56843cc0faef4ef072e",
+          "sessionPublication" : {
+            "catalogGeneration" : null,
+            "manifestSha256" : null,
+            "reasonCode" : "noCurrentPublicationRecord",
+            "state" : "unavailable"
+          },
+          "startedAtUtc" : null,
+          "state" : "preflight",
+          "supersededByRecoveryEpochId" : null,
+          "targetId" : "TGT-ORACLE",
+          "threadId" : null,
+          "waitingForHuman" : false,
+          "workspaceKind" : "diagnostics"
+        },
+        "materializedBindingRevision" : null,
+        "materializedPlanDigest" : "1a81f0369a4a00246cc1c63879df9511e856858fd5697fbb94c8b9c9fda739f8",
+        "materializedStableIdentitySha256" : null,
+        "providerId" : "analyzer",
+        "request" : {
+          "documentType" : "runtime-operation-request",
+          "idempotencyKey" : "idem-oracle-submit-a-0001",
+          "inputs" : {
+            "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e"
+          },
+          "operation" : {
+            "id" : "analyzer.extract-crash-signature",
+            "version" : 1
+          },
+          "requestId" : "req-oracle-submit-a",
+          "requestedOutputs" : [
+            "derivedArtifacts"
+          ],
+          "schemaVersion" : "1.0.0",
+          "target" : {
+            "targetId" : "TGT-ORACLE"
+          }
+        },
+        "ringCoverage" : null,
+        "schemaVersion" : "arkdeck.job/1",
+        "screenSequence" : null,
+        "timeline" : {
+          "entries" : [
+            "jobCreated",
+            "queued->preflight"
+          ],
+          "kind" : "inline"
+        }
+      }
+    },
+    "job.status" : {
+      "ok" : true,
+      "result" : {
+        "actualEffect" : "hostOnly",
+        "createdAtUtc" : "2026-09-14T00:00:00Z",
+        "executionMode" : "execute",
+        "failure" : null,
+        "finishedAtUtc" : null,
+        "jobId" : "job-d65aafabb1a7a56843cc0faef4ef072e",
+        "nextAction" : {
+          "kind" : "wait",
+          "owner" : {
+            "id" : "job-d65aafabb1a7a56843cc0faef4ef072e",
+            "kind" : "job"
+          },
+          "reasonCode" : "job.running",
+          "resource" : {
+            "id" : "job-d65aafabb1a7a56843cc0faef4ef072e",
+            "kind" : "job"
+          },
+          "retryAfter" : "250ms"
+        },
+        "operation" : "analyzer.extract-crash-signature@1",
+        "outcome" : "preflight",
+        "outcomeUnknown" : false,
+        "outstandingResidueCount" : 0,
+        "processProgress" : null,
+        "recoveryEpochId" : null,
+        "resolvedByTargetAliasResolutionId" : null,
+        "schemaVersion" : "arkdeck.job-status/1",
+        "sessionId" : "session-job-d65aafabb1a7a56843cc0faef4ef072e",
+        "sessionPublication" : {
+          "catalogGeneration" : null,
+          "manifestSha256" : null,
+          "reasonCode" : "noCurrentPublicationRecord",
+          "state" : "unavailable"
+        },
+        "startedAtUtc" : null,
+        "state" : "preflight",
+        "supersededByRecoveryEpochId" : null,
+        "targetId" : "TGT-ORACLE",
+        "threadId" : null,
+        "waitingForHuman" : false,
+        "workspaceKind" : "diagnostics"
+      }
+    }
+  }
+}

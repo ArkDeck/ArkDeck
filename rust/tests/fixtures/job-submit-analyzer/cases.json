@@ -1,0 +1,293 @@
+[
+  {
+    "name" : "admitted",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-submit-a-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-submit-a\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "ok" : true,
+      "result" : {
+        "deduplicated" : false,
+        "jobId" : "job-d65aafabb1a7a56843cc0faef4ef072e",
+        "newDispatchCount" : 0,
+        "schemaVersion" : "arkdeck.job-acceptance/1"
+      }
+    }
+  },
+  {
+    "name" : "duplicate",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-submit-a-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-submit-a\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "ok" : true,
+      "result" : {
+        "deduplicated" : true,
+        "jobId" : "job-d65aafabb1a7a56843cc0faef4ef072e",
+        "newDispatchCount" : 0,
+        "schemaVersion" : "arkdeck.job-acceptance/1"
+      }
+    }
+  },
+  {
+    "name" : "duplicateWithReviewedPlan",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-submit-a-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-submit-a\",\"reviewedPlanDigest\":\"1a81f0369a4a00246cc1c63879df9511e856858fd5697fbb94c8b9c9fda739f8\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "ok" : true,
+      "result" : {
+        "deduplicated" : true,
+        "jobId" : "job-d65aafabb1a7a56843cc0faef4ef072e",
+        "newDispatchCount" : 0,
+        "schemaVersion" : "arkdeck.job-acceptance/1"
+      }
+    }
+  },
+  {
+    "name" : "duplicateWithOtherReviewedPlan",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-submit-a-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-submit-a\",\"reviewedPlanDigest\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "reviewedPlanMismatch",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "the existing Job differs from the immutable reviewed plan"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "conflict",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-submit-a-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-submit-a-changed\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "idempotencyConflict",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "idempotency key reuse with a different request"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "admittedWithReviewedPlan",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-submit-b-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-submit-b\",\"reviewedPlanDigest\":\"1a81f0369a4a00246cc1c63879df9511e856858fd5697fbb94c8b9c9fda739f8\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "ok" : true,
+      "result" : {
+        "deduplicated" : false,
+        "jobId" : "job-19068673bce19fa55ee6207e00812877",
+        "newDispatchCount" : 0,
+        "schemaVersion" : "arkdeck.job-acceptance/1"
+      }
+    }
+  },
+  {
+    "name" : "freshPlanDiffersFromReviewedPlan",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-submit-c-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-submit-c\",\"reviewedPlanDigest\":\"0000000000000000000000000000000000000000000000000000000000000000\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "reviewedPlanMismatch",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "the fresh materialized plan differs from the immutable reviewed plan"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "admittedWithCallerCapability",
+    "params" : {
+      "requestJson" : "{\"authorization\":{\"capabilityId\":\"CAP-RT-ORACLE-D\"},\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-submit-d-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-submit-d\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "ok" : true,
+      "result" : {
+        "deduplicated" : false,
+        "jobId" : "job-784851134c779544a6094593216ee759",
+        "newDispatchCount" : 0,
+        "schemaVersion" : "arkdeck.job-acceptance/1"
+      }
+    }
+  },
+  {
+    "name" : "admittedWithClientContext",
+    "params" : {
+      "requestJson" : "{\"clientContext\":{\"clientName\":\"oracle\",\"provenance\":{\"arkdeck.threadId\":\"thread-oracle\"}},\"idempotencyKey\":\"idem-oracle-submit-e-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-submit-e\",\"requestedOutputs\":[\"analysisReport\",\"derivedArtifacts\"],\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "ok" : true,
+      "result" : {
+        "deduplicated" : false,
+        "jobId" : "job-c410a0cd501276830e1a2091883a1098",
+        "newDispatchCount" : 0,
+        "schemaVersion" : "arkdeck.job-acceptance/1"
+      }
+    }
+  },
+  {
+    "name" : "unresolvableLease",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-submit-f-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-00000000000000000000000000000000\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-submit-f\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "analyzer source artifact Artifact lease is not resolvable: artifactNotFound(\"ART-00000000000000000000000000000000\")"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "unknownOperation",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-submit-g-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.no-such-operation\",\"version\":1},\"requestId\":\"req-oracle-submit-g\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "operationUnavailable",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "operation analyzer.no-such-operation@1 is not in the catalog"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "pinnedBindingRevision",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-submit-h-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-submit-h\",\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":3,\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "analyzer.extract-crash-signature@1 is host-only: a request must not pin a binding revision"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "missingInput",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-submit-i-0001\",\"inputs\":{},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-submit-i\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "required input sourceArtifactRef is absent"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "malformedJSON",
+    "params" : {
+      "requestJson" : "{\"schemaVersion\":"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "malformed or duplicate-key JSON"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "emptyRequestJson",
+    "params" : {
+      "requestJson" : ""
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "requestJson must be a non-empty typed request document"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "requestTooLarge",
+    "requestJsonSpaces" : 1048577,
+    "response" : {
+      "error" : {
+        "code" : "inputTooLarge",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "request exceeds 1048576 bytes"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "engine" : "unconfigured",
+    "name" : "unconfiguredAnalyzer",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-submit-j-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-submit-j\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidInput",
+        "details" : {
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "analyzer.extract-crash-signature@1 is runtime unavailable: analyzer.profileUnavailable"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "name" : "duplicateAfterOthers",
+    "params" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-submit-a-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-cf645cc2f23c16cf9965b179bcb35b5e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-submit-a\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    },
+    "response" : {
+      "ok" : true,
+      "result" : {
+        "deduplicated" : true,
+        "jobId" : "job-d65aafabb1a7a56843cc0faef4ef072e",
+        "newDispatchCount" : 0,
+        "schemaVersion" : "arkdeck.job-acceptance/1"
+      }
+    }
+  }
+]

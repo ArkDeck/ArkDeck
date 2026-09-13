@@ -470,6 +470,38 @@ from Swift with `ARKDECK_RUST_JOB_PLAN_RECORD=/private/tmp/<new>`.
 turn over one state root and compares every answer over the socket and through
 both CLIs.
 
+## Job admission (TASK-XPA-014)
+
+The isolated development composition answers `job.submit` as Swift
+`RuntimeJobEngine.submitOwned` does under target control, for the operation it
+plans. `JobAdmitter` decides a retry or a conflict from the idempotency index
+before anything is materialized, checks a reviewed plan against the existing Job
+or against the fresh materialized plan, and admits under the catalog's default
+read-only policy; no capability is read or written. It then writes the admission
+row, the Job's journal (`jobCreated`, `queued -> preflight`) and `job-record.json`
+at the index's next version, each as Swift writes them. A refusal before the
+admission point carries `{"phase": "preAdmission", "newDispatchCount": 0}`; a
+failure after it carries empty details, as Swift's does. The isolated owner opens
+its Job store with the owner connection. Nothing is dispatched: an admitted Job
+waits in `preflight` for an executor, and a standalone Swift daemon given the
+same store recovers it and can run it.
+
+`arkdeck job submit` builds requests as `job plan` does, prints Swift's note when
+it generates the idempotency key, accepts only an acceptance that dispatched
+nothing, and reports a reply that cannot prove zero dispatch as an unknown
+outcome. It has no `--wait`: this Runtime cannot run the Job it admits yet.
+
+`rust/tests/fixtures/job-submit-analyzer/` is the oracle Swift
+`JobSubmitAnalyzerOracleContractTests` records under the `job.plan` oracle's fixed
+root: 18 requests in order over one store (four admissions), how `job.status` and
+`job.show` read each admitted Job, and the store left behind.
+`tests/job_admission.rs` reproduces the answers, the reads, the index and every
+Job file byte for byte. Re-record from Swift with
+`ARKDECK_RUST_JOB_SUBMIT_RECORD=/private/tmp/<new>`. `scripts/check-job-submit.py`
+runs the standalone Swift daemon and the Rust owner in turn over one state root,
+then hands the Rust-written store to a Swift daemon that recovers the Jobs and
+runs one.
+
 ## Target presentation owner (TASK-XPA-012)
 
 The explicitly isolated development composition owns `targets-state/` and serves

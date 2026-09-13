@@ -200,4 +200,51 @@ mod artifact_date_tests {
             assert!(format_timestamp_seconds(value).is_none());
         }
     }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn utc_timestamps_are_the_plain_iso8601_form() {
+        assert_eq!(utc_timestamp(0), "1970-01-01T00:00:00Z");
+        assert_eq!(utc_timestamp(1_709_210_096), "2024-02-29T12:34:56Z");
+        assert_eq!(utc_timestamp(1_789_344_000), "2026-09-14T00:00:00Z");
+        assert!(valid_format_timestamp(&utc_now().unwrap()));
+    }
+}
+
+/// The current instant as Swift durable records spell it
+/// (`ISO8601Timestamps.string`): whole seconds in UTC.
+#[cfg(target_os = "macos")]
+pub(crate) fn utc_now() -> Option<String> {
+    let seconds = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()?
+        .as_secs();
+    Some(utc_timestamp(seconds))
+}
+
+/// Unix seconds as `YYYY-MM-DDTHH:MM:SSZ` in the proleptic Gregorian calendar
+/// (Hinnant's `civil_from_days`).
+#[cfg(target_os = "macos")]
+fn utc_timestamp(seconds: u64) -> String {
+    let days = (seconds / 86_400) as i64 + 719_468;
+    let era = days.div_euclid(146_097);
+    let day_of_era = days.rem_euclid(146_097);
+    let year_of_era =
+        (day_of_era - day_of_era / 1_460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let shifted_month = (5 * day_of_year + 2) / 153;
+    let day = day_of_year - (153 * shifted_month + 2) / 5 + 1;
+    let month = if shifted_month < 10 {
+        shifted_month + 3
+    } else {
+        shifted_month - 9
+    };
+    let year = year_of_era + era * 400 + i64::from(month <= 2);
+    let second = seconds % 86_400;
+    format!(
+        "{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}Z",
+        second / 3_600,
+        second % 3_600 / 60,
+        second % 60
+    )
 }

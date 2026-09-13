@@ -48,6 +48,7 @@ fn published_argv_fixtures_replay() {
         include_str!("../../../tests/fixtures/current-cli-argv/job.evidence.json"),
         include_str!("../../../tests/fixtures/current-cli-argv/job.timeline.json"),
         include_str!("../../../tests/fixtures/current-cli-argv/job.plan.json"),
+        include_str!("../../../tests/fixtures/current-cli-argv/job.submit.json"),
     ] {
         let doc: Value = serde_json::from_str(corpus).unwrap();
         for case in doc["cases"].as_array().unwrap() {
@@ -164,7 +165,7 @@ fn current_recorded_job_lists_and_details_are_returned_verbatim() {
     // Preserve every existing producer frame while allowing new current
     // producer recordings to extend the exact contract corpus.
     assert!(counts[0] >= 10);
-    assert_eq!(counts[1], 13);
+    assert!(counts[1] >= 13);
 }
 
 #[test]

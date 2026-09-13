@@ -25,6 +25,10 @@ mod job_plan;
 #[cfg(target_os = "macos")]
 pub use job_plan::{AnalyzerProfile, JobPlanner, PlanRefusal};
 #[cfg(target_os = "macos")]
+mod job_admission;
+#[cfg(target_os = "macos")]
+pub use job_admission::{AdmissionRefusal, JobAdmitter, runtime_now};
+#[cfg(target_os = "macos")]
 mod operation_catalog;
 #[cfg(target_os = "macos")]
 mod operation_request;

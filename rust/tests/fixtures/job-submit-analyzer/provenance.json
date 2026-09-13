@@ -1,0 +1,25 @@
+{
+  "files" : {
+    "analyzer" : "d4c8b3f6e2199bf9f95ab29225ab4c391cefc7f574e31c7bf2606a3a12a23580",
+    "artifacts/job-oracle-source/ART-cf645cc2f23c16cf9965b179bcb35b5e" : "d00960e959e3e9e022f914b985cf9d834e5800b17ecab4c07a29834b211c5035",
+    "artifacts/job-oracle-source/index.json" : "b6b040ab00da31568d04944738d2eedd9eaa9ebb49b3e63d06901626d6e7d40a",
+    "cases.json" : "8f46ebb0fe8e8af62b1436f8152e1a3a626cf3692d27982091f39c86355e246c",
+    "reads.json" : "003db89261f87f4a4eac3843842d38d87e5d3aa0a33ad1edbcc884a44eb8e4f3",
+    "store/index.json" : "1b1411004a8a2305146d686c18a9fbd39c6b9b630463a4588b8b10b0d2a3b904",
+    "store/jobs/job-19068673bce19fa55ee6207e00812877/.manifest.lock" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "store/jobs/job-19068673bce19fa55ee6207e00812877/job-record.json" : "3bda70522bbf61842101340465550528235b2388e228802ecedd58461e306e66",
+    "store/jobs/job-19068673bce19fa55ee6207e00812877/journal.jsonl" : "a5517fa47e6e07dd862d5bdb6ea3cc2ac9e7f5282cdde0ab01a8e6c3f10a59d7",
+    "store/jobs/job-784851134c779544a6094593216ee759/.manifest.lock" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "store/jobs/job-784851134c779544a6094593216ee759/job-record.json" : "0c8609e184013f802f7117d394220d425d8317fba9d4df779e43ea08f9b02881",
+    "store/jobs/job-784851134c779544a6094593216ee759/journal.jsonl" : "cac17ff8644cc01560c549c4a6e416b4c3a1acd5751967c775e64ceb40efb8f7",
+    "store/jobs/job-c410a0cd501276830e1a2091883a1098/.manifest.lock" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "store/jobs/job-c410a0cd501276830e1a2091883a1098/job-record.json" : "cf056f073c228d030d99eedbec8704de8d09c57ca45ab851c59323055ce965bd",
+    "store/jobs/job-c410a0cd501276830e1a2091883a1098/journal.jsonl" : "d08e6f3b7a41ceb81349e86c75f2da268f53c33b6cc6a833353771917027b968",
+    "store/jobs/job-d65aafabb1a7a56843cc0faef4ef072e/.manifest.lock" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "store/jobs/job-d65aafabb1a7a56843cc0faef4ef072e/job-record.json" : "848af2472ef29478ffa208c0d9ec0e704bc5a709f34e1de88a9342813d60024c",
+    "store/jobs/job-d65aafabb1a7a56843cc0faef4ef072e/journal.jsonl" : "203769c85df1a50bba30f00d7a93d828316125e13743196e891f40ecfdc4d467"
+  },
+  "nowUTC" : "2026-09-14T00:00:00Z",
+  "producer" : "JobSubmitAnalyzerOracleContractTests/testSwiftAdmitsTheSharedAnalyzerOracle",
+  "root" : "/private/tmp/arkdeck-job-plan-oracle"
+}
