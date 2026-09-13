@@ -3,11 +3,14 @@
     "errorCode": {
       "enum": [
         "conflict",
+        "idempotencyConflict",
+        "inputTooLarge",
         "internalError",
         "invalidInput",
         "invalidParams",
         "malformedFrame",
         "notFound",
+        "operationUnavailable",
         "recordUnreadable",
         "rejected",
         "reviewedPlanMismatch",
@@ -74,8 +77,8 @@
   "x-arkdeck-method": "job.submit",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 16,
-    "request": 66,
-    "result": 50
+    "error": 13,
+    "request": 21,
+    "result": 8
   }
 }

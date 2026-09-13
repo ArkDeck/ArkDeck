@@ -17,7 +17,9 @@ pub use read_only_resources::{
 mod job_events;
 mod job_plan;
 mod job_resources;
-pub use job_plan::{job_plan_params, validate_plan};
+pub use job_plan::{
+    generates_identity, job_plan_params, job_submit_params, validate_acceptance, validate_plan,
+};
 mod session_resources;
 pub use bootstrap_resources::{validate_bootstrap_request, validate_bootstrap_response};
 pub use session_resources::validate_session_response;
@@ -63,7 +65,8 @@ impl CliError {
             | "resourceConflict"
             | "idempotencyConflict"
             | "resourceNotFound"
-            | "workspaceReferenceNotFound" => 65,
+            | "workspaceReferenceNotFound"
+            | "reviewedPlanMismatch" => 65,
             "runtimeUnavailable"
             | "unsupportedOnPlatform"
             | "protocolVersionUnsupported"
@@ -81,6 +84,9 @@ impl CliError {
         }
     }
     pub fn from_client(error: ClientError, method: &str) -> Self {
+        if method == "job.submit" {
+            return job_plan::submit_error(error);
+        }
         if matches!(
             method,
             "artifact.import.begin"
@@ -512,6 +518,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["job", "timeline"] => "job.timeline",
         ["job", "events"] => "job.events",
         ["job", "plan"] => "job.plan",
+        ["job", "submit"] => "job.submit",
         ["device", "candidates"] => "device.candidates",
         ["target", "list"] => "target.list",
         ["target", "show"] => "target.show",
@@ -637,7 +644,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         "runtime.bundle.register" => &["kind", "file"],
         "runtime.bundle.inspect" => &["bundle"],
         "operation.describe" | "operation.example" => &["operation"],
-        "job.plan" => &[
+        "job.plan" | "job.submit" => &[
             "requestFile",
             "targetId",
             "operation",
@@ -908,6 +915,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                     | "job.timeline"
                     | "job.events"
                     | "job.plan"
+                    | "job.submit"
             )
         {
             Some(method_options)

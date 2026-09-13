@@ -1,0 +1,3 @@
+#!/bin/sh
+# ArkDeck job.submit oracle analyzer: pinned by digest, never executed.
+exit 64

@@ -44,6 +44,8 @@ pub(crate) struct CatalogOperation {
     default_policy_issuance: bool,
     pub(crate) inputs: Vec<CatalogField>,
     pub(crate) steps: Vec<CatalogStep>,
+    pub(crate) timeout_seconds: i64,
+    pub(crate) output_byte_budget: i64,
 }
 
 /// Why typed inputs are refused. `Unsupported` names a constraint this
@@ -141,6 +143,9 @@ impl CatalogOperation {
             default_policy_issuance: value["defaultPolicyIssuance"] == "enabled",
             inputs,
             steps,
+            // An absent bound can never satisfy a policy limit.
+            timeout_seconds: value["timeoutSeconds"].as_i64().unwrap_or(i64::MAX),
+            output_byte_budget: value["outputByteBudget"].as_i64().unwrap_or(i64::MAX),
         }
     }
 

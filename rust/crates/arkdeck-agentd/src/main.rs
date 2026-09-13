@@ -111,7 +111,10 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             arkdeck_hoststore::ArtifactUsage::open(&artifacts, 8 * 1024 * 1024 * 1024)?,
         )
         .with_bootstrap(&bootstrap)?
-        .with_jobs(arkdeck_hoststore::JobStore::open(&root.join("jobs-state"))?)
+        // The isolated owner admits Jobs, so it holds the Job owner connection.
+        .with_jobs(arkdeck_hoststore::JobStore::open_owner(
+            &root.join("jobs-state"),
+        )?)
         // As the Swift daemon: an analyzer is configured only by naming its
         // executable, and a named path that is not one fails startup.
         .with_planning(

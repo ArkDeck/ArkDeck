@@ -170,6 +170,9 @@ pub struct OperationRequest {
     pub requested_outputs: Vec<String>,
     pub capability_id: Option<String>,
     pub client_context: Option<ClientContext>,
+    /// The caller's reviewed plan precondition. It is no member of the typed
+    /// request, so it never reaches the canonical bytes or the fingerprint.
+    pub reviewed_plan_digest: Option<String>,
 }
 
 fn sorted_keys(fields: &Map<String, Value>) -> Vec<&String> {
@@ -471,6 +474,10 @@ impl OperationRequest {
             requested_outputs,
             capability_id,
             client_context,
+            reviewed_plan_digest: fields
+                .get("reviewedPlanDigest")
+                .and_then(Value::as_str)
+                .map(str::to_owned),
         };
         request.validate()?;
         Ok(request)

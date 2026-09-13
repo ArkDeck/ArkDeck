@@ -92,6 +92,25 @@ impl JobStore {
         )
     }
 
+    /// The Job's private `jobs/<jobID>` directory, created on first use; the
+    /// admission journal opens there before the record is published.
+    pub(crate) fn job_directory(&self, job_id: &str) -> Result<PathBuf, JobWriteError> {
+        if !identifier(job_id) {
+            return Err(JobWriteError::Invalid(
+                "The Job identity is not a Runtime identifier",
+            ));
+        }
+        let _guard = self.activity.lock().map_err(|_| guard_unavailable())?;
+        self.root
+            .validate_path(&self.path)
+            .map_err(JobWriteError::Refused)?;
+        self.root
+            .private_child("jobs")
+            .and_then(|jobs| jobs.private_child(job_id))
+            .map_err(JobWriteError::Refused)?;
+        Ok(self.path.join("jobs").join(job_id))
+    }
+
     /// Swift RuntimeJobEngine.persistRuntimeRecord: publish
     /// `jobs/<jobID>/job-record.json` atomically, then advance the index row
     /// with the same bytes. An index row must already describe this Job; once
