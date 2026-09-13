@@ -1,0 +1,125 @@
+{
+  "actualEffect" : "hostOnly",
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "kind" : "defaultReadOnlyPolicy",
+    "reference" : "default-read-only-policy"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-96d4f821b85e0645362763736ffa1906",
+  "materializedPlanDigest" : "b96cbd1ae33692cb2caee355e4814c0bf9f890f0bdf2e2657aaf75d412dc03ba",
+  "operationFailure" : {
+    "category" : "cancelled",
+    "code" : "cancelled",
+    "recovery" : "none",
+    "retryability" : "notAutomatic",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "analyzer.extract-crash-signature@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-run-cancelled-0001",
+    "inputs" : {
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-8e92991180c82eec30c9f81167aca4fc"
+    },
+    "operation" : {
+      "id" : "analyzer.extract-crash-signature",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-run-cancelled",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "analyzer",
+  "request" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-run-cancelled-0001",
+    "inputs" : {
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-8e92991180c82eec30c9f81167aca4fc"
+    },
+    "operation" : {
+      "id" : "analyzer.extract-crash-signature",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-run-cancelled",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "sessionPublicationRecord" : {
+    "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+    "checkpointSeal" : {
+      "byteCount" : "1725",
+      "lastSequence" : 4,
+      "sha256" : "74fe8ef4eae70d6ec4a532398b0728dd7706eec76db7641533579a9d971ee0e9"
+    },
+    "claims" : [
+      {
+        "admissionGeneration" : "<admissionGeneration>",
+        "claimID" : "session-publication-job-96d4f821b85e0645362763736ffa1906",
+        "finalizationHeadroomBytes" : "16777216",
+        "metadataHeadroomBytes" : "67261",
+        "remainingGrowthBytes" : "0",
+        "volumeIdentity" : "<volumeIdentity>",
+        "writerClass" : "light"
+      }
+    ],
+    "journalSeal" : {
+      "byteCount" : "2110",
+      "lastSequence" : 5,
+      "sha256" : "530b2ba82a56c95d19c97392e58cce96d1e03ec1c0a17b579a09ed489f2df4be"
+    },
+    "phase" : "catalogPublished",
+    "policyGeneration" : "1",
+    "proposal" : {
+      "completedAtUTC" : "2026-09-14T00:00:00Z",
+      "manifestByteCount" : "1047",
+      "manifestSHA256" : "b0921ece0b991b2135e897884c78258a9f32f061980cdadd4d0cc5b8018ee1f7",
+      "outcomeCertainty" : "confirmed",
+      "terminalStatus" : "cancelled"
+    },
+    "receipt" : {
+      "catalogGeneration" : "1",
+      "manifestSHA256" : "b0921ece0b991b2135e897884c78258a9f32f061980cdadd4d0cc5b8018ee1f7",
+      "publishedAtUTC" : "2026-09-14T00:00:00Z"
+    },
+    "relativeSessionPath" : "2026\/09\/session-job-96d4f821b85e0645362763736ffa1906",
+    "root" : {
+      "device" : "<device>",
+      "inode" : "<inode>",
+      "path" : "\/tmp\/arkdeck-job-plan-oracle\/Sessions",
+      "volumeIdentity" : "<volumeIdentity>"
+    },
+    "sessionID" : "session-job-96d4f821b85e0645362763736ffa1906",
+    "sessionRootIdentity" : {
+      "device" : "<device>",
+      "inode" : "<inode>"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "state" : "cancelled",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->cancelRequested",
+    "reason: client-cancel before execution",
+    "cancelRequested->cancellingAtSafeBoundary",
+    "reason: no provider intent was dispatched",
+    "cancellingAtSafeBoundary->cancelled",
+    "reason: never-started job closed with zero dispatch"
+  ]
+}

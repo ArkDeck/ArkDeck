@@ -12,7 +12,7 @@
   "createdAtUTC" : "2026-09-14T00:00:00Z",
   "finishedAtUTC" : "2026-09-14T00:00:00Z",
   "jobID" : "job-a71d0e925d6873760071e314ffd16ff8",
-  "materializedPlanDigest" : "26a74f94b8189868d8a7d8169c378221b3c2a8df9a841eb1fb59b6bda3839cea",
+  "materializedPlanDigest" : "6a7a0449dbe8a360590e5a13fa1532f4ee7a7f071b3dc5ea2f1d88e229b3fcb7",
   "operationReference" : "analyzer.extract-crash-signature@1",
   "originalSubmissionRequest" : {
     "documentType" : "runtime-operation-request",
@@ -59,7 +59,7 @@
     "checkpointSeal" : {
       "byteCount" : "2849",
       "lastSequence" : 6,
-      "sha256" : "e607f4f7e82afe93245d8f7af8e19154b69991f1b906b3feb189fcb9dd4ac566"
+      "sha256" : "566ef19e72b8a3b286e1a1f4237a8e2d412177bd5051706689bc7ec281ee387d"
     },
     "claims" : [
       {

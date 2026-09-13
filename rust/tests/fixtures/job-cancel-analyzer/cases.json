@@ -1,0 +1,296 @@
+[
+  {
+    "method" : "job.cancel",
+    "name" : "cancelBeforeRun",
+    "params" : {
+      "jobId" : "job-96d4f821b85e0645362763736ffa1906"
+    },
+    "response" : {
+      "ok" : true,
+      "result" : {
+        "cancelRequested" : true
+      }
+    }
+  },
+  {
+    "method" : "job.cancel",
+    "name" : "cancelAgain",
+    "params" : {
+      "jobId" : "job-96d4f821b85e0645362763736ffa1906"
+    },
+    "response" : {
+      "ok" : true,
+      "result" : {
+        "cancelRequested" : true
+      }
+    }
+  },
+  {
+    "method" : "job.run",
+    "name" : "runAfterCancel",
+    "params" : {
+      "jobId" : "job-96d4f821b85e0645362763736ffa1906"
+    },
+    "response" : {
+      "error" : {
+        "code" : "resourceConflict",
+        "details" : {
+          "jobId" : "job-96d4f821b85e0645362763736ffa1906",
+          "newDispatchCount" : 0,
+          "phase" : "preAdmission"
+        },
+        "message" : "job job-96d4f821b85e0645362763736ffa1906 is cancelled, not runnable"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "method" : "job.run",
+    "name" : "runSucceeded",
+    "params" : {
+      "jobId" : "job-7e6c03dd2126fed73de39f82c2485c8e"
+    },
+    "response" : {
+      "ok" : true,
+      "result" : {
+        "actualEffect" : "hostOnly",
+        "createdAtUtc" : "2026-09-14T00:00:00Z",
+        "executionMode" : "execute",
+        "failure" : null,
+        "finishedAtUtc" : "2026-09-14T00:00:00Z",
+        "jobId" : "job-7e6c03dd2126fed73de39f82c2485c8e",
+        "nextAction" : {
+          "kind" : "readResult",
+          "owner" : {
+            "id" : "job-7e6c03dd2126fed73de39f82c2485c8e",
+            "kind" : "job"
+          },
+          "reasonCode" : "job.resultAvailable",
+          "resource" : {
+            "id" : "job-7e6c03dd2126fed73de39f82c2485c8e",
+            "kind" : "job"
+          }
+        },
+        "operation" : "analyzer.extract-crash-signature@1",
+        "outcome" : "succeeded",
+        "outcomeUnknown" : false,
+        "outstandingResidueCount" : 0,
+        "processProgress" : null,
+        "recoveryEpochId" : null,
+        "resolvedByTargetAliasResolutionId" : null,
+        "schemaVersion" : "arkdeck.job-status/1",
+        "sessionId" : "session-job-7e6c03dd2126fed73de39f82c2485c8e",
+        "sessionPublication" : {
+          "catalogGeneration" : "2",
+          "manifestSha256" : "88881432242e10ec7e1b837394c7d0e6f861c07a817940f653e4b45b03d263b8",
+          "reasonCode" : null,
+          "state" : "published"
+        },
+        "startedAtUtc" : "2026-09-14T00:00:00Z",
+        "state" : "succeeded",
+        "supersededByRecoveryEpochId" : null,
+        "targetId" : "TGT-ORACLE",
+        "threadId" : null,
+        "waitingForHuman" : false,
+        "workspaceKind" : "diagnostics"
+      }
+    }
+  },
+  {
+    "method" : "job.cancel",
+    "name" : "cancelSucceeded",
+    "params" : {
+      "jobId" : "job-7e6c03dd2126fed73de39f82c2485c8e"
+    },
+    "response" : {
+      "ok" : true,
+      "result" : {
+        "cancelRequested" : true
+      }
+    }
+  },
+  {
+    "method" : "job.run",
+    "name" : "runFailed",
+    "params" : {
+      "jobId" : "job-d73bfc00ee0ce1d85b1796a5d7c0e4f9"
+    },
+    "response" : {
+      "ok" : true,
+      "result" : {
+        "actualEffect" : "hostOnly",
+        "createdAtUtc" : "2026-09-14T00:00:00Z",
+        "executionMode" : "execute",
+        "failure" : {
+          "category" : "execution",
+          "code" : "executionFailed",
+          "recovery" : "inspectJob",
+          "retryability" : "runtimeDecisionRequired",
+          "schemaVersion" : "1.0.0"
+        },
+        "finishedAtUtc" : "2026-09-14T00:00:00Z",
+        "jobId" : "job-d73bfc00ee0ce1d85b1796a5d7c0e4f9",
+        "nextAction" : {
+          "kind" : "readResult",
+          "owner" : {
+            "id" : "job-d73bfc00ee0ce1d85b1796a5d7c0e4f9",
+            "kind" : "job"
+          },
+          "reasonCode" : "job.resultAvailable",
+          "resource" : {
+            "id" : "job-d73bfc00ee0ce1d85b1796a5d7c0e4f9",
+            "kind" : "job"
+          }
+        },
+        "operation" : "analyzer.extract-crash-signature@1",
+        "outcome" : "failed",
+        "outcomeUnknown" : false,
+        "outstandingResidueCount" : 0,
+        "processProgress" : null,
+        "recoveryEpochId" : null,
+        "resolvedByTargetAliasResolutionId" : null,
+        "schemaVersion" : "arkdeck.job-status/1",
+        "sessionId" : "session-job-d73bfc00ee0ce1d85b1796a5d7c0e4f9",
+        "sessionPublication" : {
+          "catalogGeneration" : "3",
+          "manifestSha256" : "b083e5379700537b2c191a624d5564df27b4b0b603985b8b920458149351fe8e",
+          "reasonCode" : null,
+          "state" : "published"
+        },
+        "startedAtUtc" : "2026-09-14T00:00:00Z",
+        "state" : "failed",
+        "supersededByRecoveryEpochId" : null,
+        "targetId" : "TGT-ORACLE",
+        "threadId" : null,
+        "waitingForHuman" : false,
+        "workspaceKind" : "diagnostics"
+      }
+    }
+  },
+  {
+    "method" : "job.cancel",
+    "name" : "cancelFailed",
+    "params" : {
+      "jobId" : "job-d73bfc00ee0ce1d85b1796a5d7c0e4f9"
+    },
+    "response" : {
+      "ok" : true,
+      "result" : {
+        "cancelRequested" : true
+      }
+    }
+  },
+  {
+    "method" : "job.run",
+    "name" : "runParked",
+    "params" : {
+      "jobId" : "job-bd431d3ab6fe3b03b38dbdbe92c241d3"
+    },
+    "response" : {
+      "ok" : true,
+      "result" : {
+        "actualEffect" : "hostOnly",
+        "createdAtUtc" : "2026-09-14T00:00:00Z",
+        "executionMode" : "execute",
+        "failure" : {
+          "category" : "unknownOutcome",
+          "code" : "outcomeUnknown",
+          "recovery" : "awaitRuntimeReconciliation",
+          "retryability" : "runtimeDecisionRequired",
+          "schemaVersion" : "1.0.0"
+        },
+        "finishedAtUtc" : "2026-09-14T00:00:00Z",
+        "jobId" : "job-bd431d3ab6fe3b03b38dbdbe92c241d3",
+        "nextAction" : {
+          "kind" : "reconcile",
+          "owner" : {
+            "id" : "job-bd431d3ab6fe3b03b38dbdbe92c241d3",
+            "kind" : "job"
+          },
+          "reasonCode" : "recovery.outcomeUnknown",
+          "resource" : {
+            "id" : "job-bd431d3ab6fe3b03b38dbdbe92c241d3",
+            "kind" : "job"
+          }
+        },
+        "operation" : "analyzer.extract-crash-signature@1",
+        "outcome" : "outcomeUnknown",
+        "outcomeUnknown" : true,
+        "outstandingResidueCount" : 0,
+        "processProgress" : null,
+        "recoveryEpochId" : null,
+        "resolvedByTargetAliasResolutionId" : null,
+        "schemaVersion" : "arkdeck.job-status/1",
+        "sessionId" : "session-job-bd431d3ab6fe3b03b38dbdbe92c241d3",
+        "sessionPublication" : {
+          "catalogGeneration" : null,
+          "manifestSha256" : null,
+          "reasonCode" : "noCurrentPublicationRecord",
+          "state" : "unavailable"
+        },
+        "startedAtUtc" : "2026-09-14T00:00:00Z",
+        "state" : "waitingForRecovery",
+        "supersededByRecoveryEpochId" : null,
+        "targetId" : "TGT-ORACLE",
+        "threadId" : null,
+        "waitingForHuman" : false,
+        "workspaceKind" : "diagnostics"
+      }
+    }
+  },
+  {
+    "method" : "job.cancel",
+    "name" : "cancelParked",
+    "params" : {
+      "jobId" : "job-bd431d3ab6fe3b03b38dbdbe92c241d3"
+    },
+    "response" : {
+      "ok" : true,
+      "result" : {
+        "cancelRequested" : true
+      }
+    }
+  },
+  {
+    "method" : "job.cancel",
+    "name" : "cancelAbsent",
+    "params" : {
+      "jobId" : "job-00000000000000000000000000000000"
+    },
+    "response" : {
+      "error" : {
+        "code" : "notFound",
+        "message" : "unknown job job-00000000000000000000000000000000"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "method" : "job.cancel",
+    "name" : "cancelWithoutJob",
+    "params" : {
+
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidParams",
+        "message" : "jobId is required"
+      },
+      "ok" : false
+    }
+  },
+  {
+    "method" : "job.cancel",
+    "name" : "cancelNumericJob",
+    "params" : {
+      "jobId" : 5
+    },
+    "response" : {
+      "error" : {
+        "code" : "invalidParams",
+        "message" : "jobId is required"
+      },
+      "ok" : false
+    }
+  }
+]

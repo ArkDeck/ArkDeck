@@ -615,6 +615,47 @@ for byte. Re-record from Swift with
 compares both owners' publications and has a Swift daemon list and show every
 Rust-published Session.
 
+## Job cancellation (TASK-XPA-014)
+
+The isolated development composition answers `job.cancel` for the analyzer Jobs
+it admits as Swift `RuntimeJobEngine.requestCancel` does behind the daemon's
+handler. `JobCanceller` requires a string `jobId` (`invalidParams` "jobId is
+required"), answers an absent Job `notFound` "unknown job <id>", and otherwise
+answers `{"cancelRequested": true}` once the request is carried out or needs
+nothing; like Swift it attaches no details to a refusal. A Job at its admitted
+`preflight` boundary closes with zero dispatch at once: the three journaled
+transitions `preflight -> cancelRequested -> cancellingAtSafeBoundary ->
+cancelled` with Swift's reasons, the cancelled failure (`notAutomatic`, `none`),
+its finish time and record, and then the publication every terminal Job gets, a
+cancelled Session without steps. A Job that ended or is finalizing is left as it
+is, and so is one that waits for recovery or already carries the request; Swift
+also remembers such a request in memory for the Job's recovery, which is not
+ported (L.1 item 13). A Job that has started, whether this owner is running it
+or it was left running, is refused with `rejected`: cancelling a running
+analyzer at its safe boundaries is not ported yet. A run of the same Job waits
+a cancellation out and then meets the cancelled Job (`resourceConflict` with the
+zero-dispatch proof), and concurrent cancellations of one Job join.
+
+`arkdeck job cancel --job <id>` sends the opaque identity as Swift's CLI does,
+prints the answer and exits 0. As for any mutation-capable method without the
+zero-dispatch proof, `notFound` is `resourceNotFound`, `invalidParams` is
+`invalidInput`, `rejected` and `internalError` are `outcomeUnknown` (75), and so is
+a reply lost after the request went out; a connect failure stays
+`runtimeUnavailable`.
+
+`rust/tests/fixtures/job-cancel-analyzer/` is the oracle Swift
+`JobRunAnalyzerOracleContractTests.testSwiftCancelsTheSharedAnalyzerJobs` records
+in the publication oracle's composition: four Jobs and twelve ordered requests (a
+Job cancelled before it runs, cancelled again and then run; Jobs cancelled once
+they succeeded, failed or parked; an absent Job; parameters without a string Job
+identity), Swift's four reads of each Job and everything the requests leave.
+`tests/job_cancel.rs` reproduces every answer, read, index row, Job file,
+Artifact and Session file and every entry's mode byte for byte. Re-record from
+Swift with `ARKDECK_RUST_JOB_CANCEL_RECORD=/private/tmp/<new>`.
+`scripts/check-job-run.py` compares both owners' cancellations and both CLIs'
+`job cancel`, and has a Swift daemon answer a cancellation and a run of the
+Rust-cancelled Job.
+
 ## Target presentation owner (TASK-XPA-012)
 
 The explicitly isolated development composition owns `targets-state/` and serves

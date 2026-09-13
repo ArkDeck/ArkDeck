@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Compare Rust `job.run` with the real Swift daemon, then hand the Rust-run
-store to a Swift daemon that reads every Job, result, Session and published
-Artifact.
+"""Compare Rust `job.run` and `job.cancel` with the real Swift daemon, then
+hand the Rust-run store to a Swift daemon that reads every Job, result,
+Session and published Artifact.
 
 The plan digest covers the source Artifact's absolute path, so the owners run
 over one state root in turn: the standalone Swift daemon (`--state-dir`) first,
@@ -12,6 +12,12 @@ of its source, and each admits the oracle's requests and runs them in the
 oracle's order over its socket; each CLI then runs one succeeding and one
 failing Job and reads each one's result. The 30 s production timeout lane is
 left to the oracle replay, which runs it at 2 s.
+
+Each owner then cancels: a Job admitted and cancelled before it runs closes
+with zero dispatch and is published as a cancelled Session, is cancelled again
+and refused a run; the Jobs that ended or parked answer a cancellation with
+nothing to do; an absent Job and parameters without a string Job identity are
+refused; and each CLI cancels one more Job and reads its status.
 
 Both owners publish a Session for every terminal Job, as the standalone Swift
 daemon does, each under its own Sessions root (Swift's beside its state
@@ -24,7 +30,8 @@ each Manifest digest and each seal differ with its times and are compared as
 labels, as are each Sessions root's path, its fresh inodes and each claim's
 generation. Finally the Rust-written store is placed where a standalone Swift
 daemon keeps its own: that daemon reads each Rust-run Job and its result as the
-Rust owner did, keeps the parked one parked, lists and shows every
+Rust owner did, keeps the parked one parked, answers a cancellation and a run
+of the Rust-cancelled Job as the Rust owner did, lists and shows every
 Rust-published Session with nothing unaccounted, and reads each Rust-published
 Artifact back through the Swift CLI.
 
@@ -66,6 +73,22 @@ QUOTA_CASES = {'quotaExceeded'}
 # A Manifest digest, and each seal over a record or Journal, covers its times.
 MANIFEST_KEYS = {'manifestSha256', 'manifestSHA256'}
 SEALS = {'checkpointSeal', 'journalSeal'}
+ABSENT_JOB = 'job-00000000000000000000000000000000'
+CANCELLED = {'cancelRequested': True}
+# The requests made once every case ran, as the cancellation oracle makes
+# them: each names the Job of a case (`cancelled` is admitted for it) or
+# carries its own parameters, and expects `ok` or the refusal code it names.
+CANCELLATIONS = (
+    ('cancelBeforeRun', 'job.cancel', 'cancelled', None, 'ok'),
+    ('cancelAgain', 'job.cancel', 'cancelled', None, 'ok'),
+    ('runAfterCancel', 'job.run', 'cancelled', None, 'resourceConflict'),
+    ('cancelSucceeded', 'job.cancel', 'answered', None, 'ok'),
+    ('cancelFailed', 'job.cancel', 'emptyResult', None, 'ok'),
+    ('cancelParked', 'job.cancel', 'signalled', None, 'ok'),
+    ('cancelAbsent', 'job.cancel', None, {'jobId': ABSENT_JOB}, 'notFound'),
+    ('cancelWithoutJob', 'job.cancel', None, {}, 'invalidParams'),
+    ('cancelNumericJob', 'job.cancel', None, {'jobId': 5}, 'invalidParams'),
+)
 
 
 def sha256(path: Path) -> str:
@@ -274,9 +297,10 @@ def main() -> None:
             document.update(requestId=f'req-harness-{name}', idempotencyKey=f'idem-harness-{name}-0001')
             return {'requestJson': json.dumps(document, separators=(',', ':'), sort_keys=True)}
 
-        def drive(endpoint: Path, artifacts: Path, run_cli) -> tuple[dict, dict, dict]:
-            """Admit every case, run them in the oracle's order, then let the
-            CLI run one succeeding and one failing Job and read their results."""
+        def drive(endpoint: Path, artifacts: Path, run_cli) -> tuple[dict, dict, dict, dict]:
+            """Admit every case, run them in the oracle's order, make the
+            cancellation requests, then let the CLI run one succeeding and one
+            failing Job, read their results and cancel one more Job."""
             jobs = {}
             for case in cases:
                 if 'submit' in case:
@@ -295,6 +319,11 @@ def main() -> None:
                 else:
                     params = case['params']
                 answers[case['name']] = exchange(endpoint, 'job.run', params)
+            accepted = exchange(endpoint, 'job.submit', cli_request('cancelled', 'answered'))
+            check('admitted.cancelled', accepted.get('ok') is True, accepted)
+            jobs['cancelled'] = accepted['result']['jobId']
+            for name, method, job, params, _ in CANCELLATIONS:
+                answers[name] = exchange(endpoint, method, {'jobId': jobs[job]} if job else params)
             reads = {job: {method: exchange(endpoint, method, {'jobId': job})
                            for method in ('job.status', 'job.show', 'job.result', 'job.evidence')}
                      for job in jobs.values()}
@@ -307,7 +336,11 @@ def main() -> None:
                 ran[name] = run_cli(['job', 'run', '--job', accepted['jobId']], run_exit)['result']
                 ran[f'{name}.result'] = run_cli(['job', 'result', '--job', accepted['jobId']],
                                                 result_exit)['result']
-            return answers, reads, ran
+            accepted = exchange(endpoint, 'job.submit', cli_request('cli-cancelled', 'answered'))['result']
+            ran['cli-cancelled'] = run_cli(['job', 'cancel', '--job', accepted['jobId']], 0)['result']
+            ran['cli-cancelled.status'] = run_cli(['job', 'status', '--job', accepted['jobId']], 0)['result']
+            ran['cli-cancel-absent'] = run_cli(['job', 'cancel', '--job', ABSENT_JOB], 65)['error']['code']
+            return answers, reads, ran, jobs
 
         try:
             # Phase A: the standalone Swift daemon runs over the oracle's
@@ -315,7 +348,7 @@ def main() -> None:
             seed(state, analyzer, cases)
             swift_socket = state / 'agentd.sock'
             swift = start([str(swift_daemon), '--state-dir', str(state)], clean, swift_socket)
-            swift_answers, swift_reads, swift_cli_runs = drive(
+            swift_answers, swift_reads, swift_cli_runs, _ = drive(
                 swift_socket, state / 'artifacts',
                 lambda argv, expected: cli([str(swift_cli), *argv, '--socket', str(swift_socket),
                                             '--output', 'json'], clean, expected))
@@ -331,7 +364,7 @@ def main() -> None:
             rust_env = dict(clean, ARKDECK_DEVELOPMENT_STATE_ROOT=str(state), ARKDECK_ENDPOINT=str(rust_socket))
             rust = start([str(rust_daemon)], rust_env, rust_socket)
             cli_env = dict(clean, ARKDECK_ENDPOINT=str(rust_socket), ARKDECK_DAEMON_PATH=str(rust_daemon))
-            rust_answers, rust_reads, rust_cli_runs = drive(
+            rust_answers, rust_reads, rust_cli_runs, rust_jobs = drive(
                 rust_socket, state / 'artifacts',
                 lambda argv, expected: cli([str(rust_cli), '--output', 'json', *argv], cli_env, expected))
             stop(rust)
@@ -348,13 +381,25 @@ def main() -> None:
                     check(f'oracle.{name}', without_publication(untimed_value(rust_answer))
                           == without_publication(untimed_value(case['response'])),
                           {'live': rust_answer, 'oracle': case['response']})
+            for name, _, _, _, expects in CANCELLATIONS:
+                swift_answer, rust_answer = swift_answers[name], rust_answers[name]
+                check(f'identical.{name}', comparable(rust_answer) == comparable(swift_answer),
+                      {'swift': swift_answer, 'rust': rust_answer})
+                check(f'expected.{name}', rust_answer == {'ok': True, 'result': CANCELLED}
+                      if expects == 'ok' else rust_answer.get('error', {}).get('code') == expects,
+                      rust_answer)
             check('reads', comparable(rust_reads) == comparable(swift_reads),
                   {'swift': swift_reads, 'rust': rust_reads})
+            check('cancelled.state', rust_reads[rust_jobs['cancelled']]['job.status']['result']['state']
+                  == 'cancelled', rust_reads[rust_jobs['cancelled']])
             check('cli.runs', comparable(rust_cli_runs) == comparable(swift_cli_runs)
                   and rust_cli_runs['cli-answered']['state'] == 'succeeded'
                   and rust_cli_runs['cli-empty']['state'] == 'failed'
                   and rust_cli_runs['cli-answered.result']['evidence']['status'] == 'verified'
-                  and rust_cli_runs['cli-empty.result']['evidence']['status'] == 'artifactIntegrityFailed',
+                  and rust_cli_runs['cli-empty.result']['evidence']['status'] == 'artifactIntegrityFailed'
+                  and rust_cli_runs['cli-cancelled'] == CANCELLED
+                  and rust_cli_runs['cli-cancelled.status']['state'] == 'cancelled'
+                  and rust_cli_runs['cli-cancel-absent'] == 'resourceNotFound',
                   (swift_cli_runs, rust_cli_runs))
             check('store.rows', rust_store['rows'] == swift_store['rows'],
                   {'swift': swift_store['rows'], 'rust': rust_store['rows']})
@@ -364,11 +409,13 @@ def main() -> None:
                   differences(rust_store['artifacts'], swift_store['artifacts']))
             check('store.sessions', rust_store['sessions'] == swift_store['sessions'],
                   differences(rust_store['sessions'], swift_store['sessions']))
-            # Every terminal Job is published once; the parked one publishes
-            # nothing; each registration advanced the catalog once.
+            # Every terminal Job is published once, a cancelled one included;
+            # the parked one publishes nothing; each registration advanced the
+            # catalog once.
             markers = {row['jobId']: row['record'].get('sessionPublicationRecord')
                        for row in rust_store['rows']}
-            terminal = [row['jobId'] for row in rust_store['rows'] if row['state'] in ('succeeded', 'failed')]
+            terminal = [row['jobId'] for row in rust_store['rows']
+                        if row['state'] in ('succeeded', 'failed', 'cancelled')]
             parked = [row['jobId'] for row in rust_store['rows'] if row['state'] == 'waitingForRecovery']
             check('publication.receipts', bool(terminal) and all(
                 markers[job] and markers[job]['phase'] == 'catalogPublished'
@@ -400,6 +447,13 @@ def main() -> None:
                       {'swift': result, 'rust': reads['job.result']})
             parked = [job for job, state_name in handed.items() if state_name == 'waitingForRecovery']
             check('handoff.parkedStaysParked', len(parked) == 1, handed)
+            # Swift answers a cancellation and a run of the Rust-cancelled Job
+            # as the Rust owner did.
+            for name in ('cancelAgain', 'runAfterCancel'):
+                _, method, job, _, _ = next(step for step in CANCELLATIONS if step[0] == name)
+                answer = exchange(swift_socket, method, {'jobId': rust_jobs[job]})
+                check(f'handoff.{name}', untimed_value(answer) == untimed_value(rust_answers[name]),
+                      {'swift': answer, 'rust': rust_answers[name]})
             sessions = sorted(f'session-{job}' for job in terminal)
             listed = exchange(swift_socket, 'session.list', {'pageSize': 1000})
             check('handoff.sessions', listed.get('ok') is True
@@ -435,6 +489,7 @@ def main() -> None:
             stop(swift)
             summary = {
                 'result': 'PASS', 'kind': 'isolated-host-test', 'runs': len(cases),
+                'cancellations': len(CANCELLATIONS),
                 'identicalAnswers': len(swift_answers), 'jobs': len(rust_reads), 'checks': len(checks),
                 'states': dict(sorted(collections.Counter(handed.values()).items())),
                 'sessions': len(sessions),
