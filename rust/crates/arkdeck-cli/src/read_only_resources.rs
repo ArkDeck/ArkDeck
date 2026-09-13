@@ -1,6 +1,7 @@
 //! Read-only consumers of Runtime facts. No catalog fallback, polling or replay.
 use crate::{CliError, Invocation, valid_correlation};
 use serde_json::{Map, Value, json};
+use std::collections::BTreeSet;
 pub(super) fn invalid() -> CliError {
     CliError::new(
         "recordUnreadable",
@@ -42,6 +43,7 @@ pub(crate) fn configure(
                 | "job.timeline"
                 | "job.events"
                 | "job.run"
+                | "job.result"
         )
     {
         return Ok(None);
@@ -249,6 +251,7 @@ pub fn validate_read_only_request(invocation: &Invocation) -> Result<(), CliErro
             | "job.timeline"
             | "job.events"
             | "job.run"
+            | "job.result"
     ) {
         arkdeck_contract::validate_method_value(
             invocation.method,
@@ -277,6 +280,7 @@ pub fn validate_read_only_response(invocation: &Invocation, v: &Value) -> Result
             | "job.timeline"
             | "job.events"
             | "job.run"
+            | "job.result"
     ) {
         return Ok(());
     }
@@ -309,6 +313,9 @@ pub fn validate_read_only_response(invocation: &Invocation, v: &Value) -> Result
     }
     if invocation.command == "job.evidence" {
         return validate_evidence(id, v);
+    }
+    if invocation.command == "job.result" {
+        return validate_result(id, v);
     }
     validate_job_status(id, v)
 }
@@ -515,4 +522,140 @@ fn validate_evidence(id: &str, v: &Value) -> Result<(), CliError> {
         return Err(invalid());
     }
     Ok(())
+}
+
+/// Swift `CLIJobReadValidation.validate` for `job.result`: the terminal
+/// status, its evidence, every inventory and outstanding cleanup row, and the
+/// one next action they leave.
+fn validate_result(id: &str, v: &Value) -> Result<(), CliError> {
+    let job = &v["job"];
+    if !keys(
+        v,
+        &[
+            "schemaVersion",
+            "job",
+            "terminal",
+            "outcomeUnknown",
+            "evidence",
+            "artifacts",
+            "cleanup",
+            "nextAction",
+        ],
+    ) || v["schemaVersion"] != "arkdeck.job-result/1"
+        || v["terminal"] != true
+        || !job["state"].as_str().is_some_and(terminal_job_state)
+        || v["outcomeUnknown"] != job["outcomeUnknown"]
+    {
+        return Err(invalid());
+    }
+    validate_job_status(id, job)?;
+    validate_evidence(id, &v["evidence"])?;
+    let digest = crate::session_resources::digest;
+    let named = |v: &Value| v.as_str().is_some_and(|s| !s.is_empty());
+    let decimal = |v: &Value| {
+        v.as_str()
+            .is_some_and(|s| s.parse::<i64>().is_ok_and(|n| n >= 0 && n.to_string() == s))
+    };
+    let mut artifacts = BTreeSet::new();
+    for row in v["artifacts"].as_array().ok_or_else(invalid)? {
+        let artifact = row["artifactId"]
+            .as_str()
+            .filter(|s| identifier(s))
+            .ok_or_else(invalid)?;
+        if !keys(
+            row,
+            &[
+                "artifactId",
+                "owner",
+                "reference",
+                "name",
+                "mediaType",
+                "byteCount",
+                "sha256",
+                "privacy",
+                "status",
+                "bytesVerified",
+            ],
+        ) || row["owner"] != json!({"kind": "job", "id": id})
+            || !artifacts.insert(artifact)
+            || row["reference"] != format!("arkdeck-artifact://{id}/{artifact}")
+            // Only a row recording a missing product has no digest.
+            || !(digest(&row["sha256"]) || (row["status"] == "missing" && row["sha256"] == ""))
+            || !decimal(&row["byteCount"])
+            || !row["bytesVerified"].is_boolean()
+            || !named(&row["name"])
+            || !named(&row["mediaType"])
+            || !member(&row["privacy"], &["standard", "sensitive"])
+            || !member(&row["status"], &["published", "missing", "truncated"])
+        {
+            return Err(invalid());
+        }
+    }
+    let mut debts = BTreeSet::new();
+    for row in v["cleanup"].as_array().ok_or_else(invalid)? {
+        let debt = row["cleanupDebtId"].as_str().ok_or_else(invalid)?;
+        if !keys(
+            row,
+            &[
+                "cleanupDebtId",
+                "jobId",
+                "stepId",
+                "recordedAtUtc",
+                "outcomeUnknown",
+            ],
+        ) || row["jobId"] != id
+            || !row["outcomeUnknown"].is_boolean()
+            || !debts.insert(debt)
+            || !debt
+                .strip_prefix("cleanup-")
+                .is_some_and(|hex| digest(&json!(hex)))
+            || !named(&row["stepId"])
+            || !date(&row["recordedAtUtc"])
+        {
+            return Err(invalid());
+        }
+    }
+    let next = &v["nextAction"];
+    // An unknown outcome keeps the status's reconcile action; otherwise the
+    // next action names an outstanding cleanup row, or there is none.
+    let consistent = if v["outcomeUnknown"] == true {
+        next == &job["nextAction"]
+    } else if debts.is_empty() {
+        next.is_null()
+    } else {
+        keys(next, &["kind", "owner", "resource", "reasonCode"])
+            && next["kind"] == "cleanup"
+            && next["owner"] == json!({"kind": "job", "id": id})
+            && keys(&next["resource"], &["kind", "id"])
+            && next["resource"]["kind"] == "cleanupDebt"
+            && next["resource"]["id"]
+                .as_str()
+                .is_some_and(|debt| debts.contains(debt))
+            && next["reasonCode"] == "recovery.cleanupDebt"
+    };
+    if consistent { Ok(()) } else { Err(invalid()) }
+}
+
+/// The exit a validated `arkdeck.job-evidence/1` earns: only an explicitly
+/// verified result exits 0, and a Job without a result yet is read again
+/// later. Any other status, a future one included, needs attention.
+pub fn evidence_exit(evidence: &Value) -> u8 {
+    match evidence["status"].as_str() {
+        Some("verified") => 0,
+        Some("resultNotReady") => 75,
+        _ => 2,
+    }
+}
+
+/// Swift `CLIJobReadValidation` for a validated `job.result`: an unknown
+/// outcome exits 75, since it is reconciled and never replayed; otherwise
+/// evidence that needs attention decides, and then the Job's terminal state.
+pub fn result_exit(result: &Value) -> u8 {
+    if result["outcomeUnknown"] == true {
+        return 75;
+    }
+    match evidence_exit(&result["evidence"]) {
+        0 => crate::run_exit(&result["job"]).map_or(0, |(code, _)| code),
+        code => code,
+    }
 }

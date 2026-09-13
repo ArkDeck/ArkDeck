@@ -492,6 +492,100 @@ impl JobRecord {
     pub(super) fn set_outcome_unknown(&mut self) {
         self.unknown = true;
     }
+    pub(super) fn provider(&self) -> &str {
+        &self.provider
+    }
+    pub(super) fn outcome_unknown(&self) -> bool {
+        self.unknown
+    }
+    /// Whether the record carries evidence this Runtime does not project yet:
+    /// a device observation, a Trace probe or ring and screen facts.
+    pub(super) fn carries_device_evidence(&self) -> bool {
+        self.evidence_observation.is_some()
+            || self.evidence_preflight.is_some()
+            || self.trace_before.is_some()
+            || self.trace_after.is_some()
+    }
+    /// Swift `RuntimeControlPlaneHandler.encodeEvidence` over the facts
+    /// `RuntimeJobEngine.evidenceSnapshot` reads from a record with no device
+    /// observation, Trace probe or recovery epoch (the caller checks), before
+    /// artifacts and blockers are added: the admission evidence as the
+    /// authority, the request's inputs as the parameters, and the typed steps
+    /// that ran (none recorded reads as none ran).
+    pub(super) fn evidence_fields(&self) -> Map<String, Value> {
+        let authority = self.admission.as_ref().map_or(Value::Null, |admission| {
+            let optional = |key: &str| admission.get(key).cloned().unwrap_or(Value::Null);
+            let mut fields = Map::from_iter([
+                ("kind".into(), optional("kind")),
+                ("reference".into(), optional("reference")),
+                ("admittedAtUtc".into(), optional("admittedAtUTC")),
+                ("validUntilUtc".into(), optional("validUntilUTC")),
+                (
+                    "consumptionFingerprintSha256".into(),
+                    optional("consumptionFingerprintSHA256"),
+                ),
+                ("recoveryEpoch".into(), Value::Null),
+            ]);
+            if let Some(runtime) = admission.get("runtimeCapabilityCorrelation") {
+                let value = |key: &str| runtime.get(key).cloned().unwrap_or(Value::Null);
+                for (name, key) in [
+                    ("reservationId", "reservationID"),
+                    ("useOrdinal", "useOrdinal"),
+                    ("planDigest", "planDigestSHA256"),
+                    ("stepSetDigest", "stepSetDigestSHA256"),
+                    ("targetBindingDigest", "targetBindingDigestSHA256"),
+                    ("artifactDigest", "artifactSHA256"),
+                ] {
+                    fields.insert(name.into(), value(key));
+                }
+            }
+            Value::Object(fields)
+        });
+        let effect = self.effect.as_deref().filter(|effect| {
+            ["hostOnly", "readOnly", "deviceMutation", "destructive"].contains(effect)
+        });
+        Map::from_iter([
+            ("jobId".into(), json!(self.job_id)),
+            ("operationReference".into(), json!(self.operation)),
+            ("catalogDigest".into(), json!(self.catalog)),
+            (
+                "targetId".into(),
+                self.request["target"]["targetId"].clone(),
+            ),
+            (
+                "bindingRevision".into(),
+                self.request["target"]
+                    .get("expectedBindingRevision")
+                    .cloned()
+                    .unwrap_or(Value::Null),
+            ),
+            ("providerId".into(), json!(self.provider)),
+            ("actualEffect".into(), json!(effect)),
+            ("authority".into(), authority),
+            ("observation".into(), Value::Null),
+            (
+                "actualStepKinds".into(),
+                json!(self.step_kinds.clone().unwrap_or_default()),
+            ),
+            ("executionMode".into(), json!("execute")),
+            (
+                "terminalState".into(),
+                json!(if self.unknown {
+                    "outcomeUnknown"
+                } else {
+                    &self.state
+                }),
+            ),
+            ("outcomeUnknown".into(), json!(self.unknown)),
+            ("startedAtUtc".into(), json!(self.started)),
+            ("firstEvidenceStepAtUtc".into(), json!(self.first_evidence)),
+            ("finishedAtUtc".into(), json!(self.finished)),
+            ("recoveryEpoch".into(), Value::Null),
+            ("traceProbeBefore".into(), Value::Null),
+            ("traceProbeAfter".into(), Value::Null),
+            ("parameters".into(), self.request["inputs"].clone()),
+        ])
+    }
     /// The record Swift `submitOwned` builds for a Job admitted under the
     /// default read-only policy: the caller's request is both the execution
     /// and the original submission request, the plan is the materialized one,

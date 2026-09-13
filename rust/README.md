@@ -545,6 +545,41 @@ byte for byte. Re-record from Swift with
 the standalone Swift daemon and the Rust owner in turn over one state root, then
 hands the Rust-run store to a Swift daemon that reads every Job and Artifact.
 
+## Job result and evidence (TASK-XPA-014)
+
+The isolated development composition answers `job.result` and `job.evidence` for
+the analyzer Jobs it runs as Swift `RuntimeJobResourceReader` does. `JobResultReader`
+reads the Job from its durable index — an absent Job is `notFound` without
+details, as Swift answers every Job read — and refuses `job.result` for a Job
+that is not terminal with `resultNotReady` and the status's next action. The
+evidence is derived once for both reads: the catalog descriptor while the Job's
+catalog digest is current, every Artifact index row of the Job checked against
+its owner, every published payload rehashed (all or nothing), and each required
+product the index lacks named in `missingRequiredArtifacts`; the status follows
+Swift's precedence. `job.result` adds the status with its outstanding cleanup
+count, the inventory sorted as Swift sorts it, the Job's outstanding rows of the
+cleanup ledger and the one next action they leave. A read that races a change
+of the Job is refused (`resourceConflict`), and a result over 4 MiB is
+`inputTooLarge`. Rust reads write nothing, where Swift may create a Job's empty
+Artifact directory, reseal a payload or refresh its verification cache while it
+reads. Until their owners join, a Job of another operation or one carrying
+device observations or Trace probes is refused (`rejected`, with the zero-dispatch
+proof), and a store holding recovery epochs degrades the evidence to
+`recordUnreadable` (L.1 item 13).
+
+`arkdeck job result --job <id> [--timeout <duration>]` checks the whole result
+as Swift's CLI does — the status, the evidence, every inventory and cleanup row
+and the next action they imply — and exits 75 for an unknown outcome, then 2
+while the evidence needs attention, then 1 for a failed, cancelled or interrupted
+Job. A failed analyzer Job never publishes its required product, so its result
+exits 2. `resultNotReady` exits 75 and the request may be retried.
+
+The run oracle also records Swift's `job.result` and `job.evidence` of every Job,
+the six Job reads of an absent Job and the two reads of open options
+(`refused-reads.json`); `tests/job_run.rs` answers each through the Rust readers
+byte for byte. `scripts/check-job-run.py` compares both reads and both CLIs'
+`job result`, and has the Swift daemon read the result of every Rust-run Job.
+
 ## Target presentation owner (TASK-XPA-012)
 
 The explicitly isolated development composition owns `targets-state/` and serves

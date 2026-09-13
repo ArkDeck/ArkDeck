@@ -424,6 +424,23 @@ impl HostServices for Host {
             }),
         })
     }
+    /// `job.result` and `job.evidence` read from the Job and Artifact owners
+    /// the isolated composition opened.
+    #[cfg(target_os = "macos")]
+    fn job_result_resource(
+        &self,
+        method: &str,
+        params: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<serde_json::Value, WireError> {
+        let (Some(jobs), Some(artifacts)) = (&self.jobs, &self.artifacts) else {
+            return Err(WireError {
+                code: "rejected".into(),
+                message: "this method is unavailable in the read-only Rust foundation".into(),
+                details: None,
+            });
+        };
+        arkdeck_hoststore::JobResultReader { jobs, artifacts }.handle(method, params)
+    }
     /// `job.run` runs an admitted analyzer Job in the owner that admitted it.
     /// Every concurrent caller for one Job joins its one run, as Swift's
     /// callers join the one driver of a Job.

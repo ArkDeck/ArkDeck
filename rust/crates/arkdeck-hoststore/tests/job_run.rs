@@ -8,7 +8,8 @@
 #![cfg(target_os = "macos")]
 
 use arkdeck_hoststore::{
-    AnalyzerProfile, ArtifactReadStore, JobAdmitter, JobPlanner, JobRunner, JobStore,
+    AnalyzerProfile, ArtifactReadStore, JobAdmitter, JobPlanner, JobResultReader, JobRunner,
+    JobStore,
 };
 use arkdeck_platform::{HostSqlite, SqliteValue as Sql};
 use serde_json::{Map, Value, json};
@@ -240,19 +241,60 @@ fn rust_runs_reproduce_the_swift_oracle() {
         }
     }
     assert!(differences.is_empty(), "{}", differences.join("\n"));
-    // The Rust reader projects each Rust-run Job exactly as Swift reads its own.
-    let reads: Value =
-        serde_json::from_slice(&fs::read(fixture().join("reads.json")).unwrap()).unwrap();
-    for (job, answers) in reads.as_object().unwrap() {
-        for method in ["job.status", "job.show"] {
-            let params = Map::from_iter([("jobId".into(), json!(job))]);
-            assert_eq!(answers[method]["ok"], true, "{job} {method}");
-            assert_eq!(
-                jobs.handle_resource(method, &params).unwrap(),
-                answers[method]["result"],
-                "{job} {method}"
-            );
+    // The Rust readers answer every read Swift recorded exactly as Swift did:
+    // each Rust-run Job's status, details, result and evidence, every Job read
+    // of an absent Job, and the result and evidence reads of open options.
+    {
+        let reader = JobResultReader {
+            jobs: &jobs,
+            artifacts: &artifacts,
+        };
+        let answer = |method: &str, params: &Map<String, Value>| -> Value {
+            let outcome = if matches!(method, "job.result" | "job.evidence") {
+                reader.handle(method, params)
+            } else {
+                jobs.handle_resource(method, params)
+            };
+            match outcome {
+                Ok(result) => json!({"ok": true, "result": result}),
+                Err(error) => {
+                    let mut body = json!({"code": error.code, "message": error.message});
+                    if let Some(details) = error.details {
+                        body["details"] = Value::Object(details);
+                    }
+                    json!({"ok": false, "error": body})
+                }
+            }
+        };
+        let reads: Value =
+            serde_json::from_slice(&fs::read(fixture().join("reads.json")).unwrap()).unwrap();
+        let mut differences = Vec::new();
+        for (job, answers) in reads.as_object().unwrap() {
+            for (method, recorded) in answers.as_object().unwrap() {
+                let actual = answer(method, &Map::from_iter([("jobId".into(), json!(job))]));
+                if &actual != recorded {
+                    differences.push(format!(
+                        "{job} {method}:\n  swift {recorded}\n  rust  {actual}"
+                    ));
+                }
+            }
         }
+        let refused: Vec<Value> =
+            serde_json::from_slice(&fs::read(fixture().join("refused-reads.json")).unwrap())
+                .unwrap();
+        for read in &refused {
+            let actual = answer(
+                read["method"].as_str().unwrap(),
+                read["params"].as_object().unwrap(),
+            );
+            if actual != read["response"] {
+                differences.push(format!(
+                    "{} {}:\n  swift {}\n  rust  {actual}",
+                    read["method"], read["params"], read["response"]
+                ));
+            }
+        }
+        assert!(differences.is_empty(), "{}", differences.join("\n"));
     }
     drop(jobs);
     let recorded: Value =

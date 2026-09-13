@@ -9,18 +9,19 @@ of the same sources at the same path. Both name the run oracle's analyzer
 (rust/tests/fixtures/job-run-analyzer/analyzer), which answers by the first line
 of its source, and each admits the oracle's requests and runs them in the
 oracle's order over its socket; each CLI then runs one succeeding and one
-failing Job. The 30 s production timeout lane is left to the oracle replay,
-which runs it at 2 s.
+failing Job and reads each one's result. The 30 s production timeout lane is
+left to the oracle replay, which runs it at 2 s.
 
 The Swift daemon composes a Session publication writer and the Rust owner does
 not yet, so the comparison removes the publication facts (the `finalized`
 record, the publication marker, the proposal file, the marker's extra record
 version) and checks them separately. Everything else must agree byte for byte
-apart from the clock: every answer, every `job.status`/`job.show`, the Job index
-rows, every Job's journal and record, and every Artifact index and payload.
-Finally the Rust-written store is placed where a standalone Swift daemon keeps
-its own: that daemon reads each Rust-run Job, keeps the parked one parked, and
-reads each Rust-published Artifact back through the Swift CLI.
+apart from the clock: every answer, every `job.status`/`job.show`/`job.result`/
+`job.evidence`, the Job index rows, every Job's journal and record, and every
+Artifact index and payload. Finally the Rust-written store is placed where a
+standalone Swift daemon keeps its own: that daemon reads each Rust-run Job and
+its result as the Rust owner did, keeps the parked one parked, and reads each
+Rust-published Artifact back through the Swift CLI.
 
 The analyzer copy lives outside /private: Swift `FixedExecutableResolver`
 resolves a /private/tmp path to /tmp, which then fails its own physical-path
@@ -239,7 +240,7 @@ def main() -> None:
 
         def drive(endpoint: Path, artifacts: Path, run_cli) -> tuple[dict, dict, dict]:
             """Admit every case, run them in the oracle's order, then let the
-            CLI run one succeeding and one failing Job."""
+            CLI run one succeeding and one failing Job and read their results."""
             jobs = {}
             for case in cases:
                 if 'submit' in case:
@@ -259,11 +260,17 @@ def main() -> None:
                     params = case['params']
                 answers[case['name']] = exchange(endpoint, 'job.run', params)
             reads = {job: {method: exchange(endpoint, method, {'jobId': job})
-                           for method in ('job.status', 'job.show')} for job in jobs.values()}
+                           for method in ('job.status', 'job.show', 'job.result', 'job.evidence')}
+                     for job in jobs.values()}
             ran = {}
-            for name, mode_case, expected in (('cli-answered', 'answered', 0), ('cli-empty', 'emptyResult', 1)):
+            # A failed analyzer Job never publishes its required product, so
+            # its result's evidence needs attention and exits 2, not 1.
+            for name, mode_case, run_exit, result_exit in (('cli-answered', 'answered', 0, 0),
+                                                           ('cli-empty', 'emptyResult', 1, 2)):
                 accepted = exchange(endpoint, 'job.submit', cli_request(name, mode_case))['result']
-                ran[name] = run_cli(accepted['jobId'], expected)['result']
+                ran[name] = run_cli(['job', 'run', '--job', accepted['jobId']], run_exit)['result']
+                ran[f'{name}.result'] = run_cli(['job', 'result', '--job', accepted['jobId']],
+                                                result_exit)['result']
             return answers, reads, ran
 
         try:
@@ -273,8 +280,8 @@ def main() -> None:
             swift = start([str(swift_daemon), '--state-dir', str(state)], clean, swift_socket)
             swift_answers, swift_reads, swift_cli_runs = drive(
                 swift_socket, state / 'artifacts',
-                lambda job, expected: cli([str(swift_cli), 'job', 'run', '--job', job, '--socket',
-                                           str(swift_socket), '--output', 'json'], clean, expected))
+                lambda argv, expected: cli([str(swift_cli), *argv, '--socket', str(swift_socket),
+                                            '--output', 'json'], clean, expected))
             stop(swift)
             swift_store = store(state, state / 'artifacts', base / 'inspect-swift')
             state.rename(base / 'state-swift')
@@ -287,8 +294,7 @@ def main() -> None:
             cli_env = dict(clean, ARKDECK_ENDPOINT=str(rust_socket), ARKDECK_DAEMON_PATH=str(rust_daemon))
             rust_answers, rust_reads, rust_cli_runs = drive(
                 rust_socket, state / 'artifacts',
-                lambda job, expected: cli([str(rust_cli), '--output', 'json', 'job', 'run', '--job', job],
-                                          cli_env, expected))
+                lambda argv, expected: cli([str(rust_cli), '--output', 'json', *argv], cli_env, expected))
             stop(rust)
             rust_store = store(state / 'jobs-state', state / 'artifacts', base / 'inspect-rust')
 
@@ -304,7 +310,10 @@ def main() -> None:
                   {'swift': swift_reads, 'rust': rust_reads})
             check('cli.runs', unpublished(untimed_value(rust_cli_runs)) == unpublished(untimed_value(swift_cli_runs))
                   and rust_cli_runs['cli-answered']['state'] == 'succeeded'
-                  and rust_cli_runs['cli-empty']['state'] == 'failed', (swift_cli_runs, rust_cli_runs))
+                  and rust_cli_runs['cli-empty']['state'] == 'failed'
+                  and rust_cli_runs['cli-answered.result']['evidence']['status'] == 'verified'
+                  and rust_cli_runs['cli-empty.result']['evidence']['status'] == 'artifactIntegrityFailed',
+                  (swift_cli_runs, rust_cli_runs))
             check('store.rows', rust_store['rows'] == swift_store['rows'],
                   {'swift': swift_store['rows'], 'rust': rust_store['rows']})
             check('store.files', rust_store['files'] == swift_store['files'],
@@ -338,6 +347,12 @@ def main() -> None:
                 check(f'handoff.status.{job}', status.get('ok') is True and status['result']['state']
                       == reads['job.status']['result']['state'], status)
                 handed[job] = status['result']['state']
+                # Swift verifies the Rust-published products while it reads
+                # the result the Rust owner answered.
+                result = exchange(swift_socket, 'job.result', {'jobId': job})
+                check(f'handoff.result.{job}', unpublished(untimed_value(result))
+                      == unpublished(untimed_value(reads['job.result'])),
+                      {'swift': result, 'rust': reads['job.result']})
             parked = [job for job, state_name in handed.items() if state_name == 'waitingForRecovery']
             check('handoff.parkedStaysParked', len(parked) == 1, handed)
             read_back = 0
