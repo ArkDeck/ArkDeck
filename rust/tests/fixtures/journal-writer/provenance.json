@@ -1,0 +1,23 @@
+{
+  "files": {
+    "compensation.jsonl": "be4bdee48141011ae846b51b1656ecf8b37d5a0ecbce65cf52f69cd2754b7973",
+    "compensation.replay.json": "136f2d9caf18ccf4f7a5146f9b57155a813becc3c353aad3eb971a7954f9cf4b",
+    "plan-only.jsonl": "6ada4e576372b56461925543576b9c7e6f4c8437f2f99f81faf243c03f83901e",
+    "plan-only.replay.json": "209e8531af8a2b9214e94eb9ffb935c1cedd8adfcf08b2f70889f53cba86b358",
+    "succeeded.jsonl": "fece5d7896eec8856e134f98a981579c4a6c624bb7c91faeaa5bb4115d02a5ec",
+    "succeeded.replay.json": "b5d957c370e05dab136f6032a09bf65a1e3f30d1ea6b708ac6ac8d64c4fe80db",
+    "unknown.jsonl": "2d890af79ae985a67ac3e53aea5bd0364ba2559308de876784e0fdab86104561",
+    "unknown.replay.json": "65b00709c703e4d29835c30d0c43ce609a0d25762ea66d7f18aa884b39f1966e"
+  },
+  "kind": "actual Swift FileDurableJournal output and DurableJournalRecovery facts; synthetic host records, no device or Runtime authority",
+  "producer": "JournalRustWriterParityContractTests/testSwiftJournalWritesTheSharedOracleBytesAndFacts with ARKDECK_RUST_JOURNAL_WRITER_RECORD",
+  "producerSources": {
+    "Packages/ArkDeckKit/Sources/ArkDeckCore/WorkflowStep.swift": "aecdb1f5f6fa5b37e38e9b1e0b4f9d27fbd60448461fae61c75cc53ce2e0fec3",
+    "Packages/ArkDeckKit/Sources/ArkDeckStorage/DurableFiles.swift": "cbad31d1e3612b5fa04b4eeaca324c09506b2a9f19ca7f16d583177bdb687dcb",
+    "Packages/ArkDeckKit/Sources/ArkDeckStorage/JournalEvent.swift": "6b8904107ff7e2cce810015256ffac5dec15218460f7ccb46ad4e0aa2a4c880f",
+    "Packages/ArkDeckKit/Sources/ArkDeckStorage/JournalEventValidation.swift": "7fb2aac5d6ae157ebca4b9ad048ee9bac4bc19707c7b5e4e678d553e83b263eb",
+    "Packages/ArkDeckKit/Sources/ArkDeckStorage/JournalReplay.swift": "62b3f71d7020e315c616c7dcfc2ce4494527abb325fd2ae025f00b1fd85cf20b",
+    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/JournalRustWriterParityContractTests.swift": "d5a01a63e541ccd5b4528f939d10ae0fad5d038180b8408ca8bf7a43067f7809"
+  },
+  "sourceBase": "a102a4aa622e71d565c60883f0b0ea7c0d114e9e"
+}

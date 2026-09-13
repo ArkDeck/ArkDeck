@@ -1,0 +1,26 @@
+{
+  "currentState" : "planned",
+  "eventCount" : 5,
+  "executionAuthority" : "standardAgent",
+  "executionMode" : "planOnly",
+  "finalized" : false,
+  "hasTornTail" : false,
+  "lastConfirmedStepId" : null,
+  "lastDurableSequence" : 4,
+  "lastReconcileOutcomeCertainty" : null,
+  "latestBindingRevision" : null,
+  "outstandingIntents" : [
+
+  ],
+  "pendingAbandonment" : null,
+  "requiredAbandonmentHazards" : [
+
+  ],
+  "requiresRecovery" : false,
+  "requiresUnknownFinalizedOutcome" : false,
+  "resourceReleaseAuthorized" : false,
+  "schemaVersion" : "1.0.0",
+  "unknownOutcomes" : [
+
+  ]
+}
