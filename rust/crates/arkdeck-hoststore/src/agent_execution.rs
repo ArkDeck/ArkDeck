@@ -7,9 +7,12 @@
 //! once the execution owns it and reported back when it ends. The owner also
 //! lists its executions through the snapshot pager it keeps beside them, and
 //! abandons one that owns no Job, which never cancels a Job. An execution
-//! without a target (the observation snapshot and physical assistance) is not
-//! served here, and a record holding physical-assistance actions is not read,
-//! so neither listed nor abandoned.
+//! that waits for a person is read, listed, run again and abandoned as
+//! Swift's owner does: its physical-assistance actions typed and checked as
+//! Swift checks them, the waiting one projected with its resume reference,
+//! and expired once the execution is abandoned or its budget runs out. An
+//! execution without a target is not served here: nothing here observes
+//! devices, raises an action or resumes one.
 
 use crate::format_time::{precise_utc_millis, utc_precise_from_millis};
 use crate::job_record::terminal;
@@ -517,6 +520,180 @@ impl Intent {
     }
 }
 
+const ACTION_KINDS: [&str; 3] = ["connectDevice", "trustDevice", "selectDevice"];
+const ACTION_STATUSES: [&str; 3] = ["waiting", "resolvedByFreshProbe", "expired"];
+
+/// Swift `AgentObservedCandidate`: the exact observation an action names.
+#[derive(Clone, Debug, PartialEq)]
+struct Observed {
+    candidate: String,
+    id: String,
+    generation: u64,
+}
+
+impl Observed {
+    fn decode(value: &Value) -> Option<Self> {
+        let object = value.as_object()?;
+        Some(Self {
+            candidate: object.get("candidate")?.as_str()?.to_owned(),
+            id: object.get("observationID")?.as_str()?.to_owned(),
+            generation: object.get("generation")?.as_u64()?,
+        })
+    }
+
+    fn value(&self) -> Value {
+        json!({"candidate": self.candidate, "generation": self.generation,
+            "observationID": self.id})
+    }
+}
+
+/// Swift `AgentCandidateSelection`: one choice a device selection offers.
+#[derive(Clone, Debug, PartialEq)]
+struct Selection {
+    reference: String,
+    observed: Observed,
+}
+
+/// Swift `RuntimeAgentHumanAction`: the physical assistance an execution
+/// asked a person for, the reference that resumes it and, for a device
+/// selection, the choices it offers.
+#[derive(Clone, Debug)]
+struct HumanAction {
+    id: String,
+    execution: String,
+    resume: String,
+    kind: String,
+    created: String,
+    expires: String,
+    status: String,
+    resolved: Option<String>,
+    observation: Option<Observed>,
+    selections: Vec<Selection>,
+}
+
+impl HumanAction {
+    /// Swift's decoder: its typed members, a member it does not know
+    /// dropped as `Codable` drops it.
+    fn decode(value: &Value) -> Option<Self> {
+        let object = value.as_object()?;
+        let text = |key: &str| object.get(key).and_then(Value::as_str).map(str::to_owned);
+        let kind = text("kind").filter(|kind| ACTION_KINDS.contains(&kind.as_str()))?;
+        let resolved = match object.get("resolvedSelection") {
+            None | Some(Value::Null) => None,
+            Some(Value::String(selection)) => Some(selection.clone()),
+            Some(_) => return None,
+        };
+        let observation = match object.get("observation") {
+            None | Some(Value::Null) => None,
+            Some(value) => Some(Observed::decode(value)?),
+        };
+        let selections = object
+            .get("selections")?
+            .as_array()?
+            .iter()
+            .map(|selection| {
+                Some(Selection {
+                    reference: selection.get("reference")?.as_str()?.to_owned(),
+                    observed: Observed::decode(selection.get("observation")?)?,
+                })
+            })
+            .collect::<Option<Vec<_>>>()?;
+        Some(Self {
+            id: text("actionID")?,
+            execution: text("executionID")?,
+            resume: text("resumeReference")?,
+            kind,
+            created: text("createdAt")?,
+            expires: text("expiresAt")?,
+            status: text("status")?,
+            resolved,
+            observation,
+            selections,
+        })
+    }
+
+    /// The action as Swift's canonical encoder writes it: nil members
+    /// omitted.
+    fn value(&self) -> Value {
+        let mut object = Map::new();
+        object.insert("actionID".into(), json!(self.id));
+        object.insert("createdAt".into(), json!(self.created));
+        object.insert("executionID".into(), json!(self.execution));
+        object.insert("expiresAt".into(), json!(self.expires));
+        object.insert("kind".into(), json!(self.kind));
+        if let Some(observation) = &self.observation {
+            object.insert("observation".into(), observation.value());
+        }
+        if let Some(selection) = &self.resolved {
+            object.insert("resolvedSelection".into(), json!(selection));
+        }
+        object.insert("resumeReference".into(), json!(self.resume));
+        object.insert(
+            "selections".into(),
+            self.selections
+                .iter()
+                .map(|selection| {
+                    json!({"observation": selection.observed.value(),
+                        "reference": selection.reference})
+                })
+                .collect(),
+        );
+        object.insert("status".into(), json!(self.status));
+        Value::Object(object)
+    }
+
+    /// Swift `AgentPhysicalActionKind`: the category, the reason and the
+    /// least a person must do.
+    fn contract(&self) -> (&'static str, &'static str, &'static str) {
+        match self.kind.as_str() {
+            "connectDevice" => (
+                "physicalConnection",
+                "device.notObserved",
+                "human.connectOrPowerDevice",
+            ),
+            "trustDevice" => (
+                "deviceTrustPrompt",
+                "device.trustPending",
+                "human.acceptDeviceTrustPrompt",
+            ),
+            _ => (
+                "ambiguousIdentity",
+                "device.identityAmbiguous",
+                "human.confirmDeviceIdentity",
+            ),
+        }
+    }
+
+    /// Swift `RuntimeAgentHumanAction.projection`.
+    fn projection(&self) -> Value {
+        let (category, reason, minimum) = self.contract();
+        let schema = if self.selections.is_empty() {
+            Value::Null
+        } else {
+            json!({"type": "string", "enum": self.selections.iter()
+                .map(|selection| &selection.reference).collect::<Vec<_>>()})
+        };
+        json!({
+            "schemaVersion": "arkdeck.human-action/1", "actionId": self.id,
+            "owner": {"kind": "agentExecution", "id": self.execution},
+            "resumeReference": self.resume, "category": category, "reasonCode": reason,
+            "minimumAction": minimum, "createdAt": self.created, "expiresAt": self.expires,
+            "status": self.status, "newDispatchCount": 0, "selectionSchema": schema,
+            "choices": self.selections.iter().map(|selection| json!({
+                "value": selection.reference, "candidateKey": selection.observed.candidate,
+            })).collect::<Vec<_>>(),
+        })
+    }
+
+    /// Swift `RuntimeAgentHumanAction.nextAction`.
+    fn next_action(&self) -> Value {
+        let (_, reason, _) = self.contract();
+        json!({"kind": "humanAction", "owner": {"kind": "agentExecution", "id": self.execution},
+            "resource": {"kind": "humanAction", "id": self.id}, "reasonCode": reason,
+            "resumeReference": self.resume, "expiresAt": self.expires})
+    }
+}
+
 /// Swift `RuntimeAgentExecutionRecord`.
 #[derive(Clone, Debug)]
 struct Record {
@@ -534,7 +711,7 @@ struct Record {
     job_state: Option<String>,
     unknown: bool,
     failure_code: Option<String>,
-    actions: Vec<Value>,
+    actions: Vec<HumanAction>,
 }
 
 impl Record {
@@ -542,7 +719,10 @@ impl Record {
     /// omitted, the prepared request as base64.
     fn value(&self) -> Value {
         let mut object = Map::new();
-        object.insert("actions".into(), Value::Array(self.actions.clone()));
+        object.insert(
+            "actions".into(),
+            self.actions.iter().map(HumanAction::value).collect(),
+        );
         object.insert("catalogDigest".into(), json!(self.catalog));
         object.insert("createdAt".into(), json!(self.created));
         object.insert("deadline".into(), json!(self.deadline));
@@ -624,9 +804,87 @@ impl Record {
             job_state: optional("jobState")?,
             unknown: object.get("outcomeUnknown")?.as_bool()?,
             failure_code: optional("failureCode")?,
-            actions: object.get("actions")?.as_array()?.clone(),
+            actions: object
+                .get("actions")?
+                .as_array()?
+                .iter()
+                .map(HumanAction::decode)
+                .collect::<Option<Vec<_>>>()?,
         };
         record.valid().then_some(record)
+    }
+
+    /// Swift `waitingAction`: the last action, while it waits.
+    fn waiting(&self) -> Option<&HumanAction> {
+        self.actions
+            .last()
+            .filter(|action| action.status == "waiting")
+    }
+
+    /// Swift `expireWaitingActions`.
+    fn expire_waiting(&mut self) {
+        for action in &mut self.actions {
+            if action.status == "waiting" {
+                action.status = "expired".into();
+            }
+        }
+    }
+
+    /// Swift `validate`'s actions: at most 128, owned by this execution, at
+    /// most one waiting and waiting exactly while the execution does, unique
+    /// identities and resume references, each inside the execution's life and
+    /// deadline, and choices only for a device selection, which names no
+    /// single observation.
+    fn actions_valid(&self, created: u64, observed: u64) -> bool {
+        let identities: BTreeSet<&str> = self
+            .actions
+            .iter()
+            .map(|action| action.id.as_str())
+            .collect();
+        let references: BTreeSet<&str> = self
+            .actions
+            .iter()
+            .map(|action| action.resume.as_str())
+            .collect();
+        self.actions.len() <= 128
+            && self.actions.iter().all(|action| {
+                action.execution == self.intent.execution
+                    && ACTION_STATUSES.contains(&action.status.as_str())
+            })
+            && self
+                .actions
+                .iter()
+                .filter(|action| action.status == "waiting")
+                .count()
+                <= 1
+            && (self.state == "waitingForHuman") == self.waiting().is_some()
+            && identities.len() == self.actions.len()
+            && references.len() == self.actions.len()
+            && self.actions.iter().all(|action| {
+                let choices: BTreeSet<&str> = action
+                    .selections
+                    .iter()
+                    .map(|selection| selection.reference.as_str())
+                    .collect();
+                let kind_holds = if action.kind == "selectDevice" {
+                    action.observation.is_none() && !action.selections.is_empty()
+                } else {
+                    action.selections.is_empty() && action.resolved.is_none()
+                };
+                valid_identifier(&action.id)
+                    && valid_identifier(&action.resume)
+                    && precise_utc_millis(&action.created)
+                        .is_some_and(|at| at >= created && at <= observed)
+                    && action.expires == self.deadline
+                    && action.selections.len() <= 1000
+                    && choices.len() == action.selections.len()
+                    && kind_holds
+                    && action
+                        .resolved
+                        .as_deref()
+                        .is_none_or(|selection| choices.contains(selection))
+                    && choices.iter().all(|reference| valid_identifier(reference))
+            })
     }
 
     fn valid(&self) -> bool {
@@ -642,19 +900,14 @@ impl Record {
             && observed >= created
             && deadline.checked_sub(created) == u64::try_from(self.intent.budget).ok()
             && STATES.contains(&self.state.as_str())
-            // Physical assistance is not read by the Rust Runtime yet.
-            && self.actions.is_empty()
-            && self.state != "waitingForHuman"
+            && self.actions_valid(created, observed)
             && (self.state != "creatingJob" || self.submission.is_some())
             && (self.state != "abandoned" || self.job.is_none())
             && (self.job.is_none() || self.submission.is_some())
             && self.job.as_deref().is_none_or(valid_identifier)
-            && self
-                .target
-                .as_ref()
-                .is_none_or(|(target, revision)| {
-                    valid_identifier(target) && revision.is_none_or(|revision| revision > 0)
-                })
+            && self.target.as_ref().is_none_or(|(target, revision)| {
+                valid_identifier(target) && revision.is_none_or(|revision| revision > 0)
+            })
             && self
                 .submission
                 .as_ref()
@@ -706,7 +959,10 @@ impl Record {
     fn projection(&self) -> Value {
         let id = &self.intent.execution;
         let completed = self.state == "completed";
-        let next = if let Some(job) = &self.job {
+        let waiting = self.waiting();
+        let next = if let Some(action) = waiting.filter(|_| self.state == "waitingForHuman") {
+            action.next_action()
+        } else if let Some(job) = &self.job {
             let kind = if self.unknown {
                 "reconcile"
             } else if completed {
@@ -737,7 +993,8 @@ impl Record {
             "targetId": self.target.as_ref().map(|(target, _)| target),
             "bindingRevision": self.target.as_ref().and_then(|(_, revision)| *revision),
             "jobId": self.job, "jobState": self.job_state, "outcomeUnknown": self.unknown,
-            "failureCode": self.failure_code, "humanAction": null, "nextAction": next,
+            "failureCode": self.failure_code,
+            "humanAction": waiting.map(HumanAction::projection), "nextAction": next,
         })
     }
 }
@@ -1032,6 +1289,7 @@ impl AgentExecutionStore {
                 }
                 .into();
                 record.failure_code = Some(error.code.clone());
+                record.expire_waiting();
                 self.commit(record)?;
                 Err(error)
             }
@@ -1143,6 +1401,16 @@ impl AgentExecutionStore {
         if TERMINAL.contains(&record.state.as_str()) || record.state == "jobOwned" {
             return Ok(AgentAnswer {
                 value: self.status(&id, engine)?,
+                start: None,
+            });
+        }
+        if record.state == "waitingForHuman" {
+            // Running it again is not a resume: the budget is read, and the
+            // execution answers as it waits.
+            let mut record = record;
+            self.observe_budget(&mut record, engine.now)?;
+            return Ok(AgentAnswer {
+                value: record.projection(),
                 start: None,
             });
         }
@@ -1565,6 +1833,7 @@ impl AgentExecutionStore {
         }
         if !TERMINAL.contains(&record.state.as_str()) {
             record.state = "abandoned".into();
+            record.expire_waiting();
             self.commit(&mut record)?;
         }
         Ok(record.projection())
@@ -1696,5 +1965,125 @@ mod tests {
             }
             assert_eq!(intent(fields).unwrap_err().code, code);
         }
+    }
+
+    /// The Swift physical-assistance oracle's execution records
+    /// (`rust/tests/fixtures/agent-human-action`).
+    const CONNECT: &str = include_str!(
+        "../../../tests/fixtures/agent-human-action/agent-executions/execution-a5413dfa3f543ece541da5ac39e28bd399708adaa4524a3f3e74d44129373b27.json"
+    );
+    const TRUST: &str = include_str!(
+        "../../../tests/fixtures/agent-human-action/agent-executions/execution-9be87d0b82afa6b6f432df5cd89bb755326fea7489acf981de9d32401698e564.json"
+    );
+    const AMBIGUOUS: &str = include_str!(
+        "../../../tests/fixtures/agent-human-action/agent-executions/execution-f2c43a6fa56aac7e64e76e036fd10bb45bb28d77d51013efca02783d6f3d8526.json"
+    );
+    const UNPROVEN: &str = include_str!(
+        "../../../tests/fixtures/agent-human-action/agent-executions/execution-458317a2eb34654f014beb0284270b42c104c4182c7079c4f6b6f30ec4487fc9.json"
+    );
+
+    /// The oracle's text with each identity it labelled (`<har-2>`) read as
+    /// a valid one of its kind (`har-00000000-0000-4000-8000-000000000002`).
+    fn unlabelled(text: &str) -> String {
+        let mut out = String::new();
+        let mut rest = text;
+        while let Some(at) = rest.find('<') {
+            out.push_str(&rest[..at]);
+            let tail = &rest[at + 1..];
+            let label = ["har", "resume", "candidate", "obs"]
+                .iter()
+                .find_map(|kind| {
+                    let digits = tail.strip_prefix(kind)?.strip_prefix('-')?;
+                    let end = digits.find('>')?;
+                    let number: u64 = digits[..end].parse().ok()?;
+                    Some((
+                        format!("{kind}-00000000-0000-4000-8000-{number:012}"),
+                        kind.len() + end + 2,
+                    ))
+                });
+            match label {
+                Some((identity, used)) => {
+                    out.push_str(&identity);
+                    rest = &tail[used..];
+                }
+                None => {
+                    out.push('<');
+                    rest = tail;
+                }
+            }
+        }
+        out + rest
+    }
+
+    fn record(text: &str) -> Record {
+        Record::decode(unlabelled(text).as_bytes()).expect("Swift's record reads")
+    }
+
+    #[test]
+    fn swift_physical_assistance_records_round_trip_byte_for_byte() {
+        for text in [CONNECT, TRUST, AMBIGUOUS, UNPROVEN] {
+            let bytes = session_json::encode(&record(text).value()).unwrap();
+            assert_eq!(String::from_utf8(bytes).unwrap(), unlabelled(text));
+        }
+    }
+
+    #[test]
+    fn waiting_and_abandoned_executions_project_as_swift_answered() {
+        let cases: Value = serde_json::from_str(&unlabelled(include_str!(
+            "../../../tests/fixtures/agent-human-action/cases.json"
+        )))
+        .unwrap();
+        let answer = |name: &str| {
+            cases["exchanges"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|exchange| exchange["name"] == name)
+                .unwrap()["answer"]["result"]
+                .clone()
+        };
+        assert_eq!(record(AMBIGUOUS).projection(), answer("ambiguous.run"));
+        assert_eq!(record(TRUST).projection(), answer("trust.abandon"));
+        // A resolved action is no longer projected; the Job is read next.
+        let connect = record(CONNECT).projection();
+        assert_eq!(connect["humanAction"], Value::Null);
+        assert_eq!(connect["nextAction"]["kind"], "readResult");
+    }
+
+    #[test]
+    fn actions_swift_would_not_read_are_refused() {
+        let waiting: Value = serde_json::from_str(&unlabelled(AMBIGUOUS)).unwrap();
+        let refused = |change: &dyn Fn(&mut Value)| {
+            let mut value = waiting.clone();
+            change(&mut value);
+            Record::decode(&serde_json::to_vec(&value).unwrap()).is_none()
+        };
+        assert!(!refused(&|_| ()));
+        // A waiting action while the execution does not wait.
+        assert!(refused(&|value| value["state"] = json!("orchestrating")));
+        // An action past the execution's deadline.
+        assert!(refused(&|value| {
+            value["actions"][0]["expiresAt"] = json!("2026-09-14T00:06:00.000Z")
+        }));
+        // A device selection that names one observation.
+        assert!(refused(&|value| {
+            value["actions"][0]["observation"] =
+                value["actions"][0]["selections"][0]["observation"].clone()
+        }));
+        // Two waiting actions.
+        assert!(refused(&|value| {
+            let action = value["actions"][0].clone();
+            value["actions"].as_array_mut().unwrap().push(action);
+        }));
+        // A kind Swift does not publish.
+        assert!(refused(
+            &|value| value["actions"][0]["kind"] = json!("rebootDevice")
+        ));
+        // A resolution the action never offered.
+        assert!(refused(&|value| {
+            value["actions"][0]["status"] = json!("resolvedByFreshProbe");
+            value["actions"][0]["resolvedSelection"] = json!("candidate-unknown");
+            value["state"] = json!("orchestrating");
+        }));
     }
 }
