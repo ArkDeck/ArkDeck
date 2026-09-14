@@ -28,10 +28,8 @@ the Job's first call until the harness releases it, `before` heldCall waits
 for that call, and `before` release lets it go and waits until the execution
 record holds the Job's end, as the oracle waits. Where the oracle labels the
 Job state an accepted run read, that state must not be terminal. A request
-naming `<nextCursor of X>` sends the cursor exchange X's page minted. A run
-Swift accepted for an operation the Rust daemon does not run yet is not
-replayed, nor are its reads; the fake's calls must then begin with the
-oracle's.
+naming `<nextCursor of X>` sends the cursor exchange X's page minted. The
+fake must receive the oracle's calls, in order.
 
 The daemon is then restarted over the same root, and every Job's status,
 record, result and evidence, and every execution's status, must read as they
@@ -72,8 +70,6 @@ TIME = re.compile(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z')
 LABELS = {'message', 'manifestSha256', 'snapshotRevision', 'nextCursor'}
 SERVED = {'job.plan', 'job.submit', 'job.run', 'job.result', 'job.evidence', 'artifact.list',
           'agent.run', 'agent.status'}
-# Operations whose Jobs the Rust daemon does not run yet.
-NOT_MATERIALIZED = {'capture.diagnostics@1'}
 TERMINAL = {'planned', 'succeeded', 'recovered', 'failed', 'cancelled', 'interrupted'}
 # An execution that has not yet recorded its Job's end.
 UNSETTLED = {'orchestrating', 'creatingJob', 'jobOwned'}
@@ -108,14 +104,6 @@ def labelled(answer: dict, recorded: dict) -> dict:
 def counted(page: dict) -> dict:
     """A listing's page with its items counted, not listed."""
     return comparable(dict(page, result=dict(page['result'], items=len(page['result']['items']))))
-
-
-def unmaterialized(oracle: dict) -> set[str]:
-    """The runs Swift accepted for an operation the Rust daemon does not run
-    yet; a run refused before its Job is replayed whatever it names."""
-    return {item['name'].split('.')[0] for item in oracle['exchanges']
-            if item['method'] == 'agent.run' and item['answer'].get('ok')
-            and item['params'].get('operation') in NOT_MATERIALIZED}
 
 
 def wait_for(condition, seconds: float, failure: str) -> None:
@@ -224,7 +212,6 @@ def main() -> None:
                        ARKDECK_ENDPOINT=str(endpoint),
                        ARKDECK_DEVELOPMENT_HDC_PATH=str(HDC_ROOT / 'hdc'))
 
-            skipped_runs = unmaterialized(oracle)
             calls = HDC_ROOT / 'hdc-invocations.log'
             daemon_process = start(env, endpoint)
             replayed, answers, held_from = 0, {}, 0
@@ -234,7 +221,7 @@ def main() -> None:
             listed: dict[str, tuple[list, list]] = {}
             for item in oracle['exchanges']:
                 name, method = item['name'], item['method']
-                if method not in SERVED or name.split('.')[0] in skipped_runs:
+                if method not in SERVED:
                     summary['skipped'].append(name)
                     continue
                 params = dict(item['params'])
@@ -282,14 +269,9 @@ def main() -> None:
                     compare(f'{name}: T1 answer', answer, item['answer'])
                 replayed += 1
             recorded, received = (fixture / 'hdc-invocations.log').read_bytes(), calls.read_bytes()
-            if skipped_runs:
-                check('the fake received the oracle\'s calls in order, up to the runs not replayed',
-                      len(received) < len(recorded) and recorded.startswith(received))
-            else:
-                check('the fake received the oracle\'s calls in order', received == recorded)
-            jobs = {run: job for run, job in oracle['jobs'].items() if run not in skipped_runs}
-            executions = {run: execution for run, execution in oracle.get('executions', {}).items()
-                          if run not in skipped_runs}
+            check('the fake received the oracle\'s calls in order', received == recorded)
+            jobs = oracle['jobs']
+            executions = oracle.get('executions', {})
             reads = [(run, method, {'jobId': job}) for run, job in jobs.items() for method in READS]
             reads += [(run, 'agent.status', {'executionId': execution})
                       for run, execution in executions.items()]
@@ -350,7 +332,7 @@ def main() -> None:
                             'a development HDC is configured only for an isolated development root')
             refused_startup(dict(env, ARKDECK_DEVELOPMENT_HDC_PATH='arkdeck-hdc-oracle/hdc'),
                             'ARKDECK_DEVELOPMENT_HDC_PATH must be an explicit absolute path')
-            summary.update(replayed=replayed, checks=len(checks), skippedRuns=sorted(skipped_runs),
+            summary.update(replayed=replayed, checks=len(checks),
                            invocations=hashlib.sha256(received).hexdigest())
         finally:
             # A driver still holding a call leaves once released.

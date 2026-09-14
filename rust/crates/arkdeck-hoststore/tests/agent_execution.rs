@@ -13,12 +13,10 @@
 //! held call. A request naming a cursor names the exchange whose page
 //! minted it.
 //!
-//! The runs of an operation this Runtime does not materialize yet
-//! (`capture.diagnostics@1`) are not replayed, and what they left is not
-//! compared. Everything else must be Swift's: every answer's code, details
-//! and result (a refusal's message is Swift's own wording, reported), each
-//! call the fake received, the Target document, and everything the
-//! executions and Jobs leave, byte for byte.
+//! Both runs are replayed, the observation and the capture. Everything must
+//! be Swift's: every answer's code, details and result (a refusal's message
+//! is Swift's own wording, reported), each call the fake received, the Target
+//! document, and everything the executions and Jobs leave, byte for byte.
 #![cfg(target_os = "macos")]
 
 mod support;
@@ -41,8 +39,6 @@ use support::{OracleProbe, chmod, fixed_now, fixed_precise_now};
 /// `HDCOracleFake`'s fixed root and lock, which the fake's driver names.
 const ROOT: &str = "/private/tmp/arkdeck-hdc-oracle";
 const LOCK: &str = "/private/tmp/arkdeck-hdc-oracle.lock";
-/// Operations whose Jobs this Runtime does not run yet.
-const NOT_MATERIALIZED: [&str; 1] = ["capture.diagnostics@1"];
 const TERMINAL: [&str; 6] = [
     "planned",
     "succeeded",
@@ -165,30 +161,6 @@ fn rust_runs_the_swift_agent_executions() {
     let digest = sha256_hex(&fs::read(root.join("hdc")).unwrap());
     assert_eq!(provenance["hdcSHA256"], digest.as_str());
     let exchanges = cases["exchanges"].as_array().unwrap();
-    // The runs of an operation this Runtime does not run yet, their Jobs and
-    // execution records; a refusal before a Job is replayed whatever it names.
-    let skipped_runs: Vec<String> = cases["executions"]
-        .as_object()
-        .unwrap()
-        .keys()
-        .filter(|run| {
-            exchanges.iter().any(|exchange| {
-                exchange["name"] == format!("{run}.run").as_str()
-                    && NOT_MATERIALIZED.contains(&exchange["params"]["operation"].as_str().unwrap())
-            })
-        })
-        .cloned()
-        .collect();
-    assert_eq!(skipped_runs, ["captured"], "only the capture run waits");
-    let mut skipped: Vec<String> = Vec::new();
-    for run in &skipped_runs {
-        skipped.push(cases["jobs"][run].as_str().unwrap().to_owned());
-        let execution = cases["executions"][run].as_str().unwrap();
-        skipped.push(format!(
-            "execution-{}.json",
-            sha256_hex(execution.as_bytes())
-        ));
-    }
 
     let targets = TargetStore::open(&root.join("targets-state")).unwrap();
     let artifacts = ArtifactReadStore::open(&root.join("artifacts")).unwrap();
@@ -262,12 +234,6 @@ fn rust_runs_the_swift_agent_executions() {
         let mut held_from = 0;
         for exchange in exchanges {
             let name = exchange["name"].as_str().unwrap();
-            if skipped_runs
-                .iter()
-                .any(|run| name.starts_with(&format!("{run}.")))
-            {
-                continue;
-            }
             let method = exchange["method"].as_str().unwrap();
             let mut params = exchange["params"].as_object().unwrap().clone();
             if let Some(mode) = exchange["mode"].as_str() {
@@ -351,23 +317,16 @@ fn rust_runs_the_swift_agent_executions() {
         eprintln!("refusal wording (T2): {note}");
     }
     assert!(differences.is_empty(), "{}", differences.join("\n"));
-    let recorded = fs::read(fixture.join("hdc-invocations.log")).unwrap();
-    let calls = invocations(&root);
-    if skipped.is_empty() {
-        assert_eq!(calls, recorded, "the fake's calls");
-    } else {
-        // The skipped runs come after every run replayed.
-        assert!(
-            calls.len() < recorded.len() && recorded.starts_with(&calls),
-            "the fake's calls:\n{}",
-            String::from_utf8_lossy(&calls)
-        );
-    }
+    assert_eq!(
+        String::from_utf8(invocations(&root)).unwrap(),
+        String::from_utf8(fs::read(fixture.join("hdc-invocations.log")).unwrap()).unwrap(),
+        "the fake's calls"
+    );
     assert_eq!(
         fs::read(root.join("targets-state/targets.json")).unwrap(),
         fs::read(fixture.join("targets-state/targets.json")).unwrap(),
         "the Target document"
     );
     drop(jobs);
-    support::assert_leftovers_except(&fixture, &root, &skipped);
+    support::assert_leftovers(&fixture, &root);
 }

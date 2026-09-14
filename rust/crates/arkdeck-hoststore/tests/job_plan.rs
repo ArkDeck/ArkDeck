@@ -254,16 +254,13 @@ fn rust_refuses_plans_it_cannot_materialize_yet() {
         Map::from_iter([("requestJson".into(), json!(request.to_string()))])
     };
     let refusal = planner
-        .handle(&device_request(
-            "capture.diagnostics",
-            "idem-rust-capture-0001",
-        ))
+        .handle(&device_request("debug.hap", "idem-rust-debug-0001"))
         .unwrap_err();
     assert_eq!(
         (refusal.code, refusal.message.as_str()),
         (
             "rejected",
-            "capture.diagnostics@1 is not materialized by the Rust Runtime yet"
+            "debug.hap@1 is not materialized by the Rust Runtime yet"
         )
     );
     // Swift's daemon without an HDC registration: no provider plans it.

@@ -7,7 +7,7 @@
 use crate::ArtifactReadStore;
 use crate::artifact_read_owner::{LeasedArtifact, swift_string};
 use crate::device_facts::{self, HdcComposition};
-use crate::device_steps;
+use crate::device_steps::{self, ActionRefusal};
 use crate::operation_catalog::{CatalogOperation, InputRefusal};
 use crate::operation_request::OperationRequest;
 use crate::session_json;
@@ -22,7 +22,11 @@ const MAXIMUM_ANALYZER_BYTES: u64 = 128 * 1024 * 1024;
 const MAXIMUM_ANALYZER_INPUT_BYTES: u64 = 512 * 1024 * 1024;
 /// The operations whose plans this Runtime materializes. Every other catalog
 /// operation is refused before its inputs are judged.
-const MATERIALIZED: [&str; 2] = ["analyzer.extract-crash-signature@1", "observe.device@1"];
+const MATERIALIZED: [&str; 3] = [
+    "analyzer.extract-crash-signature@1",
+    "observe.device@1",
+    "capture.diagnostics@1",
+];
 
 /// Swift `AnalyzerProfile` for `crash-signature@1`, the analyzer a host names
 /// with `ARKDECK_ANALYZER_PATH` (Swift daemon composition).
@@ -322,6 +326,14 @@ impl JobPlanner<'_> {
         )
         .map_err(|reason| unmaterialized(format!("failed({})", swift_string(reason))))?;
         self.refuse_debug_permit(request)?;
+        // Swift names a ring-buffered capture's coverage anchor in its
+        // markers; this Runtime does not compose it yet.
+        if request.inputs.get("ringBuffered") == Some(&Value::Bool(true)) {
+            return Err(refusal(
+                "rejected",
+                format!("a ring-buffered {reference} is not materialized by the Rust Runtime yet"),
+            ));
+        }
         let mut steps = Vec::new();
         for step in descriptor
             .steps
@@ -336,10 +348,26 @@ impl JobPlanner<'_> {
                 }));
                 continue;
             }
-            let (Some(action), Some(arguments)) = (
-                device_steps::action(step),
-                device_steps::journal_arguments(step),
-            ) else {
+            let action = match device_steps::action(step, &request.inputs) {
+                Ok(action) => action,
+                Err(ActionRefusal::Unported) => {
+                    return Err(refusal(
+                        "rejected",
+                        format!(
+                            "{} of {reference} is not materialized by the Rust Runtime yet",
+                            step.step_id
+                        ),
+                    ));
+                }
+                Err(ActionRefusal::Invalid(error)) => {
+                    return Err(refusal(
+                        "invalidInput",
+                        format!("typed plan preflight failed before authorization: {error}"),
+                    ));
+                }
+            };
+            let Some(arguments) = device_steps::journal_arguments(step, &request.inputs, &action)
+            else {
                 return Err(internal_failure());
             };
             if action.effect() != step.effect {

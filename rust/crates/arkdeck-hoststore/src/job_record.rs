@@ -492,6 +492,13 @@ impl JobRecord {
             self.first_evidence = Some(at.into());
         }
     }
+    /// Swift `skipReasons`: why an optional step did not run.
+    pub(super) fn set_skip_reason(&mut self, step: &str, reason: &str) {
+        self.skip_reasons.insert(step.into(), reason.into());
+    }
+    pub(super) fn skip_reason(&self, step: &str) -> Option<&str> {
+        self.skip_reasons.get(step).map(String::as_str)
+    }
     /// Swift sets `startedAtUTC` once, when a run first starts.
     pub(super) fn start(&mut self, now: &str) {
         if self.started.is_none() {
