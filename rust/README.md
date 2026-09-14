@@ -1314,8 +1314,8 @@ the shared fake HDC driver (`tests/pointer_input.rs`, `tests/port_forward.rs`).
   exit status alone (`portForwardFailed` with the host port) and the readback as `present`;
   `readback`, `desired_presence`, `conclude` and `reconcile_without_readback` Swift's
   reconciliation table; `persisted` the three `hdc.*PortForward*` intents.
-- `Reconcile` (`readback.rs`) is Swift's `ProviderReconcileOutcome`, shared by every action
-  that pairs a mutation with a readback.
+- Both reuse the native-library provider's `Reconcile` (Swift's `ProviderReconcileOutcome`)
+  for what a readback concludes.
 
 The engine half — the typed plan's preflight at `job.plan`/`job.submit`, the port-rule
 readback gate (`portForwardReadbackMismatch`) and `compensate-port-rule`, the lineage block
