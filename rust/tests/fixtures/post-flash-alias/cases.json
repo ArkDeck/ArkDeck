@@ -1,0 +1,787 @@
+[
+  {
+    "files" : [
+
+    ],
+    "index" : 0,
+    "input" : null,
+    "outcome" : {
+      "loaded" : null
+    },
+    "step" : "load-empty"
+  },
+  {
+    "files" : [
+      {
+        "bytes" : 0,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".rockchip-post-flash-hdc-binding.lock"
+      },
+      {
+        "bytes" : 512,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "rockchip-post-flash-hdc-binding.json"
+      }
+    ],
+    "index" : 1,
+    "input" : {
+      "candidate" : {
+        "bindingRevision" : 3,
+        "buildVersion" : "OpenHarmony-7.0.0.36",
+        "establishedAtUTC" : "2026-08-14T08:09:51Z",
+        "hdcConnectKey" : "old-key",
+        "hdcIdentitySHA256" : "762c08fc17a1cc5f00d248f8b50f2f2f4d17ff2934ac31e64deacb3f5bb3f2ec",
+        "jobID" : "job-host",
+        "previousHDCIdentitySHA256" : "762c08fc17a1cc5f00d248f8b50f2f2f4d17ff2934ac31e64deacb3f5bb3f2ec",
+        "productModel" : "ohos",
+        "schemaVersion" : "1.0.0",
+        "stableLoaderIdentitySHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "targetID" : "TGT-HOST",
+        "usbTopology" : "42"
+      },
+      "expectedPreviousHDCIdentitySHA256" : "762c08fc17a1cc5f00d248f8b50f2f2f4d17ff2934ac31e64deacb3f5bb3f2ec"
+    },
+    "outcome" : {
+      "published" : {
+        "bindingRevision" : 3,
+        "buildVersion" : "OpenHarmony-7.0.0.36",
+        "establishedAtUTC" : "2026-08-14T08:09:51Z",
+        "hdcConnectKey" : "old-key",
+        "hdcIdentitySHA256" : "762c08fc17a1cc5f00d248f8b50f2f2f4d17ff2934ac31e64deacb3f5bb3f2ec",
+        "jobID" : "job-host",
+        "previousHDCIdentitySHA256" : "762c08fc17a1cc5f00d248f8b50f2f2f4d17ff2934ac31e64deacb3f5bb3f2ec",
+        "productModel" : "ohos",
+        "schemaVersion" : "1.0.0",
+        "stableLoaderIdentitySHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "targetID" : "TGT-HOST",
+        "usbTopology" : "42"
+      }
+    },
+    "step" : "publish-revision-3"
+  },
+  {
+    "files" : [
+      {
+        "bytes" : 0,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".rockchip-post-flash-hdc-binding.lock"
+      },
+      {
+        "bytes" : 512,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "rockchip-post-flash-hdc-binding.json"
+      }
+    ],
+    "index" : 2,
+    "input" : {
+      "candidate" : {
+        "bindingRevision" : 3,
+        "buildVersion" : "OpenHarmony-7.0.0.36",
+        "establishedAtUTC" : "2026-08-14T09:00:00Z",
+        "hdcConnectKey" : "old-key",
+        "hdcIdentitySHA256" : "762c08fc17a1cc5f00d248f8b50f2f2f4d17ff2934ac31e64deacb3f5bb3f2ec",
+        "jobID" : "job-host",
+        "previousHDCIdentitySHA256" : "762c08fc17a1cc5f00d248f8b50f2f2f4d17ff2934ac31e64deacb3f5bb3f2ec",
+        "productModel" : "ohos",
+        "schemaVersion" : "1.0.0",
+        "stableLoaderIdentitySHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "targetID" : "TGT-HOST",
+        "usbTopology" : "42"
+      },
+      "expectedPreviousHDCIdentitySHA256" : "762c08fc17a1cc5f00d248f8b50f2f2f4d17ff2934ac31e64deacb3f5bb3f2ec"
+    },
+    "outcome" : {
+      "published" : {
+        "bindingRevision" : 3,
+        "buildVersion" : "OpenHarmony-7.0.0.36",
+        "establishedAtUTC" : "2026-08-14T08:09:51Z",
+        "hdcConnectKey" : "old-key",
+        "hdcIdentitySHA256" : "762c08fc17a1cc5f00d248f8b50f2f2f4d17ff2934ac31e64deacb3f5bb3f2ec",
+        "jobID" : "job-host",
+        "previousHDCIdentitySHA256" : "762c08fc17a1cc5f00d248f8b50f2f2f4d17ff2934ac31e64deacb3f5bb3f2ec",
+        "productModel" : "ohos",
+        "schemaVersion" : "1.0.0",
+        "stableLoaderIdentitySHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "targetID" : "TGT-HOST",
+        "usbTopology" : "42"
+      }
+    },
+    "step" : "retry-same-proof"
+  },
+  {
+    "files" : [
+      {
+        "bytes" : 0,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".rockchip-post-flash-hdc-binding.lock"
+      },
+      {
+        "bytes" : 512,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "post-flash-superseded-20260814T080951Z.json"
+      },
+      {
+        "bytes" : 512,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "rockchip-post-flash-hdc-binding.json"
+      }
+    ],
+    "index" : 3,
+    "input" : {
+      "candidate" : {
+        "bindingRevision" : 4,
+        "buildVersion" : "OpenHarmony-7.0.0.36",
+        "establishedAtUTC" : "2026-08-18T04:30:00Z",
+        "hdcConnectKey" : "new-key",
+        "hdcIdentitySHA256" : "479a61d5370a0351ad498a8f324e0f9ad50bfafbe4c044ea49cbe3981e8cb573",
+        "jobID" : "job-host",
+        "previousHDCIdentitySHA256" : "479a61d5370a0351ad498a8f324e0f9ad50bfafbe4c044ea49cbe3981e8cb573",
+        "productModel" : "ohos",
+        "schemaVersion" : "1.0.0",
+        "stableLoaderIdentitySHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "targetID" : "TGT-HOST",
+        "usbTopology" : "42"
+      },
+      "expectedPreviousHDCIdentitySHA256" : "479a61d5370a0351ad498a8f324e0f9ad50bfafbe4c044ea49cbe3981e8cb573"
+    },
+    "outcome" : {
+      "published" : {
+        "bindingRevision" : 4,
+        "buildVersion" : "OpenHarmony-7.0.0.36",
+        "establishedAtUTC" : "2026-08-18T04:30:00Z",
+        "hdcConnectKey" : "new-key",
+        "hdcIdentitySHA256" : "479a61d5370a0351ad498a8f324e0f9ad50bfafbe4c044ea49cbe3981e8cb573",
+        "jobID" : "job-host",
+        "previousHDCIdentitySHA256" : "479a61d5370a0351ad498a8f324e0f9ad50bfafbe4c044ea49cbe3981e8cb573",
+        "productModel" : "ohos",
+        "schemaVersion" : "1.0.0",
+        "stableLoaderIdentitySHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "targetID" : "TGT-HOST",
+        "usbTopology" : "42"
+      }
+    },
+    "step" : "advance-revision-4"
+  },
+  {
+    "files" : [
+      {
+        "bytes" : 0,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".rockchip-post-flash-hdc-binding.lock"
+      },
+      {
+        "bytes" : 512,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "post-flash-superseded-20260814T080951Z.json"
+      },
+      {
+        "bytes" : 512,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "rockchip-post-flash-hdc-binding.json"
+      }
+    ],
+    "index" : 4,
+    "input" : {
+      "candidate" : {
+        "bindingRevision" : 3,
+        "buildVersion" : "OpenHarmony-7.0.0.36",
+        "establishedAtUTC" : "2026-08-14T09:00:00Z",
+        "hdcConnectKey" : "old-key",
+        "hdcIdentitySHA256" : "762c08fc17a1cc5f00d248f8b50f2f2f4d17ff2934ac31e64deacb3f5bb3f2ec",
+        "jobID" : "job-host",
+        "previousHDCIdentitySHA256" : "762c08fc17a1cc5f00d248f8b50f2f2f4d17ff2934ac31e64deacb3f5bb3f2ec",
+        "productModel" : "ohos",
+        "schemaVersion" : "1.0.0",
+        "stableLoaderIdentitySHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "targetID" : "TGT-HOST",
+        "usbTopology" : "42"
+      },
+      "expectedPreviousHDCIdentitySHA256" : "762c08fc17a1cc5f00d248f8b50f2f2f4d17ff2934ac31e64deacb3f5bb3f2ec"
+    },
+    "outcome" : {
+      "refused" : "post-flash binding changed before verified alias publication"
+    },
+    "step" : "stale-revision-refused"
+  },
+  {
+    "files" : [
+      {
+        "bytes" : 0,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".rockchip-post-flash-hdc-binding.lock"
+      },
+      {
+        "bytes" : 512,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "post-flash-superseded-20260814T080951Z.json"
+      },
+      {
+        "bytes" : 512,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "rockchip-post-flash-hdc-binding.json"
+      }
+    ],
+    "index" : 5,
+    "input" : {
+      "candidate" : {
+        "bindingRevision" : 4,
+        "buildVersion" : "OpenHarmony-7.0.0.36",
+        "establishedAtUTC" : "2026-08-18T05:00:00Z",
+        "hdcConnectKey" : "new-key",
+        "hdcIdentitySHA256" : "479a61d5370a0351ad498a8f324e0f9ad50bfafbe4c044ea49cbe3981e8cb573",
+        "jobID" : "job-host",
+        "previousHDCIdentitySHA256" : "479a61d5370a0351ad498a8f324e0f9ad50bfafbe4c044ea49cbe3981e8cb573",
+        "productModel" : "ohos",
+        "schemaVersion" : "1.0.0",
+        "stableLoaderIdentitySHA256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "targetID" : "TGT-HOST",
+        "usbTopology" : "42"
+      },
+      "expectedPreviousHDCIdentitySHA256" : "479a61d5370a0351ad498a8f324e0f9ad50bfafbe4c044ea49cbe3981e8cb573"
+    },
+    "outcome" : {
+      "refused" : "post-flash binding changed before verified alias publication"
+    },
+    "step" : "other-loader-refused"
+  },
+  {
+    "files" : [
+      {
+        "bytes" : 0,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".rockchip-post-flash-hdc-binding.lock"
+      },
+      {
+        "bytes" : 512,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "post-flash-superseded-20260814T080951Z.json"
+      },
+      {
+        "bytes" : 514,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "rockchip-post-flash-hdc-binding.json"
+      }
+    ],
+    "index" : 6,
+    "input" : {
+      "candidate" : {
+        "bindingRevision" : 4,
+        "buildVersion" : "OpenHarmony-7.0.0.36",
+        "establishedAtUTC" : "2026-08-19T00:00:00Z",
+        "hdcConnectKey" : "newer-key",
+        "hdcIdentitySHA256" : "07771810711aea0df3d8dfe39283b31b008f67178994a11d896cfe2d831409d7",
+        "jobID" : "job-host",
+        "previousHDCIdentitySHA256" : "479a61d5370a0351ad498a8f324e0f9ad50bfafbe4c044ea49cbe3981e8cb573",
+        "productModel" : "ohos",
+        "schemaVersion" : "1.0.0",
+        "stableLoaderIdentitySHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "targetID" : "TGT-HOST",
+        "usbTopology" : "42"
+      },
+      "expectedPreviousHDCIdentitySHA256" : "479a61d5370a0351ad498a8f324e0f9ad50bfafbe4c044ea49cbe3981e8cb573"
+    },
+    "outcome" : {
+      "published" : {
+        "bindingRevision" : 4,
+        "buildVersion" : "OpenHarmony-7.0.0.36",
+        "establishedAtUTC" : "2026-08-19T00:00:00Z",
+        "hdcConnectKey" : "newer-key",
+        "hdcIdentitySHA256" : "07771810711aea0df3d8dfe39283b31b008f67178994a11d896cfe2d831409d7",
+        "jobID" : "job-host",
+        "previousHDCIdentitySHA256" : "479a61d5370a0351ad498a8f324e0f9ad50bfafbe4c044ea49cbe3981e8cb573",
+        "productModel" : "ohos",
+        "schemaVersion" : "1.0.0",
+        "stableLoaderIdentitySHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "targetID" : "TGT-HOST",
+        "usbTopology" : "42"
+      }
+    },
+    "step" : "rotate-serial-same-revision"
+  },
+  {
+    "files" : [
+      {
+        "bytes" : 0,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".rockchip-post-flash-hdc-binding.lock"
+      },
+      {
+        "bytes" : 512,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "post-flash-superseded-20260814T080951Z.json"
+      },
+      {
+        "bytes" : 514,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "post-flash-superseded-20260819T000000Z.json"
+      },
+      {
+        "bytes" : 514,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "rockchip-post-flash-hdc-binding.json"
+      }
+    ],
+    "index" : 7,
+    "input" : {
+      "nowUTC" : "2026-09-08T08:05:00Z",
+      "observedHDCConnectKey" : "newer-key",
+      "observedHDCIdentitySHA256" : "07771810711aea0df3d8dfe39283b31b008f67178994a11d896cfe2d831409d7",
+      "observedUSBTopology" : "42",
+      "target" : {
+        "adoptedAtUTC" : "2026-09-07T02:20:01Z",
+        "bindingRevision" : 2,
+        "connectKey" : "newer-key",
+        "stablePhysicalIdentitySHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "targetID" : "TGT-HOST",
+        "toolVersion" : "3.2.0f"
+      }
+    },
+    "outcome" : {
+      "reconciled" : {
+        "archivedRevision" : 4,
+        "hdcIdentitySHA256" : "07771810711aea0df3d8dfe39283b31b008f67178994a11d896cfe2d831409d7",
+        "publishedRevision" : 2,
+        "targetID" : "TGT-HOST"
+      }
+    },
+    "step" : "reissue-reconciled"
+  },
+  {
+    "files" : [
+      {
+        "bytes" : 0,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".rockchip-post-flash-hdc-binding.lock"
+      },
+      {
+        "bytes" : 512,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "post-flash-superseded-20260814T080951Z.json"
+      },
+      {
+        "bytes" : 514,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "post-flash-superseded-20260819T000000Z.json"
+      },
+      {
+        "bytes" : 514,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "rockchip-post-flash-hdc-binding.json"
+      }
+    ],
+    "index" : 8,
+    "input" : {
+      "nowUTC" : "2026-09-08T09:00:00Z",
+      "observedHDCConnectKey" : "newer-key",
+      "observedHDCIdentitySHA256" : "07771810711aea0df3d8dfe39283b31b008f67178994a11d896cfe2d831409d7",
+      "observedUSBTopology" : "42",
+      "target" : {
+        "adoptedAtUTC" : "2026-09-07T02:20:01Z",
+        "bindingRevision" : 2,
+        "connectKey" : "newer-key",
+        "stablePhysicalIdentitySHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "targetID" : "TGT-HOST",
+        "toolVersion" : "3.2.0f"
+      }
+    },
+    "outcome" : {
+      "reconciled" : null
+    },
+    "step" : "reissue-repeat-declined"
+  },
+  {
+    "files" : [
+      {
+        "bytes" : 0,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".rockchip-post-flash-hdc-binding.lock"
+      },
+      {
+        "bytes" : 512,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "post-flash-superseded-20260814T080951Z.json"
+      },
+      {
+        "bytes" : 514,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "post-flash-superseded-20260819T000000Z.json"
+      },
+      {
+        "bytes" : 514,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "rockchip-post-flash-hdc-binding.json"
+      }
+    ],
+    "index" : 9,
+    "input" : {
+      "nowUTC" : "2026-09-08T09:30:00Z",
+      "observedHDCConnectKey" : "newer-key",
+      "observedHDCIdentitySHA256" : "07771810711aea0df3d8dfe39283b31b008f67178994a11d896cfe2d831409d7",
+      "observedUSBTopology" : "43",
+      "target" : {
+        "adoptedAtUTC" : "2026-09-07T02:20:01Z",
+        "bindingRevision" : 2,
+        "connectKey" : "newer-key",
+        "stablePhysicalIdentitySHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "targetID" : "TGT-HOST",
+        "toolVersion" : "3.2.0f"
+      }
+    },
+    "outcome" : {
+      "reconciled" : null
+    },
+    "step" : "reissue-disagreement-declined"
+  },
+  {
+    "files" : [
+      {
+        "bytes" : 0,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".rockchip-post-flash-hdc-binding.lock"
+      },
+      {
+        "bytes" : 512,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "post-flash-superseded-20260814T080951Z.json"
+      },
+      {
+        "bytes" : 514,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "post-flash-superseded-20260819T000000Z.json"
+      },
+      {
+        "bytes" : 536,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "post-flash-superseded-20260908T080500Z.json"
+      },
+      {
+        "bytes" : 514,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "rockchip-post-flash-hdc-binding.json"
+      }
+    ],
+    "index" : 10,
+    "input" : {
+      "candidate" : {
+        "bindingRevision" : 3,
+        "buildVersion" : "OpenHarmony-7.0.0.36",
+        "establishedAtUTC" : "2026-09-09T00:00:00Z",
+        "hdcConnectKey" : "next-key",
+        "hdcIdentitySHA256" : "188880c8b7663e5e46652f7cf754855176053d8cb6f7e8c13573bf15de86e952",
+        "jobID" : "job-host",
+        "previousHDCIdentitySHA256" : "07771810711aea0df3d8dfe39283b31b008f67178994a11d896cfe2d831409d7",
+        "productModel" : "ohos",
+        "schemaVersion" : "1.0.0",
+        "stableLoaderIdentitySHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "targetID" : "TGT-HOST",
+        "usbTopology" : "42"
+      },
+      "expectedPreviousHDCIdentitySHA256" : "07771810711aea0df3d8dfe39283b31b008f67178994a11d896cfe2d831409d7",
+      "planted" : {
+        "name" : "post-flash-superseded-20260908T080500Z.json",
+        "record" : {
+          "bindingRevision" : 9,
+          "buildVersion" : "OpenHarmony-7.0.0.35",
+          "establishedAtUTC" : "2026-09-02T07:00:39Z",
+          "hdcConnectKey" : "older-connect-key",
+          "hdcIdentitySHA256" : "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "jobID" : "job-squatter",
+          "previousHDCIdentitySHA256" : "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "productModel" : "ohos",
+          "schemaVersion" : "1.0.0",
+          "stableLoaderIdentitySHA256" : "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "targetID" : "TGT-SQUATTER",
+          "usbTopology" : "18874368"
+        }
+      }
+    },
+    "outcome" : {
+      "refused" : "superseded post-flash binding archive post-flash-superseded-20260908T080500Z.json already holds a different entry"
+    },
+    "step" : "archive-collision-refused"
+  },
+  {
+    "files" : [
+      {
+        "bytes" : 0,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".rockchip-post-flash-hdc-binding.lock"
+      },
+      {
+        "bytes" : 512,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "post-flash-superseded-20260814T080951Z.json"
+      },
+      {
+        "bytes" : 514,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "post-flash-superseded-20260819T000000Z.json"
+      },
+      {
+        "bytes" : 514,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "post-flash-superseded-20260908T080500Z.json"
+      },
+      {
+        "bytes" : 513,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "rockchip-post-flash-hdc-binding.json"
+      }
+    ],
+    "index" : 11,
+    "input" : {
+      "candidate" : {
+        "bindingRevision" : 3,
+        "buildVersion" : "OpenHarmony-7.0.0.36",
+        "establishedAtUTC" : "2026-09-09T00:00:00Z",
+        "hdcConnectKey" : "next-key",
+        "hdcIdentitySHA256" : "188880c8b7663e5e46652f7cf754855176053d8cb6f7e8c13573bf15de86e952",
+        "jobID" : "job-host",
+        "previousHDCIdentitySHA256" : "07771810711aea0df3d8dfe39283b31b008f67178994a11d896cfe2d831409d7",
+        "productModel" : "ohos",
+        "schemaVersion" : "1.0.0",
+        "stableLoaderIdentitySHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "targetID" : "TGT-HOST",
+        "usbTopology" : "42"
+      },
+      "expectedPreviousHDCIdentitySHA256" : "07771810711aea0df3d8dfe39283b31b008f67178994a11d896cfe2d831409d7",
+      "planted" : {
+        "name" : "post-flash-superseded-20260908T080500Z.json",
+        "record" : {
+          "bindingRevision" : 2,
+          "buildVersion" : "OpenHarmony-7.0.0.36",
+          "establishedAtUTC" : "2026-09-08T08:05:00Z",
+          "hdcConnectKey" : "newer-key",
+          "hdcIdentitySHA256" : "07771810711aea0df3d8dfe39283b31b008f67178994a11d896cfe2d831409d7",
+          "jobID" : "job-host",
+          "previousHDCIdentitySHA256" : "07771810711aea0df3d8dfe39283b31b008f67178994a11d896cfe2d831409d7",
+          "productModel" : "ohos",
+          "schemaVersion" : "1.0.0",
+          "stableLoaderIdentitySHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "targetID" : "TGT-HOST",
+          "usbTopology" : "42"
+        }
+      }
+    },
+    "outcome" : {
+      "published" : {
+        "bindingRevision" : 3,
+        "buildVersion" : "OpenHarmony-7.0.0.36",
+        "establishedAtUTC" : "2026-09-09T00:00:00Z",
+        "hdcConnectKey" : "next-key",
+        "hdcIdentitySHA256" : "188880c8b7663e5e46652f7cf754855176053d8cb6f7e8c13573bf15de86e952",
+        "jobID" : "job-host",
+        "previousHDCIdentitySHA256" : "07771810711aea0df3d8dfe39283b31b008f67178994a11d896cfe2d831409d7",
+        "productModel" : "ohos",
+        "schemaVersion" : "1.0.0",
+        "stableLoaderIdentitySHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "targetID" : "TGT-HOST",
+        "usbTopology" : "42"
+      }
+    },
+    "step" : "archive-collision-identical"
+  },
+  {
+    "files" : [
+      {
+        "bytes" : 0,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".rockchip-post-flash-hdc-binding.lock"
+      },
+      {
+        "bytes" : 512,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "post-flash-superseded-20260814T080951Z.json"
+      },
+      {
+        "bytes" : 514,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "post-flash-superseded-20260819T000000Z.json"
+      },
+      {
+        "bytes" : 514,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "post-flash-superseded-20260908T080500Z.json"
+      },
+      {
+        "bytes" : 513,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "rockchip-post-flash-hdc-binding.json"
+      }
+    ],
+    "index" : 12,
+    "input" : {
+      "candidate" : {
+        "bindingRevision" : 3,
+        "buildVersion" : "OpenHarmony-7.0.0.36",
+        "establishedAtUTC" : "2026-09-09T00:00:00Z",
+        "hdcConnectKey" : "next-key",
+        "hdcIdentitySHA256" : "188880c8b7663e5e46652f7cf754855176053d8cb6f7e8c13573bf15de86e952",
+        "jobID" : "job-host",
+        "previousHDCIdentitySHA256" : "07771810711aea0df3d8dfe39283b31b008f67178994a11d896cfe2d831409d7",
+        "productModel" : "ohos",
+        "schemaVersion" : "1.0.0",
+        "stableLoaderIdentitySHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "targetID" : "TGT-HOST",
+        "usbTopology" : "4a"
+      },
+      "expectedPreviousHDCIdentitySHA256" : "07771810711aea0df3d8dfe39283b31b008f67178994a11d896cfe2d831409d7"
+    },
+    "outcome" : {
+      "refused" : "post-flash binding document is invalid"
+    },
+    "step" : "invalid-document-refused"
+  },
+  {
+    "files" : [
+      {
+        "bytes" : 0,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".rockchip-post-flash-hdc-binding.lock"
+      },
+      {
+        "bytes" : 512,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "post-flash-superseded-20260814T080951Z.json"
+      },
+      {
+        "bytes" : 514,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "post-flash-superseded-20260819T000000Z.json"
+      },
+      {
+        "bytes" : 514,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "post-flash-superseded-20260908T080500Z.json"
+      },
+      {
+        "bytes" : 513,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "rockchip-post-flash-hdc-binding.json"
+      }
+    ],
+    "index" : 13,
+    "input" : {
+      "candidate" : {
+        "bindingRevision" : 3,
+        "buildVersion" : "OpenHarmony-7.0.0.36",
+        "establishedAtUTC" : "2026-09-09T00:00:00Z",
+        "hdcConnectKey" : "next-key",
+        "hdcIdentitySHA256" : "188880c8b7663e5e46652f7cf754855176053d8cb6f7e8c13573bf15de86e952",
+        "jobID" : "job-host",
+        "previousHDCIdentitySHA256" : "07771810711aea0df3d8dfe39283b31b008f67178994a11d896cfe2d831409d7",
+        "productModel" : "ohos",
+        "schemaVersion" : "1.0.0",
+        "stableLoaderIdentitySHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "targetID" : "TGT-HOST",
+        "usbTopology" : "42"
+      },
+      "expectedPreviousHDCIdentitySHA256" : "not-a-digest"
+    },
+    "outcome" : {
+      "refused" : "post-flash binding previous alias is invalid"
+    },
+    "step" : "invalid-previous-alias-refused"
+  },
+  {
+    "files" : [
+      {
+        "bytes" : 0,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".rockchip-post-flash-hdc-binding.lock"
+      },
+      {
+        "bytes" : 512,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "post-flash-superseded-20260814T080951Z.json"
+      },
+      {
+        "bytes" : 514,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "post-flash-superseded-20260819T000000Z.json"
+      },
+      {
+        "bytes" : 514,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "post-flash-superseded-20260908T080500Z.json"
+      },
+      {
+        "bytes" : 513,
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "rockchip-post-flash-hdc-binding.json"
+      }
+    ],
+    "index" : 14,
+    "input" : null,
+    "outcome" : {
+      "loaded" : {
+        "bindingRevision" : 3,
+        "buildVersion" : "OpenHarmony-7.0.0.36",
+        "establishedAtUTC" : "2026-09-09T00:00:00Z",
+        "hdcConnectKey" : "next-key",
+        "hdcIdentitySHA256" : "188880c8b7663e5e46652f7cf754855176053d8cb6f7e8c13573bf15de86e952",
+        "jobID" : "job-host",
+        "previousHDCIdentitySHA256" : "07771810711aea0df3d8dfe39283b31b008f67178994a11d896cfe2d831409d7",
+        "productModel" : "ohos",
+        "schemaVersion" : "1.0.0",
+        "stableLoaderIdentitySHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "targetID" : "TGT-HOST",
+        "usbTopology" : "42"
+      }
+    },
+    "step" : "load-final"
+  }
+]
