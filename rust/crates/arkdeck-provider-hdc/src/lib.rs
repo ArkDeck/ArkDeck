@@ -6,12 +6,16 @@
 
 #![forbid(unsafe_code)]
 
+#[cfg(target_os = "macos")]
+mod dispatch;
 mod observation;
 mod operation;
 mod presence;
 mod provider;
 mod semantic;
 
+#[cfg(target_os = "macos")]
+pub use dispatch::{ProcessDispatch, SERVER_PORT_VARIABLE};
 pub use observation::{
     DeviceCandidate, ParseError, ServerCheck, parse_client_version, parse_server_check,
     parse_target_list,
