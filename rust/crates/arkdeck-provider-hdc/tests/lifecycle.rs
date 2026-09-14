@@ -16,12 +16,14 @@ use arkdeck_provider_hdc::{
     PreparedLifecycle, generation,
 };
 use sha2::{Digest, Sha256};
+use std::collections::BTreeSet;
 use std::fs;
 use std::io::ErrorKind;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpListener, TcpStream};
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 /// `KILL_MODE`: 0 acts, 1 exits 23, 2 writes stderr, 3 does nothing.
@@ -205,13 +207,19 @@ fn end_server(tool: &VerifiedTool, endpoint: SocketAddrV4) {
     }
 }
 
+/// A loopback endpoint no other test of this binary was handed: the kernel
+/// may hand the port it just released straight back to the next `bind(0)`,
+/// and the tests run on parallel threads, so a port is issued once and the
+/// listener that found it is released only after it is recorded.
 fn free_endpoint() -> SocketAddrV4 {
-    let port = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))
-        .unwrap()
-        .local_addr()
-        .unwrap()
-        .port();
-    SocketAddrV4::new(Ipv4Addr::LOCALHOST, port)
+    static ISSUED: Mutex<BTreeSet<u16>> = Mutex::new(BTreeSet::new());
+    loop {
+        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        if ISSUED.lock().unwrap().insert(port) {
+            return SocketAddrV4::new(Ipv4Addr::LOCALHOST, port);
+        }
+    }
 }
 
 fn reachable(endpoint: SocketAddrV4) -> bool {

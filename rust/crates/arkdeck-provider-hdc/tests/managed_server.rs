@@ -10,11 +10,13 @@
 use arkdeck_platform::{ServerExit, VerifiedTool};
 use arkdeck_provider_hdc::{ManagedHdcServer, StartBudget, StartFailure};
 use sha2::{Digest, Sha256};
+use std::collections::BTreeSet;
 use std::fs;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpListener, TcpStream};
 use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 use std::process::Command;
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 /// A fake `hdc`: `-s <endpoint> -m` binds the endpoint's port after a
@@ -129,13 +131,19 @@ impl Drop for FakeHdc {
     }
 }
 
+/// A loopback endpoint no other test of this binary was handed: the kernel
+/// may hand the port it just released straight back to the next `bind(0)`,
+/// and the tests run on parallel threads, so a port is issued once and the
+/// listener that found it is released only after it is recorded.
 fn free_endpoint() -> SocketAddrV4 {
-    let port = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))
-        .unwrap()
-        .local_addr()
-        .unwrap()
-        .port();
-    SocketAddrV4::new(Ipv4Addr::LOCALHOST, port)
+    static ISSUED: Mutex<BTreeSet<u16>> = Mutex::new(BTreeSet::new());
+    loop {
+        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        if ISSUED.lock().unwrap().insert(port) {
+            return SocketAddrV4::new(Ipv4Addr::LOCALHOST, port);
+        }
+    }
 }
 
 fn budget(readiness: Duration) -> StartBudget {
@@ -232,8 +240,12 @@ fn a_server_whose_versions_disagree_is_never_ready_and_is_stopped() {
 #[test]
 fn a_listener_of_another_process_never_binds_the_launch() {
     let fake = FakeHdc::compile("foreign", &["NEVER_BIND=1"]);
-    let endpoint = free_endpoint();
-    let foreign = TcpListener::bind(endpoint).unwrap();
+    // The foreign listener keeps the port it was handed: releasing it and
+    // binding again would open a window for another test's server.
+    let foreign = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+    let SocketAddr::V4(endpoint) = foreign.local_addr().unwrap() else {
+        panic!("a loopback v4 listener");
+    };
     let error = ManagedHdcServer::start(&fake.tool, endpoint, budget(Duration::from_secs(10)))
         .err()
         .expect("another process's listener is not this launch");
