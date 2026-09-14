@@ -1,0 +1,7 @@
+[
+  {
+    "kind" : "directory",
+    "mode" : "700",
+    "path" : "agent-executions/snapshots"
+  }
+]

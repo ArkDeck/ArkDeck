@@ -1,0 +1,876 @@
+{
+  "exchanges" : [
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "health" : "current",
+          "observations" : [
+            {
+              "adoptedTargetId" : null,
+              "authorizationState" : "Connected",
+              "bindingRevision" : null,
+              "candidateKey" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "deviceInformation" : null,
+              "displayName" : null,
+              "displayNameGeneration" : "1",
+              "observationContinuity" : "relationProven",
+              "observationId" : "<obs-1>",
+              "observedFacts" : null
+            }
+          ],
+          "observedAtUtc" : "2026-09-14T00:00:00Z",
+          "schemaVersion" : "arkdeck.device-observations/1",
+          "snapshotGeneration" : "1"
+        }
+      },
+      "method" : "device.observations",
+      "mode" : "normal",
+      "name" : "observe",
+      "params" : {
+
+      },
+      "usbRelations" : [
+        {
+          "attachmentId" : 30,
+          "location" : "100",
+          "productId" : 20480,
+          "serial" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "vendorId" : 8711
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidInput",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "candidate, observationId and canonical positive observationGeneration are required"
+        },
+        "ok" : false
+      },
+      "method" : "target.adopt",
+      "name" : "adopt.invalid",
+      "params" : {
+
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidInput",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "candidate, observationId and canonical positive observationGeneration are required"
+        },
+        "ok" : false
+      },
+      "method" : "target.adopt",
+      "name" : "adopt.leadingZero",
+      "params" : {
+        "candidate" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "observationGeneration" : "01",
+        "observationId" : "<obs-1>"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "resourceConflict",
+          "details" : {
+            "candidate" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "newDispatchCount" : 0,
+            "observationGeneration" : "1",
+            "observationId" : "obs-unknown",
+            "phase" : "preAdmission"
+          },
+          "message" : "the exact observation no longer belongs to the current snapshot"
+        },
+        "ok" : false
+      },
+      "method" : "target.adopt",
+      "name" : "adopt.unknown",
+      "params" : {
+        "candidate" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "observationGeneration" : "1",
+        "observationId" : "obs-unknown"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : 1,
+          "observationId" : "<obs-1>",
+          "outcome" : "adopted",
+          "snapshotGeneration" : "1",
+          "targetId" : "TGT-3ba3f5f43b92"
+        }
+      },
+      "method" : "target.adopt",
+      "name" : "adopt",
+      "params" : {
+        "candidate" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "observationGeneration" : "1",
+        "observationId" : "<obs-1>"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : 1,
+          "observationId" : "<obs-1>",
+          "outcome" : "adopted",
+          "snapshotGeneration" : "1",
+          "targetId" : "TGT-3ba3f5f43b92"
+        }
+      },
+      "method" : "target.adopt",
+      "name" : "adopt.again",
+      "params" : {
+        "candidate" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "observationGeneration" : "1",
+        "observationId" : "<obs-1>"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "health" : "current",
+          "observations" : [
+            {
+              "adoptedTargetId" : "TGT-3ba3f5f43b92",
+              "authorizationState" : "Connected",
+              "bindingRevision" : 1,
+              "candidateKey" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "deviceInformation" : null,
+              "displayName" : null,
+              "displayNameGeneration" : "2",
+              "observationContinuity" : "relationProven",
+              "observationId" : "<obs-1>",
+              "observedFacts" : null
+            }
+          ],
+          "observedAtUtc" : "2026-09-14T00:00:00Z",
+          "schemaVersion" : "arkdeck.device-observations/1",
+          "snapshotGeneration" : "2"
+        }
+      },
+      "method" : "device.observations",
+      "name" : "observe.adopted",
+      "params" : {
+
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "binding" : {
+            "adoptedAtUtc" : "2026-09-14T00:00:00Z",
+            "bindingRevision" : 1,
+            "stablePhysicalIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+            "state" : "ready",
+            "toolVersion" : "3.2.0d"
+          },
+          "observedAtUtc" : "2026-09-14T00:00:00Z",
+          "operations" : {
+            "items" : [
+              {
+                "availability" : "unavailable",
+                "reasonCodes" : [
+                  "provider_not_registered"
+                ],
+                "reasons" : [
+                  "provider analyzer is not registered"
+                ],
+                "reference" : "analyzer.analyze-trace@1"
+              },
+              {
+                "availability" : "unavailable",
+                "reasonCodes" : [
+                  "provider_not_registered"
+                ],
+                "reasons" : [
+                  "provider analyzer is not registered"
+                ],
+                "reference" : "analyzer.extract-crash-signature@1"
+              },
+              {
+                "availability" : "unavailable",
+                "reasonCodes" : [
+                  "provider_not_registered"
+                ],
+                "reasons" : [
+                  "provider analyzer is not registered"
+                ],
+                "reference" : "analyzer.summarize-hilog@1"
+              },
+              {
+                "availability" : "unavailable",
+                "reasonCodes" : [
+                  "provider_not_registered"
+                ],
+                "reasons" : [
+                  "provider analyzer is not registered"
+                ],
+                "reference" : "analyzer.summarize-trace@1"
+              },
+              {
+                "availability" : "available",
+                "reasonCodes" : [
+
+                ],
+                "reasons" : [
+
+                ],
+                "reference" : "capture.diagnostics@1"
+              },
+              {
+                "availability" : "available",
+                "reasonCodes" : [
+
+                ],
+                "reasons" : [
+
+                ],
+                "reference" : "capture.screen-sequence@1"
+              },
+              {
+                "availability" : "available",
+                "reasonCodes" : [
+
+                ],
+                "reasons" : [
+
+                ],
+                "reference" : "debug.hap@1"
+              },
+              {
+                "availability" : "available",
+                "reasonCodes" : [
+
+                ],
+                "reasons" : [
+
+                ],
+                "reference" : "debug.template@1"
+              },
+              {
+                "availability" : "available",
+                "reasonCodes" : [
+
+                ],
+                "reasons" : [
+
+                ],
+                "reference" : "deploy.native-library.app-owned@1"
+              },
+              {
+                "availability" : "unavailable",
+                "reasonCodes" : [
+                  "provider_not_registered"
+                ],
+                "reasons" : [
+                  "provider arkforge is not registered"
+                ],
+                "reference" : "flash.dayu200"
+              },
+              {
+                "availability" : "unavailable",
+                "reasonCodes" : [
+                  "provider_not_registered"
+                ],
+                "reasons" : [
+                  "provider arkforge is not registered"
+                ],
+                "reference" : "flash.full-restore@1"
+              },
+              {
+                "availability" : "available",
+                "reasonCodes" : [
+
+                ],
+                "reasons" : [
+
+                ],
+                "reference" : "input.long-press@1"
+              },
+              {
+                "availability" : "available",
+                "reasonCodes" : [
+
+                ],
+                "reasons" : [
+
+                ],
+                "reference" : "input.swipe@1"
+              },
+              {
+                "availability" : "available",
+                "reasonCodes" : [
+
+                ],
+                "reasons" : [
+
+                ],
+                "reference" : "input.tap@1"
+              },
+              {
+                "availability" : "available",
+                "reasonCodes" : [
+
+                ],
+                "reasons" : [
+
+                ],
+                "reference" : "observe.device@1"
+              },
+              {
+                "availability" : "available",
+                "reasonCodes" : [
+
+                ],
+                "reasons" : [
+
+                ],
+                "reference" : "port-forward.create@1"
+              },
+              {
+                "availability" : "available",
+                "reasonCodes" : [
+
+                ],
+                "reasons" : [
+
+                ],
+                "reference" : "port-forward.remove@1"
+              },
+              {
+                "availability" : "unavailable",
+                "reasonCodes" : [
+                  "provider_not_registered"
+                ],
+                "reasons" : [
+                  "provider workspace is not registered"
+                ],
+                "reference" : "workspace.apply-patch@1"
+              },
+              {
+                "availability" : "unavailable",
+                "reasonCodes" : [
+                  "provider_not_registered"
+                ],
+                "reasons" : [
+                  "provider workspace is not registered"
+                ],
+                "reference" : "workspace.build-openharmony@1"
+              },
+              {
+                "availability" : "unavailable",
+                "reasonCodes" : [
+                  "provider_not_registered"
+                ],
+                "reasons" : [
+                  "provider workspace is not registered"
+                ],
+                "reference" : "workspace.create-checkpoint@1"
+              },
+              {
+                "availability" : "unavailable",
+                "reasonCodes" : [
+                  "provider_not_registered"
+                ],
+                "reasons" : [
+                  "provider workspace is not registered"
+                ],
+                "reference" : "workspace.inspect-diff@1"
+              },
+              {
+                "availability" : "unavailable",
+                "reasonCodes" : [
+                  "provider_not_registered"
+                ],
+                "reasons" : [
+                  "provider workspace is not registered"
+                ],
+                "reference" : "workspace.inspect-git-status@1"
+              },
+              {
+                "availability" : "unavailable",
+                "reasonCodes" : [
+                  "provider_not_registered"
+                ],
+                "reasons" : [
+                  "provider workspace is not registered"
+                ],
+                "reference" : "workspace.inspect-source@1"
+              },
+              {
+                "availability" : "unavailable",
+                "reasonCodes" : [
+                  "provider_not_registered"
+                ],
+                "reasons" : [
+                  "provider workspace is not registered"
+                ],
+                "reference" : "workspace.prepare-isolated-copy@1"
+              },
+              {
+                "availability" : "unavailable",
+                "reasonCodes" : [
+                  "provider_not_registered"
+                ],
+                "reasons" : [
+                  "provider workspace is not registered"
+                ],
+                "reference" : "workspace.read-source-range@1"
+              },
+              {
+                "availability" : "unavailable",
+                "reasonCodes" : [
+                  "provider_not_registered"
+                ],
+                "reasons" : [
+                  "provider workspace is not registered"
+                ],
+                "reference" : "workspace.revert-patch@1"
+              },
+              {
+                "availability" : "unavailable",
+                "reasonCodes" : [
+                  "provider_not_registered"
+                ],
+                "reasons" : [
+                  "provider workspace is not registered"
+                ],
+                "reference" : "workspace.run-tests@1"
+              },
+              {
+                "availability" : "unavailable",
+                "reasonCodes" : [
+                  "provider_not_registered"
+                ],
+                "reasons" : [
+                  "provider workspace is not registered"
+                ],
+                "reference" : "workspace.sign-openharmony-hap@1"
+              },
+              {
+                "availability" : "unavailable",
+                "reasonCodes" : [
+                  "provider_not_registered"
+                ],
+                "reasons" : [
+                  "provider workspace is not registered"
+                ],
+                "reference" : "workspace.sweep-isolated-copies@1"
+              },
+              {
+                "availability" : "unavailable",
+                "reasonCodes" : [
+                  "provider_not_registered"
+                ],
+                "reasons" : [
+                  "provider workspace is not registered"
+                ],
+                "reference" : "workspace.symbolize-crash@1"
+              }
+            ],
+            "reason" : "operation availability is computed per host; no target-scoped resolver exists",
+            "reasonCode" : "target_scoped_operation_availability_unavailable",
+            "scope" : "host",
+            "targetResolution" : "unresolved"
+          },
+          "presence" : {
+            "observationHealth" : null,
+            "observedAtUtc" : null,
+            "reason" : "the Runtime has no device observation source configured",
+            "reasonCode" : "device_observation_unavailable",
+            "state" : "unresolved"
+          },
+          "profile" : {
+            "reason" : "no target-to-profile resolver exists; catalog profiles are published but unmatched",
+            "reasonCode" : "profile_resolver_unavailable",
+            "state" : "unresolved"
+          },
+          "targetId" : "TGT-3ba3f5f43b92",
+          "tool" : {
+            "clientVersion" : "3.2.0d",
+            "endpointSource" : "default",
+            "serverVersion" : "3.2.0d",
+            "state" : "ready",
+            "toolSha256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002"
+          }
+        }
+      },
+      "method" : "target.availability",
+      "name" : "availability",
+      "params" : {
+        "targetId" : "TGT-3ba3f5f43b92"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidParams",
+          "message" : "targetId is required"
+        },
+        "ok" : false
+      },
+      "method" : "target.availability",
+      "name" : "availability.missing",
+      "params" : {
+
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "notFound",
+          "message" : "no durable target TGT-000000000000"
+        },
+        "ok" : false
+      },
+      "method" : "target.availability",
+      "name" : "availability.unknown",
+      "params" : {
+        "targetId" : "TGT-000000000000"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : 1,
+          "observationId" : "<obs-1>",
+          "outcome" : "adopted",
+          "snapshotGeneration" : "2",
+          "targetId" : "TGT-3ba3f5f43b92"
+        }
+      },
+      "method" : "target.adopt",
+      "name" : "adopt.readopt",
+      "params" : {
+        "candidate" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "observationGeneration" : "2",
+        "observationId" : "<obs-1>"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "health" : "current",
+          "observations" : [
+            {
+              "adoptedTargetId" : "TGT-3ba3f5f43b92",
+              "authorizationState" : "Unauthorized",
+              "bindingRevision" : 1,
+              "candidateKey" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "deviceInformation" : null,
+              "displayName" : null,
+              "displayNameGeneration" : "4",
+              "observationContinuity" : "relationProven",
+              "observationId" : "<obs-1>",
+              "observedFacts" : null
+            }
+          ],
+          "observedAtUtc" : "2026-09-14T00:00:00Z",
+          "schemaVersion" : "arkdeck.device-observations/1",
+          "snapshotGeneration" : "4"
+        }
+      },
+      "method" : "device.observations",
+      "mode" : "unauthorized",
+      "name" : "observe.unauthorized",
+      "params" : {
+
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "resourceConflict",
+          "details" : {
+            "candidate" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "newDispatchCount" : 0,
+            "observationGeneration" : "3",
+            "observationId" : "<obs-1>",
+            "phase" : "preAdmission"
+          },
+          "message" : "the exact observation no longer belongs to the current snapshot"
+        },
+        "ok" : false
+      },
+      "method" : "target.adopt",
+      "name" : "adopt.stale",
+      "params" : {
+        "candidate" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "observationGeneration" : "3",
+        "observationId" : "<obs-1>"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "targetTrustPending",
+          "details" : {
+            "candidate" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "newDispatchCount" : 0,
+            "observationGeneration" : "4",
+            "observationId" : "<obs-1>",
+            "phase" : "preAdmission"
+          },
+          "message" : "the exact observed candidate is not authorized and connected"
+        },
+        "ok" : false
+      },
+      "method" : "target.adopt",
+      "name" : "adopt.unauthorized",
+      "params" : {
+        "candidate" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "observationGeneration" : "4",
+        "observationId" : "<obs-1>"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "health" : "current",
+          "observations" : [
+            {
+              "adoptedTargetId" : null,
+              "authorizationState" : "Connected",
+              "bindingRevision" : null,
+              "candidateKey" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "deviceInformation" : null,
+              "displayName" : null,
+              "displayNameGeneration" : "5",
+              "observationContinuity" : "generationScoped",
+              "observationId" : "<obs-2>",
+              "observedFacts" : null
+            }
+          ],
+          "observedAtUtc" : "2026-09-14T00:00:00Z",
+          "schemaVersion" : "arkdeck.device-observations/1",
+          "snapshotGeneration" : "5"
+        }
+      },
+      "method" : "device.observations",
+      "mode" : "normal",
+      "name" : "observe.unrelated",
+      "params" : {
+
+      },
+      "usbRelations" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "admissionDenied",
+          "details" : {
+            "candidate" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "newDispatchCount" : 0,
+            "observationGeneration" : "5",
+            "observationId" : "<obs-2>",
+            "phase" : "preAdmission"
+          },
+          "message" : "this observation has no independently proved physical relation"
+        },
+        "ok" : false
+      },
+      "method" : "target.adopt",
+      "name" : "adopt.unrelated",
+      "params" : {
+        "candidate" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "observationGeneration" : "5",
+        "observationId" : "<obs-2>"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "health" : "current",
+          "observations" : [
+            {
+              "adoptedTargetId" : "TGT-3ba3f5f43b92",
+              "authorizationState" : "Connected",
+              "bindingRevision" : 1,
+              "candidateKey" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "deviceInformation" : null,
+              "displayName" : null,
+              "displayNameGeneration" : "6",
+              "observationContinuity" : "relationProven",
+              "observationId" : "<obs-3>",
+              "observedFacts" : null
+            }
+          ],
+          "observedAtUtc" : "2026-09-14T00:00:00Z",
+          "schemaVersion" : "arkdeck.device-observations/1",
+          "snapshotGeneration" : "6"
+        }
+      },
+      "method" : "device.observations",
+      "name" : "observe.replugged",
+      "params" : {
+
+      },
+      "usbRelations" : [
+        {
+          "attachmentId" : 31,
+          "location" : "100",
+          "productId" : 20480,
+          "serial" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "vendorId" : 8711
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "factsDrifted",
+          "details" : {
+            "candidate" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "newDispatchCount" : 0,
+            "observationGeneration" : "6",
+            "observationId" : "<obs-3>",
+            "phase" : "preAdmission"
+          },
+          "message" : "physical identity changed during adoption readback"
+        },
+        "ok" : false
+      },
+      "method" : "target.adopt",
+      "name" : "adopt.drift",
+      "params" : {
+        "candidate" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "observationGeneration" : "6",
+        "observationId" : "<obs-3>"
+      },
+      "usbRelations" : [
+        {
+          "attachmentId" : 31,
+          "location" : "100",
+          "productId" : 20480,
+          "serial" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "vendorId" : 8711
+        }
+      ],
+      "usbRelationsAfter" : {
+        "reads" : 2,
+        "relations" : [
+          {
+            "attachmentId" : 32,
+            "location" : "100",
+            "productId" : 20480,
+            "serial" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "vendorId" : 8711
+          }
+        ]
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "health" : "current",
+          "observations" : [
+            {
+              "adoptedTargetId" : "TGT-3ba3f5f43b92",
+              "authorizationState" : "Connected",
+              "bindingRevision" : 1,
+              "candidateKey" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "deviceInformation" : null,
+              "displayName" : null,
+              "displayNameGeneration" : "7",
+              "observationContinuity" : "relationProven",
+              "observationId" : "<obs-4>",
+              "observedFacts" : null
+            }
+          ],
+          "observedAtUtc" : "2026-09-14T00:00:00Z",
+          "schemaVersion" : "arkdeck.device-observations/1",
+          "snapshotGeneration" : "7"
+        }
+      },
+      "method" : "device.observations",
+      "name" : "observe.bounded",
+      "params" : {
+
+      },
+      "usbRelations" : [
+        {
+          "attachmentId" : 32,
+          "location" : "100",
+          "productId" : 20480,
+          "serial" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "vendorId" : 8711
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "operationUnavailable",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "device snapshot exceeds its bounds"
+        },
+        "ok" : false
+      },
+      "method" : "target.adopt",
+      "mode" : "tooMany",
+      "name" : "adopt.tooMany",
+      "params" : {
+        "candidate" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "observationGeneration" : "7",
+        "observationId" : "<obs-4>"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "operationUnavailable",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "device snapshot exceeds its bounds"
+        },
+        "ok" : false
+      },
+      "method" : "device.observations",
+      "name" : "observe.tooMany",
+      "params" : {
+
+      }
+    }
+  ],
+  "hdcRuntimeDiagnostics" : {
+    "clientVersion" : "3.2.0d",
+    "endpoint" : "127.0.0.1:8710",
+    "endpointSource" : "default",
+    "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+    "serverVersion" : "3.2.0d"
+  },
+  "target" : {
+    "bindingRevision" : 1,
+    "connectKey" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "targetId" : "TGT-3ba3f5f43b92",
+    "toolVersion" : "3.2.0d"
+  }
+}
