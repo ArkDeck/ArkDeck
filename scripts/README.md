@@ -15,6 +15,8 @@ TASK-DEC-001(chg-2026-040)交付的一页索引:`scripts/` 下每个一级条目
 | `test_agent_pr_identity.py` | 上述 helper 的离线契约套件(pull-list/identity 矩阵、CLI 读回、commit-task、本 README 覆盖清点) | 无(纯测试) |
 | `check_sdd.py` | SDD 一致性检查器:specs/changes/locks/registry 的 fail-closed 校验 | openspec 布局常量在模块内硬编码(收口不在 DEC-001 范围,台账已记) |
 | `test_check_sdd.py` | 检查器契约套件(TASK-DEC-003 起接入 CI) | 无(纯测试) |
+| `check_union_merge.py` | `.gitattributes` 以 `merge=union` 合并的只追加记录(`openspec/changes/*/tasks.md`、`rust/README.md`)的守卫:重复的记录 bullet/`##` 标题或残留冲突标记即红;`check-sdd.sh` 在 checker 前调用;`--self-test` 自检 | 文件清单在模块内硬编码 |
+| `rebase-union.sh` | 把当前 `agent/**` 分支重挂到 `origin/main`(或 `--onto <base> <old>` 剥离已 squash 合入的前序),并集驱动自动保两边,随后跑上述守卫并打印带旧 SHA 的 `--force-with-lease` 推送命令;不推送 | 无 |
 | `check-sdd.sh` | check-sdd 只读入口:解释器解析(ARKDECK_PYTHON → 本 checkout venv → 主 checkout 共享 venv → PATH),preflight 失败即 fail closed | 解释器覆盖 = `ARKDECK_PYTHON` |
 | `bootstrap-sdd.sh` | 共享 `.venv-sdd` 的一次性人工初始化(check-sdd.sh 永不调用它) | base 解释器覆盖 = `ARKDECK_BOOTSTRAP_PYTHON` |
 | `requirements-sdd.txt` | SDD venv 的依赖 pin(仅 guard job 安装;Agent PR job 零安装,故 `agent_pr_identity.py` 只用 stdlib) | 本文件即 pin |
