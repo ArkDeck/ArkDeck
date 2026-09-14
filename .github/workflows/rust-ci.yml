@@ -8,14 +8,22 @@ on:
 permissions:
   contents: read
 
+# Two jobs, both required through this workflow's result. `policy` runs once
+# the checks whose answer cannot depend on the host: the generated-input and
+# format checks compare repository bytes (autocrlf is off everywhere), the
+# checker's regression tests mock every native stage, cargo-deny resolves the
+# graph for every target (deny.toml names none) and cargo-vet audits the whole
+# lockfile. Over the 1,000 Swift CI runs of 2026-08-22..09-14 none of them
+# failed on one host alone (the generated inputs failed on all three hosts at
+# once in 2 runs, the audits in 2), while repeating them cost the Windows job
+# 1.4 and the macOS job 0.6 of their minutes, and the macOS job is the critical
+# path of Swift CI. `workspace` keeps on every host what can differ between
+# hosts: lint, the workspace tests and the published/candidate contract views,
+# both of which re-verify the generated inputs before they build.
 jobs:
-  workspace:
-    name: Rust workspace (${{ matrix.os }})
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-26, windows-latest]
-    runs-on: ${{ matrix.os }}
+  policy:
+    name: Rust host-independent checks
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     defaults:
       run:
@@ -69,31 +77,9 @@ jobs:
       - name: Fetch the locked dependency graph for all host platforms
         run: cargo fetch --locked
 
-      # The contract steps around these regenerate from the checkout or build
-      # their own source views under rust/target. These two steps are the only
-      # ones that compile and run the checkout itself, so without them a red
-      # workspace reaches main behind a green lane.
-      - name: Lint the workspace, its tests and its examples
-        run: cargo clippy --workspace --all-targets -- -D warnings
-
-      # Wrapped: two `corpus_parity` cases assert the checkout equals its
-      # committed manifest. The wrapper names an edited-but-not-regenerated
-      # input with the regenerate command before the tests run; it never
-      # compares the checkout with origin/main, so a merge elsewhere cannot
-      # turn this branch red. Published-versus-candidate parity is
-      # check-contracts.py below, whose published inputs come from the
-      # merge-base with main.
-      - name: Workspace tests
-        working-directory: .
-        run: python rust/scripts/workspace-tests.py
-
       - name: Contract isolation and provenance regression tests
         working-directory: .
         run: python rust/scripts/test_contract_checks.py
-
-      - name: Published consumer and candidate contract parity
-        working-directory: .
-        run: python rust/scripts/check-contracts.py
 
       # cargo-deny and cargo-vet are the policy checkers, not the workspace,
       # and compiling them from source on every run was the Swift CI critical
@@ -153,6 +139,79 @@ jobs:
 
       - name: Verify checks left locked inputs unchanged
         run: git diff --exit-code -- Cargo.lock supply-chain
+
+  workspace:
+    name: Rust workspace (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-26, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+        working-directory: rust
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - name: Checkout exact revision with runner Git
+        working-directory: .
+        env:
+          ARKDECK_CI_REF: ${{ github.ref }}
+          ARKDECK_CI_SHA: ${{ github.sha }}
+        run: |
+          set -eu
+          git init .
+          # Contract/corpus digests are over repository bytes on every host.
+          git config core.autocrlf false
+          git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
+          git fetch --no-tags --prune origin \
+            "+refs/heads/main:refs/remotes/origin/main" \
+            "+${ARKDECK_CI_REF}:refs/remotes/origin/ci"
+          git checkout --detach refs/remotes/origin/ci
+          test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"
+
+      - name: Set up Python for contract validation
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0 (Node 24)
+        with:
+          python-version: "3.14"
+
+      - name: Install pinned contract validation dependencies
+        run: python -m pip install PyYAML==6.0.3 jsonschema==4.26.0
+
+      - name: Activate workspace toolchain and required components
+        run: |
+          set -eu
+          rustup toolchain install --profile minimal --component rustfmt,clippy --no-self-update
+          rustup show active-toolchain
+          rustc --version
+          cargo --version
+
+      - name: Fetch the locked dependency graph for all host platforms
+        run: cargo fetch --locked
+
+      # The contract steps around these regenerate from the checkout or build
+      # their own source views under rust/target. These two steps are the only
+      # ones that compile and run the checkout itself, so without them a red
+      # workspace reaches main behind a green lane.
+      - name: Lint the workspace, its tests and its examples
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      # Wrapped: two `corpus_parity` cases assert the checkout equals its
+      # committed manifest. The wrapper names an edited-but-not-regenerated
+      # input with the regenerate command before the tests run; it never
+      # compares the checkout with origin/main, so a merge elsewhere cannot
+      # turn this branch red. Published-versus-candidate parity is
+      # check-contracts.py below, whose published inputs come from the
+      # merge-base with main.
+      - name: Workspace tests
+        working-directory: .
+        run: python rust/scripts/workspace-tests.py
+
+      - name: Published consumer and candidate contract parity
+        working-directory: .
+        run: python rust/scripts/check-contracts.py
 
       - name: Preserve actual read-only recordings
         if: always()
