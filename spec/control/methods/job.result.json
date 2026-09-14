@@ -471,50 +471,22 @@
               "type": "boolean"
             },
             "parameters": {
-              "additionalProperties": false,
-              "properties": {
-                "abilityName": {
-                  "type": "string"
-                },
-                "additionalHapArtifactLeases": {
-                  "items": {
-                    "type": "string"
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
                   },
-                  "type": "array"
-                },
-                "bundleName": {
-                  "type": "string"
-                },
-                "captureDiagnostics": {
-                  "type": "boolean"
-                },
-                "cleanupPolicy": {
-                  "type": "string"
-                },
-                "diagnosticsDurationSeconds": {
-                  "type": "integer"
-                },
-                "durationSeconds": {
-                  "type": "integer"
-                },
-                "hapArtifactLease": {
-                  "type": "string"
-                },
-                "installPolicy": {
-                  "type": "string"
-                },
-                "portForwardProfile": {
-                  "type": "string"
-                },
-                "postRunAbilityState": {
-                  "type": "string"
-                },
-                "privateInput": {
-                  "type": "string"
-                },
-                "sourceArtifactRef": {
-                  "type": "string"
-                }
+                  {
+                    "type": [
+                      "boolean",
+                      "integer",
+                      "string"
+                    ]
+                  }
+                ]
               },
               "type": "object"
             },

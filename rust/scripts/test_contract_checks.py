@@ -572,6 +572,7 @@ class SchemaVocabularyTests(unittest.TestCase):
             "not": {"not": schema},
             "unused property": {"type": "object", "properties": {"unused": schema}},
             "items": {"type": "array", "items": schema},
+            "map values": {"type": "object", "additionalProperties": schema},
         }
 
     def test_current_and_new_supported_keyword_shapes(self):
@@ -579,6 +580,7 @@ class SchemaVocabularyTests(unittest.TestCase):
             {}, {"type": "string"}, {"type": ["string", "null"]},
             {"properties": {}}, {"required": []}, {"required": ["", "known"]},
             {"items": {}}, {"additionalProperties": False}, {"additionalProperties": True},
+            {"additionalProperties": {}}, {"additionalProperties": {"type": "string"}},
             {"enum": [None, True, 1, 1.0, {"type": "data"}, ["nested"]]},
             {"anyOf": [{"type": "string"}, {"type": "null"}]},
             {"oneOf": [{"const": 1}, {"const": "one"}]}, {"not": {}},
@@ -604,7 +606,7 @@ class SchemaVocabularyTests(unittest.TestCase):
             "properties": [None, [], "name", {"unused": True}],
             "required": [None, True, "name", [None], ["name", "name"]],
             "items": [None, True, [], "string"],
-            "additionalProperties": [None, 0, 1, [], {}, "false"],
+            "additionalProperties": [None, 0, 1, [], "false", {"type": "unknown"}],
             "enum": [None, False, 1, {}, [], "choice"],
             "anyOf": [None, True, {}, [], "schema", [True], [{}, None]],
             "oneOf": [None, True, {}, [], "schema", [True], [{}, None]],

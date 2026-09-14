@@ -18,8 +18,12 @@ set (a release build never reads the variable), and
 rewrites the schemas and the committed corpus under
 `Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/`.
 Results and error details are closed to the fields the daemon emitted; request
-parameters are closed to the fields a contract test exercised. A field that no
-contract test records is therefore not published, and
+parameters are closed to the fields a contract test exercised. A member keyed
+by caller data (operation input names, Artifact fact names, provenance keys;
+the generator's reviewed `MAP_VALUED_MEMBERS`) is published as a map instead:
+no member names, and an `additionalProperties` schema that admits every
+recorded value. A field that no contract test records is therefore not
+published, and
 `ControlMethodSchemaContractTests` fails when a schema, a corpus frame or a
 freshly recorded run disagrees with the other two, or when a schema carries a
 contract identity other than the build's. The Swift daemon stays the oracle

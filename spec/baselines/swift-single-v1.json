@@ -539,7 +539,7 @@
     "Catalog/profiles": "58ca1d970d40019ba2718646fde81fefda22533c5448e620217582e30f5d648f",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "94115bc886edeb30e9d6a276a4db61a1de9ad8e822abe72f4cfb095dd330fb64",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC": "9ae93642e7b81bcea918469216711d7f6a17135a29cf021556ceef0f2f789196",
-    "spec/control/methods": "599a5a1105e78ae9ef9630310261a016ef02633c8f09d71f25b842de79c9405b"
+    "spec/control/methods": "2cfe71421b1e7ba576584f431806180f7f78bb70971afea2787aaef80ab161ce"
   },
   "files": {
     "Catalog/generated/effect-authorization-matrix.md": {
@@ -1323,8 +1323,8 @@
       "sha256": "bb1b01dd389ac2bdded5a405918f5c27543f1d69d16693d7b62062b31973566d"
     },
     "spec/control/methods/agent.run.json": {
-      "blob": "82be400266d902295447db733c11e4ed16049c8b",
-      "sha256": "0b2195f98f29d8fff2e18df1b535dbe550bab764a9af2d0acb6207bb863c55f8"
+      "blob": "a3069012b6df190f9b883dc0c7032e40bc796220",
+      "sha256": "f69cf055307f25a6953f4a9aed86796970edc7e7fb96c6bfd3b37cedf3d1ebae"
     },
     "spec/control/methods/agent.status.json": {
       "blob": "17df50a9174422863f289f3a7abc2ba95af90b99",
@@ -1383,8 +1383,8 @@
       "sha256": "ca8650826ad76097653c8bc87444c94d809360d7c5f2d4b6c7dcb019056f7fa2"
     },
     "spec/control/methods/capability.inspect.json": {
-      "blob": "5a4ccac5cb7e5e6ef84e7559e687acded547b9f0",
-      "sha256": "38af3e2dfb0febc62139d8aa685f030a4936799afc0b471288c3b5c0a1c8f83c"
+      "blob": "3be39ec9e090ec790d2b41bd0c856832e3d3544c",
+      "sha256": "64889a0fe0505735a3f062c014d19df06006c8171c62bbdeef3a1648275f497e"
     },
     "spec/control/methods/capability.list.json": {
       "blob": "462a750f6d3a5779a9974b8d95e7a79c5b142897",
@@ -1507,32 +1507,32 @@
       "sha256": "5ceaf3ff144981504681d88c2c29c5d12eeb2d7559f2cad0d45d289cb6fae7b4"
     },
     "spec/control/methods/job.evidence.json": {
-      "blob": "c2f816a27f3e379016095fda003fc3b3eb2181ec",
-      "sha256": "ebff337e27867777ac59dea36bb17487caab9e7dd4cf187ac408f793a622d327"
+      "blob": "2ab066ffc2573ffa58fc63d1c4288e885d7acec6",
+      "sha256": "035dabe849b9228ef805bcd58f0151d4eac4c47d1d81042434de990586e315f7"
     },
     "spec/control/methods/job.list.json": {
       "blob": "8109c708a411ce50f85a7ee7c6523e37c9636cb9",
       "sha256": "1c3b65b94a01c3bb658a8c85270eeb297215b9fcfd3839010a377cef8370c234"
     },
     "spec/control/methods/job.plan.json": {
-      "blob": "6e3ea8b2b292113d067377ed14c2ad5a27e6c327",
-      "sha256": "3e78eab4b28a0d51c1f85fd7b342c7638d225862b1b91444df287a85750a1363"
+      "blob": "ec88d14845a3800be643fee751d700ec8a82cc76",
+      "sha256": "c79ecae26044ee6c2926a25523edead74a0bdce41af6bbdfbd46ab80c1d8794a"
     },
     "spec/control/methods/job.reconcile.json": {
       "blob": "f42675066aacbeaf717dba3ff400755bf3d06ae1",
       "sha256": "12b7621e60cdaa058db4c58b8bc01a147040dd1f37dce44e6fee8acb792c49b7"
     },
     "spec/control/methods/job.result.json": {
-      "blob": "d6c3e611c7e3910d18a75f1ac200a961532850a6",
-      "sha256": "7293d3ccb0225ba53d9dafce7172d78a4c7e2d3128f110c0159490d4be02e5a8"
+      "blob": "8a3e6a21e1437f2e5c3fdd135331eae769a919b9",
+      "sha256": "78d90363f2d6d157d65af2637fcdf5dcb5473687bfd3c296c4fd1ce6956167c7"
     },
     "spec/control/methods/job.run.json": {
       "blob": "e04ef2b6f69deee8b35d405951c8f7e8cd47b9c9",
       "sha256": "1b80f1632212dfa568df7ddf1782a2687c7ca7b152a17d4c3c7e0609145f468d"
     },
     "spec/control/methods/job.show.json": {
-      "blob": "9bc67b2f207a7336ea7d52c1cb42525c4d9304a1",
-      "sha256": "e54ea281093a31dcf1456bb5dbc08c2efaaa046840f03cdf5d077c3f5ecc8c01"
+      "blob": "6abc959bb680b1ae459276d48bf144641c66e590",
+      "sha256": "ab5328585c6459512b6fbc7ee8065cbbd06ec99f617efd2bd56f06569301bb3e"
     },
     "spec/control/methods/job.status.json": {
       "blob": "cae6815dc3ea89c184b7b2991d2e8b03c27c0754",
@@ -1731,7 +1731,7 @@
       "sha256": "95367cc3e57160752f7d1d724887ee650adb8d3ccc5d736444517641a5da8e64"
     }
   },
-  "inputDigest": "731b8e031d99a3d66e66e253246b0ac67a71f2d646fa16c0023906d58b6975ac",
+  "inputDigest": "05afe1788a087b415f417f289ffefa349076ad7ba5cbfa2ee0df1338222a4fce",
   "kind": "development",
   "methodCount": 105,
   "protocolVersion": "1.0.0",

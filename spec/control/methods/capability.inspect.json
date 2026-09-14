@@ -41,66 +41,44 @@
               "type": "string"
             },
             "exactArtifactFacts": {
-              "additionalProperties": false,
-              "properties": {
-                "artifactByteCount": {
-                  "type": "string"
-                },
-                "artifactId": {
-                  "type": "string"
-                },
-                "artifactSha256": {
-                  "type": "string"
-                }
+              "additionalProperties": {
+                "type": "string"
               },
-              "required": [
-                "artifactByteCount",
-                "artifactId",
-                "artifactSha256"
-              ],
               "type": "object"
             },
             "exactBindingRevision": {
               "type": "integer"
             },
             "exactInputs": {
-              "additionalProperties": false,
-              "properties": {
-                "deviceProfile": {
-                  "type": "string"
-                },
-                "imageBundleLease": {
-                  "type": "string"
-                },
-                "partitionPlan": {
-                  "additionalProperties": false,
-                  "properties": {
-                    "mode": {
-                      "type": "string"
-                    },
-                    "partitions": {
-                      "items": {
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "mode": {
                         "type": "string"
                       },
-                      "type": "array"
-                    }
+                      "partitions": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      }
+                    },
+                    "required": [
+                      "mode",
+                      "partitions"
+                    ],
+                    "type": "object"
                   },
-                  "required": [
-                    "mode",
-                    "partitions"
-                  ],
-                  "type": "object"
-                },
-                "postFlashVerification": {
-                  "type": "boolean"
-                }
+                  {
+                    "type": [
+                      "boolean",
+                      "string"
+                    ]
+                  }
+                ]
               },
-              "required": [
-                "deviceProfile",
-                "imageBundleLease",
-                "partitionPlan",
-                "postFlashVerification"
-              ],
               "type": "object"
             },
             "exactPlanDigest": {
@@ -110,79 +88,32 @@
               "type": "string"
             },
             "inputConstraints": {
-              "additionalProperties": false,
-              "properties": {
-                "abilityName": {
-                  "additionalProperties": false,
-                  "properties": {
-                    "kind": {
+              "additionalProperties": {
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "type": "string"
+                  },
+                  "maximum": {
+                    "type": "integer"
+                  },
+                  "minimum": {
+                    "type": "integer"
+                  },
+                  "value": {
+                    "type": "string"
+                  },
+                  "values": {
+                    "items": {
                       "type": "string"
                     },
-                    "values": {
-                      "items": {
-                        "type": "string"
-                      },
-                      "type": "array"
-                    }
-                  },
-                  "required": [
-                    "kind",
-                    "values"
-                  ],
-                  "type": "object"
+                    "type": "array"
+                  }
                 },
-                "bundleName": {
-                  "additionalProperties": false,
-                  "properties": {
-                    "kind": {
-                      "type": "string"
-                    },
-                    "value": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "kind",
-                    "value"
-                  ],
-                  "type": "object"
-                },
-                "diagnosticsDurationSeconds": {
-                  "additionalProperties": false,
-                  "properties": {
-                    "kind": {
-                      "type": "string"
-                    },
-                    "maximum": {
-                      "type": "integer"
-                    },
-                    "minimum": {
-                      "type": "integer"
-                    }
-                  },
-                  "required": [
-                    "kind",
-                    "maximum",
-                    "minimum"
-                  ],
-                  "type": "object"
-                },
-                "projectRef": {
-                  "additionalProperties": false,
-                  "properties": {
-                    "kind": {
-                      "type": "string"
-                    },
-                    "value": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "kind",
-                    "value"
-                  ],
-                  "type": "object"
-                }
+                "required": [
+                  "kind"
+                ],
+                "type": "object"
               },
               "type": "object"
             },
@@ -412,7 +343,7 @@
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
     "error": 2,
-    "request": 13,
-    "result": 11
+    "request": 11,
+    "result": 9
   }
 }

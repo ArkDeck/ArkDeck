@@ -76,7 +76,11 @@ rewrites the schemas and selects the committed corpus
 (the smallest frame of every distinct request and response shape). Results and
 error details are closed to the fields the daemon emitted; request parameters
 are closed to the fields a contract test exercised, so a parameter no test
-sends is not published. `ControlMethodSchemaContractTests` holds every corpus
+sends is not published. A member keyed by caller data (operation input names,
+Artifact fact names, provenance keys; the generator's reviewed
+`MAP_VALUED_MEMBERS`) is published as a map instead: no member names, and an
+`additionalProperties` schema that admits every recorded value.
+`ControlMethodSchemaContractTests` holds every corpus
 frame to its schema, requires a schema for exactly the published methods under
 the build's contract identity, and validates a freshly recorded directory when
 the variable is set for the test run itself. A registry change therefore

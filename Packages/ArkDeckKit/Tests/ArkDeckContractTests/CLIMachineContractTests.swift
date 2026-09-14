@@ -826,8 +826,15 @@ enum JSONSchemaSubset {
       for (key, sub) in properties {
         if let present = fields[key], !validate(present, schema: sub, root: root) { return false }
       }
-      if s["additionalProperties"] == .bool(false) {
-        for key in fields.keys where properties[key] == nil { return false }
+      if let additional = s["additionalProperties"] {
+        for (key, member) in fields where properties[key] == nil {
+          switch additional {
+          case .bool(false): return false
+          // A map: one schema for every member value, no member names.
+          case .object: if !validate(member, schema: additional, root: root) { return false }
+          default: break
+          }
+        }
       }
     }
     if case .array(let items) = value, let itemSchema = s["items"] {

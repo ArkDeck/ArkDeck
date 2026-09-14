@@ -214,6 +214,60 @@ final class ControlMethodSchemaContractTests: XCTestCase {
     XCTAssertGreaterThan(checked, 20)
   }
 
+  /// Members keyed by caller data (the generator's `MAP_VALUED_MEMBERS`) are
+  /// published as maps: a key no frame recorded is accepted with a value of a
+  /// recorded type, a value of another type is refused, and the record
+  /// holding the map stays closed.
+  func testMapValuedMembersAcceptUnrecordedKeysWhileTheirRecordsStayClosed() throws {
+    let schemas = try Self.schemas()
+    let frames = try Self.frames(in: Self.corpusDirectory)
+    for (method, map, record) in [
+      ("capability.inspect", ["capability", "exactInputs"], ["capability"]),
+      ("job.show", ["request", "inputs"], ["request"]),
+    ] {
+      var recorded: JSONValue?
+      for (_, _, frame) in frames where frame.method == method && frame.ok {
+        if let result = frame.result, case .object? = Self.value(at: map, in: result) {
+          recorded = result
+          break
+        }
+      }
+      let member = map.joined(separator: ".")
+      guard let schema = schemas[method], let result = recorded else {
+        XCTFail("\(method): no recorded result holds \(member)")
+        continue
+      }
+      let key = map + ["unrecordedKey"]
+      XCTAssertTrue(
+        schema.validates(Self.setting(.string("value"), at: key[...], in: result), as: "result"),
+        "\(method) refused a \(member) key no frame recorded")
+      XCTAssertFalse(
+        schema.validates(Self.setting(.null, at: key[...], in: result), as: "result"),
+        "\(method) accepted a \(member) value of a type no frame recorded")
+      XCTAssertFalse(
+        schema.validates(
+          Self.setting(.bool(true), at: (record + ["unrecordedMember"])[...], in: result), as: "result"),
+        "\(method) accepted an unrecorded \(record.joined(separator: ".")) member")
+    }
+  }
+
+  private static func value(at path: [String], in document: JSONValue) -> JSONValue? {
+    var current = document
+    for key in path {
+      guard case .object(let fields) = current, let next = fields[key] else { return nil }
+      current = next
+    }
+    return current
+  }
+
+  private static func setting(
+    _ value: JSONValue, at path: ArraySlice<String>, in document: JSONValue
+  ) -> JSONValue {
+    guard let key = path.first, case .object(var fields) = document else { return value }
+    fields[key] = setting(value, at: path.dropFirst(), in: fields[key] ?? .null)
+    return .object(fields)
+  }
+
   /// When the test run itself records frames, everything it recorded must
   /// validate: the corpus is a selection, the live recording is the proof.
   func testFramesRecordedByThisRunValidate() throws {

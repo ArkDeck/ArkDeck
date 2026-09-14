@@ -98,6 +98,8 @@ fn validate_schema(schema: &Value) -> Result<(), ContractError> {
             }
             "items" | "not" => validate_schema(constraint)?,
             "additionalProperties" if constraint.is_boolean() => {}
+            // A map: one schema for every member value, no member names.
+            "additionalProperties" => validate_schema(constraint)?,
             "enum"
                 if constraint
                     .as_array()
@@ -270,10 +272,16 @@ fn validate_instance(schema: &Value, value: &Value) -> Result<(), ContractError>
             return Err(failure());
         }
         for (key, value) in fields {
-            if let Some(child) = schema.get("properties").and_then(|p| p.get(key)) {
-                validate_instance(child, value)?;
-            } else if schema.get("additionalProperties") == Some(&Value::Bool(false)) {
-                return Err(failure());
+            match (
+                schema.get("properties").and_then(|p| p.get(key)),
+                schema.get("additionalProperties"),
+            ) {
+                (Some(child), _) => validate_instance(child, value)?,
+                (None, Some(Value::Bool(false))) => return Err(failure()),
+                (None, Some(additional @ Value::Object(_))) => {
+                    validate_instance(additional, value)?;
+                }
+                _ => {}
             }
         }
     }

@@ -321,62 +321,22 @@
         "parameters": {
           "anyOf": [
             {
-              "additionalProperties": false,
-              "properties": {
-                "abilityName": {
-                  "type": "string"
-                },
-                "additionalHapArtifactLeases": {
-                  "items": {
-                    "type": "string"
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
                   },
-                  "type": "array"
-                },
-                "bundleName": {
-                  "type": "string"
-                },
-                "captureDiagnostics": {
-                  "type": "boolean"
-                },
-                "cleanupPolicy": {
-                  "type": "string"
-                },
-                "diagnosticsDurationSeconds": {
-                  "type": "integer"
-                },
-                "displayHeight": {
-                  "type": "integer"
-                },
-                "displayWidth": {
-                  "type": "integer"
-                },
-                "durationSeconds": {
-                  "type": "integer"
-                },
-                "hapArtifactLease": {
-                  "type": "string"
-                },
-                "installPolicy": {
-                  "type": "string"
-                },
-                "portForwardProfile": {
-                  "type": "string"
-                },
-                "postRunAbilityState": {
-                  "type": "string"
-                },
-                "privateInput": {
-                  "type": "string"
-                },
-                "sourceArtifactRef": {
-                  "type": "string"
-                },
-                "x": {
-                  "type": "integer"
-                },
-                "y": {
-                  "type": "integer"
-                }
+                  {
+                    "type": [
+                      "boolean",
+                      "integer",
+                      "string"
+                    ]
+                  }
+                ]
               },
               "type": "object"
             },
@@ -458,7 +418,7 @@
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
     "error": 2,
-    "request": 32,
-    "result": 30
+    "request": 21,
+    "result": 19
   }
 }
