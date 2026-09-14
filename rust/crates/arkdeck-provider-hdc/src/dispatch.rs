@@ -6,6 +6,7 @@
 //! or watches an HDC server: that is the supervisor's lease, and Swift's
 //! dispatcher does not gate a run on it either — a server that is gone is
 //! the client's own error and exit status, judged by the step.
+use crate::host_diagnostics::signal_death;
 use crate::{DispatchFailure, HdcDispatch, ProcessPlan, Receipt};
 use arkdeck_platform::{ToolLimits, ToolRequest, ToolRunError, ToolTermination, VerifiedTool};
 use std::ffi::OsString;
@@ -14,12 +15,6 @@ use std::ffi::OsString;
 /// address the selected server and not the default one (Swift
 /// `HDCServerEndpointSelector.inheritedPortChildEnvironment`).
 pub const SERVER_PORT_VARIABLE: &str = "OHOS_HDC_SERVER_PORT";
-
-/// Swift `RockchipHostProcessDiagnostics.signalDeath`: a child that dies on
-/// a signal is a host fault, reported by the same sentence everywhere so that
-/// a preflight can read the signal back out of it.
-const SIGNAL_PREFIX: &str = "process died on signal ";
-const DIAGNOSTIC_REPORTS: &str = "~/Library/Logs/DiagnosticReports/";
 
 /// The registered executable, dispatched through the verified tool runner
 /// with the runner's clean base environment and, when the daemon inherited a
@@ -69,14 +64,6 @@ impl ProcessDispatch {
 fn valid_port(value: &str) -> Option<u16> {
     let port: u16 = value.parse().ok()?;
     (port >= 1).then_some(port)
-}
-
-fn signal_death(signal: i32) -> String {
-    format!(
-        "{SIGNAL_PREFIX}{signal}; the child never reached its own semantic boundary. \
-         Its crash report is in {DIAGNOSTIC_REPORTS} (look for a same-second entry \
-         named after the executable)."
-    )
 }
 
 impl HdcDispatch for ProcessDispatch {

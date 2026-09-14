@@ -76,6 +76,10 @@ impl AtTopology {
 }
 
 impl UsbProbe for AtTopology {
+    fn single_loader(&self, _: &str) -> Result<LoaderIdentity, String> {
+        Err("fixture has no Loader".into())
+    }
+
     fn single_hdc_normal(&self, _: &str) -> Result<LoaderIdentity, String> {
         Err("DAYU200 target unavailable".into())
     }

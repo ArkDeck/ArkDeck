@@ -8,6 +8,7 @@
 
 #[cfg(target_os = "macos")]
 mod dispatch;
+mod host_diagnostics;
 #[cfg(target_os = "macos")]
 mod lifecycle;
 mod live_mode;
@@ -18,10 +19,12 @@ mod operation;
 mod presence;
 mod provider;
 mod rockchip_hdc;
+mod rockchip_loader;
 mod semantic;
 
 #[cfg(target_os = "macos")]
 pub use dispatch::{ProcessDispatch, SERVER_PORT_VARIABLE};
+pub use host_diagnostics::{DIAGNOSTIC_REPORTS_DIRECTORY, signal_death, signal_number};
 #[cfg(target_os = "macos")]
 pub use lifecycle::{
     LifecycleAction, LifecycleBudget, LifecycleCommand, LifecycleOutcome, LifecycleReceipt,
@@ -51,5 +54,10 @@ pub use rockchip_hdc::{
     RockchipHdcFailure, RockchipHdcObserver, SystemClock, VerifiedBuild, WaitBudget,
     bound_reconnect_summary, hdc_normal_usb_summary, hdc_state_summary, output_excerpt,
     parse_build_properties,
+};
+pub use rockchip_loader::{
+    ENTER_LOADER_TIMEOUT, FlashRuntimeDiagnostic, LoaderTransition, LoaderTransitionFailure,
+    ReadbackBudget, RockchipLoaderTransition, Transition, TransitionRequest, enter_loader_plan,
+    loader_summary, rebind_summary, transition_evidence_summary,
 };
 pub use semantic::{CommandFailure, CommandOutcome, SemanticOutputParser};
