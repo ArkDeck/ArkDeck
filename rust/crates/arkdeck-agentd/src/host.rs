@@ -164,6 +164,7 @@ impl Host {
             targets,
             dispatch: &**dispatch,
             tool_sha256: dispatch.tool_sha256(),
+            now: arkdeck_hoststore::runtime_now,
         })
     }
     /// Swift `startJob`: the Job an execution has just come to own runs in
@@ -208,6 +209,7 @@ impl Host {
                     targets,
                     dispatch: &**dispatch,
                     tool_sha256: dispatch.tool_sha256(),
+                    now: arkdeck_hoststore::runtime_now,
                 }),
                 _ => None,
             };

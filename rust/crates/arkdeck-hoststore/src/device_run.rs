@@ -335,7 +335,10 @@ impl JobRunner<'_> {
                     )));
                 }
             }
-            let action = match device_steps::action(step, &inputs) {
+            let Some(now) = (hdc.now)() else {
+                return Err(Stop::Refused(uncertain()));
+            };
+            let action = match device_steps::action(step, &descriptor.reference(), &inputs, &now) {
                 Ok(action) => action,
                 // Swift's provider refusing an optional step skips it.
                 Err(ActionRefusal::Invalid(_)) if step.optional => {
@@ -349,6 +352,11 @@ impl JobRunner<'_> {
                     continue;
                 }
                 Err(_) => return Err(Stop::Refused(uncertain())),
+            };
+            // No pointer gesture is dispatched here yet: `DEVICE_OPERATIONS`
+            // keeps the operations that inject one out of this lane.
+            let device_steps::StepAction::Hdc(action) = action else {
+                return Err(Stop::Refused(uncertain()));
             };
             let plan = action
                 .lower(
@@ -443,7 +451,11 @@ impl JobRunner<'_> {
             .as_object()
             .cloned()
             .unwrap_or_default();
-        let Some(arguments) = device_steps::journal_arguments(step, &inputs, action) else {
+        let Some(arguments) = device_steps::journal_arguments(
+            step,
+            &inputs,
+            &device_steps::StepAction::Hdc(action.clone()),
+        ) else {
             return Err(Stop::Refused(uncertain()));
         };
         let journal_step = json!({

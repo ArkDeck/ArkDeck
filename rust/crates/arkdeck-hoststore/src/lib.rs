@@ -65,6 +65,8 @@ pub use session_publication::{
     SessionPublisher, StorageClaims, StorageProbe, StorageSnapshot, SystemStorageProbe,
 };
 #[cfg(target_os = "macos")]
+mod catalog_pattern;
+#[cfg(target_os = "macos")]
 mod operation_catalog;
 #[cfg(target_os = "macos")]
 mod operation_request;
