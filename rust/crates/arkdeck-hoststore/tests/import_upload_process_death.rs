@@ -161,7 +161,11 @@ fn sigkill_upload_recovery_uses_only_durable_checkpoints() {
             .stdout(std::process::Stdio::null())
             .spawn()
             .unwrap();
-        let deadline = Instant::now() + Duration::from_secs(10);
+        // The helper's startup and durable writes are real work that a loaded
+        // host can stretch past any tight budget, so the wait ends on its
+        // marker or its exit; the bound only keeps a hung helper from hanging
+        // the test.
+        let deadline = Instant::now() + Duration::from_secs(60);
         while !fixture.root.join("ready").is_file()
             && Instant::now() < deadline
             && child.try_wait().unwrap().is_none()
