@@ -19,9 +19,10 @@ import XCTest
 /// Artifact quota refuses one, each semantic check refuses its own answer, a
 /// timeout and a signal leave the outcome unknown, and runs of absent,
 /// terminal and parked Jobs are refused before any dispatch. The oracle keeps
-/// every answer, how `job.status` and `job.show` then read each Job, and the
-/// store the runs leave: the Job index and files and every Artifact index and
-/// payload.
+/// every answer; how `job.status`, `job.show`, `job.result` and `job.evidence`
+/// then read each Job, how every Job read answers an absent Job, and how the
+/// result and evidence reads refuse open options; and the store the runs leave:
+/// the Job index and files and every Artifact index and payload.
 ///
 /// The engine runs the real descriptor-bound process dispatcher and no Session
 /// publication writer, the composition the Rust runner reproduces. It runs
@@ -56,6 +57,7 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
   private static let lockPath = "/private/tmp/arkdeck-job-plan-oracle.lock"
   private static let nowUTC = "2026-09-14T00:00:00Z"
   private static let nowPreciseUTC = "2026-09-14T00:00:00.000Z"
+  private static let absentJob = "job-00000000000000000000000000000000"
   private static let sourceJob = "job-oracle-source"
   private static let removedSourceJob = "job-oracle-source-removed"
   private static let target = "TGT-ORACLE"
@@ -260,15 +262,32 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
       recorded.append(.object(entry))
     }
 
-    // How Swift then reads each Job it ran.
+    // How Swift then reads each Job it ran, its result and evidence included,
+    // and how every Job read answers a Job that does not exist.
     var reads: [String: JSONValue] = [:]
     for item in Self.cases where item.mode != nil {
       let jobID = jobIDs[item.name]!
       var answers: [String: JSONValue] = [:]
-      for method in ["job.status", "job.show"] {
+      for method in ["job.status", "job.show", "job.result", "job.evidence"] {
         answers[method] = try await exchange(handler, method, ["jobId": .string(jobID)])
       }
       reads[jobID] = .object(answers)
+    }
+    var absent: [String: JSONValue] = [:]
+    for method in [
+      "job.status", "job.show", "job.result", "job.evidence", "job.timeline", "job.events",
+    ] {
+      absent[method] = try await exchange(handler, method, ["jobId": .string(Self.absentJob)])
+    }
+    reads[Self.absentJob] = .object(absent)
+    // Closed read options, in the request shape the corpus already publishes.
+    var refused: [JSONValue] = []
+    for method in ["job.result", "job.evidence"] {
+      refused.append(
+        .object([
+          "method": .string(method), "params": .object([:]),
+          "response": try await exchange(handler, method, [:]),
+        ]))
     }
 
     let encoder = JSONEncoder()
@@ -277,6 +296,7 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
       "analyzer": Self.analyzerBytes,
       "cases.json": try encoder.encode(JSONValue.array(recorded)) + Data("\n".utf8),
       "reads.json": try encoder.encode(JSONValue.object(reads)) + Data("\n".utf8),
+      "refused-reads.json": try encoder.encode(JSONValue.array(refused)) + Data("\n".utf8),
       "store/index.json": try encoder.encode(try Self.index(of: jobsState)) + Data("\n".utf8),
     ]
     // Every Artifact index and payload; the payload-verification cache

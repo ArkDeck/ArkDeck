@@ -989,7 +989,9 @@ fn evidence_consumes_all_recorded_results_and_rejects_inconsistent_verification(
         .map(|s| serde_json::from_str::<Value>(s).unwrap())
         .filter(|v| v["ok"] == true)
         .collect();
-    assert_eq!(frames.len(), 15);
+    // The published contract view replays main's corpus (15 successes); a
+    // candidate may only add recorded results.
+    assert!(frames.len() >= 15, "{}", frames.len());
     for frame in frames {
         let invocation = parse(&job_recording_args(&frame)).unwrap();
         assert_eq!(invocation.timeout_ms, Some(30_000));

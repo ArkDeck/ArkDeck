@@ -227,12 +227,34 @@ impl JobStore {
                 "An exact bounded Job identity is required",
             ));
         }
+        // Swift `RuntimeJobResourceReader` spellings: an absent Job, a record
+        // that cannot be read, and an index that cannot be read at all.
         self.repository
             .rows(Some(id))
-            .map_err(unreadable)?
+            .map_err(|_| failure("recordUnreadable", "the Job read resource is unreadable"))?
             .first()
-            .ok_or_else(|| failure("notFound", "The referenced Job does not exist"))
-            .and_then(JobRecord::from_row)
+            .ok_or_else(|| failure("notFound", "the referenced Job does not exist"))
+            .and_then(|row| {
+                JobRecord::from_row(row).map_err(|_| {
+                    failure(
+                        "recordUnreadable",
+                        &format!("the referenced Job record is unreadable: {id}"),
+                    )
+                })
+            })
+    }
+
+    /// Whether the state root holds Swift's superseding recovery epochs,
+    /// which this Runtime does not read yet.
+    pub(crate) fn holds_recovery_epochs(&self) -> io::Result<bool> {
+        match self
+            .root
+            .document_metadata("superseding-recovery-epochs.json")
+        {
+            Ok(_) => Ok(true),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(false),
+            Err(error) => Err(error),
+        }
     }
 
     pub fn handle_resource(

@@ -12,7 +12,8 @@ pub use import_resources::execute_import;
 mod bootstrap_resources;
 mod read_only_resources;
 pub use read_only_resources::{
-    project_read_only_response, validate_read_only_request, validate_read_only_response,
+    evidence_exit, project_read_only_response, result_exit, validate_read_only_request,
+    validate_read_only_response,
 };
 mod job_events;
 mod job_plan;
@@ -76,7 +77,7 @@ impl CliError {
             "operationUnavailable" => 69,
             "recordUnreadable" | "artifactIntegrityFailed" => 2,
             "ioFailure" => 74,
-            "outcomeUnknown" => 75,
+            "outcomeUnknown" | "resultNotReady" => 75,
             "quotaExceeded" => 69,
             "operationFailed" => 1,
             "clientTimeout" => 75,
@@ -282,6 +283,9 @@ impl CliError {
                     "invalidParams" => "invalidInput",
                     "conflict" => "resourceConflict",
                     "notFound" => "resourceNotFound",
+                    // A Job read before its terminal result: read it again
+                    // later, as the Swift CLI tells its caller.
+                    "resultNotReady" => "resultNotReady",
                     "recordUnreadable" if method == "runtime.tool.list" && !bootstrap_proof => {
                         "internalError"
                     }
@@ -292,7 +296,12 @@ impl CliError {
                     "operationUnavailable" if proof && method == "job.plan" => {
                         "operationUnavailable"
                     }
-                    "inputTooLarge" if proof && method == "job.plan" => "inputTooLarge",
+                    "inputTooLarge"
+                        if proof
+                            && matches!(method, "job.plan" | "job.result" | "job.evidence") =>
+                    {
+                        "inputTooLarge"
+                    }
                     "admissionDenied" if proof && method == "job.plan" => "admissionDenied",
                     "invalidInput" if proof => "invalidInput",
                     "invalidCursor"
@@ -516,6 +525,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["job", "list"] => "job.list",
         ["job", "show"] => "job.show",
         ["job", "evidence"] => "job.evidence",
+        ["job", "result"] => "job.result",
         ["job", "timeline"] => "job.timeline",
         ["job", "events"] => "job.events",
         ["job", "plan"] => "job.plan",
@@ -656,7 +666,9 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             "idempotencyKey",
             "timeout",
         ],
-        "job.status" | "job.show" | "job.evidence" | "job.run" => &["jobId", "timeout"],
+        "job.status" | "job.show" | "job.evidence" | "job.result" | "job.run" => {
+            &["jobId", "timeout"]
+        }
         "job.timeline" => &["jobId", "pageSize", "cursor", "timeout"],
         "job.events" => &["jobId", "pageSize", "afterCursor", "timeout"],
         "job.list" => &[
@@ -919,6 +931,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                     | "job.plan"
                     | "job.submit"
                     | "job.run"
+                    | "job.result"
             )
         {
             Some(method_options)
@@ -942,7 +955,7 @@ pub fn success_envelope(command: &str, result: Value, id: &str) -> Value {
 
 pub fn failure_envelope(command: &str, error: &CliError, id: &str, protocol: bool) -> Value {
     let mut details = json!({"code":error.code,"message":error.message,
-        "controlRequestRetryable":matches!(error.code,"clientTimeout"|"runtimeUnavailable"),
+        "controlRequestRetryable":matches!(error.code,"clientTimeout"|"resultNotReady"|"runtimeUnavailable"),
         "attentionRequired":matches!(error.exit_code(),2|75|77)});
     if !error.details.is_empty() {
         details["details"] = json!(error.details);

@@ -100,6 +100,19 @@ pub trait HostServices: Send + Sync {
             details: None,
         })
     }
+    /// `job.result` and `job.evidence` read a Job's verified result. A host
+    /// without Job and Artifact owners answers as the foundation always has.
+    fn job_result_resource(
+        &self,
+        _method: &str,
+        _params: &serde_json::Map<String, Value>,
+    ) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "rejected".into(),
+            message: "this method is unavailable in the read-only Rust foundation".into(),
+            details: None,
+        })
+    }
     /// `job.run` runs an admitted Job. A host without a Job owner that runs
     /// answers as the read-only foundation always has.
     fn job_run(&self, _params: &serde_json::Map<String, Value>) -> Result<Value, WireError> {
@@ -736,6 +749,10 @@ impl<H: HostServices> Control<H> {
             "job.run" => Response {
                 id: request.id.clone(),
                 outcome: self.host.job_run(&params),
+            },
+            "job.result" | "job.evidence" => Response {
+                id: request.id.clone(),
+                outcome: self.host.job_result_resource(&request.method, &params),
             },
             "artifact.inspect" | "artifact.read" | "artifact.export" => Response {
                 id: request.id.clone(),

@@ -31,6 +31,13 @@ pub(crate) struct CatalogStep {
     pub(crate) optional: bool,
 }
 
+/// A product the operation declares (Swift `CatalogArtifactDeclaration`).
+#[derive(Clone, Debug)]
+pub(crate) struct CatalogArtifact {
+    pub(crate) name: String,
+    pub(crate) required: bool,
+}
+
 #[derive(Clone, Debug)]
 pub(crate) struct CatalogOperation {
     id: String,
@@ -44,6 +51,7 @@ pub(crate) struct CatalogOperation {
     default_policy_issuance: bool,
     pub(crate) inputs: Vec<CatalogField>,
     pub(crate) steps: Vec<CatalogStep>,
+    pub(crate) artifacts: Vec<CatalogArtifact>,
     pub(crate) timeout_seconds: i64,
     pub(crate) output_byte_budget: i64,
 }
@@ -143,6 +151,18 @@ impl CatalogOperation {
             default_policy_issuance: value["defaultPolicyIssuance"] == "enabled",
             inputs,
             steps,
+            artifacts: value["artifacts"]
+                .as_array()
+                .map(|artifacts| {
+                    artifacts
+                        .iter()
+                        .map(|artifact| CatalogArtifact {
+                            name: text(&artifact["name"]),
+                            required: artifact["required"] == true,
+                        })
+                        .collect()
+                })
+                .unwrap_or_default(),
             // An absent bound can never satisfy a policy limit.
             timeout_seconds: value["timeoutSeconds"].as_i64().unwrap_or(i64::MAX),
             output_byte_budget: value["outputByteBudget"].as_i64().unwrap_or(i64::MAX),

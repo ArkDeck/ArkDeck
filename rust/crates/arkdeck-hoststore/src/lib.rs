@@ -37,6 +37,10 @@ mod job_run;
 #[cfg(target_os = "macos")]
 pub use job_run::{JobRunner, RunRefusal, runtime_precise_now};
 #[cfg(target_os = "macos")]
+mod job_result;
+#[cfg(target_os = "macos")]
+pub use job_result::JobResultReader;
+#[cfg(target_os = "macos")]
 mod operation_catalog;
 #[cfg(target_os = "macos")]
 mod operation_request;
