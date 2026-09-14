@@ -1,0 +1,11 @@
+-v
+checkserver
+listtargets-v
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.product.name
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.ohos.fullname
+-v
+checkserver
+-v
+checkserver
+listtargets-v
+-v

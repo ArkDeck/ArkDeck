@@ -1,0 +1,139 @@
+{
+  "actualEffect" : "readOnly",
+  "actualStepKinds" : [
+    "probeHostTool",
+    "probeHDCServer"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "kind" : "defaultReadOnlyPolicy",
+    "reference" : "default-read-only-policy"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-efd52ab9c633074171a19ddd916fffd9",
+  "materializedBindingRevision" : 1,
+  "materializedPlanDigest" : "79fe36f61a71d4852c51b00f784085ec0139b552191bd2b89d6060bec49b3d6a",
+  "materializedStableTargetIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+  "operationFailure" : {
+    "category" : "execution",
+    "code" : "executionFailed",
+    "recovery" : "inspectJob",
+    "retryability" : "runtimeDecisionRequired",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "observe.device@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-observe-serverMismatch",
+    "inputs" : {
+
+    },
+    "operation" : {
+      "id" : "observe.device",
+      "version" : 1
+    },
+    "requestId" : "req-observe-serverMismatch",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-3ba3f5f43b92"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "hdc",
+  "request" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-observe-serverMismatch",
+    "inputs" : {
+
+    },
+    "operation" : {
+      "id" : "observe.device",
+      "version" : 1
+    },
+    "requestId" : "req-observe-serverMismatch",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-3ba3f5f43b92"
+    }
+  },
+  "sessionPublicationRecord" : {
+    "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+    "checkpointSeal" : {
+      "byteCount" : "3941",
+      "lastSequence" : 8,
+      "sha256" : "ba7df820f0b379aca12b932d4df1e0d5fefbb8cb983d4b399b059771632a8d91"
+    },
+    "claims" : [
+      {
+        "admissionGeneration" : "<admissionGeneration>",
+        "claimID" : "session-publication-job-efd52ab9c633074171a19ddd916fffd9",
+        "finalizationHeadroomBytes" : "16777216",
+        "metadataHeadroomBytes" : "69477",
+        "remainingGrowthBytes" : "0",
+        "volumeIdentity" : "<volumeIdentity>",
+        "writerClass" : "light"
+      }
+    ],
+    "journalSeal" : {
+      "byteCount" : "4323",
+      "lastSequence" : 9,
+      "sha256" : "7ab5b68b07f356dadd129e8adf97de4e6f1c6b8f8c92feafc04e0db5f112ce48"
+    },
+    "phase" : "catalogPublished",
+    "policyGeneration" : "1",
+    "proposal" : {
+      "completedAtUTC" : "2026-09-14T00:00:00Z",
+      "manifestByteCount" : "2053",
+      "manifestSHA256" : "25a764b8647cfa1bd749a41f46a062c03ac013c2a9bc9f064f530df54671ed1d",
+      "outcomeCertainty" : "confirmed",
+      "terminalStatus" : "failed"
+    },
+    "receipt" : {
+      "catalogGeneration" : "2",
+      "manifestSHA256" : "25a764b8647cfa1bd749a41f46a062c03ac013c2a9bc9f064f530df54671ed1d",
+      "publishedAtUTC" : "2026-09-14T00:00:00Z"
+    },
+    "relativeSessionPath" : "2026\/09\/session-job-efd52ab9c633074171a19ddd916fffd9",
+    "root" : {
+      "device" : "<device>",
+      "inode" : "<inode>",
+      "path" : "\/tmp\/arkdeck-hdc-oracle\/Sessions",
+      "volumeIdentity" : "<volumeIdentity>"
+    },
+    "sessionID" : "session-job-efd52ab9c633074171a19ddd916fffd9",
+    "sessionRootIdentity" : {
+      "device" : "<device>",
+      "inode" : "<inode>"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "failed",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "intent probe-host-tool",
+    "verified probe-host-tool [\"toolVersion\"]",
+    "artifact tool-facts.json -> ART-63c82e050bba706e7dfa70fda0e3f32d",
+    "intent probe-hdc-server",
+    "failed probe-hdc-server: serverVersionMismatch: client 3.2.0d vs server 3.2.0f",
+    "running->finalizing",
+    "reason: serverVersionMismatch: client 3.2.0d vs server 3.2.0f",
+    "finalizing->failed",
+    "reason: serverVersionMismatch: client 3.2.0d vs server 3.2.0f"
+  ]
+}
