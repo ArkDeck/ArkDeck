@@ -9,11 +9,9 @@ publish.workspace = true
 [dependencies]
 arkdeck-platform.workspace = true
 hmac.workspace = true
+serde_json.workspace = true
 sha2.workspace = true
 unicode-segmentation.workspace = true
-
-[dev-dependencies]
-serde_json.workspace = true
 
 [lints]
 workspace = true

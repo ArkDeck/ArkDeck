@@ -1,0 +1,817 @@
+[
+  {
+    "daemonVersion" : null,
+    "disturbance" : "none",
+    "executable" : null,
+    "launch" : {
+      "arguments" : [
+        "-s",
+        "127.0.0.1:8710",
+        "-m"
+      ],
+      "executablePath" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+      "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+      "pid" : 42,
+      "startMicroseconds" : 23,
+      "startSeconds" : 100
+    },
+    "managedProcessVerified" : true,
+    "name" : "unconfigured",
+    "observation" : {
+      "classification" : "observed",
+      "generation" : 100000023,
+      "identity" : {
+        "endpoint" : "127.0.0.1:8710",
+        "executablePath" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+        "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+        "pid" : 42,
+        "startMicroseconds" : 23,
+        "startSeconds" : 100
+      }
+    },
+    "startup" : {
+      "clientVersion" : "cached-client",
+      "endpoint" : "127.0.0.1:8710",
+      "endpointSource" : "default",
+      "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+      "serverVersion" : "cached-server"
+    }
+  },
+  {
+    "daemonVersion" : "0.0.0-oracle",
+    "disturbance" : "none",
+    "executable" : {
+      "path" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+      "sha256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002"
+    },
+    "launch" : {
+      "arguments" : [
+        "-s",
+        "127.0.0.1:8710",
+        "-m"
+      ],
+      "executablePath" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+      "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+      "pid" : 42,
+      "startMicroseconds" : 23,
+      "startSeconds" : 100
+    },
+    "managedProcessVerified" : true,
+    "name" : "observed-managed",
+    "observation" : {
+      "classification" : "observed",
+      "generation" : 100000023,
+      "identity" : {
+        "endpoint" : "127.0.0.1:8710",
+        "executablePath" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+        "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+        "pid" : 42,
+        "startMicroseconds" : 23,
+        "startSeconds" : 100
+      }
+    },
+    "startup" : {
+      "clientVersion" : "cached-client",
+      "endpoint" : "127.0.0.1:8710",
+      "endpointSource" : "default",
+      "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+      "serverVersion" : "cached-server"
+    }
+  },
+  {
+    "daemonVersion" : "0.0.0-oracle",
+    "disturbance" : "none",
+    "executable" : {
+      "path" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+      "sha256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002"
+    },
+    "launch" : null,
+    "managedProcessVerified" : true,
+    "name" : "observed-ownership-unproven-no-launch",
+    "observation" : {
+      "classification" : "observed",
+      "generation" : 100000023,
+      "identity" : {
+        "endpoint" : "127.0.0.1:8710",
+        "executablePath" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+        "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+        "pid" : 42,
+        "startMicroseconds" : 23,
+        "startSeconds" : 100
+      }
+    },
+    "startup" : {
+      "clientVersion" : "cached-client",
+      "endpoint" : "127.0.0.1:8710",
+      "endpointSource" : "default",
+      "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+      "serverVersion" : "cached-server"
+    }
+  },
+  {
+    "daemonVersion" : "0.0.0-oracle",
+    "disturbance" : "none",
+    "executable" : {
+      "path" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+      "sha256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002"
+    },
+    "launch" : {
+      "arguments" : [
+        "-s",
+        "127.0.0.1:8710",
+        "-m"
+      ],
+      "executablePath" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+      "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+      "pid" : 42,
+      "startMicroseconds" : 23,
+      "startSeconds" : 100
+    },
+    "managedProcessVerified" : false,
+    "name" : "observed-ownership-unproven-process-differs",
+    "observation" : {
+      "classification" : "observed",
+      "generation" : 100000023,
+      "identity" : {
+        "endpoint" : "127.0.0.1:8710",
+        "executablePath" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+        "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+        "pid" : 42,
+        "startMicroseconds" : 23,
+        "startSeconds" : 100
+      }
+    },
+    "startup" : {
+      "clientVersion" : "cached-client",
+      "endpoint" : "127.0.0.1:8710",
+      "endpointSource" : "default",
+      "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+      "serverVersion" : "cached-server"
+    }
+  },
+  {
+    "daemonVersion" : "0.0.0-oracle",
+    "disturbance" : "none",
+    "executable" : {
+      "path" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+      "sha256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002"
+    },
+    "launch" : {
+      "arguments" : [
+        "-s",
+        "127.0.0.1:8710",
+        "-m"
+      ],
+      "executablePath" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+      "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+      "pid" : 42,
+      "startMicroseconds" : 23,
+      "startSeconds" : 101
+    },
+    "managedProcessVerified" : true,
+    "name" : "observed-ownership-unproven-birth-differs",
+    "observation" : {
+      "classification" : "observed",
+      "generation" : 100000023,
+      "identity" : {
+        "endpoint" : "127.0.0.1:8710",
+        "executablePath" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+        "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+        "pid" : 42,
+        "startMicroseconds" : 23,
+        "startSeconds" : 100
+      }
+    },
+    "startup" : {
+      "clientVersion" : "cached-client",
+      "endpoint" : "127.0.0.1:8710",
+      "endpointSource" : "default",
+      "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+      "serverVersion" : "cached-server"
+    }
+  },
+  {
+    "daemonVersion" : "0.0.0-oracle",
+    "disturbance" : "none",
+    "executable" : {
+      "path" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+      "sha256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002"
+    },
+    "launch" : {
+      "arguments" : [
+        "-s",
+        "127.0.0.1:8710",
+        "-m"
+      ],
+      "executablePath" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+      "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+      "pid" : 42,
+      "startMicroseconds" : 23,
+      "startSeconds" : 100
+    },
+    "managedProcessVerified" : true,
+    "name" : "observed-identity-mismatch-endpoint",
+    "observation" : {
+      "classification" : "observed",
+      "generation" : 100000023,
+      "identity" : {
+        "endpoint" : "127.0.0.1:8711",
+        "executablePath" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+        "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+        "pid" : 42,
+        "startMicroseconds" : 23,
+        "startSeconds" : 100
+      }
+    },
+    "startup" : {
+      "clientVersion" : "cached-client",
+      "endpoint" : "127.0.0.1:8710",
+      "endpointSource" : "default",
+      "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+      "serverVersion" : "cached-server"
+    }
+  },
+  {
+    "daemonVersion" : "0.0.0-oracle",
+    "disturbance" : "none",
+    "executable" : {
+      "path" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+      "sha256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002"
+    },
+    "launch" : {
+      "arguments" : [
+        "-s",
+        "127.0.0.1:8710",
+        "-m"
+      ],
+      "executablePath" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+      "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+      "pid" : 42,
+      "startMicroseconds" : 23,
+      "startSeconds" : 100
+    },
+    "managedProcessVerified" : true,
+    "name" : "observed-identity-mismatch-digest",
+    "observation" : {
+      "classification" : "observed",
+      "generation" : 100000023,
+      "identity" : {
+        "endpoint" : "127.0.0.1:8710",
+        "executablePath" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+        "executableSHA256" : "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+        "pid" : 42,
+        "startMicroseconds" : 23,
+        "startSeconds" : 100
+      }
+    },
+    "startup" : {
+      "clientVersion" : "cached-client",
+      "endpoint" : "127.0.0.1:8710",
+      "endpointSource" : "default",
+      "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+      "serverVersion" : "cached-server"
+    }
+  },
+  {
+    "daemonVersion" : "0.0.0-oracle",
+    "disturbance" : "none",
+    "executable" : {
+      "path" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+      "sha256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002"
+    },
+    "launch" : {
+      "arguments" : [
+        "-s",
+        "127.0.0.1:8710",
+        "-m"
+      ],
+      "executablePath" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+      "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+      "pid" : 42,
+      "startMicroseconds" : 23,
+      "startSeconds" : 100
+    },
+    "managedProcessVerified" : true,
+    "name" : "observed-identity-mismatch-path",
+    "observation" : {
+      "classification" : "observed",
+      "generation" : 100000023,
+      "identity" : {
+        "endpoint" : "127.0.0.1:8710",
+        "executablePath" : "/private/tmp/arkdeck-hdc-status-oracle/other-hdc",
+        "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+        "pid" : 42,
+        "startMicroseconds" : 23,
+        "startSeconds" : 100
+      }
+    },
+    "startup" : {
+      "clientVersion" : "cached-client",
+      "endpoint" : "127.0.0.1:8710",
+      "endpointSource" : "default",
+      "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+      "serverVersion" : "cached-server"
+    }
+  },
+  {
+    "daemonVersion" : "0.0.0-oracle",
+    "disturbance" : "none",
+    "executable" : {
+      "path" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+      "sha256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002"
+    },
+    "launch" : {
+      "arguments" : [
+        "-s",
+        "127.0.0.1:8710",
+        "-m"
+      ],
+      "executablePath" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+      "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+      "pid" : 42,
+      "startMicroseconds" : 23,
+      "startSeconds" : 100
+    },
+    "managedProcessVerified" : true,
+    "name" : "observed-identity-mismatch-generation",
+    "observation" : {
+      "classification" : "observed",
+      "generation" : 7,
+      "identity" : {
+        "endpoint" : "127.0.0.1:8710",
+        "executablePath" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+        "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+        "pid" : 42,
+        "startMicroseconds" : 23,
+        "startSeconds" : 100
+      }
+    },
+    "startup" : {
+      "clientVersion" : "cached-client",
+      "endpoint" : "127.0.0.1:8710",
+      "endpointSource" : "default",
+      "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+      "serverVersion" : "cached-server"
+    }
+  },
+  {
+    "daemonVersion" : "0.0.0-oracle",
+    "disturbance" : "none",
+    "executable" : {
+      "path" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+      "sha256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002"
+    },
+    "launch" : {
+      "arguments" : [
+        "-s",
+        "127.0.0.1:8710",
+        "-m"
+      ],
+      "executablePath" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+      "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+      "pid" : 42,
+      "startMicroseconds" : 23,
+      "startSeconds" : 100
+    },
+    "managedProcessVerified" : true,
+    "name" : "observed-identity-missing",
+    "observation" : {
+      "classification" : "observed",
+      "generation" : 100000023,
+      "identity" : null
+    },
+    "startup" : {
+      "clientVersion" : "cached-client",
+      "endpoint" : "127.0.0.1:8710",
+      "endpointSource" : "default",
+      "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+      "serverVersion" : "cached-server"
+    }
+  },
+  {
+    "daemonVersion" : "0.0.0-oracle",
+    "disturbance" : "none",
+    "executable" : {
+      "path" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+      "sha256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002"
+    },
+    "launch" : {
+      "arguments" : [
+        "-s",
+        "127.0.0.1:8710",
+        "-m"
+      ],
+      "executablePath" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+      "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+      "pid" : 42,
+      "startMicroseconds" : 23,
+      "startSeconds" : 100
+    },
+    "managedProcessVerified" : true,
+    "name" : "observed-generation-zero",
+    "observation" : {
+      "classification" : "observed",
+      "generation" : 0,
+      "identity" : {
+        "endpoint" : "127.0.0.1:8710",
+        "executablePath" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+        "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+        "pid" : 42,
+        "startMicroseconds" : 0,
+        "startSeconds" : 0
+      }
+    },
+    "startup" : {
+      "clientVersion" : "cached-client",
+      "endpoint" : "127.0.0.1:8710",
+      "endpointSource" : "default",
+      "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+      "serverVersion" : "cached-server"
+    }
+  },
+  {
+    "daemonVersion" : "0.0.0-oracle",
+    "disturbance" : "none",
+    "executable" : {
+      "path" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+      "sha256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002"
+    },
+    "launch" : {
+      "arguments" : [
+        "-s",
+        "127.0.0.1:8710",
+        "-m"
+      ],
+      "executablePath" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+      "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+      "pid" : 42,
+      "startMicroseconds" : 23,
+      "startSeconds" : 100
+    },
+    "managedProcessVerified" : true,
+    "name" : "unavailable",
+    "observation" : {
+      "classification" : "unavailable",
+      "identity" : null,
+      "reason" : "no process owns the endpoint"
+    },
+    "startup" : {
+      "clientVersion" : "cached-client",
+      "endpoint" : "127.0.0.1:8710",
+      "endpointSource" : "default",
+      "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+      "serverVersion" : "cached-server"
+    }
+  },
+  {
+    "daemonVersion" : "0.0.0-oracle",
+    "disturbance" : "none",
+    "executable" : {
+      "path" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+      "sha256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002"
+    },
+    "launch" : {
+      "arguments" : [
+        "-s",
+        "127.0.0.1:8710",
+        "-m"
+      ],
+      "executablePath" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+      "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+      "pid" : 42,
+      "startMicroseconds" : 23,
+      "startSeconds" : 100
+    },
+    "managedProcessVerified" : true,
+    "name" : "unsupported",
+    "observation" : {
+      "classification" : "unsupported",
+      "identity" : null,
+      "reason" : "selected executable or endpoint has no published commandless identity family"
+    },
+    "startup" : {
+      "clientVersion" : "cached-client",
+      "endpoint" : "127.0.0.1:8710",
+      "endpointSource" : "default",
+      "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+      "serverVersion" : "cached-server"
+    }
+  },
+  {
+    "daemonVersion" : "0.0.0-oracle",
+    "disturbance" : "none",
+    "executable" : {
+      "path" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+      "sha256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002"
+    },
+    "launch" : {
+      "arguments" : [
+        "-s",
+        "127.0.0.1:8710",
+        "-m"
+      ],
+      "executablePath" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+      "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+      "pid" : 42,
+      "startMicroseconds" : 23,
+      "startSeconds" : 100
+    },
+    "managedProcessVerified" : true,
+    "name" : "timed-out",
+    "observation" : {
+      "classification" : "timedOut",
+      "identity" : null
+    },
+    "startup" : {
+      "clientVersion" : "cached-client",
+      "endpoint" : "127.0.0.1:8710",
+      "endpointSource" : "default",
+      "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+      "serverVersion" : "cached-server"
+    }
+  },
+  {
+    "daemonVersion" : "0.0.0-oracle",
+    "disturbance" : "none",
+    "executable" : {
+      "path" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+      "sha256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002"
+    },
+    "launch" : {
+      "arguments" : [
+        "-s",
+        "127.0.0.1:8710",
+        "-m"
+      ],
+      "executablePath" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+      "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+      "pid" : 42,
+      "startMicroseconds" : 23,
+      "startSeconds" : 100
+    },
+    "managedProcessVerified" : true,
+    "name" : "cancelled",
+    "observation" : {
+      "classification" : "cancelled",
+      "identity" : null
+    },
+    "startup" : {
+      "clientVersion" : "cached-client",
+      "endpoint" : "127.0.0.1:8710",
+      "endpointSource" : "default",
+      "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+      "serverVersion" : "cached-server"
+    }
+  },
+  {
+    "daemonVersion" : "0.0.0-oracle",
+    "disturbance" : "none",
+    "executable" : {
+      "path" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+      "sha256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002"
+    },
+    "launch" : {
+      "arguments" : [
+        "-s",
+        "127.0.0.1:8710",
+        "-m"
+      ],
+      "executablePath" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+      "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+      "pid" : 42,
+      "startMicroseconds" : 23,
+      "startSeconds" : 100
+    },
+    "managedProcessVerified" : true,
+    "name" : "unknown",
+    "observation" : {
+      "classification" : "unknown",
+      "identity" : null,
+      "reason" : "observed identity does not match the selected tool and endpoint"
+    },
+    "startup" : {
+      "clientVersion" : "cached-client",
+      "endpoint" : "127.0.0.1:8710",
+      "endpointSource" : "default",
+      "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+      "serverVersion" : "cached-server"
+    }
+  },
+  {
+    "daemonVersion" : "0.0.0-oracle",
+    "disturbance" : "duringObservation",
+    "executable" : {
+      "path" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+      "sha256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002"
+    },
+    "launch" : {
+      "arguments" : [
+        "-s",
+        "127.0.0.1:8710",
+        "-m"
+      ],
+      "executablePath" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+      "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+      "pid" : 42,
+      "startMicroseconds" : 23,
+      "startSeconds" : 100
+    },
+    "managedProcessVerified" : true,
+    "name" : "tool-changed-during-observation",
+    "observation" : {
+      "classification" : "observed",
+      "generation" : 100000023,
+      "identity" : {
+        "endpoint" : "127.0.0.1:8710",
+        "executablePath" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+        "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+        "pid" : 42,
+        "startMicroseconds" : 23,
+        "startSeconds" : 100
+      }
+    },
+    "startup" : {
+      "clientVersion" : "cached-client",
+      "endpoint" : "127.0.0.1:8710",
+      "endpointSource" : "default",
+      "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+      "serverVersion" : "cached-server"
+    }
+  },
+  {
+    "daemonVersion" : "0.0.0-oracle",
+    "disturbance" : "duringOwnership",
+    "executable" : {
+      "path" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+      "sha256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002"
+    },
+    "launch" : {
+      "arguments" : [
+        "-s",
+        "127.0.0.1:8710",
+        "-m"
+      ],
+      "executablePath" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+      "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+      "pid" : 42,
+      "startMicroseconds" : 23,
+      "startSeconds" : 100
+    },
+    "managedProcessVerified" : true,
+    "name" : "tool-changed-during-ownership",
+    "observation" : {
+      "classification" : "observed",
+      "generation" : 100000023,
+      "identity" : {
+        "endpoint" : "127.0.0.1:8710",
+        "executablePath" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+        "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+        "pid" : 42,
+        "startMicroseconds" : 23,
+        "startSeconds" : 100
+      }
+    },
+    "startup" : {
+      "clientVersion" : "cached-client",
+      "endpoint" : "127.0.0.1:8710",
+      "endpointSource" : "default",
+      "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+      "serverVersion" : "cached-server"
+    }
+  },
+  {
+    "daemonVersion" : "0.0.0-oracle",
+    "disturbance" : "none",
+    "executable" : {
+      "path" : "/private/tmp/arkdeck-hdc-status-oracle/absent-hdc",
+      "sha256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002"
+    },
+    "launch" : {
+      "arguments" : [
+        "-s",
+        "127.0.0.1:8710",
+        "-m"
+      ],
+      "executablePath" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+      "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+      "pid" : 42,
+      "startMicroseconds" : 23,
+      "startSeconds" : 100
+    },
+    "managedProcessVerified" : true,
+    "name" : "tool-missing",
+    "observation" : {
+      "classification" : "observed",
+      "generation" : 100000023,
+      "identity" : {
+        "endpoint" : "127.0.0.1:8710",
+        "executablePath" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+        "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+        "pid" : 42,
+        "startMicroseconds" : 23,
+        "startSeconds" : 100
+      }
+    },
+    "startup" : {
+      "clientVersion" : "cached-client",
+      "endpoint" : "127.0.0.1:8710",
+      "endpointSource" : "default",
+      "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+      "serverVersion" : "cached-server"
+    }
+  },
+  {
+    "daemonVersion" : "0.0.0-oracle",
+    "disturbance" : "none",
+    "executable" : {
+      "path" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+      "sha256" : "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "launch" : {
+      "arguments" : [
+        "-s",
+        "127.0.0.1:8710",
+        "-m"
+      ],
+      "executablePath" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+      "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+      "pid" : 42,
+      "startMicroseconds" : 23,
+      "startSeconds" : 100
+    },
+    "managedProcessVerified" : true,
+    "name" : "tool-digest-mismatch",
+    "observation" : {
+      "classification" : "observed",
+      "generation" : 100000023,
+      "identity" : {
+        "endpoint" : "127.0.0.1:8710",
+        "executablePath" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+        "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+        "pid" : 42,
+        "startMicroseconds" : 23,
+        "startSeconds" : 100
+      }
+    },
+    "startup" : {
+      "clientVersion" : "cached-client",
+      "endpoint" : "127.0.0.1:8710",
+      "endpointSource" : "default",
+      "executableSHA256" : "0000000000000000000000000000000000000000000000000000000000000000",
+      "serverVersion" : "cached-server"
+    }
+  },
+  {
+    "daemonVersion" : "0.0.0-oracle",
+    "disturbance" : "none",
+    "executable" : {
+      "path" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+      "sha256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002"
+    },
+    "launch" : null,
+    "managedProcessVerified" : true,
+    "name" : "explicit-endpoint-unavailable",
+    "observation" : {
+      "classification" : "unavailable",
+      "identity" : null,
+      "reason" : "no process owns the endpoint"
+    },
+    "startup" : {
+      "clientVersion" : "cached-client",
+      "endpoint" : "127.0.0.1:9000",
+      "endpointSource" : "explicit",
+      "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+      "serverVersion" : "cached-server"
+    }
+  },
+  {
+    "daemonVersion" : "0.0.0-oracle",
+    "disturbance" : "none",
+    "executable" : {
+      "path" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+      "sha256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002"
+    },
+    "launch" : null,
+    "managedProcessVerified" : true,
+    "name" : "inherited-endpoint-observed-unproven",
+    "observation" : {
+      "classification" : "observed",
+      "generation" : 100000023,
+      "identity" : {
+        "endpoint" : "127.0.0.1:8720",
+        "executablePath" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+        "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+        "pid" : 42,
+        "startMicroseconds" : 23,
+        "startSeconds" : 100
+      }
+    },
+    "startup" : {
+      "clientVersion" : "cached-client",
+      "endpoint" : "127.0.0.1:8720",
+      "endpointSource" : "inheritedEnvironment",
+      "executableSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+      "serverVersion" : "cached-server"
+    }
+  }
+]

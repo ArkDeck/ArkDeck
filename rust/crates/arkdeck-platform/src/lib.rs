@@ -41,7 +41,9 @@ pub use unix::{LocalConnection, LocalListener, default_user_endpoint};
 #[cfg(target_os = "macos")]
 mod macos_server;
 #[cfg(target_os = "macos")]
-pub use macos_server::{LoopbackServerLease, ServerIdentityReceipt};
+pub use macos_server::{
+    LoopbackServerLease, ServerIdentityReceipt, process_arguments, verifies_managed_process,
+};
 #[cfg(windows)]
 pub use windows::{LocalConnection, LocalListener, LoopbackServerLease, default_user_endpoint};
 

@@ -43,7 +43,7 @@ impl HdcReadOnlyProvider {
 /// These are facts published by Swift's current integration profiles, not a
 /// version inferred from a filename or caller claim. Windows SPK-3 must provide
 /// its own reviewed executable tuple; the macOS hashes cannot authorize it.
-fn registered_version(platform: &str, digest: &str) -> Option<&'static str> {
+pub(crate) fn registered_version(platform: &str, digest: &str) -> Option<&'static str> {
     match (platform, digest) {
         ("macos", "48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260") => {
             Some("3.2.0d")

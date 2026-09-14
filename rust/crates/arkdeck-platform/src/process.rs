@@ -222,7 +222,11 @@ impl VerifiedTool {
         })
     }
 
-    pub(crate) fn revalidate(&self) -> io::Result<()> {
+    /// The retained file is still the trusted one: unchanged identity and
+    /// metadata, the pinned digest, and the path still naming it. Callers that
+    /// hold a tool across an observation (Swift `VerifiedRegularFileDescriptor
+    /// .revalidate`) re-prove it before and after what they observed.
+    pub fn revalidate(&self) -> io::Result<()> {
         let before = self.file.metadata()?;
         validate_metadata(&before)?;
         if !same_metadata(&self.initial, &before) {
