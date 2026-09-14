@@ -672,7 +672,13 @@ use crate::windows::spawn;
 #[path = "macos_process.rs"]
 mod macos_process;
 #[cfg(target_os = "macos")]
-use macos_process::spawn;
+use macos_process::{spawn, spawn_in};
+
+#[cfg(target_os = "macos")]
+#[path = "tool_process.rs"]
+mod tool_process;
+#[cfg(target_os = "macos")]
+pub use tool_process::{ToolExecution, ToolLimits, ToolRequest, ToolRunError, ToolTermination};
 
 #[cfg(target_os = "macos")]
 #[path = "analyzer_process.rs"]

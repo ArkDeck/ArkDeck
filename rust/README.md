@@ -761,6 +761,26 @@ acquires this lease before its only argv and revalidates it after the process,
 so `device.observations` can now reach a spawn on macOS when a published HDC
 identity is registered and its server is up. `tests/loopback_server_lease.rs`
 drives it with `/usr/bin/nc`; no real HDC is launched by the tests.
+## Verified tool runner (TASK-XPA-016, SPK-6)
+
+`VerifiedTool::run_tool(&ToolRequest { arguments, environment, working_directory,
+limits }, cancelled)` runs any pinned executable the way Swift's
+`FoundationProcessExecutor` runs a descriptor-bound provider dispatch: spawned
+through its retained inode in a new process group; a caller-named environment
+overlaid on the clean base (`PATH`, `LANG`, `LC_ALL`; the daemon's own
+environment is never inherited, and `PATH`, `LC_ALL` and dynamic-loader
+variables cannot be overlaid); a child-only working directory that must be an
+absolute, canonical, existing directory; `/dev/null` as stdin; each stream kept
+to its first `capture_bytes` while the rest drains; a timeout that terminates
+the process group (TERM, then KILL after 0.25 s); and a cancellation probe asked
+before the spawn (no child) and while the child runs (the group drained). The
+result carries both streams, whether either was truncated, the termination
+(`Exited`, `Signalled`, `TimedOut`, `Cancelled { drained }`) and the monotonic
+duration Swift's receipt reports; `Refused` errors ran no tool code,
+`Unobservable` ones cannot say what the child did. `run_analyzer` is this runner
+with the source Artifact retained. `tests/tool_process.rs` drives it with shell
+scripts; the HDC provider's `run_read_only_*` path is unchanged until lane A's
+dispatch seam moves onto it.
 
 ## macOS facade host owners (TASK-XPA-012)
 

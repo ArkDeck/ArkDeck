@@ -1,7 +1,7 @@
 use super::{
     VerifiedTool, denied, invalid, retire_unix_child, same_metadata, terminate_unix_child,
 };
-use std::ffi::{CString, OsString};
+use std::ffi::{CStr, CString, OsString};
 use std::fs::File;
 use std::io;
 use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
@@ -214,6 +214,17 @@ pub(super) fn spawn(
     args: &[OsString],
     environment: &[(OsString, OsString)],
 ) -> io::Result<RunningChild> {
+    spawn_in(tool, args, environment, None)
+}
+
+/// `spawn` with a child-only working directory (`/` when `None`), applied by
+/// the spawn's file actions so the daemon's own directory never changes.
+pub(super) fn spawn_in(
+    tool: &VerifiedTool,
+    args: &[OsString],
+    environment: &[(OsString, OsString)],
+    working_directory: Option<&CStr>,
+) -> io::Result<RunningChild> {
     let inode_path = format!("/.vol/{}/{}", tool.initial.dev(), tool.initial.ino());
     if !same_metadata(&tool.initial, &std::fs::metadata(&inode_path)?) {
         return Err(denied("inode-bound executable path unavailable"));
@@ -226,7 +237,7 @@ pub(super) fn spawn(
     unsafe {
         posix(posix_spawn_file_actions_addchdir_np(
             &mut settings.actions,
-            c"/".as_ptr(),
+            working_directory.unwrap_or(c"/").as_ptr(),
         ))?;
         posix(libc::posix_spawn_file_actions_addopen(
             &mut settings.actions,
