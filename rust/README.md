@@ -1008,6 +1008,20 @@ answered it, exiting 0 whatever availability the status reports.
 serves every answer of Swift's frame corpus to the actual CLI through the fake
 Runtime in `tests/support`, which the later HDC control-action CLI tests share.
 
+`arkdeck runtime hdc impact-preview --action restart --server-endpoint-ref <ref>
+--expected-server-generation <n> --action-request-id <id>` and `arkdeck runtime
+hdc restart --control-action <id> --preview-id <id> --preview-digest <sha256>`
+follow Swift's registry grammar, then its handler's checks before any
+connection (an exact restart intent, or one exact preview tuple, else
+`invalidInput`), and emit the Runtime's answer as it gave it. Both are
+mutations: a refusal without the zero-dispatch proof, or a lost reply, is an
+unknown outcome (75), and both methods' published details admit no proof. A
+restart answers `awaitingImpactApproval`; the approval is `human-action
+resume`'s at Swift's interactive console, which this CLI answers
+`humanActionRequired`. `crates/arkdeck-cli/tests/hdc_control_actions.rs`
+replays Swift's argv fixtures and serves the recorded preview, restart and
+refusals to the actual CLI.
+
 ## Target presentation owner (TASK-XPA-012)
 
 The explicitly isolated development composition owns `targets-state/` and serves
