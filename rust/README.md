@@ -893,6 +893,20 @@ identity means nothing ran. It never gates a dispatch on the server lease.
 `tests/process_dispatch.rs` drives it with shell scripts and the shared fake HDC
 driver; `FixtureDispatch` remains for the isolated owner until the composition
 swaps.
+## Managed HDC server (TASK-XPA-016, SPK-6)
+
+`arkdeck_platform::ManagedServer` launches a verified tool through its retained
+inode in its own group with no budget, records its launch from the kernel at
+once (PID, birth, canonical path, digest, argv), captures both streams up to a
+limit, says how it ended and stops it. `arkdeck_provider_hdc::ManagedHdcServer`
+owns an HDC server with it as Swift's `HeadlessHDCServerHost` does: `hdc -s
+<endpoint> -m` with the server port named, the loopback listener reachable
+first (never `checkserver` first), `checkserver` exit 0 with agreeing versions,
+then the listener's owner proved to be the launched process by
+`LoopbackServerLease` and the same birth; a reachable listener of another
+process, however exact, is `Unbound`. `tests/managed_server.rs` in both crates
+drive it with shell scripts and a fake `hdc` compiled from C at test time; no
+real HDC is launched.
 
 ## macOS facade host owners (TASK-XPA-012)
 

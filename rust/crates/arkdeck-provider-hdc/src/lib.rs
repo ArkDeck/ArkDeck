@@ -8,6 +8,8 @@
 
 #[cfg(target_os = "macos")]
 mod dispatch;
+#[cfg(target_os = "macos")]
+mod managed_server;
 mod observation;
 mod operation;
 mod presence;
@@ -16,6 +18,8 @@ mod semantic;
 
 #[cfg(target_os = "macos")]
 pub use dispatch::{ProcessDispatch, SERVER_PORT_VARIABLE};
+#[cfg(target_os = "macos")]
+pub use managed_server::{ManagedHdcServer, StartBudget, StartFailure};
 pub use observation::{
     DeviceCandidate, ParseError, ServerCheck, parse_client_version, parse_server_check,
     parse_target_list,

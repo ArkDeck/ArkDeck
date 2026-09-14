@@ -26,6 +26,10 @@ pub(super) struct RunningChild {
 }
 
 impl RunningChild {
+    pub(super) fn pid(&self) -> libc::pid_t {
+        self.pid
+    }
+
     pub(super) fn try_wait(&mut self) -> io::Result<Option<ExitStatus>> {
         // SAFETY: zero is a valid empty siginfo_t representation.
         let mut info: libc::siginfo_t = unsafe { std::mem::zeroed() };
