@@ -1034,6 +1034,27 @@ lane's to serve over `arkforged discoverDevices` (ArkDeck no longer owns the
 USB enumeration), as is the facts port that encodes "not observable" as
 `deviceMode: "absent"`. `tests/live_mode.rs` drives the probe over the shared
 fake HDC driver as real subprocesses and asserts the argv from the fake's log.
+## Alias store primitives (TASK-XPA-016, M4)
+
+Swift's post-flash HDC alias store (`RockchipPostFlashHDCBindingStore`, the
+owner-only document under `~/Library/Application Support/ArkDeck` that keeps
+an adopted Target usable after a flash rotates its HDC serial) needs three
+host-store rules the crate did not have; they are now `arkdeck_platform`
+primitives, with no store logic behind them (its waited-for lock is the
+existing `HostDirectory::wait_lock`): `HostDirectory::open_or_create_private`
+(Swift `prepareRoot`: create every missing level owner-only, make the root
+owner-only whether or not it existed, open it by its canonical path),
+`HostDirectory::create_exclusive_or_match` (Swift `archiveSuperseded`: a
+document created exactly once at its name, synced in place, and when the
+name is taken compared byte for byte — `Created` / `Matched` / `Different` —
+never replaced or removed), and `HostDirectory::read_owner_only` (Swift
+`load` + `validateFile`: `None` for absence, otherwise the owner's
+single-link regular file of exactly mode 0600 and 1..=maximum bytes).
+`arkdeck_platform::{application_support_directory, arkdeck_application_support_root}`
+derive Swift's Application Support root from `runtime_home()`
+(`CFFIXED_USER_HOME`, never `HOME`). The store itself — the record, its
+canonical bytes, the three-way publication and the reissue reconciliation —
+is the alias-store owner's, over these.
 
 ## Rockchip post-flash HDC observation (TASK-XPA-016, M4)
 

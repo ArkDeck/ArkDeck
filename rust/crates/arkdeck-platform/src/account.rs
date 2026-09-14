@@ -2,6 +2,7 @@
 //! process: `CFFIXED_USER_HOME` when it is set, otherwise the account's home
 //! from the password database. `HOME` is deliberately not consulted.
 use std::ffi::CStr;
+use std::path::PathBuf;
 
 pub fn runtime_home() -> Option<String> {
     if let Some(fixed) = std::env::var_os("CFFIXED_USER_HOME").filter(|value| !value.is_empty()) {
@@ -30,4 +31,20 @@ pub fn runtime_home() -> Option<String> {
         .to_str()
         .ok()
         .map(str::to_owned)
+}
+
+/// Swift `FileManager.urls(for: .applicationSupportDirectory, in:
+/// .userDomainMask)[0]` for a non-sandboxed process:
+/// `<home>/Library/Application Support`, with the home resolved as
+/// [`runtime_home`] resolves it.
+pub fn application_support_directory() -> Option<PathBuf> {
+    runtime_home().map(|home| PathBuf::from(home).join("Library/Application Support"))
+}
+
+/// The product's Application Support root, `…/Library/Application
+/// Support/ArkDeck`: the parent of the daemon state directory (Swift
+/// `AgentXPCContract.applicationSupportRelativeStateDirectory`, `ArkDeck/Agentd`)
+/// and the root of the Rockchip binding and post-flash alias stores.
+pub fn arkdeck_application_support_root() -> Option<PathBuf> {
+    application_support_directory().map(|directory| directory.join("ArkDeck"))
 }
