@@ -9,7 +9,7 @@
   "createdAtUTC" : "2026-09-14T00:00:00Z",
   "finishedAtUTC" : "2026-09-14T00:00:00Z",
   "jobID" : "job-96d4f821b85e0645362763736ffa1906",
-  "materializedPlanDigest" : "b96cbd1ae33692cb2caee355e4814c0bf9f890f0bdf2e2657aaf75d412dc03ba",
+  "materializedPlanDigest" : "3a893f83c659a6d6b3ac07d507d0cb5d70012e1688b2c72a7fe069d2867df788",
   "operationFailure" : {
     "category" : "cancelled",
     "code" : "cancelled",
@@ -63,7 +63,7 @@
     "checkpointSeal" : {
       "byteCount" : "1725",
       "lastSequence" : 4,
-      "sha256" : "74fe8ef4eae70d6ec4a532398b0728dd7706eec76db7641533579a9d971ee0e9"
+      "sha256" : "22c136bea2280f086fc6aed1d312775f7e100877cf2147a734b9d542e0934e67"
     },
     "claims" : [
       {

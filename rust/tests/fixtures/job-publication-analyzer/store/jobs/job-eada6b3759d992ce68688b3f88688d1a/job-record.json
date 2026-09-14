@@ -12,7 +12,7 @@
   "createdAtUTC" : "2026-09-14T00:00:00Z",
   "finishedAtUTC" : "2026-09-14T00:00:00Z",
   "jobID" : "job-eada6b3759d992ce68688b3f88688d1a",
-  "materializedPlanDigest" : "46bf75bed4d97a4b4ad89d63255bf7b4fefe88a4c8e249420692b11879f3b5b8",
+  "materializedPlanDigest" : "23bb3fc7fadd7994fb96320dbf85625033165c05895ba7493075edc0c11656d8",
   "operationFailure" : {
     "category" : "execution",
     "code" : "executionFailed",
@@ -66,7 +66,7 @@
     "checkpointSeal" : {
       "byteCount" : "3018",
       "lastSequence" : 6,
-      "sha256" : "9e6ce0dbdcdbed6ab773f0eabe5046156a5d51537ad060264eb1ed89a7041199"
+      "sha256" : "7f11390a44ccf1917be30ca5b906c1047eeb0a0b7f9508d5590ecb3269270419"
     },
     "claims" : [
       {

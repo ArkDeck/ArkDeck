@@ -540,7 +540,9 @@ ordered runs over one store (three published products, eight semantic refusals,
 a timeout, a signal death, a quota refusal, a removed source and five refused
 runs), Swift's reads of each Job and the store they leave. Every Job but the
 timeout case's runs under the daemon's 30 s analyzer budget; the timeout case's
-entries name the 2 s budget of the composition that holds its Job.
+entries name the 2 s budget of the composition that holds its Job. Its source
+answers `hold`, which ends only once a release file exists under the oracle
+root, and nothing creates one in this oracle, so only that budget ends it.
 `tests/job_run.rs` reproduces every answer, read, index row, Job file, Artifact
 index and payload byte for byte. Re-record from Swift with
 `ARKDECK_RUST_JOB_RUN_RECORD=/private/tmp/<new>`. `scripts/check-job-run.py` runs
@@ -672,14 +674,17 @@ Artifact and Session file and every entry's mode byte for byte. Re-record from
 Swift with `ARKDECK_RUST_JOB_CANCEL_RECORD=/private/tmp/<new>`.
 `rust/tests/fixtures/job-cancel-running-analyzer/` is the oracle
 `testSwiftCancelsRunningAnalyzerJobs` records with the engine's two
-cancellation hooks: a Job cancelled once its intent is durable and its child
-runs, one cancelled at the last boundary before the intent, and one cancelled
-after its success commit. `tests/job_cancel_running.rs` reproduces every answer,
-read and file byte for byte; re-record it with
-`ARKDECK_RUST_JOB_CANCEL_RUNNING_RECORD=/private/tmp/<new>`.
+cancellation hooks: a Job cancelled once its intent is durable and its `hold`
+child runs, one cancelled at the last boundary before the intent, and one
+cancelled after its success commit. The oracle and `tests/job_cancel_running.rs`
+create the child's release file only once its run has answered, so no stall
+between the intent and the cancellation lets the child finish first.
+`tests/job_cancel_running.rs` reproduces every answer, read and file byte for
+byte; re-record it with `ARKDECK_RUST_JOB_CANCEL_RUNNING_RECORD=/private/tmp/<new>`.
 `scripts/check-job-run.py` compares both owners' cancellations, one of a Job
-whose child is running included, and both CLIs' `job cancel`, and has a Swift
-daemon answer a cancellation and a run of the Rust-cancelled Job.
+whose `hold` child is running included (the harness holds the oracles' lock and
+never releases that child), and both CLIs' `job cancel`, and has a Swift daemon
+answer a cancellation and a run of the Rust-cancelled Job.
 
 ## Capability reads (TASK-XPA-014)
 

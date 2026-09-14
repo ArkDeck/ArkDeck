@@ -12,7 +12,7 @@
   "createdAtUTC" : "2026-09-14T00:00:00Z",
   "finishedAtUTC" : "2026-09-14T00:00:00Z",
   "jobID" : "job-ff9923773cdd7dd93057b7ecece955c6",
-  "materializedPlanDigest" : "51ad85a5e14ddc4f94d96a19c8ca2f627e0279a10da6c0e10af29a4c460a89fb",
+  "materializedPlanDigest" : "ba01622ab0eafea813574d1027e1beb6ad2ef92e8265127bc2bb8a8d0069cf76",
   "operationFailure" : {
     "category" : "storage",
     "code" : "artifactPublicationFailed",
@@ -73,10 +73,10 @@
     "reason: steps-start",
     "intent extract-crash-signature",
     "verified extract-crash-signature [\"analyzerRef\", \"analyzerVersion\", \"derivedByteCount\", \"derivedSha256\", \"sourceArtifactId\", \"sourceByteCount\", \"sourceSha256\", \"truncated\"]",
-    "artifact crash-signature.json missing: quotaExceeded(requestedBytes: 77117, remainingBytes: 30327)",
+    "artifact crash-signature.json missing: quotaExceeded(requestedBytes: 77117, remainingBytes: 30328)",
     "running->finalizing",
-    "reason: artifact publication failed: crash-signature.json could not be published: quotaExceeded(requestedBytes: 77117, remainingBytes: 30327)",
+    "reason: artifact publication failed: crash-signature.json could not be published: quotaExceeded(requestedBytes: 77117, remainingBytes: 30328)",
     "finalizing->failed",
-    "reason: artifact publication failed: crash-signature.json could not be published: quotaExceeded(requestedBytes: 77117, remainingBytes: 30327)"
+    "reason: artifact publication failed: crash-signature.json could not be published: quotaExceeded(requestedBytes: 77117, remainingBytes: 30328)"
   ]
 }
