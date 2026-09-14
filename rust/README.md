@@ -784,8 +784,14 @@ recycled. `NotFound` is Swift's `unavailable`, `PermissionDenied` its `unknown`.
 The owner must also be the calling user, as on Windows. `HdcReadOnlyProvider`
 acquires this lease before its only argv and revalidates it after the process,
 so `device.observations` can now reach a spawn on macOS when a published HDC
-identity is registered and its server is up. `tests/loopback_server_lease.rs`
-drives it with `/usr/bin/nc`; no real HDC is launched by the tests.
+identity is registered and its server is up. A candidate process that exits
+between being listed and having its sockets read owns nothing and is skipped
+(a server restarting under a scan is caught by the two scans having to agree);
+a process the kernel will not describe stays `unknown`, since it may own the
+endpoint. `tests/loopback_server_lease.rs` drives it with listener processes
+of the test binary itself (re-executed with `listener_process` selected) and
+with `/usr/bin/nc` in place as another executable; no real HDC is launched by
+the tests.
 ## Verified tool runner (TASK-XPA-016, SPK-6)
 
 `VerifiedTool::run_tool(&ToolRequest { arguments, environment, working_directory,

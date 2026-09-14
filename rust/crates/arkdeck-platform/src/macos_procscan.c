@@ -1,6 +1,7 @@
 // Commandless listener facts of one process, for the macOS proof that an HDC
 // server already exists. This extracts the kernel's view and nothing more: no
 // connect, no spawn, no interpretation. The Rust side classifies addresses.
+#include <errno.h>
 #include <libproc.h>
 #include <netinet/in.h>
 #include <stdint.h>
@@ -22,22 +23,26 @@ struct arkdeck_listener {
 
 // Returns how many TCP LISTEN sockets `pid` owns, filling `out` up to
 // `capacity` of them; -1 when the descriptor or socket scan failed; -2 when
-// the process owns more listeners than `capacity`.
+// the process owns more listeners than `capacity`; -3 when the process no
+// longer exists (ESRCH: it exited between being listed and being scanned, so
+// it owns nothing and is not a scan failure).
 int arkdeck_macos_listening_sockets(pid_t pid, struct arkdeck_listener *out, int capacity) {
+    errno = 0;
     int required = proc_pidinfo(pid, PROC_PIDLISTFDS, 0, NULL, 0);
     if (required <= 0) {
-        return -1;
+        return errno == ESRCH ? -3 : -1;
     }
     size_t count = (size_t)required / sizeof(struct proc_fdinfo) + 8;
     struct proc_fdinfo *descriptors = calloc(count, sizeof(struct proc_fdinfo));
     if (descriptors == NULL) {
         return -1;
     }
+    errno = 0;
     int actual = proc_pidinfo(pid, PROC_PIDLISTFDS, 0, descriptors,
                               (int)(count * sizeof(struct proc_fdinfo)));
     if (actual < (int)sizeof(struct proc_fdinfo)) {
         free(descriptors);
-        return -1;
+        return errno == ESRCH ? -3 : -1;
     }
     int found = 0;
     size_t returned = (size_t)actual / sizeof(struct proc_fdinfo);

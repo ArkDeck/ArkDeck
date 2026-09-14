@@ -101,6 +101,11 @@ fn scan(tool: &VerifiedTool, endpoint: SocketAddrV4) -> io::Result<ServerIdentit
         }
         let count = match registered_listener_count(pid, endpoint.port()) {
             ListenerScan::Count(count) => count,
+            // Listed a moment ago, gone before its sockets could be read: it
+            // owns nothing now, so it is no candidate rather than a failed
+            // scan. A server restarting under the scan is caught by the two
+            // scans having to agree, not by this process.
+            ListenerScan::Vanished => continue,
             ListenerScan::UnregisteredAddress => {
                 return Err(denied(
                     "selected HDC process owns an unregistered listener address",
@@ -148,14 +153,20 @@ fn scan(tool: &VerifiedTool, endpoint: SocketAddrV4) -> io::Result<ServerIdentit
 enum ListenerScan {
     Count(usize),
     UnregisteredAddress,
+    /// The process exited between being listed and being scanned.
+    Vanished,
+    /// The kernel would not say (another user's process, or a scan error):
+    /// the process may own the endpoint, so nothing can be proved.
     Failed,
 }
 
 /// Swift `registeredListeningEndpointCount`: the process's TCP listeners on
 /// the port, each of which must be the registered loopback spelling.
 fn registered_listener_count(pid: i32, port: u16) -> ListenerScan {
-    let Some(listeners) = listening_sockets(pid) else {
-        return ListenerScan::Failed;
+    let listeners = match listening_sockets(pid) {
+        Ok(listeners) => listeners,
+        Err(ScanFailure::Vanished) => return ListenerScan::Vanished,
+        Err(ScanFailure::Unscannable) => return ListenerScan::Failed,
     };
     let mut count = 0;
     for listener in listeners.iter().filter(|listener| listener.port == port) {
@@ -189,7 +200,7 @@ pub(crate) fn is_registered_listener_address(family: i32, address: &[u8]) -> boo
 }
 
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct RawListener {
     family: i32,
     port: u16,
@@ -206,8 +217,16 @@ unsafe extern "C" {
 }
 
 const MAX_LISTENERS: usize = 64;
+/// The helper's report of a process that no longer exists.
+const VANISHED: libc::c_int = -3;
 
-fn listening_sockets(pid: i32) -> Option<Vec<RawListener>> {
+#[derive(Debug, PartialEq, Eq)]
+enum ScanFailure {
+    Vanished,
+    Unscannable,
+}
+
+fn listening_sockets(pid: i32) -> Result<Vec<RawListener>, ScanFailure> {
     let mut listeners = [RawListener {
         family: 0,
         port: 0,
@@ -218,9 +237,12 @@ fn listening_sockets(pid: i32) -> Option<Vec<RawListener>> {
     let found = unsafe {
         arkdeck_macos_listening_sockets(pid, listeners.as_mut_ptr(), MAX_LISTENERS as libc::c_int)
     };
+    if found == VANISHED {
+        return Err(ScanFailure::Vanished);
+    }
     usize::try_from(found)
-        .ok()
         .map(|count| listeners[..count].to_vec())
+        .map_err(|_| ScanFailure::Unscannable)
 }
 
 fn all_process_ids() -> Option<Vec<i32>> {
@@ -305,7 +327,21 @@ fn effective_uid() -> u32 {
 
 #[cfg(test)]
 mod tests {
-    use super::is_registered_listener_address;
+    use super::{ScanFailure, is_registered_listener_address, listening_sockets};
+
+    /// A PID the kernel has no process for is a vanished candidate, never a
+    /// failed scan; a process this user may not inspect stays unscannable.
+    #[test]
+    fn a_missing_process_is_vanished_and_an_uninspectable_one_is_unscannable() {
+        assert_eq!(
+            listening_sockets(99_999_999).unwrap_err(),
+            ScanFailure::Vanished
+        );
+        // SAFETY: geteuid takes no arguments and has no memory preconditions.
+        if unsafe { libc::geteuid() } != 0 {
+            assert_eq!(listening_sockets(1).unwrap_err(), ScanFailure::Unscannable);
+        }
+    }
 
     /// Swift `testHSO6_ListenerNormalizationRejectsWildcardPortOnlyAndUnregisteredAddresses`.
     #[test]
