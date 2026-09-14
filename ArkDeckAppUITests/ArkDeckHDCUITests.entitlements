@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- The UI-test runner (ArkDeckHDCUITests-Runner.app), not the App. Xcode
+	     signs every macOS UI-test runner with the entitlements of its XCTRunner
+	     template (XCTRunner.app/Contents/Resources/RunnerEntitlements.plist)
+	     merged with these, and the template turns the App Sandbox on, so the
+	     runner's temporary directory is inside its own container.
+
+	     Fixture state handed to the App cannot live there. The App under test
+	     is sandboxed and ad-hoc signed, and reading a file in another app's
+	     container raises the "would like to access data from other apps"
+	     prompt; its startup reads block until someone answers, and an Allow
+	     does not survive the next build. FixtureStateLocation puts those files
+	     in this one directory instead, outside every container, and the App
+	     reads it through the read-only "/" exception Xcode adds to test
+	     builds. The path must stay equal to
+	     FixtureStateLocation.homeRelativeDirectory.
+
+	     The runner stays sandboxed on purpose. Unsandboxed, its temporary
+	     directory becomes the per-user one, and the Open-panel fixtures the
+	     picker tests build there sit beside everything else in it: on a busy
+	     host the panel was still loading that directory when the test gave
+	     up. -->
+	<key>com.apple.security.temporary-exception.files.home-relative-path.read-write</key>
+	<array>
+		<string>/Library/Caches/com.arkdeck.ui-test-fixture-state/</string>
+	</array>
+</dict>
+</plist>

@@ -1171,10 +1171,25 @@ final class AppShellUITests: XCTestCase {
 
   /// The history fixture reads its state from this file for the same reason
   /// the HDC one does: a sweep has to walk more than one Runtime state without
-  /// spending another launch on it.
+  /// spending another launch on it. FixtureStateLocation says where it lives.
   private var fixtureStateFileURL: URL {
-    let name = "arkdeck-appshell-fixture-state-\(ProcessInfo.processInfo.processIdentifier).txt"
-    return FileManager.default.temporaryDirectory.appending(path: name)
+    FixtureStateLocation.file(
+      named: "arkdeck-appshell-fixture-state-\(ProcessInfo.processInfo.processIdentifier).txt")
+  }
+
+  /// Every fixture test hands the App its state through this file, so this
+  /// checks what they all rely on, without launching anything: the file lands
+  /// outside every app container, where the App reads it without a privacy
+  /// prompt, and the runner may still write there. A runner that lost its
+  /// entitlement, or a helper pointed back at the temporary directory, fails
+  /// here instead of stalling every fixture test at its first device wait.
+  func testFixtureStateStaysOutsideEveryAppContainer() throws {
+    let url = fixtureStateFileURL
+    XCTAssertFalse(
+      url.path.contains("/Library/Containers/"),
+      "fixture state would be written to \(url.path), inside an app container")
+    try "probe".write(to: url, atomically: true, encoding: .utf8)
+    try FileManager.default.removeItem(at: url)
   }
 
   /// Both panes that render from the Runtime-backed presentation used to fall
