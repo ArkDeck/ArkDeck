@@ -26,10 +26,6 @@ pub(super) struct RunningChild {
 }
 
 impl RunningChild {
-    pub(super) fn pid(&self) -> libc::pid_t {
-        self.pid
-    }
-
     pub(super) fn try_wait(&mut self) -> io::Result<Option<ExitStatus>> {
         // SAFETY: zero is a valid empty siginfo_t representation.
         let mut info: libc::siginfo_t = unsafe { std::mem::zeroed() };
@@ -229,6 +225,39 @@ pub(super) fn spawn_in(
     environment: &[(OsString, OsString)],
     working_directory: Option<&CStr>,
 ) -> io::Result<RunningChild> {
+    spawn_suspended(tool, args, environment, working_directory)?.resume()
+}
+
+/// A child spawned on the retained inode and not yet running: it has the PID
+/// and the birth the kernel reports and has executed no tool code, so what
+/// the spawn itself established can be recorded before `resume` lets it run
+/// — a server that ends at once is then an exit its owner sees, never a
+/// launch that could not be recorded. Dropped unresumed, it is killed.
+pub(super) struct SuspendedChild(RunningChild);
+
+impl SuspendedChild {
+    pub(super) fn pid(&self) -> libc::pid_t {
+        self.0.pid
+    }
+
+    /// Lets the child run.
+    pub(super) fn resume(self) -> io::Result<RunningChild> {
+        // SAFETY: retained, unreaped child PID still names the suspended process.
+        if unsafe { libc::kill(self.0.pid, libc::SIGCONT) } != 0 {
+            return Err(io::Error::last_os_error());
+        }
+        Ok(self.0)
+    }
+}
+
+/// `spawn_in` up to the moment the child would run: created suspended on the
+/// retained inode, the tool re-proved, the child returned still suspended.
+pub(super) fn spawn_suspended(
+    tool: &VerifiedTool,
+    args: &[OsString],
+    environment: &[(OsString, OsString)],
+    working_directory: Option<&CStr>,
+) -> io::Result<SuspendedChild> {
     let inode_path = inode_launch_path(tool)?;
     let (out_read, out_write) = pipe()?;
     let (err_read, err_write) = pipe()?;
@@ -297,11 +326,7 @@ pub(super) fn spawn_in(
     drop(err_write);
     // Every failed check drops the suspended child and kills it before tool code.
     tool.revalidate()?;
-    // SAFETY: retained, unreaped child PID still names the suspended process.
-    if unsafe { libc::kill(pid, libc::SIGCONT) } != 0 {
-        return Err(io::Error::last_os_error());
-    }
-    Ok(child)
+    Ok(SuspendedChild(child))
 }
 
 /// argv[0] is the tool's real path; the environment is the clean base every

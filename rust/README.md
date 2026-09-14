@@ -988,9 +988,11 @@ driver. The isolated development owner dispatches its fixture HDC through it
 ## Managed HDC server (TASK-XPA-016, SPK-6)
 
 `arkdeck_platform::ManagedServer` launches a verified tool through its retained
-inode in its own group with no budget, records its launch from the kernel at
-once (PID, birth, canonical path, digest, argv), captures both streams up to a
-limit, says how it ended and stops it. `arkdeck_provider_hdc::ManagedHdcServer`
+inode in its own group with no budget, records its launch from the kernel
+while the child is still suspended (PID, birth, canonical path, digest, argv —
+read before the child can run, so a server that ends at once is reported as
+its exit, never as a launch that could not be recorded), captures both
+streams up to a limit, says how it ended and stops it. `arkdeck_provider_hdc::ManagedHdcServer`
 owns an HDC server with it as Swift's `HeadlessHDCServerHost` does: `hdc -s
 <endpoint> -m` with the server port named, the loopback listener reachable
 first (never `checkserver` first), `checkserver` exit 0 with agreeing versions,
