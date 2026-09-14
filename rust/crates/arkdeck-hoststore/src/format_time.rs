@@ -209,6 +209,63 @@ mod artifact_date_tests {
         assert_eq!(utc_timestamp(1_789_344_000), "2026-09-14T00:00:00Z");
         assert!(valid_format_timestamp(&utc_now().unwrap()));
     }
+
+    #[test]
+    fn precise_timestamps_truncate_to_milliseconds() {
+        // Swift `ISO8601Timestamps.string(from:includingFractionalSeconds:)`
+        // on the pinned toolchain: .1239 s spells .123, .9999 s spells .999.
+        assert_eq!(
+            utc_precise_timestamp(1_789_344_000, 0),
+            "2026-09-14T00:00:00.000Z"
+        );
+        assert_eq!(
+            utc_precise_timestamp(1_789_344_000, 123),
+            "2026-09-14T00:00:00.123Z"
+        );
+        assert!(valid_format_timestamp(&utc_precise_now().unwrap()));
+    }
+}
+
+/// The current instant as Swift's precise Runtime clock spells it
+/// (`ISO8601Timestamps.string(includingFractionalSeconds: true)`): UTC with
+/// milliseconds, truncated.
+#[cfg(target_os = "macos")]
+pub(crate) fn utc_precise_now() -> Option<String> {
+    let elapsed = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()?;
+    Some(utc_precise_timestamp(
+        elapsed.as_secs(),
+        elapsed.subsec_millis(),
+    ))
+}
+
+/// Unix seconds of a canonical plain UTC timestamp (`utc_timestamp`'s own
+/// spelling, which the Runtime clock produces); any other spelling is none.
+#[cfg(target_os = "macos")]
+pub(crate) fn plain_utc_seconds(text: &str) -> Option<u64> {
+    let bytes = text.as_bytes();
+    if bytes.len() != 20 || !text.is_ascii() {
+        return None;
+    }
+    let number = |range: std::ops::Range<usize>| text.get(range)?.parse::<i64>().ok();
+    let (year, month, day) = (number(0..4)?, number(5..7)?, number(8..10)?);
+    let (hour, minute, second) = (number(11..13)?, number(14..16)?, number(17..19)?);
+    // Hinnant's `days_from_civil`.
+    let shifted = if month <= 2 { year - 1 } else { year };
+    let era = shifted.div_euclid(400);
+    let year_of_era = shifted - era * 400;
+    let day_of_year = (153 * (month + if month > 2 { -3 } else { 9 }) + 2) / 5 + day - 1;
+    let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+    let days = era * 146_097 + day_of_era - 719_468;
+    let seconds = u64::try_from(days * 86_400 + hour * 3_600 + minute * 60 + second).ok()?;
+    (utc_timestamp(seconds) == text).then_some(seconds)
+}
+
+#[cfg(target_os = "macos")]
+fn utc_precise_timestamp(seconds: u64, milliseconds: u32) -> String {
+    let plain = utc_timestamp(seconds);
+    format!("{}.{milliseconds:03}Z", &plain[..plain.len() - 1])
 }
 
 /// The current instant as Swift durable records spell it
@@ -225,7 +282,7 @@ pub(crate) fn utc_now() -> Option<String> {
 /// Unix seconds as `YYYY-MM-DDTHH:MM:SSZ` in the proleptic Gregorian calendar
 /// (Hinnant's `civil_from_days`).
 #[cfg(target_os = "macos")]
-fn utc_timestamp(seconds: u64) -> String {
+pub(crate) fn utc_timestamp(seconds: u64) -> String {
     let days = (seconds / 86_400) as i64 + 719_468;
     let era = days.div_euclid(146_097);
     let day_of_era = days.rem_euclid(146_097);

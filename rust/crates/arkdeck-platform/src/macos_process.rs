@@ -61,6 +61,17 @@ impl RunningChild {
         self.cleanup_attempted = true;
         terminate_unix_child(self.pid, &mut self.reaped)
     }
+    /// Deliver `signal` to the child's own process group while its PID is
+    /// still retained; a reaped child's group is never signalled.
+    pub(super) fn signal_group(&self, signal: libc::c_int) {
+        if !self.reaped {
+            // SAFETY: WNOWAIT waits keep this PID, and so its fresh process
+            // group, reserved until kill_and_wait reaps it.
+            unsafe {
+                libc::kill(-self.pid, signal);
+            }
+        }
+    }
 }
 impl Drop for RunningChild {
     fn drop(&mut self) {

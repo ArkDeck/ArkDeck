@@ -274,14 +274,14 @@
       "successes": 12
     },
     "job.run": {
-      "errors": 2,
-      "requests": 5,
+      "errors": 3,
+      "requests": 6,
       "successes": 3
     },
     "job.show": {
       "errors": 2,
-      "requests": 18,
-      "successes": 16
+      "requests": 21,
+      "successes": 19
     },
     "job.status": {
       "errors": 2,
@@ -530,16 +530,16 @@
     }
   },
   "corpusRecordCounts": {
-    "errors": 273,
-    "requests": 608,
-    "successes": 335
+    "errors": 274,
+    "requests": 612,
+    "successes": 338
   },
   "directoryDigests": {
     "Catalog/operations": "16671abf96551e9d5b9c3382fe4eb08f3fcd150cff68e7419634cd10ecda4bfd",
     "Catalog/profiles": "58ca1d970d40019ba2718646fde81fefda22533c5448e620217582e30f5d648f",
-    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "df9bc0006363d0682397724b01b3737b6ea16d61b07839a05d68c25b0546a860",
+    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "17bd99af2340e0b880c01254befb2cb9b871a03eb9288766920968f62d03ba62",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC": "9ae93642e7b81bcea918469216711d7f6a17135a29cf021556ceef0f2f789196",
-    "spec/control/methods": "2f0331fbfec6abe04e6d9416f2629679eb77ae0cd28d8bedf06422f6ebf2bc3f"
+    "spec/control/methods": "25582e53da5f65699471fdd97679de752c404347cf54bca709077fe8903bb9f0"
   },
   "files": {
     "Catalog/generated/effect-authorization-matrix.md": {
@@ -931,12 +931,12 @@
       "sha256": "7c706f243e5d7f44b486894fc54341e0c1c94016c2052e6c9da76a3840661fb9"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.run.jsonl": {
-      "blob": "2d61a22b3bcf8ad3239e099fa50fb5fdbecc8883",
-      "sha256": "e79ceda129e739f2eee0737f16b8741df7659c0a4592614ee6b298c0c5c4bbc5"
+      "blob": "ef8adc6b450fb0e73c8ff962f9bc85c788253ec7",
+      "sha256": "1c1d613854eace0c85c02556ec63030b61d7c8b260696b41924c38eed7cb209c"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.show.jsonl": {
-      "blob": "9806e51775d4f974b59939533fe21ba4c6ff820d",
-      "sha256": "b8835130f534c0024f7bd20b942e7f398a12ef14d106a11baf66370a09988312"
+      "blob": "fc054b0d78c32b18bb3228f33687a5c1e14d37fa",
+      "sha256": "1dcadaac31cbde5dd1ec2f2c71cdf268fc84c22b8b31a350efbd8dca79917b7c"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.status.jsonl": {
       "blob": "2d52b4be568db3420147186746cf169fcfd426ea",
@@ -1527,16 +1527,16 @@
       "sha256": "f77f7515c8aec9a6d3ca38f5c8a15458e43d44b219d56c87857b8b780234e4e0"
     },
     "spec/control/methods/job.run.json": {
-      "blob": "66ef26bfc3ec75320488176a092558bfd7b08131",
-      "sha256": "bbc4bfadba4c3bfa6ad3c2497a71b8bd43f1cc02c9258f24f3ba458deed448a9"
+      "blob": "e04ef2b6f69deee8b35d405951c8f7e8cd47b9c9",
+      "sha256": "1b80f1632212dfa568df7ddf1782a2687c7ca7b152a17d4c3c7e0609145f468d"
     },
     "spec/control/methods/job.show.json": {
-      "blob": "b7d9dde1a3dbf563590e9f51bec89f6c56f79dae",
-      "sha256": "4753efc06e87f0e78e39b249379f4a2060001ecb36fa65093168e9399cb5b1b9"
+      "blob": "9bc67b2f207a7336ea7d52c1cb42525c4d9304a1",
+      "sha256": "e54ea281093a31dcf1456bb5dbc08c2efaaa046840f03cdf5d077c3f5ecc8c01"
     },
     "spec/control/methods/job.status.json": {
-      "blob": "aa85c616637adfceb7d5789aa6c670440c15a3bc",
-      "sha256": "4d109fbdecbcd774ca7468ab3d948c9183687c1eb627e9dd42927b946871a026"
+      "blob": "cae6815dc3ea89c184b7b2991d2e8b03c27c0754",
+      "sha256": "de4c33279c50caef4de91282eb7ccf415cca5cceabe94d97aeb6c6e8faba32e7"
     },
     "spec/control/methods/job.submit.json": {
       "blob": "c905dd3c9dbc5f6b7ff27f8f8d2c91baa9839b10",
@@ -1731,7 +1731,7 @@
       "sha256": "95367cc3e57160752f7d1d724887ee650adb8d3ccc5d736444517641a5da8e64"
     }
   },
-  "inputDigest": "1a6c9a8ac960d8cbcdb10cc794af53807de02625a3d2b98842b3de1a95e7768f",
+  "inputDigest": "6258018d6a74c4e555f8599b5cf1512ce56ea88fcd67a96a8ed8d4ba6a3888a4",
   "kind": "development",
   "methodCount": 105,
   "protocolVersion": "1.0.0",

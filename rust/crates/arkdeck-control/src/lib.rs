@@ -100,6 +100,15 @@ pub trait HostServices: Send + Sync {
             details: None,
         })
     }
+    /// `job.run` runs an admitted Job. A host without a Job owner that runs
+    /// answers as the read-only foundation always has.
+    fn job_run(&self, _params: &serde_json::Map<String, Value>) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "rejected".into(),
+            message: "this method is unavailable in the read-only Rust foundation".into(),
+            details: None,
+        })
+    }
     fn bootstrap_register_bundle(&self, _file: &str) -> Result<Value, WireError> {
         Err(WireError {
             code: "operationUnavailable".into(),
@@ -723,6 +732,10 @@ impl<H: HostServices> Control<H> {
             "job.submit" => Response {
                 id: request.id.clone(),
                 outcome: self.host.job_submit(&params),
+            },
+            "job.run" => Response {
+                id: request.id.clone(),
+                outcome: self.host.job_run(&params),
             },
             "artifact.inspect" | "artifact.read" | "artifact.export" => Response {
                 id: request.id.clone(),

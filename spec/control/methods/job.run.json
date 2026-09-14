@@ -269,8 +269,8 @@
   "x-arkdeck-method": "job.run",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 8,
-    "request": 52,
-    "result": 44
+    "error": 7,
+    "request": 25,
+    "result": 18
   }
 }

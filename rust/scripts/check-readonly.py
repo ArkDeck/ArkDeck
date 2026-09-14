@@ -356,7 +356,9 @@ def main() -> None:
                     ("oversized", b"x" * registry["maximumRequestFrameBytes"] + b"\n", None, "malformedFrame"),
                 ]:
                     exchange(endpoint, directory, rows, name, data, method, error, valid_request=False)
-            invoke(cli, directory, rows, environment, "unknown-command", ["job", "run"], 64, "invalidCommand")
+            # A verb no CLI publishes: the Rust CLI now serves `job run`.
+            invoke(cli, directory, rows, environment, "unknown-command", ["job", "no-such-command"], 64,
+                   "invalidCommand")
             invoke(cli, directory, rows, environment, "bad-option", ["doctor", "--shell", "x"], 64, "invalidOption")
         finally:
             daemon.terminate()

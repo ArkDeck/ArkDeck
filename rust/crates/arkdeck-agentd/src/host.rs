@@ -14,6 +14,18 @@ struct ObservationState {
     snapshot: Option<DeviceObservationsResult>,
 }
 
+/// The Artifact quota the Swift daemon composes (`ArtifactQuota()`).
+#[cfg(target_os = "macos")]
+pub(crate) const ARTIFACT_QUOTA: u64 = 8 * 1024 * 1024 * 1024;
+
+/// One Job's run, which every concurrent caller for that Job joins.
+#[cfg(target_os = "macos")]
+#[derive(Default)]
+struct RunSlot {
+    outcome: Mutex<Option<Result<serde_json::Value, WireError>>>,
+    finished: std::sync::Condvar,
+}
+
 pub struct Host {
     #[cfg(target_os = "macos")]
     imports: Option<arkdeck_hoststore::ImportUploadStore>,
@@ -42,6 +54,11 @@ pub struct Host {
     )>,
     unavailable: &'static str,
     observations: Mutex<ObservationState>,
+    #[cfg(target_os = "macos")]
+    running: Mutex<std::collections::HashMap<String, std::sync::Arc<RunSlot>>>,
+    /// Swift `NSHomeDirectory()`, which Artifact redaction replaces.
+    #[cfg(target_os = "macos")]
+    home: String,
 }
 
 impl Host {
@@ -153,6 +170,10 @@ impl Host {
             storage: None,
             unavailable,
             observations: Mutex::new(ObservationState::default()),
+            #[cfg(target_os = "macos")]
+            running: Mutex::new(Default::default()),
+            #[cfg(target_os = "macos")]
+            home: arkdeck_platform::runtime_home().unwrap_or_default(),
         }
     }
 }
@@ -402,6 +423,73 @@ impl HostServices for Host {
                 serde_json::Map::new()
             }),
         })
+    }
+    /// `job.run` runs an admitted analyzer Job in the owner that admitted it.
+    /// Every concurrent caller for one Job joins its one run, as Swift's
+    /// callers join the one driver of a Job.
+    #[cfg(target_os = "macos")]
+    fn job_run(
+        &self,
+        params: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<serde_json::Value, WireError> {
+        let (Some((_, analyzer)), Some(jobs), Some(artifacts)) =
+            (&self.planning, &self.jobs, &self.artifacts)
+        else {
+            return Err(WireError {
+                code: "rejected".into(),
+                message: "this method is unavailable in the read-only Rust foundation".into(),
+                details: None,
+            });
+        };
+        let run = || {
+            arkdeck_hoststore::JobRunner {
+                jobs,
+                artifacts,
+                analyzer: analyzer.as_ref(),
+                quota: ARTIFACT_QUOTA,
+                home: &self.home,
+                now: arkdeck_hoststore::runtime_now,
+                precise_now: arkdeck_hoststore::runtime_precise_now,
+            }
+            .handle(params)
+            .map_err(|refusal| WireError {
+                code: refusal.code.into(),
+                message: refusal.message,
+                details: Some(refusal.details),
+            })
+        };
+        let uncertain = || WireError {
+            code: "internalError".into(),
+            message: "the Runtime could not complete the Job lifecycle request".into(),
+            details: Some(serde_json::Map::new()),
+        };
+        let Some(job) = params.get("jobId").and_then(serde_json::Value::as_str) else {
+            return run();
+        };
+        let slot = {
+            let mut running = self.running.lock().map_err(|_| uncertain())?;
+            if let Some(slot) = running.get(job).cloned() {
+                drop(running);
+                let mut outcome = slot.outcome.lock().map_err(|_| uncertain())?;
+                while outcome.is_none() {
+                    outcome = slot.finished.wait(outcome).map_err(|_| uncertain())?;
+                }
+                return outcome.clone().unwrap_or_else(|| Err(uncertain()));
+            }
+            let slot = std::sync::Arc::new(RunSlot::default());
+            running.insert(job.to_owned(), slot.clone());
+            slot
+        };
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(run))
+            .unwrap_or_else(|_| Err(uncertain()));
+        if let Ok(mut outcome) = slot.outcome.lock() {
+            *outcome = Some(result.clone());
+        }
+        slot.finished.notify_all();
+        if let Ok(mut running) = self.running.lock() {
+            running.remove(job);
+        }
+        result
     }
     #[cfg(target_os = "macos")]
     fn bootstrap_register_bundle(&self, source: &str) -> Result<serde_json::Value, WireError> {

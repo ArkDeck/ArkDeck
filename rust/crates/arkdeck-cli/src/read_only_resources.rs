@@ -41,6 +41,7 @@ pub(crate) fn configure(
                 | "job.evidence"
                 | "job.timeline"
                 | "job.events"
+                | "job.run"
         )
     {
         return Ok(None);
@@ -247,6 +248,7 @@ pub fn validate_read_only_request(invocation: &Invocation) -> Result<(), CliErro
             | "job.evidence"
             | "job.timeline"
             | "job.events"
+            | "job.run"
     ) {
         arkdeck_contract::validate_method_value(
             invocation.method,
@@ -274,6 +276,7 @@ pub fn validate_read_only_response(invocation: &Invocation, v: &Value) -> Result
             | "job.evidence"
             | "job.timeline"
             | "job.events"
+            | "job.run"
     ) {
         return Ok(());
     }

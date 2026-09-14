@@ -1,0 +1,91 @@
+{
+  "actualEffect" : "hostOnly",
+  "actualStepKinds" : [
+    "runDeterministicAnalyzer"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "kind" : "defaultReadOnlyPolicy",
+    "reference" : "default-read-only-policy"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-2be36e7a9189a71f770e51b2e85a033e",
+  "materializedPlanDigest" : "23efa20a4b796ef82631a0e68c09e658d94174d2960c488f8bb529d0ea96348c",
+  "operationFailure" : {
+    "category" : "unknownOutcome",
+    "code" : "outcomeUnknown",
+    "recovery" : "awaitRuntimeReconciliation",
+    "retryability" : "runtimeDecisionRequired",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "analyzer.extract-crash-signature@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-run-timedOut-0001",
+    "inputs" : {
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-51a83413b200cc278425d09aec6c992f"
+    },
+    "operation" : {
+      "id" : "analyzer.extract-crash-signature",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-run-timedOut",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "outcomeUnknown" : true,
+  "providerID" : "analyzer",
+  "recoveryAction" : {
+    "arguments" : {
+      "analyzerRef" : "crash-signature@1",
+      "analyzerVersion" : "arkdeck-fault-log-ledger@1",
+      "sourceArtifactId" : "ART-51a83413b200cc278425d09aec6c992f",
+      "sourceByteCount" : 29,
+      "sourceSha256" : "b685e64acaa1187278bd2f6b12c4190ee9a3663b786ab3f3111e7c5dbe467a25"
+    },
+    "kind" : "analyzer.analyze"
+  },
+  "recoveryIntentEventID" : "intent-extract-crash-signature",
+  "recoveryStepID" : "extract-crash-signature",
+  "request" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-run-timedOut-0001",
+    "inputs" : {
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-51a83413b200cc278425d09aec6c992f"
+    },
+    "operation" : {
+      "id" : "analyzer.extract-crash-signature",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-run-timedOut",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "waitingForRecovery",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "intent extract-crash-signature",
+    "outcomeUnknown extract-crash-signature; durable intent left outstanding",
+    "running->waitingForRecovery",
+    "reason: outcomeUnknown: process timed out before completion"
+  ]
+}

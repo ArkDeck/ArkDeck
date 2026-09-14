@@ -1,0 +1,441 @@
+// Shared Swift oracle for the Rust `job.run` analyzer runner (CHG-2026-074, TASK-XPA-014).
+
+import CryptoKit
+import Darwin
+import SQLite3
+import XCTest
+
+@testable import ArkDeckAgentDaemon
+@testable import ArkDeckCore
+@testable import ArkDeckRuntime
+@testable import ArkDeckStorage
+@testable import ArkDeckWorkflows
+
+/// Swift `job.run` for `analyzer.extract-crash-signature@1`: the oracle
+/// `rust/crates/arkdeck-hoststore/tests/job_run.rs` replays against the Rust
+/// runner. Each case admits one Job over its own source crash log, whose first
+/// line tells the oracle analyzer which answer to give, and the Jobs then run
+/// in order over one store: successes publish their derived Artifact until the
+/// Artifact quota refuses one, each semantic check refuses its own answer, a
+/// timeout and a signal leave the outcome unknown, and runs of absent,
+/// terminal and parked Jobs are refused before any dispatch. The oracle keeps
+/// every answer, how `job.status` and `job.show` then read each Job, and the
+/// store the runs leave: the Job index and files and every Artifact index and
+/// payload.
+///
+/// The engine runs the real descriptor-bound process dispatcher and no Session
+/// publication writer, the composition the Rust runner reproduces. It runs
+/// under the `job.plan` oracle's fixed physical root and lock, since the plan
+/// digest covers the source Artifact's absolute path. Record a new oracle with
+/// `ARKDECK_RUST_JOB_RUN_RECORD=/private/tmp/<new directory>`; otherwise the
+/// checked-in oracle must match byte for byte.
+final class JobRunAnalyzerOracleContractTests: XCTestCase {
+  private struct Case {
+    let name: String
+    /// Admits a Job over a source whose first line is this mode.
+    var mode: String?
+    /// The state a run of this case's Job ends in.
+    var ends: String?
+    /// Runs the Job an earlier case admitted.
+    var rerun: String?
+    /// An exact refused request, in a shape the corpus already publishes.
+    var params: [String: JSONValue]?
+    /// The source's payload is removed after admission, before the run.
+    var removesSourcePayload = false
+  }
+
+  private static let repository: URL = {
+    var url = URL(filePath: #filePath)
+    for _ in 0..<5 { url.deleteLastPathComponent() }
+    return url
+  }()
+  private static let oracle = repository.appending(
+    path: "rust/tests/fixtures/job-run-analyzer", directoryHint: .isDirectory)
+  private static let root = URL(
+    filePath: "/private/tmp/arkdeck-job-plan-oracle", directoryHint: .isDirectory)
+  private static let lockPath = "/private/tmp/arkdeck-job-plan-oracle.lock"
+  private static let nowUTC = "2026-09-14T00:00:00Z"
+  private static let nowPreciseUTC = "2026-09-14T00:00:00.000Z"
+  private static let sourceJob = "job-oracle-source"
+  private static let removedSourceJob = "job-oracle-source-removed"
+  private static let target = "TGT-ORACLE"
+  /// Redaction replaces this home directory; the `secret` answer names it.
+  private static let home = "/private/tmp/arkdeck-job-plan-oracle/home"
+  /// Small enough that the `quota` answer cannot be published.
+  private static let quotaBytes = 32 * 1024
+  /// Short enough that the `sleep` answer times out.
+  private static let timeoutSeconds = 2
+  private static let analyzerBytes = Data(
+    #"""
+    #!/bin/sh
+    # ArkDeck job.run oracle analyzer. The first line of the source it is given
+    # names its answer; nothing else is read.
+    [ "$#" -eq 2 ] && [ "$1" = "--analyze-crash-ledger" ] || exit 64
+    IFS= read -r mode < "$2" || exit 66
+    case "$mode" in
+    answered)
+      printf '%s\n' '{"status":"answered","schemaVersion":"1.0.0","extra":{"ignored":true},"analyzerVersion":"arkdeck-fault-log-ledger@1","analyzerRef":"crash-signature@1","entries":[{"uid":"20010045","timestamp":"20260914000000","name":"jscrash-com.example.oracle-20010045-20260914000000","kind":"jscrash","bundle":"com.example/oracle-崩溃","note":"ignored"}],"unreadableReason":null}' ;;
+    unreadable)
+      printf '%s' '{"analyzerRef":"crash-signature@1","analyzerVersion":"arkdeck-fault-log-ledger@1","entries":[],"schemaVersion":"1.0.0","status":"unreadable","unreadableReason":"the listing has no Fault log list header"}' ;;
+    secret)
+      printf '%s' '{"analyzerRef":"crash-signature@1","analyzerVersion":"arkdeck-fault-log-ledger@1","entries":[{"bundle":"password=hunter2hunter2","kind":"cppcrash","name":"/private/tmp/arkdeck-job-plan-oracle/home/Library/cppcrash-1","timestamp":"20260914000001","uid":"api_key: abcdef1234"}],"schemaVersion":"1.0.0","status":"answered"}' ;;
+    empty) ;;
+    exit) printf 'oracle analyzer failed\n' >&2; exit 3 ;;
+    malformed) printf 'crash signature: none\n' ;;
+    scalar) printf '"answered"' ;;
+    mismatch)
+      printf '%s' '{"analyzerRef":"crash-signature@1","analyzerVersion":"arkdeck-fault-log-ledger@2","entries":[],"schemaVersion":"1.0.0","status":"answered"}' ;;
+    badentry)
+      printf '%s' '{"analyzerRef":"crash-signature@1","analyzerVersion":"arkdeck-fault-log-ledger@1","entries":[{"name":"jscrash-only-a-name"}],"schemaVersion":"1.0.0","status":"answered"}' ;;
+    bigstdout) /usr/bin/head -c 9437184 /dev/zero ;;
+    bigstderr)
+      /usr/bin/head -c 9437184 /dev/zero >&2
+      printf '%s' '{"analyzerRef":"crash-signature@1","analyzerVersion":"arkdeck-fault-log-ledger@1","entries":[],"schemaVersion":"1.0.0","status":"answered"}' ;;
+    sleep) /bin/sleep 5 ;;
+    signal) kill -KILL "$$" ;;
+    quota)
+      printf '%s' '{"analyzerRef":"crash-signature@1","analyzerVersion":"arkdeck-fault-log-ledger@1","entries":['
+      i=0
+      while [ "$i" -lt 600 ]; do
+        [ "$i" -gt 0 ] && printf ','
+        printf '{"bundle":"com.example.quota","kind":"jscrash","name":"jscrash-com.example.quota-%d","timestamp":"20260914000000","uid":"%d"}' "$i" "$i"
+        i=$((i + 1))
+      done
+      printf '%s' '],"schemaVersion":"1.0.0","status":"answered"}' ;;
+    *) exit 65 ;;
+    esac
+
+    """#.utf8)
+
+  func testSwiftRunsTheSharedAnalyzerOracle() async throws {
+    let lock = open(Self.lockPath, O_RDWR | O_CREAT | O_CLOEXEC, 0o600)
+    guard lock >= 0 else { throw POSIXError(.EACCES) }
+    defer { close(lock) }
+    guard flock(lock, LOCK_EX) == 0 else { throw POSIXError(.EBUSY) }
+    let files = try await oracleFiles()
+    if let output = ProcessInfo.processInfo.environment["ARKDECK_RUST_JOB_RUN_RECORD"] {
+      let destination = URL(fileURLWithPath: output, isDirectory: true)
+      guard destination.path.hasPrefix("/private/tmp/"),
+        !FileManager.default.fileExists(atPath: destination.path)
+      else { throw CocoaError(.fileWriteFileExists) }
+      for (path, data) in files {
+        let url = destination.appending(path: path)
+        try FileManager.default.createDirectory(
+          at: url.deletingLastPathComponent(), withIntermediateDirectories: true,
+          attributes: [.posixPermissions: 0o700])
+        try data.write(to: url)
+      }
+      return
+    }
+    let recorded = try FileManager.default.subpathsOfDirectory(atPath: Self.oracle.path)
+      .filter { path in
+        var directory: ObjCBool = false
+        FileManager.default.fileExists(
+          atPath: Self.oracle.appending(path: path).path, isDirectory: &directory)
+        return !directory.boolValue
+      }
+    XCTAssertEqual(Set(recorded), Set(files.keys))
+    for (path, data) in files {
+      XCTAssertEqual(try Data(contentsOf: Self.oracle.appending(path: path)), data, path)
+    }
+  }
+
+  private static let cases: [Case] = [
+    Case(name: "answered", mode: "answered", ends: "succeeded"),
+    Case(name: "unreadable", mode: "unreadable", ends: "succeeded"),
+    Case(name: "redacted", mode: "secret", ends: "succeeded"),
+    Case(name: "emptyResult", mode: "empty", ends: "failed"),
+    Case(name: "nonZeroExit", mode: "exit", ends: "failed"),
+    Case(name: "malformedResult", mode: "malformed", ends: "failed"),
+    Case(name: "scalarResult", mode: "scalar", ends: "failed"),
+    Case(name: "versionMismatch", mode: "mismatch", ends: "failed"),
+    Case(name: "undecodableEntry", mode: "badentry", ends: "failed"),
+    Case(name: "truncatedStdout", mode: "bigstdout", ends: "failed"),
+    Case(name: "truncatedStderr", mode: "bigstderr", ends: "failed"),
+    Case(name: "timedOut", mode: "sleep", ends: "waitingForRecovery"),
+    Case(name: "signalled", mode: "signal", ends: "waitingForRecovery"),
+    Case(name: "quotaExceeded", mode: "quota", ends: "failed"),
+    Case(name: "rerunSucceeded", rerun: "answered"),
+    Case(name: "rerunFailed", rerun: "emptyResult"),
+    Case(name: "rerunParked", rerun: "timedOut"),
+    Case(name: "absentJob", params: ["jobId": .string("job-00000000000000000000000000000000")]),
+    Case(name: "missingJobId", params: [:]),
+    // Last: a removed payload leaves its source Job's Artifact index
+    // unverifiable, and a later publication would have to census it.
+    Case(name: "sourceRemoved", mode: "answered", ends: "failed", removesSourcePayload: true),
+  ]
+
+  private func oracleFiles() async throws -> [String: Data] {
+    let manager = FileManager.default
+    try? manager.removeItem(at: Self.root)
+    try manager.createDirectory(
+      at: Self.root, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+    defer { try? manager.removeItem(at: Self.root) }
+    let analyzer = Self.root.appending(path: "analyzer")
+    try Self.analyzerBytes.write(to: analyzer)
+    guard chmod(analyzer.path, 0o700) == 0 else { throw POSIXError(.EPERM) }
+    let artifacts = Self.root.appending(path: "artifacts", directoryHint: .isDirectory)
+    let store = try RuntimeArtifactStore(
+      rootURL: artifacts, quota: ArtifactQuota(totalBytes: Self.quotaBytes),
+      redaction: ArtifactRedactionPolicy(homeDirectory: Self.home), nowUTC: { Self.nowUTC })
+    let profile = AnalyzerProfile(
+      analyzerRef: HarnessCrashLedgerAnalysis.analyzerRef,
+      analyzerVersion: HarnessCrashLedgerAnalysis.analyzerVersion,
+      executablePath: analyzer.path,
+      executableSHA256: AnalyzerProvider.sha256(Self.analyzerBytes),
+      fixedArguments: ["--analyze-crash-ledger"], timeoutSeconds: Self.timeoutSeconds)
+    let jobsState = Self.root.appending(path: "jobs-state", directoryHint: .isDirectory)
+    let capabilities = try RuntimeCapabilityStore(
+      directoryURL: jobsState.appending(path: "capabilities", directoryHint: .isDirectory))
+    let provider = try AnalyzerProvider(profiles: [profile])
+    let engine = try RuntimeJobEngine(
+      configuration: .init(stateDirectory: jobsState),
+      providers: DeviceProviderRegistry(providers: [provider]),
+      dispatcher: DescriptorBoundProcessDispatcher(
+        resolver: try AnalyzerExecutableResolver(profiles: [profile])),
+      capabilityStore: capabilities, artifactStore: store,
+      nowUTC: { Self.nowUTC }, nowPreciseUTC: { Self.nowPreciseUTC })
+    let handler = RuntimeControlPlaneHandler(
+      engine: engine, capabilityStore: capabilities, providerIDs: [provider.providerID],
+      nowUTC: { Self.nowUTC }, targetStore: nil, bootstrap: nil, artifactStore: store,
+      flashBundleImportDirectory: nil, flashBundleImportPolicy: .production,
+      methodObserver: nil)
+
+    // Every source first, then every admission: a run meets exactly the
+    // store the Rust replay rebuilds before its first run.
+    var sources: [String: (job: String, artifact: String, lease: String)] = [:]
+    for item in Self.cases {
+      guard let mode = item.mode else { continue }
+      let job = item.removesSourcePayload ? Self.removedSourceJob : Self.sourceJob
+      let source = try await store.publish(
+        RuntimeArtifactPublicationRequest(
+          jobID: job, sessionID: "HTASK-JOBRUNORACLE", stepID: "capture-crash-log",
+          name: "crash-log-\(item.name).txt", mediaType: "text/plain", privacy: .standard,
+          retentionClass: .default, sourceOperation: "capture.diagnostics@1", providerID: "hdc",
+          bindingSnapshot: ArtifactBindingSnapshot(
+            targetID: Self.target, bindingRevision: 3,
+            stableIdentitySHA256: String(repeating: "c", count: 64)),
+          contents: Data("\(mode)\nFault log list:\n******\n".utf8)))
+      sources[item.name] = (
+        job, source.artifactID,
+        try await store.leaseReference(jobID: source.jobID, artifactID: source.artifactID)
+      )
+    }
+    var submits: [String: [String: JSONValue]] = [:]
+    var jobIDs: [String: String] = [:]
+    for item in Self.cases where item.mode != nil {
+      let params = try Self.submitParams(item.name, lease: sources[item.name]!.lease)
+      let accepted = try await exchange(handler, "job.submit", params)
+      guard case .object(let fields) = accepted, case .object(let result)? = fields["result"],
+        result["deduplicated"] == .bool(false), case .string(let jobID)? = result["jobId"]
+      else { throw CocoaError(.coderInvalidValue) }
+      submits[item.name] = params
+      jobIDs[item.name] = jobID
+    }
+
+    var recorded: [JSONValue] = []
+    for item in Self.cases {
+      var entry: [String: JSONValue] = ["name": .string(item.name)]
+      let params: [String: JSONValue]
+      if let mode = item.mode {
+        let source = sources[item.name]!
+        if item.removesSourcePayload {
+          try manager.removeItem(
+            at: artifacts.appending(path: source.job).appending(path: source.artifact))
+          entry["removesSourcePayload"] = .string("\(source.job)/\(source.artifact)")
+        }
+        entry["mode"] = .string(mode)
+        entry["submit"] = .object(submits[item.name]!)
+        params = ["jobId": .string(jobIDs[item.name]!)]
+      } else if let earlier = item.rerun {
+        entry["rerun"] = .string(earlier)
+        params = ["jobId": .string(jobIDs[earlier]!)]
+      } else {
+        params = item.params!
+      }
+      entry["params"] = .object(params)
+      let response = try await exchange(handler, "job.run", params)
+      check(response, item)
+      entry["response"] = response
+      recorded.append(.object(entry))
+    }
+
+    // How Swift then reads each Job it ran.
+    var reads: [String: JSONValue] = [:]
+    for item in Self.cases where item.mode != nil {
+      let jobID = jobIDs[item.name]!
+      var answers: [String: JSONValue] = [:]
+      for method in ["job.status", "job.show"] {
+        answers[method] = try await exchange(handler, method, ["jobId": .string(jobID)])
+      }
+      reads[jobID] = .object(answers)
+    }
+
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes]
+    var files: [String: Data] = [
+      "analyzer": Self.analyzerBytes,
+      "cases.json": try encoder.encode(JSONValue.array(recorded)) + Data("\n".utf8),
+      "reads.json": try encoder.encode(JSONValue.object(reads)) + Data("\n".utf8),
+      "store/index.json": try encoder.encode(try Self.index(of: jobsState)) + Data("\n".utf8),
+    ]
+    // Every Artifact index and payload; the payload-verification cache
+    // records this machine's inodes and times, so it is no part of the oracle.
+    for job in try manager.contentsOfDirectory(atPath: artifacts.path).sorted()
+    where !job.hasPrefix(".") {
+      let directory = artifacts.appending(path: job, directoryHint: .isDirectory)
+      for name in try manager.contentsOfDirectory(atPath: directory.path).sorted()
+      where !name.hasPrefix(".") {
+        files["artifacts/\(job)/\(name)"] = try Data(contentsOf: directory.appending(path: name))
+      }
+    }
+    // Every file each Job's directory holds.
+    let jobs = jobsState.appending(path: "jobs", directoryHint: .isDirectory)
+    for job in try manager.contentsOfDirectory(atPath: jobs.path).sorted() {
+      let directory = jobs.appending(path: job, directoryHint: .isDirectory)
+      for name in try manager.contentsOfDirectory(atPath: directory.path).sorted() {
+        files["store/jobs/\(job)/\(name)"] = try Data(contentsOf: directory.appending(path: name))
+      }
+    }
+    var digests: [String: JSONValue] = [:]
+    for (path, data) in files { digests[path] = .string(Self.sha256(data)) }
+    files["provenance.json"] =
+      try encoder.encode(
+        JSONValue.object([
+          "producer": .string(
+            "JobRunAnalyzerOracleContractTests/testSwiftRunsTheSharedAnalyzerOracle"),
+          "root": .string(Self.root.path),
+          "nowUTC": .string(Self.nowUTC),
+          "nowPreciseUTC": .string(Self.nowPreciseUTC),
+          "home": .string(Self.home),
+          "quotaBytes": .integer(Int64(Self.quotaBytes)),
+          "timeoutSeconds": .integer(Int64(Self.timeoutSeconds)),
+          "files": .object(digests),
+        ])) + Data("\n".utf8)
+    return files
+  }
+
+  private static func submitParams(_ name: String, lease: String) throws -> [String: JSONValue] {
+    let fields: [String: JSONValue] = [
+      "documentType": .string("runtime-operation-request"),
+      "schemaVersion": .string("1.0.0"),
+      "requestId": .string("req-oracle-run-\(name)"),
+      "idempotencyKey": .string("idem-oracle-run-\(name)-0001"),
+      "target": .object(["targetId": .string(Self.target)]),
+      "operation": .object([
+        "id": .string("analyzer.extract-crash-signature"), "version": .integer(1),
+      ]),
+      "inputs": .object(["sourceArtifactRef": .string(lease)]),
+    ]
+    let bytes = try CanonicalJSONEncoders.canonical().encode(JSONValue.object(fields))
+    return ["requestJson": .string(String(decoding: bytes, as: UTF8.self))]
+  }
+
+  /// A run answers the state its case names; a refusal carries the
+  /// zero-dispatch proof.
+  private func check(_ response: JSONValue, _ item: Case) {
+    guard case .object(let fields) = response else { return XCTFail(item.name) }
+    if let ends = item.ends {
+      guard fields["ok"] == .bool(true), case .object(let result)? = fields["result"] else {
+        return XCTFail("\(item.name): \(response)")
+      }
+      XCTAssertEqual(result["state"], .string(ends), item.name)
+    } else {
+      guard fields["ok"] == .bool(false), case .object(let error)? = fields["error"],
+        case .object(let details)? = error["details"]
+      else { return XCTFail("\(item.name): \(response)") }
+      XCTAssertEqual(details["newDispatchCount"], .integer(0), item.name)
+      XCTAssertEqual(details["phase"], .string("preAdmission"), item.name)
+    }
+  }
+
+  private func exchange(
+    _ handler: RuntimeControlPlaneHandler, _ method: String, _ params: [String: JSONValue]
+  ) async throws -> JSONValue {
+    let frame = try CanonicalJSONEncoders.canonical().encode(
+      JSONValue.object([
+        "protocolVersion": .string(ArkDeckControlProtocol.currentVersion),
+        "contractIdentity": .string(ArkDeckControlProtocol.contractIdentity),
+        "id": .string("job-run-oracle"), "method": .string(method),
+        "params": .object(params),
+      ]))
+    let response = await handler.handleFrame(frame)
+    var fields: [String: JSONValue] = ["ok": .bool(response.ok)]
+    if let result = response.result { fields["result"] = result }
+    if let error = response.error {
+      var body: [String: JSONValue] = [
+        "code": .string(error.code), "message": .string(error.message),
+      ]
+      if let details = error.details { body["details"] = .object(details) }
+      fields["error"] = .object(body)
+    }
+    return .object(fields)
+  }
+
+  /// What a reader observes of the Job index without writing: layout,
+  /// pragmas and every row, as `JobStoreRustWriterParityContractTests` reads it.
+  private static func index(of state: URL) throws -> JSONValue {
+    var handle: OpaquePointer?
+    let path = state.appending(path: RuntimeJobRepository.filename).path
+    guard sqlite3_open_v2(path, &handle, SQLITE_OPEN_READONLY, nil) == SQLITE_OK,
+      let db = handle
+    else {
+      if let handle { sqlite3_close_v2(handle) }
+      throw CocoaError(.fileReadUnknown)
+    }
+    defer { sqlite3_close_v2(db) }
+    func rows(_ sql: String) throws -> [[JSONValue]] {
+      var prepared: OpaquePointer?
+      guard sqlite3_prepare_v2(db, sql, -1, &prepared, nil) == SQLITE_OK, let statement = prepared
+      else { throw CocoaError(.fileReadCorruptFile) }
+      defer { sqlite3_finalize(statement) }
+      var result: [[JSONValue]] = []
+      while true {
+        let code = sqlite3_step(statement)
+        if code == SQLITE_DONE { return result }
+        guard code == SQLITE_ROW else { throw CocoaError(.fileReadCorruptFile) }
+        result.append(
+          (0..<sqlite3_column_count(statement)).map { column -> JSONValue in
+            switch sqlite3_column_type(statement, column) {
+            case SQLITE_INTEGER:
+              return .integer(sqlite3_column_int64(statement, column))
+            case SQLITE_TEXT:
+              return .string(sqlite3_column_text(statement, column).map { String(cString: $0) } ?? "")
+            case SQLITE_BLOB:
+              let count = Int(sqlite3_column_bytes(statement, column))
+              let bytes = sqlite3_column_blob(statement, column).map { Data(bytes: $0, count: count) }
+              return .string(sha256(bytes ?? Data()))
+            default:
+              return .null
+            }
+          })
+      }
+    }
+    let schema = try rows("SELECT name, type, tbl_name, sql FROM sqlite_schema ORDER BY name").map {
+      JSONValue.object(["name": $0[0], "type": $0[1], "tableName": $0[2], "sql": $0[3]])
+    }
+    let jobs = try rows(
+      """
+      SELECT job_id, idempotency_key, request_hash, state, admission_sequence, created_at_utc,
+             created_at_order_key, updated_at_utc, version, initial_record_json
+      FROM runtime_job ORDER BY admission_sequence
+      """)
+    return .object([
+      "userVersion": try rows("PRAGMA user_version")[0][0],
+      "journalMode": try rows("PRAGMA journal_mode")[0][0],
+      "schema": .array(schema),
+      "rows": .array(
+        jobs.map { row in
+          .object([
+            "jobId": row[0], "idempotencyKey": row[1], "requestHash": row[2], "state": row[3],
+            "admissionSequence": row[4], "createdAtUTC": row[5], "createdAtOrderKey": row[6],
+            "updatedAtUTC": row[7], "version": row[8], "recordSHA256": row[9],
+          ])
+        }),
+    ])
+  }
+
+  private static func sha256(_ data: Data) -> String {
+    SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+  }
+}

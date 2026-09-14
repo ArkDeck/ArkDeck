@@ -453,6 +453,45 @@ impl JobRecord {
     pub(super) fn plan_digest(&self) -> Option<&str> {
         self.plan.as_deref()
     }
+    pub(super) fn operation(&self) -> &str {
+        &self.operation
+    }
+    pub(super) fn materialized_identity(&self) -> Option<&str> {
+        self.identity.as_deref()
+    }
+    /// Swift sets `startedAtUTC` once, when a run first starts.
+    pub(super) fn start(&mut self, now: &str) {
+        if self.started.is_none() {
+            self.started = Some(now.into());
+        }
+    }
+    pub(super) fn finish(&mut self, now: &str) {
+        self.finished = Some(now.into());
+    }
+    pub(super) fn set_operation_failure(&mut self, failure: Option<Value>) {
+        self.operation_failure = failure;
+    }
+    /// The step, write-ahead intent and exact typed action recovery would
+    /// need, persisted before that intent can become dispatchable.
+    pub(super) fn set_recovery(
+        &mut self,
+        step: Option<&str>,
+        intent: Option<&str>,
+        action: Option<Value>,
+    ) {
+        self.recovery_step = step.map(str::to_owned);
+        self.recovery_intent = intent.map(str::to_owned);
+        self.recovery_action = action;
+    }
+    pub(super) fn add_step_kind(&mut self, kind: &str) {
+        let kinds = self.step_kinds.get_or_insert_with(Vec::new);
+        if !kinds.iter().any(|known| known == kind) {
+            kinds.push(kind.into());
+        }
+    }
+    pub(super) fn set_outcome_unknown(&mut self) {
+        self.unknown = true;
+    }
     /// The record Swift `submitOwned` builds for a Job admitted under the
     /// default read-only policy: the caller's request is both the execution
     /// and the original submission request, the plan is the materialized one,

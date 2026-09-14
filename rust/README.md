@@ -502,6 +502,49 @@ runs the standalone Swift daemon and the Rust owner in turn over one state root,
 then hands the Rust-written store to a Swift daemon that recovers the Jobs and
 runs one.
 
+## Job run (TASK-XPA-014)
+
+The isolated development composition answers `job.run` for the analyzer Jobs it
+admits as Swift `RuntimeJobEngine.runForTargetControl` does, composed like a
+Swift engine without a Session publication writer. `JobRunner` refuses absent,
+terminal and parked Jobs before any dispatch, with Swift's messages and the
+zero-dispatch proof, and runs only a Job at its admitted `preflight` boundary:
+the `preflight -> running` transition, the source lease resolved again, the exact
+typed action persisted in `job-record.json` before the write-ahead `stepIntent`
+is synchronized, and only then the pinned analyzer, spawned through its retained
+inode in its own process group and handed the source as the `/.vol` alias of a
+descriptor bound to its digest, with a clean environment, `/` as its directory
+and `/dev/null` as stdin. Each output stream keeps its first 8 MiB and drains the
+rest; a timeout terminates the group (TERM, then KILL after 0.25 s). Swift's
+semantic checks judge the receipt, the correlated `stepOutcome` follows, and a
+verified answer is published as `crash-signature.json`: Swift's provenance
+envelope, redacted by Swift's default policy (the home directory and
+secret-looking values, with ICU's matching), under an Artifact quota that refuses
+a new product and never evicts one, the payload sealed `0400` before the index
+names it. Terminal transitions and records are spelled as Swift writes them. A
+timeout, a signal death or an unobservable child leaves the intent outstanding
+and parks the Job in `waitingForRecovery`; nothing is dispatched twice. Recovery
+is not ported (ADR-0009 decisions 2/4, L.1 item 13): a Job in any resumable
+state, or whose journal has left `preflight`, is refused. Concurrent runs of one
+Job join its one run, as Swift's callers do.
+
+`arkdeck job run --job <id>` prints the Job's status and exits as Swift's CLI
+does: 1 for a failed, cancelled or interrupted Job and 75 for an unknown outcome.
+A connect failure stays `runtimeUnavailable`; a reply that cannot prove zero
+dispatch is `outcomeUnknown`.
+
+`rust/tests/fixtures/job-run-analyzer/` is the oracle Swift
+`JobRunAnalyzerOracleContractTests` records with the real descriptor-bound
+dispatcher and an analyzer that answers by the first line of its source: 20
+ordered runs over one store (three published products, eight semantic refusals,
+a timeout, a signal death, a quota refusal, a removed source and five refused
+runs), Swift's reads of each Job and the store they leave. `tests/job_run.rs`
+reproduces every answer, read, index row, Job file, Artifact index and payload
+byte for byte. Re-record from Swift with
+`ARKDECK_RUST_JOB_RUN_RECORD=/private/tmp/<new>`. `scripts/check-job-run.py` runs
+the standalone Swift daemon and the Rust owner in turn over one state root, then
+hands the Rust-run store to a Swift daemon that reads every Job and Artifact.
+
 ## Target presentation owner (TASK-XPA-012)
 
 The explicitly isolated development composition owns `targets-state/` and serves

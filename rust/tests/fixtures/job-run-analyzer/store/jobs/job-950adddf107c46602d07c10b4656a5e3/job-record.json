@@ -1,0 +1,76 @@
+{
+  "actualEffect" : "hostOnly",
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "kind" : "defaultReadOnlyPolicy",
+    "reference" : "default-read-only-policy"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-950adddf107c46602d07c10b4656a5e3",
+  "materializedPlanDigest" : "9f2d2199e8d6cb0e37f4a2d75db71156c4ee60a9e9ab2ef294175b90ec7075b8",
+  "operationFailure" : {
+    "category" : "execution",
+    "code" : "executionFailed",
+    "recovery" : "inspectJob",
+    "retryability" : "runtimeDecisionRequired",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "analyzer.extract-crash-signature@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-run-sourceRemoved-0001",
+    "inputs" : {
+      "sourceArtifactRef" : "lease-v1:job-oracle-source-removed:ART-842f42e540d62f5b9282bc821e6e8751"
+    },
+    "operation" : {
+      "id" : "analyzer.extract-crash-signature",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-run-sourceRemoved",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "analyzer",
+  "request" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-run-sourceRemoved-0001",
+    "inputs" : {
+      "sourceArtifactRef" : "lease-v1:job-oracle-source-removed:ART-842f42e540d62f5b9282bc821e6e8751"
+    },
+    "operation" : {
+      "id" : "analyzer.extract-crash-signature",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-run-sourceRemoved",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "failed",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "running->finalizing",
+    "reason: input Artifact lease became unreadable before extract-crash-signature: indexCorrupted(\"artifact payload is missing, linked or unreadable (errno 2)\")",
+    "finalizing->failed",
+    "reason: input Artifact lease became unreadable before extract-crash-signature: indexCorrupted(\"artifact payload is missing, linked or unreadable (errno 2)\")"
+  ]
+}

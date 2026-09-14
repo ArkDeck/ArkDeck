@@ -108,7 +108,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         .with_trace_cache(arkdeck_hoststore::TraceCacheStore::open(&trace_cache)?)
         .with_storage(
             sessions,
-            arkdeck_hoststore::ArtifactUsage::open(&artifacts, 8 * 1024 * 1024 * 1024)?,
+            arkdeck_hoststore::ArtifactUsage::open(&artifacts, host::ARTIFACT_QUOTA)?,
         )
         .with_bootstrap(&bootstrap)?
         // The isolated owner admits Jobs, so it holds the Job owner connection.
