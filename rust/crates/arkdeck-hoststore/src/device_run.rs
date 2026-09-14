@@ -15,19 +15,24 @@
 //! cannot be observed, optional or not, leaves its intent outstanding and
 //! parks the Job. Nothing is dispatched twice and no Job is resumed. A
 //! cancellation is honoured at the next step boundary, where Swift's step
-//! loop honours it.
+//! loop honours it. A step at or above `deviceMutation` consumes the Job's
+//! capability use before its intent can exist. A port rule's readback is
+//! judged against the operation it serves, and a confirmed failure after the
+//! rule changed restores it before the Job fails.
 use crate::artifact_publication::{ArtifactPublisher, Product};
 use crate::artifact_read_owner::swift_string;
 use crate::capture_documents;
 use crate::device_facts::{self, DeviceFacts, HdcComposition};
-use crate::device_steps::{self, ActionRefusal};
+use crate::device_steps::{self, ActionRefusal, StepAction};
 use crate::job_cancel::RunCancellation;
 use crate::job_journal_events::{self as events, Target};
 use crate::job_record::JobRecord;
 use crate::job_run::{JobRunner, Run, RunRefusal, failure, uncertain};
 use crate::operation_catalog::{CatalogArtifact, CatalogOperation, CatalogStep};
 use crate::session_json;
-use arkdeck_provider_hdc::{DispatchFailure, Expected, Outcome, ProcessPlan, Receipt};
+use arkdeck_provider_hdc::{
+    DispatchFailure, Expected, Outcome, PortAction, PortRule, ProcessPlan, Receipt,
+};
 use serde_json::{Map, Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -113,6 +118,41 @@ fn preflight_fresh(accumulator: &Value) -> bool {
                 .iter()
                 .all(|step| step.get("carriedFromUTC").is_none())
         })
+}
+
+/// Swift `WorkflowEffect >= .deviceMutation` over a catalog step: the steps
+/// that consume the Job's capability use before their intent. An effect this
+/// Runtime cannot read counts as one.
+fn mutates(step: &CatalogStep) -> bool {
+    !matches!(step.effect.as_str(), "hostOnly" | "readOnly")
+}
+
+/// Swift's engine judges a port rule's readback against the operation it
+/// serves: a create must find the rule, a remove must not. The provider only
+/// reports what it read.
+fn port_readback(descriptor: &CatalogOperation, step: &CatalogStep, outcome: Outcome) -> Outcome {
+    let expected = descriptor.reference() == "port-forward.create@1";
+    let readback = matches!(
+        step.step_id.as_str(),
+        "verify-port-rule" | "verify-port-rule-compensation"
+    );
+    let mismatch = readback
+        && matches!(&outcome, Outcome::Verified(summary) if summary
+            .get("present")
+            .and_then(|present| present.parse::<bool>().ok())
+            .is_some_and(|present| present != expected));
+    if !mismatch {
+        return outcome;
+    }
+    Outcome::Failed {
+        code: "portForwardReadbackMismatch",
+        detail: if expected {
+            "the exact typed rule is absent after create"
+        } else {
+            "the exact typed rule remains after remove"
+        }
+        .into(),
+    }
 }
 
 /// What every product one Job publishes shares: its owner, operation,
@@ -273,7 +313,7 @@ impl JobRunner<'_> {
             .unwrap_or_default()
             .to_owned();
         let revision = run.record.request["target"]["expectedBindingRevision"].as_i64();
-        let mut skipped = BTreeSet::new();
+        let (mut skipped, mut completed) = (BTreeSet::new(), BTreeSet::new());
         for step in &descriptor.steps {
             // The safe boundary between steps; the canceller's intent becomes
             // durable here and the run then drains.
@@ -370,11 +410,11 @@ impl JobRunner<'_> {
                 }
                 Err(_) => return Err(Stop::Refused(uncertain())),
             };
-            if matches!(&action, device_steps::StepAction::Pointer(_)) {
+            if mutates(step) {
                 let facts = facts.as_ref().ok_or_else(|| {
                     Stop::Failed("authorizationRequired: fresh device facts unavailable".into())
                 })?;
-                let authority = self.consume_pointer_authority(run, descriptor, facts);
+                let authority = self.consume_mutation_authority(run, descriptor, facts);
                 if matches!(
                     &authority,
                     Ok(crate::mutation_execution::MutationConsumption::PersistenceUncertain)
@@ -412,13 +452,23 @@ impl JobRunner<'_> {
                 &target_id,
                 revision,
             ) {
-                Ok(()) => {}
+                Ok(()) => {
+                    completed.insert(step.step_id.clone());
+                }
                 // Optional steps are the partial-success surface: one that
                 // fails is skipped with its failure and the Job goes on. An
                 // unknown outcome is never tolerated.
                 Err(Stop::Failed(reason)) if step.optional => {
                     let reason = format!("failed({})", swift_string(&reason));
                     self.skip(run, descriptor, step, &reason, &mut skipped);
+                }
+                // A port rule that changed before the failure is restored
+                // first.
+                Err(Stop::Failed(reason)) => {
+                    self.compensate_port_rule(
+                        run, hdc, descriptor, &action, &completed, &target_id, revision,
+                    )?;
+                    return Err(Stop::Failed(reason));
                 }
                 Err(stop) => return Err(stop),
             }
@@ -488,7 +538,9 @@ impl JobRunner<'_> {
             .as_object()
             .cloned()
             .unwrap_or_default();
-        let Some(arguments) = device_steps::journal_arguments(step, &inputs, action) else {
+        let Some(arguments) =
+            device_steps::journal_arguments_for(step, &descriptor.reference(), &inputs, action)
+        else {
             return Err(Stop::Refused(uncertain()));
         };
         let journal_step = json!({
@@ -560,7 +612,7 @@ impl JobRunner<'_> {
             identity_sha256: facts.map(|facts| facts.identity.as_str()),
             tool_version: facts.map(|facts| facts.tool_version.as_str()),
         };
-        match action.verify(&receipt, expected) {
+        match port_readback(descriptor, step, action.verify(&receipt, expected)) {
             Outcome::Verified(summary) => {
                 let outcome_at = run.clock()?;
                 run.step_outcome_at(&step.step_id, &intent_id, "succeeded", None, &outcome_at)?;
@@ -828,6 +880,140 @@ impl JobRunner<'_> {
                 .remember_session_evidence(key, accumulator);
         }
         Ok(())
+    }
+
+    /// Swift `compensatePortForward`: a confirmed failure that follows a
+    /// completed port-rule change restores the exact typed rule. The inverse
+    /// change and a second readback run under the inverse operation, which
+    /// journals them and judges the readback, against Target facts that must
+    /// still name the materialized binding. They consume nothing: the use the
+    /// Job consumed before its change covers them. The dispatcher must still
+    /// prove the executable it retained, as for every mutation this Runtime
+    /// dispatches. A compensation that fails is the Job's failure.
+    #[allow(clippy::too_many_arguments)]
+    fn compensate_port_rule(
+        &self,
+        run: &mut Run,
+        hdc: &HdcComposition<'_>,
+        original: &CatalogOperation,
+        failed: &StepAction,
+        completed: &BTreeSet<String>,
+        target_id: &str,
+        revision: Option<i64>,
+    ) -> Result<(), Stop> {
+        let (changed, inverse) = match original.reference().as_str() {
+            "port-forward.create@1" => ("create-port-rule", "port-forward.remove@1"),
+            "port-forward.remove@1" => ("remove-port-rule", "port-forward.create@1"),
+            _ => return Ok(()),
+        };
+        // The rule the failed step names, or else the request's own.
+        let inputs = run.record.request["inputs"]
+            .as_object()
+            .cloned()
+            .unwrap_or_default();
+        let rule = match failed {
+            StepAction::Port(action) => Some(action.rule().clone()),
+            _ => PortRule::from_inputs(&inputs).ok(),
+        };
+        let Some(rule) = rule.filter(|_| completed.contains(changed)) else {
+            return Ok(());
+        };
+        let Some(compensating) = descriptor(inverse) else {
+            return Err(Stop::Refused(uncertain()));
+        };
+        let facts = hdc
+            .facts(target_id)
+            .map_err(|_| Stop::Refused(uncertain()))?;
+        // Swift `validateMaterializedTargetFacts`.
+        device_facts::validate(&facts, target_id, revision)
+            .map_err(|reason| Stop::Failed(reason.into()))?;
+        if run.record.materialized_identity() != Some(facts.identity.as_str())
+            || run.record.materialized_binding() != Some(facts.binding_revision)
+        {
+            return Err(Stop::Failed(
+                "target identity or binding revision drifted after plan materialization".into(),
+            ));
+        }
+        let (kind, change) = if inverse == "port-forward.remove@1" {
+            ("removePortForward", PortAction::Remove(rule.clone()))
+        } else {
+            ("createPortForward", PortAction::Create(rule.clone()))
+        };
+        let step = |step_id: &str, kind: &str, effect: &str, cancellation: &str| CatalogStep {
+            step_id: step_id.into(),
+            kind: kind.into(),
+            effect: effect.into(),
+            cancellation: cancellation.into(),
+            binding: "confirmedDevice".into(),
+            optional: false,
+            action: None,
+        };
+        let steps = [
+            (
+                step(
+                    "compensate-port-rule",
+                    kind,
+                    "deviceMutation",
+                    "atSafeBoundary",
+                ),
+                StepAction::Port(change),
+            ),
+            (
+                step(
+                    "verify-port-rule-compensation",
+                    "verifyRemoteState",
+                    "readOnly",
+                    "immediate",
+                ),
+                StepAction::Port(PortAction::ReadPresence(rule)),
+            ),
+        ];
+        let restored = steps.iter().try_for_each(|(step, action)| {
+            let plan = action
+                .lower(&step.step_id, Some(&facts.connect_key))
+                .map_err(|_| Stop::Refused(uncertain()))?;
+            if mutates(step) && !hdc.dispatch.mutation_identity_current() {
+                return Err(Stop::Failed(
+                    "authorizationRequired: fresh tool identity cannot be proved".into(),
+                ));
+            }
+            self.dispatch_step(
+                run,
+                hdc,
+                compensating,
+                step,
+                action,
+                &plan,
+                Some(&facts),
+                target_id,
+                revision,
+            )
+        });
+        // Swift names a failed compensation as it interpolates its
+        // `RuntimeDispatchFailure`.
+        match restored {
+            Ok(()) => {
+                run.record
+                    .timeline
+                    .push(format!("compensated port rule to {inverse}"));
+                Ok(())
+            }
+            Err(Stop::Failed(reason)) => {
+                run.record.timeline.push(format!(
+                    "port-rule compensation failed closed: failed({})",
+                    swift_string(&reason)
+                ));
+                Err(Stop::Failed(reason))
+            }
+            Err(Stop::Unknown(reason)) => {
+                run.record.timeline.push(format!(
+                    "port-rule compensation failed closed: outcomeUnknown({})",
+                    swift_string(&reason)
+                ));
+                Err(Stop::Unknown(reason))
+            }
+            Err(stop) => Err(stop),
+        }
     }
 
     /// Swift `publishDeclaredArtifacts`: the products this step declares,

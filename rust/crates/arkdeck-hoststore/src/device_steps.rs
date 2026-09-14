@@ -5,19 +5,21 @@
 //! each step owns.
 use crate::operation_catalog::{CatalogOperation, CatalogStep};
 use arkdeck_provider_hdc::{
-    Action, DEFAULT_HILOG_BUDGET, FileActionError, FilePlan, PointerAction, ProcessPlan,
-    STORAGE_ROOT,
+    Action, DEFAULT_HILOG_BUDGET, FileActionError, FilePlan, PointerAction, PortAction, PortRule,
+    ProcessPlan, STORAGE_ROOT,
 };
 use serde_json::{Map, Value, json};
 use std::collections::BTreeSet;
 
 /// The device-bound operations this Runtime plans and runs.
-pub(crate) const DEVICE_OPERATIONS: [&str; 5] = [
+pub(crate) const DEVICE_OPERATIONS: [&str; 7] = [
     "observe.device@1",
     "capture.diagnostics@1",
     "input.tap@1",
     "input.long-press@1",
     "input.swipe@1",
+    "port-forward.create@1",
+    "port-forward.remove@1",
 ];
 
 /// Swift `evidenceEligibleOperations`: the operations whose device steps wait
@@ -106,16 +108,18 @@ pub(crate) enum ActionRefusal {
 }
 
 /// A device step's typed provider action: an observation or capture action,
-/// or a pointer gesture.
+/// a pointer gesture, or a port rule's change or readback.
 pub(crate) enum StepAction {
     Hdc(Action),
     Pointer(PointerAction),
+    Port(PortAction),
 }
 
 impl StepAction {
     pub(crate) fn persisted(&self) -> (&'static str, Map<String, Value>) {
         match self {
             Self::Pointer(action) => action.persisted(),
+            Self::Port(action) => action.persisted(),
             Self::Hdc(action) => {
                 let (kind, arguments) = action.persisted();
                 let values = arguments
@@ -134,6 +138,8 @@ impl StepAction {
         }
     }
 
+    /// The provider's verdict on the step's receipt. A gesture's and a port
+    /// rule's name no device fact.
     pub(crate) fn verify(
         &self,
         receipt: &arkdeck_provider_hdc::Receipt,
@@ -142,6 +148,7 @@ impl StepAction {
         match self {
             Self::Hdc(action) => action.verify(receipt, expected),
             Self::Pointer(action) => action.verify(receipt),
+            Self::Port(action) => action.verify(receipt),
         }
     }
 
@@ -149,6 +156,7 @@ impl StepAction {
         match self {
             Self::Hdc(action) => action.effect(),
             Self::Pointer(action) => action.effect(),
+            Self::Port(action) => action.effect(),
         }
     }
 
@@ -158,14 +166,43 @@ impl StepAction {
         step_id: &str,
         connect_key: Option<&str>,
     ) -> Result<ProcessPlan, String> {
-        match self {
-            Self::Hdc(action) => action.lower(step_id, connect_key),
-            Self::Pointer(action) => match action.lower(step_id, connect_key)? {
-                FilePlan::Process(plan) => Ok(plan),
-                _ => Err(format!("{step_id} did not lower to one process")),
-            },
+        let plan = match self {
+            Self::Hdc(action) => return action.lower(step_id, connect_key),
+            Self::Pointer(action) => action.lower(step_id, connect_key)?,
+            Self::Port(action) => action.lower(step_id, connect_key)?,
+        };
+        match plan {
+            FilePlan::Process(plan) => Ok(plan),
+            _ => Err(format!("{step_id} did not lower to one process")),
         }
     }
+}
+
+/// A provider module's answer for a step: its action, no action because the
+/// step is not its, or Swift's refusal — the provider error's detail alone,
+/// or a bound the request breaks, interpolated.
+fn claim<T>(
+    answer: Result<Option<T>, FileActionError>,
+    wrap: fn(T) -> StepAction,
+) -> Option<Result<StepAction, ActionRefusal>> {
+    match answer {
+        Ok(Some(action)) => Some(Ok(wrap(action))),
+        Ok(None) => None,
+        Err(FileActionError::Unsupported(detail)) => Some(Err(ActionRefusal::Invalid(detail))),
+        Err(FileActionError::Request(error)) => {
+            Some(Err(ActionRefusal::Invalid(error.to_string())))
+        }
+    }
+}
+
+/// Swift's journal identity of a port rule.
+fn forward_id(rule: &PortRule) -> String {
+    format!(
+        "port_forward_{}_{}_{}",
+        rule.direction.raw(),
+        rule.local_port,
+        rule.remote_port
+    )
 }
 
 /// Swift `HDCObservationProviderAdapter.action` for a catalog step of
@@ -179,15 +216,17 @@ pub(crate) fn action(
     if let Some(action) = Action::for_step(&step.kind, remote_action(step)) {
         return Ok(StepAction::Hdc(action));
     }
-    // Swift's provider error describes itself by its detail alone; a bound
-    // the gesture breaks is the spec's error, interpolated.
-    match PointerAction::for_step(&step.kind, reference, inputs, now_utc) {
-        Ok(Some(action)) => return Ok(StepAction::Pointer(action)),
-        Ok(None) => {}
-        Err(FileActionError::Unsupported(detail)) => return Err(ActionRefusal::Invalid(detail)),
-        Err(FileActionError::Request(error)) => {
-            return Err(ActionRefusal::Invalid(error.to_string()));
-        }
+    if let Some(answer) = claim(
+        PointerAction::for_step(&step.kind, reference, inputs, now_utc),
+        StepAction::Pointer,
+    ) {
+        return answer;
+    }
+    if let Some(answer) = claim(
+        PortAction::for_step(&step.kind, reference, inputs),
+        StepAction::Port,
+    ) {
+        return answer;
     }
     let invalid =
         |error: arkdeck_provider_hdc::RequestError| ActionRefusal::Invalid(error.to_string());
@@ -212,7 +251,7 @@ pub(crate) fn action(
 }
 
 /// Swift `journalStep(for:)` arguments for the kinds this Runtime
-/// materializes.
+/// materializes, for a step journaled under operation `reference`.
 pub(crate) fn journal_arguments(
     step: &CatalogStep,
     inputs: &Map<String, Value>,
@@ -250,6 +289,31 @@ pub(crate) fn journal_arguments(
             arguments.remove("screenEpochUtc");
             Value::Object(arguments)
         }
+        // The rule and its two endpoints, host first whatever the direction.
+        "createPortForward" => {
+            let StepAction::Port(PortAction::Create(rule)) = action else {
+                return None;
+            };
+            json!({"forwardId": forward_id(rule),
+                "hostEndpoint": format!("tcp:{}", rule.local_port),
+                "deviceEndpoint": format!("tcp:{}", rule.remote_port)})
+        }
+        "removePortForward" => {
+            let StepAction::Port(PortAction::Remove(rule)) = action else {
+                return None;
+            };
+            json!({"forwardId": forward_id(rule)})
+        }
+        // The rule's readback; `journal_arguments_for` names what a remove
+        // expects instead.
+        "verifyRemoteState" => {
+            let StepAction::Port(PortAction::ReadPresence(rule)) = action else {
+                return None;
+            };
+            json!({"probeId": format!("port-forward.{}.{}.{}", rule.direction.raw(),
+                    rule.local_port, rule.remote_port),
+                "expectedState": "present"})
+        }
         // The action is the catalog's own, never one guessed from the step.
         "captureRemoteStdout" => {
             let (catalog, action_id) = step.action.as_ref()?;
@@ -273,6 +337,22 @@ pub(crate) fn journal_arguments(
         }
         _ => return None,
     })
+}
+
+/// Swift's journal arguments for a step of the operation `reference`. Only a
+/// port rule's readback depends on the operation it serves: a remove expects
+/// the rule absent.
+pub(crate) fn journal_arguments_for(
+    step: &CatalogStep,
+    reference: &str,
+    inputs: &Map<String, Value>,
+    action: &StepAction,
+) -> Option<Value> {
+    let mut arguments = journal_arguments(step, inputs, action)?;
+    if step.kind == "verifyRemoteState" && reference == "port-forward.remove@1" {
+        arguments["expectedState"] = json!("absent");
+    }
+    Some(arguments)
 }
 
 /// Swift `isEvidencePreflightStep`.
@@ -306,6 +386,9 @@ pub(crate) fn products(operation: &str, step_id: &str) -> &'static [&'static str
         ("capture.diagnostics@1", "receive-screenshot") => &["screenshot.png", "screenshot.jpeg"],
         ("capture.diagnostics@1", "capture-crash-index") => &["crash-index.txt"],
         ("capture.diagnostics@1", "capture-crash-log") => &["crash-log.txt"],
+        ("port-forward.create@1" | "port-forward.remove@1", "verify-port-rule") => {
+            &["port-rule-readback.json"]
+        }
         _ => &[],
     }
 }

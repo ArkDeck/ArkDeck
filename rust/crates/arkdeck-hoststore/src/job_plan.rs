@@ -26,13 +26,15 @@ const MAXIMUM_ANALYZER_BYTES: u64 = 128 * 1024 * 1024;
 const MAXIMUM_ANALYZER_INPUT_BYTES: u64 = 512 * 1024 * 1024;
 /// The operations whose plans this Runtime materializes. Every other catalog
 /// operation is refused before its inputs are judged.
-const MATERIALIZED: [&str; 6] = [
+const MATERIALIZED: [&str; 8] = [
     "analyzer.extract-crash-signature@1",
     "observe.device@1",
     "capture.diagnostics@1",
     "input.tap@1",
     "input.long-press@1",
     "input.swipe@1",
+    "port-forward.create@1",
+    "port-forward.remove@1",
 ];
 
 /// Swift `AnalyzerProfile` for `crash-signature@1`, the analyzer a host names
@@ -415,7 +417,8 @@ impl<'a> JobPlanner<'a> {
                     ));
                 }
             };
-            let Some(arguments) = device_steps::journal_arguments(step, &request.inputs, &action)
+            let Some(arguments) =
+                device_steps::journal_arguments_for(step, &reference, &request.inputs, &action)
             else {
                 return Err(internal_failure());
             };

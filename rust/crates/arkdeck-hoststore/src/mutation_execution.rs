@@ -1,4 +1,5 @@
-//! Runtime-owned capability consumption immediately before a pointer mutation.
+//! Runtime-owned capability consumption immediately before a device mutation
+//! (a pointer gesture, or a port rule's change).
 //! Admission alone is not authority to dispatch: the complete typed plan and
 //! binding are re-established, then the reserved use and its correlated Job
 //! evidence become durable before the step's write-ahead intent.
@@ -28,7 +29,7 @@ pub(crate) enum MutationConsumption {
 }
 
 impl JobRunner<'_> {
-    pub(crate) fn consume_pointer_authority(
+    pub(crate) fn consume_mutation_authority(
         &self,
         run: &mut Run,
         descriptor: &CatalogOperation,
