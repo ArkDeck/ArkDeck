@@ -6,7 +6,7 @@
 //! budget — a server ends when it is stopped or when it exits on its own,
 //! which its owner notices by asking. Nothing here reads an endpoint or
 //! decides readiness; that is the provider's, over this.
-use super::macos_process::{RunningChild, spawn_in};
+use super::macos_process::{RunningChild, spawn_suspended};
 use super::tool_process::{
     MAX_CAPTURE_BYTES, capture, drain_group, finish, poll, validate_environment,
 };
@@ -82,13 +82,18 @@ impl ManagedServer {
         }
         validate_environment(environment)?;
         tool.revalidate()?;
-        let mut child = spawn_in(tool, arguments, environment, None)?;
-        let pid = child.pid();
+        // The birth is read while the child is still suspended, before it can
+        // run — or end: a server that exits at once (Swift's
+        // `foregroundExitReason`) is then an exit its owner sees, never a
+        // launch that "could not be recorded" because a zombie has no birth.
+        let suspended = spawn_suspended(tool, arguments, environment, None)?;
+        let pid = suspended.pid();
         let birth = process_birth(pid)
             .filter(|birth| birth.start_seconds > 0 && birth.start_microseconds < 1_000_000)
             .ok_or_else(|| {
                 io::Error::other("server launch could not be recorded from the kernel")
             })?;
+        let mut child = suspended.resume()?;
         let stop = Arc::new(AtomicBool::new(false));
         let out = capture(
             child.stdout.take().expect("spawn owns stdout"),
@@ -180,5 +185,49 @@ fn classify(status: ExitStatus) -> ServerExit {
         (Some(code), _) => ServerExit::Exited(code),
         (None, Some(signal)) => ServerExit::Signalled(signal),
         (None, None) => ServerExit::Exited(status.into_raw()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sha2::{Digest, Sha256};
+    use std::fs;
+    use std::os::unix::fs::PermissionsExt;
+    use std::time::{Duration, Instant};
+
+    /// Swift's foreground server that exits at once: its launch is recorded
+    /// (the birth is read while the child is still suspended) and its exit is
+    /// what the owner sees — on every launch, not only when the parent wins
+    /// the race to the kernel.
+    #[test]
+    fn a_server_that_ends_at_once_is_recorded_and_reports_its_exit() {
+        let root =
+            std::env::temp_dir().join(format!("arkdeck-managed-birth-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        fs::set_permissions(&root, fs::Permissions::from_mode(0o700)).unwrap();
+        let script = root.join("ends-at-once");
+        fs::write(&script, "#!/bin/sh\nexit 3\n").unwrap();
+        fs::set_permissions(&script, fs::Permissions::from_mode(0o700)).unwrap();
+        let digest = format!("{:x}", Sha256::digest(fs::read(&script).unwrap()));
+        let tool = VerifiedTool::open(&script, &digest).unwrap();
+        for launch in 0..50 {
+            let mut server = ManagedServer::launch(&tool, &[], &[], 4096)
+                .unwrap_or_else(|error| panic!("launch {launch}: {error}"));
+            let record = server.launch_record().clone();
+            assert!(record.start_seconds > 0 && record.start_microseconds < 1_000_000);
+            let deadline = Instant::now() + Duration::from_secs(20);
+            let exit = loop {
+                if let Some(exit) = server.exit().unwrap() {
+                    break exit;
+                }
+                assert!(Instant::now() < deadline, "launch {launch} did not end");
+                std::thread::sleep(Duration::from_millis(5));
+            };
+            assert_eq!(exit, ServerExit::Exited(3), "launch {launch}");
+            assert_eq!(server.stop().unwrap().exit, ServerExit::Exited(3));
+        }
+        let _ = fs::remove_dir_all(&root);
     }
 }
