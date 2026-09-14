@@ -1030,6 +1030,11 @@ private struct AppShellView: View {
         maxWidth: .infinity, minHeight: WorkspaceMetrics.navigationRowHeight,
         alignment: .leading
       )
+      // An identifier on a view that is not itself an accessibility element
+      // lands on every element inside it and overrides theirs: the reason
+      // read as `app.devices.unavailable`, never as its own identifier. A
+      // containing element keeps the row's identifier and the reason's apart.
+      .accessibilityElement(children: .contain)
       .accessibilityIdentifier("app.devices.unavailable")
     case .available:
       ForEach(deviceList.presentation.candidates) { candidate in
