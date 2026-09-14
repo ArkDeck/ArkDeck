@@ -807,6 +807,20 @@ with the source Artifact retained. `tests/tool_process.rs` drives it with shell
 scripts; the HDC provider's `run_read_only_*` path is unchanged until lane A's
 dispatch seam moves onto it.
 
+## Persistent device shell channel (TASK-XPA-016, SPK-6)
+
+`DeviceShellChannel::open(tool, ["-t", <key>, "shell"], env, settle)` keeps one
+`hdc shell` open on a pseudo-terminal, as Swift's `PersistentDeviceShellChannel`
+does for pointer injection: echo and newline translation off, the client in its
+own process group on the retained inode, opening proved by a framed `true`.
+`run(tokens, timeout, budget)` carries bare tokens only and brackets each
+command with a fresh nonce, so the device shell reports the command's own exit
+status and a late answer can never be read as the next command's. An answer
+past the budget is trimmed and marked; one past the budget plus 4 MiB, the
+timeout or the client's death closes the channel as an unknown outcome, never
+a failure. `tests/shell_channel.rs` drives it with `/bin/sh -i`; no HDC is
+launched by the tests.
+
 ## macOS facade host owners (TASK-XPA-012)
 
 The installed facade pair now serves `history.filter.list/save/delete` itself.

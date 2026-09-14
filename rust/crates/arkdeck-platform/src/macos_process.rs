@@ -225,11 +225,7 @@ pub(super) fn spawn_in(
     environment: &[(OsString, OsString)],
     working_directory: Option<&CStr>,
 ) -> io::Result<RunningChild> {
-    let inode_path = format!("/.vol/{}/{}", tool.initial.dev(), tool.initial.ino());
-    if !same_metadata(&tool.initial, &std::fs::metadata(&inode_path)?) {
-        return Err(denied("inode-bound executable path unavailable"));
-    }
-    let inode_path = CString::new(inode_path).map_err(|_| invalid("invalid inode path"))?;
+    let inode_path = inode_launch_path(tool)?;
     let (out_read, out_write) = pipe()?;
     let (err_read, err_write) = pipe()?;
     let mut settings = SpawnSettings::new()?;
@@ -264,30 +260,12 @@ pub(super) fn spawn_in(
         ))?;
         posix(libc::posix_spawnattr_setpgroup(&mut settings.attributes, 0))?;
     }
-    let argv: Vec<CString> = std::iter::once(tool.path.as_os_str())
-        .chain(args.iter().map(OsString::as_os_str))
-        .map(|argument| CString::new(argument.as_bytes()).map_err(|_| invalid("NUL in argv")))
-        .collect::<io::Result<_>>()?;
+    let (argv, env) = argv_and_environment(tool, args, environment)?;
     let mut argv_pointers: Vec<*mut libc::c_char> = argv
         .iter()
         .map(|argument| argument.as_ptr().cast_mut())
         .collect();
     argv_pointers.push(std::ptr::null_mut());
-    let mut env = vec![
-        CString::new("PATH=/usr/bin:/bin").unwrap(),
-        CString::new("LANG=C").unwrap(),
-        CString::new("LC_ALL=C").unwrap(),
-    ];
-    for (key, value) in environment {
-        env.push(
-            CString::new(format!(
-                "{}={}",
-                key.to_string_lossy(),
-                value.to_string_lossy()
-            ))
-            .map_err(|_| invalid("NUL in environment"))?,
-        );
-    }
     let mut env_pointers: Vec<*mut libc::c_char> =
         env.iter().map(|value| value.as_ptr().cast_mut()).collect();
     env_pointers.push(std::ptr::null_mut());
@@ -320,4 +298,162 @@ pub(super) fn spawn_in(
         return Err(io::Error::last_os_error());
     }
     Ok(child)
+}
+
+/// argv[0] is the tool's real path; the environment is the clean base every
+/// identity-bound spawn gets, plus what the caller named.
+fn argv_and_environment(
+    tool: &VerifiedTool,
+    args: &[OsString],
+    environment: &[(OsString, OsString)],
+) -> io::Result<(Vec<CString>, Vec<CString>)> {
+    let argv: Vec<CString> = std::iter::once(tool.path.as_os_str())
+        .chain(args.iter().map(OsString::as_os_str))
+        .map(|argument| CString::new(argument.as_bytes()).map_err(|_| invalid("NUL in argv")))
+        .collect::<io::Result<_>>()?;
+    let mut env = vec![
+        CString::new("PATH=/usr/bin:/bin").unwrap(),
+        CString::new("LANG=C").unwrap(),
+        CString::new("LC_ALL=C").unwrap(),
+    ];
+    for (key, value) in environment {
+        env.push(
+            CString::new(format!(
+                "{}={}",
+                key.to_string_lossy(),
+                value.to_string_lossy()
+            ))
+            .map_err(|_| invalid("NUL in environment"))?,
+        );
+    }
+    Ok((argv, env))
+}
+
+fn inode_launch_path(tool: &VerifiedTool) -> io::Result<CString> {
+    let inode_path = format!("/.vol/{}/{}", tool.initial.dev(), tool.initial.ino());
+    if !same_metadata(&tool.initial, &std::fs::metadata(&inode_path)?) {
+        return Err(denied("inode-bound executable path unavailable"));
+    }
+    CString::new(inode_path).map_err(|_| invalid("invalid inode path"))
+}
+
+/// A client on a pseudo-terminal, as Swift's `PersistentDeviceShellChannel`
+/// spawns it: the slave is the child's stdin, stdout and stderr with echo and
+/// newline translation off, the master comes back nonblocking, and the child
+/// starts suspended in its own process group on the retained inode and is
+/// continued only once the tool still verifies.
+pub(super) fn spawn_pty(
+    tool: &VerifiedTool,
+    args: &[OsString],
+    environment: &[(OsString, OsString)],
+) -> io::Result<(libc::pid_t, OwnedFd)> {
+    let inode_path = inode_launch_path(tool)?;
+    let (mut master_fd, mut slave_fd) = (-1, -1);
+    // SAFETY: two valid integer output slots; name, termios and window size
+    // are optional and left null.
+    if unsafe {
+        libc::openpty(
+            &mut master_fd,
+            &mut slave_fd,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+        )
+    } != 0
+    {
+        return Err(io::Error::last_os_error());
+    }
+    // SAFETY: openpty returned two newly owned descriptors.
+    let (master, slave) = unsafe {
+        (
+            OwnedFd::from_raw_fd(master_fd),
+            OwnedFd::from_raw_fd(slave_fd),
+        )
+    };
+    // SAFETY: zero is a valid empty termios; tcgetattr fills it.
+    let mut terminal: libc::termios = unsafe { std::mem::zeroed() };
+    // SAFETY: the slave is a live terminal descriptor; the struct is exclusively owned.
+    if unsafe { libc::tcgetattr(slave.as_raw_fd(), &mut terminal) } != 0 {
+        return Err(io::Error::last_os_error());
+    }
+    terminal.c_lflag &= !(libc::ECHO | libc::ECHONL);
+    terminal.c_oflag &= !libc::ONLCR;
+    // SAFETY: same descriptor and struct as above.
+    if unsafe { libc::tcsetattr(slave.as_raw_fd(), libc::TCSANOW, &terminal) } != 0 {
+        return Err(io::Error::last_os_error());
+    }
+    for descriptor in [&master, &slave] {
+        // SAFETY: live descriptor; only close-on-exec is set.
+        if unsafe { libc::fcntl(descriptor.as_raw_fd(), libc::F_SETFD, libc::FD_CLOEXEC) } < 0 {
+            return Err(io::Error::last_os_error());
+        }
+    }
+    // SAFETY: the master is read with bounded polls; nonblocking keeps every
+    // wait observable.
+    if unsafe { libc::fcntl(master.as_raw_fd(), libc::F_SETFL, libc::O_NONBLOCK) } < 0 {
+        return Err(io::Error::last_os_error());
+    }
+    let mut settings = SpawnSettings::new()?;
+    // SAFETY: actions/attributes are initialized; the slave is live.
+    unsafe {
+        for target in [libc::STDIN_FILENO, libc::STDOUT_FILENO, libc::STDERR_FILENO] {
+            posix(libc::posix_spawn_file_actions_adddup2(
+                &mut settings.actions,
+                slave.as_raw_fd(),
+                target,
+            ))?;
+        }
+        posix(libc::posix_spawnattr_setflags(
+            &mut settings.attributes,
+            (libc::POSIX_SPAWN_SETPGROUP
+                | libc::POSIX_SPAWN_START_SUSPENDED
+                | libc::POSIX_SPAWN_CLOEXEC_DEFAULT) as i16,
+        ))?;
+        posix(libc::posix_spawnattr_setpgroup(&mut settings.attributes, 0))?;
+    }
+    let (argv, env) = argv_and_environment(tool, args, environment)?;
+    let mut argv_pointers: Vec<*mut libc::c_char> = argv
+        .iter()
+        .map(|argument| argument.as_ptr().cast_mut())
+        .collect();
+    argv_pointers.push(std::ptr::null_mut());
+    let mut env_pointers: Vec<*mut libc::c_char> =
+        env.iter().map(|value| value.as_ptr().cast_mut()).collect();
+    env_pointers.push(std::ptr::null_mut());
+    let mut pid = 0;
+    // SAFETY: argv/env are NUL-terminated pointer arrays, all strings and spawn
+    // settings remain live. The child starts suspended on the retained inode.
+    posix(unsafe {
+        libc::posix_spawn(
+            &mut pid,
+            inode_path.as_ptr(),
+            &settings.actions,
+            &settings.attributes,
+            argv_pointers.as_ptr(),
+            env_pointers.as_ptr(),
+        )
+    })?;
+    drop(slave);
+    if let Err(error) = tool.revalidate() {
+        // SAFETY: the suspended child ran no tool code; its own group is
+        // killed and the PID reaped before the error is returned.
+        unsafe {
+            libc::kill(-pid, libc::SIGKILL);
+            let mut status = 0;
+            libc::waitpid(pid, &mut status, 0);
+        }
+        return Err(error);
+    }
+    // SAFETY: the unreaped child PID still names the suspended process.
+    if unsafe { libc::kill(pid, libc::SIGCONT) } != 0 {
+        let error = io::Error::last_os_error();
+        // SAFETY: as above.
+        unsafe {
+            libc::kill(-pid, libc::SIGKILL);
+            let mut status = 0;
+            libc::waitpid(pid, &mut status, 0);
+        }
+        return Err(error);
+    }
+    Ok((pid, master))
 }

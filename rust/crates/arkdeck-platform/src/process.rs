@@ -673,6 +673,11 @@ use crate::windows::spawn;
 mod macos_process;
 #[cfg(target_os = "macos")]
 use macos_process::{spawn, spawn_in};
+#[cfg(target_os = "macos")]
+#[path = "shell_channel.rs"]
+mod shell_channel;
+#[cfg(target_os = "macos")]
+pub use shell_channel::{DeviceShellAnswer, DeviceShellChannel, DeviceShellChannelError};
 
 #[cfg(target_os = "macos")]
 #[path = "tool_process.rs"]
