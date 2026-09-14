@@ -1173,6 +1173,49 @@ reference, and the adoption itself are the Target owner's.
 `tests/target_observation.rs` reads the observe fixture's shared fake with
 injected relations and checks the argv the driver logged.
 
+## Pointer input and port rules (TASK-XPA-016, M2)
+
+`arkdeck_provider_hdc::pointer_input` and `port_forward` are Swift's device actions for the
+interactive operations of Golden Journey 2 — `input.tap@1`, `input.long-press@1`,
+`input.swipe@1`, `port-forward.create@1` and `port-forward.remove@1` — as
+`HDCObservationProviderAdapter` handles them, with T1 argv parity proved by replaying the
+Swift oracles `rust/tests/fixtures/pointer-input` and `rust/tests/fixtures/port-forward` over
+the shared fake HDC driver (`tests/pointer_input.rs`, `tests/port_forward.rs`).
+
+- `PointerInput` is `HDCPointerInputSpec`: one gesture (`Gesture::{Tap, LongPress, Swipe}`)
+  at exact device coordinates with the frame it was mapped against, `new` holding Swift's
+  closed bounds in Swift's order of refusal (coordinates `0...32767`, a swipe's end point and
+  `80...2000` ms duration, a display `0...64`, a positive frame, every point strictly inside
+  it), `from_inputs` Swift's `pointerInputSpec` over the request's inputs (the operation names
+  the gesture), `frame_age_ms`/`refuse_if_stale` the freshness gate at dispatch (`inputExpired`
+  beyond 1000 ms, no claim without an epoch), `lowered_hold_ms` the hold the device command
+  is given, `persisted`/`from_persisted` the `hdc.injectPointerInput` intent.
+- `PointerAction::for_step` is the `injectPointerInput` step's action at dispatch time;
+  `lower` the positional `uinput -T` argv (`-D <display>` before `-T`; `-c x y`,
+  `-d x y -i hold -u x y`, `-m x y toX toY ms`) on one 30 s process; `verify` Swift's verdict
+  from the injector's own acknowledgement — `parameter error` fails as `pointerInputRejected`,
+  the gesture's lines verify, anything else is unknown, the exit status never consulted;
+  `readback` is none and `reconcile` stays unknown: an injected gesture leaves nothing to
+  read back.
+- `PortRule` is `HDCPortForwardSpec` (`Direction::{Forward, Reverse}`, both ports
+  `1024...65535`), `from_inputs` Swift's `portForwardSpec` with its one refusal,
+  `endpoints` the full-task tuple whose order flips with the direction, `presence` Swift's
+  reading of `fport ls` (trusted only clean, untruncated and UTF-8; a row with the direction's
+  tag and the exact tuple in order).
+- `PortAction::{Create, Remove, ReadPresence}` with `for_step` for `createPortForward`,
+  `removePortForward` and the two operations' `verifyRemoteState`; `lower` `fport`/`rport
+  <tuple>`, `fport rm <tuple>` and `fport ls` on one 30 s process; `verify` the mutation by
+  exit status alone (`portForwardFailed` with the host port) and the readback as `present`;
+  `readback`, `desired_presence`, `conclude` and `reconcile_without_readback` Swift's
+  reconciliation table; `persisted` the three `hdc.*PortForward*` intents.
+- `Reconcile` (`readback.rs`) is Swift's `ProviderReconcileOutcome`, shared by every action
+  that pairs a mutation with a readback.
+
+The engine half — the typed plan's preflight at `job.plan`/`job.submit`, the port-rule
+readback gate (`portForwardReadbackMismatch`) and `compensate-port-rule`, the lineage block
+after an unknown outcome, the persistent shell channel routing of pointer injection — stays
+with the Job owner.
+
 ## Rockchip live-mode probe (TASK-XPA-016, M4)
 
 `arkdeck_provider_hdc::LiveModeProbe` is Swift's `FoundationRockchipLiveModeProbe`,
