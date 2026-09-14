@@ -237,7 +237,15 @@ fn walk(
     for relative in entries {
         let path = base.join(&relative);
         let metadata = fs::symlink_metadata(&path).unwrap();
-        let name = format!("{prefix}/{}", relative.display());
+        // A pager snapshot is named and filled by a random revision: the
+        // oracle keeps that it exists and its mode, not its name or bytes.
+        let snapshot =
+            prefix == "agent-executions" && metadata.is_file() && pager_snapshot(&relative);
+        let name = if snapshot {
+            format!("{prefix}/snapshots/snapshot-<revision>.json")
+        } else {
+            format!("{prefix}/{}", relative.display())
+        };
         let kind = if metadata.is_dir() {
             "directory"
         } else {
@@ -248,7 +256,7 @@ fn walk(
             kind,
             format!("{:o}", metadata.permissions().mode() & 0o777),
         ));
-        if metadata.is_file() {
+        if metadata.is_file() && !snapshot {
             let bytes = fs::read(&path).unwrap();
             files.insert(
                 name,
@@ -260,6 +268,25 @@ fn walk(
             );
         }
     }
+}
+
+/// `snapshots/snapshot-<revision>.json` below the agent execution directory:
+/// a page snapshot the owner's pager wrote under a random revision.
+fn pager_snapshot(relative: &Path) -> bool {
+    relative
+        .to_str()
+        .and_then(|path| path.strip_prefix("snapshots/snapshot-"))
+        .and_then(|name| name.strip_suffix(".json"))
+        .is_some_and(|revision| {
+            revision.len() == 36
+                && revision.bytes().enumerate().all(|(index, byte)| {
+                    if [8, 13, 18, 23].contains(&index) {
+                        byte == b'-'
+                    } else {
+                        byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)
+                    }
+                })
+        })
 }
 
 /// Every Artifact index and payload, the verification cache aside.

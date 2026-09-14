@@ -4,14 +4,18 @@
 //! `agent-executions`, the orchestration that resolves the target, prepares
 //! the exact Job request, submits it and owns the Job, and the answer the
 //! daemon projects over the owned Job. The Job's run is the caller's, started
-//! once the execution owns it and reported back when it ends. An execution
+//! once the execution owns it and reported back when it ends. The owner also
+//! lists its executions through the snapshot pager it keeps beside them, and
+//! abandons one that owns no Job, which never cancels a Job. An execution
 //! without a target (the observation snapshot and physical assistance) is not
-//! served here, and a record holding physical-assistance actions is not read.
+//! served here, and a record holding physical-assistance actions is not read,
+//! so neither listed nor abandoned.
 
 use crate::format_time::{precise_utc_millis, utc_precise_from_millis};
 use crate::job_record::terminal;
 use crate::operation_catalog::{CatalogOperation, InputRefusal};
 use crate::session_json;
+use crate::snapshot_pager::SnapshotPager;
 use crate::{
     AdmissionRefusal, AdmissionVerdict, JobAdmitter, JobResultReader, JobStore, OperationRequest,
     TargetStore,
@@ -143,6 +147,33 @@ fn internal(message: &str) -> WireError {
 
 fn execution_detail(id: &str) -> Map<String, Value> {
     Map::from_iter([("executionId".into(), json!(id))])
+}
+
+/// Swift `agentExecutionRequest`'s `exact`: the request names exactly these
+/// fields.
+fn exact(params: &Map<String, Value>, keys: &[&str]) -> Result<(), WireError> {
+    if params.len() != keys.len() || !keys.iter().all(|key| params.contains_key(*key)) {
+        return Err(failure(
+            "invalidInput",
+            "request fields do not match the closed method contract",
+        ));
+    }
+    Ok(())
+}
+
+/// Swift `agentExecutionRequest`'s `string`: a field that is a bounded
+/// resource identity.
+fn identity<'a>(params: &'a Map<String, Value>, key: &str) -> Result<&'a str, WireError> {
+    params
+        .get(key)
+        .and_then(Value::as_str)
+        .filter(|value| valid_identifier(value))
+        .ok_or_else(|| {
+            failure(
+                "invalidInput",
+                format!("{key} must be a bounded resource identity"),
+            )
+        })
 }
 
 /// Swift `AgentExecutionIntent.validIdentifier`.
@@ -738,6 +769,9 @@ pub struct AgentAnswer {
 pub struct AgentExecutionStore {
     root: HostDirectory,
     path: PathBuf,
+    /// Swift's `RuntimeSnapshotPager` over `snapshots`, which the list pages
+    /// through.
+    pages: SnapshotPager,
     /// Swift's owner is an actor: one request advances the store at a time.
     gate: Mutex<()>,
     /// Swift `continuousDeadlines`: the monotonic end of each budget this
@@ -755,6 +789,8 @@ impl AgentExecutionStore {
         Ok(Self {
             root,
             path: path.into(),
+            // The gate serializes every list, as Swift's actor does.
+            pages: SnapshotPager::open_serialized(&path.join("snapshots"))?,
             gate: Mutex::new(()),
             deadlines: Mutex::new(HashMap::new()),
         })
@@ -764,32 +800,62 @@ impl AgentExecutionStore {
         format!("execution-{}.json", sha256_hex(id.as_bytes()))
     }
 
-    fn load(&self, id: &str) -> Result<Option<Record>, WireError> {
+    fn validate_directory(&self) -> Result<(), WireError> {
         self.root.validate_path(&self.path).map_err(|_| {
             failure(
                 "recordUnreadable",
                 "execution store is not a private Runtime directory",
             )
-        })?;
-        match self.root.read(&Self::file(id), MAX_RECORD) {
-            Ok(bytes) => {
-                let record = Record::decode(&bytes).ok_or_else(|| {
-                    failure("recordUnreadable", "execution record cannot be validated")
-                })?;
-                if record.intent.execution != id {
-                    return Err(failure(
-                        "recordUnreadable",
-                        "execution identity does not match its record",
-                    ));
-                }
-                Ok(Some(record))
-            }
+        })
+    }
+
+    fn load(&self, id: &str) -> Result<Option<Record>, WireError> {
+        self.validate_directory()?;
+        let Some(record) = self.read(&Self::file(id))? else {
+            return Ok(None);
+        };
+        if record.intent.execution != id {
+            return Err(failure(
+                "recordUnreadable",
+                "execution identity does not match its record",
+            ));
+        }
+        Ok(Some(record))
+    }
+
+    /// Swift `read`: the record a file holds, if the file exists.
+    fn read(&self, name: &str) -> Result<Option<Record>, WireError> {
+        match self.root.read(name, MAX_RECORD) {
+            Ok(bytes) => Record::decode(&bytes)
+                .map(Some)
+                .ok_or_else(|| failure("recordUnreadable", "execution record cannot be validated")),
             Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
             Err(_) => Err(failure(
                 "recordUnreadable",
                 "execution record failed identity or size checks",
             )),
         }
+    }
+
+    /// Swift `forEachRecord`: every record, one at a time in file-name
+    /// order, each under the name its own identity gives.
+    fn each_record(&self, mut visit: impl FnMut(&Record)) -> Result<(), WireError> {
+        self.validate_directory()?;
+        let mut files = self.files()?;
+        files.sort();
+        for file in files {
+            let record = self
+                .read(&file)?
+                .filter(|record| Self::file(&record.intent.execution) == file)
+                .ok_or_else(|| {
+                    failure(
+                        "recordUnreadable",
+                        "execution record was removed or renamed",
+                    )
+                })?;
+            visit(&record);
+        }
+        Ok(())
     }
 
     fn files(&self) -> Result<Vec<String>, WireError> {
@@ -973,8 +1039,9 @@ impl AgentExecutionStore {
         }
     }
 
-    /// The daemon's `agent.run` and `agent.status`, as `agentExecutionRequest`
-    /// takes them, before the owned Job is projected over the answer.
+    /// The daemon's `agent.run`, `agent.status`, `agent.list` and
+    /// `agent.abandon`, as `agentExecutionRequest` takes them, before the
+    /// owned Job is projected over a run's or a status read's answer.
     pub fn advance(
         &self,
         method: &str,
@@ -982,31 +1049,31 @@ impl AgentExecutionStore {
         engine: &AgentEngine<'_>,
     ) -> Result<AgentAnswer, WireError> {
         let _gate = self.gate.lock().map_err(|_| internal(UNREADABLE))?;
-        match method {
-            "agent.run" => self.run(params, engine),
+        let value = match method {
+            "agent.run" => return self.run(params, engine),
             "agent.status" => {
-                if params.len() != 1 || !params.contains_key("executionId") {
-                    return Err(failure(
-                        "invalidInput",
-                        "request fields do not match the closed method contract",
-                    ));
-                }
-                let id = params["executionId"]
-                    .as_str()
-                    .filter(|id| valid_identifier(id))
+                exact(params, &["executionId"])?;
+                self.status(identity(params, "executionId")?, engine)?
+            }
+            "agent.list" => self.list(params)?,
+            "agent.abandon" => {
+                exact(params, &["executionId", "expectedGeneration"])?;
+                let text = identity(params, "expectedGeneration")?;
+                let generation = text
+                    .parse::<i64>()
+                    .ok()
+                    .filter(|generation| *generation > 0 && generation.to_string() == text)
                     .ok_or_else(|| {
                         failure(
                             "invalidInput",
-                            "executionId must be a bounded resource identity",
+                            "expectedGeneration must be a positive canonical decimal string",
                         )
                     })?;
-                Ok(AgentAnswer {
-                    value: self.status(id, engine)?,
-                    start: None,
-                })
+                self.abandon(identity(params, "executionId")?, generation, engine)?
             }
-            _ => Err(internal("unknown execution method")),
-        }
+            _ => return Err(internal("unknown execution method")),
+        };
+        Ok(AgentAnswer { value, start: None })
     }
 
     /// Swift `run`: the execution created, or found under the same intent,
@@ -1365,6 +1432,140 @@ impl AgentExecutionStore {
             .into();
             record.unknown = owned.outcome_unknown();
             record.job_state = Some(owned.state);
+        }
+        Ok(record.projection())
+    }
+
+    /// The daemon's `agent.list` and Swift `list`: the closed request, then
+    /// every execution the filters select as its stored projection without a
+    /// physical action, newest first, paged through a stored snapshot a
+    /// cursor names. A filtered target is the resolved one.
+    fn list(&self, params: &Map<String, Value>) -> Result<Value, WireError> {
+        const FILTERS: [&str; 3] = ["state", "operation", "target"];
+        if !params
+            .keys()
+            .all(|key| FILTERS.contains(&key.as_str()) || key == "pageSize" || key == "cursor")
+        {
+            return Err(failure(
+                "invalidInput",
+                "request fields do not match the closed method contract",
+            ));
+        }
+        let size = match params.get("pageSize") {
+            None => 100,
+            Some(value) => value
+                .as_i64()
+                .filter(|size| (1..=1000).contains(size))
+                .and_then(|size| usize::try_from(size).ok())
+                .ok_or_else(|| failure("invalidInput", "pageSize must be between 1 and 1000"))?,
+        };
+        let cursor = match params.get("cursor") {
+            None => None,
+            Some(Value::String(cursor)) if cursor.len() <= 256 => Some(cursor.as_str()),
+            Some(_) => {
+                return Err(failure(
+                    "invalidCursor",
+                    "cursor must be a bounded opaque string",
+                ));
+            }
+        };
+        let filters: Map<String, Value> = params
+            .iter()
+            .filter(|(key, _)| FILTERS.contains(&key.as_str()))
+            .map(|(key, value)| (key.clone(), value.clone()))
+            .collect();
+        if !filters.iter().all(|(key, value)| {
+            value.as_str().is_some_and(|text| match key.as_str() {
+                "state" => STATES.contains(&text),
+                "target" => valid_identifier(text),
+                _ => (1..=128).contains(&text.len()),
+            })
+        }) {
+            return Err(failure("invalidInput", "invalid execution list filter"));
+        }
+        let filter = |key: &str| filters.get(key).and_then(Value::as_str);
+        self.pages
+            .page_filtered(
+                "agent.list",
+                &Value::Object(filters.clone()),
+                "createdAtDescExecutionIdAsc",
+                size,
+                cursor,
+                || {
+                    let mut rows = Vec::new();
+                    self.each_record(|record| {
+                        if filter("state").is_some_and(|state| state != record.state)
+                            || filter("operation")
+                                .is_some_and(|operation| operation != record.intent.operation)
+                            || filter("target").is_some_and(|target| {
+                                record.target.as_ref().is_none_or(|(id, _)| id != target)
+                            })
+                        {
+                            return;
+                        }
+                        let mut value = record.projection();
+                        if let Some(fields) = value.as_object_mut() {
+                            // Selection and inputs are never list metadata.
+                            fields.remove("humanAction");
+                        }
+                        rows.push((
+                            record.created.clone(),
+                            record.intent.execution.clone(),
+                            value,
+                        ));
+                    })?;
+                    rows.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.cmp(&b.1)));
+                    Ok(rows.into_iter().map(|(_, _, value)| value).collect())
+                },
+            )
+            .map_err(|error| {
+                // The pager's refusals are the owner's own in Swift, with
+                // the owner's zero-dispatch proof.
+                let message = if error.code == "invalidCursor" {
+                    "cursor is invalid, belongs to another query or its snapshot was reclaimed"
+                        .to_owned()
+                } else {
+                    error.message
+                };
+                failure(&error.code, message)
+            })
+    }
+
+    /// Swift `abandon`: an execution that owns no Job, at the generation the
+    /// caller last read, stops orchestrating. This never cancels a Job, and
+    /// a terminal execution is answered as it is, without a write.
+    fn abandon(
+        &self,
+        id: &str,
+        expected: i64,
+        engine: &AgentEngine<'_>,
+    ) -> Result<Value, WireError> {
+        let mut record = self
+            .load(id)?
+            .ok_or_else(|| failure("resourceNotFound", "execution does not exist"))?;
+        let owned = |job: &str| Map::from_iter([("jobId".into(), json!(job))]);
+        if let Some(submission) = &record.submission
+            && let Some(job) = Self::accepted(engine.jobs, submission)?
+        {
+            return Err(failure_with(
+                "resourceConflict",
+                "execution already owns a Job; use explicit job cancel",
+                owned(&job),
+            ));
+        }
+        if let Some(job) = &record.job {
+            return Err(failure_with(
+                "resourceConflict",
+                "execution already owns a Job",
+                owned(job),
+            ));
+        }
+        if record.generation != expected {
+            return Err(failure("resourceConflict", "execution generation changed"));
+        }
+        if !TERMINAL.contains(&record.state.as_str()) {
+            record.state = "abandoned".into();
+            self.commit(&mut record)?;
         }
         Ok(record.projection())
     }

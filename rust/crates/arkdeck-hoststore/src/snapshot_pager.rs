@@ -53,6 +53,9 @@ struct Snapshot {
 pub(crate) struct SnapshotPager {
     root: HostDirectory,
     path: PathBuf,
+    /// Whether the pager holds its own lock document; a pager whose owner
+    /// already serializes every request keeps none.
+    locked: bool,
 }
 
 pub(crate) fn uuid() -> Result<String, WireError> {
@@ -92,6 +95,17 @@ impl SnapshotPager {
         Ok(Self {
             root: HostDirectory::open(path)?,
             path: path.into(),
+            locked: true,
+        })
+    }
+
+    /// A pager whose owner serializes every request itself, as Swift's
+    /// agent execution owner (an actor) does: no lock document beside the
+    /// snapshots, as Swift's `RuntimeSnapshotPager` keeps none.
+    pub(crate) fn open_serialized(path: &Path) -> io::Result<Self> {
+        Ok(Self {
+            locked: false,
+            ..Self::open(path)?
         })
     }
 
@@ -127,13 +141,17 @@ impl SnapshotPager {
         .map_err(unreadable)?;
         let digest = sha256_hex(&query);
         self.root.validate_path(&self.path).map_err(unreadable)?;
-        let lock = self.root.lock_document(LOCK).map_err(|error| {
-            if error.kind() == io::ErrorKind::WouldBlock {
-                failure("resourceConflict", "Snapshot storage is being updated")
-            } else {
-                unreadable(error)
-            }
-        })?;
+        let lock = if self.locked {
+            Some(self.root.lock_document(LOCK).map_err(|error| {
+                if error.kind() == io::ErrorKind::WouldBlock {
+                    failure("resourceConflict", "Snapshot storage is being updated")
+                } else {
+                    unreadable(error)
+                }
+            })?)
+        } else {
+            None
+        };
         let (snapshot, index) = if let Some(cursor) = cursor {
             let (revision, _) = cursor_parts(cursor).ok_or_else(invalid_cursor)?;
             let snapshot = self.read(revision)?;
@@ -199,14 +217,18 @@ impl SnapshotPager {
                 ));
             }
             self.retain_space(bytes.len())?;
-            lock.validate_link(&self.root, LOCK).map_err(unreadable)?;
+            if let Some(lock) = &lock {
+                lock.validate_link(&self.root, LOCK).map_err(unreadable)?;
+            }
             self.root.validate_path(&self.path).map_err(unreadable)?;
             self.root
                 .publish_document(&filename(&snapshot.revision), &bytes, MAX_SNAPSHOT)
                 .map_err(unreadable)?;
             (snapshot, 0)
         };
-        lock.validate_link(&self.root, LOCK).map_err(unreadable)?;
+        if let Some(lock) = &lock {
+            lock.validate_link(&self.root, LOCK).map_err(unreadable)?;
+        }
         self.root.validate_path(&self.path).map_err(unreadable)?;
         let more = index + 1 < snapshot.pages.len();
         Ok(

@@ -786,6 +786,7 @@ cargo build -p arkdeck-agentd -p arkdeck-cli
 python3 scripts/check-corpus-replay.py --fixture tests/fixtures/observe-device
 python3 scripts/check-corpus-replay.py --fixture tests/fixtures/capture-diagnostics
 python3 scripts/check-corpus-replay.py --fixture tests/fixtures/agent-execution
+python3 scripts/check-corpus-replay.py --fixture tests/fixtures/agent-lifecycle
 ```
 
 ## Diagnostic capture (TASK-XPA-014, M1)
@@ -821,13 +822,14 @@ harness above replays it against the real daemon.
 
 ## Agent executions and Artifact lists (TASK-XPA-014, M1)
 
-The isolated development composition answers `agent.run` and `agent.status` as
-the Swift daemon's `RuntimeAgentExecutionCoordinator` does for an explicit
-target, and `artifact.list` for a Job owner. `AgentExecutionStore`
+The isolated development composition answers `agent.run`, `agent.status`,
+`agent.list` and `agent.abandon` as the Swift daemon's
+`RuntimeAgentExecutionCoordinator` does for an explicit target, and
+`artifact.list` for a Job owner. `AgentExecutionStore`
 (`agent_execution.rs`) keeps each execution as Swift's record,
 `<root>/agent-executions/execution-<sha256(executionId)>.json` (owner-only,
-canonical JSON, one more generation per durable step), beside the empty
-`snapshots/` directory Swift creates. A run parses the closed intent with
+canonical JSON, one more generation per durable step), beside the
+`snapshots/` directory where its pager keeps the list's pages. A run parses the closed intent with
 Swift's messages and fingerprint, validates a new execution's inputs against
 the Catalog and creates it with its orchestration deadline; the same identity
 under another intent is `idempotencyConflict`. The execution then resolves its
@@ -843,14 +845,27 @@ from the record and the Job without a write; once the Job is terminal the
 answer carries its evidence and verified Artifacts. Refusals before a Job carry
 the zero-dispatch proof.
 
+`agent.list` pages every execution's stored projection without its physical
+action (`createdAtDescExecutionIdAsc`, 1 to 1,000 per page, 100 by default),
+filtered by state, operation or resolved target, through Swift's
+`RuntimeSnapshotPager`: a first page stores the whole listing under a random
+revision in `agent-executions/snapshots/`, and a cursor names one of its pages,
+never a new scan. The owner serializes every request, so, as in Swift, the pager
+keeps no lock file there. `agent.abandon` takes the execution and the
+generation its caller read. An execution that owns a Job, or whose accepted
+submission the Job owner holds, is `resourceConflict` with its `jobId`, since
+abandonment never cancels a Job, and so is a changed generation; an execution
+still orchestrating becomes `abandoned` in one more generation, and a terminal
+one is answered as it is, without a write.
+
 `artifact.list` pages a Job's Artifacts as Swift's `RuntimeSnapshotPager` does
 (`createdAtDescArtifactIdAsc`, cursors `<revision>.<token>`, 1 to 1,000 per
 page, 100 by default); the snapshots live with the Job owner
 (`jobs-state/cli-job-snapshots`), not in the Artifact root.
 
-Not served yet: an execution without a target; `agent.list`, `agent.resume`,
-`agent.abandon` and human actions. A restart leaves an owned Job as it is:
-nothing resumes a run (L.1 item 13).
+Not served yet: an execution without a target; `agent.resume` and human
+actions, so a record holding a physical action is neither read nor listed. A
+restart leaves an owned Job as it is: nothing resumes a run (L.1 item 13).
 
 `rust/tests/fixtures/agent-execution/` is the oracle Swift
 `AgentExecutionOracleContractTests` records over the shared fake HDC with the
@@ -862,6 +877,15 @@ replays it against the real daemon: it holds and releases the owned Job's first
 call as the oracle does, compares a listing's pages without the order of their
 items, which follows the daemon's clock, and reads every execution again after
 the restart.
+
+`rust/tests/fixtures/agent-lifecycle/` is Swift
+`AgentLifecycleOracleContractTests`' oracle for the list and abandonment: three
+executions as `agent run` leaves them, their list page by page and by filter,
+the refused list requests, the abandonments and their refusals, and the
+abandoned execution read, run again and listed. `tests/agent_lifecycle.rs`
+replays it in-process and compares every answer and every file, the list's
+snapshots by their existence and mode; the harness replays it against the real
+daemon.
 
 The Rust CLI runs them as the Swift CLI does. `arkdeck agent run --operation
 <reference> --target <id> [--expected-binding-revision <n>] [--inputs-file
