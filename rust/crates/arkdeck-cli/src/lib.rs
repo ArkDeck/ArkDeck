@@ -29,6 +29,12 @@ mod target_resources;
 pub use target_resources::validate_target_response;
 mod trace_cache;
 pub use trace_cache::validate_trace_cache_response;
+mod agent_executions;
+pub use agent_executions::{
+    Settlement, agent_exit, execution_intent, human_action_progress, settle_execution,
+    validate_execution,
+};
+pub use artifact_resources::validate_artifact_page;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Invocation {
@@ -82,12 +88,31 @@ impl CliError {
             "operationFailed" => 1,
             "clientTimeout" => 75,
             "admissionDenied" | "fileIdentityChanged" | "sensitiveAccessDenied" => 77,
+            "orchestrationClockUntrusted"
+            | "bindingRevisionStale"
+            | "factsDrifted"
+            | "previewDrifted" => 77,
+            "humanActionRequired"
+            | "humanActionExpired"
+            | "orchestrationBudgetExpired"
+            | "reconcileRequired"
+            | "targetSelectionRequired"
+            | "targetAmbiguous"
+            | "targetTrustPending"
+            | "previewExpired" => 75,
+            "clientInterrupted" => 130,
             _ => 70,
         }
     }
     pub fn from_client(error: ClientError, method: &str) -> Self {
-        if matches!(method, "job.submit" | "job.run" | "job.cancel") {
+        if matches!(
+            method,
+            "job.submit" | "job.run" | "job.cancel" | "agent.run"
+        ) {
             return job_plan::mutation_error(error, method);
+        }
+        if method == "agent.status" {
+            return agent_executions::read_error(error, method);
         }
         if matches!(
             method,
@@ -231,7 +256,7 @@ impl CliError {
                 });
                 let artifact_proof = matches!(
                     method,
-                    "artifact.inspect" | "artifact.read" | "artifact.export"
+                    "artifact.list" | "artifact.inspect" | "artifact.read" | "artifact.export"
                 ) && error.details.as_ref().is_some_and(|d| {
                     d.get("phase") == Some(&json!("artifactOwner"))
                         && d.get("newDispatchCount") == Some(&json!(0))
@@ -420,6 +445,9 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                 | "--expected-binding-revision"
                 | "--request-id"
                 | "--idempotency-key"
+                | "--execution-id"
+                | "--maximum-wait"
+                | "--reviewed-plan-digest"
                 | "--timeout" => {
                     index += 1;
                     let value = argv
@@ -455,6 +483,9 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                         "--expected-binding-revision" => "expectedBindingRevision",
                         "--request-id" => "requestId",
                         "--idempotency-key" => "idempotencyKey",
+                        "--execution-id" => "executionId",
+                        "--maximum-wait" => "maximumWait",
+                        "--reviewed-plan-digest" => "reviewedPlanDigest",
                         other => &other[2..],
                     };
                     method_options.insert(key.to_owned(), json!(value));
@@ -520,6 +551,9 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["artifact", "read"] => "artifact.read",
         ["artifact", "export"] => "artifact.export",
         ["artifact", "quota"] => "artifact.quota",
+        ["artifact", "list"] => "artifact.list",
+        ["agent", "run"] => "agent.run",
+        ["agent", "status"] => "agent.status",
         ["doctor"] => "doctor",
         ["operation", "list"] => "operation.list",
         ["operation", "describe"] => "operation.describe",
@@ -635,6 +669,30 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             "artifactId",
             "offset",
             "maxBytes",
+            "allowSensitive",
+            "timeout",
+        ],
+        "agent.run" => &[
+            "requestFile",
+            "targetId",
+            "operation",
+            "inputsFile",
+            "expectedBindingRevision",
+            "requestId",
+            "idempotencyKey",
+            "capabilityId",
+            "reviewedPlanDigest",
+            "executionId",
+            "maximumWait",
+            "timeout",
+        ],
+        "agent.status" => &["executionId", "timeout"],
+        "artifact.list" => &[
+            "jobId",
+            "import",
+            "pageSize",
+            "cursor",
+            "artifactId",
             "allowSensitive",
             "timeout",
         ],
@@ -895,11 +953,13 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
     let artifact_timeout = artifact_resources::configure(command, &mut method_options, help)?;
     let target_timeout = target_resources::configure(command, &mut method_options, help)?;
     let plan_timeout = job_plan::configure(command, &mut method_options, help)?;
+    let agent_timeout = agent_executions::configure(command, &mut method_options, help)?;
     let timeout_ms = read_only_resources::configure(command, &mut method_options, help)?
         .or(import_timeout)
         .or(artifact_timeout)
         .or(target_timeout)
-        .or(plan_timeout);
+        .or(plan_timeout)
+        .or(agent_timeout);
     Ok(Invocation {
         command,
         method: if command == "device.candidates" {
@@ -949,6 +1009,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                     | "job.cancel"
                     | "job.result"
                     | "capability.inspect"
+                    | "agent.run"
+                    | "agent.status"
             )
         {
             Some(method_options)

@@ -834,6 +834,19 @@ call as the oracle does, compares a listing's pages without the order of their
 items, which follows the daemon's clock, and reads every execution again after
 the restart.
 
+The Rust CLI runs them as the Swift CLI does. `arkdeck agent run --operation
+<reference> --target <id> [--expected-binding-revision <n>] [--inputs-file
+<path>] [--execution-id <id>] [--maximum-wait <duration>] [--timeout <duration>]`
+(or `--request-file <path>`) builds the execution intent and checks it before
+anything is sent, sends `agent.run`, and reads `agent.status` at 100 ms doubling
+to 2 s until the execution settles; `--timeout` bounds only its own wait. A
+completed run prints its execution and exits 0, 1 for a failed, cancelled or
+interrupted Job, 2 for evidence that could not be verified and 75 for an unknown
+outcome; a run that stops before its Job exits with the execution's failure
+code. `arkdeck agent status --execution-id <id>` reads one execution, and
+`arkdeck artifact list --job <id> [--page-size <n>] [--cursor <cursor>]` pages a
+Job's Artifacts; every answer is checked as the Swift CLI checks it.
+
 ## Target presentation owner (TASK-XPA-012)
 
 The explicitly isolated development composition owns `targets-state/` and serves

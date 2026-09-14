@@ -107,7 +107,7 @@ pub(super) fn configure(
 }
 
 /// A random version 4 UUID in lowercase text.
-fn uuid() -> Result<String, CliError> {
+pub(super) fn uuid() -> Result<String, CliError> {
     let mut bytes = arkdeck_platform::random_bytes::<16>()
         .map_err(|_| CliError::new("internalError", "no random request identity is available"))?;
     bytes[6] = (bytes[6] & 0x0f) | 0x40;
@@ -293,6 +293,9 @@ pub(crate) fn mutation_error(error: ClientError, method: &str) -> CliError {
                     "job.submit" => {
                         "the Job submission reply is unconfirmed; submit the same request again to learn its Job"
                     }
+                    "agent.run" => {
+                        "the agent run reply is unconfirmed; read the execution with agent status, or run the same execution again, instead of starting a new one"
+                    }
                     "job.cancel" => {
                         "the Job cancellation reply is unconfirmed; read the Job with job status to learn whether it was cancelled"
                     }
@@ -318,6 +321,13 @@ pub(crate) fn mutation_error(error: ClientError, method: &str) -> CliError {
         ("admissionDenied" | "rejected", true) => "admissionDenied",
         ("resourceConflict", true) | ("conflict", _) => "resourceConflict",
         ("resourceNotFound", true) | ("notFound", _) => "resourceNotFound",
+        ("bindingRevisionStale", true) => "bindingRevisionStale",
+        ("orchestrationBudgetExpired", true) => "orchestrationBudgetExpired",
+        ("orchestrationClockUntrusted", true) => "orchestrationClockUntrusted",
+        ("humanActionExpired", true) => "humanActionExpired",
+        ("factsDrifted", true) => "factsDrifted",
+        ("targetTrustPending", true) => "targetTrustPending",
+        ("invalidCursor", true) => "invalidCursor",
         ("recordUnreadable", _) => "recordUnreadable",
         ("workspaceReferenceNotFound", _) => "workspaceReferenceNotFound",
         ("unsupportedProtocolVersion", _) => "protocolVersionUnsupported",
