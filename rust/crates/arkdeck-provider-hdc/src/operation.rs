@@ -5,12 +5,9 @@
 //! observation parsers. What runs a lowered plan is an [`HdcDispatch`]; this
 //! module starts nothing itself.
 use crate::{ParseError, parse_client_version, parse_server_check, parse_target_list};
-use arkdeck_platform::{ProcessLimits, VerifiedTool};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
-use std::ffi::OsString;
-use std::io;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use unicode_segmentation::UnicodeSegmentation;
 
 /// Swift `HDCObservationProviderAdapter.lower`: every observe action has 15 s.
@@ -312,77 +309,6 @@ pub fn property_value<'a>(output: &'a str, requested_key: &str) -> &'a str {
     match remainder.trim_start_matches([' ', '\t']).strip_prefix('=') {
         Some(value) => value.trim(),
         None => trimmed,
-    }
-}
-
-/// The dispatch of the isolated development owner's fixture tool: the pinned
-/// executable, launched through its inode with no environment of its own and
-/// within the plan's budget. A registered HDC is never run through it: that
-/// needs the existing-server identity proof, which macOS does not have yet.
-pub struct FixtureDispatch {
-    tool: VerifiedTool,
-}
-
-impl FixtureDispatch {
-    pub fn new(tool: VerifiedTool) -> Self {
-        Self { tool }
-    }
-
-    pub fn tool_sha256(&self) -> &str {
-        self.tool.sha256()
-    }
-}
-
-impl HdcDispatch for FixtureDispatch {
-    fn dispatch(&self, plan: &ProcessPlan) -> Result<Receipt, DispatchFailure> {
-        let arguments: Vec<OsString> = plan.arguments.iter().map(OsString::from).collect();
-        let limits = ProcessLimits {
-            timeout: plan.timeout,
-            max_output_bytes: plan.capture_bytes,
-        };
-        let started = Instant::now();
-        match self.tool.run_read_only(&arguments, limits) {
-            Ok(output) => match output.status.code() {
-                Some(exit_status) => Ok(Receipt {
-                    exit_status,
-                    stdout: output.stdout,
-                    stderr: output.stderr,
-                    truncated: false,
-                    duration: started.elapsed(),
-                }),
-                None => Err(DispatchFailure::Unobservable(
-                    "process ended without an exit status".into(),
-                )),
-            },
-            Err(error) => classify(&error, started.elapsed()),
-        }
-    }
-}
-
-/// How a read-only run that returned no output maps onto Swift's classes: a
-/// deadline leaves the outcome unknown, output beyond the budget is a
-/// truncated receipt (the process itself is not reported), and a refusal of
-/// the executable's identity means nothing ran.
-fn classify(error: &io::Error, duration: Duration) -> Result<Receipt, DispatchFailure> {
-    match error.kind() {
-        io::ErrorKind::TimedOut => Err(DispatchFailure::Unobservable(
-            "process timed out before completion".into(),
-        )),
-        io::ErrorKind::FileTooLarge => Ok(Receipt {
-            exit_status: -1,
-            stdout: Vec::new(),
-            stderr: Vec::new(),
-            truncated: true,
-            duration,
-        }),
-        io::ErrorKind::NotFound | io::ErrorKind::PermissionDenied | io::ErrorKind::InvalidInput => {
-            Err(DispatchFailure::Refused(format!(
-                "dispatch refused: {error}"
-            )))
-        }
-        _ => Err(DispatchFailure::Unobservable(format!(
-            "dispatch outcome unobservable: {error}"
-        ))),
     }
 }
 

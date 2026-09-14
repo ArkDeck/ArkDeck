@@ -95,9 +95,10 @@ pub struct Host {
     #[cfg(target_os = "macos")]
     claims: std::sync::Arc<arkdeck_hoststore::StorageClaims>,
     /// The isolated owner's development HDC: the fixture executable its
-    /// device-bound Jobs dispatch to.
+    /// device-bound Jobs dispatch to, through the process dispatch every HDC
+    /// plan takes.
     #[cfg(target_os = "macos")]
-    hdc: Option<std::sync::Arc<arkdeck_provider_hdc::FixtureDispatch>>,
+    hdc: Option<std::sync::Arc<arkdeck_provider_hdc::ProcessDispatch>>,
 }
 
 impl Host {
@@ -151,7 +152,7 @@ impl Host {
     #[cfg(target_os = "macos")]
     pub fn with_development_hdc(
         mut self,
-        dispatch: Option<arkdeck_provider_hdc::FixtureDispatch>,
+        dispatch: Option<arkdeck_provider_hdc::ProcessDispatch>,
     ) -> Self {
         self.hdc = dispatch.map(std::sync::Arc::new);
         self

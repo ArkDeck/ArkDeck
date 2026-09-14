@@ -30,7 +30,7 @@ use arkdeck_hoststore::{
     StorageClaims, TargetStore,
 };
 use arkdeck_platform::VerifiedTool;
-use arkdeck_provider_hdc::FixtureDispatch;
+use arkdeck_provider_hdc::ProcessDispatch;
 use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
 use std::fs::{self, File, OpenOptions};
@@ -195,7 +195,8 @@ fn rust_runs_the_swift_agent_executions() {
     let jobs = JobStore::open_owner(&root.join("jobs-state")).unwrap();
     let sessions = SessionStore::open(&root.join("session-owner"), &root.join("Sessions")).unwrap();
     let agents = AgentExecutionStore::open(&root.join("agent-executions")).unwrap();
-    let dispatch = FixtureDispatch::new(VerifiedTool::open(root.join("hdc"), &digest).unwrap());
+    let dispatch =
+        ProcessDispatch::new(VerifiedTool::open(root.join("hdc"), &digest).unwrap(), None);
     let hdc = HdcComposition {
         targets: &targets,
         dispatch: &dispatch,
