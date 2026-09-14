@@ -410,6 +410,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                 | "--offset"
                 | "--max-bytes"
                 | "--job"
+                | "--capability"
                 | "--order"
                 | "--state"
                 | "--thread"
@@ -442,6 +443,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                         "--safety-margin-bytes" => "safetyMarginBytes",
                         "--retention-days" => "retentionDays",
                         "--job" => "jobId",
+                        "--capability" => "capabilityId",
                         "--after-cursor" => "afterCursor",
                         "--artifact" => "artifactId",
                         "--max-bytes" => "maxBytes",
@@ -532,6 +534,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["job", "submit"] => "job.submit",
         ["job", "run"] => "job.run",
         ["job", "cancel"] => "job.cancel",
+        ["capability", "list"] => "capability.list",
+        ["capability", "inspect"] => "capability.inspect",
         ["device", "candidates"] => "device.candidates",
         ["target", "list"] => "target.list",
         ["target", "show"] => "target.show",
@@ -671,6 +675,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             &["jobId", "timeout"]
         }
         "job.cancel" => &["jobId"],
+        "capability.inspect" => &["capabilityId"],
         "job.timeline" => &["jobId", "pageSize", "cursor", "timeout"],
         "job.events" => &["jobId", "pageSize", "afterCursor", "timeout"],
         "job.list" => &[
@@ -710,6 +715,12 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         return Err(CliError::new(
             "invalidOption",
             "the mutation requires --expected-generation",
+        ));
+    }
+    if !help && command == "capability.inspect" && !method_options.contains_key("capabilityId") {
+        return Err(CliError::new(
+            "invalidOption",
+            "capability inspect requires --capability",
         ));
     }
     if !help
@@ -935,6 +946,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                     | "job.run"
                     | "job.cancel"
                     | "job.result"
+                    | "capability.inspect"
             )
         {
             Some(method_options)

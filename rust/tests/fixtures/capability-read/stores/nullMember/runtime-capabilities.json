@@ -1,0 +1,68 @@
+{
+  "records" : [
+    {
+      "capability" : {
+        "capabilityID" : "CAP-RT-BASE",
+        "effectCeiling" : "deviceMutation",
+        "expiresAtUTC" : "2026-12-31T00:00:00Z",
+        "inputConstraints" : {
+
+        },
+        "issuedAtUTC" : "2026-09-01T00:00:00Z",
+        "issuer" : {
+          "kind" : "maintainerMergedPR",
+          "reference" : "PR#capability-read-oracle base"
+        },
+        "maximumUses" : 5,
+        "operationScope" : [
+          {
+            "operationID" : "debug.hap",
+            "version" : 1
+          }
+        ],
+        "revocation" : {
+          "state" : "active"
+        },
+        "targetScope" : {
+          "kind" : "stablePhysicalIdentity",
+          "sha256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "consumptions" : null,
+      "remainingUses" : 2
+    },
+    {
+      "capability" : {
+        "capabilityID" : "CAP-RT-BASE-LEDGER",
+        "effectCeiling" : "deviceMutation",
+        "expiresAtUTC" : "2026-12-31T00:00:00Z",
+        "inputConstraints" : {
+
+        },
+        "issuedAtUTC" : "2026-09-01T00:00:00Z",
+        "issuer" : {
+          "kind" : "maintainerMergedPR",
+          "reference" : "PR#capability-read-oracle input"
+        },
+        "maximumUses" : 3,
+        "operationScope" : [
+          {
+            "operationID" : "input.tap",
+            "version" : 1
+          }
+        ],
+        "revocation" : {
+          "state" : "active"
+        },
+        "targetScope" : {
+          "kind" : "anyTarget"
+        }
+      },
+      "consumptions" : [
+
+      ],
+      "remainingUses" : 3
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

@@ -1,0 +1,134 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "capability",
+        "inspect",
+        "--capability",
+        "sample"
+      ],
+      "expected": {
+        "command": "capability.inspect",
+        "handlerArguments": [
+          "capability",
+          "inspect",
+          "--capability",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "capability",
+        "inspect",
+        "--help"
+      ],
+      "expected": {
+        "command": "capability.inspect",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "capability",
+        "inspect",
+        "--capability",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "capability.inspect",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "capability",
+        "inspect",
+        "--capability",
+        "sample",
+        "--capability",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "capability.inspect",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "capability",
+        "inspect"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "capability.inspect",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "capability",
+        "inspect",
+        "--capability",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "capability.inspect",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "capability",
+        "inspect",
+        "--capability",
+        "sample",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "capability.inspect",
+        "handlerArguments": [
+          "capability",
+          "inspect",
+          "--capability",
+          "sample",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "capability.inspect",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "capability",
+    "inspect"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

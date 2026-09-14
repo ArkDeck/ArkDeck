@@ -115,6 +115,10 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         .with_jobs(arkdeck_hoststore::JobStore::open_owner(
             &root.join("jobs-state"),
         )?)
+        // Beside the Job state, as the Swift engine keeps it: read only.
+        .with_capabilities(arkdeck_hoststore::CapabilityStore::open(
+            &root.join("jobs-state").join("capabilities"),
+        )?)
         // As the Swift daemon: an analyzer is configured only by naming its
         // executable, and a named path that is not one fails startup.
         .with_planning(

@@ -41,7 +41,10 @@
             "type": "boolean"
           },
           "lineageBlocker": {
-            "type": "null"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "maximumUses": {
             "type": "integer"
@@ -72,8 +75,8 @@
   "x-arkdeck-method": "capability.list",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 0,
-    "request": 6,
+    "error": 35,
+    "request": 41,
     "result": 6
   }
 }

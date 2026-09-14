@@ -1,0 +1,71 @@
+{
+  "records" : [
+    {
+      "capability" : {
+        "capabilityID" : "CAP-RT-BASE",
+        "effectCeiling" : "deviceMutation",
+        "expiresAtUTC" : "2026-12-31T00:00:00Z",
+        "inputConstraints" : {
+
+        },
+        "issuedAtUTC" : "2026-09-01T00:00:00Z",
+        "issuer" : {
+          "kind" : "maintainerMergedPR",
+          "reference" : "PR#capability-read-oracle base"
+        },
+        "maximumUses" : 5,
+        "operationScope" : [
+          {
+            "operationID" : "debug.hap",
+            "version" : 1
+          }
+        ],
+        "revocation" : {
+          "state" : "active"
+        },
+        "targetScope" : {
+          "kind" : "stablePhysicalIdentity",
+          "sha256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "consumptions" : [
+        {
+          "authorizationScopeFingerprintSHA256" : "b68f9e10897492be6eb554934631c43306cddc051e0f65b64fe8ed0a8e255869",
+          "bindingRevision" : 7,
+          "consumedAtUTC" : "2026-09-14T00:00:00Z",
+          "effect" : "deviceMutation",
+          "jobID" : "job-g1",
+          "materializedPlanDigest" : "578c12fce4d73453700befb39e87fc3fb2d5cb44c237776a626b4f9aa023a1be",
+          "operationReference" : "debug.hap@1",
+          "ordinal" : 1,
+          "outcomes" : [
+            {
+              "jobID" : "job-g1",
+              "outcome" : "confirmed",
+              "previousRecordSHA256" : "a8440993ef917977db5c8e4fa19ca0f352240807896dd9cf3d739dcce3925030",
+              "recordSHA256" : "6ebb1d277403cd2567b95c428c71448392ba85aebd6b2ed96b653daadee34319",
+              "recordedAtUTC" : "2026-09-14T00:01:00Z",
+              "terminalState" : "succeeded"
+            }
+          ],
+          "queryFingerprintSHA256" : "a7d11094005dd59757c6d03c09570024e887ace29481733fb9b2c53119651e1e",
+          "receiptSHA256" : "a8440993ef917977db5c8e4fa19ca0f352240807896dd9cf3d739dcce3925030",
+          "remainingUsesAfter" : 4,
+          "reservationID" : "res-g1",
+          "targetStableIdentitySHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        },
+        {
+          "authorizationScopeFingerprintSHA256" : "b68f9e10897492be6eb554934631c43306cddc051e0f65b64fe8ed0a8e255869",
+          "bindingRevision" : 7,
+          "consumedAtUTC" : "2026-09-14T00:00:00Z",
+          "effect" : "deviceMutation",
+          "jobID" : "job-g2",
+          "materializedPlanDigest" : "445b1dbaba4731d3ef6bb30ad2e6f71a38f295550ed08cf223995e3a8fe011b6",
+          "operationReference" : "debug.hap@1",
+          "ordinal" : 2,
+          "outcomes" : [
+            {
+              "jobID" : "job-g2",
+              "outcome" : "outcomeUnknown",
+              "previousRecordSHA256" : "a25c32af939725a6515af2cc9bffa69c7bc327cd97de1fa487db6b7de69ced35",
+              "recordSHA256" : "19093fc7999322c4a5b4e7767c70b0ade825126a7b5e03

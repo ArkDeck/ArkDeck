@@ -58,6 +58,8 @@ pub struct Host {
     #[cfg(target_os = "macos")]
     jobs: Option<arkdeck_hoststore::JobStore>,
     #[cfg(target_os = "macos")]
+    capabilities: Option<arkdeck_hoststore::CapabilityStore>,
+    #[cfg(target_os = "macos")]
     planning: Option<(
         std::path::PathBuf,
         Option<arkdeck_hoststore::AnalyzerProfile>,
@@ -102,6 +104,12 @@ impl Host {
     #[cfg(target_os = "macos")]
     pub fn with_jobs(mut self, jobs: arkdeck_hoststore::JobStore) -> Self {
         self.jobs = Some(jobs);
+        self
+    }
+    /// `capability.list` and `capability.inspect` read this capability store.
+    #[cfg(target_os = "macos")]
+    pub fn with_capabilities(mut self, capabilities: arkdeck_hoststore::CapabilityStore) -> Self {
+        self.capabilities = Some(capabilities);
         self
     }
     /// `job.plan` reads the Artifact owner, the configured analyzer and the
@@ -183,6 +191,8 @@ impl Host {
             artifacts: None,
             #[cfg(target_os = "macos")]
             jobs: None,
+            #[cfg(target_os = "macos")]
+            capabilities: None,
             #[cfg(target_os = "macos")]
             planning: None,
             #[cfg(target_os = "macos")]
@@ -552,6 +562,30 @@ impl HostServices for Host {
             running.remove(job);
         }
         result
+    }
+    /// `capability.list` and `capability.inspect` read the capability store as
+    /// the Swift daemon reads it, under the store's lock; nothing mints,
+    /// reserves or settles a use here.
+    #[cfg(target_os = "macos")]
+    fn capability_resource(
+        &self,
+        method: &str,
+        params: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<serde_json::Value, WireError> {
+        let Some(capabilities) = &self.capabilities else {
+            return Err(WireError {
+                code: "rejected".into(),
+                message: "this method is unavailable in the read-only Rust foundation".into(),
+                details: None,
+            });
+        };
+        capabilities
+            .handle(method, params)
+            .map_err(|refusal| WireError {
+                code: refusal.code.into(),
+                message: refusal.message,
+                details: None,
+            })
     }
     /// `job.cancel` cancels an admitted Job in the owner that admitted it. A
     /// Job this owner is running is cancelled by its run, which alone writes

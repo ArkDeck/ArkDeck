@@ -1,0 +1,37 @@
+{
+  "records" : [
+    {
+      "capability" : {
+        "capabilityID" : "CAP-RT-INSTALLED",
+        "effectCeiling" : "deviceMutation",
+        "expiresAtUTC" : "2026-12-31T00:00:00Z",
+        "inputConstraints" : {
+
+        },
+        "issuedAtUTC" : "2026-09-01T00:00:00Z",
+        "issuer" : {
+          "kind" : "maintainerMergedPR",
+          "reference" : "PR#capability-read-oracle input"
+        },
+        "maximumUses" : 2,
+        "operationScope" : [
+          {
+            "operationID" : "input.tap",
+            "version" : 1
+          }
+        ],
+        "revocation" : {
+          "state" : "active"
+        },
+        "targetScope" : {
+          "kind" : "anyTarget"
+        }
+      },
+      "consumptions" : [
+
+      ],
+      "remainingUses" : 2
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}
