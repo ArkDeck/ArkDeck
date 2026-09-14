@@ -1,0 +1,8 @@
+# Append-only shared records. Parallel slices add lines at the same anchor of
+# these files; a textual conflict between two such additions means "keep both",
+# never "pick one". `merge=union` makes `git rebase`/`git merge` keep both sides
+# locally (GitHub's own conflict check does not read this file, so a re-parented
+# branch still has to be pushed). `scripts/check_union_merge.py` refuses the
+# one thing a union can get wrong: a duplicated bullet or heading.
+openspec/changes/*/tasks.md merge=union
+rust/README.md merge=union

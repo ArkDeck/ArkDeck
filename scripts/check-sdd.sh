@@ -124,5 +124,8 @@ case $probe_out in
     ;;
 esac
 
+# 并集合并守卫(stdlib):tasks.md / rust/README.md 不得出现重复 bullet/标题或冲突标记。
+"$PYTHON" "$SCRIPT_DIR/check_union_merge.py" || exit 1
+
 # preflight 通过:同一解释器执行 checker,无二次解析。
 exec "$PYTHON" "$SCRIPT_DIR/check_sdd.py"

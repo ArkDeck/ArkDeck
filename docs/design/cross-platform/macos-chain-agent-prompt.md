@@ -245,6 +245,13 @@ Rust（025）。SPK-6/9/10 全过 ⇒ sidecar 永不建。
 `spec/control/methods/*`、ControlFrames 语料、`cli-feature-coverage.json`）：先推先合、其余 rebase；语料计数
 断言一律 `>=` published 条数；新方法/错误码由该车道自己录帧并在同一 PR `generate-contract.py --write`。
 
+**只追加的共享记录**（`tasks.md`、`rust/README.md`；2026-09-14 一天 32/30 个提交各改一次，四轮合入每轮让全部在飞
+分支冲突）：一刀的记录是它自己的 `evidence/runs/<task>/<slice>-run.md`，**不再**往 `tasks.md` 的 Task 小节逐刀追加
+bullet——`tasks.md` 只在该 Task 的状态行变化（`ready`→`in-progress`→`done`）时改一行；`rust/README.md` 每个 crate
+领域固定一节、就地改写，不逐刀加节，切片细节放模块 rustdoc 与 run 记录。两文件已在 `.gitattributes` 标 `merge=union`
+（本地 rebase 自动保两边；GitHub 的冲突判定不读它，仍要推一次），`scripts/check_union_merge.py` 在 check-sdd 里拒绝重复
+bullet/标题；重挂用 `scripts/rebase-union.sh [--onto <base> <old>]`。
+
 **维护者门（r11 之后仍开）**：L.1 第 13 条（决策包 `evidence/adr-0009-decision-package-20260914.md` 已提交，
 裁决前 recovery/`job.reconcile`/可恢复 Job/epoch 不移植）；GJ-4 每次开窗的 go；设备日窗（SPK-7 通过后每天
 1 小时）。第 7 条（Swift CLI 随 M5 退役）、第 14 条（日窗）、第 19 条（对等三级）已随 r11 合入 attestation。
@@ -412,7 +419,8 @@ Rust（025）。SPK-6/9/10 全过 ⇒ sidecar 永不建。
 `CLIControlMethodRegistry`/`cli-feature-coverage.json`）+ Rust CLI leaf（必要时 Swift CLI 也切到同一
 typed 方法）+ Swift 侧 producer fixture 与严格 readback 测试 + `rust/scripts/check-<slice>.py` 真实
 进程 harness（启动、请求、重启、CAS/锁、second-owner 拒绝、崩溃窗口）+ `evidence/runs/<task>/<slice>-run.md`
-+ `rust/README.md` 一段用法。规模对齐先例（一两千行），不做半成品 PR。
+（这一刀的唯一记录；`tasks.md` 不逐刀加 bullet，见 §4.0 只追加的共享记录）+ 该 crate 领域在 `rust/README.md`
+既有一节里的就地更新（不逐刀加节）。规模对齐先例（一两千行），不做半成品 PR。
 
 新方法/新错误码的 schema 来自真实录帧：`ARKDECK_CONTROL_FRAME_LOG=<dir>` 跑相关 Swift 契约测试 →
 `Packages/ArkDeckKit/Scripts/generate-control-contract.py --derive-method-schemas <dir>` → 用生成器的
@@ -469,8 +477,10 @@ python3 scripts/ci/plan.py --repo-root . --base-revision origin/main --head-revi
   --json title,state,files` 读回；重触发 CI 只能 `git commit --amend --no-edit` 换 SHA 后
   `--force-with-lease=refs/heads/<branch>:<old-sha>`。
 - **循环**：CI 绿 → 不等合入，立刻开下一个切片。默认从 `origin/main` 新建分支；只有下一切片硬依赖
-  未合入内容时才叠在其上，并在正文声明；前序 squash 合入后 `git rebase --onto origin/main <前序分支>`
-  剥离已合入 commit，再 force-with-lease。CI 红先分辨本 PR 问题还是 flake，修或重触发。「等合入」永远
+  未合入内容时才叠在其上，并在正文声明；前序 squash 合入后 `scripts/rebase-union.sh --onto origin/main <前序 SHA>`
+  剥离已合入 commit（只追加的共享记录由 union 驱动自动保两边），再 force-with-lease。GitHub 的 stacked pull
+  requests（2026-07 起公测：底层 PR 合入后其余 PR 由 GitHub 自动重挂、改 base）与 merge queue（按批合入、
+  `merge_group` 事件跑 CI）能省掉这一步，但要 bot 以前序分支为 base 开 PR、CI 加 `merge_group` 触发，属维护者决定。CI 红先分辨本 PR 问题还是 flake，修或重触发。「等合入」永远
   不是阻塞；真正的阻塞（没接设备、维护者门未裁、安全停止条件）要实测出来并写清。
 - **多车道（r11）**：每条车道一个 worktree、一个会话、一个 `agent/xpa-0NN-<slug>-<date>` 分支；开工先
   `gh pr list --state open --json number,headRefName,files` 看别的车道在飞什么；共享文件规则见 §4.0；UI
