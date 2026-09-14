@@ -1,0 +1,589 @@
+{
+  "records" : [
+    {
+      "capability" : {
+        "capabilityID" : "CAP-RT-POLICY-DC73E87C3DA6FE5BE0A5B3CFC9F43DE646115C13-G1",
+        "effectCeiling" : "deviceMutation",
+        "exactBindingRevision" : 1,
+        "exactInputs" : {
+          "direction" : "forward",
+          "localPort" : 23451,
+          "remotePort" : 34561
+        },
+        "expiresAtUTC" : "2026-10-14T00:00:00Z",
+        "inputConstraints" : {
+          "direction" : {
+            "kind" : "exactString",
+            "value" : "forward"
+          },
+          "localPort" : {
+            "kind" : "integerRange",
+            "maximum" : 23451,
+            "minimum" : 23451
+          },
+          "remotePort" : {
+            "kind" : "integerRange",
+            "maximum" : 34561,
+            "minimum" : 34561
+          }
+        },
+        "issuedAtUTC" : "2026-09-14T00:00:00Z",
+        "issuer" : {
+          "kind" : "runtimeDefaultPolicy",
+          "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:port-forward.create@1"
+        },
+        "maximumUses" : 10000,
+        "operationScope" : [
+          {
+            "operationID" : "port-forward.create",
+            "version" : 1
+          }
+        ],
+        "revocation" : {
+          "state" : "active"
+        },
+        "targetScope" : {
+          "kind" : "stablePhysicalIdentity",
+          "sha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"
+        }
+      },
+      "consumptions" : [
+        {
+          "authorizationScopeFingerprintSHA256" : "e4001599170772ea84a62259425d8e7ae98c8e1121df4ad4aaf8c4d194b35c44",
+          "bindingRevision" : 1,
+          "consumedAtUTC" : "2026-09-14T00:00:00Z",
+          "effect" : "deviceMutation",
+          "jobID" : "job-76572d599b662d6facc627e8329c64c3",
+          "materializedPlanDigest" : "798c34a637e4bc89f3e6b8e9c65ecb99c6dd1bdbf7a047cd723cfac5c8c5837d",
+          "operationReference" : "port-forward.create@1",
+          "ordinal" : 1,
+          "outcomes" : [
+            {
+              "jobID" : "job-76572d599b662d6facc627e8329c64c3",
+              "outcome" : "confirmed",
+              "previousRecordSHA256" : "96574f75ef9d136aa815b80a0daf1296b6adbf71963b4e26b805edf7a16e59af",
+              "recordSHA256" : "6c72f3121818ed5efe003373cf749cea3098bf0b73ca77adae466b0aee74004e",
+              "recordedAtUTC" : "2026-09-14T00:00:00Z",
+              "terminalState" : "succeeded"
+            }
+          ],
+          "queryFingerprintSHA256" : "545a640b02f25226915237438fb6c0b7a4a90167865db8c31f592e074fdffcb5",
+          "receiptSHA256" : "96574f75ef9d136aa815b80a0daf1296b6adbf71963b4e26b805edf7a16e59af",
+          "remainingUsesAfter" : 9999,
+          "reservationID" : "idem-port-createForward",
+          "targetStableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"
+        }
+      ],
+      "remainingUses" : 9999
+    },
+    {
+      "capability" : {
+        "capabilityID" : "CAP-RT-POLICY-99DA2348327060F442011C8CD1C86576FC627D88-G1",
+        "effectCeiling" : "deviceMutation",
+        "exactBindingRevision" : 1,
+        "exactInputs" : {
+          "direction" : "forward",
+          "localPort" : 23451,
+          "remotePort" : 34561
+        },
+        "expiresAtUTC" : "2026-10-14T00:00:00Z",
+        "inputConstraints" : {
+          "direction" : {
+            "kind" : "exactString",
+            "value" : "forward"
+          },
+          "localPort" : {
+            "kind" : "integerRange",
+            "maximum" : 23451,
+            "minimum" : 23451
+          },
+          "remotePort" : {
+            "kind" : "integerRange",
+            "maximum" : 34561,
+            "minimum" : 34561
+          }
+        },
+        "issuedAtUTC" : "2026-09-14T00:00:00Z",
+        "issuer" : {
+          "kind" : "runtimeDefaultPolicy",
+          "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:port-forward.remove@1"
+        },
+        "maximumUses" : 10000,
+        "operationScope" : [
+          {
+            "operationID" : "port-forward.remove",
+            "version" : 1
+          }
+        ],
+        "revocation" : {
+          "state" : "active"
+        },
+        "targetScope" : {
+          "kind" : "stablePhysicalIdentity",
+          "sha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"
+        }
+      },
+      "consumptions" : [
+        {
+          "authorizationScopeFingerprintSHA256" : "3c50d915ae7f5c1a987b85578feac2c62c68a46d8165bf263c47963648cc2dfb",
+          "bindingRevision" : 1,
+          "consumedAtUTC" : "2026-09-14T00:00:00Z",
+          "effect" : "deviceMutation",
+          "jobID" : "job-93e623244ddf54014148f9dcba868df5",
+          "materializedPlanDigest" : "3d9c95d596c08c71e3c451a6eaaa740e806ca3b7a8d5a42b9aafe68b40aa3e96",
+          "operationReference" : "port-forward.remove@1",
+          "ordinal" : 1,
+          "outcomes" : [
+            {
+              "jobID" : "job-93e623244ddf54014148f9dcba868df5",
+              "outcome" : "confirmed",
+              "previousRecordSHA256" : "4614bfa883b939139b697855f74d967f36b9d87b0e24e618aa5b3e15c237dcd3",
+              "recordSHA256" : "76256b3f053022663cec7529c41fe7476b2718eed071d4abbf986adba4c1209a",
+              "recordedAtUTC" : "2026-09-14T00:00:00Z",
+              "terminalState" : "succeeded"
+            }
+          ],
+          "queryFingerprintSHA256" : "c3807df0425ea9688700fe0692aef89361b3016a3214ec0c0ff848be5733b60d",
+          "receiptSHA256" : "4614bfa883b939139b697855f74d967f36b9d87b0e24e618aa5b3e15c237dcd3",
+          "remainingUsesAfter" : 9999,
+          "reservationID" : "idem-port-removeForward",
+          "targetStableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"
+        }
+      ],
+      "remainingUses" : 9999
+    },
+    {
+      "capability" : {
+        "capabilityID" : "CAP-RT-POLICY-705E2B275519F17590291542D04D14D8934551DD-G1",
+        "effectCeiling" : "deviceMutation",
+        "exactBindingRevision" : 1,
+        "exactInputs" : {
+          "direction" : "reverse",
+          "localPort" : 23452,
+          "remotePort" : 34562
+        },
+        "expiresAtUTC" : "2026-10-14T00:00:00Z",
+        "inputConstraints" : {
+          "direction" : {
+            "kind" : "exactString",
+            "value" : "reverse"
+          },
+          "localPort" : {
+            "kind" : "integerRange",
+            "maximum" : 23452,
+            "minimum" : 23452
+          },
+          "remotePort" : {
+            "kind" : "integerRange",
+            "maximum" : 34562,
+            "minimum" : 34562
+          }
+        },
+        "issuedAtUTC" : "2026-09-14T00:00:00Z",
+        "issuer" : {
+          "kind" : "runtimeDefaultPolicy",
+          "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:port-forward.create@1"
+        },
+        "maximumUses" : 10000,
+        "operationScope" : [
+          {
+            "operationID" : "port-forward.create",
+            "version" : 1
+          }
+        ],
+        "revocation" : {
+          "state" : "active"
+        },
+        "targetScope" : {
+          "kind" : "stablePhysicalIdentity",
+          "sha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"
+        }
+      },
+      "consumptions" : [
+        {
+          "authorizationScopeFingerprintSHA256" : "4ba18cff1eadc3fc023bb419aeca85d78f13bfec94c0b7c7048b17c155c428c0",
+          "bindingRevision" : 1,
+          "consumedAtUTC" : "2026-09-14T00:00:00Z",
+          "effect" : "deviceMutation",
+          "jobID" : "job-e45429a83db2883cb488ae437920108f",
+          "materializedPlanDigest" : "2c2041f0ea972a8a331029269311425c4e60053ff74dc51630bbc84117cda642",
+          "operationReference" : "port-forward.create@1",
+          "ordinal" : 1,
+          "outcomes" : [
+            {
+              "jobID" : "job-e45429a83db2883cb488ae437920108f",
+              "outcome" : "confirmed",
+              "previousRecordSHA256" : "9c783d1184c66b9efab43fe81ca53a7a8f50fbe84a493fbb2639bb09f6443ce9",
+              "recordSHA256" : "5057788405467f40cb5b917596789f68480a461b952bc4e0f2d61d018c56f79e",
+              "recordedAtUTC" : "2026-09-14T00:00:00Z",
+              "terminalState" : "succeeded"
+            }
+          ],
+          "queryFingerprintSHA256" : "c228d5270ac9c6a7e12827d7df90611e674e20d077aa38fda7b5274a506b9a01",
+          "receiptSHA256" : "9c783d1184c66b9efab43fe81ca53a7a8f50fbe84a493fbb2639bb09f6443ce9",
+          "remainingUsesAfter" : 9999,
+          "reservationID" : "idem-port-createReverse",
+          "targetStableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"
+        }
+      ],
+      "remainingUses" : 9999
+    },
+    {
+      "capability" : {
+        "capabilityID" : "CAP-RT-POLICY-3F18FC730343B8E16A4D78282B70E59C90BE9AF8-G1",
+        "effectCeiling" : "deviceMutation",
+        "exactBindingRevision" : 1,
+        "exactInputs" : {
+          "direction" : "reverse",
+          "localPort" : 23452,
+          "remotePort" : 34562
+        },
+        "expiresAtUTC" : "2026-10-14T00:00:00Z",
+        "inputConstraints" : {
+          "direction" : {
+            "kind" : "exactString",
+            "value" : "reverse"
+          },
+          "localPort" : {
+            "kind" : "integerRange",
+            "maximum" : 23452,
+            "minimum" : 23452
+          },
+          "remotePort" : {
+            "kind" : "integerRange",
+            "maximum" : 34562,
+            "minimum" : 34562
+          }
+        },
+        "issuedAtUTC" : "2026-09-14T00:00:00Z",
+        "issuer" : {
+          "kind" : "runtimeDefaultPolicy",
+          "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:port-forward.remove@1"
+        },
+        "maximumUses" : 10000,
+        "operationScope" : [
+          {
+            "operationID" : "port-forward.remove",
+            "version" : 1
+          }
+        ],
+        "revocation" : {
+          "state" : "active"
+        },
+        "targetScope" : {
+          "kind" : "stablePhysicalIdentity",
+          "sha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"
+        }
+      },
+      "consumptions" : [
+        {
+          "authorizationScopeFingerprintSHA256" : "a5d3c01e402e509ddd4fb88052b5cc03d9977ef281976b34f9774fe4ba842930",
+          "bindingRevision" : 1,
+          "consumedAtUTC" : "2026-09-14T00:00:00Z",
+          "effect" : "deviceMutation",
+          "jobID" : "job-f076f4ff0a9b763be9c0884864f909c4",
+          "materializedPlanDigest" : "0c8ae64ad550707bae4fa7f166ba6be34e221c086de0ab83d46da55a16ac23d2",
+          "operationReference" : "port-forward.remove@1",
+          "ordinal" : 1,
+          "outcomes" : [
+            {
+              "jobID" : "job-f076f4ff0a9b763be9c0884864f909c4",
+              "outcome" : "confirmed",
+              "previousRecordSHA256" : "dab29671e1b29ae07d4e3ae26edea52ab93095feb78fe8cbcd708beba5025ca7",
+              "recordSHA256" : "5df95d33de12958d4d21237021689c14f18312d1cedf22aa674c7a2edadaebc4",
+              "recordedAtUTC" : "2026-09-14T00:00:00Z",
+              "terminalState" : "succeeded"
+            }
+          ],
+          "queryFingerprintSHA256" : "0ca7a0313cb166610810050fd2e4dcfd3721fa54844658f3fb5059faca3df995",
+          "receiptSHA256" : "dab29671e1b29ae07d4e3ae26edea52ab93095feb78fe8cbcd708beba5025ca7",
+          "remainingUsesAfter" : 9999,
+          "reservationID" : "idem-port-removeReverse",
+          "targetStableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"
+        }
+      ],
+      "remainingUses" : 9999
+    },
+    {
+      "capability" : {
+        "capabilityID" : "CAP-RT-POLICY-BAD400FC2BA593E823CB813FC29982E32379D3BA-G1",
+        "effectCeiling" : "deviceMutation",
+        "exactBindingRevision" : 1,
+        "exactInputs" : {
+          "direction" : "forward",
+          "localPort" : 23453,
+          "remotePort" : 34563
+        },
+        "expiresAtUTC" : "2026-10-14T00:00:00Z",
+        "inputConstraints" : {
+          "direction" : {
+            "kind" : "exactString",
+            "value" : "forward"
+          },
+          "localPort" : {
+            "kind" : "integerRange",
+            "maximum" : 23453,
+            "minimum" : 23453
+          },
+          "remotePort" : {
+            "kind" : "integerRange",
+            "maximum" : 34563,
+            "minimum" : 34563
+          }
+        },
+        "issuedAtUTC" : "2026-09-14T00:00:00Z",
+        "issuer" : {
+          "kind" : "runtimeDefaultPolicy",
+          "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:port-forward.create@1"
+        },
+        "maximumUses" : 10000,
+        "operationScope" : [
+          {
+            "operationID" : "port-forward.create",
+            "version" : 1
+          }
+        ],
+        "revocation" : {
+          "state" : "active"
+        },
+        "targetScope" : {
+          "kind" : "stablePhysicalIdentity",
+          "sha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"
+        }
+      },
+      "consumptions" : [
+        {
+          "authorizationScopeFingerprintSHA256" : "bb318c24721941ebbbae9b3ec7f170c7786c8dafe6f001d5e1f3944fe8aba268",
+          "bindingRevision" : 1,
+          "consumedAtUTC" : "2026-09-14T00:00:00Z",
+          "effect" : "deviceMutation",
+          "jobID" : "job-b6e82aa0e1a61f585b69c12eac2b0529",
+          "materializedPlanDigest" : "fb5e6f3b30ae47b6e0827cff88c4078965f5be4ae41d1aa9c639deb13da822eb",
+          "operationReference" : "port-forward.create@1",
+          "ordinal" : 1,
+          "outcomes" : [
+            {
+              "jobID" : "job-b6e82aa0e1a61f585b69c12eac2b0529",
+              "outcome" : "confirmed",
+              "previousRecordSHA256" : "77787efd422c108d84ce6feadb69927c658d3a573d2d9d30aa3425cd36fd5334",
+              "recordSHA256" : "321c010cb0587a3548877063b834624d8e73d43bb5649d656d1b7ad86f9d70d7",
+              "recordedAtUTC" : "2026-09-14T00:00:00Z",
+              "terminalState" : "failed"
+            }
+          ],
+          "queryFingerprintSHA256" : "be165bb305888318fe24bbecb2b26b27e4dab92ee3c6f50c7d7fce795e582219",
+          "receiptSHA256" : "77787efd422c108d84ce6feadb69927c658d3a573d2d9d30aa3425cd36fd5334",
+          "remainingUsesAfter" : 9999,
+          "reservationID" : "idem-port-createRefused",
+          "targetStableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"
+        }
+      ],
+      "remainingUses" : 9999
+    },
+    {
+      "capability" : {
+        "capabilityID" : "CAP-RT-POLICY-7E5DA34C6333D8FD4BB6127FE0F85FCB7D370D4F-G1",
+        "effectCeiling" : "deviceMutation",
+        "exactBindingRevision" : 1,
+        "exactInputs" : {
+          "direction" : "forward",
+          "localPort" : 23454,
+          "remotePort" : 34564
+        },
+        "expiresAtUTC" : "2026-10-14T00:00:00Z",
+        "inputConstraints" : {
+          "direction" : {
+            "kind" : "exactString",
+            "value" : "forward"
+          },
+          "localPort" : {
+            "kind" : "integerRange",
+            "maximum" : 23454,
+            "minimum" : 23454
+          },
+          "remotePort" : {
+            "kind" : "integerRange",
+            "maximum" : 34564,
+            "minimum" : 34564
+          }
+        },
+        "issuedAtUTC" : "2026-09-14T00:00:00Z",
+        "issuer" : {
+          "kind" : "runtimeDefaultPolicy",
+          "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:port-forward.remove@1"
+        },
+        "maximumUses" : 10000,
+        "operationScope" : [
+          {
+            "operationID" : "port-forward.remove",
+            "version" : 1
+          }
+        ],
+        "revocation" : {
+          "state" : "active"
+        },
+        "targetScope" : {
+          "kind" : "stablePhysicalIdentity",
+          "sha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"
+        }
+      },
+      "consumptions" : [
+        {
+          "authorizationScopeFingerprintSHA256" : "2a01cc32f5fb33d825ae6042d7f18113209282815f504c0f07d65b096ae122fd",
+          "bindingRevision" : 1,
+          "consumedAtUTC" : "2026-09-14T00:00:00Z",
+          "effect" : "deviceMutation",
+          "jobID" : "job-93fcc205fd79022141e3879e8eed5709",
+          "materializedPlanDigest" : "772bd390e0bf59887649fb2b3306da21f8788afa40e52080e2a13d890a0decba",
+          "operationReference" : "port-forward.remove@1",
+          "ordinal" : 1,
+          "outcomes" : [
+            {
+              "jobID" : "job-93fcc205fd79022141e3879e8eed5709",
+              "outcome" : "confirmed",
+              "previousRecordSHA256" : "91db44e5fee9d12aaca4db7f9d8d06aaa862c449e6aaa2f75ba1c671b912b425",
+              "recordSHA256" : "36e7f516dc9108a861973eb71c7afb51df17524748ce855a4a50bd2e8d0ba07c",
+              "recordedAtUTC" : "2026-09-14T00:00:00Z",
+              "terminalState" : "failed"
+            }
+          ],
+          "queryFingerprintSHA256" : "89acb1ee30651469d6191a00ba97747186c09c149aefccb12ba79316bb11004f",
+          "receiptSHA256" : "91db44e5fee9d12aaca4db7f9d8d06aaa862c449e6aaa2f75ba1c671b912b425",
+          "remainingUsesAfter" : 9999,
+          "reservationID" : "idem-port-removeMissing",
+          "targetStableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"
+        }
+      ],
+      "remainingUses" : 9999
+    },
+    {
+      "capability" : {
+        "capabilityID" : "CAP-RT-POLICY-D33F13DDF818B526694DDC5CDE416B2091AF22D0-G1",
+        "effectCeiling" : "deviceMutation",
+        "exactBindingRevision" : 1,
+        "exactInputs" : {
+          "direction" : "forward",
+          "localPort" : 23455,
+          "remotePort" : 34565
+        },
+        "expiresAtUTC" : "2026-10-14T00:00:00Z",
+        "inputConstraints" : {
+          "direction" : {
+            "kind" : "exactString",
+            "value" : "forward"
+          },
+          "localPort" : {
+            "kind" : "integerRange",
+            "maximum" : 23455,
+            "minimum" : 23455
+          },
+          "remotePort" : {
+            "kind" : "integerRange",
+            "maximum" : 34565,
+            "minimum" : 34565
+          }
+        },
+        "issuedAtUTC" : "2026-09-14T00:00:00Z",
+        "issuer" : {
+          "kind" : "runtimeDefaultPolicy",
+          "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:port-forward.create@1"
+        },
+        "maximumUses" : 10000,
+        "operationScope" : [
+          {
+            "operationID" : "port-forward.create",
+            "version" : 1
+          }
+        ],
+        "revocation" : {
+          "state" : "active"
+        },
+        "targetScope" : {
+          "kind" : "stablePhysicalIdentity",
+          "sha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"
+        }
+      },
+      "consumptions" : [
+        {
+          "authorizationScopeFingerprintSHA256" : "19047f1a3d2fc10f6b96c3063b97a7b8571326481d17464a531c5cfd21e3e8ff",
+          "bindingRevision" : 1,
+          "consumedAtUTC" : "2026-09-14T00:00:00Z",
+          "effect" : "deviceMutation",
+          "jobID" : "job-557095c0df3b79dcb1855c313b42eb54",
+          "materializedPlanDigest" : "a1b8a0bf4d679818f678ab61909d6198626b476646133c99d9108ff73ab5da29",
+          "operationReference" : "port-forward.create@1",
+          "ordinal" : 1,
+          "outcomes" : [
+            {
+              "jobID" : "job-557095c0df3b79dcb1855c313b42eb54",
+              "outcome" : "confirmed",
+              "previousRecordSHA256" : "f00deee5ad4a6ee9d6c0501636d397bde4cf6eeff1e56bb012ba01f55bf80ea1",
+              "recordSHA256" : "938646e23f2c3b649bf647e9624f0ce86003a75590a7bfe97e4aa6676a9470e1",
+              "recordedAtUTC" : "2026-09-14T00:00:00Z",
+              "terminalState" : "failed"
+            }
+          ],
+          "queryFingerprintSHA256" : "b9a4c5f312fa2b4f4e643075238d61d0e76f3a1e420c95db3da7b3cf85665bf4",
+          "receiptSHA256" : "f00deee5ad4a6ee9d6c0501636d397bde4cf6eeff1e56bb012ba01f55bf80ea1",
+          "remainingUsesAfter" : 9999,
+          "reservationID" : "idem-port-ruleUnlisted",
+          "targetStableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"
+        }
+      ],
+      "remainingUses" : 9999
+    },
+    {
+      "capability" : {
+        "capabilityID" : "CAP-RT-POLICY-6049D37D8994F22542149A9B4E58DF7F940AB2F6-G1",
+        "effectCeiling" : "deviceMutation",
+        "exactBindingRevision" : 1,
+        "exactInputs" : {
+          "direction" : "forward",
+          "localPort" : 23456,
+          "remotePort" : 34566
+        },
+        "expiresAtUTC" : "2026-10-14T00:00:00Z",
+        "inputConstraints" : {
+          "direction" : {
+            "kind" : "exactString",
+            "value" : "forward"
+          },
+          "localPort" : {
+            "kind" : "integerRange",
+            "maximum" : 23456,
+            "minimum" : 23456
+          },
+          "remotePort" : {
+            "kind" : "integerRange",
+            "maximum" : 34566,
+            "minimum" : 34566
+          }
+        },
+        "issuedAtUTC" : "2026-09-14T00:00:00Z",
+        "issuer" : {
+          "kind" : "runtimeDefaultPolicy",
+          "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:port-forward.create@1"
+        },
+        "maximumUses" : 10000,
+        "operationScope" : [
+          {
+            "operationID" : "port-forward.create",
+            "version" : 1
+          }
+        ],
+        "revocation" : {
+          "state" : "active"
+        },
+        "targetScope" : {
+          "kind" : "stablePhysicalIdentity",
+          "sha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"
+        }
+      },
+      "consumptions" : [
+
+      ],
+      "remainingUses" : 10000
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

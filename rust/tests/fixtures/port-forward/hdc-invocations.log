@@ -1,0 +1,40 @@
+listtargets-v
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.product.name
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.ohos.fullname
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaafporttcp:23451tcp:34561
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaafportls
+listtargets-v
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.product.name
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.ohos.fullname
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaafportrmtcp:23451tcp:34561
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaafportls
+listtargets-v
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.product.name
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.ohos.fullname
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaarporttcp:34562tcp:23452
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaafportls
+listtargets-v
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.product.name
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.ohos.fullname
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaafportrmtcp:34562tcp:23452
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaafportls
+listtargets-v
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.product.name
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.ohos.fullname
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaafporttcp:23453tcp:34563
+listtargets-v
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.product.name
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.ohos.fullname
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaafportrmtcp:23454tcp:34564
+listtargets-v
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.product.name
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.ohos.fullname
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaafporttcp:23455tcp:34565
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaafportls
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaafportrmtcp:23455tcp:34565
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaafportls
+listtargets-v
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.product.name
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.ohos.fullname
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaafporttcp:23456tcp:34566
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaafportls
