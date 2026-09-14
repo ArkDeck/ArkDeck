@@ -125,6 +125,59 @@ impl TargetDocument {
             .map_or(direct.target_id.as_str(), |r| r.canonical.as_str());
         self.targets.iter().find(|t| t.target_id == id)
     }
+    /// Swift `materializeAdoption`: the Target an adopted identity belongs
+    /// to — the canonical Target of an alias, the Target of the same
+    /// identity (or its canonical one), or a new Target at revision 1 named
+    /// `TGT-` and the identity's first twelve digits — and whether it is new.
+    pub fn materialize_adoption(
+        &mut self,
+        identity: &str,
+        connect_key: &str,
+        tool_version: &str,
+        now: &str,
+    ) -> Result<(TargetRecord, bool), String> {
+        let resolutions = self.resolutions.as_deref().unwrap_or_default();
+        let target = |id: &str| self.targets.iter().find(|t| t.target_id == id).cloned();
+        if let Some(canonical) = resolutions
+            .iter()
+            .find(|r| r.alias_identity == identity || r.routed_identity == identity)
+            .and_then(|r| target(&r.canonical))
+        {
+            return Ok((canonical, false));
+        }
+        if let Some(existing) = self.targets.iter().find(|t| t.identity == identity) {
+            let canonical = resolutions
+                .iter()
+                .find(|r| r.alias == existing.target_id)
+                .and_then(|r| target(&r.canonical));
+            return Ok((canonical.unwrap_or_else(|| existing.clone()), false));
+        }
+        let derived = format!("TGT-{}", identity.get(..12).unwrap_or(identity));
+        if let Some(same) = target(&derived) {
+            if same.connect_key != connect_key {
+                return Err(format!(
+                    "storeFailure(\"adopted target {derived} is bound to another connect key\")"
+                ));
+            }
+            return Ok((same, false));
+        }
+        let record = TargetRecord {
+            target_id: derived,
+            identity: identity.into(),
+            binding_revision: 1,
+            connect_key: connect_key.into(),
+            tool_version: tool_version.into(),
+            adopted_at: now.into(),
+        };
+        self.targets.push(record.clone());
+        Ok((record, true))
+    }
+    /// The document as Swift's `JSONEncoder` writes it: sorted keys, pretty
+    /// printed, no trailing newline.
+    pub fn encode(&self) -> Result<Vec<u8>, DecodeError> {
+        let value = serde_json::to_value(self).map_err(|_| DecodeError::Shape)?;
+        crate::session_json::encode_pretty(&value).map_err(|_| DecodeError::Shape)
+    }
     pub fn decode(bytes: &[u8]) -> Result<Self, DecodeError> {
         if bytes.is_empty() || bytes.len() > 4 * 1024 * 1024 {
             return Err(DecodeError::Size);
