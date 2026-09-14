@@ -1006,6 +1006,31 @@ USB enumeration), as is the facts port that encodes "not observable" as
 `deviceMode: "absent"`. `tests/live_mode.rs` drives the probe over the shared
 fake HDC driver as real subprocesses and asserts the argv from the fake's log.
 
+## Rockchip post-flash HDC observation (TASK-XPA-016, M4)
+
+`arkdeck_provider_hdc::RockchipHdcObserver` is the HDC side of Swift's
+Rockchip flash executor (`FoundationRockchipRuntimeActionExecutor`): the
+waits for the bound target to leave and re-join HDC (`wait_for_hdc`, 15 s /
+120 s, a `list targets -v` every second, an empty list and a malformed read
+tolerated until the deadline, which names the last malformed read), the
+bound reconnect after a complete overwrite (`wait_for_bound_hdc`, 600 s: the
+exact HDC-normal device at the recorded topology, or the previous alias at
+its new port, self-consistent and with exactly one `Connected` row — a
+board that drifted on both axes is a rebind, not a reconnect), the fresh
+re-proof of a cached route (`revalidate_bound_hdc`), and `verify_bound_build`
+up to the alias publication: prove the device, read
+`param get const.ohos.fullname; param get const.product.model` once
+(`parse_build_properties`: exactly two ordered values, at most 400
+characters each), require the model and then the build to equal the
+published profile exactly, and return the proof for the alias-store owner
+to publish. Every read is judged as Swift's `requireSemanticSuccess` judges
+it (`output_excerpt` is its last-output line). The `UsbProbe` port gains
+`single_hdc_normal_at(usb_topology)`; the receipt summaries are the
+functions beside the observer. The durable alias store, the Target lineage
+advance and the executor's observation-reuse cache are other owners'.
+`tests/rockchip_hdc.rs` drives the shared fake HDC driver with its own
+answers fragment and asserts the argv from the driver's log.
+
 ## macOS facade host owners (TASK-XPA-012)
 
 The installed facade pair now serves `history.filter.list/save/delete` itself.

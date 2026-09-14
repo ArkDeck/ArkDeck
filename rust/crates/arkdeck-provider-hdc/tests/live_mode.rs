@@ -7,77 +7,16 @@
 //! ports the ArkForge lane serves.
 #![cfg(target_os = "macos")]
 
-use arkdeck_platform::VerifiedTool;
+mod common;
+
 use arkdeck_provider_hdc::{
     DeviceMode, LiveModeFailure, LiveModeObservation, LiveModeProbe, LoaderIdentity,
-    LoaderObserver, ProcessDispatch, UsbProbe,
+    LoaderObserver, UsbProbe,
 };
+use common::{CONNECT_KEY, SharedFake};
 use sha2::{Digest, Sha256};
-use std::fs::{self, File, OpenOptions};
-use std::os::unix::fs::PermissionsExt;
-use std::path::{Path, PathBuf};
 
-/// `HDCOracleFake`'s fixed root and lock, which the fake's driver names.
-const ROOT: &str = "/private/tmp/arkdeck-hdc-oracle";
-const LOCK: &str = "/private/tmp/arkdeck-hdc-oracle.lock";
-/// The observe fixture's one device.
-const CONNECT_KEY: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const STABLE_IDENTITY: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
-
-fn observe_fixture() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/observe-device")
-}
-
-/// The shared fake at its fixed root, in the named answer mode, under the
-/// fake's lock for the life of the value.
-struct SharedFake {
-    _lock: File,
-    root: PathBuf,
-    dispatch: ProcessDispatch,
-}
-
-impl SharedFake {
-    fn new(mode: Option<&str>) -> Self {
-        let lock = OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .truncate(false)
-            .open(LOCK)
-            .unwrap();
-        lock.lock().unwrap();
-        let fixture = observe_fixture();
-        let root = PathBuf::from(ROOT);
-        let _ = fs::remove_dir_all(&root);
-        fs::create_dir(&root).unwrap();
-        fs::set_permissions(&root, fs::Permissions::from_mode(0o700)).unwrap();
-        fs::copy(fixture.join("hdc"), root.join("hdc")).unwrap();
-        fs::set_permissions(root.join("hdc"), fs::Permissions::from_mode(0o700)).unwrap();
-        fs::copy(fixture.join("hdc-answers.sh"), root.join("hdc-answers.sh")).unwrap();
-        File::create(root.join("hdc-invocations.log")).unwrap();
-        if let Some(mode) = mode {
-            fs::write(root.join("hdc-mode"), format!("{mode}\n")).unwrap();
-        }
-        let digest = format!("{:x}", Sha256::digest(fs::read(root.join("hdc")).unwrap()));
-        let dispatch =
-            ProcessDispatch::new(VerifiedTool::open(root.join("hdc"), &digest).unwrap(), None);
-        Self {
-            _lock: lock,
-            root,
-            dispatch,
-        }
-    }
-
-    fn invocations(&self) -> Vec<u8> {
-        fs::read(self.root.join("hdc-invocations.log")).unwrap()
-    }
-}
-
-impl Drop for SharedFake {
-    fn drop(&mut self) {
-        let _ = fs::remove_dir_all(&self.root);
-    }
-}
 
 struct FixedLoader(&'static str);
 
@@ -132,7 +71,7 @@ const BUILD_LINE: &[u8] =
 /// identity — two subprocesses, in Swift's order, with Swift's argv.
 #[test]
 fn the_shared_fake_in_hdc_normal_names_the_mode_the_build_and_the_port() {
-    let fake = SharedFake::new(None);
+    let fake = SharedFake::from_fixture(None);
     let usb = NormalOnlyUsb("44");
     let observation = LiveModeProbe::new(
         &fake.dispatch,
@@ -157,7 +96,7 @@ fn the_shared_fake_in_hdc_normal_names_the_mode_the_build_and_the_port() {
 /// was read, never the build.
 #[test]
 fn the_shared_fake_listing_another_device_leaves_the_mode_to_the_loader_observer() {
-    let fake = SharedFake::new(Some("otherDevice"));
+    let fake = SharedFake::from_fixture(Some("otherDevice"));
     let observation = LiveModeProbe::new(&fake.dispatch, &FixedLoader("42"), None)
         .observe(CONNECT_KEY, STABLE_IDENTITY)
         .unwrap();
@@ -192,14 +131,12 @@ fn the_shared_fake_listing_another_device_leaves_the_mode_to_the_loader_observer
 /// observable, and the Loader observer is never consulted.
 #[test]
 fn a_list_the_fake_refuses_is_not_observable() {
-    let fake = SharedFake::new(Some("normal"));
-    // The driver answers `-v` and `checkserver`; nothing else is registered
-    // for this argv, so the fake exits 23 as `ArkDeckFakeHDCFixture` does.
-    fs::write(
-        fake.root.join("hdc-answers.sh"),
+    // Nothing is registered for any argv, so the fake exits 23 as
+    // `ArkDeckFakeHDCFixture` does.
+    let fake = SharedFake::with_answers(
         "printf 'unregistered fixture output\\n' >&2\nexit 23\n",
-    )
-    .unwrap();
+        Some("normal"),
+    );
     let refused = LiveModeProbe::new(&fake.dispatch, &RefusingLoader("not reached"), None)
         .observe(CONNECT_KEY, STABLE_IDENTITY)
         .unwrap_err();
