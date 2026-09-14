@@ -1,0 +1,263 @@
+{
+  "actualEffect" : "deviceMutation",
+  "actualStepKinds" : [
+    "probeDevice",
+    "runApprovedRemoteRead",
+    "sendFile",
+    "installPackage",
+    "startApplication",
+    "verifyRemoteState",
+    "captureRemoteStdout",
+    "stopApplication",
+    "uninstallPackage",
+    "cleanupOwnedRemotePath"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "consumptionFingerprintSHA256" : "6a679ddfa24714cd7faba2ff506e2db2ec2c8326f8b03f5dec5edd574d2a9020",
+    "kind" : "runtimeCapability",
+    "reference" : "CAP-RT-POLICY-4841B6E9B1C282313D918AC38272E247638E6480-G1",
+    "runtimeCapabilityCorrelation" : {
+      "artifactSHA256" : "2aecbe307a148ebed3aaa8b1abc8e2137369257258fc0c6a06167a980fa24575",
+      "planDigestSHA256" : "5581a12c76c6e09cc30b7223f4912241217d7b87a9161a3c0045701804e7cd38",
+      "reservationID" : "idem-hap-stillRunning",
+      "stepSetDigestSHA256" : "7105dae9799eb931969e6afab81073c48c68fc69382f93a91dce79a6559adfbf",
+      "targetBindingDigestSHA256" : "4161ef10eb5d0b7dbccbff85ca94dc26fc8a1ea914df3f88faaa43bc02651090",
+      "useOrdinal" : 4
+    },
+    "validUntilUTC" : "2026-10-14T00:00:00Z"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "evidenceObservation" : {
+    "bindingRevision" : 1,
+    "confirmationMethod" : "machineReadback",
+    "confirmedAtUTC" : "2026-09-14T00:00:00Z",
+    "firmware" : "OpenHarmony-4.1-release",
+    "model" : "OpenHarmony Reference Device",
+    "preflightSteps" : [
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "confirm-evidence-target",
+        "stepKind" : "probeDevice"
+      },
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-model",
+        "stepKind" : "runApprovedRemoteRead"
+      },
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-firmware",
+        "stepKind" : "runApprovedRemoteRead"
+      }
+    ],
+    "providerID" : "hdc",
+    "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+    "targetID" : "TGT-3ba3f5f43b92",
+    "toolSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+    "toolVersion" : "3.2.0d",
+    "transport" : "usb"
+  },
+  "evidencePreflight" : {
+    "bindingRevision" : 1,
+    "confirmedAtUTC" : "2026-09-14T00:00:00Z",
+    "firmware" : "OpenHarmony-4.1-release",
+    "model" : "OpenHarmony Reference Device",
+    "providerID" : "hdc",
+    "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+    "steps" : [
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "confirm-evidence-target",
+        "stepKind" : "probeDevice"
+      },
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-model",
+        "stepKind" : "runApprovedRemoteRead"
+      },
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-firmware",
+        "stepKind" : "runApprovedRemoteRead"
+      }
+    ],
+    "targetID" : "TGT-3ba3f5f43b92",
+    "toolSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+    "toolVersion" : "3.2.0d",
+    "transport" : "usb"
+  },
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "firstEvidenceStepAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-e79d1b4e261f4a13d0bfb58a97fbf163",
+  "materializedBindingRevision" : 1,
+  "materializedPlanDigest" : "5581a12c76c6e09cc30b7223f4912241217d7b87a9161a3c0045701804e7cd38",
+  "materializedStableTargetIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+  "operationFailure" : {
+    "category" : "execution",
+    "code" : "executionFailed",
+    "recovery" : "inspectJob",
+    "retryability" : "runtimeDecisionRequired",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "debug.hap@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-hap-stillRunning",
+    "inputs" : {
+      "abilityName" : "EntryAbility",
+      "bundleName" : "com.example.demo",
+      "captureDiagnostics" : true,
+      "cleanupPolicy" : "uninstall",
+      "diagnosticsDurationSeconds" : 10,
+      "hapArtifactLease" : "lease-v1:job-input-hap:ART-ce40ab95d8ec5ac89835a46e2d301004",
+      "installPolicy" : "installOrReplace",
+      "postRunAbilityState" : "stopped"
+    },
+    "operation" : {
+      "id" : "debug.hap",
+      "version" : 1
+    },
+    "requestId" : "req-hap-stillRunning",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-3ba3f5f43b92"
+    }
+  },
+  "outcomeUnknown" : false,
+  "outstandingResidueCount" : 0,
+  "providerID" : "hdc",
+  "request" : {
+    "authorization" : {
+      "capabilityId" : "CAP-RT-POLICY-4841B6E9B1C282313D918AC38272E247638E6480-G1"
+    },
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-hap-stillRunning",
+    "inputs" : {
+      "abilityName" : "EntryAbility",
+      "bundleName" : "com.example.demo",
+      "captureDiagnostics" : true,
+      "cleanupPolicy" : "uninstall",
+      "diagnosticsDurationSeconds" : 10,
+      "hapArtifactLease" : "lease-v1:job-input-hap:ART-ce40ab95d8ec5ac89835a46e2d301004",
+      "installPolicy" : "installOrReplace",
+      "postRunAbilityState" : "stopped"
+    },
+    "operation" : {
+      "id" : "debug.hap",
+      "version" : 1
+    },
+    "requestId" : "req-hap-stillRunning",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-3ba3f5f43b92"
+    }
+  },
+  "sessionPublicationRecord" : {
+    "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+    "checkpointSeal" : {
+      "byteCount" : "19416",
+      "lastSequence" : 28,
+      "sha256" : "c0eb1212b9b4e8f3d65ab9ded87c5cd83d573aaad16c7659e6e1e867e0ca70f7"
+    },
+    "claims" : [
+      {
+        "admissionGeneration" : "<admissionGeneration>",
+        "claimID" : "session-publication-job-e79d1b4e261f4a13d0bfb58a97fbf163",
+        "finalizationHeadroomBytes" : "16777216",
+        "metadataHeadroomBytes" : "84952",
+        "remainingGrowthBytes" : "0",
+        "volumeIdentity" : "<volumeIdentity>",
+        "writerClass" : "light"
+      }
+    ],
+    "journalSeal" : {
+      "byteCount" : "19799",
+      "lastSequence" : 29,
+      "sha256" : "577bf5d2fc27c869e6cf3ecc78a3658fabf896a5016fc870caafef7f32982042"
+    },
+    "phase" : "catalogPublished",
+    "policyGeneration" : "1",
+    "proposal" : {
+      "completedAtUTC" : "2026-09-14T00:00:00Z",
+      "manifestByteCount" : "10343",
+      "manifestSHA256" : "9155fdfff94751bedd504520600dcda3618e8d99a6d4a419aea664b6154dd336",
+      "outcomeCertainty" : "confirmed",
+      "terminalStatus" : "failed"
+    },
+    "receipt" : {
+      "catalogGeneration" : "5",
+      "manifestSHA256" : "9155fdfff94751bedd504520600dcda3618e8d99a6d4a419aea664b6154dd336",
+      "publishedAtUTC" : "2026-09-14T00:00:00Z"
+    },
+    "relativeSessionPath" : "2026\/09\/session-job-e79d1b4e261f4a13d0bfb58a97fbf163",
+    "root" : {
+      "device" : "<device>",
+      "inode" : "<inode>",
+      "path" : "\/tmp\/arkdeck-hdc-oracle\/Sessions",
+      "volumeIdentity" : "<volumeIdentity>"
+    },
+    "sessionID" : "session-job-e79d1b4e261f4a13d0bfb58a97fbf163",
+    "sessionRootIdentity" : {
+      "device" : "<device>",
+      "inode" : "<inode>"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "failed",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "host-step verify-hap-artifact",
+    "intent confirm-evidence-target",
+    "verified confirm-evidence-target [\"deviceIdentitySHA256\", \"state\", \"transport\"]",
+    "evidence-preflight confirm-evidence-target",
+    "intent read-evidence-model",
+    "verified read-evidence-model [\"value\"]",
+    "evidence-preflight read-evidence-model",
+    "intent read-evidence-firmware",
+    "verified read-evidence-firmware [\"value\"]",
+    "evidence-preflight read-evidence-firmware",
+    "capability consumed before first mutation",
+    "intent send-hap",
+    "verified send-hap [\"stagedAt\"]",
+    "intent install-hap",
+    "dispatched install-hap; awaiting readback",
+    "intent package-readback",
+    "verified package-readback [\"bundleName\", \"cpuAbi\", \"deployedArtifactSha256\", \"installed\", \"nativeLibraryFileCount\", \"nativeLibraryPath\"]",
+    "artifact install-readback.json -> ART-a147348ec15862bcb1a3d9ebc71e3595",
+    "intent start-ability",
+    "dispatched start-ability; awaiting readback",
+    "intent process-readback",
+    "verified process-readback [\"bundleName\", \"running\"]",
+    "artifact process-readback.json -> ART-4bee4992c5737bb8fb2beb98acf789a0",
+    "intent capture-diagnostics",
+    "verified capture-diagnostics [\"byteCount\"]",
+    "artifact debug-hilog.txt -> ART-38bd72b7296c63ed4e0b7198da7d1327",
+    "intent stop-ability",
+    "failed stop-ability: stopIneffective: com.example.demo is still running after force-stop",
+    "running->finalizing",
+    "reason: stopIneffective: com.example.demo is still running after force-stop",
+    "compensation needsAttention: confirmed compensation failure: stop-ability",
+    "intent compensation-cleanup-uninstall",
+    "verified cleanup-uninstall [\"uninstalled\"]",
+    "intent compensation-cleanup-remote-staging",
+    "verified cleanup-remote-staging [\"cleaned\"]",
+    "finalizing->failed",
+    "reason: original failure retained; declared compensations have confirmed outcomes"
+  ]
+}

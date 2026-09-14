@@ -79,6 +79,27 @@ package struct HDCObservationProviderAdapter: DeviceProvider {
         : .available)
   }
 
+  /// The provider over a code-sign helper named by the caller instead of the
+  /// bundled one: an oracle keeps the helper at a fixed path, because the
+  /// helper's host path reaches the materialized plan and so its digest.
+  package init(
+    factsPort: any HDCObservationFactsPort,
+    profile: HDCCompatibilityProfile = .openHarmony320Family,
+    hostReceiveRoot: URL,
+    nativeCodeSignHelper: HDCNativeCodeSignHelperArtifact?
+  ) {
+    self.factsPort = factsPort
+    self.profile = profile
+    self.hostReceiveRoot = hostReceiveRoot
+    self.nativeCodeSignHelper = nativeCodeSignHelper
+    self.appOwnedNativeLibraryAvailability =
+      nativeCodeSignHelper == nil
+      ? .unavailable(
+        code: .providerToolUnavailable,
+        reason: "arm64 OpenHarmony code-sign helper cannot be verified")
+      : .available
+  }
+
   package func resolveFacts(targetID: String) async throws -> ProviderFacts {
     try await factsPort.currentFacts(targetID: targetID)
   }

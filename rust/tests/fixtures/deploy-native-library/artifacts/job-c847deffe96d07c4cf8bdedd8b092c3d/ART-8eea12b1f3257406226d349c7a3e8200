@@ -1,0 +1,14 @@
+{
+  "artifact" : "publish-report.json",
+  "attestation" : "fsVerity",
+  "buildId" : "00112233445566778899aabbccddeeff10213243",
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "fsVerityDigest" : "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "gid" : "20010050",
+  "jobId" : "job-c847deffe96d07c4cf8bdedd8b092c3d",
+  "mode" : "-rw-------",
+  "operation" : "deploy.native-library.app-owned@1",
+  "publishedSha256" : "f8cd1ccd46071323e6b3b8e1a6b2246b7b4ea5d5f71d6ea9990e33ec722f5b53",
+  "targetPath" : "/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so",
+  "uid" : "20010050"
+}

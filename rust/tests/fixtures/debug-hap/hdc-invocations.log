@@ -1,0 +1,108 @@
+listtargets-v
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.product.name
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.ohos.fullname
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaafilesend/private/tmp/arkdeck-hdc-oracle/artifacts/job-input-hap/ART-ce40ab95d8ec5ac89835a46e2d301004/data/local/tmp/arkdeck-job-5c146e0b3c72c2d2b812c1ca0a07eb70-send-hap-owned.hap
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellbminstall-p/data/local/tmp/arkdeck-job-5c146e0b3c72c2d2b812c1ca0a07eb70-send-hap-owned.hap-r
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellbmdump-ncom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellaastart-bcom.example.demo-aEntryAbility
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellpidofcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellhilog-x
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellaaforce-stopcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellpidofcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaauninstallcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellbmdump-ncom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/local/tmp/arkdeck-job-5c146e0b3c72c2d2b812c1ca0a07eb70-send-hap-owned.hap
+listtargets-v
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.product.name
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.ohos.fullname
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellmkdir-p/data/local/tmp/arkdeck-job-e2c7f17f2443dab69389bfdd083ec742-send-hap-owned-packages
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaafilesend/private/tmp/arkdeck-hdc-oracle/artifacts/job-input-hap/ART-ce40ab95d8ec5ac89835a46e2d301004/data/local/tmp/arkdeck-job-e2c7f17f2443dab69389bfdd083ec742-send-hap-owned-packages/ART-ce40ab95d8ec5ac89835a46e2d301004.hap
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaafilesend/private/tmp/arkdeck-hdc-oracle/artifacts/job-input-hap/ART-2ab8ee3a91b3198ef6404e610ed5179f/data/local/tmp/arkdeck-job-e2c7f17f2443dab69389bfdd083ec742-send-hap-owned-packages/ART-2ab8ee3a91b3198ef6404e610ed5179f.hap
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellbminstall-p/data/local/tmp/arkdeck-job-e2c7f17f2443dab69389bfdd083ec742-send-hap-owned-packages-r
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellbmdump-ncom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellaastart-bcom.example.demo-aEntryAbility
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellpidofcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellhilog-x
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellaaforce-stopcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellpidofcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaauninstallcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellbmdump-ncom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/local/tmp/arkdeck-job-e2c7f17f2443dab69389bfdd083ec742-send-hap-owned-packages/ART-ce40ab95d8ec5ac89835a46e2d301004.hap
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/local/tmp/arkdeck-job-e2c7f17f2443dab69389bfdd083ec742-send-hap-owned-packages/ART-2ab8ee3a91b3198ef6404e610ed5179f.hap
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrmdir/data/local/tmp/arkdeck-job-e2c7f17f2443dab69389bfdd083ec742-send-hap-owned-packages
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/local/tmp/arkdeck-job-e2c7f17f2443dab69389bfdd083ec742-send-hap-owned-packages
+listtargets-v
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.product.name
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.ohos.fullname
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaafilesend/private/tmp/arkdeck-hdc-oracle/artifacts/job-input-hap/ART-ce40ab95d8ec5ac89835a46e2d301004/data/local/tmp/arkdeck-job-93e778e0ca92005307f49ed32146d9eb-send-hap-owned.hap
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellbminstall-p/data/local/tmp/arkdeck-job-93e778e0ca92005307f49ed32146d9eb-send-hap-owned.hap-r
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellbmdump-ncom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaauninstallcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellbmdump-ncom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/local/tmp/arkdeck-job-93e778e0ca92005307f49ed32146d9eb-send-hap-owned.hap
+listtargets-v
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.product.name
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.ohos.fullname
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaafilesend/private/tmp/arkdeck-hdc-oracle/artifacts/job-input-hap/ART-ce40ab95d8ec5ac89835a46e2d301004/data/local/tmp/arkdeck-job-6b8946e6728411605153f7cd82411513-send-hap-owned.hap
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellbminstall-p/data/local/tmp/arkdeck-job-6b8946e6728411605153f7cd82411513-send-hap-owned.hap-r
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellbmdump-ncom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellaastart-bcom.example.demo-aEntryAbility
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaauninstallcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellbmdump-ncom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/local/tmp/arkdeck-job-6b8946e6728411605153f7cd82411513-send-hap-owned.hap
+listtargets-v
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.product.name
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.ohos.fullname
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaafilesend/private/tmp/arkdeck-hdc-oracle/artifacts/job-input-hap/ART-ce40ab95d8ec5ac89835a46e2d301004/data/local/tmp/arkdeck-job-e79d1b4e261f4a13d0bfb58a97fbf163-send-hap-owned.hap
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellbminstall-p/data/local/tmp/arkdeck-job-e79d1b4e261f4a13d0bfb58a97fbf163-send-hap-owned.hap-r
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellbmdump-ncom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellaastart-bcom.example.demo-aEntryAbility
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellpidofcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellhilog-x
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellaaforce-stopcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellpidofcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaauninstallcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellbmdump-ncom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/local/tmp/arkdeck-job-e79d1b4e261f4a13d0bfb58a97fbf163-send-hap-owned.hap
+listtargets-v
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.product.name
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.ohos.fullname
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaafilesend/private/tmp/arkdeck-hdc-oracle/artifacts/job-input-hap/ART-ce40ab95d8ec5ac89835a46e2d301004/data/local/tmp/arkdeck-job-fef1a0e4c7231791a53842cbdbc7afb0-send-hap-owned.hap
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellbminstall-p/data/local/tmp/arkdeck-job-fef1a0e4c7231791a53842cbdbc7afb0-send-hap-owned.hap-r
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellbmdump-ncom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellaastart-bcom.example.demo-aEntryAbility
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellpidofcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellhilog-x
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellaaforce-stopcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellpidofcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaauninstallcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellbmdump-ncom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/local/tmp/arkdeck-job-fef1a0e4c7231791a53842cbdbc7afb0-send-hap-owned.hap
+listtargets-v
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.product.name
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.ohos.fullname
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaafilesend/private/tmp/arkdeck-hdc-oracle/artifacts/job-input-hap/ART-ce40ab95d8ec5ac89835a46e2d301004/data/local/tmp/arkdeck-job-aab111522c0cbfb47e6694c029d517fa-send-hap-owned.hap
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellbminstall-p/data/local/tmp/arkdeck-job-aab111522c0cbfb47e6694c029d517fa-send-hap-owned.hap-r
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellbmdump-ncom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellaastart-bcom.example.demo-aEntryAbility
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellpidofcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellhilog-x
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellaaforce-stopcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellpidofcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaauninstallcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellbmdump-ncom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/local/tmp/arkdeck-job-aab111522c0cbfb47e6694c029d517fa-send-hap-owned.hap
+listtargets-v
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.product.name
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.ohos.fullname
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaafilesend/private/tmp/arkdeck-hdc-oracle/artifacts/job-input-hap/ART-ce40ab95d8ec5ac89835a46e2d301004/data/local/tmp/arkdeck-job-a9441d87ac72135c9840cb9ddc236813-send-hap-owned.hap
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellbminstall-p/data/local/tmp/arkdeck-job-a9441d87ac72135c9840cb9ddc236813-send-hap-owned.hap-r
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellbmdump-ncom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellaastart-bcom.example.demo-aEntryAbility
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellpidofcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellhilog-x
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellbmdump-ncom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaauninstallcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellbmdump-ncom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/local/tmp/arkdeck-job-aab111522c0cbfb47e6694c029d517fa-send-hap-owned.hap
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/local/tmp/arkdeck-job-aab111522c0cbfb47e6694c029d517fa-send-hap-owned.hap

@@ -1,0 +1,46 @@
+[
+  {
+    "jobID" : "job-c847deffe96d07c4cf8bdedd8b092c3d",
+    "persistedAction" : {
+      "arguments" : {
+        "abi" : "arm64-v8a",
+        "artifactId" : "ART-469c10579b3c5461ab4d0a891c316397",
+        "artifactLeaseId" : "lease-v1:job-input-native-library:ART-469c10579b3c5461ab4d0a891c316397",
+        "backupPath" : "\/data\/app\/el1\/bundle\/public\/com.example.demo\/libs\/arm\/.libexample.so.arkdeck-job-c847deffe96d07c4cf8bdedd8b092c3d.backup",
+        "buildId" : "00112233445566778899aabbccddeeff10213243",
+        "bundleName" : "com.example.demo",
+        "byteCount" : 588,
+        "codeSignFormatVersion" : 1,
+        "codeSignHelperABI" : "arm64-v8a",
+        "codeSignHelperBuildId" : "4e6f5302a74bab03fa0ecb72a4f96b9b4fa45323",
+        "codeSignHelperByteCount" : 214016,
+        "codeSignHelperRemotePath" : "\/data\/app\/el2\/100\/base\/com.example.demo\/haps\/entry\/files\/arkdeck-native\/job-c847deffe96d07c4cf8bdedd8b092c3d\/arkdeck-code-sign-enable",
+        "codeSignHelperSha256" : "86497e1a8f9b586169218df912895785c1c0f2d8bb3f87b2b700f6f86264f5c1",
+        "codeSignVersion" : 1,
+        "directoryPath" : "\/data\/app\/el1\/bundle\/public\/com.example.demo\/libs\/arm",
+        "elfClassBits" : 64,
+        "jobId" : "job-c847deffe96d07c4cf8bdedd8b092c3d",
+        "libraryLogicalName" : "libexample.so",
+        "loaderVisiblePath" : "\/data\/storage\/el1\/bundle\/libs\/arm\/libexample.so",
+        "machine" : 183,
+        "restartProfile" : "restartAbility",
+        "rollbackPolicy" : "autoRollback",
+        "rollbackStagingPath" : "\/data\/app\/el1\/bundle\/public\/com.example.demo\/libs\/arm\/.libexample.so.arkdeck-job-c847deffe96d07c4cf8bdedd8b092c3d.rollback",
+        "sha256" : "f8cd1ccd46071323e6b3b8e1a6b2246b7b4ea5d5f71d6ea9990e33ec722f5b53",
+        "signatureByteCount" : 16,
+        "signedDataByteCount" : 256,
+        "stagingDirectoryPath" : "\/data\/app\/el2\/100\/base\/com.example.demo\/haps\/entry\/files\/arkdeck-native\/job-c847deffe96d07c4cf8bdedd8b092c3d",
+        "stagingPath" : "\/data\/app\/el2\/100\/base\/com.example.demo\/haps\/entry\/files\/arkdeck-native\/job-c847deffe96d07c4cf8bdedd8b092c3d\/libexample.so.staging",
+        "targetPath" : "\/data\/app\/el1\/bundle\/public\/com.example.demo\/libs\/arm\/libexample.so",
+        "verificationProfile" : "hashProcessAndMaps"
+      },
+      "kind" : "hdc.cleanupNativeLibrary"
+    },
+    "reason" : "failed(\"cleanupDebt: native staging or backup path remains after cleanup\")",
+    "recordedAtUTC" : "2026-09-14T00:00:00Z",
+    "remotePath" : "\/data\/app\/el2\/100\/base\/com.example.demo\/haps\/entry\/files\/arkdeck-native\/job-c847deffe96d07c4cf8bdedd8b092c3d\/libexample.so.staging",
+    "retryAttemptStartedAtUTC" : "2026-09-14T00:00:00Z",
+    "settledAtUTC" : "2026-09-14T00:00:00Z",
+    "stepID" : "cleanup-staging-and-backup"
+  }
+]

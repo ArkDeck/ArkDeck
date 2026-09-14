@@ -1,0 +1,176 @@
+{
+  "records" : [
+    {
+      "capability" : {
+        "capabilityID" : "CAP-RT-POLICY-4841B6E9B1C282313D918AC38272E247638E6480-G1",
+        "effectCeiling" : "deviceMutation",
+        "exactBindingRevision" : 1,
+        "exactInputs" : {
+          "abilityName" : "EntryAbility",
+          "bundleName" : "com.example.demo",
+          "captureDiagnostics" : true,
+          "cleanupPolicy" : "uninstall",
+          "diagnosticsDurationSeconds" : 10,
+          "hapArtifactLease" : "lease-v1:job-input-hap:ART-ce40ab95d8ec5ac89835a46e2d301004",
+          "installPolicy" : "installOrReplace",
+          "postRunAbilityState" : "stopped"
+        },
+        "expiresAtUTC" : "2026-10-14T00:00:00Z",
+        "inputConstraints" : {
+          "abilityName" : {
+            "kind" : "exactString",
+            "value" : "EntryAbility"
+          },
+          "bundleName" : {
+            "kind" : "exactString",
+            "value" : "com.example.demo"
+          },
+          "cleanupPolicy" : {
+            "kind" : "exactString",
+            "value" : "uninstall"
+          },
+          "diagnosticsDurationSeconds" : {
+            "kind" : "integerRange",
+            "maximum" : 10,
+            "minimum" : 10
+          },
+          "hapArtifactLease" : {
+            "kind" : "exactString",
+            "value" : "lease-v1:job-input-hap:ART-ce40ab95d8ec5ac89835a46e2d301004"
+          },
+          "installPolicy" : {
+            "kind" : "exactString",
+            "value" : "installOrReplace"
+          },
+          "postRunAbilityState" : {
+            "kind" : "exactString",
+            "value" : "stopped"
+          }
+        },
+        "issuedAtUTC" : "2026-09-14T00:00:00Z",
+        "issuer" : {
+          "kind" : "runtimeDefaultPolicy",
+          "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:debug.hap@1"
+        },
+        "maximumUses" : 10000,
+        "operationScope" : [
+          {
+            "operationID" : "debug.hap",
+            "version" : 1
+          }
+        ],
+        "revocation" : {
+          "state" : "active"
+        },
+        "targetScope" : {
+          "kind" : "stablePhysicalIdentity",
+          "sha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"
+        }
+      },
+      "consumptions" : [
+        {
+          "authorizationScopeFingerprintSHA256" : "88061f3db3943aba05d3004afaf8fad76b23c08071ab1667d9906d2c7e2cce95",
+          "bindingRevision" : 1,
+          "consumedAtUTC" : "2026-09-14T00:00:00Z",
+          "effect" : "deviceMutation",
+          "jobID" : "job-5c146e0b3c72c2d2b812c1ca0a07eb70",
+          "materializedPlanDigest" : "5581a12c76c6e09cc30b7223f4912241217d7b87a9161a3c0045701804e7cd38",
+          "operationReference" : "debug.hap@1",
+          "ordinal" : 1,
+          "outcomes" : [
+            {
+              "jobID" : "job-5c146e0b3c72c2d2b812c1ca0a07eb70",
+              "outcome" : "confirmed",
+              "previousRecordSHA256" : "05ba8d7b04149bd3dcefb6c2c9a52a1e88da8dda50f9a6a88185914d2e5ea54b",
+              "recordSHA256" : "f7e64bd539d4a7aaddc4e577f4fe505e09cd059bb022a232f15c1c72126d99a8",
+              "recordedAtUTC" : "2026-09-14T00:00:00Z",
+              "terminalState" : "succeeded"
+            }
+          ],
+          "queryFingerprintSHA256" : "6a679ddfa24714cd7faba2ff506e2db2ec2c8326f8b03f5dec5edd574d2a9020",
+          "receiptSHA256" : "05ba8d7b04149bd3dcefb6c2c9a52a1e88da8dda50f9a6a88185914d2e5ea54b",
+          "remainingUsesAfter" : 9999,
+          "reservationID" : "idem-hap-installed",
+          "targetStableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"
+        }
+      ],
+      "remainingUses" : 9999
+    },
+    {
+      "capability" : {
+        "capabilityID" : "CAP-RT-POLICY-828AE3707114AB6D387D1B51FE63C9A41351CE66-G1",
+        "effectCeiling" : "deviceMutation",
+        "exactBindingRevision" : 1,
+        "exactInputs" : {
+          "abilityName" : "EntryAbility",
+          "additionalHapArtifactLeases" : [
+            "lease-v1:job-input-hap:ART-2ab8ee3a91b3198ef6404e610ed5179f"
+          ],
+          "bundleName" : "com.example.demo",
+          "captureDiagnostics" : true,
+          "cleanupPolicy" : "uninstall",
+          "diagnosticsDurationSeconds" : 10,
+          "hapArtifactLease" : "lease-v1:job-input-hap:ART-ce40ab95d8ec5ac89835a46e2d301004",
+          "installPolicy" : "installOrReplace",
+          "postRunAbilityState" : "stopped"
+        },
+        "expiresAtUTC" : "2026-10-14T00:00:00Z",
+        "inputConstraints" : {
+          "abilityName" : {
+            "kind" : "exactString",
+            "value" : "EntryAbility"
+          },
+          "bundleName" : {
+            "kind" : "exactString",
+            "value" : "com.example.demo"
+          },
+          "cleanupPolicy" : {
+            "kind" : "exactString",
+            "value" : "uninstall"
+          },
+          "diagnosticsDurationSeconds" : {
+            "kind" : "integerRange",
+            "maximum" : 10,
+            "minimum" : 10
+          },
+          "hapArtifactLease" : {
+            "kind" : "exactString",
+            "value" : "lease-v1:job-input-hap:ART-ce40ab95d8ec5ac89835a46e2d301004"
+          },
+          "installPolicy" : {
+            "kind" : "exactString",
+            "value" : "installOrReplace"
+          },
+          "postRunAbilityState" : {
+            "kind" : "exactString",
+            "value" : "stopped"
+          }
+        },
+        "issuedAtUTC" : "2026-09-14T00:00:00Z",
+        "issuer" : {
+          "kind" : "runtimeDefaultPolicy",
+          "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:debug.hap@1"
+        },
+        "maximumUses" : 10000,
+        "operationScope" : [
+          {
+            "operationID" : "debug.hap",
+            "version" : 1
+          }
+        ],
+        "revocation" : {
+          "state" : "active"
+        },
+        "targetScope" : {
+          "kind" : "stablePhysicalIdentity",
+          "sha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"
+        }
+      },
+      "consumptions" : [
+
+      ],
+      "remainingUses" : 10000
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

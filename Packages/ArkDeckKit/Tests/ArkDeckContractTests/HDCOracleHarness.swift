@@ -32,6 +32,9 @@ enum HDCOracleHarness {
 
   struct Composition {
     let handler: RuntimeControlPlaneHandler
+    /// The Artifact store the handler serves, for the inputs an oracle
+    /// publishes before its Jobs run.
+    let artifactStore: RuntimeArtifactStore
     let targets: URL
     let artifacts: URL
     let jobsState: URL
@@ -76,9 +79,11 @@ enum HDCOracleHarness {
   /// The standalone daemon's engine under the fixed root: the Target store,
   /// the Artifact store, the Job state with its capability store, the
   /// Session publication writer over a Sessions root and storage owner of
-  /// the root's own, and the HDC provider over the fake.
+  /// the root's own, and the HDC provider over the fake — with the code-sign
+  /// helper an oracle names, at a fixed path, when its operation sends one.
   static func composition(
-    hdc: URL, targetStore: RuntimeTargetStore, targets: URL, settings: Settings
+    hdc: URL, targetStore: RuntimeTargetStore, targets: URL, settings: Settings,
+    nativeCodeSignHelper: HDCNativeCodeSignHelperArtifact? = nil
   ) throws -> Composition {
     let root = settings.root
     let artifacts = root.appending(path: "artifacts", directoryHint: .isDirectory)
@@ -94,10 +99,16 @@ enum HDCOracleHarness {
     let writer = RuntimeSessionPublicationWriter(
       owner: try RuntimeSessionStorageStore(ownerRoot: owner, defaultSessionsRoot: sessions),
       coordinator: HostStorageCoordinator(), probe: RoomyStorageProbe())
-    let provider = HDCObservationProviderAdapter(
-      factsPort: OracleFactsPort(
-        targetStore: targetStore, executableSHA256: SHA256Hex.string(of: HDCOracleFake.driver),
-        nowUTC: settings.nowUTC))
+    let factsPort = OracleFactsPort(
+      targetStore: targetStore, executableSHA256: SHA256Hex.string(of: HDCOracleFake.driver),
+      nowUTC: settings.nowUTC)
+    let provider =
+      nativeCodeSignHelper.map {
+        HDCObservationProviderAdapter(
+          factsPort: factsPort,
+          hostReceiveRoot: root.appending(path: "receive", directoryHint: .isDirectory),
+          nativeCodeSignHelper: $0)
+      } ?? HDCObservationProviderAdapter(factsPort: factsPort)
     let providers = DeviceProviderRegistry(providers: [provider])
     let engine = try RuntimeJobEngine(
       configuration: .init(stateDirectory: jobsState, sessionPublicationWriter: writer),
@@ -112,8 +123,8 @@ enum HDCOracleHarness {
       flashBundleImportDirectory: nil, flashBundleImportPolicy: .production,
       methodObserver: nil)
     return Composition(
-      handler: handler, targets: targets, artifacts: artifacts, jobsState: jobsState,
-      sessions: sessions, owner: owner)
+      handler: handler, artifactStore: store, targets: targets, artifacts: artifacts,
+      jobsState: jobsState, sessions: sessions, owner: owner)
   }
 
   /// One recorded request and its answer; a run names the fake's mode.
@@ -175,10 +186,12 @@ enum HDCOracleHarness {
   }
 
   /// What the oracle records: the fake and every call it received, the
-  /// Target document, the cases, the Job index, every Artifact, every file
-  /// below the Job directories, the Sessions root and the storage owner (dot
-  /// entries included, each Job record's machine facts as labels), every such
-  /// entry's kind and mode, and the provenance of all of them.
+  /// Target document, the cases, the Job index, every Artifact and the
+  /// Artifact store's own ledgers beside the Job directories, every file
+  /// below the Job directories, the capability store, the Sessions root and
+  /// the storage owner (dot entries included, each Job record's machine
+  /// facts as labels), every such entry's kind and mode, and the provenance
+  /// of all of them.
   static func files(
     _ composition: Composition, target: RuntimeTargetRecord, cases: JSONValue,
     answers: String, producer: String, settings: Settings
@@ -196,17 +209,27 @@ enum HDCOracleHarness {
       "store/index.json":
         try encoder.encode(try index(of: composition.jobsState)) + Data("\n".utf8),
     ]
-    for job in try manager.contentsOfDirectory(atPath: composition.artifacts.path).sorted()
-    where !job.hasPrefix(".") {
-      let directory = composition.artifacts.appending(path: job, directoryHint: .isDirectory)
-      for name in try manager.contentsOfDirectory(atPath: directory.path).sorted()
+    for entry in try manager.contentsOfDirectory(atPath: composition.artifacts.path).sorted()
+    where !entry.hasPrefix(".") {
+      let url = composition.artifacts.appending(path: entry)
+      var isDirectory: ObjCBool = false
+      guard manager.fileExists(atPath: url.path, isDirectory: &isDirectory) else { continue }
+      guard isDirectory.boolValue else {
+        files["artifacts/\(entry)"] = try Data(contentsOf: url)
+        continue
+      }
+      for name in try manager.contentsOfDirectory(atPath: url.path).sorted()
       where !name.hasPrefix(".") {
-        files["artifacts/\(job)/\(name)"] = try Data(contentsOf: directory.appending(path: name))
+        files["artifacts/\(entry)/\(name)"] = try Data(contentsOf: url.appending(path: name))
       }
     }
     var tree: [JSONValue] = []
     for (directory, prefix) in [
       (composition.jobsState.appending(path: "jobs", directoryHint: .isDirectory), "store/jobs"),
+      (
+        composition.jobsState.appending(path: "capabilities", directoryHint: .isDirectory),
+        "store/capabilities"
+      ),
       (composition.sessions, "sessions"), (composition.owner, "session-owner"),
     ] {
       for path in try manager.subpathsOfDirectory(atPath: directory.path).sorted() {
@@ -272,10 +295,32 @@ enum HDCOracleHarness {
           atPath: oracle.appending(path: path).path, isDirectory: &directory)
         return !directory.boolValue
       }
-    XCTAssertEqual(Set(recorded), Set(files.keys))
-    for (path, data) in files {
-      XCTAssertEqual(try Data(contentsOf: oracle.appending(path: path)), data, path)
+    let produced = Set(files.keys)
+    XCTAssertEqual(
+      Set(recorded), produced,
+      "recorded only: \(Set(recorded).subtracting(produced).sorted()); "
+        + "produced only: \(produced.subtracting(recorded).sorted())")
+    for (path, data) in files.sorted(by: { $0.key < $1.key }) {
+      let expected = try Data(contentsOf: oracle.appending(path: path))
+      XCTAssertEqual(expected, data, "\(path)\(firstDifference(recorded: expected, produced: data))")
     }
+  }
+
+  /// Where two files first differ and what surrounds it, so that a mismatch of
+  /// two files of the same size names the value rather than the size.
+  static func firstDifference(recorded: Data, produced: Data) -> String {
+    guard recorded != produced else { return "" }
+    let index =
+      zip(recorded, produced).enumerated().first { $0.element.0 != $0.element.1 }?.offset
+      ?? min(recorded.count, produced.count)
+    func excerpt(_ data: Data) -> String {
+      let lower = max(0, index - 60)
+      let upper = min(data.count, index + 60)
+      let text = String(decoding: data.subdata(in: lower..<upper), as: UTF8.self)
+      return text.replacingOccurrences(of: "\n", with: "⏎")
+    }
+    return " differs at byte \(index) of \(recorded.count)/\(produced.count): recorded «"
+      + excerpt(recorded) + "» produced «" + excerpt(produced) + "»"
   }
 
   /// What a reader observes of the Job index without writing: layout,

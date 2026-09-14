@@ -1,0 +1,34 @@
+{
+  "artifacts" : [
+    {
+      "artifactID" : "ART-469c10579b3c5461ab4d0a891c316397",
+      "bindingSnapshot" : {
+        "bindingRevision" : 1,
+        "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "targetID" : "TGT-3ba3f5f43b92"
+      },
+      "byteCount" : 588,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-input-native-library",
+      "mediaType" : "application\/x-elf",
+      "name" : "libexample.so",
+      "privacy" : "standard",
+      "providerID" : "host",
+      "redactionApplied" : false,
+      "retention" : {
+        "pinned" : true,
+        "retentionClass" : "pinnedUntilVerified"
+      },
+      "sessionID" : "session-input-native-library",
+      "sha256" : "f8cd1ccd46071323e6b3b8e1a6b2246b7b4ea5d5f71d6ea9990e33ec722f5b53",
+      "sourceOperation" : "artifact.import-native-library",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "publish-native-library"
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}
