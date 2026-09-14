@@ -1,0 +1,7 @@
+{
+  "artifact" : "tool-facts.json",
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "jobId" : "job-73b1cb9a96d12a0ea736a065afdf5abd",
+  "operation" : "observe.device@1",
+  "toolVersion" : "3.2.0d"
+}

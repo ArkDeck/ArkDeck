@@ -296,6 +296,19 @@ def derive_method_schemas(source):
             if key not in groups or len(line) < len(groups[key]):
                 groups[key] = line
         selected = [groups[key] for key in sorted(groups)[:MAXIMUM_SIGNATURES_PER_METHOD]]
+        # Refusals of one shape differ only in their code, so the selection can
+        # keep one code of a shape and drop the frame of another. Keep the
+        # smallest frame of every recorded code it dropped, so that a later
+        # derivation over the committed corpus publishes the same codes.
+        evidenced = {json.loads(line)["error"]["code"] for line in selected if not json.loads(line)["ok"]}
+        dropped = {}
+        for frame, line in samples:
+            if frame["ok"] or len(line.encode()) > MAXIMUM_SAMPLE_BYTES:
+                continue
+            code = frame["error"]["code"]
+            if code not in evidenced and (code not in dropped or len(line) < len(dropped[code])):
+                dropped[code] = line
+        selected += [dropped[code] for code in sorted(dropped)]
         (FRAME_CORPUS_DIRECTORY / f"{method}.jsonl").write_text("\n".join(selected) + "\n")
     print(f"derived {len(by_method)} method schemas from {len(frames)} frames; corpus written")
 

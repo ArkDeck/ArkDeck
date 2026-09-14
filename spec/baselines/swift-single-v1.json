@@ -19,14 +19,14 @@
       "successes": 4
     },
     "agent.run": {
-      "errors": 3,
-      "requests": 10,
-      "successes": 7
+      "errors": 9,
+      "requests": 21,
+      "successes": 12
     },
     "agent.status": {
-      "errors": 1,
-      "requests": 9,
-      "successes": 8
+      "errors": 2,
+      "requests": 11,
+      "successes": 9
     },
     "artifact.export": {
       "errors": 4,
@@ -79,9 +79,9 @@
       "successes": 7
     },
     "artifact.list": {
-      "errors": 4,
-      "requests": 10,
-      "successes": 6
+      "errors": 6,
+      "requests": 16,
+      "successes": 10
     },
     "artifact.quota": {
       "errors": 0,
@@ -259,9 +259,9 @@
       "successes": 20
     },
     "job.plan": {
-      "errors": 3,
-      "requests": 6,
-      "successes": 3
+      "errors": 5,
+      "requests": 9,
+      "successes": 4
     },
     "job.reconcile": {
       "errors": 1,
@@ -270,8 +270,8 @@
     },
     "job.result": {
       "errors": 5,
-      "requests": 21,
-      "successes": 16
+      "requests": 23,
+      "successes": 18
     },
     "job.run": {
       "errors": 3,
@@ -530,16 +530,16 @@
     }
   },
   "corpusRecordCounts": {
-    "errors": 278,
-    "requests": 638,
-    "successes": 360
+    "errors": 289,
+    "requests": 662,
+    "successes": 373
   },
   "directoryDigests": {
     "Catalog/operations": "16671abf96551e9d5b9c3382fe4eb08f3fcd150cff68e7419634cd10ecda4bfd",
     "Catalog/profiles": "58ca1d970d40019ba2718646fde81fefda22533c5448e620217582e30f5d648f",
-    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "b47b731c8b79c64f0809fabb518baf5b2afc0466fda64bf4656b9319eabf7f76",
+    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "94115bc886edeb30e9d6a276a4db61a1de9ad8e822abe72f4cfb095dd330fb64",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC": "9ae93642e7b81bcea918469216711d7f6a17135a29cf021556ceef0f2f789196",
-    "spec/control/methods": "1f7ba44f5cd25207362bda1815492168fc5fdb97d8bb1757830c453231b7d69c"
+    "spec/control/methods": "599a5a1105e78ae9ef9630310261a016ef02633c8f09d71f25b842de79c9405b"
   },
   "files": {
     "Catalog/generated/effect-authorization-matrix.md": {
@@ -727,12 +727,12 @@
       "sha256": "776f79291a762a0533363492e7f719236d5a78b5d4376bc9b2c469d8c2546ad1"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/agent.run.jsonl": {
-      "blob": "e8f02605527ea49c4f66eab5e6b3c82e718e057b",
-      "sha256": "6c6df801133edf8e8985a9fdd90a31e984d317dd06b0625bd7f7c49e7cf77a52"
+      "blob": "35c32b13521c184789459391dee89f8d1048127a",
+      "sha256": "e7b19e3a9411363b9067927778d72dee3637ba3daf12af06ad964a290cd1ad1f"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/agent.status.jsonl": {
-      "blob": "4d0f9496c639fec139fa571da014fffdf4d81c66",
-      "sha256": "0ad99aceb370bb7451fbe4fe4a1ada0d4c0b150537c0308c968492009c619149"
+      "blob": "cd09b6aa398d8243a5e5203b2eb20fe0c5c0a28c",
+      "sha256": "609fbb69d12e2007d5011753ef0972a519a0ecbf2d99e8a6fcb654833563c662"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/artifact.export.jsonl": {
       "blob": "294a7e11eca1a71198217b967800a4e2eb297544",
@@ -775,8 +775,8 @@
       "sha256": "af3c127d1540bbaff4269b39925c00fc369d0fa16123309c0cd005c8f3d964c7"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/artifact.list.jsonl": {
-      "blob": "3034580fbccb901d0ee818cd82d47da97de5e0f8",
-      "sha256": "61473179fd1f8920c053403c5b30f92ecb12f56e88abf91e7a423769fee57c84"
+      "blob": "4b225023b59eebf7dec75c346ac027424a3155d3",
+      "sha256": "c88df6b55f9fb9833e8d70d26fd627324a7bab0e970acb5cd7ebf17a6909454e"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/artifact.quota.jsonl": {
       "blob": "47e688830bcf1ddb08f727d073421be25cfe660d",
@@ -919,16 +919,16 @@
       "sha256": "4b88971603c751bd3f8cc8d2950b6dae5c4bc06910450f1bd2ae33e9c4c21629"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.plan.jsonl": {
-      "blob": "f77ee9dc23228922191a489a7bd7385a2c379304",
-      "sha256": "00fa67ad1054ad29a0956d507e8a9ad7ad5f95a96e1ee5701de5d9239b6c846a"
+      "blob": "563e470222c165b96f334bedf9c0ea9094df34fb",
+      "sha256": "7d4e1b2e4cbfdd646733eb8d5e23084190ee30f736f50cde21b504833e7cad37"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.reconcile.jsonl": {
       "blob": "1fa6e69a0afa568a2204cdead11c3645668ab64b",
       "sha256": "d2a4cf124fbbb5c9f77a1ad7339a2d0a9a9c3f0791a8357c45d45daffa4ef1d3"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.result.jsonl": {
-      "blob": "75847948503423f199ee3394277892b817a68967",
-      "sha256": "5eeb1e2b1bbbfeee0fdf07022cbcf03544d7243299782cdc617c5d7fd527b371"
+      "blob": "f6bff131b18c03a6d43c9529147264326e9da69c",
+      "sha256": "6a9f4b126ab1eeff9f35970051c6b0cad5ab0410d6fa7488623db377fe08d1fd"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.run.jsonl": {
       "blob": "c8c66377329be20a286c63e55d0dfd64dfd5595a",
@@ -1323,12 +1323,12 @@
       "sha256": "bb1b01dd389ac2bdded5a405918f5c27543f1d69d16693d7b62062b31973566d"
     },
     "spec/control/methods/agent.run.json": {
-      "blob": "350ac31415cfe74812ba9067baa9acc0c646fab6",
-      "sha256": "805930c390dc61ff106a7d33432d3bc98160bbefbc7f638dbbcb1e72f2217e03"
+      "blob": "82be400266d902295447db733c11e4ed16049c8b",
+      "sha256": "0b2195f98f29d8fff2e18df1b535dbe550bab764a9af2d0acb6207bb863c55f8"
     },
     "spec/control/methods/agent.status.json": {
-      "blob": "17a6e2d10b6cce2597153959c7204306e90424b3",
-      "sha256": "d84da214c02d240ce34d6485d4ae5ec18a1b66699c03c685c608701f2a7b39ef"
+      "blob": "17df50a9174422863f289f3a7abc2ba95af90b99",
+      "sha256": "daee0e00ec979e0d5d9347b08e874384120a95d1e8e98d12218f4de084a9a03c"
     },
     "spec/control/methods/artifact.export.json": {
       "blob": "a5e9bba8d59089e6aa1de5069eb7f0561b505656",
@@ -1371,8 +1371,8 @@
       "sha256": "dac35548c9781f7285e4a9708585f8fa4cc7b33779dcbb9024a803167e81856d"
     },
     "spec/control/methods/artifact.list.json": {
-      "blob": "b2086f9593928241a142b8342b91b194772917d7",
-      "sha256": "1e973b25848a7b5cd9165e1a108978f81db2010a249364eb43743218e38e3747"
+      "blob": "5916f0c37572dd9360f6f98ea07a4fcfcf8b778c",
+      "sha256": "3deccc64b517008342106718eed5821cebe51f29ec1fe29b78e8df2a7607a8b0"
     },
     "spec/control/methods/artifact.quota.json": {
       "blob": "932f1b622c75b682c6aa10603c955b715a10b1ec",
@@ -1515,16 +1515,16 @@
       "sha256": "1c3b65b94a01c3bb658a8c85270eeb297215b9fcfd3839010a377cef8370c234"
     },
     "spec/control/methods/job.plan.json": {
-      "blob": "4b2ad0d6c9a73cb4789bec24594244e1c480c324",
-      "sha256": "59746b745c314a6dad6859c6f8d6c4fe972a254c97ab90bee6e1d009e6a0af2e"
+      "blob": "6e3ea8b2b292113d067377ed14c2ad5a27e6c327",
+      "sha256": "3e78eab4b28a0d51c1f85fd7b342c7638d225862b1b91444df287a85750a1363"
     },
     "spec/control/methods/job.reconcile.json": {
       "blob": "f42675066aacbeaf717dba3ff400755bf3d06ae1",
       "sha256": "12b7621e60cdaa058db4c58b8bc01a147040dd1f37dce44e6fee8acb792c49b7"
     },
     "spec/control/methods/job.result.json": {
-      "blob": "c604ea2d65b0f00ee020086b1d5a32eb37f42dd7",
-      "sha256": "f77f7515c8aec9a6d3ca38f5c8a15458e43d44b219d56c87857b8b780234e4e0"
+      "blob": "d6c3e611c7e3910d18a75f1ac200a961532850a6",
+      "sha256": "7293d3ccb0225ba53d9dafce7172d78a4c7e2d3128f110c0159490d4be02e5a8"
     },
     "spec/control/methods/job.run.json": {
       "blob": "e04ef2b6f69deee8b35d405951c8f7e8cd47b9c9",
@@ -1731,7 +1731,7 @@
       "sha256": "95367cc3e57160752f7d1d724887ee650adb8d3ccc5d736444517641a5da8e64"
     }
   },
-  "inputDigest": "bbe91b30562c6369f6cf13157d02310830847069c3d751f6c360771ea4ade9bd",
+  "inputDigest": "731b8e031d99a3d66e66e253246b0ac67a71f2d646fa16c0023906d58b6975ac",
   "kind": "development",
   "methodCount": 105,
   "protocolVersion": "1.0.0",

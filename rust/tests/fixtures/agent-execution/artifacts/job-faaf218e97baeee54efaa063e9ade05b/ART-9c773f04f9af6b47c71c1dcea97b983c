@@ -1,0 +1,60 @@
+{
+  "artifacts" : {
+    "advanced-dump.txt" : {
+      "detail" : "step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    },
+    "application-liveness.json" : {
+      "detail" : "step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    },
+    "crash-index.txt" : {
+      "detail" : "step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    },
+    "crash-log.txt" : {
+      "detail" : "step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    },
+    "hilog.txt" : {
+      "artifactId" : "ART-8c1fe372840b40b77fcedc87fb188935",
+      "byteCount" : 28,
+      "required" : false,
+      "sha256" : "8e58ed7ea64151a3b7a907ed6871307a9641e037c4fb72409aaf1b434a41b182",
+      "status" : "published"
+    },
+    "screenshot.jpeg" : {
+      "detail" : "upstream capture-screenshot did not run: step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    },
+    "screenshot.png" : {
+      "detail" : "upstream capture-screenshot did not run: step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    },
+    "trace.htrace" : {
+      "detail" : "upstream capture-trace did not run: step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    },
+    "ui-dump.json" : {
+      "artifactId" : "ART-c1922c581a3427c7182bd127a1e75dff",
+      "byteCount" : 15,
+      "required" : false,
+      "sha256" : "829e9704ae2d587d34d8c8c69cbb8e3b90467019eceead92d6a930853c2c790c",
+      "status" : "published"
+    },
+    "ui-tree.json" : {
+      "detail" : "upstream capture-ui-tree did not run: step not selected by the request inputs",
+      "required" : false,
+      "status" : "missing"
+    }
+  },
+  "jobId" : "job-faaf218e97baeee54efaa063e9ade05b",
+  "operation" : "capture.diagnostics@1"
+}

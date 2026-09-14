@@ -5,6 +5,7 @@
         "artifactIntegrityFailed",
         "conflict",
         "internalError",
+        "invalidCursor",
         "invalidInput",
         "invalidParams",
         "malformedFrame",
@@ -12,6 +13,7 @@
         "operationUnavailable",
         "recordUnreadable",
         "rejected",
+        "resourceNotFound",
         "unknownMethod",
         "unsupportedProtocolVersion",
         "workspaceReferenceNotFound"
@@ -37,6 +39,9 @@
       "additionalProperties": false,
       "properties": {
         "artifactId": {
+          "type": "string"
+        },
+        "cursor": {
           "type": "string"
         },
         "jobId": {
@@ -231,7 +236,10 @@
           "type": "array"
         },
         "nextCursor": {
-          "type": "null"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "order": {
           "type": "string"
@@ -266,8 +274,8 @@
   "x-arkdeck-method": "artifact.list",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 10,
-    "request": 62,
-    "result": 52
+    "error": 13,
+    "request": 58,
+    "result": 45
   }
 }
