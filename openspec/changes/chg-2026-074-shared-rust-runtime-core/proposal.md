@@ -1,7 +1,7 @@
 ---
 id: CHG-2026-074-shared-rust-runtime-core
-revision: 10
-status: proposed # r9 approval remains historical; the r10 implementation delta requires maintainer review
+revision: 11
+status: proposed # r9 approval remains historical; the r10/r11 deltas require maintainer review
 class: platform
 core_change_level: none
 owner: fuhanfeng
@@ -10,6 +10,16 @@ platforms: [macos, windows]
 ---
 
 # CHG-2026-074 — Shared Rust runtime core with native SwiftUI and WinUI 3 clients
+
+Revision 11 (2026-09-14) re-measures the macOS chain after four days of delivery and changes
+how the remaining work is cut, verified and parallelised: Golden Journey milestones on the
+isolated Rust daemon (M1 GJ-1 → M2 GJ-2/3 → M3 GJ-5 → M4 GJ-4 → M5 one-shot cutover and
+retirement), a three-tier parity rule for XPA-AC-1/3 under the r10 premise, the withdrawal of
+the installed store-by-store composition, `ready` status for TASK-XPA-015/016/019/025 on their
+actual interface dependencies, spikes SPK-6..11, a decision package for design §L.1 item 13 and
+a verification-overhead rule set. It changes no Requirement, Acceptance Scenario, Core baseline,
+safety invariant or hardware criterion; the maintainer's merge is the attestation of the rulings
+it records (§ "Revision 11" below).
 
 Revision 10 is delivered with the Rust History owner implementation. The user confirmed
 that ArkDeck is unreleased and ordinary existing data is rebuildable test state. It removes
@@ -171,6 +181,104 @@ itself; the maintainer's merge of this PR is the attestation. It rewrites the Al
    [CHG-2026-076](../chg-2026-076-declared-scope-extension/proposal.md), which lets a PR declare an
    adjacent-path extension in band under bounded, reviewed conditions.
 
+## Revision 11 — Golden Journey milestones, tiered parity, four lanes (2026-09-14)
+
+Revision 11 changes no scope, no Requirement, no Acceptance Scenario, no platform disposition, no
+Core baseline, no safety invariant and no hardware criterion, and it does not approve r6–r10 or
+itself; the maintainer's merge of this PR is the attestation of the rulings it records. It is an
+acceleration review of the macOS chain measured on `main` `6cf99fb6` (#1905).
+
+1. **Measured state.** Since the Rust tree appeared (#1768, 2026-09-08) 65 PRs have merged and
+   the `.rs` tree grew from 0 to 2.84 MB (`.py` harnesses 0.43 MB); on 2026-09-13/14 a slice
+   merged every 50–90 minutes. Against the chain's own sizing (013, 014, 015, 016, 017, 018,
+   019 = L, 025 = M; 30–59 engineer-weeks) that pace is five to ten times the plan. Yet the
+   distance to G5 is unchanged in the units that matter: the isolated Rust owner answers 54 of
+   the 105 control methods natively while the installed facade serves 3 locally; 1 of the 30
+   Catalog operations (`analyzer.extract-crash-signature@1`, one hostOnly step) runs in Rust;
+   GJ-1..5 on the pure Rust daemon 0/5; App facades on ClientKit 0/13; Swift targets deleted
+   0/6. In the last three engine slices recorded oracle fixtures were 44–60 % of the added lines
+   and Rust product code 16–30 %; of the last 18 PRs, 10 advanced the port and 8 repaired locks,
+   timing or CI cost.
+2. **Ruling: milestones are Golden Journeys on the isolated Rust daemon.** M1 GJ-1
+   (`observe.device@1`, `capture.diagnostics@1`, `agent.run/status/list/resume/abandon` with
+   HAR, `human-action.*`, `target.adopt/availability`, `runtime.hdc.status/restart/impact-preview`,
+   the restart carry-over of design §G.4); M2 GJ-2/3 (`artifact.import.commit` and private
+   publication, capability mint/reserve/consume for `deviceMutation` admission, `debug.hap@1`,
+   `debug.*`, `deploy.native-library.app-owned@1` with rollback, `capability.*`,
+   `cleanupDebt.*`); M3 GJ-5 (the 13 `workspace.*` operations and `workspace.preset/project.*`
+   with the registered toolchain, hap-sign-tool and Keychain `SecItem*`); M4 GJ-4 (the ArkForge
+   lane through `arkforge-client`, `flash.*`, Rockchip binding and live-mode probes, the DEC-016
+   recovery epoch); M5 the one-shot cutover and retirement of TASK-XPA-017 after the clients
+   detach (TASK-XPA-018/019) and the performance lanes measure Rust (TASK-XPA-025). Each
+   milestone is proven first on the isolated root against `ArkDeckFakeHDCFixture`, then
+   headless on the DAYU200 (`REAL_DEVICE_PASS`, assumption A4 unchanged). The next TASK-XPA-014
+   slice is `observe.device@1` end to end (SPK-7), not a further analyzer lane and not the
+   capability store in isolation. The three analyzers on no Golden Journey
+   (`analyze-trace`, `summarize-trace`, `summarize-hilog`) are delivered after M4; G5's "no
+   regression" still requires them.
+3. **Ruling: parity is tiered (interpretation of XPA-AC-1 and XPA-AC-3 under r10).** T0
+   byte-equal: wire schemas and the envelope; digests and reference identity (plan digest,
+   Artifact digests, canonical JSON/CBOR, receipt seals); the durable formats that are read
+   after the cutover because the installed state holds real intent, outcome, capability and
+   evidence (journal, `runtime_job` index, `job-record.json`, Session manifest and audit,
+   capability ledger, Artifact index, recovery manifests). T1 semantically equal: state
+   transitions, error codes, refusal conditions, zero-dispatch proofs (`details.phase`,
+   `newDispatchCount`), next actions, evidence precedence. T2 free: `message` text and Swift
+   debug renderings (`spec/control/methods/*.json` constrain codes and shapes, never text),
+   timestamp precision beyond the schema, logs, incidental side-effect files
+   (`.payload-verification-v1.json`, empty directories). Oracles record T0 files only; T1 is
+   compared by code, shape and transition sequence; no new Foundation or ICU emulation is
+   written for T2 output. XPA-AC-1's "zero differences in current product contract, safety and
+   digest/reference identity" and XPA-AC-3's "byte-equal accepted frames" are read with these
+   tiers; the rows themselves are unchanged.
+4. **Ruling: the installed store-by-store composition is withdrawn.** #1888 moved three History
+   filter methods into the facade and its own record shows the other stores cannot follow while
+   the Swift engine consumes them (Session output and storage policy, Trace cache census,
+   Bootstrap selection, Target bindings); the r10 route C already makes activation one event
+   after the consumers detach. The History slice stays as delivered; every other owner is
+   activated once at M5 through the design §G.4 preflight, with a snapshot digest of the old
+   state directory and the facade bundle retained one cycle as rollback. Dual-owner lock
+   coordination stops being a deliverable.
+5. **Ruling: TASK-XPA-015, 016, 019 and 025 are `ready`** on their interface dependencies —
+   the contract, the isolated Rust daemon as delivered, the recorded fixtures and the spike
+   that precedes each — not on TASK-XPA-014 `done`. TASK-XPA-019 is on the critical path of
+   M5 because the App's NSXPC transport cannot reach the Rust daemon; the DAG edges
+   XPA-014 → XPA-015 → XPA-016, XPA-014 → XPA-019 and XPA-014 → XPA-025 become "acceptance
+   only". Their readiness pins are instantiated in this revision. Four lanes run in parallel
+   worktrees: A engine and device path (014, 013), B platform executor (016), C clients (019,
+   018), D providers, ArkForge lane and performance (015, the ArkForge part of 017, 025); file
+   ownership and the shared-file rules are in design §G.1 r11.
+6. **Spikes SPK-6..11** (design §J.3) precede the lanes, each at most one day, each recording a
+   go/no-go fact and a reusable library under `evidence/runs/<task>/`: SPK-6 the HDC process
+   executor (PTY secret exchange, persistent shell channel, libproc observation, `/.vol`
+   launch); SPK-7 `observe.device@1` end to end on the isolated daemon; SPK-8 the ClientKit
+   `xpc_connection` transport and generator on the smallest facade; SPK-9 ArkForge Rust-to-Rust
+   through `arkforge-client`; SPK-10 Keychain, DevEco password decoding and the signing tools;
+   SPK-11 the performance harness and `arkdeck-soak` on the Rust daemon. If SPK-6, SPK-9 and
+   SPK-10 pass, the executor sidecar of TASK-XPA-014 is never built.
+7. **Decision package for design §L.1 item 13.** `evidence/adr-0009-decision-package-20260914.md` names the code that carries ADR-0009
+   decisions 2 and 4 today, file and line, with the contract tests that pin each carrier, the
+   Rust mirrors that already exist and the four symbols the ADR names that have no successor.
+   The proposed ruling is to port the named carriers unchanged; recovery, `job.reconcile`,
+   resumable Jobs and recovery epochs stay unported until the maintainer rules.
+8. **Verification overhead.** The T0 oracles for M1 and M2 are recorded once in a Swift-only PR
+   against the fake HDC fixture, so that the Rust slices that follow change no Swift file and
+   the planner selects only the Rust lane; one corpus-replay harness over the recorded
+   ControlFrames and the T0 fixtures replaces per-slice `check-<slice>.py` scripts; tests that
+   spawn children keep their own binaries; oracles use no real-time budget below 30 s except
+   the case that tests the timeout; corpus-count assertions are written `>=` the published
+   count. `evidence/macos-remaining.md` carries a six-number dashboard — methods on the
+   standalone Rust daemon, operations executable, Golden Journeys on Rust, App facades on
+   ClientKit, CLI leaves on Rust, Swift targets deleted — updated on every merge.
+9. **Proposed rulings attested by this merge**, recorded in design §L.1: item 7, the Swift CLI
+   retires with M5 and the compatibility leaves are tombstoned per CLI spec §12; item 19 (new),
+   the parity tiers above; item 14, a daily one-hour DAYU200 window once SPK-7 passes, GJ-4
+   windows still on an explicit go. Item 13 is not ruled here; the decision package asks for it.
+10. **Design re-pin.** Sections A (item 5), G.1 (r11 subsection), J.2 (four edges), J.3
+    (SPK-6..11), J.4 (rows 012, 014, 015, 016, 019, 025), J.5 (r11 entry) and L.1 (items 7, 13,
+    14, 19) changed; nothing else. `docs/design/cross-platform/macos-chain-agent-prompt.md` is
+    re-issued at version 2026-09-14 for the executing agents.
+
 ## Governance loop
 
 1. **Why a change is required at all.** `core-portability.md:30` states that introducing a shared
@@ -290,7 +398,9 @@ zero-dependency); (3) control-plane peer hardening; (4) Golden Journey re-pass r
 replacement; (9) Windows support tuple (Windows 11 x64 + ARM64); (10) MSIX packaged + self-contained
 Windows App SDK; (13) ADR-0009 open ruling before recovery is ported; (17) the same-user trust
 boundary statement (r5); (18) the macOS-first order, ruled on 2026-09-09 and recorded in r8,
-effective on its merge.
+effective on its merge; (r11) item 19 the parity tiers, item 7 the Swift CLI retirement with M5 and
+item 14 the device window cadence, recorded in r11 and effective on its merge, while item 13 waits for
+the ruling requested by `evidence/adr-0009-decision-package-20260914.md`.
 
 ## Historical revisions 2–5
 

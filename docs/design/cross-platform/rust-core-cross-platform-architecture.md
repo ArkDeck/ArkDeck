@@ -18,7 +18,7 @@
 2. **macOS 保留 SwiftUI App**，通过 launchd Mach service（XPC C API）访问 daemon；**Windows 用 WinUI 3 / Windows App SDK 2.x**，通过 user-private Named Pipe 访问同一 Rust daemon；CLI 改为单一 Rust 实现，两端同一二进制源码。
 3. **FFI 只允许一个 crate `arkdeck-contract-ffi`**，内容限定为确定性纯计算：canonical JSON/CBOR、digest、schema/文档校验、离线 journal/artifact index 解码、（按需）Viewer 大树索引。它没有任何 authority、I/O 或副作用；panic 在边界捕获并返回错误码。它是可选优化，不是架构依赖。
 4. **语言无关契约成为唯一事实源**：Catalog、JSON Schema、逐 method typed schema、状态机表、reason code、canonical vectors、CLI fixtures 全部放入 `spec/` 类目录，Rust 与 Swift/C# 都从它生成或直接消费；迁移期以 SVC 完成后的最新 Swift 单 v1 字节为 oracle、Rust 为新实现，通过 byte-for-byte differential 与只读 shadow 证明相等后再切换 owner。
-5. **迁移是 strangler，不是 big-bang**：第一刀是 Rust「控制面 façade」拥有 socket/XPC/pipe 并把未迁移方法转发给 Swift daemon；随后按 durable store 的 owner 逐个搬迁（host-only 存储 → artifact → admission/job/capability/recovery），provider 逐族搬迁，Swift 最终只剩 App 与客户端 SDK；Swift daemon/引擎/存储 target 的删除（XPA-017）只在 Rust CLI 与 App 都已脱钩（XPA-018/019）之后进行，仓库不经过「客户端链接已删模块」的中间态（r3）。r10 按未发布产品在隔离开发根建设最终 Rust 链；不要求每一步可发布或切回 Swift，当前契约与安全边界保持，必要格式调整随实现 review。
+5. **迁移是 strangler，不是 big-bang**：第一刀是 Rust「控制面 façade」拥有 socket/XPC/pipe 并把未迁移方法转发给 Swift daemon；随后按 durable store 的 owner 逐个搬迁（host-only 存储 → artifact → admission/job/capability/recovery），provider 逐族搬迁，Swift 最终只剩 App 与客户端 SDK；Swift daemon/引擎/存储 target 的删除（XPA-017）只在 Rust CLI 与 App 都已脱钩（XPA-018/019）之后进行，仓库不经过「客户端链接已删模块」的中间态（r3）。r10 按未发布产品在隔离开发根建设最终 Rust 链；不要求每一步可发布或切回 Swift，当前契约与安全边界保持，必要格式调整随实现 review。（r11：进度单位改为隔离 Rust daemon 上的 Golden Journey 里程碑 M1～M5，安装态逐 store 组合撤回，唯一一次 cutover 在 M5；见 §G.1 r11）
 6. **Windows 从最薄的真实 GJ-1 walking skeleton 开始**（`arkdeck doctor` → `device candidates` → `target adopt` → `observe.device@1` → `capture.diagnostics@1` → 重启后可读），每个 PR 推进一个 hop，然后 GJ-2～GJ-5。（r8：Windows 阶段在 macOS 侧完成、GJ-1～5 在纯 Rust daemon 上 PASS（§J.5 G5）之后才开始。）
 
 淘汰理由摘要：方案 2（进程内 cdylib）把 authority 放进每个客户端进程，破坏「唯一 owner / 单写者」与 crash isolation，且沙箱 App 在结构上不能拥有设备副作用；方案 1（纯 daemon、零 FFI）与推荐方案只差一个可选的纯计算 kernel，差异在 Viewer/离线解析的跨平台一致性与性能，因此推荐方案吸收方案 1 为骨干、把 FFI 收窄为「无 authority 的纯函数」。详见 §C 决策矩阵。
@@ -489,6 +489,53 @@ ArkDeck 尚未 release，普通现有状态是可重建测试数据。保留已�
 确保唯一有权 Runtime；新目录不能让同一设备的 unknown intent、reservation 或 outcome
 消失。无法证明安全时只继续 host/fake 开发，危险 dispatch 为零。
 
+**r11（2026-09-14，加速评审；proposal r11 记录裁决，合入即 attestation）**：
+
+- **里程碑 = 隔离 Rust daemon 上的 Golden Journey，不是 store 或 RPC 方法。** M1 GJ-1
+  （`observe.device@1`、`capture.diagnostics@1`、`agent.*` 与 HAR、`human-action.*`、
+  `target.adopt/availability`、`runtime.hdc.*`、§G.4 的重启承接）→ M2 GJ-2/3（Artifact 发布与
+  import commit、deviceMutation 准入的 capability mint/reserve/consume、`debug.*`、
+  `deploy.native-library.app-owned@1` 含 rollback、`capability.*`、`cleanupDebt.*`）→ M3 GJ-5
+  （13 个 `workspace.*`、`workspace.preset/project.*`、registered toolchain、hap-sign-tool、Keychain
+  `SecItem*`）→ M4 GJ-4（ArkForge lane 直连 `arkforge-client`、`flash.*`、Rockchip binding/live-mode
+  probe、DEC-016 recovery epoch）→ M5 一次性 cutover 与退役（XPA-017；前置 018/019 脱钩、025 在 Rust 上
+  测量）。每个里程碑先在隔离根对 `ArkDeckFakeHDCFixture` 跑通，再真机 headless `REAL_DEVICE_PASS`。
+  不在任何 GJ 上的三个 analyzer（`analyze-trace/summarize-trace/summarize-hilog`）排在 M4 之后，G5
+  「不退化」仍要求它们。
+- **对等分三级（XPA-AC-1/3 在 r10 前提下的解释）。** T0 逐字节：线协议 schema 与 envelope；digest 与
+  引用身份（plan digest、Artifact digest、canonical JSON/CBOR、receipt seal）；cutover 后仍被读的
+  durable 格式（journal、`runtime_job` 索引、`job-record.json`、Session manifest/audit、capability
+  ledger、Artifact index、recovery manifest），因为安装态持有真实 intent/outcome/capability/evidence
+  （§G.2 第三行）。T1 语义相等：状态迁移、错误码、拒绝条件、零派发证明、nextAction、evidence 优先级。
+  T2 自由：`message` 文本与 Swift 调试渲染（`spec/control/methods/*.json` 只钉 code 与结构）、schema
+  之外的时间戳精度、日志、偶然副作用文件。oracle 只录 T0 文件；T1 按 code、形状、迁移序列比对；不再为
+  T2 输出新写 Foundation/ICU 仿真。
+- **安装态逐 store 组合撤回。** #1888 之后其余 store 因 Swift 引擎仍在消费而搬不动；路线 C 本就是消费方
+  脱钩后的一次性激活。History 切片保留；其余 owner 在 M5 经 §G.4 preflight 一次激活，旧 state 目录留
+  快照摘要，façade bundle 保留一个周期作回滚。双 owner 锁协调不再是交付物。
+- **四条并行车道（各占一个 worktree）与文件所有权。** A 引擎/设备路径（014、013）：`arkdeck-hoststore`、
+  `arkdeck-agentd`、`arkdeck-provider-hdc` 的 operation 部分；B 平台执行器（016）：`arkdeck-platform`、
+  `arkdeck-provider-hdc` 的 process/observation 部分；C 客户端（019、018）：`ArkDeckClientKit`、
+  `ArkDeckApp/**`、`ArkDeckAppUITests/**`、`arkdeck-cli`，独占 UI 测试跑道；D 供应者与性能（015、017 的
+  ArkForge lane、025）：`arkdeck-provider-workspace/analyzer/arkforge`、`scripts/bench`、`rust-perf.yml`。
+  共享文件（`Package.swift`、`project.pbxproj`、`Cargo.toml`/`Cargo.lock`、`control-protocol.json`、
+  `spec/control/methods/*`、ControlFrames 语料、`cli-feature-coverage.json`）：先推先合、其余 rebase；
+  语料计数断言一律 `>=` published 条数；新方法/错误码由该车道自己录帧并在同一 PR
+  `generate-contract.py --write`。015/016/019/025 的 DAG 边改为「仅验收」依赖（§J.2）。
+- **穿刺先行（§J.3 SPK-6..11）。** 每个 ≤ 1 天，产出 go/no-go 事实与可复用库；SPK-6/9/10 全过则 014 的
+  executor sidecar 永不建。
+- **验证减负。** M1/M2 的 T0 oracle 在一个 Swift-only PR 一次录完，此后 Rust 切片不改 Swift、planner 只
+  选 Rust 车道；一个通用语料回放 harness（ControlFrames + T0 fixture → T1 差异报告）取代逐切片
+  `check-<slice>.py`；spawn 子进程的测试独占二进制；oracle 不用 30 s 以下的真实时间预算（测超时的用例
+  除外）。`evidence/macos-remaining.md` 顶部维护六数仪表盘（standalone Rust 方法数 / 可执行 operation 数 /
+  Rust 上的 GJ 数 / ClientKit facade 数 / Rust CLI leaf 数 / 已删 Swift target 数），每次合入更新。
+- **L.1 第 13 条的决策包**：`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/
+  adr-0009-decision-package-20260914.md` 逐行点名 ADR-0009 决策 2/4 今天的承载代码与钉住它们的契约
+  测试，提议原样移植；裁决前 recovery、`job.reconcile`、可恢复 Job 与 recovery epoch 不移植。
+- **估算（假设：以上全部采纳、四车道并行、每天 1 小时设备窗口、第 13 条本周裁决）**：穿刺 2–3 天；M1 3–4
+  天；M2 3–4 天；M3 3–4 天；M4 2–3 天加 go 窗口；C/D 车道与之并行 5–7 天；M5 2–3 天；到 G5 约 2.5–3 周。
+  沿 r10 之前的轨迹（单 Agent 串行、逐方法逐字节对等、逐 store 安装态组合、四车道等 014）估算 6–8 周。
+
 ### G.2 当前消费者、身份与数据边界
 
 | 数据 | 实现要求 | 验证 |
@@ -734,14 +781,17 @@ flowchart TD
   X006 --> X008 --> X009 --> X010
   X008 --> X011
   X003 --> X012 --> X013 --> X014
-  X014 --> X015 --> X016
+  X012 -->|r11：隔离 Rust daemon 与契约| X015
+  X012 -->|r11：平台 API 与 Golden/Probe fixture| X016
+  X014 -.->|r11：仅 GJ 验收| X015
+  X014 -.->|r11：仅 GJ 验收| X016
   X016 --> X017
   X018 --> X017
   X019 --> X017
   X002 -->|foundation 的 Rust CLI，持续| X018
   X016 --> X018
   X001 --> X019
-  X014 --> X019
+  X014 -.->|r11：仅逐 facade 的方法就绪| X019
   X007 --> X020
   X020 --> X021
   X007 --> X022
@@ -750,7 +800,7 @@ flowchart TD
   SPK1 --> X024
   X019 --> X024
   X020 --> X024
-  X014 --> X025
+  X014 -.->|r11：仅扩大 soak 覆盖| X025
   X023 --> X025
   X025 --> X017
 ```
@@ -764,6 +814,12 @@ flowchart TD
 | SPK-3 | Windows W0（`windows/profile.md:71-81`）+ Rust daemon named pipe + `hdc.exe list targets -v` 解析真机 | 跨账户连接被拒（Win32 error 5）；packaged App 与 unpackaged CLI 都能连 pipe；MotW/SmartScreen 行为记录；DAYU200 在 hdc.exe 可见；Golden fixture 解析一致 | 驱动需要静默提权或 pipe 从 packaged App 不可达 | Windows 最低支持格、打包形态、驱动引导文案 | Windows 11 x64 主机 + DAYU200 |
 | SPK-4 | WinUI 3 门（§H.4 淘汰条件 a–e） | 全部通过 | 任一失败且两周内不可修 | WinUI vs WPF | Windows 主机（x64 + ARM64） |
 | SPK-5 | NTFS 上 `FlushFileBuffers`/`MoveFileExW` 写穿原子性、`LockFileEx` 语义、断电/kill 撕裂尾部 | 撕裂尾部穷举通过；append p95 记录 | 原子替换不可证明 | Windows journal/record 写入设计 | Windows 主机 |
+| SPK-6 | Rust HDC 进程执行器：PTY 一次性口令交换（`IdentityBoundPTYExecutor`）、带退出码框架的持久 `hdc shell` 通道（`PersistentDeviceShellChannel`）、libproc supervisor 观测（server identity/generation）、`/.vol/<dev>/<ino>` 启动 | 37 个 Golden/Probe fixture 全回放；fake HDC 子进程见到含 `-t <connectKey>` 的真实 argv；接板时 `hdc list targets -v` + 一次 shell 往返 | 某原语离开 Swift 不可复刻 | XPA-016；M1（r11） | 本机，接板可选 |
+| SPK-7 | `observe.device@1` 在隔离 Rust daemon 上对 `ArkDeckFakeHDCFixture` 端到端：runbook §2 全部命令（不含 §2.1） | journal/record/receipt/index T0 相等；`job result/evidence`、`artifact list` T1 相等 | 引擎设备路径需要 executor sidecar | XPA-014 M1；验证 r11 切法（r11） | 本机 |
+| SPK-8 | ClientKit 传输：App 经 `xpc_connection` 长连接并反向钉 daemon 身份，typed 模型由 `spec/control/methods/**` 生成，只切最小的 `RuntimeHistoryFilterApplicationFacade` | History filter UI 测试在 Rust standalone daemon 上绿；六项 entitlements 不动 | 生成模型或传输无法服务某 facade | XPA-019（其余 12 个 facade 并行）（r11） | 本机 |
+| SPK-9 | ArkForge Rust↔Rust：Rust daemon 用 `arkforge-client` 驱动 `arkforged` 跑 `flash.prerequisites`/`lanePlanPreview`（无设备）；StepPermit CBOR 向量沿用 | 与 Swift `ArkForgeLaneHost` 的 preview T1 相等；CBOR 向量逐字节 | Swift SDK 承载了 crate 未暴露的语义 | XPA-017 ArkForge lane；M4（r11） | 本机 |
+| SPK-10 | 签名与凭据：Rust 经 `SecItem*` 读 Keychain、DevEco 口令解码、hap-sign-tool/hvigor 经 registered toolchain 调用 | `ArkDeckFakeHapSignerFixture` 下 argv/env/receipt 零口令；真签名产物 digest 与 Swift 相等 | 某步骤需要 `LAContext` 或 Rust 走不通的路径 | XPA-015；M3（r11） | 本机 + DevEco SDK |
+| SPK-11 | Rust 上的性能与 soak：`scripts/bench` 对 cargo 构建的隔离 daemon 采 13 项；`arkdeck-soak` 复刻 `ArkDeckRuntimeSoakFixture` | 参考主机 3 轮 p95 离散 < 30%；RSS 两电平分开记 | harness 驱动不了 Rust daemon | XPA-025；顺带给 §L.1 第 15/16 条 Rust 数据（r11） | 参考主机 |
 
 ### J.4 任务明细
 
@@ -917,7 +973,7 @@ flowchart TD
 #### TASK-XPA-012 — Move host-only durable stores to the Rust owner on macOS
 - 用户结果：macOS 无感；`session/storage/history filter/display name/trace cache/tool registry` 由 Rust 服务，字节兼容。
 - 平台/GJ：macOS GJ-1 re-pass（daemon 重启后可查）。
-- 依赖：XPA-003。并行：Windows 链。
+- 依赖：XPA-003。并行：Windows 链。（r11：安装态逐 store 组合撤回，激活只在 M5 一次；GJ-1 验收即 014 的 M1。）
 - Reachability：façade 本地处理这些方法，不再转发；lock 文件与 JSON 形状不变。
 - AC：现有 shadow 保留为回归；Rust 实际拥有当前请求，写入后重启读回、锁/CAS/原子写通过；无 nightly 日历等待或旧 Swift 回滚要求。
 - 验证：differential、fault-injection（lock 争用、CAS 冲突）、UI test（Settings/History 筛选）。
@@ -938,7 +994,7 @@ flowchart TD
 #### TASK-XPA-014 — Move admission, job store, capability and recovery to Rust with the Swift engine as executor sidecar
 - 用户结果：macOS 的 authority 在 Rust；Swift 只按逐 step typed permit 执行 lowering；语义不变。
 - 平台/GJ：macOS GJ-1～5 re-pass。
-- 依赖：XPA-013（r8：不再依赖 XPA-005；durable/admission 代码在本任务于 macOS 首写，之后回流 Windows）。
+- 依赖：XPA-013（r8：不再依赖 XPA-005；durable/admission 代码在本任务于 macOS 首写，之后回流 Windows）。（r11：剩余工作按 §G.1 r11 的 M1→M4 里程碑切；下一刀 SPK-7 `observe.device@1` 端到端；SPK-6/9/10 全过则 sidecar 不建；recovery 等 §L.1 第 13 条裁决。）
 - Reachability：Rust admission（§D.3 顺序）→ journal intent → 私有 `executor.step.execute{jobId, stepId, typedAction, planDigest, targetFacts, useOrdinal}` → Swift lowering + process + verify → receipt → Rust outcome/artifact。
 - AC：cutover preflight（无活动 job/未决 intent/running execution）；outcomeUnknown lane 原样承接；crash-window 四象限（Rust/Swift × intent 前后）全部 fail closed；GJ re-pass；回滚演练。
 - 验证：differential（`job.plan` digest 两端相等）、fault-injection、真机。
@@ -947,14 +1003,14 @@ flowchart TD
 
 #### TASK-XPA-015 — Port analyzer and workspace providers to Rust (shared with Windows)
 - 平台/GJ：macOS GJ-5 re-pass；与 XPA-011 共享代码。
-- 依赖：XPA-014。
+- 依赖：SPK-10 与已交付的隔离 Rust daemon（r11：接口依赖；XPA-014 的 M1/M2 authority 只为 GJ-5 验收；`ready`，D 车道）。
 - 要点：Keychain（`SecItem*` C API）+ 存在性门改 HAR；`/usr/bin/git` 改 registered ref；sidecar 覆盖面收缩。
 - AC：分析器输出字节相等；签名流程口令零泄漏；GJ-5 re-pass。
 - 规模：L。
 
 #### TASK-XPA-016 — Port the HDC provider, supervisor observation and process executor to Rust
 - 平台/GJ：macOS GJ-1/2/3 re-pass。
-- 依赖：XPA-015。
+- 依赖：SPK-6（r11：平台 API 与 Golden/Probe fixture 的接口依赖，去掉 XPA-015 边；XPA-014 的 M1/M2 authority 只为 GJ 验收；`ready`，B 车道）。
 - 要点：`/.vol` inode 启动、25 ms poll → 事件驱动、libproc 观测、PTY 秘密交换、持久 shell 通道；Golden/Probe fixtures 全回放。
 - AC：Fake 面断言真实 argv；supervisor identity/generation 与 Swift 相同；GJ re-pass。
 - 规模：L。
@@ -975,7 +1031,7 @@ flowchart TD
 #### TASK-XPA-019 — macOS App consumes ArkDeckClientKit and drops ArkDeckWorkflows
 - 用户结果：App 行为不变；App 只依赖生成的 typed 模型与 XPC 传输。
 - 平台/GJ：macOS App 呈现 AC（按 AGENTS 只在 AC 要求 App 时跑 UI）。
-- 依赖：XPA-001（schemas）、XPA-014（投影服务端化）；可逐 facade 分 13 个子 PR；必须先于 XPA-017 完成（r3）。
+- 依赖：XPA-001（schemas）、SPK-2（已过）、SPK-8（r11：去掉 XPA-014 done 边，每个 facade 只等它消费的方法在隔离 Rust daemon 上就绪；`ready`，C 车道，M5 的关键路径）；可逐 facade 分 13 个子 PR；必须先于 XPA-017 完成（r3）。
 - AC：`ArkDeckApp` 无 `import ArkDeckWorkflows`；59 个 UI test 通过；presentation 语义由 daemon 投影或 `ui-semantics` 生成。
 - 规模：L（分批 S/M）。
 
@@ -1011,7 +1067,7 @@ flowchart TD
 
 #### TASK-XPA-025 — Port the performance lanes to the Rust daemon and a Rust soak fixture（r5 新增）
 - 缺口：`rust-perf.yml` 用 SwiftPM 构建 `arkdeck-agentd` 与 `ArkDeckRuntimeSoakFixture` 并由 `scripts/bench` 驱动；XPA-017 要删这两个产品却无权改 workflow，XPA-023 已 done——退役前置无法闭合，直接删则打坏性能车道。
-- 依赖：XPA-014（Rust authority 可被 soak）、XPA-023。
+- 依赖：XPA-023、SPK-11（r11：去掉 XPA-014 done 边，隔离 Rust daemon 已可被测量；`ready`，D 车道）。
 - 交付物：Rust `arkdeck-soak`（复刻 soak fixture 语义与 `arkdeck-runtime-soak/v1` schema）；`scripts/bench` 对 cargo 构建的 Rust `arkdeck-agentd`（同名）capture；`rust-perf.yml` 不再构建任何 SwiftPM 产品；在参考主机上用 Rust daemon 重取基线（含 RSS 两电平拆分）并入仓，Swift 末版基线并列保留作迁移前后记录。
 - AC：PR/nightly/soak 三车道在 Rust daemon 上全绿后 XPA-017 才可开工。
 - 硬件：无。
@@ -1036,6 +1092,11 @@ flowchart TD
 1. SVC-005 done：GJ-1～5 在当前 digest `508783ac…` 上全部 `REAL_DEVICE_PASS`（GJ-4 于已发布 `6e8c3ed5` 构建）；XPA-001 done；XPA-002 的 macOS read-only foundation 已交付（#1768），基线 pin 在 `main` `a61848f9`。
 2. 下一项是 XPA-003（`ready`，readiness pins 已实例化），随后按 macOS 迁移链推进；Windows 任务在 G5 之后开始。
 
+
+**当前进度与后续入口（2026-09-14，r11）**：
+1. 实测：隔离 Rust owner 原生应答 54/105 方法、安装态 façade 本地 3/105；operation 1/30 在 Rust 跑通；GJ 纯 Rust 0/5；App facade 0/13；Swift target 删除 0/6；Rust `.rs` 2.84 MB（6 天）。012/013/014/018 in-progress；015/016/019/025 自 r11 起 `ready`；017 blocked。
+2. 关键路径改为 §G.1 r11 的 M1→M2→M3→M4→M5，四车道并行，SPK-6..11 先行；下一刀 = SPK-7。
+3. 维护者门：§L.1 第 13 条（决策包已提交）、GJ-4 的 go、设备窗口（第 14 条按 r11 排日窗）。
 
 **Release gates（macOS-only → Windows/macOS supported）**：（r8）G5 先于 G2：Windows GJ 任务在 G5 达成后才开始，G2/G3/G4/G9 随 Windows 阶段。
 | Gate | 判据 | 载体 |
@@ -1088,18 +1149,19 @@ flowchart TD
 4. **GJ 状态语义**：确认「runtime 实现更换后同一 digest 必须重新 `REAL_DEVICE_PASS`」（假设 A4）写入 `PRODUCT-LOOP.md` §6 或以兼容注记承载。
 5. **Windows Trace 范围**：Trace Viewer（ArkTrace，Swift）在 Windows 首版是 (a) 不提供并按 platformService/deferred 记录，(b) 只做 capture/inspect/export 对等，(c) 投入 WinUI Viewer。本文建议 (b) 作为「supported」门槛，(c) 作为后续。
 6. **App XPC 传输换代**：从 `NSXPCConnection` 改为 `xpc_connection` C API（NSXPC 与 Rust 侧线协议不兼容）；确认 entitlements 保持六项 + 一项 mach-lookup 例外不扩集。（SPK-2 已实测：现有 entitlements 不变即可连通；换代时应改为长连接并由 App 钉住 daemon 身份。）
-7. **Swift CLI 退役时点**：双 CLI 期长度与 `--socket` 等 macOS compatibility leaf 的 tombstone 时机（CLI 规格 §12）。
+7. **Swift CLI 退役时点**：双 CLI 期长度与 `--socket` 等 macOS compatibility leaf 的 tombstone 时机（CLI 规格 §12）。（r11 提议并随合入 attestation：随 M5 一起退役，双 CLI 期到 cutover 为止，兼容 leaf 按 §12 tombstone。）
 8. **最低 macOS 冲突**：Profile/ADR-0002 的 macOS 14 与工程的 macOS 26；Rust daemon 可支持更低版本，但 App 已是 26。需对齐 Profile 或接受 26。
 9. **Windows 支持格**：Windows 11 x64 + ARM64（假设 A1）；是否排除 Windows 10 1809+（WinUI 3 支持但 x64 仿真无）。
 10. **Windows 打包**：MSIX packaged + self-contained Windows App SDK + Azure Artifact Signing + App Installer 更新（本文推荐）vs unpackaged 自研安装器。
 11. **Windows daemon 生命周期**：客户端自启动 + 单实例（推荐）vs 登录计划任务 vs 两者。
 12. **FFI kernel 是否立项**（XPA-024）：仅当 §I 测量证明需要。
-13. **ADR-0009 悬案**：决策 2/4 今日承载点仍未裁决（`0009:3-14`），Rust 移植 recovery 前必须定案，否则 Rust 会固化一个未裁决语义。
-14. **硬件与主机**：新增 Windows 11 x64 与 ARM64 验证主机；DAYU200 窗口与 HardwareCampaign 授权（GJ-4）。
+13. **ADR-0009 悬案**：决策 2/4 今日承载点仍未裁决（`0009:3-14`），Rust 移植 recovery 前必须定案，否则 Rust 会固化一个未裁决语义。（r11：决策包 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/adr-0009-decision-package-20260914.md` 逐行点名承载代码并提议原样移植；本条仍待维护者裁决，r11 合入不构成裁决。）
+14. **硬件与主机**：新增 Windows 11 x64 与 ARM64 验证主机；DAYU200 窗口与 HardwareCampaign 授权（GJ-4）。（r11 提议并随合入 attestation：SPK-7 在 fake HDC 上通过后每天固定 1 小时接板窗口；GJ-4 仍逐次 go。）
 15. **idle RSS 上限**（r2 新增，当前证据见 §I.2 注 2）：冷 idle 独立采样与两电平已交付；启动 plateau 73.71 MB、steady 21.53 MB 对拟定 64 MiB 得出不同结果。仍需决定上限约束哪个阶段、是否分别预算，并复测当前单 v1 二进制；本次不提高上限或宣布稳态预算已批准。
 16. **分页投影预算**（r2 新增，当前证据见 §I.2 注 1）：行数已机械记录为 30，尚需多规模测量来分离固定开销与每行成本。当前记录推导的 `≤ 19.5 ms p95` 仅作该规模回归参考，不作发布门。
 17. **同用户信任边界（r5 新增，见 §F.2）**：确认「同用户、同完整性级别的任意代码在信任边界之外；本产品签名的 daemon 二进制按构造可信」这一表述，与 ADR-0005 决策 1 的 MVP 立场一致；若维护者要求把同用户任意代码也纳入边界，Windows 需要 protected-process 级别的方案而 macOS UDS 没有对应物，本文不推荐。
 18. **macOS 先行次序（r8 新增，维护者 2026-09-09 裁定，本 revision 合入即为 attestation）**：macOS 迁移链完成并在纯 Rust daemon 上取得 GJ-1～5 PASS（G5）之后才开始任何 Windows GJ 任务；XPA-003 只依赖 XPA-002 已交付的 macOS read-only foundation；XPA-014 不再依赖 XPA-005；XPA-004 与 XPA-002 的 Windows 验收等 XPA-017。Windows 主机提前到位不自动重开 Windows 阶段，只有新的 revision 可以。
+19. **对等三级（r11 新增，维护者 2026-09-14 评审，本 revision 合入即为 attestation）**：XPA-AC-1/3 在 r10 前提下按 §G.1 r11 的 T0/T1/T2 解释——T0 逐字节只限线协议、digest/引用身份与 cutover 后仍被读的 durable 格式；T1 语义相等；`message` 文本等 T2 不比对。不放宽任何 AC 行文；只界定「product contract」的范围。
 
 ### L.2 缺失证据（本文无法从仓库或官方资料取得）
 

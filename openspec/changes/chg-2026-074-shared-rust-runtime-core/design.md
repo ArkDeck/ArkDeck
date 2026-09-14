@@ -9,8 +9,8 @@ SLO and benchmark plan, task DAG, risk register, maintainer decisions) is:
 
 ```yaml pins
 - path: docs/design/cross-platform/rust-core-cross-platform-architecture.md
-  blob: fd93c408f99b8cd5126f5fd7b380a3b4c09d706d
-  sha256: 42b1608a2765d88e4512bc86e91660c907e3be53f45ad5bcbf3e98bbe4cd8973
+  blob: fdd610224ca88ef9dc37878019792690aa904478
+  sha256: 94d97b579b1d7e73965fc83568bb82e48c1003c30cd22001016a701896b73fa8
 ```
 
 Later revisions of the design must re-pin here in the same PR; the pinned blob is what the
@@ -32,6 +32,12 @@ Revision 8 re-pins it for the macOS-first sequencing: sections A (item 6), G.1, 
 002, 003, 004, 005, 014, 018, 024), J.5 and L.1 (item 18) changed; nothing else.
 Revision 9 changes no design text and keeps the pin above; its Allowed-path reconciliation lives
 in `tasks.md`, and the §J.4 rows of XPA-012..025 carry no path lines.
+Revision 11 re-pins it for the acceleration review of 2026-09-14: sections A (item 5), G.1 (the
+r11 subsection: Golden Journey milestones M1–M5, the three parity tiers, the withdrawal of the
+installed store-by-store composition, four lanes with file ownership, spikes, verification
+overhead, the estimate), J.2 (four edges become acceptance-only), J.3 (SPK-6..11), J.4 (rows 012,
+014, 015, 016, 019, 025), J.5 (the 2026-09-14 entry) and L.1 (items 7, 13, 14, 19) changed;
+nothing else.
 
 The 2026-09-06 design refresh is re-pinned for review against checkout
 `d3d5c32c60cf60c96c64c50f8f1ab52b4d444cfa`. It updates current single-v1 facts,
@@ -128,6 +134,16 @@ requirements from development. No historical receipt is rewritten or reclassifie
 3. Detach all actual consumers before removing Swift daemon/engine/storage/CLI and the temporary
    facade. Validate paired installation, signing, IPC identity, final GJ-1..5, applicable App UI,
    crash recovery and performance. Windows implementation/acceptance follows.
+
+Revision 11 (2026-09-14) keeps the three routes and makes the unit of progress a Golden Journey
+on the isolated Rust daemon: M1 GJ-1, M2 GJ-2/3, M3 GJ-5, M4 GJ-4, M5 the one-shot cutover and
+retirement. Route A's "detach Swift consumers before installed activation" is no longer performed
+store by store: after the History filter slice (#1888) every owner is activated once at M5 through
+the §G.4 preflight. Parity is tiered — T0 byte-equal for the wire contract, digests and the durable
+formats read after the cutover; T1 semantic equality for transitions, codes, refusals and proofs;
+T2 free for message text and incidental behaviour — and the executor sidecar of step 2 is not
+built if the process-executor, ArkForge and signing spikes (SPK-6, SPK-9, SPK-10) pass.
+TASK-XPA-015/016/019/025 run in parallel lanes on their interface dependencies.
 
 Old state is preserved or explicitly archived. Raw Artifact, real device intent/outcome,
 capability/recovery and evidence remain immutable/preserved. A new root cannot clear unresolved

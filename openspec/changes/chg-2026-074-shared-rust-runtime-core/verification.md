@@ -1,6 +1,6 @@
 # Verification — CHG-2026-074
 
-> Change:CHG-2026-074-shared-rust-runtime-core@r10
+> Change:CHG-2026-074-shared-rust-runtime-core@r11
 > Status:planned; nothing in this file approves the change, and no host, fixture or simulation
 > result counts as platform or hardware support (POL-VERIFY-001, POL-MODE-001).
 
@@ -31,6 +31,19 @@ approved or verified. Development checks cover actual final-owner writes, restar
 atomic publication and current consumers. Ordinary old test-data interread is not a gate.
 Real-device safety and final integrated acceptance remain mandatory; a new state root cannot
 bypass prior unresolved effects. PRODUCT-LOOP §2/§16 governs conflicting old process gates.
+
+Revision 11 (2026-09-14) reads XPA-AC-1 and XPA-AC-3 with the three parity tiers of proposal
+r11 §3 and design §G.1 r11 — T0 byte-equal (wire schemas and envelope, digests and reference
+identity, the durable formats read after the cutover), T1 semantically equal (transitions, error
+codes, refusal conditions, zero-dispatch proofs, next actions, evidence precedence), T2 free
+(`message` text, Swift debug renderings, timestamp precision beyond the schema, logs, incidental
+side-effect files) — and changes no acceptance row, method, expected result or evidence directory.
+The Golden Journeys row is unchanged: each milestone is proven on the isolated root against the
+fake HDC fixture first and then `REAL_DEVICE_PASS` headless on the DAYU200; fixture results are
+never platform or hardware support. XPA-AC-9's "safe final-owner activation" is met by one cutover
+at milestone M5 (design §G.4 preflight, snapshot digest, facade bundle retained one cycle), not by
+store-by-store installed activation. This interpretation is submitted with the revision for
+maintainer review; the merge is the attestation.
 
 ## Environment
 
