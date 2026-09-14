@@ -516,8 +516,8 @@ The isolated development composition answers `job.submit` as Swift
 `RuntimeJobEngine.submitOwned` does under target control, for the operation it
 plans. `JobAdmitter` decides a retry or a conflict from the idempotency index
 before anything is materialized, checks a reviewed plan against the existing Job
-or against the fresh materialized plan, and admits under the catalog's default
-read-only policy; no capability is read or written. It then writes the admission
+or against the fresh materialized plan, and admits a read-only Job under the
+catalog's default read-only policy and a device mutation as below. It then writes the admission
 row, the Job's journal (`jobCreated`, `queued -> preflight`) and `job-record.json`
 at the index's next version, each as Swift writes them. A refusal before the
 admission point carries `{"phase": "preAdmission", "newDispatchCount": 0}`; a
@@ -541,6 +541,33 @@ Job file byte for byte. Re-record from Swift with
 runs the standalone Swift daemon and the Rust owner in turn over one state root,
 then hands the Rust-written store to a Swift daemon that recovers the Jobs and
 runs one.
+
+A device mutation that the catalog authorizes with a standing capability is
+admitted under a Runtime capability, as Swift's `preauthorize` admits it (M2):
+- **The device hold.** A session-scoped request (a gesture, or a
+  screenshot-only capture) takes or refreshes this daemon's hold on its device
+  for its client (`DeviceHolds`). While a hold is live, another client's
+  mutation is `resourceConflict`.
+- **The capability.** A capability the caller names is used as named. Otherwise
+  the Runtime issues its own (`capability_policy.rs`):
+  1. it checks every capability's uses on the Target binding for one without a
+     settled outcome;
+  2. it finds or installs the first live generation of
+     `CAP-RT-POLICY-<fingerprint>-G<n>`, as the envelope Swift issues (a
+     gesture's subject is its frame, for an hour and 2000 uses).
+
+  The capability then passes `validateNewExecution`, or the submission is
+  `admissionDenied` in Swift's words.
+- **The Job.** It runs the request naming the capability and keeps the caller's
+  as its original submission. It carries no admission evidence until a use is
+  consumed, and nothing is consumed yet.
+- **Not served.** A descriptor without `defaultPolicyIssuance` counts as enabled,
+  as Swift's generated catalog reads it. Destructive effects, the
+  `runtimeCapability` policy and workspace subjects are still refused.
+
+`tests/pointer_input_submit.rs` replays the pointer-input oracle's submissions:
+the answers, the capabilities installed, each Job's request and original
+submission, and the refusal after an unknown outcome.
 
 ## Job run (TASK-XPA-014)
 
