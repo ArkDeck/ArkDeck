@@ -34,9 +34,12 @@ fake must receive the oracle's calls, in order.
 The daemon is then restarted over the same root, and every Job's status,
 record, result and evidence, and every execution's status, must read as they
 did before; the Rust CLI reads the first Job's result and evidence as the
-socket did and, for an agent oracle, every execution's status and the first
-Job's Artifacts, then runs a new `observe.device@1` execution to its end as
-Golden Journey 1 enters (`agent run --operation … --target …`). Two startups
+socket did and, for an agent oracle, every execution's status, the execution
+list and the first Job's Artifacts. It then abandons every execution at the
+generation it read (one that owns a Job is refused, since abandonment never
+cancels a Job, and a settled one is answered as it is) and runs a new
+`observe.device@1` execution to its end as Golden Journey 1 enters (`agent run
+--operation … --target …`). Two startups
 are refused: a development HDC without a development root, and one named by a
 relative path.
 
@@ -305,6 +308,38 @@ def main() -> None:
                 check(f'CLI agent status {run}', completed.returncode == 0
                       and envelope.get('result') == before[(run, 'agent.status')]['result'],
                       (completed.returncode, completed.stderr.decode(errors='replace')))
+            if executions:
+                listed = subprocess.run(
+                    [str(cli), '--output', 'json', 'agent', 'list', '--page-size', '1000'],
+                    env=cli_env, capture_output=True, timeout=120)
+                page = json.loads(listed.stdout or b'{}').get('result') or {}
+                direct = exchange(endpoint, 'agent.list', {'pageSize': 1000})
+                check('CLI agent list', listed.returncode == 0 and page.get('hasMore') is False
+                      and page.get('items') == direct['result']['items'],
+                      (listed.returncode, listed.stderr.decode(errors='replace')))
+            for run, execution in executions.items():
+                status = before[(run, 'agent.status')]['result']
+                abandoned = subprocess.run(
+                    [str(cli), '--output', 'json', 'agent', 'abandon', '--execution-id', execution,
+                     '--expected-generation', status['generation']],
+                    env=cli_env, capture_output=True, timeout=120)
+                envelope = json.loads(abandoned.stdout or b'{}')
+                detail = (abandoned.returncode, abandoned.stdout[-400:],
+                          abandoned.stderr.decode(errors='replace'))
+                if status['jobId'] is not None:
+                    # Abandonment never cancels a Job.
+                    error = envelope.get('error') or {}
+                    check(f'CLI agent abandon {run} refused', abandoned.returncode == 65
+                          and error.get('code') == 'resourceConflict'
+                          and (error.get('details') or {}).get('jobId') == status['jobId'], detail)
+                else:
+                    moving = status['state'] in UNSETTLED
+                    result = envelope.get('result') or {}
+                    check(f'CLI agent abandon {run}', abandoned.returncode == 0
+                          and result.get('state') == ('abandoned' if moving else status['state'])
+                          and result.get('generation') == (str(int(status['generation']) + 1)
+                                                           if moving else status['generation']),
+                          detail)
             if executions:
                 listed = subprocess.run(
                     [str(cli), '--output', 'json', 'artifact', 'list', '--job', jobs[first]],
