@@ -1229,6 +1229,13 @@ impl HostServices for Host {
         })?;
         store.handle(method, params, &utc_now())
     }
+    /// Swift's daemon answers from the observer its HDC host gives it, and
+    /// `unconfigured()` without one. This composition starts no managed HDC
+    /// server, so it answers as Swift's daemon without its HDC host does.
+    #[cfg(target_os = "macos")]
+    fn runtime_hdc_status(&self) -> Result<serde_json::Value, WireError> {
+        Ok(arkdeck_provider_hdc::unconfigured_status(None))
+    }
 
     fn observed_at(&self) -> String {
         utc_now()

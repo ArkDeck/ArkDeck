@@ -175,6 +175,11 @@ fn semantic_invalid_requests_do_not_trigger_observation_or_capability_paths() {
         ("health", json!({"padding":"x"}), "invalidParams"),
         ("operation.list", json!({"path":"/tmp"}), "invalidParams"),
         (
+            "runtime.hdc.status",
+            json!({"path":"/tmp/hdc"}),
+            "invalidParams",
+        ),
+        (
             "device.observations",
             json!({"candidateKey":"untrusted"}),
             "invalidInput",
