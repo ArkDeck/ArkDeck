@@ -1,6 +1,9 @@
-use crate::{LocalEndpoint, ServerIdentity, VerifiedTool, denied, invalid};
+#[cfg(not(target_os = "macos"))]
+use crate::VerifiedTool;
+use crate::{LocalEndpoint, ServerIdentity, denied, invalid};
 use std::fs::{self, DirBuilder};
 use std::io::{self, IoSlice, Read, Write};
+#[cfg(not(target_os = "macos"))]
 use std::net::SocketAddrV4;
 use std::os::fd::AsRawFd;
 use std::os::unix::fs::{DirBuilderExt, FileTypeExt, MetadataExt, PermissionsExt};
@@ -210,10 +213,13 @@ impl Write for LocalConnection {
     }
 }
 
-/// macOS remains a parser/contract shadow until its commandless HDC listener
-/// inspection is ported. No HDC invocation is permitted on missing proof.
+/// Unix platforms other than macOS remain a parser/contract shadow until their
+/// commandless HDC listener inspection is ported. No HDC invocation is
+/// permitted on missing proof; macOS proves it in `macos_server`.
+#[cfg(not(target_os = "macos"))]
 pub struct LoopbackServerLease;
 
+#[cfg(not(target_os = "macos"))]
 impl LoopbackServerLease {
     pub fn acquire(_tool: &VerifiedTool, _endpoint: SocketAddrV4) -> io::Result<Self> {
         Err(io::Error::new(

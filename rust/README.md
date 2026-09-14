@@ -745,6 +745,23 @@ simulated host-test data. Run it after current Swift producer recording and sche
 generation; it checks typed refusals as well as CAS, restart and binding-byte
 preservation. No hardware acceptance is claimed by this harness.
 
+## macOS HDC server identity (TASK-XPA-016, SPK-6)
+
+`LoopbackServerLease::acquire(tool, 127.0.0.1:<port>)` proves that an HDC server
+already exists on macOS the way Swift's `HDCExact320FSystemIdentityObserver`
+does: it reads libproc, never connects to the endpoint and never launches a
+client (not even `checkserver`, which may bootstrap a server). The one process
+running the verified executable that owns exactly one TCP listener on the exact
+registered loopback spelling — `127.0.0.1` or its IPv4-mapped IPv6 form as the
+kernel labels it, never a wildcard — is named by its birth identity; two scans
+must agree, and `revalidate()` fails once that process exits or a PID is
+recycled. `NotFound` is Swift's `unavailable`, `PermissionDenied` its `unknown`.
+The owner must also be the calling user, as on Windows. `HdcReadOnlyProvider`
+acquires this lease before its only argv and revalidates it after the process,
+so `device.observations` can now reach a spawn on macOS when a published HDC
+identity is registered and its server is up. `tests/loopback_server_lease.rs`
+drives it with `/usr/bin/nc`; no real HDC is launched by the tests.
+
 ## macOS facade host owners (TASK-XPA-012)
 
 The installed facade pair now serves `history.filter.list/save/delete` itself.

@@ -30,8 +30,14 @@ mod host_signature;
 pub use host_signature::{
     NativeCodeSignature, inspect_deveco_publisher_signature, inspect_native_code_signature,
 };
+#[cfg(all(unix, not(target_os = "macos")))]
+pub use unix::LoopbackServerLease;
 #[cfg(unix)]
-pub use unix::{LocalConnection, LocalListener, LoopbackServerLease, default_user_endpoint};
+pub use unix::{LocalConnection, LocalListener, default_user_endpoint};
+#[cfg(target_os = "macos")]
+mod macos_server;
+#[cfg(target_os = "macos")]
+pub use macos_server::{LoopbackServerLease, ServerIdentityReceipt};
 #[cfg(windows)]
 pub use windows::{LocalConnection, LocalListener, LoopbackServerLease, default_user_endpoint};
 

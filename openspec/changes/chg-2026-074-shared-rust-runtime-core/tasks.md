@@ -1017,7 +1017,7 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 
 ## TASK-XPA-016 — Port the HDC provider, supervisor observation and process executor to Rust
 
-- Status:ready（2026-09-14, r11: the executor, supervisor observation and parsers depend on the platform APIs and the Golden/Probe fixtures, not on TASK-XPA-015; SPK-6 precedes the port. The GJ-1/2/3 acceptance needs the M1/M2 authority of TASK-XPA-014. Readiness pins instantiated at `main` `6cf99fb6`）
+- Status:in-progress（2026-09-14: SPK-6 phase 1 — the macOS commandless proof that an HDC server exists, `arkdeck_platform::LoopbackServerLease` over libproc, is delivered as the task's first slice; the budgeted tool runner, the persistent shell channel, the PTY secret exchange, the provider families and the GJ-1/2/3 acceptance remain pending. r11 readiness: the executor, supervisor observation and parsers depend on the platform APIs and the Golden/Probe fixtures, not on TASK-XPA-015; the GJ acceptance needs the M1/M2 authority of TASK-XPA-014）
 - Platform:macos
 - Requirements:REQ-HDC-006, REQ-HDC-009, POL-HDC-001, POL-WORKFLOW-001, PORT-PROCESS-001
 - Acceptance:AC-HDC-006-01, AC-HDC-009-01, XPA-AC-1, XPA-AC-2; macOS GJ-1/2/3 re-pass
@@ -1063,6 +1063,7 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 
 - Fake process face asserts the real argv; supervisor identity/generation equal to Swift; GJ-1/2/3 re-pass. Size: L.
 - r11: lane B. SPK-6 first (PTY secret exchange, persistent shell channel, libproc observation, `/.vol` launch); then the provider families in the order the milestones need them — Observe/Diagnostics (M1), Debug and native library (M2), input/port-forward/screen-sequence (with M2), Rockchip live-mode and post-flash binding (M4). `ArkDeckFakeHDCFixture` is driven as a subprocess by the Rust tests; the fixture's argv assertions are T1.
+- SPK-6 phase 1 (2026-09-14): the commandless proof that an HDC server exists is ported to macOS — `arkdeck_platform::LoopbackServerLease` scans libproc for the one process running the verified executable that owns exactly one TCP listener on the exact registered loopback spelling, keeps its birth identity, requires two agreeing scans and the calling user, and revalidates without ever connecting or launching a client; the Unix `Unsupported` stub remains only off macOS. Exercised with `/usr/bin/nc` as the listener; no HDC executable, device or fixture replay is involved. See `evidence/runs/TASK-XPA-016/spk-6-run.md`; as the task's first slice after r11 made it `ready`, this phase flips it to `in-progress`.
 
 ## TASK-XPA-017 — Port the ArkForge lane and retire the Swift daemon, engine and storage targets
 
