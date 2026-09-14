@@ -345,9 +345,31 @@ def plan_between(
     )
 
 
+def _full_oid(value: str | None) -> str | None:
+    """A full lowercase commit OID, the form the Actions API reports, or None."""
+    if (
+        value is None
+        or len(value) != 40
+        or not all(character in "0123456789abcdef" for character in value)
+    ):
+        return None
+    return value
+
+
+def _is_ancestor(repo_root: pathlib.Path, ancestor: str, descendant: str) -> bool:
+    result = _git(
+        repo_root,
+        ["merge-base", "--is-ancestor", "--end-of-options", ancestor, descendant],
+        check=False,
+    )
+    return result.returncode == 0
+
+
 def plan_from_push_event(
     repo_root: pathlib.Path,
     event: Mapping[str, object],
+    *,
+    last_success: str | None = None,
 ) -> CIPlan:
     ref = event.get("ref")
     after = event.get("after")
@@ -372,12 +394,42 @@ def plan_from_push_event(
                 base_kind="push-before",
                 reason="main-before-unavailable-fail-closed",
             )
+        # A main run validates every change since the newest main commit this
+        # workflow passed on, not only its own push. GitHub keeps one pending
+        # run per concurrency group, so a third merge replaces the run still
+        # waiting behind the first, and `before` then names a commit no run
+        # validated: #1903's 99dda729 on 2026-09-14, whose files the next run
+        # never looked at. A red run leaves the same hole, and a docs-only merge
+        # after it would otherwise turn main green over a lane still broken.
+        candidate = _full_oid(last_success)
+        validated = _commit_oid(repo_root, candidate) if candidate else None
+        if validated is None:
+            return _all_lanes_plan(
+                head_revision=after,
+                base_kind="main-last-success",
+                reason="main-last-success-unavailable-fail-closed",
+            )
+        if validated == after:
+            # A re-run of a commit main already passed re-checks its own push.
+            return plan_between(
+                repo_root,
+                base_revision=before,
+                head_revision=after,
+                use_merge_base=False,
+                base_kind="push-before",
+            )
+        if not _is_ancestor(repo_root, validated, before):
+            return _all_lanes_plan(
+                head_revision=after,
+                base_kind="main-last-success",
+                reason="main-last-success-not-behind-push-fail-closed",
+            )
         return plan_between(
             repo_root,
-            base_revision=before,
+            base_revision=validated,
             head_revision=after,
             use_merge_base=False,
-            base_kind="push-before",
+            base_kind="main-last-success",
         )
 
     if branch.startswith("agent/"):
@@ -538,6 +590,10 @@ def _parse_arguments(argv: Sequence[str]) -> argparse.Namespace:
     parser.add_argument("--include-worktree", action="store_true")
     parser.add_argument("--github-output", type=pathlib.Path)
     parser.add_argument("--run-local", action="store_true")
+    # Hosted runs only: the newest main commit Swift CI passed on. A push to
+    # main plans from it; empty means the workflow could not tell, which
+    # selects every lane on main. Agent branches ignore it.
+    parser.add_argument("--main-last-success")
     return parser.parse_args(argv)
 
 
@@ -552,8 +608,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                 event = json.load(stream)
             if not isinstance(event, dict):
                 raise PlanError("event root must be an object")
-            plan = plan_from_push_event(repo_root, event)
+            plan = plan_from_push_event(
+                repo_root, event, last_success=arguments.main_last_success or None
+            )
         else:
+            if arguments.main_last_success is not None:
+                raise PlanError("--main-last-success is only valid with --event")
             plan = plan_between(
                 repo_root,
                 base_revision=arguments.base_revision,

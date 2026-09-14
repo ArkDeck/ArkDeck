@@ -400,6 +400,16 @@ def validate_automatic_check_contract(
         '--event "$GITHUB_EVENT_PATH"',
         '--github-output "$GITHUB_OUTPUT"',
         "      rust: ${{ steps.paths.outputs.rust }}\n",
+        # A main run plans from the newest main commit this workflow passed on.
+        # Only a successful run counts: a red or replaced one leaves its
+        # changes to the next run. The job may read runs and nothing more.
+        "    permissions:\n      contents: read\n      actions: read\n",
+        "      - name: Find the last main commit Swift CI passed on\n"
+        "        id: last-success\n"
+        "        if: github.ref == 'refs/heads/main'\n",
+        "actions/workflows/swift-ci.yml/runs?branch=main&event=push&status=success&per_page=1",
+        "ARKDECK_MAIN_LAST_SUCCESS: ${{ steps.last-success.outputs.oid }}",
+        '--main-last-success "$ARKDECK_MAIN_LAST_SUCCESS"',
     )
     required_swift_tests = (
         "    needs: plan\n",
@@ -491,6 +501,10 @@ def validate_automatic_check_contract(
     for token in required_plan:
         if token not in plan_job:
             raise WorkflowContractError(f"Swift plan job missing contract token: {token}")
+    if plan_job.index("        id: last-success\n") > plan_job.index("        id: paths\n"):
+        raise WorkflowContractError(
+            "Swift plan job must look up the last main success before it plans"
+        )
     for token in required_swift_tests:
         if token not in swift_tests_job:
             raise WorkflowContractError(
@@ -1170,6 +1184,26 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
                 swift.replace(
                     "  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}\n",
                     "  cancel-in-progress: true\n",
+                ),
+            ),
+            (
+                "a red main run counted as validated",
+                agent,
+                sdd,
+                swift.replace("&status=success&", "&status=completed&"),
+            ),
+            (
+                "main planned from its own push alone",
+                agent,
+                sdd,
+                swift.replace('          --main-last-success "$ARKDECK_MAIN_LAST_SUCCESS"\n', ""),
+            ),
+            (
+                "plan job cannot read runs",
+                agent,
+                sdd,
+                swift.replace(
+                    "      contents: read\n      actions: read\n", "      contents: read\n"
                 ),
             ),
             (
