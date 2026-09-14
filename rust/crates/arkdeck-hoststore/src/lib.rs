@@ -150,6 +150,18 @@ mod target_document;
 mod target_owner;
 #[cfg(target_os = "macos")]
 pub use target_owner::{ObservationReference, TargetStore};
+#[cfg(target_os = "macos")]
+mod post_flash_alias;
+#[cfg(target_os = "macos")]
+mod post_flash_alias_store;
+#[cfg(target_os = "macos")]
+pub use post_flash_alias::{
+    LiveTarget, ObservedHdc, PostFlashAliasError, PostFlashBinding, Publication, Reconciliation,
+    SCHEMA_VERSION as POST_FLASH_ALIAS_SCHEMA_VERSION, admit as admit_post_flash_alias, is_sha256,
+    reissue as reissue_post_flash_alias, resolve as resolve_post_flash_alias,
+};
+#[cfg(target_os = "macos")]
+pub use post_flash_alias_store::PostFlashAliasStore;
 mod display_names;
 mod format_time;
 pub use display_names::decode_display_names;

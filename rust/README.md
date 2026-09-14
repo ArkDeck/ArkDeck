@@ -1034,7 +1034,7 @@ lane's to serve over `arkforged discoverDevices` (ArkDeck no longer owns the
 USB enumeration), as is the facts port that encodes "not observable" as
 `deviceMode: "absent"`. `tests/live_mode.rs` drives the probe over the shared
 fake HDC driver as real subprocesses and asserts the argv from the fake's log.
-## Alias store primitives (TASK-XPA-016, M4)
+## Post-flash HDC alias store (TASK-XPA-016, M4)
 
 Swift's post-flash HDC alias store (`RockchipPostFlashHDCBindingStore`, the
 owner-only document under `~/Library/Application Support/ArkDeck` that keeps
@@ -1054,7 +1054,32 @@ single-link regular file of exactly mode 0600 and 1..=maximum bytes).
 derive Swift's Application Support root from `runtime_home()`
 (`CFFIXED_USER_HOME`, never `HOME`). The store itself — the record, its
 canonical bytes, the three-way publication and the reissue reconciliation —
-is the alias-store owner's, over these.
+is the store below, over these.
+
+`arkdeck_hoststore::PostFlashAliasStore` is Swift's
+`RockchipPostFlashHDCBindingStore`: the owner-only document
+`rockchip-post-flash-hdc-binding.json` under the product's Application
+Support root that keeps an adopted Target usable after a flash rotates its
+HDC serial. `PostFlashBinding` is the record (twelve fields, the canonical
+sorted compact bytes plus one trailing newline; decoded as Foundation
+decodes, validated as Swift validates with one message); `publish` admits
+the candidate and its expected previous alias before anything is touched,
+then under the waited-for lock reads the stored record and resolves three
+ways — the same proof returned unchanged and unwritten, a revision advance
+archiving the superseded epoch as `post-flash-superseded-<alphanumerics of
+its time>.json` (a taken name compared byte for byte, never replaced) before
+the commit, or the chain rule (same target, revision and Loader identity,
+the stored alias being the one expected) letting a same-revision rotation
+commit; `reconcile_reissued_lineage` republishes a stored alias ahead of the
+live Target at the live revision when it agrees with the Target and the
+observed device on every identity fact, else declines without a write. The
+decisions are pure functions (`admit_post_flash_alias`,
+`resolve_post_flash_alias`, `reissue_post_flash_alias`); the I/O is the
+`arkdeck_platform` primitives (`open_or_create_private`, `wait_lock`,
+`read_owner_only`, `publish_document`, `create_exclusive_or_match`).
+`tests/post_flash_alias.rs` replays the Swift oracle
+(`rust/tests/fixtures/post-flash-alias`) step by step, comparing every
+outcome and every file the root holds — names, modes, sizes, bytes.
 
 ## Rockchip post-flash HDC observation (TASK-XPA-016, M4)
 
@@ -1080,7 +1105,6 @@ functions beside the observer. The durable alias store, the Target lineage
 advance and the executor's observation-reuse cache are other owners'.
 `tests/rockchip_hdc.rs` drives the shared fake HDC driver with its own
 answers fragment and asserts the argv from the driver's log.
-
 ## Rockchip Loader transition (TASK-XPA-016, M4)
 
 `arkdeck_provider_hdc::RockchipLoaderTransition` is the Loader side of
