@@ -1,0 +1,93 @@
+{
+  "records" : [
+    {
+      "capability" : {
+        "capabilityID" : "CAP-RT-EMPTIED",
+        "effectCeiling" : "deviceMutation",
+        "expiresAtUTC" : "2026-12-31T00:00:00Z",
+        "inputConstraints" : {
+
+        },
+        "issuedAtUTC" : "2026-09-01T00:00:00Z",
+        "issuer" : {
+          "kind" : "maintainerMergedPR",
+          "reference" : "PR#capability-read-oracle input"
+        },
+        "maximumUses" : 2,
+        "operationScope" : [
+          {
+            "operationID" : "input.tap",
+            "version" : 1
+          }
+        ],
+        "revocation" : {
+          "state" : "active"
+        },
+        "targetScope" : {
+          "kind" : "anyTarget"
+        }
+      },
+      "consumptions" : [
+        {
+          "authorizationScopeFingerprintSHA256" : "1313e36b5ed80b63094dc6ccec3f48c4067006a6630fad8ecbd18edaa33bc16d",
+          "bindingRevision" : 7,
+          "consumedAtUTC" : "2026-09-14T00:00:00Z",
+          "effect" : "deviceMutation",
+          "jobID" : "job-d1",
+          "materializedPlanDigest" : "9c49a0aea17004649d116e3be5c19e98722f681edf6150125dc8e72a9576a380",
+          "operationReference" : "input.tap@1",
+          "ordinal" : 1,
+          "outcomes" : [
+            {
+              "jobID" : "job-d1",
+              "outcome" : "confirmed",
+              "previousRecordSHA256" : "5725632e93d770743e16f23cd21f2fac09a980a698af9e94a179f74702de0499",
+              "recordSHA256" : "14fda56d67c9d35e3dfeaa44ef09028029e500d2b48fb9875a899f4701e1d8c0",
+              "recordedAtUTC" : "2026-09-14T00:01:00Z",
+              "terminalState" : "succeeded"
+            }
+          ],
+          "queryFingerprintSHA256" : "c0e25ad344c3d62bc427d5f6992e8742a9308db919034dac1f0c1b87dffa4915",
+          "receiptSHA256" : "5725632e93d770743e16f23cd21f2fac09a980a698af9e94a179f74702de0499",
+          "remainingUsesAfter" : 1,
+          "reservationID" : "res-d1",
+          "targetStableIdentitySHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      ],
+      "remainingUses" : 1
+    },
+    {
+      "capability" : {
+        "capabilityID" : "CAP-RT-EMPTIED-NEXT",
+        "effectCeiling" : "deviceMutation",
+        "expiresAtUTC" : "2026-12-31T00:00:00Z",
+        "inputConstraints" : {
+
+        },
+        "issuedAtUTC" : "2026-09-01T00:00:00Z",
+        "issuer" : {
+          "kind" : "maintainerMergedPR",
+          "reference" : "PR#capability-read-oracle input"
+        },
+        "maximumUses" : 1,
+        "operationScope" : [
+          {
+            "operationID" : "input.tap",
+            "version" : 1
+          }
+        ],
+        "revocation" : {
+          "state" : "active"
+        },
+        "targetScope" : {
+          "kind" : "anyTarget"
+        }
+      },
+      "consumptions" : [
+
+      ],
+      "remainingUses" : 1
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

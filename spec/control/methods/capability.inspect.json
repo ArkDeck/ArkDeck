@@ -40,12 +40,150 @@
             "effectCeiling": {
               "type": "string"
             },
+            "exactArtifactFacts": {
+              "additionalProperties": false,
+              "properties": {
+                "artifactByteCount": {
+                  "type": "string"
+                },
+                "artifactId": {
+                  "type": "string"
+                },
+                "artifactSha256": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "artifactByteCount",
+                "artifactId",
+                "artifactSha256"
+              ],
+              "type": "object"
+            },
+            "exactBindingRevision": {
+              "type": "integer"
+            },
+            "exactInputs": {
+              "additionalProperties": false,
+              "properties": {
+                "deviceProfile": {
+                  "type": "string"
+                },
+                "imageBundleLease": {
+                  "type": "string"
+                },
+                "partitionPlan": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "mode": {
+                      "type": "string"
+                    },
+                    "partitions": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "mode",
+                    "partitions"
+                  ],
+                  "type": "object"
+                },
+                "postFlashVerification": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "deviceProfile",
+                "imageBundleLease",
+                "partitionPlan",
+                "postFlashVerification"
+              ],
+              "type": "object"
+            },
+            "exactPlanDigest": {
+              "type": "string"
+            },
             "expiresAtUTC": {
               "type": "string"
             },
             "inputConstraints": {
               "additionalProperties": false,
-              "properties": {},
+              "properties": {
+                "abilityName": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "type": "string"
+                    },
+                    "values": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "values"
+                  ],
+                  "type": "object"
+                },
+                "bundleName": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "value"
+                  ],
+                  "type": "object"
+                },
+                "diagnosticsDurationSeconds": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "type": "string"
+                    },
+                    "maximum": {
+                      "type": "integer"
+                    },
+                    "minimum": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "maximum",
+                    "minimum"
+                  ],
+                  "type": "object"
+                },
+                "projectRef": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "value"
+                  ],
+                  "type": "object"
+                }
+              },
               "type": "object"
             },
             "issuedAtUTC": {
@@ -82,8 +220,7 @@
                   }
                 },
                 "required": [
-                  "operationID",
-                  "version"
+                  "operationID"
                 ],
                 "type": "object"
               },
@@ -92,6 +229,12 @@
             "revocation": {
               "additionalProperties": false,
               "properties": {
+                "atUTC": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": "string"
+                },
                 "state": {
                   "type": "string"
                 }
@@ -104,7 +247,16 @@
             "targetScope": {
               "additionalProperties": false,
               "properties": {
+                "allowedFileScopesDigest": {
+                  "type": "string"
+                },
+                "expectedWorkspaceRevision": {
+                  "type": "string"
+                },
                 "kind": {
+                  "type": "string"
+                },
+                "sha256": {
                   "type": "string"
                 }
               },
@@ -132,10 +284,110 @@
           "type": "integer"
         },
         "lineage": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "authorizationScopeFingerprintSHA256": {
+                "type": "string"
+              },
+              "bindingRevision": {
+                "type": "integer"
+              },
+              "consumedAtUTC": {
+                "type": "string"
+              },
+              "effect": {
+                "type": "string"
+              },
+              "jobID": {
+                "type": "string"
+              },
+              "materializedPlanDigest": {
+                "type": "string"
+              },
+              "operationReference": {
+                "type": "string"
+              },
+              "ordinal": {
+                "type": "integer"
+              },
+              "outcomeHistory": {
+                "items": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "jobID": {
+                      "type": "string"
+                    },
+                    "outcome": {
+                      "type": "string"
+                    },
+                    "previousRecordSHA256": {
+                      "type": "string"
+                    },
+                    "recordSHA256": {
+                      "type": "string"
+                    },
+                    "recordedAtUTC": {
+                      "type": "string"
+                    },
+                    "terminalState": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "jobID",
+                    "outcome",
+                    "previousRecordSHA256",
+                    "recordSHA256",
+                    "recordedAtUTC",
+                    "terminalState"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "previousLineageSHA256": {
+                "type": "string"
+              },
+              "queryFingerprintSHA256": {
+                "type": "string"
+              },
+              "receiptSHA256": {
+                "type": "string"
+              },
+              "remainingUsesAfter": {
+                "type": "integer"
+              },
+              "reservationID": {
+                "type": "string"
+              },
+              "targetStableIdentitySHA256": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "authorizationScopeFingerprintSHA256",
+              "consumedAtUTC",
+              "effect",
+              "jobID",
+              "materializedPlanDigest",
+              "operationReference",
+              "ordinal",
+              "outcomeHistory",
+              "queryFingerprintSHA256",
+              "receiptSHA256",
+              "remainingUsesAfter",
+              "reservationID"
+            ],
+            "type": "object"
+          },
           "type": "array"
         },
         "lineageAllowsNewExecution": {
           "type": "boolean"
+        },
+        "lineageBlocker": {
+          "type": "string"
         },
         "remainingUses": {
           "type": "integer"
@@ -159,8 +411,8 @@
   "x-arkdeck-method": "capability.inspect",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 4,
-    "request": 6,
-    "result": 2
+    "error": 2,
+    "request": 13,
+    "result": 11
   }
 }

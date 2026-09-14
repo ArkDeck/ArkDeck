@@ -1,0 +1,1733 @@
+{
+  "base" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5777
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5777
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ]
+  },
+  "capabilityInvariant" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5767
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5767
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ]
+  },
+  "checkpointLinked" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "linked-checkpoint.json",
+        "size" : 5777
+      },
+      {
+        "kind" : "symlink",
+        "path" : "runtime-capabilities.json",
+        "target" : "linked-checkpoint.json"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "linked-checkpoint.json",
+        "size" : 5777
+      },
+      {
+        "kind" : "symlink",
+        "path" : "runtime-capabilities.json",
+        "target" : "linked-checkpoint.json"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ]
+  },
+  "checkpointMissing" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ]
+  },
+  "duplicateCapability" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 10745
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 10745
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ]
+  },
+  "duplicateMember" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5804
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5804
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ]
+  },
+  "empty" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      }
+    ],
+    "before" : [
+
+    ]
+  },
+  "emptyLedger" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 2861
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 0
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 2861
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 0
+      }
+    ]
+  },
+  "fractionalMember" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5779
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5779
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ]
+  },
+  "installedOnly" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 807
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 807
+      }
+    ]
+  },
+  "integralFloatMember" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5779
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5779
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ]
+  },
+  "ledger" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 96477
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 3654
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 96477
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 3654
+      }
+    ]
+  },
+  "ledgerBreaksLineage" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5777
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 2714
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5777
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 2714
+      }
+    ]
+  },
+  "ledgerConsumeWithoutUse" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5777
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 2019
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5777
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 2019
+      }
+    ]
+  },
+  "ledgerDuplicateReservation" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5777
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 2714
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5777
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 2714
+      }
+    ]
+  },
+  "ledgerExtraMember" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5777
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 2820
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5777
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 2820
+      }
+    ]
+  },
+  "ledgerGarbage" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5777
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1972
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5777
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1972
+      }
+    ]
+  },
+  "ledgerLinked" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "linked-ledger.jsonl",
+        "size" : 1963
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5777
+      },
+      {
+        "kind" : "symlink",
+        "path" : "runtime-capabilities.ledger",
+        "target" : "linked-ledger.jsonl"
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "linked-ledger.jsonl",
+        "size" : 1963
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5777
+      },
+      {
+        "kind" : "symlink",
+        "path" : "runtime-capabilities.ledger",
+        "target" : "linked-ledger.jsonl"
+      }
+    ]
+  },
+  "ledgerOrphanOutcome" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5777
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 2340
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5777
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 2340
+      }
+    ]
+  },
+  "ledgerOutcomeWithoutRecord" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5777
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 2043
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5777
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 2043
+      }
+    ]
+  },
+  "ledgerUnknownCapability" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5777
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 2716
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5777
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 2716
+      }
+    ]
+  },
+  "ledgerUnknownKind" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5777
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 2016
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5777
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 2016
+      }
+    ]
+  },
+  "lineageOrdering" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5777
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5777
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ]
+  },
+  "missingMember" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5750
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5750
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ]
+  },
+  "nullCapabilityOptional" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5811
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5811
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ]
+  },
+  "nullMember" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 1655
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 1655
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ]
+  },
+  "nullOptional" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5819
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5819
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ]
+  },
+  "outcomeDigest" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5777
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5777
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ]
+  },
+  "outcomeTransition" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 6185
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 6185
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ]
+  },
+  "receiptDigest" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5777
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5777
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ]
+  },
+  "tornFinalAppend" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5777
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 2003
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5777
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 2003
+      }
+    ]
+  },
+  "trailingData" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5779
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5779
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ]
+  },
+  "truncatedCheckpoint" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 2888
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 2888
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ]
+  },
+  "unknownCapabilityMember" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5803
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5803
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ]
+  },
+  "unknownDocumentMember" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5797
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5797
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ]
+  },
+  "unknownEffect" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5771
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5771
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ]
+  },
+  "unknownTargetKind" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5761
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5761
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ]
+  },
+  "unsupportedEffectCeiling" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5771
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5771
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ]
+  },
+  "unsupportedSchemaVersion" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5777
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5777
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ]
+  },
+  "useAccounting" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5777
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5777
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ]
+  },
+  "wrongMemberType" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5781
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5781
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ]
+  },
+  "wrongNestedType" : {
+    "after" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5644
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : ".runtime-capabilities.lock",
+        "size" : 0
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.json",
+        "size" : 5644
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "runtime-capabilities.ledger",
+        "size" : 1963
+      }
+    ]
+  }
+}

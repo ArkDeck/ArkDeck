@@ -681,6 +681,46 @@ read and file byte for byte; re-record it with
 whose child is running included, and both CLIs' `job cancel`, and has a Swift
 daemon answer a cancellation and a run of the Rust-cancelled Job.
 
+## Capability reads (TASK-XPA-014)
+
+The isolated development composition answers `capability.list` and
+`capability.inspect` from a capability store beside its Job state,
+`<root>/jobs-state/capabilities`, as the Swift daemon answers them from
+`<state>/capabilities`. `CapabilityStore` (`arkdeck-hoststore`) reads Swift's
+`RuntimeCapabilityStore` format under the store's blocking exclusive lock: the
+checkpoint `runtime-capabilities.json` and every event appended to
+`runtime-capabilities.ledger` since it, a torn final append dropped. It refuses
+what Swift refuses, in Swift's words: a checkpoint or ledger that is a symbolic
+link, a ledger without its checkpoint, duplicate or malformed JSON (a port of
+Swift's `StrictJSONDuplicateValidator`, `strict_json.rs`), a document outside
+the current shape or a capability breaking its model invariants (with Swift's
+`DecodingError` descriptions), an event that cannot be replayed, and
+inconsistent use accounting, lineage order or receipt and outcome digests.
+Every refusal is `internalError` with Swift's rendering of the store error, the
+store's directory included. A list row carries the capability's identity,
+effect ceiling, uses and lineage blocker (a use without a settled outcome, else
+an exhausted budget); an inspection carries the whole capability and its
+lineage, `invalidParams` without a string `capabilityId` and `notFound` for an
+unknown one. A read writes nothing but the lock file; nothing here installs,
+mints, reserves or consumes a use.
+
+`arkdeck capability list` and `arkdeck capability inspect --capability <id>`
+send what Swift's CLI sends and print the answer.
+
+`rust/tests/fixtures/capability-read/` is the oracle Swift
+`CapabilityReadOracleContractTests` records: synthetic capability stores the
+Swift store writes through its public API in temporary directories (every use
+outcome, a revocation, a device, workspace and destructive Runtime-issued
+capability, more appended events than the periodic checkpoint allows) and such
+stores with one defect each, with every answer the daemon's control plane gives
+over them and the kind and mode of every entry before and after the reads.
+`tests/capability_read.rs` reproduces every answer and leaves every store as
+Swift's reads left it. Re-record from Swift with
+`ARKDECK_RUST_CAPABILITY_READ_RECORD=/private/tmp/<new>`.
+`scripts/check-capability-read.py` places every oracle store where each daemon
+keeps its own and compares the standalone Swift daemon and the Rust owner, and
+both CLIs, over the oracle's reads.
+
 ## Target presentation owner (TASK-XPA-012)
 
 The explicitly isolated development composition owns `targets-state/` and serves
