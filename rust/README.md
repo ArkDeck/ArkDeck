@@ -1016,6 +1016,48 @@ failure, stderr or an unprovable state is `OutcomeUnknown` with Swift's
 reason. `tests/lifecycle.rs` drives it with a fake `hdc` compiled from C whose
 `kill -r` client starts a new server of the same executable.
 
+## HDC runtime status (TASK-XPA-016, M1)
+
+`arkdeck_provider_hdc::HdcStatusObserver` is Swift's
+`HeadlessHDCStatusObserver`, the object `runtime.hdc.status` answers with
+(`arkdeck.runtime-hdc-status/1`, twenty-three members, `unconfigured_status`
+for a daemon without a tool): the configured facts — the tool's path and
+digest, the selected endpoint with its source and `serverEndpointRef`
+(`hdc-endpoint:` + SHA-256 of the endpoint), the startup versions kept as
+history — then what one commandless observation proves. The tool is pinned
+(`VerifiedTool`, now with a public `revalidate`), its signature read, the
+identity observed once, and the tool re-proved on both sides of every step;
+an observed receipt must be the selected tool at the selected endpoint with
+the observed generation, else `hdc.identityMismatch` claims nothing. Managed
+ownership needs the daemon's own launch record read three times unchanged,
+matching the receipt by PID, birth, path and digest, and the live process
+verified — or the supervisor's unchanged, healthy, managed record of this
+generation; else `hdc.ownershipUnproven`. The five non-observed
+classifications map to their reason codes; any failure of the tool itself
+withdraws every tool fact (`hdc.toolIdentityOrSignatureInvalid`).
+`serverHealth` is always `unknown`, `serverVersion` null and
+`newDispatchCount` 0: the status launches nothing. The production pieces
+beside it: `CommandlessIdentity` (Swift `HDCCommandlessServerIdentity
+.observe`: the 3.2.0f family only at `127.0.0.1:8710`, the 3.2.0d family at
+the selected loopback endpoint, `LoopbackServerLease::acquire` raced against
+the 1000 ms deadline, the receipt checked against the selected tool),
+`NativeSignature` (the signing facts plus `platformTrust: unverified` and
+`executionAssessment: notPerformed`) and `SystemManagedProcess`
+(`arkdeck_platform::verifies_managed_process`: the observed birth on both
+sides of Swift's inspector — the process alive, running the receipt's
+executable, its complete argv after argv[0] equal to the launch's through
+`process_arguments` (`KERN_PROCARGS2`), declaring `-s <endpoint>`, and owning
+a TCP listener on the port bound to the loopback or a wildcard). Beyond
+Swift: a server another user owns is `hdc.identityUnknown` rather than an
+observed identity, and the deadline abandons the scan rather than
+cancelling it. `tests/hdc_status.rs` replays the Swift oracle
+(`rust/tests/fixtures/hdc-status`, twenty-two cases at a fixed root under
+the oracle's lock) byte for byte. The `runtime.hdc.status` method arm in
+`arkdeck-control`, and the corpus and schema regeneration the live-valued
+object needs (the published schema was derived from frames that carry only
+nulls for `generation`, `processId` and `clientVersion`), are the method
+owner's.
+
 ## Rockchip live-mode probe (TASK-XPA-016, M4)
 
 `arkdeck_provider_hdc::LiveModeProbe` is Swift's `FoundationRockchipLiveModeProbe`,

@@ -21,6 +21,8 @@ mod provider;
 mod rockchip_hdc;
 mod rockchip_loader;
 mod semantic;
+#[cfg(target_os = "macos")]
+mod status;
 
 #[cfg(target_os = "macos")]
 pub use dispatch::{ProcessDispatch, SERVER_PORT_VARIABLE};
@@ -62,3 +64,10 @@ pub use rockchip_loader::{
     loader_summary, rebind_summary, transition_evidence_summary,
 };
 pub use semantic::{CommandFailure, CommandOutcome, SemanticOutputParser};
+#[cfg(target_os = "macos")]
+pub use status::{
+    CommandlessIdentity, HdcStatusObserver, IdentityObservation, IdentityObserver, ManagedLaunch,
+    ManagedProcessVerifier, NativeSignature, STATUS_SCHEMA_VERSION, SignatureInspector,
+    StartupDiagnostics, StatusExecutable, SupervisedServer, SupervisorState, SystemManagedProcess,
+    server_endpoint_ref, unconfigured_status,
+};

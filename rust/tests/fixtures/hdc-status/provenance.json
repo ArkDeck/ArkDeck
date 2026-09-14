@@ -1,0 +1,48 @@
+{
+  "daemonVersion" : "0.0.0-oracle",
+  "executablePath" : "/private/tmp/arkdeck-hdc-status-oracle/hdc",
+  "files" : {
+    "cases.json" : "7fb30e93366069980fe2516349b145194a6816b57ffe93f4928b402df5ddc437",
+    "snapshots/00-unconfigured.json" : "7e8d8661f6f75a17f35676dfd4928f916cd8af7e93ee8c7ea7b52acfa9bc0c55",
+    "snapshots/01-observed-managed.json" : "cce8f3b3aeb55ea51cf21fa3e006662d3462894e945591a6e3b9eed9b63dbc92",
+    "snapshots/02-observed-ownership-unproven-no-launch.json" : "ca178e9979fac7f1f69d3be2aa6e0b259c1667f7ddb9cfca82091230cf2f0abf",
+    "snapshots/03-observed-ownership-unproven-process-differs.json" : "ca178e9979fac7f1f69d3be2aa6e0b259c1667f7ddb9cfca82091230cf2f0abf",
+    "snapshots/04-observed-ownership-unproven-birth-differs.json" : "ca178e9979fac7f1f69d3be2aa6e0b259c1667f7ddb9cfca82091230cf2f0abf",
+    "snapshots/05-observed-identity-mismatch-endpoint.json" : "aaaec89121f7e8ec44d73edaeec9b877a2f2206f6e995da90300724ee0138212",
+    "snapshots/06-observed-identity-mismatch-digest.json" : "aaaec89121f7e8ec44d73edaeec9b877a2f2206f6e995da90300724ee0138212",
+    "snapshots/07-observed-identity-mismatch-path.json" : "aaaec89121f7e8ec44d73edaeec9b877a2f2206f6e995da90300724ee0138212",
+    "snapshots/08-observed-identity-mismatch-generation.json" : "aaaec89121f7e8ec44d73edaeec9b877a2f2206f6e995da90300724ee0138212",
+    "snapshots/09-observed-identity-missing.json" : "aaaec89121f7e8ec44d73edaeec9b877a2f2206f6e995da90300724ee0138212",
+    "snapshots/10-observed-generation-zero.json" : "aaaec89121f7e8ec44d73edaeec9b877a2f2206f6e995da90300724ee0138212",
+    "snapshots/11-unavailable.json" : "d9b13f3dfc7d054c41acc0a30d02bcbc1066c6b0bdcf5f4d61168b85e9195ae1",
+    "snapshots/12-unsupported.json" : "8f1ee4b9e7f9a216e47c06315976f466470452eccd77b39300e0aa0bbef1497f",
+    "snapshots/13-timed-out.json" : "dff69d4d1129a7a6c46ea08c9a70607d848a508ceb408381b8681de3ab4bb893",
+    "snapshots/14-cancelled.json" : "a07e6e8ef87e978418ed256560af0012a8b37da702f86838d739fc3218465d4f",
+    "snapshots/15-unknown.json" : "17f6f5681665f150861d958b567cd70e843fa0892e7104914fc56f01fac38e87",
+    "snapshots/16-tool-changed-during-observation.json" : "e245f2148433e18043abbb3676b41ca6d5351db7d5702ab04008e61138739731",
+    "snapshots/17-tool-changed-during-ownership.json" : "e245f2148433e18043abbb3676b41ca6d5351db7d5702ab04008e61138739731",
+    "snapshots/18-tool-missing.json" : "691d8bed8d7e480954b6e884b6965907796e019a16eeed03796464a9c6a284c0",
+    "snapshots/19-tool-digest-mismatch.json" : "afb9877501259b3caf78acd39bcf8f87f5b31396156c6ac4f729533acef3a5ee",
+    "snapshots/20-explicit-endpoint-unavailable.json" : "097d6ba82a7330fab946a9539f30d3e45f0894bfa8e838f3a32e7d92f1407bbd",
+    "snapshots/21-inherited-endpoint-observed-unproven.json" : "393744cdbca1751a12a4fa9d51f083b235f9696b5cbf7944c6ae637a74d7719d"
+  },
+  "hdcSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+  "nowUTC" : "2026-09-14T00:00:00Z",
+  "producer" : "HDCStatusOracleContractTests.testSwiftAnswersTheLiveHDCStatusAcrossItsDecisionTable",
+  "registeredIdentities" : [
+    {
+      "executableSHA256" : "48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260",
+      "family" : "readOnlyProbeRegistry",
+      "toolVersion" : "3.2.0d"
+    },
+    {
+      "exactEndpoint" : "127.0.0.1:8710",
+      "executableSHA256" : "05b2bf7ad30201c082da336db28f8856952a2b2f49ac3404b96fdb4bf1a68f83",
+      "family" : "supervisorObservationProbeCatalog",
+      "timeoutMilliseconds" : 1000,
+      "toolVersion" : "3.2.0f"
+    }
+  ],
+  "root" : "/private/tmp/arkdeck-hdc-status-oracle",
+  "schemaVersion" : "arkdeck.runtime-hdc-status/1"
+}

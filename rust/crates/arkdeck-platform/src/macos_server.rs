@@ -325,9 +325,286 @@ fn effective_uid() -> u32 {
     unsafe { libc::geteuid() }
 }
 
+/// Swift `HDCCommandlessServerIdentity.verifiesManagedProcess`: the managed
+/// ownership predicate bracketed by the observed birth identity, so that a
+/// PID recycled between the status observation and this inspection fails
+/// closed. The receipt must carry a representable generation and name a
+/// process still born when it says; that process must match the launch as
+/// Swift's `SystemHDCManagedServerProcessInspector` checks it — alive,
+/// running the receipt's executable, its complete argv after argv[0] equal to
+/// the launch's, that argv declaring the endpoint (`-s <endpoint>`), and a TCP
+/// listener of its own on the endpoint's port bound to the loopback or a
+/// wildcard; then the same birth once more.
+pub fn verifies_managed_process(receipt: &ServerIdentityReceipt, arguments: &[String]) -> bool {
+    let same_birth = || {
+        receipt.pid > 0
+            && process_birth(receipt.pid).is_some_and(|birth| {
+                (birth.start_seconds, birth.start_microseconds)
+                    == (receipt.start_seconds, receipt.start_microseconds)
+            })
+    };
+    let generation = receipt
+        .start_seconds
+        .checked_mul(1_000_000)
+        .and_then(|seconds| seconds.checked_add(receipt.start_microseconds));
+    if !generation.is_some_and(|generation| generation > 0 && generation <= i64::MAX as u64) {
+        return false;
+    }
+    if !same_birth() {
+        return false;
+    }
+    managed_process_matches(receipt, arguments) && same_birth()
+}
+
+/// Swift `SystemHDCManagedServerProcessInspector.matches`.
+fn managed_process_matches(receipt: &ServerIdentityReceipt, arguments: &[String]) -> bool {
+    use std::os::unix::ffi::OsStrExt;
+    let pid = receipt.pid;
+    if pid <= 0 || !receipt.executable_path.is_absolute() {
+        return false;
+    }
+    // Swift `FileManager.isExecutableFile`: access(2) for execution.
+    let Ok(path) = std::ffi::CString::new(receipt.executable_path.as_os_str().as_bytes()) else {
+        return false;
+    };
+    // SAFETY: the C string is NUL-terminated and outlives the call.
+    if unsafe { libc::access(path.as_ptr(), libc::X_OK) } != 0 {
+        return false;
+    }
+    // SAFETY: signal 0 delivers nothing; it asks whether the PID exists.
+    if unsafe { libc::kill(pid, 0) } != 0 {
+        return false;
+    }
+    let Some(running) = executable_path(pid) else {
+        return false;
+    };
+    let Ok(tool) = std::fs::canonicalize(&receipt.executable_path) else {
+        return false;
+    };
+    if running != tool {
+        return false;
+    }
+    if process_arguments(pid).as_deref() != Some(arguments) {
+        return false;
+    }
+    let endpoint = receipt.endpoint.to_string();
+    let declares = arguments
+        .iter()
+        .position(|argument| argument == "-s")
+        .and_then(|option| arguments.get(option + 1))
+        .is_some_and(|argument| *argument == endpoint);
+    declares && owns_local_listener(pid, receipt.endpoint)
+}
+
+/// Swift `ownsListeningEndpoint`: the endpoint must be the IPv4 loopback with
+/// a port, and the process must own a TCP listener on that port whose local
+/// address is the loopback or a wildcard bind that serves it (real `hdc`
+/// listens dual-stack; the kernel labels that listener by its IPv4 address).
+fn owns_local_listener(pid: i32, endpoint: SocketAddrV4) -> bool {
+    if *endpoint.ip() != Ipv4Addr::LOCALHOST || endpoint.port() == 0 {
+        return false;
+    }
+    let Ok(listeners) = listening_sockets(pid) else {
+        return false;
+    };
+    listeners.iter().any(|listener| {
+        listener.port == endpoint.port()
+            && is_loopback_or_wildcard(listener.family, &listener.address)
+    })
+}
+
+/// Swift `HDCListenerAddressFacts.isLoopbackOrWildcard`: exactly the IPv4
+/// loopback or its mapped IPv6 form, or the IPv4 or IPv6 wildcard.
+fn is_loopback_or_wildcard(family: i32, address: &[u8; 16]) -> bool {
+    if family == libc::AF_INET {
+        return address[..4] == [0, 0, 0, 0] || address[..4] == [127, 0, 0, 1];
+    }
+    family == libc::AF_INET6
+        && (address.iter().all(|byte| *byte == 0)
+            || is_registered_listener_address(family, &address[..]))
+}
+
+/// Swift `arguments(for:)`: the complete argv of a process after argv[0], as
+/// the kernel keeps it (`KERN_PROCARGS2`: the argument count, the executable
+/// path, then the NUL-separated arguments). `None` when the kernel refuses
+/// or the record is not shaped so.
+pub fn process_arguments(pid: i32) -> Option<Vec<String>> {
+    // <sys/sysctl.h>
+    const KERN_ARGMAX: libc::c_int = 8;
+    const KERN_PROCARGS2: libc::c_int = 49;
+    let mut maximum: libc::c_int = 0;
+    let mut maximum_size = std::mem::size_of::<libc::c_int>();
+    let mut name = [libc::CTL_KERN, KERN_ARGMAX];
+    // SAFETY: the name is a live two-entry MIB and the out pointer a live
+    // c_int of the declared size; nothing is written to the kernel.
+    let status = unsafe {
+        libc::sysctl(
+            name.as_mut_ptr(),
+            2,
+            (&mut maximum as *mut libc::c_int).cast(),
+            &mut maximum_size,
+            std::ptr::null_mut(),
+            0,
+        )
+    };
+    let maximum = usize::try_from(maximum).ok()?;
+    if status != 0 || maximum <= std::mem::size_of::<i32>() {
+        return None;
+    }
+    let mut buffer = vec![0u8; maximum];
+    let mut actual = buffer.len();
+    let mut name = [libc::CTL_KERN, KERN_PROCARGS2, pid];
+    // SAFETY: the name is a live three-entry MIB, the buffer is writable for
+    // its declared length and the kernel reports how much it wrote.
+    let status = unsafe {
+        libc::sysctl(
+            name.as_mut_ptr(),
+            3,
+            buffer.as_mut_ptr().cast(),
+            &mut actual,
+            std::ptr::null_mut(),
+            0,
+        )
+    };
+    if status != 0 || actual <= std::mem::size_of::<i32>() || actual > buffer.len() {
+        return None;
+    }
+    let count = i32::from_ne_bytes(buffer[..4].try_into().ok()?);
+    let count = usize::try_from(count).ok().filter(|count| *count > 0)?;
+    let mut cursor = std::mem::size_of::<i32>();
+    // The executable path, then its padding.
+    while cursor < actual && buffer[cursor] != 0 {
+        cursor += 1;
+    }
+    while cursor < actual && buffer[cursor] == 0 {
+        cursor += 1;
+    }
+    let mut values = Vec::with_capacity(count);
+    for _ in 0..count {
+        while cursor < actual && buffer[cursor] == 0 {
+            cursor += 1;
+        }
+        if cursor >= actual {
+            return None;
+        }
+        let start = cursor;
+        while cursor < actual && buffer[cursor] != 0 {
+            cursor += 1;
+        }
+        if cursor >= actual {
+            return None;
+        }
+        values.push(String::from_utf8_lossy(&buffer[start..cursor]).into_owned());
+    }
+    if values.is_empty() {
+        return None;
+    }
+    values.remove(0);
+    Some(values)
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{ScanFailure, is_registered_listener_address, listening_sockets};
+    use super::{
+        ScanFailure, ServerIdentityReceipt, is_loopback_or_wildcard,
+        is_registered_listener_address, listening_sockets, owns_local_listener, process_arguments,
+        process_birth, verifies_managed_process,
+    };
+    use std::net::{Ipv4Addr, SocketAddrV4, TcpListener};
+
+    /// The kernel's argv of this very process is the one it was started
+    /// with, after argv[0]; a process that does not exist has none.
+    #[test]
+    fn process_arguments_are_this_process_s_own_and_absent_for_no_process() {
+        let pid = i32::try_from(std::process::id()).unwrap();
+        let expected: Vec<String> = std::env::args().skip(1).collect();
+        assert_eq!(process_arguments(pid), Some(expected));
+        assert_eq!(process_arguments(99_999_999), None);
+    }
+
+    /// A listener this process binds on the loopback or the wildcard is owned
+    /// on its port; another port, another host or a dead process is not.
+    #[test]
+    fn a_loopback_or_wildcard_listener_of_this_process_is_owned_on_its_port() {
+        let pid = i32::try_from(std::process::id()).unwrap();
+        let loopback = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = loopback.local_addr().unwrap().port();
+        assert!(owns_local_listener(
+            pid,
+            SocketAddrV4::new(Ipv4Addr::LOCALHOST, port)
+        ));
+        let wildcard = TcpListener::bind("0.0.0.0:0").unwrap();
+        let wildcard_port = wildcard.local_addr().unwrap().port();
+        assert!(owns_local_listener(
+            pid,
+            SocketAddrV4::new(Ipv4Addr::LOCALHOST, wildcard_port)
+        ));
+        assert!(!owns_local_listener(
+            pid,
+            SocketAddrV4::new(Ipv4Addr::LOCALHOST, 0)
+        ));
+        assert!(!owns_local_listener(
+            pid,
+            SocketAddrV4::new(Ipv4Addr::new(10, 0, 0, 1), port)
+        ));
+        assert!(!owns_local_listener(
+            99_999_999,
+            SocketAddrV4::new(Ipv4Addr::LOCALHOST, port)
+        ));
+        drop(loopback);
+        assert!(!owns_local_listener(
+            pid,
+            SocketAddrV4::new(Ipv4Addr::LOCALHOST, port)
+        ));
+        let mut mapped = [0u8; 16];
+        mapped[10] = 0xFF;
+        mapped[11] = 0xFF;
+        mapped[12..].copy_from_slice(&[127, 0, 0, 1]);
+        assert!(is_loopback_or_wildcard(libc::AF_INET6, &mapped));
+        assert!(is_loopback_or_wildcard(libc::AF_INET6, &[0; 16]));
+        let mut other = [0u8; 16];
+        other[15] = 1;
+        assert!(!is_loopback_or_wildcard(libc::AF_INET6, &other));
+        assert!(!is_loopback_or_wildcard(0, &[0; 16]));
+    }
+
+    /// This process, with its real birth and argv, is no managed HDC server:
+    /// its argv declares no endpoint and it owns no listener there. A dead
+    /// PID, a wrong birth and a wrong argv fail before anything else.
+    #[test]
+    fn a_process_that_is_not_the_launched_server_is_never_managed() {
+        let pid = i32::try_from(std::process::id()).unwrap();
+        let birth = process_birth(pid).unwrap();
+        let arguments: Vec<String> = std::env::args().skip(1).collect();
+        let receipt = ServerIdentityReceipt {
+            pid,
+            start_seconds: birth.start_seconds,
+            start_microseconds: birth.start_microseconds,
+            executable_path: std::env::current_exe().unwrap(),
+            executable_sha256: "0".repeat(64),
+            endpoint: SocketAddrV4::new(Ipv4Addr::LOCALHOST, 8710),
+        };
+        assert!(!verifies_managed_process(&receipt, &arguments));
+        let mut wrong_arguments = arguments.clone();
+        wrong_arguments.push("-m".into());
+        assert!(!verifies_managed_process(&receipt, &wrong_arguments));
+        let reborn = ServerIdentityReceipt {
+            start_seconds: birth.start_seconds + 1,
+            ..receipt.clone()
+        };
+        assert!(!verifies_managed_process(&reborn, &arguments));
+        let dead = ServerIdentityReceipt {
+            pid: 99_999_999,
+            ..receipt.clone()
+        };
+        assert!(!verifies_managed_process(&dead, &arguments));
+        let unborn = ServerIdentityReceipt {
+            start_seconds: 0,
+            start_microseconds: 0,
+            ..receipt
+        };
+        assert!(!verifies_managed_process(&unborn, &arguments));
+    }
 
     /// A PID the kernel has no process for is a vanished candidate, never a
     /// failed scan; a process this user may not inspect stays unscannable.
