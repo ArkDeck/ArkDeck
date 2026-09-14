@@ -32,8 +32,8 @@ pub use observation::{
     parse_target_list,
 };
 pub use operation::{
-    Action, DispatchFailure, Expected, FixtureDispatch, HdcDispatch, Outcome, ProcessPlan,
-    Property, Receipt, property_value, stable_identity_sha256,
+    Action, DispatchFailure, Expected, HdcDispatch, Outcome, ProcessPlan, Property, Receipt,
+    property_value, stable_identity_sha256,
 };
 pub use presence::{
     ObservationFailure, ObservationInput, ObservationTermination, PresenceSnapshot,

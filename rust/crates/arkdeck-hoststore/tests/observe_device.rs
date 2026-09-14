@@ -21,7 +21,7 @@ use arkdeck_hoststore::{
     JobStore, SessionPublisher, SessionStore, StorageClaims, TargetStore,
 };
 use arkdeck_platform::VerifiedTool;
-use arkdeck_provider_hdc::FixtureDispatch;
+use arkdeck_provider_hdc::ProcessDispatch;
 use serde_json::{Map, Value, json};
 use std::fs::{self, File, OpenOptions};
 use std::path::{Path, PathBuf};
@@ -112,7 +112,8 @@ fn rust_observes_the_swift_fake_device() {
     let artifacts = ArtifactReadStore::open(&root.join("artifacts")).unwrap();
     let jobs = JobStore::open_owner(&root.join("jobs-state")).unwrap();
     let sessions = SessionStore::open(&root.join("session-owner"), &root.join("Sessions")).unwrap();
-    let dispatch = FixtureDispatch::new(VerifiedTool::open(root.join("hdc"), &digest).unwrap());
+    let dispatch =
+        ProcessDispatch::new(VerifiedTool::open(root.join("hdc"), &digest).unwrap(), None);
     let hdc = HdcComposition {
         targets: &targets,
         dispatch: &dispatch,

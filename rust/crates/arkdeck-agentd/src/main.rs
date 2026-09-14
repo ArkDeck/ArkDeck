@@ -17,13 +17,15 @@ use std::sync::{
 use std::time::Duration;
 
 /// The isolated owner's development HDC, named by
-/// `ARKDECK_DEVELOPMENT_HDC_PATH` and pinned by the digest of its bytes at
-/// startup. It must be a fixture: a registered HDC executable would address a
-/// real server and device, which needs the existing-server identity proof the
-/// isolated owner does not have, so one is refused.
+/// `ARKDECK_DEVELOPMENT_HDC_PATH`, pinned by the digest of its bytes at
+/// startup and dispatched as every HDC plan is (`ProcessDispatch`, with the
+/// server port the daemon inherited). It must be a fixture: a registered HDC
+/// executable would address a real server and device, which needs the
+/// existing-server identity proof the isolated owner does not have, so one is
+/// refused.
 #[cfg(target_os = "macos")]
 fn development_hdc()
--> Result<Option<arkdeck_provider_hdc::FixtureDispatch>, Box<dyn std::error::Error>> {
+-> Result<Option<arkdeck_provider_hdc::ProcessDispatch>, Box<dyn std::error::Error>> {
     let Some(path) = std::env::var_os("ARKDECK_DEVELOPMENT_HDC_PATH") else {
         return Ok(None);
     };
@@ -40,8 +42,9 @@ fn development_hdc()
                 .into(),
         );
     }
-    Ok(Some(arkdeck_provider_hdc::FixtureDispatch::new(
+    Ok(Some(arkdeck_provider_hdc::ProcessDispatch::new(
         arkdeck_platform::VerifiedTool::open(&path, &digest)?,
+        arkdeck_provider_hdc::ProcessDispatch::inherited_server_port().as_deref(),
     )))
 }
 

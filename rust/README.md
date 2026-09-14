@@ -759,8 +759,9 @@ because it would address a real server and device. Facts come from the Target
 owner's adopted record (`<root>/targets-state/targets.json`): the connect key,
 the identity it names, the revision and the tool version. `job.plan` binds that
 identity and revision into the plan digest; `job.run` dispatches each step
-through `arkdeck-provider-hdc`'s `HdcDispatch` with its typed action persisted
-and its write-ahead intent durable first, proves the evidence preflight
+through `arkdeck-provider-hdc`'s `ProcessDispatch`, the `HdcDispatch` every HDC
+plan takes on the verified tool runner, with its typed action persisted and its
+write-ahead intent durable first, proves the evidence preflight
 (target, model, firmware), publishes `tool-facts.json`, `device-facts.json` and
 `binding-snapshot.json`, and publishes a device Session; `job.result` and
 `job.evidence` carry the evidence observation. A step whose outcome cannot be
@@ -939,8 +940,9 @@ whether either went past the capture; a timeout or a signal death leaves the
 outcome unobservable (Swift's wording); a refused budget, environment or
 identity means nothing ran. It never gates a dispatch on the server lease.
 `tests/process_dispatch.rs` drives it with shell scripts and the shared fake HDC
-driver; `FixtureDispatch` remains for the isolated owner until the composition
-swaps.
+driver. The isolated development owner dispatches its fixture HDC through it
+(TASK-XPA-014), and so do the `observe.device@1` and agent execution replays.
+
 ## Managed HDC server (TASK-XPA-016, SPK-6)
 
 `arkdeck_platform::ManagedServer` launches a verified tool through its retained
