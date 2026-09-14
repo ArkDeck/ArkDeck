@@ -4,8 +4,12 @@
 //! group, the source Artifact handed over as the `/.vol` alias of a descriptor
 //! bound to its digest, each output stream kept to its first bytes while the
 //! rest is drained unread, and a timeout that terminates the process group
-//! (TERM, then KILL after 0.25 s). The child's environment is the clean one
-//! every identity-bound spawn here gets; no ambient variable is inherited.
+//! (TERM, then KILL after 0.25 s). A cancellation seen before the spawn leaves
+//! no child; one seen while the child runs terminates its group as Swift's
+//! executor does and reports whether any member survived. The child's
+//! environment is the clean one every identity-bound spawn here gets; no
+//! ambient variable is inherited.
+use super::macos_process::RunningChild;
 use super::{READER_CLEANUP_TIMEOUT, VerifiedTool, denied, hash_file, invalid, same_metadata};
 use std::ffi::OsString;
 use std::fs::{File, Metadata};
@@ -23,6 +27,10 @@ const MAX_CAPTURE_BYTES: usize = 64 * 1024 * 1024;
 const MAX_TIMEOUT: Duration = Duration::from_secs(3600);
 /// Swift `terminateProcessGroup`: how long TERM has before KILL.
 const TERMINATION_GRACE: Duration = Duration::from_millis(250);
+/// Swift `terminateProcessGroup`: how long a killed group has to disappear.
+const KILL_GRACE: Duration = Duration::from_secs(1);
+/// Swift `waitForGroupToDisappear`: how often the group is looked for.
+const DRAIN_PROBE: Duration = Duration::from_millis(10);
 
 #[derive(Clone, Copy, Debug)]
 pub struct AnalyzerLimits {
@@ -37,6 +45,12 @@ pub enum AnalyzerTermination {
     Signalled(i32),
     /// The deadline passed; the process group was terminated.
     TimedOut,
+    /// Cancelled before the child was spawned, or while it ran, when its
+    /// process group was terminated. `drained` holds when no member of the
+    /// group was left: Swift's positive proof that nothing survived.
+    Cancelled {
+        drained: bool,
+    },
 }
 
 #[derive(Debug)]
@@ -54,6 +68,13 @@ pub enum AnalyzerRunError {
     Refused(io::Error),
     /// The child may have run; what it did cannot be observed.
     Unobservable(io::Error),
+}
+
+/// Why a child that had not finished was stopped.
+#[derive(Clone, Copy)]
+enum Stop {
+    TimedOut,
+    Cancelled,
 }
 
 /// A regular file bound, through one retained descriptor, to its expected
@@ -96,11 +117,13 @@ impl VerifiedSource {
 impl VerifiedTool {
     /// Run the pinned executable once with `arguments`; `source` stays open,
     /// keeping its inode alias valid, until the child has been reaped.
+    /// `cancelled` is asked before the spawn and while the child runs.
     pub fn run_analyzer(
         &self,
         arguments: &[OsString],
         source: &VerifiedSource,
         limits: AnalyzerLimits,
+        cancelled: &dyn Fn() -> bool,
     ) -> Result<AnalyzerExecution, AnalyzerRunError> {
         if limits.timeout.is_zero()
             || limits.timeout > MAX_TIMEOUT
@@ -113,6 +136,16 @@ impl VerifiedTool {
         }
         let _source = source;
         self.revalidate().map_err(AnalyzerRunError::Refused)?;
+        // Swift's executor checks for a cancellation before it spawns; one
+        // seen there leaves no child, and so nothing to drain.
+        if cancelled() {
+            return Ok(AnalyzerExecution {
+                stdout: Vec::new(),
+                stderr: Vec::new(),
+                truncated: false,
+                termination: AnalyzerTermination::Cancelled { drained: true },
+            });
+        }
         let started = Instant::now();
         // The child starts suspended and is killed unless the retained
         // executable still verifies, so any failure here ran no tool code.
@@ -124,38 +157,48 @@ impl VerifiedTool {
         let err = capture(stderr, limits.capture_bytes, stop.clone());
         let (mut status, mut stdout, mut stderr) = (None, None, None);
         let mut failure = None;
-        let timed_out = loop {
+        let ended = loop {
             poll(&out, &mut stdout);
             poll(&err, &mut stderr);
             if stdout.as_ref().is_some_and(Result::is_err)
                 || stderr.as_ref().is_some_and(Result::is_err)
             {
-                break false;
+                break None;
             }
             if status.is_none() {
                 match child.try_wait() {
                     Ok(value) => status = value,
                     Err(error) => {
                         failure = Some(error);
-                        break false;
+                        break None;
                     }
                 }
             }
             if status.is_some() && stdout.is_some() && stderr.is_some() {
-                break false;
+                break None;
+            }
+            if cancelled() {
+                break Some(Stop::Cancelled);
             }
             if started.elapsed() >= limits.timeout {
-                break true;
+                break Some(Stop::TimedOut);
             }
             std::thread::sleep(Duration::from_millis(5));
         };
-        if timed_out {
-            child.signal_group(libc::SIGTERM);
-            let grace = Instant::now() + TERMINATION_GRACE;
-            while Instant::now() < grace && matches!(child.try_wait(), Ok(None)) {
-                std::thread::sleep(Duration::from_millis(5));
+        let stopped = match ended {
+            Some(Stop::TimedOut) => {
+                child.signal_group(libc::SIGTERM);
+                let grace = Instant::now() + TERMINATION_GRACE;
+                while Instant::now() < grace && matches!(child.try_wait(), Ok(None)) {
+                    std::thread::sleep(Duration::from_millis(5));
+                }
+                Some(AnalyzerTermination::TimedOut)
             }
-        }
+            Some(Stop::Cancelled) => Some(AnalyzerTermination::Cancelled {
+                drained: drain_group(&child),
+            }),
+            None => None,
+        };
         stop.store(true, Ordering::Release);
         // Collects the whole group, descendants holding output handles open
         // included, and reaps the child.
@@ -164,7 +207,7 @@ impl VerifiedTool {
         let stdout = finish(&out, stdout, deadline);
         let stderr = finish(&err, stderr, deadline);
         let unobservable = AnalyzerRunError::Unobservable;
-        let ((stdout, stdout_dropped), (stderr, stderr_dropped)) = if timed_out {
+        let ((stdout, stdout_dropped), (stderr, stderr_dropped)) = if stopped.is_some() {
             // A terminated child's partial output is kept, never judged.
             (stdout.unwrap_or_default(), stderr.unwrap_or_default())
         } else {
@@ -174,17 +217,18 @@ impl VerifiedTool {
             cleanup.map_err(unobservable)?;
             (stdout.map_err(unobservable)?, stderr.map_err(unobservable)?)
         };
-        let termination = if timed_out {
-            AnalyzerTermination::TimedOut
-        } else {
-            let status = status.expect("finished child");
-            match (status.code(), status.signal()) {
-                (Some(code), _) => AnalyzerTermination::Exited(code),
-                (None, Some(signal)) => AnalyzerTermination::Signalled(signal),
-                (None, None) => {
-                    return Err(unobservable(io::Error::other(
-                        "unrecognized child wait status",
-                    )));
+        let termination = match stopped {
+            Some(termination) => termination,
+            None => {
+                let status = status.expect("finished child");
+                match (status.code(), status.signal()) {
+                    (Some(code), _) => AnalyzerTermination::Exited(code),
+                    (None, Some(signal)) => AnalyzerTermination::Signalled(signal),
+                    (None, None) => {
+                        return Err(unobservable(io::Error::other(
+                            "unrecognized child wait status",
+                        )));
+                    }
                 }
             }
         };
@@ -195,6 +239,30 @@ impl VerifiedTool {
             termination,
         })
     }
+}
+
+/// Swift `terminateProcessGroup`: TERM the child's process group, KILL it if
+/// a member is left after 0.25 s, and report whether none is left once the
+/// following second is over.
+fn drain_group(child: &RunningChild) -> bool {
+    child.signal_group(libc::SIGTERM);
+    wait_until_drained(child, TERMINATION_GRACE) || {
+        child.signal_group(libc::SIGKILL);
+        wait_until_drained(child, KILL_GRACE)
+    }
+}
+
+/// Swift `waitForGroupToDisappear`: the group looked for every 10 ms, and
+/// once more when the time is up.
+fn wait_until_drained(child: &RunningChild, within: Duration) -> bool {
+    let deadline = Instant::now() + within;
+    while Instant::now() < deadline {
+        if child.group_drained() {
+            return true;
+        }
+        std::thread::sleep(DRAIN_PROBE);
+    }
+    child.group_drained()
 }
 
 /// Swift `ProcessOutputBuffer.append`: keep the first `limit` bytes and note

@@ -17,7 +17,9 @@ Each owner then cancels: a Job admitted and cancelled before it runs closes
 with zero dispatch and is published as a cancelled Session, is cancelled again
 and refused a run; the Jobs that ended or parked answer a cancellation with
 nothing to do; an absent Job and parameters without a string Job identity are
-refused; and each CLI cancels one more Job and reads its status.
+refused; a Job whose analyzer child is running when its cancellation arrives
+is closed once the child's process group is drained, and its run answers the
+cancelled Job; and each CLI cancels one more Job and reads its status.
 
 Both owners publish a Session for every terminal Job, as the standalone Swift
 daemon does, each under its own Sessions root (Swift's beside its state
@@ -58,6 +60,7 @@ import socket
 import sqlite3
 import subprocess
 import tempfile
+import threading
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -89,6 +92,9 @@ CANCELLATIONS = (
     ('cancelWithoutJob', 'job.cancel', None, {}, 'invalidParams'),
     ('cancelNumericJob', 'job.cancel', None, {'jobId': 5}, 'invalidParams'),
 )
+# The Job cancelled while its child runs answers the `sleep` source, which
+# outlasts no production budget but gives the cancellation a running child.
+RUNNING_SOURCE_CASE = 'timedOut'
 
 
 def sha256(path: Path) -> str:
@@ -297,10 +303,30 @@ def main() -> None:
             document.update(requestId=f'req-harness-{name}', idempotencyKey=f'idem-harness-{name}-0001')
             return {'requestJson': json.dumps(document, separators=(',', ':'), sort_keys=True)}
 
-        def drive(endpoint: Path, artifacts: Path, run_cli) -> tuple[dict, dict, dict, dict]:
+        def cancel_while_running(endpoint: Path, journals: Path, job: str) -> tuple[dict, dict]:
+            """Run `job` on its own connection, cancel it once its analyzer
+            intent is durable, and return the cancellation's and the run's
+            answers."""
+            ran: dict = {}
+            runner = threading.Thread(
+                target=lambda: ran.update(answer=exchange(endpoint, 'job.run', {'jobId': job})))
+            runner.start()
+            journal = journals / job / 'journal.jsonl'
+            deadline = time.monotonic() + 60
+            while not (journal.exists() and '"kind":"stepIntent"' in journal.read_text()):
+                if time.monotonic() > deadline or not runner.is_alive():
+                    raise AssertionError(f'{job} never recorded its analyzer intent: {ran}')
+                time.sleep(.01)
+            cancelled = exchange(endpoint, 'job.cancel', {'jobId': job})
+            runner.join(timeout=120)
+            return cancelled, ran['answer']
+
+        def drive(endpoint: Path, artifacts: Path, journals: Path,
+                  run_cli) -> tuple[dict, dict, dict, dict]:
             """Admit every case, run them in the oracle's order, make the
-            cancellation requests, then let the CLI run one succeeding and one
-            failing Job, read their results and cancel one more Job."""
+            cancellation requests and cancel a running Job, then let the CLI
+            run one succeeding and one failing Job, read their results and
+            cancel one more Job."""
             jobs = {}
             for case in cases:
                 if 'submit' in case:
@@ -324,6 +350,11 @@ def main() -> None:
             jobs['cancelled'] = accepted['result']['jobId']
             for name, method, job, params, _ in CANCELLATIONS:
                 answers[name] = exchange(endpoint, method, {'jobId': jobs[job]} if job else params)
+            accepted = exchange(endpoint, 'job.submit', cli_request('running', RUNNING_SOURCE_CASE))
+            check('admitted.running', accepted.get('ok') is True, accepted)
+            jobs['running'] = accepted['result']['jobId']
+            answers['cancelRunning'], answers['runCancelled'] = cancel_while_running(
+                endpoint, journals, jobs['running'])
             reads = {job: {method: exchange(endpoint, method, {'jobId': job})
                            for method in ('job.status', 'job.show', 'job.result', 'job.evidence')}
                      for job in jobs.values()}
@@ -349,7 +380,7 @@ def main() -> None:
             swift_socket = state / 'agentd.sock'
             swift = start([str(swift_daemon), '--state-dir', str(state)], clean, swift_socket)
             swift_answers, swift_reads, swift_cli_runs, _ = drive(
-                swift_socket, state / 'artifacts',
+                swift_socket, state / 'artifacts', state / 'jobs',
                 lambda argv, expected: cli([str(swift_cli), *argv, '--socket', str(swift_socket),
                                             '--output', 'json'], clean, expected))
             stop(swift)
@@ -365,7 +396,7 @@ def main() -> None:
             rust = start([str(rust_daemon)], rust_env, rust_socket)
             cli_env = dict(clean, ARKDECK_ENDPOINT=str(rust_socket), ARKDECK_DAEMON_PATH=str(rust_daemon))
             rust_answers, rust_reads, rust_cli_runs, rust_jobs = drive(
-                rust_socket, state / 'artifacts',
+                rust_socket, state / 'artifacts', state / 'jobs-state' / 'jobs',
                 lambda argv, expected: cli([str(rust_cli), '--output', 'json', *argv], cli_env, expected))
             stop(rust)
             rust_store = store(state / 'jobs-state', state / 'artifacts', state / 'sessions',
@@ -388,6 +419,14 @@ def main() -> None:
                 check(f'expected.{name}', rust_answer == {'ok': True, 'result': CANCELLED}
                       if expects == 'ok' else rust_answer.get('error', {}).get('code') == expects,
                       rust_answer)
+            for name in ('cancelRunning', 'runCancelled'):
+                check(f'identical.{name}', comparable(rust_answers[name]) == comparable(swift_answers[name]),
+                      {'swift': swift_answers[name], 'rust': rust_answers[name]})
+            check('expected.cancelRunning', rust_answers['cancelRunning'] == {'ok': True, 'result': CANCELLED},
+                  rust_answers['cancelRunning'])
+            check('expected.runCancelled', rust_answers['runCancelled'].get('ok') is True
+                  and rust_answers['runCancelled']['result']['state'] == 'cancelled',
+                  rust_answers['runCancelled'])
             check('reads', comparable(rust_reads) == comparable(swift_reads),
                   {'swift': swift_reads, 'rust': rust_reads})
             check('cancelled.state', rust_reads[rust_jobs['cancelled']]['job.status']['result']['state']
@@ -489,7 +528,7 @@ def main() -> None:
             stop(swift)
             summary = {
                 'result': 'PASS', 'kind': 'isolated-host-test', 'runs': len(cases),
-                'cancellations': len(CANCELLATIONS),
+                'cancellations': len(CANCELLATIONS) + 1,
                 'identicalAnswers': len(swift_answers), 'jobs': len(rust_reads), 'checks': len(checks),
                 'states': dict(sorted(collections.Counter(handed.values()).items())),
                 'sessions': len(sessions),

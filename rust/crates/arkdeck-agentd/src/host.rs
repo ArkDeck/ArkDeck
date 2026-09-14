@@ -18,14 +18,16 @@ struct ObservationState {
 #[cfg(target_os = "macos")]
 pub(crate) const ARTIFACT_QUOTA: u64 = 8 * 1024 * 1024 * 1024;
 
-/// One Job's run, which every concurrent caller for that Job joins, or its
-/// cancellation, which a concurrent run waits out.
+/// One Job's run, which every concurrent caller for that Job joins and a
+/// cancellation reaches through the run's `cancellation`, or the cancellation
+/// of a Job no run holds, which a concurrent run waits out.
 #[cfg(target_os = "macos")]
 #[derive(Default)]
 struct RunSlot {
     outcome: Mutex<Option<Result<serde_json::Value, WireError>>>,
     finished: std::sync::Condvar,
     cancelling: bool,
+    cancellation: arkdeck_hoststore::RunCancellation,
 }
 
 #[cfg(target_os = "macos")]
@@ -495,7 +497,7 @@ impl HostServices for Host {
                     claims: &self.claims,
                     probe: &probe,
                 });
-        let run = || {
+        let run = |cancellation: Option<&arkdeck_hoststore::RunCancellation>| {
             arkdeck_hoststore::JobRunner {
                 jobs,
                 artifacts,
@@ -505,6 +507,8 @@ impl HostServices for Host {
                 now: arkdeck_hoststore::runtime_now,
                 precise_now: arkdeck_hoststore::runtime_precise_now,
                 sessions: publisher.as_ref(),
+                cancellation,
+                after_commit: None,
             }
             .handle(params)
             .map_err(|refusal| WireError {
@@ -519,7 +523,7 @@ impl HostServices for Host {
             details: Some(serde_json::Map::new()),
         };
         let Some(job) = params.get("jobId").and_then(serde_json::Value::as_str) else {
-            return run();
+            return run(None);
         };
         let slot = loop {
             let mut running = self.running.lock().map_err(|_| uncertain())?;
@@ -536,8 +540,13 @@ impl HostServices for Host {
                 return outcome.unwrap_or_else(|| Err(uncertain()));
             }
         };
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(run))
-            .unwrap_or_else(|_| Err(uncertain()));
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            run(Some(&slot.cancellation))
+        }))
+        .unwrap_or_else(|_| Err(uncertain()));
+        // A request the run never acted on falls back to the Job's record,
+        // which the run no longer holds.
+        slot.cancellation.end();
         slot.finish(&result);
         if let Ok(mut running) = self.running.lock() {
             running.remove(job);
@@ -545,9 +554,9 @@ impl HostServices for Host {
         result
     }
     /// `job.cancel` cancels an admitted Job in the owner that admitted it. A
-    /// run of the same Job waits the cancellation out, and a concurrent
-    /// cancellation joins it. A Job this owner is running is refused: the
-    /// Rust Runtime cancels only a Job that never started.
+    /// Job this owner is running is cancelled by its run, which alone writes
+    /// the Job's Journal. A run of a Job no run holds waits the cancellation
+    /// out, and a concurrent cancellation joins it.
     #[cfg(target_os = "macos")]
     fn job_cancel(
         &self,
@@ -588,27 +597,33 @@ impl HostServices for Host {
         let Some(job) = params.get("jobId").and_then(serde_json::Value::as_str) else {
             return cancel();
         };
-        let slot = {
+        let slot = loop {
             let mut running = self.running.lock().map_err(|_| uncertain())?;
-            if let Some(slot) = running.get(job).cloned() {
-                drop(running);
-                if slot.cancelling {
-                    return slot.wait().unwrap_or_else(|| Err(uncertain()));
-                }
-                return Err(WireError {
-                    code: "rejected".into(),
-                    message: format!(
-                        "job {job} is being run; the Rust Runtime cancels only a Job that never started"
-                    ),
-                    details: None,
+            let Some(slot) = running.get(job).cloned() else {
+                let slot = std::sync::Arc::new(RunSlot {
+                    cancelling: true,
+                    ..RunSlot::default()
                 });
+                running.insert(job.to_owned(), slot.clone());
+                break slot;
+            };
+            drop(running);
+            if slot.cancelling {
+                return slot.wait().unwrap_or_else(|| Err(uncertain()));
             }
-            let slot = std::sync::Arc::new(RunSlot {
-                cancelling: true,
-                ..RunSlot::default()
-            });
-            running.insert(job.to_owned(), slot.clone());
-            slot
+            if let Some(answer) = arkdeck_hoststore::cancel_running(&slot.cancellation) {
+                return Ok(answer);
+            }
+            // The run ended without acting on the request: once it has let
+            // go of the Job, the Job's record decides.
+            let _ = slot.wait();
+            while self.running.lock().is_ok_and(|running| {
+                running
+                    .get(job)
+                    .is_some_and(|current| std::sync::Arc::ptr_eq(current, &slot))
+            }) {
+                std::thread::sleep(std::time::Duration::from_millis(1));
+            }
         };
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(cancel))
             .unwrap_or_else(|_| Err(uncertain()));
@@ -1355,30 +1370,39 @@ mod cancellation_tests {
     }
 
     #[test]
-    fn a_job_this_owner_is_running_is_refused_without_details() {
+    fn a_request_waits_in_the_run_and_falls_back_to_the_record_when_it_ends() {
         let fixture = Fixture::new();
         let host = fixture.host();
-        hold(&host, "job-a", false);
-        let refusal = host.job_cancel(&job("job-a")).unwrap_err();
-        assert_eq!(
-            (
-                refusal.code.as_str(),
-                refusal.message.as_str(),
-                &refusal.details
-            ),
-            (
-                "rejected",
-                "job job-a is being run; the Rust Runtime cancels only a Job that never started",
-                &None
-            )
-        );
-        // Once the run is over, the Job owner answers.
-        host.running.lock().unwrap().clear();
-        let absent = host.job_cancel(&job("job-a")).unwrap_err();
-        assert_eq!(
-            (absent.code.as_str(), absent.message.as_str()),
-            ("notFound", "unknown job job-a")
-        );
+        let slot = hold(&host, "job-a", false);
+        std::thread::scope(|scope| {
+            let cancel = scope.spawn(|| host.job_cancel(&job("job-a")));
+            // The run alone writes the Job's Journal, so the request waits in
+            // it rather than in this owner.
+            let deadline = Instant::now() + Duration::from_secs(30);
+            while !slot.cancellation.pending() {
+                assert!(
+                    Instant::now() < deadline,
+                    "the request never reached the run"
+                );
+                std::thread::sleep(Duration::from_millis(1));
+            }
+            assert!(!cancel.is_finished());
+            // The run returns without acting on it, as job_run lets a run go.
+            slot.cancellation.end();
+            slot.finish(&Ok(serde_json::json!({})));
+            host.running.lock().unwrap().remove("job-a");
+            // The Job's record then decides; this owner holds no such Job.
+            let absent = cancel.join().unwrap().unwrap_err();
+            assert_eq!(
+                (
+                    absent.code.as_str(),
+                    absent.message.as_str(),
+                    &absent.details
+                ),
+                ("notFound", "unknown job job-a", &None)
+            );
+        });
+        assert!(host.running.lock().unwrap().is_empty());
     }
 
     #[test]

@@ -10,6 +10,14 @@
 //! whose outcome cannot be observed leaves its intent outstanding and parks
 //! the Job in `waitingForRecovery`; nothing is dispatched twice.
 //!
+//! A cancellation request reaches the run through its [`RunCancellation`].
+//! The run makes it durable as Swift's `requestCancel` does, then closes the
+//! Job at its last boundary before the intent or, while the child runs,
+//! terminates the child's process group and closes the Job once no member is
+//! left. A child that finished first, or a group that could not be drained,
+//! parks the Job instead. Once the child has finished, a request changes
+//! nothing.
+//!
 //! Only a Job at its admitted `preflight` boundary runs. Swift resumes a
 //! `running` Job after its own restart recovery; until recovery is ported
 //! (ADR-0009 decisions 2/4, L.1 item 13) the Rust owner refuses it, with the
@@ -17,6 +25,7 @@
 use crate::analyzer_output::{self, ANALYZER_REF, ANALYZER_VERSION, DERIVED_NAME, Receipt, Source};
 use crate::artifact_publication::{ArtifactPublisher, Product};
 use crate::artifact_read_owner::{ArtifactReadStore, LeasedArtifact, swift_string};
+use crate::job_cancel::RunCancellation;
 use crate::job_journal_events::{self as events, Envelope, Target};
 use crate::job_journal_writer::JournalWriter;
 use crate::job_owner::JobStore;
@@ -111,10 +120,12 @@ pub(crate) fn failure(code: &str, category: &str, retryability: &str, recovery: 
         "retryability": retryability, "recovery": recovery})
 }
 
-/// Swift `RuntimeDispatchFailure` before a verified receipt.
+/// Swift `RuntimeDispatchFailure` before a verified receipt, and the
+/// process-group resolution of a cancelled child.
 enum Dispatch {
     Failed(String),
     OutcomeUnknown(String),
+    Cancelled { drained: bool },
 }
 
 /// A child that exited: its status, stdout and whether output was dropped.
@@ -138,6 +149,12 @@ pub struct JobRunner<'a> {
     /// runner composes like a Swift engine that has none, and its Jobs report
     /// no publication record.
     pub sessions: Option<&'a SessionPublisher<'a>>,
+    /// The cancellation a canceller reaches while this run lasts; the run's
+    /// caller ends it once the run has returned.
+    pub cancellation: Option<&'a RunCancellation>,
+    /// Swift's `afterAnalyzerCommitLinearization` test hook: given the Job's
+    /// identity once its child has finished and its answer is verified.
+    pub after_commit: Option<&'a (dyn Fn(&str) + Sync)>,
 }
 
 /// One run's durable state: the record as the run advances it and the
@@ -182,7 +199,9 @@ impl Run {
         self.record.timeline.push(format!("reason: {reason}"));
         Ok(())
     }
-    fn outcome(&mut self, result: &str) -> Result<(), RunRefusal> {
+    /// The step's confirmed outcome, with the semantic code Swift names for
+    /// it where it names one.
+    fn outcome(&mut self, result: &str, semantic_code: Option<&str>) -> Result<(), RunRefusal> {
         let envelope = self.envelope(OUTCOME.into())?;
         self.append(events::step_outcome(
             &envelope,
@@ -191,7 +210,7 @@ impl Run {
             INTENT,
             result,
             "confirmed",
-            None,
+            semantic_code,
             None,
         ))
     }
@@ -405,6 +424,13 @@ impl JobRunner<'_> {
             None,
         )
         .map_err(|_| uncertain())?;
+        // Swift's last synchronous boundary before an intent or a child can
+        // be installed: a request that reached the run by now closes the Job
+        // with zero dispatch.
+        if self.cancellation.is_some_and(RunCancellation::pending) {
+            self.carry(run)?;
+            return self.close_cancelled(run, false);
+        }
         // The exact typed action is durable before its intent can be.
         run.record.set_recovery(
             Some(STEP),
@@ -422,10 +448,12 @@ impl JobRunner<'_> {
         }
         run.record.timeline.push(format!("intent {STEP}"));
         run.record.add_step_kind(STEP_KIND);
-        // Only now may the child start.
+        // Only now may the child start; a request that reaches the run while
+        // the child runs terminates it.
+        let cancelled = || self.cancellation.is_some_and(RunCancellation::pending);
         let opened = (self.precise_now)();
         let dispatched = match opened {
-            Some(_) => self.dispatch(profile, &leased.path, &source),
+            Some(_) => self.dispatch(profile, &leased.path, &source, &cancelled),
             None => Err(Dispatch::Failed(
                 "dispatch refused: the Runtime clock is unavailable".into(),
             )),
@@ -433,6 +461,24 @@ impl JobRunner<'_> {
         let window = opened.zip((self.precise_now)());
         let exited = match dispatched {
             Ok(exited) => exited,
+            Err(Dispatch::Cancelled { drained }) if cancelled() => {
+                self.carry(run)?;
+                if drained {
+                    return self.close_cancelled(run, true);
+                }
+                run.record.timeline.push(
+                    "analyzer cancellation process-group drain unconfirmed; intent retained".into(),
+                );
+                return self.park(run, "analyzer process-group drain unconfirmed");
+            }
+            // Only a request stops the child; a stop without one is Swift's
+            // unknown outcome.
+            Err(Dispatch::Cancelled { .. }) => {
+                return self.park(
+                    run,
+                    "process cancellation occurred without an admitted immediate cancellation",
+                );
+            }
             Err(Dispatch::OutcomeUnknown(reason)) => {
                 // The intent stays outstanding: no outcome is invented, and
                 // recovery alone may resolve it by readback.
@@ -442,12 +488,25 @@ impl JobRunner<'_> {
                 return self.park(run, &reason);
             }
             Err(Dispatch::Failed(reason)) => {
-                run.outcome("failed")?;
+                run.outcome("failed", None)?;
                 run.record.timeline.push(format!("failed {STEP}"));
                 run.record.set_recovery(None, None, None);
                 return self.fail(run, &reason);
             }
         };
+        // Swift's success commit: a request that reached the run before its
+        // child was seen to finish raced the completion, which proves no
+        // drain; one that arrives from now on changes nothing.
+        if self.cancellation.is_some_and(RunCancellation::commit) {
+            self.carry(run)?;
+            run.record.timeline.push(
+                "analyzer cancellation raced completion without process-group drain proof".into(),
+            );
+            run.record.timeline.push(format!(
+                "outcomeUnknown {STEP}; durable intent left outstanding"
+            ));
+            return self.park(run, "analyzer cancellation lacks process-group drain proof");
+        }
         let receipt = Receipt {
             exit_status: exited.status,
             stdout: &exited.stdout,
@@ -456,7 +515,7 @@ impl JobRunner<'_> {
         let verified = match analyzer_output::verify(&receipt, &source, OUTPUT_BYTE_BUDGET) {
             Ok(verified) => verified,
             Err((code, detail)) => {
-                run.outcome("failed")?;
+                run.outcome("failed", None)?;
                 run.record.set_recovery(None, None, None);
                 run.record
                     .timeline
@@ -464,7 +523,10 @@ impl JobRunner<'_> {
                 return self.fail(run, &format!("{code}: {detail}"));
             }
         };
-        run.outcome("succeeded")?;
+        if let Some(hook) = self.after_commit {
+            hook(&run.record.job_id);
+        }
+        run.outcome("succeeded", None)?;
         run.record
             .timeline
             .push(format!("verified {STEP} {}", verified.fact_names()));
@@ -550,7 +612,8 @@ impl JobRunner<'_> {
         run.persist(self.jobs)
     }
 
-    /// Swift's `.outcomeUnknown(reason)` lane: parked, never replayed.
+    /// Swift's `.outcomeUnknown(reason)` lane: parked from the state the run
+    /// has reached, never replayed.
     fn park(&self, run: &mut Run, reason: &str) -> Result<(), RunRefusal> {
         run.record.set_operation_failure(Some(failure(
             "outcomeUnknown",
@@ -558,8 +621,9 @@ impl JobRunner<'_> {
             "runtimeDecisionRequired",
             "awaitRuntimeReconciliation",
         )));
+        let from = run.record.state.clone();
         run.transition(
-            "running",
+            &from,
             "waitingForRecovery",
             &format!("outcomeUnknown: {reason}"),
         )?;
@@ -568,14 +632,63 @@ impl JobRunner<'_> {
         run.persist(self.jobs)
     }
 
+    /// Swift `requestCancel`'s durable intent, written by the run that owns
+    /// the Journal; the waiting canceller answers once it is persisted.
+    fn carry(&self, run: &mut Run) -> Result<(), RunRefusal> {
+        if run.record.state == "running" {
+            run.transition(
+                "running",
+                "cancelRequested",
+                "durable client cancellation intent",
+            )?;
+            run.persist(self.jobs)?;
+        }
+        if let Some(cancellation) = self.cancellation {
+            cancellation.carried();
+        }
+        Ok(())
+    }
+
+    /// Swift `completeCancellationAtSafeBoundary`: a dispatched step's
+    /// cancelled outcome, the typed action forgotten, and the Job closed.
+    fn close_cancelled(&self, run: &mut Run, dispatched: bool) -> Result<(), RunRefusal> {
+        if dispatched {
+            run.outcome("failed", Some("cancelled"))?;
+            run.record.timeline.push(format!(
+                "cancelled {STEP}; dispatch reached a confirmed safe boundary before publication"
+            ));
+        }
+        run.record.set_recovery(None, None, None);
+        run.transition(
+            "cancelRequested",
+            "cancellingAtSafeBoundary",
+            "dispatch has a confirmed safe boundary",
+        )?;
+        run.transition(
+            "cancellingAtSafeBoundary",
+            "cancelled",
+            "cancelled intent closed without publication",
+        )?;
+        run.record.set_operation_failure(Some(failure(
+            "cancelled",
+            "cancelled",
+            "notAutomatic",
+            "none",
+        )));
+        run.finish()?;
+        run.persist(self.jobs)
+    }
+
     /// Swift `DescriptorBoundProcessDispatcher.dispatch` for one analyzer
     /// invocation: the source bound by descriptor first, then the pinned
-    /// executable, then the child, which reads the source's inode alias.
+    /// executable, then the child, which reads the source's inode alias and
+    /// is stopped once `cancelled` holds.
     fn dispatch(
         &self,
         profile: &AnalyzerProfile,
         path: &Path,
         source: &Source<'_>,
+        cancelled: &dyn Fn() -> bool,
     ) -> Result<Exited, Dispatch> {
         let verified = VerifiedSource::open(path, source.sha256, source.byte_count)
             .map_err(|_| Dispatch::Failed("analyzer input Artifact identity refused".into()))?;
@@ -588,7 +701,7 @@ impl JobRunner<'_> {
             timeout: Duration::from_secs(profile.timeout_seconds.max(1) as u64),
             capture_bytes: OUTPUT_BYTE_BUDGET,
         };
-        match tool.run_analyzer(&arguments, &verified, limits) {
+        match tool.run_analyzer(&arguments, &verified, limits, cancelled) {
             Err(AnalyzerRunError::Refused(error)) => {
                 Err(Dispatch::Failed(format!("dispatch refused: {error}")))
             }
@@ -607,6 +720,8 @@ impl JobRunner<'_> {
                 AnalyzerTermination::Signalled(signal) => {
                     Err(Dispatch::OutcomeUnknown(signal_death(signal)))
                 }
+                // Whether a request stopped it is the run's to judge.
+                AnalyzerTermination::Cancelled { drained } => Err(Dispatch::Cancelled { drained }),
             },
         }
     }

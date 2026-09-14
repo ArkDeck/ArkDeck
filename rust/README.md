@@ -632,11 +632,27 @@ its finish time and record, and then the publication every terminal Job gets, a
 cancelled Session without steps. A Job that ended or is finalizing is left as it
 is, and so is one that waits for recovery or already carries the request; Swift
 also remembers such a request in memory for the Job's recovery, which is not
-ported (L.1 item 13). A Job that has started, whether this owner is running it
-or it was left running, is refused with `rejected`: cancelling a running
-analyzer at its safe boundaries is not ported yet. A run of the same Job waits
-a cancellation out and then meets the cancelled Job (`resourceConflict` with the
-zero-dispatch proof), and concurrent cancellations of one Job join.
+ported (L.1 item 13).
+
+A Job this owner is running is cancelled by its run, which alone writes the
+Job's Journal: the request waits in the run's `RunCancellation` until the run
+has written and persisted Swift's `running -> cancelRequested` ("durable client
+cancellation intent"). At its last boundary before the analyzer intent the run
+then closes the Job with zero dispatch. While the child runs, the run
+terminates the child's process group as Swift's executor does (TERM, then KILL
+after 0.25 s, then a second for the group to disappear) and, once no member is
+left, records the step's confirmed `failed` outcome with semantic code
+`cancelled` and closes the Job through `cancellingAtSafeBoundary` to
+`cancelled`, which is published as a Session. A group that cannot be drained,
+or a child that finished before the request reached the run, parks the Job in
+`waitingForRecovery` without replay; once the child has finished, a request
+changes nothing. Swift answers as soon as the intent is durable; the Rust
+canceller answers once the run has acted, which for a running child is after
+the drain. A Job left active without a run here is refused as Swift refuses a
+Job it holds no runtime for (`rejected`, `internalFailure("job <id> is <state>
+but is not resident, …")`). A run of a Job no run holds waits a cancellation
+out and then meets the cancelled Job (`resourceConflict` with the zero-dispatch
+proof), and concurrent cancellations of one Job join.
 
 `arkdeck job cancel --job <id>` sends the opaque identity as Swift's CLI does,
 prints the answer and exits 0. As for any mutation-capable method without the
@@ -654,9 +670,16 @@ identity), Swift's four reads of each Job and everything the requests leave.
 `tests/job_cancel.rs` reproduces every answer, read, index row, Job file,
 Artifact and Session file and every entry's mode byte for byte. Re-record from
 Swift with `ARKDECK_RUST_JOB_CANCEL_RECORD=/private/tmp/<new>`.
-`scripts/check-job-run.py` compares both owners' cancellations and both CLIs'
-`job cancel`, and has a Swift daemon answer a cancellation and a run of the
-Rust-cancelled Job.
+`rust/tests/fixtures/job-cancel-running-analyzer/` is the oracle
+`testSwiftCancelsRunningAnalyzerJobs` records with the engine's two
+cancellation hooks: a Job cancelled once its intent is durable and its child
+runs, one cancelled at the last boundary before the intent, and one cancelled
+after its success commit. `tests/job_cancel_running.rs` reproduces every answer,
+read and file byte for byte; re-record it with
+`ARKDECK_RUST_JOB_CANCEL_RUNNING_RECORD=/private/tmp/<new>`.
+`scripts/check-job-run.py` compares both owners' cancellations, one of a Job
+whose child is running included, and both CLIs' `job cancel`, and has a Swift
+daemon answer a cancellation and a run of the Rust-cancelled Job.
 
 ## Target presentation owner (TASK-XPA-012)
 

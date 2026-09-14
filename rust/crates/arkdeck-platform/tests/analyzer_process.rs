@@ -1,13 +1,14 @@
 //! The analyzer child runner: each stream kept to its first bytes while the
-//! rest drains, the group-terminating timeout, signal deaths, and the source
-//! handed over as the `/.vol` alias of its verified descriptor. Spawning
-//! children, these tests keep a binary of their own.
+//! rest drains, the group-terminating timeout and cancellation, signal deaths,
+//! and the source handed over as the `/.vol` alias of its verified descriptor.
+//! Spawning children, these tests keep a binary of their own.
 #![cfg(target_os = "macos")]
 
 use arkdeck_platform::{
     AnalyzerLimits, AnalyzerRunError, AnalyzerTermination, VerifiedSource, VerifiedTool,
 };
 use sha2::{Digest, Sha256};
+use std::cell::Cell;
 use std::ffi::OsString;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
@@ -55,14 +56,29 @@ fn limits(timeout: Duration, capture_bytes: usize) -> AnalyzerLimits {
     }
 }
 
+fn run_cancellable(
+    tool: &VerifiedTool,
+    source: &VerifiedSource,
+    arguments: &[&str],
+    limits: AnalyzerLimits,
+    cancelled: &dyn Fn() -> bool,
+) -> Result<arkdeck_platform::AnalyzerExecution, AnalyzerRunError> {
+    let arguments: Vec<OsString> = arguments.iter().map(OsString::from).collect();
+    tool.run_analyzer(&arguments, source, limits, cancelled)
+}
+
 fn run(
     tool: &VerifiedTool,
     source: &VerifiedSource,
     arguments: &[&str],
     limits: AnalyzerLimits,
 ) -> Result<arkdeck_platform::AnalyzerExecution, AnalyzerRunError> {
-    let arguments: Vec<OsString> = arguments.iter().map(OsString::from).collect();
-    tool.run_analyzer(&arguments, source, limits)
+    run_cancellable(tool, source, arguments, limits, &|| false)
+}
+
+/// The member PID a tool wrote, once its write is complete.
+fn member(path: &Path) -> Option<libc::pid_t> {
+    std::fs::read_to_string(path).ok()?.trim().parse().ok()
 }
 
 #[test]
@@ -122,9 +138,7 @@ fn a_timeout_terminates_the_whole_process_group() {
     // A loaded host may time the child out before it started its member;
     // any member it did start belongs to the terminated group. A killed
     // member stays a zombie until launchd reaps it, so wait for that.
-    if let Ok(text) = std::fs::read_to_string(&pid_file)
-        && let Ok(pid) = text.trim().parse::<libc::pid_t>()
-    {
+    if let Some(pid) = member(&pid_file) {
         let deadline = Instant::now() + Duration::from_secs(30);
         // SAFETY: signal 0 only probes whether the process still exists.
         while unsafe { libc::kill(pid, 0) } == 0 {
@@ -132,6 +146,87 @@ fn a_timeout_terminates_the_whole_process_group() {
             std::thread::sleep(Duration::from_millis(20));
         }
     }
+}
+
+#[test]
+fn a_cancellation_before_the_spawn_starts_no_child() {
+    let scratch = Scratch::new("cancel-first");
+    let marker = scratch.0.join("ran");
+    let tool = scratch.tool(r#": > "$1""#);
+    let source = scratch.source(b"x");
+    let execution = run_cancellable(
+        &tool,
+        &source,
+        &[marker.to_str().unwrap()],
+        limits(Duration::from_secs(10), 1024),
+        &|| true,
+    )
+    .unwrap();
+    assert_eq!(
+        execution.termination,
+        AnalyzerTermination::Cancelled { drained: true }
+    );
+    assert!(execution.stdout.is_empty() && execution.stderr.is_empty());
+    assert!(!marker.exists());
+}
+
+#[test]
+fn a_cancellation_drains_the_whole_process_group() {
+    let scratch = Scratch::new("cancel");
+    let tool = scratch.tool(r#"/bin/sleep 60 & echo $! > "$1"; exec /bin/sleep 60"#);
+    let source = scratch.source(b"x");
+    let pid_file = scratch.0.join("member");
+    let started = Instant::now();
+    // Cancelled once the group has a second member, so both must go.
+    let execution = run_cancellable(
+        &tool,
+        &source,
+        &[pid_file.to_str().unwrap()],
+        limits(Duration::from_secs(60), 1024),
+        &|| member(&pid_file).is_some(),
+    )
+    .unwrap();
+    assert_eq!(
+        execution.termination,
+        AnalyzerTermination::Cancelled { drained: true }
+    );
+    assert!(started.elapsed() < Duration::from_secs(30));
+    let pid = member(&pid_file).unwrap();
+    // SAFETY: signal 0 only probes whether the process still exists.
+    assert_ne!(
+        unsafe { libc::kill(pid, 0) },
+        0,
+        "member {pid} survived its group"
+    );
+}
+
+#[test]
+fn a_group_that_ignores_term_is_killed_once_its_grace_is_over() {
+    let scratch = Scratch::new("cancel-kill");
+    let marker = scratch.0.join("ignoring");
+    let tool = scratch.tool(r#"trap '' TERM; : > "$1"; exec /bin/sleep 60"#);
+    let source = scratch.source(b"x");
+    let requested = Cell::new(None);
+    let execution = run_cancellable(
+        &tool,
+        &source,
+        &[marker.to_str().unwrap()],
+        limits(Duration::from_secs(60), 1024),
+        &|| {
+            let ready = marker.exists();
+            if ready && requested.get().is_none() {
+                requested.set(Some(Instant::now()));
+            }
+            ready
+        },
+    )
+    .unwrap();
+    assert_eq!(
+        execution.termination,
+        AnalyzerTermination::Cancelled { drained: true }
+    );
+    // TERM was ignored, so only KILL after the grace ended the group.
+    assert!(requested.get().unwrap().elapsed() >= Duration::from_millis(250));
 }
 
 #[test]

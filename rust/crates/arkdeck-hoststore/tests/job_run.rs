@@ -240,6 +240,8 @@ fn rust_runs_reproduce_the_swift_oracle() {
                 now: fixed_now,
                 precise_now: fixed_precise_now,
                 sessions: None,
+                cancellation: None,
+                after_commit: None,
             };
             (*seconds, runner)
         })
