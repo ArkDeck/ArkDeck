@@ -29,7 +29,10 @@
         "additionalProperties": false,
         "properties": {
           "bundleName": {
-            "type": "null"
+            "type": [
+              "null",
+              "string"
+            ]
           },
           "identity": {
             "type": "string"
@@ -77,7 +80,7 @@
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
     "error": 0,
-    "request": 6,
-    "result": 6
+    "request": 3,
+    "result": 3
   }
 }
