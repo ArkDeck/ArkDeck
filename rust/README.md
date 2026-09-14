@@ -323,7 +323,9 @@ acceptance.
 and digest functions. `arkdeck-control` has transport-free observation and local-resource handlers.
 `arkdeck-platform` owns the unsafe OS boundary; all other crates forbid unsafe
 code. `arkdeck-provider-hdc` lowers one fixed observation argv through that
-boundary. `arkdeck-client` owns same-connection health and refusal handling;
+boundary and holds the HDC typed actions of the device operations, which the
+Job engine in `arkdeck-hoststore` lowers its device steps through.
+`arkdeck-client` owns same-connection health and refusal handling;
 `arkdeck-cli` presents the current CLI envelope; `arkdeck-agentd` composes them.
 The black-box check also verifies these dependency edges.
 
@@ -745,6 +747,43 @@ Swift's reads left it. Re-record from Swift with
 `scripts/check-capability-read.py` places every oracle store where each daemon
 keeps its own and compares the standalone Swift daemon and the Rust owner, and
 both CLIs, over the oracle's reads.
+
+## Device observation (TASK-XPA-014, SPK-7)
+
+The isolated development composition plans, admits, runs and reads
+`observe.device@1` as the Swift engine does, when it is given a development
+HDC: `ARKDECK_DEVELOPMENT_HDC_PATH` names a fixture executable, pinned by its
+digest at startup, and is accepted only beside
+`ARKDECK_DEVELOPMENT_STATE_ROOT`. A registered HDC executable is refused there,
+because it would address a real server and device. Facts come from the Target
+owner's adopted record (`<root>/targets-state/targets.json`): the connect key,
+the identity it names, the revision and the tool version. `job.plan` binds that
+identity and revision into the plan digest; `job.run` dispatches each step
+through `arkdeck-provider-hdc`'s `HdcDispatch` with its typed action persisted
+and its write-ahead intent durable first, proves the evidence preflight
+(target, model, firmware), publishes `tool-facts.json`, `device-facts.json` and
+`binding-snapshot.json`, and publishes a device Session; `job.result` and
+`job.evidence` carry the evidence observation. A step whose outcome cannot be
+observed parks the Job with its intent outstanding.
+
+`rust/tests/fixtures/observe-device/` is the oracle Swift
+`ObserveDeviceOracleContractTests` records over the fake HDC every HDC oracle
+shares (`HDCOracleFake`: one driver at `/private/tmp/arkdeck-hdc-oracle/hdc`,
+answering from the oracle's `hdc-answers.sh` in the mode `hdc-mode` names).
+`tests/observe_device.rs` replays it in-process on the oracle's clock and
+compares every answer and every file the Jobs leave. Re-record from Swift with
+`ARKDECK_RUST_OBSERVE_DEVICE_RECORD=/private/tmp/<new>`.
+
+`scripts/check-corpus-replay.py` replays any oracle in this format against the
+real daemon: it installs the fake under its lock, seeds a fresh isolated root
+from the oracle, replays every exchange the daemon serves over its socket at T1
+(times and Swift's wording as labels), checks the fake's calls, restarts the
+daemon and reads every Job again, and reads through the Rust CLI:
+
+```bash
+cargo build -p arkdeck-agentd -p arkdeck-cli
+python3 scripts/check-corpus-replay.py --fixture tests/fixtures/observe-device
+```
 
 ## Target presentation owner (TASK-XPA-012)
 

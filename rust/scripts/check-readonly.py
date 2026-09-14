@@ -57,7 +57,9 @@ def assert_boundaries() -> None:
         "arkdeck-contract": set(),
         "arkdeck-platform": set(),
         "arkdeck-control": {"arkdeck-contract"},
-        "arkdeck-hoststore": {"arkdeck-contract", "arkdeck-platform"},
+        # The Job engine lowers device steps through the HDC provider's typed
+        # actions (the design's crate graph: RUNTIME --> PHDC).
+        "arkdeck-hoststore": {"arkdeck-contract", "arkdeck-platform", "arkdeck-provider-hdc"},
         "arkdeck-provider-hdc": {"arkdeck-platform"},
         "arkdeck-client": {"arkdeck-contract", "arkdeck-platform"},
         "arkdeck-cli": {"arkdeck-contract", "arkdeck-client", "arkdeck-platform"},

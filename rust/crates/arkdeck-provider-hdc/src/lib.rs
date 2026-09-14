@@ -7,6 +7,7 @@
 #![forbid(unsafe_code)]
 
 mod observation;
+mod operation;
 mod presence;
 mod provider;
 mod semantic;
@@ -14,6 +15,10 @@ mod semantic;
 pub use observation::{
     DeviceCandidate, ParseError, ServerCheck, parse_client_version, parse_server_check,
     parse_target_list,
+};
+pub use operation::{
+    Action, DispatchFailure, Expected, FixtureDispatch, HdcDispatch, Outcome, ProcessPlan,
+    Property, Receipt, property_value, stable_identity_sha256,
 };
 pub use presence::{
     ObservationFailure, ObservationInput, ObservationTermination, PresenceSnapshot,

@@ -16,6 +16,35 @@ use std::sync::{
 };
 use std::time::Duration;
 
+/// The isolated owner's development HDC, named by
+/// `ARKDECK_DEVELOPMENT_HDC_PATH` and pinned by the digest of its bytes at
+/// startup. It must be a fixture: a registered HDC executable would address a
+/// real server and device, which needs the existing-server identity proof the
+/// isolated owner does not have, so one is refused.
+#[cfg(target_os = "macos")]
+fn development_hdc()
+-> Result<Option<arkdeck_provider_hdc::FixtureDispatch>, Box<dyn std::error::Error>> {
+    let Some(path) = std::env::var_os("ARKDECK_DEVELOPMENT_HDC_PATH") else {
+        return Ok(None);
+    };
+    let path = std::path::PathBuf::from(path);
+    if !path.is_absolute() {
+        return Err("ARKDECK_DEVELOPMENT_HDC_PATH must be an explicit absolute path".into());
+    }
+    let digest = arkdeck_contract::sha256_hex(&std::fs::read(&path)?);
+    let registered = arkdeck_platform::VerifiedTool::open(&path, &digest)?;
+    if arkdeck_provider_hdc::HdcReadOnlyProvider::new(registered).is_ok() {
+        return Err(
+            "the isolated Rust development owner runs a fixture HDC only; a registered HDC \
+             needs the existing-server identity proof"
+                .into(),
+        );
+    }
+    Ok(Some(arkdeck_provider_hdc::FixtureDispatch::new(
+        arkdeck_platform::VerifiedTool::open(&path, &digest)?,
+    )))
+}
+
 fn serve() -> Result<(), Box<dyn std::error::Error>> {
     let development = std::env::var_os("ARKDECK_DEVELOPMENT_STATE_ROOT");
     #[cfg(target_os = "macos")]
@@ -33,6 +62,9 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             "the isolated Rust development owner cannot pair a Swift daemon or configure HDC"
                 .into(),
         );
+    }
+    if development.is_none() && std::env::var_os("ARKDECK_DEVELOPMENT_HDC_PATH").is_some() {
+        return Err("a development HDC is configured only for an isolated development root".into());
     }
     #[cfg(target_os = "macos")]
     if development.is_none()
@@ -129,6 +161,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
                 })
                 .transpose()?,
         )
+        .with_development_hdc(development_hdc()?)
     } else {
         host
     };

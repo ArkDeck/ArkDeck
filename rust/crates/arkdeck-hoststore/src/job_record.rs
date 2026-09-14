@@ -459,6 +459,39 @@ impl JobRecord {
     pub(super) fn materialized_identity(&self) -> Option<&str> {
         self.identity.as_deref()
     }
+    pub(super) fn materialized_binding(&self) -> Option<i64> {
+        self.binding
+    }
+    /// Swift `materializedStableTargetIdentitySHA256` and
+    /// `materializedBindingRevision`: what a device-bound plan was bound to.
+    pub(super) fn set_materialized(&mut self, identity: Option<String>, binding: Option<i64>) {
+        self.identity = identity;
+        self.binding = binding;
+    }
+    pub(super) fn evidence_preflight(&self) -> Option<&Value> {
+        self.evidence_preflight.as_ref()
+    }
+    /// The admission evidence Swift records as the Job's authority.
+    pub(super) fn admission(&self) -> Option<&Value> {
+        self.admission.as_ref()
+    }
+    /// Whether the record carries a Trace probe, which this Runtime does not
+    /// project yet.
+    pub(super) fn carries_trace_probe(&self) -> bool {
+        self.trace_before.is_some() || self.trace_after.is_some()
+    }
+    pub(super) fn set_evidence_preflight(&mut self, preflight: Value) {
+        self.evidence_preflight = Some(preflight);
+    }
+    pub(super) fn set_evidence_observation(&mut self, observation: Value) {
+        self.evidence_observation = Some(observation);
+    }
+    /// Swift sets `firstEvidenceStepAtUTC` once.
+    pub(super) fn set_first_evidence(&mut self, at: &str) {
+        if self.first_evidence.is_none() {
+            self.first_evidence = Some(at.into());
+        }
+    }
     /// Swift sets `startedAtUTC` once, when a run first starts.
     pub(super) fn start(&mut self, now: &str) {
         if self.started.is_none() {
@@ -514,13 +547,39 @@ impl JobRecord {
     pub(super) fn set_session_publication(&mut self, marker: Value) {
         self.session_publication = Some(marker);
     }
-    /// Whether the record carries evidence this Runtime does not project yet:
-    /// a device observation, a Trace probe or ring and screen facts.
-    pub(super) fn carries_device_evidence(&self) -> bool {
-        self.evidence_observation.is_some()
-            || self.evidence_preflight.is_some()
-            || self.trace_before.is_some()
-            || self.trace_after.is_some()
+    /// Swift `encodeEvidence`'s observation: the Job's evidence observation
+    /// with its absent members as nulls, or null.
+    fn observation_fields(&self) -> Value {
+        let Some(observation) = &self.evidence_observation else {
+            return Value::Null;
+        };
+        let member = |key: &str| observation.get(key).cloned().unwrap_or(Value::Null);
+        let steps: Vec<Value> = observation["preflightSteps"]
+            .as_array()
+            .map(|steps| {
+                steps
+                    .iter()
+                    .map(|step| {
+                        json!({"stepId": step["stepID"], "stepKind": step["stepKind"],
+                            "outcomeAtUtc": step["outcomeAtUTC"]})
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        json!({
+            "targetId": member("targetID"),
+            "bindingRevision": member("bindingRevision"),
+            "stableIdentitySha256": member("stableIdentitySHA256"),
+            "model": member("model"),
+            "firmware": member("firmware"),
+            "transport": member("transport"),
+            "providerId": member("providerID"),
+            "toolVersion": member("toolVersion"),
+            "toolSha256": member("toolSHA256"),
+            "confirmedAtUtc": member("confirmedAtUTC"),
+            "confirmationMethod": member("confirmationMethod"),
+            "preflightSteps": steps,
+        })
     }
     /// Swift `RuntimeControlPlaneHandler.encodeEvidence` over the facts
     /// `RuntimeJobEngine.evidenceSnapshot` reads from a record with no device
@@ -578,7 +637,7 @@ impl JobRecord {
             ("providerId".into(), json!(self.provider)),
             ("actualEffect".into(), json!(effect)),
             ("authority".into(), authority),
-            ("observation".into(), Value::Null),
+            ("observation".into(), self.observation_fields()),
             (
                 "actualStepKinds".into(),
                 json!(self.step_kinds.clone().unwrap_or_default()),

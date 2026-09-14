@@ -25,6 +25,14 @@ mod job_plan;
 #[cfg(target_os = "macos")]
 pub use job_plan::{AnalyzerProfile, JobPlanner, PlanRefusal};
 #[cfg(target_os = "macos")]
+mod device_facts;
+#[cfg(target_os = "macos")]
+pub use device_facts::HdcComposition;
+#[cfg(target_os = "macos")]
+mod device_run;
+#[cfg(target_os = "macos")]
+mod device_steps;
+#[cfg(target_os = "macos")]
 mod job_admission;
 #[cfg(target_os = "macos")]
 pub use job_admission::{AdmissionRefusal, JobAdmitter, runtime_now};

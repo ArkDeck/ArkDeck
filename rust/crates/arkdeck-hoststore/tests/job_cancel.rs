@@ -55,6 +55,7 @@ fn rust_cancels_the_swift_jobs() {
                 artifacts: Some(&artifact_store),
                 analyzer: Some(&profile),
                 state_root: &root,
+                hdc: None,
             },
             jobs: &jobs,
             now: fixed_now,
@@ -81,6 +82,7 @@ fn rust_cancels_the_swift_jobs() {
         sessions: Some(&publisher),
         cancellation: None,
         after_commit: None,
+        hdc: None,
     };
     let canceller = JobCanceller {
         jobs: &jobs,

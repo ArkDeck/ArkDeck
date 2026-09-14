@@ -36,6 +36,14 @@ pub struct TargetStore {
     path: PathBuf,
     root: HostDirectory,
 }
+/// Swift `RuntimeTargetHDCRoute`: where an adopted Target's HDC commands go.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct HdcRoute {
+    pub(crate) target_id: String,
+    pub(crate) binding_revision: u64,
+    pub(crate) tool_version: String,
+    pub(crate) connect_key: String,
+}
 pub(super) fn failure(code: &str, message: &str, phase: &str) -> WireError {
     WireError {
         code: code.into(),
@@ -249,6 +257,38 @@ impl TargetStore {
             Ok((Value::Null, false))
         })?;
         binding.ok_or_else(|| unreadable(phase))
+    }
+    /// Swift `RuntimeTargetStore.hdcExecutionRoute`: the adopted record's own
+    /// target, revision, tool version and connect key, or none for a Target
+    /// never adopted. A route through a proven alias needs the live candidate
+    /// observation Swift consults, which this owner does not hold, so such a
+    /// Target is refused rather than routed by its stale connect key.
+    pub(crate) fn hdc_route(&self, target_id: &str) -> Result<Option<HdcRoute>, String> {
+        let mut route = Err("the HDC execution route could not be read".to_owned());
+        self.transaction("", |document, _| {
+            let mut targets = document
+                .targets
+                .iter()
+                .filter(|target| target.target_id == target_id);
+            route = match (targets.next(), targets.next()) {
+                (_, Some(_)) => Err("storeFailure(\"HDC execution target is ambiguous\")".into()),
+                (None, None) => Ok(None),
+                (Some(_), None) if document.has_hdc_alias(target_id) => Err(
+                    "an HDC execution route through a Target alias is not resolved by the Rust \
+                     Runtime yet"
+                        .into(),
+                ),
+                (Some(target), None) => Ok(Some(HdcRoute {
+                    target_id: target.target_id.clone(),
+                    binding_revision: target.binding_revision,
+                    tool_version: target.tool_version.clone(),
+                    connect_key: target.connect_key.clone(),
+                })),
+            };
+            Ok((Value::Null, false))
+        })
+        .map_err(|error| error.message)?;
+        route
     }
     pub fn handle(
         &self,

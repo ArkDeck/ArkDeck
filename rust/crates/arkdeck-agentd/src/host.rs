@@ -87,6 +87,10 @@ pub struct Host {
     /// publications this process makes.
     #[cfg(target_os = "macos")]
     claims: arkdeck_hoststore::StorageClaims,
+    /// The isolated owner's development HDC: the fixture executable its
+    /// device-bound Jobs dispatch to.
+    #[cfg(target_os = "macos")]
+    hdc: Option<arkdeck_provider_hdc::FixtureDispatch>,
 }
 
 impl Host {
@@ -127,6 +131,25 @@ impl Host {
     pub fn with_artifacts(mut self, artifacts: arkdeck_hoststore::ArtifactReadStore) -> Self {
         self.artifacts = Some(artifacts);
         self
+    }
+    /// Device-bound Jobs plan against the Target owner and run through this
+    /// development HDC; without one no HDC provider is registered.
+    #[cfg(target_os = "macos")]
+    pub fn with_development_hdc(
+        mut self,
+        dispatch: Option<arkdeck_provider_hdc::FixtureDispatch>,
+    ) -> Self {
+        self.hdc = dispatch;
+        self
+    }
+    #[cfg(target_os = "macos")]
+    fn hdc(&self) -> Option<arkdeck_hoststore::HdcComposition<'_>> {
+        let (dispatch, targets) = (self.hdc.as_ref()?, self.targets.as_ref()?);
+        Some(arkdeck_hoststore::HdcComposition {
+            targets,
+            dispatch,
+            tool_sha256: dispatch.tool_sha256(),
+        })
     }
     #[cfg(target_os = "macos")]
     fn require_artifact_job(&self, job_id: &str) -> Result<(), WireError> {
@@ -212,6 +235,8 @@ impl Host {
             home: arkdeck_platform::runtime_home().unwrap_or_default(),
             #[cfg(target_os = "macos")]
             claims: Default::default(),
+            #[cfg(target_os = "macos")]
+            hdc: None,
         }
     }
 }
@@ -408,10 +433,12 @@ impl HostServices for Host {
                 details: None,
             });
         };
+        let hdc = self.hdc();
         arkdeck_hoststore::JobPlanner {
             artifacts: self.artifacts.as_ref(),
             analyzer: analyzer.as_ref(),
             state_root,
+            hdc: hdc.as_ref(),
         }
         .handle(params)
         // Planning never admits: every refusal is pre-admission with zero dispatch.
@@ -437,11 +464,13 @@ impl HostServices for Host {
                 details: None,
             });
         };
+        let hdc = self.hdc();
         arkdeck_hoststore::JobAdmitter {
             planner: arkdeck_hoststore::JobPlanner {
                 artifacts: self.artifacts.as_ref(),
                 analyzer: analyzer.as_ref(),
                 state_root,
+                hdc: hdc.as_ref(),
             },
             jobs,
             now: arkdeck_hoststore::runtime_now,
@@ -507,6 +536,7 @@ impl HostServices for Host {
                     claims: &self.claims,
                     probe: &probe,
                 });
+        let hdc = self.hdc();
         let run = |cancellation: Option<&arkdeck_hoststore::RunCancellation>| {
             arkdeck_hoststore::JobRunner {
                 jobs,
@@ -519,6 +549,7 @@ impl HostServices for Host {
                 sessions: publisher.as_ref(),
                 cancellation,
                 after_commit: None,
+                hdc: hdc.as_ref(),
             }
             .handle(params)
             .map_err(|refusal| WireError {

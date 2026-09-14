@@ -21,7 +21,7 @@ use serde_json::{Map, Value, json};
 use std::collections::BTreeSet;
 
 /// The operations whose results this Runtime reads.
-const READABLE: [&str; 1] = ["analyzer.extract-crash-signature@1"];
+const READABLE: [&str; 2] = ["analyzer.extract-crash-signature@1", "observe.device@1"];
 const MAX_LEDGER: usize = 16 * 1024 * 1024;
 /// Swift `RuntimeJobReadProjection.bounded`.
 const MAX_RESPONSE: usize = 4 * 1024 * 1024;
@@ -87,7 +87,7 @@ impl JobResultReader<'_> {
             }
         };
         let record = self.snapshot(id)?;
-        if !READABLE.contains(&record.operation()) || record.carries_device_evidence() {
+        if !READABLE.contains(&record.operation()) || record.carries_trace_probe() {
             return Err(proven(
                 "rejected",
                 format!(
