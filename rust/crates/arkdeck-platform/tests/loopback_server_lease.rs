@@ -2,21 +2,71 @@
 //! a real listener process is found by executable path, single registered
 //! loopback listener and birth identity, without any connect or spawn of the
 //! observed tool. Spawning children, these tests keep a binary of their own.
+//!
+//! The lease selects candidates by executable path, and the tests here run in
+//! parallel threads, each spawning and killing a listener of its own. The
+//! listener is this binary itself: re-executed with `listener_process`
+//! selected and the endpoint named in its environment, it binds one TCP
+//! listener and holds it until it is killed. So every test's candidate
+//! population is this binary's own processes — which the vanished-candidate
+//! rule keeps from disturbing each other — and no `nc` on the machine is a
+//! candidate at all (a copied Apple binary cannot run: the kernel kills it).
 #![cfg(target_os = "macos")]
 
 use arkdeck_platform::{LoopbackServerLease, VerifiedTool};
 use sha2::{Digest, Sha256};
+use std::fs;
 use std::io::ErrorKind;
 use std::net::{Ipv4Addr, SocketAddrV4, TcpListener};
+use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
-/// A listener process whose executable path the lease must recognise.
-const NC: &str = "/usr/bin/nc";
+const LISTENER_HOST: &str = "ARKDECK_LEASE_LISTENER_HOST";
+const LISTENER_PORT: &str = "ARKDECK_LEASE_LISTENER_PORT";
 
-fn nc_tool() -> VerifiedTool {
-    let digest = format!("{:x}", Sha256::digest(std::fs::read(NC).unwrap()));
-    VerifiedTool::open(NC, &digest).unwrap()
+/// The listener process's body: selected by name in a re-execution of this
+/// binary, it holds exactly one TCP listener on the named endpoint until it
+/// is killed. Run as an ordinary test, it does nothing.
+#[test]
+fn listener_process() {
+    let (Ok(host), Ok(port)) = (std::env::var(LISTENER_HOST), std::env::var(LISTENER_PORT)) else {
+        return;
+    };
+    let _listener = TcpListener::bind((host.as_str(), port.parse::<u16>().unwrap())).unwrap();
+    loop {
+        std::thread::sleep(Duration::from_secs(3600));
+    }
+}
+
+/// This binary as the verified executable every listener runs.
+struct Executable {
+    path: PathBuf,
+    tool: VerifiedTool,
+}
+
+impl Executable {
+    fn new() -> Self {
+        let path = std::env::current_exe().unwrap().canonicalize().unwrap();
+        let digest = format!("{:x}", Sha256::digest(fs::read(&path).unwrap()));
+        let tool = VerifiedTool::open(&path, &digest).unwrap();
+        Self { path, tool }
+    }
+
+    /// One TCP listener on `host:port`, held by a process of this binary; no
+    /// connection is ever made to it.
+    fn listener(&self, host: &str, port: u16) -> Listener {
+        let child = Command::new(&self.path)
+            .args(["--exact", "listener_process", "--test-threads", "1"])
+            .env(LISTENER_HOST, host)
+            .env(LISTENER_PORT, port.to_string())
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap();
+        Listener(child)
+    }
 }
 
 /// A port nothing listened on a moment ago.
@@ -31,21 +81,6 @@ fn free_port() -> u16 {
 struct Listener(Child);
 
 impl Listener {
-    /// `nc -l <host> <port>`: one TCP listener, no connection ever made to it.
-    fn spawn(host: Option<&str>, port: u16) -> Self {
-        let mut command = Command::new(NC);
-        command.arg("-l");
-        if let Some(host) = host {
-            command.arg(host);
-        }
-        command
-            .arg(port.to_string())
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null());
-        Self(command.spawn().unwrap())
-    }
-
     fn pid(&self) -> i32 {
         i32::try_from(self.0.id()).unwrap()
     }
@@ -76,15 +111,15 @@ fn acquire_within(
 
 #[test]
 fn an_existing_loopback_listener_of_the_verified_executable_is_proved_without_a_connect() {
-    let tool = nc_tool();
+    let this = Executable::new();
     let port = free_port();
-    let mut listener = Listener::spawn(Some("127.0.0.1"), port);
+    let mut listener = this.listener("127.0.0.1", port);
     let endpoint = SocketAddrV4::new(Ipv4Addr::LOCALHOST, port);
-    let lease = acquire_within(&tool, endpoint, Duration::from_secs(5)).unwrap();
+    let lease = acquire_within(&this.tool, endpoint, Duration::from_secs(5)).unwrap();
     let identity = lease.identity();
     assert_eq!(identity.pid, listener.pid());
-    assert_eq!(identity.executable_path, std::fs::canonicalize(NC).unwrap());
-    assert_eq!(identity.executable_sha256, tool.sha256());
+    assert_eq!(identity.executable_path, this.path);
+    assert_eq!(identity.executable_sha256, this.tool.sha256());
     assert_eq!(identity.endpoint, endpoint);
     assert!(identity.start_microseconds < 1_000_000);
     lease.revalidate().unwrap();
@@ -102,9 +137,9 @@ fn an_existing_loopback_listener_of_the_verified_executable_is_proved_without_a_
 
 #[test]
 fn no_process_on_the_endpoint_is_unavailable_not_unknown() {
-    let tool = nc_tool();
+    let this = Executable::new();
     let endpoint = SocketAddrV4::new(Ipv4Addr::LOCALHOST, free_port());
-    let error = LoopbackServerLease::acquire(&tool, endpoint).unwrap_err();
+    let error = LoopbackServerLease::acquire(&this.tool, endpoint).unwrap_err();
     assert_eq!(error.kind(), ErrorKind::NotFound);
     assert!(
         error
@@ -113,24 +148,66 @@ fn no_process_on_the_endpoint_is_unavailable_not_unknown() {
     );
 }
 
+/// The population the scan walks changes under it: listeners of the verified
+/// executable on other ports come and go while the endpoint is judged. A
+/// listener that exits between being listed and being scanned owns nothing,
+/// and the verdict for the endpoint stays `unavailable`, never `unknown`.
+#[test]
+fn listeners_of_the_executable_that_come_and_go_on_other_ports_do_not_disturb_the_verdict() {
+    let this = Executable::new();
+    let endpoint = SocketAddrV4::new(Ipv4Addr::LOCALHOST, free_port());
+    let deadline = Instant::now() + Duration::from_secs(3);
+    let mut scans = 0;
+    while Instant::now() < deadline {
+        let listeners: Vec<Listener> = (0..3)
+            .map(|_| this.listener("127.0.0.1", free_port()))
+            .collect();
+        let error = LoopbackServerLease::acquire(&this.tool, endpoint).unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::NotFound, "{error}");
+        drop(listeners);
+        let error = LoopbackServerLease::acquire(&this.tool, endpoint).unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::NotFound, "{error}");
+        scans += 2;
+    }
+    assert!(scans >= 2);
+}
+
+/// `/usr/bin/nc -l`, run from where it is installed, owns the endpoint: a
+/// listener of another executable, however exact, is never the server.
 #[test]
 fn a_listener_owned_by_another_executable_is_not_the_server() {
-    let tool = nc_tool();
-    let own = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
-    let endpoint = SocketAddrV4::new(Ipv4Addr::LOCALHOST, own.local_addr().unwrap().port());
-    let error = LoopbackServerLease::acquire(&tool, endpoint).unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::NotFound);
+    let this = Executable::new();
+    let port = free_port();
+    let other = Listener(
+        Command::new("/usr/bin/nc")
+            .args(["-l", "127.0.0.1", &port.to_string()])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap(),
+    );
+    // Listening is proved by the port refusing a second bind; a connection
+    // would end `nc -l`.
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while TcpListener::bind((Ipv4Addr::LOCALHOST, port)).is_ok() && Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    let endpoint = SocketAddrV4::new(Ipv4Addr::LOCALHOST, port);
+    let error = LoopbackServerLease::acquire(&this.tool, endpoint).unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::NotFound, "{error}");
+    drop(other);
 }
 
 #[test]
 fn a_wildcard_listener_of_the_verified_executable_is_unknown() {
-    let tool = nc_tool();
+    let this = Executable::new();
     let port = free_port();
-    let _listener = Listener::spawn(None, port);
+    let _listener = this.listener("0.0.0.0", port);
     let endpoint = SocketAddrV4::new(Ipv4Addr::LOCALHOST, port);
     let deadline = Instant::now() + Duration::from_secs(5);
     let error = loop {
-        match LoopbackServerLease::acquire(&tool, endpoint) {
+        match LoopbackServerLease::acquire(&this.tool, endpoint) {
             Err(error) if error.kind() == ErrorKind::NotFound && Instant::now() < deadline => {
                 std::thread::sleep(Duration::from_millis(50));
             }
@@ -144,13 +221,13 @@ fn a_wildcard_listener_of_the_verified_executable_is_unknown() {
 
 #[test]
 fn the_endpoint_must_be_the_exact_ipv4_loopback() {
-    let tool = nc_tool();
+    let this = Executable::new();
     for endpoint in [
         SocketAddrV4::new(Ipv4Addr::new(10, 0, 0, 1), 8710),
         SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, 8710),
         SocketAddrV4::new(Ipv4Addr::LOCALHOST, 0),
     ] {
-        let error = LoopbackServerLease::acquire(&tool, endpoint).unwrap_err();
+        let error = LoopbackServerLease::acquire(&this.tool, endpoint).unwrap_err();
         assert_eq!(error.kind(), ErrorKind::InvalidInput);
     }
 }
