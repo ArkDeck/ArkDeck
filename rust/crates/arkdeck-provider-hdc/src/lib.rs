@@ -7,6 +7,7 @@
 #![forbid(unsafe_code)]
 
 mod capture_files;
+mod debug_hap;
 #[cfg(target_os = "macos")]
 mod dispatch;
 mod host_diagnostics;
@@ -32,6 +33,11 @@ pub use capture_files::{
     OwnedRemotePath, PNG_MAGIC, RECEIVE_MAXIMUM_BYTES, ReceiveArtifact, STDOUT_BUDGET,
     ScreenSequenceRequest, TraceRequest, fault_log_entries, file_producer_step_id, host_landing,
     path_presence, remote_regular_file_byte_count, run, screenshot_image_type,
+};
+pub use debug_hap::{
+    AbilityReference, BundleReference, HapAction, ResolvedArtifact, StagedArtifact, StagedPackage,
+    StagedPackageSet, append_native_library_facts, bounded_process_diagnostic,
+    install_dispatch_outcome, package_presence, process_presence,
 };
 #[cfg(target_os = "macos")]
 pub use dispatch::{ProcessDispatch, SERVER_PORT_VARIABLE};
