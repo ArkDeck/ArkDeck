@@ -5,12 +5,14 @@
         "conflict",
         "humanActionExpired",
         "internalError",
+        "invalidInput",
         "invalidParams",
         "malformedFrame",
         "notFound",
         "operationUnavailable",
         "recordUnreadable",
         "rejected",
+        "resourceNotFound",
         "unknownMethod",
         "unsupportedProtocolVersion",
         "workspaceReferenceNotFound"
@@ -42,6 +44,9 @@
           "type": "string"
         },
         "resumeReference": {
+          "type": "string"
+        },
+        "selection": {
           "type": "string"
         }
       },
@@ -686,7 +691,10 @@
                   "type": "string"
                 },
                 "consumptionFingerprintSha256": {
-                  "type": "string"
+                  "type": [
+                    "null",
+                    "string"
+                  ]
                 },
                 "kind": {
                   "type": "string"
@@ -713,21 +721,18 @@
                   "type": "integer"
                 },
                 "validUntilUtc": {
-                  "type": "string"
+                  "type": [
+                    "null",
+                    "string"
+                  ]
                 }
               },
               "required": [
                 "admittedAtUtc",
-                "artifactDigest",
                 "consumptionFingerprintSha256",
                 "kind",
-                "planDigest",
                 "recoveryEpoch",
                 "reference",
-                "reservationId",
-                "stepSetDigest",
-                "targetBindingDigest",
-                "useOrdinal",
                 "validUntilUtc"
               ],
               "type": "object"
@@ -1030,13 +1035,22 @@
               "additionalProperties": false,
               "properties": {
                 "catalogGeneration": {
-                  "type": "null"
+                  "type": [
+                    "null",
+                    "string"
+                  ]
                 },
                 "manifestSha256": {
-                  "type": "null"
+                  "type": [
+                    "null",
+                    "string"
+                  ]
                 },
                 "reasonCode": {
-                  "type": "string"
+                  "type": [
+                    "null",
+                    "string"
+                  ]
                 },
                 "state": {
                   "type": "string"
@@ -1423,8 +1437,8 @@
   "x-arkdeck-method": "human-action.resume",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 6,
-    "request": 36,
-    "result": 30
+    "error": 10,
+    "request": 33,
+    "result": 23
   }
 }

@@ -1,0 +1,1590 @@
+{
+  "exchanges" : [
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : null,
+          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "createdAt" : "2026-09-14T00:00:00.000Z",
+          "deadline" : "2026-09-14T00:05:00.000Z",
+          "executionId" : "har-connect",
+          "failureCode" : null,
+          "generation" : "3",
+          "humanAction" : {
+            "actionId" : "<har-1>",
+            "category" : "physicalConnection",
+            "choices" : [
+
+            ],
+            "createdAt" : "2026-09-14T00:00:00.000Z",
+            "expiresAt" : "2026-09-14T00:05:00.000Z",
+            "minimumAction" : "human.connectOrPowerDevice",
+            "newDispatchCount" : 0,
+            "owner" : {
+              "id" : "har-connect",
+              "kind" : "agentExecution"
+            },
+            "reasonCode" : "device.notObserved",
+            "resumeReference" : "<resume-1>",
+            "schemaVersion" : "arkdeck.human-action/1",
+            "selectionSchema" : null,
+            "status" : "waiting"
+          },
+          "jobId" : null,
+          "jobState" : null,
+          "lastObservedAt" : "2026-09-14T00:00:00.000Z",
+          "nextAction" : {
+            "expiresAt" : "2026-09-14T00:05:00.000Z",
+            "kind" : "humanAction",
+            "owner" : {
+              "id" : "har-connect",
+              "kind" : "agentExecution"
+            },
+            "reasonCode" : "device.notObserved",
+            "resource" : {
+              "id" : "<har-1>",
+              "kind" : "humanAction"
+            },
+            "resumeReference" : "<resume-1>"
+          },
+          "operation" : "observe.device@1",
+          "outcomeUnknown" : false,
+          "schemaVersion" : "arkdeck.agent-execution/1",
+          "state" : "waitingForHuman",
+          "targetId" : null
+        }
+      },
+      "method" : "agent.run",
+      "mode" : "offline",
+      "name" : "connect.run",
+      "params" : {
+        "executionId" : "har-connect",
+        "inputs" : {
+
+        },
+        "maximumWaitMilliseconds" : "300000",
+        "operation" : "observe.device@1",
+        "schemaVersion" : "arkdeck.agent-execution-request/1"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : null,
+          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "createdAt" : "2026-09-14T00:00:00.000Z",
+          "deadline" : "2026-09-14T00:05:00.000Z",
+          "executionId" : "har-connect",
+          "failureCode" : null,
+          "generation" : "4",
+          "humanAction" : {
+            "actionId" : "<har-1>",
+            "category" : "physicalConnection",
+            "choices" : [
+
+            ],
+            "createdAt" : "2026-09-14T00:00:00.000Z",
+            "expiresAt" : "2026-09-14T00:05:00.000Z",
+            "minimumAction" : "human.connectOrPowerDevice",
+            "newDispatchCount" : 0,
+            "owner" : {
+              "id" : "har-connect",
+              "kind" : "agentExecution"
+            },
+            "reasonCode" : "device.notObserved",
+            "resumeReference" : "<resume-1>",
+            "schemaVersion" : "arkdeck.human-action/1",
+            "selectionSchema" : null,
+            "status" : "waiting"
+          },
+          "jobId" : null,
+          "jobState" : null,
+          "lastObservedAt" : "2026-09-14T00:00:00.000Z",
+          "nextAction" : {
+            "expiresAt" : "2026-09-14T00:05:00.000Z",
+            "kind" : "humanAction",
+            "owner" : {
+              "id" : "har-connect",
+              "kind" : "agentExecution"
+            },
+            "reasonCode" : "device.notObserved",
+            "resource" : {
+              "id" : "<har-1>",
+              "kind" : "humanAction"
+            },
+            "resumeReference" : "<resume-1>"
+          },
+          "operation" : "observe.device@1",
+          "outcomeUnknown" : false,
+          "schemaVersion" : "arkdeck.agent-execution/1",
+          "state" : "waitingForHuman",
+          "targetId" : null
+        }
+      },
+      "method" : "agent.run",
+      "name" : "connect.rerun",
+      "params" : {
+        "executionId" : "har-connect",
+        "inputs" : {
+
+        },
+        "maximumWaitMilliseconds" : "300000",
+        "operation" : "observe.device@1",
+        "schemaVersion" : "arkdeck.agent-execution-request/1"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : null,
+          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "createdAt" : "2026-09-14T00:00:00.000Z",
+          "deadline" : "2026-09-14T00:05:00.000Z",
+          "executionId" : "har-connect",
+          "failureCode" : null,
+          "generation" : "4",
+          "humanAction" : {
+            "actionId" : "<har-1>",
+            "category" : "physicalConnection",
+            "choices" : [
+
+            ],
+            "createdAt" : "2026-09-14T00:00:00.000Z",
+            "expiresAt" : "2026-09-14T00:05:00.000Z",
+            "minimumAction" : "human.connectOrPowerDevice",
+            "newDispatchCount" : 0,
+            "owner" : {
+              "id" : "har-connect",
+              "kind" : "agentExecution"
+            },
+            "reasonCode" : "device.notObserved",
+            "resumeReference" : "<resume-1>",
+            "schemaVersion" : "arkdeck.human-action/1",
+            "selectionSchema" : null,
+            "status" : "waiting"
+          },
+          "jobId" : null,
+          "jobState" : null,
+          "lastObservedAt" : "2026-09-14T00:00:00.000Z",
+          "nextAction" : {
+            "expiresAt" : "2026-09-14T00:05:00.000Z",
+            "kind" : "humanAction",
+            "owner" : {
+              "id" : "har-connect",
+              "kind" : "agentExecution"
+            },
+            "reasonCode" : "device.notObserved",
+            "resource" : {
+              "id" : "<har-1>",
+              "kind" : "humanAction"
+            },
+            "resumeReference" : "<resume-1>"
+          },
+          "operation" : "observe.device@1",
+          "outcomeUnknown" : false,
+          "schemaVersion" : "arkdeck.agent-execution/1",
+          "state" : "waitingForHuman",
+          "targetId" : null
+        }
+      },
+      "method" : "agent.status",
+      "name" : "connect.status",
+      "params" : {
+        "executionId" : "har-connect"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "hasMore" : false,
+          "items" : [
+            {
+              "actionId" : "<har-1>",
+              "category" : "physicalConnection",
+              "choices" : [
+
+              ],
+              "createdAt" : "2026-09-14T00:00:00.000Z",
+              "expiresAt" : "2026-09-14T00:05:00.000Z",
+              "minimumAction" : "human.connectOrPowerDevice",
+              "newDispatchCount" : 0,
+              "owner" : {
+                "id" : "har-connect",
+                "kind" : "agentExecution"
+              },
+              "reasonCode" : "device.notObserved",
+              "resumeReference" : "<resume-1>",
+              "schemaVersion" : "arkdeck.human-action/1",
+              "selectionSchema" : null,
+              "status" : "waiting"
+            }
+          ],
+          "nextCursor" : null,
+          "order" : "createdAtDescActionIdAsc",
+          "pageKind" : "snapshot",
+          "schemaVersion" : "arkdeck.cli.page/1",
+          "snapshotRevision" : "<snapshotRevision>"
+        }
+      },
+      "method" : "human-action.list",
+      "name" : "connect.list",
+      "params" : {
+        "owner" : "har-connect",
+        "ownerKind" : "agentExecution"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "actionId" : "<har-1>",
+          "category" : "physicalConnection",
+          "choices" : [
+
+          ],
+          "createdAt" : "2026-09-14T00:00:00.000Z",
+          "expiresAt" : "2026-09-14T00:05:00.000Z",
+          "minimumAction" : "human.connectOrPowerDevice",
+          "newDispatchCount" : 0,
+          "owner" : {
+            "id" : "har-connect",
+            "kind" : "agentExecution"
+          },
+          "reasonCode" : "device.notObserved",
+          "resumeReference" : "<resume-1>",
+          "schemaVersion" : "arkdeck.human-action/1",
+          "selectionSchema" : null,
+          "status" : "waiting"
+        }
+      },
+      "method" : "human-action.show",
+      "name" : "connect.show",
+      "params" : {
+        "humanAction" : "<har-1>"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "hasMore" : false,
+          "items" : [
+            {
+              "bindingRevision" : null,
+              "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+              "createdAt" : "2026-09-14T00:00:00.000Z",
+              "deadline" : "2026-09-14T00:05:00.000Z",
+              "executionId" : "har-connect",
+              "failureCode" : null,
+              "generation" : "4",
+              "jobId" : null,
+              "jobState" : null,
+              "lastObservedAt" : "2026-09-14T00:00:00.000Z",
+              "nextAction" : {
+                "expiresAt" : "2026-09-14T00:05:00.000Z",
+                "kind" : "humanAction",
+                "owner" : {
+                  "id" : "har-connect",
+                  "kind" : "agentExecution"
+                },
+                "reasonCode" : "device.notObserved",
+                "resource" : {
+                  "id" : "<har-1>",
+                  "kind" : "humanAction"
+                },
+                "resumeReference" : "<resume-1>"
+              },
+              "operation" : "observe.device@1",
+              "outcomeUnknown" : false,
+              "schemaVersion" : "arkdeck.agent-execution/1",
+              "state" : "waitingForHuman",
+              "targetId" : null
+            }
+          ],
+          "nextCursor" : null,
+          "order" : "createdAtDescExecutionIdAsc",
+          "pageKind" : "snapshot",
+          "schemaVersion" : "arkdeck.cli.page/1",
+          "snapshotRevision" : "<snapshotRevision>"
+        }
+      },
+      "method" : "agent.list",
+      "name" : "connect.waiting",
+      "params" : {
+        "state" : "waitingForHuman"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : 1,
+          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "createdAt" : "2026-09-14T00:00:00.000Z",
+          "deadline" : "2026-09-14T00:05:00.000Z",
+          "executionId" : "har-connect",
+          "failureCode" : null,
+          "generation" : "10",
+          "humanAction" : null,
+          "job" : {
+            "jobId" : "job-d166d1a72b51eb3b14528dae5cac37ee",
+            "outcome" : "<jobState>",
+            "outcomeUnknown" : false,
+            "outstandingResidueCount" : null,
+            "sessionPublication" : {
+              "catalogGeneration" : null,
+              "manifestSha256" : null,
+              "reasonCode" : "noCurrentPublicationRecord",
+              "state" : "unavailable"
+            },
+            "state" : "<jobState>",
+            "waitingForHuman" : false
+          },
+          "jobId" : "job-d166d1a72b51eb3b14528dae5cac37ee",
+          "jobState" : "<jobState>",
+          "lastObservedAt" : "2026-09-14T00:00:00.000Z",
+          "nextAction" : {
+            "kind" : "wait",
+            "owner" : {
+              "id" : "job-d166d1a72b51eb3b14528dae5cac37ee",
+              "kind" : "job"
+            },
+            "reasonCode" : "job.running",
+            "resource" : {
+              "id" : "job-d166d1a72b51eb3b14528dae5cac37ee",
+              "kind" : "job"
+            },
+            "retryAfter" : "250ms"
+          },
+          "operation" : "observe.device@1",
+          "outcomeUnknown" : false,
+          "schemaVersion" : "arkdeck.agent-execution/1",
+          "state" : "jobOwned",
+          "targetId" : "TGT-3ba3f5f43b92"
+        }
+      },
+      "method" : "agent.resume",
+      "mode" : "heldServer",
+      "name" : "connect.resume",
+      "params" : {
+        "resumeReference" : "<resume-1>"
+      },
+      "usbRelations" : [
+        {
+          "attachmentId" : 18,
+          "location" : "100",
+          "productId" : 20480,
+          "serial" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "vendorId" : 8711
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "artifacts" : [
+            {
+              "bindingRevision" : 1,
+              "byteCount" : 240,
+              "bytesVerified" : true,
+              "jobId" : "job-d166d1a72b51eb3b14528dae5cac37ee",
+              "providerId" : "hdc",
+              "reference" : "arkdeck-artifact://job-d166d1a72b51eb3b14528dae5cac37ee/ART-9cfb209ff5bf906471aca2a66caebd29",
+              "sha256" : "bb95967555961bdcac9568bffb5bb3654c61670c9a97ddbd1e91f37c508f20e0",
+              "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+              "targetId" : "TGT-3ba3f5f43b92"
+            },
+            {
+              "bindingRevision" : 1,
+              "byteCount" : 457,
+              "bytesVerified" : true,
+              "jobId" : "job-d166d1a72b51eb3b14528dae5cac37ee",
+              "providerId" : "hdc",
+              "reference" : "arkdeck-artifact://job-d166d1a72b51eb3b14528dae5cac37ee/ART-d27bf6efafc264b85e3e67cfcafb80b4",
+              "sha256" : "df22b0496942a7c3f400811854e0b09a7366d1c1420f6bb42fd22922ac580819",
+              "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+              "targetId" : "TGT-3ba3f5f43b92"
+            },
+            {
+              "bindingRevision" : 1,
+              "byteCount" : 529,
+              "bytesVerified" : true,
+              "jobId" : "job-d166d1a72b51eb3b14528dae5cac37ee",
+              "providerId" : "hdc",
+              "reference" : "arkdeck-artifact://job-d166d1a72b51eb3b14528dae5cac37ee/ART-5609b10a99389cd7a73e63985db8ea7a",
+              "sha256" : "01ab3a6a8c8c1059e31b49edfcea8898d4cbc62caae584102a802d9daf5758ce",
+              "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+              "targetId" : "TGT-3ba3f5f43b92"
+            }
+          ],
+          "bindingRevision" : 1,
+          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "createdAt" : "2026-09-14T00:00:00.000Z",
+          "deadline" : "2026-09-14T00:05:00.000Z",
+          "evidence" : {
+            "actualEffect" : "readOnly",
+            "actualStepKinds" : [
+              "probeHostTool",
+              "probeHDCServer",
+              "probeDevice",
+              "runApprovedRemoteRead"
+            ],
+            "artifacts" : [
+              {
+                "bindingRevision" : 1,
+                "byteCount" : 240,
+                "bytesVerified" : true,
+                "jobId" : "job-d166d1a72b51eb3b14528dae5cac37ee",
+                "providerId" : "hdc",
+                "reference" : "arkdeck-artifact://job-d166d1a72b51eb3b14528dae5cac37ee/ART-9cfb209ff5bf906471aca2a66caebd29",
+                "sha256" : "bb95967555961bdcac9568bffb5bb3654c61670c9a97ddbd1e91f37c508f20e0",
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              {
+                "bindingRevision" : 1,
+                "byteCount" : 457,
+                "bytesVerified" : true,
+                "jobId" : "job-d166d1a72b51eb3b14528dae5cac37ee",
+                "providerId" : "hdc",
+                "reference" : "arkdeck-artifact://job-d166d1a72b51eb3b14528dae5cac37ee/ART-d27bf6efafc264b85e3e67cfcafb80b4",
+                "sha256" : "df22b0496942a7c3f400811854e0b09a7366d1c1420f6bb42fd22922ac580819",
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              {
+                "bindingRevision" : 1,
+                "byteCount" : 529,
+                "bytesVerified" : true,
+                "jobId" : "job-d166d1a72b51eb3b14528dae5cac37ee",
+                "providerId" : "hdc",
+                "reference" : "arkdeck-artifact://job-d166d1a72b51eb3b14528dae5cac37ee/ART-5609b10a99389cd7a73e63985db8ea7a",
+                "sha256" : "01ab3a6a8c8c1059e31b49edfcea8898d4cbc62caae584102a802d9daf5758ce",
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              }
+            ],
+            "authority" : {
+              "admittedAtUtc" : "2026-09-14T00:00:00Z",
+              "consumptionFingerprintSha256" : null,
+              "kind" : "defaultReadOnlyPolicy",
+              "recoveryEpoch" : null,
+              "reference" : "default-read-only-policy",
+              "validUntilUtc" : null
+            },
+            "bindingRevision" : 1,
+            "blockers" : [
+
+            ],
+            "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+            "executionMode" : "execute",
+            "finishedAtUtc" : "2026-09-14T00:00:00Z",
+            "firstEvidenceStepAtUtc" : "2026-09-14T00:00:00Z",
+            "jobId" : "job-d166d1a72b51eb3b14528dae5cac37ee",
+            "observation" : {
+              "bindingRevision" : 1,
+              "confirmationMethod" : "machineReadback",
+              "confirmedAtUtc" : "2026-09-14T00:00:00Z",
+              "firmware" : "OpenHarmony-4.1-release",
+              "model" : "OpenHarmony Reference Device",
+              "preflightSteps" : [
+                {
+                  "outcomeAtUtc" : "2026-09-14T00:00:00Z",
+                  "stepId" : "confirm-evidence-target",
+                  "stepKind" : "probeDevice"
+                },
+                {
+                  "outcomeAtUtc" : "2026-09-14T00:00:00Z",
+                  "stepId" : "read-evidence-model",
+                  "stepKind" : "runApprovedRemoteRead"
+                },
+                {
+                  "outcomeAtUtc" : "2026-09-14T00:00:00Z",
+                  "stepId" : "read-evidence-firmware",
+                  "stepKind" : "runApprovedRemoteRead"
+                }
+              ],
+              "providerId" : "hdc",
+              "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+              "targetId" : "TGT-3ba3f5f43b92",
+              "toolSha256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+              "toolVersion" : "3.2.0d",
+              "transport" : "usb"
+            },
+            "operationReference" : "observe.device@1",
+            "outcomeUnknown" : false,
+            "providerId" : "hdc",
+            "recoveryEpoch" : null,
+            "startedAtUtc" : "2026-09-14T00:00:00Z",
+            "status" : "verified",
+            "targetId" : "TGT-3ba3f5f43b92",
+            "terminalState" : "succeeded"
+          },
+          "executionId" : "har-connect",
+          "failureCode" : null,
+          "generation" : "11",
+          "humanAction" : null,
+          "job" : {
+            "jobId" : "job-d166d1a72b51eb3b14528dae5cac37ee",
+            "outcome" : "succeeded",
+            "outcomeUnknown" : false,
+            "outstandingResidueCount" : null,
+            "sessionPublication" : {
+              "catalogGeneration" : "1",
+              "manifestSha256" : "ece300e7f6869083d5d6c4d954290d2d85cab473f775515b44503b28dd378369",
+              "reasonCode" : null,
+              "state" : "published"
+            },
+            "state" : "succeeded",
+            "waitingForHuman" : false
+          },
+          "jobId" : "job-d166d1a72b51eb3b14528dae5cac37ee",
+          "jobState" : "succeeded",
+          "lastObservedAt" : "2026-09-14T00:00:00.000Z",
+          "nextAction" : {
+            "kind" : "readResult",
+            "owner" : {
+              "id" : "job-d166d1a72b51eb3b14528dae5cac37ee",
+              "kind" : "job"
+            },
+            "reasonCode" : "job.resultAvailable",
+            "resource" : {
+              "id" : "job-d166d1a72b51eb3b14528dae5cac37ee",
+              "kind" : "job"
+            }
+          },
+          "operation" : "observe.device@1",
+          "outcomeUnknown" : false,
+          "schemaVersion" : "arkdeck.agent-execution/1",
+          "state" : "completed",
+          "targetId" : "TGT-3ba3f5f43b92"
+        }
+      },
+      "before" : "release",
+      "method" : "agent.status",
+      "name" : "connect.completed",
+      "params" : {
+        "executionId" : "har-connect"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "actionId" : "<har-1>",
+          "category" : "physicalConnection",
+          "choices" : [
+
+          ],
+          "createdAt" : "2026-09-14T00:00:00.000Z",
+          "expiresAt" : "2026-09-14T00:05:00.000Z",
+          "minimumAction" : "human.connectOrPowerDevice",
+          "newDispatchCount" : 0,
+          "owner" : {
+            "id" : "har-connect",
+            "kind" : "agentExecution"
+          },
+          "reasonCode" : "device.notObserved",
+          "resumeReference" : "<resume-1>",
+          "schemaVersion" : "arkdeck.human-action/1",
+          "selectionSchema" : null,
+          "status" : "resolvedByFreshProbe"
+        }
+      },
+      "method" : "human-action.show",
+      "name" : "connect.resolved",
+      "params" : {
+        "humanAction" : "<har-1>"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "artifacts" : [
+            {
+              "bindingRevision" : 1,
+              "byteCount" : 240,
+              "bytesVerified" : true,
+              "jobId" : "job-d166d1a72b51eb3b14528dae5cac37ee",
+              "providerId" : "hdc",
+              "reference" : "arkdeck-artifact://job-d166d1a72b51eb3b14528dae5cac37ee/ART-9cfb209ff5bf906471aca2a66caebd29",
+              "sha256" : "bb95967555961bdcac9568bffb5bb3654c61670c9a97ddbd1e91f37c508f20e0",
+              "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+              "targetId" : "TGT-3ba3f5f43b92"
+            },
+            {
+              "bindingRevision" : 1,
+              "byteCount" : 457,
+              "bytesVerified" : true,
+              "jobId" : "job-d166d1a72b51eb3b14528dae5cac37ee",
+              "providerId" : "hdc",
+              "reference" : "arkdeck-artifact://job-d166d1a72b51eb3b14528dae5cac37ee/ART-d27bf6efafc264b85e3e67cfcafb80b4",
+              "sha256" : "df22b0496942a7c3f400811854e0b09a7366d1c1420f6bb42fd22922ac580819",
+              "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+              "targetId" : "TGT-3ba3f5f43b92"
+            },
+            {
+              "bindingRevision" : 1,
+              "byteCount" : 529,
+              "bytesVerified" : true,
+              "jobId" : "job-d166d1a72b51eb3b14528dae5cac37ee",
+              "providerId" : "hdc",
+              "reference" : "arkdeck-artifact://job-d166d1a72b51eb3b14528dae5cac37ee/ART-5609b10a99389cd7a73e63985db8ea7a",
+              "sha256" : "01ab3a6a8c8c1059e31b49edfcea8898d4cbc62caae584102a802d9daf5758ce",
+              "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+              "targetId" : "TGT-3ba3f5f43b92"
+            }
+          ],
+          "bindingRevision" : 1,
+          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "createdAt" : "2026-09-14T00:00:00.000Z",
+          "deadline" : "2026-09-14T00:05:00.000Z",
+          "evidence" : {
+            "actualEffect" : "readOnly",
+            "actualStepKinds" : [
+              "probeHostTool",
+              "probeHDCServer",
+              "probeDevice",
+              "runApprovedRemoteRead"
+            ],
+            "artifacts" : [
+              {
+                "bindingRevision" : 1,
+                "byteCount" : 240,
+                "bytesVerified" : true,
+                "jobId" : "job-d166d1a72b51eb3b14528dae5cac37ee",
+                "providerId" : "hdc",
+                "reference" : "arkdeck-artifact://job-d166d1a72b51eb3b14528dae5cac37ee/ART-9cfb209ff5bf906471aca2a66caebd29",
+                "sha256" : "bb95967555961bdcac9568bffb5bb3654c61670c9a97ddbd1e91f37c508f20e0",
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              {
+                "bindingRevision" : 1,
+                "byteCount" : 457,
+                "bytesVerified" : true,
+                "jobId" : "job-d166d1a72b51eb3b14528dae5cac37ee",
+                "providerId" : "hdc",
+                "reference" : "arkdeck-artifact://job-d166d1a72b51eb3b14528dae5cac37ee/ART-d27bf6efafc264b85e3e67cfcafb80b4",
+                "sha256" : "df22b0496942a7c3f400811854e0b09a7366d1c1420f6bb42fd22922ac580819",
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              {
+                "bindingRevision" : 1,
+                "byteCount" : 529,
+                "bytesVerified" : true,
+                "jobId" : "job-d166d1a72b51eb3b14528dae5cac37ee",
+                "providerId" : "hdc",
+                "reference" : "arkdeck-artifact://job-d166d1a72b51eb3b14528dae5cac37ee/ART-5609b10a99389cd7a73e63985db8ea7a",
+                "sha256" : "01ab3a6a8c8c1059e31b49edfcea8898d4cbc62caae584102a802d9daf5758ce",
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              }
+            ],
+            "authority" : {
+              "admittedAtUtc" : "2026-09-14T00:00:00Z",
+              "consumptionFingerprintSha256" : null,
+              "kind" : "defaultReadOnlyPolicy",
+              "recoveryEpoch" : null,
+              "reference" : "default-read-only-policy",
+              "validUntilUtc" : null
+            },
+            "bindingRevision" : 1,
+            "blockers" : [
+
+            ],
+            "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+            "executionMode" : "execute",
+            "finishedAtUtc" : "2026-09-14T00:00:00Z",
+            "firstEvidenceStepAtUtc" : "2026-09-14T00:00:00Z",
+            "jobId" : "job-d166d1a72b51eb3b14528dae5cac37ee",
+            "observation" : {
+              "bindingRevision" : 1,
+              "confirmationMethod" : "machineReadback",
+              "confirmedAtUtc" : "2026-09-14T00:00:00Z",
+              "firmware" : "OpenHarmony-4.1-release",
+              "model" : "OpenHarmony Reference Device",
+              "preflightSteps" : [
+                {
+                  "outcomeAtUtc" : "2026-09-14T00:00:00Z",
+                  "stepId" : "confirm-evidence-target",
+                  "stepKind" : "probeDevice"
+                },
+                {
+                  "outcomeAtUtc" : "2026-09-14T00:00:00Z",
+                  "stepId" : "read-evidence-model",
+                  "stepKind" : "runApprovedRemoteRead"
+                },
+                {
+                  "outcomeAtUtc" : "2026-09-14T00:00:00Z",
+                  "stepId" : "read-evidence-firmware",
+                  "stepKind" : "runApprovedRemoteRead"
+                }
+              ],
+              "providerId" : "hdc",
+              "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+              "targetId" : "TGT-3ba3f5f43b92",
+              "toolSha256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+              "toolVersion" : "3.2.0d",
+              "transport" : "usb"
+            },
+            "operationReference" : "observe.device@1",
+            "outcomeUnknown" : false,
+            "providerId" : "hdc",
+            "recoveryEpoch" : null,
+            "startedAtUtc" : "2026-09-14T00:00:00Z",
+            "status" : "verified",
+            "targetId" : "TGT-3ba3f5f43b92",
+            "terminalState" : "succeeded"
+          },
+          "executionId" : "har-connect",
+          "failureCode" : null,
+          "generation" : "11",
+          "humanAction" : null,
+          "job" : {
+            "jobId" : "job-d166d1a72b51eb3b14528dae5cac37ee",
+            "outcome" : "succeeded",
+            "outcomeUnknown" : false,
+            "outstandingResidueCount" : null,
+            "sessionPublication" : {
+              "catalogGeneration" : "1",
+              "manifestSha256" : "ece300e7f6869083d5d6c4d954290d2d85cab473f775515b44503b28dd378369",
+              "reasonCode" : null,
+              "state" : "published"
+            },
+            "state" : "succeeded",
+            "waitingForHuman" : false
+          },
+          "jobId" : "job-d166d1a72b51eb3b14528dae5cac37ee",
+          "jobState" : "succeeded",
+          "lastObservedAt" : "2026-09-14T00:00:00.000Z",
+          "nextAction" : {
+            "kind" : "readResult",
+            "owner" : {
+              "id" : "job-d166d1a72b51eb3b14528dae5cac37ee",
+              "kind" : "job"
+            },
+            "reasonCode" : "job.resultAvailable",
+            "resource" : {
+              "id" : "job-d166d1a72b51eb3b14528dae5cac37ee",
+              "kind" : "job"
+            }
+          },
+          "operation" : "observe.device@1",
+          "outcomeUnknown" : false,
+          "schemaVersion" : "arkdeck.agent-execution/1",
+          "state" : "completed",
+          "targetId" : "TGT-3ba3f5f43b92"
+        }
+      },
+      "method" : "agent.resume",
+      "name" : "connect.again",
+      "params" : {
+        "resumeReference" : "<resume-1>"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "artifacts" : [
+            {
+              "bindingRevision" : 1,
+              "byteCount" : 240,
+              "bytesVerified" : true,
+              "jobId" : "job-d166d1a72b51eb3b14528dae5cac37ee",
+              "providerId" : "hdc",
+              "reference" : "arkdeck-artifact://job-d166d1a72b51eb3b14528dae5cac37ee/ART-9cfb209ff5bf906471aca2a66caebd29",
+              "sha256" : "bb95967555961bdcac9568bffb5bb3654c61670c9a97ddbd1e91f37c508f20e0",
+              "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+              "targetId" : "TGT-3ba3f5f43b92"
+            },
+            {
+              "bindingRevision" : 1,
+              "byteCount" : 457,
+              "bytesVerified" : true,
+              "jobId" : "job-d166d1a72b51eb3b14528dae5cac37ee",
+              "providerId" : "hdc",
+              "reference" : "arkdeck-artifact://job-d166d1a72b51eb3b14528dae5cac37ee/ART-d27bf6efafc264b85e3e67cfcafb80b4",
+              "sha256" : "df22b0496942a7c3f400811854e0b09a7366d1c1420f6bb42fd22922ac580819",
+              "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+              "targetId" : "TGT-3ba3f5f43b92"
+            },
+            {
+              "bindingRevision" : 1,
+              "byteCount" : 529,
+              "bytesVerified" : true,
+              "jobId" : "job-d166d1a72b51eb3b14528dae5cac37ee",
+              "providerId" : "hdc",
+              "reference" : "arkdeck-artifact://job-d166d1a72b51eb3b14528dae5cac37ee/ART-5609b10a99389cd7a73e63985db8ea7a",
+              "sha256" : "01ab3a6a8c8c1059e31b49edfcea8898d4cbc62caae584102a802d9daf5758ce",
+              "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+              "targetId" : "TGT-3ba3f5f43b92"
+            }
+          ],
+          "bindingRevision" : 1,
+          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "createdAt" : "2026-09-14T00:00:00.000Z",
+          "deadline" : "2026-09-14T00:05:00.000Z",
+          "evidence" : {
+            "actualEffect" : "readOnly",
+            "actualStepKinds" : [
+              "probeHostTool",
+              "probeHDCServer",
+              "probeDevice",
+              "runApprovedRemoteRead"
+            ],
+            "artifacts" : [
+              {
+                "bindingRevision" : 1,
+                "byteCount" : 240,
+                "bytesVerified" : true,
+                "jobId" : "job-d166d1a72b51eb3b14528dae5cac37ee",
+                "providerId" : "hdc",
+                "reference" : "arkdeck-artifact://job-d166d1a72b51eb3b14528dae5cac37ee/ART-9cfb209ff5bf906471aca2a66caebd29",
+                "sha256" : "bb95967555961bdcac9568bffb5bb3654c61670c9a97ddbd1e91f37c508f20e0",
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              {
+                "bindingRevision" : 1,
+                "byteCount" : 457,
+                "bytesVerified" : true,
+                "jobId" : "job-d166d1a72b51eb3b14528dae5cac37ee",
+                "providerId" : "hdc",
+                "reference" : "arkdeck-artifact://job-d166d1a72b51eb3b14528dae5cac37ee/ART-d27bf6efafc264b85e3e67cfcafb80b4",
+                "sha256" : "df22b0496942a7c3f400811854e0b09a7366d1c1420f6bb42fd22922ac580819",
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              },
+              {
+                "bindingRevision" : 1,
+                "byteCount" : 529,
+                "bytesVerified" : true,
+                "jobId" : "job-d166d1a72b51eb3b14528dae5cac37ee",
+                "providerId" : "hdc",
+                "reference" : "arkdeck-artifact://job-d166d1a72b51eb3b14528dae5cac37ee/ART-5609b10a99389cd7a73e63985db8ea7a",
+                "sha256" : "01ab3a6a8c8c1059e31b49edfcea8898d4cbc62caae584102a802d9daf5758ce",
+                "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+                "targetId" : "TGT-3ba3f5f43b92"
+              }
+            ],
+            "authority" : {
+              "admittedAtUtc" : "2026-09-14T00:00:00Z",
+              "consumptionFingerprintSha256" : null,
+              "kind" : "defaultReadOnlyPolicy",
+              "recoveryEpoch" : null,
+              "reference" : "default-read-only-policy",
+              "validUntilUtc" : null
+            },
+            "bindingRevision" : 1,
+            "blockers" : [
+
+            ],
+            "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+            "executionMode" : "execute",
+            "finishedAtUtc" : "2026-09-14T00:00:00Z",
+            "firstEvidenceStepAtUtc" : "2026-09-14T00:00:00Z",
+            "jobId" : "job-d166d1a72b51eb3b14528dae5cac37ee",
+            "observation" : {
+              "bindingRevision" : 1,
+              "confirmationMethod" : "machineReadback",
+              "confirmedAtUtc" : "2026-09-14T00:00:00Z",
+              "firmware" : "OpenHarmony-4.1-release",
+              "model" : "OpenHarmony Reference Device",
+              "preflightSteps" : [
+                {
+                  "outcomeAtUtc" : "2026-09-14T00:00:00Z",
+                  "stepId" : "confirm-evidence-target",
+                  "stepKind" : "probeDevice"
+                },
+                {
+                  "outcomeAtUtc" : "2026-09-14T00:00:00Z",
+                  "stepId" : "read-evidence-model",
+                  "stepKind" : "runApprovedRemoteRead"
+                },
+                {
+                  "outcomeAtUtc" : "2026-09-14T00:00:00Z",
+                  "stepId" : "read-evidence-firmware",
+                  "stepKind" : "runApprovedRemoteRead"
+                }
+              ],
+              "providerId" : "hdc",
+              "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+              "targetId" : "TGT-3ba3f5f43b92",
+              "toolSha256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+              "toolVersion" : "3.2.0d",
+              "transport" : "usb"
+            },
+            "operationReference" : "observe.device@1",
+            "outcomeUnknown" : false,
+            "providerId" : "hdc",
+            "recoveryEpoch" : null,
+            "startedAtUtc" : "2026-09-14T00:00:00Z",
+            "status" : "verified",
+            "targetId" : "TGT-3ba3f5f43b92",
+            "terminalState" : "succeeded"
+          },
+          "executionId" : "har-connect",
+          "failureCode" : null,
+          "generation" : "11",
+          "humanAction" : null,
+          "job" : {
+            "jobId" : "job-d166d1a72b51eb3b14528dae5cac37ee",
+            "outcome" : "succeeded",
+            "outcomeUnknown" : false,
+            "outstandingResidueCount" : null,
+            "sessionPublication" : {
+              "catalogGeneration" : "1",
+              "manifestSha256" : "ece300e7f6869083d5d6c4d954290d2d85cab473f775515b44503b28dd378369",
+              "reasonCode" : null,
+              "state" : "published"
+            },
+            "state" : "succeeded",
+            "waitingForHuman" : false
+          },
+          "jobId" : "job-d166d1a72b51eb3b14528dae5cac37ee",
+          "jobState" : "succeeded",
+          "lastObservedAt" : "2026-09-14T00:00:00.000Z",
+          "nextAction" : {
+            "kind" : "readResult",
+            "owner" : {
+              "id" : "job-d166d1a72b51eb3b14528dae5cac37ee",
+              "kind" : "job"
+            },
+            "reasonCode" : "job.resultAvailable",
+            "resource" : {
+              "id" : "job-d166d1a72b51eb3b14528dae5cac37ee",
+              "kind" : "job"
+            }
+          },
+          "operation" : "observe.device@1",
+          "outcomeUnknown" : false,
+          "schemaVersion" : "arkdeck.agent-execution/1",
+          "state" : "completed",
+          "targetId" : "TGT-3ba3f5f43b92"
+        }
+      },
+      "method" : "human-action.resume",
+      "name" : "connect.againByAction",
+      "params" : {
+        "humanAction" : "<har-1>",
+        "resumeReference" : "<resume-1>"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidInput",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "this physical action accepts no selection"
+        },
+        "ok" : false
+      },
+      "method" : "human-action.resume",
+      "name" : "connect.selection",
+      "params" : {
+        "humanAction" : "<har-1>",
+        "resumeReference" : "<resume-1>",
+        "selection" : "any"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : null,
+          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "createdAt" : "2026-09-14T00:00:00.000Z",
+          "deadline" : "2026-09-14T00:05:00.000Z",
+          "executionId" : "har-trust",
+          "failureCode" : null,
+          "generation" : "3",
+          "humanAction" : {
+            "actionId" : "<har-2>",
+            "category" : "deviceTrustPrompt",
+            "choices" : [
+
+            ],
+            "createdAt" : "2026-09-14T00:00:00.000Z",
+            "expiresAt" : "2026-09-14T00:05:00.000Z",
+            "minimumAction" : "human.acceptDeviceTrustPrompt",
+            "newDispatchCount" : 0,
+            "owner" : {
+              "id" : "har-trust",
+              "kind" : "agentExecution"
+            },
+            "reasonCode" : "device.trustPending",
+            "resumeReference" : "<resume-2>",
+            "schemaVersion" : "arkdeck.human-action/1",
+            "selectionSchema" : null,
+            "status" : "waiting"
+          },
+          "jobId" : null,
+          "jobState" : null,
+          "lastObservedAt" : "2026-09-14T00:00:00.000Z",
+          "nextAction" : {
+            "expiresAt" : "2026-09-14T00:05:00.000Z",
+            "kind" : "humanAction",
+            "owner" : {
+              "id" : "har-trust",
+              "kind" : "agentExecution"
+            },
+            "reasonCode" : "device.trustPending",
+            "resource" : {
+              "id" : "<har-2>",
+              "kind" : "humanAction"
+            },
+            "resumeReference" : "<resume-2>"
+          },
+          "operation" : "observe.device@1",
+          "outcomeUnknown" : false,
+          "schemaVersion" : "arkdeck.agent-execution/1",
+          "state" : "waitingForHuman",
+          "targetId" : null
+        }
+      },
+      "method" : "agent.run",
+      "mode" : "unauthorized",
+      "name" : "trust.run",
+      "params" : {
+        "executionId" : "har-trust",
+        "inputs" : {
+
+        },
+        "maximumWaitMilliseconds" : "300000",
+        "operation" : "observe.device@1",
+        "schemaVersion" : "arkdeck.agent-execution-request/1"
+      },
+      "usbRelations" : [
+        {
+          "attachmentId" : 19,
+          "location" : "100",
+          "productId" : 20480,
+          "serial" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "vendorId" : 8711
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "resourceConflict",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "execution generation changed"
+        },
+        "ok" : false
+      },
+      "method" : "agent.abandon",
+      "name" : "trust.abandonStale",
+      "params" : {
+        "executionId" : "har-trust",
+        "expectedGeneration" : "1"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : null,
+          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "createdAt" : "2026-09-14T00:00:00.000Z",
+          "deadline" : "2026-09-14T00:05:00.000Z",
+          "executionId" : "har-trust",
+          "failureCode" : null,
+          "generation" : "4",
+          "humanAction" : null,
+          "jobId" : null,
+          "jobState" : null,
+          "lastObservedAt" : "2026-09-14T00:00:00.000Z",
+          "nextAction" : null,
+          "operation" : "observe.device@1",
+          "outcomeUnknown" : false,
+          "schemaVersion" : "arkdeck.agent-execution/1",
+          "state" : "abandoned",
+          "targetId" : null
+        }
+      },
+      "method" : "agent.abandon",
+      "name" : "trust.abandon",
+      "params" : {
+        "executionId" : "har-trust",
+        "expectedGeneration" : "3"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "actionId" : "<har-2>",
+          "category" : "deviceTrustPrompt",
+          "choices" : [
+
+          ],
+          "createdAt" : "2026-09-14T00:00:00.000Z",
+          "expiresAt" : "2026-09-14T00:05:00.000Z",
+          "minimumAction" : "human.acceptDeviceTrustPrompt",
+          "newDispatchCount" : 0,
+          "owner" : {
+            "id" : "har-trust",
+            "kind" : "agentExecution"
+          },
+          "reasonCode" : "device.trustPending",
+          "resumeReference" : "<resume-2>",
+          "schemaVersion" : "arkdeck.human-action/1",
+          "selectionSchema" : null,
+          "status" : "expired"
+        }
+      },
+      "method" : "human-action.show",
+      "name" : "trust.expired",
+      "params" : {
+        "humanAction" : "<har-2>"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "humanActionExpired",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "the exact human action expired"
+        },
+        "ok" : false
+      },
+      "method" : "agent.resume",
+      "name" : "trust.resume",
+      "params" : {
+        "resumeReference" : "<resume-2>"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "humanActionExpired",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "the exact human action expired"
+        },
+        "ok" : false
+      },
+      "method" : "human-action.resume",
+      "name" : "trust.resumeByAction",
+      "params" : {
+        "humanAction" : "<har-2>",
+        "resumeReference" : "<resume-2>"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : null,
+          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "createdAt" : "2026-09-14T00:00:00.000Z",
+          "deadline" : "2026-09-14T00:05:00.000Z",
+          "executionId" : "har-trust",
+          "failureCode" : null,
+          "generation" : "4",
+          "humanAction" : null,
+          "jobId" : null,
+          "jobState" : null,
+          "lastObservedAt" : "2026-09-14T00:00:00.000Z",
+          "nextAction" : null,
+          "operation" : "observe.device@1",
+          "outcomeUnknown" : false,
+          "schemaVersion" : "arkdeck.agent-execution/1",
+          "state" : "abandoned",
+          "targetId" : null
+        }
+      },
+      "method" : "agent.run",
+      "name" : "trust.rerun",
+      "params" : {
+        "executionId" : "har-trust",
+        "inputs" : {
+
+        },
+        "maximumWaitMilliseconds" : "300000",
+        "operation" : "observe.device@1",
+        "schemaVersion" : "arkdeck.agent-execution-request/1"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : null,
+          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "createdAt" : "2026-09-14T00:00:00.000Z",
+          "deadline" : "2026-09-14T00:05:00.000Z",
+          "executionId" : "har-ambiguous",
+          "failureCode" : null,
+          "generation" : "3",
+          "humanAction" : {
+            "actionId" : "<har-3>",
+            "category" : "ambiguousIdentity",
+            "choices" : [
+              {
+                "candidateKey" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                "value" : "<candidate-1>"
+              },
+              {
+                "candidateKey" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                "value" : "<candidate-2>"
+              }
+            ],
+            "createdAt" : "2026-09-14T00:00:00.000Z",
+            "expiresAt" : "2026-09-14T00:05:00.000Z",
+            "minimumAction" : "human.confirmDeviceIdentity",
+            "newDispatchCount" : 0,
+            "owner" : {
+              "id" : "har-ambiguous",
+              "kind" : "agentExecution"
+            },
+            "reasonCode" : "device.identityAmbiguous",
+            "resumeReference" : "<resume-3>",
+            "schemaVersion" : "arkdeck.human-action/1",
+            "selectionSchema" : {
+              "enum" : [
+                "<candidate-1>",
+                "<candidate-2>"
+              ],
+              "type" : "string"
+            },
+            "status" : "waiting"
+          },
+          "jobId" : null,
+          "jobState" : null,
+          "lastObservedAt" : "2026-09-14T00:00:00.000Z",
+          "nextAction" : {
+            "expiresAt" : "2026-09-14T00:05:00.000Z",
+            "kind" : "humanAction",
+            "owner" : {
+              "id" : "har-ambiguous",
+              "kind" : "agentExecution"
+            },
+            "reasonCode" : "device.identityAmbiguous",
+            "resource" : {
+              "id" : "<har-3>",
+              "kind" : "humanAction"
+            },
+            "resumeReference" : "<resume-3>"
+          },
+          "operation" : "observe.device@1",
+          "outcomeUnknown" : false,
+          "schemaVersion" : "arkdeck.agent-execution/1",
+          "state" : "waitingForHuman",
+          "targetId" : null
+        }
+      },
+      "method" : "agent.run",
+      "mode" : "twoDevices",
+      "name" : "ambiguous.run",
+      "params" : {
+        "executionId" : "har-ambiguous",
+        "inputs" : {
+
+        },
+        "maximumWaitMilliseconds" : "300000",
+        "operation" : "observe.device@1",
+        "schemaVersion" : "arkdeck.agent-execution-request/1"
+      },
+      "usbRelations" : [
+        {
+          "attachmentId" : 20,
+          "location" : "100",
+          "productId" : 20480,
+          "serial" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "vendorId" : 8711
+        },
+        {
+          "attachmentId" : 21,
+          "location" : "100",
+          "productId" : 20480,
+          "serial" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "vendorId" : 8711
+        }
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidInput",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "selection must be an opaque value from this action's schema"
+        },
+        "ok" : false
+      },
+      "method" : "agent.resume",
+      "name" : "ambiguous.missing",
+      "params" : {
+        "resumeReference" : "<resume-3>"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidInput",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "selection must be an opaque value from this action's schema"
+        },
+        "ok" : false
+      },
+      "method" : "agent.resume",
+      "name" : "ambiguous.foreign",
+      "params" : {
+        "resumeReference" : "<resume-3>",
+        "selection" : "candidate-unknown"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "admissionDenied",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "the Runtime cannot prove the candidate's physical identity"
+        },
+        "ok" : false
+      },
+      "method" : "agent.run",
+      "mode" : "normal",
+      "name" : "unproven.run",
+      "params" : {
+        "executionId" : "har-unproven",
+        "inputs" : {
+
+        },
+        "maximumWaitMilliseconds" : "300000",
+        "operation" : "observe.device@1",
+        "schemaVersion" : "arkdeck.agent-execution-request/1"
+      },
+      "usbRelations" : [
+
+      ]
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidInput",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "invalid human-action owner filter"
+        },
+        "ok" : false
+      },
+      "method" : "human-action.list",
+      "name" : "refuse.listHalfFilter",
+      "params" : {
+        "ownerKind" : "agentExecution"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidInput",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "invalid human-action owner filter"
+        },
+        "ok" : false
+      },
+      "method" : "human-action.list",
+      "name" : "refuse.listKind",
+      "params" : {
+        "owner" : "har-connect",
+        "ownerKind" : "job"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidInput",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "pageSize must be between 1 and 1000"
+        },
+        "ok" : false
+      },
+      "method" : "human-action.list",
+      "name" : "refuse.listPageSize",
+      "params" : {
+        "pageSize" : 0
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidCursor",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "cursor must be a bounded opaque string"
+        },
+        "ok" : false
+      },
+      "method" : "human-action.list",
+      "name" : "refuse.listCursor",
+      "params" : {
+        "cursor" : "ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "resourceNotFound",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "human action does not exist"
+        },
+        "ok" : false
+      },
+      "method" : "human-action.show",
+      "name" : "refuse.showUnknown",
+      "params" : {
+        "humanAction" : "har-unknown"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidInput",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "humanAction must be a bounded resource identity"
+        },
+        "ok" : false
+      },
+      "method" : "human-action.show",
+      "name" : "refuse.showInvalid",
+      "params" : {
+        "humanAction" : "-bad"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "resourceNotFound",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "human action does not exist"
+        },
+        "ok" : false
+      },
+      "method" : "human-action.resume",
+      "name" : "refuse.resumeUnknown",
+      "params" : {
+        "humanAction" : "har-unknown",
+        "resumeReference" : "resume-unknown"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidInput",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "resume requires one exact human action and reference"
+        },
+        "ok" : false
+      },
+      "method" : "human-action.resume",
+      "name" : "refuse.resumeWithoutAction",
+      "params" : {
+        "resumeReference" : "<resume-1>"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "resourceNotFound",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "human action does not exist"
+        },
+        "ok" : false
+      },
+      "method" : "agent.resume",
+      "name" : "refuse.agentResumeUnknown",
+      "params" : {
+        "resumeReference" : "resume-unknown"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidInput",
+          "details" : {
+            "newDispatchCount" : 0,
+            "phase" : "preAdmission"
+          },
+          "message" : "resumeReference must be a bounded resource identity"
+        },
+        "ok" : false
+      },
+      "method" : "agent.resume",
+      "name" : "refuse.agentResumeInvalid",
+      "params" : {
+        "resumeReference" : "-bad"
+      }
+    }
+  ],
+  "executions" : {
+    "ambiguous" : "har-ambiguous",
+    "connect" : "har-connect",
+    "trust" : "har-trust",
+    "unproven" : "har-unproven"
+  },
+  "jobs" : {
+    "connect" : "job-d166d1a72b51eb3b14528dae5cac37ee"
+  },
+  "target" : {
+    "bindingRevision" : 1,
+    "connectKey" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "targetId" : "TGT-3ba3f5f43b92",
+    "toolVersion" : "3.2.0d"
+  }
+}

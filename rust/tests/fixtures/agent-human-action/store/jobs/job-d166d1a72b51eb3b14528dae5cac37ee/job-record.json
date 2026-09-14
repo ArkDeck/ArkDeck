@@ -1,0 +1,206 @@
+{
+  "actualEffect" : "readOnly",
+  "actualStepKinds" : [
+    "probeHostTool",
+    "probeHDCServer",
+    "probeDevice",
+    "runApprovedRemoteRead"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "kind" : "defaultReadOnlyPolicy",
+    "reference" : "default-read-only-policy"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "evidenceObservation" : {
+    "bindingRevision" : 1,
+    "confirmationMethod" : "machineReadback",
+    "confirmedAtUTC" : "2026-09-14T00:00:00Z",
+    "firmware" : "OpenHarmony-4.1-release",
+    "model" : "OpenHarmony Reference Device",
+    "preflightSteps" : [
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "confirm-evidence-target",
+        "stepKind" : "probeDevice"
+      },
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-model",
+        "stepKind" : "runApprovedRemoteRead"
+      },
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-firmware",
+        "stepKind" : "runApprovedRemoteRead"
+      }
+    ],
+    "providerID" : "hdc",
+    "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+    "targetID" : "TGT-3ba3f5f43b92",
+    "toolSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+    "toolVersion" : "3.2.0d",
+    "transport" : "usb"
+  },
+  "evidencePreflight" : {
+    "bindingRevision" : 1,
+    "confirmedAtUTC" : "2026-09-14T00:00:00Z",
+    "firmware" : "OpenHarmony-4.1-release",
+    "model" : "OpenHarmony Reference Device",
+    "providerID" : "hdc",
+    "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+    "steps" : [
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "confirm-evidence-target",
+        "stepKind" : "probeDevice"
+      },
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-model",
+        "stepKind" : "runApprovedRemoteRead"
+      },
+      {
+        "outcomeAtUTC" : "2026-09-14T00:00:00Z",
+        "stepID" : "read-evidence-firmware",
+        "stepKind" : "runApprovedRemoteRead"
+      }
+    ],
+    "targetID" : "TGT-3ba3f5f43b92",
+    "toolSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+    "toolVersion" : "3.2.0d",
+    "transport" : "usb"
+  },
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "firstEvidenceStepAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-d166d1a72b51eb3b14528dae5cac37ee",
+  "materializedBindingRevision" : 1,
+  "materializedPlanDigest" : "79fe36f61a71d4852c51b00f784085ec0139b552191bd2b89d6060bec49b3d6a",
+  "materializedStableTargetIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+  "operationReference" : "observe.device@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "agent-execution-a5413dfa3f543ece541da5ac39e28bd399708adaa4524a3f3e74d44129373b27",
+    "inputs" : {
+
+    },
+    "operation" : {
+      "id" : "observe.device",
+      "version" : 1
+    },
+    "requestId" : "agent-request-a5413dfa3f543ece541da5ac39e28bd399708adaa4524a3f3e74d44129373b27",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-3ba3f5f43b92"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "hdc",
+  "request" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "agent-execution-a5413dfa3f543ece541da5ac39e28bd399708adaa4524a3f3e74d44129373b27",
+    "inputs" : {
+
+    },
+    "operation" : {
+      "id" : "observe.device",
+      "version" : 1
+    },
+    "requestId" : "agent-request-a5413dfa3f543ece541da5ac39e28bd399708adaa4524a3f3e74d44129373b27",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-3ba3f5f43b92"
+    }
+  },
+  "sessionPublicationRecord" : {
+    "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+    "checkpointSeal" : {
+      "byteCount" : "7888",
+      "lastSequence" : 14,
+      "sha256" : "1658243284a0215f9651889bdf86dff9e0ada997779b67238ed9f91f49b7c120"
+    },
+    "claims" : [
+      {
+        "admissionGeneration" : "<admissionGeneration>",
+        "claimID" : "session-publication-job-d166d1a72b51eb3b14528dae5cac37ee",
+        "finalizationHeadroomBytes" : "16777216",
+        "metadataHeadroomBytes" : "73424",
+        "remainingGrowthBytes" : "0",
+        "volumeIdentity" : "<volumeIdentity>",
+        "writerClass" : "light"
+      }
+    ],
+    "journalSeal" : {
+      "byteCount" : "8274",
+      "lastSequence" : 15,
+      "sha256" : "e90a593d445407c909f81a947dca4628b4aee32d4f67709eb2766887149d9f8f"
+    },
+    "phase" : "catalogPublished",
+    "policyGeneration" : "1",
+    "proposal" : {
+      "completedAtUTC" : "2026-09-14T00:00:00Z",
+      "manifestByteCount" : "4672",
+      "manifestSHA256" : "ece300e7f6869083d5d6c4d954290d2d85cab473f775515b44503b28dd378369",
+      "outcomeCertainty" : "confirmed",
+      "terminalStatus" : "succeeded"
+    },
+    "receipt" : {
+      "catalogGeneration" : "1",
+      "manifestSHA256" : "ece300e7f6869083d5d6c4d954290d2d85cab473f775515b44503b28dd378369",
+      "publishedAtUTC" : "2026-09-14T00:00:00Z"
+    },
+    "relativeSessionPath" : "2026\/09\/session-job-d166d1a72b51eb3b14528dae5cac37ee",
+    "root" : {
+      "device" : "<device>",
+      "inode" : "<inode>",
+      "path" : "\/tmp\/arkdeck-hdc-oracle\/Sessions",
+      "volumeIdentity" : "<volumeIdentity>"
+    },
+    "sessionID" : "session-job-d166d1a72b51eb3b14528dae5cac37ee",
+    "sessionRootIdentity" : {
+      "device" : "<device>",
+      "inode" : "<inode>"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "succeeded",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "intent probe-host-tool",
+    "verified probe-host-tool [\"toolVersion\"]",
+    "artifact tool-facts.json -> ART-9cfb209ff5bf906471aca2a66caebd29",
+    "intent probe-hdc-server",
+    "verified probe-hdc-server [\"clientVersion\", \"serverVersion\"]",
+    "intent confirm-evidence-target",
+    "verified confirm-evidence-target [\"deviceIdentitySHA256\", \"state\", \"transport\"]",
+    "evidence-preflight confirm-evidence-target",
+    "intent read-evidence-model",
+    "verified read-evidence-model [\"value\"]",
+    "evidence-preflight read-evidence-model",
+    "intent read-evidence-firmware",
+    "verified read-evidence-firmware [\"value\"]",
+    "evidence-preflight read-evidence-firmware",
+    "artifact device-facts.json -> ART-d27bf6efafc264b85e3e67cfcafb80b4",
+    "artifact binding-snapshot.json -> ART-5609b10a99389cd7a73e63985db8ea7a",
+    "host-step finalize-session",
+    "running->finalizing",
+    "reason: steps-complete",
+    "finalizing->succeeded",
+    "reason: finalized"
+  ]
+}

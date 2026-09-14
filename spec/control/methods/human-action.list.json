@@ -4,6 +4,8 @@
       "enum": [
         "conflict",
         "internalError",
+        "invalidCursor",
+        "invalidInput",
         "invalidParams",
         "malformedFrame",
         "notFound",
@@ -34,11 +36,17 @@
     "request": {
       "additionalProperties": false,
       "properties": {
+        "cursor": {
+          "type": "string"
+        },
         "owner": {
           "type": "string"
         },
         "ownerKind": {
           "type": "string"
+        },
+        "pageSize": {
+          "type": "integer"
         }
       },
       "type": "object"
@@ -138,7 +146,6 @@
             },
             "required": [
               "actionId",
-              "binding",
               "category",
               "choices",
               "createdAt",
@@ -146,7 +153,6 @@
               "minimumAction",
               "newDispatchCount",
               "owner",
-              "prohibitedAutomation",
               "reasonCode",
               "resumeReference",
               "schemaVersion",
@@ -193,8 +199,8 @@
   "x-arkdeck-method": "human-action.list",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 2,
-    "request": 4,
-    "result": 2
+    "error": 6,
+    "request": 9,
+    "result": 3
   }
 }

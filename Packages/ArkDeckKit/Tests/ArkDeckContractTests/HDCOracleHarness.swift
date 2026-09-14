@@ -42,6 +42,8 @@ enum HDCOracleHarness {
     let owner: URL
     /// The daemon's agent execution owner and its directory, when composed.
     var agentExecutions: (owner: RuntimeAgentExecutionCoordinator, directory: URL)? = nil
+    /// The daemon's human-action owner over those executions, when composed.
+    var humanActions: RuntimeHumanActionResourceCoordinator? = nil
   }
 
   /// The daemon's `TargetStoreFactsPort` with the oracle's clock: the adopted
@@ -86,10 +88,16 @@ enum HDCOracleHarness {
   /// With `agentExecutions`, also the daemon's agent execution owner under
   /// `agent-executions` beside them, on the oracle's clock, and the Target
   /// observation owner it is composed with, over the same provider and
-  /// dispatcher as in the daemon.
+  /// dispatcher as in the daemon. That owner brackets every device list with
+  /// `usbRelations`, the independent USB observation (none unless an oracle
+  /// names one). With `humanActions`, also the daemon's human-action owner
+  /// over the executions, its pages under `human-action-snapshots` as the
+  /// daemon keeps them.
   static func composition(
     hdc: URL, targetStore: RuntimeTargetStore, targets: URL, settings: Settings,
-    nativeCodeSignHelper: HDCNativeCodeSignHelperArtifact? = nil, agentExecutions: Bool = false
+    nativeCodeSignHelper: HDCNativeCodeSignHelperArtifact? = nil, agentExecutions: Bool = false,
+    humanActions: Bool = false,
+    usbRelations: @escaping @Sendable () throws -> [TargetUSBRelation] = { [] }
   ) throws -> Composition {
     let root = settings.root
     let artifacts = root.appending(path: "artifacts", directoryHint: .isDirectory)
@@ -131,7 +139,7 @@ enum HDCOracleHarness {
       let observing = TargetObservationCoordinator(
         observation: ProviderBootstrapObservation(
           provider: provider, dispatcher: dispatcher, nowUTC: { settings.nowUTC }),
-        targetStore: targetStore, usbRelations: { [] }, nowUTC: { settings.nowUTC })
+        targetStore: targetStore, usbRelations: usbRelations, nowUTC: { settings.nowUTC })
       let directory = root.appending(path: "agent-executions", directoryHint: .isDirectory)
       executions = (
         try RuntimeAgentExecutionCoordinator(
@@ -141,15 +149,23 @@ enum HDCOracleHarness {
       )
       observations = observing
     }
+    var union: RuntimeHumanActionResourceCoordinator?
+    if humanActions {
+      union = try RuntimeHumanActionResourceCoordinator(
+        directory: root.appending(path: "human-action-snapshots", directoryHint: .isDirectory),
+        agents: executions?.owner, controlResources: nil)
+    }
     let handler = RuntimeControlPlaneHandler(
       engine: engine, capabilityStore: capabilities, providerIDs: providers.registeredProviderIDs,
       nowUTC: { settings.nowUTC }, targetStore: targetStore, bootstrap: nil,
-      targetObservations: observations, agentExecutions: executions?.owner, artifactStore: store,
+      targetObservations: observations, agentExecutions: executions?.owner,
+      humanActionResources: union, artifactStore: store,
       flashBundleImportDirectory: nil, flashBundleImportPolicy: .production,
       methodObserver: nil)
     return Composition(
       handler: handler, artifactStore: store, targets: targets, artifacts: artifacts,
-      jobsState: jobsState, sessions: sessions, owner: owner, agentExecutions: executions)
+      jobsState: jobsState, sessions: sessions, owner: owner, agentExecutions: executions,
+      humanActions: union)
   }
 
   /// One recorded request and its answer; a run names the fake's mode.
@@ -219,7 +235,8 @@ enum HDCOracleHarness {
   /// entry's kind and mode, and the provenance of all of them.
   static func files(
     _ composition: Composition, target: RuntimeTargetRecord, cases: JSONValue,
-    answers: String, producer: String, settings: Settings
+    answers: String, producer: String, settings: Settings,
+    identities: RandomIdentities? = nil
   ) throws -> [String: Data] {
     let manager = FileManager.default
     let encoder = JSONEncoder()
@@ -283,6 +300,11 @@ enum HDCOracleHarness {
       }
     }
     files["tree.json"] = try encoder.encode(JSONValue.array(tree)) + Data("\n".utf8)
+    // Identities minted at random read as labels, every file in path order
+    // after the answers, as a replay reads its own.
+    if let identities {
+      for path in files.keys.sorted() { files[path] = identities.label(files[path]!) }
+    }
     var digests: [String: JSONValue] = [:]
     for (path, data) in files { digests[path] = .string(SHA256Hex.string(of: data)) }
     var provenance: [String: JSONValue] = [
@@ -315,6 +337,56 @@ enum HDCOracleHarness {
     guard path.hasPrefix(prefix), path.hasSuffix(suffix) else { return false }
     let revision = String(path.dropFirst(prefix.count).dropLast(suffix.count))
     return UUID(uuidString: revision)?.uuidString.lowercased() == revision
+  }
+
+  /// The identities the agent execution and Target observation owners mint
+  /// at random — a human action's own, its resume reference and its
+  /// selections' values, and the observations they name — read as
+  /// `<har-1>`, `<resume-1>`, `<candidate-1>` and `<obs-1>` by the order they
+  /// first appear in: each recorded answer's canonical text in exchange
+  /// order, then each recorded file's text in path order. A replay labels its
+  /// own identities the same way, and a request naming a label sends the
+  /// identity it stands for.
+  final class RandomIdentities {
+    private static let pattern = try! NSRegularExpression(
+      pattern:
+        "(har|resume|candidate|obs)-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+    private var labels: [String: String] = [:]
+    private var counts: [String: Int] = [:]
+
+    func label(_ text: String) -> String {
+      let source = text as NSString
+      var result = ""
+      var last = 0
+      for match in Self.pattern.matches(in: text, range: NSRange(location: 0, length: source.length)) {
+        result += source.substring(with: NSRange(location: last, length: match.range.location - last))
+        let identity = source.substring(with: match.range)
+        if labels[identity] == nil {
+          let kind = source.substring(with: match.range(at: 1))
+          counts[kind, default: 0] += 1
+          labels[identity] = "<\(kind)-\(counts[kind]!)>"
+        }
+        result += labels[identity]!
+        last = match.range.location + match.range.length
+      }
+      return result + source.substring(from: last)
+    }
+
+    /// A recorded file, when it is text naming such an identity; any other
+    /// file, bytes included, as it is.
+    func label(_ data: Data) -> Data {
+      guard let text = String(data: data, encoding: .utf8),
+        Self.pattern.firstMatch(in: text, range: NSRange(location: 0, length: (text as NSString).length)) != nil
+      else { return data }
+      return Data(label(text).utf8)
+    }
+
+    /// An answer or a request as the oracle records it: its canonical text
+    /// labelled.
+    func label(_ value: JSONValue) throws -> JSONValue {
+      let text = String(decoding: try CanonicalJSONEncoders.canonical().encode(value), as: UTF8.self)
+      return try JSONDecoder().decode(JSONValue.self, from: Data(label(text).utf8))
+    }
   }
 
   /// Writes a new oracle when `variable` names a new directory under
