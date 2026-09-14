@@ -286,32 +286,72 @@ fn artifacts(base: &Path) -> BTreeMap<String, Vec<u8>> {
 /// recorded: the Job index, every entry's kind and mode, and every file.
 /// The Job owner must be closed first.
 pub fn assert_leftovers(fixture: &Path, root: &Path) {
+    assert_leftovers_except(fixture, root, &[]);
+}
+
+/// `assert_leftovers` without what belongs to a Job or an execution the
+/// replay did not serve: every path naming one of `skipped` (a Job's
+/// directories, Artifacts and Session; an execution record), those Jobs'
+/// index rows and, once anything is skipped, the Sessions retention catalog,
+/// which lists every Session. An agent execution directory beside the Job
+/// state is read as well.
+pub fn assert_leftovers_except(fixture: &Path, root: &Path, skipped: &[String]) {
+    let kept = |path: &str| {
+        !skipped.iter().any(|name| path.contains(name.as_str()))
+            && (skipped.is_empty() || path != "sessions/.arkdeck-retention-catalog.json")
+    };
+    let rows = |mut document: Value| {
+        if let Some(rows) = document["rows"].as_array_mut() {
+            rows.retain(|row| !skipped.iter().any(|name| row["jobId"] == name.as_str()));
+        }
+        document
+    };
     assert_eq!(
-        index(&root.join("jobs-state")),
-        document(fixture, "store/index.json")
+        rows(index(&root.join("jobs-state"))),
+        rows(document(fixture, "store/index.json"))
     );
     let (mut files, mut tree) = (BTreeMap::new(), Vec::new());
-    for (base, prefix) in [
+    let mut bases = vec![
         (root.join("jobs-state/jobs"), "store/jobs"),
         (root.join("Sessions"), "sessions"),
         (root.join("session-owner"), "session-owner"),
-    ] {
+    ];
+    if root.join("agent-executions").exists() {
+        bases.push((root.join("agent-executions"), "agent-executions"));
+    }
+    for (base, prefix) in bases {
         walk(&base, prefix, &mut files, &mut tree);
     }
     files.extend(artifacts(&root.join("artifacts")));
+    files.retain(|path, _| kept(path));
     let actual: Vec<Value> = tree
         .iter()
+        .filter(|(path, _, _)| kept(path))
         .map(|(path, kind, mode)| json!({"path": path, "kind": kind, "mode": mode}))
         .collect();
-    assert_eq!(Value::Array(actual), document(fixture, "tree.json"));
+    let expected: Vec<Value> = document(fixture, "tree.json")
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|entry| kept(entry["path"].as_str().unwrap()))
+        .cloned()
+        .collect();
+    assert_eq!(actual, expected);
     let mut recorded = BTreeMap::new();
     for (path, _) in document(fixture, "provenance.json")["files"]
         .as_object()
         .unwrap()
     {
-        if ["store/jobs/", "sessions/", "session-owner/", "artifacts/"]
-            .iter()
-            .any(|prefix| path.starts_with(prefix))
+        if [
+            "store/jobs/",
+            "sessions/",
+            "session-owner/",
+            "artifacts/",
+            "agent-executions/",
+        ]
+        .iter()
+        .any(|prefix| path.starts_with(prefix))
+            && kept(path)
         {
             recorded.insert(path.clone(), fs::read(fixture.join(path)).unwrap());
         }

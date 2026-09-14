@@ -200,6 +200,12 @@ impl CatalogOperation {
         }
     }
 
+    /// Swift `CatalogOperationDescriptor.binding`: `none` for an operation
+    /// that binds no device, otherwise the binding its steps require.
+    pub(crate) fn binding(&self) -> &str {
+        &self.binding
+    }
+
     /// Swift `RuntimeJobEngine.validateInputs`; keys are judged in byte order.
     pub(crate) fn validate_inputs(&self, inputs: &Map<String, Value>) -> Result<(), InputRefusal> {
         let invalid = |message: String| Err(InputRefusal::Invalid(message));

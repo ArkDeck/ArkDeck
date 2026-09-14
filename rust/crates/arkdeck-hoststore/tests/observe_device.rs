@@ -8,9 +8,9 @@
 //! and everything the Jobs leave (the Job index and files, every Artifact,
 //! every file of the Sessions root and the storage owner, every entry's kind
 //! and mode) must be Swift's byte for byte, once each Job record's volume,
-//! device, inode and claim generation are read as labels. `artifact.list` is
-//! not served by this Runtime yet, so its recorded answers are not replayed.
-//! The runs spawn the fake, so this binary is theirs.
+//! device, inode and claim generation are read as labels, as is the revision
+//! of an `artifact.list` page. The runs spawn the fake, so this binary is
+//! theirs.
 #![cfg(target_os = "macos")]
 
 mod support;
@@ -184,7 +184,19 @@ fn rust_observes_the_swift_fake_device() {
                 Ok(result) => json!({"ok": true, "result": result}),
                 Err(error) => refused(&error.code, error.message, error.details),
             },
-            _ => continue,
+            "artifact.list" => {
+                match artifacts.handle_list(params, &jobs.snapshot_directory(), |job| {
+                    jobs.read_snapshot(job).map(|_| ())
+                }) {
+                    // The pager's revision is its own; the oracle labels it.
+                    Ok(mut result) => {
+                        result["snapshotRevision"] = json!("<snapshotRevision>");
+                        json!({"ok": true, "result": result})
+                    }
+                    Err(error) => refused(&error.code, error.message, error.details),
+                }
+            }
+            other => panic!("{name}: the oracle sent {other}"),
         };
         let recorded = &exchange["answer"];
         if semantic(&actual) != semantic(recorded) {

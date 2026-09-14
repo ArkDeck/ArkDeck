@@ -268,6 +268,31 @@ fn utc_precise_timestamp(seconds: u64, milliseconds: u32) -> String {
     format!("{}.{milliseconds:03}Z", &plain[..plain.len() - 1])
 }
 
+/// Milliseconds since the Unix epoch of a canonical precise UTC timestamp,
+/// the one spelling Swift `RuntimeAgentTime` writes and reads back
+/// (`yyyy-MM-ddTHH:mm:ss.SSSZ`); any other spelling is none.
+#[cfg(target_os = "macos")]
+pub(crate) fn precise_utc_millis(text: &str) -> Option<u64> {
+    let bytes = text.as_bytes();
+    if bytes.len() != 24 || bytes[19] != b'.' || bytes[23] != b'Z' || !text.is_ascii() {
+        return None;
+    }
+    let fraction = &text[20..23];
+    if !fraction.bytes().all(|byte| byte.is_ascii_digit()) {
+        return None;
+    }
+    let seconds = plain_utc_seconds(&format!("{}Z", &text[..19]))?;
+    seconds
+        .checked_mul(1000)?
+        .checked_add(fraction.parse::<u64>().ok()?)
+}
+
+/// A millisecond instant as Swift `RuntimeAgentTime.format` spells it.
+#[cfg(target_os = "macos")]
+pub(crate) fn utc_precise_from_millis(milliseconds: u64) -> String {
+    utc_precise_timestamp(milliseconds / 1000, (milliseconds % 1000) as u32)
+}
+
 /// The current instant as Swift durable records spell it
 /// (`ISO8601Timestamps.string`): whole seconds in UTC.
 #[cfg(target_os = "macos")]

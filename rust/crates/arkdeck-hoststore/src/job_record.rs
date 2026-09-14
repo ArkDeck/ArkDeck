@@ -712,6 +712,11 @@ impl JobRecord {
             residues: None,
         }
     }
+    /// Swift `RuntimeJobRecord.outstandingResidueCount`: none until a cleanup
+    /// path has counted the Job's residue.
+    pub(super) fn residues(&self) -> Option<i64> {
+        self.residues
+    }
     pub(super) fn status(&self) -> Value {
         let uncertain =
             self.unknown || ["waitingForRecovery", "reconciling"].contains(&self.state.as_str());

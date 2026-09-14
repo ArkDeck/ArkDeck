@@ -131,6 +131,20 @@ pub trait HostServices: Send + Sync {
             details: None,
         })
     }
+    /// `agent.run` and `agent.status` advance and read agent executions. A
+    /// host without an agent execution owner answers as the read-only
+    /// foundation always has.
+    fn agent_execution(
+        &self,
+        _method: &str,
+        _params: &serde_json::Map<String, Value>,
+    ) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "rejected".into(),
+            message: "this method is unavailable in the read-only Rust foundation".into(),
+            details: None,
+        })
+    }
     /// `artifact.quota` reads the Artifact store's used bytes against its
     /// quota. A host without an Artifact owner answers as the read-only
     /// foundation always has.
@@ -795,9 +809,15 @@ impl<H: HostServices> Control<H> {
                 id: request.id.clone(),
                 outcome: self.host.capability_resource(&request.method, &params),
             },
-            "artifact.inspect" | "artifact.read" | "artifact.export" => Response {
+            "artifact.list" | "artifact.inspect" | "artifact.read" | "artifact.export" => {
+                Response {
+                    id: request.id.clone(),
+                    outcome: self.host.artifact_resource(&request.method, &params),
+                }
+            }
+            "agent.run" | "agent.status" => Response {
                 id: request.id.clone(),
-                outcome: self.host.artifact_resource(&request.method, &params),
+                outcome: self.host.agent_execution(&request.method, &params),
             },
             // Swift reads no parameter of a quota request.
             "artifact.quota" => Response {

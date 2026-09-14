@@ -16,17 +16,34 @@ starts `arkdeck-agentd` over a fresh isolated root
 exchange whose method the Rust daemon serves. Each answer is compared at T1:
 the ok flag, the error code and details, and the result, with every time read
 as <time> and what is Swift's wording or its own clock's (a refusal's message,
-a Manifest digest, a snapshot revision) read as a label. The fake must receive
-the oracle's calls in the oracle's order. The daemon is then restarted over the
-same root, and every Job's status, record, result and evidence must read as
-they did before; the Rust CLI reads the first Job's result and evidence as the
+a Manifest digest, a pager's revision and cursor) read as a label. A listing
+ordered by creation time follows the daemon's clock, not the oracle's, so each
+of its pages is compared with its items counted, and once the listing ends its
+items are compared across its pages and must stand in the order the listing
+declares over their own times.
+
+An agent run answers once it owns its Job and runs the Job in the background,
+so the oracle orders what the daemon does not: in `mode` held the fake keeps
+the Job's first call until the harness releases it, `before` heldCall waits
+for that call, and `before` release lets it go and waits until the execution
+record holds the Job's end, as the oracle waits. Where the oracle labels the
+Job state an accepted run read, that state must not be terminal. A request
+naming `<nextCursor of X>` sends the cursor exchange X's page minted. A run
+Swift accepted for an operation the Rust daemon does not run yet is not
+replayed, nor are its reads; the fake's calls must then begin with the
+oracle's.
+
+The daemon is then restarted over the same root, and every Job's status,
+record, result and evidence, and every execution's status, must read as they
+did before; the Rust CLI reads the first Job's result and evidence as the
 socket did. Two startups are refused: a development HDC without a development
 root, and one named by a relative path.
 
-Byte equality of what the Jobs leave (T0) is the in-process replay's
-(`cargo test -p arkdeck-hoststore --test observe_device`), which runs on the
-oracle's fixed clock; this harness runs on the host's. Host-only: the fake
-reaches no device, and nothing installed is read or written.
+Byte equality of what the Jobs and executions leave (T0) is the in-process
+replays' (`cargo test -p arkdeck-hoststore --test observe_device --test
+agent_execution`), which run on the oracle's fixed clock; this harness runs on
+the host's. Host-only: the fake reaches no device, and nothing installed is
+read or written.
 """
 from __future__ import annotations
 
@@ -49,9 +66,16 @@ HDC_ROOT = Path('/private/tmp/arkdeck-hdc-oracle')
 HDC_LOCK = Path('/private/tmp/arkdeck-hdc-oracle.lock')
 TIME = re.compile(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z')
 # Swift's wording, and values that cover the owner's own clock.
-LABELS = {'message', 'manifestSha256', 'snapshotRevision'}
-SERVED = {'job.plan', 'job.submit', 'job.run', 'job.result', 'job.evidence'}
+LABELS = {'message', 'manifestSha256', 'snapshotRevision', 'nextCursor'}
+SERVED = {'job.plan', 'job.submit', 'job.run', 'job.result', 'job.evidence', 'artifact.list',
+          'agent.run', 'agent.status'}
+# Operations whose Jobs the Rust daemon does not run yet.
+NOT_MATERIALIZED = {'capture.diagnostics@1'}
+TERMINAL = {'planned', 'succeeded', 'recovered', 'failed', 'cancelled', 'interrupted'}
+# An execution that has not yet recorded its Job's end.
+UNSETTLED = {'orchestrating', 'creatingJob', 'jobOwned'}
 READS = ('job.status', 'job.show', 'job.result', 'job.evidence')
+CURSOR = re.compile(r'<nextCursor of (.+)>')
 
 
 def comparable(value, key: str | None = None):
@@ -62,6 +86,41 @@ def comparable(value, key: str | None = None):
     if isinstance(value, list):
         return [comparable(item) for item in value]
     return TIME.sub('<time>', value) if isinstance(value, str) else value
+
+
+def labelled(answer: dict, recorded: dict) -> dict:
+    """The Job state an accepted run read while its Job started, as a label
+    where the oracle labels it; the state must not be terminal."""
+    result = answer.get('result')
+    if not isinstance(result, dict) or (recorded.get('result') or {}).get('jobState') != '<jobState>':
+        return answer
+    if result.get('jobState') in TERMINAL:
+        raise AssertionError(f"an accepted run read its Job {result.get('jobState')}")
+    result = dict(result, jobState='<jobState>')
+    if isinstance(result.get('job'), dict):
+        result['job'] = dict(result['job'], state='<jobState>', outcome='<jobState>')
+    return dict(answer, result=result)
+
+
+def counted(page: dict) -> dict:
+    """A listing's page with its items counted, not listed."""
+    return comparable(dict(page, result=dict(page['result'], items=len(page['result']['items']))))
+
+
+def unmaterialized(oracle: dict) -> set[str]:
+    """The runs Swift accepted for an operation the Rust daemon does not run
+    yet; a run refused before its Job is replayed whatever it names."""
+    return {item['name'].split('.')[0] for item in oracle['exchanges']
+            if item['method'] == 'agent.run' and item['answer'].get('ok')
+            and item['params'].get('operation') in NOT_MATERIALIZED}
+
+
+def wait_for(condition, seconds: float, failure: str) -> None:
+    deadline = time.monotonic() + seconds
+    while not condition():
+        if time.monotonic() > deadline:
+            raise AssertionError(failure)
+        time.sleep(.02)
 
 
 def install_fake(fixture: Path) -> None:
@@ -94,6 +153,11 @@ def main() -> None:
         if not condition:
             raise AssertionError(f'{name}: {detail}')
         checks.append(name)
+
+    def compare(name: str, answer: dict, recorded: dict, shape=comparable) -> None:
+        check(name, shape(answer) == shape(recorded),
+              f"\n  swift {json.dumps(shape(recorded), sort_keys=True)}"
+              f"\n  rust  {json.dumps(shape(answer), sort_keys=True)}")
 
     def exchange(endpoint: Path, method: str, params: dict | None = None) -> dict:
         request = {'protocolVersion': registry['currentVersion'], 'contractIdentity': identity,
@@ -157,32 +221,83 @@ def main() -> None:
                        ARKDECK_ENDPOINT=str(endpoint),
                        ARKDECK_DEVELOPMENT_HDC_PATH=str(HDC_ROOT / 'hdc'))
 
+            skipped_runs = unmaterialized(oracle)
+            calls = HDC_ROOT / 'hdc-invocations.log'
             daemon_process = start(env, endpoint)
-            replayed = 0
+            replayed, answers, held_from = 0, {}, 0
+            # The first page of the listing each page belongs to, and each
+            # listing's items so far as the daemon and Swift listed them.
+            listings: dict[str, str] = {}
+            listed: dict[str, tuple[list, list]] = {}
             for item in oracle['exchanges']:
                 name, method = item['name'], item['method']
-                if method not in SERVED:
+                if method not in SERVED or name.split('.')[0] in skipped_runs:
                     summary['skipped'].append(name)
                     continue
+                params = dict(item['params'])
                 if 'mode' in item:
                     (HDC_ROOT / 'hdc-mode').write_text(f"{item['mode']}\n")
-                answer = exchange(endpoint, method, item['params'])
-                check(f'{name}: T1 answer', comparable(answer) == comparable(item['answer']),
-                      f"\n  swift {json.dumps(comparable(item['answer']), sort_keys=True)}"
-                      f"\n  rust  {json.dumps(comparable(answer), sort_keys=True)}")
+                    if item['mode'] == 'held':
+                        (HDC_ROOT / 'released').unlink(missing_ok=True)
+                        held_from = len(calls.read_bytes())
+                if item.get('before') == 'heldCall':
+                    wait_for(lambda: len(calls.read_bytes()) > held_from, 60,
+                             f'{name}: the held Job never called the fake')
+                elif item.get('before') == 'release':
+                    (HDC_ROOT / 'released').write_bytes(b'')
+                    # As the oracle does: until the run has returned and the
+                    # execution record holds the Job's end (Swift finishJob).
+                    # A status read says completed as soon as the Job is
+                    # terminal, before its Session is published.
+                    record = state / 'agent-executions' / 'execution-{}.json'.format(
+                        hashlib.sha256(params['executionId'].encode()).hexdigest())
+                    wait_for(lambda: json.loads(record.read_bytes())['state'] not in UNSETTLED, 120,
+                             f'{name}: the execution never recorded its Job\'s end')
+                opened = name
+                if isinstance(params.get('cursor'), str) and (minted := CURSOR.fullmatch(params['cursor'])):
+                    params['cursor'] = answers[minted[1]]['result']['nextCursor']
+                    opened = listings.get(minted[1], minted[1])
+                answer = exchange(endpoint, method, params)
+                answers[name] = answer
+                answer = labelled(answer, item['answer'])
+                if method == 'artifact.list' and answer.get('ok') and item['answer'].get('ok'):
+                    listings[name] = opened
+                    compare(f'{name}: T1 page', answer, item['answer'], counted)
+                    ours, swift = listed.setdefault(opened, ([], []))
+                    ours += answer['result']['items']
+                    swift += item['answer']['result']['items']
+                    if answer['result']['nextCursor'] is None:
+                        def by_id(entry: dict) -> str:
+                            return entry['artifactId']
+                        check(f'{opened}: T1 listing', sorted(map(comparable, ours), key=by_id)
+                              == sorted(map(comparable, swift), key=by_id), (ours, swift))
+                        check(f'{opened}: listing order (createdAtDescArtifactIdAsc)',
+                              ours == sorted(sorted(ours, key=by_id),
+                                             key=lambda entry: entry['createdAtUtc'], reverse=True),
+                              ours)
+                else:
+                    compare(f'{name}: T1 answer', answer, item['answer'])
                 replayed += 1
-            check('the fake received the oracle\'s calls in order',
-                  (HDC_ROOT / 'hdc-invocations.log').read_bytes()
-                  == (fixture / 'hdc-invocations.log').read_bytes())
-            jobs = oracle['jobs']
-            before = {(job, method): exchange(endpoint, method, {'jobId': job_id})
-                      for job, job_id in jobs.items() for method in READS}
+            recorded, received = (fixture / 'hdc-invocations.log').read_bytes(), calls.read_bytes()
+            if skipped_runs:
+                check('the fake received the oracle\'s calls in order, up to the runs not replayed',
+                      len(received) < len(recorded) and recorded.startswith(received))
+            else:
+                check('the fake received the oracle\'s calls in order', received == recorded)
+            jobs = {run: job for run, job in oracle['jobs'].items() if run not in skipped_runs}
+            executions = {run: execution for run, execution in oracle.get('executions', {}).items()
+                          if run not in skipped_runs}
+            reads = [(run, method, {'jobId': job}) for run, job in jobs.items() for method in READS]
+            reads += [(run, 'agent.status', {'executionId': execution})
+                      for run, execution in executions.items()]
+            before = {(run, method): exchange(endpoint, method, params)
+                      for run, method, params in reads}
             stop(daemon_process)
 
             daemon_process = start(env, endpoint)
-            for (job, method), answer in before.items():
-                check(f'{job}: {method} after restart',
-                      exchange(endpoint, method, {'jobId': jobs[job]}) == answer)
+            for run, method, params in reads:
+                check(f'{run}: {method} after restart',
+                      exchange(endpoint, method, params) == before[(run, method)])
             first = next(iter(oracle['exchanges']))['name'].split('.')[0]
             cli_env = dict(clean, ARKDECK_ENDPOINT=str(endpoint), ARKDECK_DAEMON_PATH=str(daemon))
             for command, method in (('result', 'job.result'), ('evidence', 'job.evidence')):
@@ -200,19 +315,22 @@ def main() -> None:
                             'a development HDC is configured only for an isolated development root')
             refused_startup(dict(env, ARKDECK_DEVELOPMENT_HDC_PATH='arkdeck-hdc-oracle/hdc'),
                             'ARKDECK_DEVELOPMENT_HDC_PATH must be an explicit absolute path')
-            summary.update(replayed=replayed, checks=len(checks),
-                           invocations=hashlib.sha256(
-                               (HDC_ROOT / 'hdc-invocations.log').read_bytes()).hexdigest())
+            summary.update(replayed=replayed, checks=len(checks), skippedRuns=sorted(skipped_runs),
+                           invocations=hashlib.sha256(received).hexdigest())
         finally:
+            # A driver still holding a call leaves once released.
+            if HDC_ROOT.is_dir():
+                (HDC_ROOT / 'released').write_bytes(b'')
             for child in children:
                 if child.poll() is None:
                     child.kill()
                     child.wait()
+            time.sleep(.5)
             shutil.rmtree(HDC_ROOT, ignore_errors=True)
     if args.record:
         args.record.write_text(json.dumps(dict(summary, checkNames=checks), indent=2) + '\n')
     print(f"PASS: {summary['fixture']}, {summary['replayed']} exchanges replayed, "
-          f"{len(summary['skipped'])} not served, {len(checks)} checks")
+          f"{len(summary['skipped'])} not replayed, {len(checks)} checks")
 
 
 if __name__ == '__main__':

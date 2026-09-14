@@ -51,12 +51,17 @@ impl RunSlot {
 pub struct Host {
     #[cfg(target_os = "macos")]
     imports: Option<arkdeck_hoststore::ImportUploadStore>,
+    // The owners a background agent run keeps using after its request has
+    // answered are shared with it.
     #[cfg(target_os = "macos")]
-    targets: Option<arkdeck_hoststore::TargetStore>,
+    targets: Option<std::sync::Arc<arkdeck_hoststore::TargetStore>>,
     #[cfg(target_os = "macos")]
-    artifacts: Option<arkdeck_hoststore::ArtifactReadStore>,
+    artifacts: Option<std::sync::Arc<arkdeck_hoststore::ArtifactReadStore>>,
     #[cfg(target_os = "macos")]
-    jobs: Option<arkdeck_hoststore::JobStore>,
+    jobs: Option<std::sync::Arc<arkdeck_hoststore::JobStore>>,
+    /// The agent execution owner beside the Job state.
+    #[cfg(target_os = "macos")]
+    agents: Option<std::sync::Arc<arkdeck_hoststore::AgentExecutionStore>>,
     #[cfg(target_os = "macos")]
     capabilities: Option<arkdeck_hoststore::CapabilityStore>,
     #[cfg(target_os = "macos")]
@@ -72,25 +77,27 @@ pub struct Host {
     #[cfg(target_os = "macos")]
     trace_cache: Option<arkdeck_hoststore::TraceCacheStore>,
     #[cfg(target_os = "macos")]
-    storage: Option<(
-        arkdeck_hoststore::SessionStore,
-        arkdeck_hoststore::ArtifactUsage,
-    )>,
+    storage: Option<
+        std::sync::Arc<(
+            arkdeck_hoststore::SessionStore,
+            arkdeck_hoststore::ArtifactUsage,
+        )>,
+    >,
     unavailable: &'static str,
     observations: Mutex<ObservationState>,
     #[cfg(target_os = "macos")]
-    running: Mutex<std::collections::HashMap<String, std::sync::Arc<RunSlot>>>,
+    running: std::sync::Arc<Mutex<std::collections::HashMap<String, std::sync::Arc<RunSlot>>>>,
     /// Swift `NSHomeDirectory()`, which Artifact redaction replaces.
     #[cfg(target_os = "macos")]
     home: String,
     /// Swift `HostStorageCoordinator`'s claims, held by the Session
     /// publications this process makes.
     #[cfg(target_os = "macos")]
-    claims: arkdeck_hoststore::StorageClaims,
+    claims: std::sync::Arc<arkdeck_hoststore::StorageClaims>,
     /// The isolated owner's development HDC: the fixture executable its
     /// device-bound Jobs dispatch to.
     #[cfg(target_os = "macos")]
-    hdc: Option<arkdeck_provider_hdc::FixtureDispatch>,
+    hdc: Option<std::sync::Arc<arkdeck_provider_hdc::FixtureDispatch>>,
 }
 
 impl Host {
@@ -102,12 +109,19 @@ impl Host {
 
     #[cfg(target_os = "macos")]
     pub fn with_targets(mut self, targets: arkdeck_hoststore::TargetStore) -> Self {
-        self.targets = Some(targets);
+        self.targets = Some(std::sync::Arc::new(targets));
         self
     }
     #[cfg(target_os = "macos")]
     pub fn with_jobs(mut self, jobs: arkdeck_hoststore::JobStore) -> Self {
-        self.jobs = Some(jobs);
+        self.jobs = Some(std::sync::Arc::new(jobs));
+        self
+    }
+    /// `agent.run` and `agent.status` advance and read this owner's
+    /// executions, which own Jobs of the Job owner.
+    #[cfg(target_os = "macos")]
+    pub fn with_agent_executions(mut self, agents: arkdeck_hoststore::AgentExecutionStore) -> Self {
+        self.agents = Some(std::sync::Arc::new(agents));
         self
     }
     /// `capability.list` and `capability.inspect` read this capability store.
@@ -129,7 +143,7 @@ impl Host {
     }
     #[cfg(target_os = "macos")]
     pub fn with_artifacts(mut self, artifacts: arkdeck_hoststore::ArtifactReadStore) -> Self {
-        self.artifacts = Some(artifacts);
+        self.artifacts = Some(std::sync::Arc::new(artifacts));
         self
     }
     /// Device-bound Jobs plan against the Target owner and run through this
@@ -139,7 +153,7 @@ impl Host {
         mut self,
         dispatch: Option<arkdeck_provider_hdc::FixtureDispatch>,
     ) -> Self {
-        self.hdc = dispatch;
+        self.hdc = dispatch.map(std::sync::Arc::new);
         self
     }
     #[cfg(target_os = "macos")]
@@ -147,9 +161,92 @@ impl Host {
         let (dispatch, targets) = (self.hdc.as_ref()?, self.targets.as_ref()?);
         Some(arkdeck_hoststore::HdcComposition {
             targets,
-            dispatch,
+            dispatch: &**dispatch,
             tool_sha256: dispatch.tool_sha256(),
         })
+    }
+    /// Swift `startJob`: the Job an execution has just come to own runs in
+    /// the background, in the slot every `job.run` and `job.cancel` of it
+    /// meets, registered before the owning request answers; its end is
+    /// reported to the execution (Swift `finishJob`).
+    #[cfg(target_os = "macos")]
+    fn start_agent_run(&self, start: arkdeck_hoststore::AgentStart) {
+        let (Some(agents), Some(jobs), Some(artifacts)) = (
+            self.agents.clone(),
+            self.jobs.clone(),
+            self.artifacts.clone(),
+        ) else {
+            return;
+        };
+        let (targets, dispatch, storage, claims, running, home) = (
+            self.targets.clone(),
+            self.hdc.clone(),
+            self.storage.clone(),
+            self.claims.clone(),
+            self.running.clone(),
+            self.home.clone(),
+        );
+        let slot = std::sync::Arc::new(RunSlot::default());
+        match running.lock() {
+            Ok(mut runs) if !runs.contains_key(&start.job) => {
+                runs.insert(start.job.clone(), slot.clone());
+            }
+            _ => return,
+        }
+        std::thread::spawn(move || {
+            let probe = arkdeck_hoststore::SystemStorageProbe;
+            let publisher = storage
+                .as_ref()
+                .map(|storage| arkdeck_hoststore::SessionPublisher {
+                    sessions: &storage.0,
+                    claims: &claims,
+                    probe: &probe,
+                });
+            let hdc = match (&dispatch, &targets) {
+                (Some(dispatch), Some(targets)) => Some(arkdeck_hoststore::HdcComposition {
+                    targets,
+                    dispatch: &**dispatch,
+                    tool_sha256: dispatch.tool_sha256(),
+                }),
+                _ => None,
+            };
+            let params =
+                serde_json::Map::from_iter([("jobId".into(), serde_json::json!(start.job))]);
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                arkdeck_hoststore::JobRunner {
+                    jobs: &jobs,
+                    artifacts: &artifacts,
+                    analyzer: None,
+                    quota: ARTIFACT_QUOTA,
+                    home: &home,
+                    now: arkdeck_hoststore::runtime_now,
+                    precise_now: arkdeck_hoststore::runtime_precise_now,
+                    sessions: publisher.as_ref(),
+                    cancellation: Some(&slot.cancellation),
+                    after_commit: None,
+                    hdc: hdc.as_ref(),
+                }
+                .handle(&params)
+                .map_err(|refusal| WireError {
+                    code: refusal.code.into(),
+                    message: refusal.message,
+                    details: Some(refusal.details),
+                })
+            }))
+            .unwrap_or_else(|_| {
+                Err(WireError {
+                    code: "internalError".into(),
+                    message: "the Runtime could not complete the Job lifecycle request".into(),
+                    details: Some(serde_json::Map::new()),
+                })
+            });
+            slot.cancellation.end();
+            slot.finish(&result);
+            if let Ok(mut runs) = running.lock() {
+                runs.remove(&start.job);
+            }
+            agents.finish(&start, &jobs);
+        });
     }
     #[cfg(target_os = "macos")]
     fn require_artifact_job(&self, job_id: &str) -> Result<(), WireError> {
@@ -182,7 +279,7 @@ impl Host {
         sessions: arkdeck_hoststore::SessionStore,
         artifacts: arkdeck_hoststore::ArtifactUsage,
     ) -> Self {
-        self.storage = Some((sessions, artifacts));
+        self.storage = Some(std::sync::Arc::new((sessions, artifacts)));
         self
     }
     #[cfg(target_os = "macos")]
@@ -230,13 +327,15 @@ impl Host {
             unavailable,
             observations: Mutex::new(ObservationState::default()),
             #[cfg(target_os = "macos")]
-            running: Mutex::new(Default::default()),
+            running: Default::default(),
             #[cfg(target_os = "macos")]
             home: arkdeck_platform::runtime_home().unwrap_or_default(),
             #[cfg(target_os = "macos")]
             claims: Default::default(),
             #[cfg(target_os = "macos")]
             hdc: None,
+            #[cfg(target_os = "macos")]
+            agents: None,
         }
     }
 }
@@ -403,7 +502,84 @@ impl HostServices for Host {
                 ("newDispatchCount".into(), serde_json::json!(0)),
             ])),
         })?;
+        if method == "artifact.list" {
+            // The pages are kept in the Job owner's snapshot directory, never
+            // in the Artifact root, whose every entry the quota and Trace
+            // census read.
+            let jobs = self.jobs.as_ref().ok_or_else(|| WireError {
+                code: "operationUnavailable".into(),
+                message: "Artifact Job owner is unavailable".into(),
+                details: Some(serde_json::Map::from_iter([
+                    ("phase".into(), serde_json::json!("artifactOwner")),
+                    ("newDispatchCount".into(), serde_json::json!(0)),
+                ])),
+            })?;
+            return artifacts.handle_list(params, &jobs.snapshot_directory(), |job| {
+                self.require_artifact_job(job)
+            });
+        }
         artifacts.handle_resource(method, params, |job| self.require_artifact_job(job))
+    }
+
+    /// `agent.run` and `agent.status`, as the Swift daemon's
+    /// `agentExecutionRequest` answers them: the execution advanced or read
+    /// by its owner, its newly owned Job started in the background, then the
+    /// Job projected over the answer.
+    #[cfg(target_os = "macos")]
+    fn agent_execution(
+        &self,
+        method: &str,
+        params: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<serde_json::Value, WireError> {
+        let (
+            Some(agents),
+            Some((state_root, analyzer)),
+            Some(jobs),
+            Some(artifacts),
+            Some(targets),
+        ) = (
+            &self.agents,
+            &self.planning,
+            &self.jobs,
+            &self.artifacts,
+            &self.targets,
+        )
+        else {
+            return Err(WireError {
+                code: "operationUnavailable".into(),
+                message: "AgentExecution owner is unavailable".into(),
+                details: Some(serde_json::Map::from_iter([
+                    ("phase".into(), serde_json::json!("preAdmission")),
+                    ("newDispatchCount".into(), serde_json::json!(0)),
+                ])),
+            });
+        };
+        let hdc = self.hdc();
+        let admitter = arkdeck_hoststore::JobAdmitter {
+            planner: arkdeck_hoststore::JobPlanner {
+                artifacts: Some(&**artifacts),
+                analyzer: analyzer.as_ref(),
+                state_root,
+                hdc: hdc.as_ref(),
+            },
+            jobs,
+            now: arkdeck_hoststore::runtime_now,
+        };
+        let engine = arkdeck_hoststore::AgentEngine {
+            targets,
+            jobs,
+            admitter: &admitter,
+            now: arkdeck_hoststore::runtime_precise_now,
+        };
+        let answer = agents.advance(method, params, &engine)?;
+        if let Some(start) = answer.start {
+            self.start_agent_run(start);
+        }
+        arkdeck_hoststore::AgentExecutionStore::project(
+            answer.value,
+            jobs,
+            &arkdeck_hoststore::JobResultReader { jobs, artifacts },
+        )
     }
 
     #[cfg(target_os = "macos")]
@@ -435,7 +611,7 @@ impl HostServices for Host {
         };
         let hdc = self.hdc();
         arkdeck_hoststore::JobPlanner {
-            artifacts: self.artifacts.as_ref(),
+            artifacts: self.artifacts.as_deref(),
             analyzer: analyzer.as_ref(),
             state_root,
             hdc: hdc.as_ref(),
@@ -467,7 +643,7 @@ impl HostServices for Host {
         let hdc = self.hdc();
         arkdeck_hoststore::JobAdmitter {
             planner: arkdeck_hoststore::JobPlanner {
-                artifacts: self.artifacts.as_ref(),
+                artifacts: self.artifacts.as_deref(),
                 analyzer: analyzer.as_ref(),
                 state_root,
                 hdc: hdc.as_ref(),
@@ -530,7 +706,7 @@ impl HostServices for Host {
         let probe = arkdeck_hoststore::SystemStorageProbe;
         let publisher =
             self.storage
-                .as_ref()
+                .as_deref()
                 .map(|(sessions, _)| arkdeck_hoststore::SessionPublisher {
                     sessions,
                     claims: &self.claims,
@@ -598,7 +774,7 @@ impl HostServices for Host {
     /// walks its own before it has cached a total, and writes nothing.
     #[cfg(target_os = "macos")]
     fn artifact_quota(&self) -> Result<serde_json::Value, WireError> {
-        let Some((_, usage)) = &self.storage else {
+        let Some((_, usage)) = self.storage.as_deref() else {
             return Err(WireError {
                 code: "rejected".into(),
                 message: "this method is unavailable in the read-only Rust foundation".into(),
@@ -656,7 +832,7 @@ impl HostServices for Host {
         let probe = arkdeck_hoststore::SystemStorageProbe;
         let publisher =
             self.storage
-                .as_ref()
+                .as_deref()
                 .map(|(sessions, _)| arkdeck_hoststore::SessionPublisher {
                     sessions,
                     claims: &self.claims,
@@ -893,7 +1069,7 @@ impl HostServices for Host {
         method: &str,
         params: &serde_json::Map<String, serde_json::Value>,
     ) -> Result<serde_json::Value, WireError> {
-        let (sessions, _) = self.storage.as_ref().ok_or_else(|| WireError {
+        let (sessions, _) = self.storage.as_deref().ok_or_else(|| WireError {
             code: "rejected".into(),
             message: "Session owner is not configured".into(),
             details: None,
@@ -1023,7 +1199,7 @@ impl HostServices for Host {
         };
         let (sessions, artifacts) = self
             .storage
-            .as_ref()
+            .as_deref()
             .ok_or_else(|| failed("rejected", "Runtime storage owners are not configured"))?;
         let artifact = artifacts
             .status()

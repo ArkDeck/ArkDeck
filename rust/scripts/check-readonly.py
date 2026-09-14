@@ -322,7 +322,12 @@ def main() -> None:
                     expected = ("rejected" if method not in SUPPORTED or method == "device.observations" else None)
                     if method in {"runtime.tool.inspect", "runtime.bundle.inspect", "operation.describe", "runtime.tool.register", "runtime.bundle.remove", "runtime.tool.remove", "runtime.bundle.register"}:
                         expected = "invalidParams"
-                    if method in {"runtime.bundle.list", "runtime.tool.list", "artifact.inspect", "artifact.read", "artifact.export"}:
+                    if method in {"runtime.bundle.list", "runtime.tool.list", "artifact.inspect", "artifact.read",
+                                  "artifact.export", "artifact.list"}:
+                        expected = "operationUnavailable"
+                    # Only the macOS daemon composes an agent execution owner; without one it
+                    # answers as Swift's daemon does. Elsewhere they stay the foundation's refusal.
+                    if method in {"agent.run", "agent.status"} and platform.system() == "Darwin":
                         expected = "operationUnavailable"
                     if method in {"target.list", "target.show", "target.display-name.set", "target.display-name.clear", "device.display-name.set", "device.display-name.clear"}:
                         expected = "internalError"

@@ -55,6 +55,34 @@ fn closed(fields: &Map<String, Value>, allowed: &[&str]) -> io::Result<()> {
     }
     Ok(())
 }
+/// The Job an `artifact.list` names: one tagged owner, as `reference` reads
+/// it, without an Artifact identity. An Import owner belongs to the Import
+/// owner.
+pub(crate) fn job_owner(fields: &Map<String, Value>) -> io::Result<String> {
+    let owner = fields
+        .get("owner")
+        .and_then(Value::as_object)
+        .ok_or_else(invalid)?;
+    closed(owner, &["kind", "id"])?;
+    let kind = owner
+        .get("kind")
+        .and_then(Value::as_str)
+        .ok_or_else(invalid)?;
+    let job = owner
+        .get("id")
+        .and_then(Value::as_str)
+        .ok_or_else(invalid)?;
+    if kind == "import" {
+        return Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "Import Artifact ownership requires its Import owner",
+        ));
+    }
+    if kind != "job" || !identifier(job) || job.starts_with("imp-") {
+        return Err(invalid());
+    }
+    Ok(job.into())
+}
 fn reference(fields: &Map<String, Value>) -> io::Result<ArtifactInspectRequest> {
     let owner = fields
         .get("owner")
