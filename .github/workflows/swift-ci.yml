@@ -7,8 +7,10 @@ name: Swift CI
 # Linux planner computes the exact diff first, so docs-only pushes do not
 # allocate a macOS runner.  Agent branches compare their cumulative head
 # with the current origin/main merge base; this handles an all-zero first-push
-# `before` OID without conservatively compiling unrelated docs.  Missing base
-# facts fail closed by selecting every lane.
+# `before` OID without conservatively compiling unrelated docs.  Main compares
+# with the newest main commit this workflow passed on, so the changes of a run
+# that went red, or that GitHub replaced while it waited, stay selected until
+# a run passes them.  Missing base facts fail closed by selecting every lane.
 #
 # ArkDeckKit keeps its full test suite as the merge gate.  SwiftPM's stable
 # mirrored workspace makes a restored cache genuinely incremental across
@@ -34,7 +36,10 @@ permissions:
 # with no validation of their own commit, no cache entry and a `cancelled`
 # status on main (#1850, #1854, #1866), while the merge that displaced them
 # was validated only as a whole. Finishing a superseded main run costs the
-# runner minutes it had left, nothing more.
+# runner minutes it had left, nothing more. GitHub still keeps one pending
+# run per group, so of three quick merges the second's run can be replaced
+# before it starts (#1903 on 2026-09-14); the plan job then covers that commit
+# in the next run.
 concurrency:
   group: swift-ci-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
@@ -43,6 +48,11 @@ jobs:
   plan:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # actions: read is for the one step that asks which main commit this
+    # workflow last passed on; nothing in this job writes.
+    permissions:
+      contents: read
+      actions: read
     outputs:
       swift: ${{ steps.paths.outputs.swift }}
       app: ${{ steps.paths.outputs.app }}
@@ -72,19 +82,36 @@ jobs:
       - name: CI workflow contract tests
         run: python3 scripts/test_agent_pr_workflow.py
 
+      # A main run plans from the newest main commit this workflow passed on,
+      # not from the push's `before` (see plan.py). If that cannot be read the
+      # output stays empty, and an empty answer selects every lane.
+      - name: Find the last main commit Swift CI passed on
+        id: last-success
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -u
+          oid=$(gh api "repos/${GITHUB_REPOSITORY}/actions/workflows/swift-ci.yml/runs?branch=main&event=push&status=success&per_page=1" --jq '.workflow_runs[0].head_sha // ""' 2>/dev/null) || oid=""
+          echo "last main commit Swift CI passed on: ${oid:-unknown}"
+          printf 'oid=%s\n' "$oid" >> "$GITHUB_OUTPUT"
+
       - name: Determine compiled lanes
         id: paths
+        env:
+          ARKDECK_MAIN_LAST_SUCCESS: ${{ steps.last-success.outputs.oid }}
         run: >-
           python3 scripts/ci/plan.py
           --repo-root "$GITHUB_WORKSPACE"
           --event "$GITHUB_EVENT_PATH"
+          --main-last-success "$ARKDECK_MAIN_LAST_SUCCESS"
           --github-output "$GITHUB_OUTPUT"
 
       - name: Plan summary
         run: |
           {
             echo "### Compiled CI plan"
-            echo "- Base: \`${{ steps.paths.outputs.base }}\`"
+            echo "- Base: \`${{ steps.paths.outputs.base }}\` (\`${{ steps.paths.outputs.base-kind }}\`)"
             echo "- Decision: \`${{ steps.paths.outputs.reason }}\`"
             echo "- Changed files: \`${{ steps.paths.outputs.changed-count }}\`"
             echo "- ArkDeckKit full tests: \`${{ steps.paths.outputs.swift }}\`"

@@ -277,15 +277,110 @@ class GitPlanTests(unittest.TestCase):
         self.assertFalse(plan.lanes.app)
         self.assertTrue(plan.lanes.ds)
 
-    def test_main_push_uses_exact_before_revision(self):
-        head = self.commit_file("docs/note.md", "docs\n")
-        plan = PLAN.plan_from_push_event(
+    def main_plan(self, *, before: str, after: str, last_success: str | None):
+        return PLAN.plan_from_push_event(
             self.root,
-            self.event(before=self.base, after=head, ref="refs/heads/main"),
+            self.event(before=before, after=after, ref="refs/heads/main"),
+            last_success=last_success,
         )
+
+    def test_main_push_after_a_green_run_plans_its_own_push(self):
+        head = self.commit_file("docs/note.md", "docs\n")
+        plan = self.main_plan(before=self.base, after=head, last_success=self.base)
+        self.assertEqual(plan.base_revision, self.base)
+        self.assertEqual(plan.base_kind, "main-last-success")
         self.assertFalse(plan.lanes.swift)
         self.assertFalse(plan.lanes.app)
         self.assertFalse(plan.lanes.ds)
+        self.assertFalse(plan.lanes.rust)
+
+    def test_main_push_covers_every_commit_since_the_last_green_run(self):
+        # 2026-09-14: #1903's run waited behind #1904's and GitHub replaced it
+        # with #1905's, one pending run per concurrency group. #1905's run then
+        # planned 99dda729..6cf99fb6 and never looked at #1903's files. A red
+        # run leaves the same hole; the last green commit closes both.
+        source = "Packages/ArkDeckKit/Sources/ArkDeckCore/Example.swift"
+        unvalidated = self.commit_file(source, "// swift\n")
+        head = self.commit_file("docs/note.md", "docs\n")
+        own_push = PLAN.plan_between(
+            self.root, base_revision=unvalidated, head_revision=head, use_merge_base=False
+        )
+        self.assertFalse(own_push.lanes.swift)
+        plan = self.main_plan(before=unvalidated, after=head, last_success=self.base)
+        self.assertEqual(plan.base_revision, self.base)
+        self.assertEqual(plan.base_kind, "main-last-success")
+        self.assertIn(source, plan.changed_files)
+        self.assertTrue(plan.lanes.swift)
+        self.assertTrue(plan.lanes.app)
+        self.assertTrue(plan.lanes.ds)
+
+    def test_main_push_without_a_usable_last_success_runs_every_lane(self):
+        head = self.commit_file("docs/note.md", "docs\n")
+        for last_success in (None, "", "HEAD", "main", self.base[:12], self.base.upper(),
+                             "f" * 40):
+            with self.subTest(last_success=last_success):
+                plan = self.main_plan(before=self.base, after=head, last_success=last_success)
+                self.assertEqual(plan.reason, "main-last-success-unavailable-fail-closed")
+                self.assertTrue(plan.lanes.swift)
+                self.assertTrue(plan.lanes.app)
+                self.assertTrue(plan.lanes.ds)
+                self.assertTrue(plan.lanes.rust)
+
+    def test_main_last_success_must_precede_the_push(self):
+        self.git("switch", "-qc", "side")
+        elsewhere = self.commit_file("docs/side.md", "side\n")
+        self.git("switch", "-q", "main")
+        head = self.commit_file("docs/note.md", "docs\n")
+        plan = self.main_plan(before=self.base, after=head, last_success=elsewhere)
+        self.assertEqual(plan.reason, "main-last-success-not-behind-push-fail-closed")
+        self.assertTrue(plan.lanes.swift)
+        self.assertTrue(plan.lanes.rust)
+
+    def test_rerun_of_a_passed_main_commit_rechecks_its_own_push(self):
+        head = self.commit_file("rust/crates/arkdeck-contract/src/lib.rs", "// Rust\n")
+        plan = self.main_plan(before=self.base, after=head, last_success=head)
+        self.assertEqual(plan.base_revision, self.base)
+        self.assertEqual(plan.base_kind, "push-before")
+        self.assertTrue(plan.lanes.rust)
+        self.assertFalse(plan.lanes.swift)
+
+    def test_agent_push_ignores_the_main_last_success(self):
+        self.git("switch", "-qc", "agent/docs")
+        head = self.commit_file("docs/note.md", "docs\n")
+        event = self.event(before=PLAN.ZERO_OID, after=head, ref="refs/heads/agent/docs")
+        self.assertEqual(
+            PLAN.plan_from_push_event(self.root, event, last_success=None),
+            PLAN.plan_from_push_event(self.root, event, last_success="f" * 40),
+        )
+
+    def test_cli_hands_the_main_last_success_to_the_plan(self):
+        head = self.commit_file("docs/note.md", "docs\n")
+        event_path = self.root / "event.json"
+        event_path.write_text(
+            f'{{"before": "{self.base}", "after": "{head}", "ref": "refs/heads/main"}}',
+            encoding="utf-8",
+        )
+        output = self.root / "github-output"
+        arguments = ["--repo-root", str(self.root), "--event", str(event_path),
+                     "--github-output", str(output)]
+        with mock.patch("sys.stdout"):
+            status = PLAN.main([*arguments, "--main-last-success", self.base])
+        self.assertEqual(status, 0)
+        values = dict(line.split("=", 1) for line in output.read_text(encoding="utf-8").splitlines())
+        self.assertEqual(values["base"], self.base)
+        self.assertEqual(values["base-kind"], "main-last-success")
+        # The workflow passes an empty value off main and when the lookup fails.
+        output.unlink()
+        with mock.patch("sys.stdout"):
+            self.assertEqual(PLAN.main([*arguments, "--main-last-success", ""]), 0)
+        values = dict(line.split("=", 1) for line in output.read_text(encoding="utf-8").splitlines())
+        self.assertEqual(values["reason"], "main-last-success-unavailable-fail-closed")
+        with mock.patch("sys.stderr"):
+            self.assertEqual(
+                PLAN.main(["--repo-root", str(self.root), "--base-revision", self.base,
+                           "--main-last-success", self.base]),
+                1,
+            )
 
     def test_missing_main_before_runs_every_lane(self):
         plan = PLAN.plan_from_push_event(
