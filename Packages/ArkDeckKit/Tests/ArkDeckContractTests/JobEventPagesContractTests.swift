@@ -237,6 +237,17 @@ final class JobEventPagesContractTests: XCTestCase {
     }
     return id
   }
+  // A release that reaches the gate before the Job's run does is lost and
+  // parks the run forever. `enter` stores its continuation in the actor turn
+  // that sets `arrived`, so wait for the hold itself rather than for time.
+  private func held(_ gate: RuntimeAgentExecutionContractTests.Gate) async throws -> Bool {
+    let limit = ContinuousClock.now.advanced(by: .seconds(60))
+    while await !gate.arrived {
+      guard ContinuousClock.now < limit else { return false }
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    return true
+  }
   private func cli(_ args: [String], interruptAfter: Double? = nil) throws -> (Int32, [[String: JSONValue]]) {
     let process = Process()
     process.executableURL = Bundle(for: Self.self).bundleURL.deletingLastPathComponent().appending(path: "arkdeck")
@@ -298,6 +309,9 @@ final class JobEventPagesContractTests: XCTestCase {
     let gate = RuntimeAgentExecutionContractTests.Gate()
     runtime.dispatcher.hold(gate)
     let id = try await run(runtime, finished: false)
+    // Let the Job's run hold its dispatch first, so the CLI's wait times out
+    // during that dispatch and the release below cannot come before it.
+    guard try await held(gate) else { return XCTFail("the Job's run never reached its dispatch") }
     let output = try cli(["job", "wait", "--job", id, "--output", "jsonl", "--timeout", "300ms"])
     XCTAssertEqual(output.0, 75)
     assertFrames(output.1, exit: 75, command: "job.wait")
@@ -323,10 +337,7 @@ final class JobEventPagesContractTests: XCTestCase {
     let gate = RuntimeAgentExecutionContractTests.Gate()
     runtime.dispatcher.hold(gate)
     let id = try await run(runtime, finished: false)
-    for _ in 0..<100 {
-      if await gate.arrived { break }
-      try await Task.sleep(for: .milliseconds(10))
-    }
+    guard try await held(gate) else { return XCTFail("the Job's run never reached its dispatch") }
     try await runtime.engine.requestCancel(jobID: id)
     await gate.release()
     let finished = try await runtime.engine.run(jobID: id)
