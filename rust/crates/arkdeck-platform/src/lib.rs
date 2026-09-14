@@ -27,7 +27,7 @@ pub use process::{ProcessLimits, ProcessOutput, VerifiedTool};
 #[cfg(unix)]
 mod account;
 #[cfg(unix)]
-pub use account::runtime_home;
+pub use account::{application_support_directory, arkdeck_application_support_root, runtime_home};
 #[cfg(target_os = "macos")]
 mod host_signature;
 #[cfg(target_os = "macos")]
@@ -130,11 +130,11 @@ pub use macos_control::{PeerOrigin, listen_mach};
 mod host_store;
 #[cfg(target_os = "macos")]
 pub use host_store::{
-    DocumentPublishError, ExportPublishError, ExportStaging, FileExportStaging, HostDirectory,
-    HostDirectoryFacts, HostEntryKind, HostExportCapacity, HostImportSource, HostJournal,
-    HostJournalAppender, HostReadLock, HostUploadFile, JournalAppendError, JournalWritePoint,
-    PayloadCheck, PreparedSessionRemoval, PreparedTraceRemoval, UploadChunkCheckpoint,
-    UploadWritePoint,
+    DocumentPublishError, ExclusiveOutcome, ExportPublishError, ExportStaging, FileExportStaging,
+    HostDirectory, HostDirectoryFacts, HostEntryKind, HostExportCapacity, HostImportSource,
+    HostJournal, HostJournalAppender, HostReadLock, HostUploadFile, JournalAppendError,
+    JournalWritePoint, PayloadCheck, PreparedSessionRemoval, PreparedTraceRemoval,
+    UploadChunkCheckpoint, UploadWritePoint,
 };
 
 #[cfg(target_os = "macos")]

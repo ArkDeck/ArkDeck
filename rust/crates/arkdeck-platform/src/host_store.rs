@@ -172,6 +172,29 @@ fn owned(file: &File, directory: bool, ownership: Ownership) -> io::Result<()> {
     Ok(())
 }
 
+/// Swift `RockchipPostFlashHDCBindingStore.validateFile`: an owned,
+/// single-link regular file whose mode is exactly owner read/write.
+fn owner_only(file: &File, ownership: Ownership) -> io::Result<std::fs::Metadata> {
+    owned(file, false, ownership)?;
+    let metadata = file.metadata()?;
+    if metadata.mode() & 0o777 != 0o600 {
+        return Err(fail());
+    }
+    Ok(metadata)
+}
+
+/// What [`HostDirectory::create_exclusive_or_match`] found at the name.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ExclusiveOutcome {
+    /// The name was free: the bytes are there now, synced, owner-only.
+    Created,
+    /// The name already held exactly these bytes; nothing was written.
+    Matched,
+    /// The name already holds a different owner-only document; nothing was
+    /// written and nothing was replaced.
+    Different,
+}
+
 impl HostDirectory {
     pub fn directory_identity(&self) -> io::Result<(u64, u64)> {
         owned(&self.0, true, self.1)?;
@@ -396,6 +419,87 @@ impl HostDirectory {
         Ok(lock)
     }
 
+    /// Swift `RockchipPostFlashHDCBindingStore.archiveSuperseded`: a document
+    /// created exactly once at its name, written and synced in place (no
+    /// rename, no unlink), and — when the name is already taken — compared
+    /// byte for byte against the owner-only file there instead of replaced.
+    /// A taken name is evidence: nothing here ever removes one.
+    pub fn create_exclusive_or_match(
+        &self,
+        name: &str,
+        bytes: &[u8],
+        maximum: usize,
+    ) -> io::Result<ExclusiveOutcome> {
+        if !matches!(self.1, Ownership::Private) || bytes.is_empty() || bytes.len() > maximum {
+            return Err(fail());
+        }
+        owned(&self.0, true, self.1)?;
+        let name_c = segment(name)?;
+        let fd = unsafe {
+            libc::openat(
+                self.0.as_raw_fd(),
+                name_c.as_ptr(),
+                libc::O_WRONLY | libc::O_CREAT | libc::O_EXCL | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+                0o600,
+            )
+        };
+        if fd < 0 {
+            let error = io::Error::last_os_error();
+            if error.kind() != io::ErrorKind::AlreadyExists {
+                return Err(error);
+            }
+            let existing = self.open_at(name, 0)?;
+            let metadata = owner_only(&existing, self.1)?;
+            if metadata.len() > maximum as u64 {
+                return Err(fail());
+            }
+            if metadata.len() != bytes.len() as u64 {
+                return Ok(ExclusiveOutcome::Different);
+            }
+            let mut held = Vec::with_capacity(bytes.len());
+            (&existing)
+                .take(maximum as u64 + 1)
+                .read_to_end(&mut held)?;
+            return Ok(if held == bytes {
+                ExclusiveOutcome::Matched
+            } else {
+                ExclusiveOutcome::Different
+            });
+        }
+        let mut file = unsafe { File::from_raw_fd(fd) };
+        file.write_all(bytes)?;
+        // SAFETY: fsync on the retained descriptors; Swift syncs the file
+        // then the directory, without F_FULLFSYNC, for an archive.
+        if unsafe { libc::fsync(file.as_raw_fd()) } != 0
+            || unsafe { libc::fsync(self.0.as_raw_fd()) } != 0
+        {
+            return Err(io::Error::last_os_error());
+        }
+        Ok(ExclusiveOutcome::Created)
+    }
+
+    /// Swift `RockchipPostFlashHDCBindingStore.load`: `None` when the name is
+    /// absent; otherwise the whole document, which must be the owner's
+    /// single-link regular file of exactly owner read/write mode, opened
+    /// through no link, of 1..=`maximum` bytes.
+    pub fn read_owner_only(&self, name: &str, maximum: usize) -> io::Result<Option<Vec<u8>>> {
+        let file = match self.open_at(name, 0) {
+            Ok(file) => file,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
+            Err(error) => return Err(error),
+        };
+        let metadata = owner_only(&file, self.1)?;
+        if metadata.len() == 0 || metadata.len() > maximum as u64 {
+            return Err(fail());
+        }
+        let mut bytes = Vec::with_capacity(metadata.len() as usize);
+        (&file).take(maximum as u64 + 1).read_to_end(&mut bytes)?;
+        if bytes.len() as u64 != metadata.len() {
+            return Err(fail());
+        }
+        Ok(Some(bytes))
+    }
+
     /// Sync a fresh private file, atomically rename it, then sync the directory.
     /// Errors after rename must be treated as uncertain publication by callers.
     pub fn publish_document(
@@ -480,6 +584,29 @@ impl HostDirectory {
             return Err(io::Error::last_os_error());
         }
         file.sync_all()
+    }
+
+    /// Swift `RockchipPostFlashHDCBindingStore.prepareRoot`: a private root
+    /// that is created when absent — every missing level owner-only — and
+    /// whose mode is made owner-only whether or not it existed, then opened
+    /// as [`HostDirectory::open`] opens it, by its canonical path.
+    pub fn open_or_create_private(path: &Path) -> io::Result<Self> {
+        use std::os::unix::ffi::OsStrExt;
+        use std::os::unix::fs::DirBuilderExt;
+        if !path.is_absolute() {
+            return Err(fail());
+        }
+        std::fs::DirBuilder::new()
+            .recursive(true)
+            .mode(0o700)
+            .create(path)?;
+        let canonical = path.canonicalize()?;
+        let target = CString::new(canonical.as_os_str().as_bytes()).map_err(|_| fail())?;
+        // SAFETY: a NUL-terminated path, as Swift's `chmod(rootURL.path, 0o700)`.
+        if unsafe { libc::chmod(target.as_ptr(), 0o700) } != 0 {
+            return Err(io::Error::last_os_error());
+        }
+        Self::open_root(&canonical, false)
     }
 
     pub fn open(path: &Path) -> io::Result<Self> {
