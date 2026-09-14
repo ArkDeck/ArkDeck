@@ -678,6 +678,11 @@ use macos_process::{spawn, spawn_in};
 mod shell_channel;
 #[cfg(target_os = "macos")]
 pub use shell_channel::{DeviceShellAnswer, DeviceShellChannel, DeviceShellChannelError};
+#[cfg(target_os = "macos")]
+#[path = "pty_exchange.rs"]
+mod pty_exchange;
+#[cfg(target_os = "macos")]
+pub use pty_exchange::{PtyError, PtyExecution, PtyFailureCategory, PtyInteraction, PtyRequest};
 
 #[cfg(target_os = "macos")]
 #[path = "tool_process.rs"]
