@@ -530,81 +530,125 @@ def validate_automatic_check_contract(
             )
 
 
+RUST_CI_JOBS = ("policy", "workspace")
+# Both jobs check out, set up and fetch the same way: every contract digest is
+# over repository bytes on every host.
+RUST_SHARED_JOB_TOKENS = (
+    "        shell: bash\n        working-directory: rust\n",
+    "git config core.autocrlf false",
+    '"+refs/heads/main:refs/remotes/origin/main"',
+    'test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"',
+    "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97",
+    '          python-version: "3.14"\n',
+    "run: python -m pip install PyYAML==6.0.3 jsonschema==4.26.0",
+    "rustup toolchain install --profile minimal --component rustfmt,clippy --no-self-update",
+    "rustup show active-toolchain",
+    "run: cargo fetch --locked",
+)
+# Answers that cannot depend on the host: each runs exactly once, in `policy`.
+RUST_POLICY_TOKENS = (
+    "run: python rust/scripts/generate-contract.py --check",
+    "run: cargo fmt --all --check",
+    "        working-directory: .\n"
+    "        run: python rust/scripts/test_contract_checks.py\n",
+    # cargo-deny and cargo-vet are memoized between hosted runs. The memo
+    # must stay exact (one key naming both pinned versions and the pinned
+    # toolchain, no prefix fallback), be written only by protected main,
+    # and be read back against the pinned versions before either policy
+    # check runs, so a restored binary never stands in for the `--locked`
+    # install it replaces.
+    "      - name: Restore pinned dependency policy tools\n"
+    "        id: policy-tools\n"
+    "        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+    "      - name: Install pinned dependency policy tools\n"
+    "        if: steps.policy-tools.outputs.cache-hit != 'true'\n",
+    "cargo install --locked --version 0.20.2 cargo-deny",
+    "cargo install --locked --version 0.10.2 cargo-vet",
+    "      - name: Require the pinned dependency policy tool versions\n"
+    "        run: |\n",
+    "test \"$(cargo deny --version | tr -d '\\r')\" = \"cargo-deny 0.20.2\"",
+    "test \"$(cargo vet --version | tr -d '\\r')\" = \"cargo-vet 0.10.2\"",
+    "      - name: Save pinned dependency policy tools\n"
+    "        if: >-\n"
+    "          success() &&\n"
+    "          github.ref == 'refs/heads/main' &&\n"
+    "          steps.policy-tools.outputs.cache-hit != 'true'\n"
+    "        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+    "run: cargo deny --locked check",
+    "run: cargo vet --locked --no-registry-suggestions",
+    "run: git diff --exit-code -- Cargo.lock supply-chain",
+)
+# Answers that can differ between hosts: each runs exactly once per host, in
+# the `workspace` matrix.
+RUST_WORKSPACE_TOKENS = (
+    # Only these two steps compile and run the checkout. Every contract
+    # step either reads Git objects at the pinned Swift commit or builds a
+    # separate candidate view, so dropping either one lets a workspace
+    # that does not build, or whose tests fail, pass a green rust lane.
+    # The workspace tests run through a wrapper that keeps the pin's
+    # currency and the Rust code's correctness as separate questions;
+    # calling `cargo test --workspace` directly here fails every branch
+    # that legitimately changes a recorded frame.
+    "run: cargo clippy --workspace --all-targets -- -D warnings\n",
+    "        working-directory: .\n"
+    "        run: python rust/scripts/workspace-tests.py\n",
+    "        working-directory: .\n"
+    "        run: python rust/scripts/check-contracts.py\n",
+    "      - name: Preserve actual read-only recordings\n"
+    "        if: always()\n"
+    "        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1 (Node 24)\n"
+    "        with:\n"
+    "          name: rust-readonly-recordings-${{ matrix.os }}\n"
+    "          path: rust/target/readonly-check/\n"
+    "          if-no-files-found: warn\n"
+    "          retention-days: 7\n",
+)
+
+
 def validate_rust_ci_contract(text: str) -> None:
-    """Require native host checks and fail-closed locked dependency audits."""
+    """Require native host checks and fail-closed locked dependency audits.
+
+    The checks whose answer cannot depend on the host run once, in `policy`.
+    Lint, the workspace tests and the contract views run on every host, in the
+    `workspace` matrix. The swift aggregate requires both through the calling
+    job's result.
+    """
 
     if extract_event_names(text) != ("workflow_call",):
         raise WorkflowContractError("Rust CI must be called through the shared planner")
-    required = (
-        "permissions:\n  contents: read\n",
+    if "permissions:\n  contents: read\n" not in text:
+        raise WorkflowContractError("Rust CI must be limited to reading contents")
+    if extract_job_names(text) != RUST_CI_JOBS:
+        raise WorkflowContractError(
+            "Rust CI must run its host-independent checks in `policy` and its "
+            "host checks in the `workspace` matrix"
+        )
+    policy = _job_block(text, "policy")
+    workspace = _job_block(text, "workspace")
+    if "    runs-on: ubuntu-latest\n" not in policy or "matrix" in policy:
+        raise WorkflowContractError("Rust policy checks must run once, on one fixed host")
+    for token in (
         "      fail-fast: false\n",
         "        os: [ubuntu-latest, macos-26, windows-latest]\n",
         "    runs-on: ${{ matrix.os }}\n",
-        "        shell: bash\n        working-directory: rust\n",
-        "git config core.autocrlf false",
-        '"+refs/heads/main:refs/remotes/origin/main"',
-        'test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"',
-        "actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97",
-        '          python-version: "3.14"\n',
-        "run: python -m pip install PyYAML==6.0.3 jsonschema==4.26.0",
-        "run: python rust/scripts/generate-contract.py --check",
-        "rustup toolchain install --profile minimal --component rustfmt,clippy --no-self-update",
-        "rustup show active-toolchain",
-        "run: cargo fmt --all --check",
-        "run: cargo fetch --locked",
-        # Only these two steps compile and run the checkout. Every contract
-        # step either reads Git objects at the pinned Swift commit or builds a
-        # separate candidate view, so dropping either one lets a workspace
-        # that does not build, or whose tests fail, pass a green rust lane.
-        # The workspace tests run through a wrapper that keeps the pin's
-        # currency and the Rust code's correctness as separate questions;
-        # calling `cargo test --workspace` directly here fails every branch
-        # that legitimately changes a recorded frame.
-        "run: cargo clippy --workspace --all-targets -- -D warnings\n",
-        "        working-directory: .\n"
-        "        run: python rust/scripts/workspace-tests.py\n",
-        "        working-directory: .\n"
-        "        run: python rust/scripts/test_contract_checks.py\n",
-        "        working-directory: .\n"
-        "        run: python rust/scripts/check-contracts.py\n",
-        # cargo-deny and cargo-vet are memoized between hosted runs. The memo
-        # must stay exact (one key naming both pinned versions and the pinned
-        # toolchain, no prefix fallback), be written only by protected main,
-        # and be read back against the pinned versions before either policy
-        # check runs, so a restored binary never stands in for the `--locked`
-        # install it replaces.
-        "      - name: Restore pinned dependency policy tools\n"
-        "        id: policy-tools\n"
-        "        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
-        "      - name: Install pinned dependency policy tools\n"
-        "        if: steps.policy-tools.outputs.cache-hit != 'true'\n",
-        "cargo install --locked --version 0.20.2 cargo-deny",
-        "cargo install --locked --version 0.10.2 cargo-vet",
-        "      - name: Require the pinned dependency policy tool versions\n"
-        "        run: |\n",
-        "test \"$(cargo deny --version | tr -d '\\r')\" = \"cargo-deny 0.20.2\"",
-        "test \"$(cargo vet --version | tr -d '\\r')\" = \"cargo-vet 0.10.2\"",
-        "      - name: Save pinned dependency policy tools\n"
-        "        if: >-\n"
-        "          success() &&\n"
-        "          github.ref == 'refs/heads/main' &&\n"
-        "          steps.policy-tools.outputs.cache-hit != 'true'\n"
-        "        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
-        "run: cargo deny --locked check",
-        "run: cargo vet --locked --no-registry-suggestions",
-        "run: git diff --exit-code -- Cargo.lock supply-chain",
-        "      - name: Preserve actual read-only recordings\n"
-        "        if: always()\n"
-        "        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1 (Node 24)\n"
-        "        with:\n"
-        "          name: rust-readonly-recordings-${{ matrix.os }}\n"
-        "          path: rust/target/readonly-check/\n"
-        "          if-no-files-found: warn\n"
-        "          retention-days: 7\n",
-    )
-    for token in required:
-        if token not in text:
-            raise WorkflowContractError(f"Rust CI missing contract token: {token}")
+    ):
+        if token not in workspace:
+            raise WorkflowContractError(f"Rust workspace matrix missing contract token: {token}")
+    for name, block in (("policy", policy), ("workspace", workspace)):
+        for token in RUST_SHARED_JOB_TOKENS:
+            if token not in block:
+                raise WorkflowContractError(f"Rust {name} job missing contract token: {token}")
+    for name, block, tokens in (
+        ("policy", policy, RUST_POLICY_TOKENS),
+        ("workspace", workspace, RUST_WORKSPACE_TOKENS),
+    ):
+        for token in tokens:
+            if token not in block:
+                raise WorkflowContractError(f"Rust {name} job missing contract token: {token}")
+            if text.count(token) != 1:
+                raise WorkflowContractError(
+                    f"Rust CI must run this check exactly once, in the {name} job: {token}"
+                )
     for token in (
         "continue-on-error:", "secrets.", "secrets[", "secrets: inherit",
         "contents: write", "id-token: write", "cargo vet init",
@@ -613,46 +657,39 @@ def validate_rust_ci_contract(text: str) -> None:
     ):
         if token in text:
             raise WorkflowContractError(f"Rust CI contains forbidden token: {token}")
-    if text.count(RUST_POLICY_TOOLS_CACHE_KEY) != 2:
+    if text.count(RUST_POLICY_TOOLS_CACHE_KEY) != 2 or policy.count(RUST_POLICY_TOOLS_CACHE_KEY) != 2:
         raise WorkflowContractError(
             "Rust CI must restore and save the policy tools under one exact key "
             "naming both pinned versions and the pinned toolchain"
         )
-    restore = text.index("      - name: Restore pinned dependency policy tools")
-    install = text.index("      - name: Install pinned dependency policy tools")
-    read_back = text.index("      - name: Require the pinned dependency policy tool versions")
-    save = text.index("      - name: Save pinned dependency policy tools")
-    if not (restore < install < read_back < save < text.index("run: cargo deny --locked check")):
+    restore = policy.index("      - name: Restore pinned dependency policy tools")
+    install = policy.index("      - name: Install pinned dependency policy tools")
+    read_back = policy.index("      - name: Require the pinned dependency policy tool versions")
+    save = policy.index("      - name: Save pinned dependency policy tools")
+    if not (restore < install < read_back < save < policy.index("run: cargo deny --locked check")):
         raise WorkflowContractError(
             "Rust CI must restore, install on a miss, read back the pinned versions "
             "and save before the dependency policy checks"
         )
-    if text.index("run: cargo fetch --locked") > text.index("run: cargo vet --locked"):
+    if policy.index("run: cargo fetch --locked") > policy.index("run: cargo vet --locked"):
         raise WorkflowContractError("Rust CI must fetch locked metadata before locked vet")
-    if text.index("rustup toolchain install") > text.index(
+    if policy.index("rustup toolchain install") > policy.index(
         "run: python rust/scripts/generate-contract.py --check"
     ):
         raise WorkflowContractError("Rust CI must install rustfmt before checking generated inputs")
-    if text.index("run: python rust/scripts/generate-contract.py --check") > text.index(
-        "run: python rust/scripts/check-contracts.py"
-    ):
-        raise WorkflowContractError("Rust CI must check generated inputs before compilation")
-    if text.index("run: cargo fetch --locked") > text.index(
-        "run: python rust/scripts/check-contracts.py"
-    ):
-        raise WorkflowContractError("Rust CI must fetch locked metadata before contract checks")
-    if text.index("run: python rust/scripts/test_contract_checks.py") > text.index(
-        "run: python rust/scripts/check-contracts.py"
-    ):
-        raise WorkflowContractError("Rust CI must verify isolation and provenance before contract checks")
-    if text.index("run: python rust/scripts/check-contracts.py") > text.index(
-        "run: cargo deny --locked check"
-    ):
-        raise WorkflowContractError("Rust CI must record contract checks before dependency policy")
-    if text.index("run: python rust/scripts/check-contracts.py") > text.index(
-        "      - name: Preserve actual read-only recordings"
-    ):
-        raise WorkflowContractError("Rust CI must preserve recordings after their producer runs")
+    order = [
+        workspace.index("rustup toolchain install"),
+        workspace.index("run: cargo fetch --locked"),
+        workspace.index("run: cargo clippy --workspace"),
+        workspace.index("run: python rust/scripts/workspace-tests.py"),
+        workspace.index("run: python rust/scripts/check-contracts.py"),
+        workspace.index("      - name: Preserve actual read-only recordings"),
+    ]
+    if order != sorted(order):
+        raise WorkflowContractError(
+            "Rust workspace job must fetch locked metadata before it lints, tests and "
+            "runs the contract views, and preserve recordings after their producer runs"
+        )
 
 
 def validate_arkforge_private_package_auth(swift_text: str, auth_text: str) -> None:
@@ -815,7 +852,30 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
             rust.index("      - name: Activate workspace toolchain"):
             rust.index("      - name: Verify generated contract inputs")
         ]
+        policy_start = rust.index("  policy:\n")
+        workspace_start = rust.index("  workspace:\n")
+        deny_step = (
+            "      - name: Dependency source, license, ban and advisory policy\n"
+            "        run: cargo deny --locked check\n\n"
+        )
+        lint_step = (
+            "      - name: Lint the workspace, its tests and its examples\n"
+            "        run: cargo clippy --workspace --all-targets -- -D warnings\n\n"
+        )
+        recordings = "      - name: Preserve actual read-only recordings\n"
+        lock_check = "      - name: Verify checks left locked inputs unchanged\n"
         mutations = (
+            # A host-independent check repeated on every host is the cost the
+            # policy job removes, and one on no host is no check at all.
+            rust.replace(recordings, deny_step + recordings),
+            rust[:policy_start] + rust[workspace_start:],
+            rust.replace(
+                "    name: Rust host-independent checks\n    runs-on: ubuntu-latest\n",
+                "    name: Rust host-independent checks\n    runs-on: ${{ matrix.os }}\n",
+            ),
+            # A host check moved to the single policy host leaves the other two
+            # hosts unlinted.
+            rust.replace(lint_step, "").replace(lock_check, lint_step + lock_check),
             rust.replace(bootstrap, "").replace(
                 "      - name: Format check", bootstrap + "      - name: Format check"
             ),
@@ -857,6 +917,8 @@ class AgentPrWorkflowContractTests(unittest.TestCase):
             rust.replace("run: python rust/scripts/check-contracts.py", "run: true"),
         )
         for mutated in mutations:
+            # A mutation that no longer matches the workflow proves nothing.
+            self.assertNotEqual(mutated, rust)
             with self.assertRaises(WorkflowContractError):
                 validate_rust_ci_contract(mutated)
 
