@@ -692,8 +692,11 @@ forwards those frames; the Swift daemon composed behind a facade
 (`AgentFacadeHostOwnership`) no longer opens that store, so one process owns
 its lock. A standalone Swift daemon keeps its own owner over the same file and
 format. Requests inside the facade queue on one in-process guard, as the Swift
-owner's blocking lock did; another process holding the lock is refused with
-`resourceConflict`. Every other method is still forwarded unchanged.
+owner's blocking lock did. Every Rust owner lock is retried for up to
+`HostDirectory::LOCK_WAIT` (500 ms), because a child that another thread is
+spawning keeps a lock this process just released until its exec; another
+process holding the lock longer is refused with `resourceConflict`. Every other
+method is still forwarded unchanged.
 
 `ARKDECK_DAEMON_UNDER_TEST=target/debug/arkdeck-agentd python3
 scripts/test-macos-facade.py` checks the transport against a fixture authority,
