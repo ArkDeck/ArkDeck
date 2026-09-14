@@ -24,7 +24,6 @@ mod pointer_input;
 mod port_forward;
 mod presence;
 mod provider;
-mod readback;
 mod rockchip_hdc;
 mod rockchip_loader;
 mod semantic;
@@ -88,7 +87,6 @@ pub use presence::{
     parse_registered_presence,
 };
 pub use provider::HdcReadOnlyProvider;
-pub use readback::Reconcile;
 pub use rockchip_hdc::{
     BuildReadback, Clock, POST_FLASH_BUILD_PROPERTIES_COMMAND, ReconnectExpectation,
     RockchipHdcFailure, RockchipHdcObserver, SystemClock, VerifiedBuild, WaitBudget,

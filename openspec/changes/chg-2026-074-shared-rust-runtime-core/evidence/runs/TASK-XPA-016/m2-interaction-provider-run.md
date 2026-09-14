@@ -11,9 +11,10 @@ server, no daemon.
 Base: protected main `68e8241a` (#1954). Branch
 `agent/xpa-016-pointer-port-forward-provider-20260914`, stacked on the oracle slice
 (`agent/xpa-014-pointer-port-forward-oracle-20260914`) whose fixtures it replays. Files:
-`arkdeck-provider-hdc/src/pointer_input.rs` (new), `src/port_forward.rs` (new), `src/readback.rs`
-(new: `Reconcile`, Swift's `ProviderReconcileOutcome`), `tests/pointer_input.rs` (new),
-`tests/port_forward.rs` (new), the export block in `lib.rs`, this record, one README section.
+`arkdeck-provider-hdc/src/pointer_input.rs` (new), `src/port_forward.rs` (new) — both reusing the
+native-library provider's `Reconcile` (Swift's `ProviderReconcileOutcome`) since #1955 and #1961
+met on main — `tests/pointer_input.rs` (new), `tests/port_forward.rs` (new), the export block in
+`lib.rs`, this record, one README section.
 Neither module is macOS-gated (no platform API); the replays are. No `arkdeck-hoststore`,
 `arkdeck-agentd`, `arkdeck-control`, Swift or contract change.
 
