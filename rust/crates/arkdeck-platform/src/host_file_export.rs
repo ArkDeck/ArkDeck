@@ -703,7 +703,6 @@ mod tests {
                 .env("ARKDECK_FILE_EXPORT_PROCESS_ROOT", root)
                 .env("ARKDECK_FILE_EXPORT_PROCESS_PHASE", phase)
                 .stdout(std::process::Stdio::null())
-                .stderr(std::process::Stdio::null())
                 .spawn()
                 .unwrap()
         };
@@ -712,16 +711,20 @@ mod tests {
             let fixture = Fixture::new(&bytes);
             std::fs::write(fixture.output(), b"original destination").unwrap();
             let mut child = Child(launch(&fixture.root, phase));
-            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+            // Reaching the boundary is real work (a new process, a 512 KiB copy
+            // and F_FULLFSYNC) that a loaded host can stretch past any tight
+            // budget, so the wait ends on the child's marker or its exit; the
+            // bound only keeps a hung child from hanging the test.
+            let bound = std::time::Duration::from_secs(60);
+            let deadline = std::time::Instant::now() + bound;
             while !fixture.root.join("ready").exists() {
                 assert!(
                     std::time::Instant::now() < deadline,
-                    "export child did not reach the publication boundary"
+                    "export child did not reach the publication boundary within {bound:?}"
                 );
-                assert!(
-                    child.0.try_wait().unwrap().is_none(),
-                    "export child exited before the publication boundary"
-                );
+                if let Some(status) = child.0.try_wait().unwrap() {
+                    panic!("export child exited before the publication boundary: {status}");
+                }
                 std::thread::sleep(std::time::Duration::from_millis(10));
             }
             child.0.kill().unwrap();
