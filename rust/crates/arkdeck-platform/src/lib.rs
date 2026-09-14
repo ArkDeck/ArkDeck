@@ -17,7 +17,8 @@ mod windows;
 
 #[cfg(target_os = "macos")]
 pub use process::{
-    AnalyzerExecution, AnalyzerLimits, AnalyzerRunError, AnalyzerTermination, VerifiedSource,
+    AnalyzerExecution, AnalyzerLimits, AnalyzerRunError, AnalyzerTermination, ToolExecution,
+    ToolLimits, ToolRequest, ToolRunError, ToolTermination, VerifiedSource,
 };
 pub use process::{ProcessLimits, ProcessOutput, VerifiedTool};
 #[cfg(unix)]
