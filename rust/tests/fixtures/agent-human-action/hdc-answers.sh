@@ -1,0 +1,45 @@
+# Physical assistance: the device list in the state the mode names, and a
+# Job held at its server check until the oracle releases it.
+if [ "$*" = "list targets -v" ]; then
+  case "$mode" in
+  offline)
+    printf '%s\t\tUSB\tOffline\tlocalhost\n' aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    exit 0 ;;
+  unauthorized)
+    printf '%s\t\tUSB\tUnauthorized\tlocalhost\n' aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    exit 0 ;;
+  twoDevices)
+    printf '%s\t\tUSB\tConnected\tlocalhost\n' aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    printf '%s\t\tUSB\tConnected\tlocalhost\n' bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+    exit 0 ;;
+  esac
+fi
+if [ "$mode" = heldServer ] && [ "$*" = checkserver ]; then
+  while [ ! -e /private/tmp/arkdeck-hdc-oracle/released ]; do /bin/sleep 0.01; done
+fi
+# capture.diagnostics@1 answers of ArkDeckFakeHDCFixture and the scripted dispatcher, by mode.
+key=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+case "$*" in
+"-v")
+  printf 'Ver: 3.2.0d\n' ;;
+"checkserver")
+  printf 'Client version:Ver: 3.2.0d, server version:Ver: 3.2.0d\n' ;;
+"list targets -v")
+  if [ "$mode" = otherDevice ]; then row=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb; else row=$key; fi
+  printf '%s\t\tUSB\tConnected\tlocalhost\n' "$row" ;;
+"-t $key shell param get const.product.name")
+  printf 'OpenHarmony Reference Device\n' ;;
+"-t $key shell param get const.ohos.fullname")
+  printf 'OpenHarmony-4.1-release\n' ;;
+"-t $key shell df -k /data/local/tmp")
+  if [ "$mode" = lowStorage ]; then available=16; else available=1047552; fi
+  printf 'Filesystem 1K-blocks Used Available Use%% Mounted on\n'
+  printf '/dev/block/data 1048576 1024 %s 1%% /data\n' "$available" ;;
+"-t $key shell hilog -x")
+  [ "$mode" = emptyHilog ] || printf '01-01 00:00:00 I app: hello\n' ;;
+"-t $key shell hidumper -s WindowManagerService -a -a")
+  printf '{"windows":[]}\n' ;;
+*)
+  printf 'unregistered fixture output\n' >&2
+  exit 23 ;;
+esac
