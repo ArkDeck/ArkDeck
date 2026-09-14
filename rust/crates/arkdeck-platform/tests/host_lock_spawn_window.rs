@@ -1,10 +1,12 @@
 //! A child that another thread spawns shares every open file description of
 //! this process until its exec closes the close-on-exec descriptors, so a
-//! host-store lock this process has just released can still be held by that
-//! child for the window. These tests spawn children, so they have this test
-//! binary to themselves: every other test's locks would be shared too.
+//! lock released only by closing its descriptor stays held through that
+//! child for the window. `HostReadLock` unlocks before it closes, which
+//! releases the lock for every reference at once. These tests spawn
+//! children, so they have this test binary to themselves: every other test's
+//! locks would be shared too.
 #![cfg(target_os = "macos")]
-use arkdeck_platform::{HostDirectory, random_bytes};
+use arkdeck_platform::{HostDirectory, HostReadLock, random_bytes};
 use std::fs::{self, File, TryLockError};
 use std::io;
 use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
@@ -15,12 +17,11 @@ use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::thread::{self, JoinHandle};
-use std::time::{Duration, Instant};
 
 const NAME: &str = "owner.lock";
 
 /// Each child shares every descriptor of this process, another test's locks
-/// included; one test at a time keeps each test's timing its own.
+/// included; one test at a time keeps each test's children its own.
 static SERIAL: Mutex<()> = Mutex::new(());
 
 struct Fixture(PathBuf);
@@ -34,15 +35,18 @@ impl Fixture {
         fs::set_permissions(&root, fs::Permissions::from_mode(0o700)).unwrap();
         Self(root)
     }
-    /// One non-blocking attempt from a new open file description, as a
-    /// second owner would make it.
-    fn refuses_one_attempt(&self) -> bool {
-        let file = File::options()
+    /// The lock file through a new open file description, as a second owner
+    /// opens it.
+    fn open(&self) -> File {
+        File::options()
             .read(true)
             .write(true)
             .open(self.0.join(NAME))
-            .unwrap();
-        matches!(file.try_lock(), Err(TryLockError::WouldBlock))
+            .unwrap()
+    }
+    /// One non-blocking attempt from a new open file description.
+    fn refuses_one_attempt(&self) -> bool {
+        matches!(self.open().try_lock(), Err(TryLockError::WouldBlock))
     }
 }
 impl Drop for Fixture {
@@ -72,7 +76,7 @@ fn pipe() -> (OwnedFd, OwnedFd) {
 }
 
 /// A child that has forked, and so shares every descriptor of this process,
-/// but does not exec until it is released (by drop, at the latest).
+/// but does not exec until it is dropped.
 struct HeldChild {
     release: Option<OwnedFd>,
     spawner: Option<JoinHandle<()>>,
@@ -124,7 +128,7 @@ impl Drop for HeldChild {
 
 /// Every entry point that takes an existing owner lock; `None` is its
 /// refusal.
-fn reacquire(root: &HostDirectory, entry: usize) -> Option<arkdeck_platform::HostReadLock> {
+fn reacquire(root: &HostDirectory, entry: usize) -> Option<HostReadLock> {
     match entry {
         0 => match root.lock_document(NAME) {
             Ok(lock) => Some(lock),
@@ -137,43 +141,47 @@ fn reacquire(root: &HostDirectory, entry: usize) -> Option<arkdeck_platform::Hos
 }
 
 #[test]
-fn a_released_lock_a_forked_child_still_shares_is_reacquired_once_the_child_execs() {
+fn a_lock_released_while_a_forked_child_shares_it_is_free_at_once() {
     let _serial = SERIAL.lock().unwrap_or_else(PoisonError::into_inner);
     let fixture = Fixture::new();
     let root = HostDirectory::open(&fixture.0).unwrap();
+    drop(root.lock_document(NAME).unwrap());
+    // Control: a lock released only by closing stays held through the child.
+    let closed_only = fixture.open();
+    closed_only.try_lock().unwrap();
+    let child = HeldChild::start();
+    drop(closed_only);
+    assert!(
+        fixture.refuses_one_attempt(),
+        "closing alone must leave the lock with the child"
+    );
+    drop(child);
+    assert!(
+        !fixture.refuses_one_attempt(),
+        "the child's exec releases it"
+    );
     for entry in 0..3 {
-        let held = root.lock_document(NAME).unwrap();
+        let held = reacquire(&root, entry).expect("the lock is free");
         let child = HeldChild::start();
         drop(held);
-        // Released here, the lock is still held through the child's copy
-        // of the descriptor: one non-blocking attempt is refused.
-        assert!(fixture.refuses_one_attempt(), "entry {entry}");
-        let releaser = thread::spawn(move || {
-            thread::sleep(Duration::from_millis(100));
-            drop(child);
-        });
-        let started = Instant::now();
-        let reacquired = reacquire(&root, entry);
-        let waited = started.elapsed();
-        releaser.join().unwrap();
         assert!(
-            reacquired.is_some(),
-            "entry {entry} refused after {waited:?}"
+            !fixture.refuses_one_attempt(),
+            "entry {entry}: a released owner lock stayed held by a forked child"
         );
-        assert!(
-            waited >= Duration::from_millis(90),
-            "entry {entry} acquired before the child exec'd: {waited:?}"
-        );
+        assert!(reacquire(&root, entry).is_some(), "entry {entry}");
+        drop(child);
     }
 }
 
 #[test]
-fn a_live_second_owner_is_still_refused_once_the_wait_has_passed() {
+fn a_live_owner_keeps_its_lock_while_children_come_and_go() {
     let _serial = SERIAL.lock().unwrap_or_else(PoisonError::into_inner);
     let fixture = Fixture::new();
     let root = HostDirectory::open(&fixture.0).unwrap();
     let held = root.lock_document(NAME).unwrap();
-    let started = Instant::now();
+    // A child that shared the descriptor and then exec'd leaves the owner's
+    // lock in place: only the owner's own release unlocks it.
+    drop(HeldChild::start());
     let refused = root
         .lock_document(NAME)
         .err()
@@ -182,15 +190,9 @@ fn a_live_second_owner_is_still_refused_once_the_wait_has_passed() {
         (refused.kind(), refused.raw_os_error()),
         (io::ErrorKind::WouldBlock, Some(libc::EWOULDBLOCK))
     );
-    assert!(started.elapsed() >= HostDirectory::LOCK_WAIT);
-    for entry in 1..3 {
-        let started = Instant::now();
-        assert!(reacquire(&root, entry).is_none(), "entry {entry}");
-        assert!(
-            started.elapsed() >= HostDirectory::LOCK_WAIT,
-            "entry {entry}"
-        );
-    }
+    assert!(root.try_lock_existing(NAME).unwrap().is_none());
+    assert!(root.try_lock_existing_strict(NAME).unwrap().is_none());
+    assert!(fixture.refuses_one_attempt());
     drop(held);
     assert!(reacquire(&root, 0).is_some());
 }
