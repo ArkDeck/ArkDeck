@@ -40,6 +40,8 @@ enum HDCOracleHarness {
     let jobsState: URL
     let sessions: URL
     let owner: URL
+    /// The daemon's agent execution owner and its directory, when composed.
+    var agentExecutions: (owner: RuntimeAgentExecutionCoordinator, directory: URL)? = nil
   }
 
   /// The daemon's `TargetStoreFactsPort` with the oracle's clock: the adopted
@@ -81,9 +83,13 @@ enum HDCOracleHarness {
   /// Session publication writer over a Sessions root and storage owner of
   /// the root's own, and the HDC provider over the fake — with the code-sign
   /// helper an oracle names, at a fixed path, when its operation sends one.
+  /// With `agentExecutions`, also the daemon's agent execution owner under
+  /// `agent-executions` beside them, on the oracle's clock, and the Target
+  /// observation owner it is composed with, over the same provider and
+  /// dispatcher as in the daemon.
   static func composition(
     hdc: URL, targetStore: RuntimeTargetStore, targets: URL, settings: Settings,
-    nativeCodeSignHelper: HDCNativeCodeSignHelperArtifact? = nil
+    nativeCodeSignHelper: HDCNativeCodeSignHelperArtifact? = nil, agentExecutions: Bool = false
   ) throws -> Composition {
     let root = settings.root
     let artifacts = root.appending(path: "artifacts", directoryHint: .isDirectory)
@@ -110,21 +116,40 @@ enum HDCOracleHarness {
           nativeCodeSignHelper: $0)
       } ?? HDCObservationProviderAdapter(factsPort: factsPort)
     let providers = DeviceProviderRegistry(providers: [provider])
+    let dispatcher = DescriptorBoundProcessDispatcher(
+      resolver: try FixedExecutableResolver.hashing(path: hdc.path, providerID: "hdc"))
     let engine = try RuntimeJobEngine(
       configuration: .init(stateDirectory: jobsState, sessionPublicationWriter: writer),
       providers: providers,
-      dispatcher: DescriptorBoundProcessDispatcher(
-        resolver: try FixedExecutableResolver.hashing(path: hdc.path, providerID: "hdc")),
+      dispatcher: dispatcher,
       capabilityStore: capabilities, artifactStore: store,
       nowUTC: { settings.nowUTC }, nowPreciseUTC: { settings.nowPreciseUTC })
+    var executions: (owner: RuntimeAgentExecutionCoordinator, directory: URL)?
+    var observations: TargetObservationCoordinator?
+    if agentExecutions {
+      let now = RuntimeAgentTime.parse(settings.nowPreciseUTC)
+      let observing = TargetObservationCoordinator(
+        observation: ProviderBootstrapObservation(
+          provider: provider, dispatcher: dispatcher, nowUTC: { settings.nowUTC }),
+        targetStore: targetStore, usbRelations: { [] }, nowUTC: { settings.nowUTC })
+      let directory = root.appending(path: "agent-executions", directoryHint: .isDirectory)
+      executions = (
+        try RuntimeAgentExecutionCoordinator(
+          directory: directory, engine: engine, targets: targetStore, observations: observing,
+          now: { now }),
+        directory
+      )
+      observations = observing
+    }
     let handler = RuntimeControlPlaneHandler(
       engine: engine, capabilityStore: capabilities, providerIDs: providers.registeredProviderIDs,
-      nowUTC: { settings.nowUTC }, targetStore: targetStore, bootstrap: nil, artifactStore: store,
+      nowUTC: { settings.nowUTC }, targetStore: targetStore, bootstrap: nil,
+      targetObservations: observations, agentExecutions: executions?.owner, artifactStore: store,
       flashBundleImportDirectory: nil, flashBundleImportPolicy: .production,
       methodObserver: nil)
     return Composition(
       handler: handler, artifactStore: store, targets: targets, artifacts: artifacts,
-      jobsState: jobsState, sessions: sessions, owner: owner)
+      jobsState: jobsState, sessions: sessions, owner: owner, agentExecutions: executions)
   }
 
   /// One recorded request and its answer; a run names the fake's mode.
@@ -188,10 +213,10 @@ enum HDCOracleHarness {
   /// What the oracle records: the fake and every call it received, the
   /// Target document, the cases, the Job index, every Artifact and the
   /// Artifact store's own ledgers beside the Job directories, every file
-  /// below the Job directories, the capability store, the Sessions root and
-  /// the storage owner (dot entries included, each Job record's machine
-  /// facts as labels), every such entry's kind and mode, and the provenance
-  /// of all of them.
+  /// below the Job directories, the capability store, the Sessions root, the
+  /// storage owner and the agent execution directory when composed (dot
+  /// entries included, each Job record's machine facts as labels), every such
+  /// entry's kind and mode, and the provenance of all of them.
   static func files(
     _ composition: Composition, target: RuntimeTargetRecord, cases: JSONValue,
     answers: String, producer: String, settings: Settings
@@ -224,14 +249,18 @@ enum HDCOracleHarness {
       }
     }
     var tree: [JSONValue] = []
-    for (directory, prefix) in [
+    var roots = [
       (composition.jobsState.appending(path: "jobs", directoryHint: .isDirectory), "store/jobs"),
       (
         composition.jobsState.appending(path: "capabilities", directoryHint: .isDirectory),
         "store/capabilities"
       ),
       (composition.sessions, "sessions"), (composition.owner, "session-owner"),
-    ] {
+    ]
+    if let executions = composition.agentExecutions {
+      roots.append((executions.directory, "agent-executions"))
+    }
+    for (directory, prefix) in roots {
       for path in try manager.subpathsOfDirectory(atPath: directory.path).sorted() {
         let url = directory.appending(path: path)
         var metadata = stat()
@@ -252,22 +281,25 @@ enum HDCOracleHarness {
     files["tree.json"] = try encoder.encode(JSONValue.array(tree)) + Data("\n".utf8)
     var digests: [String: JSONValue] = [:]
     for (path, data) in files { digests[path] = .string(SHA256Hex.string(of: data)) }
+    var provenance: [String: JSONValue] = [
+      "producer": .string(producer),
+      "root": .string(settings.root.path),
+      "sessionsRoot": .string(composition.sessions.path),
+      "sessionOwner": .string(composition.owner.path),
+      "availableBytes": .integer(Int64(RoomyStorageProbe.roomyBytes)),
+      "nowUTC": .string(settings.nowUTC),
+      "nowPreciseUTC": .string(settings.nowPreciseUTC),
+      "home": .string(settings.home),
+      "quotaBytes": .integer(Int64(settings.quotaBytes)),
+      "hdcSHA256": .string(SHA256Hex.string(of: HDCOracleFake.driver)),
+      "targetId": .string(target.targetID),
+      "files": .object(digests),
+    ]
+    if let executions = composition.agentExecutions {
+      provenance["agentExecutions"] = .string(executions.directory.path)
+    }
     files["provenance.json"] =
-      try encoder.encode(
-        JSONValue.object([
-          "producer": .string(producer),
-          "root": .string(settings.root.path),
-          "sessionsRoot": .string(composition.sessions.path),
-          "sessionOwner": .string(composition.owner.path),
-          "availableBytes": .integer(Int64(RoomyStorageProbe.roomyBytes)),
-          "nowUTC": .string(settings.nowUTC),
-          "nowPreciseUTC": .string(settings.nowPreciseUTC),
-          "home": .string(settings.home),
-          "quotaBytes": .integer(Int64(settings.quotaBytes)),
-          "hdcSHA256": .string(SHA256Hex.string(of: HDCOracleFake.driver)),
-          "targetId": .string(target.targetID),
-          "files": .object(digests),
-        ])) + Data("\n".utf8)
+      try encoder.encode(JSONValue.object(provenance)) + Data("\n".utf8)
     return files
   }
 

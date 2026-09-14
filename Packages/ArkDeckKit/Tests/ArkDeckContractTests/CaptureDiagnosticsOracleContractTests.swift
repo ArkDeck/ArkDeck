@@ -71,8 +71,9 @@ final class CaptureDiagnosticsOracleContractTests: XCTestCase {
   /// `DiagnosticsAndHAPContractTests` answer it, by mode: `lowStorage` leaves
   /// the device volume 16 KiB where the collection needs its budget,
   /// `otherDevice` lists another device's row, and `emptyHilog` answers the
-  /// bounded HiLog capture with nothing.
-  private static let answers = #"""
+  /// bounded HiLog capture with nothing. `AgentExecutionOracleContractTests`
+  /// answers with the same fragment.
+  static let answers = #"""
     # capture.diagnostics@1 answers of ArkDeckFakeHDCFixture and the scripted dispatcher, by mode.
     key=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     case "$*" in

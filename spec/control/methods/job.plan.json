@@ -88,6 +88,9 @@
             "diagnosticsDurationSeconds": {
               "type": "integer"
             },
+            "durationSeconds": {
+              "type": "integer"
+            },
             "hapArtifactLease": {
               "type": "string"
             },
@@ -199,8 +202,8 @@
   "x-arkdeck-method": "job.plan",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 69,
-    "request": 75,
-    "result": 6
+    "error": 78,
+    "request": 99,
+    "result": 21
   }
 }
