@@ -187,9 +187,9 @@ impl Host {
         self.hdc = dispatch.map(std::sync::Arc::new);
         self
     }
-    /// The USB relations the Target observation owner reads. Only tests
-    /// compose them until a development source lands.
-    #[cfg(all(test, target_os = "macos"))]
+    /// The USB relations the Target observation owner reads: a test's, or
+    /// the development source the isolated owner names.
+    #[cfg(target_os = "macos")]
     pub fn with_usb_relations(
         mut self,
         usb: std::sync::Arc<dyn arkdeck_provider_hdc::UsbRelations + Send + Sync>,
