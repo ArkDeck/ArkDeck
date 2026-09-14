@@ -174,19 +174,29 @@
         "tool": {
           "additionalProperties": false,
           "properties": {
+            "clientVersion": {
+              "type": "string"
+            },
+            "endpointSource": {
+              "type": "string"
+            },
             "reason": {
               "type": "string"
             },
             "reasonCode": {
               "type": "string"
             },
+            "serverVersion": {
+              "type": "string"
+            },
             "state": {
+              "type": "string"
+            },
+            "toolSha256": {
               "type": "string"
             }
           },
           "required": [
-            "reason",
-            "reasonCode",
             "state"
           ],
           "type": "object"
@@ -212,8 +222,8 @@
   "x-arkdeck-method": "target.availability",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 6,
-    "request": 8,
-    "result": 2
+    "error": 7,
+    "request": 10,
+    "result": 3
   }
 }

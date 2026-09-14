@@ -92,12 +92,15 @@ enum HDCOracleHarness {
   /// `usbRelations`, the independent USB observation (none unless an oracle
   /// names one). With `humanActions`, also the daemon's human-action owner
   /// over the executions, its pages under `human-action-snapshots` as the
-  /// daemon keeps them.
+  /// daemon keeps them. With `hdcRuntimeDiagnostics`, the handler has what
+  /// the daemon's managed HDC server reported at startup, as the daemon gives
+  /// it (none unless an oracle names it).
   static func composition(
     hdc: URL, targetStore: RuntimeTargetStore, targets: URL, settings: Settings,
     nativeCodeSignHelper: HDCNativeCodeSignHelperArtifact? = nil, agentExecutions: Bool = false,
     humanActions: Bool = false,
-    usbRelations: @escaping @Sendable () throws -> [TargetUSBRelation] = { [] }
+    usbRelations: @escaping @Sendable () throws -> [TargetUSBRelation] = { [] },
+    hdcRuntimeDiagnostics: HDCManagedRuntimeDiagnostics? = nil
   ) throws -> Composition {
     let root = settings.root
     let artifacts = root.appending(path: "artifacts", directoryHint: .isDirectory)
@@ -159,7 +162,8 @@ enum HDCOracleHarness {
       engine: engine, capabilityStore: capabilities, providerIDs: providers.registeredProviderIDs,
       nowUTC: { settings.nowUTC }, targetStore: targetStore, bootstrap: nil,
       targetObservations: observations, agentExecutions: executions?.owner,
-      humanActionResources: union, artifactStore: store,
+      humanActionResources: union, hdcRuntimeDiagnostics: hdcRuntimeDiagnostics,
+      artifactStore: store,
       flashBundleImportDirectory: nil, flashBundleImportPolicy: .production,
       methodObserver: nil)
     return Composition(

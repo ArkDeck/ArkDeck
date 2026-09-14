@@ -2,12 +2,15 @@
   "$defs": {
     "errorCode": {
       "enum": [
+        "admissionDenied",
         "conflict",
+        "factsDrifted",
         "internalError",
         "invalidInput",
         "invalidParams",
         "malformedFrame",
         "notFound",
+        "operationUnavailable",
         "recordUnreadable",
         "rejected",
         "resourceConflict",
@@ -94,8 +97,8 @@
   "x-arkdeck-method": "target.adopt",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 14,
-    "request": 42,
-    "result": 28
+    "error": 19,
+    "request": 37,
+    "result": 18
   }
 }

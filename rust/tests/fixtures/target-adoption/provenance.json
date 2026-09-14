@@ -1,0 +1,23 @@
+{
+  "agentExecutions" : "/private/tmp/arkdeck-hdc-oracle/agent-executions",
+  "availableBytes" : 1099511627776,
+  "files" : {
+    "cases.json" : "39b3b52ef4066b75c3d8563b77cd55cfaaedf84a20981352fb0582be4d57a4cf",
+    "hdc" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+    "hdc-answers.sh" : "00d49f08f269e3b0dde6ee57733e20f7088e8f37ae285982abc8181fac6008d4",
+    "hdc-invocations.log" : "5aacdce3a4905d210b674ad1075213378095c84ff25788aee9b67314cf513c00",
+    "store/index.json" : "468ae4796f309d34542d080cf154c86fc9d91aa2f21e8ab260e39d35fb66c408",
+    "targets-state/targets.json" : "219caf0d443d902a3fa31adf44d28f1e3611bd25df00ee3a53e696e855077b22",
+    "tree.json" : "6ef619ac3ab079274239a2cf7704408f1e1e8243eaa13ec04e4a2bf73bcc8311"
+  },
+  "hdcSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+  "home" : "/private/tmp/arkdeck-hdc-oracle/home",
+  "nowPreciseUTC" : "2026-09-14T00:00:00.000Z",
+  "nowUTC" : "2026-09-14T00:00:00Z",
+  "producer" : "TargetAdoptionOracleContractTests.testSwiftAdoptsTheSharedFakeDeviceAndAnswersItsAvailability",
+  "quotaBytes" : 8589934592,
+  "root" : "/private/tmp/arkdeck-hdc-oracle",
+  "sessionOwner" : "/private/tmp/arkdeck-hdc-oracle/session-owner",
+  "sessionsRoot" : "/private/tmp/arkdeck-hdc-oracle/Sessions",
+  "targetId" : "TGT-3ba3f5f43b92"
+}
