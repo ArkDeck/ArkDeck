@@ -116,6 +116,7 @@ fn every_unimplemented_method_is_refused_without_entering_the_host() {
             "artifact.import.commit",
             "artifact.import.release",
             "artifact.inspect",
+            "artifact.list",
             "artifact.read",
             "health",
             "doctor",

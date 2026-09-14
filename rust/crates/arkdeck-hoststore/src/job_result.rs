@@ -75,6 +75,45 @@ struct Facts {
 }
 
 impl JobResultReader<'_> {
+    /// The evidence Swift `executionResultProjection` attaches to a terminal
+    /// Job: the same facts and blockers `job.evidence` reads, encoded as
+    /// `AgentDaemon.encodeEvidence` encodes them — each verified Artifact's
+    /// byte count a number — without the inputs or Trace probes, and
+    /// `verified`, or `blocked` when a blocker stands.
+    pub(crate) fn agent_evidence(&self, record: &JobRecord) -> Value {
+        let facts = self.facts(record, true);
+        let mut fields = record.evidence_fields();
+        for key in ["parameters", "traceProbeBefore", "traceProbeAfter"] {
+            fields.remove(key);
+        }
+        let artifacts: Vec<Value> = facts
+            .verified
+            .iter()
+            .map(|row| {
+                let mut row = row.clone();
+                if let Some(count) = row["byteCount"]
+                    .as_str()
+                    .and_then(|text| text.parse::<u64>().ok())
+                {
+                    row["byteCount"] = json!(count);
+                }
+                row
+            })
+            .collect();
+        let blockers: Vec<&str> = facts.blockers.iter().copied().collect();
+        fields.insert(
+            "status".into(),
+            json!(if blockers.is_empty() {
+                "verified"
+            } else {
+                "blocked"
+            }),
+        );
+        fields.insert("artifacts".into(), json!(artifacts));
+        fields.insert("blockers".into(), json!(blockers));
+        Value::Object(fields)
+    }
+
     pub fn handle(&self, method: &str, params: &Map<String, Value>) -> Result<Value, WireError> {
         let id = match (params.len(), params.get("jobId").and_then(Value::as_str)) {
             (1, Some(id)) if valid_identifier(id) => id,

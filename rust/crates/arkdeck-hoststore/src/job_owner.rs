@@ -53,6 +53,12 @@ impl JobStore {
         })
     }
 
+    /// Swift `RuntimeJobEngine`'s `cli-job-snapshots`: where this owner's
+    /// resource pages are kept, made when the store opens.
+    pub fn snapshot_directory(&self) -> PathBuf {
+        self.path.join("cli-job-snapshots")
+    }
+
     /// Swift RuntimeAdmissionService.lookup.
     pub fn lookup(
         &self,

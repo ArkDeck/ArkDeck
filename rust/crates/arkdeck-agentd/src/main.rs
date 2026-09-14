@@ -107,6 +107,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             "bootstrap",
             "jobs-state",
             "targets-state",
+            "agent-executions",
         ] {
             directory.private_child(name)?;
         }
@@ -129,6 +130,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
                 bootstrap.clone(),
                 root.join("jobs-state"),
                 root.join("targets-state"),
+                root.join("agent-executions"),
             ],
         )?;
         host.with_targets(arkdeck_hoststore::TargetStore::open(
@@ -146,6 +148,11 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         // The isolated owner admits Jobs, so it holds the Job owner connection.
         .with_jobs(arkdeck_hoststore::JobStore::open_owner(
             &root.join("jobs-state"),
+        )?)
+        // Beside the Job state, as the Swift daemon keeps its agent
+        // executions; each owns a Job of this owner.
+        .with_agent_executions(arkdeck_hoststore::AgentExecutionStore::open(
+            &root.join("agent-executions"),
         )?)
         // Beside the Job state, as the Swift engine keeps it: read only.
         .with_capabilities(arkdeck_hoststore::CapabilityStore::open(

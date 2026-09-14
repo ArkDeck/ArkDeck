@@ -783,7 +783,55 @@ daemon and reads every Job again, and reads through the Rust CLI:
 ```bash
 cargo build -p arkdeck-agentd -p arkdeck-cli
 python3 scripts/check-corpus-replay.py --fixture tests/fixtures/observe-device
+python3 scripts/check-corpus-replay.py --fixture tests/fixtures/agent-execution
 ```
+
+## Agent executions and Artifact lists (TASK-XPA-014, M1)
+
+The isolated development composition answers `agent.run` and `agent.status` as
+the Swift daemon's `RuntimeAgentExecutionCoordinator` does for an explicit
+target, and `artifact.list` for a Job owner. `AgentExecutionStore`
+(`agent_execution.rs`) keeps each execution as Swift's record,
+`<root>/agent-executions/execution-<sha256(executionId)>.json` (owner-only,
+canonical JSON, one more generation per durable step), beside the empty
+`snapshots/` directory Swift creates. A run parses the closed intent with
+Swift's messages and fingerprint, validates a new execution's inputs against
+the Catalog and creates it with its orchestration deadline; the same identity
+under another intent is `idempotencyConflict`. The execution then resolves its
+target (a target never adopted is `resourceNotFound` and a stale revision
+`bindingRevisionStale`, both leaving the execution orchestrating), prepares the
+exact typed Job request (`agent-request-<seed>` and `agent-execution-<seed>`,
+the seed being `sha256(executionId)`), submits it through the Job admitter and
+answers once it owns the Job. The Job runs in the background as Swift's
+`startJob` runs it, registered with the daemon's runs before the answer, and
+the execution records the Job's end when the run returns (Swift `finishJob`).
+A status read, like a run of an execution that already owns its Job, answers
+from the record and the Job without a write; once the Job is terminal the
+answer carries its evidence and verified Artifacts. Refusals before a Job carry
+the zero-dispatch proof.
+
+`artifact.list` pages a Job's Artifacts as Swift's `RuntimeSnapshotPager` does
+(`createdAtDescArtifactIdAsc`, cursors `<revision>.<token>`, 1 to 1,000 per
+page, 100 by default); the snapshots live with the Job owner
+(`jobs-state/cli-job-snapshots`), not in the Artifact root.
+
+Not served yet: an execution without a target; `agent.list`, `agent.resume`,
+`agent.abandon` and human actions; and the Jobs of `capture.diagnostics@1`,
+whose admission this Runtime refuses, so such an execution fails with
+`admissionDenied` as Swift's does for an operation its engine cannot plan. A
+restart leaves an owned Job as it is: nothing resumes a run (L.1 item 13).
+
+`rust/tests/fixtures/agent-execution/` is the oracle Swift
+`AgentExecutionOracleContractTests` records over the shared fake HDC with the
+daemon's coordinator: Golden Journey 1's two runs, their reads and Artifact
+pages, and the refusals. `tests/agent_execution.rs` replays it in-process and
+compares every answer and every file the executions and Jobs leave, apart from
+the capture run's; re-record from Swift with
+`ARKDECK_RUST_AGENT_EXECUTION_RECORD=/private/tmp/<new>`. The harness above
+replays it against the real daemon: it holds and releases the owned Job's first
+call as the oracle does, compares a listing's pages without the order of their
+items, which follows the daemon's clock, and reads every execution again after
+the restart.
 
 ## Target presentation owner (TASK-XPA-012)
 

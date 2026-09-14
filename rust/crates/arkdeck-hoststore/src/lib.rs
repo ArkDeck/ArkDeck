@@ -37,6 +37,10 @@ mod job_admission;
 #[cfg(target_os = "macos")]
 pub use job_admission::{AdmissionRefusal, JobAdmitter, runtime_now};
 #[cfg(target_os = "macos")]
+mod agent_execution;
+#[cfg(target_os = "macos")]
+pub use agent_execution::{AgentAnswer, AgentEngine, AgentExecutionStore, AgentStart};
+#[cfg(target_os = "macos")]
 mod analyzer_output;
 #[cfg(target_os = "macos")]
 mod artifact_publication;

@@ -315,6 +315,18 @@ impl ArtifactReadStore {
         Ok(ArtifactReadSnapshot { rows })
     }
 
+    /// Swift `list(jobID:)` as `artifact.list` reads it: a Job without an
+    /// Artifact directory has no Artifact (Swift creates the directory as it
+    /// reads; this reader writes nothing).
+    pub(crate) fn listed_rows(&self, job_id: &str) -> io::Result<Vec<Value>> {
+        if let Err(error) = self.root.kind_and_size(job_id)
+            && error.kind() == io::ErrorKind::NotFound
+        {
+            return Ok(Vec::new());
+        }
+        Ok(self.list(job_id)?.rows)
+    }
+
     pub fn inspect(&self, job_id: &str, artifact_id: &str) -> io::Result<Value> {
         self.verified_rows(job_id)?
             .into_iter()
