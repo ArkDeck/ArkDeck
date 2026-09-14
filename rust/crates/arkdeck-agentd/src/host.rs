@@ -563,6 +563,23 @@ impl HostServices for Host {
         }
         result
     }
+    /// `artifact.quota` walks this owner's Artifact root as the Swift daemon
+    /// walks its own before it has cached a total, and writes nothing.
+    #[cfg(target_os = "macos")]
+    fn artifact_quota(&self) -> Result<serde_json::Value, WireError> {
+        let Some((_, usage)) = &self.storage else {
+            return Err(WireError {
+                code: "rejected".into(),
+                message: "this method is unavailable in the read-only Rust foundation".into(),
+                details: None,
+            });
+        };
+        usage.quota().map_err(|message| WireError {
+            code: "internalError".into(),
+            message,
+            details: None,
+        })
+    }
     /// `capability.list` and `capability.inspect` read the capability store as
     /// the Swift daemon reads it, under the store's lock; nothing mints,
     /// reserves or settles a use here.

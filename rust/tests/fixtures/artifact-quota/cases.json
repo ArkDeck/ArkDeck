@@ -1,0 +1,279 @@
+[
+  {
+    "response" : {
+      "ok" : true,
+      "result" : {
+        "remainingBytes" : 8589934592,
+        "totalBytes" : 8589934592,
+        "usedBytes" : 0
+      }
+    },
+    "scenario" : "empty"
+  },
+  {
+    "response" : {
+      "ok" : true,
+      "result" : {
+        "remainingBytes" : 8589934481,
+        "totalBytes" : 8589934592,
+        "usedBytes" : 111
+      }
+    },
+    "scenario" : "published"
+  },
+  {
+    "response" : {
+      "error" : {
+        "code" : "internalError",
+        "message" : "indexCorrupted(\"artifact root contains an unexpected or linked entry notes.txt\")"
+      },
+      "ok" : false
+    },
+    "scenario" : "strayFile"
+  },
+  {
+    "response" : {
+      "error" : {
+        "code" : "internalError",
+        "message" : "indexCorrupted(\"artifact root contains an unexpected or linked entry job-link\")"
+      },
+      "ok" : false
+    },
+    "scenario" : "linkedJob"
+  },
+  {
+    "response" : {
+      "error" : {
+        "code" : "internalError",
+        "message" : "ioFailure(\"malformed job identifier\")"
+      },
+      "ok" : false
+    },
+    "scenario" : "dotDirectory"
+  },
+  {
+    "response" : {
+      "ok" : true,
+      "result" : {
+        "remainingBytes" : 8589934481,
+        "totalBytes" : 8589934592,
+        "usedBytes" : 111
+      }
+    },
+    "scenario" : "jobWithoutIndex"
+  },
+  {
+    "response" : {
+      "error" : {
+        "code" : "internalError",
+        "message" : "indexCorrupted(\"artifact index exceeds its read bound\")"
+      },
+      "ok" : false
+    },
+    "scenario" : "emptyIndex"
+  },
+  {
+    "response" : {
+      "error" : {
+        "code" : "internalError",
+        "message" : "indexCorrupted(\"artifact index must be a real regular file\")"
+      },
+      "ok" : false
+    },
+    "scenario" : "linkedIndex"
+  },
+  {
+    "response" : {
+      "ok" : true,
+      "result" : {
+        "remainingBytes" : 8589934579,
+        "totalBytes" : 8589934592,
+        "usedBytes" : 13
+      }
+    },
+    "scenario" : "danglingIndexLink"
+  },
+  {
+    "response" : {
+      "error" : {
+        "code" : "internalError",
+        "message" : "indexCorrupted(\"artifact index must be a real regular file\")"
+      },
+      "ok" : false
+    },
+    "scenario" : "indexDirectory"
+  },
+  {
+    "response" : {
+      "error" : {
+        "code" : "internalError",
+        "message" : "indexCorrupted(\"unsupported index schema 2.0.0\")"
+      },
+      "ok" : false
+    },
+    "scenario" : "unsupportedSchema"
+  },
+  {
+    "response" : {
+      "ok" : true,
+      "result" : {
+        "remainingBytes" : 8589934481,
+        "totalBytes" : 8589934592,
+        "usedBytes" : 111
+      }
+    },
+    "scenario" : "unknownRowMember"
+  },
+  {
+    "response" : {
+      "ok" : true,
+      "result" : {
+        "remainingBytes" : 8589934481,
+        "totalBytes" : 8589934592,
+        "usedBytes" : 111
+      }
+    },
+    "scenario" : "negativeMissingCount"
+  },
+  {
+    "response" : {
+      "error" : {
+        "code" : "internalError",
+        "message" : "indexCorrupted(\"artifact index contains a foreign, unsafe or duplicate identity\")"
+      },
+      "ok" : false
+    },
+    "scenario" : "duplicateIdentity"
+  },
+  {
+    "response" : {
+      "error" : {
+        "code" : "internalError",
+        "message" : "indexCorrupted(\"artifact index contains a foreign, unsafe or duplicate identity\")"
+      },
+      "ok" : false
+    },
+    "scenario" : "foreignJob"
+  },
+  {
+    "response" : {
+      "error" : {
+        "code" : "internalError",
+        "message" : "indexCorrupted(\"artifact index contains a foreign, unsafe or duplicate identity\")"
+      },
+      "ok" : false
+    },
+    "scenario" : "unsafeIdentity"
+  },
+  {
+    "response" : {
+      "error" : {
+        "code" : "internalError",
+        "message" : "indexCorrupted(\"artifact index contains a foreign, unsafe or duplicate identity\")"
+      },
+      "ok" : false
+    },
+    "scenario" : "trailingNewlineIdentity"
+  },
+  {
+    "response" : {
+      "error" : {
+        "code" : "internalError",
+        "message" : "indexCorrupted(\"undecodable artifact index: DecodingError.typeMismatch: expected value of type Int. Path: artifacts[0].byteCount. Debug description: Expected to decode Int but found a string instead.\")"
+      },
+      "ok" : false
+    },
+    "scenario" : "wrongMemberType"
+  },
+  {
+    "response" : {
+      "error" : {
+        "code" : "internalError",
+        "message" : "indexCorrupted(\"undecodable artifact index: DecodingError.keyNotFound: Key \\'sha256\\' not found in keyed decoding container. Path: artifacts[0]. Debug description: No value associated with key CodingKeys(stringValue: \\\"sha256\\\", intValue: nil) (\\\"sha256\\\").\")"
+      },
+      "ok" : false
+    },
+    "scenario" : "missingMember"
+  },
+  {
+    "response" : {
+      "error" : {
+        "code" : "internalError",
+        "message" : "indexCorrupted(\"undecodable artifact index: DecodingError.typeMismatch: expected value of type ArtifactStatus. Path: artifacts[0].status. Debug description: Invalid number of keys found, expected one.\")"
+      },
+      "ok" : false
+    },
+    "scenario" : "ambiguousStatus"
+  },
+  {
+    "response" : {
+      "error" : {
+        "code" : "internalError",
+        "message" : "indexCorrupted(\"undecodable artifact index: DecodingError.typeMismatch: expected value of type ArtifactStatus. Path: artifacts[0].status. Debug description: Invalid number of keys found, expected one.\")"
+      },
+      "ok" : false
+    },
+    "scenario" : "unknownStatus"
+  },
+  {
+    "response" : {
+      "error" : {
+        "code" : "internalError",
+        "message" : "indexCorrupted(\"artifact payload is missing, linked or unreadable (errno 2)\")"
+      },
+      "ok" : false
+    },
+    "scenario" : "missingPayload"
+  },
+  {
+    "response" : {
+      "error" : {
+        "code" : "internalError",
+        "message" : "indexCorrupted(\"artifact payload is missing, linked or unreadable (errno 62)\")"
+      },
+      "ok" : false
+    },
+    "scenario" : "linkedPayload"
+  },
+  {
+    "response" : {
+      "error" : {
+        "code" : "internalError",
+        "message" : "indexCorrupted(\"artifact payload is missing, linked or unreadable (errno 13)\")"
+      },
+      "ok" : false
+    },
+    "scenario" : "unreadablePayload"
+  },
+  {
+    "response" : {
+      "error" : {
+        "code" : "internalError",
+        "message" : "indexCorrupted(\"artifact payload type or size drifted\")"
+      },
+      "ok" : false
+    },
+    "scenario" : "resizedPayload"
+  },
+  {
+    "response" : {
+      "error" : {
+        "code" : "internalError",
+        "message" : "indexCorrupted(\"artifact payload digest or identity drifted\")"
+      },
+      "ok" : false
+    },
+    "scenario" : "rewrittenPayload"
+  },
+  {
+    "response" : {
+      "ok" : true,
+      "result" : {
+        "remainingBytes" : 8589934481,
+        "totalBytes" : 8589934592,
+        "usedBytes" : 111
+      }
+    },
+    "scenario" : "unsealedPayload"
+  }
+]

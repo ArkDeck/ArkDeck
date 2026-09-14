@@ -1,0 +1,89 @@
+{
+  "artifacts" : [
+    {
+      "artifactID" : "ART-3b5ed7a563df80a91df9ba71b00c4848",
+      "bindingSnapshot" : {
+        "targetID" : "TGT-ORACLE"
+      },
+      "byteCount" : 51,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-oracle-a",
+      "mediaType" : "text\/plain",
+      "name" : "hilog.txt",
+      "privacy" : "standard",
+      "providerID" : "host",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-oracle-a",
+      "sha256" : "58ff95839644e69f2aeeed18f73d6e563b45a16c5271b3540a36af8794c7e1c0",
+      "sourceOperation" : "analyzer.extract-crash-signature@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "step-1"
+    },
+    {
+      "artifactID" : "ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+      "bindingSnapshot" : {
+        "targetID" : "TGT-ORACLE"
+      },
+      "byteCount" : 47,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-oracle-a",
+      "mediaType" : "application\/json",
+      "name" : "crash-signature.json",
+      "privacy" : "standard",
+      "providerID" : "host",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-oracle-a",
+      "sha256" : "22ecab914c636eeee0d230c342c54c6122dccafb53bc8d97feacba9763c49c36",
+      "sourceOperation" : "analyzer.extract-crash-signature@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "step-1"
+    },
+    {
+      "artifactID" : "ART-MISSING-ea6f6778e47c5626c9a9ebcec1154c46",
+      "bindingSnapshot" : {
+        "targetID" : "TGT-ORACLE"
+      },
+      "byteCount" : 0,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-oracle-a",
+      "mediaType" : "image\/png",
+      "name" : "screenshot.png",
+      "privacy" : "standard",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-oracle-a",
+      "sha256" : "",
+      "sourceOperation" : "capture.screen-sequence@1",
+      "status" : {
+        "missing" : {
+          "reason" : "the device refused the capture"
+        }
+      },
+      "stepID" : "step-1"
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

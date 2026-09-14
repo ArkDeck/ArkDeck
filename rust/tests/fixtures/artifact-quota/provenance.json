@@ -1,0 +1,7 @@
+{
+  "home" : "/private/tmp/arkdeck-artifact-quota-oracle/home",
+  "nowUTC" : "2026-09-14T00:00:00Z",
+  "quotaBytes" : 8589934592,
+  "recordedBy" : "ArtifactQuotaOracleContractTests.testSwiftAnswersTheSharedArtifactQuotaOracle",
+  "rootLabel" : "<root>"
+}

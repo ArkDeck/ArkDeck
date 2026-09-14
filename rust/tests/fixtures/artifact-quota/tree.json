@@ -1,0 +1,3194 @@
+{
+  "ambiguousStatus" : {
+    "after" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2600
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2600
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ]
+  },
+  "danglingIndexLink" : {
+    "after" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "symlink",
+        "path" : "job-oracle-a/index.json",
+        "target" : "absent.json"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/.payload-verification-v1.json"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "symlink",
+        "path" : "job-oracle-a/index.json",
+        "target" : "absent.json"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ]
+  },
+  "dotDirectory" : {
+    "after" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".cache"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/.payload-verification-v1.json"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2542
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/.payload-verification-v1.json"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".cache"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2542
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ]
+  },
+  "duplicateIdentity" : {
+    "after" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/.payload-verification-v1.json"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2539
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2539
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ]
+  },
+  "empty" : {
+    "after" : [
+
+    ],
+    "before" : [
+
+    ]
+  },
+  "emptyIndex" : {
+    "after" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 0
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 0
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ]
+  },
+  "foreignJob" : {
+    "after" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2539
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2539
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ]
+  },
+  "indexDirectory" : {
+    "after" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a/index.json"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a/index.json"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ]
+  },
+  "jobWithoutIndex" : {
+    "after" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/.payload-verification-v1.json"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2542
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/.payload-verification-v1.json"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-c"
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2542
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-c"
+      }
+    ]
+  },
+  "linkedIndex" : {
+    "after" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index-copy.json",
+        "size" : 2542
+      },
+      {
+        "kind" : "symlink",
+        "path" : "job-oracle-a/index.json",
+        "target" : "index-copy.json"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index-copy.json",
+        "size" : 2542
+      },
+      {
+        "kind" : "symlink",
+        "path" : "job-oracle-a/index.json",
+        "target" : "index-copy.json"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ]
+  },
+  "linkedJob" : {
+    "after" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "symlink",
+        "path" : "job-link",
+        "target" : "job-oracle-a"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2542
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "symlink",
+        "path" : "job-link",
+        "target" : "job-oracle-a"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2542
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ]
+  },
+  "linkedPayload" : {
+    "after" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "symlink",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "target" : "payload-copy"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2542
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/payload-copy",
+        "size" : 51
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "symlink",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "target" : "payload-copy"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2542
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/payload-copy",
+        "size" : 51
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ]
+  },
+  "missingMember" : {
+    "after" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2454
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2454
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ]
+  },
+  "missingPayload" : {
+    "after" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2542
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2542
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ]
+  },
+  "negativeMissingCount" : {
+    "after" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/.payload-verification-v1.json"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2540
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/.payload-verification-v1.json"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2540
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ]
+  },
+  "published" : {
+    "after" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/.payload-verification-v1.json"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2542
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/.payload-verification-v1.json"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2542
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ]
+  },
+  "resizedPayload" : {
+    "after" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 52
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2542
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 52
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2542
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ]
+  },
+  "rewrittenPayload" : {
+    "after" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2542
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2542
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ]
+  },
+  "strayFile" : {
+    "after" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2542
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "notes.txt",
+        "size" : 6
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2542
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "notes.txt",
+        "size" : 6
+      }
+    ]
+  },
+  "trailingNewlineIdentity" : {
+    "after" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2541
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2541
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ]
+  },
+  "unknownRowMember" : {
+    "after" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/.payload-verification-v1.json"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2563
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/.payload-verification-v1.json"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2563
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ]
+  },
+  "unknownStatus" : {
+    "after" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2534
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2534
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ]
+  },
+  "unreadablePayload" : {
+    "after" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "0",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2542
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "0",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2542
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ]
+  },
+  "unsafeIdentity" : {
+    "after" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2515
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2515
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ]
+  },
+  "unsealedPayload" : {
+    "after" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/.payload-verification-v1.json"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2542
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/.payload-verification-v1.json"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "644",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2542
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ]
+  },
+  "unsupportedSchema" : {
+    "after" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2539
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2539
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ]
+  },
+  "wrongMemberType" : {
+    "after" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2541
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ],
+    "before" : [
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1"
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : ".imports-v1/records"
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "cleanup-debt.json",
+        "size" : 3
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-a"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-3b5ed7a563df80a91df9ba71b00c4848",
+        "size" : 51
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-a/ART-cc636e5fd70dfa7ea391bba1c06be1e7",
+        "size" : 47
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-a/index.json",
+        "size" : 2541
+      },
+      {
+        "kind" : "directory",
+        "mode" : "700",
+        "path" : "job-oracle-b"
+      },
+      {
+        "kind" : "file",
+        "mode" : "400",
+        "path" : "job-oracle-b/ART-d57413dc8f39bde73d518ee5a10b828e",
+        "size" : 13
+      },
+      {
+        "kind" : "file",
+        "mode" : "600",
+        "path" : "job-oracle-b/index.json",
+        "size" : 1021
+      }
+    ]
+  }
+}

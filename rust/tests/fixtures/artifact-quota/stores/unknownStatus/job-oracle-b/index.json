@@ -1,0 +1,37 @@
+{
+  "artifacts" : [
+    {
+      "artifactID" : "ART-d57413dc8f39bde73d518ee5a10b828e",
+      "bindingSnapshot" : {
+        "targetID" : "TGT-ORACLE"
+      },
+      "byteCount" : 13,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-oracle-b",
+      "mediaType" : "text\/plain",
+      "name" : "trace-note.txt",
+      "observationWindow" : {
+        "endUTC" : "2026-09-13T23:59:59.500Z",
+        "startUTC" : "2026-09-13T23:59:58.000Z"
+      },
+      "privacy" : "sensitive",
+      "providerID" : "host",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-oracle-b",
+      "sha256" : "c72cced0ea8741859b66548d108ec3fa137b1981cf39a24ffb1655a31efd96c3",
+      "sourceOperation" : "analyzer.extract-crash-signature@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "step-1"
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

@@ -519,6 +519,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["artifact", "inspect"] => "artifact.inspect",
         ["artifact", "read"] => "artifact.read",
         ["artifact", "export"] => "artifact.export",
+        ["artifact", "quota"] => "artifact.quota",
         ["doctor"] => "doctor",
         ["operation", "list"] => "operation.list",
         ["operation", "describe"] => "operation.describe",
@@ -927,7 +928,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                     | "runtime.tool.list"
                     | "runtime.bundle.remove"
             )
-            || command.starts_with("artifact.")
+            // Swift sends a quota request without parameters.
+            || (command.starts_with("artifact.") && command != "artifact.quota")
             || command.starts_with("target.")
             || command.starts_with("device.display-name.")
             || command.starts_with("session.")

@@ -267,6 +267,26 @@ pending. `python3 rust/scripts/check-artifact-read-owner.py` runs the read-libra
 checks; `cargo test -p arkdeck-cli --test artifact_resources` checks current
 producer metadata, argv, raw encoding and failure classifications.
 
+The isolated development composition also answers `artifact.quota` (TASK-XPA-013)
+as a Swift daemon answers it before it has cached a total: `artifact_quota.rs`
+classifies every Artifact root entry first (the Import owner's directory and a
+regular cleanup ledger are skipped, any other directory is a Job, anything else
+refuses), reads each Job's index as Swift `loadIndex` does (an absent or dangling
+index has no rows), decodes it as Swift's synthesized `Codable` does (unknown
+members ignored, Swift's `DecodingError` descriptions), and checks each row's
+identity and each published payload's type, size and digest in order. Every
+refusal is `internalError` with Swift's rendering of the store error. Unlike
+Swift, which reseals a payload that is not `0400` and writes its verification
+caches while it hashes, the Rust read writes nothing, and it keeps no total
+between reads. `arkdeck artifact quota` sends the method without parameters, as
+Swift's CLI does. `rust/tests/fixtures/artifact-quota/` is the oracle Swift
+`ArtifactQuotaOracleContractTests` records over 27 roots its store writes in
+temporary directories (re-record with
+`ARKDECK_RUST_ARTIFACT_QUOTA_RECORD=/private/tmp/<new>`); `tests/artifact_quota.rs`
+reproduces every answer and leaves every root untouched, and
+`scripts/check-artifact-quota.py` compares a fresh Swift daemon and a fresh Rust
+owner, and both CLIs, over each root.
+
 ## Contract and ownership boundaries
 
 The isolated macOS host serves `trace cache status` and `trace cache purge` from
