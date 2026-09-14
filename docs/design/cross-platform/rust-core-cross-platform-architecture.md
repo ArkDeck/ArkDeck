@@ -652,7 +652,7 @@ SPK-1 已提交结果为 2026-09-04 的 release/静机/3 次独立 run，实际 
 
 注 2（RSS 阶段仍待裁决）：当前 harness 在 IPC 阶段结束后停止 daemon，另起新进程测冷 idle，并将内存释放前后分别记为 `daemon.residentSetPlateau` 与 `daemon.residentSetSteady`；本基线三次分别在采样第 82/16/38 秒观察到释放。旧的 62.24 MB 混合读数已由这份两电平记录取代，不用于余量判断。启动 plateau 73.71 MB 超过拟定 64 MiB（67.11 MB）约 9.8%，steady 21.53 MB 的公式推导值约 32.3 MB。§L.1 第 15 项现在缺的是**上限约束启动阶段还是稳态的产品决定**，以及当前 post-SVC 二进制的复测，不是缺采样隔离代码。本次不选择任何方案，不放宽 64 MiB，不把稳态推导值宣布为新硬门，也不据此声称 Rust 有多少余量。
 
-注 3（性能车道的实际覆盖）：`rust-perf.yml` 当前 PR/nightly 都使用 `--mode ratio`，阈值分别 +20%/+10%；仅时间指标除以校准负载，字节/计数直接比较。`compare.py` 校验主机元数据和 workload scale，零参考值有绝对预算才可判断；主机不匹配时 workflow 显式 skip，不能按绿灯解释为回归通过。当前仍需 runner 自身基线，nightly 绝对预算门也未落地。每周 hosted soak 默认 4 h，24 h 目标需要持续运行的 runner；性能车道本身不属于 merge gate。这里记录缺口，保留既有目标与阈值。
+注 3（性能车道的实际覆盖）：`rust-perf.yml` 的 nightly 使用 `--mode ratio`，阈值 +10%；仅时间指标除以校准负载，字节/计数直接比较。`compare.py` 校验主机元数据和 workload scale，零参考值有绝对预算才可判断；主机不匹配时 workflow 显式 skip，不能按绿灯解释为回归通过。按合入运行的 PR 微基准车道（+20%）已于 2026-09-14 撤下：hosted runner 永远不是参考主机，该车道 205 次运行中 202 次输出 skip、其余 3 次是 #1723 修复比较器之前的早期运行，从未判定也不归档测量（run 记录 `evidence/runs/TASK-XPA-023/run-2026-09-14-retire-merge-lane.md`）；+20% 阈值作为目标保留，待有提交了自身基线的 runner 再恢复该车道。当前仍需 runner 自身基线，nightly 绝对预算门也未落地。每周 hosted soak 默认 4 h，24 h 目标需要持续运行的 runner；性能车道本身不属于 merge gate。这里记录缺口，保留既有目标与阈值。
 
 ### I.3 基线 Spike（SPK-1）的通过/失败判据
 
