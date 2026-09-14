@@ -1090,6 +1090,41 @@ the oracle's lock) byte for byte. The `runtime.hdc.status` method arm in
 object needs (the published schema was derived from frames that carry only
 nulls for `generation`, `processId` and `clientVersion`), are the method
 owner's.
+## Capture file legs (TASK-XPA-016, M1)
+
+`arkdeck_provider_hdc::FileAction` is Swift's HDC provider for the legs of
+`capture.diagnostics@1` beyond its default request: the file products — a
+trace (`hitrace -t … -o`, or an armed ring: `--trace_begin`, the coverage
+anchor echoed into `trace_marker` and read back with `grep -c`, `sleep`,
+`--trace_dump`, `--trace_finish_nodump`), the component tree (`uitest
+dumpLayout -p`), a screenshot (`snapshot_display -t <type> -f`) and a screen
+sequence (`mkdir -p`, one `snapshot_display` per frame, `tar -c -f`) — each
+written to a provider-owned path (`OwnedRemotePath`: the job/step/nonce
+tuple under `/data/local/tmp` with the producer's suffix) and judged by its
+`ls -l` readback, never by the client's exit status (`remote_regular_file_
+byte_count`, the size column of one listing line); their receive (`file
+recv <remote> <host>`, the host file named by the remote basename, judged
+by the bytes that landed — `HostLanding::inspect`: no file, a symlink or a
+changed file is unknown, empty and over-budget fail without a digest, a
+pinned hash and a pinned magic are checked) and their cleanup (`rm -f` by
+name; for a sequence the frames, the archive, `rmdir`, proved by `ls -ld`'s
+not-found grammar — `path_presence`); and the stdout legs the default
+request leaves unselected — the crash ledger (`hidumper -s 1201 -a "-p
+Faultlogger -l"` / `-f <name>`), the component detail dump and the
+application liveness readback (`pidof`, always a verified fact naming
+running, stopped, unreadable or ambiguous). `FileAction::for_step` is
+Swift's step-to-action mapping from the request's inputs, minting one path
+for a product's capture, receive and cleanup; `lower` the exact argv,
+timeouts and continue-after-non-zero of each invocation; `run` Swift's
+sequence rule over any `HdcDispatch` (stop at the first non-zero exit an
+invocation does not continue past; a landing prepared before the transfer
+and inspected after it whatever the exit); `verify` Swift's verdicts and
+summaries; `persisted` the journal forms. The default legs, the storage
+preflight and the observe steps stay with `Action`; the Job's products,
+index and summary with the store owner. `tests/capture_files.rs` drives
+every leg through the real process dispatch over the shared fake HDC
+driver with its own answers fragment, reading the argv back from the
+driver's log and the received bytes back from the host.
 
 ## Rockchip live-mode probe (TASK-XPA-016, M4)
 

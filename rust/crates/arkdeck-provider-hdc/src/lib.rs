@@ -6,6 +6,7 @@
 
 #![forbid(unsafe_code)]
 
+mod capture_files;
 #[cfg(target_os = "macos")]
 mod dispatch;
 mod host_diagnostics;
@@ -24,6 +25,13 @@ mod semantic;
 #[cfg(target_os = "macos")]
 mod status;
 
+pub use capture_files::{
+    DirectoryPurpose, FaultLogName, FileAction, FileActionError, FilePlan, FileReceipt,
+    HostLanding, ImageType, Invocation, JFIF_MAGIC, Landed, LivenessRequest, OwnedRemoteDirectory,
+    OwnedRemotePath, PNG_MAGIC, RECEIVE_MAXIMUM_BYTES, ReceiveArtifact, STDOUT_BUDGET,
+    ScreenSequenceRequest, TraceRequest, fault_log_entries, file_producer_step_id, host_landing,
+    path_presence, remote_regular_file_byte_count, run, screenshot_image_type,
+};
 #[cfg(target_os = "macos")]
 pub use dispatch::{ProcessDispatch, SERVER_PORT_VARIABLE};
 pub use host_diagnostics::{DIAGNOSTIC_REPORTS_DIRECTORY, signal_death, signal_number};
