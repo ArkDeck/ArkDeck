@@ -1,0 +1,116 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "agent",
+        "run",
+        "--request-file",
+        "sample"
+      ],
+      "expected": {
+        "command": "agent.run",
+        "handlerArguments": [
+          "agent",
+          "run",
+          "--request-file",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "agent",
+        "run",
+        "--help"
+      ],
+      "expected": {
+        "command": "agent.run",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "agent",
+        "run",
+        "--request-file",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "agent.run",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "agent",
+        "run"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "agent.run",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "agent",
+        "run",
+        "--request-file",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "agent.run",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "agent",
+        "run",
+        "--request-file",
+        "sample",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "agent.run",
+        "handlerArguments": [
+          "agent",
+          "run",
+          "--request-file",
+          "sample",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "agent.run",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "agent",
+    "run"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

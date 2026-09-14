@@ -81,7 +81,7 @@ final class AgentExecutionOracleContractTests: XCTestCase {
   /// `held` run until the oracle creates `released`. A Job calls one at a
   /// time, so its first call is the one held, whichever it is: `-v` for
   /// `observe.device@1`, `list targets -v` for `capture.diagnostics@1`.
-  private static let answers =
+  static let answers =
     #"""
     # A held run: its Job's first call waits until the oracle releases it.
     if [ "$mode" = held ]; then

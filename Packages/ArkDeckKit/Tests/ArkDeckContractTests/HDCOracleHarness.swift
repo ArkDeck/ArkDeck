@@ -266,13 +266,17 @@ enum HDCOracleHarness {
         var metadata = stat()
         guard lstat(url.path, &metadata) == 0 else { throw POSIXError(.EIO) }
         let isDirectory = metadata.st_mode & S_IFMT == S_IFDIR
+        // A pager snapshot is named and filled by a random revision, so the
+        // oracle keeps that it exists and its mode, not its name or bytes.
+        let snapshot = prefix == "agent-executions" && !isDirectory && isPagerSnapshot(path)
         tree.append(
           .object([
-            "path": .string("\(prefix)/\(path)"),
+            "path": .string(
+              snapshot ? "\(prefix)/snapshots/snapshot-<revision>.json" : "\(prefix)/\(path)"),
             "kind": .string(isDirectory ? "directory" : "file"),
             "mode": .string(String(metadata.st_mode & 0o777, radix: 8)),
           ]))
-        guard !isDirectory else { continue }
+        guard !isDirectory, !snapshot else { continue }
         let data = try Data(contentsOf: url)
         files["\(prefix)/\(path)"] =
           url.lastPathComponent == "job-record.json" ? machineIndependent(data) : data
@@ -301,6 +305,16 @@ enum HDCOracleHarness {
     files["provenance.json"] =
       try encoder.encode(JSONValue.object(provenance)) + Data("\n".utf8)
     return files
+  }
+
+  /// `snapshots/snapshot-<revision>.json` below the agent execution directory:
+  /// a page snapshot `RuntimeSnapshotPager` wrote under a random revision.
+  static func isPagerSnapshot(_ path: String) -> Bool {
+    let prefix = "snapshots/snapshot-"
+    let suffix = ".json"
+    guard path.hasPrefix(prefix), path.hasSuffix(suffix) else { return false }
+    let revision = String(path.dropFirst(prefix.count).dropLast(suffix.count))
+    return UUID(uuidString: revision)?.uuidString.lowercased() == revision
   }
 
   /// Writes a new oracle when `variable` names a new directory under
