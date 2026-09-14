@@ -173,7 +173,9 @@ final class RuntimeAgentExecutionContractTests: XCTestCase {
     return instance
   }
 
-  private func cli(_ arguments: [String], server: AgentDaemonServer) throws -> (Int32, [String: JSONValue]) {
+  private func cli(
+    _ arguments: [String], server: AgentDaemonServer, hangGuard: TimeInterval = 30
+  ) throws -> (Int32, [String: JSONValue]) {
     let process = Process()
     process.executableURL = Bundle(for: type(of: self)).bundleURL.deletingLastPathComponent().appending(path: "arkdeck")
     process.arguments = arguments + ["--output", "json", "--socket", server.socketURL.path]
@@ -182,7 +184,7 @@ final class RuntimeAgentExecutionContractTests: XCTestCase {
     process.standardOutput = stdout
     process.standardError = stderr
     try process.run()
-    let limit = Date().addingTimeInterval(30)
+    let limit = Date().addingTimeInterval(hangGuard)
     while process.isRunning && Date() < limit { Thread.sleep(forTimeInterval: 0.01) }
     if process.isRunning { process.terminate(); throw AgentClientFixtureError.missingObject }
     let bytes = stdout.fileHandleForReading.readDataToEndOfFile()
@@ -1170,13 +1172,37 @@ final class RuntimeAgentExecutionContractTests: XCTestCase {
     dispatcher.hold(gate)
     let owner = try owner()
     let server = try startServer(owner)
-    let (code, result) = try cli(["agent", "run", "--execution-id", "execution-test",
-      "--operation", "observe.device@1", "--timeout", "400ms"], server: server)
-    XCTAssertEqual(code, 75)
-    XCTAssertEqual(try object(XCTUnwrap(result["error"]))["code"], .string("clientTimeout"))
+    // `--timeout` bounds the whole invocation. A budget that runs out before
+    // agent.run is answered - while the CLI connects, checks health or waits
+    // for admission - proves nothing about a running Job, and the CLI rightly
+    // answers outcomeUnknown. Only an answered run can time out as
+    // clientTimeout, so re-enter the same execution, which returns it without
+    // a new dispatch (CLI-REQ-008), with a larger budget until one is answered
+    // in time. The wall clock then bounds the fixture, never the verdict.
+    let unanswered = CLIRuntimeSession.mapped(.deadlineExceeded, method: "agent.run", command: "agent.run")
+    var error: [String: JSONValue] = [:]
+    for budget in [400, 1_600, 6_400, 25_600] {
+      let (code, result) = try cli(["agent", "run", "--execution-id", "execution-test",
+        "--operation", "observe.device@1", "--timeout", "\(budget)ms"], server: server,
+        hangGuard: 30 + Double(budget) / 1000)
+      XCTAssertEqual(code, 75)
+      error = try object(XCTUnwrap(result["error"]))
+      guard error["code"] == .string(unanswered.code.rawValue),
+        error["message"] == .string(unanswered.message) else { break }
+    }
+    XCTAssertEqual(error["code"], .string("clientTimeout"))
     let jobs = try await engine.listJobs()
     XCTAssertEqual(jobs.count, 1)
     let jobID = try XCTUnwrap(jobs.first?.jobID)
+    // A release that reaches the gate before the run does is lost and parks
+    // the run forever. `enter` stores its continuation in the actor turn that
+    // sets `arrived`, so wait for the hold itself rather than for time.
+    let holdLimit = ContinuousClock.now.advanced(by: .seconds(60))
+    while await !gate.arrived {
+      guard ContinuousClock.now < holdLimit else { return XCTFail("the Job's run never reached its dispatch") }
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    XCTAssertEqual(dispatcher.dispatchCount, 1)
     let engine = engine!
     let joined = Task { try await engine.run(jobID: jobID) }
     try await Task.sleep(for: .milliseconds(50))
