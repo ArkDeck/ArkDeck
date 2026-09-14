@@ -1,0 +1,73 @@
+{
+  "artifacts" : [
+    {
+      "artifactID" : "ART-8ac03ed079313fc1df8b16abea3de6a0",
+      "bindingSnapshot" : {
+        "bindingRevision" : 1,
+        "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "targetID" : "TGT-3ba3f5f43b92"
+      },
+      "byteCount" : 673,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-a9441d87ac72135c9840cb9ddc236813",
+      "mediaType" : "application\/json",
+      "name" : "install-readback.json",
+      "observationWindow" : {
+        "endUTC" : "2026-09-14T00:00:00.000Z",
+        "startUTC" : "2026-09-14T00:00:00.000Z"
+      },
+      "privacy" : "standard",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-a9441d87ac72135c9840cb9ddc236813",
+      "sha256" : "7344bd2871348aa3da320d4d12b5c165d6ea6847bd5caeb6a5c52c7be06915d7",
+      "sourceOperation" : "debug.hap@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "package-readback"
+    },
+    {
+      "artifactID" : "ART-8330a128d3c118babad302c914be0cdf",
+      "bindingSnapshot" : {
+        "bindingRevision" : 1,
+        "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "targetID" : "TGT-3ba3f5f43b92"
+      },
+      "byteCount" : 476,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-a9441d87ac72135c9840cb9ddc236813",
+      "mediaType" : "application\/json",
+      "name" : "process-readback.json",
+      "observationWindow" : {
+        "endUTC" : "2026-09-14T00:00:00.000Z",
+        "startUTC" : "2026-09-14T00:00:00.000Z"
+      },
+      "privacy" : "standard",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-a9441d87ac72135c9840cb9ddc236813",
+      "sha256" : "738d87940bb43068d3cc70afb30e0204a0889b810f428e346ae360238c2f1bf4",
+      "sourceOperation" : "debug.hap@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "process-readback"
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

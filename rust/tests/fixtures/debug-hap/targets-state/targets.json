@@ -1,0 +1,13 @@
+{
+  "schemaVersion" : "1.0.0",
+  "targets" : [
+    {
+      "adoptedAtUTC" : "2026-09-14T00:00:00Z",
+      "bindingRevision" : 1,
+      "connectKey" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "stablePhysicalIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+      "targetID" : "TGT-3ba3f5f43b92",
+      "toolVersion" : "3.2.0d"
+    }
+  ]
+}

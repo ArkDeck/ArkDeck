@@ -1,0 +1,225 @@
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellmkdir-p/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-186c8faffebe3b9cb8b0150ef9a645b2
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaafilesend/private/tmp/arkdeck-hdc-oracle/artifacts/job-input-native-library/ART-469c10579b3c5461ab4d0a891c316397/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-186c8faffebe3b9cb8b0150ef9a645b2/libexample.so.staging
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaafilesend/private/tmp/arkdeck-hdc-oracle/host/arkdeck-code-sign-enable/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-186c8faffebe3b9cb8b0150ef9a645b2/arkdeck-code-sign-enable
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellchmod700/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-186c8faffebe3b9cb8b0150ef9a645b2/arkdeck-code-sign-enable
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsha256sum/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-186c8faffebe3b9cb8b0150ef9a645b2/arkdeck-code-sign-enable
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsha256sum/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-186c8faffebe3b9cb8b0150ef9a645b2/libexample.so.staging
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-l/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-186c8faffebe3b9cb8b0150ef9a645b2/libexample.so.staging
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/app/el1/bundle/public/com.example.demo/libs/arm
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-l/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsha256sum/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-186c8faffebe3b9cb8b0150ef9a645b2.backup
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellln/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-186c8faffebe3b9cb8b0150ef9a645b2.backup
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsha256sum/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-186c8faffebe3b9cb8b0150ef9a645b2.backup
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-l/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-186c8faffebe3b9cb8b0150ef9a645b2.backup
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-la/data/app/el1/bundle/public/com.example.demo/libs
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ln/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashell/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-186c8faffebe3b9cb8b0150ef9a645b2/arkdeck-code-sign-enableverify/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-186c8faffebe3b9cb8b0150ef9a645b2.backup
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashell/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-186c8faffebe3b9cb8b0150ef9a645b2/arkdeck-code-sign-enablepublish/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-186c8faffebe3b9cb8b0150ef9a645b2/libexample.so.staging/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-186c8faffebe3b9cb8b0150ef9a645b2.rollback
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsha256sum/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashell/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-186c8faffebe3b9cb8b0150ef9a645b2/arkdeck-code-sign-enableverify/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ln/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellaaforce-stopcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellpidofcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsleep2
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellpidofcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellaastart-bcom.example.demo-aEntryAbility
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsleep2
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellpidofcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsha256sum/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashell/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-186c8faffebe3b9cb8b0150ef9a645b2/arkdeck-code-sign-enableverify/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-186c8faffebe3b9cb8b0150ef9a645b2.backup
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashell/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-186c8faffebe3b9cb8b0150ef9a645b2/arkdeck-code-sign-enableverify/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellpidofcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellgrep-F/data/storage/el1/bundle/libs/arm/libexample.so/proc/*/maps
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-186c8faffebe3b9cb8b0150ef9a645b2/libexample.so.staging
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-186c8faffebe3b9cb8b0150ef9a645b2/arkdeck-code-sign-enable
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrmdir/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-186c8faffebe3b9cb8b0150ef9a645b2
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-186c8faffebe3b9cb8b0150ef9a645b2.rollback
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-186c8faffebe3b9cb8b0150ef9a645b2.backup
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-186c8faffebe3b9cb8b0150ef9a645b2/libexample.so.staging
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-186c8faffebe3b9cb8b0150ef9a645b2/arkdeck-code-sign-enable
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-186c8faffebe3b9cb8b0150ef9a645b2
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-186c8faffebe3b9cb8b0150ef9a645b2.rollback
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-186c8faffebe3b9cb8b0150ef9a645b2.backup
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellmkdir-p/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-77f80bef1b0b380733dd6c0759c5ccb4
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaafilesend/private/tmp/arkdeck-hdc-oracle/artifacts/job-input-native-library/ART-469c10579b3c5461ab4d0a891c316397/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-77f80bef1b0b380733dd6c0759c5ccb4/libexample.so.staging
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaafilesend/private/tmp/arkdeck-hdc-oracle/host/arkdeck-code-sign-enable/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-77f80bef1b0b380733dd6c0759c5ccb4/arkdeck-code-sign-enable
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellchmod700/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-77f80bef1b0b380733dd6c0759c5ccb4/arkdeck-code-sign-enable
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsha256sum/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-77f80bef1b0b380733dd6c0759c5ccb4/arkdeck-code-sign-enable
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsha256sum/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-77f80bef1b0b380733dd6c0759c5ccb4/libexample.so.staging
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-l/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-77f80bef1b0b380733dd6c0759c5ccb4/libexample.so.staging
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/app/el1/bundle/public/com.example.demo/libs/arm
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-l/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsha256sum/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-77f80bef1b0b380733dd6c0759c5ccb4.backup
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellln/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-77f80bef1b0b380733dd6c0759c5ccb4.backup
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsha256sum/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-77f80bef1b0b380733dd6c0759c5ccb4.backup
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-l/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-77f80bef1b0b380733dd6c0759c5ccb4.backup
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-la/data/app/el1/bundle/public/com.example.demo/libs
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ln/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashell/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-77f80bef1b0b380733dd6c0759c5ccb4/arkdeck-code-sign-enableverify/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-77f80bef1b0b380733dd6c0759c5ccb4.backup
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashell/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-77f80bef1b0b380733dd6c0759c5ccb4/arkdeck-code-sign-enablepublish/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-77f80bef1b0b380733dd6c0759c5ccb4/libexample.so.staging/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-77f80bef1b0b380733dd6c0759c5ccb4.rollback
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsha256sum/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashell/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-77f80bef1b0b380733dd6c0759c5ccb4/arkdeck-code-sign-enableverify/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ln/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellaaforce-stopcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellpidofcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsleep2
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellpidofcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellaastart-bcom.example.demo-aEntryAbility
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsleep2
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellpidofcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsha256sum/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashell/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-77f80bef1b0b380733dd6c0759c5ccb4/arkdeck-code-sign-enableverify/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-77f80bef1b0b380733dd6c0759c5ccb4.backup
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashell/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-77f80bef1b0b380733dd6c0759c5ccb4/arkdeck-code-sign-enableverify/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellpidofcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellgrep-F/data/storage/el1/bundle/libs/arm/libexample.so/proc/*/maps
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsha256sum/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-77f80bef1b0b380733dd6c0759c5ccb4.backup
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellaaforce-stopcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellpidofcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsleep2
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellpidofcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-77f80bef1b0b380733dd6c0759c5ccb4.rollback
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellln/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-77f80bef1b0b380733dd6c0759c5ccb4.backup/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-77f80bef1b0b380733dd6c0759c5ccb4.rollback
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellmv-f/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-77f80bef1b0b380733dd6c0759c5ccb4.rollback/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsha256sum/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellaastart-bcom.example.demo-aEntryAbility
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsleep2
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellpidofcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellgrep-F/data/storage/el1/bundle/libs/arm/libexample.so/proc/*/maps
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-77f80bef1b0b380733dd6c0759c5ccb4/libexample.so.staging
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-77f80bef1b0b380733dd6c0759c5ccb4/arkdeck-code-sign-enable
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrmdir/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-77f80bef1b0b380733dd6c0759c5ccb4
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-77f80bef1b0b380733dd6c0759c5ccb4.rollback
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-77f80bef1b0b380733dd6c0759c5ccb4.backup
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-77f80bef1b0b380733dd6c0759c5ccb4/libexample.so.staging
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-77f80bef1b0b380733dd6c0759c5ccb4/arkdeck-code-sign-enable
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-77f80bef1b0b380733dd6c0759c5ccb4
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-77f80bef1b0b380733dd6c0759c5ccb4.rollback
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-77f80bef1b0b380733dd6c0759c5ccb4.backup
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellmkdir-p/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-40ebc2b42062093893bd7bc3eaa2a837
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaafilesend/private/tmp/arkdeck-hdc-oracle/artifacts/job-input-native-library/ART-469c10579b3c5461ab4d0a891c316397/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-40ebc2b42062093893bd7bc3eaa2a837/libexample.so.staging
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaafilesend/private/tmp/arkdeck-hdc-oracle/host/arkdeck-code-sign-enable/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-40ebc2b42062093893bd7bc3eaa2a837/arkdeck-code-sign-enable
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellchmod700/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-40ebc2b42062093893bd7bc3eaa2a837/arkdeck-code-sign-enable
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsha256sum/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-40ebc2b42062093893bd7bc3eaa2a837/arkdeck-code-sign-enable
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsha256sum/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-40ebc2b42062093893bd7bc3eaa2a837/libexample.so.staging
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-l/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-40ebc2b42062093893bd7bc3eaa2a837/libexample.so.staging
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/app/el1/bundle/public/com.example.demo/libs/arm
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-l/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsha256sum/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-40ebc2b42062093893bd7bc3eaa2a837.backup
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellln/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-40ebc2b42062093893bd7bc3eaa2a837.backup
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsha256sum/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-40ebc2b42062093893bd7bc3eaa2a837.backup
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-l/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-40ebc2b42062093893bd7bc3eaa2a837.backup
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-la/data/app/el1/bundle/public/com.example.demo/libs
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-40ebc2b42062093893bd7bc3eaa2a837/libexample.so.staging
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-40ebc2b42062093893bd7bc3eaa2a837/arkdeck-code-sign-enable
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrmdir/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-40ebc2b42062093893bd7bc3eaa2a837
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-40ebc2b42062093893bd7bc3eaa2a837.rollback
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-40ebc2b42062093893bd7bc3eaa2a837.backup
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-40ebc2b42062093893bd7bc3eaa2a837/libexample.so.staging
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-40ebc2b42062093893bd7bc3eaa2a837/arkdeck-code-sign-enable
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-40ebc2b42062093893bd7bc3eaa2a837
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-40ebc2b42062093893bd7bc3eaa2a837.rollback
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-40ebc2b42062093893bd7bc3eaa2a837.backup
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellmkdir-p/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaafilesend/private/tmp/arkdeck-hdc-oracle/artifacts/job-input-native-library/ART-469c10579b3c5461ab4d0a891c316397/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/libexample.so.staging
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaafilesend/private/tmp/arkdeck-hdc-oracle/host/arkdeck-code-sign-enable/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/arkdeck-code-sign-enable
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellchmod700/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/arkdeck-code-sign-enable
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsha256sum/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/arkdeck-code-sign-enable
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsha256sum/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/libexample.so.staging
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-l/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/libexample.so.staging
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/app/el1/bundle/public/com.example.demo/libs/arm
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-l/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsha256sum/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0.backup
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellln/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0.backup
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsha256sum/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0.backup
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-l/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0.backup
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-la/data/app/el1/bundle/public/com.example.demo/libs
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ln/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashell/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/arkdeck-code-sign-enableverify/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0.backup
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashell/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/arkdeck-code-sign-enablepublish/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/libexample.so.staging/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0.rollback
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsha256sum/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashell/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/arkdeck-code-sign-enableverify/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ln/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellaaforce-stopcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellpidofcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsleep2
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellpidofcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellaastart-bcom.example.demo-aEntryAbility
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsleep2
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellpidofcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsha256sum/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashell/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/arkdeck-code-sign-enableverify/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0.backup
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashell/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/arkdeck-code-sign-enableverify/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellpidofcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellgrep-F/data/storage/el1/bundle/libs/arm/libexample.so/proc/*/maps
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/libexample.so.staging
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/arkdeck-code-sign-enable
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrmdir/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0.rollback
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0.backup
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/libexample.so.staging
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0/arkdeck-code-sign-enable
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0.rollback
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-d5fc7b8bd5a54cafebf7fb4f2ee85dc0.backup
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellmkdir-p/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-c847deffe96d07c4cf8bdedd8b092c3d
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaafilesend/private/tmp/arkdeck-hdc-oracle/artifacts/job-input-native-library/ART-469c10579b3c5461ab4d0a891c316397/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-c847deffe96d07c4cf8bdedd8b092c3d/libexample.so.staging
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaafilesend/private/tmp/arkdeck-hdc-oracle/host/arkdeck-code-sign-enable/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-c847deffe96d07c4cf8bdedd8b092c3d/arkdeck-code-sign-enable
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellchmod700/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-c847deffe96d07c4cf8bdedd8b092c3d/arkdeck-code-sign-enable
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsha256sum/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-c847deffe96d07c4cf8bdedd8b092c3d/arkdeck-code-sign-enable
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsha256sum/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-c847deffe96d07c4cf8bdedd8b092c3d/libexample.so.staging
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-l/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-c847deffe96d07c4cf8bdedd8b092c3d/libexample.so.staging
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/app/el1/bundle/public/com.example.demo/libs/arm
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-l/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsha256sum/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-c847deffe96d07c4cf8bdedd8b092c3d.backup
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellln/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-c847deffe96d07c4cf8bdedd8b092c3d.backup
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsha256sum/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-c847deffe96d07c4cf8bdedd8b092c3d.backup
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-l/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-c847deffe96d07c4cf8bdedd8b092c3d.backup
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-la/data/app/el1/bundle/public/com.example.demo/libs
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ln/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashell/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-c847deffe96d07c4cf8bdedd8b092c3d/arkdeck-code-sign-enableverify/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-c847deffe96d07c4cf8bdedd8b092c3d.backup
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashell/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-c847deffe96d07c4cf8bdedd8b092c3d/arkdeck-code-sign-enablepublish/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-c847deffe96d07c4cf8bdedd8b092c3d/libexample.so.staging/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-c847deffe96d07c4cf8bdedd8b092c3d.rollback
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsha256sum/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashell/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-c847deffe96d07c4cf8bdedd8b092c3d/arkdeck-code-sign-enableverify/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ln/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellaaforce-stopcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellpidofcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsleep2
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellpidofcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellaastart-bcom.example.demo-aEntryAbility
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsleep2
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellpidofcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsha256sum/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashell/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-c847deffe96d07c4cf8bdedd8b092c3d/arkdeck-code-sign-enableverify/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-c847deffe96d07c4cf8bdedd8b092c3d.backup
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashell/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-c847deffe96d07c4cf8bdedd8b092c3d/arkdeck-code-sign-enableverify/data/app/el1/bundle/public/com.example.demo/libs/arm/libexample.so
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellpidofcom.example.demo
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellgrep-F/data/storage/el1/bundle/libs/arm/libexample.so/proc/*/maps
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-c847deffe96d07c4cf8bdedd8b092c3d/libexample.so.staging
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-c847deffe96d07c4cf8bdedd8b092c3d/arkdeck-code-sign-enable
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrmdir/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-c847deffe96d07c4cf8bdedd8b092c3d
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-c847deffe96d07c4cf8bdedd8b092c3d.rollback
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-c847deffe96d07c4cf8bdedd8b092c3d.backup
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-c847deffe96d07c4cf8bdedd8b092c3d/libexample.so.staging
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-c847deffe96d07c4cf8bdedd8b092c3d/arkdeck-code-sign-enable
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-c847deffe96d07c4cf8bdedd8b092c3d
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-c847deffe96d07c4cf8bdedd8b092c3d.rollback
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-c847deffe96d07c4cf8bdedd8b092c3d.backup
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-c847deffe96d07c4cf8bdedd8b092c3d/libexample.so.staging
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-c847deffe96d07c4cf8bdedd8b092c3d/arkdeck-code-sign-enable
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-c847deffe96d07c4cf8bdedd8b092c3d
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-c847deffe96d07c4cf8bdedd8b092c3d.rollback
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-c847deffe96d07c4cf8bdedd8b092c3d.backup
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-c847deffe96d07c4cf8bdedd8b092c3d/libexample.so.staging
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-c847deffe96d07c4cf8bdedd8b092c3d/arkdeck-code-sign-enable
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrmdir/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-c847deffe96d07c4cf8bdedd8b092c3d
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-c847deffe96d07c4cf8bdedd8b092c3d.rollback
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-c847deffe96d07c4cf8bdedd8b092c3d.backup
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-c847deffe96d07c4cf8bdedd8b092c3d/libexample.so.staging
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-c847deffe96d07c4cf8bdedd8b092c3d/arkdeck-code-sign-enable
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/app/el2/100/base/com.example.demo/haps/entry/files/arkdeck-native/job-c847deffe96d07c4cf8bdedd8b092c3d
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-c847deffe96d07c4cf8bdedd8b092c3d.rollback
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/app/el1/bundle/public/com.example.demo/libs/arm/.libexample.so.arkdeck-job-c847deffe96d07c4cf8bdedd8b092c3d.backup

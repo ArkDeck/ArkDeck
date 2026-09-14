@@ -1,0 +1,63 @@
+{
+  "artifacts" : [
+    {
+      "artifactID" : "ART-ce40ab95d8ec5ac89835a46e2d301004",
+      "bindingSnapshot" : {
+        "bindingRevision" : 1,
+        "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "targetID" : "TGT-3ba3f5f43b92"
+      },
+      "byteCount" : 24,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-input-hap",
+      "mediaType" : "application\/octet-stream",
+      "name" : "entry.hap",
+      "privacy" : "standard",
+      "providerID" : "host",
+      "redactionApplied" : false,
+      "retention" : {
+        "pinned" : true,
+        "retentionClass" : "pinnedUntilVerified"
+      },
+      "sessionID" : "session-input-hap",
+      "sha256" : "2aecbe307a148ebed3aaa8b1abc8e2137369257258fc0c6a06167a980fa24575",
+      "sourceOperation" : "artifact.import-hap",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "publish-hap"
+    },
+    {
+      "artifactID" : "ART-2ab8ee3a91b3198ef6404e610ed5179f",
+      "bindingSnapshot" : {
+        "bindingRevision" : 1,
+        "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "targetID" : "TGT-3ba3f5f43b92"
+      },
+      "byteCount" : 26,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-input-hap",
+      "mediaType" : "application\/octet-stream",
+      "name" : "feature.hsp",
+      "privacy" : "standard",
+      "providerID" : "host",
+      "redactionApplied" : false,
+      "retention" : {
+        "pinned" : true,
+        "retentionClass" : "pinnedUntilVerified"
+      },
+      "sessionID" : "session-input-hap",
+      "sha256" : "94c740e9e2c9bb39b9d3053bed8c8d56213768cccf65ef2433f06ceba392f877",
+      "sourceOperation" : "artifact.import-hap",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "publish-hap"
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

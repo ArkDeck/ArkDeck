@@ -1,0 +1,39 @@
+{
+  "artifacts" : [
+    {
+      "artifactID" : "ART-4eca943391af702726038224b5332f56",
+      "bindingSnapshot" : {
+        "bindingRevision" : 1,
+        "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "targetID" : "TGT-3ba3f5f43b92"
+      },
+      "byteCount" : 657,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-77f80bef1b0b380733dd6c0759c5ccb4",
+      "mediaType" : "application\/json",
+      "name" : "publish-report.json",
+      "observationWindow" : {
+        "endUTC" : "2026-09-14T00:00:00.000Z",
+        "startUTC" : "2026-09-14T00:00:00.000Z"
+      },
+      "privacy" : "standard",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-77f80bef1b0b380733dd6c0759c5ccb4",
+      "sha256" : "a73c43938395956eedd5820263eba70fb2e1498b7907cfafd0b0129fd55802a8",
+      "sourceOperation" : "deploy.native-library.app-owned@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "atomic-publish"
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}
