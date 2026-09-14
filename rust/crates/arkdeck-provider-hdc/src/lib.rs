@@ -20,8 +20,11 @@ mod native_elf;
 mod native_library;
 mod observation;
 mod operation;
+mod pointer_input;
+mod port_forward;
 mod presence;
 mod provider;
+mod readback;
 mod rockchip_hdc;
 mod rockchip_loader;
 mod semantic;
@@ -75,11 +78,17 @@ pub use operation::{
     property_value, stable_identity_sha256,
 };
 pub use operation::{DEFAULT_HILOG_BUDGET, Persisted, RequestError, STORAGE_ROOT};
+pub use pointer_input::{
+    DEFAULT_LONG_PRESS_MS, DISPLAY_MAXIMUM, DURATION_MAXIMUM_MS, DURATION_MINIMUM_MS,
+    FRAME_FRESHNESS_BUDGET_MS, Gesture, PointerAction, PointerInput,
+};
+pub use port_forward::{Direction, PORT_MAXIMUM, PORT_MINIMUM, PortAction, PortRule};
 pub use presence::{
     ObservationFailure, ObservationInput, ObservationTermination, PresenceSnapshot,
     parse_registered_presence,
 };
 pub use provider::HdcReadOnlyProvider;
+pub use readback::Reconcile;
 pub use rockchip_hdc::{
     BuildReadback, Clock, POST_FLASH_BUILD_PROPERTIES_COMMAND, ReconnectExpectation,
     RockchipHdcFailure, RockchipHdcObserver, SystemClock, VerifiedBuild, WaitBudget,
