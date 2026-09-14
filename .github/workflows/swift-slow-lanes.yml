@@ -1,4 +1,5 @@
 name: Swift slow lanes
+run-name: ${{ github.event_name == 'workflow_dispatch' && format('Swift slow lanes ({0})', inputs.job) || 'Swift slow lanes' }}
 
 # Deep-scan report P2 (dimension 6): the four durability/scale tests behind
 # ARKDECK_RUN_LONG_JOURNAL_TESTS / ARKDECK_RUN_LONG_RUNTIME_TESTS /
@@ -19,12 +20,33 @@ name: Swift slow lanes
 # required gate remains swift-ci.yml's full `swift test`.
 # Zero secrets; read-only permissions; same marketplace-independent checkout
 # as swift-ci.yml.
+#
+# A manual run names its lane, for example
+# `gh workflow run swift-slow-lanes.yml --ref <branch> -f job=ui-tests`, and
+# `all` repeats the nightly run. Each lane holds a macOS runner for 3 to 40
+# minutes and the organisation gets five at once. Before the choice existed a
+# dispatch ran every lane: seven of the eight manual runs up to 2026-09-14
+# were for the UI lane and still ran slow-lanes, and the last one
+# host-store-shadow as well, 56 macOS minutes nobody asked for; on 2026-09-14
+# a main run's Rust job waited two minutes for a runner those extra lanes held.
 
 on:
   schedule:
     # 18:00 UTC nightly (02:00 UTC+8), off the interactive working day.
     - cron: "0 18 * * *"
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      job:
+        description: >-
+          Lane to run. Each holds a macOS runner for 3 to 40 minutes; `all`
+          repeats the nightly run.
+        type: choice
+        required: true
+        options:
+          - ui-tests
+          - slow-lanes
+          - host-store-shadow
+          - all
 
 permissions:
   contents: read
@@ -35,6 +57,7 @@ concurrency:
 
 jobs:
   host-store-shadow:
+    if: github.event_name == 'schedule' || inputs.job == 'all' || inputs.job == 'host-store-shadow'
     runs-on: macos-26
     timeout-minutes: 30
     env:
@@ -81,6 +104,7 @@ jobs:
           echo "Manual runs and retries do not add nightly days; scheduled evidence requires run provenance review." >> "$GITHUB_STEP_SUMMARY"
 
   slow-lanes:
+    if: github.event_name == 'schedule' || inputs.job == 'all' || inputs.job == 'slow-lanes'
     runs-on: macos-26
     # Measured locally (warm build): the four lanes take ~170s total
     # (artifact 73s, runtime 38s, history 3s, journal 52s; peak RSS ~1.2 GB).
@@ -108,6 +132,7 @@ jobs:
           echo "job is not a merge gate." >> "$GITHUB_STEP_SUMMARY"
 
   ui-tests:
+    if: github.event_name == 'schedule' || inputs.job == 'all' || inputs.job == 'ui-tests'
     runs-on: macos-26
     # Its own runner, deliberately: XCUITest drives a real window server and
     # these tests are load-sensitive. Sharing a machine with another lane
