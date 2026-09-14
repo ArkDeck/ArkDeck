@@ -17,6 +17,7 @@ mod observation;
 mod operation;
 mod presence;
 mod provider;
+mod rockchip_hdc;
 mod semantic;
 
 #[cfg(target_os = "macos")]
@@ -27,7 +28,7 @@ pub use lifecycle::{
     PostDispatchObservation, PreparedLifecycle, generation,
 };
 pub use live_mode::{
-    DeviceMode, LiveModeFailure, LiveModeObservation, LiveModeProbe, LoaderIdentity,
+    DeviceMode, HdcIdentity, LiveModeFailure, LiveModeObservation, LiveModeProbe, LoaderIdentity,
     LoaderObserver, UsbProbe,
 };
 #[cfg(target_os = "macos")]
@@ -45,4 +46,10 @@ pub use presence::{
     parse_registered_presence,
 };
 pub use provider::HdcReadOnlyProvider;
+pub use rockchip_hdc::{
+    BuildReadback, Clock, POST_FLASH_BUILD_PROPERTIES_COMMAND, ReconnectExpectation,
+    RockchipHdcFailure, RockchipHdcObserver, SystemClock, VerifiedBuild, WaitBudget,
+    bound_reconnect_summary, hdc_normal_usb_summary, hdc_state_summary, output_excerpt,
+    parse_build_properties,
+};
 pub use semantic::{CommandFailure, CommandOutcome, SemanticOutputParser};

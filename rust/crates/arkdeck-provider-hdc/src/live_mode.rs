@@ -119,6 +119,16 @@ pub struct LoaderIdentity {
     pub topology: String,
 }
 
+/// Swift `RockchipRuntimeHDCIdentity`: an HDC-normal device seen at a USB
+/// topology — its connect key, the SHA-256 (lowercase hex) of that key's
+/// exact bytes, and the topology.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct HdcIdentity {
+    pub connect_key: String,
+    pub serial_digest_sha256: String,
+    pub topology: String,
+}
+
 /// Swift `ArkForgeLoaderObserving.observeLoader(stableIdentitySHA256:
 /// expectedUSBTopology:requestID:)`: the dual-source proof that the device at
 /// the bound identity is a settled DAYU200 RockUSB Loader — the host's USB
@@ -135,13 +145,22 @@ pub trait LoaderObserver {
     ) -> Result<LoaderIdentity, String>;
 }
 
-/// Swift `RockchipRuntimeUSBProbing.singleHDCNormal(stableIdentitySHA256:)`:
-/// exactly one HDC-normal DAYU200 whose serial digest is the given identity,
-/// with its current USB topology. ArkDeck no longer owns the enumeration
-/// (design: `arkforged discoverDevices`), so this is a port; the probe
-/// discards the reason a lookup refuses with, as Swift's `try?` does.
+/// Swift `RockchipRuntimeUSBProbing`'s HDC-normal lookups: exactly one
+/// HDC-normal DAYU200 whose serial digest is the given identity, or exactly
+/// one at the given USB topology, each with its current topology. ArkDeck no
+/// longer owns the enumeration (design: `arkforged discoverDevices`), so this
+/// is a port; the callers discard the reason a lookup refuses with, as
+/// Swift's `try?` does.
 pub trait UsbProbe {
+    /// `singleHDCNormal(stableIdentitySHA256:)`.
     fn single_hdc_normal(&self, stable_identity_sha256: &str) -> Result<LoaderIdentity, String>;
+
+    /// `singleHDCNormal(usbTopology:)`, with Swift's default refusal for a
+    /// probe that cannot look a port up by topology.
+    fn single_hdc_normal_at(&self, usb_topology: &str) -> Result<HdcIdentity, String> {
+        let _ = usb_topology;
+        Err("topology-bound HDC observation is unavailable".to_owned())
+    }
 }
 
 /// Swift `FoundationRockchipLiveModeProbe`, over an [`HdcDispatch`] and the two
@@ -307,7 +326,7 @@ fn not_observable(detail: impl Into<String>) -> LiveModeFailure {
     LiveModeFailure::NotObservable(detail.into())
 }
 
-fn sha256_hex(bytes: &[u8]) -> String {
+pub(crate) fn sha256_hex(bytes: &[u8]) -> String {
     Sha256::digest(bytes)
         .iter()
         .map(|byte| format!("{byte:02x}"))
