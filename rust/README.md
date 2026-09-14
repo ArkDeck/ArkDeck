@@ -1172,6 +1172,40 @@ observation identities and generations over a reading, following a
 reference, and the adoption itself are the Target owner's.
 `tests/target_observation.rs` reads the observe fixture's shared fake with
 injected relations and checks the argv the driver logged.
+## Debug HAP provider (TASK-XPA-016, M2)
+
+`arkdeck_provider_hdc::HapAction` is Swift's HDC provider for `debug.hap@1`
+(`debugHAPAction`): a package staged to a provider-owned path (`file send
+<host> <staged>`) or a set of packages to a provider-owned directory
+(`mkdir -p`, one `file send` per package), installed (`shell bm install -p
+<staged|dir> -r`) and believed only through its readback (`shell bm dump -n
+<bundle>`: the bundle on its own boundaries, the deployed Artifact's digest,
+the native-library facts the device reports), the ability started (`shell
+aa start -b <bundle> -a <ability>`) and believed only through its process
+readback (`shell pidof`), stopped (`shell aa force-stop` + `pidof`) and
+uninstalled (`uninstall` + `bm dump`), each judged by its paired readback
+rather than by the mutation's own exit, and the staging cleaned by name
+(`rm -f`; for a set the packages, `rmdir` and the `ls -ld` that proves it).
+An install's failures are named as Swift names them (`installFailed`,
+`installOutputTruncated`, `deviceUDIDUnauthorized` on `bm` code 9568423,
+`installRejected`, each with the bounded hex diagnostic of both streams).
+`for_step` is Swift's step-to-action mapping from the request's inputs, the
+staged set appearing only with additional leases; `lower` sends nothing
+unless the Artifacts it stages are the resolved ones (`ResolvedArtifact`,
+handed in by the Job owner — identity through the lease's suffix, bytes
+through the pinned hash); `verify` Swift's verdicts; `persisted` the journal
+forms; `readback`/`desired_presence`/`presence` the recovery table that
+concludes a mutation whose outcome was never observed through its
+read-only probe (`readPackagePresence`, `readProcessPresence`,
+`readOwnedPathPresence`, `readOwnedDirectoryPresence`) without resending
+it. `tests/debug_hap.rs` replays the Swift oracle
+(`rust/tests/fixtures/debug-hap`: eight Jobs and two cleanup-debt
+continuations over the shared fake HDC driver with the oracle's own answers
+and modes) step by step through the real process dispatch, checking every
+verdict and comparing the argv the driver logged with the oracle's recorded
+log line for line. The Job's planner and runner, the lease resolution and
+the products (`install-readback.json`, `process-readback.json`,
+`debug-hilog.txt`) are the store owner's.
 
 ## Rockchip live-mode probe (TASK-XPA-016, M4)
 
