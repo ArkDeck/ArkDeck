@@ -57,6 +57,41 @@ never erase Raw Artifact, real intent/outcome, capability/recovery or evidence, 
 pending effects on the same device. Device activation still requires one published Runtime,
 fresh facts and complete mechanical safety proof. No approval or hardware pass is implied.
 
+Revision 11 (2026-09-14, acceleration review) re-measures the chain after four days of delivery
+and changes how progress is cut, verified and parallelised. It changes no Requirement, no Acceptance
+Scenario, no Core baseline, no safety invariant and no hardware criterion; the maintainer's merge of
+the PR that carries it is the attestation of the rulings it records. (1) Milestones are Golden
+Journeys on the isolated Rust daemon, not stores or RPC methods: M1 GJ-1 (`observe.device@1`,
+`capture.diagnostics@1`, `agent.*`, `human-action.*`, `target.adopt/availability`, `runtime.hdc.*`),
+M2 GJ-2/3 (Artifact publication, capability-bearing admission, `debug.*`,
+`deploy.native-library.app-owned@1`), M3 GJ-5 (workspace operations and the remaining analyzers),
+M4 GJ-4 (the ArkForge lane and `flash.*`), M5 the one-shot cutover and retirement (TASK-XPA-017)
+after the clients detach (018/019) and the lanes measure Rust (025). (2) Parity is tiered for
+XPA-AC-1/3 under the r10 premise: T0 byte-equal — wire schemas and envelope, digests and reference
+identity, and the durable formats read after the cutover (journal, `runtime_job` index,
+`job-record.json`, Session manifest and audit, capability ledger, Artifact index, recovery
+manifests); T1 semantically equal — state transitions, error codes, refusal conditions,
+zero-dispatch proofs, next actions, evidence precedence; T2 free — `message` text, Swift debug
+renderings, timestamp precision beyond the schema, logs, incidental side-effect files. Oracles
+record T0 files only; T1 is compared by code, shape and transition sequence. (3) The installed
+per-store composition of TASK-XPA-012 (the facade serving a store itself while the Swift authority
+still runs) is withdrawn: the History filter slice (#1888) stays as delivered, and every store is
+activated once, at M5, through the design §G.4 preflight. (4) TASK-XPA-015, 016, 019 and 025 are
+`ready` on their actual interface dependencies (the contract, the isolated Rust daemon and the
+recorded fixtures), not on TASK-XPA-014 `done`; four lanes run in parallel worktrees with the file
+ownership of design §G.1 r11. (5) Spikes SPK-6..11 precede the lanes and record go/no-go facts; the
+executor sidecar of TASK-XPA-014 is not built if SPK-6, SPK-9 and SPK-10 pass. (6) A decision
+package for design §L.1 item 13 (`evidence/adr-0009-decision-package-20260914.md`) names the code
+that carries ADR-0009 decisions 2 and 4 today and proposes porting it unchanged; recovery is ported
+only after the maintainer rules on it. (7) Verification overhead: the T0 oracles for M1 and M2 are
+recorded in one Swift-only PR so that the Rust slices that follow select the Rust lane only; one
+corpus-replay harness replaces per-slice `check-<slice>.py` scripts; child-spawning tests keep
+their own binaries; oracles use no real-time budget below 30 s except the case that tests the
+timeout. (8) `evidence/macos-remaining.md` carries the six-number dashboard updated on every merge.
+Compatibility note (PRODUCT-LOOP §2/§16): earlier status text, `pin-example` placeholders and the
+r8 serial order remain historical records; a runnable milestone on the isolated Rust daemon is the
+unit of progress, and device activation still requires the r10 safety proof.
+
 Conventions shared by every task:
 
 - One task = one vertical PR that carries production code, tests, applicable real-device
@@ -89,6 +124,12 @@ Conventions shared by every task:
 | SPK-3 | Windows W0 (`openspec/platforms/windows/profile.md:71-81`) plus a Rust named-pipe daemon and `hdc.exe list targets -v` against a DAYU200 | cross-account connect refused (Win32 error 5); packaged App and unpackaged CLI both reach the pipe; MotW/SmartScreen behaviour recorded; Golden fixtures parse identically | driver needs silent elevation or pipe unreachable from a packaged App | TASK-XPA-002, Windows support tuple, packaging |
 | SPK-4 | WinUI 3 gate (design §H.4 a–e) | all pass | any fails and cannot be fixed in two weeks | WinUI 3 vs WPF |
 | SPK-5 | NTFS durability primitives (`FlushFileBuffers`, `MoveFileExW` write-through, `LockFileEx`, torn-tail exhaustive test) | torn-tail matrix passes; append p95 recorded | atomic replace cannot be proven | TASK-XPA-005 write path design |
+| SPK-6 | Rust HDC process executor: the PTY one-time secret exchange (`IdentityBoundPTYExecutor`), the persistent `hdc shell` channel with exit-code framing (`PersistentDeviceShellChannel`), supervisor observation through libproc (server identity/generation) and the `/.vol/<dev>/<ino>` launch path | the 37 Golden/Probe fixtures replay; the fake HDC fixture sees the real argv with `-t <connectKey>`; with a board attached, `hdc list targets -v` and one shell round trip | a primitive cannot be reproduced without Swift | TASK-XPA-016; M1（r11） |
+| SPK-7 | `observe.device@1` end to end on the isolated Rust daemon against `ArkDeckFakeHDCFixture`: the runbook §2 commands except §2.1 | T0-equal journal, records, receipts and index; T1-equal `job result`, `job evidence` and `artifact list` | the engine's device path needs the executor sidecar | TASK-XPA-014 M1; validates the r11 slice shape（r11） |
+| SPK-8 | ClientKit transport: the App over an `xpc_connection` long-lived connection that pins the daemon's identity, typed models generated from `spec/control/methods/**`, the smallest facade (`RuntimeHistoryFilterApplicationFacade`) switched | the History filter UI tests green against the Rust standalone daemon; the six entitlements unchanged | a generated model or the transport cannot serve a facade | TASK-XPA-019, the other twelve facades in parallel（r11） |
+| SPK-9 | ArkForge Rust-to-Rust: the Rust daemon drives `arkforged` through `arkforge-client` for `flash.prerequisites` and `flash.lanePlanPreview` without a device; the StepPermit CBOR vectors reused | previews T1-equal to Swift `ArkForgeLaneHost`; CBOR vectors byte-equal | the Swift SDK carries semantics the crate does not expose | TASK-XPA-017 ArkForge lane; M4（r11） |
+| SPK-10 | Signing and credentials: Keychain through `SecItem*`, DevEco password decoding, hap-sign-tool and hvigor through registered toolchain references | zero secret in argv/env/receipts under `ArkDeckFakeHapSignerFixture`; a real signed product's digest equals Swift's | a step needs `LAContext` or a path Rust cannot take | TASK-XPA-015; M3（r11） |
+| SPK-11 | Performance and soak on Rust: `scripts/bench` against the cargo-built isolated daemon for the 13 metrics; `arkdeck-soak` reproducing `ArkDeckRuntimeSoakFixture` | three runs on the reference host with p95 spread < 30%; the two resident-set levels recorded separately | the harness cannot drive the Rust daemon | TASK-XPA-025; data for design §L.1 items 15–16（r11） |
 
 ## TASK-XPA-001 — Publish per-method typed schemas from the single v1 contract for Rust consumers
 
@@ -702,7 +743,7 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 
 ## TASK-XPA-012 — Move host-only durable stores to the Rust owner on macOS
 
-- Status:in-progress（2026-09-13: isolated Rust History, Session resources/export/cleanup, Trace cache status and purge, Bootstrap inspection, DevEco/HDC registration, tool inventory/retirement, Bundle list/registration/retirement and Target queries/display names serve CLI/control; writes preserve their frozen formats and reads verify existing native content. The Trace purge slice is recorded in evidence/runs/TASK-XPA-012/trace-cache-maintenance-run.md; its pinned native parity is recorded after the ArkTrace pin bump (#1887). Installed composition has started: the paired facade serves the History filter store itself and the Swift authority behind it no longer opens it (evidence/runs/TASK-XPA-012/facade-history-owner-run.md). Tool selection writes, trace database preparation, the remaining installed stores (Session, Trace cache, Bootstrap, Target) and GJ-1 acceptance remain pending）
+- Status:in-progress（2026-09-14: isolated Rust History, Session resources/export/cleanup, Trace cache status and purge, Bootstrap inspection, DevEco/HDC registration, tool inventory/retirement, Bundle list/registration/retirement and Target queries/display names serve CLI/control; writes preserve their frozen formats and reads verify existing native content. The Trace purge slice is recorded in evidence/runs/TASK-XPA-012/trace-cache-maintenance-run.md; its pinned native parity is recorded after the ArkTrace pin bump (#1887). r11 withdraws the installed per-store composition: the facade History filter slice (#1888, evidence/runs/TASK-XPA-012/facade-history-owner-run.md) stays as delivered, every other store is activated once at the M5 cutover through the design §G.4 preflight, and no further Swift consumer is detached store by store. Remaining: tool selection writes (`RuntimeToolSelectionControlActionStore`), trace database preparation, and the GJ-1 acceptance that M1 delivers on the isolated Rust daemon）
 - Platform:macos
 - Requirements:`session-artifact-storage` (storage owner), `docs/design/cli-runtime-storage.md:11-24`
 - Acceptance:XPA-AC-1, XPA-AC-7, XPA-AC-9; macOS GJ-1 re-pass
@@ -717,7 +758,7 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
   ```
 
 - Applicable failure patterns:AF-004, AF-005, AF-018
-- Production reachability:the Rust daemon owns session storage, history filters, display names, trace cache, tool/bundle registry and storage policy; develop against an explicit isolated root, then detach Swift consumers before installed activation. The first slice serves `history.filter.*` directly without a Swift child.
+- Production reachability:the Rust daemon owns session storage, history filters, display names, trace cache, tool/bundle registry and storage policy; develop against an explicit isolated root, then detach Swift consumers before installed activation. The first slice serves `history.filter.*` directly without a Swift child.（r11: activation is the single M5 cutover of design §G.1 r11; no further store-by-store detachment of Swift consumers）
 - Trusted fact sources:generation-CAS documents under the same lock discipline; ordinary saved filters and display preferences may be rebuilt. These local preferences confer no device authority.
 - Allowed paths:
   - `spec/baselines/swift-single-v1.json`（declared scope extension: refresh the published-main contract pin after conflict resolution）
@@ -784,6 +825,7 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 - HDC RPC phase: `rust/**` connects the existing capture/registration owner to the Rust CLI and typed handler. The existing `spec/control/methods/*.json` inspection/registration scope and `Packages/ArkDeckKit/Tests/**` cover the actual HDC producer schemas and corpora, including native nullable/quarantine fields needed for restart inspect. The published-main pin refresh uses its existing exact path. No new Allowed paths are added, so this phase carries no Scope-Extension trailers. The four DevEco-only Swift CLI/export scope notes above are not HDC authorization; those files and the Swift CLI behavior remain unchanged. This phase does not complete TASK-XPA-012 or activate the installed owner.
 - Trace maintenance phase (2026-09-13): the isolated Rust owner serves `trace.cache.purge` and the `trace cache purge` leaf behind the guarded Job census and an import-aware Artifact census (the Import owner's idle `.imports-v1` skeleton no longer retains everything). The 2026-09-12 checkpoints were rebased onto current main. Native parity was blocked by pinned ArkTrace `e6e3133d`, whose `evict` compared an un-hinted owner target URL with the directory-hinted entry URL and skipped every Ready entry, so the installed Swift purge reclaims nothing today; the fix is ArkTrace PR #25 (`ef541c7c`) and the Rust receipt equals the fixed native receipt on the same native fixture. ArkTrace PR #25 merged as `9172c952`; the ArkDeck pin bump is in review and the pinned parity re-run is recorded. See `evidence/runs/TASK-XPA-012/trace-cache-maintenance-run.md`.
 - Facade History owner phase (2026-09-13): the first installed-composition step. `arkdeck-facade` serves `history.filter.*` from the paired authority's state directory and never forwards those frames; `AgentFacadeHostOwnership` composes the Swift authority behind a facade without the History filter store, while a standalone Swift daemon keeps its owner over the same file and format. The real pair was checked with both CLIs, restart, a foreign lock holder, queued concurrent reads and the Swift daemon's own control-frame log (zero History filter frames at the paired authority; the standalone phase records them as the positive control). The other host stores stay Swift-owned when installed because the Swift engine still consumes them (Session output and storage policy, Trace cache census, Bootstrap selection, Target bindings). See `evidence/runs/TASK-XPA-012/facade-history-owner-run.md`.
+- Revision 11 (2026-09-14): installed per-store composition withdrawn. The other host stores could not follow #1888 because the Swift engine consumes them (Session output and storage policy, Trace cache census, Bootstrap selection, Target bindings), and the r10 route C already makes activation a single event once the consumers detach. The remaining writes (tool selection, trace database preparation) are delivered against the isolated root; XPA-AC-9 for this task is met by the isolated-root restart and single-owner checks plus the M5 preflight, and the GJ-1 acceptance is the M1 run of TASK-XPA-014 on the same daemon.
 - Stop condition: two processes holding the same store lock.
 - Size: M.
 
@@ -849,11 +891,12 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 
 - Explicit export phase (2026-09-12): the Rust Artifact source owner, typed handler and CLI now export a verified Job Artifact into an explicit external directory, retaining the existing overwrite metadata comparison, exclusive create, sensitive-content permission and receipt. Fixed-memory descriptor copying, full sync, readback, owner revalidation and destination directory sync preserve the publication boundary. SIGKILL before/after rename and CLI malformed/disconnected responses never replay or adopt old staging files. This phase does not publish new Artifacts, activate the installed owner or complete import/lease/quota/GC migration.
 - Import upload phase (2026-09-12): the candidate resumes current Swift upload records through Rust begin/append/abort/inspect, durable chunk checkpoints and bounded CLI rediscovery. New daemon begin now resolves the published Target owner: workspace-patch/flash retain their existing snapshots and HAP/native-library use the exact adopted HDC route digest when no canonical alias exists. Canonical alias HDC routes, commit, release and Job-reference inspection remain unavailable until their complete owners join. Unknown commit responses are inspected once and never replayed. See `evidence/runs/TASK-XPA-013/import-upload-run.md` and `import-upload-target-integration.md`; this slice does not complete TASK-XPA-013 or activate the installed owner.
+- Revision 11 (2026-09-14): the remaining write paths (`artifact.import.commit`, private publication, `artifact.import.release`, Job-reference inspection, leases, quota, active-use/release, GC and cleanup-debt, the canonical alias HDC route) are delivered inside M2 (GJ-2/3) by lane A, driven by the operations that need them, not as a separate store cutover; the Artifact owner is activated with the rest at M5. Parity follows the r11 tiers: `index.json`, payload verification documents, records and provenance are T0; refusal messages are T2.
 - Size: L.
 
 ## TASK-XPA-014 — Move admission, job store, capability and recovery to Rust with the Swift engine as executor sidecar
 
-- Status:in-progress（2026-09-14: Rust reads the v1 SQLite Job index, Job events and stored records, writes current journal records, the v1 admission index and `job-record.json` under the Swift discipline, and plans, admits and runs `analyzer.extract-crash-signature@1`, publishes each terminal Job's Session and reads its results and evidence as Swift does; the other operations, capability-bearing admission, Session publication, recovery, device execution coordination and GJ acceptance remain pending）
+- Status:in-progress（2026-09-14: Rust reads the v1 SQLite Job index, Job events and stored records, writes current journal records, the v1 admission index and `job-record.json` under the Swift discipline, and plans, admits and runs `analyzer.extract-crash-signature@1`, publishes each terminal Job's Session and reads its results and evidence as Swift does, and reads the capability store (#1909); r11 turns the remaining work into Golden Journey milestones on the isolated Rust daemon — M1 GJ-1 first (`observe.device@1` end to end against the fake HDC fixture, then `capture.diagnostics@1`, the agent execution methods and HAR, `target.adopt/availability`, `runtime.hdc.*`), then M2 GJ-2/3, M3 GJ-5 and M4 GJ-4 — with capability-bearing admission, Session publication for device Jobs, device execution coordination and the GJ acceptance inside those milestones; recovery waits for the maintainer's ruling on design §L.1 item 13）
 - Platform:macos
 - Requirements:REQ-JOB-001, REQ-JOB-006, REQ-WF-004, POL-AGENT-002, POL-RECOVERY-001, POL-MODE-001, POL-TARGET-001
 - Acceptance:XPA-AC-1, XPA-AC-2, XPA-AC-4, XPA-AC-7, XPA-AC-9; macOS GJ-1..5 re-pass
@@ -868,7 +911,7 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
   ```
 
 - Applicable failure patterns:AF-002, AF-003, AF-004, AF-005, AF-008, AF-014
-- Production reachability:Rust admission in the published order → journal intent → private `executor.step.execute{jobId, stepId, typedAction, planDigest, targetFacts, useOrdinal}` → Swift lowering + process + semantic verify → receipt → Rust outcome and artifact publication; plan-only never reaches the executor
+- Production reachability:Rust admission in the published order → journal intent → private `executor.step.execute{jobId, stepId, typedAction, planDigest, targetFacts, useOrdinal}` → Swift lowering + process + semantic verify → receipt → Rust outcome and artifact publication; plan-only never reaches the executor（r10: the sidecar only if needed; r11: not built if SPK-6, SPK-9 and SPK-10 pass — the Rust daemon lowers and dispatches directly, as the analyzer slices already do）
 - Trusted fact sources:the Rust authority alone reads fresh target/binding/tool facts, materialises the plan, mints/reserves/consumes capabilities and writes intents; the Swift sidecar receives typed actions only and cannot alter operation, target, plan or step set
 - Allowed paths:
   - `openspec/changes/chg-2026-074-shared-rust-runtime-core/**`
@@ -924,20 +967,25 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 - Cancellation phase (2026-09-14): `JobCanceller` answers `job.cancel` for the analyzer Jobs the Rust owner admits as Swift `requestCancel` does behind the daemon's handler — a string `jobId` required, an absent Job `notFound`, `{"cancelRequested": true}` for every Job the request leaves as it is (ended, finalizing, waiting for recovery or already cancelling), and a Job at its admitted `preflight` boundary closed at once with zero dispatch: Swift's three journaled transitions to `cancelled`, the cancelled failure, its finish time and record, then the cancelled Session every terminal Job gets — and the Rust CLI gains `job cancel`. A run of the same Job waits a cancellation out and meets the cancelled Job. The Rust owner reproduces a Swift-recorded cancellation oracle of 12 ordered requests over four Jobs byte for byte: answers, reads, the index, every Job file, Artifact and Session file and every entry's mode. A real-process harness finds the standalone Swift daemon and the Rust owner answering nine cancellation requests and both CLIs' `job cancel` identically and publishing the same 17 Sessions apart from the clock, and a Swift daemon handed the Rust-run store reads the cancelled Job and answers its cancellation and run as the Rust owner did. A Job that has started is refused (`rejected`) until the running lanes are ported, and Swift's in-memory request for a parked Job's recovery is not kept (L.1 item 13). See `evidence/runs/TASK-XPA-014/job-cancel-analyzer-run.md`; this slice does not complete TASK-XPA-014.
 - Running cancellation phase (2026-09-14): a Job the Rust owner is running is cancelled by its run, which alone writes the Journal, as Swift's `requestCancel` and its safe-boundary lanes cancel a running analyzer — the request waits in the run's `RunCancellation` until the run has written and persisted Swift's durable `running -> cancelRequested`; at the last boundary before the analyzer intent the run closes the Job with zero dispatch; while the child runs, the run terminates the child's process group as Swift's executor does (TERM, then KILL after 0.25 s, then a second for the group to disappear) and, with no member left, records the step's confirmed `failed` outcome with semantic code `cancelled` and closes the Job to `cancelled`, published as a Session; a group that cannot be drained, or a child that finished before the request reached the run, parks the Job without replay; after the success commit a request changes nothing. A Job left active without a run here is refused with Swift's non-resident rendering. The Rust owner reproduces a Swift-recorded running-cancellation oracle of three Jobs (a running child drained, a request at the last boundary before the intent, one after the success commit) byte for byte, and a real-process harness finds the standalone Swift daemon and the Rust owner cancelling a Job whose analyzer child is running identically, leaving the same store and publishing the same 18 Sessions apart from the clock. The undrained-group and raced-completion lanes follow Swift's source and are not exercised: no real child survives KILL, and no hook separates a child's exit from the run's next step. See `evidence/runs/TASK-XPA-014/job-cancel-running-analyzer-run.md`; this slice does not complete TASK-XPA-014.
 - Capability read phase (2026-09-14): the isolated Rust composition answers `capability.list` and `capability.inspect` from a Runtime capability store beside its Job state as the Swift daemon answers them — `CapabilityStore` reads Swift's `RuntimeCapabilityStore` under the store's blocking exclusive lock: the checkpoint and every event appended to the ledger since it, a torn final append dropped; linked files, a ledger without its checkpoint, duplicate or malformed JSON (a port of Swift's `StrictJSONDuplicateValidator`), a document outside the current shape or a capability breaking its model invariants (with Swift's `DecodingError` descriptions), an unreplayable event, and inconsistent accounting, lineage order or receipt and outcome digests refused with Swift's rendering of the store error — and the Rust CLI gains `capability list|inspect`. The Rust reader reproduces a Swift-recorded oracle of 42 synthetic stores (written by Swift's store API in temporary directories, most of them with one defect) and all 93 reads, leaving every store as Swift's reads left it; a real-process harness finds the standalone Swift daemon and the Rust owner, and both CLIs, answering every read identically. Both method schemas were re-derived from the oracle's frames; a capability's input maps stay closed to the recorded names, as a Job's inputs are. Nothing installs, mints, reserves or consumes a use; capability writes and capability-bearing admission remain. See `evidence/runs/TASK-XPA-014/capability-read-run.md`; this slice does not complete TASK-XPA-014.
+- Revision 11 (2026-09-14): the next slice is SPK-7, `observe.device@1` end to end on the isolated Rust daemon against `ArkDeckFakeHDCFixture` (runbook §2 without §2.1), then `capture.diagnostics@1`, `agent.run/status/list/resume/abandon` with HAR and `human-action.*`, `target.adopt/availability` and `runtime.hdc.status/restart/impact-preview` — M1 of design §G.1 r11. The analyzer path is complete for its purpose; its lanes that Swift's own source never exercises (undrained group, raced completion) are not extended. The executor sidecar (`executor.step.execute`) is not built if SPK-6, SPK-9 and SPK-10 pass. Recovery, `job.reconcile`, resumable Jobs and recovery epochs wait for the maintainer's ruling on `evidence/adr-0009-decision-package-20260914.md` (design §L.1 item 13); once ruled, the port reproduces the named carriers unchanged. The T0 oracles for M1 and M2 are recorded once, in a Swift-only PR against the fake HDC fixture, so that the Rust slices that follow select only the Rust lane; the T1 comparison of answers is by code, shape and transition sequence, and `message` text is T2.
 - Size: L.
 
 ## TASK-XPA-015 — Port analyzer and workspace providers to Rust (shared with Windows)
 
-- Status:blocked
+- Status:ready（2026-09-14, r11: the provider port depends on the isolated Rust daemon and the analyzer/workspace contracts as delivered, and on SPK-10 for the signing path; it no longer waits for TASK-XPA-014 `done`. The GJ-5 acceptance still needs the M1/M2 authority of TASK-XPA-014 for the device-bound hops. Readiness pins instantiated at `main` `6cf99fb6`）
 - Platform:macos
 - Requirements:CLI-REQ-022, POL-PRIVACY-001, `PRODUCT-LOOP.md:412-448`
 - Acceptance:XPA-AC-1, XPA-AC-10; macOS GJ-5 re-pass
-- Depends on:TASK-XPA-014
-- Readiness input pins（非载体示例）:
+- Depends on:SPK-10, the isolated Rust daemon of TASK-XPA-012/014 as delivered（r11: interface dependency — the provider crates consume the analyzer profile contract, the workspace project store format and the Catalog; TASK-XPA-014's M1/M2 authority is needed only for the GJ-5 acceptance run）
+- Readiness input pins（r11: instantiated at `main` on 2026-09-14）:
 
-  ```yaml pin-example
+  ```yaml pins
+  - path: main
+    commit: 6cf99fb6d955f2954d76c7b848911999e0531aef
   - path: Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AnalyzerProvider/AnalyzerProvider.swift
-    blob: <40-hex git OID>
+    blob: 608d30869f901b4dd6464e9c5dfc7a6a6267f8fe
+  - path: Packages/ArkDeckKit/Sources/ArkDeckWorkflows/WorkspaceProvider/WorkspaceOperationsProvider.swift
+    blob: 5c9cbb226e90991b74cc100d85be7b87d792727b
   ```
 
 - Applicable failure patterns:AF-003, AF-004, AF-007, AF-011
@@ -965,19 +1013,26 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 ### Deliverables / Verification
 
 - Analyzer outputs byte-equal to Swift for the same artifacts; signing flow with zero secret leakage; GJ-5 re-pass. Size: L.
+- r11: lane D. Order: SPK-10 first; then the 13 `workspace.*` operations and the `workspace.preset/project.*` methods (M3), then `analyzer.analyze-trace/summarize-trace/summarize-hilog` (after M4, not on any Golden Journey but required by G5 "no regression"). Analyzer outputs are T0; refusal messages T2. No sidecar coverage shrink is needed once TASK-XPA-014 dispatches directly.
 
 ## TASK-XPA-016 — Port the HDC provider, supervisor observation and process executor to Rust
 
-- Status:blocked
+- Status:ready（2026-09-14, r11: the executor, supervisor observation and parsers depend on the platform APIs and the Golden/Probe fixtures, not on TASK-XPA-015; SPK-6 precedes the port. The GJ-1/2/3 acceptance needs the M1/M2 authority of TASK-XPA-014. Readiness pins instantiated at `main` `6cf99fb6`）
 - Platform:macos
 - Requirements:REQ-HDC-006, REQ-HDC-009, POL-HDC-001, POL-WORKFLOW-001, PORT-PROCESS-001
 - Acceptance:AC-HDC-006-01, AC-HDC-009-01, XPA-AC-1, XPA-AC-2; macOS GJ-1/2/3 re-pass
-- Depends on:TASK-XPA-015
-- Readiness input pins（非载体示例）:
+- Depends on:SPK-6（r11: interface dependency on `arkdeck-platform` and the pinned Golden/Probe fixtures; TASK-XPA-014's M1/M2 authority is needed only for the GJ-1/2/3 acceptance runs; the edge from TASK-XPA-015 is removed）
+- Readiness input pins（r11: instantiated at `main` on 2026-09-14）:
 
-  ```yaml pin-example
+  ```yaml pins
+  - path: main
+    commit: 6cf99fb6d955f2954d76c7b848911999e0531aef
   - artifact: openspec/integrations/openharmony/supervisor-observation-probes.yaml
-    sha256: <64-hex sha256>
+    sha256: f1691f748da10f1bb7753167d71ff3b764a347676f97d5ec70a1e97ac35c9763
+  - path: Packages/ArkDeckKit/Sources/ArkDeckOpenHarmony/HDCProduction.swift
+    blob: 1ab28a5f7d09df893b4ba1a4316356c57c85ea69
+  - path: Packages/ArkDeckKit/Sources/ArkDeckProcess/ArkDeckProcess.swift
+    blob: ea7bcd78c0e423465550edfa4cfa780512f1a023
   ```
 
 - Applicable failure patterns:AF-002, AF-004, AF-010, AF-011, AF-013
@@ -1007,6 +1062,7 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 ### Deliverables / Verification
 
 - Fake process face asserts the real argv; supervisor identity/generation equal to Swift; GJ-1/2/3 re-pass. Size: L.
+- r11: lane B. SPK-6 first (PTY secret exchange, persistent shell channel, libproc observation, `/.vol` launch); then the provider families in the order the milestones need them — Observe/Diagnostics (M1), Debug and native library (M2), input/port-forward/screen-sequence (with M2), Rockchip live-mode and post-flash binding (M4). `ArkDeckFakeHDCFixture` is driven as a subprocess by the Rust tests; the fixture's argv assertions are T1.
 
 ## TASK-XPA-017 — Port the ArkForge lane and retire the Swift daemon, engine and storage targets
 
@@ -1050,6 +1106,7 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 ### Deliverables / Verification
 
 - No second runtime implementation in the repository; structural tests guard "Swift holds no runtime semantics"; release DMG contains the Rust daemon as nested code with empty entitlements; GJ-1..5 `REAL_DEVICE_PASS`; the macOS column of `openspec/verification/traceability.md` and the lock file flip here and nowhere earlier. Size: L.
+- r11: M5 is one cutover, not a series — the design §G.4 preflight, a snapshot digest of the old state directory, the LaunchAgent switched to the standalone Rust binary (`main.rs` third mode), the facade bundle retained one cycle as rollback — followed by the deletions in the same milestone. Proposed ruling on design §L.1 item 7, attested by the merge of r11: the Swift CLI retires with M5, the dual-CLI period ends at the cutover, and the macOS in-process compatibility leaves are tombstoned per CLI spec §12.
 - r3 note: r1/r2 depended on TASK-XPA-016 alone, which would have deleted modules the Swift CLI and the App still linked — an unreleasable intermediate state. The order is now decouple (018 ∥ 019), then delete.
 
 ## TASK-XPA-018 — Rust CLI full parity and Swift CLI retirement
@@ -1092,19 +1149,24 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 ### Deliverables / Verification
 
 - Byte-equal fixtures; zero-drift export from Rust; Swift CLI deleted; GJ-1..5 headless with the Rust CLI. Must complete before TASK-XPA-017 (r3). Size: L.
+- r11: lane C, continuous — the remaining leaves are ported against the isolated Rust daemon as its methods land; the dashboard row `CLI leaves on Rust` in `evidence/macos-remaining.md` is the progress record; envelope/page/nextAction samples are T0, human-readable text T2. The retirement lands with M5 (see TASK-XPA-017's proposed ruling on design §L.1 item 7).
 
 ## TASK-XPA-019 — macOS App consumes ArkDeckClientKit and drops ArkDeckWorkflows
 
-- Status:blocked
+- Status:ready（2026-09-14, r11: the transport and the generated models depend on the contract and SPK-2, and each facade switches when the isolated Rust daemon serves its methods; the task no longer waits for TASK-XPA-014 `done`. It is on the critical path of the M5 cutover because the App's NSXPC transport cannot reach the Rust daemon. Readiness pins instantiated at `main` `6cf99fb6`）
 - Platform:macos
 - Requirements:REQ-UX-001..007, REQ-DIAG-001/002, REQ-I18N-001, `openspec/architecture/system.md:34`
 - Acceptance:AC-UX-001-01..AC-UX-007-01, AC-DIAG-001-01/02, AC-DIAG-002-01, AC-I18N-001-01, XPA-AC-8
-- Depends on:TASK-XPA-001, TASK-XPA-014（delivered facade by facade, up to 13 sub-PRs）
-- Readiness input pins（非载体示例）:
+- Depends on:TASK-XPA-001, SPK-2（passed）, SPK-8（r11: the edge from TASK-XPA-014 `done` is removed; each facade waits only for the methods it consumes to be served by the isolated Rust daemon — delivered facade by facade, up to 13 sub-PRs）
+- Readiness input pins（r11: instantiated at `main` on 2026-09-14）:
 
-  ```yaml pin-example
+  ```yaml pins
+  - path: main
+    commit: 6cf99fb6d955f2954d76c7b848911999e0531aef
   - path: ArkDeckApp/App/ArkDeckApp.swift
-    blob: <40-hex git OID>
+    blob: f4fd28bf73920ab8f1fec3917f55221e2f49dd22
+  - path: Packages/ArkDeckKit/Contracts/control-protocol.json
+    blob: f3e047b6a3ca68e43b14f2a6049e971a2962a0d1
   ```
 
 - Applicable failure patterns:AF-002, AF-004, AF-010, AF-013
@@ -1127,6 +1189,7 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 ### Deliverables / Verification
 
 - `ArkDeckApp` has no `import ArkDeckWorkflows`; 59 UI tests pass; each facade switch is releasable. Must complete before TASK-XPA-017 (r3). Size: L (S/M per facade).
+- r11: lane C. SPK-8 first (the `xpc_connection` transport pinning the daemon's identity, the model generator over `spec/control/methods/**`, `RuntimeHistoryFilterApplicationFacade` switched); then the twelve other facades in the order their methods land on the Rust daemon, each a releasable PR against the Rust standalone daemon with its UI suite; the generator is shared with the Windows `ArkDeck.ClientKit`. The UI-test runway is unique per host and belongs to this lane.
 
 ## TASK-XPA-020 — WinUI surfaces to parity (Debug, Flash, Viewer, Diagnostics, Settings, Device)
 
@@ -1302,18 +1365,22 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 
 ## TASK-XPA-025 — Port the performance lanes to the Rust daemon and a Rust soak fixture
 
-- Status:blocked（r5; awaits the Rust authority of TASK-XPA-014）
+- Status:ready（2026-09-14, r11: the lanes measure the isolated Rust daemon as delivered; TASK-XPA-014's later milestones only widen what the soak exercises. SPK-11 precedes the port. Readiness pins instantiated at `main` `6cf99fb6`）
 - Platform:macos and windows
 - Requirements:design §I.2 budgets; `openspec/specs/workflow-journal-recovery/spec.md:296-298` clock contract
 - Acceptance:XPA-AC-5
-- Depends on:TASK-XPA-014, TASK-XPA-023
-- Readiness input pins（非载体示例）:
+- Depends on:TASK-XPA-023（done）, SPK-11（r11: the edge from TASK-XPA-014 `done` is removed; the isolated Rust daemon and the Rust CLI already answer the metrics' methods）
+- Readiness input pins（r11: instantiated at `main` on 2026-09-14）:
 
-  ```yaml pin-example
+  ```yaml pins
+  - path: main
+    commit: 6cf99fb6d955f2954d76c7b848911999e0531aef
   - path: .github/workflows/rust-perf.yml
-    blob: <40-hex git OID>
+    blob: c4c5f85ec20a0900578fde1d6af518ef1848139e
   - path: scripts/bench/harness.py
-    blob: <40-hex git OID>
+    blob: 1a8d6587a26802c0c6477f5cd05735d45f727854
+  - path: Packages/ArkDeckKit/Tests/ArkDeckRuntimeSoakFixture/main.swift
+    blob: 9784cf7a1a4598cb85b03e6fd78c7462a45514af
   ```
 
 - Applicable failure patterns:AF-007, AF-010, AF-011
@@ -1335,9 +1402,11 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 ### Deliverables / Verification
 
 - `arkdeck-soak` (Rust) reproducing the `ArkDeckRuntimeSoakFixture` semantics and the `arkdeck-runtime-soak/v1` metrics schema; `scripts/bench` captures against the Rust `arkdeck-agentd` (same binary name, built by cargo); `rust-perf.yml` builds no SwiftPM product; a committed baseline re-taken on the Rust daemon on the reference host with the two-level resident-set split; PR, nightly and soak lanes green on the Rust daemon before TASK-XPA-017 starts; the last Swift baseline kept beside it as the before/after record. Size: M.
+- r11: lane D, after SPK-11; measured on the isolated Rust daemon from the start so that the Rust numbers exist before M5 rather than after it; only measurements are recorded — no budget is approved or raised (design §L.1 items 15–16).
 
 ## Critical path, parallel groups, first three
 
 - Critical path to "Windows/macOS supported": SPK-3 → XPA-001 → XPA-002 → XPA-004 → XPA-005 → XPA-006 → XPA-008 → XPA-010 (external: ArkForge AF-W1) → XPA-022 → gates G1–G10.
 - Parallel groups: (1) Windows GJ chain; (2) macOS store cutover chain XPA-003/012/013/014/015/016, then XPA-018 ∥ XPA-019, then XPA-017 (r3: clients decouple before the Swift targets are deleted); (3) client chain XPA-007/019/020; (4) infrastructure SPK-1, XPA-023, XPA-025, XPA-022; XPA-017 also waits for XPA-025 (r5).
 - First three: SPK-1, TASK-XPA-001, TASK-XPA-002 (with SPK-2/SPK-3 in parallel).
+- r11 (2026-09-14): the macOS chain runs as Golden Journey milestones M1–M5 in four lanes — A engine/device path (TASK-XPA-014, 013), B platform executor (TASK-XPA-016), C clients (TASK-XPA-019, 018), D providers, ArkForge lane and performance (TASK-XPA-015, the ArkForge part of 017, 025) — after spikes SPK-6..11; TASK-XPA-015/016/019/025 are `ready`, only TASK-XPA-017 waits for everything. See design §G.1 r11 and `docs/design/cross-platform/macos-chain-agent-prompt.md` (2026-09-14).
