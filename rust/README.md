@@ -1001,6 +1001,13 @@ as the Swift CLI checks it, and an execution page is passed on as the Runtime
 answers it. A page is a bounded read; an abandonment is a mutation, so a refusal
 without the zero-dispatch proof, or a lost reply, is an unknown outcome (75).
 
+`arkdeck runtime hdc status` reads `runtime.hdc.status` as the Swift CLI does:
+no parameters and no options of its own, a bounded read emitted as the Runtime
+answered it, exiting 0 whatever availability the status reports.
+`crates/arkdeck-cli/tests/runtime_hdc_status.rs` replays Swift's argv fixture and
+serves every answer of Swift's frame corpus to the actual CLI through the fake
+Runtime in `tests/support`, which the later HDC control-action CLI tests share.
+
 ## Target presentation owner (TASK-XPA-012)
 
 The explicitly isolated development composition owns `targets-state/` and serves
