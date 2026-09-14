@@ -346,6 +346,8 @@ pub(super) fn spawn_pty(
     tool: &VerifiedTool,
     args: &[OsString],
     environment: &[(OsString, OsString)],
+    working_directory: Option<&CStr>,
+    keep_output_translation: bool,
 ) -> io::Result<(libc::pid_t, OwnedFd)> {
     let inode_path = inode_launch_path(tool)?;
     let (mut master_fd, mut slave_fd) = (-1, -1);
@@ -377,7 +379,9 @@ pub(super) fn spawn_pty(
         return Err(io::Error::last_os_error());
     }
     terminal.c_lflag &= !(libc::ECHO | libc::ECHONL);
-    terminal.c_oflag &= !libc::ONLCR;
+    if !keep_output_translation {
+        terminal.c_oflag &= !libc::ONLCR;
+    }
     // SAFETY: same descriptor and struct as above.
     if unsafe { libc::tcsetattr(slave.as_raw_fd(), libc::TCSANOW, &terminal) } != 0 {
         return Err(io::Error::last_os_error());
@@ -396,6 +400,10 @@ pub(super) fn spawn_pty(
     let mut settings = SpawnSettings::new()?;
     // SAFETY: actions/attributes are initialized; the slave is live.
     unsafe {
+        posix(posix_spawn_file_actions_addchdir_np(
+            &mut settings.actions,
+            working_directory.unwrap_or(c"/").as_ptr(),
+        ))?;
         for target in [libc::STDIN_FILENO, libc::STDOUT_FILENO, libc::STDERR_FILENO] {
             posix(libc::posix_spawn_file_actions_adddup2(
                 &mut settings.actions,

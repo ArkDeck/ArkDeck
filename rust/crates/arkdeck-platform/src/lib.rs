@@ -18,8 +18,9 @@ mod windows;
 #[cfg(target_os = "macos")]
 pub use process::{
     AnalyzerExecution, AnalyzerLimits, AnalyzerRunError, AnalyzerTermination, DeviceShellAnswer,
-    DeviceShellChannel, DeviceShellChannelError, ToolExecution, ToolLimits, ToolRequest,
-    ToolRunError, ToolTermination, VerifiedSource,
+    DeviceShellChannel, DeviceShellChannelError, PtyError, PtyExecution, PtyFailureCategory,
+    PtyInteraction, PtyRequest, ToolExecution, ToolLimits, ToolRequest, ToolRunError,
+    ToolTermination, VerifiedSource,
 };
 pub use process::{ProcessLimits, ProcessOutput, VerifiedTool};
 #[cfg(unix)]

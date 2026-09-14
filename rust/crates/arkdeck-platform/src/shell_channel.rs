@@ -74,7 +74,7 @@ impl DeviceShellChannel {
         };
         tool.revalidate()
             .map_err(|error| unavailable("channel executable identity refused", error))?;
-        let (child, master) = spawn_pty(tool, arguments, environment)
+        let (child, master) = spawn_pty(tool, arguments, environment, None, false)
             .map_err(|error| unavailable("cannot start the channel client", error))?;
         let mut channel = Self {
             master: Some(master),

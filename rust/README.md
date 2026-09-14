@@ -821,6 +821,20 @@ timeout or the client's death closes the channel as an unknown outcome, never
 a failure. `tests/shell_channel.rs` drives it with `/bin/sh -i`; no HDC is
 launched by the tests.
 
+## PTY prompt/secret exchange (TASK-XPA-016, SPK-6)
+
+`VerifiedTool::run_pty_exchange(&PtyRequest { arguments, environment,
+working_directory, timeout }, interactions, output_byte_budget, cancelled)`
+runs a signer on a pseudo-terminal as Swift's `IdentityBoundPTYExecutor` does:
+echo disabled by the parent before the child runs, each exact prompt answered
+in order with its secret, the secret never in argv, environment or result, a
+secret seen in the output or a prompt out of protocol ending the exchange, the
+budget, the deadline and a cancellation terminating the child's group. What
+comes back is the termination, how many prompts were answered, how many bytes
+were seen and Swift's closed failure category classified from the diagnostic
+after the last prompt; the transcript is wiped. `tests/pty_exchange.rs` drives
+it with shell scripts that print the signer's prompts; no signer is launched.
+
 ## macOS facade host owners (TASK-XPA-012)
 
 The installed facade pair now serves `history.filter.list/save/delete` itself.

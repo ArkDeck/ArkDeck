@@ -235,7 +235,7 @@ impl VerifiedTool {
 /// Swift `FoundationProcessExecutor`'s environment validation: a caller names
 /// every variable beyond the clean base explicitly, and none of them can
 /// redirect the loader or the search path the identity-bound spawn fixed.
-fn validate_environment(environment: &[(OsString, OsString)]) -> io::Result<()> {
+pub(super) fn validate_environment(environment: &[(OsString, OsString)]) -> io::Result<()> {
     for (key, value) in environment {
         let key = key.as_bytes();
         if key.is_empty()
@@ -262,7 +262,7 @@ fn validate_environment(environment: &[(OsString, OsString)]) -> io::Result<()> 
 
 /// Swift's `workingDirectoryUnavailable` rule: absolute, canonical and an
 /// existing directory; the daemon's own directory never changes.
-fn validate_working_directory(directory: &Path) -> io::Result<CString> {
+pub(super) fn validate_working_directory(directory: &Path) -> io::Result<CString> {
     if !directory.is_absolute() || directory.as_os_str().as_bytes().contains(&0) {
         return Err(invalid(
             "working directory must be an absolute NUL-free path",
