@@ -880,6 +880,20 @@ were seen and Swift's closed failure category classified from the diagnostic
 after the last prompt; the transcript is wiped. `tests/pty_exchange.rs` drives
 it with shell scripts that print the signer's prompts; no signer is launched.
 
+## HDC process dispatch (TASK-XPA-016, SPK-6)
+
+`arkdeck_provider_hdc::ProcessDispatch` implements lane A's `HdcDispatch` over
+`VerifiedTool::run_tool` as Swift's `DescriptorBoundProcessDispatcher.hdc(resolver:)`
+dispatches: a plan's arguments and budget, no working directory, the runner's
+clean base plus `OHOS_HDC_SERVER_PORT` only when the daemon inherited a valid
+port. An exited child is a receipt with its real exit status, both streams and
+whether either went past the capture; a timeout or a signal death leaves the
+outcome unobservable (Swift's wording); a refused budget, environment or
+identity means nothing ran. It never gates a dispatch on the server lease.
+`tests/process_dispatch.rs` drives it with shell scripts and the shared fake HDC
+driver; `FixtureDispatch` remains for the isolated owner until the composition
+swaps.
+
 ## macOS facade host owners (TASK-XPA-012)
 
 The installed facade pair now serves `history.filter.list/save/delete` itself.
