@@ -972,6 +972,25 @@ failure, stderr or an unprovable state is `OutcomeUnknown` with Swift's
 reason. `tests/lifecycle.rs` drives it with a fake `hdc` compiled from C whose
 `kill -r` client starts a new server of the same executable.
 
+## Rockchip live-mode probe (TASK-XPA-016, M4)
+
+`arkdeck_provider_hdc::LiveModeProbe` is Swift's `FoundationRockchipLiveModeProbe`,
+the read-only observation of a bound Rockchip target's current mode and build
+that stands behind the flash facts: `hdc list targets -v` through an
+`HdcDispatch` (15 s, 64 KiB) names the mode `hdc` only for exactly one
+`Connected` row with the bound connect key; then the allowlisted
+`param get const.ohos.fullname` is the build (a failed readback is a known
+mode with an unknown build, never a guess) and the exact HDC-normal identity's
+current port comes from the `UsbProbe` port. Anything else is decided by the
+`LoaderObserver` port — ArkForge's dual-source Loader observation for the
+exact bound identity — as `loader` with the observed topology, or the target
+is not observable with Swift's reason. A target list the registered parser
+cannot read is never downgraded to absence. Both ports are the ArkForge
+lane's to serve over `arkforged discoverDevices` (ArkDeck no longer owns the
+USB enumeration), as is the facts port that encodes "not observable" as
+`deviceMode: "absent"`. `tests/live_mode.rs` drives the probe over the shared
+fake HDC driver as real subprocesses and asserts the argv from the fake's log.
+
 ## macOS facade host owners (TASK-XPA-012)
 
 The installed facade pair now serves `history.filter.list/save/delete` itself.

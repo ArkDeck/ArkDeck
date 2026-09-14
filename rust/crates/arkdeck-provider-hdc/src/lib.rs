@@ -10,6 +10,7 @@
 mod dispatch;
 #[cfg(target_os = "macos")]
 mod lifecycle;
+mod live_mode;
 #[cfg(target_os = "macos")]
 mod managed_server;
 mod observation;
@@ -24,6 +25,10 @@ pub use dispatch::{ProcessDispatch, SERVER_PORT_VARIABLE};
 pub use lifecycle::{
     LifecycleAction, LifecycleBudget, LifecycleCommand, LifecycleOutcome, LifecycleReceipt,
     PostDispatchObservation, PreparedLifecycle, generation,
+};
+pub use live_mode::{
+    DeviceMode, LiveModeFailure, LiveModeObservation, LiveModeProbe, LoaderIdentity,
+    LoaderObserver, UsbProbe,
 };
 #[cfg(target_os = "macos")]
 pub use managed_server::{ManagedHdcServer, StartBudget, StartFailure};
