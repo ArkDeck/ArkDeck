@@ -401,9 +401,11 @@ final class HDCStatusUITests: XCTestCase {
 
   // MARK: - Sweep helpers
 
+  /// Outside every app container, or the App cannot read it without a privacy
+  /// prompt; FixtureStateLocation says why that is not the temporary directory.
   private var fixtureStateFileURL: URL {
-    FileManager.default.temporaryDirectory
-      .appending(path: "arkdeck-ui-fixture-state-\(ProcessInfo.processInfo.processIdentifier).txt")
+    FixtureStateLocation.file(
+      named: "arkdeck-ui-fixture-state-\(ProcessInfo.processInfo.processIdentifier).txt")
   }
 
   private func launchSweep(language: String) -> XCUIApplication {

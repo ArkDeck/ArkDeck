@@ -74,6 +74,7 @@
 		A10000000000000000000F10 /* DeviceStaleFrameUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000F11 /* DeviceStaleFrameUITests.swift */; };
 		A10000000000000000000F20 /* DeviceRecordingUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000F21 /* DeviceRecordingUITests.swift */; };
 		A100000000000000000000A0 /* KeyboardInputSourcePin.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000A1 /* KeyboardInputSourcePin.swift */; };
+		F30000000000000000000132 /* FixtureStateLocation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F30000000000000000000131 /* FixtureStateLocation.swift */; };
 		A10000000000000000000016 /* ArkDeckWorkflows in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000093 /* ArkDeckWorkflows */; };
 		A10000000000000000000015 /* HDCStatusUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000025 /* HDCStatusUITests.swift */; };
 		A100000000000000000000EA /* OverviewRecordUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100000000000000000000E9 /* OverviewRecordUITests.swift */; };
@@ -92,6 +93,7 @@
 		F30000000000000000000122 /* HistoryFilterDependenciesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HistoryFilterDependenciesTests.swift; sourceTree = "<group>"; };
 		F30000000000000000000123 /* TraceFlagTagEditorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArkDeckAppUITests/TraceFlagTagEditorTests.swift; sourceTree = SOURCE_ROOT; };
 		F30000000000000000000124 /* SettingsStorageStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArkDeckAppUITests/SettingsStorageStateTests.swift; sourceTree = SOURCE_ROOT; };
+		F30000000000000000000130 /* ArkDeckHDCUITests.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ArkDeckAppUITests/ArkDeckHDCUITests.entitlements; sourceTree = SOURCE_ROOT; };
 		A10000000000000000000020 /* ArkDeckApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArkDeckApp.swift; sourceTree = "<group>"; };
 		A10000000000000000000021 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		A100000000000000000000A4 /* FlashLocalizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = FlashLocalizable.xcstrings; sourceTree = "<group>"; };
@@ -142,6 +144,7 @@
 		A10000000000000000000F11 /* DeviceStaleFrameUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceStaleFrameUITests.swift; sourceTree = "<group>"; };
 		A10000000000000000000F21 /* DeviceRecordingUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceRecordingUITests.swift; sourceTree = "<group>"; };
 		A100000000000000000000A1 /* KeyboardInputSourcePin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardInputSourcePin.swift; sourceTree = "<group>"; };
+		F30000000000000000000131 /* FixtureStateLocation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FixtureStateLocation.swift; sourceTree = "<group>"; };
 		E10000000000000000000002 /* WorkspaceChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspaceChrome.swift; sourceTree = "<group>"; };
 		E10000000000000000000005 /* RuntimeExecutionModeBadge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeExecutionModeBadge.swift; sourceTree = "<group>"; };
 		F20000000000000000000002 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -197,6 +200,7 @@
 				A100000000000000000000EB /* Overview UI Tests */,
 				A1000000000000000000003A /* App Shell UI Tests */,
 				A10000000000000000000F12 /* Device UI Tests */,
+				F30000000000000000000130 /* ArkDeckHDCUITests.entitlements */,
 				A10000000000000000000033 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -432,6 +436,7 @@
 				F30000000000000000000125 /* FacadeRollbackUITests.swift */,
 				A10000000000000000000038 /* AppShellUITests.swift */,
 				A100000000000000000000A1 /* KeyboardInputSourcePin.swift */,
+				F30000000000000000000131 /* FixtureStateLocation.swift */,
 				A100000000000000000000E1 /* ViewerUITests.swift */,
 				F30000000000000000000121 /* RemoteBuildSourceStateTests.swift */,
 				F30000000000000000000122 /* HistoryFilterDependenciesTests.swift */,
@@ -660,6 +665,7 @@
 				A10000000000000000000F10 /* DeviceStaleFrameUITests.swift in Sources */,
 				A10000000000000000000F20 /* DeviceRecordingUITests.swift in Sources */,
 				A100000000000000000000A0 /* KeyboardInputSourcePin.swift in Sources */,
+				F30000000000000000000132 /* FixtureStateLocation.swift in Sources */,
 				A10000000000000000000015 /* HDCStatusUITests.swift in Sources */,
 				A100000000000000000000EA /* OverviewRecordUITests.swift in Sources */,
 			);
@@ -805,6 +811,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_ENTITLEMENTS = ArkDeckAppUITests/ArkDeckHDCUITests.entitlements;
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				CODE_SIGNING_ALLOWED = YES;
@@ -822,6 +829,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_ENTITLEMENTS = ArkDeckAppUITests/ArkDeckHDCUITests.entitlements;
 				CODE_SIGN_IDENTITY = "-";
 				CODE_SIGN_STYLE = Manual;
 				CODE_SIGNING_ALLOWED = YES;
