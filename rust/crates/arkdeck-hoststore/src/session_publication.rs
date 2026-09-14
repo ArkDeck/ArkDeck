@@ -480,27 +480,31 @@ fn compose(
     };
     let steps = manifest_steps(events)?;
     let compensations = manifest_compensations(events)?;
-    if touches_device(events) {
-        // Swift names the device facts a device Session needs; no Job this
-        // Runtime runs carries a device observation.
-        return Err(stop(
-            "sourceIntegrityFailed",
-            "device Session: missing or inconsistent job-local target/tool observation",
-        ));
+    let device = device_context(record, events, mode)?;
+    let mut bindings = manifest_bindings(events);
+    if let Some(device) = &device
+        && bindings.is_empty()
+    {
+        bindings = vec![device.binding.clone()];
     }
-    if !manifest_bindings(events).is_empty() {
-        return Err(stop(
-            "sourceIntegrityFailed",
-            "device-bound Session publication needs target and toolchain facts this Job \
-             record does not carry",
-        ));
-    }
-    if record.evidence_observation().is_some() {
-        return Err(stop(
-            "sourceIntegrityFailed",
-            "this Runtime publishes no Session for a Job carrying a tool observation",
-        ));
-    }
+    let (target, toolchain) = match &device {
+        Some(device) => (device.target.clone(), device.toolchain.clone()),
+        // An honest host branch: no device is named, not even the target the
+        // request carried.
+        None if !touches_device(events) && bindings.is_empty() => (
+            json!({"kind": "host", "connectKey": null, "transport": "host",
+                "identitySnapshot": {"workspaceScope": record.request["target"]["targetId"],
+                    "providerId": record.provider(), "catalogDigest": record.catalog_digest()}}),
+            json!({"kind": "none"}),
+        ),
+        None => {
+            return Err(stop(
+                "sourceIntegrityFailed",
+                "device-bound Session publication needs target and toolchain facts this Job \
+                 record does not carry",
+            ));
+        }
+    };
     let mut manifest = json!({
         "schemaVersion": "1.0.0", "appVersion": APP_VERSION, "coreSpecBaseline": baseline,
         "platformProfile": PLATFORM_PROFILE, "sessionId": format!("session-{}", record.job_id),
@@ -508,12 +512,7 @@ fn compose(
         "executionAuthority": authority, "outcomeCertainty": "confirmed",
         "sessionDisposition": "finalized", "createdAt": record.created(),
         "completedAt": completed, "archivedAt": null,
-        // An honest host branch: no device is named, not even the target the
-        // request carried.
-        "originalTarget": {"kind": "host", "connectKey": null, "transport": "host",
-            "identitySnapshot": {"workspaceScope": record.request["target"]["targetId"],
-                "providerId": record.provider(), "catalogDigest": record.catalog_digest()}},
-        "bindingHistory": [], "toolchain": {"kind": "none"},
+        "originalTarget": target, "bindingHistory": bindings, "toolchain": toolchain,
         "workflow": {"kind": record.operation(), "profileVersion": record.catalog_digest(),
             "providerIdentity": record.provider()},
         "steps": steps, "parameters": [], "compensations": compensations,
@@ -521,6 +520,9 @@ fn compose(
         // Runtime Artifacts stay in the Artifact store; Swift copies none.
         "artifacts": [], "warnings": [], "recovery": null,
     });
+    if let Some(device) = device {
+        manifest["runtimeAuthority"] = device.authority;
+    }
     manifest["failure"] = if status == "failed" {
         let Some(failure) = record.operation_failure() else {
             return Err(stop(
@@ -697,6 +699,208 @@ fn manifest_bindings(events: &[Value]) -> Vec<Value> {
         by_revision.insert(revision, Value::Object(entry));
     }
     by_revision.into_values().collect()
+}
+
+/// Swift `DeviceContext`: the audit projection of device facts this Job
+/// already owns.
+struct DeviceContext {
+    target: Value,
+    binding: Value,
+    toolchain: Value,
+    authority: Value,
+}
+
+fn lowercase_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+/// Swift `deviceContext`: a Job whose Journal holds an intent that can touch
+/// a device becomes a device Session only through its own verified
+/// observation, Journal device outcomes that are confirmed and agree with it,
+/// and its admission audit. None when no intent can touch a device.
+fn device_context(
+    record: &JobRecord,
+    events: &[Value],
+    mode: &str,
+) -> Result<Option<DeviceContext>, Stop> {
+    fn declaration(event: &Value) -> Option<&Value> {
+        let key = match event["kind"].as_str() {
+            Some("stepIntent") => "step",
+            Some("compensationIntent") => "descriptor",
+            _ => return None,
+        };
+        Some(&event["payload"][key]).filter(|step| step.is_object())
+    }
+    let intents: Vec<&Value> = events
+        .iter()
+        .filter(|event| {
+            declaration(event).is_some_and(|step| {
+                step["effect"].as_str() != Some("hostOnly")
+                    || step["bindingRequirement"].as_str() != Some("none")
+            })
+        })
+        .collect();
+    if intents.is_empty() {
+        return Ok(None);
+    }
+    let refused = |detail: &str| stop("sourceIntegrityFailed", format!("device Session: {detail}"));
+    let inconsistent = || refused("missing or inconsistent job-local target/tool observation");
+    let requested = &record.request["target"];
+    let observed = record.evidence_observation().filter(|_| mode == "execute");
+    let text = |key: &str| observed.and_then(|observation| observation[key].as_str());
+    let seconds = |at: Option<&str>| at.and_then(crate::format_time::format_timestamp_seconds);
+    let target_id = text("targetID")
+        .filter(|target| Some(*target) == requested["targetId"].as_str())
+        .ok_or_else(inconsistent)?;
+    let revision = observed
+        .and_then(|observation| observation["bindingRevision"].as_i64())
+        .filter(|revision| {
+            *revision > 0
+                && Some(*revision) == requested["expectedBindingRevision"].as_i64()
+                && record
+                    .materialized_binding()
+                    .is_none_or(|bound| bound == *revision)
+        })
+        .ok_or_else(inconsistent)?;
+    let identity = text("stableIdentitySHA256")
+        .filter(|identity| {
+            lowercase_sha256(identity)
+                && record
+                    .materialized_identity()
+                    .is_none_or(|bound| bound == *identity)
+        })
+        .ok_or_else(inconsistent)?;
+    let provider = text("providerID")
+        .filter(|provider| *provider == record.provider() && ["hdc", "arkforge"].contains(provider))
+        .ok_or_else(inconsistent)?;
+    let model = text("model")
+        .filter(|model| !model.is_empty())
+        .ok_or_else(inconsistent)?;
+    let firmware = text("firmware")
+        .filter(|firmware| !firmware.is_empty())
+        .ok_or_else(inconsistent)?;
+    let transport = text("transport")
+        .filter(|transport| ["usb", "tcp", "uart"].contains(transport))
+        .ok_or_else(inconsistent)?;
+    let confirmed = text("confirmedAtUTC").ok_or_else(inconsistent)?;
+    let tool_version = text("toolVersion")
+        .filter(|version| !version.is_empty())
+        .ok_or_else(inconsistent)?;
+    let tool_sha256 = text("toolSHA256")
+        .filter(|digest| lowercase_sha256(digest))
+        .ok_or_else(inconsistent)?;
+    let (Some(confirmed_at), Some(started_at), Some(finished_at)) = (
+        seconds(Some(confirmed)),
+        seconds(Some(record.created())),
+        seconds(record.finished_at()),
+    ) else {
+        return Err(inconsistent());
+    };
+    if text("confirmationMethod") != Some("machineReadback")
+        || started_at > confirmed_at
+        || confirmed_at > finished_at
+    {
+        return Err(inconsistent());
+    }
+
+    let mut connect_key: Option<&str> = None;
+    let mut confirmed_outcome = false;
+    let mut mutation = false;
+    for intent in intents {
+        let target = &intent["payload"]["target"];
+        let key = target["connectKey"].as_str().filter(|key| !key.is_empty());
+        let agrees = intent["bindingRevision"].as_i64() == Some(revision)
+            && target["scope"] == "device"
+            && target["targetId"] == target_id
+            && target["identitySnapshotHash"] == identity
+            && key.is_some()
+            && connect_key.is_none_or(|known| Some(known) == key);
+        if !agrees {
+            return Err(refused(
+                "Journal target or binding differs from the verified observation",
+            ));
+        }
+        connect_key = key;
+        let outcome = events
+            .iter()
+            .filter(|event| {
+                matches!(
+                    event["kind"].as_str(),
+                    Some("stepOutcome" | "compensationOutcome")
+                )
+            })
+            .find(|event| {
+                event["payload"]["correlatesToIntentEventId"].as_str() == intent["eventId"].as_str()
+            })
+            .filter(|outcome| outcome["payload"]["outcomeCertainty"] == "confirmed")
+            .ok_or_else(|| refused("Journal device outcome is missing or not confirmed"))?;
+        confirmed_outcome |= outcome["payload"]["result"] == "succeeded";
+        mutation |= declaration(intent).is_some_and(|step| {
+            matches!(
+                step["effect"].as_str(),
+                Some("deviceMutation" | "destructive")
+            )
+        });
+    }
+    let (Some(connect_key), true) = (connect_key, confirmed_outcome) else {
+        return Err(refused(
+            "no confirmed device outcome substantiates the target",
+        ));
+    };
+    let unaudited = || refused("missing admission audit or unsupported recovery provenance");
+    let admission = record.admission().ok_or_else(unaudited)?;
+    let member = |key: &str| admission.get(key).cloned().unwrap_or(Value::Null);
+    let admitted = seconds(admission["admittedAtUTC"].as_str());
+    if !admission["reference"]
+        .as_str()
+        .is_some_and(|reference| !reference.is_empty())
+        || !admitted.is_some_and(|admitted| admitted <= confirmed_at)
+        || !member("completeOverwriteRecovery").is_null()
+    {
+        return Err(unaudited());
+    }
+    // This Runtime admits under the default read-only policy only; a
+    // consumed Runtime capability's audit is not ported.
+    if admission["kind"] != "defaultReadOnlyPolicy" {
+        return Err(refused(
+            "missing or inconsistent consumed Runtime capability audit",
+        ));
+    }
+    if mutation
+        || !member("validUntilUTC").is_null()
+        || !member("consumptionFingerprintSHA256").is_null()
+        || !member("runtimeCapabilityCorrelation").is_null()
+    {
+        return Err(refused("read-only policy cannot substantiate a mutation"));
+    }
+    let snapshot = json!({"targetId": target_id, "stableIdentitySHA256": identity,
+        "model": model, "firmware": firmware});
+    Ok(Some(DeviceContext {
+        target: json!({"kind": "real", "connectKey": connect_key, "transport": transport,
+            "identitySnapshot": snapshot}),
+        binding: json!({
+            "revision": revision, "connectKey": connect_key, "transport": transport,
+            "identitySnapshot": snapshot,
+            "evidence": [
+                format!("Job-local machine readback at {confirmed}"),
+                format!("Confirmed Journal device outcomes at binding revision {revision}"),
+            ],
+            "confirmedBy": "corePolicy", "channelProtection": "unverifiedAssumeUnprotected",
+        }),
+        toolchain: json!({"kind": "runtimeProvider", "providerIdentity": provider,
+            "profileIdentifier": record.operation(), "reportedVersion": tool_version,
+            "sha256": tool_sha256}),
+        authority: json!({
+            "kind": member("kind"), "reference": member("reference"),
+            "admittedAtUtc": member("admittedAtUTC"), "validUntilUtc": member("validUntilUTC"),
+            "consumptionFingerprintSha256": member("consumptionFingerprintSHA256"),
+            "reservationId": null, "useOrdinal": null, "planDigest": null,
+            "stepSetDigest": null, "targetBindingDigest": null, "artifactDigest": null,
+        }),
+    }))
 }
 
 /// Whether any intent can touch a device, which is what makes Swift build a

@@ -6,6 +6,8 @@
 //! pre-admission with zero new dispatch.
 use crate::ArtifactReadStore;
 use crate::artifact_read_owner::{LeasedArtifact, swift_string};
+use crate::device_facts::{self, HdcComposition};
+use crate::device_steps;
 use crate::operation_catalog::{CatalogOperation, InputRefusal};
 use crate::operation_request::OperationRequest;
 use crate::session_json;
@@ -20,7 +22,7 @@ const MAXIMUM_ANALYZER_BYTES: u64 = 128 * 1024 * 1024;
 const MAXIMUM_ANALYZER_INPUT_BYTES: u64 = 512 * 1024 * 1024;
 /// The operations whose plans this Runtime materializes. Every other catalog
 /// operation is refused before its inputs are judged.
-const MATERIALIZED: [&str; 1] = ["analyzer.extract-crash-signature@1"];
+const MATERIALIZED: [&str; 2] = ["analyzer.extract-crash-signature@1", "observe.device@1"];
 
 /// Swift `AnalyzerProfile` for `crash-signature@1`, the analyzer a host names
 /// with `ARKDECK_ANALYZER_PATH` (Swift daemon composition).
@@ -116,6 +118,17 @@ pub struct JobPlanner<'a> {
     pub artifacts: Option<&'a ArtifactReadStore>,
     pub analyzer: Option<&'a AnalyzerProfile>,
     pub state_root: &'a Path,
+    /// The HDC composition a device-bound operation materializes against;
+    /// without one no HDC provider is registered.
+    pub hdc: Option<&'a HdcComposition<'a>>,
+}
+
+/// A materialized plan: its digest and, for a device-bound plan, the Target
+/// identity and binding revision it binds.
+pub(crate) struct Materialized {
+    pub(crate) digest: String,
+    pub(crate) identity: Option<String>,
+    pub(crate) binding_revision: Option<i64>,
 }
 
 /// Swift's Job lifecycle `requestJSON()`: exactly one non-empty `requestJson`
@@ -163,7 +176,7 @@ impl JobPlanner<'_> {
         let descriptor = Self::descriptor(&request)?;
         Self::validate_inputs(&request, descriptor)?;
         let fingerprint = request.fingerprint();
-        let digest = self.materialized_digest(&request, descriptor)?;
+        let materialized = self.materialized(&request, descriptor)?;
         let reference = descriptor.reference();
         let effect = descriptor.effective_effect(&request.inputs);
         let steps: Vec<Value> = descriptor
@@ -181,12 +194,12 @@ impl JobPlanner<'_> {
             "executionMode": "planOnly",
             "operation": reference,
             "targetId": request.target_id,
-            "bindingRevision": null,
-            "stableIdentitySha256": null,
+            "bindingRevision": materialized.binding_revision,
+            "stableIdentitySha256": materialized.identity,
             "providerId": descriptor.provider,
             "catalogDigest": CATALOG_DIGEST,
             "requestFingerprintSha256": fingerprint,
-            "materializedPlanDigest": digest,
+            "materializedPlanDigest": materialized.digest,
             "inputs": request.inputs,
             "steps": steps,
             "effectiveEffect": effect,
@@ -236,14 +249,137 @@ impl JobPlanner<'_> {
     }
 
     /// Swift's Import holds, then `materializeTypedPlanBeforeAuthorization`:
-    /// the digest of the materialized plan document.
-    pub(crate) fn materialized_digest(
+    /// the materialized plan document's digest and, for a device-bound plan,
+    /// what it binds.
+    pub(crate) fn materialized(
         &self,
         request: &OperationRequest,
         descriptor: &CatalogOperation,
-    ) -> Result<String, PlanRefusal> {
+    ) -> Result<Materialized, PlanRefusal> {
         self.refuse_import_leases(request, descriptor)?;
-        self.materialize(request, descriptor)
+        if descriptor.provider == "hdc" {
+            return self.materialize_device(request, descriptor);
+        }
+        Ok(Materialized {
+            digest: self.materialize(request, descriptor)?,
+            identity: None,
+            binding_revision: None,
+        })
+    }
+
+    /// Swift consults a Runtime debug attempt permit for every plan; this
+    /// Runtime reads none, so a request that has one is refused.
+    fn refuse_debug_permit(&self, request: &OperationRequest) -> Result<(), PlanRefusal> {
+        let permit = self
+            .state_root
+            .join("runtime-debug-attempts")
+            .join(format!("{}.json", request.idempotency_key));
+        if std::fs::symlink_metadata(permit).is_ok() {
+            return Err(refusal(
+                "rejected",
+                "a Runtime debug attempt permit is not read by the Rust Runtime yet",
+            ));
+        }
+        Ok(())
+    }
+
+    /// Swift `materializeTypedPlanBeforeAuthorization` for an HDC operation:
+    /// a registered provider, the Artifact store its products need, the
+    /// Target's facts checked against the request, then every selected step
+    /// as the engine or the HDC provider materializes it, the provider's with
+    /// the exact arguments its executor will run.
+    fn materialize_device(
+        &self,
+        request: &OperationRequest,
+        descriptor: &CatalogOperation,
+    ) -> Result<Materialized, PlanRefusal> {
+        let reference = descriptor.reference();
+        let Some(hdc) = self.hdc else {
+            return Err(refusal(
+                "invalidInput",
+                format!("provider {} is not registered", descriptor.provider),
+            ));
+        };
+        if self.artifacts.is_none() {
+            return Err(refusal(
+                "invalidInput",
+                format!("{reference} is runtime unavailable: runtime.artifactStoreUnavailable"),
+            ));
+        }
+        let unmaterialized = |error: String| {
+            refusal(
+                "invalidInput",
+                format!(
+                    "target facts cannot materialize the typed plan before authorization: {error}"
+                ),
+            )
+        };
+        let facts = hdc.facts(&request.target_id).map_err(unmaterialized)?;
+        device_facts::validate(
+            &facts,
+            &request.target_id,
+            request.expected_binding_revision,
+        )
+        .map_err(|reason| unmaterialized(format!("failed({})", swift_string(reason))))?;
+        self.refuse_debug_permit(request)?;
+        let mut steps = Vec::new();
+        for step in descriptor
+            .steps
+            .iter()
+            .filter(|step| descriptor.step_is_selected(step, &request.inputs))
+        {
+            if device_steps::engine_step(&step.kind) {
+                steps.push(json!({
+                    "stepID": step.step_id, "kind": step.kind, "effect": step.effect,
+                    "cancellation": step.cancellation, "binding": step.binding,
+                    "isOptional": step.optional, "processKind": "engine",
+                }));
+                continue;
+            }
+            let (Some(action), Some(arguments)) = (
+                device_steps::action(step),
+                device_steps::journal_arguments(step),
+            ) else {
+                return Err(internal_failure());
+            };
+            if action.effect() != step.effect {
+                return Err(internal_failure());
+            }
+            let plan = action
+                .lower(&step.step_id, Some(&facts.connect_key))
+                .map_err(|error| {
+                    refusal(
+                        "invalidInput",
+                        format!("typed plan preflight failed before authorization: {error}"),
+                    )
+                })?;
+            steps.push(json!({
+                "stepID": step.step_id, "kind": step.kind, "effect": step.effect,
+                "cancellation": step.cancellation, "binding": step.binding,
+                "isOptional": step.optional, "journalArguments": arguments,
+                "processKind": "process",
+                // Swift lowers the executable's identity at dispatch.
+                "executableSHA256": "resolved-at-dispatch",
+                "argumentSummary": plan.arguments,
+                "timeoutSeconds": plan.timeout.as_secs(),
+            }));
+        }
+        let document = json!({
+            "operationReference": reference,
+            "catalogDigest": CATALOG_DIGEST,
+            "inputs": request.inputs,
+            "targetID": request.target_id,
+            "stableTargetIdentitySHA256": facts.identity,
+            "bindingRevision": facts.binding_revision,
+            "providerID": descriptor.provider,
+            "steps": steps,
+        });
+        let bytes = session_json::encode(&document).map_err(|_| internal_failure())?;
+        Ok(Materialized {
+            digest: sha256_hex(&bytes),
+            identity: Some(facts.identity),
+            binding_revision: Some(facts.binding_revision),
+        })
     }
 
     /// Swift `RuntimeImportLeaseReference.inputs`: a malformed Import lease is
@@ -364,16 +500,7 @@ impl JobPlanner<'_> {
                 format!("analyzer source artifact Artifact lease is not resolvable: {reason}"),
             )
         })?;
-        let permit = self
-            .state_root
-            .join("runtime-debug-attempts")
-            .join(format!("{}.json", request.idempotency_key));
-        if std::fs::symlink_metadata(permit).is_ok() {
-            return Err(refusal(
-                "rejected",
-                "a Runtime debug attempt permit is not read by the Rust Runtime yet",
-            ));
-        }
+        self.refuse_debug_permit(request)?;
         let path = leased
             .path
             .to_str()

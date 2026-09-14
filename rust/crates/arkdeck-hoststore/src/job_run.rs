@@ -25,6 +25,7 @@
 use crate::analyzer_output::{self, ANALYZER_REF, ANALYZER_VERSION, DERIVED_NAME, Receipt, Source};
 use crate::artifact_publication::{ArtifactPublisher, Product};
 use crate::artifact_read_owner::{ArtifactReadStore, LeasedArtifact, swift_string};
+use crate::device_facts::HdcComposition;
 use crate::job_cancel::RunCancellation;
 use crate::job_journal_events::{self as events, Envelope, Target};
 use crate::job_journal_writer::JournalWriter;
@@ -84,7 +85,7 @@ fn proven(code: &'static str, message: impl Into<String>, job: Option<&str>) -> 
 }
 
 /// Swift's handler answers any other run failure with one message.
-fn uncertain() -> RunRefusal {
+pub(crate) fn uncertain() -> RunRefusal {
     RunRefusal {
         code: "internalError",
         message: "the Runtime could not complete the Job lifecycle request".into(),
@@ -155,6 +156,9 @@ pub struct JobRunner<'a> {
     /// Swift's `afterAnalyzerCommitLinearization` test hook: given the Job's
     /// identity once its child has finished and its answer is verified.
     pub after_commit: Option<&'a (dyn Fn(&str) + Sync)>,
+    /// The HDC composition a device-bound Job runs through; without one no
+    /// such Job runs.
+    pub hdc: Option<&'a HdcComposition<'a>>,
 }
 
 /// One run's durable state: the record as the run advances it and the
@@ -170,16 +174,52 @@ impl Run {
     pub(crate) fn clock(&self) -> Result<String, RunRefusal> {
         (self.now)().ok_or_else(uncertain)
     }
-    fn envelope(&self, event_id: String) -> Result<Envelope, RunRefusal> {
-        Ok(Envelope {
+    pub(crate) fn envelope(&self, event_id: String) -> Result<Envelope, RunRefusal> {
+        let timestamp = self.clock()?;
+        Ok(self.envelope_at(event_id, timestamp))
+    }
+    fn envelope_at(&self, event_id: String, timestamp: String) -> Envelope {
+        Envelope {
             event_id,
             sequence: self.sequence,
             session_id: format!("session-{}", self.record.job_id),
             job_id: self.record.job_id.clone(),
-            timestamp: self.clock()?,
-        })
+            timestamp,
+        }
     }
-    fn append(&mut self, event: Value) -> Result<(), RunRefusal> {
+    /// A dispatched step's confirmed outcome, correlated to its intent.
+    pub(crate) fn step_outcome(
+        &mut self,
+        step_id: &str,
+        intent_id: &str,
+        result: &str,
+        semantic_code: Option<&str>,
+    ) -> Result<(), RunRefusal> {
+        let timestamp = self.clock()?;
+        self.step_outcome_at(step_id, intent_id, result, semantic_code, &timestamp)
+    }
+    /// The same, at the time the run already read for it.
+    pub(crate) fn step_outcome_at(
+        &mut self,
+        step_id: &str,
+        intent_id: &str,
+        result: &str,
+        semantic_code: Option<&str>,
+        timestamp: &str,
+    ) -> Result<(), RunRefusal> {
+        let envelope = self.envelope_at(format!("outcome-{step_id}"), timestamp.into());
+        self.append(events::step_outcome(
+            &envelope,
+            step_id,
+            1,
+            intent_id,
+            result,
+            "confirmed",
+            semantic_code,
+            None,
+        ))
+    }
+    pub(crate) fn append(&mut self, event: Value) -> Result<(), RunRefusal> {
         self.journal.append(&event).map_err(|_| uncertain())?;
         self.sequence += 1;
         Ok(())
@@ -299,7 +339,8 @@ impl JobRunner<'_> {
                 None,
             ));
         }
-        if record.operation() != OPERATION {
+        let device = record.operation() == crate::device_run::OPERATION && self.hdc.is_some();
+        if record.operation() != OPERATION && !device {
             return Err(proven(
                 "rejected",
                 format!(
@@ -349,7 +390,10 @@ impl JobRunner<'_> {
             sequence: facts.last_durable_sequence.map_or(0, |last| last + 1),
             now: self.now,
         };
-        self.execute(&mut run)?;
+        match self.hdc.filter(|_| device) {
+            Some(hdc) => self.execute_device(&mut run, hdc)?,
+            None => self.execute(&mut run)?,
+        }
         run.release(self.jobs, self.sessions, &directory)?;
         Ok(run.record.status())
     }
@@ -592,7 +636,7 @@ impl JobRunner<'_> {
     }
 
     /// Swift's `.failed(reason)` lane in `runOwned`.
-    fn fail(&self, run: &mut Run, reason: &str) -> Result<(), RunRefusal> {
+    pub(crate) fn fail(&self, run: &mut Run, reason: &str) -> Result<(), RunRefusal> {
         run.record.set_operation_failure(Some(failure(
             "executionFailed",
             "execution",
@@ -604,7 +648,7 @@ impl JobRunner<'_> {
 
     /// The failure already recorded, persisted, then closed through
     /// `finalizing` to `failed`.
-    fn close(&self, run: &mut Run, reason: &str) -> Result<(), RunRefusal> {
+    pub(crate) fn close(&self, run: &mut Run, reason: &str) -> Result<(), RunRefusal> {
         run.persist(self.jobs)?;
         run.transition("running", "finalizing", reason)?;
         run.transition("finalizing", "failed", reason)?;
@@ -614,7 +658,7 @@ impl JobRunner<'_> {
 
     /// Swift's `.outcomeUnknown(reason)` lane: parked from the state the run
     /// has reached, never replayed.
-    fn park(&self, run: &mut Run, reason: &str) -> Result<(), RunRefusal> {
+    pub(crate) fn park(&self, run: &mut Run, reason: &str) -> Result<(), RunRefusal> {
         run.record.set_operation_failure(Some(failure(
             "outcomeUnknown",
             "unknownOutcome",
@@ -634,7 +678,7 @@ impl JobRunner<'_> {
 
     /// Swift `requestCancel`'s durable intent, written by the run that owns
     /// the Journal; the waiting canceller answers once it is persisted.
-    fn carry(&self, run: &mut Run) -> Result<(), RunRefusal> {
+    pub(crate) fn carry(&self, run: &mut Run) -> Result<(), RunRefusal> {
         if run.record.state == "running" {
             run.transition(
                 "running",

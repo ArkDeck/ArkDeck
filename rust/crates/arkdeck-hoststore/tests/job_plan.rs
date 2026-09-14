@@ -174,6 +174,7 @@ fn rust_plans_reproduce_the_swift_oracle() {
             artifacts: Some(&store),
             analyzer: (case["engine"] != "unconfigured").then_some(&profile),
             state_root: &root,
+            hdc: None,
         }
         .handle(&params);
         restore();
@@ -211,6 +212,7 @@ fn a_request_json_that_is_not_text_is_refused_as_an_empty_one() {
         artifacts: None,
         analyzer: None,
         state_root: Path::new(ROOT),
+        hdc: None,
     };
     for value in [json!(7), json!(null), json!(["{}"]), json!("")] {
         let refusal = planner
@@ -239,26 +241,38 @@ fn rust_refuses_plans_it_cannot_materialize_yet() {
         artifacts: Some(&store),
         analyzer: Some(&profile),
         state_root: &root,
+        hdc: None,
     };
-    let observe = json!({
-        "schemaVersion": "1.0.0",
-        "requestId": "req-rust-observe",
-        "idempotencyKey": "idem-rust-observe-0001",
-        "target": {"targetId": "TGT-ORACLE", "expectedBindingRevision": 3},
-        "operation": {"id": "observe.device", "version": 1},
-    });
+    let device_request = |operation: &str, key: &str| {
+        let request = json!({
+            "schemaVersion": "1.0.0",
+            "requestId": "req-rust-device",
+            "idempotencyKey": key,
+            "target": {"targetId": "TGT-ORACLE", "expectedBindingRevision": 3},
+            "operation": {"id": operation, "version": 1},
+        });
+        Map::from_iter([("requestJson".into(), json!(request.to_string()))])
+    };
     let refusal = planner
-        .handle(&Map::from_iter([(
-            "requestJson".into(),
-            json!(observe.to_string()),
-        )]))
+        .handle(&device_request(
+            "capture.diagnostics",
+            "idem-rust-capture-0001",
+        ))
         .unwrap_err();
     assert_eq!(
         (refusal.code, refusal.message.as_str()),
         (
             "rejected",
-            "observe.device@1 is not materialized by the Rust Runtime yet"
+            "capture.diagnostics@1 is not materialized by the Rust Runtime yet"
         )
+    );
+    // Swift's daemon without an HDC registration: no provider plans it.
+    let refusal = planner
+        .handle(&device_request("observe.device", "idem-rust-observe-0001"))
+        .unwrap_err();
+    assert_eq!(
+        (refusal.code, refusal.message.as_str()),
+        ("invalidInput", "provider hdc is not registered")
     );
     let import = format!(
         "lease-v1:imp-{}:ART-{}",

@@ -29,6 +29,9 @@ pub(crate) struct CatalogStep {
     pub(crate) cancellation: String,
     pub(crate) binding: String,
     pub(crate) optional: bool,
+    /// Swift `actionReference`: the catalog and action an approved remote
+    /// operation names, as (`catalogId`, `actionId`).
+    pub(crate) action: Option<(String, String)>,
 }
 
 /// A product the operation declares (Swift `CatalogArtifactDeclaration`).
@@ -36,6 +39,9 @@ pub(crate) struct CatalogStep {
 pub(crate) struct CatalogArtifact {
     pub(crate) name: String,
     pub(crate) required: bool,
+    pub(crate) media_type: String,
+    pub(crate) privacy: String,
+    pub(crate) retention_class: String,
 }
 
 #[derive(Clone, Debug)]
@@ -124,6 +130,9 @@ impl CatalogOperation {
                         cancellation: text(&step["cancellation"]),
                         binding: text(&step["binding"]),
                         optional: step["optional"] == true,
+                        action: step["actionRef"].as_object().map(|reference| {
+                            (text(&reference["catalogId"]), text(&reference["actionId"]))
+                        }),
                     })
                     .collect()
             })
@@ -159,6 +168,13 @@ impl CatalogOperation {
                         .map(|artifact| CatalogArtifact {
                             name: text(&artifact["name"]),
                             required: artifact["required"] == true,
+                            media_type: text(&artifact["mediaType"]),
+                            privacy: text(&artifact["privacy"]),
+                            // Swift's generated descriptors default the class.
+                            retention_class: artifact["retentionClass"]
+                                .as_str()
+                                .unwrap_or("default")
+                                .to_owned(),
                         })
                         .collect()
                 })

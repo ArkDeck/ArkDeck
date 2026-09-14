@@ -56,6 +56,7 @@ impl Composition<'_> {
             sessions: Some(self.publisher),
             cancellation: Some(cancellation),
             after_commit,
+            hdc: None,
         }
     }
 }
@@ -133,6 +134,7 @@ fn rust_cancels_the_swift_running_jobs() {
                 artifacts: Some(&artifact_store),
                 analyzer: Some(&profile),
                 state_root: &root,
+                hdc: None,
             },
             jobs: &jobs,
             now: fixed_now,

@@ -216,6 +216,7 @@ fn rust_runs_reproduce_the_swift_oracle() {
                 artifacts: Some(&artifacts),
                 analyzer: Some(&profiles[&budget(case)]),
                 state_root: &root,
+                hdc: None,
             },
             jobs: &jobs,
             now: fixed_now,
@@ -242,6 +243,7 @@ fn rust_runs_reproduce_the_swift_oracle() {
                 sessions: None,
                 cancellation: None,
                 after_commit: None,
+                hdc: None,
             };
             (*seconds, runner)
         })

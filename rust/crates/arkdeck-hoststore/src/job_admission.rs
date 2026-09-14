@@ -158,11 +158,11 @@ impl JobAdmitter<'_> {
             "job-{}",
             &sha256_hex(format!("{}\n{fingerprint}", request.idempotency_key).as_bytes())[..32]
         );
-        let digest = self.planner.materialized_digest(&request, descriptor)?;
+        let materialized = self.planner.materialized(&request, descriptor)?;
         if request
             .reviewed_plan_digest
             .as_ref()
-            .is_some_and(|reviewed| *reviewed != digest)
+            .is_some_and(|reviewed| *reviewed != materialized.digest)
         {
             return Err(refused(
                 "reviewedPlanMismatch",
@@ -171,7 +171,7 @@ impl JobAdmitter<'_> {
         }
         let evidence = default_read_only(descriptor, &effect, &self.clock()?)?;
         let timestamp = self.clock()?;
-        let record = JobRecord::admitted(
+        let mut record = JobRecord::admitted(
             &job_id,
             request.canonical_value(),
             &descriptor.reference(),
@@ -180,8 +180,9 @@ impl JobAdmitter<'_> {
             &timestamp,
             &effect,
             evidence,
-            &digest,
+            &materialized.digest,
         );
+        record.set_materialized(materialized.identity, materialized.binding_revision);
         match self
             .jobs
             .admit(&record, &fingerprint)

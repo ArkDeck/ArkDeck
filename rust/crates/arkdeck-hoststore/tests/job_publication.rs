@@ -43,6 +43,7 @@ fn rust_publishes_the_swift_sessions() {
                 artifacts: Some(&artifact_store),
                 analyzer: Some(&profile),
                 state_root: &root,
+                hdc: None,
             },
             jobs: &jobs,
             now: fixed_now,
@@ -73,6 +74,7 @@ fn rust_publishes_the_swift_sessions() {
         sessions: Some(&publisher),
         cancellation: None,
         after_commit: None,
+        hdc: None,
     };
     let mut differences = Vec::new();
     for case in cases {
