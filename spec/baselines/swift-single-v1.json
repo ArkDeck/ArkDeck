@@ -345,8 +345,8 @@
     },
     "runtime.hdc.status": {
       "errors": 1,
-      "requests": 3,
-      "successes": 2
+      "requests": 7,
+      "successes": 6
     },
     "runtime.storage.policy": {
       "errors": 2,
@@ -531,15 +531,15 @@
   },
   "corpusRecordCounts": {
     "errors": 308,
-    "requests": 695,
-    "successes": 387
+    "requests": 699,
+    "successes": 391
   },
   "directoryDigests": {
     "Catalog/operations": "16671abf96551e9d5b9c3382fe4eb08f3fcd150cff68e7419634cd10ecda4bfd",
     "Catalog/profiles": "58ca1d970d40019ba2718646fde81fefda22533c5448e620217582e30f5d648f",
-    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "1fd67e0089cb6ba10ba161b2aacd5bd241df1d8bb71a1006c1f9a290c6e3db6a",
+    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "f304c89b296bbd37c3b21ee6e06bc86dc6e24e9288d8078f207bf979d502078e",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC": "9ae93642e7b81bcea918469216711d7f6a17135a29cf021556ceef0f2f789196",
-    "spec/control/methods": "373d4d977b73026d5765dbaa4d357eeeafd81baeac28eb8de2bfc0b5e3c6130d"
+    "spec/control/methods": "ba25c2f83c11567f1c691087a9bd5519cdf27a889738bc98a22ffe4ae1f0513e"
   },
   "files": {
     "Catalog/generated/effect-authorization-matrix.md": {
@@ -987,8 +987,8 @@
       "sha256": "60e689b8032502d4cfef86049596cbd71ff10252d8fe8db199ecf875fc5f90ca"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/runtime.hdc.status.jsonl": {
-      "blob": "c379a7bf88b807d1f3bd23bb9fccc0b266015318",
-      "sha256": "651548df0929b61dc31e1a4574976c096ed18f4ec42afb067f6dc834f643a1ac"
+      "blob": "c4dcc7e2d4b123344956b6f631348a203211a0cb",
+      "sha256": "3ba7fdefc159254388af09a988ad738b22ecf75df71b72a4d671c6da5cdb9324"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/runtime.storage.policy.jsonl": {
       "blob": "a00bb6ac05591ff65617a3d137afac0a45a1e568",
@@ -1583,8 +1583,8 @@
       "sha256": "073f9e96c2ac86f9b9e5181a545fd39de90254ddb76685fb1a4c20f8c567ea96"
     },
     "spec/control/methods/runtime.hdc.status.json": {
-      "blob": "00618ff819698aa461d96bbfdf997b3b9410f2be",
-      "sha256": "3842b7b8c8ceefaf15523b0e265a7c851cb4fa666cf472b089c9f977d931e52e"
+      "blob": "d3deee7757f9d1235eae04a1d0fa320ccd6de356",
+      "sha256": "b669bc3e1a9aa1d34490bfb809b7491f339f0894907f228fb967bc40f33e9448"
     },
     "spec/control/methods/runtime.storage.policy.json": {
       "blob": "e29211a9ec21a1be757123cc8295977d461aa6cc",
@@ -1731,7 +1731,7 @@
       "sha256": "95367cc3e57160752f7d1d724887ee650adb8d3ccc5d736444517641a5da8e64"
     }
   },
-  "inputDigest": "3a9475d4858753e1b086c85799d0d8da24c0ffae86d5a4c5a50b3ec8ba78c04a",
+  "inputDigest": "dd642721101acc3d1db0263c2d6320c15633d30226b00bb0a06230c3653d300c",
   "kind": "development",
   "methodCount": 105,
   "protocolVersion": "1.0.0",
