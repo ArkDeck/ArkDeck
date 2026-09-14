@@ -42,6 +42,160 @@ fn remote(code: &str, proven: bool) -> ClientError {
     })
 }
 
+/// An exchange of Swift's agent lifecycle oracle
+/// (`rust/tests/fixtures/agent-lifecycle`).
+fn lifecycle(name: &str) -> Value {
+    let oracle: Value = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/agent-lifecycle/cases.json"
+    ))
+    .unwrap();
+    oracle["exchanges"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|exchange| exchange["name"] == name)
+        .unwrap_or_else(|| panic!("no exchange {name}"))
+        .clone()
+}
+
+/// A recorded refusal as the client receives it.
+fn recorded_refusal(name: &str) -> ClientError {
+    let error = &lifecycle(name)["answer"]["error"];
+    ClientError::Remote(WireError {
+        code: error["code"].as_str().unwrap().into(),
+        message: error["message"].as_str().unwrap().into(),
+        details: error["details"].as_object().cloned(),
+    })
+}
+
+#[test]
+fn a_list_and_an_abandonment_send_what_the_swift_oracle_sent() {
+    let target = lifecycle("list.target")["params"]["target"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    for (argv, name) in [
+        (vec!["agent", "list"], "list.all"),
+        (vec!["agent", "list", "--page-size", "1"], "list.page1"),
+        (
+            vec!["agent", "list", "--state", "completed"],
+            "list.completed",
+        ),
+        (
+            vec!["agent", "list", "--operation", "capture.diagnostics@1"],
+            "list.capture",
+        ),
+        (vec!["agent", "list", "--target", &target], "list.target"),
+        (
+            vec![
+                "agent",
+                "abandon",
+                "--execution-id",
+                "life-unadopted",
+                "--expected-generation",
+                "2",
+            ],
+            "abandon.orchestrating",
+        ),
+    ] {
+        let parsed =
+            parse(&args(&argv)).unwrap_or_else(|error| panic!("{name}: {}", error.message));
+        let exchange = lifecycle(name);
+        assert_eq!(json!(parsed.method), exchange["method"], "{name}");
+        assert_eq!(
+            Value::Object(parsed.params.unwrap()),
+            exchange["params"],
+            "{name}"
+        );
+    }
+    // Swift's registry refuses these before anything is sent.
+    for argv in [
+        vec!["agent", "list", "--page-size", "0"],
+        vec!["agent", "list", "--page-size", "01"],
+        vec!["agent", "list", "--page-size", "1001"],
+        vec!["agent", "list", "--state", "paused"],
+        vec![
+            "agent",
+            "abandon",
+            "--execution-id",
+            "life-stale",
+            "--expected-generation",
+            "02",
+        ],
+        vec!["agent", "abandon", "--expected-generation", "2"],
+    ] {
+        let error = parse(&args(&argv)).unwrap_err();
+        assert_eq!(
+            (error.code, error.exit_code()),
+            ("invalidOption", 64),
+            "{argv:?}"
+        );
+    }
+    // And its handler refuses an inexact identity before anything is sent.
+    let parsed = parse(&args(&[
+        "agent",
+        "abandon",
+        "--execution-id",
+        "-bad",
+        "--expected-generation",
+        "2",
+    ]))
+    .unwrap();
+    let error = require_execution_identity(parsed.params.as_ref().unwrap()).unwrap_err();
+    assert_eq!((error.code, error.exit_code()), ("invalidInput", 65));
+}
+
+#[test]
+fn an_abandonment_is_checked_and_refused_as_a_mutation_and_a_page_as_a_read() {
+    for name in ["abandon.orchestrating", "abandon.again", "abandoned.status"] {
+        validate_execution(&lifecycle(name)["answer"]["result"])
+            .unwrap_or_else(|error| panic!("{name}: {}", error.message));
+    }
+    for (name, code) in [
+        ("abandon.staleGeneration", "resourceConflict"),
+        ("abandon.jobOwned", "resourceConflict"),
+        ("abandon.absent", "resourceNotFound"),
+        ("abandon.nonCanonical", "invalidInput"),
+    ] {
+        let error = CliError::from_client(recorded_refusal(name), "agent.abandon");
+        assert_eq!((error.code, error.exit_code()), (code, 65), "{name}");
+    }
+    let owned = CliError::from_client(recorded_refusal("abandon.jobOwned"), "agent.abandon");
+    assert_eq!(
+        owned.details["jobId"],
+        lifecycle("abandon.jobOwned")["answer"]["error"]["details"]["jobId"]
+    );
+    // Without the zero-dispatch proof, or without a reply, an abandonment's
+    // outcome is not known.
+    for error in [
+        remote("resourceConflict", false),
+        ClientError::ConnectionUnusable,
+    ] {
+        let error = CliError::from_client(error, "agent.abandon");
+        assert_eq!((error.code, error.exit_code()), ("outcomeUnknown", 75));
+    }
+    for (name, code) in [
+        ("list.otherQuery", "invalidCursor"),
+        ("list.foreignCursor", "invalidCursor"),
+        ("list.longCursor", "invalidCursor"),
+        ("list.zeroPageSize", "invalidInput"),
+        ("list.unknownState", "invalidInput"),
+    ] {
+        let error = CliError::from_client(recorded_refusal(name), "agent.list");
+        assert_eq!((error.code, error.exit_code()), (code, 65), "{name}");
+    }
+    // A page is a bounded read: an unproven refusal is internal, and no
+    // reply is the Runtime's unavailability, never an unknown outcome.
+    assert_eq!(
+        CliError::from_client(remote("invalidCursor", false), "agent.list").code,
+        "internalError"
+    );
+    assert_eq!(
+        CliError::from_client(ClientError::ConnectionUnusable, "agent.list").code,
+        "runtimeUnavailable"
+    );
+}
+
 #[test]
 fn argv_fixtures_replay_as_the_swift_cli_parses_them() {
     // The Swift CLI's argv fixtures, as packaged beside the other parser
@@ -49,6 +203,8 @@ fn argv_fixtures_replay_as_the_swift_cli_parses_them() {
     for bytes in [
         include_str!("../../../tests/fixtures/current-cli-argv/agent.run.json"),
         include_str!("../../../tests/fixtures/current-cli-argv/agent.status.json"),
+        include_str!("../../../tests/fixtures/current-cli-argv/agent.list.json"),
+        include_str!("../../../tests/fixtures/current-cli-argv/agent.abandon.json"),
         include_str!("../../../tests/fixtures/current-cli-argv/artifact.list.json"),
     ] {
         let document: Value = serde_json::from_str(bytes).unwrap();

@@ -1,8 +1,10 @@
-//! `agent run` and `agent status`: Swift `RuntimeCLI.runRuntimeExecution` for
-//! the agent family. A run's intent is built from its options or from a typed
-//! request document and checked as Swift's `AgentExecutionIntent` checks it
-//! before anything is sent; every answer is checked as Swift's
-//! `executionFields` checks the execution projection; and a run settles as
+//! `agent run`, `agent status`, `agent list` and `agent abandon`: Swift
+//! `RuntimeCLI.runRuntimeExecution` for the agent family. A run's intent is
+//! built from its options or from a typed request document and checked as
+//! Swift's `AgentExecutionIntent` checks it before anything is sent; an
+//! execution read or abandoned is named by an exact identity; every execution
+//! answered is checked as Swift's `executionFields` checks the projection, and a
+//! page is passed on as the Runtime answers it; and a run settles as
 //! `emitSettledExecution` settles it, polling `agent.status` until it does.
 use crate::read_only_resources::{
     duration, keys, known_job_state, publication, terminal_job_state,
@@ -228,19 +230,55 @@ fn published_binding(reference: &str) -> Option<String> {
         .map(str::to_owned)
 }
 
-/// Parse-time `agent run` and `agent status` checks, as the Swift registry
-/// makes them. Returns the client's own wait: only `--timeout` bounds it.
+/// Parse-time `agent run`, `agent status`, `agent list` and `agent abandon`
+/// checks, as the Swift registry makes them. Returns the client's own wait:
+/// only `--timeout` bounds it.
 pub(super) fn configure(
     command: &str,
     fields: &mut Map<String, Value>,
     help: bool,
 ) -> Result<Option<u64>, CliError> {
-    if help || !matches!(command, "agent.run" | "agent.status") {
+    if help
+        || !matches!(
+            command,
+            "agent.run" | "agent.status" | "agent.list" | "agent.abandon"
+        )
+    {
         return Ok(None);
     }
-    if command == "agent.status" {
+    if matches!(command, "agent.status" | "agent.abandon") {
         if !fields.contains_key("executionId") {
-            return Err(usage("agent status requires --execution-id"));
+            return Err(usage(format!(
+                "agent {} requires --execution-id",
+                &command["agent.".len()..]
+            )));
+        }
+    } else if command == "agent.list" {
+        if let Some(state) = fields.get("state").and_then(Value::as_str)
+            && !STATES.contains(&state)
+        {
+            return Err(usage(format!(
+                "`--state` state must be one of {}",
+                STATES.join("|")
+            )));
+        }
+        if let Some(text) = fields.get("pageSize").and_then(Value::as_str) {
+            // Swift's `positiveInteger` grammar: plain digits, no sign and
+            // no leading zero.
+            let size = Some(text)
+                .filter(|text| {
+                    !text.is_empty()
+                        && !text.starts_with('0')
+                        && text.bytes().all(|byte| byte.is_ascii_digit())
+                })
+                .and_then(|text| text.parse::<u64>().ok())
+                .filter(|size| (1..=1000).contains(size))
+                .ok_or_else(|| usage("page-size must be between 1 and 1000"))?;
+            fields.insert("pageSize".into(), json!(size));
+        }
+        // The list filters the resolved target, which its request names `target`.
+        if let Some(target) = fields.remove("targetId") {
+            fields.insert("target".into(), target);
         }
     } else {
         if !fields.contains_key("requestFile") && !fields.contains_key("operation") {
@@ -281,6 +319,20 @@ pub(super) fn configure(
         Some(text) => duration(text.as_str().unwrap_or_default())
             .map(Some)
             .ok_or_else(|| usage("timeout must be a bounded duration")),
+    }
+}
+
+/// Swift's check before `agent status` or `agent abandon` sends anything: the
+/// execution is named by an exact identity.
+pub fn require_execution_identity(params: &Map<String, Value>) -> Result<(), CliError> {
+    if params
+        .get("executionId")
+        .and_then(Value::as_str)
+        .is_some_and(valid_identifier)
+    {
+        Ok(())
+    } else {
+        Err(invalid_input("an exact execution identity is required"))
     }
 }
 

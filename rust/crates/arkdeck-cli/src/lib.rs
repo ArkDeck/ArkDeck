@@ -31,8 +31,8 @@ mod trace_cache;
 pub use trace_cache::validate_trace_cache_response;
 mod agent_executions;
 pub use agent_executions::{
-    Settlement, agent_exit, execution_intent, human_action_progress, settle_execution,
-    validate_execution,
+    Settlement, agent_exit, execution_intent, human_action_progress, require_execution_identity,
+    settle_execution, validate_execution,
 };
 pub use artifact_resources::validate_artifact_page;
 
@@ -107,11 +107,11 @@ impl CliError {
     pub fn from_client(error: ClientError, method: &str) -> Self {
         if matches!(
             method,
-            "job.submit" | "job.run" | "job.cancel" | "agent.run"
+            "job.submit" | "job.run" | "job.cancel" | "agent.run" | "agent.abandon"
         ) {
             return job_plan::mutation_error(error, method);
         }
-        if method == "agent.status" {
+        if matches!(method, "agent.status" | "agent.list") {
             return agent_executions::read_error(error, method);
         }
         if matches!(
@@ -554,6 +554,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["artifact", "list"] => "artifact.list",
         ["agent", "run"] => "agent.run",
         ["agent", "status"] => "agent.status",
+        ["agent", "list"] => "agent.list",
+        ["agent", "abandon"] => "agent.abandon",
         ["doctor"] => "doctor",
         ["operation", "list"] => "operation.list",
         ["operation", "describe"] => "operation.describe",
@@ -687,6 +689,15 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             "timeout",
         ],
         "agent.status" => &["executionId", "timeout"],
+        "agent.list" => &[
+            "state",
+            "operation",
+            "targetId",
+            "pageSize",
+            "cursor",
+            "timeout",
+        ],
+        "agent.abandon" => &["executionId", "expectedGeneration", "timeout"],
         "artifact.list" => &[
             "jobId",
             "import",
@@ -1011,6 +1022,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                     | "capability.inspect"
                     | "agent.run"
                     | "agent.status"
+                    | "agent.list"
+                    | "agent.abandon"
             )
         {
             Some(method_options)

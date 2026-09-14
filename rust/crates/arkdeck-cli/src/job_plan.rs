@@ -296,6 +296,9 @@ pub(crate) fn mutation_error(error: ClientError, method: &str) -> CliError {
                     "agent.run" => {
                         "the agent run reply is unconfirmed; read the execution with agent status, or run the same execution again, instead of starting a new one"
                     }
+                    "agent.abandon" => {
+                        "the agent abandon reply is unconfirmed; read the execution with agent status to learn whether it was abandoned"
+                    }
                     "job.cancel" => {
                         "the Job cancellation reply is unconfirmed; read the Job with job status to learn whether it was cancelled"
                     }

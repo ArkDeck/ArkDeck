@@ -896,9 +896,16 @@ to 2 s until the execution settles; `--timeout` bounds only its own wait. A
 completed run prints its execution and exits 0, 1 for a failed, cancelled or
 interrupted Job, 2 for evidence that could not be verified and 75 for an unknown
 outcome; a run that stops before its Job exits with the execution's failure
-code. `arkdeck agent status --execution-id <id>` reads one execution, and
-`arkdeck artifact list --job <id> [--page-size <n>] [--cursor <cursor>]` pages a
-Job's Artifacts; every answer is checked as the Swift CLI checks it.
+code. `arkdeck agent status --execution-id <id>` reads one execution; `arkdeck
+agent list [--state <state>] [--operation <reference>] [--target <id>]
+[--page-size <n>] [--cursor <cursor>]` pages the executions; `arkdeck agent
+abandon --execution-id <id> --expected-generation <n>` abandons one that owns no
+Job; and `arkdeck artifact list --job <id> [--page-size <n>] [--cursor
+<cursor>]` pages a Job's Artifacts. An execution identity is checked before
+anything is sent. Every execution answered and every Artifact page is checked
+as the Swift CLI checks it, and an execution page is passed on as the Runtime
+answers it. A page is a bounded read; an abandonment is a mutation, so a refusal
+without the zero-dispatch proof, or a lost reply, is an unknown outcome (75).
 
 ## Target presentation owner (TASK-XPA-012)
 
