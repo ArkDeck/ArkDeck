@@ -728,8 +728,26 @@ store's directory included. A list row carries the capability's identity,
 effect ceiling, uses and lineage blocker (a use without a settled outcome, else
 an exhausted budget); an inspection carries the whole capability and its
 lineage, `invalidParams` without a string `capabilityId` and `notFound` for an
-unknown one. A read writes nothing but the lock file; nothing here installs,
-mints, reserves or consumes a use.
+unknown one. A read writes nothing but the lock file.
+
+`CapabilityStore` also writes the store as Swift's does, for the M2 admission
+the Rust owner has yet to serve; nothing in the daemon calls these writes yet.
+`install` appends a capability with its whole budget and writes the checkpoint
+atomically in Swift's `canonicalPretty` spelling, then empties an existing
+ledger, only once the checkpoint holding its events is durable. `consume`
+reserves one use after `validateNewExecution`: a device or workspace subject, a
+materialized plan digest, no earlier use left unsettled, the scope of the
+lineage's first use, then `authorizes`'s denials in Swift's order.
+`recordOutcome` settles a pending use. Each receipt and outcome is digested
+into one hash-linked lineage per capability and appended to the ledger as one
+event, fully synchronized; the event after 128 is folded into a new checkpoint
+instead. Retrying a reservation answers its receipt and writes nothing. A
+drifted retry, a second pending use, a change to a recorded outcome and
+settling an unknown outcome are refused; settling one is recovery, which
+ADR-0009 has not placed yet. `tests/capability_write.rs` replays the stores
+the four M2 oracles leave (`pointer-input`, `port-forward`, `debug-hap`,
+`deploy-native-library`) through these writes, checkpoint and ledger byte for
+byte, and checks the refusals over synthetic capabilities.
 
 `arkdeck capability list` and `arkdeck capability inspect --capability <id>`
 send what Swift's CLI sends and print the answer.
