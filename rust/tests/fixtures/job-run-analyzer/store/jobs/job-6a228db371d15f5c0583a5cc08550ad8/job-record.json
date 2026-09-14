@@ -12,7 +12,7 @@
   "createdAtUTC" : "2026-09-14T00:00:00Z",
   "finishedAtUTC" : "2026-09-14T00:00:00Z",
   "jobID" : "job-6a228db371d15f5c0583a5cc08550ad8",
-  "materializedPlanDigest" : "7f25b888b0ea3ad8a619598420fb6352daee2c56b2831371f1a767bd1acfdd07",
+  "materializedPlanDigest" : "55583934c3efcd1bf92e248ef5ea69ae447cd557797421f5aa35dc2ed916631a",
   "operationFailure" : {
     "category" : "execution",
     "code" : "executionFailed",

@@ -19,7 +19,10 @@ and refused a run; the Jobs that ended or parked answer a cancellation with
 nothing to do; an absent Job and parameters without a string Job identity are
 refused; a Job whose analyzer child is running when its cancellation arrives
 is closed once the child's process group is drained, and its run answers the
-cancelled Job; and each CLI cancels one more Job and reads its status.
+cancelled Job; and each CLI cancels one more Job and reads its status. That
+child answers `hold`, which ends only once a release file exists under the
+oracles' fixed root; the harness holds their lock and never releases it, so
+however late the cancellation arrives it finds the child running.
 
 Both owners publish a Session for every terminal Job, as the standalone Swift
 daemon does, each under its own Sessions root (Swift's beside its state
@@ -49,6 +52,8 @@ from __future__ import annotations
 
 import argparse
 import collections
+import contextlib
+import fcntl
 import hashlib
 import json
 import os
@@ -67,8 +72,9 @@ ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = ROOT / 'rust/tests/fixtures/job-run-analyzer'
 SOURCES = ('job-oracle-source', 'job-oracle-source-removed')
 TIME = re.compile(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z')
-# The production timeout is 30 s; its lane runs in the oracle replay instead.
-SKIPPED_MODES = {'sleep'}
+# A `hold` source answers only once released, and both daemons compose the 30 s
+# production budget; the timeout lane runs in the oracle replay instead, at 2 s.
+SKIPPED_MODES = {'hold'}
 # A rerun of a skipped Job reruns the other parked one.
 RERUN_INSTEAD = {'timedOut': 'signalled'}
 # The oracle composes a 32 KiB Artifact quota; both daemons here compose 8 GiB.
@@ -92,9 +98,13 @@ CANCELLATIONS = (
     ('cancelWithoutJob', 'job.cancel', None, {}, 'invalidParams'),
     ('cancelNumericJob', 'job.cancel', None, {'jobId': 5}, 'invalidParams'),
 )
-# The Job cancelled while its child runs answers the `sleep` source, which
-# outlasts no production budget but gives the cancellation a running child.
+# The Job cancelled while its child runs is admitted over the timeout case's
+# `hold` source. Its child answers only once `release` exists under the oracles'
+# fixed root, which this harness never creates, so its cancellation finds it
+# running however late it arrives.
 RUNNING_SOURCE_CASE = 'timedOut'
+ORACLE_LOCK = Path('/private/tmp/arkdeck-job-plan-oracle.lock')
+RELEASE = Path('/private/tmp/arkdeck-job-plan-oracle/release')
 
 
 def sha256(path: Path) -> str:
@@ -150,6 +160,20 @@ def comparable(value, parent: str | None = None):
 
 def differences(left: dict, right: dict) -> list[str]:
     return sorted(set(map(str, left.items())) ^ set(map(str, right.items())))
+
+
+@contextlib.contextmanager
+def unreleased_hold():
+    """The oracles' lock, with any release they left behind removed, so no
+    oracle or replay releases a `hold` child while the block runs."""
+    descriptor = os.open(ORACLE_LOCK, os.O_RDWR | os.O_CREAT, 0o600)
+    try:
+        fcntl.flock(descriptor, fcntl.LOCK_EX)
+        RELEASE.unlink(missing_ok=True)
+        yield
+    finally:
+        fcntl.flock(descriptor, fcntl.LOCK_UN)
+        os.close(descriptor)
 
 
 def seed(state: Path, analyzer: Path, cases: list[dict]) -> None:
@@ -304,21 +328,24 @@ def main() -> None:
             return {'requestJson': json.dumps(document, separators=(',', ':'), sort_keys=True)}
 
         def cancel_while_running(endpoint: Path, journals: Path, job: str) -> tuple[dict, dict]:
-            """Run `job` on its own connection, cancel it once its analyzer
-            intent is durable, and return the cancellation's and the run's
-            answers."""
-            ran: dict = {}
-            runner = threading.Thread(
-                target=lambda: ran.update(answer=exchange(endpoint, 'job.run', {'jobId': job})))
-            runner.start()
-            journal = journals / job / 'journal.jsonl'
-            deadline = time.monotonic() + 60
-            while not (journal.exists() and '"kind":"stepIntent"' in journal.read_text()):
-                if time.monotonic() > deadline or not runner.is_alive():
-                    raise AssertionError(f'{job} never recorded its analyzer intent: {ran}')
-                time.sleep(.01)
-            cancelled = exchange(endpoint, 'job.cancel', {'jobId': job})
-            runner.join(timeout=120)
+            """Run `job`, whose `hold` child answers only once released, on
+            its own connection, cancel it once its analyzer intent is durable,
+            and return the cancellation's and the run's answers. Nothing
+            releases the child meanwhile, so it runs until the cancellation
+            drains it, however late that arrives."""
+            with unreleased_hold():
+                ran: dict = {}
+                runner = threading.Thread(
+                    target=lambda: ran.update(answer=exchange(endpoint, 'job.run', {'jobId': job})))
+                runner.start()
+                journal = journals / job / 'journal.jsonl'
+                deadline = time.monotonic() + 60
+                while not (journal.exists() and '"kind":"stepIntent"' in journal.read_text()):
+                    if time.monotonic() > deadline or not runner.is_alive():
+                        raise AssertionError(f'{job} never recorded its analyzer intent: {ran}')
+                    time.sleep(.01)
+                cancelled = exchange(endpoint, 'job.cancel', {'jobId': job})
+                runner.join(timeout=120)
             return cancelled, ran['answer']
 
         def drive(endpoint: Path, artifacts: Path, journals: Path,

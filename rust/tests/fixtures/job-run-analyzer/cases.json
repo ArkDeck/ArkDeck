@@ -653,10 +653,10 @@
     }
   },
   {
-    "mode" : "sleep",
+    "mode" : "hold",
     "name" : "timedOut",
     "params" : {
-      "jobId" : "job-2be36e7a9189a71f770e51b2e85a033e"
+      "jobId" : "job-926fc7b6cc6ccdf882c269ca125c1b13"
     },
     "response" : {
       "ok" : true,
@@ -672,16 +672,16 @@
           "schemaVersion" : "1.0.0"
         },
         "finishedAtUtc" : "2026-09-14T00:00:00Z",
-        "jobId" : "job-2be36e7a9189a71f770e51b2e85a033e",
+        "jobId" : "job-926fc7b6cc6ccdf882c269ca125c1b13",
         "nextAction" : {
           "kind" : "reconcile",
           "owner" : {
-            "id" : "job-2be36e7a9189a71f770e51b2e85a033e",
+            "id" : "job-926fc7b6cc6ccdf882c269ca125c1b13",
             "kind" : "job"
           },
           "reasonCode" : "recovery.outcomeUnknown",
           "resource" : {
-            "id" : "job-2be36e7a9189a71f770e51b2e85a033e",
+            "id" : "job-926fc7b6cc6ccdf882c269ca125c1b13",
             "kind" : "job"
           }
         },
@@ -693,7 +693,7 @@
         "recoveryEpochId" : null,
         "resolvedByTargetAliasResolutionId" : null,
         "schemaVersion" : "arkdeck.job-status/1",
-        "sessionId" : "session-job-2be36e7a9189a71f770e51b2e85a033e",
+        "sessionId" : "session-job-926fc7b6cc6ccdf882c269ca125c1b13",
         "sessionPublication" : {
           "catalogGeneration" : null,
           "manifestSha256" : null,
@@ -710,7 +710,7 @@
       }
     },
     "submit" : {
-      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-run-timedOut-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-51a83413b200cc278425d09aec6c992f\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-run-timedOut\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-run-timedOut-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-a7702965c24026db2f2b9a675bd81cc2\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-run-timedOut\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
     },
     "timeoutSeconds" : 2
   },
@@ -877,7 +877,7 @@
   {
     "name" : "rerunParked",
     "params" : {
-      "jobId" : "job-2be36e7a9189a71f770e51b2e85a033e"
+      "jobId" : "job-926fc7b6cc6ccdf882c269ca125c1b13"
     },
     "rerun" : "timedOut",
     "response" : {
@@ -887,7 +887,7 @@
           "newDispatchCount" : 0,
           "phase" : "preAdmission"
         },
-        "message" : "job job-2be36e7a9189a71f770e51b2e85a033e is waitingForRecovery, not runnable"
+        "message" : "job job-926fc7b6cc6ccdf882c269ca125c1b13 is waitingForRecovery, not runnable"
       },
       "ok" : false
     },

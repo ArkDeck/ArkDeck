@@ -3,12 +3,13 @@
 //! `JobRunAnalyzerOracleContractTests.testSwiftCancelsRunningAnalyzerJobs`)
 //! against the Rust runner and its cancellation, composed with the
 //! publication writer as the standalone Swift daemon is: a Job cancelled once
-//! its analyzer intent is durable and its child runs, one whose request
-//! waited for its run at the last boundary before the intent, and one
-//! cancelled after its success commit. Every answer, every read and
-//! everything the runs leave must be Swift's byte for byte, once each Job
-//! record's volume, device, inode and claim generation are read as labels.
-//! The runs spawn children, so this binary is theirs.
+//! its analyzer intent is durable and its `hold` child runs, released only
+//! once its run has answered; one whose request waited for its run at the
+//! last boundary before the intent; and one cancelled after its success
+//! commit. Every answer, every read and everything the runs leave must be
+//! Swift's byte for byte, once each Job record's volume, device, inode and
+//! claim generation are read as labels. The runs spawn children, so this
+//! binary is theirs.
 #![cfg(target_os = "macos")]
 
 mod support;
@@ -170,7 +171,10 @@ fn rust_cancels_the_swift_running_jobs() {
                 cancellation.end();
                 (run, canceller.join().unwrap())
             }),
-            // The request reaches the run while its child runs.
+            // The request reaches the run while its `hold` child runs, which
+            // answers only once released. As the oracle does, the replay
+            // releases it only once the run has answered, so no stall here
+            // lets the child finish before the cancellation.
             "childRunning" => std::thread::scope(|scope| {
                 let running =
                     scope.spawn(|| run_answer(&composition.runner(&cancellation, None), &params));
@@ -178,6 +182,7 @@ fn rust_cancels_the_swift_running_jobs() {
                 let cancel = cancel_answer(&cancellation);
                 let run = running.join().unwrap();
                 cancellation.end();
+                fs::write(root.join("release"), b"").unwrap();
                 (run, cancel)
             }),
             // The request is made from the success commit's hook, once the

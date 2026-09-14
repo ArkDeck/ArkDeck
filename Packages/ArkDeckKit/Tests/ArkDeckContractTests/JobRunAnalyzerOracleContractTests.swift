@@ -52,7 +52,8 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
     /// A directory already holds this Job's Session path before it runs.
     var presetsSession = false
     /// The Job is admitted, run and read by the composition whose analyzer
-    /// has the short budget, so the `sleep` answer times out.
+    /// has the short budget, so the `hold` answer, never released here,
+    /// times out.
     var shortBudget = false
   }
 
@@ -80,8 +81,12 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
   /// but the one holding the run oracle's timeout case: on a busy host the
   /// short budget turned an `answered` run into a timeout.
   private static let timeoutSeconds = 30
-  /// Short enough that the `sleep` answer times out.
+  /// The budget that ends the `hold` answer the run oracle never releases.
   private static let shortTimeoutSeconds = 2
+  /// The analyzer's `hold` answer waits for this file, so it answers only
+  /// once an oracle creates it; the running-cancellation oracle does, and
+  /// only once its run has answered.
+  private static let release = root.appending(path: "release")
   private static let analyzerBytes = Data(
     #"""
     #!/bin/sh
@@ -108,7 +113,14 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
     bigstderr)
       /usr/bin/head -c 9437184 /dev/zero >&2
       printf '%s' '{"analyzerRef":"crash-signature@1","analyzerVersion":"arkdeck-fault-log-ledger@1","entries":[],"schemaVersion":"1.0.0","status":"answered"}' ;;
-    sleep) /bin/sleep 5 ;;
+    hold)
+      # Answers nothing until an oracle creates its release file, so only a
+      # cancellation or the budget ends it first; a hold whose parent is gone
+      # ends too, so none outlives the process that ran it.
+      while [ ! -e /private/tmp/arkdeck-job-plan-oracle/release ] &&
+        kill -0 "$PPID" 2>/dev/null; do
+        /bin/sleep 0.05
+      done ;;
     signal) kill -KILL "$$" ;;
     quota)
       printf '%s' '{"analyzerRef":"crash-signature@1","analyzerVersion":"arkdeck-fault-log-ledger@1","entries":['
@@ -161,9 +173,11 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
   /// The running-cancellation oracle
   /// `rust/crates/arkdeck-hoststore/tests/job_cancel_running.rs` replays, in
   /// the writer oracles' composition with the engine's two cancellation
-  /// hooks: a Job cancelled once its analyzer intent is durable and its child
-  /// runs, one cancelled while its run waits at the last boundary before the
-  /// intent, and one cancelled after its success commit. Record it with
+  /// hooks: a Job cancelled once its analyzer intent is durable and its
+  /// `hold` child runs, released only once its run has answered so that no
+  /// stall lets the child finish first, one cancelled while its run waits at
+  /// the last boundary before the intent, and one cancelled after its success
+  /// commit. Record it with
   /// `ARKDECK_RUST_JOB_CANCEL_RUNNING_RECORD=/private/tmp/<new directory>`.
   func testSwiftCancelsRunningAnalyzerJobs() async throws {
     let lock = try Self.lockOracleRoot()
@@ -268,7 +282,7 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
   /// The running-cancellation oracle's Jobs, each admitted over its own
   /// source, with where its run is when its cancellation arrives.
   private static let runningCancellationJobs: [(name: String, mode: String, when: String)] = [
-    ("drained", "sleep", "childRunning"),
+    ("drained", "hold", "childRunning"),
     ("beforeDispatch", "answered", "beforeDispatchInstall"),
     ("committed", "answered", "afterCommitLinearization"),
   ]
@@ -285,7 +299,7 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
     Case(name: "undecodableEntry", mode: "badentry", ends: "failed"),
     Case(name: "truncatedStdout", mode: "bigstdout", ends: "failed"),
     Case(name: "truncatedStderr", mode: "bigstderr", ends: "failed"),
-    Case(name: "timedOut", mode: "sleep", ends: "waitingForRecovery", shortBudget: true),
+    Case(name: "timedOut", mode: "hold", ends: "waitingForRecovery", shortBudget: true),
     Case(name: "signalled", mode: "signal", ends: "waitingForRecovery"),
     Case(name: "quotaExceeded", mode: "quota", ends: "failed"),
     Case(name: "rerunSucceeded", rerun: "answered"),
@@ -811,11 +825,15 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
       }
       let cancel = try await exchange(composition.handler, "job.cancel", params)
       await gate?.release()
+      let answer = try await run.value
+      // Swift answers the cancellation once its intent is durable, while the
+      // child is still being stopped, so a held child is released only now.
+      if job.mode == "hold" { try Data().write(to: Self.release) }
       recorded.append(
         .object([
           "name": .string(job.name), "mode": .string(job.mode), "cancelWhen": .string(job.when),
           "jobId": .string(jobID), "submit": .object(submits[job.name]!),
-          "run": try await run.value, "cancel": cancel,
+          "run": answer, "cancel": cancel,
         ]))
     }
     var reads: [String: JSONValue] = [:]

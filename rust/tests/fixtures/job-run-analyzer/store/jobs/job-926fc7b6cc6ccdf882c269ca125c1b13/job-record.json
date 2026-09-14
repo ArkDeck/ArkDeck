@@ -11,8 +11,8 @@
   "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
   "createdAtUTC" : "2026-09-14T00:00:00Z",
   "finishedAtUTC" : "2026-09-14T00:00:00Z",
-  "jobID" : "job-2be36e7a9189a71f770e51b2e85a033e",
-  "materializedPlanDigest" : "23efa20a4b796ef82631a0e68c09e658d94174d2960c488f8bb529d0ea96348c",
+  "jobID" : "job-926fc7b6cc6ccdf882c269ca125c1b13",
+  "materializedPlanDigest" : "50cc91c5e20dc0520f84f7847f4469a5e38655c6df25bcf7361ecb2548024e24",
   "operationFailure" : {
     "category" : "unknownOutcome",
     "code" : "outcomeUnknown",
@@ -25,7 +25,7 @@
     "documentType" : "runtime-operation-request",
     "idempotencyKey" : "idem-oracle-run-timedOut-0001",
     "inputs" : {
-      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-51a83413b200cc278425d09aec6c992f"
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-a7702965c24026db2f2b9a675bd81cc2"
     },
     "operation" : {
       "id" : "analyzer.extract-crash-signature",
@@ -46,9 +46,9 @@
     "arguments" : {
       "analyzerRef" : "crash-signature@1",
       "analyzerVersion" : "arkdeck-fault-log-ledger@1",
-      "sourceArtifactId" : "ART-51a83413b200cc278425d09aec6c992f",
-      "sourceByteCount" : 29,
-      "sourceSha256" : "b685e64acaa1187278bd2f6b12c4190ee9a3663b786ab3f3111e7c5dbe467a25"
+      "sourceArtifactId" : "ART-a7702965c24026db2f2b9a675bd81cc2",
+      "sourceByteCount" : 28,
+      "sourceSha256" : "3795b005288bcbf4a0846b444edf13dad8cf544a0a80920b915538acfd159c2b"
     },
     "kind" : "analyzer.analyze"
   },
@@ -58,7 +58,7 @@
     "documentType" : "runtime-operation-request",
     "idempotencyKey" : "idem-oracle-run-timedOut-0001",
     "inputs" : {
-      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-51a83413b200cc278425d09aec6c992f"
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-a7702965c24026db2f2b9a675bd81cc2"
     },
     "operation" : {
       "id" : "analyzer.extract-crash-signature",

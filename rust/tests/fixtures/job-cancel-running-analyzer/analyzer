@@ -22,7 +22,14 @@ bigstdout) /usr/bin/head -c 9437184 /dev/zero ;;
 bigstderr)
   /usr/bin/head -c 9437184 /dev/zero >&2
   printf '%s' '{"analyzerRef":"crash-signature@1","analyzerVersion":"arkdeck-fault-log-ledger@1","entries":[],"schemaVersion":"1.0.0","status":"answered"}' ;;
-sleep) /bin/sleep 5 ;;
+hold)
+  # Answers nothing until an oracle creates its release file, so only a
+  # cancellation or the budget ends it first; a hold whose parent is gone
+  # ends too, so none outlives the process that ran it.
+  while [ ! -e /private/tmp/arkdeck-job-plan-oracle/release ] &&
+    kill -0 "$PPID" 2>/dev/null; do
+    /bin/sleep 0.05
+  done ;;
 signal) kill -KILL "$$" ;;
 quota)
   printf '%s' '{"analyzerRef":"crash-signature@1","analyzerVersion":"arkdeck-fault-log-ledger@1","entries":['

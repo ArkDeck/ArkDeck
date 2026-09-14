@@ -242,7 +242,7 @@
           "workspaceKind" : "diagnostics"
         },
         "materializedBindingRevision" : null,
-        "materializedPlanDigest" : "c67989bf1a7aa61e3db30ca8d9954b94cd6e44ea9a86643c9ec3fe927ddcc045",
+        "materializedPlanDigest" : "718b8c0fc370f327dea43d39fed6a10479d24936fde55f6c2e3bc78a4f0ef1c0",
         "materializedStableIdentitySha256" : null,
         "providerId" : "analyzer",
         "request" : {
@@ -331,7 +331,7 @@
       }
     }
   },
-  "job-3a3fdbd6c539a5b6ebc98a6f2d18a53a" : {
+  "job-5ca4fbf1408ee64cf5f6eeb9f435f007" : {
     "job.evidence" : {
       "ok" : true,
       "result" : {
@@ -359,7 +359,7 @@
         "finishedAtUtc" : "2026-09-14T00:00:00Z",
         "firstEvidenceStepAtUtc" : null,
         "inventoryAvailable" : true,
-        "jobId" : "job-3a3fdbd6c539a5b6ebc98a6f2d18a53a",
+        "jobId" : "job-5ca4fbf1408ee64cf5f6eeb9f435f007",
         "missingRequiredArtifacts" : [
           "crash-signature.json"
         ],
@@ -367,7 +367,7 @@
         "operationReference" : "analyzer.extract-crash-signature@1",
         "outcomeUnknown" : false,
         "parameters" : {
-          "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-913388288ad0d3d661cceca0dff4fc9c"
+          "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-0c7b62bcfcdf04ecf97b2a87bdf94343"
         },
         "providerId" : "analyzer",
         "recoveryEpoch" : null,
@@ -414,7 +414,7 @@
           "finishedAtUtc" : "2026-09-14T00:00:00Z",
           "firstEvidenceStepAtUtc" : null,
           "inventoryAvailable" : true,
-          "jobId" : "job-3a3fdbd6c539a5b6ebc98a6f2d18a53a",
+          "jobId" : "job-5ca4fbf1408ee64cf5f6eeb9f435f007",
           "missingRequiredArtifacts" : [
             "crash-signature.json"
           ],
@@ -422,7 +422,7 @@
           "operationReference" : "analyzer.extract-crash-signature@1",
           "outcomeUnknown" : false,
           "parameters" : {
-            "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-913388288ad0d3d661cceca0dff4fc9c"
+            "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-0c7b62bcfcdf04ecf97b2a87bdf94343"
           },
           "providerId" : "analyzer",
           "recoveryEpoch" : null,
@@ -446,16 +446,16 @@
             "schemaVersion" : "1.0.0"
           },
           "finishedAtUtc" : "2026-09-14T00:00:00Z",
-          "jobId" : "job-3a3fdbd6c539a5b6ebc98a6f2d18a53a",
+          "jobId" : "job-5ca4fbf1408ee64cf5f6eeb9f435f007",
           "nextAction" : {
             "kind" : "readResult",
             "owner" : {
-              "id" : "job-3a3fdbd6c539a5b6ebc98a6f2d18a53a",
+              "id" : "job-5ca4fbf1408ee64cf5f6eeb9f435f007",
               "kind" : "job"
             },
             "reasonCode" : "job.resultAvailable",
             "resource" : {
-              "id" : "job-3a3fdbd6c539a5b6ebc98a6f2d18a53a",
+              "id" : "job-5ca4fbf1408ee64cf5f6eeb9f435f007",
               "kind" : "job"
             }
           },
@@ -467,10 +467,10 @@
           "recoveryEpochId" : null,
           "resolvedByTargetAliasResolutionId" : null,
           "schemaVersion" : "arkdeck.job-status/1",
-          "sessionId" : "session-job-3a3fdbd6c539a5b6ebc98a6f2d18a53a",
+          "sessionId" : "session-job-5ca4fbf1408ee64cf5f6eeb9f435f007",
           "sessionPublication" : {
             "catalogGeneration" : "1",
-            "manifestSha256" : "59d9f3c2b91e06e41f6404792f3c8bd8f0894d88c33b5a8d30a9c932ff7ee6c8",
+            "manifestSha256" : "4e91432ba0fd436a574d3e08f323b2ed8d64788b087601f3729290bdc65bcfe4",
             "reasonCode" : null,
             "state" : "published"
           },
@@ -496,11 +496,11 @@
         ],
         "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
         "events" : {
-          "jobId" : "job-3a3fdbd6c539a5b6ebc98a6f2d18a53a",
+          "jobId" : "job-5ca4fbf1408ee64cf5f6eeb9f435f007",
           "method" : "job.events"
         },
         "evidence" : {
-          "jobId" : "job-3a3fdbd6c539a5b6ebc98a6f2d18a53a",
+          "jobId" : "job-5ca4fbf1408ee64cf5f6eeb9f435f007",
           "method" : "job.evidence"
         },
         "job" : {
@@ -515,16 +515,16 @@
             "schemaVersion" : "1.0.0"
           },
           "finishedAtUtc" : "2026-09-14T00:00:00Z",
-          "jobId" : "job-3a3fdbd6c539a5b6ebc98a6f2d18a53a",
+          "jobId" : "job-5ca4fbf1408ee64cf5f6eeb9f435f007",
           "nextAction" : {
             "kind" : "readResult",
             "owner" : {
-              "id" : "job-3a3fdbd6c539a5b6ebc98a6f2d18a53a",
+              "id" : "job-5ca4fbf1408ee64cf5f6eeb9f435f007",
               "kind" : "job"
             },
             "reasonCode" : "job.resultAvailable",
             "resource" : {
-              "id" : "job-3a3fdbd6c539a5b6ebc98a6f2d18a53a",
+              "id" : "job-5ca4fbf1408ee64cf5f6eeb9f435f007",
               "kind" : "job"
             }
           },
@@ -536,10 +536,10 @@
           "recoveryEpochId" : null,
           "resolvedByTargetAliasResolutionId" : null,
           "schemaVersion" : "arkdeck.job-status/1",
-          "sessionId" : "session-job-3a3fdbd6c539a5b6ebc98a6f2d18a53a",
+          "sessionId" : "session-job-5ca4fbf1408ee64cf5f6eeb9f435f007",
           "sessionPublication" : {
             "catalogGeneration" : "1",
-            "manifestSha256" : "59d9f3c2b91e06e41f6404792f3c8bd8f0894d88c33b5a8d30a9c932ff7ee6c8",
+            "manifestSha256" : "4e91432ba0fd436a574d3e08f323b2ed8d64788b087601f3729290bdc65bcfe4",
             "reasonCode" : null,
             "state" : "published"
           },
@@ -552,14 +552,14 @@
           "workspaceKind" : "diagnostics"
         },
         "materializedBindingRevision" : null,
-        "materializedPlanDigest" : "ef681836c816920f703e1097793acfa44cd1a4819d383a765675ed79a103acb2",
+        "materializedPlanDigest" : "4e0612fdf11bdbd6a6d26cb786b6adc7477cb08dfa584cccdf22c7ad2bf66ca8",
         "materializedStableIdentitySha256" : null,
         "providerId" : "analyzer",
         "request" : {
           "documentType" : "runtime-operation-request",
           "idempotencyKey" : "idem-oracle-run-drained-0001",
           "inputs" : {
-            "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-913388288ad0d3d661cceca0dff4fc9c"
+            "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-0c7b62bcfcdf04ecf97b2a87bdf94343"
           },
           "operation" : {
             "id" : "analyzer.extract-crash-signature",
@@ -610,16 +610,16 @@
           "schemaVersion" : "1.0.0"
         },
         "finishedAtUtc" : "2026-09-14T00:00:00Z",
-        "jobId" : "job-3a3fdbd6c539a5b6ebc98a6f2d18a53a",
+        "jobId" : "job-5ca4fbf1408ee64cf5f6eeb9f435f007",
         "nextAction" : {
           "kind" : "readResult",
           "owner" : {
-            "id" : "job-3a3fdbd6c539a5b6ebc98a6f2d18a53a",
+            "id" : "job-5ca4fbf1408ee64cf5f6eeb9f435f007",
             "kind" : "job"
           },
           "reasonCode" : "job.resultAvailable",
           "resource" : {
-            "id" : "job-3a3fdbd6c539a5b6ebc98a6f2d18a53a",
+            "id" : "job-5ca4fbf1408ee64cf5f6eeb9f435f007",
             "kind" : "job"
           }
         },
@@ -631,10 +631,10 @@
         "recoveryEpochId" : null,
         "resolvedByTargetAliasResolutionId" : null,
         "schemaVersion" : "arkdeck.job-status/1",
-        "sessionId" : "session-job-3a3fdbd6c539a5b6ebc98a6f2d18a53a",
+        "sessionId" : "session-job-5ca4fbf1408ee64cf5f6eeb9f435f007",
         "sessionPublication" : {
           "catalogGeneration" : "1",
-          "manifestSha256" : "59d9f3c2b91e06e41f6404792f3c8bd8f0894d88c33b5a8d30a9c932ff7ee6c8",
+          "manifestSha256" : "4e91432ba0fd436a574d3e08f323b2ed8d64788b087601f3729290bdc65bcfe4",
           "reasonCode" : null,
           "state" : "published"
         },
@@ -867,7 +867,7 @@
           "workspaceKind" : "diagnostics"
         },
         "materializedBindingRevision" : null,
-        "materializedPlanDigest" : "f2cd6394a606f741bbc2ff3142595f6ca4d91929e70c7140a269e1509e68c131",
+        "materializedPlanDigest" : "849dc30ade63d0dc2a9b89699df2df150b3ac287f8dc00e1c45b80dafda3c15a",
         "materializedStableIdentitySha256" : null,
         "providerId" : "analyzer",
         "request" : {
