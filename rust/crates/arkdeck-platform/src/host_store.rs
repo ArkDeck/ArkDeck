@@ -346,6 +346,36 @@ impl HostDirectory {
         Ok(child)
     }
 
+    /// How long an owner lock is retried before it is refused. A child that
+    /// another thread of this process is spawning shares every open file
+    /// description until its exec closes the close-on-exec ones, so a lock
+    /// this process has just released stays held for that window, which
+    /// lasted up to 106 ms on an 8-core host with its CPUs four times
+    /// oversubscribed. A second live owner holds the lock far longer and is
+    /// still refused once this has passed.
+    pub const LOCK_WAIT: std::time::Duration = std::time::Duration::from_millis(500);
+
+    /// `flock(LOCK_EX | LOCK_NB)`, retried every millisecond while another
+    /// open file description holds the lock, for at most `LOCK_WAIT`.
+    /// `Ok(false)` when it is still held.
+    fn lock_within_wait(file: &File) -> io::Result<bool> {
+        let started = std::time::Instant::now();
+        loop {
+            if unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0 {
+                return Ok(true);
+            }
+            let error = io::Error::last_os_error();
+            match error.kind() {
+                io::ErrorKind::Interrupted => {}
+                io::ErrorKind::WouldBlock if started.elapsed() < Self::LOCK_WAIT => {
+                    std::thread::sleep(std::time::Duration::from_millis(1));
+                }
+                io::ErrorKind::WouldBlock => return Ok(false),
+                _ => return Err(error),
+            }
+        }
+    }
+
     /// A private document owner's lock, shared across processes. Never unlink
     /// the lock: replacing its inode would split the writer population.
     pub fn lock_document(&self, name: &str) -> io::Result<HostReadLock> {
@@ -370,14 +400,8 @@ impl HostDirectory {
         }
         let file = unsafe { File::from_raw_fd(fd) };
         owned(&file, false, self.1)?;
-        loop {
-            if unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0 {
-                break;
-            }
-            let error = io::Error::last_os_error();
-            if error.kind() != io::ErrorKind::Interrupted {
-                return Err(error);
-            }
+        if !Self::lock_within_wait(&file)? {
+            return Err(io::Error::from_raw_os_error(libc::EWOULDBLOCK));
         }
         let lock = HostReadLock { file };
         lock.validate_link(self, name)?;
@@ -990,18 +1014,8 @@ impl HostDirectory {
             Err(error) => return Err(error),
         };
         owned(&file, false, self.1)?;
-        loop {
-            if unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } == 0 {
-                break;
-            }
-            let error = io::Error::last_os_error();
-            if error.kind() == io::ErrorKind::Interrupted {
-                continue;
-            }
-            if error.kind() == io::ErrorKind::WouldBlock {
-                return Ok(None);
-            }
-            return Err(error);
+        if !Self::lock_within_wait(&file)? {
+            return Ok(None);
         }
         let lock = HostReadLock { file };
         lock.validate_link(self, name)?;
