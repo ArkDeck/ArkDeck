@@ -932,17 +932,42 @@ without the zero-dispatch proof, or a lost reply, is an unknown outcome (75).
 The explicitly isolated development composition owns `targets-state/` and serves
 `target list`, `target show`, `target display-name set|clear`, and
 `device display-name set|clear`. Target bindings and alias history are validated
-and read without rewriting `targets.json`; local names use the current Swift
-`target-display-names.json` format, private descriptor-anchored locks and atomic
-publication. Target names survive restart; candidate names require the current
-Runtime observation reference and expire on refresh or restart. A lost or invalid
-name-write reply is `outcomeUnknown`; the CLI never replays it.
+and read. Only an adoption of a new Target (below) writes `targets.json`. Local
+names use the current Swift `target-display-names.json` format, private
+descriptor-anchored locks and atomic publication. Target names survive restart;
+candidate names require the current Runtime observation reference and expire on
+refresh or restart. A lost or invalid name-write reply is `outcomeUnknown`; the
+CLI never replays it.
 
-Candidate observations come from the configured HDC read-only provider. This
-phase cannot produce independent USB attachment proof, adopt a target, select an
-execution route, or write binding/alias history. `target.show` leaves the absent
-Bootstrap warm presentation and confirmed Job-observation sources as `null`.
-Existing adopted names can be projected onto actually observed provider addresses.
+The daemon's candidate observations still come from the configured HDC read-only
+provider, until its routes move to the owner below. The daemon cannot select an
+execution route or write alias history. `target.show` leaves the absent Bootstrap
+warm presentation and confirmed Job-observation sources as `null`. Existing
+adopted names can be projected onto actually observed provider addresses.
+
+`TargetObservations` (`target_observation.rs`, TASK-XPA-014) is Swift's
+`TargetObservationCoordinator`. Every device list is bracketed by two reads of
+independently observed USB relations: lane B's `Reading`, over an `HdcDispatch`
+and a `UsbRelations` port. An observation keeps its identity only while an
+unchanged proved relation carries it. The fact generation advances only when the
+facts change, and that expires the candidate names. A reference is followed only
+while it still belongs to the snapshot. `adopt` adopts the device of one exact
+current observation whose relation still holds through the tool version, the
+identity readback and a final relation read. Its refusals carry Swift's codes:
+`targetTrustPending`, `admissionDenied`, `factsDrifted`, `resourceConflict` and
+`operationUnavailable`.
+
+`TargetStore::adopt_observed_candidate` writes the adoption in one transaction:
+1. It materializes the Target: an alias's canonical Target, the Target with the
+   same identity, or `TGT-` and twelve digits at revision 1.
+2. It stages the candidate's name onto the Target.
+3. For a new Target only, it writes `targets.json` in Swift's encoding.
+4. It finishes the candidate names.
+
+The snapshot, the generations and the receipts live in memory, as in Swift.
+`tests/target_adoption.rs` replays Swift's `TargetAdoptionOracleContractTests`
+(`rust/tests/fixtures/target-adoption`) byte for byte: its answers, the fake's
+calls, `targets.json` and the display names.
 
 `rust/scripts/check-target-resources.py --swift-target-store <fixture-directory>`
 checks actual Rust endpoint/CLI behavior from bytes exported by the Swift contract

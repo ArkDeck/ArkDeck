@@ -9,12 +9,21 @@ use arkdeck_contract::WireError;
 use arkdeck_platform::{DocumentPublishError, HostDirectory};
 use serde_json::{Map, Value, json};
 use std::{
+    collections::BTreeMap,
     io,
     path::{Path, PathBuf},
 };
 const NAMES: &str = "target-display-names.json";
 const LOCK: &str = ".target-display-names.lock";
 const MAX: usize = 512 * 1024;
+const TARGETS: &str = "targets.json";
+const TARGETS_MAX: usize = 4 * 1024 * 1024;
+
+/// A document an owner transaction publishes, in its order.
+enum Publication {
+    Names(Document),
+    Targets(Vec<u8>),
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ObservationReference {
@@ -75,6 +84,153 @@ fn empty_names() -> Document {
         candidates: None,
     }
 }
+/// Swift `stageCandidateAdoption`: the adopted observation's exact
+/// candidate name handed to its Target before the binding becomes visible,
+/// unless the Target already has a name; repeating the exact stage changes
+/// nothing. Whether the names changed.
+fn stage_candidate_adoption(
+    names: &mut Document,
+    reference: &ObservationReference,
+    target_id: &str,
+    now: &str,
+) -> Result<bool, WireError> {
+    let Some(index) = names
+        .candidates
+        .as_deref()
+        .unwrap_or_default()
+        .iter()
+        .position(|record| {
+            record.candidate == reference.candidate
+                && record.observation_id == reference.observation_id
+        })
+    else {
+        return Ok(false);
+    };
+    let candidate = names.candidates.as_deref().unwrap_or_default()[index].clone();
+    if candidate.generation != reference.generation {
+        return Err(failure(
+            "resourceConflict",
+            "candidate display-name generation changed",
+            "",
+        ));
+    }
+    if let (Some(staged), Some(generation)) = (
+        candidate.staged_target_id.as_deref(),
+        candidate.staged_target_generation,
+    ) {
+        let consistent = staged == target_id
+            && names.records.iter().any(|record| {
+                record.target_id == target_id
+                    && record.generation == generation
+                    && record.name.as_deref() == Some(candidate.name.as_str())
+            });
+        if !consistent {
+            return Err(failure(
+                "recordUnreadable",
+                "candidate display-name migration stage is inconsistent",
+                "",
+            ));
+        }
+        return Ok(false);
+    }
+    // A durable Target name outranks an observation-scoped one.
+    if names
+        .records
+        .iter()
+        .any(|record| record.target_id == target_id && record.name.is_some())
+    {
+        return Ok(false);
+    }
+    let current = names
+        .records
+        .iter()
+        .find(|record| record.target_id == target_id)
+        .map_or(1, |record| record.generation);
+    let next = current
+        .checked_add(1)
+        .filter(|next| *next <= i64::MAX as u64)
+        .ok_or_else(|| {
+            failure(
+                "resourceConflict",
+                "target display-name generation is exhausted",
+                "",
+            )
+        })?;
+    if !crate::format_time::valid_format_timestamp(now) {
+        return Err(unreadable(""));
+    }
+    let record = Record {
+        target_id: target_id.into(),
+        generation: next,
+        name: Some(candidate.name.clone()),
+        updated_at: now.into(),
+    };
+    if let Some(held) = names
+        .records
+        .iter_mut()
+        .find(|held| held.target_id == target_id)
+    {
+        *held = record;
+    } else {
+        if names.records.len() >= 4096 {
+            return Err(failure(
+                "quotaExceeded",
+                "target display-name resource count exceeds its bound",
+                "",
+            ));
+        }
+        names.records.push(record);
+    }
+    if let Some(candidates) = names.candidates.as_mut() {
+        candidates[index].staged_target_id = Some(target_id.into());
+        candidates[index].staged_target_generation = Some(next);
+    }
+    Ok(true)
+}
+/// Swift `finishCandidateAdoption`: the adopted observation's name and
+/// every inactive one dropped, the others carried into the next generation
+/// with any stage cleared.
+fn finish_candidate_adoption(
+    names: &mut Document,
+    reference: &ObservationReference,
+    active: &[ObservationReference],
+    next_generation: u64,
+) -> Result<(), WireError> {
+    let records = names.candidates.take().unwrap_or_default();
+    let is_active = |record: &Candidate| {
+        active.iter().any(|held| {
+            same_text(&held.candidate, &record.candidate)
+                && same_text(&held.observation_id, &record.observation_id)
+        })
+    };
+    if records
+        .iter()
+        .any(|record| is_active(record) && record.generation != reference.generation)
+    {
+        return Err(failure(
+            "resourceConflict",
+            "candidate display-name generation changed",
+            "",
+        ));
+    }
+    names.candidates = Some(
+        records
+            .into_iter()
+            .filter(|record| {
+                is_active(record)
+                    && !(record.candidate == reference.candidate
+                        && record.observation_id == reference.observation_id)
+            })
+            .map(|mut record| {
+                record.generation = next_generation;
+                record.staged_target_id = None;
+                record.staged_target_generation = None;
+                record
+            })
+            .collect(),
+    );
+    Ok(())
+}
 fn target_name(doc: &Document, id: &str) -> Value {
     doc.records.iter().find(|r| r.target_id == id).map_or_else(|| json!({"schemaVersion":"arkdeck.target-display-name/1","targetId":id,"generation":"1","name":null,"updatedAtUtc":null}), |r| json!({"schemaVersion":"arkdeck.target-display-name/1","targetId":id,"generation":r.generation.to_string(),"name":r.name,"updatedAtUtc":r.updated_at}))
 }
@@ -103,6 +259,27 @@ impl TargetStore {
         &self,
         phase: &str,
         action: impl FnOnce(&TargetDocument, &mut Document) -> Result<(Value, bool), WireError>,
+    ) -> Result<Value, WireError> {
+        self.publishing(phase, |targets, names| {
+            let (value, write) = action(targets, names)?;
+            let publications = if write {
+                vec![Publication::Names(names.clone())]
+            } else {
+                Vec::new()
+            };
+            Ok((value, publications))
+        })
+    }
+    /// Both documents read under both locks, `action` run over them, then
+    /// each publication it names made in its order, the namespace checked
+    /// before and after each.
+    fn publishing(
+        &self,
+        phase: &str,
+        action: impl FnOnce(
+            &mut TargetDocument,
+            &mut Document,
+        ) -> Result<(Value, Vec<Publication>), WireError>,
     ) -> Result<Value, WireError> {
         self.root
             .validate_path(&self.path)
@@ -137,7 +314,7 @@ impl TargetStore {
                 unreadable(phase)
             }
         })?;
-        let targets = match self.root.read("targets.json", 4 * 1024 * 1024) {
+        let mut targets = match self.root.read(TARGETS, TARGETS_MAX) {
             Ok(bytes) => TargetDocument::decode(&bytes).map_err(|_| unreadable(phase))?,
             Err(e) if e.kind() == io::ErrorKind::NotFound => TargetDocument::empty(),
             Err(_) => return Err(unreadable(phase)),
@@ -150,7 +327,7 @@ impl TargetStore {
             Err(e) if e.kind() == io::ErrorKind::NotFound => empty_names(),
             Err(_) => return Err(unreadable(phase)),
         };
-        let (value, write) = action(&targets, &mut names)?;
+        let (value, publications) = action(&mut targets, &mut names)?;
         self.root
             .validate_path(&self.path)
             .map_err(|_| unreadable(phase))?;
@@ -160,30 +337,40 @@ impl TargetStore {
         names_lock
             .validate_link(&self.root, LOCK)
             .map_err(|_| unreadable(phase))?;
-        if write {
-            names.records.sort_by(|a, b| a.target_id.cmp(&b.target_id));
-            if let Some(candidates) = names.candidates.as_mut() {
-                candidates.sort_by(|a, b| {
-                    if same_text(&a.candidate, &b.candidate) {
-                        a.observation_id.cmp(&b.observation_id)
-                    } else {
-                        a.candidate.cmp(&b.candidate)
+        for publication in publications {
+            match publication {
+                Publication::Names(mut names) => {
+                    names.records.sort_by(|a, b| a.target_id.cmp(&b.target_id));
+                    if let Some(candidates) = names.candidates.as_mut() {
+                        candidates.sort_by(|a, b| {
+                            if same_text(&a.candidate, &b.candidate) {
+                                a.observation_id.cmp(&b.observation_id)
+                            } else {
+                                a.candidate.cmp(&b.candidate)
+                            }
+                        });
                     }
-                });
+                    let bytes = serde_json::to_vec(&names).map_err(|_| unreadable(phase))?;
+                    if bytes.len() >= MAX {
+                        return Err(failure(
+                            "quotaExceeded",
+                            "Display-name storage exceeds its bound",
+                            phase,
+                        ));
+                    }
+                    let validated = decode_display_names(&bytes).map_err(|_| unreadable(phase))?;
+                    self.root.publish_document(NAMES, &validated.document, MAX).map_err(|e| match e {
+                        DocumentPublishError::BeforePublication(_) => failure("ioFailure", "Display-name update could not be written", phase),
+                        DocumentPublishError::OutcomeUnknown(_) => failure("outcomeUnknown", "Display-name publication is unconfirmed; read current state before another update", phase),
+                    })?;
+                }
+                Publication::Targets(bytes) => {
+                    self.root.publish_document(TARGETS, &bytes, TARGETS_MAX).map_err(|e| match e {
+                        DocumentPublishError::BeforePublication(_) => failure("ioFailure", "Target binding update could not be written", phase),
+                        DocumentPublishError::OutcomeUnknown(_) => failure("outcomeUnknown", "Target binding publication is unconfirmed; read current state before another update", phase),
+                    })?;
+                }
             }
-            let bytes = serde_json::to_vec(&names).map_err(|_| unreadable(phase))?;
-            if bytes.len() >= MAX {
-                return Err(failure(
-                    "quotaExceeded",
-                    "Display-name storage exceeds its bound",
-                    phase,
-                ));
-            }
-            let validated = decode_display_names(&bytes).map_err(|_| unreadable(phase))?;
-            self.root.publish_document(NAMES, &validated.document, MAX).map_err(|e| match e {
-                DocumentPublishError::BeforePublication(_) => failure("ioFailure", "Display-name update could not be written", phase),
-                DocumentPublishError::OutcomeUnknown(_) => failure("outcomeUnknown", "Display-name publication is unconfirmed; read current state before another update", phase),
-            })?;
             if self.root.validate_path(&self.path).is_err()
                 || names_lock.validate_link(&self.root, LOCK).is_err()
                 || target_lock
@@ -198,6 +385,74 @@ impl TargetStore {
             }
         }
         Ok(value)
+    }
+    /// Swift `candidateDisplayNames(references:)`: each observation's
+    /// candidate name, which counts only in the generation it was named in;
+    /// otherwise none, in the reference's generation.
+    pub(crate) fn candidate_display_names(
+        &self,
+        references: &[ObservationReference],
+    ) -> Result<BTreeMap<String, (Option<String>, u64)>, WireError> {
+        let mut resolved = BTreeMap::new();
+        self.transaction("", |_, names| {
+            let records = names.candidates.as_deref().unwrap_or_default();
+            for reference in references {
+                let name = records
+                    .iter()
+                    .find(|record| {
+                        record.candidate == reference.candidate
+                            && record.observation_id == reference.observation_id
+                            && record.generation == reference.generation
+                    })
+                    .map(|record| record.name.clone());
+                resolved.insert(
+                    reference.observation_id.clone(),
+                    (name, reference.generation),
+                );
+            }
+            Ok((Value::Null, false))
+        })?;
+        Ok(resolved)
+    }
+    /// Swift `RuntimeTargetStore.adoptObservedCandidate`: the adopted
+    /// identity's Target, materialized in the binding document; the adopted
+    /// observation's candidate name staged onto it, the binding published
+    /// only for a new Target, then the candidate names finished into the
+    /// next observation generation — in Swift's order, under both locks.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn adopt_observed_candidate(
+        &self,
+        identity: &str,
+        connect_key: &str,
+        tool_version: &str,
+        now: &str,
+        reference: &ObservationReference,
+        active: &[ObservationReference],
+        next_generation: u64,
+    ) -> Result<crate::target_observation::Adopted, WireError> {
+        let mut adopted = None;
+        self.publishing("", |targets, names| {
+            let (record, created) = targets
+                .materialize_adoption(identity, connect_key, tool_version, now)
+                .map_err(|message| failure("internalError", &message, ""))?;
+            let mut publications = Vec::new();
+            if stage_candidate_adoption(names, reference, &record.target_id, now)? {
+                publications.push(Publication::Names(names.clone()));
+            }
+            if created {
+                publications.push(Publication::Targets(
+                    targets.encode().map_err(|_| unreadable(""))?,
+                ));
+            }
+            finish_candidate_adoption(names, reference, active, next_generation)?;
+            publications.push(Publication::Names(names.clone()));
+            adopted = Some(crate::target_observation::Adopted {
+                target_id: record.target_id,
+                binding_revision: record.binding_revision,
+            });
+            Ok((Value::Null, publications))
+        })?;
+        adopted.ok_or_else(|| unreadable(""))
     }
     /// Resolve only existing durable Target authority for a new Import intent.
     /// No wire input supplies a binding, route, observation or inspected fact.

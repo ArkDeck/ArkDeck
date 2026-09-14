@@ -151,6 +151,13 @@ mod target_owner;
 #[cfg(target_os = "macos")]
 pub use target_owner::{ObservationReference, TargetStore};
 #[cfg(target_os = "macos")]
+mod target_observation;
+#[cfg(target_os = "macos")]
+pub use target_observation::{
+    Adopted, Observation, ObservationError, Snapshot, Sources, TargetObservations, adoption_answer,
+    parse_reference,
+};
+#[cfg(target_os = "macos")]
 mod post_flash_alias;
 #[cfg(target_os = "macos")]
 mod post_flash_alias_store;
