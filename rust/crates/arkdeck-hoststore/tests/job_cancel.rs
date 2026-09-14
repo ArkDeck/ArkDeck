@@ -79,6 +79,8 @@ fn rust_cancels_the_swift_jobs() {
         now: fixed_now,
         precise_now: fixed_precise_now,
         sessions: Some(&publisher),
+        cancellation: None,
+        after_commit: None,
     };
     let canceller = JobCanceller {
         jobs: &jobs,

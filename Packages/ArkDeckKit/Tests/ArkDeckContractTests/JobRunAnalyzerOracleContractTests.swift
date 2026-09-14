@@ -158,6 +158,21 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
       variable: "ARKDECK_RUST_JOB_CANCEL_RECORD")
   }
 
+  /// The running-cancellation oracle
+  /// `rust/crates/arkdeck-hoststore/tests/job_cancel_running.rs` replays, in
+  /// the writer oracles' composition with the engine's two cancellation
+  /// hooks: a Job cancelled once its analyzer intent is durable and its child
+  /// runs, one cancelled while its run waits at the last boundary before the
+  /// intent, and one cancelled after its success commit. Record it with
+  /// `ARKDECK_RUST_JOB_CANCEL_RUNNING_RECORD=/private/tmp/<new directory>`.
+  func testSwiftCancelsRunningAnalyzerJobs() async throws {
+    let lock = try Self.lockOracleRoot()
+    defer { close(lock) }
+    try Self.recordOrCompare(
+      try await runningCancellationFiles(), oracle: Self.runningCancellationOracle,
+      variable: "ARKDECK_RUST_JOB_CANCEL_RUNNING_RECORD")
+  }
+
   /// Serializes every user of the fixed root, Rust replays included.
   private static func lockOracleRoot() throws -> Int32 {
     let lock = open(lockPath, O_RDWR | O_CREAT | O_CLOEXEC, 0o600)
@@ -246,6 +261,17 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
         ("cancelWithoutJob", "job.cancel", nil, [:], "invalidParams"),
         ("cancelNumericJob", "job.cancel", nil, ["jobId": .integer(5)], "invalidParams"),
       ]
+
+  private static let runningCancellationOracle = repository.appending(
+    path: "rust/tests/fixtures/job-cancel-running-analyzer", directoryHint: .isDirectory)
+
+  /// The running-cancellation oracle's Jobs, each admitted over its own
+  /// source, with where its run is when its cancellation arrives.
+  private static let runningCancellationJobs: [(name: String, mode: String, when: String)] = [
+    ("drained", "sleep", "childRunning"),
+    ("beforeDispatch", "answered", "beforeDispatchInstall"),
+    ("committed", "answered", "afterCommitLinearization"),
+  ]
 
   private static let cases: [Case] = [
     Case(name: "answered", mode: "answered", ends: "succeeded"),
@@ -485,8 +511,11 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
     let owner: URL
   }
 
-  /// Resets the fixed root and composes the standalone daemon's engine there.
-  private func writerComposition() throws -> WriterComposition {
+  /// Resets the fixed root and composes the standalone daemon's engine there,
+  /// with the engine's test hooks where an oracle needs a run held.
+  private func writerComposition(
+    testHooks: RuntimeJobEngine.Configuration.TestHooks = .none
+  ) throws -> WriterComposition {
     let manager = FileManager.default
     try? manager.removeItem(at: Self.root)
     try manager.createDirectory(
@@ -515,7 +544,8 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
       owner: try RuntimeSessionStorageStore(ownerRoot: owner, defaultSessionsRoot: sessions),
       coordinator: HostStorageCoordinator(), probe: probe)
     let engine = try RuntimeJobEngine(
-      configuration: .init(stateDirectory: jobsState, sessionPublicationWriter: writer),
+      configuration: .init(
+        stateDirectory: jobsState, testHooks: testHooks, sessionPublicationWriter: writer),
       providers: DeviceProviderRegistry(providers: [provider]),
       dispatcher: DescriptorBoundProcessDispatcher(
         resolver: try AnalyzerExecutableResolver(profiles: [profile])),
@@ -746,6 +776,79 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
       producer: "JobRunAnalyzerOracleContractTests/testSwiftCancelsTheSharedAnalyzerJobs")
   }
 
+  private func runningCancellationFiles() async throws -> [String: Data] {
+    // Each hook holds only the Job its gate names; every other run passes.
+    let beforeDispatch = OracleHookGate()
+    let afterCommit = OracleHookGate()
+    let composition = try writerComposition(
+      testHooks: .init(
+        beforeDispatchInstall: { jobID, _ in await beforeDispatch.pause(jobID) },
+        afterAnalyzerCommitLinearization: { jobID, _ in await afterCommit.pause(jobID) }))
+    defer { try? FileManager.default.removeItem(at: Self.root) }
+    let (_, submits, jobIDs) = try await writerAdmissions(
+      composition, Self.runningCancellationJobs.map { ($0.name, $0.mode, false) })
+    var recorded: [JSONValue] = []
+    for job in Self.runningCancellationJobs {
+      let jobID = jobIDs[job.name]!
+      let params: [String: JSONValue] = ["jobId": .string(jobID)]
+      let gate: OracleHookGate? =
+        switch job.when {
+        case "beforeDispatchInstall": beforeDispatch
+        case "afterCommitLinearization": afterCommit
+        default: nil
+        }
+      await gate?.hold(jobID)
+      let handler = composition.handler
+      // Named rather than `Self`, which the isolation checker cannot follow
+      // into a task.
+      let run = Task {
+        try await JobRunAnalyzerOracleContractTests.send(handler, "job.run", params)
+      }
+      if let gate {
+        await gate.waitUntilReached()
+      } else {
+        try await Self.waitForIntent(of: jobID, in: composition.jobsState)
+      }
+      let cancel = try await exchange(composition.handler, "job.cancel", params)
+      await gate?.release()
+      recorded.append(
+        .object([
+          "name": .string(job.name), "mode": .string(job.mode), "cancelWhen": .string(job.when),
+          "jobId": .string(jobID), "submit": .object(submits[job.name]!),
+          "run": try await run.value, "cancel": cancel,
+        ]))
+    }
+    var reads: [String: JSONValue] = [:]
+    for job in Self.runningCancellationJobs {
+      let jobID = jobIDs[job.name]!
+      var answers: [String: JSONValue] = [:]
+      for method in ["job.status", "job.show", "job.result", "job.evidence"] {
+        answers[method] = try await exchange(
+          composition.handler, method, ["jobId": .string(jobID)])
+      }
+      reads[jobID] = .object(answers)
+    }
+    return try writerFiles(
+      composition, documents: ["cases.json": .array(recorded), "reads.json": .object(reads)],
+      producer: "JobRunAnalyzerOracleContractTests/testSwiftCancelsRunningAnalyzerJobs")
+  }
+
+  /// Waits until a Job's analyzer intent is durable: from then on its run
+  /// installs the child a cancellation must drain.
+  private static func waitForIntent(of jobID: String, in state: URL) async throws {
+    let journal = state.appending(path: "jobs/\(jobID)/journal.jsonl")
+    let deadline = ContinuousClock.now + .seconds(30)
+    while ContinuousClock.now < deadline {
+      if let text = try? String(contentsOf: journal, encoding: .utf8),
+        text.contains("\"kind\":\"stepIntent\"")
+      {
+        return
+      }
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    throw CocoaError(.fileReadUnknown)
+  }
+
   private static func submitParams(_ name: String, lease: String) throws -> [String: JSONValue] {
     let fields: [String: JSONValue] = [
       "documentType": .string("runtime-operation-request"),
@@ -781,6 +884,14 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
   }
 
   private func exchange(
+    _ handler: RuntimeControlPlaneHandler, _ method: String, _ params: [String: JSONValue]
+  ) async throws -> JSONValue {
+    try await Self.send(handler, method, params)
+  }
+
+  /// One control frame through the handler, answered as the oracle records
+  /// it; static so a run can be sent from a task of its own.
+  private static func send(
     _ handler: RuntimeControlPlaneHandler, _ method: String, _ params: [String: JSONValue]
   ) async throws -> JSONValue {
     let frame = try CanonicalJSONEncoders.canonical().encode(
@@ -895,6 +1006,43 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
 
 /// The publication oracle's storage probe: this machine's volume with room
 /// for every claim, unless a case reports it full.
+/// Holds one Job's run at an engine hook until the oracle releases it: the
+/// engine calls the hook for every run, and only the Job the gate names
+/// waits there.
+private actor OracleHookGate {
+  private var jobID: String?
+  private var reached = false
+  private var released = false
+  private var reachedWaiters: [CheckedContinuation<Void, Never>] = []
+  private var releaseWaiters: [CheckedContinuation<Void, Never>] = []
+
+  func hold(_ jobID: String) {
+    self.jobID = jobID
+  }
+
+  func pause(_ jobID: String) async {
+    guard jobID == self.jobID else { return }
+    reached = true
+    let waiters = reachedWaiters
+    reachedWaiters.removeAll()
+    waiters.forEach { $0.resume() }
+    if released { return }
+    await withCheckedContinuation { releaseWaiters.append($0) }
+  }
+
+  func waitUntilReached() async {
+    if reached { return }
+    await withCheckedContinuation { reachedWaiters.append($0) }
+  }
+
+  func release() {
+    released = true
+    let waiters = releaseWaiters
+    releaseWaiters.removeAll()
+    waiters.forEach { $0.resume() }
+  }
+}
+
 private final class OracleStorageProbe: HostStorageProbing, @unchecked Sendable {
   static let roomyBytes: UInt64 = 1 << 40
   private let lock = NSLock()

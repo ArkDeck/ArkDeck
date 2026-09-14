@@ -1,0 +1,80 @@
+{
+  "journalMode" : "wal",
+  "rows" : [
+    {
+      "admissionSequence" : 1,
+      "createdAtOrderKey" : "c1c82bb840000000",
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "idempotencyKey" : "idem-oracle-run-drained-0001",
+      "jobId" : "job-3a3fdbd6c539a5b6ebc98a6f2d18a53a",
+      "recordSHA256" : "44bd20481c50d2be76832101a0df3b803ba87408729a82c54fcaff892e8eb524",
+      "requestHash" : "d57eaf1d8016bbf196151a25395d97056a2886af2bdc954ee0069e601bff5a31",
+      "state" : "cancelled",
+      "updatedAtUTC" : "2026-09-14T00:00:00Z",
+      "version" : 6
+    },
+    {
+      "admissionSequence" : 2,
+      "createdAtOrderKey" : "c1c82bb840000000",
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "idempotencyKey" : "idem-oracle-run-beforeDispatch-0001",
+      "jobId" : "job-e1ca83b654fb71dcfc681bf7e9e67dff",
+      "recordSHA256" : "77b8c09d6604c694c13706f42de6bc012e0c2064cba0aba81218b440429456fd",
+      "requestHash" : "7ddb0b8786ab853494e605869dbf43057ae5429935de2457c9e923d2c0b9f49d",
+      "state" : "cancelled",
+      "updatedAtUTC" : "2026-09-14T00:00:00Z",
+      "version" : 5
+    },
+    {
+      "admissionSequence" : 3,
+      "createdAtOrderKey" : "c1c82bb840000000",
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "idempotencyKey" : "idem-oracle-run-committed-0001",
+      "jobId" : "job-107679f20983827cfcdcabfb4debb2f8",
+      "recordSHA256" : "fdadae0496c0bac0113c9d2cc985a4ff2b966b339b61f8645a0d7ba8ed8f1e30",
+      "requestHash" : "581b3095212e51093958acc184d195ecbba2f851729a8061569941f7e1d5fadb",
+      "state" : "succeeded",
+      "updatedAtUTC" : "2026-09-14T00:00:00Z",
+      "version" : 5
+    }
+  ],
+  "schema" : [
+    {
+      "name" : "runtime_job",
+      "sql" : "CREATE TABLE runtime_job(\n  job_id TEXT PRIMARY KEY,\n  idempotency_key TEXT NOT NULL UNIQUE,\n  request_hash TEXT NOT NULL,\n  state TEXT NOT NULL,\n  admission_sequence INTEGER NOT NULL,\n  created_at_utc TEXT NOT NULL,\n  created_at_order_key TEXT NOT NULL,\n  updated_at_utc TEXT NOT NULL,\n  version INTEGER NOT NULL CHECK(version >= 1),\n  initial_record_json BLOB\n)",
+      "tableName" : "runtime_job",
+      "type" : "table"
+    },
+    {
+      "name" : "runtime_job_admission_sequence_idx",
+      "sql" : "CREATE UNIQUE INDEX runtime_job_admission_sequence_idx ON runtime_job(admission_sequence)",
+      "tableName" : "runtime_job",
+      "type" : "index"
+    },
+    {
+      "name" : "runtime_job_created_idx",
+      "sql" : "CREATE INDEX runtime_job_created_idx ON runtime_job(created_at_order_key, job_id COLLATE BINARY)",
+      "tableName" : "runtime_job",
+      "type" : "index"
+    },
+    {
+      "name" : "runtime_job_updated_idx",
+      "sql" : "CREATE INDEX runtime_job_updated_idx ON runtime_job(updated_at_utc DESC, job_id)",
+      "tableName" : "runtime_job",
+      "type" : "index"
+    },
+    {
+      "name" : "sqlite_autoindex_runtime_job_1",
+      "sql" : null,
+      "tableName" : "runtime_job",
+      "type" : "index"
+    },
+    {
+      "name" : "sqlite_autoindex_runtime_job_2",
+      "sql" : null,
+      "tableName" : "runtime_job",
+      "type" : "index"
+    }
+  ],
+  "userVersion" : 1
+}

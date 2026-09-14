@@ -71,6 +71,8 @@ fn rust_publishes_the_swift_sessions() {
         now: fixed_now,
         precise_now: fixed_precise_now,
         sessions: Some(&publisher),
+        cancellation: None,
+        after_commit: None,
     };
     let mut differences = Vec::new();
     for case in cases {

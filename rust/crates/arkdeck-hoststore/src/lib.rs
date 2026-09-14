@@ -43,7 +43,7 @@ pub use job_result::JobResultReader;
 #[cfg(target_os = "macos")]
 mod job_cancel;
 #[cfg(target_os = "macos")]
-pub use job_cancel::JobCanceller;
+pub use job_cancel::{CancelledRun, JobCanceller, RunCancellation, cancel_running};
 #[cfg(target_os = "macos")]
 mod session_publication;
 #[cfg(target_os = "macos")]

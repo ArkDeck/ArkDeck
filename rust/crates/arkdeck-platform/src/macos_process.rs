@@ -72,6 +72,12 @@ impl RunningChild {
             }
         }
     }
+    /// Swift `processGroupExists` turned false: the leader has exited and no
+    /// other member of its process group is left. The leader itself stays a
+    /// retained zombie until kill_and_wait reaps it.
+    pub(super) fn group_drained(&self) -> bool {
+        !self.reaped && only_retained_zombie_remains(self.pid, true).unwrap_or(false)
+    }
 }
 impl Drop for RunningChild {
     fn drop(&mut self) {

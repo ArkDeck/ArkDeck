@@ -1,0 +1,133 @@
+{
+  "actualEffect" : "hostOnly",
+  "actualStepKinds" : [
+    "runDeterministicAnalyzer"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "kind" : "defaultReadOnlyPolicy",
+    "reference" : "default-read-only-policy"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-3a3fdbd6c539a5b6ebc98a6f2d18a53a",
+  "materializedPlanDigest" : "ef681836c816920f703e1097793acfa44cd1a4819d383a765675ed79a103acb2",
+  "operationFailure" : {
+    "category" : "cancelled",
+    "code" : "cancelled",
+    "recovery" : "none",
+    "retryability" : "notAutomatic",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "analyzer.extract-crash-signature@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-run-drained-0001",
+    "inputs" : {
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-913388288ad0d3d661cceca0dff4fc9c"
+    },
+    "operation" : {
+      "id" : "analyzer.extract-crash-signature",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-run-drained",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "analyzer",
+  "request" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-run-drained-0001",
+    "inputs" : {
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-913388288ad0d3d661cceca0dff4fc9c"
+    },
+    "operation" : {
+      "id" : "analyzer.extract-crash-signature",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-run-drained",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "sessionPublicationRecord" : {
+    "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+    "checkpointSeal" : {
+      "byteCount" : "3308",
+      "lastSequence" : 7,
+      "sha256" : "5309d0ac06af3b4be6f7e3028dd45283d2b83c60a95a23dce93bd19c32295d9c"
+    },
+    "claims" : [
+      {
+        "admissionGeneration" : "<admissionGeneration>",
+        "claimID" : "session-publication-job-3a3fdbd6c539a5b6ebc98a6f2d18a53a",
+        "finalizationHeadroomBytes" : "16777216",
+        "metadataHeadroomBytes" : "68844",
+        "remainingGrowthBytes" : "0",
+        "volumeIdentity" : "<volumeIdentity>",
+        "writerClass" : "light"
+      }
+    ],
+    "journalSeal" : {
+      "byteCount" : "3693",
+      "lastSequence" : 8,
+      "sha256" : "dc13301e4053cda17d37a870160c83b171678f07e43b328c6c50bd6e2f5714fe"
+    },
+    "phase" : "catalogPublished",
+    "policyGeneration" : "1",
+    "proposal" : {
+      "completedAtUTC" : "2026-09-14T00:00:00Z",
+      "manifestByteCount" : "1593",
+      "manifestSHA256" : "59d9f3c2b91e06e41f6404792f3c8bd8f0894d88c33b5a8d30a9c932ff7ee6c8",
+      "outcomeCertainty" : "confirmed",
+      "terminalStatus" : "cancelled"
+    },
+    "receipt" : {
+      "catalogGeneration" : "1",
+      "manifestSHA256" : "59d9f3c2b91e06e41f6404792f3c8bd8f0894d88c33b5a8d30a9c932ff7ee6c8",
+      "publishedAtUTC" : "2026-09-14T00:00:00Z"
+    },
+    "relativeSessionPath" : "2026\/09\/session-job-3a3fdbd6c539a5b6ebc98a6f2d18a53a",
+    "root" : {
+      "device" : "<device>",
+      "inode" : "<inode>",
+      "path" : "\/tmp\/arkdeck-job-plan-oracle\/Sessions",
+      "volumeIdentity" : "<volumeIdentity>"
+    },
+    "sessionID" : "session-job-3a3fdbd6c539a5b6ebc98a6f2d18a53a",
+    "sessionRootIdentity" : {
+      "device" : "<device>",
+      "inode" : "<inode>"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "cancelled",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "intent extract-crash-signature",
+    "running->cancelRequested",
+    "reason: durable client cancellation intent",
+    "cancelled extract-crash-signature; dispatch reached a confirmed safe boundary before publication",
+    "cancelRequested->cancellingAtSafeBoundary",
+    "reason: dispatch has a confirmed safe boundary",
+    "cancellingAtSafeBoundary->cancelled",
+    "reason: cancelled intent closed without publication"
+  ]
+}
