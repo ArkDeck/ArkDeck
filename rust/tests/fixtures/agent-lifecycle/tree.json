@@ -1,0 +1,237 @@
+[
+  {
+    "kind" : "directory",
+    "mode" : "700",
+    "path" : "store/jobs/job-68b3be1c1b8ed4cadb4f985ba34a145e"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "store/jobs/job-68b3be1c1b8ed4cadb4f985ba34a145e/.manifest.lock"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "store/jobs/job-68b3be1c1b8ed4cadb4f985ba34a145e/job-record.json"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "store/jobs/job-68b3be1c1b8ed4cadb4f985ba34a145e/journal.jsonl"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "store/jobs/job-68b3be1c1b8ed4cadb4f985ba34a145e/session-manifest.proposal.json"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "sessions/.arkdeck-retention-catalog.json"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "sessions/.arkdeck-retention-catalog.lock"
+  },
+  {
+    "kind" : "directory",
+    "mode" : "700",
+    "path" : "sessions/2026"
+  },
+  {
+    "kind" : "directory",
+    "mode" : "700",
+    "path" : "sessions/2026/09"
+  },
+  {
+    "kind" : "directory",
+    "mode" : "700",
+    "path" : "sessions/2026/09/session-job-68b3be1c1b8ed4cadb4f985ba34a145e"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "sessions/2026/09/session-job-68b3be1c1b8ed4cadb4f985ba34a145e/.manifest.lock"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "sessions/2026/09/session-job-68b3be1c1b8ed4cadb4f985ba34a145e/.session-identity.json"
+  },
+  {
+    "kind" : "directory",
+    "mode" : "700",
+    "path" : "sessions/2026/09/session-job-68b3be1c1b8ed4cadb4f985ba34a145e/artifacts"
+  },
+  {
+    "kind" : "directory",
+    "mode" : "700",
+    "path" : "sessions/2026/09/session-job-68b3be1c1b8ed4cadb4f985ba34a145e/artifacts/derived"
+  },
+  {
+    "kind" : "directory",
+    "mode" : "700",
+    "path" : "sessions/2026/09/session-job-68b3be1c1b8ed4cadb4f985ba34a145e/artifacts/partial"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "sessions/2026/09/session-job-68b3be1c1b8ed4cadb4f985ba34a145e/artifacts/partial/.publication-lock-0.lock"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "sessions/2026/09/session-job-68b3be1c1b8ed4cadb4f985ba34a145e/artifacts/partial/.publication-lock-1.lock"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "sessions/2026/09/session-job-68b3be1c1b8ed4cadb4f985ba34a145e/artifacts/partial/.publication-lock-2.lock"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "sessions/2026/09/session-job-68b3be1c1b8ed4cadb4f985ba34a145e/artifacts/partial/.publication-lock-3.lock"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "sessions/2026/09/session-job-68b3be1c1b8ed4cadb4f985ba34a145e/artifacts/partial/.publication-lock-4.lock"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "sessions/2026/09/session-job-68b3be1c1b8ed4cadb4f985ba34a145e/artifacts/partial/.publication-lock-5.lock"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "sessions/2026/09/session-job-68b3be1c1b8ed4cadb4f985ba34a145e/artifacts/partial/.publication-lock-6.lock"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "sessions/2026/09/session-job-68b3be1c1b8ed4cadb4f985ba34a145e/artifacts/partial/.publication-lock-7.lock"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "sessions/2026/09/session-job-68b3be1c1b8ed4cadb4f985ba34a145e/artifacts/partial/.publication-lock-8.lock"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "sessions/2026/09/session-job-68b3be1c1b8ed4cadb4f985ba34a145e/artifacts/partial/.publication-lock-9.lock"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "sessions/2026/09/session-job-68b3be1c1b8ed4cadb4f985ba34a145e/artifacts/partial/.publication-lock-a.lock"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "sessions/2026/09/session-job-68b3be1c1b8ed4cadb4f985ba34a145e/artifacts/partial/.publication-lock-b.lock"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "sessions/2026/09/session-job-68b3be1c1b8ed4cadb4f985ba34a145e/artifacts/partial/.publication-lock-c.lock"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "sessions/2026/09/session-job-68b3be1c1b8ed4cadb4f985ba34a145e/artifacts/partial/.publication-lock-d.lock"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "sessions/2026/09/session-job-68b3be1c1b8ed4cadb4f985ba34a145e/artifacts/partial/.publication-lock-e.lock"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "sessions/2026/09/session-job-68b3be1c1b8ed4cadb4f985ba34a145e/artifacts/partial/.publication-lock-f.lock"
+  },
+  {
+    "kind" : "directory",
+    "mode" : "700",
+    "path" : "sessions/2026/09/session-job-68b3be1c1b8ed4cadb4f985ba34a145e/artifacts/raw"
+  },
+  {
+    "kind" : "directory",
+    "mode" : "700",
+    "path" : "sessions/2026/09/session-job-68b3be1c1b8ed4cadb4f985ba34a145e/audit"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "sessions/2026/09/session-job-68b3be1c1b8ed4cadb4f985ba34a145e/audit/session.jsonl"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "sessions/2026/09/session-job-68b3be1c1b8ed4cadb4f985ba34a145e/journal.jsonl"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "sessions/2026/09/session-job-68b3be1c1b8ed4cadb4f985ba34a145e/manifest.json"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "session-owner/.session-storage.lock"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "agent-executions/execution-4f782c43d47543def2b86d4929285a57fe91b3cd51028460bcfb5386ec9e9f19.json"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "agent-executions/execution-74e83b2e507c3eaa6164638d5fdc8d830d7bb65309240c14c157e5787215a936.json"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "agent-executions/execution-de91745fc817d451e8e9370fb8ae0a1f029e6e90c68aceb5231be404bbf02f89.json"
+  },
+  {
+    "kind" : "directory",
+    "mode" : "700",
+    "path" : "agent-executions/snapshots"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "agent-executions/snapshots/snapshot-<revision>.json"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "agent-executions/snapshots/snapshot-<revision>.json"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "agent-executions/snapshots/snapshot-<revision>.json"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "agent-executions/snapshots/snapshot-<revision>.json"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "agent-executions/snapshots/snapshot-<revision>.json"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "agent-executions/snapshots/snapshot-<revision>.json"
+  }
+]

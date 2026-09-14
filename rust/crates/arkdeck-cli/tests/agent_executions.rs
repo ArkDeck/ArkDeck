@@ -44,16 +44,12 @@ fn remote(code: &str, proven: bool) -> ClientError {
 
 #[test]
 fn argv_fixtures_replay_as_the_swift_cli_parses_them() {
+    // The Swift CLI's argv fixtures, as packaged beside the other parser
+    // samples, which `check-contracts.py` keeps byte-identical to Swift's.
     for bytes in [
-        include_str!(
-            "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI/argv/agent.run.json"
-        ),
-        include_str!(
-            "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI/argv/agent.status.json"
-        ),
-        include_str!(
-            "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI/argv/artifact.list.json"
-        ),
+        include_str!("../../../tests/fixtures/current-cli-argv/agent.run.json"),
+        include_str!("../../../tests/fixtures/current-cli-argv/agent.status.json"),
+        include_str!("../../../tests/fixtures/current-cli-argv/artifact.list.json"),
     ] {
         let document: Value = serde_json::from_str(bytes).unwrap();
         for case in document["cases"].as_array().unwrap() {
