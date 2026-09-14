@@ -59,6 +59,10 @@ pub struct Host {
     /// Swift `NSHomeDirectory()`, which Artifact redaction replaces.
     #[cfg(target_os = "macos")]
     home: String,
+    /// Swift `HostStorageCoordinator`'s claims, held by the Session
+    /// publications this process makes.
+    #[cfg(target_os = "macos")]
+    claims: arkdeck_hoststore::StorageClaims,
 }
 
 impl Host {
@@ -174,6 +178,8 @@ impl Host {
             running: Mutex::new(Default::default()),
             #[cfg(target_os = "macos")]
             home: arkdeck_platform::runtime_home().unwrap_or_default(),
+            #[cfg(target_os = "macos")]
+            claims: Default::default(),
         }
     }
 }
@@ -458,6 +464,17 @@ impl HostServices for Host {
                 details: None,
             });
         };
+        // As the standalone Swift daemon: every terminal Job is published as
+        // a Session through the Session owner this composition holds.
+        let probe = arkdeck_hoststore::SystemStorageProbe;
+        let publisher =
+            self.storage
+                .as_ref()
+                .map(|(sessions, _)| arkdeck_hoststore::SessionPublisher {
+                    sessions,
+                    claims: &self.claims,
+                    probe: &probe,
+                });
         let run = || {
             arkdeck_hoststore::JobRunner {
                 jobs,
@@ -467,6 +484,7 @@ impl HostServices for Host {
                 home: &self.home,
                 now: arkdeck_hoststore::runtime_now,
                 precise_now: arkdeck_hoststore::runtime_precise_now,
+                sessions: publisher.as_ref(),
             }
             .handle(params)
             .map_err(|refusal| WireError {

@@ -1,0 +1,37 @@
+{
+  "artifacts" : [
+    {
+      "artifactID" : "ART-3e5505b847a219b3a8bd310098d27ece",
+      "bindingSnapshot" : {
+        "targetID" : "TGT-ORACLE"
+      },
+      "byteCount" : 697,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-5427c6cc294fa4e21ef64bdf677ef1f5",
+      "mediaType" : "application\/json",
+      "name" : "crash-signature.json",
+      "observationWindow" : {
+        "endUTC" : "2026-09-14T00:00:00.000Z",
+        "startUTC" : "2026-09-14T00:00:00.000Z"
+      },
+      "privacy" : "standard",
+      "providerID" : "analyzer",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-5427c6cc294fa4e21ef64bdf677ef1f5",
+      "sha256" : "ba0a6a798f3267c096c9a11b3baff58dcefbe626799e1729823c4b500ca7709c",
+      "sourceOperation" : "analyzer.extract-crash-signature@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "extract-crash-signature"
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

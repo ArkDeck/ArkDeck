@@ -222,6 +222,7 @@ fn rust_runs_reproduce_the_swift_oracle() {
         home: provenance["home"].as_str().unwrap(),
         now: fixed_now,
         precise_now: fixed_precise_now,
+        sessions: None,
     };
     let mut differences = Vec::new();
     for case in &cases {

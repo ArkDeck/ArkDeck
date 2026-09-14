@@ -214,6 +214,68 @@ fn catalog(root: &HostDirectory) -> Option<Catalog> {
     Some(doc)
 }
 
+/// Swift `SessionRetentionCatalog.registerFinalizedSession` under its root
+/// lock: the published Session at `location` (`yyyy`, `mm`, Session identity)
+/// joins the catalog with its retention deadline, an identical entry is left
+/// as it is, the catalog is published and sealed, and the entry is read back.
+/// Answers the catalog generation.
+pub(crate) fn register_session(
+    path: &Path,
+    location: [&str; 3],
+    days: u64,
+    policy_generation: u64,
+) -> io::Result<u64> {
+    let owner = HostDirectory::open(path)?;
+    let root = HostDirectory::open_session_tree(path)?;
+    let lock = owner.wait_lock(LOCK, false)?;
+    let [year, month, name] = location;
+    let mut document = catalog(&root).ok_or_else(invalid)?;
+    let scanned = scan_session(&root.child(year)?.child(month)?, year, month, name)?;
+    let completed = scanned.manifest.completed_at;
+    if let Some(existing) = document
+        .entries
+        .iter()
+        .find(|entry| entry.session_id == name)
+    {
+        if session_timestamp(&existing.completed_at) != Some(completed)
+            || existing.policy_generation != policy_generation
+        {
+            return Err(invalid());
+        }
+    } else {
+        let days = i32::try_from(days).map_err(|_| invalid())?;
+        let expires = host_gregorian_add_days(completed, days).ok_or_else(invalid)?;
+        document.entries.push(Entry {
+            session_id: name.into(),
+            completed_at: host_gregorian_timestamp(completed).ok_or_else(invalid)?,
+            expires_at: host_gregorian_timestamp(expires).ok_or_else(invalid)?,
+            is_pinned: false,
+            policy_generation,
+        });
+        document.generation = document.generation.checked_add(1).ok_or_else(invalid)?;
+        document
+            .entries
+            .sort_by(|a, b| a.session_id.cmp(&b.session_id));
+        let value = serde_json::to_value(&document).map_err(|_| invalid())?;
+        let bytes = serde_json::to_vec(&value).map_err(|_| invalid())?;
+        owner
+            .publish_document(METADATA, &bytes, 16 * 1024 * 1024)
+            .map_err(|error| match error {
+                DocumentPublishError::BeforePublication(error) => error,
+                DocumentPublishError::OutcomeUnknown(error) => io::Error::other(format!(
+                    "Session catalog publication outcome unknown: {error}"
+                )),
+            })?;
+        lock.mark_catalog_initialized(&owner, LOCK)?;
+    }
+    let written = catalog(&root).ok_or_else(invalid)?;
+    if !written.entries.iter().any(|entry| entry.session_id == name) {
+        return Err(invalid());
+    }
+    lock.validate_link(&owner, LOCK)?;
+    Ok(written.generation)
+}
+
 pub fn session_inventory(configuration: &[u8], path: &Path) -> io::Result<Value> {
     inventory(configuration, path, false)
 }

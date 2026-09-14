@@ -2,7 +2,7 @@
 //! Session tree are disjoint; requests can only select an existing private root.
 use crate::{decode_session_configuration, session_inventory_owned};
 use arkdeck_contract::WireError;
-use arkdeck_platform::{DocumentPublishError, HostDirectory};
+use arkdeck_platform::{DocumentPublishError, HostDirectory, HostReadLock};
 use serde_json::{Map, Value, json};
 use std::{
     io,
@@ -308,6 +308,81 @@ impl SessionStore {
         root.validate_path(path).map_err(unreadable)?;
         Ok(root)
     }
+    /// Swift `RuntimeSessionStorageStore.status()` as the publication writer
+    /// reads it: the active Session root, the settings generation and the
+    /// retention days, once the status read has reconciled (and the first
+    /// time initialized) the catalog. A refusal is spelled `code: message`.
+    pub(crate) fn publication_status(&self) -> Result<(PathBuf, u64, u64), String> {
+        let refused = |error: WireError| format!("{}: {}", error.code, error.message);
+        self.root
+            .validate_path(&self.path)
+            .map_err(|error| refused(unreadable(error)))?;
+        // Swift's status read waits for the storage lock; a request holding it
+        // at this instant delays the publication rather than refusing it.
+        let lock = self
+            .root
+            .wait_lock(LOCK, false)
+            .map_err(|error| refused(unreadable(error)))?;
+        let status = self
+            .locked_storage(&lock, None, None, None)
+            .map_err(refused)?;
+        let number = |value: &Value| value.as_str().and_then(|text| text.parse::<u64>().ok());
+        match (
+            status["rootPath"].as_str(),
+            number(&status["generation"]),
+            number(&status["policy"]["retentionDays"]),
+        ) {
+            (Some(root), Some(generation), Some(days)) => {
+                Ok((PathBuf::from(root), generation, days))
+            }
+            _ => Err("recordUnreadable: Session storage status is unreadable".into()),
+        }
+    }
+
+    /// Swift `registerPublishedSession`: under the storage lock, the catalog
+    /// registers the published Session at `location` (`yyyy`, `mm`, Session
+    /// identity) with the configured retention and generation, and reads the
+    /// entry back. Answers the catalog generation.
+    pub(crate) fn register_published_session(
+        &self,
+        root: &Path,
+        location: [&str; 3],
+    ) -> Result<u64, String> {
+        fn unreadable<E>(_: E) -> String {
+            "recordUnreadable: Session storage is unavailable or unsafe".to_owned()
+        }
+        self.root.validate_path(&self.path).map_err(unreadable)?;
+        let lock = self.root.wait_lock(LOCK, false).map_err(unreadable)?;
+        let loaded = match self.root.read(DOCUMENT, MAXIMUM) {
+            Ok(value) => value,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => bytes(&json!({
+                "schemaVersion":"arkdeck.session-storage-store/1", "generation":1,
+                "rootKind":"default", "rootPath":self.default_sessions,
+                "policy":{"totalQuotaBytes":21474836480_u64,"safetyMarginBytes":2147483648_u64,"retentionDays":90}}))
+            .map_err(unreadable)?,
+            Err(error) => return Err(unreadable(error)),
+        };
+        let projection = decode_session_configuration(&loaded)
+            .map_err(unreadable)?
+            .projection;
+        let number = |value: &Value| value.as_str().and_then(|text| text.parse::<u64>().ok());
+        let (Some(generation), Some(days)) = (
+            number(&projection["generation"]),
+            number(&projection["policy"]["retentionDays"]),
+        ) else {
+            return Err(unreadable(()));
+        };
+        let registered = crate::session_inventory::register_session(
+            root, location, days, generation,
+        )
+        .map_err(|_| {
+            "recordUnreadable: the Session catalog does not hold the entry it just registered"
+                .to_owned()
+        })?;
+        lock.validate_link(&self.root, LOCK).map_err(unreadable)?;
+        Ok(registered)
+    }
+
     pub fn handle(&self, method: &str, params: &Map<String, Value>) -> Result<Value, WireError> {
         let status = method == "runtime.storage.status";
         let policy = method == "runtime.storage.policy";
@@ -391,6 +466,21 @@ impl SessionStore {
                 unreadable(e)
             }
         })?;
+        self.locked_storage(&lock, expected, replacement_policy, selection)
+    }
+
+    /// A storage request once `lock` holds the storage lock: the settings
+    /// read, an expected-generation update applied, the real tree reconciled
+    /// with the catalog, and changed settings published. A status read is
+    /// the request with no expected generation.
+    fn locked_storage(
+        &self,
+        lock: &HostReadLock,
+        expected: Option<u64>,
+        replacement_policy: Option<Value>,
+        selection: Option<(PathBuf, &'static str)>,
+    ) -> Result<Value, WireError> {
+        let status = expected.is_none();
         let loaded = match self.root.read(DOCUMENT, MAXIMUM) {
             Ok(value) => value,
             Err(e) if e.kind() == io::ErrorKind::NotFound => bytes(&json!({
@@ -531,6 +621,31 @@ mod tests {
             json!({"expectedGeneration":generation,"totalQuotaBytes":"500000","safetyMarginBytes":"1000","retentionDays":"30"}),
         )
     }
+    #[test]
+    fn the_publication_status_read_waits_for_a_held_storage_lock() {
+        let root = Root::new();
+        let store = root.open();
+        let held = store.root.lock_document(LOCK).unwrap();
+        let (sender, receiver) = std::sync::mpsc::channel();
+        std::thread::scope(|scope| {
+            let store = &store;
+            scope.spawn(move || sender.send(store.publication_status()).unwrap());
+            // A typed status read refuses the held lock at once; the
+            // publication's read, as Swift's, is still waiting for it.
+            assert!(
+                receiver
+                    .recv_timeout(std::time::Duration::from_millis(200))
+                    .is_err()
+            );
+            drop(held);
+            let status = receiver
+                .recv_timeout(std::time::Duration::from_secs(30))
+                .unwrap()
+                .unwrap();
+            assert_eq!(status, (root.0.join("sessions"), 1, 90));
+        });
+    }
+
     #[test]
     fn cleanup_preview_is_durable_and_refuses_configuration_contention_or_unknown_content() {
         use std::collections::BTreeSet;

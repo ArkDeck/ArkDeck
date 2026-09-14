@@ -43,6 +43,10 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
     var params: [String: JSONValue]?
     /// The source's payload is removed after admission, before the run.
     var removesSourcePayload = false
+    /// The storage probe reports no free bytes while this Job runs.
+    var exhaustsStorage = false
+    /// A directory already holds this Job's Session path before it runs.
+    var presetsSession = false
   }
 
   private static let repository: URL = {
@@ -110,12 +114,42 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
     """#.utf8)
 
   func testSwiftRunsTheSharedAnalyzerOracle() async throws {
-    let lock = open(Self.lockPath, O_RDWR | O_CREAT | O_CLOEXEC, 0o600)
-    guard lock >= 0 else { throw POSIXError(.EACCES) }
+    let lock = try Self.lockOracleRoot()
     defer { close(lock) }
-    guard flock(lock, LOCK_EX) == 0 else { throw POSIXError(.EBUSY) }
-    let files = try await oracleFiles()
-    if let output = ProcessInfo.processInfo.environment["ARKDECK_RUST_JOB_RUN_RECORD"] {
+    try Self.recordOrCompare(
+      try await oracleFiles(), oracle: Self.oracle, variable: "ARKDECK_RUST_JOB_RUN_RECORD")
+  }
+
+  /// The Session publication oracle `rust/crates/arkdeck-hoststore/tests/
+  /// job_publication.rs` replays: the same engine composed with the
+  /// standalone daemon's publication writer, over a Sessions root and storage
+  /// owner of its own. Record it with
+  /// `ARKDECK_RUST_JOB_PUBLICATION_RECORD=/private/tmp/<new directory>`.
+  func testSwiftPublishesTheSharedAnalyzerSessions() async throws {
+    let lock = try Self.lockOracleRoot()
+    defer { close(lock) }
+    try Self.recordOrCompare(
+      try await publicationFiles(), oracle: Self.publicationOracle,
+      variable: "ARKDECK_RUST_JOB_PUBLICATION_RECORD")
+  }
+
+  /// Serializes every user of the fixed root, Rust replays included.
+  private static func lockOracleRoot() throws -> Int32 {
+    let lock = open(lockPath, O_RDWR | O_CREAT | O_CLOEXEC, 0o600)
+    guard lock >= 0 else { throw POSIXError(.EACCES) }
+    guard flock(lock, LOCK_EX) == 0 else {
+      close(lock)
+      throw POSIXError(.EBUSY)
+    }
+    return lock
+  }
+
+  /// Writes a new oracle when `variable` names a new directory under
+  /// `/private/tmp`; otherwise the checked-in oracle must match byte for byte.
+  private static func recordOrCompare(
+    _ files: [String: Data], oracle: URL, variable: String
+  ) throws {
+    if let output = ProcessInfo.processInfo.environment[variable] {
       let destination = URL(fileURLWithPath: output, isDirectory: true)
       guard destination.path.hasPrefix("/private/tmp/"),
         !FileManager.default.fileExists(atPath: destination.path)
@@ -129,18 +163,35 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
       }
       return
     }
-    let recorded = try FileManager.default.subpathsOfDirectory(atPath: Self.oracle.path)
+    let recorded = try FileManager.default.subpathsOfDirectory(atPath: oracle.path)
       .filter { path in
         var directory: ObjCBool = false
         FileManager.default.fileExists(
-          atPath: Self.oracle.appending(path: path).path, isDirectory: &directory)
+          atPath: oracle.appending(path: path).path, isDirectory: &directory)
         return !directory.boolValue
       }
     XCTAssertEqual(Set(recorded), Set(files.keys))
     for (path, data) in files {
-      XCTAssertEqual(try Data(contentsOf: Self.oracle.appending(path: path)), data, path)
+      XCTAssertEqual(try Data(contentsOf: oracle.appending(path: path)), data, path)
     }
   }
+
+  private static let publicationOracle = repository.appending(
+    path: "rust/tests/fixtures/job-publication-analyzer", directoryHint: .isDirectory)
+
+  /// The publication oracle's Jobs, run in order over one store: a success
+  /// and a failure each published as a Session, a parked Job that publishes
+  /// nothing, a full volume that leaves the publication waiting for storage,
+  /// a Session path something else already holds, and a Job whose source
+  /// disappears before it runs.
+  private static let publicationCases: [Case] = [
+    Case(name: "published", mode: "answered", ends: "succeeded"),
+    Case(name: "publishedFailure", mode: "empty", ends: "failed"),
+    Case(name: "parked", mode: "signal", ends: "waitingForRecovery"),
+    Case(name: "waitingForStorage", mode: "answered", ends: "succeeded", exhaustsStorage: true),
+    Case(name: "sessionExists", mode: "answered", ends: "succeeded", presetsSession: true),
+    Case(name: "sourceRemoved", mode: "answered", ends: "failed", removesSourcePayload: true),
+  ]
 
   private static let cases: [Case] = [
     Case(name: "answered", mode: "answered", ends: "succeeded"),
@@ -335,6 +386,183 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
     return files
   }
 
+  private func publicationFiles() async throws -> [String: Data] {
+    let manager = FileManager.default
+    try? manager.removeItem(at: Self.root)
+    try manager.createDirectory(
+      at: Self.root, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+    defer { try? manager.removeItem(at: Self.root) }
+    let analyzer = Self.root.appending(path: "analyzer")
+    try Self.analyzerBytes.write(to: analyzer)
+    guard chmod(analyzer.path, 0o700) == 0 else { throw POSIXError(.EPERM) }
+    let artifacts = Self.root.appending(path: "artifacts", directoryHint: .isDirectory)
+    let store = try RuntimeArtifactStore(
+      rootURL: artifacts, quota: ArtifactQuota(totalBytes: Self.quotaBytes),
+      redaction: ArtifactRedactionPolicy(homeDirectory: Self.home), nowUTC: { Self.nowUTC })
+    let profile = AnalyzerProfile(
+      analyzerRef: HarnessCrashLedgerAnalysis.analyzerRef,
+      analyzerVersion: HarnessCrashLedgerAnalysis.analyzerVersion,
+      executablePath: analyzer.path,
+      executableSHA256: AnalyzerProvider.sha256(Self.analyzerBytes),
+      fixedArguments: ["--analyze-crash-ledger"], timeoutSeconds: Self.timeoutSeconds)
+    let jobsState = Self.root.appending(path: "jobs-state", directoryHint: .isDirectory)
+    let capabilities = try RuntimeCapabilityStore(
+      directoryURL: jobsState.appending(path: "capabilities", directoryHint: .isDirectory))
+    let provider = try AnalyzerProvider(profiles: [profile])
+    // The standalone daemon's writer, over a storage owner and Sessions root
+    // of this root's own, with a probe that can report the volume full.
+    let sessions = Self.root.appending(path: "Sessions", directoryHint: .isDirectory)
+    let owner = Self.root.appending(path: "session-owner", directoryHint: .isDirectory)
+    let probe = OracleStorageProbe()
+    let writer = RuntimeSessionPublicationWriter(
+      owner: try RuntimeSessionStorageStore(ownerRoot: owner, defaultSessionsRoot: sessions),
+      coordinator: HostStorageCoordinator(), probe: probe)
+    let engine = try RuntimeJobEngine(
+      configuration: .init(stateDirectory: jobsState, sessionPublicationWriter: writer),
+      providers: DeviceProviderRegistry(providers: [provider]),
+      dispatcher: DescriptorBoundProcessDispatcher(
+        resolver: try AnalyzerExecutableResolver(profiles: [profile])),
+      capabilityStore: capabilities, artifactStore: store,
+      nowUTC: { Self.nowUTC }, nowPreciseUTC: { Self.nowPreciseUTC })
+    let handler = RuntimeControlPlaneHandler(
+      engine: engine, capabilityStore: capabilities, providerIDs: [provider.providerID],
+      nowUTC: { Self.nowUTC }, targetStore: nil, bootstrap: nil, artifactStore: store,
+      flashBundleImportDirectory: nil, flashBundleImportPolicy: .production,
+      methodObserver: nil)
+
+    var sources: [String: (job: String, artifact: String, lease: String)] = [:]
+    for item in Self.publicationCases {
+      let job = item.removesSourcePayload ? Self.removedSourceJob : Self.sourceJob
+      let source = try await store.publish(
+        RuntimeArtifactPublicationRequest(
+          jobID: job, sessionID: "HTASK-JOBRUNORACLE", stepID: "capture-crash-log",
+          name: "crash-log-\(item.name).txt", mediaType: "text/plain", privacy: .standard,
+          retentionClass: .default, sourceOperation: "capture.diagnostics@1", providerID: "hdc",
+          bindingSnapshot: ArtifactBindingSnapshot(
+            targetID: Self.target, bindingRevision: 3,
+            stableIdentitySHA256: String(repeating: "c", count: 64)),
+          contents: Data("\(item.mode!)\nFault log list:\n******\n".utf8)))
+      sources[item.name] = (
+        job, source.artifactID,
+        try await store.leaseReference(jobID: source.jobID, artifactID: source.artifactID)
+      )
+    }
+    var submits: [String: [String: JSONValue]] = [:]
+    var jobIDs: [String: String] = [:]
+    for item in Self.publicationCases {
+      let params = try Self.submitParams(item.name, lease: sources[item.name]!.lease)
+      let accepted = try await exchange(handler, "job.submit", params)
+      guard case .object(let fields) = accepted, case .object(let result)? = fields["result"],
+        result["deduplicated"] == .bool(false), case .string(let jobID)? = result["jobId"]
+      else { throw CocoaError(.coderInvalidValue) }
+      submits[item.name] = params
+      jobIDs[item.name] = jobID
+    }
+
+    // A Job's Session lies under the UTC month its Job was created in.
+    let month = sessions.appending(
+      path: Self.nowUTC.prefix(7).replacingOccurrences(of: "-", with: "/"),
+      directoryHint: .isDirectory)
+    var recorded: [JSONValue] = []
+    for item in Self.publicationCases {
+      let source = sources[item.name]!
+      let jobID = jobIDs[item.name]!
+      var entry: [String: JSONValue] = [
+        "name": .string(item.name), "mode": .string(item.mode!),
+        "submit": .object(submits[item.name]!), "params": .object(["jobId": .string(jobID)]),
+      ]
+      if item.removesSourcePayload {
+        try manager.removeItem(
+          at: artifacts.appending(path: source.job).appending(path: source.artifact))
+        entry["removesSourcePayload"] = .string("\(source.job)/\(source.artifact)")
+      }
+      if item.presetsSession {
+        try manager.createDirectory(
+          at: month.appending(path: "session-\(jobID)", directoryHint: .isDirectory),
+          withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        entry["presetsSession"] = .bool(true)
+      }
+      if item.exhaustsStorage { entry["exhaustsStorage"] = .bool(true) }
+      probe.exhaust(item.exhaustsStorage)
+      let response = try await exchange(handler, "job.run", ["jobId": .string(jobID)])
+      probe.exhaust(false)
+      check(response, item)
+      entry["response"] = response
+      recorded.append(.object(entry))
+    }
+    var reads: [String: JSONValue] = [:]
+    for item in Self.publicationCases {
+      let jobID = jobIDs[item.name]!
+      var answers: [String: JSONValue] = [:]
+      for method in ["job.status", "job.show"] {
+        answers[method] = try await exchange(handler, method, ["jobId": .string(jobID)])
+      }
+      reads[jobID] = .object(answers)
+    }
+
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes]
+    var files: [String: Data] = [
+      "analyzer": Self.analyzerBytes,
+      "cases.json": try encoder.encode(JSONValue.array(recorded)) + Data("\n".utf8),
+      "reads.json": try encoder.encode(JSONValue.object(reads)) + Data("\n".utf8),
+      "store/index.json":
+        try encoder.encode(try Self.index(of: jobsState, normalizing: true)) + Data("\n".utf8),
+    ]
+    for job in try manager.contentsOfDirectory(atPath: artifacts.path).sorted()
+    where !job.hasPrefix(".") {
+      let directory = artifacts.appending(path: job, directoryHint: .isDirectory)
+      for name in try manager.contentsOfDirectory(atPath: directory.path).sorted()
+      where !name.hasPrefix(".") {
+        files["artifacts/\(job)/\(name)"] = try Data(contentsOf: directory.appending(path: name))
+      }
+    }
+    // Every file below the Job directories, the Sessions root and the storage
+    // owner, dot entries included, and every entry's kind and mode.
+    var tree: [JSONValue] = []
+    for (directory, prefix) in [
+      (jobsState.appending(path: "jobs", directoryHint: .isDirectory), "store/jobs"),
+      (sessions, "sessions"), (owner, "session-owner"),
+    ] {
+      for path in try manager.subpathsOfDirectory(atPath: directory.path).sorted() {
+        let url = directory.appending(path: path)
+        var metadata = stat()
+        guard lstat(url.path, &metadata) == 0 else { throw POSIXError(.EIO) }
+        let isDirectory = metadata.st_mode & S_IFMT == S_IFDIR
+        tree.append(
+          .object([
+            "path": .string("\(prefix)/\(path)"),
+            "kind": .string(isDirectory ? "directory" : "file"),
+            "mode": .string(String(metadata.st_mode & 0o777, radix: 8)),
+          ]))
+        guard !isDirectory else { continue }
+        let data = try Data(contentsOf: url)
+        files["\(prefix)/\(path)"] =
+          url.lastPathComponent == "job-record.json" ? Self.machineIndependent(data) : data
+      }
+    }
+    files["tree.json"] = try encoder.encode(JSONValue.array(tree)) + Data("\n".utf8)
+    var digests: [String: JSONValue] = [:]
+    for (path, data) in files { digests[path] = .string(Self.sha256(data)) }
+    files["provenance.json"] =
+      try encoder.encode(
+        JSONValue.object([
+          "producer": .string(
+            "JobRunAnalyzerOracleContractTests/testSwiftPublishesTheSharedAnalyzerSessions"),
+          "root": .string(Self.root.path),
+          "sessionsRoot": .string(sessions.path),
+          "sessionOwner": .string(owner.path),
+          "availableBytes": .integer(Int64(OracleStorageProbe.roomyBytes)),
+          "nowUTC": .string(Self.nowUTC),
+          "nowPreciseUTC": .string(Self.nowPreciseUTC),
+          "home": .string(Self.home),
+          "quotaBytes": .integer(Int64(Self.quotaBytes)),
+          "timeoutSeconds": .integer(Int64(Self.timeoutSeconds)),
+          "files": .object(digests),
+        ])) + Data("\n".utf8)
+    return files
+  }
+
   private static func submitParams(_ name: String, lease: String) throws -> [String: JSONValue] {
     let fields: [String: JSONValue] = [
       "documentType": .string("runtime-operation-request"),
@@ -394,7 +622,7 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
 
   /// What a reader observes of the Job index without writing: layout,
   /// pragmas and every row, as `JobStoreRustWriterParityContractTests` reads it.
-  private static func index(of state: URL) throws -> JSONValue {
+  private static func index(of state: URL, normalizing: Bool = false) throws -> JSONValue {
     var handle: OpaquePointer?
     let path = state.appending(path: RuntimeJobRepository.filename).path
     guard sqlite3_open_v2(path, &handle, SQLITE_OPEN_READONLY, nil) == SQLITE_OK,
@@ -423,8 +651,10 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
               return .string(sqlite3_column_text(statement, column).map { String(cString: $0) } ?? "")
             case SQLITE_BLOB:
               let count = Int(sqlite3_column_bytes(statement, column))
-              let bytes = sqlite3_column_blob(statement, column).map { Data(bytes: $0, count: count) }
-              return .string(sha256(bytes ?? Data()))
+              let bytes =
+                sqlite3_column_blob(statement, column).map { Data(bytes: $0, count: count) }
+                ?? Data()
+              return .string(sha256(normalizing ? machineIndependent(bytes) : bytes))
             default:
               return .null
             }
@@ -457,5 +687,49 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
 
   private static func sha256(_ data: Data) -> String {
     SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+  }
+
+  /// A Job record's publication marker names this machine's volume, device,
+  /// inode and claim generation. The oracle keeps each as a fixed label; a
+  /// refused marker's blank or zero value stays as it is.
+  private static let machineFact = try! NSRegularExpression(
+    pattern: #""(device|inode|volumeIdentity|admissionGeneration)"( ?: ?)"([^"]*)""#)
+
+  private static func machineIndependent(_ data: Data) -> Data {
+    let source = String(decoding: data, as: UTF8.self)
+    let text = NSMutableString(string: source)
+    let matches = machineFact.matches(
+      in: source, range: NSRange(location: 0, length: text.length))
+    for match in matches.reversed() {
+      let value = text.substring(with: match.range(at: 3))
+      guard !value.isEmpty, value != "0" else { continue }
+      text.replaceCharacters(
+        in: match.range(at: 3), with: "<\(text.substring(with: match.range(at: 1)))>")
+    }
+    return Data((text as String).utf8)
+  }
+}
+
+/// The publication oracle's storage probe: this machine's volume with room
+/// for every claim, unless a case reports it full.
+private final class OracleStorageProbe: HostStorageProbing, @unchecked Sendable {
+  static let roomyBytes: UInt64 = 1 << 40
+  private let lock = NSLock()
+  private var exhausted = false
+
+  func exhaust(_ value: Bool) {
+    lock.lock()
+    defer { lock.unlock() }
+    exhausted = value
+  }
+
+  func snapshot(for url: URL) throws -> HostStorageSnapshot {
+    lock.lock()
+    let full = exhausted
+    lock.unlock()
+    return HostStorageSnapshot(
+      volumeIdentity: try SystemVolumeIdentityResolver().resolve(url),
+      totalBytes: Self.roomyBytes, availableBytes: full ? 0 : Self.roomyBytes,
+      isReadOnly: false)
   }
 }

@@ -1,0 +1,126 @@
+{
+  "actualEffect" : "hostOnly",
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "kind" : "defaultReadOnlyPolicy",
+    "reference" : "default-read-only-policy"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-950adddf107c46602d07c10b4656a5e3",
+  "materializedPlanDigest" : "9f2d2199e8d6cb0e37f4a2d75db71156c4ee60a9e9ab2ef294175b90ec7075b8",
+  "operationFailure" : {
+    "category" : "execution",
+    "code" : "executionFailed",
+    "recovery" : "inspectJob",
+    "retryability" : "runtimeDecisionRequired",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "analyzer.extract-crash-signature@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-run-sourceRemoved-0001",
+    "inputs" : {
+      "sourceArtifactRef" : "lease-v1:job-oracle-source-removed:ART-842f42e540d62f5b9282bc821e6e8751"
+    },
+    "operation" : {
+      "id" : "analyzer.extract-crash-signature",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-run-sourceRemoved",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "analyzer",
+  "request" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-run-sourceRemoved-0001",
+    "inputs" : {
+      "sourceArtifactRef" : "lease-v1:job-oracle-source-removed:ART-842f42e540d62f5b9282bc821e6e8751"
+    },
+    "operation" : {
+      "id" : "analyzer.extract-crash-signature",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-run-sourceRemoved",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "sessionPublicationRecord" : {
+    "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+    "checkpointSeal" : {
+      "byteCount" : "1883",
+      "lastSequence" : 4,
+      "sha256" : "8ed661fe0972d0145364b0a2392f02280d72bb285a8e72623402b05bbd2ce602"
+    },
+    "claims" : [
+      {
+        "admissionGeneration" : "<admissionGeneration>",
+        "claimID" : "session-publication-job-950adddf107c46602d07c10b4656a5e3",
+        "finalizationHeadroomBytes" : "16777216",
+        "metadataHeadroomBytes" : "67419",
+        "remainingGrowthBytes" : "0",
+        "volumeIdentity" : "<volumeIdentity>",
+        "writerClass" : "light"
+      }
+    ],
+    "journalSeal" : {
+      "byteCount" : "2265",
+      "lastSequence" : 5,
+      "sha256" : "4c00cd07c179da25d32bfa3a6cddae89b389fb8119021dc8c774d38604fae028"
+    },
+    "phase" : "catalogPublished",
+    "policyGeneration" : "1",
+    "proposal" : {
+      "completedAtUTC" : "2026-09-14T00:00:00Z",
+      "manifestByteCount" : "1141",
+      "manifestSHA256" : "524e844a02938122e47d8770787cb92ba477b353bb9dbc36e8482588237aa5f0",
+      "outcomeCertainty" : "confirmed",
+      "terminalStatus" : "failed"
+    },
+    "receipt" : {
+      "catalogGeneration" : "3",
+      "manifestSHA256" : "524e844a02938122e47d8770787cb92ba477b353bb9dbc36e8482588237aa5f0",
+      "publishedAtUTC" : "2026-09-14T00:00:00Z"
+    },
+    "relativeSessionPath" : "2026\/09\/session-job-950adddf107c46602d07c10b4656a5e3",
+    "root" : {
+      "device" : "<device>",
+      "inode" : "<inode>",
+      "path" : "\/tmp\/arkdeck-job-plan-oracle\/Sessions",
+      "volumeIdentity" : "<volumeIdentity>"
+    },
+    "sessionID" : "session-job-950adddf107c46602d07c10b4656a5e3",
+    "sessionRootIdentity" : {
+      "device" : "<device>",
+      "inode" : "<inode>"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "failed",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "running->finalizing",
+    "reason: input Artifact lease became unreadable before extract-crash-signature: indexCorrupted(\"artifact payload is missing, linked or unreadable (errno 2)\")",
+    "finalizing->failed",
+    "reason: input Artifact lease became unreadable before extract-crash-signature: indexCorrupted(\"artifact payload is missing, linked or unreadable (errno 2)\")"
+  ]
+}

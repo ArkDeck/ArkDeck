@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Compare Rust `job.run` with the real Swift daemon, then hand the Rust-run
-store to a Swift daemon that reads every Job and published Artifact.
+store to a Swift daemon that reads every Job, result, Session and published
+Artifact.
 
 The plan digest covers the source Artifact's absolute path, so the owners run
 over one state root in turn: the standalone Swift daemon (`--state-dir`) first,
@@ -12,16 +13,20 @@ oracle's order over its socket; each CLI then runs one succeeding and one
 failing Job and reads each one's result. The 30 s production timeout lane is
 left to the oracle replay, which runs it at 2 s.
 
-The Swift daemon composes a Session publication writer and the Rust owner does
-not yet, so the comparison removes the publication facts (the `finalized`
-record, the publication marker, the proposal file, the marker's extra record
-version) and checks them separately. Everything else must agree byte for byte
-apart from the clock: every answer, every `job.status`/`job.show`/`job.result`/
-`job.evidence`, the Job index rows, every Job's journal and record, and every
-Artifact index and payload. Finally the Rust-written store is placed where a
-standalone Swift daemon keeps its own: that daemon reads each Rust-run Job and
-its result as the Rust owner did, keeps the parked one parked, and reads each
-Rust-published Artifact back through the Swift CLI.
+Both owners publish a Session for every terminal Job, as the standalone Swift
+daemon does, each under its own Sessions root (Swift's beside its state
+directory, the Rust owner's inside its root). Everything must agree byte for
+byte apart from the clock and what differs by construction: every answer, every
+`job.status`/`job.show`/`job.result`/`job.evidence`, the Job index rows, every
+Job's journal, record and Manifest proposal, every Artifact index and payload,
+and every Session file with its mode. Each owner publishes at its own clock, so
+each Manifest digest and each seal differ with its times and are compared as
+labels, as are each Sessions root's path, its fresh inodes and each claim's
+generation. Finally the Rust-written store is placed where a standalone Swift
+daemon keeps its own: that daemon reads each Rust-run Job and its result as the
+Rust owner did, keeps the parked one parked, lists and shows every
+Rust-published Session with nothing unaccounted, and reads each Rust-published
+Artifact back through the Swift CLI.
 
 The analyzer copy lives outside /private: Swift `FixedExecutableResolver`
 resolves a /private/tmp path to /tmp, which then fails its own physical-path
@@ -34,6 +39,7 @@ device, installed state or hardware evidence.
 from __future__ import annotations
 
 import argparse
+import collections
 import hashlib
 import json
 import os
@@ -57,6 +63,9 @@ SKIPPED_MODES = {'sleep'}
 RERUN_INSTEAD = {'timedOut': 'signalled'}
 # The oracle composes a 32 KiB Artifact quota; both daemons here compose 8 GiB.
 QUOTA_CASES = {'quotaExceeded'}
+# A Manifest digest, and each seal over a record or Journal, covers its times.
+MANIFEST_KEYS = {'manifestSha256', 'manifestSHA256'}
+SEALS = {'checkpointSeal', 'journalSeal'}
 
 
 def sha256(path: Path) -> str:
@@ -75,13 +84,43 @@ def untimed_value(value):
     return untimed(value) if isinstance(value, str) else value
 
 
-def unpublished(value):
-    """An answer without Session publication facts, which only Swift composes."""
+def without_publication(value):
+    """An answer without its Session publication fact: the run oracle
+    composes no publication writer."""
     if isinstance(value, dict):
-        return {key: unpublished(item) for key, item in value.items() if key != 'sessionPublication'}
+        return {key: without_publication(item) for key, item in value.items()
+                if key != 'sessionPublication'}
     if isinstance(value, list):
-        return [unpublished(item) for item in value]
+        return [without_publication(item) for item in value]
     return value
+
+
+def comparable(value, parent: str | None = None):
+    """A value as both owners must agree on it: times as <time>, and as labels
+    what differs by construction — each Manifest digest and seal (they cover
+    each owner's own times), each Sessions root's path, its fresh inodes and
+    each claim's generation. A refused marker's blank or zero stays."""
+    if isinstance(value, dict):
+        result = {}
+        for key, item in value.items():
+            if key in MANIFEST_KEYS and isinstance(item, str):
+                result[key] = '<manifest>'
+            elif key == 'sha256' and parent in SEALS:
+                result[key] = '<seal>'
+            elif key in ('inode', 'admissionGeneration') and item not in ('', '0'):
+                result[key] = f'<{key}>'
+            elif key == 'path' and parent == 'root' and item:
+                result[key] = '<sessions>'
+            else:
+                result[key] = comparable(item, key)
+        return result
+    if isinstance(value, list):
+        return [comparable(item, parent) for item in value]
+    return untimed(value) if isinstance(value, str) else value
+
+
+def differences(left: dict, right: dict) -> list[str]:
+    return sorted(set(map(str, left.items())) ^ set(map(str, right.items())))
 
 
 def seed(state: Path, analyzer: Path, cases: list[dict]) -> None:
@@ -106,46 +145,39 @@ def seed(state: Path, analyzer: Path, cases: list[dict]) -> None:
         analyzer.chmod(0o700)
 
 
-def store(jobs_root: Path, artifacts: Path, scratch: Path) -> dict:
-    """The Job index rows, every Job's files and every Artifact file, with the
-    Session publication facts separated from the rest. The index is read from
-    a copy, so the owner's files stay as the owner left them."""
+def file_value(path: Path):
+    """A JSON document, or each record of a JSON Lines file, as both owners
+    must agree on it; any other file by its digest."""
+    if path.suffix == '.jsonl':
+        return [comparable(json.loads(line)) for line in path.read_text().splitlines()]
+    if path.suffix == '.json':
+        return comparable(json.loads(path.read_text()))
+    return sha256(path)
+
+
+def store(jobs_root: Path, artifacts: Path, sessions: Path, scratch: Path) -> dict:
+    """The Job index rows, every Job's files, every Artifact file and every
+    Session file with its mode, each as both owners must agree on it. The index
+    is read from a copy, so the owner's files stay as the owner left them."""
     scratch.mkdir(mode=0o700)
     for database in jobs_root.glob('runtime-jobs.sqlite3*'):
         shutil.copyfile(database, scratch / database.name)
     connection = sqlite3.connect(scratch / 'runtime-jobs.sqlite3')
-    rows, publication = [], {}
+    rows = []
     try:
         for job, key, digest, state, sequence, version, record in connection.execute(
                 'SELECT job_id, idempotency_key, request_hash, state, admission_sequence, version, '
                 'initial_record_json FROM runtime_job ORDER BY admission_sequence'):
             record = json.loads(record if isinstance(record, str) else record.decode())
-            marker = record.pop('sessionPublicationRecord', None)
-            publication[job] = marker is not None
             rows.append({'jobId': job, 'idempotencyKey': key, 'requestHash': digest, 'state': state,
-                         'admissionSequence': sequence,
-                         # Swift persists the publication marker once more.
-                         'version': version - (1 if marker is not None else 0),
-                         'record': untimed_value(record)})
+                         'admissionSequence': sequence, 'version': version,
+                         'record': comparable(record)})
     finally:
         connection.close()
-    files, proposals, finalized = {}, [], {}
+    files = {}
     for job in sorted((jobs_root / 'jobs').iterdir()):
         for path in sorted(job.iterdir()):
-            name = f'{job.name}/{path.name}'
-            if path.name == 'session-manifest.proposal.json':
-                proposals.append(job.name)
-            elif path.name == 'journal.jsonl':
-                lines = path.read_text().splitlines()
-                finalized[job.name] = [json.loads(line)['kind'] for line in lines].count('finalized')
-                files[name] = untimed('\n'.join(line for line in lines
-                                                if json.loads(line)['kind'] != 'finalized'))
-            elif path.name == 'job-record.json':
-                record = json.loads(path.read_text())
-                record.pop('sessionPublicationRecord', None)
-                files[name] = untimed_value(record)
-            else:
-                files[name] = untimed(path.read_text())
+            files[f'{job.name}/{path.name}'] = file_value(path)
     published = {}
     # Dot entries are owner namespaces and caches (the Import skeleton, the
     # payload-verification cache), not Artifacts.
@@ -154,8 +186,12 @@ def store(jobs_root: Path, artifacts: Path, scratch: Path) -> dict:
             if not path.name.startswith('.'):
                 published[f'{job.name}/{path.name}'] = (untimed(path.read_text())
                                                         if path.name == 'index.json' else sha256(path))
-    return {'rows': rows, 'files': files, 'artifacts': published,
-            'publication': {'markers': publication, 'proposals': proposals, 'finalized': finalized}}
+    tree = {}
+    for path in sorted(sessions.rglob('*')):
+        mode = oct(path.lstat().st_mode & 0o777)
+        relative = path.relative_to(sessions).as_posix()
+        tree[relative] = ('directory', mode) if path.is_dir() else ('file', mode, file_value(path))
+    return {'rows': rows, 'files': files, 'artifacts': published, 'sessions': tree}
 
 
 def main() -> None:
@@ -274,7 +310,8 @@ def main() -> None:
             return answers, reads, ran
 
         try:
-            # Phase A: the standalone Swift daemon runs over the oracle's sources.
+            # Phase A: the standalone Swift daemon runs over the oracle's
+            # sources and publishes its Sessions beside its state directory.
             seed(state, analyzer, cases)
             swift_socket = state / 'agentd.sock'
             swift = start([str(swift_daemon), '--state-dir', str(state)], clean, swift_socket)
@@ -283,10 +320,12 @@ def main() -> None:
                 lambda argv, expected: cli([str(swift_cli), *argv, '--socket', str(swift_socket),
                                             '--output', 'json'], clean, expected))
             stop(swift)
-            swift_store = store(state, state / 'artifacts', base / 'inspect-swift')
+            swift_store = store(state, state / 'artifacts', base / 'Sessions', base / 'inspect-swift')
             state.rename(base / 'state-swift')
+            (base / 'Sessions').rename(base / 'Sessions-swift')
 
-            # Phase B: the isolated Rust owner runs over a fresh copy at the same path.
+            # Phase B: the isolated Rust owner runs over a fresh copy at the same
+            # path and publishes its Sessions inside its root.
             seed(state, analyzer, cases)
             rust_socket = state / 'control.sock'
             rust_env = dict(clean, ARKDECK_DEVELOPMENT_STATE_ROOT=str(state), ARKDECK_ENDPOINT=str(rust_socket))
@@ -296,19 +335,22 @@ def main() -> None:
                 rust_socket, state / 'artifacts',
                 lambda argv, expected: cli([str(rust_cli), '--output', 'json', *argv], cli_env, expected))
             stop(rust)
-            rust_store = store(state / 'jobs-state', state / 'artifacts', base / 'inspect-rust')
+            rust_store = store(state / 'jobs-state', state / 'artifacts', state / 'sessions',
+                               base / 'inspect-rust')
 
             for case in cases:
                 name = case['name']
-                swift_answer, rust_answer = untimed_value(swift_answers[name]), untimed_value(rust_answers[name])
-                check(f'identical.{name}', unpublished(rust_answer) == unpublished(swift_answer),
+                swift_answer, rust_answer = swift_answers[name], rust_answers[name]
+                check(f'identical.{name}', comparable(rust_answer) == comparable(swift_answer),
                       {'swift': swift_answer, 'rust': rust_answer})
                 if name not in QUOTA_CASES and 'rerun' not in case:
-                    check(f'oracle.{name}', unpublished(rust_answer) == unpublished(untimed_value(case['response'])),
+                    # The run oracle composes no publication writer.
+                    check(f'oracle.{name}', without_publication(untimed_value(rust_answer))
+                          == without_publication(untimed_value(case['response'])),
                           {'live': rust_answer, 'oracle': case['response']})
-            check('reads', unpublished(untimed_value(rust_reads)) == unpublished(untimed_value(swift_reads)),
+            check('reads', comparable(rust_reads) == comparable(swift_reads),
                   {'swift': swift_reads, 'rust': rust_reads})
-            check('cli.runs', unpublished(untimed_value(rust_cli_runs)) == unpublished(untimed_value(swift_cli_runs))
+            check('cli.runs', comparable(rust_cli_runs) == comparable(swift_cli_runs)
                   and rust_cli_runs['cli-answered']['state'] == 'succeeded'
                   and rust_cli_runs['cli-empty']['state'] == 'failed'
                   and rust_cli_runs['cli-answered.result']['evidence']['status'] == 'verified'
@@ -317,44 +359,69 @@ def main() -> None:
             check('store.rows', rust_store['rows'] == swift_store['rows'],
                   {'swift': swift_store['rows'], 'rust': rust_store['rows']})
             check('store.files', rust_store['files'] == swift_store['files'],
-                  sorted(set(map(str, rust_store['files'].items())) ^ set(map(str, swift_store['files'].items()))))
+                  differences(rust_store['files'], swift_store['files']))
             check('store.artifacts', rust_store['artifacts'] == swift_store['artifacts'],
-                  sorted(set(rust_store['artifacts'].items()) ^ set(swift_store['artifacts'].items())))
-            # The one composed difference: Swift publishes a Session for every
-            # terminal Job, and the Rust owner has no publication writer yet.
+                  differences(rust_store['artifacts'], swift_store['artifacts']))
+            check('store.sessions', rust_store['sessions'] == swift_store['sessions'],
+                  differences(rust_store['sessions'], swift_store['sessions']))
+            # Every terminal Job is published once; the parked one publishes
+            # nothing; each registration advanced the catalog once.
+            markers = {row['jobId']: row['record'].get('sessionPublicationRecord')
+                       for row in rust_store['rows']}
             terminal = [row['jobId'] for row in rust_store['rows'] if row['state'] in ('succeeded', 'failed')]
-            check('publication.swift', all(swift_store['publication']['markers'][job]
-                                           and swift_store['publication']['finalized'][job] == 1
-                                           and job in swift_store['publication']['proposals']
-                                           for job in terminal), swift_store['publication'])
-            check('publication.rust', not any(rust_store['publication']['markers'].values())
-                  and not any(rust_store['publication']['finalized'].values())
-                  and not rust_store['publication']['proposals'], rust_store['publication'])
-            unavailable = {'state': 'unavailable', 'reasonCode': 'noCurrentPublicationRecord',
-                           'catalogGeneration': None, 'manifestSha256': None}
-            check('publication.rustReads', all(reads['job.status']['result']['sessionPublication'] == unavailable
-                                               for reads in rust_reads.values()), rust_reads)
+            parked = [row['jobId'] for row in rust_store['rows'] if row['state'] == 'waitingForRecovery']
+            check('publication.receipts', bool(terminal) and all(
+                markers[job] and markers[job]['phase'] == 'catalogPublished'
+                and markers[job]['receipt']['catalogGeneration'] for job in terminal)
+                  and all(markers[job] is None for job in parked), markers)
+            catalog = rust_store['sessions']['.arkdeck-retention-catalog.json'][2]
+            check('publication.catalog', catalog['generation'] == len(terminal)
+                  and sorted(entry['sessionId'] for entry in catalog['entries'])
+                  == sorted(f'session-{job}' for job in terminal), catalog)
 
-            # Phase C: a standalone Swift daemon reads the Rust-run store.
+            # Phase C: a standalone Swift daemon reads the Rust-run store, its
+            # Sessions placed where that daemon keeps its own.
             jobs_state = state / 'jobs-state'
             for database in jobs_state.glob('runtime-jobs.sqlite3*'):
                 database.rename(state / database.name)
             (jobs_state / 'jobs').rename(state / 'jobs')
+            (state / 'sessions').rename(base / 'Sessions')
             swift = start([str(swift_daemon), '--state-dir', str(state)], clean, swift_socket)
             handed = {}
             for job, reads in rust_reads.items():
                 status = exchange(swift_socket, 'job.status', {'jobId': job})
-                check(f'handoff.status.{job}', status.get('ok') is True and status['result']['state']
-                      == reads['job.status']['result']['state'], status)
+                check(f'handoff.status.{job}', untimed_value(status) == untimed_value(reads['job.status']),
+                      {'swift': status, 'rust': reads['job.status']})
                 handed[job] = status['result']['state']
                 # Swift verifies the Rust-published products while it reads
                 # the result the Rust owner answered.
                 result = exchange(swift_socket, 'job.result', {'jobId': job})
-                check(f'handoff.result.{job}', unpublished(untimed_value(result))
-                      == unpublished(untimed_value(reads['job.result'])),
+                check(f'handoff.result.{job}', untimed_value(result) == untimed_value(reads['job.result']),
                       {'swift': result, 'rust': reads['job.result']})
             parked = [job for job, state_name in handed.items() if state_name == 'waitingForRecovery']
             check('handoff.parkedStaysParked', len(parked) == 1, handed)
+            sessions = sorted(f'session-{job}' for job in terminal)
+            listed = exchange(swift_socket, 'session.list', {'pageSize': 1000})
+            check('handoff.sessions', listed.get('ok') is True
+                  and sorted(item['sessionId'] for item in listed['result']['items']) == sessions, listed)
+            for session in sessions:
+                shown = exchange(swift_socket, 'session.show', {'sessionId': session})
+                check(f'handoff.session.{session}', shown.get('ok') is True
+                      and shown['result']['sessionId'] == session, shown)
+            # Both Artifact censuses refuse an index whose published payload is
+            # gone, and the `sourceRemoved` case removed one on purpose (the
+            # first Swift daemon answered from the total it had cached before).
+            # The payload is put back before the storage status is read.
+            for case in cases:
+                if 'removesSourcePayload' in case:
+                    path = state / 'artifacts' / case['removesSourcePayload']
+                    path.write_bytes(f"{case['mode']}\nFault log list:\n******\n".encode())
+                    path.chmod(0o400)
+            storage = exchange(swift_socket, 'runtime.storage.status', {})
+            usage = storage.get('result', {}).get('sessionDomain', {}).get('usage', {})
+            check('handoff.storage', storage.get('ok') is True
+                  and usage.get('sessionCount') == str(len(sessions))
+                  and usage.get('unaccountedSessionCount') == '0', storage)
             read_back = 0
             for job in [job for job, state_name in handed.items() if state_name == 'succeeded']:
                 index = json.loads((state / 'artifacts' / job / 'index.json').read_text())
@@ -369,8 +436,10 @@ def main() -> None:
             summary = {
                 'result': 'PASS', 'kind': 'isolated-host-test', 'runs': len(cases),
                 'identicalAnswers': len(swift_answers), 'jobs': len(rust_reads), 'checks': len(checks),
-                'states': dict(sorted(__import__('collections').Counter(handed.values()).items())),
-                'handoff': {'readJobs': len(handed), 'parked': parked, 'artifactsReadBack': read_back},
+                'states': dict(sorted(collections.Counter(handed.values()).items())),
+                'sessions': len(sessions),
+                'handoff': {'readJobs': len(handed), 'parked': parked, 'sessionsListed': len(sessions),
+                            'artifactsReadBack': read_back},
                 'skippedModes': sorted(SKIPPED_MODES),
                 'analyzerSHA256': sha256(analyzer),
                 'rustDaemonSHA256': sha256(rust_daemon), 'rustCliSHA256': sha256(rust_cli),

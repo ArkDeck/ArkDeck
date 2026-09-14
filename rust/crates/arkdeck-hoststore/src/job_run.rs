@@ -1,7 +1,8 @@
 //! Swift `RuntimeJobEngine.runForTargetControl` for an admitted
 //! `analyzer.extract-crash-signature@1` Job, as the isolated Rust owner runs
-//! it, composed like a Swift engine with no Session publication writer and no
-//! power controller: the running transition, the source lease resolved again,
+//! it, composed like a Swift engine with no power controller and, where one
+//! is given, the standalone daemon's Session publication writer: the running
+//! transition, the source lease resolved again,
 //! the exact typed action persisted before its write-ahead intent is durable,
 //! the analyzer child started only after that intent, Swift's semantic checks,
 //! the correlated outcome, the derived Artifact published after it, and the
@@ -21,6 +22,7 @@ use crate::job_journal_writer::JournalWriter;
 use crate::job_owner::JobStore;
 use crate::job_plan::AnalyzerProfile;
 use crate::job_record::{JobRecord, terminal};
+use crate::session_publication::SessionPublisher;
 use arkdeck_contract::CATALOG_DIGEST;
 use arkdeck_platform::{
     AnalyzerLimits, AnalyzerRunError, AnalyzerTermination, VerifiedSource, VerifiedTool,
@@ -132,6 +134,10 @@ pub struct JobRunner<'a> {
     pub home: &'a str,
     pub now: fn() -> Option<String>,
     pub precise_now: fn() -> Option<String>,
+    /// The standalone daemon's Session publication writer. Without one the
+    /// runner composes like a Swift engine that has none, and its Jobs report
+    /// no publication record.
+    pub sessions: Option<&'a SessionPublisher<'a>>,
 }
 
 /// One run's durable state: the record as the run advances it and the
@@ -294,6 +300,24 @@ impl JobRunner<'_> {
             now: self.now,
         };
         self.execute(&mut run)?;
+        // Swift `statusAndReleaseTerminalRuntime`: a terminal Job whose
+        // outcome is known becomes a Session once its terminal record is
+        // durable, and the record then keeps the publication's marker.
+        if let Some(sessions) = self.sessions
+            && terminal(&run.record.state)
+            && !run.record.outcome_unknown()
+        {
+            let now = run.clock()?;
+            let marker = sessions.publish(&run.record, &mut run.journal, &directory, &now);
+            run.record.set_session_publication(marker);
+            if run.persist(self.jobs).is_err() {
+                // The Session, if any, is durable; only the marker was lost,
+                // so readers see no publication rather than a receipt.
+                run.record
+                    .timeline
+                    .push("session publication marker could not be persisted".into());
+            }
+        }
         Ok(run.record.status())
     }
 
