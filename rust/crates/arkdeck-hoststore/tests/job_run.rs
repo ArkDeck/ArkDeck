@@ -2,9 +2,11 @@
 //! produced by `JobRunAnalyzerOracleContractTests`) against the Rust runner:
 //! the same sources, the same admissions through the Rust admitter, then every
 //! run in order over one store with the oracle analyzer, which answers by the
-//! first line of its source. Every answer, every read and the store the runs
-//! leave (the Job index and files, every Artifact index and payload) must be
-//! Swift's, byte for byte. The runs spawn children, so this binary is theirs.
+//! first line of its source. Each Job is admitted and run under the analyzer
+//! budget Swift gave it: the provenance's production budget, or the short one
+//! the timeout case's entries name. Every answer, every read and the store the
+//! runs leave (the Job index and files, every Artifact index and payload) must
+//! be Swift's, byte for byte. The runs spawn children, so this binary is theirs.
 #![cfg(target_os = "macos")]
 
 use arkdeck_hoststore::{
@@ -192,15 +194,27 @@ fn rust_runs_reproduce_the_swift_oracle() {
         serde_json::from_slice(&fs::read(fixture().join("provenance.json")).unwrap()).unwrap();
     let root = rebuild(&cases);
     let artifacts = ArtifactReadStore::open(&root.join("artifacts")).unwrap();
-    let mut profile = AnalyzerProfile::crash_signature(&root.join("analyzer")).unwrap();
-    profile.timeout_seconds = provenance["timeoutSeconds"].as_i64().unwrap();
+    // One analyzer profile per budget Swift composed: the production budget,
+    // and the short one only the timeout case's entries name.
+    let production = provenance["timeoutSeconds"].as_i64().unwrap();
+    let budget = |case: &Value| case["timeoutSeconds"].as_i64().unwrap_or(production);
+    let profiles: BTreeMap<i64, AnalyzerProfile> = cases
+        .iter()
+        .map(budget)
+        .chain([production])
+        .map(|seconds| {
+            let mut profile = AnalyzerProfile::crash_signature(&root.join("analyzer")).unwrap();
+            profile.timeout_seconds = seconds;
+            (seconds, profile)
+        })
+        .collect();
     let jobs = JobStore::open_owner(&root.join("jobs-state")).unwrap();
     // The admissions the Swift oracle made, through the Rust admitter.
     for case in cases.iter().filter(|case| case["submit"].is_object()) {
         let accepted = JobAdmitter {
             planner: JobPlanner {
                 artifacts: Some(&artifacts),
-                analyzer: Some(&profile),
+                analyzer: Some(&profiles[&budget(case)]),
                 state_root: &root,
             },
             jobs: &jobs,
@@ -214,22 +228,28 @@ fn rust_runs_reproduce_the_swift_oracle() {
             case["name"]
         );
     }
-    let runner = JobRunner {
-        jobs: &jobs,
-        artifacts: &artifacts,
-        analyzer: Some(&profile),
-        quota: provenance["quotaBytes"].as_u64().unwrap(),
-        home: provenance["home"].as_str().unwrap(),
-        now: fixed_now,
-        precise_now: fixed_precise_now,
-        sessions: None,
-    };
+    let runners: BTreeMap<i64, JobRunner<'_>> = profiles
+        .iter()
+        .map(|(seconds, profile)| {
+            let runner = JobRunner {
+                jobs: &jobs,
+                artifacts: &artifacts,
+                analyzer: Some(profile),
+                quota: provenance["quotaBytes"].as_u64().unwrap(),
+                home: provenance["home"].as_str().unwrap(),
+                now: fixed_now,
+                precise_now: fixed_precise_now,
+                sessions: None,
+            };
+            (*seconds, runner)
+        })
+        .collect();
     let mut differences = Vec::new();
     for case in &cases {
         if let Some(removed) = case["removesSourcePayload"].as_str() {
             fs::remove_file(root.join("artifacts").join(removed)).unwrap();
         }
-        let actual = match runner.handle(case["params"].as_object().unwrap()) {
+        let actual = match runners[&budget(case)].handle(case["params"].as_object().unwrap()) {
             Ok(result) => json!({"ok": true, "result": result}),
             Err(refusal) => json!({"ok": false, "error": {"code": refusal.code,
                 "message": refusal.message, "details": Value::Object(refusal.details)}}),

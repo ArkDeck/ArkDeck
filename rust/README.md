@@ -538,9 +538,11 @@ dispatch is `outcomeUnknown`.
 dispatcher and an analyzer that answers by the first line of its source: 20
 ordered runs over one store (three published products, eight semantic refusals,
 a timeout, a signal death, a quota refusal, a removed source and five refused
-runs), Swift's reads of each Job and the store they leave. `tests/job_run.rs`
-reproduces every answer, read, index row, Job file, Artifact index and payload
-byte for byte. Re-record from Swift with
+runs), Swift's reads of each Job and the store they leave. Every Job but the
+timeout case's runs under the daemon's 30 s analyzer budget; the timeout case's
+entries name the 2 s budget of the composition that holds its Job.
+`tests/job_run.rs` reproduces every answer, read, index row, Job file, Artifact
+index and payload byte for byte. Re-record from Swift with
 `ARKDECK_RUST_JOB_RUN_RECORD=/private/tmp/<new>`. `scripts/check-job-run.py` runs
 the standalone Swift daemon and the Rust owner in turn over one state root, then
 hands the Rust-run store to a Swift daemon that reads every Job and Artifact.
