@@ -333,7 +333,7 @@ fn argv_and_environment(
     Ok((argv, env))
 }
 
-fn inode_launch_path(tool: &VerifiedTool) -> io::Result<CString> {
+pub(super) fn inode_launch_path(tool: &VerifiedTool) -> io::Result<CString> {
     let inode_path = format!("/.vol/{}/{}", tool.initial.dev(), tool.initial.ino());
     if !same_metadata(&tool.initial, &std::fs::metadata(&inode_path)?) {
         return Err(denied("inode-bound executable path unavailable"));

@@ -9,6 +9,8 @@
 #[cfg(target_os = "macos")]
 mod dispatch;
 #[cfg(target_os = "macos")]
+mod lifecycle;
+#[cfg(target_os = "macos")]
 mod managed_server;
 mod observation;
 mod operation;
@@ -18,6 +20,11 @@ mod semantic;
 
 #[cfg(target_os = "macos")]
 pub use dispatch::{ProcessDispatch, SERVER_PORT_VARIABLE};
+#[cfg(target_os = "macos")]
+pub use lifecycle::{
+    LifecycleAction, LifecycleBudget, LifecycleCommand, LifecycleOutcome, LifecycleReceipt,
+    PostDispatchObservation, PreparedLifecycle, generation,
+};
 #[cfg(target_os = "macos")]
 pub use managed_server::{ManagedHdcServer, StartBudget, StartFailure};
 pub use observation::{

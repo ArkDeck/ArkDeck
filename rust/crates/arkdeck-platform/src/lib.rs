@@ -20,7 +20,8 @@ pub use process::{
     AnalyzerExecution, AnalyzerLimits, AnalyzerRunError, AnalyzerTermination, DeviceShellAnswer,
     DeviceShellChannel, DeviceShellChannelError, ManagedServer, PtyError, PtyExecution,
     PtyFailureCategory, PtyInteraction, PtyRequest, ServerExit, ServerLaunch, ServerStop,
-    ToolExecution, ToolLimits, ToolRequest, ToolRunError, ToolTermination, VerifiedSource,
+    ToolExecution, ToolLaunchIdentity, ToolLimits, ToolRequest, ToolRunError, ToolTermination,
+    VerifiedSource,
 };
 pub use process::{ProcessLimits, ProcessOutput, VerifiedTool};
 #[cfg(unix)]
