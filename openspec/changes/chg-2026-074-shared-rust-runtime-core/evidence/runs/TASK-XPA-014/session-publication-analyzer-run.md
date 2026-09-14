@@ -94,6 +94,12 @@ The Sessions root's recorded path is `/tmp/arkdeck-job-plan-oracle/Sessions`: Sw
 configured root with `resolvingSymlinksInPath()`, which drops `/private`. The writer spells the path
 the same way.
 
+Later, in the cancellation slice: the writer oracles now give the analyzer the production 30 s
+budget instead of the run oracle's 2 s, which a busy host turned into a timeout, and this fixture
+was re-recorded with it (`/private/tmp/xpa014-job-publication-oracle-r2`). Only `timeoutSeconds`,
+each Job's plan digest, the checkpoint seals over the records and the index's record digests
+changed; see `job-cancel-analyzer-run.md`.
+
 ## Checks
 
 | Check | Command | Result |

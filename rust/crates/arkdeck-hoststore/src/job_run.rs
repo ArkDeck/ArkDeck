@@ -106,7 +106,7 @@ fn signal_death(signal: i32) -> String {
     )
 }
 
-fn failure(code: &str, category: &str, retryability: &str, recovery: &str) -> Value {
+pub(crate) fn failure(code: &str, category: &str, retryability: &str, recovery: &str) -> Value {
     json!({"schemaVersion": "1.0.0", "code": code, "category": category,
         "retryability": retryability, "recovery": recovery})
 }
@@ -142,15 +142,15 @@ pub struct JobRunner<'a> {
 
 /// One run's durable state: the record as the run advances it and the
 /// journal it appends to, whose owner lock it holds.
-struct Run {
-    record: JobRecord,
-    journal: JournalWriter,
-    sequence: i64,
-    now: fn() -> Option<String>,
+pub(crate) struct Run {
+    pub(crate) record: JobRecord,
+    pub(crate) journal: JournalWriter,
+    pub(crate) sequence: i64,
+    pub(crate) now: fn() -> Option<String>,
 }
 
 impl Run {
-    fn clock(&self) -> Result<String, RunRefusal> {
+    pub(crate) fn clock(&self) -> Result<String, RunRefusal> {
         (self.now)().ok_or_else(uncertain)
     }
     fn envelope(&self, event_id: String) -> Result<Envelope, RunRefusal> {
@@ -169,7 +169,12 @@ impl Run {
     }
     /// Swift `transition`: journaled and synchronized; the record changes
     /// only in memory until the next persist.
-    fn transition(&mut self, from: &str, to: &str, reason: &str) -> Result<(), RunRefusal> {
+    pub(crate) fn transition(
+        &mut self,
+        from: &str,
+        to: &str,
+        reason: &str,
+    ) -> Result<(), RunRefusal> {
         let envelope = self.envelope(format!("t-{}", self.sequence))?;
         self.append(events::state_transition(&envelope, from, to, reason, None))?;
         self.record.state = to.into();
@@ -190,13 +195,39 @@ impl Run {
             None,
         ))
     }
-    fn persist(&self, jobs: &JobStore) -> Result<(), RunRefusal> {
+    pub(crate) fn persist(&self, jobs: &JobStore) -> Result<(), RunRefusal> {
         jobs.persist(&self.record, &self.clock()?)
             .map_err(|_| uncertain())
     }
-    fn finish(&mut self) -> Result<(), RunRefusal> {
+    pub(crate) fn finish(&mut self) -> Result<(), RunRefusal> {
         let now = self.clock()?;
         self.record.finish(&now);
+        Ok(())
+    }
+    /// Swift `statusAndReleaseTerminalRuntime`: a terminal Job whose outcome
+    /// is known becomes a Session once its terminal record is durable, and
+    /// the record then keeps the publication's marker.
+    pub(crate) fn release(
+        &mut self,
+        jobs: &JobStore,
+        sessions: Option<&SessionPublisher<'_>>,
+        directory: &Path,
+    ) -> Result<(), RunRefusal> {
+        if let Some(sessions) = sessions
+            && terminal(&self.record.state)
+            && !self.record.outcome_unknown()
+        {
+            let now = self.clock()?;
+            let marker = sessions.publish(&self.record, &mut self.journal, directory, &now);
+            self.record.set_session_publication(marker);
+            if self.persist(jobs).is_err() {
+                // The Session, if any, is durable; only the marker was lost,
+                // so readers see no publication rather than a receipt.
+                self.record
+                    .timeline
+                    .push("session publication marker could not be persisted".into());
+            }
+        }
         Ok(())
     }
 }
@@ -300,24 +331,7 @@ impl JobRunner<'_> {
             now: self.now,
         };
         self.execute(&mut run)?;
-        // Swift `statusAndReleaseTerminalRuntime`: a terminal Job whose
-        // outcome is known becomes a Session once its terminal record is
-        // durable, and the record then keeps the publication's marker.
-        if let Some(sessions) = self.sessions
-            && terminal(&run.record.state)
-            && !run.record.outcome_unknown()
-        {
-            let now = run.clock()?;
-            let marker = sessions.publish(&run.record, &mut run.journal, &directory, &now);
-            run.record.set_session_publication(marker);
-            if run.persist(self.jobs).is_err() {
-                // The Session, if any, is durable; only the marker was lost,
-                // so readers see no publication rather than a receipt.
-                run.record
-                    .timeline
-                    .push("session publication marker could not be persisted".into());
-            }
-        }
+        run.release(self.jobs, self.sessions, &directory)?;
         Ok(run.record.status())
     }
 

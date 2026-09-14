@@ -60,13 +60,21 @@ fn valid_identifier(id: &str) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || b"._-".contains(&byte))
 }
 
-/// Parse-time `job plan` and `job submit` checks. Returns the client deadline,
-/// 30 s unless `--timeout` names another bounded one.
+/// Parse-time `job plan`, `job submit` and `job cancel` checks. Returns the
+/// client deadline: none for a cancellation, which Swift sends without one,
+/// otherwise 30 s unless `--timeout` names another bounded one.
 pub(super) fn configure(
     command: &str,
     fields: &mut Map<String, Value>,
     help: bool,
 ) -> Result<Option<u64>, CliError> {
+    if !help && command == "job.cancel" {
+        // Swift sends the opaque `--job` as given; the Runtime answers it.
+        if !fields.contains_key("jobId") {
+            return Err(usage("job.cancel requires --job"));
+        }
+        return Ok(None);
+    }
     if help || !matches!(command, "job.plan" | "job.submit") {
         return Ok(None);
     }
@@ -263,10 +271,10 @@ pub fn validate_acceptance(value: &Value) -> Result<(), CliError> {
     Ok(())
 }
 
-/// Swift `CLIControlFailureMapper` for the mutation-capable `job.submit` and
-/// `job.run`: a refusal keeps its code only with the pre-admission
-/// zero-dispatch proof; any reply that cannot prove nothing was admitted or
-/// dispatched is an unknown outcome.
+/// Swift `CLIControlFailureMapper` for the mutation-capable `job.submit`,
+/// `job.run` and `job.cancel`: a refusal keeps its code only with the
+/// pre-admission zero-dispatch proof; any reply that cannot prove nothing was
+/// admitted or dispatched is an unknown outcome.
 pub(crate) fn mutation_error(error: ClientError, method: &str) -> CliError {
     let wire = match error {
         ClientError::Remote(wire) => wire,
@@ -281,10 +289,16 @@ pub(crate) fn mutation_error(error: ClientError, method: &str) -> CliError {
         _ => {
             let mut result = CliError::new(
                 "outcomeUnknown",
-                if method == "job.submit" {
-                    "the Job submission reply is unconfirmed; submit the same request again to learn its Job"
-                } else {
-                    "the Job run reply is unconfirmed; read the Job with job status instead of running it again"
+                match method {
+                    "job.submit" => {
+                        "the Job submission reply is unconfirmed; submit the same request again to learn its Job"
+                    }
+                    "job.cancel" => {
+                        "the Job cancellation reply is unconfirmed; read the Job with job status to learn whether it was cancelled"
+                    }
+                    _ => {
+                        "the Job run reply is unconfirmed; read the Job with job status instead of running it again"
+                    }
                 },
             );
             result.details.insert("method".into(), json!(method));
@@ -334,6 +348,19 @@ pub fn run_exit(status: &Value) -> Option<(u8, &'static str)> {
         "cancelled" => Some((1, "job terminal state is cancelled")),
         "interrupted" => Some((1, "job terminal state is interrupted")),
         _ => None,
+    }
+}
+
+/// Swift `job.cancel` answers exactly `cancelRequested` once the request is
+/// carried out or needs nothing; the Job's own reads say what it became.
+pub fn validate_cancellation(value: &Value) -> Result<(), CliError> {
+    if *value == json!({"cancelRequested": true}) {
+        Ok(())
+    } else {
+        Err(CliError::new(
+            "recordUnreadable",
+            "the Runtime returned an invalid Job cancellation answer",
+        ))
     }
 }
 

@@ -20,7 +20,7 @@ mod job_plan;
 mod job_resources;
 pub use job_plan::{
     generates_identity, job_plan_params, job_submit_params, run_exit, validate_acceptance,
-    validate_plan,
+    validate_cancellation, validate_plan,
 };
 mod session_resources;
 pub use bootstrap_resources::{validate_bootstrap_request, validate_bootstrap_response};
@@ -86,7 +86,7 @@ impl CliError {
         }
     }
     pub fn from_client(error: ClientError, method: &str) -> Self {
-        if matches!(method, "job.submit" | "job.run") {
+        if matches!(method, "job.submit" | "job.run" | "job.cancel") {
             return job_plan::mutation_error(error, method);
         }
         if matches!(
@@ -531,6 +531,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["job", "plan"] => "job.plan",
         ["job", "submit"] => "job.submit",
         ["job", "run"] => "job.run",
+        ["job", "cancel"] => "job.cancel",
         ["device", "candidates"] => "device.candidates",
         ["target", "list"] => "target.list",
         ["target", "show"] => "target.show",
@@ -669,6 +670,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         "job.status" | "job.show" | "job.evidence" | "job.result" | "job.run" => {
             &["jobId", "timeout"]
         }
+        "job.cancel" => &["jobId"],
         "job.timeline" => &["jobId", "pageSize", "cursor", "timeout"],
         "job.events" => &["jobId", "pageSize", "afterCursor", "timeout"],
         "job.list" => &[
@@ -931,6 +933,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                     | "job.plan"
                     | "job.submit"
                     | "job.run"
+                    | "job.cancel"
                     | "job.result"
             )
         {

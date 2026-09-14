@@ -133,6 +133,20 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
       variable: "ARKDECK_RUST_JOB_PUBLICATION_RECORD")
   }
 
+  /// The cancellation oracle `rust/crates/arkdeck-hoststore/tests/job_cancel.rs`
+  /// replays, in the publication oracle's composition: a Job cancelled before
+  /// it runs, cancelled again and then run, Jobs cancelled once they
+  /// succeeded, failed or parked, and the refusals of an absent Job and of
+  /// parameters without a string Job identity. Record it with
+  /// `ARKDECK_RUST_JOB_CANCEL_RECORD=/private/tmp/<new directory>`.
+  func testSwiftCancelsTheSharedAnalyzerJobs() async throws {
+    let lock = try Self.lockOracleRoot()
+    defer { close(lock) }
+    try Self.recordOrCompare(
+      try await cancellationFiles(), oracle: Self.cancellationOracle,
+      variable: "ARKDECK_RUST_JOB_CANCEL_RECORD")
+  }
+
   /// Serializes every user of the fixed root, Rust replays included.
   private static func lockOracleRoot() throws -> Int32 {
     let lock = open(lockPath, O_RDWR | O_CREAT | O_CLOEXEC, 0o600)
@@ -192,6 +206,35 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
     Case(name: "sessionExists", mode: "answered", ends: "succeeded", presetsSession: true),
     Case(name: "sourceRemoved", mode: "answered", ends: "failed", removesSourcePayload: true),
   ]
+
+  private static let cancellationOracle = repository.appending(
+    path: "rust/tests/fixtures/job-cancel-analyzer", directoryHint: .isDirectory)
+
+  /// The cancellation oracle's Jobs, each admitted over its own source.
+  private static let cancellationJobs: [(name: String, mode: String)] = [
+    ("cancelled", "answered"), ("succeeded", "answered"), ("failed", "empty"),
+    ("parked", "signal"),
+  ]
+
+  /// The cancellation oracle's requests, made in order once every Job is
+  /// admitted: each names a Job above or carries its own parameters, and
+  /// expects `ok` or the refusal code it names.
+  private static let cancellationSteps:
+    [(name: String, method: String, job: String?, params: [String: JSONValue]?, expects: String)] =
+      [
+        ("cancelBeforeRun", "job.cancel", "cancelled", nil, "ok"),
+        ("cancelAgain", "job.cancel", "cancelled", nil, "ok"),
+        ("runAfterCancel", "job.run", "cancelled", nil, "resourceConflict"),
+        ("runSucceeded", "job.run", "succeeded", nil, "ok"),
+        ("cancelSucceeded", "job.cancel", "succeeded", nil, "ok"),
+        ("runFailed", "job.run", "failed", nil, "ok"),
+        ("cancelFailed", "job.cancel", "failed", nil, "ok"),
+        ("runParked", "job.run", "parked", nil, "ok"),
+        ("cancelParked", "job.cancel", "parked", nil, "ok"),
+        ("cancelAbsent", "job.cancel", nil, ["jobId": .string(absentJob)], "notFound"),
+        ("cancelWithoutJob", "job.cancel", nil, [:], "invalidParams"),
+        ("cancelNumericJob", "job.cancel", nil, ["jobId": .integer(5)], "invalidParams"),
+      ]
 
   private static let cases: [Case] = [
     Case(name: "answered", mode: "answered", ends: "succeeded"),
@@ -386,12 +429,31 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
     return files
   }
 
-  private func publicationFiles() async throws -> [String: Data] {
+  /// The standalone daemon's composition under the fixed root: the Artifact
+  /// store, the analyzer, and the engine with the daemon's Session publication
+  /// writer over a storage owner and Sessions root of the root's own, with a
+  /// probe that can report the volume full.
+  private struct WriterComposition {
+    let handler: RuntimeControlPlaneHandler
+    let store: RuntimeArtifactStore
+    let probe: OracleStorageProbe
+    let artifacts: URL
+    let jobsState: URL
+    let sessions: URL
+    let owner: URL
+  }
+
+  /// The writer oracles never run the `sleep` answer, so their analyzer gets
+  /// the production budget: on a busy host the run oracle's 2 s turned an
+  /// `answered` run into a timeout.
+  private static let writerTimeoutSeconds = 30
+
+  /// Resets the fixed root and composes the standalone daemon's engine there.
+  private func writerComposition() throws -> WriterComposition {
     let manager = FileManager.default
     try? manager.removeItem(at: Self.root)
     try manager.createDirectory(
       at: Self.root, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
-    defer { try? manager.removeItem(at: Self.root) }
     let analyzer = Self.root.appending(path: "analyzer")
     try Self.analyzerBytes.write(to: analyzer)
     guard chmod(analyzer.path, 0o700) == 0 else { throw POSIXError(.EPERM) }
@@ -404,13 +466,11 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
       analyzerVersion: HarnessCrashLedgerAnalysis.analyzerVersion,
       executablePath: analyzer.path,
       executableSHA256: AnalyzerProvider.sha256(Self.analyzerBytes),
-      fixedArguments: ["--analyze-crash-ledger"], timeoutSeconds: Self.timeoutSeconds)
+      fixedArguments: ["--analyze-crash-ledger"], timeoutSeconds: Self.writerTimeoutSeconds)
     let jobsState = Self.root.appending(path: "jobs-state", directoryHint: .isDirectory)
     let capabilities = try RuntimeCapabilityStore(
       directoryURL: jobsState.appending(path: "capabilities", directoryHint: .isDirectory))
     let provider = try AnalyzerProvider(profiles: [profile])
-    // The standalone daemon's writer, over a storage owner and Sessions root
-    // of this root's own, with a probe that can report the volume full.
     let sessions = Self.root.appending(path: "Sessions", directoryHint: .isDirectory)
     let owner = Self.root.appending(path: "session-owner", directoryHint: .isDirectory)
     let probe = OracleStorageProbe()
@@ -429,11 +489,24 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
       nowUTC: { Self.nowUTC }, targetStore: nil, bootstrap: nil, artifactStore: store,
       flashBundleImportDirectory: nil, flashBundleImportPolicy: .production,
       methodObserver: nil)
+    return WriterComposition(
+      handler: handler, store: store, probe: probe, artifacts: artifacts, jobsState: jobsState,
+      sessions: sessions, owner: owner)
+  }
 
+  /// Every source first, then every admission, as the Rust replays rebuild
+  /// them: one crash log per named Job, whose first line is its mode, in the
+  /// source Job its case names.
+  private func writerAdmissions(
+    _ composition: WriterComposition, _ jobs: [(name: String, mode: String, removed: Bool)]
+  ) async throws -> (
+    sources: [String: (job: String, artifact: String, lease: String)],
+    submits: [String: [String: JSONValue]], jobIDs: [String: String]
+  ) {
     var sources: [String: (job: String, artifact: String, lease: String)] = [:]
-    for item in Self.publicationCases {
-      let job = item.removesSourcePayload ? Self.removedSourceJob : Self.sourceJob
-      let source = try await store.publish(
+    for item in jobs {
+      let job = item.removed ? Self.removedSourceJob : Self.sourceJob
+      let source = try await composition.store.publish(
         RuntimeArtifactPublicationRequest(
           jobID: job, sessionID: "HTASK-JOBRUNORACLE", stepID: "capture-crash-log",
           name: "crash-log-\(item.name).txt", mediaType: "text/plain", privacy: .standard,
@@ -441,88 +514,59 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
           bindingSnapshot: ArtifactBindingSnapshot(
             targetID: Self.target, bindingRevision: 3,
             stableIdentitySHA256: String(repeating: "c", count: 64)),
-          contents: Data("\(item.mode!)\nFault log list:\n******\n".utf8)))
+          contents: Data("\(item.mode)\nFault log list:\n******\n".utf8)))
       sources[item.name] = (
         job, source.artifactID,
-        try await store.leaseReference(jobID: source.jobID, artifactID: source.artifactID)
+        try await composition.store.leaseReference(
+          jobID: source.jobID, artifactID: source.artifactID)
       )
     }
     var submits: [String: [String: JSONValue]] = [:]
     var jobIDs: [String: String] = [:]
-    for item in Self.publicationCases {
+    for item in jobs {
       let params = try Self.submitParams(item.name, lease: sources[item.name]!.lease)
-      let accepted = try await exchange(handler, "job.submit", params)
+      let accepted = try await exchange(composition.handler, "job.submit", params)
       guard case .object(let fields) = accepted, case .object(let result)? = fields["result"],
         result["deduplicated"] == .bool(false), case .string(let jobID)? = result["jobId"]
       else { throw CocoaError(.coderInvalidValue) }
       submits[item.name] = params
       jobIDs[item.name] = jobID
     }
+    return (sources, submits, jobIDs)
+  }
 
-    // A Job's Session lies under the UTC month its Job was created in.
-    let month = sessions.appending(
-      path: Self.nowUTC.prefix(7).replacingOccurrences(of: "-", with: "/"),
-      directoryHint: .isDirectory)
-    var recorded: [JSONValue] = []
-    for item in Self.publicationCases {
-      let source = sources[item.name]!
-      let jobID = jobIDs[item.name]!
-      var entry: [String: JSONValue] = [
-        "name": .string(item.name), "mode": .string(item.mode!),
-        "submit": .object(submits[item.name]!), "params": .object(["jobId": .string(jobID)]),
-      ]
-      if item.removesSourcePayload {
-        try manager.removeItem(
-          at: artifacts.appending(path: source.job).appending(path: source.artifact))
-        entry["removesSourcePayload"] = .string("\(source.job)/\(source.artifact)")
-      }
-      if item.presetsSession {
-        try manager.createDirectory(
-          at: month.appending(path: "session-\(jobID)", directoryHint: .isDirectory),
-          withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-        entry["presetsSession"] = .bool(true)
-      }
-      if item.exhaustsStorage { entry["exhaustsStorage"] = .bool(true) }
-      probe.exhaust(item.exhaustsStorage)
-      let response = try await exchange(handler, "job.run", ["jobId": .string(jobID)])
-      probe.exhaust(false)
-      check(response, item)
-      entry["response"] = response
-      recorded.append(.object(entry))
-    }
-    var reads: [String: JSONValue] = [:]
-    for item in Self.publicationCases {
-      let jobID = jobIDs[item.name]!
-      var answers: [String: JSONValue] = [:]
-      for method in ["job.status", "job.show"] {
-        answers[method] = try await exchange(handler, method, ["jobId": .string(jobID)])
-      }
-      reads[jobID] = .object(answers)
-    }
-
+  /// What an oracle over the writer's composition records: the given
+  /// documents, the Job index, every Artifact, every file below the Job
+  /// directories, the Sessions root and the storage owner (dot entries
+  /// included, each Job record's machine facts as labels), every entry's
+  /// kind and mode, and the provenance of all of them.
+  private func writerFiles(
+    _ composition: WriterComposition, documents: [String: JSONValue], producer: String
+  ) throws -> [String: Data] {
+    let manager = FileManager.default
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes]
     var files: [String: Data] = [
       "analyzer": Self.analyzerBytes,
-      "cases.json": try encoder.encode(JSONValue.array(recorded)) + Data("\n".utf8),
-      "reads.json": try encoder.encode(JSONValue.object(reads)) + Data("\n".utf8),
       "store/index.json":
-        try encoder.encode(try Self.index(of: jobsState, normalizing: true)) + Data("\n".utf8),
+        try encoder.encode(try Self.index(of: composition.jobsState, normalizing: true))
+        + Data("\n".utf8),
     ]
-    for job in try manager.contentsOfDirectory(atPath: artifacts.path).sorted()
+    for (name, document) in documents {
+      files[name] = try encoder.encode(document) + Data("\n".utf8)
+    }
+    for job in try manager.contentsOfDirectory(atPath: composition.artifacts.path).sorted()
     where !job.hasPrefix(".") {
-      let directory = artifacts.appending(path: job, directoryHint: .isDirectory)
+      let directory = composition.artifacts.appending(path: job, directoryHint: .isDirectory)
       for name in try manager.contentsOfDirectory(atPath: directory.path).sorted()
       where !name.hasPrefix(".") {
         files["artifacts/\(job)/\(name)"] = try Data(contentsOf: directory.appending(path: name))
       }
     }
-    // Every file below the Job directories, the Sessions root and the storage
-    // owner, dot entries included, and every entry's kind and mode.
     var tree: [JSONValue] = []
     for (directory, prefix) in [
-      (jobsState.appending(path: "jobs", directoryHint: .isDirectory), "store/jobs"),
-      (sessions, "sessions"), (owner, "session-owner"),
+      (composition.jobsState.appending(path: "jobs", directoryHint: .isDirectory), "store/jobs"),
+      (composition.sessions, "sessions"), (composition.owner, "session-owner"),
     ] {
       for path in try manager.subpathsOfDirectory(atPath: directory.path).sorted() {
         let url = directory.appending(path: path)
@@ -547,20 +591,122 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
     files["provenance.json"] =
       try encoder.encode(
         JSONValue.object([
-          "producer": .string(
-            "JobRunAnalyzerOracleContractTests/testSwiftPublishesTheSharedAnalyzerSessions"),
+          "producer": .string(producer),
           "root": .string(Self.root.path),
-          "sessionsRoot": .string(sessions.path),
-          "sessionOwner": .string(owner.path),
+          "sessionsRoot": .string(composition.sessions.path),
+          "sessionOwner": .string(composition.owner.path),
           "availableBytes": .integer(Int64(OracleStorageProbe.roomyBytes)),
           "nowUTC": .string(Self.nowUTC),
           "nowPreciseUTC": .string(Self.nowPreciseUTC),
           "home": .string(Self.home),
           "quotaBytes": .integer(Int64(Self.quotaBytes)),
-          "timeoutSeconds": .integer(Int64(Self.timeoutSeconds)),
+          "timeoutSeconds": .integer(Int64(Self.writerTimeoutSeconds)),
           "files": .object(digests),
         ])) + Data("\n".utf8)
     return files
+  }
+
+  private func publicationFiles() async throws -> [String: Data] {
+    let manager = FileManager.default
+    let composition = try writerComposition()
+    defer { try? manager.removeItem(at: Self.root) }
+    let (sources, submits, jobIDs) = try await writerAdmissions(
+      composition, Self.publicationCases.map { ($0.name, $0.mode!, $0.removesSourcePayload) })
+
+    // A Job's Session lies under the UTC month its Job was created in.
+    let month = composition.sessions.appending(
+      path: Self.nowUTC.prefix(7).replacingOccurrences(of: "-", with: "/"),
+      directoryHint: .isDirectory)
+    var recorded: [JSONValue] = []
+    for item in Self.publicationCases {
+      let source = sources[item.name]!
+      let jobID = jobIDs[item.name]!
+      var entry: [String: JSONValue] = [
+        "name": .string(item.name), "mode": .string(item.mode!),
+        "submit": .object(submits[item.name]!), "params": .object(["jobId": .string(jobID)]),
+      ]
+      if item.removesSourcePayload {
+        try manager.removeItem(
+          at: composition.artifacts.appending(path: source.job).appending(path: source.artifact))
+        entry["removesSourcePayload"] = .string("\(source.job)/\(source.artifact)")
+      }
+      if item.presetsSession {
+        try manager.createDirectory(
+          at: month.appending(path: "session-\(jobID)", directoryHint: .isDirectory),
+          withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+        entry["presetsSession"] = .bool(true)
+      }
+      if item.exhaustsStorage { entry["exhaustsStorage"] = .bool(true) }
+      composition.probe.exhaust(item.exhaustsStorage)
+      let response = try await exchange(
+        composition.handler, "job.run", ["jobId": .string(jobID)])
+      composition.probe.exhaust(false)
+      check(response, item)
+      entry["response"] = response
+      recorded.append(.object(entry))
+    }
+    var reads: [String: JSONValue] = [:]
+    for item in Self.publicationCases {
+      let jobID = jobIDs[item.name]!
+      var answers: [String: JSONValue] = [:]
+      for method in ["job.status", "job.show"] {
+        answers[method] = try await exchange(
+          composition.handler, method, ["jobId": .string(jobID)])
+      }
+      reads[jobID] = .object(answers)
+    }
+    return try writerFiles(
+      composition, documents: ["cases.json": .array(recorded), "reads.json": .object(reads)],
+      producer: "JobRunAnalyzerOracleContractTests/testSwiftPublishesTheSharedAnalyzerSessions")
+  }
+
+  private func cancellationFiles() async throws -> [String: Data] {
+    let composition = try writerComposition()
+    defer { try? FileManager.default.removeItem(at: Self.root) }
+    let (_, submits, jobIDs) = try await writerAdmissions(
+      composition, Self.cancellationJobs.map { ($0.name, $0.mode, false) })
+    let jobs: [JSONValue] = Self.cancellationJobs.map { job in
+      .object([
+        "name": .string(job.name), "mode": .string(job.mode),
+        "submit": .object(submits[job.name]!), "jobId": .string(jobIDs[job.name]!),
+      ])
+    }
+    var recorded: [JSONValue] = []
+    for step in Self.cancellationSteps {
+      let params = step.params ?? ["jobId": .string(jobIDs[step.job!]!)]
+      let response = try await exchange(composition.handler, step.method, params)
+      guard case .object(let fields) = response else { throw CocoaError(.coderInvalidValue) }
+      if step.expects == "ok" {
+        XCTAssertEqual(fields["ok"], .bool(true), "\(step.name): \(response)")
+      } else {
+        guard case .object(let error)? = fields["error"] else {
+          XCTFail("\(step.name): \(response)")
+          continue
+        }
+        XCTAssertEqual(error["code"], .string(step.expects), "\(step.name): \(response)")
+      }
+      recorded.append(
+        .object([
+          "name": .string(step.name), "method": .string(step.method), "params": .object(params),
+          "response": response,
+        ]))
+    }
+    var reads: [String: JSONValue] = [:]
+    for job in Self.cancellationJobs {
+      let jobID = jobIDs[job.name]!
+      var answers: [String: JSONValue] = [:]
+      for method in ["job.status", "job.show", "job.result", "job.evidence"] {
+        answers[method] = try await exchange(
+          composition.handler, method, ["jobId": .string(jobID)])
+      }
+      reads[jobID] = .object(answers)
+    }
+    return try writerFiles(
+      composition,
+      documents: [
+        "jobs.json": .array(jobs), "cases.json": .array(recorded), "reads.json": .object(reads),
+      ],
+      producer: "JobRunAnalyzerOracleContractTests/testSwiftCancelsTheSharedAnalyzerJobs")
   }
 
   private static func submitParams(_ name: String, lease: String) throws -> [String: JSONValue] {

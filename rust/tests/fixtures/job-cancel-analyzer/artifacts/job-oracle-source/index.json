@@ -1,0 +1,125 @@
+{
+  "artifacts" : [
+    {
+      "artifactID" : "ART-8e92991180c82eec30c9f81167aca4fc",
+      "bindingSnapshot" : {
+        "bindingRevision" : 3,
+        "stableIdentitySHA256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "targetID" : "TGT-ORACLE"
+      },
+      "byteCount" : 32,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-oracle-source",
+      "mediaType" : "text\/plain",
+      "name" : "crash-log-cancelled.txt",
+      "privacy" : "standard",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "HTASK-JOBRUNORACLE",
+      "sha256" : "9dd74c5950a558507ee8af22c8d083ff8b7794cf20c39d8d3761127b8541b30e",
+      "sourceOperation" : "capture.diagnostics@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "capture-crash-log"
+    },
+    {
+      "artifactID" : "ART-73deeb970a032e1b7fdecf34c4fc5511",
+      "bindingSnapshot" : {
+        "bindingRevision" : 3,
+        "stableIdentitySHA256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "targetID" : "TGT-ORACLE"
+      },
+      "byteCount" : 32,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-oracle-source",
+      "mediaType" : "text\/plain",
+      "name" : "crash-log-succeeded.txt",
+      "privacy" : "standard",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "HTASK-JOBRUNORACLE",
+      "sha256" : "9dd74c5950a558507ee8af22c8d083ff8b7794cf20c39d8d3761127b8541b30e",
+      "sourceOperation" : "capture.diagnostics@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "capture-crash-log"
+    },
+    {
+      "artifactID" : "ART-ebb8710264ec267650b2bef9b9ecf2bb",
+      "bindingSnapshot" : {
+        "bindingRevision" : 3,
+        "stableIdentitySHA256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "targetID" : "TGT-ORACLE"
+      },
+      "byteCount" : 29,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-oracle-source",
+      "mediaType" : "text\/plain",
+      "name" : "crash-log-failed.txt",
+      "privacy" : "standard",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "HTASK-JOBRUNORACLE",
+      "sha256" : "51861d7f165faf9cfca4747ea4dff1b0df3153c19b9034e0aa6067d1eb7a9c04",
+      "sourceOperation" : "capture.diagnostics@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "capture-crash-log"
+    },
+    {
+      "artifactID" : "ART-4782cd8adbca94506c2af7ecf453800e",
+      "bindingSnapshot" : {
+        "bindingRevision" : 3,
+        "stableIdentitySHA256" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "targetID" : "TGT-ORACLE"
+      },
+      "byteCount" : 30,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-oracle-source",
+      "mediaType" : "text\/plain",
+      "name" : "crash-log-parked.txt",
+      "privacy" : "standard",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "HTASK-JOBRUNORACLE",
+      "sha256" : "57b3f46264f3cb0301bfc7f9eb7695799454ece3472d918e41ae2400f5a38a32",
+      "sourceOperation" : "capture.diagnostics@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "capture-crash-log"
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}
