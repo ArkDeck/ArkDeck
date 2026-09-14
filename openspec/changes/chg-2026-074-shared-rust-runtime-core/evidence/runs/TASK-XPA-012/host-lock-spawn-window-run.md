@@ -6,6 +6,11 @@ no durable format, lock file, method, schema, CLI leaf, entitlement or installed
 below is disposable host data; nothing here is device evidence. The measurements ran on the bases
 named with them; #1897 (`job.cancel`) changes neither the lock code nor the analyzer spawn.
 
+Revised the same day (`host-lock-unlock-on-drop-run.md`): owner locks now unlock before their
+descriptor closes, which removes the window at its source, and the 500 ms retry described below is
+removed. The residual below about the Swift daemon's non-blocking locks was wrong: they unlock
+before they close.
+
 ## Already on main / this change / still remaining
 
 | Already on main | This change | Still remaining for TASK-XPA-012 |
@@ -169,9 +174,9 @@ After the final run only this section changed.
 - `try_trace_lock_existing` keeps ArkTrace's single non-blocking probe. A lease lock held only by a
   spawn window makes that entry look in use, so it is kept, never removed; waiting there would cost up
   to 500 ms for every genuinely leased entry an inventory or purge visits.
-- The Swift daemon spawns children too, and its non-blocking locks are open to the same window:
-  `BootstrapBundleRegistry` ("another bootstrap operation holds the store"),
-  `RuntimeToolSelectionControlActionStore`, `RuntimeHDCControlActionStore`, `SessionAudit` and
-  `RuntimeUpdateStateStore`. Not measured or changed here; that code is retired at G5.
+- Corrected the same day: the Swift daemon's non-blocking locks (`BootstrapBundleRegistry`,
+  `RuntimeToolSelectionControlActionStore`, `RuntimeHDCControlActionStore`, `SessionAudit`,
+  `RuntimeUpdateStateStore`) all unlock before they close, so their own releases are not exposed
+  (`host-lock-unlock-on-drop-run.md`).
 - A genuine second owner now waits 500 ms for its refusal, and a process harness that holds a lock
   to check a refusal takes 0.5 s longer per such request.

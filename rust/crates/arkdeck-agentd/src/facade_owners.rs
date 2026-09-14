@@ -231,31 +231,6 @@ mod tests {
     }
 
     #[test]
-    fn a_lock_released_within_the_wait_is_taken_instead_of_refused() {
-        // A child another thread spawned while the last request held the
-        // lock keeps it until its exec, as any brief second holder would.
-        let root = Root::new();
-        let owners = FacadeOwners::new(root.0.clone()).unwrap();
-        assert_eq!(
-            reply(&owners, "history.filter.list", json!({}))["result"]["generation"],
-            "1"
-        );
-        let lock = fs::OpenOptions::new()
-            .read(true)
-            .write(true)
-            .open(root.0.join(".history-filter.lock"))
-            .unwrap();
-        lock.try_lock().unwrap();
-        let releaser = std::thread::spawn(move || {
-            std::thread::sleep(std::time::Duration::from_millis(100));
-            lock.unlock().unwrap();
-        });
-        let answer = reply(&owners, "history.filter.list", json!({}));
-        releaser.join().unwrap();
-        assert_eq!(answer["result"]["generation"], "1", "{answer}");
-    }
-
-    #[test]
     fn an_unsafe_directory_fails_only_that_request() {
         let root = Root::new();
         let owners = FacadeOwners::new(root.0.join("missing")).unwrap();
