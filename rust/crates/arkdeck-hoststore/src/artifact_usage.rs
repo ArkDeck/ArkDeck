@@ -219,6 +219,13 @@ impl ArtifactUsage {
             quota,
         })
     }
+    /// The daemon's `artifact.quota`: the root walked as a Swift store that
+    /// has not cached its total walks it (see `artifact_quota`), or Swift's
+    /// rendering of the store error that stopped the walk.
+    pub fn quota(&self) -> Result<Value, String> {
+        crate::artifact_quota::answer(&self.path, self.quota)
+    }
+
     pub fn status(&self) -> io::Result<Value> {
         self.root.validate_path(&self.path)?;
         let names = self.root.names(usize::MAX)?;

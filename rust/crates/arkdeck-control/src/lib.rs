@@ -131,6 +131,16 @@ pub trait HostServices: Send + Sync {
             details: None,
         })
     }
+    /// `artifact.quota` reads the Artifact store's used bytes against its
+    /// quota. A host without an Artifact owner answers as the read-only
+    /// foundation always has.
+    fn artifact_quota(&self) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "rejected".into(),
+            message: "this method is unavailable in the read-only Rust foundation".into(),
+            details: None,
+        })
+    }
     /// `capability.list` and `capability.inspect` read the Runtime capability
     /// store. A host without one answers as the read-only foundation always
     /// has.
@@ -788,6 +798,11 @@ impl<H: HostServices> Control<H> {
             "artifact.inspect" | "artifact.read" | "artifact.export" => Response {
                 id: request.id.clone(),
                 outcome: self.host.artifact_resource(&request.method, &params),
+            },
+            // Swift reads no parameter of a quota request.
+            "artifact.quota" => Response {
+                id: request.id.clone(),
+                outcome: self.host.artifact_quota(),
             },
             "artifact.import.begin"
             | "artifact.import.append"

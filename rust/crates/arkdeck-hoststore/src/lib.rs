@@ -57,9 +57,13 @@ mod operation_request;
 #[cfg(target_os = "macos")]
 pub use operation_request::{OperationRequest, RequestErrorCode, RequestRejection};
 #[cfg(target_os = "macos")]
+mod artifact_quota;
+#[cfg(target_os = "macos")]
 mod capability_store;
 #[cfg(target_os = "macos")]
 mod strict_json;
+#[cfg(target_os = "macos")]
+mod swift_decoding;
 #[cfg(target_os = "macos")]
 pub use capability_store::{CapabilityRefusal, CapabilityStore, CapabilityStoreError};
 

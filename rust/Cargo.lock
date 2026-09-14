@@ -94,8 +94,10 @@ dependencies = [
  "aes-gcm",
  "arkdeck-contract",
  "arkdeck-platform",
+ "libc",
  "serde",
  "serde_json",
+ "sha2",
  "unicode-segmentation",
 ]
 
