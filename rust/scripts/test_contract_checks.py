@@ -408,6 +408,44 @@ class ContractChecksTests(unittest.TestCase):
         self.assertEqual(checker[checker.index("--bin-dir") + 1], str(view / "rust/target/debug"))
         self.assertEqual(cwd, view)
 
+    def test_a_view_of_the_tested_checkout_runs_only_what_the_lane_did_not(self):
+        view = self.root / "view"
+        argvs = [argv for argv, _ in runner.commands(view, self.root / "output", checkout_tested=True)]
+        self.assertEqual(argvs[0], ["cargo", "test", "--package", "arkdeck-contract", "--locked"])
+        self.assertEqual([argv[1] for argv in argvs[1:3]], ["run", "build"])
+        self.assertEqual(argvs[1][-1], "process-selftest")
+        self.assertIn("--bins", argvs[2])
+        self.assertEqual(argvs[3][1], str(view / "rust/scripts/check-readonly.py"))
+        self.assertEqual([argv for argv in argvs if argv[:2] == ["cargo", "clippy"]], [])
+        self.assertEqual([argv for argv in argvs if argv[:2] == ["cargo", "test"]], argvs[:1])
+
+    def test_only_a_candidate_of_the_published_inputs_leaves_lint_and_tests_to_the_lane(self):
+        _, drifted = self.change_candidate()
+        identical = contract.candidate(self.published, self.commit, self.commit)
+        self.assertEqual(identical["inputDigest"], self.published_info["inputDigest"])
+        self.assertNotEqual(drifted["inputDigest"], self.published_info["inputDigest"])
+        lint = ["cargo", "clippy", "--workspace", "--all-targets", "--locked", "--", "-D", "warnings"]
+        workspace_tests = ["cargo", "test", "--workspace", "--locked"]
+        for label, info, repeated in (
+            ("candidate-of-published-inputs", identical, False),
+            ("candidate-of-drifted-inputs", drifted, True),
+            ("published", self.published_info, True),
+        ):
+            with self.subTest(view=label):
+                calls = []
+
+                def run(argv, *, cwd, env, check):
+                    calls.append(argv)
+                    return subprocess.CompletedProcess(argv, 0)
+
+                runner.run_view(self.root / "view", self.root / "outputs" / label, info,
+                                self.published_info, run=run)
+                self.assertEqual(lint in calls, repeated)
+                self.assertEqual(workspace_tests in calls, repeated)
+                self.assertEqual(
+                    ["cargo", "test", "--package", "arkdeck-contract", "--locked"] in calls, not repeated)
+                self.assertIn(["cargo", "build", "--workspace", "--bins", "--locked"], calls)
+
     def test_any_native_stage_failure_stops_that_view_and_is_preserved(self):
         for fail_at in range(5):
             with self.subTest(stage=fail_at):

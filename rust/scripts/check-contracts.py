@@ -83,11 +83,26 @@ def materialize(destination: Path, inputs, info: dict, published_info: dict,
         encoding="utf-8", newline="\n")
 
 
-def commands(view: Path, output: Path, *, owners: bool = False) -> list[tuple[list[str], Path]]:
+def commands(view: Path, output: Path, *, owners: bool = False,
+             checkout_tested: bool = False) -> list[tuple[list[str], Path]]:
     rust = view / "rust"
-    result = [
-        (["cargo", "clippy", "--workspace", "--all-targets", "--locked", "--", "-D", "warnings"], rust),
-        (["cargo", "test", "--workspace", "--locked"], rust),
+    if checkout_tested:
+        # The lane lints and tests the checkout before this script runs, and a
+        # view of the published inputs compiles the checkout's own sources. It
+        # differs only in the two input documents its bindings embed:
+        # SWIFT_BASELINE names the merge-base commit and CONTRACT_INPUTS is the
+        # candidate document. Of the tests that read them, the arkdeck-contract
+        # parity tests assert on their contents, so they run here; arkdeck-cli
+        # reads only the kind, and only for a method missing from the registry,
+        # which here is main's. Linting and testing the rest again repeated the
+        # lane's own two steps, and their flakes, at about two minutes on macOS.
+        native = [(["cargo", "test", "--package", "arkdeck-contract", "--locked"], rust)]
+    else:
+        native = [
+            (["cargo", "clippy", "--workspace", "--all-targets", "--locked", "--", "-D", "warnings"], rust),
+            (["cargo", "test", "--workspace", "--locked"], rust),
+        ]
+    result = native + [
         (["cargo", "run", "--package", "arkdeck-platform", "--example", "windows_spk3",
           "--locked", "--", "process-selftest"], rust),
         (["cargo", "build", "--workspace", "--bins", "--locked"], rust),
@@ -141,8 +156,13 @@ def run_view(view: Path, output: Path, info: dict, published_info: dict, run=sub
     # Cargo target. No binary from the other view can reach the frame checker.
     environment = os.environ.copy()
     environment["CARGO_TARGET_DIR"] = str(view / "rust/target")
+    # A candidate of the published inputs is the checkout the lane already
+    # linted and tested; see commands().
+    checkout_tested = (info["kind"] == "candidate"
+                       and info["inputDigest"] == published_info["inputDigest"])
     try:
-        for argv, cwd in commands(view, output, owners=info["kind"] == "candidate"):
+        for argv, cwd in commands(view, output, owners=info["kind"] == "candidate",
+                                  checkout_tested=checkout_tested):
             print(f'+ [{info["kind"]}] ' + " ".join(argv), flush=True)
             record = {"argv": argv, "completed": False}
             provenance["commands"].append(record)
@@ -192,13 +212,13 @@ def check(output_root: Path) -> Path:
     source_digest = rust_digest(ROOT / "rust")
     # When the working inputs are byte-identical to the published base (the
     # merge-base with origin/main), the published view would be the checkout
-    # this lane already linted and tested at top level, and the candidate
-    # view runs the same native checks on the same inputs plus its own.
-    # Building the same sources twice proved nothing more, at 1 to 1.7
-    # minutes per host (the parity step was 2.0, 3.4 and 1.2 minutes on the
-    # three hosted runners over #1844..#1873), so the published view is
-    # recorded as covered and the checks run once. Any drift keeps both
-    # views: that is the case the published view exists for.
+    # this lane already linted and tested at top level. Building the same
+    # sources again proved nothing more, at 1 to 1.7 minutes per host (the
+    # parity step was 2.0, 3.4 and 1.2 minutes on the three hosted runners
+    # over #1844..#1873), so the published view is recorded as covered and
+    # only the candidate view runs, itself without the lint and workspace
+    # tests the lane already ran (see commands()). Any drift keeps both views
+    # complete: that is the case the published view exists for.
     published_covered = current_info["inputDigest"] == published_info["inputDigest"]
     # A short task-owned path also bounds Cargo's native Windows build paths.
     temporary_root = ROOT / "rust/target/contract-check"
