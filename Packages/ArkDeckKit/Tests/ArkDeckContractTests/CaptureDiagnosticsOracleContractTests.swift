@@ -1,4 +1,4 @@
-// Shared Swift oracle for the Rust `observe.device@1` engine (CHG-2026-074, TASK-XPA-014).
+// Shared Swift oracle for the Rust `capture.diagnostics@1` engine (CHG-2026-074, TASK-XPA-014).
 
 import Darwin
 import XCTest
@@ -9,28 +9,25 @@ import XCTest
 @testable import ArkDeckStorage
 @testable import ArkDeckWorkflows
 
-/// Swift `observe.device@1` over the shared fake HDC (`HDCOracleFake`): the
-/// oracle `rust/crates/arkdeck-hoststore/tests/observe_device.rs` replays
-/// against the Rust planner, admitter, runner and readers. One device is
-/// adopted; each case then plans a request for it, and a case with a mode also
-/// admits it and runs its Job while the fake answers in that mode, so the Jobs
-/// run in order over one store: one observes the device, one meets a server
-/// of another version, one finds another device's row, and one gets no
-/// version at all and parks. The other cases are refused before admission: a
-/// stale binding revision, a request without one and a target never adopted.
-/// A second run of the observed Job is refused, and every Job's result,
-/// evidence and Artifact list are read last. The oracle keeps every answer,
-/// each call the fake received, and the store the Jobs leave: the Target
-/// document, the Job index and files, every Artifact index and payload, the
-/// Sessions and the storage owner.
+/// Swift `capture.diagnostics@1` with the runbook's default input
+/// (`{ "durationSeconds": 5 }`: the HiLog and UI dump captures, no trace,
+/// screenshot, crash log or application liveness) over the shared fake HDC
+/// (`HDCOracleFake`), the second operation of Golden Journey 1 and the M1
+/// oracle lane A's Rust engine replays after `observe.device@1`. One device is
+/// adopted; each case then plans a request for it, and a case with a mode
+/// also admits it and runs its Job while the fake answers in that mode, so
+/// the Jobs run in order over one store: one captures both products, one
+/// finds the device volume too full for the collection, one finds another
+/// device's row, and one gets an empty HiLog capture and parks. The other
+/// cases are refused before admission: a stale binding revision, a request
+/// without one and a target never adopted. A second run of the captured Job
+/// is refused, and every Job's result, evidence and Artifact list are read
+/// last. What the oracle keeps and how it is composed is `HDCOracleHarness`.
 ///
-/// The production daemon refuses an HDC executable whose identity is not a
-/// registered one, so the oracle composes the standalone daemon's engine
-/// in-process, with its Session publication writer and with the daemon's
-/// Target facts port over the fake (`HDCOracleHarness`). Record a new oracle
-/// with `ARKDECK_RUST_OBSERVE_DEVICE_RECORD=/private/tmp/<new directory>`;
+/// Record a new oracle with
+/// `ARKDECK_RUST_CAPTURE_DIAGNOSTICS_RECORD=/private/tmp/<new directory>`;
 /// otherwise the checked-in oracle must match byte for byte.
-final class ObserveDeviceOracleContractTests: XCTestCase {
+final class CaptureDiagnosticsOracleContractTests: XCTestCase {
   private struct Case {
     let name: String
     /// The fake's mode while this case's Job runs; a case without one only
@@ -45,10 +42,10 @@ final class ObserveDeviceOracleContractTests: XCTestCase {
   }
 
   private static let cases: [Case] = [
-    Case(name: "observed", mode: "normal", ends: "succeeded"),
-    Case(name: "serverMismatch", mode: "serverMismatch", ends: "failed"),
+    Case(name: "captured", mode: "normal", ends: "succeeded"),
+    Case(name: "lowStorage", mode: "lowStorage", ends: "failed"),
     Case(name: "otherDevice", mode: "otherDevice", ends: "failed"),
-    Case(name: "emptyVersion", mode: "emptyVersion", ends: "waitingForRecovery"),
+    Case(name: "emptyHilog", mode: "emptyHilog", ends: "waitingForRecovery"),
     Case(name: "staleBinding", bindingRevision: 2),
     Case(name: "unboundRequest", bindingRevision: nil),
     Case(name: "unadopted", target: "TGT-000000000000"),
@@ -60,7 +57,7 @@ final class ObserveDeviceOracleContractTests: XCTestCase {
     return url
   }()
   private static let oracle = repository.appending(
-    path: "rust/tests/fixtures/observe-device", directoryHint: .isDirectory)
+    path: "rust/tests/fixtures/capture-diagnostics", directoryHint: .isDirectory)
   private static let settings = HDCOracleHarness.Settings(
     root: HDCOracleFake.root,
     nowUTC: "2026-09-14T00:00:00Z",
@@ -69,19 +66,20 @@ final class ObserveDeviceOracleContractTests: XCTestCase {
     quotaBytes: 8 * 1024 * 1024 * 1024)
   private static let connectKey = String(repeating: "a", count: 32)
 
-  /// `ArkDeckFakeHDCFixture`'s answers to what `observe.device@1` asks, by
-  /// mode: `serverMismatch` reports a server of another version,
-  /// `otherDevice` lists another device's row, and `emptyVersion` answers the
-  /// version probe with nothing.
+  /// What `capture.diagnostics@1` asks with the default input, answered as
+  /// `ArkDeckFakeHDCFixture` and the scripted dispatcher of
+  /// `DiagnosticsAndHAPContractTests` answer it, by mode: `lowStorage` leaves
+  /// the device volume 16 KiB where the collection needs its budget,
+  /// `otherDevice` lists another device's row, and `emptyHilog` answers the
+  /// bounded HiLog capture with nothing.
   private static let answers = #"""
-    # observe.device@1 answers of ArkDeckFakeHDCFixture, by mode.
+    # capture.diagnostics@1 answers of ArkDeckFakeHDCFixture and the scripted dispatcher, by mode.
     key=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     case "$*" in
     "-v")
-      [ "$mode" = emptyVersion ] || printf 'Ver: 3.2.0d\n' ;;
+      printf 'Ver: 3.2.0d\n' ;;
     "checkserver")
-      if [ "$mode" = serverMismatch ]; then server=3.2.0f; else server=3.2.0d; fi
-      printf 'Client version:Ver: 3.2.0d, server version:Ver: %s\n' "$server" ;;
+      printf 'Client version:Ver: 3.2.0d, server version:Ver: 3.2.0d\n' ;;
     "list targets -v")
       if [ "$mode" = otherDevice ]; then row=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb; else row=$key; fi
       printf '%s\t\tUSB\tConnected\tlocalhost\n' "$row" ;;
@@ -89,6 +87,14 @@ final class ObserveDeviceOracleContractTests: XCTestCase {
       printf 'OpenHarmony Reference Device\n' ;;
     "-t $key shell param get const.ohos.fullname")
       printf 'OpenHarmony-4.1-release\n' ;;
+    "-t $key shell df -k /data/local/tmp")
+      if [ "$mode" = lowStorage ]; then available=16; else available=1047552; fi
+      printf 'Filesystem 1K-blocks Used Available Use%% Mounted on\n'
+      printf '/dev/block/data 1048576 1024 %s 1%% /data\n' "$available" ;;
+    "-t $key shell hilog -x")
+      [ "$mode" = emptyHilog ] || printf '01-01 00:00:00 I app: hello\n' ;;
+    "-t $key shell hidumper -s WindowManagerService -a -a")
+      printf '{"windows":[]}\n' ;;
     *)
       printf 'unregistered fixture output\n' >&2
       exit 23 ;;
@@ -96,11 +102,11 @@ final class ObserveDeviceOracleContractTests: XCTestCase {
 
     """#
 
-  func testSwiftObservesTheSharedFakeDevice() async throws {
+  func testSwiftCapturesDiagnosticsOfTheSharedFakeDevice() async throws {
     let lock = try HDCOracleFake.lock()
     defer { close(lock) }
     try HDCOracleHarness.recordOrCompare(
-      try await oracleFiles(), variable: "ARKDECK_RUST_OBSERVE_DEVICE_RECORD",
+      try await oracleFiles(), variable: "ARKDECK_RUST_CAPTURE_DIAGNOSTICS_RECORD",
       oracle: Self.oracle)
   }
 
@@ -112,10 +118,11 @@ final class ObserveDeviceOracleContractTests: XCTestCase {
     let document = JSONValue.object([
       "documentType": .string("runtime-operation-request"),
       "schemaVersion": .string("1.0.0"),
-      "requestId": .string("req-observe-\(item.name)"),
-      "idempotencyKey": .string("idem-observe-\(item.name)"),
+      "requestId": .string("req-capture-\(item.name)"),
+      "idempotencyKey": .string("idem-capture-\(item.name)"),
       "target": .object(bound),
-      "operation": .object(["id": .string("observe.device"), "version": .integer(1)]),
+      "operation": .object(["id": .string("capture.diagnostics"), "version": .integer(1)]),
+      "inputs": .object(["durationSeconds": .integer(5)]),
     ])
     return String(decoding: try CanonicalJSONEncoders.canonical().encode(document), as: UTF8.self)
   }
@@ -123,7 +130,8 @@ final class ObserveDeviceOracleContractTests: XCTestCase {
   private static func send(
     _ handler: RuntimeControlPlaneHandler, _ method: String, _ params: [String: JSONValue]
   ) async throws -> JSONValue {
-    try await HDCOracleHarness.send(handler, method, params, frameID: "observe-device-oracle")
+    try await HDCOracleHarness.send(
+      handler, method, params, frameID: "capture-diagnostics-oracle")
   }
 
   private func oracleFiles() async throws -> [String: Data] {
@@ -166,11 +174,11 @@ final class ObserveDeviceOracleContractTests: XCTestCase {
       }
       XCTAssertEqual(status["state"], item.ends.map(JSONValue.string), item.name)
     }
-    let observed = ["jobId": JSONValue.string(jobs[0].job)]
+    let captured = ["jobId": JSONValue.string(jobs[0].job)]
     exchanges.append(
       HDCOracleHarness.exchange(
-        "observed.rerun", "job.run", observed,
-        try await Self.send(composition.handler, "job.run", observed)))
+        "captured.rerun", "job.run", captured,
+        try await Self.send(composition.handler, "job.run", captured)))
     for (name, job) in jobs {
       let reads: [(String, String, [String: JSONValue])] = [
         ("result", "job.result", ["jobId": .string(job)]),
@@ -202,7 +210,8 @@ final class ObserveDeviceOracleContractTests: XCTestCase {
         "exchanges": .array(exchanges),
       ]),
       answers: Self.answers,
-      producer: "ObserveDeviceOracleContractTests.testSwiftObservesTheSharedFakeDevice",
+      producer:
+        "CaptureDiagnosticsOracleContractTests.testSwiftCapturesDiagnosticsOfTheSharedFakeDevice",
       settings: Self.settings)
   }
 }
