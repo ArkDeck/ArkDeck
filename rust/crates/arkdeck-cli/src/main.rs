@@ -6,7 +6,7 @@ use arkdeck_platform::{LocalEndpoint, ServerIdentity, default_user_endpoint, ran
 use serde_json::Value;
 use std::io::{self, Write};
 use std::path::PathBuf;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 fn correlation() -> io::Result<String> {
     Ok(format!(
@@ -85,6 +85,34 @@ fn execute(invocation: &Invocation, id: &str) -> Result<Value, CliError> {
             arkdeck_cli::validate_acceptance(&result)?;
         } else {
             arkdeck_cli::validate_plan(&result)?;
+        }
+        return Ok(result);
+    }
+    if invocation.command == "agent.run" {
+        return run_agent(invocation, id, &endpoint, &identity);
+    }
+    if matches!(invocation.command, "agent.status" | "artifact.list") {
+        let mut client = Client::connect_bounded(
+            &endpoint,
+            &identity,
+            Duration::from_millis(invocation.timeout_ms.unwrap_or(30_000)),
+        )
+        .map_err(|error| CliError::from_client(error, invocation.method))?;
+        let result = client
+            .request(id, invocation.method, invocation.params.clone())
+            .map_err(|error| CliError::from_client(error, invocation.method))?;
+        if invocation.command == "agent.status" {
+            arkdeck_cli::validate_execution(&result)?;
+        } else {
+            let params = invocation
+                .params
+                .as_ref()
+                .expect("parsed Artifact list parameters");
+            arkdeck_cli::validate_artifact_page(
+                &result,
+                &params["owner"],
+                params["pageSize"].as_u64().unwrap_or(100),
+            )?;
         }
         return Ok(result);
     }
@@ -212,6 +240,73 @@ fn execute(invocation: &Invocation, id: &str) -> Result<Value, CliError> {
     Ok(result)
 }
 
+fn stopped() -> CliError {
+    CliError::new(
+        "clientTimeout",
+        "client stopped waiting; the Runtime execution and Job were not cancelled",
+    )
+}
+
+/// Swift `runRuntimeExecution` for `agent run`: the intent is built and
+/// checked before any connection, then the execution is read with
+/// `agent.status`, backing off from 100 ms to 2 s, until it settles or
+/// `--timeout` ends the client's wait (never the execution or its Job).
+fn run_agent(
+    invocation: &Invocation,
+    id: &str,
+    endpoint: &LocalEndpoint,
+    identity: &ServerIdentity,
+) -> Result<Value, CliError> {
+    let params = arkdeck_cli::execution_intent(invocation)?;
+    let deadline = invocation
+        .timeout_ms
+        .map(|milliseconds| Instant::now() + Duration::from_millis(milliseconds));
+    // Each request waits for what is left of the client's deadline, or 30 s.
+    let remaining = || match deadline {
+        None => Ok(Duration::from_secs(30)),
+        Some(deadline) => deadline
+            .checked_duration_since(Instant::now())
+            .filter(|left| !left.is_zero())
+            .ok_or_else(stopped),
+    };
+    let request = |method: &str, body: serde_json::Map<String, Value>| {
+        let wait = remaining()?;
+        // Nothing is sent before the connection is made, so a connect
+        // failure maps as it does for a read.
+        let mut client = Client::connect_bounded(endpoint, identity, wait)
+            .map_err(|error| CliError::from_client(error, "agent.status"))?;
+        client
+            .request(id, method, Some(body))
+            .map_err(|error| CliError::from_client(error, method))
+    };
+    let mut execution = params["executionId"].clone();
+    let attach = |mut error: CliError, execution: &Value| {
+        if execution.is_string() {
+            error
+                .details
+                .insert("executionId".into(), execution.clone());
+        }
+        error
+    };
+    let mut answer = request("agent.run", params).map_err(|error| attach(error, &execution))?;
+    let mut interval = 100;
+    loop {
+        let fields =
+            arkdeck_cli::validate_execution(&answer).map_err(|error| attach(error, &execution))?;
+        execution = fields["executionId"].clone();
+        match arkdeck_cli::settle_execution(&fields).map_err(|error| attach(error, &execution))? {
+            arkdeck_cli::Settlement::Settled(result) => return Ok(result),
+            arkdeck_cli::Settlement::Pending => (),
+        }
+        let left = remaining().map_err(|error| attach(error, &execution))?;
+        std::thread::sleep(Duration::from_millis(interval).min(left));
+        remaining().map_err(|error| attach(error, &execution))?;
+        let body = serde_json::Map::from_iter([("executionId".to_owned(), execution.clone())]);
+        answer = request("agent.status", body).map_err(|error| attach(error, &execution))?;
+        interval = (interval * 2).min(2000);
+    }
+}
+
 fn write_document(value: &Value) -> io::Result<()> {
     let bytes = render(value).map_err(io::Error::other)?;
     io::stdout().lock().write_all(&bytes)
@@ -255,7 +350,7 @@ fn main() -> std::process::ExitCode {
     };
     if invocation.help {
         println!(
-            "ArkDeck commands:\n  doctor [--deep] [--require-healthy]\n  operation list\n  operation describe|example --operation <reference>\n  job status|show|evidence|result --job <id> [--timeout <duration>]\n  job timeline --job <id> [--page-size <n>] [--cursor <cursor>] [--timeout <duration>]\n  job events --job <id> [--page-size <n>] [--after-cursor <cursor>] [--timeout <duration>]\n  job plan --request-file <path> | --target <id> --operation <reference> [--inputs-file <path>] [--expected-binding-revision <n>] [--request-id <id>] [--idempotency-key <key>] [--timeout <duration>]\n  job submit --request-file <path> | --target <id> --operation <reference> [--inputs-file <path>] [--expected-binding-revision <n>] [--request-id <id>] [--idempotency-key <key>] [--timeout <duration>]\n  job run --job <id> [--timeout <duration>]\n  job cancel --job <id>\n  capability list\n  capability inspect --capability <id>\n  job list [--page-size <n>] [--cursor <cursor>] [--order <order>] [--include-current] [--include-timeline] [--state <state>] [--operation <reference>] [--target <id>] [--thread <id>] [--timeout <duration>]\n  artifact import hap|native-library|workspace-patch|flash-bundle --import-request-id <id> --target <id> --file <path> [--timeout <duration>]\n  artifact import abort --import-request-id <id> --expected-generation <n> [--timeout <duration>]\n  artifact import inspect --import-request-id <id>|--import <id> [--timeout <duration>]\n  artifact inspect --job <id>|--import <id> --artifact <id> [--timeout <duration>]\n  artifact read --job <id>|--import <id> --artifact <id> [--offset <n>] [--max-bytes <n>] [--allow-sensitive] [--raw] [--timeout <duration>]\n  artifact export --job <id>|--import <id> --artifact <id> --destination <directory> [--allow-sensitive] [--overwrite] [--timeout <duration>]\n  artifact quota\n  device candidates\n  target list\n  target show --target <id> [--timeout <duration>]\n  target display-name set|clear --target <id> --expected-generation <n> [--name <text>]\n  device display-name set|clear --candidate <key> --observation <id> --observation-generation <n> [--name <text>]\n  trace cache status|purge\n  history filter list\n  history filter save --expected-generation <n> [--search <text>] [--status <status>] [--mode <mode>] [--session <id>] [--target <id>] [--time <range>] [--activity <activity>]\n  history filter delete --expected-generation <n>\n  runtime tool register --kind deveco --root <absolute-path>\n  runtime tool register --kind hdc --file <absolute-path>\n  runtime tool list [--page-size <n>] [--cursor <cursor>]\n  runtime tool remove --tool <reference> --expected-generation <n>\n  runtime tool inspect --tool <reference>\n  runtime bundle register --kind daemon-bundle --file <absolute-path>\n  runtime bundle inspect --bundle <reference>\n  runtime bundle list [--page-size <n>] [--cursor <cursor>]\n  runtime bundle remove --bundle <reference> --expected-generation <n>\n  runtime storage status\n  runtime storage policy --expected-generation <n> --total-quota-bytes <bytes> --safety-margin-bytes <bytes> --retention-days <days>\n  runtime storage root --expected-generation <n> (--root <path> | --default)\n  session list [--page-size <n>] [--cursor <cursor>]\n  session show --session <id>\n  session pin|unpin --session <id> --expected-generation <n>\n  session cleanup preview\n  session cleanup apply --preview-id <uuid> --preview-digest <sha256>\n  session export preview --session <id> --destination <path> [--allow-sensitive]\n  session export apply --preview-id <uuid> --preview-digest <sha256>\n\nOptions: --output human|json, --control-request-id <id>\nA private local Runtime must be running. Windows requires the installed daemon identity."
+            "ArkDeck commands:\n  doctor [--deep] [--require-healthy]\n  operation list\n  operation describe|example --operation <reference>\n  job status|show|evidence|result --job <id> [--timeout <duration>]\n  job timeline --job <id> [--page-size <n>] [--cursor <cursor>] [--timeout <duration>]\n  job events --job <id> [--page-size <n>] [--after-cursor <cursor>] [--timeout <duration>]\n  job plan --request-file <path> | --target <id> --operation <reference> [--inputs-file <path>] [--expected-binding-revision <n>] [--request-id <id>] [--idempotency-key <key>] [--timeout <duration>]\n  job submit --request-file <path> | --target <id> --operation <reference> [--inputs-file <path>] [--expected-binding-revision <n>] [--request-id <id>] [--idempotency-key <key>] [--timeout <duration>]\n  job run --job <id> [--timeout <duration>]\n  job cancel --job <id>\n  capability list\n  capability inspect --capability <id>\n  job list [--page-size <n>] [--cursor <cursor>] [--order <order>] [--include-current] [--include-timeline] [--state <state>] [--operation <reference>] [--target <id>] [--thread <id>] [--timeout <duration>]\n  artifact import hap|native-library|workspace-patch|flash-bundle --import-request-id <id> --target <id> --file <path> [--timeout <duration>]\n  artifact import abort --import-request-id <id> --expected-generation <n> [--timeout <duration>]\n  artifact import inspect --import-request-id <id>|--import <id> [--timeout <duration>]\n  artifact inspect --job <id>|--import <id> --artifact <id> [--timeout <duration>]\n  artifact read --job <id>|--import <id> --artifact <id> [--offset <n>] [--max-bytes <n>] [--allow-sensitive] [--raw] [--timeout <duration>]\n  artifact export --job <id>|--import <id> --artifact <id> --destination <directory> [--allow-sensitive] [--overwrite] [--timeout <duration>]\n  artifact quota\n  artifact list --job <id>|--import <id> [--page-size <n>] [--cursor <cursor>] [--timeout <duration>]\n  agent run --operation <reference> [--target <id>] [--expected-binding-revision <n>] [--inputs-file <path>] [--request-id <id>] [--idempotency-key <key>] [--capability <id>] [--reviewed-plan-digest <sha256>] | --request-file <path>, [--execution-id <id>] [--maximum-wait <duration>] [--timeout <duration>]\n  agent status --execution-id <id> [--timeout <duration>]\n  device candidates\n  target list\n  target show --target <id> [--timeout <duration>]\n  target display-name set|clear --target <id> --expected-generation <n> [--name <text>]\n  device display-name set|clear --candidate <key> --observation <id> --observation-generation <n> [--name <text>]\n  trace cache status|purge\n  history filter list\n  history filter save --expected-generation <n> [--search <text>] [--status <status>] [--mode <mode>] [--session <id>] [--target <id>] [--time <range>] [--activity <activity>]\n  history filter delete --expected-generation <n>\n  runtime tool register --kind deveco --root <absolute-path>\n  runtime tool register --kind hdc --file <absolute-path>\n  runtime tool list [--page-size <n>] [--cursor <cursor>]\n  runtime tool remove --tool <reference> --expected-generation <n>\n  runtime tool inspect --tool <reference>\n  runtime bundle register --kind daemon-bundle --file <absolute-path>\n  runtime bundle inspect --bundle <reference>\n  runtime bundle list [--page-size <n>] [--cursor <cursor>]\n  runtime bundle remove --bundle <reference> --expected-generation <n>\n  runtime storage status\n  runtime storage policy --expected-generation <n> --total-quota-bytes <bytes> --safety-margin-bytes <bytes> --retention-days <days>\n  runtime storage root --expected-generation <n> (--root <path> | --default)\n  session list [--page-size <n>] [--cursor <cursor>]\n  session show --session <id>\n  session pin|unpin --session <id> --expected-generation <n>\n  session cleanup preview\n  session cleanup apply --preview-id <uuid> --preview-digest <sha256>\n  session export preview --session <id> --destination <path> [--allow-sensitive]\n  session export apply --preview-id <uuid> --preview-digest <sha256>\n\nOptions: --output human|json, --control-request-id <id>\nA private local Runtime must be running. Windows requires the installed daemon identity."
         );
         return 0.into();
     }
@@ -269,17 +364,25 @@ fn main() -> std::process::ExitCode {
             // verification or outcome needs attention: only the validated
             // Runtime answer determines the process exit code. A run's terminal
             // state and a result's attention are reported after it is emitted.
-            let attention = match invocation.command {
-                "job.run" => arkdeck_cli::run_exit(&result),
+            let attention: Option<(u8, String)> = match invocation.command {
+                "job.run" => {
+                    arkdeck_cli::run_exit(&result).map(|(code, reason)| (code, reason.to_owned()))
+                }
                 "job.result" => Some(arkdeck_cli::result_exit(&result))
                     .filter(|code| *code != 0)
-                    .map(|code| (code, "Job outcome or evidence requires attention")),
+                    .map(|code| {
+                        (
+                            code,
+                            "Job outcome or evidence requires attention".to_owned(),
+                        )
+                    }),
+                "agent.run" => arkdeck_cli::agent_exit(&result),
                 _ => None,
             };
             let exit: u8 = if invocation.command == "job.evidence" {
                 arkdeck_cli::evidence_exit(&result)
             } else {
-                attention.map_or(0, |(code, _)| code)
+                attention.as_ref().map_or(0, |(code, _)| *code)
             };
             if invocation.raw {
                 let bytes = arkdeck_cli::artifact_bytes(&result).expect("validated Artifact bytes");
@@ -308,6 +411,9 @@ fn main() -> std::process::ExitCode {
                     return 74.into();
                 }
             } else {
+                if let Some(progress) = arkdeck_cli::human_action_progress(&error) {
+                    eprintln!("{progress}");
+                }
                 eprintln!("arkdeck: {}", error.message);
             }
             error.exit_code().into()

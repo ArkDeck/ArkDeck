@@ -58,6 +58,7 @@ dependencies = [
  "arkdeck-contract",
  "arkdeck-platform",
  "serde_json",
+ "unicode-segmentation",
 ]
 
 [[package]]

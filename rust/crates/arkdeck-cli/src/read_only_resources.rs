@@ -148,7 +148,7 @@ pub(super) fn date(v: &Value) -> bool {
             && tail[1..3].parse::<u32>().is_ok_and(|n| n < 24)
             && tail[4..6].parse::<u32>().is_ok_and(|n| n < 60))
 }
-fn publication(v: &Value) -> bool {
+pub(super) fn publication(v: &Value) -> bool {
     if !keys(
         v,
         &["state", "manifestSha256", "catalogGeneration", "reasonCode"],
@@ -412,7 +412,7 @@ pub(super) fn validate_job_status(id: &str, v: &Value) -> Result<(), CliError> {
     Ok(())
 }
 
-fn terminal_job_state(state: &str) -> bool {
+pub(super) fn terminal_job_state(state: &str) -> bool {
     [
         "planned",
         "succeeded",

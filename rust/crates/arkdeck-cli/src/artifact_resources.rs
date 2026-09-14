@@ -59,7 +59,7 @@ pub(crate) fn configure(
     if help
         || !matches!(
             command,
-            "artifact.inspect" | "artifact.read" | "artifact.export"
+            "artifact.list" | "artifact.inspect" | "artifact.read" | "artifact.export"
         )
     {
         return Ok(None);
@@ -69,6 +69,12 @@ pub(crate) fn configure(
     let (kind, id) = match (job, imported) {
         (Some(id), None) => ("job", id),
         (None, Some(id)) => ("import", id),
+        (None, None) if command == "artifact.list" => {
+            return Err(CliError::new(
+                "invalidOption",
+                "artifact list requires exactly one of --job or --import",
+            ));
+        }
         (None, None) => {
             return Err(CliError::new(
                 "invalidOption",
@@ -90,6 +96,35 @@ pub(crate) fn configure(
         ));
     }
     fields.insert("owner".into(), value);
+    if command == "artifact.list" {
+        // Swift: a metadata query takes neither an item filter nor content access.
+        if fields.remove("artifactId").is_some() || fields.remove("allowSensitive").is_some() {
+            return Err(CliError::new(
+                "invalidInput",
+                "Artifact metadata queries do not accept content-access or item-filter options",
+            ));
+        }
+        let size = match fields.remove("pageSize") {
+            None => 100,
+            Some(value) => value
+                .as_str()
+                .and_then(|text| text.parse::<u64>().ok())
+                .filter(|size| (1..=1000).contains(size))
+                .ok_or_else(|| {
+                    CliError::new("invalidOption", "page-size must be between 1 and 1000")
+                })?,
+        };
+        fields.insert("pageSize".into(), json!(size));
+        let timeout = fields.remove("timeout").unwrap_or(json!("1h"));
+        return crate::read_only_resources::duration(timeout.as_str().unwrap_or_default())
+            .map(Some)
+            .ok_or_else(|| {
+                CliError::new(
+                    "invalidInput",
+                    "Artifact timeout must be a positive duration bounded by 24h",
+                )
+            });
+    }
     let id = fields
         .get("artifactId")
         .and_then(Value::as_str)
@@ -204,6 +239,82 @@ pub fn validate_artifact_metadata(
         if end < start {
             return Err(invalid());
         }
+    }
+    Ok(())
+}
+/// Swift `ArtifactResourceProjection.validatePage`: one snapshot page of the
+/// owner's Artifacts, each row valid metadata of that owner, each identity once,
+/// in `createdAtDescArtifactIdAsc` order, with a cursor of the same snapshot
+/// exactly when more rows follow.
+pub fn validate_artifact_page(
+    value: &Value,
+    owner: &Value,
+    page_size: u64,
+) -> Result<(), CliError> {
+    let malformed = || CliError::new("recordUnreadable", "Artifact inventory page is malformed");
+    arkdeck_contract::validate_method_value("artifact.list", "result", value)
+        .map_err(|_| malformed())?;
+    let revision = value["snapshotRevision"].as_str().unwrap_or_default();
+    let uuid = revision.len() == 36
+        && revision.bytes().enumerate().all(|(index, byte)| {
+            if [8, 13, 18, 23].contains(&index) {
+                byte == b'-'
+            } else {
+                byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)
+            }
+        });
+    let (Some(rows), Some(more)) = (value["items"].as_array(), value["hasMore"].as_bool()) else {
+        return Err(malformed());
+    };
+    let cursor = if more {
+        value["nextCursor"].as_str().is_some_and(|cursor| {
+            cursor
+                .strip_prefix(revision)
+                .is_some_and(|tail| tail.starts_with('.'))
+                && cursor.len() <= 2048
+        })
+    } else {
+        value["nextCursor"].is_null()
+    };
+    if !keys(
+        value,
+        &[
+            "schemaVersion",
+            "pageKind",
+            "items",
+            "order",
+            "snapshotRevision",
+            "hasMore",
+            "nextCursor",
+        ],
+    ) || value["schemaVersion"] != "arkdeck.cli.page/1"
+        || value["pageKind"] != "snapshot"
+        || value["order"] != "createdAtDescArtifactIdAsc"
+        || !uuid
+        || rows.len() as u64 > page_size.min(1000)
+        || (more && rows.is_empty())
+        || !cursor
+    {
+        return Err(malformed());
+    }
+    let mut seen = std::collections::BTreeSet::new();
+    let mut previous: Option<(f64, &str)> = None;
+    for row in rows {
+        let params = Map::from_iter([
+            ("owner".into(), owner.clone()),
+            ("artifactId".into(), row["artifactId"].clone()),
+        ]);
+        validate_artifact_metadata(&params, row).map_err(|_| malformed())?;
+        let id = row["artifactId"].as_str().ok_or_else(malformed)?;
+        let created =
+            crate::job_resources::date_seconds(&row["createdAtUtc"]).ok_or_else(malformed)?;
+        if !seen.insert(id)
+            || previous
+                .is_some_and(|(time, before)| time < created || (time == created && before >= id))
+        {
+            return Err(malformed());
+        }
+        previous = Some((created, id));
     }
     Ok(())
 }

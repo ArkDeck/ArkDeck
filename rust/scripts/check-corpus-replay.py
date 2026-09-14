@@ -36,8 +36,11 @@ oracle's.
 The daemon is then restarted over the same root, and every Job's status,
 record, result and evidence, and every execution's status, must read as they
 did before; the Rust CLI reads the first Job's result and evidence as the
-socket did. Two startups are refused: a development HDC without a development
-root, and one named by a relative path.
+socket did and, for an agent oracle, every execution's status and the first
+Job's Artifacts, then runs a new `observe.device@1` execution to its end as
+Golden Journey 1 enters (`agent run --operation … --target …`). Two startups
+are refused: a development HDC without a development root, and one named by a
+relative path.
 
 Byte equality of what the Jobs and executions leave (T0) is the in-process
 replays' (`cargo test -p arkdeck-hoststore --test observe_device --test
@@ -308,6 +311,38 @@ def main() -> None:
                 check(f'CLI job {command}', completed.returncode == 0
                       and envelope.get('result') == before[(first, method)]['result'],
                       (completed.returncode, completed.stderr.decode(errors='replace')))
+            for run, execution in executions.items():
+                completed = subprocess.run(
+                    [str(cli), '--output', 'json', 'agent', 'status', '--execution-id', execution],
+                    env=cli_env, capture_output=True, timeout=120)
+                envelope = json.loads(completed.stdout or b'{}')
+                check(f'CLI agent status {run}', completed.returncode == 0
+                      and envelope.get('result') == before[(run, 'agent.status')]['result'],
+                      (completed.returncode, completed.stderr.decode(errors='replace')))
+            if executions:
+                listed = subprocess.run(
+                    [str(cli), '--output', 'json', 'artifact', 'list', '--job', jobs[first]],
+                    env=cli_env, capture_output=True, timeout=120)
+                page = json.loads(listed.stdout or b'{}').get('result') or {}
+                direct = exchange(endpoint, 'artifact.list',
+                                  {'owner': {'kind': 'job', 'id': jobs[first]}, 'pageSize': 100})
+                check('CLI artifact list', listed.returncode == 0
+                      and sorted(item['artifactId'] for item in page.get('items', []))
+                      == sorted(item['artifactId'] for item in direct['result']['items']),
+                      (listed.returncode, listed.stderr.decode(errors='replace')))
+                # Golden Journey 1's entry through the Rust CLI: a new execution
+                # owns its Job, which runs on the fake to its end.
+                run = subprocess.run(
+                    [str(cli), '--output', 'json', 'agent', 'run', '--operation', 'observe.device@1',
+                     '--target', oracle['target']['targetId'], '--execution-id', 'gj1-cli',
+                     '--timeout', '2m'],
+                    env=cli_env, capture_output=True, timeout=300)
+                envelope = json.loads(run.stdout or b'{}')
+                result = envelope.get('result') or {}
+                check('CLI agent run', run.returncode == 0 and envelope.get('ok') is True
+                      and result.get('state') == 'completed' and result.get('jobState') == 'succeeded'
+                      and result.get('evidence', {}).get('status') == 'verified',
+                      (run.returncode, run.stdout[-400:], run.stderr.decode(errors='replace')))
             stop(daemon_process)
 
             refused_startup(dict(clean, ARKDECK_ENDPOINT=str(base / 'refused.sock'),
