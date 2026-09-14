@@ -50,6 +50,10 @@ impl LoaderObserver for RefusingLoader {
 struct NormalOnlyUsb(&'static str);
 
 impl UsbProbe for NormalOnlyUsb {
+    fn single_loader(&self, _: &str) -> Result<LoaderIdentity, String> {
+        Err("fixture has no Loader".into())
+    }
+
     fn single_hdc_normal(&self, stable_identity_sha256: &str) -> Result<LoaderIdentity, String> {
         let identity = format!("{:x}", Sha256::digest(CONNECT_KEY.as_bytes()));
         if stable_identity_sha256 != identity {

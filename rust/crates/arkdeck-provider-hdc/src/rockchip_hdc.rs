@@ -756,6 +756,10 @@ mod tests {
     }
 
     impl UsbProbe for UsbScript {
+        fn single_loader(&self, _: &str) -> Result<LoaderIdentity, String> {
+            Err("DAYU200 target unavailable".to_owned())
+        }
+
         fn single_hdc_normal(
             &self,
             stable_identity_sha256: &str,

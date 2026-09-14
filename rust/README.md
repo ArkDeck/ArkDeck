@@ -1031,6 +1031,29 @@ advance and the executor's observation-reuse cache are other owners'.
 `tests/rockchip_hdc.rs` drives the shared fake HDC driver with its own
 answers fragment and asserts the argv from the driver's log.
 
+## Rockchip Loader transition (TASK-XPA-016, M4)
+
+`arkdeck_provider_hdc::RockchipLoaderTransition` is the Loader side of
+Swift's Rockchip flash executor: `enter_loader` sends the one mutating HDC
+command of the flash flow (`hdc -t <key> shell reboot loader`, 20 s, 64 KiB)
+unless the exact bound Loader is already there (confirmed by ArkForge, no
+command sent), and believes the command only when the exact bound Loader
+appears within the readback budget (45 s, one readback a second) — even exit
+0 is not the semantic boundary of a command whose success disconnects its
+own transport. When it does not: the exact HDC-normal readback proves the
+transition did not complete (`ConfirmedNotExecuted` with one of Swift's two
+closed diagnostics), else a command that did not return cleanly stays as it
+was, else the mutation is unknown; both failure exits carry the command's
+evidence clause (`transition_evidence_summary`: exit status, a bounded
+single-line stderr, the runner failure — which names a terminating signal
+through `signal_death`, readable back with `signal_number`). `wait_for_loader`
+and `rebind_loader` are the same readback for the Loader and rebind arms.
+The `UsbProbe` port gains `single_loader`; `LoaderObserver` gains
+`confirm_loader` (defaulting to a fresh observation). The observation-reuse
+cache keyed by the managed-control step id stays with the executor.
+`tests/rockchip_loader.rs` drives the shared fake HDC driver and asserts the
+command's argv and the refusal it prints.
+
 ## macOS facade host owners (TASK-XPA-012)
 
 The installed facade pair now serves `history.filter.list/save/delete` itself.

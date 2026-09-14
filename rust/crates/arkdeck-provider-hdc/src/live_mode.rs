@@ -143,15 +143,34 @@ pub trait LoaderObserver {
         expected_usb_topology: Option<&str>,
         request_id: &str,
     ) -> Result<LoaderIdentity, String>;
+
+    /// Swift `confirmLoader(_:stableIdentitySHA256:expectedUSBTopology:
+    /// requestID:)`: confirms ArkForge's independent observation against an
+    /// identity the caller just read from the port, so production need not
+    /// enumerate a second time; the conservative default observes afresh.
+    fn confirm_loader(
+        &self,
+        identity: &LoaderIdentity,
+        stable_identity_sha256: &str,
+        expected_usb_topology: Option<&str>,
+        request_id: &str,
+    ) -> Result<LoaderIdentity, String> {
+        let _ = identity;
+        self.observe_loader(stable_identity_sha256, expected_usb_topology, request_id)
+    }
 }
 
-/// Swift `RockchipRuntimeUSBProbing`'s HDC-normal lookups: exactly one
-/// HDC-normal DAYU200 whose serial digest is the given identity, or exactly
-/// one at the given USB topology, each with its current topology. ArkDeck no
-/// longer owns the enumeration (design: `arkforged discoverDevices`), so this
-/// is a port; the callers discard the reason a lookup refuses with, as
-/// Swift's `try?` does.
+/// Swift `RockchipRuntimeUSBProbing`: exactly one Loader or HDC-normal
+/// DAYU200 whose serial digest is the given identity, or exactly one
+/// HDC-normal at the given USB topology, each with its current topology.
+/// ArkDeck no longer owns the enumeration (design: `arkforged
+/// discoverDevices`), so this is a port; the callers discard or quote the
+/// reason a lookup refuses with, as Swift does.
 pub trait UsbProbe {
+    /// `singleLoader(stableIdentitySHA256:)`: exactly one RockUSB Loader
+    /// whose serial digest is the given identity.
+    fn single_loader(&self, stable_identity_sha256: &str) -> Result<LoaderIdentity, String>;
+
     /// `singleHDCNormal(stableIdentitySHA256:)`.
     fn single_hdc_normal(&self, stable_identity_sha256: &str) -> Result<LoaderIdentity, String>;
 
@@ -500,6 +519,10 @@ mod tests {
     }
 
     impl UsbProbe for NormalOnlyUsb {
+        fn single_loader(&self, _: &str) -> Result<LoaderIdentity, String> {
+            Err("fixture has no Loader".into())
+        }
+
         fn single_hdc_normal(
             &self,
             stable_identity_sha256: &str,
