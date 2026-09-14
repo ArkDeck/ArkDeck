@@ -107,7 +107,12 @@ impl CliError {
     pub fn from_client(error: ClientError, method: &str) -> Self {
         if matches!(
             method,
-            "job.submit" | "job.run" | "job.cancel" | "agent.run" | "agent.abandon"
+            "job.submit"
+                | "job.run"
+                | "job.cancel"
+                | "agent.run"
+                | "agent.abandon"
+                | "target.adopt"
         ) {
             return job_plan::mutation_error(error, method);
         }
@@ -574,8 +579,10 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["capability", "list"] => "capability.list",
         ["capability", "inspect"] => "capability.inspect",
         ["device", "candidates"] => "device.candidates",
+        ["target", "adopt"] => "target.adopt",
         ["target", "list"] => "target.list",
         ["target", "show"] => "target.show",
+        ["target", "availability"] => "target.availability",
         ["target", "display-name", "set"] => "target.display-name.set",
         ["target", "display-name", "clear"] => "target.display-name.clear",
         ["device", "display-name", "set"] => "device.display-name.set",
@@ -608,7 +615,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         _ => {
             return Err(CliError::new(
                 "invalidCommand",
-                "available commands: doctor, operation list, target list|show, target display-name set|clear, device display-name set|clear, device candidates, trace cache status|purge, history filter list|save|delete, runtime storage status|policy|root, session list|show|pin|unpin, session cleanup preview|apply, session export preview|apply",
+                "available commands: doctor, operation list, target adopt|list|show|availability, target display-name set|clear, device display-name set|clear, device candidates, trace cache status|purge, history filter list|save|delete, runtime storage status|policy|root, session list|show|pin|unpin, session cleanup preview|apply, session export preview|apply",
             ));
         }
     };
@@ -638,8 +645,14 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         "artifact.import.abort" => &["importRequestId", "expectedGeneration", "timeout"],
         "artifact.import.inspect" => &["importRequestId", "import", "timeout"],
 
+        "target.adopt" => &[
+            "candidate",
+            "observationId",
+            "observationGeneration",
+            "timeout",
+        ],
         "target.list" => &["timeout"],
-        "target.show" => &["targetId", "timeout"],
+        "target.show" | "target.availability" => &["targetId", "timeout"],
         "target.display-name.set" => &["targetId", "expectedGeneration", "name", "timeout"],
         "target.display-name.clear" => &["targetId", "expectedGeneration", "timeout"],
         "device.display-name.set" => &[
