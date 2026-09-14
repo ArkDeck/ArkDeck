@@ -289,14 +289,14 @@ fn executable_path(pid: i32) -> Option<PathBuf> {
     std::fs::canonicalize(path).ok()
 }
 
-struct ProcessBirth {
-    uid: u32,
-    start_seconds: u64,
-    start_microseconds: u64,
+pub(crate) struct ProcessBirth {
+    pub(crate) uid: u32,
+    pub(crate) start_seconds: u64,
+    pub(crate) start_microseconds: u64,
 }
 
 /// Swift `startIdentity`: the birth time the kernel keeps for the PID.
-fn process_birth(pid: i32) -> Option<ProcessBirth> {
+pub(crate) fn process_birth(pid: i32) -> Option<ProcessBirth> {
     // SAFETY: zero is a valid empty proc_bsdinfo representation.
     let mut info: libc::proc_bsdinfo = unsafe { std::mem::zeroed() };
     let size = libc::c_int::try_from(std::mem::size_of::<libc::proc_bsdinfo>()).ok()?;

@@ -689,6 +689,11 @@ pub use pty_exchange::{PtyError, PtyExecution, PtyFailureCategory, PtyInteractio
 mod tool_process;
 #[cfg(target_os = "macos")]
 pub use tool_process::{ToolExecution, ToolLimits, ToolRequest, ToolRunError, ToolTermination};
+#[cfg(target_os = "macos")]
+#[path = "managed_server.rs"]
+mod managed_server;
+#[cfg(target_os = "macos")]
+pub use managed_server::{ManagedServer, ServerExit, ServerLaunch, ServerStop};
 
 #[cfg(target_os = "macos")]
 #[path = "analyzer_process.rs"]
