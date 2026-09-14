@@ -131,9 +131,9 @@ pub trait HostServices: Send + Sync {
             details: None,
         })
     }
-    /// `agent.run` and `agent.status` advance and read agent executions. A
-    /// host without an agent execution owner answers as the read-only
-    /// foundation always has.
+    /// `agent.run`, `agent.status`, `agent.list` and `agent.abandon` advance,
+    /// read, list and abandon agent executions. A host without an agent
+    /// execution owner answers as the read-only foundation always has.
     fn agent_execution(
         &self,
         _method: &str,
@@ -815,7 +815,7 @@ impl<H: HostServices> Control<H> {
                     outcome: self.host.artifact_resource(&request.method, &params),
                 }
             }
-            "agent.run" | "agent.status" => Response {
+            "agent.run" | "agent.status" | "agent.list" | "agent.abandon" => Response {
                 id: request.id.clone(),
                 outcome: self.host.agent_execution(&request.method, &params),
             },

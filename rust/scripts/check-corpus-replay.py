@@ -42,8 +42,8 @@ relative path.
 
 Byte equality of what the Jobs and executions leave (T0) is the in-process
 replays' (`cargo test -p arkdeck-hoststore --test observe_device --test
-agent_execution`), which run on the oracle's fixed clock; this harness runs on
-the host's. Host-only: the fake reaches no device, and nothing installed is
+capture_diagnostics --test agent_execution --test agent_lifecycle`), which run
+on the oracle's fixed clock; this harness runs on the host's. Host-only: the fake reaches no device, and nothing installed is
 read or written.
 """
 from __future__ import annotations
@@ -69,12 +69,15 @@ TIME = re.compile(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z')
 # Swift's wording, and values that cover the owner's own clock.
 LABELS = {'message', 'manifestSha256', 'snapshotRevision', 'nextCursor'}
 SERVED = {'job.plan', 'job.submit', 'job.run', 'job.result', 'job.evidence', 'artifact.list',
-          'agent.run', 'agent.status'}
+          'agent.run', 'agent.status', 'agent.list', 'agent.abandon'}
 TERMINAL = {'planned', 'succeeded', 'recovered', 'failed', 'cancelled', 'interrupted'}
 # An execution that has not yet recorded its Job's end.
 UNSETTLED = {'orchestrating', 'creatingJob', 'jobOwned'}
 READS = ('job.status', 'job.show', 'job.result', 'job.evidence')
 CURSOR = re.compile(r'<nextCursor of (.+)>')
+# Listings ordered by creation time: each item's identity and time, and the order.
+LISTINGS = {'artifact.list': ('artifactId', 'createdAtUtc', 'createdAtDescArtifactIdAsc'),
+            'agent.list': ('executionId', 'createdAt', 'createdAtDescExecutionIdAsc')}
 
 
 def comparable(value, key: str | None = None):
@@ -250,7 +253,8 @@ def main() -> None:
                 answer = exchange(endpoint, method, params)
                 answers[name] = answer
                 answer = labelled(answer, item['answer'])
-                if method == 'artifact.list' and answer.get('ok') and item['answer'].get('ok'):
+                if method in LISTINGS and answer.get('ok') and item['answer'].get('ok'):
+                    identity_key, created_key, order = LISTINGS[method]
                     listings[name] = opened
                     compare(f'{name}: T1 page', answer, item['answer'], counted)
                     ours, swift = listed.setdefault(opened, ([], []))
@@ -258,12 +262,12 @@ def main() -> None:
                     swift += item['answer']['result']['items']
                     if answer['result']['nextCursor'] is None:
                         def by_id(entry: dict) -> str:
-                            return entry['artifactId']
+                            return entry[identity_key]
                         check(f'{opened}: T1 listing', sorted(map(comparable, ours), key=by_id)
                               == sorted(map(comparable, swift), key=by_id), (ours, swift))
-                        check(f'{opened}: listing order (createdAtDescArtifactIdAsc)',
+                        check(f'{opened}: listing order ({order})',
                               ours == sorted(sorted(ours, key=by_id),
-                                             key=lambda entry: entry['createdAtUtc'], reverse=True),
+                                             key=lambda entry: entry[created_key], reverse=True),
                               ours)
                 else:
                     compare(f'{name}: T1 answer', answer, item['answer'])

@@ -522,10 +522,11 @@ impl HostServices for Host {
         artifacts.handle_resource(method, params, |job| self.require_artifact_job(job))
     }
 
-    /// `agent.run` and `agent.status`, as the Swift daemon's
-    /// `agentExecutionRequest` answers them: the execution advanced or read
-    /// by its owner, its newly owned Job started in the background, then the
-    /// Job projected over the answer.
+    /// `agent.run`, `agent.status`, `agent.list` and `agent.abandon`, as the
+    /// Swift daemon's `agentExecutionRequest` answers them: the execution
+    /// advanced, read, listed or abandoned by its owner, its newly owned Job
+    /// started in the background, then the Job projected over an execution's
+    /// own answer.
     #[cfg(target_os = "macos")]
     fn agent_execution(
         &self,
@@ -575,6 +576,11 @@ impl HostServices for Host {
         let answer = agents.advance(method, params, &engine)?;
         if let Some(start) = answer.start {
             self.start_agent_run(start);
+        }
+        // Swift projects the owned Job over a run's and a status read's
+        // answer only; a page and an abandonment answer as the owner wrote.
+        if !matches!(method, "agent.run" | "agent.status") {
+            return Ok(answer.value);
         }
         arkdeck_hoststore::AgentExecutionStore::project(
             answer.value,
