@@ -939,11 +939,20 @@ candidate names require the current Runtime observation reference and expire on
 refresh or restart. A lost or invalid name-write reply is `outcomeUnknown`; the
 CLI never replays it.
 
-The daemon's candidate observations still come from the configured HDC read-only
-provider, until its routes move to the owner below. The daemon cannot select an
-execution route or write alias history. `target.show` leaves the absent Bootstrap
-warm presentation and confirmed Job-observation sources as `null`. Existing
-adopted names can be projected onto actually observed provider addresses.
+With the development HDC, the daemon answers `device.observations` (following a
+reference too) and `target.adopt` through the owner below. Its USB relations are
+the production stand-in, which reads none until the ArkForge lane's reader lands,
+so the daemon proves and adopts nothing yet. A host composed with relations
+(`Host::with_usb_relations`, which only tests compose until a development source
+lands) proves and adopts as Swift does. Candidate display
+names stay on the provider snapshot's path until Swift's coordinator is recorded
+for them, so with the development HDC they find no current snapshot
+(`resourceConflict`). Without the development HDC, observations keep the
+read-only provider's path. The daemon cannot select an execution route or write
+alias history.
+`target.show` leaves the absent Bootstrap warm presentation and confirmed
+Job-observation sources as `null`. Existing adopted names can be projected onto
+actually observed provider addresses.
 
 `TargetObservations` (`target_observation.rs`, TASK-XPA-014) is Swift's
 `TargetObservationCoordinator`. Every device list is bracketed by two reads of
@@ -967,7 +976,9 @@ identity readback and a final relation read. Its refusals carry Swift's codes:
 The snapshot, the generations and the receipts live in memory, as in Swift.
 `tests/target_adoption.rs` replays Swift's `TargetAdoptionOracleContractTests`
 (`rust/tests/fixtures/target-adoption`) byte for byte: its answers, the fake's
-calls, `targets.json` and the display names.
+calls, `targets.json` and the display names. `target_observation_control.rs`, in
+agentd, replays the same fixture through `Control` with the daemon's own host, on
+the host's clock, so every time there reads as `<time>`.
 
 `rust/scripts/check-target-resources.py --swift-target-store <fixture-directory>`
 checks actual Rust endpoint/CLI behavior from bytes exported by the Swift contract

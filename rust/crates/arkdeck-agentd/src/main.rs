@@ -5,6 +5,8 @@ mod facade;
 #[cfg(target_os = "macos")]
 mod facade_owners;
 mod host;
+#[cfg(all(test, target_os = "macos"))]
+mod target_observation_control;
 
 use arkdeck_contract::MAX_REQUEST_BYTES;
 use arkdeck_control::Control;

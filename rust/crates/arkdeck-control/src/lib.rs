@@ -317,6 +317,29 @@ pub trait HostServices: Send + Sync {
             ])),
         })
     }
+    /// `device.observations` following an observation reference. A host
+    /// without a retained snapshot answers that this Runtime does not retain
+    /// it.
+    fn observations_following(
+        &self,
+        reference: &Value,
+    ) -> Result<DeviceObservationsResult, WireError> {
+        Err(observation_refusal(
+            "resourceConflict",
+            "the referenced observation is not retained by this Runtime",
+            Some(reference),
+        ))
+    }
+    /// `target.adopt`: the device of one exact observation adopted as a
+    /// Target. A host without the Target observation owner keeps the
+    /// foundation's refusal.
+    fn target_adopt(&self, _params: &serde_json::Map<String, Value>) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "rejected".into(),
+            message: "this method is unavailable in the read-only Rust foundation".into(),
+            details: None,
+        })
+    }
     fn observed_at(&self) -> String;
     fn hdc_status(&self, deep: bool) -> HdcStatus;
     fn observations(&self) -> Result<DeviceObservationsResult, WireError>;
@@ -499,15 +522,16 @@ impl<H: HostServices> Control<H> {
                         None,
                     )
                 } else if let Some(reference) = params.get("following") {
-                    // No durable relation or retained snapshot exists in this
-                    // foundation. Do not turn a caller reference into identity.
+                    // Only the host's own snapshot can retain an observation;
+                    // a caller's reference never becomes identity.
                     if valid_observation_reference(reference) {
-                        observation_failure(
-                            &request.id,
-                            "resourceConflict",
-                            "the referenced observation is not retained by this Runtime",
-                            Some(reference),
-                        )
+                        Response {
+                            id: request.id.clone(),
+                            outcome: self
+                                .host
+                                .observations_following(reference)
+                                .and_then(encode_observations),
+                        }
                     } else {
                         observation_failure(
                             &request.id,
@@ -519,16 +543,14 @@ impl<H: HostServices> Control<H> {
                 } else {
                     Response {
                         id: request.id.clone(),
-                        outcome: self.host.observations().and_then(|snapshot| {
-                            serde_json::to_value(snapshot).map_err(|_| WireError {
-                                code: "internalError".into(),
-                                message: "observation encoding failed".into(),
-                                details: None,
-                            })
-                        }),
+                        outcome: self.host.observations().and_then(encode_observations),
                     }
                 }
             }
+            "target.adopt" => Response {
+                id: request.id.clone(),
+                outcome: self.host.target_adopt(&params),
+            },
             "trace.cache.purge" if params.is_empty() => Response {
                 id: request.id.clone(),
                 outcome: self.host.trace_cache_purge(),
@@ -1033,9 +1055,9 @@ fn valid_observation_reference(value: &Value) -> bool {
             })
 }
 
-fn observation_failure(id: &str, code: &str, message: &str, reference: Option<&Value>) -> Response {
-    // All callers are before the host entry; this proof is local, not inferred
-    // from a timeout, lost reply or external observation failure.
+/// A device observation refused before admission: no new dispatch, and the
+/// observation reference the request named, if any.
+pub fn observation_refusal(code: &str, message: &str, reference: Option<&Value>) -> WireError {
     let mut details = serde_json::Map::from_iter([
         ("phase".into(), json!("preAdmission")),
         ("newDispatchCount".into(), json!(0)),
@@ -1045,14 +1067,28 @@ fn observation_failure(id: &str, code: &str, message: &str, reference: Option<&V
             details.insert(key.into(), reference[key].clone());
         }
     }
+    WireError {
+        code: code.into(),
+        message: message.into(),
+        details: Some(details),
+    }
+}
+
+fn observation_failure(id: &str, code: &str, message: &str, reference: Option<&Value>) -> Response {
+    // All callers are before the host entry; this proof is local, not inferred
+    // from a timeout, lost reply or external observation failure.
     Response {
         id: id.into(),
-        outcome: Err(WireError {
-            code: code.into(),
-            message: message.into(),
-            details: Some(details),
-        }),
+        outcome: Err(observation_refusal(code, message, reference)),
     }
+}
+
+fn encode_observations(snapshot: DeviceObservationsResult) -> Result<Value, WireError> {
+    serde_json::to_value(snapshot).map_err(|_| WireError {
+        code: "internalError".into(),
+        message: "observation encoding failed".into(),
+        details: None,
+    })
 }
 
 fn frame_id(bytes: &[u8]) -> String {

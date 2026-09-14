@@ -14,6 +14,18 @@ struct ObservationState {
     snapshot: Option<DeviceObservationsResult>,
 }
 
+/// The Target observation owner's answer as the control layer's typed result.
+#[cfg(target_os = "macos")]
+fn typed_observations(
+    answer: Result<serde_json::Value, arkdeck_hoststore::ObservationError>,
+) -> Result<DeviceObservationsResult, WireError> {
+    serde_json::from_value(answer.map_err(|error| error.wire())?).map_err(|_| WireError {
+        code: "internalError".into(),
+        message: "observation encoding failed".into(),
+        details: None,
+    })
+}
+
 /// The Artifact quota the Swift daemon composes (`ArtifactQuota()`).
 #[cfg(target_os = "macos")]
 pub(crate) const ARTIFACT_QUOTA: u64 = 8 * 1024 * 1024 * 1024;
@@ -99,6 +111,15 @@ pub struct Host {
     /// plan takes.
     #[cfg(target_os = "macos")]
     hdc: Option<std::sync::Arc<arkdeck_provider_hdc::ProcessDispatch>>,
+    /// The Runtime's Target observation owner over the development HDC.
+    #[cfg(target_os = "macos")]
+    target_observations: arkdeck_hoststore::TargetObservations,
+    /// Who reads the live USB relations that prove an observation's
+    /// physical identity. By default nothing is read, until the ArkForge
+    /// lane's reader lands, so no observation is proved and nothing can be
+    /// adopted.
+    #[cfg(target_os = "macos")]
+    usb: std::sync::Arc<dyn arkdeck_provider_hdc::UsbRelations + Send + Sync>,
 }
 
 impl Host {
@@ -156,6 +177,29 @@ impl Host {
     ) -> Self {
         self.hdc = dispatch.map(std::sync::Arc::new);
         self
+    }
+    /// The USB relations the Target observation owner reads. Only tests
+    /// compose them until a development source lands.
+    #[cfg(all(test, target_os = "macos"))]
+    pub fn with_usb_relations(
+        mut self,
+        usb: std::sync::Arc<dyn arkdeck_provider_hdc::UsbRelations + Send + Sync>,
+    ) -> Self {
+        self.usb = usb;
+        self
+    }
+    /// Runs `run` over the Target observation owner's sources — the
+    /// development HDC, the USB relations, the Target store and the clock —
+    /// when this composition has them.
+    #[cfg(target_os = "macos")]
+    fn observe<T>(&self, run: impl FnOnce(&arkdeck_hoststore::Sources<'_>) -> T) -> Option<T> {
+        let (dispatch, targets) = (self.hdc.as_ref()?, self.targets.as_ref()?);
+        Some(run(&arkdeck_hoststore::Sources {
+            dispatch: &**dispatch,
+            relations: &*self.usb,
+            targets,
+            now: &utc_now,
+        }))
     }
     #[cfg(target_os = "macos")]
     fn hdc(&self) -> Option<arkdeck_hoststore::HdcComposition<'_>> {
@@ -337,6 +381,10 @@ impl Host {
             hdc: None,
             #[cfg(target_os = "macos")]
             agents: None,
+            #[cfg(target_os = "macos")]
+            target_observations: Default::default(),
+            #[cfg(target_os = "macos")]
+            usb: std::sync::Arc::new(arkdeck_provider_hdc::NoUsbRelations),
         }
     }
 }
@@ -1255,12 +1303,61 @@ impl HostServices for Host {
             reason_code: reason.into(),
         }
     }
+    #[cfg(target_os = "macos")]
+    fn observations_following(
+        &self,
+        reference: &serde_json::Value,
+    ) -> Result<DeviceObservationsResult, WireError> {
+        let empty = serde_json::Map::new();
+        let fields = reference.as_object().unwrap_or(&empty);
+        match self.observe(|sources| {
+            let reference = arkdeck_hoststore::parse_reference(fields)?;
+            self.target_observations
+                .snapshot(sources, Some(&reference))
+                .and_then(|snapshot| snapshot.answer(sources.targets))
+        }) {
+            Some(answer) => typed_observations(answer),
+            None => Err(arkdeck_control::observation_refusal(
+                "resourceConflict",
+                "the referenced observation is not retained by this Runtime",
+                Some(reference),
+            )),
+        }
+    }
+    #[cfg(target_os = "macos")]
+    fn target_adopt(
+        &self,
+        params: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<serde_json::Value, WireError> {
+        match self.observe(|sources| {
+            let reference = arkdeck_hoststore::parse_reference(params)?;
+            self.target_observations
+                .adopt(sources, &reference)
+                .map(|adopted| arkdeck_hoststore::adoption_answer(&adopted, &reference))
+        }) {
+            Some(answer) => answer.map_err(|error| error.wire()),
+            None => Err(WireError {
+                code: "rejected".into(),
+                message: "this method is unavailable in the read-only Rust foundation".into(),
+                details: None,
+            }),
+        }
+    }
     fn observations(&self) -> Result<DeviceObservationsResult, WireError> {
         let fail = |message: &str| WireError {
             code: "rejected".into(),
             message: message.into(),
             details: None,
         };
+        // With the development HDC, the Target observation owner observes.
+        #[cfg(target_os = "macos")]
+        if let Some(answer) = self.observe(|sources| {
+            self.target_observations
+                .snapshot(sources, None)
+                .and_then(|snapshot| snapshot.answer(sources.targets))
+        }) {
+            return typed_observations(answer);
+        }
         let Some(provider) = &self.provider else {
             return Err(fail(self.unavailable));
         };
