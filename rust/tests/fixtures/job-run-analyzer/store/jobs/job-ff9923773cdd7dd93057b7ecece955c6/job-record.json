@@ -12,7 +12,7 @@
   "createdAtUTC" : "2026-09-14T00:00:00Z",
   "finishedAtUTC" : "2026-09-14T00:00:00Z",
   "jobID" : "job-ff9923773cdd7dd93057b7ecece955c6",
-  "materializedPlanDigest" : "342b41c0c7bd17e4cc51c7893f3db44015f4cb4763c2f3261439df3aef2a44c9",
+  "materializedPlanDigest" : "51ad85a5e14ddc4f94d96a19c8ca2f627e0279a10da6c0e10af29a4c460a89fb",
   "operationFailure" : {
     "category" : "storage",
     "code" : "artifactPublicationFailed",

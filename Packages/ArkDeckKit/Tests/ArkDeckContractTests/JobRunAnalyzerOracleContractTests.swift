@@ -24,10 +24,14 @@ import XCTest
 /// result and evidence reads refuse open options; and the store the runs leave:
 /// the Job index and files and every Artifact index and payload.
 ///
-/// The engine runs the real descriptor-bound process dispatcher and no Session
-/// publication writer, the composition the Rust runner reproduces. It runs
-/// under the `job.plan` oracle's fixed physical root and lock, since the plan
-/// digest covers the source Artifact's absolute path. Record a new oracle with
+/// Two engines over the one store run the real descriptor-bound process
+/// dispatcher and no Session publication writer, the composition the Rust
+/// runner reproduces: the timeout case's Job is admitted, run and read by the
+/// one whose analyzer has a short budget, and every other Job by the one with
+/// the daemon's production budget, so only the run that must time out rests
+/// on a short wall-clock budget. Both run under the `job.plan` oracle's fixed
+/// physical root and lock, since the plan digest covers the source Artifact's
+/// absolute path. Record a new oracle with
 /// `ARKDECK_RUST_JOB_RUN_RECORD=/private/tmp/<new directory>`; otherwise the
 /// checked-in oracle must match byte for byte.
 final class JobRunAnalyzerOracleContractTests: XCTestCase {
@@ -47,6 +51,9 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
     var exhaustsStorage = false
     /// A directory already holds this Job's Session path before it runs.
     var presetsSession = false
+    /// The Job is admitted, run and read by the composition whose analyzer
+    /// has the short budget, so the `sleep` answer times out.
+    var shortBudget = false
   }
 
   private static let repository: URL = {
@@ -69,8 +76,12 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
   private static let home = "/private/tmp/arkdeck-job-plan-oracle/home"
   /// Small enough that the `quota` answer cannot be published.
   private static let quotaBytes = 32 * 1024
+  /// The analyzer budget the daemon composes, which every composition gives
+  /// but the one holding the run oracle's timeout case: on a busy host the
+  /// short budget turned an `answered` run into a timeout.
+  private static let timeoutSeconds = 30
   /// Short enough that the `sleep` answer times out.
-  private static let timeoutSeconds = 2
+  private static let shortTimeoutSeconds = 2
   private static let analyzerBytes = Data(
     #"""
     #!/bin/sh
@@ -248,7 +259,7 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
     Case(name: "undecodableEntry", mode: "badentry", ends: "failed"),
     Case(name: "truncatedStdout", mode: "bigstdout", ends: "failed"),
     Case(name: "truncatedStderr", mode: "bigstderr", ends: "failed"),
-    Case(name: "timedOut", mode: "sleep", ends: "waitingForRecovery"),
+    Case(name: "timedOut", mode: "sleep", ends: "waitingForRecovery", shortBudget: true),
     Case(name: "signalled", mode: "signal", ends: "waitingForRecovery"),
     Case(name: "quotaExceeded", mode: "quota", ends: "failed"),
     Case(name: "rerunSucceeded", rerun: "answered"),
@@ -274,28 +285,18 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
     let store = try RuntimeArtifactStore(
       rootURL: artifacts, quota: ArtifactQuota(totalBytes: Self.quotaBytes),
       redaction: ArtifactRedactionPolicy(homeDirectory: Self.home), nowUTC: { Self.nowUTC })
-    let profile = AnalyzerProfile(
-      analyzerRef: HarnessCrashLedgerAnalysis.analyzerRef,
-      analyzerVersion: HarnessCrashLedgerAnalysis.analyzerVersion,
-      executablePath: analyzer.path,
-      executableSHA256: AnalyzerProvider.sha256(Self.analyzerBytes),
-      fixedArguments: ["--analyze-crash-ledger"], timeoutSeconds: Self.timeoutSeconds)
     let jobsState = Self.root.appending(path: "jobs-state", directoryHint: .isDirectory)
     let capabilities = try RuntimeCapabilityStore(
       directoryURL: jobsState.appending(path: "capabilities", directoryHint: .isDirectory))
-    let provider = try AnalyzerProvider(profiles: [profile])
-    let engine = try RuntimeJobEngine(
-      configuration: .init(stateDirectory: jobsState),
-      providers: DeviceProviderRegistry(providers: [provider]),
-      dispatcher: DescriptorBoundProcessDispatcher(
-        resolver: try AnalyzerExecutableResolver(profiles: [profile])),
-      capabilityStore: capabilities, artifactStore: store,
-      nowUTC: { Self.nowUTC }, nowPreciseUTC: { Self.nowPreciseUTC })
-    let handler = RuntimeControlPlaneHandler(
-      engine: engine, capabilityStore: capabilities, providerIDs: [provider.providerID],
-      nowUTC: { Self.nowUTC }, targetStore: nil, bootstrap: nil, artifactStore: store,
-      flashBundleImportDirectory: nil, flashBundleImportPolicy: .production,
-      methodObserver: nil)
+    // One engine per budget over the one store. An engine runs only the Jobs
+    // it admitted, so each Job stays with the composition of its budget.
+    var handlers: [Int: RuntimeControlPlaneHandler] = [:]
+    for seconds in [Self.timeoutSeconds, Self.shortTimeoutSeconds] {
+      handlers[seconds] = try runHandler(
+        timeoutSeconds: seconds, analyzer: analyzer, jobsState: jobsState, store: store,
+        capabilities: capabilities)
+    }
+    let handler = handlers[Self.timeoutSeconds]!
 
     // Every source first, then every admission: a run meets exactly the
     // store the Rust replay rebuilds before its first run.
@@ -321,7 +322,7 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
     var jobIDs: [String: String] = [:]
     for item in Self.cases where item.mode != nil {
       let params = try Self.submitParams(item.name, lease: sources[item.name]!.lease)
-      let accepted = try await exchange(handler, "job.submit", params)
+      let accepted = try await exchange(handlers[Self.budget(of: item)]!, "job.submit", params)
       guard case .object(let fields) = accepted, case .object(let result)? = fields["result"],
         result["deduplicated"] == .bool(false), case .string(let jobID)? = result["jobId"]
       else { throw CocoaError(.coderInvalidValue) }
@@ -349,21 +350,26 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
       } else {
         params = item.params!
       }
+      // An entry names its budget only where it is not the production one.
+      let budget = Self.budget(of: item)
+      if budget != Self.timeoutSeconds { entry["timeoutSeconds"] = .integer(Int64(budget)) }
       entry["params"] = .object(params)
-      let response = try await exchange(handler, "job.run", params)
+      let response = try await exchange(handlers[budget]!, "job.run", params)
       check(response, item)
       entry["response"] = response
       recorded.append(.object(entry))
     }
 
-    // How Swift then reads each Job it ran, its result and evidence included,
-    // and how every Job read answers a Job that does not exist.
+    // How Swift then reads each Job it ran, through the composition that ran
+    // it, its result and evidence included, and how every Job read answers a
+    // Job that does not exist.
     var reads: [String: JSONValue] = [:]
     for item in Self.cases where item.mode != nil {
       let jobID = jobIDs[item.name]!
+      let reader = handlers[Self.budget(of: item)]!
       var answers: [String: JSONValue] = [:]
       for method in ["job.status", "job.show", "job.result", "job.evidence"] {
-        answers[method] = try await exchange(handler, method, ["jobId": .string(jobID)])
+        answers[method] = try await exchange(reader, method, ["jobId": .string(jobID)])
       }
       reads[jobID] = .object(answers)
     }
@@ -429,6 +435,42 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
     return files
   }
 
+  /// The budget of the composition that holds a case's Job: the short one for
+  /// the case that must time out, the production one otherwise. A rerun's Job
+  /// is its earlier case's.
+  private static func budget(of item: Case) -> Int {
+    let holder = item.rerun.flatMap { earlier in cases.first { $0.name == earlier } } ?? item
+    return holder.shortBudget ? shortTimeoutSeconds : timeoutSeconds
+  }
+
+  /// An engine over the run oracle's Job state, Artifact store and capability
+  /// store, with the real descriptor-bound process dispatcher, no Session
+  /// publication writer, and an analyzer given `timeoutSeconds`.
+  private func runHandler(
+    timeoutSeconds: Int, analyzer: URL, jobsState: URL, store: RuntimeArtifactStore,
+    capabilities: RuntimeCapabilityStore
+  ) throws -> RuntimeControlPlaneHandler {
+    let profile = AnalyzerProfile(
+      analyzerRef: HarnessCrashLedgerAnalysis.analyzerRef,
+      analyzerVersion: HarnessCrashLedgerAnalysis.analyzerVersion,
+      executablePath: analyzer.path,
+      executableSHA256: AnalyzerProvider.sha256(Self.analyzerBytes),
+      fixedArguments: ["--analyze-crash-ledger"], timeoutSeconds: timeoutSeconds)
+    let provider = try AnalyzerProvider(profiles: [profile])
+    let engine = try RuntimeJobEngine(
+      configuration: .init(stateDirectory: jobsState),
+      providers: DeviceProviderRegistry(providers: [provider]),
+      dispatcher: DescriptorBoundProcessDispatcher(
+        resolver: try AnalyzerExecutableResolver(profiles: [profile])),
+      capabilityStore: capabilities, artifactStore: store,
+      nowUTC: { Self.nowUTC }, nowPreciseUTC: { Self.nowPreciseUTC })
+    return RuntimeControlPlaneHandler(
+      engine: engine, capabilityStore: capabilities, providerIDs: [provider.providerID],
+      nowUTC: { Self.nowUTC }, targetStore: nil, bootstrap: nil, artifactStore: store,
+      flashBundleImportDirectory: nil, flashBundleImportPolicy: .production,
+      methodObserver: nil)
+  }
+
   /// The standalone daemon's composition under the fixed root: the Artifact
   /// store, the analyzer, and the engine with the daemon's Session publication
   /// writer over a storage owner and Sessions root of the root's own, with a
@@ -442,11 +484,6 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
     let sessions: URL
     let owner: URL
   }
-
-  /// The writer oracles never run the `sleep` answer, so their analyzer gets
-  /// the production budget: on a busy host the run oracle's 2 s turned an
-  /// `answered` run into a timeout.
-  private static let writerTimeoutSeconds = 30
 
   /// Resets the fixed root and composes the standalone daemon's engine there.
   private func writerComposition() throws -> WriterComposition {
@@ -466,7 +503,7 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
       analyzerVersion: HarnessCrashLedgerAnalysis.analyzerVersion,
       executablePath: analyzer.path,
       executableSHA256: AnalyzerProvider.sha256(Self.analyzerBytes),
-      fixedArguments: ["--analyze-crash-ledger"], timeoutSeconds: Self.writerTimeoutSeconds)
+      fixedArguments: ["--analyze-crash-ledger"], timeoutSeconds: Self.timeoutSeconds)
     let jobsState = Self.root.appending(path: "jobs-state", directoryHint: .isDirectory)
     let capabilities = try RuntimeCapabilityStore(
       directoryURL: jobsState.appending(path: "capabilities", directoryHint: .isDirectory))
@@ -600,7 +637,7 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
           "nowPreciseUTC": .string(Self.nowPreciseUTC),
           "home": .string(Self.home),
           "quotaBytes": .integer(Int64(Self.quotaBytes)),
-          "timeoutSeconds": .integer(Int64(Self.writerTimeoutSeconds)),
+          "timeoutSeconds": .integer(Int64(Self.timeoutSeconds)),
           "files": .object(digests),
         ])) + Data("\n".utf8)
     return files

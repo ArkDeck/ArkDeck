@@ -711,7 +711,8 @@
     },
     "submit" : {
       "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-run-timedOut-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-51a83413b200cc278425d09aec6c992f\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-run-timedOut\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
-    }
+    },
+    "timeoutSeconds" : 2
   },
   {
     "mode" : "signal",
@@ -889,7 +890,8 @@
         "message" : "job job-2be36e7a9189a71f770e51b2e85a033e is waitingForRecovery, not runnable"
       },
       "ok" : false
-    }
+    },
+    "timeoutSeconds" : 2
   },
   {
     "name" : "absentJob",
