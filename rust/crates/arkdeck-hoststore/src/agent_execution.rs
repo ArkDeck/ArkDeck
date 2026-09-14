@@ -11,14 +11,20 @@
 //! Swift's owner does: its physical-assistance actions typed and checked as
 //! Swift checks them, the waiting one projected with its resume reference,
 //! and expired once the execution is abandoned or its budget runs out. An
-//! execution without a target is not served here: nothing here observes
-//! devices, raises an action or resumes one.
+//! execution without a target observes the devices through the Target
+//! observation owner and, when a person must act, raises the action Swift's
+//! owner raises; the combined human-action owner lists and shows those
+//! actions. Adopting an observed device and resuming an action are not
+//! served here yet.
 
 use crate::format_time::{precise_utc_millis, utc_precise_from_millis};
 use crate::job_record::terminal;
 use crate::operation_catalog::{CatalogOperation, InputRefusal};
 use crate::session_json;
-use crate::snapshot_pager::SnapshotPager;
+use crate::snapshot_pager::{SnapshotPager, uuid};
+use crate::target_observation::{
+    Observation, ObservationError, Snapshot, Sources, TargetObservations,
+};
 use crate::{
     AdmissionRefusal, AdmissionVerdict, JobAdmitter, JobResultReader, JobStore, OperationRequest,
     TargetStore,
@@ -148,6 +154,33 @@ fn internal(message: &str) -> WireError {
     }
 }
 
+/// Swift `agentExecutionRequest`'s answer to an observation that failed:
+/// the reading's own reason or, for the observation owner's refusal, that
+/// the execution could not be advanced.
+fn observation_failure(error: ObservationError) -> WireError {
+    match error {
+        ObservationError::Refused { .. } => internal(UNREADABLE),
+        ObservationError::Failed(reason) => internal(&reason),
+    }
+}
+
+/// Swift `AgentObservedCandidate`: one observation of a snapshot, exactly.
+fn observed(row: &Observation, snapshot: &Snapshot) -> Observed {
+    Observed {
+        candidate: row.candidate.connect_key.clone(),
+        id: row.observation_id.clone(),
+        generation: snapshot.generation,
+    }
+}
+
+/// A fresh identity of `kind` (`har`, `resume` or `candidate`): the kind
+/// and a lowercase version-4 UUID, as Swift mints one.
+fn minted(kind: &str) -> Result<String, WireError> {
+    uuid()
+        .map(|uuid| format!("{kind}-{uuid}"))
+        .map_err(|_| internal(UNREADABLE))
+}
+
 fn execution_detail(id: &str) -> Map<String, Value> {
     Map::from_iter([("executionId".into(), json!(id))])
 }
@@ -180,7 +213,7 @@ fn identity<'a>(params: &'a Map<String, Value>, key: &str) -> Result<&'a str, Wi
 }
 
 /// Swift `AgentExecutionIntent.validIdentifier`.
-fn valid_identifier(value: &str) -> bool {
+pub(crate) fn valid_identifier(value: &str) -> bool {
     (1..=128).contains(&value.len())
         && value.as_bytes()[0].is_ascii_alphanumeric()
         && value
@@ -1000,12 +1033,27 @@ impl Record {
 }
 
 /// What an execution reaches: the Target owner, the Job owner and the
-/// admitter the daemon admits with, and the Runtime's precise clock.
+/// admitter the daemon admits with, the Runtime's precise clock and, for an
+/// execution that names no target, the Runtime's own device observation.
 pub struct AgentEngine<'a> {
     pub targets: &'a TargetStore,
     pub jobs: &'a JobStore,
     pub admitter: &'a JobAdmitter<'a>,
     pub now: fn() -> Option<String>,
+    pub observations: Option<Observing<'a>>,
+}
+
+/// The Target observation owner and what it reads through.
+pub struct Observing<'a> {
+    pub owner: &'a TargetObservations,
+    pub sources: Sources<'a>,
+}
+
+/// One physical-assistance action as the human-action owner lists it.
+pub(crate) struct ActionRow {
+    pub(crate) created: String,
+    pub(crate) id: String,
+    pub(crate) value: Value,
 }
 
 /// The Job an execution has just come to own, which the caller runs.
@@ -1457,7 +1505,14 @@ impl AgentExecutionStore {
             ));
         }
         if record.target.is_none() {
-            record.target = Some(Self::resolve_target(&record, engine)?);
+            let Some(target) = self.resolve_target(&mut record, engine)? else {
+                // A person must act first: the execution answers as it waits.
+                return Ok(AgentAnswer {
+                    value: record.projection(),
+                    start: None,
+                });
+            };
+            record.target = Some(target);
             self.commit(&mut record)?;
         }
         self.observe_budget(&mut record, engine.now)?;
@@ -1551,49 +1606,204 @@ impl AgentExecutionStore {
         }
     }
 
-    /// Swift `resolveTarget` for an explicit target: the exact durable
-    /// Target at its current binding revision.
+    /// Swift `resolveTarget`: the exact durable Target the intent names, at
+    /// its current binding revision; a registered project, for an operation
+    /// that binds no device; or else the device the Runtime observes. `None`
+    /// is an execution that now waits for a person.
     fn resolve_target(
-        record: &Record,
+        &self,
+        record: &mut Record,
         engine: &AgentEngine<'_>,
-    ) -> Result<(String, Option<i64>), WireError> {
+    ) -> Result<Option<(String, Option<i64>)>, WireError> {
         let catalog = record.intent.descriptor().ok_or_else(|| {
             failure(
                 "operationUnavailable",
                 "the declared operation is not published",
             )
         })?;
-        let Some(target) = &record.intent.target else {
+        if let Some(target) = &record.intent.target {
+            if catalog.binding() == "none" {
+                return Ok(Some((target.clone(), None)));
+            }
+            let route = engine
+                .targets
+                .hdc_route(target)
+                .map_err(|_| internal(UNREADABLE))?
+                .ok_or_else(|| {
+                    failure(
+                        "resourceNotFound",
+                        "the explicitly requested target is not registered",
+                    )
+                })?;
+            let current =
+                i64::try_from(route.binding_revision).map_err(|_| internal(UNREADABLE))?;
+            if record
+                .intent
+                .expected_revision
+                .is_some_and(|expected| expected != current)
+            {
+                return Err(failure(
+                    "bindingRevisionStale",
+                    "the requested binding revision is no longer current",
+                ));
+            }
+            return Ok(Some((target.clone(), Some(current))));
+        }
+        if catalog.binding() == "none"
+            && let Some(Value::String(project)) = record.intent.inputs.get("projectRef")
+            && valid_identifier(project)
+        {
+            // A registered host workspace is an existing typed scope.
+            return Ok(Some((project.clone(), None)));
+        }
+        let Some(observing) = &engine.observations else {
             return Err(failure(
                 "operationUnavailable",
                 "an execution without a target is not served by the Rust Runtime yet",
             ));
         };
-        if catalog.binding() == "none" {
-            return Ok((target.clone(), None));
-        }
-        let route = engine
-            .targets
-            .hdc_route(target)
-            .map_err(|_| internal(UNREADABLE))?
-            .ok_or_else(|| {
-                failure(
-                    "resourceNotFound",
-                    "the explicitly requested target is not registered",
-                )
-            })?;
-        let current = i64::try_from(route.binding_revision).map_err(|_| internal(UNREADABLE))?;
-        if record
-            .intent
-            .expected_revision
-            .is_some_and(|expected| expected != current)
+        let snapshot = observing
+            .owner
+            .snapshot(&observing.sources, None)
+            .map_err(observation_failure)?;
+        self.guard_budget(record, engine.now)?;
+        self.resolve_snapshot(&snapshot, record)
+    }
+
+    /// Swift `budget.check()` inside `drive`, whose expiry `serialize`
+    /// records: unless the execution has ended or owns a Job, it stops at
+    /// its original budget with its waiting action expired.
+    fn guard_budget(
+        &self,
+        record: &mut Record,
+        now: fn() -> Option<String>,
+    ) -> Result<(), WireError> {
+        let Err(error) = self.check_budget(record, now) else {
+            return Ok(());
+        };
+        if matches!(
+            error.code.as_str(),
+            "orchestrationBudgetExpired" | "orchestrationClockUntrusted"
+        ) && !TERMINAL.contains(&record.state.as_str())
+            && record.job.is_none()
         {
+            record.state = if error.code == "orchestrationBudgetExpired" {
+                "budgetExpired"
+            } else {
+                "clockUntrusted"
+            }
+            .into();
+            record.failure_code = Some(error.code.clone());
+            record.expire_waiting();
+            self.commit(record)?;
+        }
+        Err(error)
+    }
+
+    /// Swift `resolveSnapshot` for a run: no device observed, several, one
+    /// that is not authorized and connected, or one whose physical identity
+    /// is unproved. A person must act on the first three, so each raises its
+    /// action; the last is refused. A proved, connected device is one Swift
+    /// adopts inside the run, which no oracle records yet, so that is
+    /// refused as not served.
+    fn resolve_snapshot(
+        &self,
+        snapshot: &Snapshot,
+        record: &mut Record,
+    ) -> Result<Option<(String, Option<i64>)>, WireError> {
+        let [row] = snapshot.observations.as_slice() else {
+            let kind = if snapshot.observations.is_empty() {
+                "connectDevice"
+            } else {
+                "selectDevice"
+            };
+            self.raise_action(kind, record, snapshot, None)?;
+            return Ok(None);
+        };
+        if row.candidate.state != "Connected" {
+            let kind = if row.candidate.state == "Unauthorized" {
+                "trustDevice"
+            } else {
+                "connectDevice"
+            };
+            self.raise_action(kind, record, snapshot, Some(observed(row, snapshot)))?;
+            return Ok(None);
+        }
+        if row.relation.is_none() {
             return Err(failure(
-                "bindingRevisionStale",
-                "the requested binding revision is no longer current",
+                "admissionDenied",
+                "the Runtime cannot prove the candidate's physical identity",
             ));
         }
-        Ok((target.clone(), Some(current)))
+        Err(failure(
+            "operationUnavailable",
+            "adopting an observed device inside an agent execution is not served by the Rust Runtime yet",
+        ))
+    }
+
+    /// Swift `raiseAction`: the one action the execution now waits on, with
+    /// the observation it names or, for a device selection, one choice per
+    /// observed device. An observation that asks for exactly what the
+    /// waiting action asks raises nothing new.
+    fn raise_action(
+        &self,
+        kind: &str,
+        record: &mut Record,
+        snapshot: &Snapshot,
+        observation: Option<Observed>,
+    ) -> Result<(), WireError> {
+        let choices: Vec<Observed> = if kind == "selectDevice" {
+            snapshot
+                .observations
+                .iter()
+                .map(|row| observed(row, snapshot))
+                .collect()
+        } else {
+            Vec::new()
+        };
+        if let Some(current) = record.waiting()
+            && current.kind == kind
+            && current.observation == observation
+            && current
+                .selections
+                .iter()
+                .map(|selection| &selection.observed)
+                .eq(choices.iter())
+        {
+            return Ok(());
+        }
+        if record.actions.len() >= 128 {
+            return Err(failure(
+                "operationUnavailable",
+                "the bounded physical-assistance history is exhausted",
+            ));
+        }
+        record.expire_waiting();
+        let id = minted("har")?;
+        let resume = minted("resume")?;
+        let selections = choices
+            .into_iter()
+            .map(|observed| {
+                Ok(Selection {
+                    reference: minted("candidate")?,
+                    observed,
+                })
+            })
+            .collect::<Result<Vec<_>, WireError>>()?;
+        record.actions.push(HumanAction {
+            id,
+            execution: record.intent.execution.clone(),
+            resume,
+            kind: kind.into(),
+            created: record.observed.clone(),
+            expires: record.deadline.clone(),
+            status: "waiting".into(),
+            resolved: None,
+            observation,
+            selections,
+        });
+        record.state = "waitingForHuman".into();
+        self.commit(record)
     }
 
     /// Swift `submission(for:)`: the exact typed Job request the execution
@@ -1797,6 +2007,28 @@ impl AgentExecutionStore {
                 };
                 failure(&error.code, message)
             })
+    }
+
+    /// Swift `humanActionResourceRows`: every physical-assistance action of
+    /// every execution, or of one, as the combined human-action owner lists
+    /// them.
+    pub(crate) fn human_action_rows(
+        &self,
+        owner: Option<&str>,
+    ) -> Result<Vec<ActionRow>, WireError> {
+        let _gate = self.gate.lock().map_err(|_| internal(UNREADABLE))?;
+        let mut rows = Vec::new();
+        self.each_record(|record| {
+            if owner.is_some_and(|owner| owner != record.intent.execution) {
+                return;
+            }
+            rows.extend(record.actions.iter().map(|action| ActionRow {
+                created: action.created.clone(),
+                id: action.id.clone(),
+                value: action.projection(),
+            }));
+        })?;
+        Ok(rows)
     }
 
     /// Swift `abandon`: an execution that owns no Job, at the generation the

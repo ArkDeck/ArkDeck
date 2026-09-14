@@ -191,6 +191,7 @@ fn rust_runs_the_swift_agent_executions() {
         targets: &targets,
         jobs: &jobs,
         admitter: &admitter,
+        observations: None,
         now: fixed_precise_now,
     };
     let reader = JobResultReader {

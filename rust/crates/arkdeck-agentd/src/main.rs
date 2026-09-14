@@ -113,6 +113,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             "jobs-state",
             "targets-state",
             "agent-executions",
+            "human-action-snapshots",
         ] {
             directory.private_child(name)?;
         }
@@ -136,6 +137,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
                 root.join("jobs-state"),
                 root.join("targets-state"),
                 root.join("agent-executions"),
+                root.join("human-action-snapshots"),
             ],
         )?;
         host.with_targets(arkdeck_hoststore::TargetStore::open(
@@ -158,6 +160,11 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         // executions; each owns a Job of this owner.
         .with_agent_executions(arkdeck_hoststore::AgentExecutionStore::open(
             &root.join("agent-executions"),
+        )?)
+        // Swift's combined human-action owner pages the executions' actions
+        // in its own directory beside them.
+        .with_human_actions(arkdeck_hoststore::HumanActionResources::open(
+            &root.join("human-action-snapshots"),
         )?)
         // Beside the Job state, as the Swift engine keeps it: read only.
         .with_capabilities(arkdeck_hoststore::CapabilityStore::open(

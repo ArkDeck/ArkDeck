@@ -41,7 +41,11 @@ pub use job_admission::{AdmissionRefusal, JobAdmitter, runtime_now};
 #[cfg(target_os = "macos")]
 mod agent_execution;
 #[cfg(target_os = "macos")]
-pub use agent_execution::{AgentAnswer, AgentEngine, AgentExecutionStore, AgentStart};
+pub use agent_execution::{AgentAnswer, AgentEngine, AgentExecutionStore, AgentStart, Observing};
+#[cfg(target_os = "macos")]
+mod human_action;
+#[cfg(target_os = "macos")]
+pub use human_action::HumanActionResources;
 #[cfg(target_os = "macos")]
 mod analyzer_output;
 #[cfg(target_os = "macos")]
