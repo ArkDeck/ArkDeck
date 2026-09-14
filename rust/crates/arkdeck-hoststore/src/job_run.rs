@@ -339,7 +339,7 @@ impl JobRunner<'_> {
                 None,
             ));
         }
-        let device = record.operation() == crate::device_run::OPERATION && self.hdc.is_some();
+        let device = crate::device_run::runs(record.operation()) && self.hdc.is_some();
         if record.operation() != OPERATION && !device {
             return Err(proven(
                 "rejected",

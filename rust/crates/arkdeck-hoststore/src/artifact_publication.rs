@@ -99,6 +99,42 @@ impl ArtifactPublisher<'_> {
             .map_err(|error| io_failure(&format!("cannot inspect artifact retention: {error}")))?
     }
 
+    /// Swift `preflightAdditionalBytes`: whether the store still has room for
+    /// this many more published bytes, before anything is collected.
+    pub(crate) fn preflight_additional_bytes(&self, requested: i64) -> Result<(), String> {
+        let Ok(requested) = u64::try_from(requested) else {
+            return Err(io_failure(
+                "artifact preflight byte count must be nonnegative",
+            ));
+        };
+        let used = self.used_bytes()?;
+        if requested > self.quota - used.min(self.quota) {
+            return Err(format!(
+                "quotaExceeded(requestedBytes: {requested}, remainingBytes: {})",
+                self.quota.saturating_sub(used)
+            ));
+        }
+        Ok(())
+    }
+
+    /// Swift `list(jobID:)`: the Job's index rows in file order, every
+    /// published payload checked; an absent index is empty.
+    pub(crate) fn list(&self, job_id: &str) -> Result<Vec<Value>, String> {
+        let job = self.job_directory(job_id)?;
+        self.load_index(&job, job_id)
+    }
+
+    /// The bytes a Job's published products already hold, which a capture's
+    /// job byte budget bounds.
+    pub(crate) fn published_bytes(&self, job_id: &str) -> Result<u64, String> {
+        Ok(self
+            .list(job_id)?
+            .iter()
+            .filter(|row| published(row))
+            .map(|row| row["byteCount"].as_u64().unwrap_or(0))
+            .sum())
+    }
+
     fn publish_guarded(&self, product: &Product<'_>, contents: &[u8]) -> Result<Value, String> {
         let (payload, redacted) = redact(contents, product.media_type, self.home);
         let digest = sha256_hex(&payload);

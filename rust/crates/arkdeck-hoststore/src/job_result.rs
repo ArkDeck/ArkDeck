@@ -7,11 +7,13 @@
 //! verification cache while it reads.
 //!
 //! Only Jobs of the operations this Runtime runs are read. A Job carrying a
-//! device observation or Trace probe, and a store holding recovery epochs, are
-//! refused or degraded until their owners join (recovery waits for the L.1
-//! item 13 ruling).
+//! Trace probe, and a store holding recovery epochs, are refused or degraded
+//! until their owners join (recovery waits for the L.1 item 13 ruling). A
+//! product the request chose not to take may stay missing; any other missing
+//! product fails the evidence.
 use crate::artifact_read_owner::ArtifactReadStore;
 use crate::artifact_usage::decode_index;
+use crate::device_steps;
 use crate::job_owner::JobStore;
 use crate::job_record::{JobRecord, terminal};
 use crate::operation_catalog::CatalogOperation;
@@ -21,7 +23,11 @@ use serde_json::{Map, Value, json};
 use std::collections::BTreeSet;
 
 /// The operations whose results this Runtime reads.
-const READABLE: [&str; 2] = ["analyzer.extract-crash-signature@1", "observe.device@1"];
+const READABLE: [&str; 3] = [
+    "analyzer.extract-crash-signature@1",
+    "observe.device@1",
+    "capture.diagnostics@1",
+];
 const MAX_LEDGER: usize = 16 * 1024 * 1024;
 /// Swift `RuntimeJobReadProjection.bounded`.
 const MAX_RESPONSE: usize = 4 * 1024 * 1024;
@@ -208,18 +214,39 @@ impl JobResultReader<'_> {
         if descriptor.is_none() {
             blockers.insert("operationUnavailable");
         }
+        // Swift reads what the request left out from the persisted operation,
+        // whichever catalog admitted it.
+        let empty = Map::new();
+        let inputs = record.request["inputs"].as_object().unwrap_or(&empty);
+        let omitted = match record
+            .operation()
+            .rsplit_once('@')
+            .and_then(|(id, version)| CatalogOperation::lookup(id, version.parse().ok()))
+        {
+            Some(operation) => device_steps::omitted_products(operation, inputs),
+            None => {
+                blockers.insert("recordUnreadable");
+                BTreeSet::new()
+            }
+        };
         let (mut metadata, mut verified, mut inventory_available) = (Vec::new(), Vec::new(), false);
         let job_id = &record.job_id;
-        match self.inventory(job_id) {
+        match self.inventory(job_id, &omitted) {
             Ok((rows, integrity_failed)) => {
                 metadata = rows;
                 inventory_available = true;
                 let owned = metadata.iter().all(|row| {
+                    let binding = &row["bindingSnapshot"];
                     row["jobID"] == job_id.as_str()
                         && row["providerID"] == record.provider()
                         && row["sourceOperation"] == record.operation()
-                        && row["bindingSnapshot"]["targetID"]
-                            == record.request["target"]["targetId"]
+                        && binding["targetID"] == record.request["target"]["targetId"]
+                        && record
+                            .materialized_binding()
+                            .is_none_or(|revision| binding["bindingRevision"] == revision)
+                        && record
+                            .materialized_identity()
+                            .is_none_or(|identity| binding["stableIdentitySHA256"] == identity)
                 });
                 if !owned || integrity_failed.is_err() {
                     blockers.insert("artifactIntegrityFailed");
@@ -241,7 +268,9 @@ impl JobResultReader<'_> {
                     .artifacts
                     .iter()
                     .filter(|artifact| {
-                        artifact.required && !present.contains(artifact.name.as_str())
+                        artifact.required
+                            && !omitted.contains(&artifact.name)
+                            && !present.contains(artifact.name.as_str())
                     })
                     .map(|artifact| artifact.name.clone())
                     .collect::<BTreeSet<_>>()
@@ -273,10 +302,15 @@ impl JobResultReader<'_> {
     }
 
     /// Swift `evidenceInventory`: every index row in file order and, all or
-    /// nothing, each published payload's full digest. The outer error is an
-    /// unreadable index; the inner one an integrity failure.
+    /// nothing, each published payload's full digest; a product the request
+    /// intentionally omitted may be missing. The outer error is an unreadable
+    /// index; the inner one an integrity failure.
     #[allow(clippy::type_complexity)]
-    fn inventory(&self, job_id: &str) -> Result<(Vec<Value>, Result<Vec<Value>, ()>), ()> {
+    fn inventory(
+        &self,
+        job_id: &str,
+        omitted: &BTreeSet<String>,
+    ) -> Result<(Vec<Value>, Result<Vec<Value>, ()>), ()> {
         if !artifact_job(job_id) {
             return Err(());
         }
@@ -293,10 +327,20 @@ impl JobResultReader<'_> {
             return Ok((Vec::new(), Ok(Vec::new())));
         }
         let rows = decode_index(&bytes, job_id).map_err(|_| ())?;
+        if rows.is_empty() {
+            return Ok((Vec::new(), Ok(Vec::new())));
+        }
         let mut verified = Vec::new();
         for row in &rows {
             if row["status"].get("published").is_none() {
-                // A missing or truncated product the step did not omit.
+                let omission = row["status"].get("missing").is_some()
+                    && row["name"]
+                        .as_str()
+                        .is_some_and(|name| omitted.contains(name));
+                if omission {
+                    continue;
+                }
+                // A missing or truncated product the request did not omit.
                 return Ok((rows.clone(), Err(())));
             }
             let (Some(artifact), Some(length), Some(digest)) = (

@@ -1,29 +1,40 @@
 //! Swift `RuntimeJobEngine.runOwned` over `executeSteps` and `dispatchWithWAL`
-//! for an admitted `observe.device@1` Job, as the isolated Rust owner runs it
-//! through its HDC composition: the running transition; every step in
-//! catalog order, the engine's own recorded and the provider's dispatched,
-//! each with its exact typed action persisted before its write-ahead intent
-//! is durable and the executor started only after that intent, its receipt
-//! verified as Swift's HDC provider verifies it and its correlated outcome
-//! appended; the evidence preflight the device steps prove, the products each
-//! step declares, and the terminal transitions. A step whose outcome cannot
-//! be observed leaves its intent outstanding and parks the Job; nothing is
-//! dispatched twice and no Job is resumed. A cancellation is honoured at the
-//! next step boundary, where Swift's step loop honours it.
+//! for an admitted device-bound HDC Job (`observe.device@1` and the default
+//! legs of `capture.diagnostics@1`), as the isolated Rust owner runs it
+//! through its HDC composition: the running transition; every catalog step in
+//! order — the engine's own recorded, the host storage preflight among them;
+//! an optional step the request did not select recorded as skipped, with the
+//! products it owned recorded missing; the provider's dispatched, each with
+//! its exact typed action persisted before its write-ahead intent is durable
+//! and the executor started only after that intent, its receipt verified as
+//! Swift's HDC provider verifies it and its correlated outcome appended — then
+//! finalization, which publishes the run's own products, and the terminal
+//! transitions. The evidence preflight is the first thing the device steps
+//! prove, and every later device step waits for it. An optional step that
+//! fails is skipped with its reason and the Job goes on; a step whose outcome
+//! cannot be observed, optional or not, leaves its intent outstanding and
+//! parks the Job. Nothing is dispatched twice and no Job is resumed. A
+//! cancellation is honoured at the next step boundary, where Swift's step
+//! loop honours it.
 use crate::artifact_publication::{ArtifactPublisher, Product};
+use crate::artifact_read_owner::swift_string;
+use crate::capture_documents;
 use crate::device_facts::{self, DeviceFacts, HdcComposition};
-use crate::device_steps;
+use crate::device_steps::{self, ActionRefusal};
 use crate::job_cancel::RunCancellation;
 use crate::job_journal_events::{self as events, Target};
 use crate::job_record::JobRecord;
 use crate::job_run::{JobRunner, Run, RunRefusal, failure, uncertain};
-use crate::operation_catalog::{CatalogOperation, CatalogStep};
+use crate::operation_catalog::{CatalogArtifact, CatalogOperation, CatalogStep};
 use crate::session_json;
-use arkdeck_provider_hdc::{Action, DispatchFailure, Expected, Outcome, ProcessPlan};
+use arkdeck_provider_hdc::{
+    Action, DispatchFailure, Expected, Outcome, Persisted, ProcessPlan, Receipt,
+};
 use serde_json::{Map, Value, json};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
-pub(crate) const OPERATION: &str = "observe.device@1";
+const OBSERVE: &str = "observe.device@1";
+const CAPTURE: &str = "capture.diagnostics@1";
 
 /// Swift's evidence preflight, in the order its fragments must arrive.
 const EVIDENCE_STEPS: [&str; 3] = [
@@ -32,14 +43,13 @@ const EVIDENCE_STEPS: [&str; 3] = [
     "read-evidence-firmware",
 ];
 
-/// Swift `RuntimeArtifactService.artifacts(reference:stepID:)` for
-/// `observe.device@1`.
-fn products(step_id: &str) -> &'static [&'static str] {
-    match step_id {
-        "probe-host-tool" => &["tool-facts.json"],
-        "read-evidence-firmware" => &["device-facts.json", "binding-snapshot.json"],
-        _ => &[],
-    }
+/// Swift's job byte budget for a capture's products when the request sets no
+/// `totalArtifactByteBudget`.
+const CAPTURE_BYTE_BUDGET: u64 = 128 * 1024 * 1024;
+
+/// Whether a Job of this operation runs through the HDC composition.
+pub(crate) fn runs(operation: &str) -> bool {
+    device_steps::DEVICE_OPERATIONS.contains(&operation)
 }
 
 /// How a step ended the step loop, as Swift's `runOwned` tells its lanes
@@ -69,6 +79,92 @@ fn fact_names(summary: &BTreeMap<String, String>) -> String {
     format!("[{}]", names.join(", "))
 }
 
+/// The catalog descriptor a Job record names.
+fn descriptor(reference: &str) -> Option<&'static CatalogOperation> {
+    let (id, version) = reference.rsplit_once('@')?;
+    CatalogOperation::lookup(id, version.parse().ok())
+}
+
+/// Swift's capture budget: the request's `totalArtifactByteBudget`, else
+/// 128 MiB.
+fn byte_budget(record: &JobRecord) -> u64 {
+    record.request["inputs"]["totalArtifactByteBudget"]
+        .as_u64()
+        .unwrap_or(CAPTURE_BYTE_BUDGET)
+}
+
+/// Swift `RuntimeEvidencePreflightAccumulator.isComplete`.
+fn preflight_complete(accumulator: &Value) -> bool {
+    ["transport", "confirmedAtUTC", "model", "firmware"]
+        .iter()
+        .all(|key| accumulator.get(*key).is_some())
+        && accumulator["steps"].as_array().is_some_and(|steps| {
+            steps
+                .iter()
+                .map(|step| step["stepID"].clone())
+                .collect::<Vec<_>>()
+                == EVIDENCE_STEPS.map(Value::from)
+        })
+}
+
+fn persisted_value(value: Persisted) -> Value {
+    match value {
+        Persisted::Text(text) => json!(text),
+        Persisted::Integer(number) => json!(number),
+        Persisted::Texts(texts) => json!(texts),
+    }
+}
+
+/// What every product one Job publishes shares: its owner, operation,
+/// provider and binding snapshot as they stand now.
+struct Owner {
+    job_id: String,
+    session_id: String,
+    reference: String,
+    provider: String,
+    binding: Value,
+}
+
+impl Owner {
+    fn of(record: &JobRecord, descriptor: &CatalogOperation) -> Self {
+        Self {
+            job_id: record.job_id.clone(),
+            session_id: format!("session-{}", record.job_id),
+            reference: descriptor.reference(),
+            provider: descriptor.provider.clone(),
+            binding: binding_snapshot(record),
+        }
+    }
+
+    fn product<'a>(
+        &'a self,
+        step_id: &'a str,
+        declaration: &'a CatalogArtifact,
+        window: Option<(String, String)>,
+    ) -> Product<'a> {
+        Product {
+            job_id: &self.job_id,
+            session_id: &self.session_id,
+            step_id,
+            name: &declaration.name,
+            media_type: &declaration.media_type,
+            privacy: &declaration.privacy,
+            retention_class: &declaration.retention_class,
+            source_operation: &self.reference,
+            provider_id: &self.provider,
+            binding: self.binding.clone(),
+            observation_window: window,
+        }
+    }
+}
+
+fn declaration<'a>(descriptor: &'a CatalogOperation, name: &str) -> Option<&'a CatalogArtifact> {
+    descriptor
+        .artifacts
+        .iter()
+        .find(|artifact| artifact.name == name)
+}
+
 impl JobRunner<'_> {
     /// Swift `runOwned` for a device-bound HDC operation.
     pub(crate) fn execute_device(
@@ -79,7 +175,7 @@ impl JobRunner<'_> {
         let started = run.clock()?;
         run.record.start(&started);
         run.transition("preflight", "running", "steps-start")?;
-        let Some(descriptor) = CatalogOperation::lookup("observe.device", Some(1)) else {
+        let Some(descriptor) = descriptor(run.record.operation()) else {
             return Err(uncertain());
         };
         match self.steps(run, hdc, descriptor) {
@@ -114,21 +210,46 @@ impl JobRunner<'_> {
             }
             Err(Stop::Refused(refusal)) => return Err(refusal),
         }
-        // Swift's finalization publishes no product of `observe.device@1`.
         run.transition("running", "finalizing", "steps-complete")?;
+        if let Err(detail) = self.finalize(run, descriptor) {
+            run.record.set_operation_failure(Some(failure(
+                "artifactFinalizationFailed",
+                "storage",
+                "notAutomatic",
+                "inspectJob",
+            )));
+            run.transition(
+                "finalizing",
+                "failed",
+                &format!("artifact finalization failed: {detail}"),
+            )?;
+            run.finish()?;
+            return run.persist(self.jobs);
+        }
         run.record.set_operation_failure(None);
         run.transition("finalizing", "succeeded", "finalized")?;
         run.finish()?;
         run.persist(self.jobs)
     }
 
-    /// Swift `executeSteps` over the steps the plan selected.
+    fn publisher(&self) -> ArtifactPublisher<'_> {
+        ArtifactPublisher {
+            store: self.artifacts,
+            quota: self.quota,
+            home: self.home,
+            now: self.now,
+        }
+    }
+
+    /// Swift `executeSteps` over every step the descriptor declares.
     fn steps(
         &self,
         run: &mut Run,
         hdc: &HdcComposition<'_>,
         descriptor: &CatalogOperation,
     ) -> Result<(), Stop> {
+        let reference = descriptor.reference();
+        let gated = device_steps::requires_evidence_preflight(&reference);
         let inputs = run.record.request["inputs"]
             .as_object()
             .cloned()
@@ -138,11 +259,8 @@ impl JobRunner<'_> {
             .unwrap_or_default()
             .to_owned();
         let revision = run.record.request["target"]["expectedBindingRevision"].as_i64();
-        for step in descriptor
-            .steps
-            .iter()
-            .filter(|step| descriptor.step_is_selected(step, &inputs))
-        {
+        let mut skipped = BTreeSet::new();
+        for step in &descriptor.steps {
             // The safe boundary between steps; the canceller's intent becomes
             // durable here and the run then drains.
             if self.cancellation.is_some_and(RunCancellation::pending) {
@@ -150,19 +268,36 @@ impl JobRunner<'_> {
                 return Err(Stop::Cancelled);
             }
             if device_steps::engine_step(&step.kind) {
-                if step.kind != "finalizeSession" {
-                    return Err(Stop::Refused(uncertain()));
+                match step.kind.as_str() {
+                    "preflightHostStorage" => self.preflight_host_storage(run, descriptor)?,
+                    "postprocessArtifact" | "finalizeSession" => {}
+                    _ => return Err(Stop::Refused(uncertain())),
                 }
                 run.record
                     .timeline
                     .push(format!("host-step {}", step.step_id));
                 continue;
             }
+            // "Its upstream did not run" and "you did not ask for it" are
+            // different facts, and the reason names the real one.
+            let upstream = device_steps::upstream(&reference, &step.step_id);
+            if upstream.is_some_and(|upstream| skipped.contains(upstream))
+                || !descriptor.step_is_selected(step, &inputs)
+            {
+                let reason = match upstream
+                    .and_then(|upstream| Some((upstream, run.record.skip_reason(upstream)?)))
+                {
+                    Some((upstream, cause)) => format!("upstream {upstream} did not run: {cause}"),
+                    None => "step not selected by the request inputs".into(),
+                };
+                self.skip(run, descriptor, step, &reason, &mut skipped);
+                continue;
+            }
             let evidence = device_steps::evidence_preflight_step(step);
             let facts = if step.binding == "confirmedDevice" {
                 match hdc.facts(&target_id) {
                     Ok(facts) => Some(facts),
-                    Err(error) if evidence => {
+                    Err(error) if gated && evidence => {
                         return Err(Stop::Failed(format!(
                             "evidenceIncomplete: descriptor-bound target facts unavailable: {error}"
                         )));
@@ -177,17 +312,43 @@ impl JobRunner<'_> {
             } else {
                 None
             };
-            if step.binding == "confirmedDevice" {
-                // Every device step of this operation is an evidence step;
-                // a later device step would wait for the complete preflight.
-                let Some(facts) = facts.as_ref().filter(|_| evidence) else {
-                    return Err(Stop::Refused(uncertain()));
-                };
+            if gated && evidence {
+                let facts = facts.as_ref().ok_or_else(|| {
+                    Stop::Failed(
+                        "evidenceIncomplete: target/binding/routing/tool facts are absent or mismatched"
+                            .into(),
+                    )
+                })?;
                 device_facts::validate(facts, &target_id, revision)
                     .map_err(|reason| Stop::Failed(reason.into()))?;
+            } else if gated && step.binding == "confirmedDevice" {
+                // Swift `requireCompleteEvidencePreflight`.
+                let complete = run
+                    .record
+                    .evidence_preflight()
+                    .is_some_and(preflight_complete)
+                    && run.record.evidence_observation().is_some();
+                if !complete {
+                    return Err(Stop::Failed(format!(
+                        "evidenceIncomplete: three-step typed preflight is incomplete before {}",
+                        step.step_id
+                    )));
+                }
             }
-            let Some(action) = device_steps::action(step) else {
-                return Err(Stop::Refused(uncertain()));
+            let action = match device_steps::action(step, &inputs) {
+                Ok(action) => action,
+                // Swift's provider refusing an optional step skips it.
+                Err(ActionRefusal::Invalid(_)) if step.optional => {
+                    self.skip(
+                        run,
+                        descriptor,
+                        step,
+                        "provider has no action for this step",
+                        &mut skipped,
+                    );
+                    continue;
+                }
+                Err(_) => return Err(Stop::Refused(uncertain())),
             };
             let plan = action
                 .lower(
@@ -195,18 +356,69 @@ impl JobRunner<'_> {
                     facts.as_ref().map(|facts| facts.connect_key.as_str()),
                 )
                 .map_err(|_| Stop::Refused(uncertain()))?;
-            self.dispatch_step(
+            match self.dispatch_step(
                 run,
                 hdc,
+                descriptor,
                 step,
-                action,
+                &action,
                 &plan,
                 facts.as_ref(),
                 &target_id,
                 revision,
-            )?;
+            ) {
+                Ok(()) => {}
+                // Optional steps are the partial-success surface: one that
+                // fails is skipped with its failure and the Job goes on. An
+                // unknown outcome is never tolerated.
+                Err(Stop::Failed(reason)) if step.optional => {
+                    let reason = format!("failed({})", swift_string(&reason));
+                    self.skip(run, descriptor, step, &reason, &mut skipped);
+                }
+                Err(stop) => return Err(stop),
+            }
         }
         Ok(())
+    }
+
+    /// Swift `recordSkippedOptionalStep`: the reason on the timeline and in
+    /// the record, and every product the step owned recorded missing with it.
+    fn skip(
+        &self,
+        run: &mut Run,
+        descriptor: &CatalogOperation,
+        step: &CatalogStep,
+        reason: &str,
+        skipped: &mut BTreeSet<String>,
+    ) {
+        run.record
+            .timeline
+            .push(format!("skipped {}: {reason}", step.step_id));
+        skipped.insert(step.step_id.clone());
+        run.record.set_skip_reason(&step.step_id, reason);
+        let owner = Owner::of(&run.record, descriptor);
+        let publisher = self.publisher();
+        for name in device_steps::products(&owner.reference, &step.step_id) {
+            if let Some(declaration) = declaration(descriptor, name) {
+                let _ = publisher
+                    .record_missing(&owner.product(&step.step_id, declaration, None), reason);
+            }
+        }
+    }
+
+    /// Swift's `preflightHostStorage` step: the room the capture may take,
+    /// asked of the Artifact store before any device is touched.
+    fn preflight_host_storage(&self, run: &Run, descriptor: &CatalogOperation) -> Result<(), Stop> {
+        let requested = run.record.request["inputs"]["totalArtifactByteBudget"]
+            .as_i64()
+            .unwrap_or(descriptor.output_byte_budget);
+        self.publisher()
+            .preflight_additional_bytes(requested)
+            .map_err(|error| {
+                Stop::Publication(format!(
+                    "host storage preflight refused collection: {error}"
+                ))
+            })
     }
 
     /// Swift `dispatchWithWAL` for one HDC step.
@@ -215,8 +427,9 @@ impl JobRunner<'_> {
         &self,
         run: &mut Run,
         hdc: &HdcComposition<'_>,
+        descriptor: &CatalogOperation,
         step: &CatalogStep,
-        action: Action,
+        action: &Action,
         plan: &ProcessPlan,
         facts: Option<&DeviceFacts>,
         target_id: &str,
@@ -226,7 +439,11 @@ impl JobRunner<'_> {
         let intent_id = format!("intent-{}", step.step_id);
         // The journal mirrors the descriptor-bound facts without the raw key.
         let identity = facts.map_or_else(|| "0".repeat(64), |facts| facts.identity.clone());
-        let Some(arguments) = device_steps::journal_arguments(step) else {
+        let inputs = run.record.request["inputs"]
+            .as_object()
+            .cloned()
+            .unwrap_or_default();
+        let Some(arguments) = device_steps::journal_arguments(step, &inputs, action) else {
             return Err(Stop::Refused(uncertain()));
         };
         let journal_step = json!({
@@ -251,7 +468,7 @@ impl JobRunner<'_> {
         let (kind, persisted) = action.persisted();
         let persisted: Map<String, Value> = persisted
             .into_iter()
-            .map(|(key, value)| (key.to_owned(), json!(value)))
+            .map(|(key, value)| (key.to_owned(), persisted_value(value)))
             .collect();
         run.record.set_recovery(
             Some(&step.step_id),
@@ -266,6 +483,11 @@ impl JobRunner<'_> {
         }
         run.record.timeline.push(format!("intent {}", step.step_id));
         run.record.add_step_kind(&step.kind);
+        // A device step after the preflight is where a Job's evidence starts.
+        if device && !device_steps::evidence_preflight_step(step) {
+            let now = run.clock()?;
+            run.record.set_first_evidence(&now);
+        }
         // Only now may the executor start.
         let Some(opened) = (self.precise_now)() else {
             run.step_outcome(&step.step_id, &intent_id, "failed", None)?;
@@ -307,7 +529,7 @@ impl JobRunner<'_> {
                     fact_names(&summary)
                 ));
                 run.record.set_recovery(None, None, None);
-                if device_steps::requires_evidence_preflight(OPERATION)
+                if device_steps::requires_evidence_preflight(run.record.operation())
                     && device_steps::evidence_preflight_step(step)
                 {
                     self.capture_evidence(
@@ -320,7 +542,7 @@ impl JobRunner<'_> {
                         &outcome_at,
                     )?;
                 }
-                self.publish(run, step, &summary, window)
+                self.publish(run, descriptor, step, &summary, window, &receipt)
             }
             Outcome::Failed { code, detail } => {
                 run.step_outcome(&step.step_id, &intent_id, "failed", None)?;
@@ -430,17 +652,7 @@ impl JobRunner<'_> {
         run.record
             .timeline
             .push(format!("evidence-preflight {}", step.step_id));
-        let complete = ["transport", "confirmedAtUTC", "model", "firmware"]
-            .iter()
-            .all(|key| accumulator.get(*key).is_some())
-            && accumulator["steps"].as_array().is_some_and(|steps| {
-                steps
-                    .iter()
-                    .map(|step| step["stepID"].clone())
-                    .collect::<Vec<_>>()
-                    == EVIDENCE_STEPS.map(Value::from)
-            });
-        if complete {
+        if preflight_complete(&accumulator) {
             let mut observation = accumulator.clone();
             if let Some(fields) = observation.as_object_mut() {
                 let steps = fields.remove("steps").unwrap_or_default();
@@ -449,8 +661,11 @@ impl JobRunner<'_> {
             }
             run.record.set_evidence_observation(observation);
             // observe.device publishes its evidence-bearing products from the
-            // final preflight outcome itself.
-            run.record.set_first_evidence(outcome_at);
+            // final preflight outcome itself; the other operations set this at
+            // their first post-preflight device step.
+            if run.record.operation() == OBSERVE {
+                run.record.set_first_evidence(outcome_at);
+            }
         }
         run.persist(self.jobs).map_err(|_| {
             incomplete("could not persist preflight fragment: the Job record is unwritable")
@@ -458,53 +673,49 @@ impl JobRunner<'_> {
     }
 
     /// Swift `publishDeclaredArtifacts`: the products this step declares,
-    /// published after its correlated outcome; a product that cannot be is
-    /// recorded missing with its reason and fails the Job.
+    /// published after its correlated outcome, a capture's within its job
+    /// byte budget; a product that cannot be is recorded missing with its
+    /// reason and fails the Job.
     fn publish(
         &self,
         run: &mut Run,
+        descriptor: &CatalogOperation,
         step: &CatalogStep,
         summary: &BTreeMap<String, String>,
         window: Option<(String, String)>,
+        receipt: &Receipt,
     ) -> Result<(), Stop> {
-        let names = products(&step.step_id);
-        if names.is_empty() {
+        let owner = Owner::of(&run.record, descriptor);
+        let mapping = device_steps::products(&owner.reference, &step.step_id);
+        if mapping.is_empty() {
             return Ok(());
         }
-        let Some(descriptor) = CatalogOperation::lookup("observe.device", Some(1)) else {
-            return Err(Stop::Refused(uncertain()));
-        };
-        let job_id = run.record.job_id.clone();
-        let session_id = format!("session-{job_id}");
-        let binding = binding_snapshot(&run.record);
-        let publisher = ArtifactPublisher {
-            store: self.artifacts,
-            quota: self.quota,
-            home: self.home,
-            now: self.now,
-        };
-        for name in names {
-            let Some(declaration) = descriptor
-                .artifacts
-                .iter()
-                .find(|artifact| artifact.name == *name)
-            else {
+        let inputs = run.record.request["inputs"]
+            .as_object()
+            .cloned()
+            .unwrap_or_default();
+        let publisher = self.publisher();
+        for name in device_steps::publishable(mapping, &inputs) {
+            let Some(declaration) = declaration(descriptor, name) else {
                 continue;
             };
-            let product = Product {
-                job_id: &job_id,
-                session_id: &session_id,
-                step_id: &step.step_id,
-                name,
-                media_type: &declaration.media_type,
-                privacy: &declaration.privacy,
-                retention_class: &declaration.retention_class,
-                source_operation: OPERATION,
-                provider_id: "hdc",
-                binding: binding.clone(),
-                observation_window: window.clone(),
-            };
-            match publisher.publish(&product, &contents(name, &run.record, summary)) {
+            let product = owner.product(&step.step_id, declaration, window.clone());
+            let contents = contents(name, &run.record, summary, receipt);
+            if owner.reference == CAPTURE {
+                let budget = byte_budget(&run.record);
+                let used = publisher.published_bytes(&owner.job_id).map_err(|error| {
+                    Stop::Publication(format!(
+                        "cannot inspect job byte budget before {name}: {error}"
+                    ))
+                })?;
+                if used > budget || contents.len() as u64 > budget - used {
+                    let detail =
+                        format!("job byte budget {budget} exceeded while publishing {name}");
+                    let _ = publisher.record_missing(&product, &detail);
+                    return Err(Stop::Publication(detail));
+                }
+            }
+            match publisher.publish(&product, &contents) {
                 Ok(metadata) => run.record.timeline.push(format!(
                     "artifact {name} -> {}",
                     metadata["artifactID"].as_str().unwrap_or_default()
@@ -519,6 +730,91 @@ impl JobRunner<'_> {
                     )));
                 }
             }
+        }
+        Ok(())
+    }
+
+    /// Swift `publishFinalizeArtifacts`: every declared product no step
+    /// recorded is recorded missing, then the run's own products are composed
+    /// from the record and the index as they stand and published under
+    /// `finalize-session`, each within the job byte budget.
+    fn finalize(&self, run: &mut Run, descriptor: &CatalogOperation) -> Result<(), String> {
+        let owner = Owner::of(&run.record, descriptor);
+        let names = device_steps::finalize_products(&owner.reference);
+        if names.is_empty() {
+            return Ok(());
+        }
+        let publisher = self.publisher();
+        let named = |recorded: &[Value], name: &str| recorded.iter().any(|row| row["name"] == name);
+        let recorded = publisher.list(&owner.job_id).map_err(|error| {
+            format!("cannot inspect Artifact index during finalization: {error}")
+        })?;
+        for declaration in descriptor.artifacts.iter().filter(|declaration| {
+            !names.contains(&declaration.name.as_str()) && !named(&recorded, &declaration.name)
+        }) {
+            publisher
+                .record_missing(
+                    &owner.product("finalize-session", declaration, None),
+                    "no step produced this declared artifact",
+                )
+                .map_err(|error| {
+                    format!(
+                        "cannot record missing product {}: {error}",
+                        declaration.name
+                    )
+                })?;
+        }
+        let recorded = publisher.list(&owner.job_id).map_err(|error| {
+            format!("cannot reopen Artifact index during finalization: {error}")
+        })?;
+        let mut missing_required: Vec<&str> = descriptor
+            .artifacts
+            .iter()
+            .filter(|declaration| {
+                declaration.required
+                    && !names.contains(&declaration.name.as_str())
+                    && !recorded.iter().any(|row| {
+                        row["name"] == declaration.name.as_str()
+                            && row["status"].get("published").is_some()
+                    })
+            })
+            .map(|declaration| declaration.name.as_str())
+            .collect();
+        for name in names {
+            let Some(declaration) = declaration(descriptor, name) else {
+                continue;
+            };
+            let contents =
+                capture_documents::contents(name, descriptor, &run.record, &recorded, names)
+                    .map_err(|error| format!("cannot encode final Artifact {name}: {error}"))?;
+            if owner.reference == CAPTURE {
+                let budget = byte_budget(&run.record);
+                let used = publisher.published_bytes(&owner.job_id).map_err(|error| {
+                    format!("cannot inspect final Artifact budget before {name}: {error}")
+                })?;
+                if used > budget || contents.len() as u64 > budget - used {
+                    return Err(format!(
+                        "job byte budget {budget} exceeded while finalizing {name}"
+                    ));
+                }
+            }
+            publisher
+                .publish(
+                    &owner.product("finalize-session", declaration, None),
+                    &contents,
+                )
+                .map_err(|error| format!("cannot publish final Artifact {name}: {error}"))?;
+        }
+        if !missing_required.is_empty() {
+            missing_required.sort_unstable();
+            let names: Vec<String> = missing_required
+                .iter()
+                .map(|name| format!("\"{name}\""))
+                .collect();
+            run.record.timeline.push(format!(
+                "incomplete: missing required [{}]",
+                names.join(", ")
+            ));
         }
         Ok(())
     }
@@ -542,11 +838,26 @@ fn binding_snapshot(record: &JobRecord) -> Value {
     binding
 }
 
-/// Swift `RuntimeArtifactService.artifactContents` for a facts product: the
-/// product, the operation and the Job, the observation's device facts where
-/// there is one, the step's verified facts, and for the binding snapshot the
-/// requested target and revision, in Swift's canonical pretty spelling.
-fn contents(name: &str, record: &JobRecord, summary: &BTreeMap<String, String>) -> Vec<u8> {
+/// Swift `RuntimeArtifactService.artifactContents` for a step's product: a
+/// capture's bytes as the provider received them, or a facts product.
+fn contents(
+    name: &str,
+    record: &JobRecord,
+    summary: &BTreeMap<String, String>,
+    receipt: &Receipt,
+) -> Vec<u8> {
+    match name {
+        "hilog.txt" | "ui-dump.json" | "advanced-dump.txt" | "crash-index.txt"
+        | "crash-log.txt" => receipt.stdout.clone(),
+        _ => facts(name, record, summary),
+    }
+}
+
+/// A facts product: the product, the operation and the Job, the
+/// observation's device facts where there is one, the step's verified facts,
+/// and for the binding snapshot the requested target and revision, in Swift's
+/// canonical pretty spelling.
+fn facts(name: &str, record: &JobRecord, summary: &BTreeMap<String, String>) -> Vec<u8> {
     let mut fields = Map::from_iter([
         ("artifact".to_owned(), json!(name)),
         ("operation".to_owned(), json!(record.operation())),
@@ -575,5 +886,5 @@ fn contents(name: &str, record: &JobRecord, summary: &BTreeMap<String, String>) 
             fields.insert("expectedBindingRevision".into(), json!(revision));
         }
     }
-    session_json::encode_pretty(&Value::Object(fields)).unwrap_or_else(|_| b"{}".to_vec())
+    session_json::encode_canonical_pretty(&Value::Object(fields)).unwrap_or_else(|_| b"{}".to_vec())
 }

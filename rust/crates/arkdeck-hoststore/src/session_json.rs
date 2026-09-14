@@ -276,11 +276,24 @@ pub(super) fn encode(value: &Value) -> Result<Vec<u8>> {
 /// solidus and no trailing newline. Keys and numbers are spelled as `encode`.
 #[cfg(target_os = "macos")]
 pub(super) fn encode_pretty(value: &Value) -> Result<Vec<u8>> {
-    fn string(text: &str, output: &mut Vec<u8>) -> Result<()> {
+    pretty(value, true)
+}
+
+/// Swift `CanonicalJSONEncoders.canonicalPretty()`: the same spelling with
+/// `.withoutEscapingSlashes`, the one the Artifact documents Swift composes
+/// (a facts product, a capture's markers, index and summary) are written in.
+#[cfg(target_os = "macos")]
+pub(super) fn encode_canonical_pretty(value: &Value) -> Result<Vec<u8>> {
+    pretty(value, false)
+}
+
+#[cfg(target_os = "macos")]
+fn pretty(value: &Value, escape_solidus: bool) -> Result<Vec<u8>> {
+    fn string(text: &str, escape_solidus: bool, output: &mut Vec<u8>) -> Result<()> {
         // serde escapes Foundation's set (quote, backslash, C0 controls with
         // the short forms and lowercase \u00xx) except the solidus.
         for byte in serde_json::to_vec(text).map_err(|_| DecodeError::Shape)? {
-            if byte == b'/' {
+            if byte == b'/' && escape_solidus {
                 output.push(b'\\');
             }
             output.push(byte);
@@ -291,7 +304,12 @@ pub(super) fn encode_pretty(value: &Value) -> Result<Vec<u8>> {
         output.push(b'\n');
         output.resize(output.len() + 2 * depth, b' ');
     }
-    fn write(value: &Value, depth: usize, output: &mut Vec<u8>) -> Result<()> {
+    fn write(
+        value: &Value,
+        depth: usize,
+        escape_solidus: bool,
+        output: &mut Vec<u8>,
+    ) -> Result<()> {
         match value {
             Value::Array(values) => {
                 output.push(b'[');
@@ -300,7 +318,7 @@ pub(super) fn encode_pretty(value: &Value) -> Result<Vec<u8>> {
                         output.push(b',');
                     }
                     line(output, depth + 1);
-                    write(value, depth + 1, output)?;
+                    write(value, depth + 1, escape_solidus, output)?;
                 }
                 if values.is_empty() {
                     output.push(b'\n');
@@ -317,9 +335,9 @@ pub(super) fn encode_pretty(value: &Value) -> Result<Vec<u8>> {
                         output.push(b',');
                     }
                     line(output, depth + 1);
-                    string(key, output)?;
+                    string(key, escape_solidus, output)?;
                     output.extend_from_slice(b" : ");
-                    write(&fields[key.as_str()], depth + 1, output)?;
+                    write(&fields[key.as_str()], depth + 1, escape_solidus, output)?;
                 }
                 if fields.is_empty() {
                     output.push(b'\n');
@@ -327,14 +345,14 @@ pub(super) fn encode_pretty(value: &Value) -> Result<Vec<u8>> {
                 line(output, depth);
                 output.push(b'}');
             }
-            Value::String(text) => string(text, output)?,
+            Value::String(text) => string(text, escape_solidus, output)?,
             Value::Number(n) if !n.is_i64() && !n.is_u64() => output.extend(float_text(n)?.bytes()),
             _ => output.extend(serde_json::to_vec(value).map_err(|_| DecodeError::Shape)?),
         }
         Ok(())
     }
     let mut bytes = Vec::new();
-    write(value, 0, &mut bytes)?;
+    write(value, 0, escape_solidus, &mut bytes)?;
     Ok(bytes)
 }
 
@@ -377,8 +395,19 @@ pub fn decode_session_json(bytes: &[u8]) -> Result<DecodedStore> {
 
 #[cfg(all(test, target_os = "macos"))]
 mod tests {
-    use super::encode_pretty;
+    use super::{encode_canonical_pretty, encode_pretty};
     use serde_json::{Value, json};
+
+    #[test]
+    fn canonical_pretty_spelling_leaves_the_solidus_unescaped() {
+        // Printed by Foundation JSONEncoder([.sortedKeys, .prettyPrinted,
+        // .withoutEscapingSlashes]), Swift `CanonicalJSONEncoders.canonicalPretty()`.
+        let value = json!({"c": "\\/", "a/b": ["x/y", {}]});
+        assert_eq!(
+            String::from_utf8(encode_canonical_pretty(&value).unwrap()).unwrap(),
+            "{\n  \"a/b\" : [\n    \"x/y\",\n    {\n\n    }\n  ],\n  \"c\" : \"\\\\/\"\n}"
+        );
+    }
 
     #[test]
     fn pretty_spelling_matches_foundation() {

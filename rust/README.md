@@ -784,8 +784,40 @@ daemon and reads every Job again, and reads through the Rust CLI:
 ```bash
 cargo build -p arkdeck-agentd -p arkdeck-cli
 python3 scripts/check-corpus-replay.py --fixture tests/fixtures/observe-device
+python3 scripts/check-corpus-replay.py --fixture tests/fixtures/capture-diagnostics
 python3 scripts/check-corpus-replay.py --fixture tests/fixtures/agent-execution
 ```
+
+## Diagnostic capture (TASK-XPA-014, M1)
+
+`capture.diagnostics@1` runs through the same composition, for the legs Swift's
+default selects. The host storage preflight asks the Artifact store for the
+room the capture may take (the request's `totalArtifactByteBudget`, else the
+operation's 512 MiB), then come the evidence preflight, the device's free space
+(`shell df -k /data/local/tmp` against the job byte budget, 128 MiB unless the
+request sets one), the HiLog drain (`shell hilog -x`; the window bounds only
+its timeout, the budget is 16 MiB) and the window inventory (`shell hidumper -s
+WindowManagerService -a -a`), each with Swift's typed action and verdict; their
+raw bytes become `hilog.txt` and `ui-dump.json`, within the job byte budget. An
+optional step the request did not select, or whose upstream did not run, is
+recorded as skipped, and every product it owned as missing, with the reason; an
+optional step that fails is skipped with its failure and the Job goes on; an
+empty HiLog drain is an unknown outcome and parks the Job, optional or not.
+Finalization publishes `capture.log` (the timeline), `markers.json`,
+`artifact-index.json` and `capture-summary.json`, which states every declared
+product's status, so a partial capture never reads as a whole one.
+`job.result` and `job.evidence` accept as missing only the products the request
+left out. A request for a leg this Runtime does not run yet (the advanced dump,
+the crash ledger, the liveness readback, the tree, screenshot and Trace file
+legs, a ring-buffered capture) is refused at planning, before anything is
+admitted.
+
+`rust/tests/fixtures/capture-diagnostics/` is Swift
+`CaptureDiagnosticsOracleContractTests`' oracle over the shared fake: a capture
+that succeeds, one the device's free space refuses, one on another device and
+one whose HiLog drain comes back empty. `tests/capture_diagnostics.rs` replays
+it in-process and compares every answer and every file the Jobs leave; the
+harness above replays it against the real daemon.
 
 ## Agent executions and Artifact lists (TASK-XPA-014, M1)
 
@@ -817,18 +849,15 @@ page, 100 by default); the snapshots live with the Job owner
 (`jobs-state/cli-job-snapshots`), not in the Artifact root.
 
 Not served yet: an execution without a target; `agent.list`, `agent.resume`,
-`agent.abandon` and human actions; and the Jobs of `capture.diagnostics@1`,
-whose admission this Runtime refuses, so such an execution fails with
-`admissionDenied` as Swift's does for an operation its engine cannot plan. A
-restart leaves an owned Job as it is: nothing resumes a run (L.1 item 13).
+`agent.abandon` and human actions. A restart leaves an owned Job as it is:
+nothing resumes a run (L.1 item 13).
 
 `rust/tests/fixtures/agent-execution/` is the oracle Swift
 `AgentExecutionOracleContractTests` records over the shared fake HDC with the
 daemon's coordinator: Golden Journey 1's two runs, their reads and Artifact
 pages, and the refusals. `tests/agent_execution.rs` replays it in-process and
-compares every answer and every file the executions and Jobs leave, apart from
-the capture run's; re-record from Swift with
-`ARKDECK_RUST_AGENT_EXECUTION_RECORD=/private/tmp/<new>`. The harness above
+compares every answer and every file the executions and Jobs leave; re-record
+from Swift with `ARKDECK_RUST_AGENT_EXECUTION_RECORD=/private/tmp/<new>`. The harness above
 replays it against the real daemon: it holds and releases the owned Job's first
 call as the oracle does, compares a listing's pages without the order of their
 items, which follows the daemon's clock, and reads every execution again after

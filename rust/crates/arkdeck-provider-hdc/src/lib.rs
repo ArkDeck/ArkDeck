@@ -44,6 +44,7 @@ pub use operation::{
     Action, DispatchFailure, Expected, HdcDispatch, Outcome, ProcessPlan, Property, Receipt,
     property_value, stable_identity_sha256,
 };
+pub use operation::{DEFAULT_HILOG_BUDGET, Persisted, RequestError, STORAGE_ROOT};
 pub use presence::{
     ObservationFailure, ObservationInput, ObservationTermination, PresenceSnapshot,
     parse_registered_presence,
