@@ -1,0 +1,39 @@
+{
+  "artifacts" : [
+    {
+      "artifactID" : "ART-1908ae395d242542eaf36e6a196d217f",
+      "bindingSnapshot" : {
+        "bindingRevision" : 1,
+        "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "targetID" : "TGT-3ba3f5f43b92"
+      },
+      "byteCount" : 240,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-1721f8df101bec4bab91e4619d3f66fa",
+      "mediaType" : "application\/json",
+      "name" : "tool-facts.json",
+      "observationWindow" : {
+        "endUTC" : "2026-09-14T00:00:00.000Z",
+        "startUTC" : "2026-09-14T00:00:00.000Z"
+      },
+      "privacy" : "standard",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-1721f8df101bec4bab91e4619d3f66fa",
+      "sha256" : "7e95f1bca39de970e898f58f94b41d32b261958f94096a4d70e446e4a8049dd6",
+      "sourceOperation" : "observe.device@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "probe-host-tool"
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

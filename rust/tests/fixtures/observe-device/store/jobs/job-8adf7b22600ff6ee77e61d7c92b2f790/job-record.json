@@ -1,0 +1,91 @@
+{
+  "actualEffect" : "readOnly",
+  "actualStepKinds" : [
+    "probeHostTool"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "kind" : "defaultReadOnlyPolicy",
+    "reference" : "default-read-only-policy"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-8adf7b22600ff6ee77e61d7c92b2f790",
+  "materializedBindingRevision" : 1,
+  "materializedPlanDigest" : "79fe36f61a71d4852c51b00f784085ec0139b552191bd2b89d6060bec49b3d6a",
+  "materializedStableTargetIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+  "operationFailure" : {
+    "category" : "unknownOutcome",
+    "code" : "outcomeUnknown",
+    "recovery" : "awaitRuntimeReconciliation",
+    "retryability" : "runtimeDecisionRequired",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "observe.device@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-observe-emptyVersion",
+    "inputs" : {
+
+    },
+    "operation" : {
+      "id" : "observe.device",
+      "version" : 1
+    },
+    "requestId" : "req-observe-emptyVersion",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-3ba3f5f43b92"
+    }
+  },
+  "outcomeUnknown" : true,
+  "providerID" : "hdc",
+  "recoveryAction" : {
+    "arguments" : {
+
+    },
+    "kind" : "hdc.observeTool"
+  },
+  "recoveryIntentEventID" : "intent-probe-host-tool",
+  "recoveryStepID" : "probe-host-tool",
+  "request" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-observe-emptyVersion",
+    "inputs" : {
+
+    },
+    "operation" : {
+      "id" : "observe.device",
+      "version" : 1
+    },
+    "requestId" : "req-observe-emptyVersion",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-3ba3f5f43b92"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "waitingForRecovery",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "intent probe-host-tool",
+    "outcomeUnknown probe-host-tool; durable intent left outstanding",
+    "running->waitingForRecovery",
+    "reason: outcomeUnknown: empty observation output"
+  ]
+}
