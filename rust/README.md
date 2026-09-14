@@ -1091,6 +1091,33 @@ object needs (the published schema was derived from frames that carry only
 nulls for `generation`, `processId` and `clientVersion`), are the method
 owner's.
 
+## Target observation port (TASK-XPA-016, M1)
+
+`arkdeck_provider_hdc::target_observation` is the physical side of a target
+observation as Swift's `TargetObservationCoordinator` proves it. `UsbRelation`
+is Swift's `TargetUSBRelation` (the serial that is the connect key, the
+decimal location, one IOKit attachment identity, the vendor and product) with
+its `is_usable` rule and the JSON shape the oracles record; `UsbRelations` is
+the port that reads them, implemented by any closure for tests and by
+`NoUsbRelations` in production until the ArkForge lane's `arkforged
+discoverDevices` client reads the registry (r11 keeps IOKit out of this
+crate) — it answers no relations, so no candidate is proved and no adoption
+can pass, while the device list stays readable. `Reading::take` is Swift's
+bracketed read over any `HdcDispatch`: the relations, `list targets -v`
+(parsed with the highest registered version, as Swift's bootstrap port
+parses it), the relations again; `Reading::rows` is the stamp's rule — a
+candidate carries a proved relation only when exactly one usable relation
+names its serial in both reads, unchanged, and no other row shares its
+connect key — and `validate` its bounds. `observe_tool_version` (`-v`) and
+`observe_device_identity` (the exact-row confirmation, answering the serial)
+are Swift's `ProviderBootstrapObservation`; `adoption_holds` is the
+adoption's final check over the live relations and the readback;
+`stable_identity_sha256_for_serial` Swift's normalized serial digest. Minting
+observation identities and generations over a reading, following a
+reference, and the adoption itself are the Target owner's.
+`tests/target_observation.rs` reads the observe fixture's shared fake with
+injected relations and checks the argv the driver logged.
+
 ## Rockchip live-mode probe (TASK-XPA-016, M4)
 
 `arkdeck_provider_hdc::LiveModeProbe` is Swift's `FoundationRockchipLiveModeProbe`,

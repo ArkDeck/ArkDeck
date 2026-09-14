@@ -23,6 +23,7 @@ mod rockchip_loader;
 mod semantic;
 #[cfg(target_os = "macos")]
 mod status;
+mod target_observation;
 
 #[cfg(target_os = "macos")]
 pub use dispatch::{ProcessDispatch, SERVER_PORT_VARIABLE};
@@ -70,4 +71,10 @@ pub use status::{
     ManagedProcessVerifier, NativeSignature, STATUS_SCHEMA_VERSION, SignatureInspector,
     StartupDiagnostics, StatusExecutable, SupervisedServer, SupervisorState, SystemManagedProcess,
     server_endpoint_ref, unconfigured_status,
+};
+pub use target_observation::{
+    BootstrapFailure, DAYU200_NORMAL_PRODUCT_ID, NoUsbRelations, ObservedCandidate,
+    ROCKUSB_VENDOR_ID, Reading, UsbRelation, UsbRelations, adoption_holds, list_candidates,
+    observe_device_identity, observe_tool_version, stable_identity_sha256_for_serial,
+    usable_relations,
 };
