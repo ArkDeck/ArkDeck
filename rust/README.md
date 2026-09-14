@@ -1207,6 +1207,53 @@ log line for line. The Job's planner and runner, the lease resolution and
 the products (`install-readback.json`, `process-readback.json`,
 `debug-hilog.txt`) are the store owner's.
 
+## Native library provider (TASK-XPA-016, M2)
+
+`arkdeck_provider_hdc::NativeAction` is Swift's HDC provider for
+`deploy.native-library.app-owned@1` (`nativeLibraryAction`): a leased native
+library staged into the target application's own data directory with the
+bundled code-sign helper (`mkdir -p`, two `file send`, `chmod 700`,
+`sha256sum`), the current library backed up by a hard link (`ls -ld`, `ls
+-l`, `sha256sum`, `rm -f`, `ln`, `sha256sum`, `ls -l`, `ls -la`), the
+replacement published atomically by the helper (`ls -ln`, `<helper> verify
+<backup>`, `<helper> publish <staging> <target> <rollback>`, `sha256sum`,
+`<helper> verify <target>`, `ls -ln` — the published library must be at
+least as attested as the one it replaced, read off the helper's
+`ARKDECK_CODE_SIGN_*` lines), the target stopped and started (`aa
+force-stop`/`aa start … EntryAbility` with `sleep 2` and `pidof`), the
+loaded library proved through `grep -F <loader path> /proc/*/maps`, the
+staging cleaned by name and proved absent by `ls -ld`, and the rollback (13
+steps) that restores the backup. `Deployment` derives the whole
+provider-owned namespace from the bundle, the ABI and the Job
+(`/data/app/el1/bundle/public/<bundle>/libs/<arm|x86_64>/…`, the job-owned
+staging directory under the application's `el2` data, the loader-visible
+path under `/data/storage/el1/bundle/libs`), accepting persisted paths only
+when they are exactly what it would have produced; `Deployment::from_inputs`
+is Swift's admission over the request's inputs, the engine-resolved
+Artifact, the library's bytes and the helper. `native_elf::validate_elf` is
+the host-side verifier (Swift `NativeLibraryArtifactValidator`): the closed
+ELF fields, the ABI by class and machine, the GNU build id from the note
+sections, and the OpenHarmony V1 code-sign block appended to the file;
+`is_static_executable` the shape the bundled helper must have. `lower`,
+`verify`, `persisted`, `readback` (each mutation's read-only inspection —
+`Inspection`, eight of them) and `reconcile` (a failed readback is "not
+executed" for the idempotent mutations, never for a publish or a rollback)
+follow Swift line for line, with its codes (`nativeSendFailed`,
+`nativeAppOwnedDirectoryMissing`, `nativeBackupMismatch`,
+`nativePublishMismatch`, `nativeTargetStillRunning`,
+`nativeTargetNotRunning`, `cleanupDebt`, `nativeRollbackVerificationFailed`,
+`nativeStagingMismatch`, `nativeTargetHashMismatch`, `nativeLibraryNotLoaded`,
+`nativeCleanupIncomplete`) and summaries (`loaderVerified` stated as
+`notObserved` under a profile that never read the maps).
+`tests/native_library.rs` replays the Swift oracle
+(`rust/tests/fixtures/deploy-native-library`: five Jobs and the debt
+continuation over the shared fake HDC driver with the oracle's own answers
+and modes) step by step through the real process dispatch, comparing the
+argv the driver logged with the oracle's 225 recorded lines. The Job's
+planner, the rollback/compensation sequencing, the lease resolution, the
+bundled helper's discovery and the published reports are the store
+owner's.
+
 ## Rockchip live-mode probe (TASK-XPA-016, M4)
 
 `arkdeck_provider_hdc::LiveModeProbe` is Swift's `FoundationRockchipLiveModeProbe`,

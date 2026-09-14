@@ -16,6 +16,8 @@ mod lifecycle;
 mod live_mode;
 #[cfg(target_os = "macos")]
 mod managed_server;
+mod native_elf;
+mod native_library;
 mod observation;
 mod operation;
 mod presence;
@@ -53,6 +55,17 @@ pub use live_mode::{
 };
 #[cfg(target_os = "macos")]
 pub use managed_server::{ManagedHdcServer, StartBudget, StartFailure};
+pub use native_elf::{
+    CodeSignFacts, MAXIMUM_LIBRARY_BYTES, NativeAbi, NativeLibraryFacts, ValidationError,
+    is_static_executable, validate_elf,
+};
+pub use native_library::{
+    Attestation, CodeSignHelper, CodeSignHelperFacts, Deployment, ExactPaths, Inspection,
+    NativeAction, NativeFileIdentity, Reconcile, RestartProfile, RollbackPolicy,
+    VerificationProfile, attestation_at_least_replaced, code_sign_digest, is_directory_listing,
+    is_regular_file_listing, maps_contain, native_file_identity, process_ids, process_is_absent,
+    published_without_attestation, readback_attestation, sha256_token,
+};
 pub use observation::{
     DeviceCandidate, ParseError, ServerCheck, parse_client_version, parse_server_check,
     parse_target_list,
