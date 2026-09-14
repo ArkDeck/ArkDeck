@@ -1,0 +1,90 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "control-action",
+        "list"
+      ],
+      "expected": {
+        "command": "control-action.list",
+        "handlerArguments": [
+          "control-action",
+          "list"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "control-action",
+        "list",
+        "--help"
+      ],
+      "expected": {
+        "command": "control-action.list",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "control-action",
+        "list",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "control-action.list",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "control-action",
+        "list",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "control-action.list",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "control-action",
+        "list",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "control-action.list",
+        "handlerArguments": [
+          "control-action",
+          "list",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "control-action.list",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "control-action",
+    "list"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}
