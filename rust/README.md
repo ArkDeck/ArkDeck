@@ -858,14 +858,25 @@ abandonment never cancels a Job, and so is a changed generation; an execution
 still orchestrating becomes `abandoned` in one more generation, and a terminal
 one is answered as it is, without a write.
 
+An execution that waits for a person, as the runbook's §2.1 path leaves one, is
+read, listed, run again and abandoned as Swift's owner does. Its record keeps
+Swift's physical-assistance actions (`connectDevice`, `trustDevice` or
+`selectDevice`, each `waiting`, `resolvedByFreshProbe` or `expired`), checked as
+Swift's `validate` checks them: at most one waits, the last, exactly while the
+execution does, and only a device selection offers choices. Its answer carries
+the waiting action (`arkdeck.human-action/1`) and a `nextAction` naming it with
+its resume reference; a list item leaves the action out. Running it again only
+reads its budget, and an abandonment, like a budget that runs out, expires the
+action in the same write.
+
 `artifact.list` pages a Job's Artifacts as Swift's `RuntimeSnapshotPager` does
 (`createdAtDescArtifactIdAsc`, cursors `<revision>.<token>`, 1 to 1,000 per
 page, 100 by default); the snapshots live with the Job owner
 (`jobs-state/cli-job-snapshots`), not in the Artifact root.
 
-Not served yet: an execution without a target; `agent.resume` and human
-actions, so a record holding a physical action is neither read nor listed. A
-restart leaves an owned Job as it is: nothing resumes a run (L.1 item 13).
+Not served yet: an execution without a target, so nothing here raises an action;
+`agent.resume` and `human-action.*`. A restart leaves an owned Job as it is:
+nothing resumes a run (L.1 item 13).
 
 `rust/tests/fixtures/agent-execution/` is the oracle Swift
 `AgentExecutionOracleContractTests` records over the shared fake HDC with the
@@ -886,6 +897,15 @@ abandoned execution read, run again and listed. `tests/agent_lifecycle.rs`
 replays it in-process and compares every answer and every file, the list's
 snapshots by their existence and mode; the harness replays it against the real
 daemon.
+
+`rust/tests/fixtures/agent-human-action/` is Swift
+`AgentHumanActionOracleContractTests`' oracle for the §2.1 path: executions
+that name no target, the actions they raise, their resumes and the human-action
+routes. `tests/agent_human_action_records.rs` seeds its execution records, the
+identities the oracle labelled (`<har-1>`) read as valid ones of their kind, and
+answers them as the oracle recorded: the waiting execution read, listed, run
+again and abandoned, and the abandoned one run again. Replaying the whole
+fixture waits for the Target observation owner and the resume path.
 
 The Rust CLI runs them as the Swift CLI does. `arkdeck agent run --operation
 <reference> --target <id> [--expected-binding-revision <n>] [--inputs-file
