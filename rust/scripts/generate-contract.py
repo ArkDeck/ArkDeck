@@ -283,7 +283,8 @@ def check_vocabulary(schema: dict, location: str = "schema") -> None:
                 or len(set(required)) != len(required)):
             invalid("required", "an array of distinct property names")
     if "additionalProperties" in schema and type(schema["additionalProperties"]) is not bool:
-        invalid("additionalProperties", "a boolean")
+        # A map: one schema for every member value, no member names.
+        check_vocabulary(schema["additionalProperties"], f"{location}.additionalProperties")
     if "items" in schema:
         check_vocabulary(schema["items"], f"{location}.items")
     for keyword in ("anyOf", "oneOf"):

@@ -59,7 +59,8 @@ else:
 # dispatched frame a contract-test run recorded. Results and error details are
 # closed to the fields the daemon emitted; request parameters are closed to the
 # fields a contract test exercised, so a parameter no test sends is not
-# published. `ControlMethodSchemaContractTests` holds the committed corpus to
+# published. A member keyed by caller data is published as a map instead (see
+# MAP_VALUED_MEMBERS). `ControlMethodSchemaContractTests` holds the committed corpus to
 # the schemas; re-recording and re-deriving is how a new field enters.
 
 METHOD_SCHEMA_DIRECTORY = repository_root / "spec/control/methods"
@@ -103,6 +104,35 @@ TOOL_LIST_OWNER_ERROR_CODES = [
     "invalidInput", "invalidCursor", "resourceConflict", "admissionDenied",
     "recordUnreadable", "operationUnavailable", "inputTooLarge", "fileIdentityChanged", "ioFailure", "outcomeUnknown",
 ]
+# Members keyed by caller data — operation input names, Artifact fact names,
+# provenance keys — rather than records with a fixed member set. Each is
+# published as a map, `{"type": "object", "additionalProperties": <schema of
+# every sampled value>}` without `properties`, so a key no frame recorded is
+# accepted with a value of a recorded type. Every other object stays closed to
+# the members the daemon emitted. A path names the `$defs` part and then object
+# members; `[]` steps into array items, `*` into a map's values. Reviewed
+# against the Swift type that encodes each member: list only dictionaries.
+# `operation.describe`'s example inputs stay closed: their keys are the
+# Catalog's own input names, fixed by the build, and arkdeck-control validates
+# the description of every Catalog operation against the published schema.
+MAP_VALUED_MEMBERS = {
+    # RuntimeAgentExecutionRequest.inputs: [String: JSONValue]
+    "agent.run": ["request.inputs"],
+    # RuntimeCapability.inputConstraints: [String: RuntimeCapabilityInputConstraint],
+    # .exactInputs: [String: JSONValue]?, .exactArtifactFacts: [String: String]?
+    "capability.inspect": [
+        "result.capability.exactArtifactFacts", "result.capability.exactInputs",
+        "result.capability.inputConstraints",
+    ],
+    # The Job evidence document's `parameters`: [String: JSONValue]
+    "job.evidence": ["result.parameters"],
+    # RuntimePlanOnlyPreview.inputs: [String: JSONValue]
+    "job.plan": ["result.inputs"],
+    "job.result": ["result.evidence.parameters"],
+    # RuntimeOperationRequest.inputs: [String: JSONValue],
+    # RuntimeClientContext.provenance: [String: String]?
+    "job.show": ["result.request.clientContext.provenance", "result.request.inputs"],
+}
 MAXIMUM_SIGNATURES_PER_METHOD = 24
 MAXIMUM_SAMPLE_BYTES = 65536
 
@@ -133,8 +163,14 @@ def signature(value):
     return kind
 
 
-def infer(values, closed):
-    """The narrowest schema in the validator's vocabulary that admits every sample."""
+def infer(values, closed, path="", maps=None):
+    """The narrowest schema in the validator's vocabulary that admits every sample.
+
+    `path` names where the samples sit, as MAP_VALUED_MEMBERS spells it. An
+    object at a path in `maps` is published as a map, and the path is marked
+    as reached.
+    """
+    maps = {} if maps is None else maps
     kinds = sorted({json_type(value) for value in values})
     if kinds == ["integer", "number"] or kinds == ["number"]:
         return {"type": "number"}
@@ -143,13 +179,21 @@ def infer(values, closed):
     branches = []
     for kind in kinds:
         members = [value for value in values if json_type(value) == kind]
-        if kind == "object":
+        if kind == "object" and path in maps:
+            maps[path] = True
+            entries = [entry for member in members for entry in member.values()]
+            # With only empty maps recorded, no value is published.
+            branches.append({
+                "type": "object",
+                "additionalProperties": infer(entries, closed, path + ".*", maps) if entries else False,
+            })
+        elif kind == "object":
             keys = sorted({key for member in members for key in member})
             schema = {"type": "object"}
             if closed:
                 schema["additionalProperties"] = False
             schema["properties"] = {
-                key: infer([member[key] for member in members if key in member], closed)
+                key: infer([member[key] for member in members if key in member], closed, f"{path}.{key}", maps)
                 for key in keys
             }
             required = [key for key in keys if all(key in member for member in members)]
@@ -160,7 +204,7 @@ def infer(values, closed):
             items = [item for member in members for item in member]
             schema = {"type": "array"}
             if items:
-                schema["items"] = infer(items, closed)
+                schema["items"] = infer(items, closed, path + "[]", maps)
             branches.append(schema)
         elif kind == "integer" and "number" in kinds:
             continue
@@ -198,6 +242,9 @@ def load_frames(source):
 def derive_method_schemas(source):
     frames = load_frames(source)
     published = set(contract["methods"])
+    unpublished = sorted(set(MAP_VALUED_MEMBERS) - published)
+    if unpublished:
+        raise SystemExit("MAP_VALUED_MEMBERS names unpublished methods: " + ", ".join(unpublished))
     current = contract["currentVersion"]
     by_method = {}
     for frame, line in frames:
@@ -236,6 +283,7 @@ def derive_method_schemas(source):
                        | (set(BUNDLE_RETIREMENT_OWNER_ERROR_CODES) if method == "runtime.bundle.remove" else set())
                        | (set(TOOL_RETIREMENT_OWNER_ERROR_CODES) if method == "runtime.tool.remove" else set())
                        | (set(TOOL_LIST_OWNER_ERROR_CODES) if method == "runtime.tool.list" else set()))
+        maps = dict.fromkeys(MAP_VALUED_MEMBERS.get(method, []), False)
         schema = {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "$id": f"https://arkdeck.dev/schemas/control/methods/{method}.json",
@@ -253,8 +301,8 @@ def derive_method_schemas(source):
                 "request": len(params), "result": len(results), "error": len(errors),
             },
             "$defs": {
-                "request": infer(params, closed=True),
-                "result": infer(results, closed=True) if results else {
+                "request": infer(params, closed=True, path="request", maps=maps),
+                "result": infer(results, closed=True, path="result", maps=maps) if results else {
                     "description": (
                         "no successful frame was recorded, so the result shape is not published "
                         "yet; a contract test that exercises the success path through the control "
@@ -262,7 +310,7 @@ def derive_method_schemas(source):
                     "x-arkdeck-unpublished": True,
                 },
                 "errorCode": {"enum": codes},
-                "errorDetails": infer(details, closed=True) if details else {"type": "object", "additionalProperties": False, "properties": {}},
+                "errorDetails": infer(details, closed=True, path="errorDetails", maps=maps) if details else {"type": "object", "additionalProperties": False, "properties": {}},
             },
         }
         if method == "runtime.bundle.register" and results:
@@ -271,7 +319,7 @@ def derive_method_schemas(source):
             # actual inspection results without inventing registration frames.
             inspection = load_frames(FRAME_CORPUS_DIRECTORY / "runtime.bundle.inspect.jsonl")
             projections = [frame["result"] for frame, _ in inspection if frame["ok"]]
-            schema["$defs"]["result"] = infer(projections + results, closed=True)
+            schema["$defs"]["result"] = infer(projections + results, closed=True, path="result", maps=maps)
         if method in {"runtime.tool.list", "runtime.tool.remove"} and results:
             # Both leaves return the existing Tool projection. Preserve its
             # native optional trust/dependency/selection fields from actual
@@ -281,9 +329,14 @@ def derive_method_schemas(source):
             projections = [frame["result"] for frame, _ in inspection if frame["ok"]]
             if method == "runtime.tool.list":
                 projections += [row for result in results for row in result["items"]]
-                schema["$defs"]["result"]["properties"]["items"]["items"] = infer(projections, closed=True)
+                schema["$defs"]["result"]["properties"]["items"]["items"] = infer(
+                    projections, closed=True, path="result.items[]", maps=maps)
             else:
-                schema["$defs"]["result"] = infer(projections + results, closed=True)
+                schema["$defs"]["result"] = infer(projections + results, closed=True, path="result", maps=maps)
+        unreached = sorted(path for path, reached in maps.items() if not reached)
+        if unreached:
+            print(f"{method}: no recorded frame reaches the map-valued member(s) "
+                  + ", ".join(unreached) + ", so they are not published", file=sys.stderr)
         (METHOD_SCHEMA_DIRECTORY / f"{method}.json").write_text(
             json.dumps(schema, indent=2, sort_keys=True, ensure_ascii=False) + "\n")
         # The committed corpus: the smallest frame of every distinct request and

@@ -301,10 +301,47 @@ fn unknown_vocabulary_cannot_hide_in_unvisited_or_inverted_branches() {
         (json!({"oneOf": [{"const": "hit"}, unknown]}), json!("hit")),
         (json!({"properties": {"absent": unknown}}), json!({})),
         (json!({"items": unknown}), json!([])),
+        (json!({"additionalProperties": unknown}), json!({})),
         (json!({"not": {"not": unknown}}), json!(1)),
     ] {
         rejects(&schema, instance);
     }
+}
+
+#[test]
+fn a_schema_valued_additional_properties_types_every_undeclared_member() {
+    // A map: any member name, each value held to one schema.
+    let map = json!({"type": "object", "additionalProperties": {"type": ["boolean", "string"]}});
+    accepts(&map, json!({}));
+    accepts(&map, json!({"anyName": "value", "other": true}));
+    rejects(&map, json!({"anyName": 1}));
+    rejects(&map, json!({"anyName": null}));
+    let declared = json!({
+        "type": "object", "properties": {"count": {"type": "integer"}},
+        "additionalProperties": {"type": "string"}
+    });
+    accepts(&declared, json!({"count": 1, "name": "value"}));
+    rejects(&declared, json!({"count": "1"}));
+    rejects(&declared, json!({"name": 1}));
+    let records = json!({"type": "object", "additionalProperties": {
+        "type": "object", "additionalProperties": false, "required": ["kind"],
+        "properties": {"kind": {"type": "string"}}
+    }});
+    accepts(
+        &records,
+        json!({"a": {"kind": "exact"}, "b": {"kind": "range"}}),
+    );
+    rejects(&records, json!({"a": {"kind": "exact", "extra": 1}}));
+    rejects(&records, json!({"a": {}}));
+    accepts(&json!({"additionalProperties": true}), json!({"any": null}));
+    rejects(
+        &json!({"additionalProperties": false}),
+        json!({"any": null}),
+    );
+    accepts(
+        &json!({"additionalProperties": {"type": "string"}}),
+        json!([1]),
+    );
 }
 
 #[test]

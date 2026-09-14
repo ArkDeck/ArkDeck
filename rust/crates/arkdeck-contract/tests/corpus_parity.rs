@@ -491,6 +491,69 @@ fn current_schema_closure_rejects_unpublished_fields_in_every_method() {
     }
 }
 
+/// A capability's exact inputs are keyed by operation input names, so the
+/// published map accepts a name no recorded capability used, with a value of a
+/// recorded type, while the capability record itself stays closed.
+#[test]
+fn capability_exact_inputs_accept_an_unrecorded_name_and_the_capability_stays_closed() {
+    let recorded = corpus("capability.inspect")
+        .into_iter()
+        .find(|row| row["ok"] == true && row["result"]["capability"]["exactInputs"].is_object())
+        .expect("a recorded capability with exact inputs");
+    let mut result = recorded["result"].clone();
+    assert!(
+        result["capability"]["exactInputs"]
+            .get("unrecordedInput")
+            .is_none()
+    );
+    result["capability"]["exactInputs"]["unrecordedInput"] = json!("value");
+    assert!(
+        validate_method_value("capability.inspect", "result", &result).is_ok() || published_view(),
+        "an exact input name no frame recorded"
+    );
+    let mut mistyped = result.clone();
+    mistyped["capability"]["exactInputs"]["unrecordedInput"] = json!(null);
+    assert!(
+        validate_method_value("capability.inspect", "result", &mistyped).is_err(),
+        "a map value of a type no frame recorded"
+    );
+    result["capability"]["unrecordedMember"] = json!(true);
+    assert!(
+        validate_method_value("capability.inspect", "result", &result).is_err(),
+        "an unknown member of the capability"
+    );
+}
+
+/// The published view runs this checkout's tests against the schemas of the
+/// merge base with main, which name their commit and may predate map-valued
+/// members. The checkout and the candidate view must publish them.
+fn published_view() -> bool {
+    let inputs = strict_json(CONTRACT_INPUTS.as_bytes()).unwrap();
+    inputs["kind"] == "development" && inputs.get("commit").is_some()
+}
+
+/// A Job's request inputs are the caller's operation inputs: `durationSeconds`,
+/// capture.diagnostics@1's runbook input, is accepted although no committed
+/// Job frame carries it, and the request record stays closed.
+#[test]
+fn job_request_inputs_accept_an_unrecorded_input_and_the_request_stays_closed() {
+    let recorded = corpus("job.show")
+        .into_iter()
+        .find(|row| row["ok"] == true && row["result"]["request"]["inputs"].is_object())
+        .expect("a recorded Job request with inputs");
+    let mut result = recorded["result"].clone();
+    result["request"]["inputs"]["durationSeconds"] = json!(5);
+    assert!(
+        validate_method_value("job.show", "result", &result).is_ok() || published_view(),
+        "an operation input no Job frame recorded"
+    );
+    result["request"]["unrecordedMember"] = json!(true);
+    assert!(
+        validate_method_value("job.show", "result", &result).is_err(),
+        "an unknown member of the Job request"
+    );
+}
+
 #[test]
 fn source_schema_and_corpus_files_match_the_selected_input_manifest() {
     fn assert_git_object_id(value: &Value) {
