@@ -88,6 +88,12 @@ impl VerifiedTool {
         Ok(tool)
     }
 
+    /// The absolute path the tool was opened by; its retained inode, not this
+    /// path, is what a launch uses.
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
     pub fn sha256(&self) -> &str {
         &self.sha256
     }
@@ -692,6 +698,44 @@ pub use tool_process::{ToolExecution, ToolLimits, ToolRequest, ToolRunError, Too
 #[cfg(target_os = "macos")]
 #[path = "managed_server.rs"]
 mod managed_server;
+
+/// Swift `ProcessExecutableIdentityReceipt`: what a launch-window audit
+/// records about the executable a lifecycle command is about to run through
+/// — its authorized path, the inode path it is launched by, and the retained
+/// file identity — read from the tool as it would be launched now.
+#[cfg(target_os = "macos")]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ToolLaunchIdentity {
+    pub authorized_path: PathBuf,
+    pub inode_launch_path: String,
+    pub device: u64,
+    pub inode: u64,
+    pub file_size: u64,
+    pub mode: u32,
+    pub sha256: String,
+}
+
+#[cfg(target_os = "macos")]
+impl VerifiedTool {
+    /// The identity a launch would bind to now: refused when the tool no
+    /// longer verifies or its inode path no longer names the retained file.
+    pub fn launch_identity(&self) -> io::Result<ToolLaunchIdentity> {
+        use std::os::unix::fs::MetadataExt;
+        self.revalidate()?;
+        let inode_launch_path = macos_process::inode_launch_path(self)?
+            .into_string()
+            .map_err(|_| invalid("inode launch path is not text"))?;
+        Ok(ToolLaunchIdentity {
+            authorized_path: self.path.clone(),
+            inode_launch_path,
+            device: self.initial.dev(),
+            inode: self.initial.ino(),
+            file_size: self.initial.len(),
+            mode: self.initial.mode(),
+            sha256: self.sha256.clone(),
+        })
+    }
+}
 #[cfg(target_os = "macos")]
 pub use managed_server::{ManagedServer, ServerExit, ServerLaunch, ServerStop};
 

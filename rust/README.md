@@ -908,6 +908,22 @@ process, however exact, is `Unbound`. `tests/managed_server.rs` in both crates
 drive it with shell scripts and a fake `hdc` compiled from C at test time; no
 real HDC is launched.
 
+## HDC lifecycle executor (TASK-XPA-016, SPK-6)
+
+`arkdeck_provider_hdc::{LifecycleAction, LifecycleCommand, PreparedLifecycle}`
+is the process part of Swift's `HDCProcessLifecycleExecutor`: the exact
+`hdc -s <endpoint> kill -r` / `kill` argv as the actual command an audit
+records before anything is prepared, `VerifiedTool::launch_identity()`
+(`/.vol/<dev>/<ino>`, device, inode, size, mode, digest) as the launch-window
+entry it records before the launch, one launch per preparation through the
+verified tool runner (15 s), and the post-dispatch re-observation through
+`LoopbackServerLease` (12 s, every 100 ms) that alone decides the outcome — a
+restart is `Succeeded` only with a strictly newer server generation, a stop is
+`Stopped` only with nothing at the endpoint, and a nonzero exit, a registered
+failure, stderr or an unprovable state is `OutcomeUnknown` with Swift's
+reason. `tests/lifecycle.rs` drives it with a fake `hdc` compiled from C whose
+`kill -r` client starts a new server of the same executable.
+
 ## macOS facade host owners (TASK-XPA-012)
 
 The installed facade pair now serves `history.filter.list/save/delete` itself.
