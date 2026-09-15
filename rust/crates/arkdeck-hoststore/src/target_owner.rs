@@ -501,10 +501,16 @@ impl TargetStore {
                     }
                     // Swift hdcExecutionRoute uses the exact adopted connect key
                     // for a Target without a proven alias, independently of live
-                    // candidate observations. Physical identity is not this hash.
+                    // candidate observations. The Import is bound to the
+                    // identity that key names
+                    // (`HDCObservationProviderAdapter.stableIdentitySHA256`): the
+                    // digest of the key lowercased, as the Target's device facts
+                    // and a Job's plan name it. Physical identity is not this
+                    // hash.
                     resolved.binding_revision = Some(target.binding_revision);
-                    resolved.stable_identity_sha256 =
-                        Some(arkdeck_contract::sha256_hex(target.connect_key.as_bytes()));
+                    resolved.stable_identity_sha256 = Some(
+                        arkdeck_provider_hdc::stable_identity_sha256(&target.connect_key),
+                    );
                 }
                 _ => return Err(failure("invalidInput", "Invalid Import kind", phase)),
             }

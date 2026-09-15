@@ -85,12 +85,34 @@ fn native_target_owner_resolves_each_import_kind_without_rewriting_binding() {
         let expected = if kind == "workspace-patch" {
             json!({"targetID":f.target["targetID"]})
         } else {
-            json!({"targetID":f.target["targetID"],"bindingRevision":1,"stableIdentitySHA256":if kind=="flash-bundle" {f.target["stablePhysicalIdentitySHA256"].clone()} else {json!(sha256_hex(f.target["connectKey"].as_str().unwrap().as_bytes()))}})
+            json!({"targetID":f.target["targetID"],"bindingRevision":1,"stableIdentitySHA256":if kind=="flash-bundle" {f.target["stablePhysicalIdentitySHA256"].clone()} else {json!(sha256_hex(f.target["connectKey"].as_str().unwrap().to_lowercase().as_bytes()))}})
         };
         assert_eq!(record["binding"], expected);
         assert_eq!(
             fs::read(f.root.join("targets/targets.json")).unwrap(),
             before
+        );
+    }
+}
+#[test]
+fn hdc_imports_are_bound_to_the_identity_their_lowercased_connect_key_names() {
+    let f = Fixture::new("direct");
+    // A connect key with capitals, as a device serial may have.
+    let path = f.root.join("targets/targets.json");
+    let mut document: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+    let key = f.target["connectKey"].as_str().unwrap().to_uppercase();
+    document["targets"][0]["connectKey"] = json!(key);
+    fs::write(&path, serde_json::to_vec(&document).unwrap()).unwrap();
+    let targets = TargetStore::open(&f.root.join("targets")).unwrap();
+    for kind in ["hap", "native-library"] {
+        let intent = ImportIntent::from_wire(f.intent(kind).as_object().unwrap()).unwrap();
+        let binding = targets.resolve_import_binding(&intent).unwrap();
+        // Swift `HDCObservationProviderAdapter.stableIdentitySHA256(connectKey:)`:
+        // the identity the Target's device facts name.
+        assert_eq!(
+            binding.stable_identity_sha256,
+            Some(sha256_hex(key.to_lowercase().as_bytes())),
+            "{kind}"
         );
     }
 }
