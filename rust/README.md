@@ -1023,6 +1023,20 @@ simulated host-test data. Run it after current Swift producer recording and sche
 generation; it checks typed refusals as well as CAS, restart and binding-byte
 preservation. No hardware acceptance is claimed by this harness.
 
+The Rust CLI's `target adopt --candidate <key> --observation <id>
+--observation-generation <n>` and `target availability --target <id>` are
+Swift's leaves (TASK-XPA-014). An adoption is a mutation: its answer must be
+exactly the receipt of that observation (`adopted`, a Target, a positive binding
+revision, and the request's observation and generation), or it is
+`outcomeUnknown` (75) and never replayed. A Runtime refusal keeps its code
+(`resourceConflict`, `targetTrustPending`, `admissionDenied`, `factsDrifted`,
+`operationUnavailable`) only with the pre-admission zero-dispatch proof. The
+generation follows Swift's positive-integer grammar, so a leading zero is a usage
+error that is never sent. Availability is one bounded read of the Runtime's
+aggregate, emitted as it answered. `crates/arkdeck-cli/tests/target_adoption.rs`
+replays Swift's argv fixtures and serves every answer of the Target adoption
+oracle to the actual CLI.
+
 ## macOS HDC server identity (TASK-XPA-016, SPK-6)
 
 `LoopbackServerLease::acquire(tool, 127.0.0.1:<port>)` proves that an HDC server
