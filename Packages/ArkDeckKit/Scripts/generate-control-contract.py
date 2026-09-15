@@ -133,7 +133,10 @@ MAP_VALUED_MEMBERS = {
     # RuntimeClientContext.provenance: [String: String]?
     "job.show": ["result.request.clientContext.provenance", "result.request.inputs"],
 }
-MAXIMUM_SIGNATURES_PER_METHOD = 24
+# Room for every committed shape of a method plus the shapes a new oracle
+# adds: the selection keeps the first N shapes in sort order, so a method at
+# the bound silently loses a committed shape (job.result held 23).
+MAXIMUM_SIGNATURES_PER_METHOD = 32
 MAXIMUM_SAMPLE_BYTES = 65536
 
 
