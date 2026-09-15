@@ -1191,11 +1191,21 @@ Swift: a server another user owns is `hdc.identityUnknown` rather than an
 observed identity, and the deadline abandons the scan rather than
 cancelling it. `tests/hdc_status.rs` replays the Swift oracle
 (`rust/tests/fixtures/hdc-status`, twenty-two cases at a fixed root under
-the oracle's lock) byte for byte. The `runtime.hdc.status` method arm in
-`arkdeck-control`, and the corpus and schema regeneration the live-valued
-object needs (the published schema was derived from frames that carry only
-nulls for `generation`, `processId` and `clientVersion`), are the method
-owner's.
+the oracle's lock) byte for byte.
+
+The published schema admits these live values. It was re-derived (TASK-XPA-014)
+from the frames Swift's daemon answers through its handler for these cases and
+for a registered tool. `arkdeck-control` serves `runtime.hdc.status` through
+`HostServices::runtime_hdc_status`. A request that names any parameter is
+refused with `invalidParams` ("live HDC status does not accept caller facts or
+paths") before the host is asked. The macOS host of `arkdeck-agentd` starts no
+managed HDC server, so it answers `unconfigured_status(None)`, as Swift's daemon
+does without its HDC host. On other platforms the method keeps the foundation's
+refusal. `hdc_status_control.rs` in agentd sends every oracle case through
+`Control`, behind a host that composes the observer per request, and each
+answer is the oracle's snapshot byte for byte. Composing the observer over a
+managed HDC server that the daemon starts is next.
+
 ## Capture file legs (TASK-XPA-016, M1)
 
 `arkdeck_provider_hdc::FileAction` is Swift's HDC provider for the legs of

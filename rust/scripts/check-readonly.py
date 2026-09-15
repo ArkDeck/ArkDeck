@@ -329,6 +329,10 @@ def main() -> None:
                     # answers as Swift's daemon does. Elsewhere they stay the foundation's refusal.
                     if method in {"agent.run", "agent.status", "agent.list", "agent.abandon"} and platform.system() == "Darwin":
                         expected = "operationUnavailable"
+                    # The macOS daemon starts no managed HDC server, so it answers the live HDC
+                    # status as Swift's daemon without its HDC host does.
+                    if method == "runtime.hdc.status" and platform.system() == "Darwin":
+                        expected = None
                     if method in {"target.list", "target.show", "target.display-name.set", "target.display-name.clear", "device.display-name.set", "device.display-name.clear"}:
                         expected = "internalError"
                     if method in IMPORT_OWNER_METHODS:

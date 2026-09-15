@@ -264,6 +264,15 @@ pub trait HostServices: Send + Sync {
             details: None,
         })
     }
+    /// `runtime.hdc.status`: the live HDC status the Runtime answers. A host
+    /// without it keeps the foundation's refusal.
+    fn runtime_hdc_status(&self) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "rejected".into(),
+            message: "this method is unavailable in the read-only Rust foundation".into(),
+            details: None,
+        })
+    }
     fn history_filter(
         &self,
         _method: &str,
@@ -873,6 +882,17 @@ impl<H: HostServices> Control<H> {
                     outcome: self.host.runtime_storage(&request.method, &params),
                 }
             }
+            // As Swift's handler: a caller's facts are refused before any
+            // observation.
+            "runtime.hdc.status" if params.is_empty() => Response {
+                id: request.id.clone(),
+                outcome: self.host.runtime_hdc_status(),
+            },
+            "runtime.hdc.status" => Response::failure(
+                &request.id,
+                "invalidParams",
+                "live HDC status does not accept caller facts or paths",
+            ),
             _ => Response::failure(
                 &request.id,
                 "rejected",
