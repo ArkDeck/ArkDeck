@@ -2,6 +2,7 @@
 //! `RuntimeOperationCatalog`) and the rules Swift admission and planning apply
 //! to it: exact descriptor lookup, typed input validation, the host-only
 //! descriptor check, the effect a request resolves to and the steps it selects.
+use crate::catalog_pattern;
 use arkdeck_contract::CATALOG_CANONICAL_JSON;
 use serde_json::{Map, Value};
 use std::collections::BTreeMap;
@@ -209,6 +210,13 @@ impl CatalogOperation {
     /// Swift `RuntimeJobEngine.validateInputs`; keys are judged in byte order.
     pub(crate) fn validate_inputs(&self, inputs: &Map<String, Value>) -> Result<(), InputRefusal> {
         let invalid = |message: String| Err(InputRefusal::Invalid(message));
+        // A pattern outside the syntax `catalog_pattern` reads is refused, not
+        // skipped; every pattern the published catalog declares is read.
+        let unevaluated = |key: &str| {
+            Err(InputRefusal::Unsupported(format!(
+                "input {key} carries a catalog pattern the Rust Runtime does not evaluate yet"
+            )))
+        };
         for field in &self.inputs {
             if field.required && !inputs.contains_key(&field.name) {
                 return invalid(format!("required input {} is absent", field.name));
@@ -251,10 +259,16 @@ impl CatalogOperation {
                     {
                         return invalid(format!("input {key} exceeds maxLength {maximum}"));
                     }
-                    if field.pattern.is_some() {
-                        return Err(InputRefusal::Unsupported(format!(
-                            "input {key} carries a catalog pattern the Rust Runtime does not evaluate yet"
-                        )));
+                    if let Some(pattern) = &field.pattern {
+                        match catalog_pattern::matches(pattern, text) {
+                            Some(true) => {}
+                            Some(false) => {
+                                return invalid(format!(
+                                    "input {key} does not match its catalog pattern"
+                                ));
+                            }
+                            None => return unevaluated(key),
+                        }
                     }
                 }
                 Value::Array(values) => {
@@ -273,10 +287,19 @@ impl CatalogOperation {
                             "input {key} contains an item exceeding maxLength {maximum}"
                         ));
                     }
-                    if field.pattern.is_some() {
-                        return Err(InputRefusal::Unsupported(format!(
-                            "input {key} carries a catalog pattern the Rust Runtime does not evaluate yet"
-                        )));
+                    // Swift judges each item against an array field's pattern.
+                    if let Some(pattern) = &field.pattern {
+                        for item in values.iter().filter_map(Value::as_str) {
+                            match catalog_pattern::matches(pattern, item) {
+                                Some(true) => {}
+                                Some(false) => {
+                                    return invalid(format!(
+                                        "input {key} contains an item outside its catalog pattern"
+                                    ));
+                                }
+                                None => return unevaluated(key),
+                            }
+                        }
                     }
                 }
                 Value::Number(number) => {

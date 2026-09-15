@@ -492,6 +492,24 @@ from Swift with `ARKDECK_RUST_JOB_PLAN_RECORD=/private/tmp/<new>`.
 turn over one state root and compares every answer over the socket and through
 both CLIs.
 
+Catalog patterns are evaluated as Swift's `text.range(of: pattern, options:
+.regularExpression)` evaluates them (`catalog_pattern.rs`), for the syntax every
+published catalog pattern uses. A string input outside its pattern is
+`invalidInput` `input <key> does not match its catalog pattern`, an array item
+outside it `input <key> contains an item outside its catalog pattern`; a pattern
+outside that syntax is still refused as unevaluated. `input.tap@1`,
+`input.long-press@1` and `input.swipe@1` are planned as Swift plans them (M2):
+the evidence preflight's three steps, the gesture step, then the session's
+finalization. The gesture's typed action is named from the inputs and the
+provider context's clock (`HdcComposition::now`, Swift
+`ProviderExecutionContext.nowUTC`), journaled with Swift's arguments and
+lowered to the provider's `uinput` process. A frame older than the 1000 ms
+freshness bound, or a point outside the frame, is refused before authorization
+in Swift's words. `tests/pointer_input_plan.rs` replays every `job.plan` of
+`rust/tests/fixtures/pointer-input/` against the planner, message included.
+Submitting a gesture is still refused, because no Runtime capability is issued
+yet.
+
 ## Job admission (TASK-XPA-014)
 
 The isolated development composition answers `job.submit` as Swift

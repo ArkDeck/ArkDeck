@@ -4,7 +4,10 @@
 //! journals for it, which steps carry the evidence preflight, and the products
 //! each step owns.
 use crate::operation_catalog::{CatalogOperation, CatalogStep};
-use arkdeck_provider_hdc::{Action, DEFAULT_HILOG_BUDGET, STORAGE_ROOT};
+use arkdeck_provider_hdc::{
+    Action, DEFAULT_HILOG_BUDGET, FileActionError, FilePlan, PointerAction, ProcessPlan,
+    STORAGE_ROOT,
+};
 use serde_json::{Map, Value, json};
 use std::collections::BTreeSet;
 
@@ -96,23 +99,66 @@ pub(crate) enum ActionRefusal {
     Invalid(String),
 }
 
-/// Swift `HDCObservationProviderAdapter.action` for a catalog step, with the
-/// request's inputs.
+/// A device step's typed provider action: an observation or capture action,
+/// or a pointer gesture.
+pub(crate) enum StepAction {
+    Hdc(Action),
+    Pointer(PointerAction),
+}
+
+impl StepAction {
+    pub(crate) fn effect(&self) -> &'static str {
+        match self {
+            Self::Hdc(action) => action.effect(),
+            Self::Pointer(action) => action.effect(),
+        }
+    }
+
+    /// The one process the step lowers to, against the Target's connect key.
+    pub(crate) fn lower(
+        &self,
+        step_id: &str,
+        connect_key: Option<&str>,
+    ) -> Result<ProcessPlan, String> {
+        match self {
+            Self::Hdc(action) => action.lower(step_id, connect_key),
+            Self::Pointer(action) => match action.lower(step_id, connect_key)? {
+                FilePlan::Process(plan) => Ok(plan),
+                _ => Err(format!("{step_id} did not lower to one process")),
+            },
+        }
+    }
+}
+
+/// Swift `HDCObservationProviderAdapter.action` for a catalog step of
+/// `reference`, with the request's inputs and the provider context's clock.
 pub(crate) fn action(
     step: &CatalogStep,
+    reference: &str,
     inputs: &Map<String, Value>,
-) -> Result<Action, ActionRefusal> {
+    now_utc: &str,
+) -> Result<StepAction, ActionRefusal> {
     if let Some(action) = Action::for_step(&step.kind, remote_action(step)) {
-        return Ok(action);
+        return Ok(StepAction::Hdc(action));
+    }
+    // Swift's provider error describes itself by its detail alone; a bound
+    // the gesture breaks is the spec's error, interpolated.
+    match PointerAction::for_step(&step.kind, reference, inputs, now_utc) {
+        Ok(Some(action)) => return Ok(StepAction::Pointer(action)),
+        Ok(None) => {}
+        Err(FileActionError::Unsupported(detail)) => return Err(ActionRefusal::Invalid(detail)),
+        Err(FileActionError::Request(error)) => {
+            return Err(ActionRefusal::Invalid(error.to_string()));
+        }
     }
     let invalid =
         |error: arkdeck_provider_hdc::RequestError| ActionRefusal::Invalid(error.to_string());
-    match (step.kind.as_str(), catalog_action(step)) {
+    let action = match (step.kind.as_str(), catalog_action(step)) {
         ("preflightDeviceStorage", _) => Action::observe_storage(
             integer(inputs, "totalArtifactByteBudget").unwrap_or(DEFAULT_REQUIRED_BYTES),
         )
-        .map_err(invalid),
-        ("captureRemoteStdout", Some("windowInventory")) => Ok(Action::CaptureWindowList),
+        .map_err(invalid)?,
+        ("captureRemoteStdout", Some("windowInventory")) => Action::CaptureWindowList,
         ("captureRemoteStdout", Some("boundedHilog")) => Action::capture_hilog(
             hilog_duration(inputs),
             hilog_filters(inputs)
@@ -121,16 +167,18 @@ pub(crate) fn action(
                 .collect(),
             DEFAULT_HILOG_BUDGET,
         )
-        .map_err(invalid),
-        _ => Err(ActionRefusal::Unported),
-    }
+        .map_err(invalid)?,
+        _ => return Err(ActionRefusal::Unported),
+    };
+    Ok(StepAction::Hdc(action))
 }
 
-/// Swift `journalStep(for:)` arguments for the kinds this Runtime dispatches.
+/// Swift `journalStep(for:)` arguments for the kinds this Runtime
+/// materializes.
 pub(crate) fn journal_arguments(
     step: &CatalogStep,
     inputs: &Map<String, Value>,
-    action: &Action,
+    action: &StepAction,
 ) -> Option<Value> {
     Some(match step.kind.as_str() {
         "probeHostTool" => {
@@ -148,10 +196,21 @@ pub(crate) fn journal_arguments(
         }),
         "preflightDeviceStorage" => {
             let required = match action {
-                Action::ObserveStorage { required_bytes } => *required_bytes,
+                StepAction::Hdc(Action::ObserveStorage { required_bytes }) => *required_bytes,
                 _ => 1_048_576,
             };
             json!({"remotePath": STORAGE_ROOT, "requiredBytes": required})
+        }
+        // The gesture and the frame it was mapped against, which a later
+        // reader needs to tell what the coordinates meant; not the frame's
+        // capture time.
+        "injectPointerInput" => {
+            let StepAction::Pointer(PointerAction(spec)) = action else {
+                return None;
+            };
+            let (_, mut arguments) = spec.persisted();
+            arguments.remove("screenEpochUtc");
+            Value::Object(arguments)
         }
         // The action is the catalog's own, never one guessed from the step.
         "captureRemoteStdout" => {

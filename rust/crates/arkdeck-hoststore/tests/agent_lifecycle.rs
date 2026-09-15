@@ -155,6 +155,7 @@ fn rust_lists_and_abandons_the_swift_agent_executions() {
         targets: &targets,
         dispatch: &dispatch,
         tool_sha256: &digest,
+        now: fixed_now,
     };
     let probe = OracleProbe::new(&provenance);
     let claims = StorageClaims::default();
@@ -192,6 +193,7 @@ fn rust_lists_and_abandons_the_swift_agent_executions() {
             targets: &targets,
             dispatch: &dispatch,
             tool_sha256: &digest,
+            now: fixed_now,
         };
         let _ = JobRunner {
             jobs: &jobs,

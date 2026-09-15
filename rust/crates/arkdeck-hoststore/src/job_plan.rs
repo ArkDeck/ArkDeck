@@ -22,10 +22,13 @@ const MAXIMUM_ANALYZER_BYTES: u64 = 128 * 1024 * 1024;
 const MAXIMUM_ANALYZER_INPUT_BYTES: u64 = 512 * 1024 * 1024;
 /// The operations whose plans this Runtime materializes. Every other catalog
 /// operation is refused before its inputs are judged.
-const MATERIALIZED: [&str; 3] = [
+const MATERIALIZED: [&str; 6] = [
     "analyzer.extract-crash-signature@1",
     "observe.device@1",
     "capture.diagnostics@1",
+    "input.tap@1",
+    "input.long-press@1",
+    "input.swipe@1",
 ];
 
 /// Swift `AnalyzerProfile` for `crash-signature@1`, the analyzer a host names
@@ -334,6 +337,9 @@ impl JobPlanner<'_> {
                 format!("a ring-buffered {reference} is not materialized by the Rust Runtime yet"),
             ));
         }
+        // The provider context's clock, which a pointer gesture's frame is
+        // judged against.
+        let now = (hdc.now)().ok_or_else(internal_failure)?;
         let mut steps = Vec::new();
         for step in descriptor
             .steps
@@ -348,7 +354,7 @@ impl JobPlanner<'_> {
                 }));
                 continue;
             }
-            let action = match device_steps::action(step, &request.inputs) {
+            let action = match device_steps::action(step, &reference, &request.inputs, &now) {
                 Ok(action) => action,
                 Err(ActionRefusal::Unported) => {
                     return Err(refusal(
