@@ -327,7 +327,7 @@ def main() -> None:
                         expected = "operationUnavailable"
                     # Only the macOS daemon composes an agent execution owner; without one it
                     # answers as Swift's daemon does. Elsewhere they stay the foundation's refusal.
-                    if method in {"agent.run", "agent.status", "agent.list", "agent.abandon"} and platform.system() == "Darwin":
+                    if method in {"agent.run", "agent.status", "agent.list", "agent.abandon", "human-action.list", "human-action.show"} and platform.system() == "Darwin":
                         expected = "operationUnavailable"
                     # The macOS daemon starts no managed HDC server, so it answers the live HDC
                     # status as Swift's daemon without its HDC host does.

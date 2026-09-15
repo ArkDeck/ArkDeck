@@ -120,6 +120,9 @@ pub struct Host {
     /// adopted.
     #[cfg(target_os = "macos")]
     usb: std::sync::Arc<dyn arkdeck_provider_hdc::UsbRelations + Send + Sync>,
+    /// The combined human-action owner over the agent executions.
+    #[cfg(target_os = "macos")]
+    human_actions: Option<arkdeck_hoststore::HumanActionResources>,
 }
 
 impl Host {
@@ -200,6 +203,31 @@ impl Host {
             targets,
             now: &utc_now,
         }))
+    }
+    /// The Target observation owner an execution that names no target
+    /// observes through, when this composition has its sources.
+    #[cfg(target_os = "macos")]
+    fn observing(&self) -> Option<arkdeck_hoststore::Observing<'_>> {
+        let (dispatch, targets) = (self.hdc.as_ref()?, self.targets.as_ref()?);
+        Some(arkdeck_hoststore::Observing {
+            owner: &self.target_observations,
+            sources: arkdeck_hoststore::Sources {
+                dispatch: &**dispatch,
+                relations: &*self.usb,
+                targets,
+                now: &utc_now,
+            },
+        })
+    }
+    /// `human-action.list` and `human-action.show` read the physical
+    /// assistance this owner's agent executions ask for.
+    #[cfg(target_os = "macos")]
+    pub fn with_human_actions(
+        mut self,
+        resources: arkdeck_hoststore::HumanActionResources,
+    ) -> Self {
+        self.human_actions = Some(resources);
+        self
     }
     #[cfg(target_os = "macos")]
     fn hdc(&self) -> Option<arkdeck_hoststore::HdcComposition<'_>> {
@@ -387,6 +415,8 @@ impl Host {
             target_observations: Default::default(),
             #[cfg(target_os = "macos")]
             usb: std::sync::Arc::new(arkdeck_provider_hdc::NoUsbRelations),
+            #[cfg(target_os = "macos")]
+            human_actions: None,
         }
     }
 }
@@ -622,6 +652,7 @@ impl HostServices for Host {
             jobs,
             admitter: &admitter,
             now: arkdeck_hoststore::runtime_precise_now,
+            observations: self.observing(),
         };
         let answer = agents.advance(method, params, &engine)?;
         if let Some(start) = answer.start {
@@ -637,6 +668,27 @@ impl HostServices for Host {
             jobs,
             &arkdeck_hoststore::JobResultReader { jobs, artifacts },
         )
+    }
+
+    /// `human-action.list` and `human-action.show`, as the Swift daemon
+    /// answers them with its combined human-action owner.
+    #[cfg(target_os = "macos")]
+    fn human_action(
+        &self,
+        method: &str,
+        params: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<serde_json::Value, WireError> {
+        let (Some(agents), Some(resources)) = (&self.agents, &self.human_actions) else {
+            return Err(WireError {
+                code: "operationUnavailable".into(),
+                message: "AgentExecution owner is unavailable".into(),
+                details: Some(serde_json::Map::from_iter([
+                    ("phase".into(), serde_json::json!("preAdmission")),
+                    ("newDispatchCount".into(), serde_json::json!(0)),
+                ])),
+            });
+        };
+        resources.answer(method, params, agents)
     }
 
     #[cfg(target_os = "macos")]

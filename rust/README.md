@@ -910,9 +910,17 @@ action in the same write.
 page, 100 by default); the snapshots live with the Job owner
 (`jobs-state/cli-job-snapshots`), not in the Artifact root.
 
-Not served yet: an execution without a target, so nothing here raises an action;
-`agent.resume` and `human-action.*`. A restart leaves an owned Job as it is:
-nothing resumes a run (L.1 item 13).
+An execution that names no target, for an operation that binds a device, takes
+one observation through the Target observation owner and, when a person must
+act, raises Swift's action: `connectDevice` for no device, `selectDevice` for
+several, and `trustDevice` or `connectDevice` naming the one observed device
+that is not authorized and connected. A connected device whose physical identity
+is unproved is refused with `admissionDenied`. One whose identity is proved is
+refused as not served yet: Swift adopts it inside the run, which no oracle
+records. `human-action.list` and `human-action.show` are the combined
+human-action owner's (`human_action.rs`, paged in `human-action-snapshots`).
+Not served yet: `agent.resume`, `human-action.resume` and adoption. A restart
+leaves an owned Job as it is: nothing resumes a run (L.1 item 13).
 
 `rust/tests/fixtures/agent-execution/` is the oracle Swift
 `AgentExecutionOracleContractTests` records over the shared fake HDC with the
@@ -940,8 +948,11 @@ that name no target, the actions they raise, their resumes and the human-action
 routes. `tests/agent_human_action_records.rs` seeds its execution records, the
 identities the oracle labelled (`<har-1>`) read as valid ones of their kind, and
 answers them as the oracle recorded: the waiting execution read, listed, run
-again and abandoned, and the abandoned one run again. Replaying the whole
-fixture waits for the Target observation owner and the resume path.
+again and abandoned, and the abandoned one run again.
+`tests/agent_human_action_raise.rs` replays, in recorded order over the shared
+fake, the 19 exchanges that need no adoption, resume or Job: the raises, the
+reads, and the list and show refusals. Replaying the rest waits for the resume
+path.
 
 The Rust CLI runs them as the Swift CLI does. `arkdeck agent run --operation
 <reference> --target <id> [--expected-binding-revision <n>] [--inputs-file
