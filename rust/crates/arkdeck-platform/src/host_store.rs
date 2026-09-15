@@ -508,7 +508,54 @@ impl HostDirectory {
         bytes: &[u8],
         maximum: usize,
     ) -> Result<(), DocumentPublishError> {
+        if bytes.is_empty() {
+            return Err(fail().into());
+        }
         self.publish_with_checkpoint(name, bytes, maximum, |_| {})
+    }
+
+    /// Swift `DurableFileWriter.createOrReplaceAtomically`, with which the
+    /// capability store writes its checkpoint and empties its ledger: published
+    /// as [`Self::publish_document`] publishes, where the document may be empty.
+    pub fn replace_document(
+        &self,
+        name: &str,
+        bytes: &[u8],
+        maximum: usize,
+    ) -> Result<(), DocumentPublishError> {
+        self.publish_with_checkpoint(name, bytes, maximum, |_| {})
+    }
+
+    /// Swift `RuntimeCapabilityStore.appendEvent`'s write: the bytes appended
+    /// to an owner-only document, created 0600 when absent, through no link,
+    /// then fully synchronized. Swift synchronizes no directory for it, not
+    /// even for a new document; the store's lock serializes its writers.
+    pub fn append_synchronized(&self, name: &str, bytes: &[u8]) -> io::Result<()> {
+        if !matches!(self.1, Ownership::Private) {
+            return Err(fail());
+        }
+        let name_c = segment(name)?;
+        // SAFETY: the held directory descriptor and one checked segment.
+        let fd = unsafe {
+            libc::openat(
+                self.0.as_raw_fd(),
+                name_c.as_ptr(),
+                libc::O_WRONLY
+                    | libc::O_APPEND
+                    | libc::O_CREAT
+                    | libc::O_NOFOLLOW
+                    | libc::O_CLOEXEC,
+                0o600,
+            )
+        };
+        if fd < 0 {
+            return Err(io::Error::last_os_error());
+        }
+        // SAFETY: openat returned a new owned descriptor.
+        let mut file = unsafe { File::from_raw_fd(fd) };
+        owned(&file, false, self.1)?;
+        file.write_all(bytes)?;
+        file.sync_all()
     }
 
     fn publish_with_checkpoint(
@@ -518,7 +565,7 @@ impl HostDirectory {
         maximum: usize,
         checkpoint: impl Fn(&str),
     ) -> Result<(), DocumentPublishError> {
-        if !matches!(self.1, Ownership::Private) || bytes.is_empty() || bytes.len() > maximum {
+        if !matches!(self.1, Ownership::Private) || bytes.len() > maximum {
             return Err(fail().into());
         }
         owned(&self.0, true, self.1)?;

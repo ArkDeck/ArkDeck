@@ -79,7 +79,11 @@ mod strict_json;
 #[cfg(target_os = "macos")]
 mod swift_decoding;
 #[cfg(target_os = "macos")]
-pub use capability_store::{CapabilityRefusal, CapabilityStore, CapabilityStoreError};
+pub use capability_store::{
+    Capability as RuntimeCapability, CapabilityDenial, CapabilityQuery, CapabilityRefusal,
+    CapabilityStore, CapabilityStoreError, ConsumptionReceipt, Effect as WorkflowEffect,
+    UseOutcome as CapabilityUseOutcome,
+};
 
 #[cfg(target_os = "macos")]
 mod job_events;

@@ -1,5 +1,6 @@
-//! The read side of Swift's `RuntimeCapabilityStore` (ArkDeckStorage), for
-//! `capability.list` and `capability.inspect`.
+//! Swift's `RuntimeCapabilityStore` (ArkDeckStorage): its reads, for
+//! `capability.list` and `capability.inspect`, and its writes, which install a
+//! capability and reserve and settle its uses.
 //!
 //! A store is a directory: the checkpoint `runtime-capabilities.json`, the
 //! events appended to `runtime-capabilities.ledger` since the checkpoint was
@@ -15,6 +16,20 @@
 //! error rendered as the daemon renders it. A read writes nothing but the lock
 //! file, which Swift's reads create too.
 //!
+//! A write loads the document the same way under the same lock, then writes
+//! as Swift writes. An install appends the capability with its whole budget
+//! and writes the checkpoint (Swift's `canonicalPretty`: sorted keys, two-space
+//! indentation, no escaped solidus, no trailing newline) atomically, then
+//! empties an existing ledger, only once the checkpoint holding its events is
+//! durable. A use is reserved (`consume`) and settled (`recordOutcome`) by
+//! appending one event, compact canonical JSON and a newline, fully
+//! synchronized; once 128 events have been appended since the checkpoint, the
+//! next is folded into a new checkpoint instead. Each receipt and outcome is
+//! digested into one hash-linked lineage per capability. Settling an unknown
+//! outcome is recovery, which ADR-0009 has not placed yet (decisions 2 and 4),
+//! so this owner refuses it as Swift refuses every other change to a recorded
+//! outcome.
+//!
 //! Numbers follow Foundation, as the oracle records it: a field Swift decodes
 //! as `Int` takes a number with no fraction however it is spelled (`2.0` is
 //! 2), and any other number fails the whole decode; a number inside
@@ -22,42 +37,128 @@
 //! `JSONValue` holds it. The refusal of a fraction quotes serde's spelling of
 //! the number where Foundation quotes the document's.
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::io;
 use std::os::unix::fs::DirBuilderExt;
 use std::path::{Path, PathBuf};
 
+use arkdeck_platform::{DocumentPublishError, HostDirectory};
 use serde_json::{Map, Value, json};
 
 use crate::strict_json::{self, swift_quoted};
 use crate::swift_decoding::{
-    Decoding, Keyed, Step, characters, same_text, string, swift_value, text_key,
+    Decoding, Keyed, Step, characters, same_text, string, swift_integer, swift_value, text_key,
 };
 
 const CHECKPOINT: &str = "runtime-capabilities.json";
 const LEDGER: &str = "runtime-capabilities.ledger";
 const LOCK: &str = ".runtime-capabilities.lock";
 const SCHEMA_VERSION: &str = "1.0.0";
+/// Swift `checkpointEveryEvents`: how many events the ledger takes before the
+/// next change is written out as a whole checkpoint instead.
+const CHECKPOINT_EVERY_EVENTS: usize = 128;
 /// Swift `CurrentDurableJSON`'s refusal of a record outside the current shape.
 const DURABLE_SHAPE: &str = "record does not match the current durable field shape";
 
-/// Swift `RuntimeCapabilityStoreError`: the cases a read can meet.
+/// Swift `RuntimeCapabilityStoreError`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CapabilityStoreError {
     /// `ioFailure`
     Io(String),
     /// `storeCorrupted`
     Corrupted(String),
+    /// `capabilityNotFound`
+    NotFound(String),
+    /// `capabilityAlreadyInstalled`
+    AlreadyInstalled(String),
+    /// `reservationConflict`
+    ReservationConflict(String),
+    /// `lineageBlocked`
+    LineageBlocked(String),
+    /// `outcomeConflict`
+    OutcomeConflict(String),
+    /// `denied`
+    Denied(CapabilityDenial),
 }
 
 impl CapabilityStoreError {
-    /// Swift's interpolation of the error, which the daemon answers with.
+    /// Swift's interpolation of the error, which the daemon answers with. A
+    /// denial is spelled as Swift reflects its value; no oracle records one.
     pub fn swift(&self) -> String {
         match self {
-            Self::Io(detail) => format!("ioFailure({})", swift_quoted(detail)),
-            Self::Corrupted(detail) => format!("storeCorrupted({})", swift_quoted(detail)),
+            Self::Io(detail) => case_text("ioFailure", detail),
+            Self::Corrupted(detail) => case_text("storeCorrupted", detail),
+            Self::NotFound(id) => case_text("capabilityNotFound", id),
+            Self::AlreadyInstalled(id) => case_text("capabilityAlreadyInstalled", id),
+            Self::ReservationConflict(detail) => case_text("reservationConflict", detail),
+            Self::LineageBlocked(detail) => case_text("lineageBlocked", detail),
+            Self::OutcomeConflict(detail) => case_text("outcomeConflict", detail),
+            Self::Denied(denial) => format!(
+                "denied(ArkDeckCore.RuntimeCapabilityDenial(reason: \
+                 ArkDeckCore.RuntimeCapabilityDenialReason.{}, detail: {}))",
+                denial.reason,
+                swift_quoted(&denial.detail)
+            ),
         }
     }
+}
+
+/// Swift `RuntimeCapabilityDenial`: why a capability does not authorize a
+/// query (the reason's case name), and Swift's detail.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CapabilityDenial {
+    pub reason: &'static str,
+    pub detail: String,
+}
+
+fn denial(reason: &'static str, detail: impl Into<String>) -> CapabilityDenial {
+    CapabilityDenial {
+        reason,
+        detail: detail.into(),
+    }
+}
+
+/// Swift `RuntimeCapabilityAuthorizationQuery`, as far as the store reads it:
+/// may an operation run at an effect against a subject, with these typed
+/// inputs, these Runtime-resolved Artifact facts and this materialized plan?
+#[derive(Clone, Debug, PartialEq)]
+pub struct CapabilityQuery {
+    pub operation_id: String,
+    pub operation_version: Option<i64>,
+    pub effect: Effect,
+    pub target_stable_identity_sha256: Option<String>,
+    pub target_binding_revision: Option<i64>,
+    pub plan_digest: Option<String>,
+    pub inputs: Map<String, Value>,
+    pub artifact_facts: BTreeMap<String, String>,
+    pub workspace_identity_sha256: Option<String>,
+    pub workspace_revision: Option<String>,
+    pub workspace_file_scopes_digest: Option<String>,
+}
+
+impl CapabilityQuery {
+    /// Swift `operationReference`.
+    pub fn operation_reference(&self) -> String {
+        match self.operation_version {
+            Some(version) => format!("{}@{version}", self.operation_id),
+            None => self.operation_id.clone(),
+        }
+    }
+}
+
+/// Swift `RuntimeCapabilityConsumptionReceipt`: the use a `consume` reserved.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ConsumptionReceipt {
+    pub capability_id: String,
+    pub ordinal: i64,
+    pub reservation_id: String,
+    pub job_id: String,
+    pub consumed_at_utc: String,
+    pub operation_reference: String,
+    pub query_fingerprint_sha256: String,
+    pub remaining_uses_after: i64,
+    pub previous_lineage_sha256: Option<String>,
+    pub receipt_sha256: String,
 }
 
 /// A refused `capability.list` or `capability.inspect`: Swift's code and
@@ -124,17 +225,229 @@ impl CapabilityStore {
     }
 
     fn read<T>(&self, answer: impl FnOnce(&[Record]) -> T) -> Result<T, CapabilityRefusal> {
-        let document = self
-            .load()
-            .map_err(|error| refusal("internalError", error.swift()))?;
-        Ok(answer(&document.records))
+        self.locked(|_, document, _| Ok(answer(&document.records)))
+            .map_err(|error| refusal("internalError", error.swift()))
     }
 
-    /// Swift `loadDocument` under `withExclusiveLock`.
-    fn load(&self) -> Result<Document, CapabilityStoreError> {
+    /// Swift `install`: a new capability appended with its whole budget and
+    /// the store checkpointed. The same capability again changes nothing; a
+    /// different one under an installed identity is refused.
+    pub fn install(&self, capability: &Capability) -> Result<(), CapabilityStoreError> {
+        self.locked(|directory, mut document, _| {
+            if let Some(existing) = document
+                .records
+                .iter()
+                .find(|record| same_text(&record.capability.id, &capability.id))
+            {
+                if existing.capability.value() == capability.value() {
+                    return Ok(());
+                }
+                return Err(CapabilityStoreError::AlreadyInstalled(
+                    capability.id.clone(),
+                ));
+            }
+            document.records.push(Record {
+                capability: capability.clone(),
+                remaining_uses: capability.maximum_uses,
+                consumptions: Vec::new(),
+            });
+            self.persist(directory, &document)
+        })
+    }
+
+    /// Swift `validateNewExecution`: an execution checked against the
+    /// installed envelope and its durable lineage, reserving nothing.
+    pub fn validate_new_execution(
+        &self,
+        capability_id: &str,
+        query: &CapabilityQuery,
+        now_utc: &str,
+    ) -> Result<(), CapabilityStoreError> {
+        self.locked(|_, document, _| {
+            let record = document
+                .records
+                .iter()
+                .find(|record| same_text(&record.capability.id, capability_id))
+                .ok_or_else(|| CapabilityStoreError::NotFound(capability_id.to_owned()))?;
+            validate_new_execution(record, query, now_utc)
+        })
+    }
+
+    /// Swift `consume`: one use reserved for an exact Job execution, the Job
+    /// defaulting to the reservation. Retrying a reservation answers its
+    /// receipt and writes nothing; a new one must pass `validateNewExecution`
+    /// and is linked to the tip of the use before it.
+    pub fn consume(
+        &self,
+        capability_id: &str,
+        reservation_id: &str,
+        job_id: Option<&str>,
+        query: &CapabilityQuery,
+        now_utc: &str,
+    ) -> Result<ConsumptionReceipt, CapabilityStoreError> {
+        if reservation_id.is_empty() || characters(reservation_id) > 128 {
+            return Err(CapabilityStoreError::ReservationConflict(
+                "malformed reservation ID".into(),
+            ));
+        }
+        let job = job_id.unwrap_or(reservation_id);
+        if job.is_empty() || characters(job) > 160 {
+            return Err(CapabilityStoreError::ReservationConflict(
+                "malformed Job ID".into(),
+            ));
+        }
+        self.locked(|directory, mut document, appended| {
+            let index = document
+                .records
+                .iter()
+                .position(|record| same_text(&record.capability.id, capability_id))
+                .ok_or_else(|| CapabilityStoreError::NotFound(capability_id.to_owned()))?;
+            let query_fingerprint = fingerprint(query, true);
+            if let Some(existing) = document.records[index]
+                .consumptions
+                .iter()
+                .find(|use_| same_text(&use_.reservation, reservation_id))
+            {
+                if existing.query != query_fingerprint || !same_text(&existing.job, job) {
+                    return Err(CapabilityStoreError::ReservationConflict(format!(
+                        "reservation retry fields drifted for {reservation_id}"
+                    )));
+                }
+                return Ok(existing.to_receipt(capability_id));
+            }
+            let record = &document.records[index];
+            validate_new_execution(record, query, now_utc)?;
+            let mut use_ = Consumption {
+                ordinal: record.consumptions.len() as i64 + 1,
+                reservation: reservation_id.to_owned(),
+                job: job.to_owned(),
+                consumed_at: now_utc.to_owned(),
+                operation_reference: query.operation_reference(),
+                effect: query.effect.raw().to_owned(),
+                target: query.target_stable_identity_sha256.clone(),
+                binding_revision: query.target_binding_revision,
+                plan_digest: query.plan_digest.clone(),
+                authorization_scope: fingerprint(query, false),
+                query: query_fingerprint,
+                remaining_after: record.remaining_uses - 1,
+                previous_lineage: record
+                    .consumptions
+                    .last()
+                    .map(|last| last.lineage_tip().to_owned()),
+                receipt: String::new(),
+                outcomes: Vec::new(),
+            };
+            use_.receipt = digest(&use_.receipt_material(capability_id)).ok_or_else(unencodable)?;
+            let receipt = use_.to_receipt(capability_id);
+            let record = &mut document.records[index];
+            record.remaining_uses = use_.remaining_after;
+            record.consumptions.push(use_.clone());
+            let event = Event {
+                kind: "consumed".into(),
+                capability: capability_id.to_owned(),
+                consumption: Some(use_),
+                reservation: None,
+                outcome: None,
+            };
+            self.append(directory, &event, &document, appended)?;
+            Ok(receipt)
+        })
+    }
+
+    /// Swift `recordOutcome`: a pending use settled by the Job that owns it.
+    /// The same outcome again changes nothing. A recorded outcome is never
+    /// changed here: settling an unknown one is recovery, which ADR-0009 has
+    /// not placed yet (decisions 2 and 4), and Swift refuses every other
+    /// change as this refuses them all.
+    pub fn record_outcome(
+        &self,
+        capability_id: &str,
+        reservation_id: &str,
+        job_id: &str,
+        outcome: UseOutcome,
+        terminal_state: &str,
+        at_utc: &str,
+    ) -> Result<(), CapabilityStoreError> {
+        let conflict = CapabilityStoreError::OutcomeConflict;
+        if outcome == UseOutcome::Pending {
+            return Err(conflict(
+                "only confirmed, safeToReflash or outcomeUnknown may be recorded".into(),
+            ));
+        }
+        if job_id.is_empty() || characters(job_id) > 160 {
+            return Err(conflict("malformed outcome Job ID".into()));
+        }
+        if terminal_state.is_empty() || characters(terminal_state) > 80 {
+            return Err(conflict("malformed terminal state".into()));
+        }
+        self.locked(|directory, mut document, appended| {
+            let index = document
+                .records
+                .iter()
+                .position(|record| same_text(&record.capability.id, capability_id))
+                .ok_or_else(|| CapabilityStoreError::NotFound(capability_id.to_owned()))?;
+            let Some(use_index) = document.records[index]
+                .consumptions
+                .iter()
+                .position(|use_| same_text(&use_.reservation, reservation_id))
+            else {
+                return Err(conflict(format!(
+                    "reservation {reservation_id} has no durable consumption"
+                )));
+            };
+            let use_ = &document.records[index].consumptions[use_index];
+            let current = use_.outcomes.last();
+            if !same_text(&use_.job, job_id)
+                && !current.is_some_and(|current| same_text(&current.job, job_id))
+            {
+                return Err(conflict(format!(
+                    "outcome Job {job_id} does not own reservation {reservation_id}"
+                )));
+            }
+            if let Some(current) = current {
+                if current.outcome == outcome && same_text(&current.terminal_state, terminal_state)
+                {
+                    return Ok(());
+                }
+                return Err(conflict(format!(
+                    "cannot change {} to {}",
+                    current.outcome.raw(),
+                    outcome.raw()
+                )));
+            }
+            let mut settlement = Outcome {
+                job: job_id.to_owned(),
+                outcome,
+                terminal_state: terminal_state.to_owned(),
+                recorded_at: at_utc.to_owned(),
+                previous_record: use_.lineage_tip().to_owned(),
+                record: String::new(),
+            };
+            settlement.record =
+                digest(&settlement.material(capability_id, use_)).ok_or_else(unencodable)?;
+            document.records[index].consumptions[use_index]
+                .outcomes
+                .push(settlement.clone());
+            let event = Event {
+                kind: "outcome".into(),
+                capability: capability_id.to_owned(),
+                consumption: None,
+                reservation: Some(reservation_id.to_owned()),
+                outcome: Some(settlement),
+            };
+            self.append(directory, &event, &document, appended)
+        })
+    }
+
+    /// Swift `withExclusiveLock` around `loadDocument`: the store's lock held
+    /// for the whole call, over the document as it stands and the number of
+    /// events appended since its checkpoint.
+    fn locked<T>(
+        &self,
+        body: impl FnOnce(&HostDirectory, Document, usize) -> Result<T, CapabilityStoreError>,
+    ) -> Result<T, CapabilityStoreError> {
         let unavailable = || CapabilityStoreError::Io("cannot open capability store lock".into());
-        let directory =
-            arkdeck_platform::HostDirectory::open(&self.directory).map_err(|_| unavailable())?;
+        let directory = HostDirectory::open(&self.directory).map_err(|_| unavailable())?;
         let _lock = directory
             .wait_lock(LOCK, false)
             .map_err(|_| unavailable())?;
@@ -147,7 +460,66 @@ impl CapabilityStore {
             // Replayed state is validated as a whole, as a checkpoint is.
             validate(&document)?;
         }
-        Ok(document)
+        body(&directory, document, events.len())
+    }
+
+    /// Swift `persist`: the whole document written out as the checkpoint, then
+    /// an existing ledger emptied, only once the checkpoint holding its events
+    /// is durable. A crash between the two leaves events the checkpoint
+    /// already holds, which replay refuses as a reservation taken twice.
+    fn persist(
+        &self,
+        directory: &HostDirectory,
+        document: &Document,
+    ) -> Result<(), CapabilityStoreError> {
+        let bytes = crate::session_json::encode_canonical_pretty(&document.value())
+            .map_err(|_| CapabilityStoreError::Io("cannot encode capability store".into()))?;
+        directory
+            .replace_document(CHECKPOINT, &bytes, usize::MAX)
+            .map_err(|error| {
+                CapabilityStoreError::Io(format!(
+                    "cannot durably persist capability store: {}",
+                    publication_failure(error)
+                ))
+            })?;
+        if self.directory.join(LEDGER).exists() {
+            directory
+                .replace_document(LEDGER, &[], usize::MAX)
+                .map_err(|error| {
+                    CapabilityStoreError::Io(format!(
+                        "cannot reset capability ledger: {}",
+                        publication_failure(error)
+                    ))
+                })?;
+        }
+        Ok(())
+    }
+
+    /// Swift `appendEvent`: one change appended to the ledger and fully
+    /// synchronized before the call answers, or, once the ledger holds
+    /// `CHECKPOINT_EVERY_EVENTS`, the document holding it written out as a new
+    /// checkpoint instead.
+    fn append(
+        &self,
+        directory: &HostDirectory,
+        event: &Event,
+        document: &Document,
+        appended: usize,
+    ) -> Result<(), CapabilityStoreError> {
+        if appended >= CHECKPOINT_EVERY_EVENTS {
+            return self.persist(directory, document);
+        }
+        let mut line = crate::session_json::encode(&event.value()).map_err(|_| {
+            CapabilityStoreError::Io("cannot encode capability ledger event".into())
+        })?;
+        line.push(b'\n');
+        directory
+            .append_synchronized(LEDGER, &line)
+            .map_err(|error| {
+                CapabilityStoreError::Io(format!(
+                    "cannot durably append to capability ledger: {error}"
+                ))
+            })
     }
 
     /// Swift `loadCheckpoint`.
@@ -264,8 +636,11 @@ struct Record {
     consumptions: Vec<Consumption>,
 }
 
-/// Swift `RuntimeCapability`.
-struct Capability {
+/// Swift `RuntimeCapability`: a durable, revocable envelope bounding which
+/// operations may run at what effect, on which subject, with which inputs,
+/// how many times and until when.
+#[derive(Clone)]
+pub struct Capability {
     id: String,
     target_scope: TargetScope,
     operation_scope: Vec<OperationScope>,
@@ -283,6 +658,7 @@ struct Capability {
     revocation: Revocation,
 }
 
+#[derive(Clone)]
 enum TargetScope {
     AnyTarget,
     StablePhysicalIdentity(String),
@@ -293,6 +669,7 @@ enum TargetScope {
     },
 }
 
+#[derive(Clone)]
 struct OperationScope {
     operation_id: String,
     version: Option<i64>,
@@ -307,14 +684,16 @@ impl OperationScope {
     }
 }
 
+#[derive(Clone)]
 enum Constraint {
     ExactString(String),
     OneOfStrings(Vec<String>),
     IntegerRange(i64, i64),
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Effect {
+/// Swift `WorkflowEffect`, ordered by its risk rank.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Effect {
     HostOnly,
     ReadOnly,
     DeviceMutation,
@@ -322,7 +701,7 @@ enum Effect {
 }
 
 impl Effect {
-    fn parse(raw: &str) -> Option<Self> {
+    pub fn parse(raw: &str) -> Option<Self> {
         Some(match raw {
             "hostOnly" => Self::HostOnly,
             "readOnly" => Self::ReadOnly,
@@ -332,12 +711,22 @@ impl Effect {
         })
     }
 
-    fn raw(self) -> &'static str {
+    pub fn raw(self) -> &'static str {
         match self {
             Self::HostOnly => "hostOnly",
             Self::ReadOnly => "readOnly",
             Self::DeviceMutation => "deviceMutation",
             Self::Destructive => "destructive",
+        }
+    }
+
+    /// Swift `WorkflowEffect.riskRank`.
+    fn rank(self) -> u8 {
+        match self {
+            Self::HostOnly => 0,
+            Self::ReadOnly => 1,
+            Self::DeviceMutation => 2,
+            Self::Destructive => 3,
         }
     }
 }
@@ -365,6 +754,7 @@ impl IssuerKind {
     }
 }
 
+#[derive(Clone)]
 enum Revocation {
     Active,
     Revoked { at: String, reason: String },
@@ -415,16 +805,21 @@ struct Outcome {
     record: String,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum UseOutcome {
+/// Swift `RuntimeCapabilityUseOutcome`: where one use of a capability stands.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum UseOutcome {
+    /// Reserved; its Job has reached no confirmed terminal outcome.
     Pending,
+    /// Its Job reached a known terminal outcome, successful or not.
     Confirmed,
+    /// Complete readback proves no mutation happened.
     SafeToReflash,
+    /// Dispatch may have happened, and nothing has resolved it.
     OutcomeUnknown,
 }
 
 impl UseOutcome {
-    fn parse(raw: &str) -> Option<Self> {
+    pub fn parse(raw: &str) -> Option<Self> {
         Some(match raw {
             "pending" => Self::Pending,
             "confirmed" => Self::Confirmed,
@@ -434,7 +829,7 @@ impl UseOutcome {
         })
     }
 
-    fn raw(self) -> &'static str {
+    pub fn raw(self) -> &'static str {
         match self {
             Self::Pending => "pending",
             Self::Confirmed => "confirmed",
@@ -569,6 +964,18 @@ impl Record {
 }
 
 impl Capability {
+    /// Swift `RuntimeCapability(from:)` over a document: every member, then
+    /// the model's invariants, then the exact current field shape. A refusal
+    /// is Swift's `DecodingError` description.
+    pub fn from_value(value: &Value) -> Result<Self, String> {
+        Self::decode(value, Vec::new()).map_err(|error| error.describe())
+    }
+
+    /// Swift `capabilityID`.
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
     /// Swift `RuntimeCapability.init(from:)`: every member, then the model's
     /// invariants, then the exact current field shape.
     fn decode(value: &Value, path: Vec<Step>) -> Result<Self, Decoding> {
@@ -663,7 +1070,7 @@ impl Capability {
     }
 
     /// The synthesized encoding: an absent optional has no member.
-    fn value(&self) -> Value {
+    pub fn value(&self) -> Value {
         let mut capability = Map::new();
         capability.insert("capabilityID".into(), json!(self.id));
         capability.insert("targetScope".into(), self.target_scope.value());
@@ -842,6 +1249,179 @@ impl Capability {
         }
         Ok(())
     }
+
+    /// Swift `RuntimeCapability.authorizes`: the first condition the query
+    /// fails, in Swift's order, with Swift's reason and detail. `now_utc` and
+    /// `remaining_uses` come from the store; the model reads no clock.
+    pub fn authorizes(
+        &self,
+        query: &CapabilityQuery,
+        now_utc: &str,
+        remaining_uses: i64,
+    ) -> Result<(), CapabilityDenial> {
+        if let Revocation::Revoked { at, reason } = &self.revocation {
+            return Err(denial("revoked", format!("revoked at {at}: {reason}")));
+        }
+        if !fixed_utc(now_utc) {
+            return Err(denial(
+                "expired",
+                format!("unverifiable clock value {now_utc}"),
+            ));
+        }
+        if now_utc < self.issued_at.as_str() {
+            return Err(denial(
+                "notYetValid",
+                format!("issued at {}", self.issued_at),
+            ));
+        }
+        if now_utc >= self.expires_at.as_str() {
+            return Err(denial("expired", format!("expired at {}", self.expires_at)));
+        }
+        if remaining_uses <= 0 {
+            return Err(denial(
+                "exhausted",
+                format!("maximumUses {} consumed", self.maximum_uses),
+            ));
+        }
+        if query.effect.rank() > self.effect_ceiling.rank() {
+            return Err(denial(
+                "effectAboveCeiling",
+                format!(
+                    "requested {} above ceiling {}",
+                    query.effect.raw(),
+                    self.effect_ceiling.raw()
+                ),
+            ));
+        }
+        if !self.operation_scope.iter().any(|scope| {
+            same_text(&scope.operation_id, &query.operation_id)
+                && scope.version == query.operation_version
+        }) {
+            return Err(denial(
+                "operationScopeMismatch",
+                format!("{} not in scope", query.operation_reference()),
+            ));
+        }
+        match &self.target_scope {
+            TargetScope::AnyTarget => {}
+            TargetScope::StablePhysicalIdentity(expected) => {
+                let Some(actual) = &query.target_stable_identity_sha256 else {
+                    return Err(denial(
+                        "targetIdentityRequired",
+                        "query carries no stable identity",
+                    ));
+                };
+                if !same_text(actual, expected) {
+                    return Err(denial(
+                        "targetScopeMismatch",
+                        "stable identity does not match scope",
+                    ));
+                }
+            }
+            TargetScope::WorkspaceIdentity {
+                sha256,
+                expected_revision,
+                allowed_scopes,
+            } => {
+                let (Some(identity), Some(revision), Some(scopes)) = (
+                    &query.workspace_identity_sha256,
+                    &query.workspace_revision,
+                    &query.workspace_file_scopes_digest,
+                ) else {
+                    return Err(denial(
+                        "targetIdentityRequired",
+                        "query carries no workspace identity, revision or scope digest",
+                    ));
+                };
+                if !same_text(identity, sha256) {
+                    return Err(denial(
+                        "targetScopeMismatch",
+                        "workspace identity does not match scope",
+                    ));
+                }
+                // An empty expected revision is a standing grant: this tree and
+                // these scopes, not this tree at this instant.
+                if !expected_revision.is_empty() && !same_text(revision, expected_revision) {
+                    return Err(denial(
+                        "targetScopeMismatch",
+                        "workspace revision moved since this capability was issued",
+                    ));
+                }
+                if !same_text(scopes, allowed_scopes) {
+                    return Err(denial(
+                        "targetScopeMismatch",
+                        "workspace writable scopes differ from the authorized set",
+                    ));
+                }
+            }
+        }
+        if let Some(expected) = self.exact_binding_revision {
+            let Some(actual) = query.target_binding_revision else {
+                return Err(denial(
+                    "targetScopeMismatch",
+                    "query carries no target binding revision",
+                ));
+            };
+            if actual != expected {
+                return Err(denial(
+                    "targetScopeMismatch",
+                    "target binding revision differs",
+                ));
+            }
+        }
+        if let Some(expected) = &self.exact_plan_digest {
+            let Some(actual) = &query.plan_digest else {
+                return Err(denial("planDigestRequired", "query carries no plan digest"));
+            };
+            if !same_text(actual, expected) {
+                return Err(denial("planDigestMismatch", "plan digest differs"));
+            }
+        }
+        if let Some(exact) = &self.exact_inputs
+            && swift_value(&Value::Object(query.inputs.clone())) != Value::Object(exact.clone())
+        {
+            return Err(denial(
+                "inputConstraintViolated",
+                "typed inputs differ from the runtime-issued envelope",
+            ));
+        }
+        if let Some(facts) = &self.exact_artifact_facts
+            && !same_facts(facts, &query.artifact_facts)
+        {
+            return Err(denial(
+                "inputConstraintViolated",
+                "Runtime-resolved Artifact identity or content digest differs",
+            ));
+        }
+        for (name, constraint) in &self.input_constraints {
+            let Some(value) = query.inputs.get(name) else {
+                return Err(denial(
+                    "inputConstraintViolated",
+                    format!("constrained input {name} is absent"),
+                ));
+            };
+            if !constraint.permits(value) {
+                return Err(denial(
+                    "inputConstraintViolated",
+                    format!("input {name} violates constraint"),
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    /// Swift `permitsWorkspaceStandingMaterialization`: a maintainer's
+    /// workspace standing grant, which pins no revision, authorizes uses whose
+    /// scope differs from its first use's.
+    fn permits_workspace_standing_materialization(&self) -> bool {
+        self.effect_ceiling == Effect::DeviceMutation
+            && self.issuer_kind == IssuerKind::MaintainerMergedPr
+            && matches!(
+                &self.target_scope,
+                TargetScope::WorkspaceIdentity { expected_revision, .. }
+                    if expected_revision.is_empty()
+            )
+    }
 }
 
 impl TargetScope {
@@ -880,6 +1460,22 @@ impl TargetScope {
 }
 
 impl Constraint {
+    /// Swift `RuntimeCapabilityInputConstraint.permits`: the string a string
+    /// constraint names, or for a range an integer, or a number with no
+    /// fraction, inside it.
+    fn permits(&self, value: &Value) -> bool {
+        match (self, value) {
+            (Self::ExactString(expected), Value::String(actual)) => same_text(expected, actual),
+            (Self::OneOfStrings(allowed), Value::String(actual)) => {
+                allowed.iter().any(|allowed| same_text(allowed, actual))
+            }
+            (Self::IntegerRange(minimum, maximum), Value::Number(number)) => {
+                swift_integer(number).is_some_and(|value| (*minimum..=*maximum).contains(&value))
+            }
+            _ => false,
+        }
+    }
+
     fn decode(keyed: &Keyed<'_>) -> Result<Self, Decoding> {
         let kind = keyed.string("kind")?;
         match kind.as_str() {
@@ -1000,6 +1596,22 @@ impl Consumption {
             members.insert("previousLineageSHA256".into(), json!(previous));
         }
         members
+    }
+
+    /// Swift `receipt(capabilityID:consumption:)`.
+    fn to_receipt(&self, capability: &str) -> ConsumptionReceipt {
+        ConsumptionReceipt {
+            capability_id: capability.to_owned(),
+            ordinal: self.ordinal,
+            reservation_id: self.reservation.clone(),
+            job_id: self.job.clone(),
+            consumed_at_utc: self.consumed_at.clone(),
+            operation_reference: self.operation_reference.clone(),
+            query_fingerprint_sha256: self.query.clone(),
+            remaining_uses_after: self.remaining_after,
+            previous_lineage_sha256: self.previous_lineage.clone(),
+            receipt_sha256: self.receipt.clone(),
+        }
     }
 
     /// Swift `ReceiptMaterial`.
@@ -1219,6 +1831,128 @@ fn validate(document: &Document) -> Result<(), CapabilityStoreError> {
         }
     }
     Ok(())
+}
+
+// MARK: - Admission of a new execution
+
+/// Swift `validateNewExecution(record:query:nowUTC:)`: a subject the ledger
+/// can name, a complete plan, no earlier use left unsettled, the scope of the
+/// lineage's first use, then the envelope's own authorization.
+fn validate_new_execution(
+    record: &Record,
+    query: &CapabilityQuery,
+    now_utc: &str,
+) -> Result<(), CapabilityStoreError> {
+    let device = query
+        .target_stable_identity_sha256
+        .as_deref()
+        .is_some_and(lowercase_sha256)
+        && query.target_binding_revision.unwrap_or(0) > 0;
+    let workspace = [
+        &query.workspace_identity_sha256,
+        &query.workspace_revision,
+        &query.workspace_file_scopes_digest,
+    ]
+    .into_iter()
+    .all(|value| value.as_deref().is_some_and(lowercase_sha256));
+    if !device && !workspace {
+        return Err(CapabilityStoreError::Denied(denial(
+            "targetIdentityRequired",
+            "a device (stable identity + binding revision) or workspace \
+             (identity + revision + scope digest) subject is required",
+        )));
+    }
+    if !query.plan_digest.as_deref().is_some_and(lowercase_sha256) {
+        return Err(CapabilityStoreError::Denied(denial(
+            "planDigestRequired",
+            "a complete materialized plan digest is required",
+        )));
+    }
+    if let Some(unresolved) = record
+        .consumptions
+        .iter()
+        .find(|use_| !use_.current().settled())
+    {
+        return Err(CapabilityStoreError::LineageBlocked(format!(
+            "previous use {} is {}; new mutation dispatch is forbidden",
+            unresolved.ordinal,
+            unresolved.current().raw()
+        )));
+    }
+    if let Some(first) = record.consumptions.first()
+        && !record
+            .capability
+            .permits_workspace_standing_materialization()
+        && first.authorization_scope != fingerprint(query, false)
+    {
+        return Err(CapabilityStoreError::LineageBlocked(
+            "operation, effect, target, binding or typed inputs drifted from authorization \
+             lineage use 1"
+                .into(),
+        ));
+    }
+    record
+        .capability
+        .authorizes(query, now_utc, record.remaining_uses)
+        .map_err(CapabilityStoreError::Denied)
+}
+
+/// Swift `fingerprint(of:includePlan:)`: the lowercase SHA-256 of the query's
+/// scope, one `name=value` line each, with the plan digest for the query
+/// fingerprint and without it for the authorization scope. The workspace
+/// revision is deliberately absent: it moves with every legitimate mutation.
+fn fingerprint(query: &CapabilityQuery, include_plan: bool) -> String {
+    let or_dash = |value: &Option<String>| value.clone().unwrap_or_else(|| "-".into());
+    let mut lines = vec![
+        format!("operation={}", query.operation_reference()),
+        format!("effect={}", query.effect.raw()),
+        format!("target={}", or_dash(&query.target_stable_identity_sha256)),
+        format!(
+            "bindingRevision={}",
+            query
+                .target_binding_revision
+                .map_or_else(|| "-".into(), |revision| revision.to_string())
+        ),
+        format!("workspace={}", or_dash(&query.workspace_identity_sha256)),
+        format!(
+            "workspaceScopes={}",
+            or_dash(&query.workspace_file_scopes_digest)
+        ),
+    ];
+    if include_plan {
+        lines.push(format!("plan={}", or_dash(&query.plan_digest)));
+    }
+    // Swift encodes the inputs as `JSONValue`s, whose numbers with no fraction
+    // are integers.
+    lines.push(
+        match crate::session_json::encode(&swift_value(&Value::Object(query.inputs.clone()))) {
+            Ok(bytes) => format!("inputs={}", String::from_utf8_lossy(&bytes)),
+            Err(_) => "inputs=unencodable".into(),
+        },
+    );
+    arkdeck_contract::sha256_hex(lines.join("\n").as_bytes())
+}
+
+/// Swift's `[String: String]` equality, of a capability's Artifact facts and
+/// a query's.
+fn same_facts(facts: &[(String, String)], query: &BTreeMap<String, String>) -> bool {
+    facts.len() == query.len()
+        && facts
+            .iter()
+            .all(|(name, fact)| query.get(name).is_some_and(|value| same_text(value, fact)))
+}
+
+/// Lineage material always encodes (Swift's precondition); this answers the
+/// impossible case without a panic.
+fn unencodable() -> CapabilityStoreError {
+    CapabilityStoreError::Io("cannot encode capability lineage material".into())
+}
+
+fn publication_failure(error: DocumentPublishError) -> io::Error {
+    match error {
+        DocumentPublishError::BeforePublication(error)
+        | DocumentPublishError::OutcomeUnknown(error) => error,
+    }
 }
 
 // MARK: - Helpers
