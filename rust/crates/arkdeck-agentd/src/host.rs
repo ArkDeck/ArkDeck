@@ -423,6 +423,37 @@ impl Host {
 
 impl HostServices for Host {
     #[cfg(target_os = "macos")]
+    fn operation_availability(
+        &self,
+        reference: &str,
+        provider: &str,
+    ) -> Option<Vec<(&'static str, String)>> {
+        arkdeck_hoststore::operation_unavailability(
+            reference,
+            provider,
+            &arkdeck_hoststore::OperationAvailabilityContext {
+                planning_owner: self.planning.is_some(),
+                job_owner: self.jobs.is_some(),
+                artifacts: self.artifacts.is_some(),
+                analyzer: self
+                    .planning
+                    .as_ref()
+                    .and_then(|(_, analyzer)| analyzer.as_ref()),
+                hdc_registered: self.hdc.is_some() && self.targets.is_some(),
+                hdc_tool_current: if provider == "hdc"
+                    && ["observe.device@1", "capture.diagnostics@1"].contains(&reference)
+                {
+                    self.hdc
+                        .as_ref()
+                        .is_some_and(|dispatch| dispatch.tool_identity_current())
+                } else {
+                    false
+                },
+            },
+        )
+    }
+
+    #[cfg(target_os = "macos")]
     fn import_resource(
         &self,
         method: &str,

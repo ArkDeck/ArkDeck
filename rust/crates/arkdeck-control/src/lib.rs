@@ -18,6 +18,17 @@ pub enum BootstrapRegistryKind {
 }
 
 pub trait HostServices: Send + Sync {
+    /// Fresh host-scoped provider/dispatcher/Artifact availability. None means
+    /// no provider is registered; an empty reason list means available on this
+    /// host, never target admission. Implementations must not dispatch.
+    fn operation_availability(
+        &self,
+        _reference: &str,
+        _provider: &str,
+    ) -> Option<Vec<(&'static str, String)>> {
+        None
+    }
+
     fn import_resource(
         &self,
         _method: &str,
@@ -394,6 +405,7 @@ impl HdcStatus {
 pub struct Control<H> {
     host: H,
     operations: Value,
+    providers: Vec<String>,
 }
 
 impl<H: HostServices> Control<H> {
@@ -403,9 +415,9 @@ impl<H: HostServices> Control<H> {
         }
         let catalog: Vec<Value> =
             serde_json::from_str(CATALOG_CANONICAL_JSON).map_err(|_| ContractError::Malformed)?;
-        // This foundation owns discovery, not the full HDC operation provider.
-        // Advertising an available operation before its lowering exists would
-        // claim an execution path the daemon cannot provide.
+        // Cache only Catalog metadata and the unregistered fallback. Fresh
+        // host availability replaces that fallback at each discovery request;
+        // publishing a descriptor alone never registers its provider.
         let operations = Value::Array(catalog.iter().map(|d| {
             let reference = match d["version"].as_u64() {
                 Some(version) => format!("{}@{version}", d["id"].as_str().expect("Catalog id")),
@@ -417,7 +429,57 @@ impl<H: HostServices> Control<H> {
                 "reasons":[format!("provider {} is not registered",d["provider"].as_str().expect("Catalog provider"))]})
         }).collect());
         validate_method_value("operation.list", "result", &operations)?;
-        Ok(Self { host, operations })
+        let providers = catalog
+            .iter()
+            .map(|d| d["provider"].as_str().expect("Catalog provider").to_owned())
+            .collect();
+        Ok(Self {
+            host,
+            operations,
+            providers,
+        })
+    }
+
+    /// The same fresh projection feeds discovery and descriptor views. Keep
+    /// metadata cached, but never cache provider or executable availability.
+    pub fn operation_availability(&self) -> Value {
+        let items: Vec<_> = self
+            .operations
+            .as_array()
+            .expect("Catalog operations")
+            .iter()
+            .zip(&self.providers)
+            .map(|(base, provider)| {
+                let mut item = base.clone();
+                if let Some(reasons) = self.host.operation_availability(
+                    base["reference"].as_str().expect("Catalog reference"),
+                    provider,
+                ) {
+                    item["availability"] = json!(if reasons.is_empty() {
+                        "available"
+                    } else {
+                        "unavailable"
+                    });
+                    item["reasons"] =
+                        json!(reasons.iter().map(|(_, reason)| reason).collect::<Vec<_>>());
+                    item["reasonCodes"] =
+                        json!(reasons.iter().map(|(code, _)| code).collect::<Vec<_>>());
+                    item["reasonOrigins"] = json!(
+                        reasons
+                            .iter()
+                            .map(|(code, _)| match *code {
+                                "provider_not_registered"
+                                | "operation_not_supported"
+                                | "workspace_preset_not_offered" => "product_build",
+                                _ => "host_configuration",
+                            })
+                            .collect::<Vec<_>>()
+                    );
+                }
+                item
+            })
+            .collect();
+        Value::Array(items)
     }
 
     /// Payload excludes its LF delimiter. Every path returns one bounded frame.
@@ -464,7 +526,7 @@ impl<H: HostServices> Control<H> {
                 Response::failure(&request.id, "invalidParams", "health accepts no parameters")
             }
             "operation.list" if params.is_empty() => {
-                Response::success(&request.id, self.operations.clone())
+                Response::success(&request.id, self.operation_availability())
             }
             "operation.list" => Response::failure(
                 &request.id,
@@ -480,8 +542,8 @@ impl<H: HostServices> Control<H> {
                     )
                 } else {
                     let reference = params["reference"].as_str().expect("checked reference");
-                    match self
-                        .operations
+                    let operations = self.operation_availability();
+                    match operations
                         .as_array()
                         .expect("Catalog operations")
                         .iter()
