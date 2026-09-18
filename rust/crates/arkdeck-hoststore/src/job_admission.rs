@@ -1,20 +1,29 @@
 //! Rust `job.submit` for the operations this Runtime materializes: Swift
-//! `RuntimeJobEngine.submitOwned` as the target control plane calls it. The
-//! idempotency lookup comes before materialization; a new Job is admitted under
-//! the default read-only policy (no capability is read, reserved or consumed),
-//! its journal then starts with `jobCreated` and `queued -> preflight`, and its
-//! record is published. Nothing is dispatched: an admitted Job waits in
-//! `preflight` for an executor.
+//! `RuntimeJobEngine.submitOwned` as the target control plane calls it.
+//! - The idempotency lookup comes before materialization.
+//! - A new read-only Job is admitted under the default read-only policy.
+//! - A device mutation the catalog authorizes with a standing capability is
+//!   admitted under the capability the caller names or, when it names none,
+//!   the one the Runtime issues (`capability_policy`). Either is checked
+//!   against its envelope and lineage; no use is reserved or consumed.
+//! - The Job's journal then starts with `jobCreated` and `queued -> preflight`,
+//!   and its record is published.
+//!
+//! Nothing is dispatched: an admitted Job waits in `preflight` for an
+//! executor.
 use crate::JobStore;
+use crate::capability_policy::{self, DeviceHolds, IssueFailure};
+use crate::capability_store::{CapabilityQuery, CapabilityStore, CapabilityStoreError, Effect};
 use crate::job_journal_events::{self, Envelope};
 use crate::job_journal_writer::JournalWriter;
-use crate::job_plan::{JobPlanner, PlanRefusal, request_json};
+use crate::job_plan::{JobPlanner, Materialized, PlanRefusal, request_json};
 use crate::job_record::JobRecord;
 use crate::job_repository::AdmissionVerdict;
 use crate::operation_catalog::CatalogOperation;
 use crate::operation_request::OperationRequest;
 use arkdeck_contract::{CATALOG_DIGEST, sha256_hex};
 use serde_json::{Map, Value, json};
+use std::collections::BTreeMap;
 
 /// Swift `RuntimeDefaultReadOnlyPolicy` bounds.
 const READ_ONLY_TIMEOUT_SECONDS: i64 = 900;
@@ -77,22 +86,13 @@ pub fn runtime_now() -> Option<String> {
 
 /// Swift `preauthorize` for an effect of at most `readOnly`: the catalog's
 /// default read-only policy within the policy's bounds, recorded as
-/// admission evidence. Anything above `readOnly` needs a Runtime capability,
-/// which this Runtime does not issue yet.
+/// admission evidence.
 fn default_read_only(
     descriptor: &CatalogOperation,
     effect: &str,
     admitted_at: &str,
 ) -> Result<Value, AdmissionRefusal> {
     let reference = descriptor.reference();
-    if !matches!(effect, "hostOnly" | "readOnly") {
-        return Err(refused(
-            "rejected",
-            format!(
-                "{reference} needs a Runtime capability, which the Rust Runtime does not issue yet"
-            ),
-        ));
-    }
     if descriptor.authorization.get(effect).map(String::as_str) != Some("defaultReadOnly") {
         return Err(refused(
             "admissionDenied",
@@ -123,12 +123,33 @@ fn default_read_only(
     )
 }
 
+/// Swift `denialCode(of:)`: the machine-readable half of a capability
+/// refusal. Only decisions are named; a store fault is `unclassified`.
+fn denial_code(error: &CapabilityStoreError) -> &'static str {
+    match error {
+        CapabilityStoreError::Denied(denial) => denial.reason,
+        CapabilityStoreError::LineageBlocked(_) => "lineageBlocked",
+        CapabilityStoreError::NotFound(_) => "capabilityNotFound",
+        _ => "unclassified",
+    }
+}
+
+/// What a device mutation is authorized from: the capability store, and the
+/// device sessions this daemon holds.
+#[derive(Clone, Copy)]
+pub struct MutationAuthority<'a> {
+    pub capabilities: &'a CapabilityStore,
+    pub holds: &'a DeviceHolds,
+}
+
 /// The owners an admission writes: the Job store, through the planner's
-/// materialization, at the time the clock gives.
+/// materialization, at the time the clock gives. Without an authority no
+/// device mutation is admitted.
 pub struct JobAdmitter<'a> {
     pub planner: JobPlanner<'a>,
     pub jobs: &'a JobStore,
     pub now: fn() -> Option<String>,
+    pub authority: Option<MutationAuthority<'a>>,
 }
 
 impl JobAdmitter<'_> {
@@ -169,10 +190,21 @@ impl JobAdmitter<'_> {
                 "the fresh materialized plan differs from the immutable reviewed plan",
             ));
         }
-        let evidence = default_read_only(descriptor, &effect, &self.clock()?)?;
+        // A device mutation runs the request that names its capability; the
+        // caller's own stays the original submission.
+        let (evidence, executed) = if matches!(effect.as_str(), "hostOnly" | "readOnly") {
+            let evidence = default_read_only(descriptor, &effect, &self.clock()?)?;
+            (Some(evidence), request.canonical_value())
+        } else {
+            let capability = self.preauthorize(&request, descriptor, &effect, &materialized)?;
+            let mut authorized = request.clone();
+            authorized.capability_id = Some(capability);
+            (None, authorized.canonical_value())
+        };
         let timestamp = self.clock()?;
         let mut record = JobRecord::admitted(
             &job_id,
+            executed,
             request.canonical_value(),
             &descriptor.reference(),
             CATALOG_DIGEST,
@@ -197,6 +229,118 @@ impl JobAdmitter<'_> {
         // Past the durable admission point: a failure below is uncertain.
         self.start(&record, &timestamp).ok_or_else(uncertain)?;
         Ok(acceptance(&job_id, false))
+    }
+
+    /// Swift `preauthorize` above `readOnly`:
+    /// 1. another client's live device session is refused;
+    /// 2. then the catalog's policy is read;
+    /// 3. a standing capability the caller names is used as named;
+    /// 4. without one, the Runtime issues its own when the catalog lets it.
+    ///
+    /// Either capability is checked against its envelope and lineage before
+    /// admission, and nothing is consumed yet. A destructive effect, the
+    /// Runtime-capability policy and a workspace subject are not served yet.
+    fn preauthorize(
+        &self,
+        request: &OperationRequest,
+        descriptor: &CatalogOperation,
+        effect: &str,
+        materialized: &Materialized,
+    ) -> Result<String, AdmissionRefusal> {
+        let reference = descriptor.reference();
+        let unserved = || {
+            refused(
+                "rejected",
+                format!(
+                    "{reference} needs a Runtime capability, which the Rust Runtime does not issue yet"
+                ),
+            )
+        };
+        let (Some(authority), Some(parsed)) = (self.authority, Effect::parse(effect)) else {
+            return Err(unserved());
+        };
+        let session_scoped = capability_policy::session_scoped(descriptor, &request.inputs);
+        let client = request
+            .client_context
+            .as_ref()
+            .and_then(|context| context.client_name.as_deref())
+            .unwrap_or("anonymous");
+        authority
+            .holds
+            .admit(
+                materialized.identity.as_deref(),
+                client,
+                session_scoped,
+                &self.clock()?,
+            )
+            .map_err(|message| refused("resourceConflict", message))?;
+        let Some(policy) = descriptor.authorization.get(effect) else {
+            return Err(refused(
+                "admissionDenied",
+                format!("catalog has no authorization policy for effect {effect}"),
+            ));
+        };
+        let (Some(identity), Some(binding_revision)) =
+            (&materialized.identity, materialized.binding_revision)
+        else {
+            return Err(unserved());
+        };
+        if parsed == Effect::Destructive || policy == "runtimeCapability" {
+            return Err(unserved());
+        }
+        let query = CapabilityQuery {
+            operation_id: descriptor.id().to_owned(),
+            operation_version: descriptor.version(),
+            effect: parsed,
+            target_stable_identity_sha256: Some(identity.clone()),
+            target_binding_revision: Some(binding_revision),
+            plan_digest: Some(materialized.digest.clone()),
+            inputs: capability_policy::subject(descriptor, &request.inputs),
+            // The operations admitted here resolve no Artifact.
+            artifact_facts: BTreeMap::new(),
+            workspace_identity_sha256: None,
+            workspace_revision: None,
+            workspace_file_scopes_digest: None,
+        };
+        let capability = if let Some(supplied) = &request.capability_id {
+            supplied.clone()
+        } else if parsed == Effect::DeviceMutation
+            && policy == "standingCapability"
+            && descriptor.default_policy_issuance()
+        {
+            capability_policy::issue(
+                authority.capabilities,
+                descriptor,
+                &query,
+                session_scoped,
+                &self.clock()?,
+            )
+            .map_err(|failure| match failure {
+                IssueFailure::Refused(message) => refused("admissionDenied", message),
+                // Swift's engine reports a store it cannot read without the
+                // zero-dispatch proof.
+                IssueFailure::Unreadable => uncertain(),
+            })?
+        } else {
+            return Err(refused(
+                "admissionDenied",
+                format!("effect {effect} requires an explicit runtime capability"),
+            ));
+        };
+        authority
+            .capabilities
+            .validate_new_execution(&capability, &query, &self.clock()?)
+            .map_err(|error| {
+                refused(
+                    "admissionDenied",
+                    format!(
+                        "capability denied [denial:{}]: {}",
+                        denial_code(&error),
+                        error.swift()
+                    ),
+                )
+            })?;
+        Ok(capability)
     }
 
     /// Swift `currentCatalogDuplicate` and the reviewed-plan check of a
