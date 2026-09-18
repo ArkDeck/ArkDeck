@@ -1,4 +1,3 @@
-import ArkDeckClientKit
 // App-facing Runtime history, over the daemon's read-only XPC door.
 //
 // Same shape as HDCApplicationDiagnosticsFacade: the App receives closed
@@ -744,7 +743,7 @@ private enum RuntimeArtifactChunkResponseDecoding {
   }
 }
 
-enum RuntimeHistoryTransportResult: Sendable {
+package enum RuntimeHistoryTransportResult: Sendable {
   case success(Data)
   case failure(String)
 }
@@ -1084,7 +1083,7 @@ enum RuntimeJobDetailResponseDecoding {
         guard let name = row["name"] as? String else { return nil }
         return (name, row)
       })
-    let expectedNames = TraceDebugParameterCatalog.definitions.map(\.name)
+    let expectedNames = RuntimeTraceParameterName.allCases.map(\.rawValue)
     guard Set(beforeByName.keys) == Set(expectedNames),
       Set(afterByName.keys) == Set(expectedNames)
     else { return ([], []) }

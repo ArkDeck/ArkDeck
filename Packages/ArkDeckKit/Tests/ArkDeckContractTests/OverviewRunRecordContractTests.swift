@@ -1,3 +1,4 @@
+@testable import ArkDeckClientKit
 // What the Overview may conclude from a run record.
 //
 // Two judgements carry the page: which runs were one piece of work, and
@@ -93,7 +94,7 @@ final class OverviewRunRecordContractTests: XCTestCase {
 
   func testContinuationFreshChecksPrecedeSubmissionAndRunIsOneShot() async throws {
     let source = DiagnosticSessionUIFixture.job
-    let transport = HistoryRPCScenario([
+    let transport = OverviewRPCScenario([
       ("target.list", try continuationResponse([["targetId": source.targetID, "bindingRevision": 3]])),
       ("job.status", try continuationResponse(continuationSourceStatus())),
       ("job.submit", try continuationResponse(["jobId": "job-new", "deduplicated": false])),
@@ -121,7 +122,7 @@ final class OverviewRunRecordContractTests: XCTestCase {
   }
 
   func testContinuationFreshBindingDriftAndForeignRunReadNoNewJob() async throws {
-    let transport = HistoryRPCScenario([
+    let transport = OverviewRPCScenario([
       ("target.list", try continuationResponse([["targetId": DiagnosticSessionUIFixture.job.targetID, "bindingRevision": 4]])),
       ("job.status", try continuationResponse(continuationSourceStatus())),
     ])
@@ -152,7 +153,7 @@ final class OverviewRunRecordContractTests: XCTestCase {
           "state": "waitingForRecovery", "outcomeUnknown": true,
         ])))
       }
-      let transport = HistoryRPCScenario(answers)
+      let transport = OverviewRPCScenario(answers)
       let provider = RuntimeContinuationXPCProvider(
         reader: RuntimeJobDetailApplicationFacade.make(arguments: ["--ui-test-runtime-history"]),
         request: { await transport.request($0, $1) })
@@ -525,4 +526,19 @@ final class OverviewWorkspaceKindContractTests: XCTestCase {
         forOperation: "observe.device@1", parameters: []),
       "no workspace submits this one")
   }
+}
+
+private actor OverviewRPCScenario {
+  private var answers: [(String, RuntimeHistoryTransportResult)]
+  private var calls: [(String, [String: JSONValue])] = []
+
+  init(_ answers: [(String, RuntimeHistoryTransportResult)]) { self.answers = answers }
+
+  func request(_ method: String, _ parameters: [String: JSONValue]) -> RuntimeHistoryTransportResult {
+    calls.append((method, parameters))
+    guard !answers.isEmpty, answers[0].0 == method else { return .failure("unexpected fixture RPC") }
+    return answers.removeFirst().1
+  }
+
+  func recordedCalls() -> [(String, [String: JSONValue])] { calls }
 }
