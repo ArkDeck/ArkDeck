@@ -1,6 +1,6 @@
 # Remaining macOS Rust implementation
 
-Updated 2026-09-19 against protected main `bef94236` (#1975), revision 11. This list tracks
+Updated 2026-09-19 against protected main `98cb3b96` (#1977), revision 11. This list tracks
 implementation, installed activation and macOS real-device acceptance separately. The current
 goal includes pure-Rust macOS GJ-1–5 acceptance; Windows and Linux product work are outside scope.
 
@@ -8,7 +8,7 @@ goal includes pure-Rust macOS GJ-1–5 acceptance; Windows and Linux product wor
 
 | Routed methods on the standalone Rust daemon | Operations executable in Rust | Golden Journeys on Rust | App facades on ClientKit | Registered CLI feature names on Rust | Swift targets deleted |
 | --- | --- | --- | --- | --- | --- |
-| 69 / 105 (65.7%; installed facade serves 3 locally) | 3 / 30 (10%; analyzer, observe, default diagnostic capture) | 0 / 5 | 0 / 13 | 65 / 256 (25.4%; 68 parser command names total) | 0 / 6 |
+| 69 / 105 (65.7%; installed facade serves 3 locally) | 3 / 30 (10%; analyzer, observe, default diagnostic capture) | 0 / 5 | 1 / 13 | 65 / 256 (25.4%; 68 parser command names total) | 0 / 6 |
 
 These are separate coverage measures, not a weighted completion percentage. A routed method or
 CLI entry is not proof of complete behavior, installed activation or hardware acceptance. In
@@ -32,8 +32,9 @@ How each number is measured at the pinned main:
 - **Golden Journeys:** `REAL_DEVICE_PASS` records on the pure Rust daemon. Fake-HDC/oracle
   replay and the earlier paired-facade acceptance do not increase this count.
 - **App / retirement:** the 13 App-facing facades switched to `ArkDeckClientKit`, and the six
-  Swift targets removed by XPA-017. The ClientKit target is still absent and all six Swift
-  targets remain in `Packages/ArkDeckKit/Package.swift`.
+  Swift targets removed by XPA-017. History filter and its transport/models are extracted to ClientKit (#1976); the
+  other facades and all six Swift targets remain. This structural extraction is
+  not signed standalone Rust App acceptance; SPK-8 remains incomplete.
 - **CLI:** unique canonical names returned by the positional-command match in
   `rust/crates/arkdeck-cli/src/lib.rs`, intersected with `feature` in
   `openspec/contracts/cli-feature-coverage.json`. There are 68 parser names, of which 65 match
@@ -49,7 +50,7 @@ import json
 import re
 import subprocess
 
-ref = "bef942364a3730b761c74448a1b601dfb1fceb35"
+ref = "98cb3b963e2b959287b9bc1c94e4840c747b3ccc"
 def read(path):
     return subprocess.check_output(["git", "show", f"{ref}:{path}"], text=True)
 
@@ -93,8 +94,8 @@ PYCOUNT
 | XPA-015 | ready (r11) | HDC observation/parsers and process foundation | SPK-10, then M3; the three ArkTrace/hilog analyzers after M4 |
 | XPA-016 | in-progress | SPK-6 executor foundation; Rockchip probes/transition/alias store (#1934–#1941); HDC status (#1947); capture providers (#1949); physical relation proof port (#1952); HAP (#1951), native-library (#1955), pointer/port-rule (#1961) providers | daemon composition and M1/M2 end-to-end acceptance; M4 ArkForge-served ports after SPK-9 |
 | XPA-018 | in-progress | 68 parser command names, 65 matching registered features; target adopt/availability (#1967), HAR list/show (#1974) | remaining commands including HAR resume, full parity/export; Swift CLI retirement with M5 |
-| XPA-019 | ready (r11) | no ClientKit target on pinned main; #1976 ClientKit/History implementation pending review/merge | SPK-8 acceptance, remaining facades; hard prerequisite of M5 |
-| XPA-025 | in-progress | Rust benchmark launcher/probe (#1972); candidate owner soak #1977 pending review; Swift performance baseline; merge-lane micro-benchmarks retired (#1902) | SPK-11 repeated measurements, Rust soak and remaining lanes on the Rust daemon |
+| XPA-019 | in-progress | ClientKit transport/models and History filter extraction merged (#1976) | SPK-8 acceptance, remaining facades; hard prerequisite of M5 |
+| XPA-025 | in-progress | Rust benchmark launcher/probe (#1972); isolated Rust owner soak tool merged (#1977), successful/cancelled/reopen workload; Swift performance baseline; merge-lane micro-benchmarks retired (#1902) | SPK-11 repeated measurements, Rust soak and remaining lanes on the Rust daemon |
 | XPA-017 | blocked | — | M5 |
 
 Spikes SPK-6..11 are defined in `tasks.md` and design §J.3; their records land under
@@ -103,12 +104,16 @@ Spikes SPK-6..11 are defined in `tasks.md` and design §J.3; their records land 
 
 ## Pending review at this baseline
 
-- #1976: ClientKit/History client decoupling plus SDK 6.4 compatibility; pending,
-  so main's App/Swift-retirement counts remain unchanged.
 - #1968: pointer capability admission, still pending; admission alone does not
   qualify pointer execution or capability consumption as delivered.
 
 ## History
+
+2026-09-19 (`98cb3b96`): #1976 merges the ClientKit transport and History filter
+extraction (1/13 facades; zero Swift targets retired). #1977 merges the isolated
+Rust owner soak workload with local smoke evidence; full installed-daemon IPC,
+performance/soak acceptance and SPK-11 remain incomplete. Neither change adds
+real-device Golden Journey evidence or installed activation.
 
 2026-09-19 (`bef94236`): #1975 delivers proved Target adoption inside agent.run
 and commit-gap restart coverage. This extends an existing execution path and

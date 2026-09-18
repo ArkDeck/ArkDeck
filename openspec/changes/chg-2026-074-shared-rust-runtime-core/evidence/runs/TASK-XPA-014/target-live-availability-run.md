@@ -55,3 +55,9 @@ do not call observation/adoption or infer target-scoped readiness. The original
 fixture's adoption setup uses the same unchanged public `adopt` entry point,
 now backed by main's guarded implementation. No capability or dispatch boundary
 was changed while resolving the merge. Final post-merge unified gate pending.
+
+Subsequently integrated protected main `98cb3b96` (#1976 and #1977) without
+conflicts. The dashboard records one extracted ClientKit facade and the merged
+Rust owner soak tool separately from signed App/installed Runtime/physical
+acceptance, which remain incomplete. Source counts were reproduced unchanged.
+The post-merge unified gate remains pending.
