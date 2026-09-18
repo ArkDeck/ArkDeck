@@ -6,6 +6,7 @@ let package = Package(
   name: "ArkDeckKit",
   platforms: [.macOS(.v26)],
   products: [
+    .library(name: "ArkDeckClientKit", targets: ["ArkDeckClientKit"]),
     .library(name: "ArkDeckCore", targets: ["ArkDeckCore"]),
     .library(name: "ArkDeckProcess", targets: ["ArkDeckProcess"]),
     .library(name: "ArkDeckRuntime", targets: ["ArkDeckRuntime"]),
@@ -50,6 +51,7 @@ let package = Package(
       revision: "9172c9525f954ec397e0555d7d03cd4367f3efcf"),
   ],
   targets: [
+    .target(name: "ArkDeckClientKit", dependencies: ["ArkDeckCore"]),
     .target(
       name: "ArkDeckCore",
       swiftSettings: [.strictMemorySafety()]),
@@ -65,6 +67,7 @@ let package = Package(
     .target(
       name: "ArkDeckWorkflows",
       dependencies: [
+        "ArkDeckClientKit",
         "ArkDeckCore", "ArkDeckProcess", "ArkDeckRuntime", "ArkDeckOpenHarmony",
         "ArkDeckStorage",
         .product(name: "Citadel", package: "Citadel"),
@@ -117,7 +120,7 @@ let package = Package(
     ),
     .target(
       name: "ArkDeckAgentDaemon",
-      dependencies: ["ArkDeckCore", "ArkDeckStorage", "ArkDeckWorkflows"]
+      dependencies: ["ArkDeckClientKit", "ArkDeckCore", "ArkDeckStorage", "ArkDeckWorkflows"]
     ),
     .target(
       name: "ArkDeckAgentClient",
@@ -185,6 +188,7 @@ let package = Package(
       name: "ArkDeckFakeHapSignerFixture",
       path: "Tests/ArkDeckFakeHapSignerFixture"
     ),
+    .testTarget(name: "ArkDeckClientKitTests", dependencies: ["ArkDeckClientKit", "ArkDeckCore"]),
     .testTarget(name: "ArkDeckCoreTests", dependencies: ["ArkDeckCore"]),
     .testTarget(
       name: "ArkDeckTraceAdapterTests",
@@ -196,6 +200,7 @@ let package = Package(
     .testTarget(
       name: "ArkDeckContractTests",
       dependencies: [
+        "ArkDeckClientKit",
         "ArkDeckCore",
         "ArkDeckProcess",
         .product(name: "ArkForgeProtocol", package: "ArkForge"),

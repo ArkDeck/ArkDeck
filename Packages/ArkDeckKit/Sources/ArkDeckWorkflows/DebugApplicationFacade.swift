@@ -1,3 +1,4 @@
+import ArkDeckClientKit
 // App-facing Debug workspace over Runtime's closed typed XPC door.
 //
 // Executable work is limited to published Debug operations: bounded
