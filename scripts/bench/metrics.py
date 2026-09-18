@@ -221,6 +221,8 @@ class RunFailed(RuntimeError):
 
 
 JOB_LIST_PAGE_SIZE = 50
+# Three requests per iteration plus handshake fit the 128-frame connection.
+IPC_SAMPLES_PER_CONNECTION = 32
 
 
 def split_at_release(
@@ -287,6 +289,7 @@ def execute_run(
         "seedRestartIntervalSeconds": SEED_RESTART_INTERVAL_SECONDS,
         "jobListPageSize": JOB_LIST_PAGE_SIZE,
         "jobStoreRowCount": None,
+        "ipcSamplesPerConnection": IPC_SAMPLES_PER_CONNECTION,
     }
 
     for _ in range(context.calibration_samples):
@@ -327,7 +330,11 @@ def execute_run(
                     "use matching Runtime and soak executables"
                 )
             scale["jobStoreRowCount"] = row_count
-            for _ in range(context.ipc_samples):
+            for index in range(context.ipc_samples):
+                if index and index % IPC_SAMPLES_PER_CONNECTION == 0:
+                    client.close()
+                    client.connect()
+                    client.verify_contract()
                 _, elapsed = client.timed_call("health")
                 samples["ipc.health"].append(elapsed * 1000.0)
                 _, elapsed = client.timed_call(

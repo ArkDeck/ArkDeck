@@ -359,7 +359,7 @@ class RuntimeCompositionTests(unittest.TestCase):
             context = metrics.RunContext(
                 daemon_executable=pathlib.Path("/daemon"),
                 soak_executable=pathlib.Path("/soak"), cold_start_samples=2,
-                ipc_samples=1, idle_seconds=1, calibration_samples=0,
+                ipc_samples=65, idle_seconds=1, calibration_samples=0,
                 seed_seconds=1, seed_jobs_per_cycle=10, runtime_kind=kind)
             with mock.patch.object(harness, "seed_state_directory") as seed, \
                  mock.patch.object(harness, "IsolatedRuntime") as runtime_class, \
@@ -377,7 +377,11 @@ class RuntimeCompositionTests(unittest.TestCase):
                 self.assertEqual(runtime.start.call_count, 4)
                 self.assertEqual(len(samples["daemon.coldStart"]), 2)
                 self.assertEqual(scale["jobStoreRowCount"], 1)
-                self.assertIn("ipc.jobStatus", samples)
+                self.assertEqual(len(samples["ipc.jobStatus"]), 65)
+                self.assertEqual(client.close.call_count, 2)
+                self.assertEqual(client.connect.call_count, 2)
+                self.assertEqual(client.verify_contract.call_count, 2)
+                self.assertEqual(client.timed_call.call_count, 65 * 3)
 
 
     def test_empty_or_incompatible_seed_is_not_measured_as_a_fast_store(self) -> None:
