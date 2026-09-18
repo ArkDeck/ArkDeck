@@ -1,0 +1,66 @@
+{
+  "advisory": true,
+  "emptyStore": true,
+  "runs": [
+    {
+      "coldStartMs": 100.08070804178715,
+      "restartMs": 23.21654197294265,
+      "healthMs": {
+        "count": 100,
+        "min": 0.028125010430812836,
+        "p50": 0.030916009563952684,
+        "p95": 0.05033303750678897,
+        "p99": 0.0825000461190939,
+        "max": 0.09045901242643595
+      },
+      "resources": {
+        "residentSetBytes": 15286272,
+        "cpuPercent": 4.5,
+        "threadCount": 1,
+        "openFileDescriptorCount": 34,
+        "unmeasured": {}
+      },
+      "emptyJobReadSurvivedRestart": true
+    },
+    {
+      "coldStartMs": 82.1012919768691,
+      "restartMs": 23.05108302971348,
+      "healthMs": {
+        "count": 100,
+        "min": 0.029875023756176233,
+        "p50": 0.03512500552460551,
+        "p95": 0.046083005145192146,
+        "p99": 0.05220901221036911,
+        "max": 0.06308400770649314
+      },
+      "resources": {
+        "residentSetBytes": 15319040,
+        "cpuPercent": 2.2,
+        "threadCount": 1,
+        "openFileDescriptorCount": 34,
+        "unmeasured": {}
+      },
+      "emptyJobReadSurvivedRestart": true
+    },
+    {
+      "coldStartMs": 67.38820800092071,
+      "restartMs": 19.300708023365587,
+      "healthMs": {
+        "count": 100,
+        "min": 0.029542017728090286,
+        "p50": 0.030875031370669603,
+        "p95": 0.03879197174683213,
+        "p99": 0.043707957956939936,
+        "max": 0.05308300023898482
+      },
+      "resources": {
+        "residentSetBytes": 15269888,
+        "cpuPercent": 1.8,
+        "threadCount": 1,
+        "openFileDescriptorCount": 34,
+        "unmeasured": {}
+      },
+      "emptyJobReadSurvivedRestart": true
+    }
+  ]
+}

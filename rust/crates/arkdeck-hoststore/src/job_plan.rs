@@ -78,7 +78,7 @@ impl AnalyzerProfile {
     /// Swift `ArkTraceProfileFileReader.matches(requireExecutable: true)` at
     /// every plan: the profiled path still names these exact executable bytes,
     /// through no symbolic link.
-    fn still_matches(&self) -> bool {
+    pub(crate) fn still_matches(&self) -> bool {
         let current = || -> io::Result<bool> {
             if std::fs::canonicalize(&self.executable_path)? != self.executable_path {
                 return Ok(false);

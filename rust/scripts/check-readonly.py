@@ -320,7 +320,7 @@ def main() -> None:
                        ["job", "status", "--job", "JOB-unknown"], 1, "operationFailed")
                 for method in registry["methods"]:
                     expected = ("rejected" if method not in SUPPORTED or method == "device.observations" else None)
-                    if method in {"runtime.tool.inspect", "runtime.bundle.inspect", "operation.describe", "runtime.tool.register", "runtime.bundle.remove", "runtime.tool.remove", "runtime.bundle.register"}:
+                    if method in {"runtime.tool.inspect", "runtime.bundle.inspect", "operation.describe", "runtime.tool.register", "runtime.bundle.remove", "runtime.tool.remove", "runtime.bundle.register", "target.availability"}:
                         expected = "invalidParams"
                     if method in {"runtime.bundle.list", "runtime.tool.list", "artifact.inspect", "artifact.read",
                                   "artifact.export", "artifact.list"}:
@@ -343,6 +343,7 @@ def main() -> None:
                     "operation.describe")
                 assert wire_descriptor["result"] == descriptor["result"]
                 for name, method, params, error in [
+                    ("availability-missing-owner", "target.availability", {"targetId": "target-fixture"}, "internalError"),
                     ("descriptor-not-found", "operation.describe", {"reference": "unknown@1"}, "notFound"),
                     ("descriptor-bad-type", "operation.describe", {"reference": 1}, "invalidParams"),
                     ("descriptor-extra", "operation.describe", {"reference": reference, "extra": True}, "invalidParams"),

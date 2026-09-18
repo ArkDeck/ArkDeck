@@ -178,7 +178,12 @@ class IsolatedRuntime:
         self,
         daemon_executable: pathlib.Path,
         state_directory: pathlib.Path,
+        *,
+        runtime_kind: str = "swift",
     ) -> None:
+        if runtime_kind not in {"swift", "rust"}:
+            raise ValueError("runtime_kind must be swift or rust")
+        self.runtime_kind = runtime_kind
         self.daemon_executable = daemon_executable
         self.state_directory = state_directory
         self.socket_path = state_directory / SOCKET_NAME
@@ -205,11 +210,21 @@ class IsolatedRuntime:
         environment = dict(os.environ)
         # An ArkForge bundle or an inherited HDC path would make the sample
         # depend on host tooling that a CI runner does not have.
-        for key in ("ARKDECK_ARKFORGE_BUNDLE_PATH", "ARKDECK_HDC_PATH"):
-            environment.pop(key, None)
+        # Never inherit pairing, provider or endpoint configuration from the
+        # caller. In particular a Rust measurement must not start the Swift
+        # facade or attach a development HDC fixture from another test.
+        for key in list(environment):
+            if key.startswith("ARKDECK_"):
+                environment.pop(key)
+        arguments = [str(self.daemon_executable)]
+        if self.runtime_kind == "rust":
+            environment["ARKDECK_DEVELOPMENT_STATE_ROOT"] = str(self.state_directory)
+            environment["ARKDECK_ENDPOINT"] = str(self.socket_path)
+        else:
+            arguments.extend(["--state-dir", str(self.state_directory)])
         started = clocks.awake_seconds()
         self.process = subprocess.Popen(
-            [str(self.daemon_executable), "--state-dir", str(self.state_directory)],
+            arguments,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             env=environment,
@@ -223,13 +238,9 @@ class IsolatedRuntime:
                 )
             if self.socket_path.exists():
                 try:
-                    client = control.ControlClient(str(self.socket_path))
-                    client.connect()
-                    client.verify_contract()
-                    client.call("health")
-                    elapsed = clocks.awake_seconds() - started
-                    client.close()
-                    return elapsed
+                    with control.ControlClient(str(self.socket_path)) as client:
+                        client.call("health")
+                        return clocks.awake_seconds() - started
                 except (control.ControlError, OSError):
                     pass
             # Polling without a pause would spend a core on failed connects and
@@ -297,4 +308,6 @@ def seed_state_directory(
 def temporary_state_directory(prefix: str = "adkb.") -> pathlib.Path:
     """A short-path state directory, as `sun_path` requires."""
 
-    return pathlib.Path(tempfile.mkdtemp(prefix=prefix, dir=tempfile.gettempdir()))
+    # Rust's owner opens canonical paths only. macOS commonly spells TMPDIR
+    # through /var, a symlink to /private/var.
+    return pathlib.Path(tempfile.mkdtemp(prefix=prefix, dir=tempfile.gettempdir())).resolve()
