@@ -860,7 +860,12 @@ impl<H: HostServices> Control<H> {
                     outcome: self.host.artifact_resource(&request.method, &params),
                 }
             }
-            "agent.run" | "agent.status" | "agent.list" | "agent.abandon" => Response {
+            "agent.run"
+            | "agent.status"
+            | "agent.list"
+            | "agent.abandon"
+            | "agent.resume"
+            | "human-action.resume" => Response {
                 id: request.id.clone(),
                 outcome: self.host.agent_execution(&request.method, &params),
             },
