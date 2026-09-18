@@ -21,12 +21,13 @@ final class ArkDeckContractTests: XCTestCase {
   // subset these older assertions walk. Keep the two in agreement.
   private static let declaredPackageDependencies: [String: Set<String>] = [
     "ArkDeckCore": [],
+    "ArkDeckClientKit": ["ArkDeckCore"],
     "ArkDeckProcess": ["ArkDeckCore"],
     "ArkDeckRuntime": ["ArkDeckCore"],
     "ArkDeckOpenHarmony": ["ArkDeckCore", "ArkDeckProcess"],
     "ArkDeckWorkflows": [
       "ArkDeckCore", "ArkDeckOpenHarmony", "ArkDeckProcess", "ArkDeckRuntime",
-      "ArkDeckStorage",
+      "ArkDeckStorage", "ArkDeckClientKit",
     ],
     "ArkDeckStorage": ["ArkDeckCore"],
   ]
@@ -102,7 +103,7 @@ final class ArkDeckContractTests: XCTestCase {
 
   func testAppTargetImportsOnlyApprovedCompositionModulesFromArkDeckKit() throws {
     let allowed = Set([
-      "ArkDeckCore", "ArkDeckWorkflows", "ArkDeckTraceAdapter",
+      "ArkDeckCore", "ArkDeckClientKit", "ArkDeckWorkflows", "ArkDeckTraceAdapter",
     ])
     for (file, modules) in try importsByFile(under: repoRoot.appending(path: "ArkDeckApp")) {
       for module in modules where module.hasPrefix("ArkDeck") {
