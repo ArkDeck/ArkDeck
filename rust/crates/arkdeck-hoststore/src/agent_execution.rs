@@ -1667,7 +1667,7 @@ impl AgentExecutionStore {
             .snapshot(&observing.sources, None)
             .map_err(observation_failure)?;
         self.guard_budget(record, engine.now)?;
-        self.resolve_snapshot(&snapshot, record)
+        self.resolve_snapshot(&snapshot, record, engine)
     }
 
     /// Swift `budget.check()` inside `drive`, whose expiry `serialize`
@@ -1703,13 +1703,13 @@ impl AgentExecutionStore {
     /// Swift `resolveSnapshot` for a run: no device observed, several, one
     /// that is not authorized and connected, or one whose physical identity
     /// is unproved. A person must act on the first three, so each raises its
-    /// action; the last is refused. A proved, connected device is one Swift
-    /// adopts inside the run, which no oracle records yet, so that is
-    /// refused as not served.
+    /// action; the last is refused. A single proved connected device is
+    /// adopted through the observation owner before creating the typed Job.
     fn resolve_snapshot(
         &self,
         snapshot: &Snapshot,
         record: &mut Record,
+        engine: &AgentEngine<'_>,
     ) -> Result<Option<(String, Option<i64>)>, WireError> {
         let [row] = snapshot.observations.as_slice() else {
             let kind = if snapshot.observations.is_empty() {
@@ -1735,10 +1735,49 @@ impl AgentExecutionStore {
                 "the Runtime cannot prove the candidate's physical identity",
             ));
         }
-        Err(failure(
-            "operationUnavailable",
-            "adopting an observed device inside an agent execution is not served by the Rust Runtime yet",
-        ))
+        let observing = engine
+            .observations
+            .as_ref()
+            .ok_or_else(|| internal(ADVANCE))?;
+        let reference = crate::target_owner::ObservationReference {
+            candidate: row.candidate.connect_key.clone(),
+            observation_id: row.observation_id.clone(),
+            generation: snapshot.generation,
+        };
+        // Preserve the agent owner's exact budget refusal (including execution
+        // identity), rather than reclassifying it as an observation failure.
+        let mut budget_error = None;
+        let adopted = observing
+            .owner
+            .adopt_guarded(&observing.sources, &reference, || {
+                self.guard_budget(record, engine.now).map_err(|error| {
+                    let reason = error.message.clone();
+                    budget_error = Some(error);
+                    ObservationError::Failed(reason)
+                })
+            })
+            .map_err(|error| budget_error.unwrap_or_else(|| observation_failure(error)))?;
+        self.guard_budget(record, engine.now)?;
+        if record
+            .target
+            .as_ref()
+            .is_some_and(|(target, _)| target != &adopted.target_id)
+        {
+            return Err(failure(
+                "factsDrifted",
+                "physical assistance cannot select a different resolved target",
+            ));
+        }
+        let binding = record
+            .intent
+            .descriptor()
+            .ok_or_else(|| internal(ADVANCE))?;
+        let revision = if binding.binding() == "none" {
+            None
+        } else {
+            Some(i64::try_from(adopted.binding_revision).map_err(|_| internal(UNREADABLE))?)
+        };
+        Ok(Some((adopted.target_id, revision)))
     }
 
     /// Swift `raiseAction`: the one action the execution now waits on, with
