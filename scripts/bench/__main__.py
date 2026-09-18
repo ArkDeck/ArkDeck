@@ -116,6 +116,7 @@ def command_capture(arguments: argparse.Namespace) -> int:
         calibration_samples=arguments.calibration_samples,
         seed_seconds=arguments.seed_seconds,
         seed_jobs_per_cycle=arguments.seed_jobs_per_cycle,
+        runtime_kind=arguments.runtime_kind,
     )
 
     results: dict[str, baseline.MetricResult] = {}
@@ -186,6 +187,7 @@ def command_capture(arguments: argparse.Namespace) -> int:
 
     toolchain = _toolchain_facts(arguments.daemon, arguments.soak)
     toolchain["buildConfiguration"] = arguments.build_configuration
+    toolchain["runtimeKind"] = arguments.runtime_kind
     document = baseline.build_document(
         host=harness.host_facts(),
         toolchain=toolchain,
@@ -264,6 +266,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     capture.add_argument("--daemon", type=_executable, required=True)
     capture.add_argument("--soak", type=_executable, required=True)
+    capture.add_argument(
+        "--runtime-kind", choices=("swift", "rust"), default="swift",
+        help="daemon composition; Rust requires its matching Rust soak seed",
+    )
     capture.add_argument(
         "--out-dir",
         type=pathlib.Path,

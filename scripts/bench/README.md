@@ -17,9 +17,9 @@ The harness contacts no device and touches no installed Runtime.  Every number
 comes from a daemon it starts itself, on a state directory it creates, seeds
 and deletes:
 
-- `arkdeck-agentd --state-dir <private dir>` with `ARKDECK_ARKFORGE_BUNDLE_PATH`
-  and `ARKDECK_HDC_PATH` removed from the child environment;
-- `ArkDeckRuntimeSoakFixture` to seed real terminal Jobs through the production
+- Rust `arkdeck-agentd` with an explicit private development root and endpoint,
+  clearing inherited `ARKDECK_*` configuration;
+- Rust `arkdeck-soak` to seed real terminal Jobs through the production
   engine, SQLite repository, journals and Artifact store with a simulated
   provider that opens no transport and spawns no child process.
 
@@ -32,8 +32,9 @@ read-only control methods.  A host result is not hardware evidence
 ```bash
 cd scripts
 python3 -m bench capture \
-  --daemon ../Packages/ArkDeckKit/.build/release/arkdeck-agentd \
-  --soak ../Packages/ArkDeckKit/.build/release/ArkDeckRuntimeSoakFixture \
+  --daemon ../rust/target/release/arkdeck-agentd \
+  --soak ../rust/target/release/arkdeck-soak \
+  --runtime-kind rust \
   --build-configuration release \
   --out-dir /tmp/arkdeck-perf
 ```
@@ -59,9 +60,16 @@ arguments, sets only the private development root and endpoint, and clears
 inherited `ARKDECK_*` configuration so a measurement cannot select the paired
 facade or a device provider. Use `temporary_state_directory()` for a canonical
 macOS path. Contract verification and process stop/restart use the same harness.
-This launcher is the first XPA-025 integration step; `bench capture` and the
-scheduled lanes still require the existing Swift soak seed. An empty-store
-Rust launch/IPC probe is advisory, not a performance baseline or SPK-11 pass.
+`bench capture --runtime-kind rust` carries that selection through cold starts,
+seeded Job list/status reads and the idle resource window, and records it in
+`toolchain.runtimeKind`. Connections are renewed and verified between batches
+of 32 iterations, within the Rust daemon's 128-frame budget; requests are never
+replayed after a transport failure. An unreadable or empty seeded Job store
+fails the capture. The scheduled lanes build both Rust executables using
+Cargo; no SwiftPM product or ArkForge package credential is required. Historical
+Swift captures remain available with `--runtime-kind swift` (the compatibility
+default) and a matching Swift soak executable. The committed Swift baseline is
+preserved; a Rust reference-host baseline still requires three qualifying runs.
 
 ## What decides whether a run counts
 
