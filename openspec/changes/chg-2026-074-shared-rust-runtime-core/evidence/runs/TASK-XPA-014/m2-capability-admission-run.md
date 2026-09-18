@@ -150,3 +150,20 @@ common checks, design-system checks, full Swift tests, App build-for-testing,
 Rust workspace tests, published and candidate contract checks, cargo-deny and
 cargo-vet. Log: `/private/tmp/arkdeck-capability-1968-unified-final-20260919.log`.
 This is branch validation, not protected-main or real-device acceptance.
+
+### Integration with merged adoption and Rust soak
+
+After #1975, #1976 and #1977 merged, the review of `7714175e` identified that
+the new soak's `JobAdmitter` needed the capability-admission field. Main
+`98cb3b963e2b959287b9bc1c94e4840c747b3ccc` is now integrated as `215d2b3b`.
+The soak and both newly added adoption-test constructors explicitly use
+`authority: None`, preserving their read-only operation scope. All Rust
+`JobAdmitter` constructors were checked, including the real daemon's existing
+Runtime authority wiring. No capability is created by these fixtures.
+
+`cargo check --offline --locked --workspace --all-targets --jobs 1` passed,
+covering the actual integrated tree; formatting also passed. Log:
+`/private/tmp/arkdeck-1968-integration-check.log`. The final unified gate on this
+new combination remains pending; the preceding branch pass and remote CI do
+not validate this newer combination. #1976 is now merged, so that dependency
+no longer awaits approval.
