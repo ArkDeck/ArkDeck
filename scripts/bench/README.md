@@ -62,7 +62,10 @@ facade or a device provider. Use `temporary_state_directory()` for a canonical
 macOS path. Contract verification and process stop/restart use the same harness.
 `bench capture --runtime-kind rust` carries that selection through cold starts,
 seeded Job list/status reads and the idle resource window, and records it in
-`toolchain.runtimeKind`. The scheduled lanes build both Rust executables using
+`toolchain.runtimeKind`. Connections are renewed and verified between batches
+of 32 iterations, within the Rust daemon's 128-frame budget; requests are never
+replayed after a transport failure. An unreadable or empty seeded Job store
+fails the capture. The scheduled lanes build both Rust executables using
 Cargo; no SwiftPM product or ArkForge package credential is required. Historical
 Swift captures remain available with `--runtime-kind swift` (the compatibility
 default) and a matching Swift soak executable. The committed Swift baseline is
