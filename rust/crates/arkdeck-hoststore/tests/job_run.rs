@@ -213,6 +213,7 @@ fn rust_runs_reproduce_the_swift_oracle() {
     for case in cases.iter().filter(|case| case["submit"].is_object()) {
         let accepted = JobAdmitter {
             planner: JobPlanner {
+                imports: None,
                 artifacts: Some(&artifacts),
                 analyzer: Some(&profiles[&budget(case)]),
                 state_root: &root,
@@ -233,6 +234,7 @@ fn rust_runs_reproduce_the_swift_oracle() {
         .iter()
         .map(|(seconds, profile)| {
             let runner = JobRunner {
+                imports: None,
                 jobs: &jobs,
                 artifacts: &artifacts,
                 analyzer: Some(profile),

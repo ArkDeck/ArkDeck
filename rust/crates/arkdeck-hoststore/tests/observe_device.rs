@@ -128,12 +128,14 @@ fn rust_observes_the_swift_fake_device() {
         probe: &probe,
     };
     let planner = || JobPlanner {
+        imports: None,
         artifacts: Some(&artifacts),
         analyzer: None,
         state_root: &root,
         hdc: Some(&hdc),
     };
     let runner = JobRunner {
+        imports: None,
         jobs: &jobs,
         artifacts: &artifacts,
         analyzer: None,

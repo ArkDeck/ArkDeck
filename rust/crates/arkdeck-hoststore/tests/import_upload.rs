@@ -1194,3 +1194,792 @@ fn published_but_unreceipted_missing_or_corrupt_payload_cannot_finish_commit() {
         assert_eq!(fs::read(fixture.stage(id)).unwrap(), bytes);
     }
 }
+
+fn lifecycle(
+    store: &ImportUploadStore,
+    artifacts: &arkdeck_hoststore::ArtifactReadStore,
+    jobs: &arkdeck_hoststore::JobStore,
+    method: &str,
+    params: Value,
+) -> Result<Value, WireError> {
+    store.lifecycle_resource(
+        artifacts,
+        jobs,
+        &format!("artifact.import.{method}"),
+        params.as_object().unwrap(),
+        NOW,
+    )
+}
+fn jobs(fixture: &Fixture) -> arkdeck_hoststore::JobStore {
+    let root = fixture.root.join("jobs-state");
+    if !root.exists() {
+        fs::DirBuilder::new().mode(0o700).create(&root).unwrap();
+    }
+    arkdeck_hoststore::JobStore::open_owner(&root).unwrap()
+}
+#[test]
+fn release_is_durable_idempotent_and_preserves_historical_artifact_reads() {
+    let fixture = Fixture::new();
+    let store = fixture.store();
+    let artifacts = arkdeck_hoststore::ArtifactReadStore::open(&fixture.artifacts).unwrap();
+    let jobs = jobs(&fixture);
+    let bytes = b"PK\x03\x04host-only-lifecycle";
+    let begin = call(&store, "begin", fixture.metadata("lifecycle", bytes)).unwrap();
+    let id = begin["importId"].as_str().unwrap();
+    append(&store, id, 0, bytes).unwrap();
+    let committed = commit(&store, &artifacts, id).unwrap();
+    assert_eq!(
+        lifecycle(
+            &store,
+            &artifacts,
+            &jobs,
+            "inspection",
+            json!({"importId":id})
+        )
+        .unwrap()["references"]["state"],
+        "clear"
+    );
+    let release = lifecycle(
+        &store,
+        &artifacts,
+        &jobs,
+        "release",
+        json!({"importId":id,"generation":"2"}),
+    )
+    .unwrap();
+    assert_eq!(release["retention"]["pinned"], false);
+    assert_eq!(
+        lifecycle(
+            &store,
+            &artifacts,
+            &jobs,
+            "release",
+            json!({"importId":id,"generation":"2"})
+        )
+        .unwrap(),
+        release
+    );
+    assert_eq!(
+        lifecycle(
+            &store,
+            &artifacts,
+            &jobs,
+            "release",
+            json!({"importId":id,"generation":"3"})
+        )
+        .unwrap_err()
+        .code,
+        "resourceConflict"
+    );
+    let snapshots = fixture.root.join("snapshots");
+    let request =
+        json!({"owner":{"kind":"import","id":id},"artifactId":committed["receipt"]["artifactId"]});
+    let inspected = store
+        .artifact_resource(
+            &artifacts,
+            "artifact.inspect",
+            request.as_object().unwrap(),
+            &snapshots,
+        )
+        .unwrap();
+    assert_eq!(inspected["lease"], Value::Null);
+    assert_eq!(inspected["retention"]["pinned"], false);
+    assert_eq!(
+        fs::read(
+            fixture
+                .artifacts
+                .join(id)
+                .join(committed["receipt"]["artifactId"].as_str().unwrap())
+        )
+        .unwrap(),
+        bytes
+    );
+    drop(store);
+    let restarted = fixture.store();
+    assert_eq!(
+        lifecycle(
+            &restarted,
+            &artifacts,
+            &jobs,
+            "release",
+            json!({"importId":id,"generation":"2"})
+        )
+        .unwrap(),
+        release
+    );
+}
+#[test]
+fn release_crash_windows_recover_the_same_deadline_without_reviving_a_pin() {
+    for fault in [
+        ImportUploadFault::AfterReleaseCheckpoint,
+        ImportUploadFault::AfterReleaseUnpin,
+    ] {
+        let fixture = Fixture::new();
+        let store = ImportUploadStore::open_with_fault(
+            &fixture.artifacts,
+            Arc::new(move |point| {
+                if point == fault {
+                    Err(io::Error::other("crash window"))
+                } else {
+                    Ok(())
+                }
+            }),
+        )
+        .unwrap();
+        let artifacts = arkdeck_hoststore::ArtifactReadStore::open(&fixture.artifacts).unwrap();
+        let jobs = jobs(&fixture);
+        let bytes = b"PK\x03\x04release-crash";
+        let begin = call(&store, "begin", fixture.metadata("release-crash", bytes)).unwrap();
+        let id = begin["importId"].as_str().unwrap();
+        append(&store, id, 0, bytes).unwrap();
+        commit(&store, &artifacts, id).unwrap();
+        assert!(
+            lifecycle(
+                &store,
+                &artifacts,
+                &jobs,
+                "release",
+                json!({"importId":id,"generation":"2"})
+            )
+            .is_err()
+        );
+        let durable = read(&fixture.record("release-crash"));
+        assert_eq!(durable["state"], "released");
+        let receipt = durable["releaseReceipt"].clone();
+        drop(store);
+        let restarted = fixture.store();
+        assert_eq!(
+            lifecycle(
+                &restarted,
+                &artifacts,
+                &jobs,
+                "release",
+                json!({"importId":id,"generation":"2"})
+            )
+            .unwrap(),
+            receipt
+        );
+        assert_eq!(
+            read(&fixture.artifacts.join(id).join("index.json"))["artifacts"][0]["retention"]["deadlineUTC"],
+            receipt["retention"]["deadlineUtc"]
+        );
+    }
+}
+
+fn analyzer_request(lease: &Value) -> Vec<u8> {
+    serde_json::to_vec(&json!({"documentType":"runtime-operation-request","schemaVersion":"1.0.0","requestId":"req-import-lifecycle","idempotencyKey":"idem-import-lifecycle","target":{"targetId":"TGT-fixture"},"operation":{"id":"analyzer.extract-crash-signature","version":1},"inputs":{"sourceArtifactRef":lease}})).unwrap()
+}
+#[test]
+fn materialization_hold_blocks_release_and_failed_planning_drops_it() {
+    use std::sync::Barrier;
+    let fixture = Fixture::new();
+    let entered = Arc::new(Barrier::new(2));
+    let resume = Arc::new(Barrier::new(2));
+    let (worker_enter, worker_resume) = (entered.clone(), resume.clone());
+    let store = ImportUploadStore::open_with_fault(
+        &fixture.artifacts,
+        Arc::new(move |point| {
+            if point == ImportUploadFault::AfterInputHold {
+                worker_enter.wait();
+                worker_resume.wait();
+            }
+            Ok(())
+        }),
+    )
+    .unwrap();
+    let artifacts = arkdeck_hoststore::ArtifactReadStore::open(&fixture.artifacts).unwrap();
+    let jobs = jobs(&fixture);
+    let bytes = b"PK\x03\x04hold";
+    let begin = call(&store, "begin", fixture.metadata("hold", bytes)).unwrap();
+    let id = begin["importId"].as_str().unwrap();
+    append(&store, id, 0, bytes).unwrap();
+    let committed = commit(&store, &artifacts, id).unwrap();
+    let request = analyzer_request(&committed["receipt"]["lease"]);
+    std::thread::scope(|scope| {
+        let planner = arkdeck_hoststore::JobPlanner {
+            imports: Some(&store),
+            artifacts: Some(&artifacts),
+            analyzer: None,
+            state_root: &fixture.root,
+            hdc: None,
+        };
+        let thread = scope.spawn(move || planner.plan(&request));
+        entered.wait();
+        let inspection = lifecycle(
+            &store,
+            &artifacts,
+            &jobs,
+            "inspection",
+            json!({"importId":id}),
+        )
+        .unwrap();
+        assert_eq!(inspection["references"]["activeMaterializationCount"], "1");
+        assert_eq!(
+            lifecycle(
+                &store,
+                &artifacts,
+                &jobs,
+                "release",
+                json!({"importId":id,"generation":"2"})
+            )
+            .unwrap_err()
+            .code,
+            "resourceConflict"
+        );
+        resume.wait();
+        assert!(thread.join().unwrap().is_err());
+    });
+    assert_eq!(
+        lifecycle(
+            &store,
+            &artifacts,
+            &jobs,
+            "inspection",
+            json!({"importId":id})
+        )
+        .unwrap()["references"]["activeMaterializationCount"],
+        "0"
+    );
+    lifecycle(
+        &store,
+        &artifacts,
+        &jobs,
+        "release",
+        json!({"importId":id,"generation":"2"}),
+    )
+    .unwrap();
+    let planner = arkdeck_hoststore::JobPlanner {
+        imports: Some(&store),
+        artifacts: Some(&artifacts),
+        analyzer: None,
+        state_root: &fixture.root,
+        hdc: None,
+    };
+    assert!(
+        planner
+            .plan(&analyzer_request(&committed["receipt"]["lease"]))
+            .is_err()
+    );
+}
+#[test]
+fn admitted_import_is_retained_across_restart_and_retries_without_new_hold() {
+    let fixture = Fixture::new();
+    let store = fixture.store();
+    let artifacts = arkdeck_hoststore::ArtifactReadStore::open(&fixture.artifacts).unwrap();
+    let jobs = jobs(&fixture);
+    let bytes = b"PK\x03\x04admitted";
+    let begin = call(&store, "begin", fixture.metadata("admitted", bytes)).unwrap();
+    let id = begin["importId"].as_str().unwrap();
+    append(&store, id, 0, bytes).unwrap();
+    let committed = commit(&store, &artifacts, id).unwrap();
+    use std::os::unix::fs::PermissionsExt;
+    let analyzer = fixture.root.join("analyzer");
+    fs::copy(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/fixtures/job-submit-analyzer/analyzer"),
+        &analyzer,
+    )
+    .unwrap();
+    fs::set_permissions(&analyzer, fs::Permissions::from_mode(0o700)).unwrap();
+    let profile = arkdeck_hoststore::AnalyzerProfile::crash_signature(&analyzer).unwrap();
+    let request = analyzer_request(&committed["receipt"]["lease"]);
+    let admit = arkdeck_hoststore::JobAdmitter {
+        planner: arkdeck_hoststore::JobPlanner {
+            imports: Some(&store),
+            artifacts: Some(&artifacts),
+            analyzer: Some(&profile),
+            state_root: &fixture.root,
+            hdc: None,
+        },
+        jobs: &jobs,
+        now: || Some(NOW.into()),
+    };
+    let accepted = admit.submit(&request).unwrap();
+    fs::write(
+        &analyzer,
+        b"changed tool must not rematerialize an idempotent retry",
+    )
+    .unwrap();
+    assert_eq!(admit.submit(&request).unwrap()["jobId"], accepted["jobId"]);
+    assert_eq!(
+        lifecycle(
+            &store,
+            &artifacts,
+            &jobs,
+            "release",
+            json!({"importId":id,"generation":"2"})
+        )
+        .unwrap_err()
+        .code,
+        "resourceConflict"
+    );
+    drop(jobs);
+    drop(store);
+    let store = fixture.store();
+    let jobs = crate::jobs(&fixture);
+    let inspection = lifecycle(
+        &store,
+        &artifacts,
+        &jobs,
+        "inspection",
+        json!({"importId":id}),
+    )
+    .unwrap();
+    assert_eq!(
+        inspection["references"]["activeJobIds"],
+        json!([accepted["jobId"]])
+    );
+    assert_eq!(inspection["references"]["activeMaterializationCount"], "0");
+    assert_eq!(
+        lifecycle(
+            &store,
+            &artifacts,
+            &jobs,
+            "release",
+            json!({"importId":id,"generation":"2"})
+        )
+        .unwrap_err()
+        .code,
+        "resourceConflict"
+    );
+    let snapshot = fixture
+        .root
+        .join("jobs-state/jobs")
+        .join(accepted["jobId"].as_str().unwrap())
+        .join("job-record.json");
+    let original = fs::read(&snapshot).unwrap();
+    let mut drifted: Value = serde_json::from_slice(&original).unwrap();
+    drifted["request"]["inputs"]["sourceArtifactRef"] =
+        json!("lease-v1:job-other:ART-00000000000000000000000000000000");
+    fs::write(&snapshot, serde_json::to_vec(&drifted).unwrap()).unwrap();
+    assert_eq!(
+        lifecycle(
+            &store,
+            &artifacts,
+            &jobs,
+            "release",
+            json!({"importId":id,"generation":"2"})
+        )
+        .unwrap_err()
+        .code,
+        "recordUnreadable"
+    );
+    fs::write(&snapshot, original).unwrap();
+    fs::DirBuilder::new()
+        .mode(0o700)
+        .create(fixture.root.join("jobs-state/jobs/job-orphan"))
+        .unwrap();
+    assert_eq!(
+        lifecycle(
+            &store,
+            &artifacts,
+            &jobs,
+            "inspection",
+            json!({"importId":id})
+        )
+        .unwrap_err()
+        .code,
+        "recordUnreadable"
+    );
+}
+
+#[test]
+fn reference_census_checks_submission_hash_history_and_unknown_outcomes() {
+    for case in [
+        "active",
+        "enriched",
+        "unknown-terminal",
+        "terminal",
+        "foreign-catalog",
+        "changed-input",
+        "changed-original",
+        "wrong-fingerprint",
+        "broken-unrelated-terminal",
+    ] {
+        let fixture = Fixture::new();
+        let store = fixture.store();
+        let artifacts = arkdeck_hoststore::ArtifactReadStore::open(&fixture.artifacts).unwrap();
+        let jobs = jobs(&fixture);
+        let bytes = b"PK\x03\x04census";
+        let begin = call(&store, "begin", fixture.metadata("census", bytes)).unwrap();
+        let id = begin["importId"].as_str().unwrap();
+        append(&store, id, 0, bytes).unwrap();
+        let committed = commit(&store, &artifacts, id).unwrap();
+        let request = arkdeck_hoststore::OperationRequest::decode(&analyzer_request(
+            &committed["receipt"]["lease"],
+        ))
+        .unwrap();
+        let mut value = json!({"jobID":"job-reference","request":request.canonical_value(),"originalSubmissionRequest":request.canonical_value(),"operationReference":"analyzer.extract-crash-signature@1","catalogDigest":arkdeck_contract::CATALOG_DIGEST,"providerID":"analyzer","createdAtUTC":NOW,"state":"queued","outcomeUnknown":false,"timeline":[],"actualStepKinds":[],"skipReasons":{}});
+        if case == "enriched" {
+            value["request"]["authorization"] = json!({"capabilityId":"CAP-RT-test-enriched"});
+        }
+        if case == "unknown-terminal" {
+            value["state"] = json!("failed");
+            value["outcomeUnknown"] = json!(true);
+        }
+        if case == "terminal" || case == "broken-unrelated-terminal" {
+            value["state"] = json!("succeeded");
+        }
+        if case == "foreign-catalog" {
+            value["catalogDigest"] = json!("f".repeat(64));
+        }
+        if case == "changed-input" {
+            value["request"]["inputs"]["sourceArtifactRef"] =
+                json!("lease-v1:job-unrelated:ART-00000000000000000000000000000000");
+        }
+        if case == "changed-original" {
+            value["originalSubmissionRequest"]["inputs"]["sourceArtifactRef"] =
+                json!("lease-v1:job-unrelated:ART-00000000000000000000000000000000");
+        }
+        let record =
+            arkdeck_hoststore::JobRecord::decode(&serde_json::to_vec(&value).unwrap()).unwrap();
+        jobs.admit(
+            &record,
+            &if case == "wrong-fingerprint" {
+                "a".repeat(64)
+            } else {
+                request.fingerprint()
+            },
+        )
+        .unwrap();
+        if case == "broken-unrelated-terminal" {
+            let mut db = arkdeck_platform::HostSqlite::open(
+                &fixture.root.join("jobs-state/runtime-jobs.sqlite3"),
+                false,
+                false,
+            )
+            .unwrap();
+            db.execute(
+                "UPDATE runtime_job SET initial_record_json = ?",
+                &[arkdeck_platform::SqliteValue::Blob(b"{".to_vec())],
+            )
+            .unwrap();
+        }
+        let inspection = lifecycle(
+            &store,
+            &artifacts,
+            &jobs,
+            "inspection",
+            json!({"importId":id}),
+        );
+        let release = lifecycle(
+            &store,
+            &artifacts,
+            &jobs,
+            "release",
+            json!({"importId":id,"generation":"2"}),
+        );
+        match case {
+            "terminal" => {
+                assert_eq!(inspection.unwrap()["references"]["state"], "clear");
+                assert!(release.is_ok());
+            }
+            "active" | "enriched" | "unknown-terminal" | "foreign-catalog" => {
+                let inspection = inspection.unwrap();
+                assert_eq!(
+                    inspection["references"]["activeJobIds"],
+                    json!(["job-reference"])
+                );
+                if case == "unknown-terminal" {
+                    assert_eq!(
+                        inspection["references"]["outcomeUnknownJobIds"],
+                        json!(["job-reference"])
+                    );
+                }
+                assert_eq!(release.unwrap_err().code, "resourceConflict");
+            }
+            _ => {
+                assert_eq!(inspection.unwrap_err().code, "recordUnreadable", "{case}");
+                assert_eq!(release.unwrap_err().code, "recordUnreadable", "{case}");
+            }
+        }
+    }
+}
+
+#[test]
+fn concurrent_releases_share_one_receipt_and_missing_payload_never_reopens_the_lease() {
+    let fixture = Fixture::new();
+    let store = fixture.store();
+    let artifacts = arkdeck_hoststore::ArtifactReadStore::open(&fixture.artifacts).unwrap();
+    let jobs = jobs(&fixture);
+    let bytes = b"PK\x03\x04concurrent-release";
+    let begin = call(
+        &store,
+        "begin",
+        fixture.metadata("concurrent-release", bytes),
+    )
+    .unwrap();
+    let id = begin["importId"].as_str().unwrap();
+    append(&store, id, 0, bytes).unwrap();
+    let committed = commit(&store, &artifacts, id).unwrap();
+    let barrier = std::sync::Barrier::new(3);
+    let release = std::thread::scope(|scope| {
+        let run = || {
+            barrier.wait();
+            lifecycle(
+                &store,
+                &artifacts,
+                &jobs,
+                "release",
+                json!({"importId":id,"generation":"2"}),
+            )
+            .unwrap()
+        };
+        let a = scope.spawn(run);
+        let b = scope.spawn(run);
+        barrier.wait();
+        let first = a.join().unwrap();
+        assert_eq!(first, b.join().unwrap());
+        first
+    });
+    let aid = committed["receipt"]["artifactId"].as_str().unwrap();
+    // Model completed retention reclamation: no metadata/payload are recreated.
+    fs::remove_file(fixture.artifacts.join(id).join(aid)).unwrap();
+    fs::remove_file(fixture.artifacts.join(id).join("index.json")).unwrap();
+    assert_eq!(
+        lifecycle(
+            &store,
+            &artifacts,
+            &jobs,
+            "release",
+            json!({"importId":id,"generation":"2"})
+        )
+        .unwrap(),
+        release
+    );
+    assert!(!fixture.artifacts.join(id).join(aid).exists());
+}
+
+#[test]
+fn unfinished_or_wrong_artifact_identity_never_acquires_an_input_hold() {
+    let fixture = Fixture::new();
+    let store = fixture.store();
+    let artifacts = arkdeck_hoststore::ArtifactReadStore::open(&fixture.artifacts).unwrap();
+    let jobs = jobs(&fixture);
+    let bytes = b"PK\x03\x04incomplete-input";
+    let begin = call(&store, "begin", fixture.metadata("incomplete-input", bytes)).unwrap();
+    let id = begin["importId"].as_str().unwrap();
+    let lease = json!(format!(
+        "lease-v1:{id}:ART-00000000000000000000000000000000"
+    ));
+    let planner = arkdeck_hoststore::JobPlanner {
+        imports: Some(&store),
+        artifacts: Some(&artifacts),
+        analyzer: None,
+        state_root: &fixture.root,
+        hdc: None,
+    };
+    assert!(
+        planner
+            .plan(&analyzer_request(&lease))
+            .unwrap_err()
+            .message
+            .contains("valid committed import")
+    );
+    append(&store, id, 0, bytes).unwrap();
+    commit(&store, &artifacts, id).unwrap();
+    assert!(
+        planner
+            .plan(&analyzer_request(&lease))
+            .unwrap_err()
+            .message
+            .contains("valid committed import")
+    );
+    assert_eq!(
+        lifecycle(
+            &store,
+            &artifacts,
+            &jobs,
+            "inspection",
+            json!({"importId":id})
+        )
+        .unwrap()["references"]["activeMaterializationCount"],
+        "0"
+    );
+}
+
+#[test]
+fn release_recovery_refuses_retention_drift_and_keeps_the_closed_lease() {
+    let fixture = Fixture::new();
+    let store = ImportUploadStore::open_with_fault(
+        &fixture.artifacts,
+        Arc::new(|point| {
+            if point == ImportUploadFault::AfterReleaseCheckpoint {
+                Err(io::Error::other("release checkpoint"))
+            } else {
+                Ok(())
+            }
+        }),
+    )
+    .unwrap();
+    let artifacts = arkdeck_hoststore::ArtifactReadStore::open(&fixture.artifacts).unwrap();
+    let jobs = jobs(&fixture);
+    let bytes = b"PK\x03\x04retention-drift";
+    let begin = call(&store, "begin", fixture.metadata("retention-drift", bytes)).unwrap();
+    let id = begin["importId"].as_str().unwrap();
+    append(&store, id, 0, bytes).unwrap();
+    let committed = commit(&store, &artifacts, id).unwrap();
+    assert!(
+        lifecycle(
+            &store,
+            &artifacts,
+            &jobs,
+            "release",
+            json!({"importId":id,"generation":"2"})
+        )
+        .is_err()
+    );
+    drop(store);
+    let index = fixture.artifacts.join(id).join("index.json");
+    let mut altered = read(&index);
+    altered["artifacts"][0]["retention"] =
+        json!({"retentionClass":"default","pinned":false,"deadlineUTC":"2027-09-19T00:00:00Z"});
+    let bytes = serde_json::to_vec(&altered).unwrap();
+    fs::write(&index, &bytes).unwrap();
+    let store = fixture.store();
+    assert_eq!(
+        lifecycle(&store, &artifacts, &jobs, "inspect", json!({"importId":id}))
+            .unwrap_err()
+            .code,
+        "recordUnreadable"
+    );
+    assert_eq!(fs::read(&index).unwrap(), bytes);
+    let planner = arkdeck_hoststore::JobPlanner {
+        imports: Some(&store),
+        artifacts: Some(&artifacts),
+        analyzer: None,
+        state_root: &fixture.root,
+        hdc: None,
+    };
+    assert!(
+        planner
+            .plan(&analyzer_request(&committed["receipt"]["lease"]))
+            .is_err()
+    );
+    assert_eq!(
+        read(&fixture.record("retention-drift"))["state"],
+        "released"
+    );
+}
+
+#[test]
+#[ignore = "subprocess fixture invoked by the SIGKILL durability test"]
+fn release_sigkill_child() {
+    let Some(root) = std::env::var_os("ARKDECK_TEST_IMPORT_RELEASE_CRASH_ROOT") else {
+        return;
+    };
+    let root = PathBuf::from(root);
+    let window = std::env::var("ARKDECK_TEST_IMPORT_RELEASE_CRASH_WINDOW").unwrap();
+    let ready = root.join("ready");
+    let point = if window == "checkpoint" {
+        ImportUploadFault::AfterReleaseCheckpoint
+    } else {
+        assert_eq!(window, "unpin");
+        ImportUploadFault::AfterReleaseUnpin
+    };
+    let fixture = Fixture {
+        artifacts: root.join("artifacts"),
+        root,
+    };
+    let store = ImportUploadStore::open_with_fault(
+        &fixture.artifacts,
+        Arc::new(move |observed| {
+            if observed == point {
+                fs::write(&ready, b"durable window").unwrap();
+                loop {
+                    std::thread::park();
+                }
+            }
+            Ok(())
+        }),
+    )
+    .unwrap();
+    let artifacts = arkdeck_hoststore::ArtifactReadStore::open(&fixture.artifacts).unwrap();
+    let jobs = jobs(&fixture);
+    let bytes = b"PK\x03\x04sigkill-release";
+    let begin = call(&store, "begin", fixture.metadata("sigkill-release", bytes)).unwrap();
+    let id = begin["importId"].as_str().unwrap();
+    append(&store, id, 0, bytes).unwrap();
+    commit(&store, &artifacts, id).unwrap();
+    let _ = lifecycle(
+        &store,
+        &artifacts,
+        &jobs,
+        "release",
+        json!({"importId":id,"generation":"2"}),
+    );
+    panic!("crash fixture did not reach its requested window");
+}
+#[test]
+fn sigkill_after_release_checkpoint_and_unpin_preserves_the_original_receipt() {
+    struct Child(std::process::Child);
+    impl Drop for Child {
+        fn drop(&mut self) {
+            let _ = self.0.kill();
+            let _ = self.0.wait();
+        }
+    }
+    for window in ["checkpoint", "unpin"] {
+        let fixture = Fixture::new();
+        let mut child = Child(
+            std::process::Command::new(std::env::current_exe().unwrap())
+                .args(["--exact", "release_sigkill_child", "--ignored", "--nocapture"])
+                .env("ARKDECK_TEST_IMPORT_RELEASE_CRASH_ROOT", &fixture.root)
+                .env("ARKDECK_TEST_IMPORT_RELEASE_CRASH_WINDOW", window)
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::inherit())
+                .spawn()
+                .unwrap(),
+        );
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        while !fixture.root.join("ready").exists() {
+            assert!(
+                child.0.try_wait().unwrap().is_none(),
+                "fixture exited before {window}"
+            );
+            assert!(
+                std::time::Instant::now() < deadline,
+                "fixture missed {window}"
+            );
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        child.0.kill().unwrap();
+        child.0.wait().unwrap();
+        let durable = read(&fixture.record("sigkill-release"));
+        let receipt = durable["releaseReceipt"].clone();
+        let store = fixture.store();
+        let artifacts = arkdeck_hoststore::ArtifactReadStore::open(&fixture.artifacts).unwrap();
+        let jobs = jobs(&fixture);
+        let projection = lifecycle(
+            &store,
+            &artifacts,
+            &jobs,
+            "inspect",
+            json!({"importRequestId":"sigkill-release"}),
+        )
+        .unwrap();
+        assert_eq!(projection["state"], "released");
+        assert_eq!(
+            lifecycle(
+                &store,
+                &artifacts,
+                &jobs,
+                "release",
+                json!({"importId":projection["importId"],"generation":"2"})
+            )
+            .unwrap(),
+            receipt
+        );
+        let index = read(
+            &fixture
+                .artifacts
+                .join(projection["importId"].as_str().unwrap())
+                .join("index.json"),
+        );
+        assert_eq!(
+            index["artifacts"][0]["retention"]["deadlineUTC"],
+            receipt["retention"]["deadlineUtc"]
+        );
+        assert_eq!(index["artifacts"][0]["retention"]["pinned"], false);
+    }
+}

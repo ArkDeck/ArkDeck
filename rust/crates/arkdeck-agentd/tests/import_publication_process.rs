@@ -34,6 +34,11 @@ impl Runtime {
             fs::Permissions::from_mode(0o600),
         )
         .unwrap();
+        // Isolated host analyzer fixture; it consumes the exact imported file
+        // path through the production runner and returns a bounded typed answer.
+        let analyzer = root.join("host-analyzer");
+        fs::write(&analyzer, b"#!/bin/sh\n[ \"$#\" -eq 2 ] && [ \"$1\" = --analyze-crash-ledger ] && [ -r \"$2\" ] || exit 64\n/usr/bin/head -c 4 \"$2\" >/dev/null || exit 66\nprintf '%s' '{\"analyzerRef\":\"crash-signature@1\",\"analyzerVersion\":\"arkdeck-fault-log-ledger@1\",\"schemaVersion\":\"1.0.0\",\"status\":\"answered\",\"entries\":[]}'\n").unwrap();
+        fs::set_permissions(&analyzer, fs::Permissions::from_mode(0o700)).unwrap();
         let mut runtime = Self { root, child: None };
         runtime.start();
         runtime
@@ -48,6 +53,7 @@ impl Runtime {
             command
                 .env("ARKDECK_DEVELOPMENT_STATE_ROOT", &self.root)
                 .env("ARKDECK_ENDPOINT", self.socket())
+                .env("ARKDECK_ANALYZER_PATH", self.root.join("host-analyzer"))
                 .stdout(Stdio::null())
                 .stderr(Stdio::inherit())
                 .spawn()
@@ -316,4 +322,92 @@ fn real_cli_daemon_three_kinds_restart_and_lost_commit_reply() {
     assert!(!missing.status.success());
     let failure: Value = serde_json::from_slice(&missing.stdout).unwrap();
     assert_eq!(failure["error"]["code"], "resourceNotFound");
+    let input = runtime.root.join("analyzer-input.json");
+    fs::write(
+        &input,
+        serde_json::to_vec(&json!({"sourceArtifactRef":results[0]["receipt"]["lease"]})).unwrap(),
+    )
+    .unwrap();
+    let args = [
+        "--target",
+        "TGT-3ba3f5f43b92",
+        "--operation",
+        "analyzer.extract-crash-signature@1",
+        "--inputs-file",
+        input.to_str().unwrap(),
+        "--request-id",
+        "request-import-analyzer",
+        "--idempotency-key",
+        "idem-import-analyzer",
+    ];
+    let mut plan = vec!["job", "plan"];
+    plan.extend(args);
+    assert!(runtime.cli(&plan)["materializedPlanDigest"].is_string());
+    let mut submit = vec!["job", "submit"];
+    submit.extend(args);
+    let accepted = runtime.cli(&submit);
+    let jid = accepted["jobId"].as_str().unwrap();
+    let id = results[0]["importId"].as_str().unwrap();
+    let inspection = runtime.cli(&["artifact", "import", "inspect", "--import", id]);
+    assert_eq!(inspection["references"]["activeJobIds"], json!([jid]));
+    let refused = runtime.cli_at(
+        &[
+            "artifact",
+            "import",
+            "release",
+            "--import",
+            id,
+            "--generation",
+            "2",
+        ],
+        &runtime.socket(),
+        Path::new(env!("CARGO_BIN_EXE_arkdeck-agentd")),
+    );
+    assert!(!refused.status.success());
+    let failure: Value = serde_json::from_slice(&refused.stdout).unwrap();
+    assert_eq!(failure["error"]["code"], "resourceConflict");
+    runtime.stop();
+    runtime.start();
+    let finished = runtime.cli(&["job", "run", "--job", jid]);
+    assert_eq!(finished["state"], "succeeded");
+
+    // Real CLI lifecycle leaves, followed by a new daemon process. Released
+    // artifacts remain readable; their old lease is never advertised anew.
+    for result in &results {
+        let id = result["importId"].as_str().unwrap();
+        let inspection = runtime.cli(&["artifact", "import", "inspect", "--import", id]);
+        assert_eq!(inspection["references"]["state"], "clear");
+        let released = runtime.cli(&[
+            "artifact",
+            "import",
+            "release",
+            "--import",
+            id,
+            "--generation",
+            "2",
+        ]);
+        assert_eq!(released["state"], "released");
+        runtime.stop();
+        runtime.start();
+        assert_eq!(
+            runtime.cli(&[
+                "artifact",
+                "import",
+                "release",
+                "--import",
+                id,
+                "--generation",
+                "2"
+            ]),
+            released
+        );
+        let listed = runtime.cli(&["artifact", "list", "--import", id]);
+        assert_eq!(listed["items"][0]["lease"], Value::Null);
+        let aid = result["receipt"]["artifactId"].as_str().unwrap();
+        let mut args = vec!["artifact", "read", "--import", id, "--artifact", aid];
+        if result["metadata"]["kind"] == "workspace-patch" {
+            args.push("--allow-sensitive");
+        }
+        assert!(runtime.cli(&args)["base64"].is_string());
+    }
 }

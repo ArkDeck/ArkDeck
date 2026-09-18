@@ -55,6 +55,18 @@ pub(crate) fn configure(
         {
             return Err(invalid());
         }
+    } else if command == "artifact.import.release" {
+        let id = fields.remove("import").ok_or_else(invalid)?;
+        if !id.as_str().is_some_and(arkdeck_contract::import_id)
+            || !fields
+                .get("generation")
+                .and_then(Value::as_str)
+                .and_then(|s| s.parse::<u64>().ok())
+                .is_some_and(|n| (1..=9_007_199_254_740_991).contains(&n))
+        {
+            return Err(invalid());
+        }
+        fields.insert("importId".into(), id);
     } else if command == "artifact.import.inspect" {
         if fields.contains_key("import") == fields.contains_key("importRequestId") {
             return Err(invalid());
@@ -208,6 +220,44 @@ pub fn execute_import(
                 return Err(invalid());
             }
             return Ok(current.value);
+        }
+        if invocation.command == "artifact.import.release" {
+            let value = send(invocation.method, fields.clone())?;
+            arkdeck_contract::validate_method_value(invocation.method, "result", &value)
+                .map_err(|_| invalid())?;
+            let id = fields["importId"].as_str().ok_or_else(invalid)?;
+            let artifact = value["artifactId"].as_str().ok_or_else(invalid)?;
+            let released = value["releasedAtUtc"]
+                .as_str()
+                .and_then(arkdeck_contract::import_timestamp)
+                .ok_or_else(invalid)?;
+            let deadline = value["retention"]["deadlineUtc"]
+                .as_str()
+                .and_then(arkdeck_contract::import_timestamp)
+                .ok_or_else(invalid)?;
+            if fields["generation"] != "2"
+                || value["schemaVersion"] != "arkdeck.import-release/1"
+                || value["importId"] != id
+                || value["owner"] != json!({"kind":"import","id":id})
+                || value["releasedGeneration"] != "2"
+                || value["generation"] != "3"
+                || value["state"] != "released"
+                || artifact.len() != 36
+                || !artifact.starts_with("ART-")
+                || !artifact[4..]
+                    .bytes()
+                    .all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c))
+                || value["lease"] != format!("lease-v1:{id}:{artifact}")
+                || !value["importRequestId"]
+                    .as_str()
+                    .is_some_and(arkdeck_contract::import_identifier)
+                || value["retention"]["class"] != "default"
+                || value["retention"]["pinned"] != false
+                || deadline <= released
+            {
+                return Err(invalid());
+            }
+            return Ok(value);
         }
         if invocation.command == "artifact.import.inspect" {
             let value = send("artifact.import.inspection", fields.clone())?;

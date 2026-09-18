@@ -139,6 +139,7 @@ struct Exited {
 pub struct JobRunner<'a> {
     pub jobs: &'a JobStore,
     pub artifacts: &'a ArtifactReadStore,
+    pub imports: Option<&'a crate::ImportUploadStore>,
     pub analyzer: Option<&'a AnalyzerProfile>,
     /// Swift `ArtifactQuota`, in bytes.
     pub quota: u64,
@@ -411,7 +412,20 @@ impl JobRunner<'_> {
         else {
             return Err(uncertain());
         };
-        let leased = match self.artifacts.lease(&reference) {
+        let resolved = match crate::job_owner::import_references::ImportReference::parse(&reference)
+        {
+            Ok(Some(reference)) => self
+                .imports
+                .ok_or_else(|| "Import owner is unavailable".to_owned())
+                .and_then(|owner| {
+                    owner
+                        .resolve_input(self.artifacts, &reference)
+                        .map_err(|error| error.message)
+                }),
+            Ok(None) => self.artifacts.lease(&reference),
+            Err(error) => Err(error.message),
+        };
+        let leased = match resolved {
             Ok(leased) => leased,
             Err(error) => {
                 return self.fail(

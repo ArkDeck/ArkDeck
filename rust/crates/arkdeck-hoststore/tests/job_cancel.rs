@@ -52,6 +52,7 @@ fn rust_cancels_the_swift_jobs() {
     for job in support::document(&fixture, "jobs.json").as_array().unwrap() {
         let accepted = JobAdmitter {
             planner: JobPlanner {
+                imports: None,
                 artifacts: Some(&artifact_store),
                 analyzer: Some(&profile),
                 state_root: &root,
@@ -72,6 +73,7 @@ fn rust_cancels_the_swift_jobs() {
         probe: &probe,
     };
     let runner = JobRunner {
+        imports: None,
         jobs: &jobs,
         artifacts: &artifact_store,
         analyzer: Some(&profile),

@@ -256,6 +256,7 @@ fn rust_raises_and_reads_the_physical_assistance_swift_asked_for() {
     let resources = HumanActionResources::open(&root.join("human-action-snapshots")).unwrap();
     let admitter = JobAdmitter {
         planner: JobPlanner {
+            imports: None,
             artifacts: Some(&artifacts),
             analyzer: None,
             state_root: root,

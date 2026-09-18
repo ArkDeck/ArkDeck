@@ -62,7 +62,7 @@ impl RunSlot {
 
 pub struct Host {
     #[cfg(target_os = "macos")]
-    imports: Option<arkdeck_hoststore::ImportUploadStore>,
+    imports: Option<std::sync::Arc<arkdeck_hoststore::ImportUploadStore>>,
     // The owners a background agent run keeps using after its request has
     // answered are shared with it.
     #[cfg(target_os = "macos")]
@@ -128,7 +128,7 @@ pub struct Host {
 impl Host {
     #[cfg(target_os = "macos")]
     pub fn with_imports(mut self, imports: arkdeck_hoststore::ImportUploadStore) -> Self {
-        self.imports = Some(imports);
+        self.imports = Some(std::sync::Arc::new(imports));
         self
     }
 
@@ -260,6 +260,7 @@ impl Host {
             self.running.clone(),
             self.home.clone(),
         );
+        let imports = self.imports.clone();
         let slot = std::sync::Arc::new(RunSlot::default());
         match running.lock() {
             Ok(mut runs) if !runs.contains_key(&start.job) => {
@@ -289,6 +290,7 @@ impl Host {
                 serde_json::Map::from_iter([("jobId".into(), serde_json::json!(start.job))]);
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 arkdeck_hoststore::JobRunner {
+                    imports: imports.as_deref(),
                     jobs: &jobs,
                     artifacts: &artifacts,
                     analyzer: None,
@@ -467,8 +469,31 @@ impl HostServices for Host {
                 ("newDispatchCount".into(), serde_json::json!(0)),
             ])),
         };
+        if [
+            "artifact.import.release",
+            "artifact.import.inspection",
+            "artifact.import.inspect",
+        ]
+        .contains(&method)
+        {
+            return self
+                .imports
+                .as_ref()
+                .ok_or_else(unavailable)?
+                .lifecycle_resource(
+                    self.artifacts.as_ref().ok_or_else(unavailable)?,
+                    self.jobs.as_ref().ok_or_else(unavailable)?,
+                    method,
+                    params,
+                    &utc_now(),
+                );
+        }
         if method == "artifact.import.list" {
-            return self.imports.as_ref().ok_or_else(unavailable)?.list(params);
+            return self
+                .imports
+                .as_ref()
+                .ok_or_else(unavailable)?
+                .list_with_artifacts(params, self.artifacts.as_ref().ok_or_else(unavailable)?);
         }
         if method == "artifact.import.commit" {
             return self.imports.as_ref().ok_or_else(unavailable)?.commit(
@@ -711,6 +736,7 @@ impl HostServices for Host {
         let hdc = self.hdc();
         let admitter = arkdeck_hoststore::JobAdmitter {
             planner: arkdeck_hoststore::JobPlanner {
+                imports: self.imports.as_deref(),
                 artifacts: Some(&**artifacts),
                 analyzer: analyzer.as_ref(),
                 state_root,
@@ -792,6 +818,7 @@ impl HostServices for Host {
         };
         let hdc = self.hdc();
         arkdeck_hoststore::JobPlanner {
+            imports: self.imports.as_deref(),
             artifacts: self.artifacts.as_deref(),
             analyzer: analyzer.as_ref(),
             state_root,
@@ -824,6 +851,7 @@ impl HostServices for Host {
         let hdc = self.hdc();
         arkdeck_hoststore::JobAdmitter {
             planner: arkdeck_hoststore::JobPlanner {
+                imports: self.imports.as_deref(),
                 artifacts: self.artifacts.as_deref(),
                 analyzer: analyzer.as_ref(),
                 state_root,
@@ -896,6 +924,7 @@ impl HostServices for Host {
         let hdc = self.hdc();
         let run = |cancellation: Option<&arkdeck_hoststore::RunCancellation>| {
             arkdeck_hoststore::JobRunner {
+                imports: self.imports.as_deref(),
                 jobs,
                 artifacts,
                 analyzer: analyzer.as_ref(),

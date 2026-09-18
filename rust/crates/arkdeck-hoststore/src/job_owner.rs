@@ -1,5 +1,7 @@
 //! Runtime-owned Job discovery. A read-only SQLite snapshot supplies Job
 //! identity and state; presentation cursors retain immutable query results.
+#[path = "import_references.rs"]
+pub(crate) mod import_references;
 use crate::job_record::{JobRecord, STATES, digest, failure, unreadable};
 use crate::job_repository::{
     AdmissionVerdict, JobRepository, JobWriteError, identifier, order_key,

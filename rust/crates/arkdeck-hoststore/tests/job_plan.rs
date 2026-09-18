@@ -171,6 +171,7 @@ fn rust_plans_reproduce_the_swift_oracle() {
         };
         let restore = mutate(case["mutation"].as_str(), &root, &payload);
         let outcome = JobPlanner {
+            imports: None,
             artifacts: Some(&store),
             analyzer: (case["engine"] != "unconfigured").then_some(&profile),
             state_root: &root,
@@ -209,6 +210,7 @@ fn rust_plans_reproduce_the_swift_oracle() {
 #[test]
 fn a_request_json_that_is_not_text_is_refused_as_an_empty_one() {
     let planner = JobPlanner {
+        imports: None,
         artifacts: None,
         analyzer: None,
         state_root: Path::new(ROOT),
@@ -238,6 +240,7 @@ fn rust_refuses_plans_it_cannot_materialize_yet() {
     let store = ArtifactReadStore::open(&root.join("artifacts")).unwrap();
     let profile = AnalyzerProfile::crash_signature(&root.join("analyzer")).unwrap();
     let planner = JobPlanner {
+        imports: None,
         artifacts: Some(&store),
         analyzer: Some(&profile),
         state_root: &root,
@@ -282,8 +285,8 @@ fn rust_refuses_plans_it_cannot_materialize_yet() {
     assert_eq!(
         (refusal.code, refusal.message.as_str()),
         (
-            "rejected",
-            "an imported Artifact lease is not resolved by the Rust Runtime yet"
+            "invalidInput",
+            "Import input owner is unavailable"
         )
     );
     let index: Value = serde_json::from_slice(

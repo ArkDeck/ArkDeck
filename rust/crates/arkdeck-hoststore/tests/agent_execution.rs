@@ -179,6 +179,7 @@ fn rust_runs_the_swift_agent_executions() {
     let claims = StorageClaims::default();
     let admitter = JobAdmitter {
         planner: JobPlanner {
+            imports: None,
             artifacts: Some(&artifacts),
             analyzer: None,
             state_root: &root,
@@ -215,6 +216,7 @@ fn rust_runs_the_swift_agent_executions() {
             now: fixed_now,
         };
         let _ = JobRunner {
+            imports: None,
             jobs: &jobs,
             artifacts: &artifacts,
             analyzer: None,
