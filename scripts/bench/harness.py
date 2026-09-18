@@ -282,7 +282,7 @@ def seed_state_directory(
 ) -> subprocess.CompletedProcess:
     """Populate a state directory with real terminal Jobs.
 
-    `ArkDeckRuntimeSoakFixture` drives the production engine, SQLite repository,
+    The matching Swift or Rust soak drives the production engine, SQLite repository,
     durable journals and Artifact store through a simulated provider that opens
     no device transport and spawns no child process, so the resulting directory
     is a genuine Runtime state with no hardware in the loop.  Measuring reads

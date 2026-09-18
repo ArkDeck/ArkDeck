@@ -201,7 +201,11 @@ class RunContext:
         calibration_samples: int,
         seed_seconds: int,
         seed_jobs_per_cycle: int,
+        runtime_kind: str = "swift",
     ) -> None:
+        if runtime_kind not in {"swift", "rust"}:
+            raise ValueError("runtime_kind must be swift or rust")
+        self.runtime_kind = runtime_kind
         self.daemon_executable = daemon_executable
         self.soak_executable = soak_executable
         self.cold_start_samples = cold_start_samples
@@ -301,7 +305,9 @@ def execute_run(
             f"{seeded.stdout.strip()} {seeded.stderr.strip()}"
         )
 
-    runtime = harness.IsolatedRuntime(context.daemon_executable, state_directory)
+    runtime = harness.IsolatedRuntime(
+        context.daemon_executable, state_directory, runtime_kind=context.runtime_kind
+    )
     try:
         # Cold start is measured by repeatedly restarting the daemon on the
         # same populated state directory, which is what design section I.2
