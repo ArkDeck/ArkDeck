@@ -41,7 +41,7 @@ mod device_steps;
 #[cfg(target_os = "macos")]
 mod job_admission;
 #[cfg(target_os = "macos")]
-pub use job_admission::{AdmissionRefusal, JobAdmitter, runtime_now};
+pub use job_admission::{AdmissionRefusal, JobAdmitter, MutationAuthority, runtime_now};
 #[cfg(target_os = "macos")]
 mod agent_execution;
 #[cfg(target_os = "macos")]
@@ -82,6 +82,10 @@ mod operation_request;
 pub use operation_request::{OperationRequest, RequestErrorCode, RequestRejection};
 #[cfg(target_os = "macos")]
 mod artifact_quota;
+#[cfg(target_os = "macos")]
+mod capability_policy;
+#[cfg(target_os = "macos")]
+pub use capability_policy::DeviceHolds;
 #[cfg(target_os = "macos")]
 mod capability_store;
 #[cfg(target_os = "macos")]

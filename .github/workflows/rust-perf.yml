@@ -1,6 +1,6 @@
 name: Performance lanes
 
-# ArkDeckRuntimeSoakFixture carries hard gates — resident growth <= 32 MiB,
+# arkdeck-soak carries hard gates — resident growth <= 32 MiB,
 # descriptor growth <= 16, no torn journal tail, no outstanding cleanup debt —
 # and design section I.1 of the cross-platform architecture already records it
 # as "硬门但零调用方". This workflow is that caller.
@@ -120,82 +120,28 @@ jobs:
           git fetch --no-tags --prune --depth 1 origin "${GITHUB_REF}"
           git checkout --detach FETCH_HEAD
           git rev-parse HEAD
-      - name: Configure read-only ArkForge package access
-        env:
-          ARKFORGE_DEPLOY_KEY: ${{ secrets.ARKFORGE_DEPLOY_KEY }}
-        run: sh scripts/ci/arkforge-package-auth.sh setup
-      - name: Record the runner image build
-        # The SwiftPM build directory is only fully reusable on the runner
-        # image build that produced it: llbuild re-runs every C compile whose
-        # SDK inputs changed identity, and those differ between image builds
-        # (swift-ci.yml's swift-tests job records the measurement). The key
-        # therefore names the image build, with a same-toolchain fallback so
-        # a new image build starts from the Swift state instead of cold. The
-        # version is read in a step because the runner exports it to the
-        # process environment, not to the workflow env context.
-        id: runner-image
+      - name: Activate the workspace Rust toolchain
+        working-directory: rust
         run: |
           set -eu
-          if [ -z "${ImageVersion:-}" ]; then
-            echo "::warning::ImageVersion is unset; the release SwiftPM cache falls back to same-toolchain entries"
-          fi
-          printf 'version=%s\n' "${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
-      - name: Restore the release SwiftPM cache
-        # Same shape as swift-ci.yml's trusted stable cache, under its own key:
-        # this lane builds release objects, the test lane builds debug ones,
-        # and neither should carry the other's. Restore-only off main; a cold
-        # build here was 9 to 11 of the job's 11 to 13 minutes.
-        id: perf-build-cache
-        continue-on-error: true
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
-        with:
-          path: ${{ runner.temp }}/arkdeck-swiftpm
-          key: arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
-          restore-keys: |
-            arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-
-            arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-image-${{ steps.runner-image.outputs.version }}-
-            arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-
-      - name: Build the measured executables
-        # Every run-swiftpm.sh call, the --show-bin-path lookup included, must
-        # see the cache root the restore populated. Step level, because the
-        # runner context is not available in a job-level env.
-        env:
-          ARKDECK_SWIFTPM_CACHE_ROOT: ${{ runner.temp }}/arkdeck-swiftpm
-        run: |
-          set -eu
-          sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh build -c release \
-            --product arkdeck-agentd
-          sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh build -c release \
-            --product ArkDeckRuntimeSoakFixture
-      - name: Remove ArkForge package credential
-        if: always()
-        run: sh scripts/ci/arkforge-package-auth.sh cleanup
-      - name: Save the release SwiftPM cache
-        if: >-
-          success() &&
-          github.ref == 'refs/heads/main' &&
-          steps.perf-build-cache.outputs.cache-hit != 'true'
-        continue-on-error: true
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
-        with:
-          path: ${{ runner.temp }}/arkdeck-swiftpm
-          key: arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
+          rustup toolchain install --profile minimal --no-self-update
+          rustup show active-toolchain
+          rustc --version
+          cargo --version
+      - name: Build the Rust measurement executables
+        working-directory: rust
+        run: cargo build --locked --release -p arkdeck-agentd -p arkdeck-soak
       - name: Capture a candidate baseline
-        # Every run-swiftpm.sh call, the --show-bin-path lookup included, must
-        # see the cache root the restore populated. Step level, because the
-        # runner context is not available in a job-level env.
-        env:
-          ARKDECK_SWIFTPM_CACHE_ROOT: ${{ runner.temp }}/arkdeck-swiftpm
         run: |
           set -eu
-          BIN="$(sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh build -c release \
-            --show-bin-path | tail -1)"
+          BIN="$GITHUB_WORKSPACE/rust/target/release"
           cd scripts
           # A shared CI runner is never provably quiet, so the document records
           # itself as advisory rather than claiming baseline eligibility.
           python3 -m bench capture \
             --daemon "$BIN/arkdeck-agentd" \
-            --soak "$BIN/ArkDeckRuntimeSoakFixture" \
+            --soak "$BIN/arkdeck-soak" \
+            --runtime-kind rust \
             --build-configuration release \
             --out-dir "$RUNNER_TEMP/perf" \
             --allow-loaded-host
@@ -243,79 +189,38 @@ jobs:
           git fetch --no-tags --prune --depth 1 origin "${GITHUB_REF}"
           git checkout --detach FETCH_HEAD
           git rev-parse HEAD
-      - name: Configure read-only ArkForge package access
-        env:
-          ARKFORGE_DEPLOY_KEY: ${{ secrets.ARKFORGE_DEPLOY_KEY }}
-        run: sh scripts/ci/arkforge-package-auth.sh setup
-      - name: Record the runner image build
-        # The SwiftPM build directory is only fully reusable on the runner
-        # image build that produced it: llbuild re-runs every C compile whose
-        # SDK inputs changed identity, and those differ between image builds
-        # (swift-ci.yml's swift-tests job records the measurement). The key
-        # therefore names the image build, with a same-toolchain fallback so
-        # a new image build starts from the Swift state instead of cold. The
-        # version is read in a step because the runner exports it to the
-        # process environment, not to the workflow env context.
-        id: runner-image
+      - name: Activate the workspace Rust toolchain
+        working-directory: rust
         run: |
           set -eu
-          if [ -z "${ImageVersion:-}" ]; then
-            echo "::warning::ImageVersion is unset; the release SwiftPM cache falls back to same-toolchain entries"
-          fi
-          printf 'version=%s\n' "${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
-      - name: Restore the release SwiftPM cache
-        # Restore only: this job builds one product and must not publish a
-        # partial cache the other lanes would then prefer as the newest.
-        id: perf-build-cache
-        continue-on-error: true
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0 (Node 24)
-        with:
-          path: ${{ runner.temp }}/arkdeck-swiftpm
-          key: arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-${{ github.sha }}
-          restore-keys: |
-            arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-image-${{ steps.runner-image.outputs.version }}-${{ hashFiles('Packages/ArkDeckKit/Package.swift') }}-
-            arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-image-${{ steps.runner-image.outputs.version }}-
-            arkdeck-swiftpm-perf-v1-${{ runner.os }}-${{ runner.arch }}-xcode-26.6-
-      - name: Build the soak fixture
-        # Every run-swiftpm.sh call, the --show-bin-path lookup included, must
-        # see the cache root the restore populated. Step level, because the
-        # runner context is not available in a job-level env.
-        env:
-          ARKDECK_SWIFTPM_CACHE_ROOT: ${{ runner.temp }}/arkdeck-swiftpm
-        run: |
-          set -eu
-          sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh build -c release \
-            --product ArkDeckRuntimeSoakFixture
-      - name: Remove ArkForge package credential
-        if: always()
-        run: sh scripts/ci/arkforge-package-auth.sh cleanup
+          rustup toolchain install --profile minimal --no-self-update
+          rustup show active-toolchain
+          rustc --version
+          cargo --version
+      - name: Build the Rust measurement executables
+        working-directory: rust
+        run: cargo build --locked --release -p arkdeck-agentd -p arkdeck-soak
       # The state directory is chosen in its own step so that the archive below
       # can address it without depending on anything in the soak step having
       # run to completion. The fixture persists its metrics after every cycle
       # and only then enforces its resident-set and descriptor gates
-      # (`main.swift` persistMetrics -> verifySteadyStateResources), so the
+      # (persist_metrics -> verify_resources), so the
       # document exists precisely when a gate fails — and, on a four-hour soak,
       # also when the job's own timeout kills the step mid-run. Copying the file
       # at the end of the soak step would lose it on both of those paths.
       - name: Prepare the soak state directory
         run: |
           set -eu
-          # <state-dir>/d/agentd.sock must fit Darwin's 104-byte sun_path, so
-          # the directory has to be short; the fixture says so in its own
-          # start-up error.
+          # Use a fresh private root, independent of the installed Runtime.
           echo "SOAK_STATE=$(mktemp -d /tmp/adksoak.XXXX)" >> "$GITHUB_ENV"
       - name: Run the Runtime soak
         env:
           SOAK_HOURS: ${{ github.event.inputs.soak-hours || '4' }}
-          # The --show-bin-path lookup must see the cache root the restore
-          # populated; the runner context is step-level only.
-          ARKDECK_SWIFTPM_CACHE_ROOT: ${{ runner.temp }}/arkdeck-swiftpm
         run: |
           set -eu
-          BIN="$(sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh build -c release \
-            --show-bin-path | tail -1)"
+          BIN="$GITHUB_WORKSPACE/rust/target/release"
           echo "soak hours: $SOAK_HOURS"
-          "$BIN/ArkDeckRuntimeSoakFixture" \
+          "$BIN/arkdeck-soak" \
             --state-directory "$SOAK_STATE" \
             --duration-seconds "$((SOAK_HOURS * 3600))" \
             --restart-interval-seconds 300 \

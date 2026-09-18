@@ -47,6 +47,7 @@ fn rust_publishes_the_swift_sessions() {
             },
             jobs: &jobs,
             now: fixed_now,
+            authority: None,
         }
         .handle(case["submit"].as_object().unwrap())
         .unwrap();
