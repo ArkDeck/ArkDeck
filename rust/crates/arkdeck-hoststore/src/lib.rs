@@ -106,7 +106,7 @@ mod job_journal_writer;
 #[cfg(target_os = "macos")]
 pub use job_journal_replay::{AbandonmentFact, IntentFact, ReplayFacts, UnknownFact};
 #[cfg(target_os = "macos")]
-pub use job_journal_writer::{JournalWriteError, JournalWriter};
+pub use job_journal_writer::{JournalWriteError, JournalWriter, inspect_journal};
 
 #[cfg(target_os = "macos")]
 mod history_owner;
