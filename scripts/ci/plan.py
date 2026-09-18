@@ -57,6 +57,7 @@ RUST_CONTRACT_INPUT_FILES = frozenset({
     "openspec/changes/chg-2026-059-arkdeck-arkforge-authority/permit-vectors.md",
 })
 APP_PACKAGE_TARGET_PREFIXES = (
+    "Packages/ArkDeckKit/Sources/ArkDeckClientKit/",
     "Packages/ArkDeckKit/Sources/ArkDeckCore/",
     "Packages/ArkDeckKit/Sources/ArkDeckProcess/",
     "Packages/ArkDeckKit/Sources/ArkDeckRuntime/",
