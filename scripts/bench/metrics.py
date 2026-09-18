@@ -201,7 +201,11 @@ class RunContext:
         calibration_samples: int,
         seed_seconds: int,
         seed_jobs_per_cycle: int,
+        runtime_kind: str = "swift",
     ) -> None:
+        if runtime_kind not in {"swift", "rust"}:
+            raise ValueError("runtime_kind must be swift or rust")
+        self.runtime_kind = runtime_kind
         self.daemon_executable = daemon_executable
         self.soak_executable = soak_executable
         self.cold_start_samples = cold_start_samples
@@ -217,6 +221,8 @@ class RunFailed(RuntimeError):
 
 
 JOB_LIST_PAGE_SIZE = 50
+# Three requests per iteration plus handshake fit the 128-frame connection.
+IPC_SAMPLES_PER_CONNECTION = 32
 
 
 def split_at_release(
@@ -283,6 +289,7 @@ def execute_run(
         "seedRestartIntervalSeconds": SEED_RESTART_INTERVAL_SECONDS,
         "jobListPageSize": JOB_LIST_PAGE_SIZE,
         "jobStoreRowCount": None,
+        "ipcSamplesPerConnection": IPC_SAMPLES_PER_CONNECTION,
     }
 
     for _ in range(context.calibration_samples):
@@ -301,7 +308,9 @@ def execute_run(
             f"{seeded.stdout.strip()} {seeded.stderr.strip()}"
         )
 
-    runtime = harness.IsolatedRuntime(context.daemon_executable, state_directory)
+    runtime = harness.IsolatedRuntime(
+        context.daemon_executable, state_directory, runtime_kind=context.runtime_kind
+    )
     try:
         # Cold start is measured by repeatedly restarting the daemon on the
         # same populated state directory, which is what design section I.2
@@ -315,8 +324,17 @@ def execute_run(
         runtime.start()
         with runtime.client() as client:
             job_id, row_count = _job_store_probe(client)
+            if job_id is None or row_count is None or row_count <= 0:
+                raise RunFailed(
+                    "the measured daemon cannot read the soak seed's Jobs; "
+                    "use matching Runtime and soak executables"
+                )
             scale["jobStoreRowCount"] = row_count
-            for _ in range(context.ipc_samples):
+            for index in range(context.ipc_samples):
+                if index and index % IPC_SAMPLES_PER_CONNECTION == 0:
+                    client.close()
+                    client.connect()
+                    client.verify_contract()
                 _, elapsed = client.timed_call("health")
                 samples["ipc.health"].append(elapsed * 1000.0)
                 _, elapsed = client.timed_call(
