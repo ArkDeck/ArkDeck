@@ -8,6 +8,7 @@ use arkdeck_contract::{
 };
 use serde_json::{Value, json};
 mod operation_description;
+mod target_availability;
 
 /// The composition root supplies local resources and device observations.
 /// This interface provides no device mutation or authority administration.
@@ -587,6 +588,10 @@ impl<H: HostServices> Control<H> {
                     )
                 }
             }
+            "target.availability" => Response {
+                id: request.id.clone(),
+                outcome: self.target_availability(&params),
+            },
             "target.list"
             | "target.show"
             | "target.display-name.set"
