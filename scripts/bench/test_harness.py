@@ -353,6 +353,56 @@ class ResidentSetSplitTests(unittest.TestCase):
         self.assertNotIn("daemon.idleResidentSetBytes", metrics.METRIC_DEFINITIONS)
 
 
+class RuntimeCompositionTests(unittest.TestCase):
+    def test_capture_uses_selected_composition_for_every_phase(self) -> None:
+        for kind in ("swift", "rust"):
+            context = metrics.RunContext(
+                daemon_executable=pathlib.Path("/daemon"),
+                soak_executable=pathlib.Path("/soak"), cold_start_samples=2,
+                ipc_samples=65, idle_seconds=1, calibration_samples=0,
+                seed_seconds=1, seed_jobs_per_cycle=10, runtime_kind=kind)
+            with mock.patch.object(harness, "seed_state_directory") as seed, \
+                 mock.patch.object(harness, "IsolatedRuntime") as runtime_class, \
+                 mock.patch.object(clocks, "Deadline") as deadline:
+                seed.return_value.returncode = 0
+                runtime = runtime_class.return_value
+                runtime.start.return_value = 0.1
+                client = runtime.client.return_value.__enter__.return_value
+                client.call.return_value = {"items": [{"jobId": "job-one"}]}
+                client.timed_call.return_value = ({}, 0.01)
+                deadline.return_value.expired.return_value = True
+                samples, scale = metrics.execute_run(context, pathlib.Path("/state"))
+                runtime_class.assert_called_once_with(
+                    pathlib.Path("/daemon"), pathlib.Path("/state"), runtime_kind=kind)
+                self.assertEqual(runtime.start.call_count, 4)
+                self.assertEqual(len(samples["daemon.coldStart"]), 2)
+                self.assertEqual(scale["jobStoreRowCount"], 1)
+                self.assertEqual(len(samples["ipc.jobStatus"]), 65)
+                self.assertEqual(client.close.call_count, 2)
+                self.assertEqual(client.connect.call_count, 2)
+                self.assertEqual(client.verify_contract.call_count, 2)
+                self.assertEqual(client.timed_call.call_count, 65 * 3)
+
+
+    def test_empty_or_incompatible_seed_is_not_measured_as_a_fast_store(self) -> None:
+        context = metrics.RunContext(
+            daemon_executable=pathlib.Path("/daemon"),
+            soak_executable=pathlib.Path("/soak"), cold_start_samples=1,
+            ipc_samples=1, idle_seconds=1, calibration_samples=0,
+            seed_seconds=1, seed_jobs_per_cycle=10, runtime_kind="rust")
+        with mock.patch.object(harness, "seed_state_directory") as seed, \
+             mock.patch.object(harness, "IsolatedRuntime") as runtime_class:
+            seed.return_value.returncode = 0
+            runtime = runtime_class.return_value
+            runtime.start.return_value = 0.1
+            client = runtime.client.return_value.__enter__.return_value
+            client.call.return_value = {"items": []}
+            with self.assertRaisesRegex(metrics.RunFailed, "cannot read the soak seed"):
+                metrics.execute_run(context, pathlib.Path("/state"))
+            client.timed_call.assert_not_called()
+            self.assertEqual(runtime.stop.call_count, 2)
+
+
 class StaticImportAudit(unittest.TestCase):
     """The harness stays stdlib-only and never reaches a device."""
 
