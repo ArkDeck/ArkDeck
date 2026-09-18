@@ -163,7 +163,10 @@ Runtime authority wiring. No capability is created by these fixtures.
 
 `cargo check --offline --locked --workspace --all-targets --jobs 1` passed,
 covering the actual integrated tree; formatting also passed. Log:
-`/private/tmp/arkdeck-1968-integration-check.log`. The final unified gate on this
-new combination remains pending; the preceding branch pass and remote CI do
-not validate this newer combination. #1976 is now merged, so that dependency
-no longer awaits approval.
+`/private/tmp/arkdeck-1968-integration-check.log`. The final unified gate on this actual combination passed (exit 0), using
+`ARKDECK_PYTHON=/private/tmp/arkdeck-validation-venv/bin/python` and the same
+outer interpreter, with `CARGO_BUILD_JOBS=2 RUST_TEST_THREADS=2`. No filter,
+skip or timeout change was used. The planner selected common checks and Rust;
+workspace tests, both published/candidate contract views, cargo-deny and
+cargo-vet all passed. Log: `/private/tmp/arkdeck-1968-integrated-final-gate.log`.
+#1976 is now merged, so that dependency no longer awaits approval.
