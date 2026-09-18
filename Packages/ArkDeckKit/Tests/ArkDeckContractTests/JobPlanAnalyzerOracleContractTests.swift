@@ -96,8 +96,13 @@ final class JobPlanAnalyzerOracleContractTests: XCTestCase {
         return !directory.boolValue
       }
     XCTAssertEqual(Set(recorded), Set(files.keys))
-    for (path, data) in files {
-      XCTAssertEqual(try Data(contentsOf: Self.oracle.appending(path: path)), data, path)
+    let expected = try Dictionary(uniqueKeysWithValues: recorded.map { path in
+      (path, try Data(contentsOf: Self.oracle.appending(path: path)))
+    })
+    let comparableExpected = try OracleSDKDiagnosticCompatibility.comparableFiles(expected, family: .jobPlanAnalyzer)
+    let comparableActual = try OracleSDKDiagnosticCompatibility.comparableFiles(files, family: .jobPlanAnalyzer)
+    for (path, data) in comparableActual {
+      XCTAssertEqual(comparableExpected[path], data, path)
     }
   }
 

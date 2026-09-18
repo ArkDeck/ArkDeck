@@ -1,3 +1,4 @@
+@testable import ArkDeckClientKit
 @testable import ArkDeckStorage
 import ArkDeckCore
 import Foundation
