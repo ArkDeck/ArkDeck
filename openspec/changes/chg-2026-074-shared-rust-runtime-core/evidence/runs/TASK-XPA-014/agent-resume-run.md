@@ -118,3 +118,16 @@ native argv fixtures now use the existing `rust/tests/fixtures/current-cli-argv`
 source-view mechanism; `verify_current_cli_argv` verifies byte identity against
 the Swift originals. No fixture expectation changes. Failed attempt log:
 `/private/tmp/arkdeck-resume-integrated-final-20260919.log`.
+
+Unified verification on `55470353` passed (exit 0): Swift full/timing, App
+build-for-testing, Rust workspace, actual published/candidate views, deny and vet.
+Log: `/private/tmp/arkdeck-resume-unified-pass-20260919.log`. Separate actual
+source-view verification also passed at
+`/private/tmp/arkdeck-resume-source-views-final-20260919.log`.
+
+Subsequently integrated protected main `187321ea` containing #1968. The three
+new resume fixture JobAdmitter constructions explicitly set `authority: None`;
+production Host retains main's Runtime-owned MutationAuthority policy composition.
+This integration requires its own final unified validation; the preceding pass
+is retained as evidence of the pre-capability combination, not claimed for the
+new merged HEAD. No hardware or capability evidence was fabricated.

@@ -138,6 +138,7 @@ fn rust_cancels_the_swift_running_jobs() {
             },
             jobs: &jobs,
             now: fixed_now,
+            authority: None,
         }
         .handle(case["submit"].as_object().unwrap())
         .unwrap();

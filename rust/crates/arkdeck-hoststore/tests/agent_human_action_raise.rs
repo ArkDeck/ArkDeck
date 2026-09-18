@@ -263,6 +263,7 @@ fn rust_raises_and_reads_the_physical_assistance_swift_asked_for() {
         },
         jobs: &jobs,
         now: fixed_now,
+        authority: None,
     };
     let digest = sha256_hex(&fs::read(hdc.join("hdc")).unwrap());
     let dispatch =
@@ -452,6 +453,7 @@ fn adopting_run(
         },
         jobs: &jobs,
         now: fixed_now,
+        authority: None,
     };
     let reads = Cell::new(0);
     let usb = || {
@@ -720,6 +722,7 @@ fn crash_between_target_and_execution_commit_reopens_all_owners_and_keeps_origin
             },
             jobs: &jobs,
             now: fixed_now,
+            authority: None,
         };
         let usb = || Ok::<_, String>(plugged.clone());
         let clock = || "2026-09-14T00:00:00Z".to_owned();
@@ -843,6 +846,7 @@ fn physical_resume_keeps_original_intent_and_unique_job() {
             },
             jobs: &jobs,
             now: fixed_now,
+            authority: None,
         };
         let reads = Cell::new(0);
         let usb = || {
@@ -1028,6 +1032,7 @@ fn physical_resume_keeps_original_intent_and_unique_job() {
                             },
                             jobs,
                             now: fixed_now,
+                            authority: None,
                         };
                         let engine = AgentEngine {
                             targets,
@@ -1187,6 +1192,7 @@ fn resolved_resume_commit_gap_preserves_status_then_run_continuation() {
             },
             jobs: &jobs,
             now: fixed_now,
+            authority: None,
         };
         let usb = || Ok::<_, String>(plugged.clone());
         let clock = || "2026-09-14T00:00:00Z".to_owned();
