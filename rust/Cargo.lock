@@ -125,6 +125,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "arkdeck-soak"
+version = "0.1.0"
+dependencies = [
+ "arkdeck-hoststore",
+ "arkdeck-platform",
+ "arkdeck-provider-hdc",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "block-buffer"
 version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"

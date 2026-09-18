@@ -64,6 +64,9 @@ def assert_boundaries() -> None:
         "arkdeck-client": {"arkdeck-contract", "arkdeck-platform"},
         "arkdeck-cli": {"arkdeck-contract", "arkdeck-client", "arkdeck-platform"},
         "arkdeck-agentd": {"arkdeck-contract", "arkdeck-control", "arkdeck-platform", "arkdeck-provider-hdc", "arkdeck-hoststore"},
+        # Measurement composition only: in-memory provider, production owners,
+        # and self-resource sampling. No client or daemon transport dependency.
+        "arkdeck-soak": {"arkdeck-hoststore", "arkdeck-platform", "arkdeck-provider-hdc"},
     }
     manifests = list((ROOT / "rust/crates").glob("*/Cargo.toml"))
     assert len(manifests) == len(allowed), "review the composition boundary for new crates"
