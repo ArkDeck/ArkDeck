@@ -1,4 +1,6 @@
 #[cfg(target_os = "macos")]
+mod app_ingress;
+#[cfg(target_os = "macos")]
 mod bootstrap_readers;
 #[cfg(target_os = "macos")]
 mod facade;
@@ -56,6 +58,8 @@ fn development_hdc()
 
 fn serve() -> Result<(), Box<dyn std::error::Error>> {
     let development = std::env::var_os("ARKDECK_DEVELOPMENT_STATE_ROOT");
+    #[cfg(target_os = "macos")]
+    let app_ingress = app_ingress::Configuration::from_environment(development.as_deref())?;
     #[cfg(target_os = "macos")]
     let mut development_listener = None;
     if development.is_some()
@@ -201,6 +205,12 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
     };
     #[cfg(not(target_os = "macos"))]
     let mut listener = LocalListener::bind(&endpoint)?;
+    #[cfg(target_os = "macos")]
+    if let Some(configuration) = app_ingress {
+        // This explicit isolated composition owns no Swift process. Both local
+        // transports use the very same Control and durable History owner.
+        configuration.listen(Arc::clone(&control))?;
+    }
     let active = Arc::new(AtomicUsize::new(0));
     loop {
         let connection = match listener.accept() {
