@@ -130,3 +130,23 @@ main SDK compatibility issue addressed in PR #1976; this capability slice does
 not duplicate that unrelated fix. At that attempt full validation had not passed,
 and the merge was left uncommitted/unpushed. The integration continuation below
 records the subsequent explicit dependency and final validation separately.
+
+### Explicit validation dependency and final branch rerun
+
+The current-main merge was completed as `e6900080`. PR #1976's original commit
+`b710252d1d7844f1fcd361e58c66429a06173493` was then merged, without copying its
+compatibility changes, as `e2849f78`. The dependency is the original reviewed
+ClientKit/SDK compatibility diff, not a second patch owned by this capability
+slice. PR #1976 was still OPEN and awaiting maintainer approval/main integration
+when checked; this local branch merge does not supply that approval.
+
+The unified gate runs on this actual PR branch with the outer planner using
+`/private/tmp/arkdeck-validation-venv` and the required host permissions for
+Swift/Xcode caches. The planner selected the shared `.venv-sdd` for common Python checks (all
+passed); Rust child commands explicitly use
+`/private/tmp/arkdeck-validation-venv/bin/python` via `sys.executable`.
+`ARKDECK_PYTHON` was not set. The complete unified gate passed (exit 0):
+common checks, design-system checks, full Swift tests, App build-for-testing,
+Rust workspace tests, published and candidate contract checks, cargo-deny and
+cargo-vet. Log: `/private/tmp/arkdeck-capability-1968-unified-final-20260919.log`.
+This is branch validation, not protected-main or real-device acceptance.
