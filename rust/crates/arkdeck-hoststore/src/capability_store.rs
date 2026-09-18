@@ -161,6 +161,32 @@ pub struct ConsumptionReceipt {
     pub receipt_sha256: String,
 }
 
+/// What automatic issuance reads of an installed generation.
+pub(crate) struct Generation {
+    pub(crate) remaining_uses: i64,
+    pub(crate) expires_at: String,
+    pub(crate) revoked: bool,
+}
+
+/// A use on a Target binding left without a settled outcome.
+pub(crate) struct UnresolvedUse {
+    capability: String,
+    ordinal: i64,
+    outcome: UseOutcome,
+}
+
+impl UnresolvedUse {
+    /// Swift's `lineageBlocked` for it.
+    pub(crate) fn blocker(&self) -> CapabilityStoreError {
+        CapabilityStoreError::LineageBlocked(format!(
+            "target binding has unresolved capability {} use {} outcome {}",
+            self.capability,
+            self.ordinal,
+            self.outcome.raw()
+        ))
+    }
+}
+
 /// A refused `capability.list` or `capability.inspect`: Swift's code and
 /// message. Swift attaches no details to either.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -270,6 +296,63 @@ impl CapabilityStore {
                 .find(|record| same_text(&record.capability.id, capability_id))
                 .ok_or_else(|| CapabilityStoreError::NotFound(capability_id.to_owned()))?;
             validate_new_execution(record, query, now_utc)
+        })
+    }
+
+    /// Swift `inspect(capabilityID:)` as automatic issuance reads a
+    /// generation: whether it exists and, if so, its remaining uses, its
+    /// expiry and whether it was revoked.
+    pub(crate) fn generation(
+        &self,
+        capability_id: &str,
+    ) -> Result<Option<Generation>, CapabilityStoreError> {
+        self.locked(|_, document, _| {
+            Ok(document
+                .records
+                .iter()
+                .find(|record| same_text(&record.capability.id, capability_id))
+                .map(|record| Generation {
+                    remaining_uses: record.remaining_uses,
+                    expires_at: record.capability.expires_at.clone(),
+                    revoked: matches!(record.capability.revocation, Revocation::Revoked { .. }),
+                }))
+        })
+    }
+
+    /// Swift `validateNoUnresolvedMutationLineage` without recovery epochs:
+    /// over every capability in store order, the first use on this Target
+    /// binding whose outcome is neither confirmed nor safe to reflash. A
+    /// pending use of `owner`'s own reservation and Job does not count.
+    pub(crate) fn unresolved_use(
+        &self,
+        identity: &str,
+        binding_revision: i64,
+        owner: Option<(&str, &str)>,
+    ) -> Result<Option<UnresolvedUse>, CapabilityStoreError> {
+        self.locked(|_, document, _| {
+            for record in &document.records {
+                for use_ in &record.consumptions {
+                    let outcome = use_.current();
+                    if use_.target.as_deref() != Some(identity)
+                        || use_.binding_revision != Some(binding_revision)
+                        || outcome.settled()
+                    {
+                        continue;
+                    }
+                    let owned = owner.is_some_and(|(reservation, job)| {
+                        same_text(&use_.reservation, reservation) && same_text(&use_.job, job)
+                    });
+                    if outcome == UseOutcome::Pending && owned {
+                        continue;
+                    }
+                    return Ok(Some(UnresolvedUse {
+                        capability: record.capability.id.clone(),
+                        ordinal: use_.ordinal,
+                        outcome,
+                    }));
+                }
+            }
+            Ok(None)
         })
     }
 
@@ -976,10 +1059,37 @@ impl Capability {
         &self.id
     }
 
+    /// Swift `RuntimeCapability.init(...)` for an envelope the Runtime issues:
+    /// its members as the store encodes them, refused with Swift's
+    /// `RuntimeCapabilityValidationError` when it breaks the model.
+    pub(crate) fn issued(value: &Value) -> Result<Self, String> {
+        let capability = Self::members(value, Vec::new()).map_err(|error| error.describe())?;
+        capability.invariants()?;
+        Ok(capability)
+    }
+
     /// Swift `RuntimeCapability.init(from:)`: every member, then the model's
     /// invariants, then the exact current field shape.
     fn decode(value: &Value, path: Vec<Step>) -> Result<Self, Decoding> {
-        let keyed = Keyed::of(value, path.clone())?;
+        let capability = Self::members(value, path.clone())?;
+        capability
+            .invariants()
+            .map_err(|violation| Decoding::DataCorrupted {
+                description: format!("capability violates model invariants: {violation}"),
+                path: path.clone(),
+            })?;
+        if swift_value(value) != capability.value() {
+            return Err(Decoding::DataCorrupted {
+                description: "unsupported current capability field shape".into(),
+                path,
+            });
+        }
+        Ok(capability)
+    }
+
+    /// Every member, as Swift's decoder reads them.
+    fn members(value: &Value, path: Vec<Step>) -> Result<Self, Decoding> {
+        let keyed = Keyed::of(value, path)?;
         let id = keyed.string("capabilityID")?;
         let target_scope = TargetScope::decode(&keyed.keyed("targetScope")?)?;
         let operation_scope = keyed
@@ -1037,7 +1147,7 @@ impl Capability {
         let exact_plan_digest = keyed.optional_string("exactPlanDigest")?;
         let exact_binding_revision = keyed.optional_int("exactBindingRevision")?;
         let revocation = Revocation::decode(&keyed.keyed("revocation")?)?;
-        let capability = Self {
+        Ok(Self {
             id,
             target_scope,
             operation_scope,
@@ -1053,20 +1163,7 @@ impl Capability {
             exact_plan_digest,
             exact_binding_revision,
             revocation,
-        };
-        capability
-            .invariants()
-            .map_err(|violation| Decoding::DataCorrupted {
-                description: format!("capability violates model invariants: {violation}"),
-                path: path.clone(),
-            })?;
-        if swift_value(value) != capability.value() {
-            return Err(Decoding::DataCorrupted {
-                description: "unsupported current capability field shape".into(),
-                path,
-            });
-        }
-        Ok(capability)
+        })
     }
 
     /// The synthesized encoding: an absent optional has no member.

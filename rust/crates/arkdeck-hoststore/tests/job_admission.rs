@@ -159,6 +159,7 @@ fn rust_admissions_reproduce_the_swift_oracle() {
             },
             jobs: &jobs,
             now: fixed_now,
+            authority: None,
         }
         .handle(&params);
         let actual = match outcome {

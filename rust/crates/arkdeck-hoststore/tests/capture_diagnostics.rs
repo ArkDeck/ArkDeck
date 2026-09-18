@@ -180,6 +180,7 @@ fn rust_captures_diagnostics_of_the_swift_fake_device() {
                 planner: planner(),
                 jobs: &jobs,
                 now: fixed_now,
+                authority: None,
             })
             .handle(params)
             {
