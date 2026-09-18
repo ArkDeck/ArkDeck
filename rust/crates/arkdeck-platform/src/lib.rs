@@ -200,3 +200,13 @@ pub use host_deveco_files::{
 mod host_deveco_resources;
 #[cfg(target_os = "macos")]
 pub use host_deveco_resources::{DEVECO_RESOURCE_PATHS, verify_deveco_resource_envelope};
+
+#[cfg(target_os = "macos")]
+mod self_resources;
+#[cfg(target_os = "macos")]
+pub use self_resources::{SelfResources, self_resources};
+
+#[cfg(target_os = "macos")]
+mod continuous_clock;
+#[cfg(target_os = "macos")]
+pub use continuous_clock::ContinuousInstant;

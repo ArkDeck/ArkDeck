@@ -223,6 +223,17 @@ impl TargetObservations {
         sources: &Sources<'_>,
         reference: &ObservationReference,
     ) -> Result<Adopted, ObservationError> {
+        self.adopt_guarded(sources, reference, || Ok(()))
+    }
+
+    /// The agent's original budget must still hold before each identity
+    /// readback and before the synchronous Target commit, as Swift checks it.
+    pub(crate) fn adopt_guarded(
+        &self,
+        sources: &Sources<'_>,
+        reference: &ObservationReference,
+        mut before_commit: impl FnMut() -> Result<(), ObservationError>,
+    ) -> Result<Adopted, ObservationError> {
         let mut state = self.lock()?;
         if let Some(adopted) = state
             .receipts
@@ -235,6 +246,7 @@ impl TargetObservations {
             Self::observe(&mut state, sources, Some(reference))?;
             return Ok(adopted);
         }
+        before_commit()?;
         let initial = Self::current(&state, reference, false)?.clone();
         if initial.relation.is_none() {
             return Err(ObservationError::refused(
@@ -261,19 +273,20 @@ impl TargetObservations {
         };
         let reads = (|| {
             let tool_version = observe_tool_version(sources.dispatch)?;
+            before_commit()?;
             let readback = observe_device_identity(
                 sources.dispatch,
                 &reference.candidate,
                 Expected::default(),
             )?;
             let live = sources.relations.relations().map_err(BootstrapFailure)?;
-            Ok::<_, BootstrapFailure>((tool_version, readback, live))
+            Ok::<_, ObservationError>((tool_version, readback, live))
         })();
         let (tool_version, readback, live) = match reads {
             Ok(reads) => reads,
             Err(failure) => {
                 state.latest = None;
-                return Err(failure.into());
+                return Err(failure);
             }
         };
         let last = Self::current(&state, reference, false)?;
@@ -285,6 +298,7 @@ impl TargetObservations {
                 Some(reference),
             ));
         }
+        before_commit()?;
         let Some(latest) = state.latest.clone() else {
             return Err(ObservationError::refused(
                 "resourceConflict",

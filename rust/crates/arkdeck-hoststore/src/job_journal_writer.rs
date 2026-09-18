@@ -153,6 +153,19 @@ impl JournalWriter {
     }
 }
 
+/// Inspect an existing journal without acquiring write authority or repairing
+/// a torn tail. The caller must quiesce the owner for a terminal audit.
+pub fn inspect_journal(job_directory: &Path) -> Result<ReplayFacts, JournalWriteError> {
+    let root =
+        arkdeck_platform::HostDirectory::open(job_directory).map_err(JournalWriteError::Refused)?;
+    let bytes = root
+        .read("journal.jsonl", 64 * 1024 * 1024)
+        .map_err(JournalWriteError::Refused)?;
+    let replay = ReplayState::replay(&bytes)
+        .map_err(|message| JournalWriteError::Invalid(message.into()))?;
+    Ok(replay.state.facts(replay.torn))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

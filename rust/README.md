@@ -1568,3 +1568,22 @@ concurrent reads, the Swift daemon's own control-frame log, and a standalone
 Swift daemon over the same directory in between as the positive control.
 Swift children get a disposable `CFFIXED_USER_HOME`, so nothing installed is
 opened. Installed activation follows the normal helper update.
+
+## macOS owner lifecycle soak
+
+`arkdeck-soak` runs a simulated-provider workload through production Rust owners
+without child processes or device access. Use a new private state directory:
+
+```sh
+cargo run --release --locked -p arkdeck-soak -- \
+  --state-directory /private/tmp/arkdeck-rust-soak \
+  --duration-seconds 60 --restart-interval-seconds 5 --jobs-per-cycle 10
+```
+
+It atomically writes `runtime-soak-metrics.json`, reopens owners between cycles,
+verifies published Artifact evidence and journals, and fails on unresolved
+intents, cleanup debt or excessive RSS/FD growth. The default duration is 24
+hours. This owner-only fixture does not exercise IPC, qualify a performance
+baseline, or provide hardware acceptance evidence. See
+[the run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-025/rust-soak-run.md)
+for validation and remaining scope.
