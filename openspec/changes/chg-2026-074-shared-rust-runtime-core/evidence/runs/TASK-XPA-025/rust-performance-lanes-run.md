@@ -14,8 +14,9 @@ all cold starts, seeded Job reads and the idle resource window. Captures record
 Swift for callers intentionally retaining historical measurements. The existing launcher keeps temporary
 roots canonicalized before serving as endpoint and owner paths.
 
-Validation so far: all 126 Python harness tests pass, including both runtime
-compositions across the full sampling orchestration. Workflow YAML parses and
+Validation so far: all 127 Python harness tests pass, including both runtime
+compositions across the full sampling orchestration. An empty or incompatible seed fails before IPC measurement instead of yielding
+an artificially cheap empty-store result. Workflow YAML parses and
 both measurement jobs use Cargo. The initial sandbox attempt could not run `ps`;
 the complete suite passed with host process inspection permission. The unified repository gate also passed (exit 0; only common checks selected
 for this diff), using the pinned validation venv and no filter/skip. Log:

@@ -321,6 +321,11 @@ def execute_run(
         runtime.start()
         with runtime.client() as client:
             job_id, row_count = _job_store_probe(client)
+            if job_id is None or row_count is None or row_count <= 0:
+                raise RunFailed(
+                    "the measured daemon cannot read the soak seed's Jobs; "
+                    "use matching Runtime and soak executables"
+                )
             scale["jobStoreRowCount"] = row_count
             for _ in range(context.ipc_samples):
                 _, elapsed = client.timed_call("health")
