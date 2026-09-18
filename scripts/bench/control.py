@@ -45,8 +45,12 @@ class ControlClient:
         self._verified = False
 
     def __enter__(self) -> "ControlClient":
-        self.connect()
-        self.verify_contract()
+        try:
+            self.connect()
+            self.verify_contract()
+        except Exception:
+            self.close()
+            raise
         return self
 
     def __exit__(self, *_exception: object) -> None:
