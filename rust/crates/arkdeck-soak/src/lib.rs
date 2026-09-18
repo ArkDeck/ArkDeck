@@ -336,6 +336,7 @@ fn execute_cycle(root: &Path, run_id: &str, cycle: u64, count: u64) -> Result<(u
             },
             jobs: &owners.jobs,
             now: runtime_now,
+            authority: None,
         };
         let canceller = JobCanceller {
             jobs: &owners.jobs,

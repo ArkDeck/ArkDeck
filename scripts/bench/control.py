@@ -80,9 +80,15 @@ class ControlClient:
         payload = json.dumps(frame, separators=(",", ":")).encode("utf-8") + b"\n"
         if len(payload) > MAXIMUM_FRAME_BYTES:
             raise ControlError("request frame exceeds the 4 MiB transport limit")
-        self._socket.sendall(payload)
+        try:
+            self._socket.sendall(payload)
+        except OSError as error:
+            raise ControlError(f"request transport failed: {error}") from error
         while b"\n" not in self._buffer:
-            chunk = self._socket.recv(65536)
+            try:
+                chunk = self._socket.recv(65536)
+            except OSError as error:
+                raise ControlError(f"response transport failed: {error}") from error
             if not chunk:
                 raise ControlError("daemon closed the connection")
             self._buffer += chunk

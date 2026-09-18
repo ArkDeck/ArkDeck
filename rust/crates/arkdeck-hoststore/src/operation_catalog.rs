@@ -158,7 +158,9 @@ impl CatalogOperation {
                 })
                 .unwrap_or_default(),
             concurrency_key: text(&value["concurrencyKey"]),
-            default_policy_issuance: value["defaultPolicyIssuance"] == "enabled",
+            // Swift's generated descriptors enable Runtime issuance unless
+            // the catalog disables it.
+            default_policy_issuance: value["defaultPolicyIssuance"] != "disabled",
             inputs,
             steps,
             artifacts: value["artifacts"]
@@ -199,6 +201,21 @@ impl CatalogOperation {
             Some(version) => format!("{}@{version}", self.id),
             None => self.id.clone(),
         }
+    }
+
+    /// Swift `CatalogOperationDescriptor.id` and `version`.
+    pub(crate) fn id(&self) -> &str {
+        &self.id
+    }
+
+    pub(crate) fn version(&self) -> Option<i64> {
+        self.version
+    }
+
+    /// Swift `defaultPolicyIssuanceEnabled`: whether the Runtime may issue a
+    /// capability for this operation when the caller names none.
+    pub(crate) fn default_policy_issuance(&self) -> bool {
+        self.default_policy_issuance
     }
 
     /// Swift `CatalogOperationDescriptor.binding`: `none` for an operation
@@ -460,5 +477,35 @@ impl CatalogOperation {
         }
         let _ = &self.binding;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::CatalogOperation;
+
+    /// Swift's generated descriptors enable Runtime issuance unless the
+    /// catalog disables it. The M2 device mutations leave it out and have it;
+    /// the workspace mutations a person reviews disable it.
+    #[test]
+    fn runtime_issuance_is_enabled_unless_the_catalog_disables_it() {
+        let issuance = |id: &str| {
+            CatalogOperation::lookup(id, Some(1))
+                .unwrap()
+                .default_policy_issuance()
+        };
+        for enabled in [
+            "input.tap",
+            "input.long-press",
+            "input.swipe",
+            "port-forward.create",
+            "debug.hap",
+            "workspace.create-checkpoint",
+        ] {
+            assert!(issuance(enabled), "{enabled}");
+        }
+        for disabled in ["workspace.apply-patch", "workspace.run-tests"] {
+            assert!(!issuance(disabled), "{disabled}");
+        }
     }
 }
