@@ -117,6 +117,11 @@ impl JobStore {
             }
             // Rust persists the record before advancing SQLite. A crash between
             // those writes must not hide a later uncertain input owner.
+            if crate::job_record::terminal(&record.state) && !directories.contains_key(&row.id) {
+                // Every durable terminal transition has a Journal. A missing
+                // directory cannot prove that this input owner ended safely.
+                return Err(unreadable(()));
+            }
             if let Some(directory) = directories.get(&row.id) {
                 match directory.read("job-record.json", RECORD_BOUND) {
                     Ok(bytes) => {

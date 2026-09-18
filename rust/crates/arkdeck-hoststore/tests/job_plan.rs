@@ -284,10 +284,7 @@ fn rust_refuses_plans_it_cannot_materialize_yet() {
         .unwrap_err();
     assert_eq!(
         (refusal.code, refusal.message.as_str()),
-        (
-            "invalidInput",
-            "Import input owner is unavailable"
-        )
+        ("invalidInput", "Import input owner is unavailable")
     );
     let index: Value = serde_json::from_slice(
         &fs::read(root.join("artifacts").join(SOURCE_JOB).join("index.json")).unwrap(),

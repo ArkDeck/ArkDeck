@@ -1584,6 +1584,108 @@ fn admitted_import_is_retained_across_restart_and_retries_without_new_hold() {
 }
 
 #[test]
+fn missing_terminal_job_directory_cannot_clear_import_references() {
+    let fixture = Fixture::new();
+    let store = fixture.store();
+    let artifacts = arkdeck_hoststore::ArtifactReadStore::open(&fixture.artifacts).unwrap();
+    let jobs = jobs(&fixture);
+    let bytes = b"PK\x03\x04admitted";
+    let begin = call(&store, "begin", fixture.metadata("admitted", bytes)).unwrap();
+    let id = begin["importId"].as_str().unwrap();
+    append(&store, id, 0, bytes).unwrap();
+    let committed = commit(&store, &artifacts, id).unwrap();
+    use std::os::unix::fs::PermissionsExt;
+    let analyzer = fixture.root.join("analyzer");
+    fs::copy(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/fixtures/job-submit-analyzer/analyzer"),
+        &analyzer,
+    )
+    .unwrap();
+    fs::set_permissions(&analyzer, fs::Permissions::from_mode(0o700)).unwrap();
+    let profile = arkdeck_hoststore::AnalyzerProfile::crash_signature(&analyzer).unwrap();
+    let request = analyzer_request(&committed["receipt"]["lease"]);
+    let admit = arkdeck_hoststore::JobAdmitter {
+        planner: arkdeck_hoststore::JobPlanner {
+            imports: Some(&store),
+            artifacts: Some(&artifacts),
+            analyzer: Some(&profile),
+            state_root: &fixture.root,
+            hdc: None,
+        },
+        jobs: &jobs,
+        now: || Some(NOW.into()),
+    };
+    let accepted = admit.submit(&request).unwrap();
+    let job_id = accepted["jobId"].as_str().unwrap();
+    for name in ["session-owner", "Sessions"] {
+        fs::DirBuilder::new()
+            .mode(0o700)
+            .create(fixture.root.join(name))
+            .unwrap();
+    }
+    let sessions = arkdeck_hoststore::SessionStore::open(
+        &fixture.root.join("session-owner"),
+        &fixture.root.join("Sessions"),
+    )
+    .unwrap();
+    let claims = arkdeck_hoststore::StorageClaims::default();
+    let probe = arkdeck_hoststore::SystemStorageProbe;
+    let publisher = arkdeck_hoststore::SessionPublisher {
+        sessions: &sessions,
+        claims: &claims,
+        probe: &probe,
+    };
+    arkdeck_hoststore::JobCanceller {
+        jobs: &jobs,
+        now: || Some(NOW.into()),
+        sessions: Some(&publisher),
+    }
+    .handle(json!({"jobId":job_id}).as_object().unwrap())
+    .unwrap();
+    assert_eq!(
+        lifecycle(
+            &store,
+            &artifacts,
+            &jobs,
+            "inspection",
+            json!({"importId":id})
+        )
+        .unwrap()["references"]["state"],
+        "clear"
+    );
+    let pinned =
+        read(&fixture.artifacts.join(id).join("index.json"))["artifacts"][0]["retention"].clone();
+    fs::remove_dir_all(fixture.root.join("jobs-state/jobs").join(job_id)).unwrap();
+    // Reopen both durable owners: no transient hold supplies this refusal.
+    drop(jobs);
+    drop(store);
+    let jobs = crate::jobs(&fixture);
+    let store = fixture.store();
+    for method in ["inspection", "release"] {
+        let fields = if method == "release" {
+            json!({"importId":id,"generation":"2"})
+        } else {
+            json!({"importId":id})
+        };
+        assert_eq!(
+            lifecycle(&store, &artifacts, &jobs, method, fields)
+                .unwrap_err()
+                .code,
+            "recordUnreadable"
+        );
+    }
+    assert_eq!(
+        call(&store, "inspect", json!({"importId":id})).unwrap()["state"],
+        "committed"
+    );
+    assert_eq!(
+        read(&fixture.artifacts.join(id).join("index.json"))["artifacts"][0]["retention"],
+        pinned
+    );
+}
+
+#[test]
 fn reference_census_checks_submission_hash_history_and_unknown_outcomes() {
     for case in [
         "active",
@@ -1670,22 +1772,12 @@ fn reference_census_checks_submission_hash_history_and_unknown_outcomes() {
             json!({"importId":id,"generation":"2"}),
         );
         match case {
-            "terminal" => {
-                assert_eq!(inspection.unwrap()["references"]["state"], "clear");
-                assert!(release.is_ok());
-            }
-            "active" | "enriched" | "unknown-terminal" | "foreign-catalog" => {
+            "active" | "enriched" | "foreign-catalog" => {
                 let inspection = inspection.unwrap();
                 assert_eq!(
                     inspection["references"]["activeJobIds"],
                     json!(["job-reference"])
                 );
-                if case == "unknown-terminal" {
-                    assert_eq!(
-                        inspection["references"]["outcomeUnknownJobIds"],
-                        json!(["job-reference"])
-                    );
-                }
                 assert_eq!(release.unwrap_err().code, "resourceConflict");
             }
             _ => {
@@ -1923,7 +2015,12 @@ fn sigkill_after_release_checkpoint_and_unpin_preserves_the_original_receipt() {
         let fixture = Fixture::new();
         let mut child = Child(
             std::process::Command::new(std::env::current_exe().unwrap())
-                .args(["--exact", "release_sigkill_child", "--ignored", "--nocapture"])
+                .args([
+                    "--exact",
+                    "release_sigkill_child",
+                    "--ignored",
+                    "--nocapture",
+                ])
                 .env("ARKDECK_TEST_IMPORT_RELEASE_CRASH_ROOT", &fixture.root)
                 .env("ARKDECK_TEST_IMPORT_RELEASE_CRASH_WINDOW", window)
                 .stdout(std::process::Stdio::null())

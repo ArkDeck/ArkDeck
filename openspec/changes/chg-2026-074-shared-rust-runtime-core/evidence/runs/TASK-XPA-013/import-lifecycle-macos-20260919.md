@@ -86,3 +86,26 @@ This slice does not deploy HAP/native libraries or execute device mutations. The
 host process test's isolated analyzer is an explicit test fixture, never a real
 GJ result. Device capability admission, deployed workflows, workspace execution,
 installed-runtime cutover and real-device GJ acceptance remain independent work.
+
+## Terminal-directory census follow-up
+
+On the lifecycle branch after merging protected main `98cb3b96`, inspection and
+release now reject any terminal SQL Job whose complete durable Job directory is
+missing. Rust admission/cancellation/execution create and advance the Journal
+before recording a terminal state; no production Job-directory reclamation path
+exists. Swift's persisted-row census is not evidence that a missing Rust Journal
+safely closes the Rust record-before-SQL crash window.
+
+The regression creates an actual isolated host Job through `JobAdmitter`, cancels
+it with `JobCanceller` and publishes its Session, first observes clear references,
+then deletes the entire Job directory and reopens the durable owners. Both
+inspection and release refuse with `recordUnreadable`; the committed receipt and
+Artifact retention remain unchanged. Synthetic terminal-only SQL rows (including
+unknown-outcome rows) now also refuse instead of bypassing this proof. No locks
+or guards were added: Import lifetime → uses → Job activity order is unchanged;
+`ImportUse::drop` still acquires only the uses mutex.
+
+Validation: `RUST_TEST_THREADS=2 cargo test -p arkdeck-hoststore --test import_upload
+--jobs 2 -- --nocapture` passed: 32 tests, zero failures, one intentionally ignored
+SIGKILL child fixture (exercised by its parent test), 4.74 seconds. This is targeted
+host validation, not the pending unified gate or real-device acceptance.

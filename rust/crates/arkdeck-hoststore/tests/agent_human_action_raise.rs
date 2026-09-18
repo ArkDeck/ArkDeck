@@ -434,6 +434,7 @@ fn adopting_run(
     };
     let admitter = JobAdmitter {
         planner: JobPlanner {
+            imports: None,
             artifacts: Some(&artifacts),
             analyzer: None,
             state_root: root,
@@ -572,6 +573,7 @@ fn adopting_run(
             probe: &probe,
         };
         JobRunner {
+            imports: None,
             jobs: &jobs,
             artifacts: &artifacts,
             analyzer: None,
@@ -702,6 +704,7 @@ fn crash_between_target_and_execution_commit_reopens_all_owners_and_keeps_origin
         };
         let admitter = JobAdmitter {
             planner: JobPlanner {
+                imports: None,
                 artifacts: Some(&artifacts),
                 analyzer: None,
                 state_root: root,
