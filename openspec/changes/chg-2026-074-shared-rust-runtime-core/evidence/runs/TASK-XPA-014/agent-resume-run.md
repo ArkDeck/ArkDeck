@@ -105,3 +105,9 @@ and candidate preserved errors, and the daemon check expects the actual missing
 execution-owner refusal. No production safety mapping was relaxed. Initial log:
 `/private/tmp/arkdeck-resume-unified-20260919.log`. This is not the final integrated
 gate; the complete unified entry point must pass on the actual merged branch.
+
+The first integrated gate stopped at the main HAR CLI test's historical assertion
+that `human-action resume` is an unknown command. The new closed leaf correctly
+rejects its missing required references as `invalidOption`; that assertion is
+updated without accepting missing arguments. Integrated attempt log:
+`/private/tmp/arkdeck-resume-integrated-unified-20260919.log` (exit 1).
