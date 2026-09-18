@@ -365,3 +365,401 @@ fn rust_raises_and_reads_the_physical_assistance_swift_asked_for() {
     assert_eq!(connect["generation"], 4);
     assert_eq!(connect["actions"].as_array().unwrap().len(), 1);
 }
+
+thread_local! {
+    static ADOPTION_EXPIRED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    static ADOPTION_CRASH_PENDING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+fn adoption_now() -> Option<String> {
+    if ADOPTION_CRASH_PENDING.get() {
+        std::process::exit(79);
+    }
+    Some(
+        if ADOPTION_EXPIRED.get() {
+            "2026-09-14T00:06:00.000Z"
+        } else {
+            "2026-09-14T00:00:00.000Z"
+        }
+        .into(),
+    )
+}
+
+/// Exercise the production run path, without a caller-selected Target.
+/// A budget may expire during the final identity readback or Target commit.
+fn adopting_run(
+    expire_before_commit: bool,
+    expire_after_commit: bool,
+    identity_drift: bool,
+    crash_after_commit: bool,
+) {
+    use arkdeck_hoststore::HdcComposition;
+    use std::cell::Cell;
+    let _lock = exclusive();
+    ADOPTION_EXPIRED.set(false);
+    let fixture = support::fixture("agent-human-action");
+    let cases: Value =
+        serde_json::from_slice(&fs::read(fixture.join("cases.json")).unwrap()).unwrap();
+    let exchanges = cases["exchanges"].as_array().unwrap();
+    let request = exchanges
+        .iter()
+        .find(|v| v["name"] == "connect.run")
+        .unwrap()["params"]
+        .as_object()
+        .unwrap()
+        .clone();
+    let plugged = relations(
+        &exchanges
+            .iter()
+            .find(|v| v["name"] == "connect.resume")
+            .unwrap()["usbRelations"],
+    );
+    let fake = install_fake(&fixture);
+    fs::write(fake.join("hdc-mode"), "normal\n").unwrap();
+    let state = State::new(&fixture);
+    let root = &state.0;
+    let target_path = root.join("targets-state/targets.json");
+    let initial = fs::read(&target_path).unwrap();
+    let targets = TargetStore::open(&root.join("targets-state")).unwrap();
+    let artifacts = ArtifactReadStore::open(&root.join("artifacts")).unwrap();
+    let jobs = JobStore::open_owner(&root.join("jobs-state")).unwrap();
+    let agents = AgentExecutionStore::open(&root.join("agent-executions")).unwrap();
+    let digest = sha256_hex(&fs::read(fake.join("hdc")).unwrap());
+    let dispatch =
+        ProcessDispatch::new(VerifiedTool::open(fake.join("hdc"), &digest).unwrap(), None);
+    let hdc = HdcComposition {
+        targets: &targets,
+        dispatch: &dispatch,
+        tool_sha256: &digest,
+        now: fixed_now,
+    };
+    let admitter = JobAdmitter {
+        planner: JobPlanner {
+            artifacts: Some(&artifacts),
+            analyzer: None,
+            state_root: root,
+            hdc: Some(&hdc),
+        },
+        jobs: &jobs,
+        now: fixed_now,
+    };
+    let reads = Cell::new(0);
+    let usb = || {
+        reads.set(reads.get() + 1);
+        if expire_before_commit && reads.get() == 5 {
+            ADOPTION_EXPIRED.set(true);
+        }
+        if identity_drift && reads.get() == 5 {
+            return Ok(Vec::new());
+        }
+        Ok::<_, String>(plugged.clone())
+    };
+    let clock_calls = Cell::new(0);
+    let clock = || {
+        clock_calls.set(clock_calls.get() + 1);
+        // Two snapshot timestamps precede the Target store timestamp.
+        if expire_after_commit && clock_calls.get() == 3 {
+            ADOPTION_EXPIRED.set(true);
+        }
+        if crash_after_commit && clock_calls.get() == 3 {
+            // This source clock supplies the Target commit timestamp. The
+            // agent's next budget clock runs after adopt has durably returned,
+            // before resolve_snapshot can publish execution.target.
+            ADOPTION_CRASH_PENDING.set(true);
+        }
+        "2026-09-14T00:00:00Z".to_owned()
+    };
+    let observer = TargetObservations::default();
+    let engine = AgentEngine {
+        targets: &targets,
+        jobs: &jobs,
+        admitter: &admitter,
+        now: adoption_now,
+        observations: Some(Observing {
+            owner: &observer,
+            sources: Sources {
+                dispatch: &dispatch,
+                relations: &usb,
+                targets: &targets,
+                now: &clock,
+            },
+        }),
+    };
+    let answer = agents.advance("agent.run", &request, &engine);
+    if identity_drift {
+        let error = match answer {
+            Err(error) => error,
+            Ok(_) => panic!("drifting identity accepted"),
+        };
+        // Swift wraps TargetObservationFailure as the agent handler's internal
+        // refusal. No target or Job may be committed behind that refusal.
+        assert_eq!(error.code, "internalError");
+        assert_eq!(fs::read(target_path).unwrap(), initial);
+        let status = agents
+            .advance(
+                "agent.status",
+                &Map::from_iter([("executionId".into(), json!("har-connect"))]),
+                &engine,
+            )
+            .unwrap();
+        assert!(status.value["jobId"].is_null());
+        assert!(status.value["targetId"].is_null());
+    } else if expire_before_commit || expire_after_commit {
+        let error = match answer {
+            Err(error) => error,
+            Ok(_) => panic!("expired run accepted"),
+        };
+        assert_eq!(error.code, "orchestrationBudgetExpired");
+        assert_eq!(error.details.unwrap()["executionId"], "har-connect");
+        let status = agents
+            .advance(
+                "agent.status",
+                &Map::from_iter([("executionId".into(), json!("har-connect"))]),
+                &engine,
+            )
+            .unwrap();
+        assert_eq!(status.value["state"], "budgetExpired");
+        assert!(status.value["jobId"].is_null());
+        assert!(status.start.is_none());
+        if expire_before_commit {
+            assert_eq!(fs::read(target_path).unwrap(), initial);
+        }
+        let rerun = agents.advance("agent.run", &request, &engine);
+        assert!(
+            rerun.is_err(),
+            "expired execution must not resume by rerunning"
+        );
+    } else {
+        let answer = answer.unwrap();
+        let start = answer
+            .start
+            .expect("newly owned Job must be returned for dispatch");
+        assert_eq!(answer.value["state"], "jobOwned");
+        assert!(answer.value["humanAction"].is_null());
+        let durable: Value = serde_json::from_slice(&fs::read(target_path).unwrap()).unwrap();
+        assert_eq!(answer.value["targetId"], durable["targets"][0]["targetID"]);
+        let after_calls = fs::read(fake.join("hdc-invocations.log")).unwrap();
+        let rerun = agents.advance("agent.run", &request, &engine).unwrap();
+        assert_eq!(rerun.value["jobId"], start.job);
+        assert!(rerun.start.is_none());
+        assert_eq!(
+            fs::read(fake.join("hdc-invocations.log")).unwrap(),
+            after_calls
+        );
+        drop(agents);
+        let reopened = AgentExecutionStore::open(&root.join("agent-executions")).unwrap();
+        let rerun = reopened.advance("agent.run", &request, &engine).unwrap();
+        assert_eq!(rerun.value["jobId"], start.job);
+        assert!(
+            rerun.start.is_none(),
+            "reopening owner does not replay an owned Job"
+        );
+        // The daemon dispatches only the original returned start identity.
+        // Complete its read-only Observe Job through the actual Rust runner.
+        use arkdeck_hoststore::{JobRunner, SessionPublisher, SessionStore, StorageClaims};
+        use support::OracleProbe;
+        let provenance = support::document(&fixture, "provenance.json");
+        for name in ["session-owner", "Sessions"] {
+            fs::create_dir(root.join(name)).unwrap();
+            chmod(&root.join(name), 0o700);
+        }
+        let sessions =
+            SessionStore::open(&root.join("session-owner"), &root.join("Sessions")).unwrap();
+        let claims = StorageClaims::default();
+        let probe = OracleProbe::new(&provenance);
+        let publisher = SessionPublisher {
+            sessions: &sessions,
+            claims: &claims,
+            probe: &probe,
+        };
+        JobRunner {
+            jobs: &jobs,
+            artifacts: &artifacts,
+            analyzer: None,
+            quota: provenance["quotaBytes"].as_u64().unwrap(),
+            home: provenance["home"].as_str().unwrap(),
+            now: fixed_now,
+            precise_now: fixed_precise_now,
+            sessions: Some(&publisher),
+            cancellation: None,
+            after_commit: None,
+            hdc: Some(&hdc),
+        }
+        .handle(&Map::from_iter([("jobId".into(), json!(start.job))]))
+        .unwrap();
+        reopened.finish(&start, &jobs);
+        let completed = reopened
+            .advance(
+                "agent.status",
+                &Map::from_iter([("executionId".into(), json!("har-connect"))]),
+                &engine,
+            )
+            .unwrap();
+        assert_eq!(completed.value["state"], "completed");
+        assert_eq!(completed.value["jobState"], "succeeded");
+    }
+    ADOPTION_EXPIRED.set(false);
+}
+
+#[test]
+fn connected_proved_candidate_is_adopted_once_and_owns_one_job() {
+    adopting_run(false, false, false, false);
+}
+#[test]
+fn budget_expiring_during_identity_readback_prevents_target_commit_and_job() {
+    adopting_run(true, false, false, false);
+}
+#[test]
+fn budget_expiring_at_target_commit_prevents_job_creation() {
+    adopting_run(false, true, false, false);
+}
+
+#[test]
+fn changed_usb_identity_during_adoption_never_commits_target_or_job() {
+    adopting_run(false, false, true, false);
+}
+
+#[test]
+#[ignore = "subprocess crash fixture; launched only by the restart test"]
+fn adoption_commit_gap_crash_child() {
+    adopting_run(false, false, false, true);
+    panic!("crash boundary was not reached");
+}
+
+#[test]
+fn crash_between_target_and_execution_commit_reopens_all_owners_and_keeps_original_budget() {
+    use arkdeck_hoststore::HdcComposition;
+    for expired in [false, true] {
+        let mut child = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "adoption_commit_gap_crash_child",
+                "--ignored",
+                "--nocapture",
+            ])
+            .spawn()
+            .unwrap();
+        let root = std::env::temp_dir()
+            .canonicalize()
+            .unwrap()
+            .join(format!("agent-human-action-raise-{}", child.id()));
+        assert_eq!(child.wait().unwrap().code(), Some(79));
+        let _lock = exclusive();
+        let state = State(root);
+        let root = &state.0;
+        let target_path = root.join("targets-state/targets.json");
+        let target_before: Value =
+            serde_json::from_slice(&fs::read(&target_path).unwrap()).unwrap();
+        assert_eq!(target_before["targets"].as_array().unwrap().len(), 1);
+        let record_path = fs::read_dir(root.join("agent-executions"))
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .find(|path| {
+                path.file_name()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .starts_with("execution-")
+            })
+            .unwrap();
+        let before: Value = serde_json::from_slice(&fs::read(&record_path).unwrap()).unwrap();
+        assert_eq!(before["state"], "orchestrating");
+        assert!(before.get("target").is_none());
+        assert!(before.get("jobID").is_none());
+        assert_eq!(before["deadline"], "2026-09-14T00:05:00.000Z");
+        let fixture = support::fixture("agent-human-action");
+        let cases: Value =
+            serde_json::from_slice(&fs::read(fixture.join("cases.json")).unwrap()).unwrap();
+        let exchanges = cases["exchanges"].as_array().unwrap();
+        let request = exchanges
+            .iter()
+            .find(|v| v["name"] == "connect.run")
+            .unwrap()["params"]
+            .as_object()
+            .unwrap();
+        let plugged = relations(
+            &exchanges
+                .iter()
+                .find(|v| v["name"] == "connect.resume")
+                .unwrap()["usbRelations"],
+        );
+        let fake = install_fake(&fixture);
+        fs::write(fake.join("hdc-mode"), "normal\n").unwrap();
+        // New owners and a new observation source: no in-memory receipt from
+        // the exited process is available to make this retry pass.
+        let targets = TargetStore::open(&root.join("targets-state")).unwrap();
+        let artifacts = ArtifactReadStore::open(&root.join("artifacts")).unwrap();
+        let jobs = JobStore::open_owner(&root.join("jobs-state")).unwrap();
+        let agents = AgentExecutionStore::open(&root.join("agent-executions")).unwrap();
+        let observer = TargetObservations::default();
+        let digest = sha256_hex(&fs::read(fake.join("hdc")).unwrap());
+        let dispatch =
+            ProcessDispatch::new(VerifiedTool::open(fake.join("hdc"), &digest).unwrap(), None);
+        let hdc = HdcComposition {
+            targets: &targets,
+            dispatch: &dispatch,
+            tool_sha256: &digest,
+            now: fixed_now,
+        };
+        let admitter = JobAdmitter {
+            planner: JobPlanner {
+                artifacts: Some(&artifacts),
+                analyzer: None,
+                state_root: root,
+                hdc: Some(&hdc),
+            },
+            jobs: &jobs,
+            now: fixed_now,
+        };
+        let usb = || Ok::<_, String>(plugged.clone());
+        let clock = || "2026-09-14T00:00:00Z".to_owned();
+        let engine = AgentEngine {
+            targets: &targets,
+            jobs: &jobs,
+            admitter: &admitter,
+            now: adoption_now,
+            observations: Some(Observing {
+                owner: &observer,
+                sources: Sources {
+                    dispatch: &dispatch,
+                    relations: &usb,
+                    targets: &targets,
+                    now: &clock,
+                },
+            }),
+        };
+        ADOPTION_EXPIRED.set(expired);
+        let outcome = agents.advance("agent.run", request, &engine);
+        if expired {
+            let error = outcome.err().expect("original deadline must refuse retry");
+            assert_eq!(error.code, "orchestrationBudgetExpired");
+            assert!(
+                fs::read(fake.join("hdc-invocations.log"))
+                    .unwrap()
+                    .is_empty()
+            );
+        } else {
+            let answer = outcome.unwrap();
+            let job = answer.start.expect("one newly admitted Job").job;
+            assert_eq!(
+                answer.value["targetId"],
+                target_before["targets"][0]["targetID"]
+            );
+            let calls = fs::read(fake.join("hdc-invocations.log")).unwrap();
+            let retry = agents.advance("agent.run", request, &engine).unwrap();
+            assert_eq!(retry.value["jobId"], job);
+            assert!(retry.start.is_none());
+            assert_eq!(fs::read(fake.join("hdc-invocations.log")).unwrap(), calls);
+        }
+        let after: Value = serde_json::from_slice(&fs::read(&record_path).unwrap()).unwrap();
+        assert_eq!(after["createdAt"], before["createdAt"]);
+        assert_eq!(after["deadline"], before["deadline"]);
+        let target_after: Value = serde_json::from_slice(&fs::read(target_path).unwrap()).unwrap();
+        assert_eq!(target_after, target_before);
+        let inventory = jobs.handle_resource("job.list", &Map::new()).unwrap();
+        assert_eq!(
+            inventory["items"].as_array().unwrap().len(),
+            if expired { 0 } else { 1 }
+        );
+        ADOPTION_EXPIRED.set(false);
+    }
+}
