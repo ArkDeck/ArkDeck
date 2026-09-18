@@ -39,3 +39,19 @@ The dashboard is repinned to current main and independently recounted: 69/105
 explicit routes, 68 canonical parser names, 65/256 matching registered CLI
 features. Other coverage counts remain unchanged. #1975 and #1976 remain pending
 at this baseline; the goal explicitly includes macOS GJ-1–5 physical acceptance.
+
+## Main integration after #1975
+
+Integrated protected main `bef942364a3730b761c74448a1b601dfb1fceb35`.
+The only conflict was the dashboard: retained its current macOS real-device
+scope and independent coverage definitions, repinned the source-count script,
+and recorded #1975 as delivered rather than pending. The read-only recount
+still produces 69 routes, 68 parser names and 65/256 registered CLI features.
+
+There was no production-code conflict. Main's guarded Target adoption continues
+to serve agent.run and the existing Target owner; this change still obtains
+host availability through Control's per-request projection. Availability reads
+do not call observation/adoption or infer target-scoped readiness. The original
+fixture's adoption setup uses the same unchanged public `adopt` entry point,
+now backed by main's guarded implementation. No capability or dispatch boundary
+was changed while resolving the merge. Final post-merge unified gate pending.

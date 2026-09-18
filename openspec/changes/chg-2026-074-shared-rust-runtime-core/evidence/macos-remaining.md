@@ -1,6 +1,6 @@
 # Remaining macOS Rust implementation
 
-Updated 2026-09-19 against protected main `1ee1d73d` (#1974), revision 11. This list tracks
+Updated 2026-09-19 against protected main `bef94236` (#1975), revision 11. This list tracks
 implementation, installed activation and macOS real-device acceptance separately. The current
 goal includes pure-Rust macOS GJ-1–5 acceptance; Windows and Linux product work are outside scope.
 
@@ -49,7 +49,7 @@ import json
 import re
 import subprocess
 
-ref = "1ee1d73ddeffcae6cda7ca49bf57ff22bf89d3d7"
+ref = "bef942364a3730b761c74448a1b601dfb1fceb35"
 def read(path):
     return subprocess.check_output(["git", "show", f"{ref}:{path}"], text=True)
 
@@ -77,7 +77,7 @@ PYCOUNT
 
 | Milestone | Golden Journey | Delivers | Lane | State |
 | --- | --- | --- | --- | --- |
-| M1 | GJ-1 | `observe.device@1`, `capture.diagnostics@1`, `agent.*` with HAR, `human-action.*`, `target.adopt/availability`, `runtime.hdc.*`, restart carry-over | A (+ B for the executor) | in progress: observe/capture and agent run/status (#1920, #1932, #1938), agent list/abandon (#1945, CLI #1946), waiting-execution records (#1953), Target owner/routes (#1959, #1966; CLI #1967), HDC status (#1956), physical-assistance raise and human-action list/show (#1970), host operation availability (#1973), bounded Target availability and HAR CLI reads (#1974). Remaining: adoption within agent run/resume, resume routes and subsequent Job, trusted USB relation source and real-daemon replay, remaining HDC lifecycle routes and GJ-1 acceptance |
+| M1 | GJ-1 | `observe.device@1`, `capture.diagnostics@1`, `agent.*` with HAR, `human-action.*`, `target.adopt/availability`, `runtime.hdc.*`, restart carry-over | A (+ B for the executor) | in progress: observe/capture and agent run/status (#1920, #1932, #1938), agent list/abandon (#1945, CLI #1946), waiting-execution records (#1953), Target owner/routes (#1959, #1966; CLI #1967), HDC status (#1956), physical-assistance raise and human-action list/show (#1970), host operation availability (#1973), bounded Target availability and HAR CLI reads (#1974), proved Target adoption inside agent.run with commit-gap restart coverage (#1975). Remaining: adoption within agent resume, resume routes and subsequent Job, trusted USB relation source and real-daemon replay, remaining HDC lifecycle routes and GJ-1 acceptance |
 | M2 | GJ-2/3 | Artifact publication and import commit, capability mint/reserve/consume, `debug.*`, `deploy.native-library.app-owned@1`, `capability.*`, `cleanupDebt.*` | A (+ B) | foundations delivered: HAP provider (#1951), native-library provider (#1955), pointer/port-rule providers (#1961), capability store install/consume/outcome writes (#1963), pointer planning (#1964). These are not complete operation admission/run paths; Artifact import completion, authority integration and GJ-2/3 acceptance remain |
 | M3 | GJ-5 | 13 `workspace.*` operations, `workspace.preset/project.*`, registered toolchain, hap-sign-tool, Keychain | D | after SPK-10 |
 | M4 | GJ-4 | ArkForge lane through `arkforge-client`, `flash.*`, Rockchip probes, DEC-016 recovery epoch | A + D | Rockchip live-mode probe (#1934), post-flash observation (#1936), Loader transition (#1937) and alias-store primitives/oracle/store (#1939–#1941) are merged. ArkForge lane and flash methods still wait for SPK-9 prerequisites and the §L.1 item 13 ruling |
@@ -89,7 +89,7 @@ PYCOUNT
 | --- | --- | --- | --- |
 | XPA-012 | in-progress | Isolated Rust owners for History, Session, Trace cache, Bootstrap, DevEco/HDC registration, tool/bundle registry, Target queries; facade History filter owner (#1888); owner locks unlock on drop (#1903) | tool selection writes, trace database preparation; installed per-store composition withdrawn (r11) — activation only at M5 |
 | XPA-013 | in-progress | Artifact read/inspect/export, durable Import upload (#1881), quota query (#1911), device Import binding identity fix (#1969) | Import commit/publication, release and reference inspection; leases, active-use/release and GC integration — inside M2 |
-| XPA-014 | in-progress | Job journal/index/records and analyzer lifecycle; observe/capture and agent run/status/list/abandon; Target observation/adoption/availability routes; live host operation availability (#1973/#1974); HDC status; physical-assistance raise and human-action reads; capability store writes and pointer planning (#1963, #1964) | M1 HAR resume/adoption and remaining routes; M2 integrated authority and device operation execution; M3/M4; recovery after the §L.1 item 13 ruling |
+| XPA-014 | in-progress | Job journal/index/records and analyzer lifecycle; observe/capture and agent run/status/list/abandon; Target observation/adoption/availability routes; live host operation availability (#1973/#1974); agent.run Target adoption (#1975); HDC status; physical-assistance raise and human-action reads; capability store writes and pointer planning (#1963, #1964) | M1 HAR resume and remaining routes; M2 integrated authority and device operation execution; M3/M4; recovery after the §L.1 item 13 ruling |
 | XPA-015 | ready (r11) | HDC observation/parsers and process foundation | SPK-10, then M3; the three ArkTrace/hilog analyzers after M4 |
 | XPA-016 | in-progress | SPK-6 executor foundation; Rockchip probes/transition/alias store (#1934–#1941); HDC status (#1947); capture providers (#1949); physical relation proof port (#1952); HAP (#1951), native-library (#1955), pointer/port-rule (#1961) providers | daemon composition and M1/M2 end-to-end acceptance; M4 ArkForge-served ports after SPK-9 |
 | XPA-018 | in-progress | 68 parser command names, 65 matching registered features; target adopt/availability (#1967), HAR list/show (#1974) | remaining commands including HAR resume, full parity/export; Swift CLI retirement with M5 |
@@ -103,14 +103,17 @@ Spikes SPK-6..11 are defined in `tasks.md` and design §J.3; their records land 
 
 ## Pending review at this baseline
 
-- #1975: agent.run Target adoption and commit-gap restart tests; not merged into
-  `1ee1d73d`, so it does not increase main's operation or GJ counts.
 - #1976: ClientKit/History client decoupling plus SDK 6.4 compatibility; pending,
   so main's App/Swift-retirement counts remain unchanged.
 - #1968: pointer capability admission, still pending; admission alone does not
   qualify pointer execution or capability consumption as delivered.
 
 ## History
+
+2026-09-19 (`bef94236`): #1975 delivers proved Target adoption inside agent.run
+and commit-gap restart coverage. This extends an existing execution path and
+does not add a route, executable operation or real-device Golden Journey. The
+six coverage counts remain unchanged.
 
 2026-09-19 (`1ee1d73d`): #1972 delivers the Rust benchmark launcher/probe, #1973
 live operation discovery, and #1974 bounded Target availability plus HAR list/show
