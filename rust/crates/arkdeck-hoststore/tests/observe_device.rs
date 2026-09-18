@@ -163,6 +163,7 @@ fn rust_observes_the_swift_fake_device() {
                 planner: planner(),
                 jobs: &jobs,
                 now: fixed_now,
+                authority: None,
             })
             .handle(params)
             {
