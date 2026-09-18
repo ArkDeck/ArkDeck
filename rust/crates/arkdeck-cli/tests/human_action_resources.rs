@@ -11,12 +11,8 @@ fn args(values: &[&str]) -> Vec<String> {
 #[test]
 fn swift_argv_fixtures() {
     for text in [
-        include_str!(
-            "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI/argv/human-action.list.json"
-        ),
-        include_str!(
-            "../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/CLI/argv/human-action.show.json"
-        ),
+        include_str!("../../../tests/fixtures/current-cli-argv/human-action.list.json"),
+        include_str!("../../../tests/fixtures/current-cli-argv/human-action.show.json"),
     ] {
         let fixture: Value = serde_json::from_str(text).unwrap();
         for row in fixture["cases"].as_array().unwrap() {

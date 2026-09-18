@@ -111,3 +111,10 @@ that `human-action resume` is an unknown command. The new closed leaf correctly
 rejects its missing required references as `invalidOption`; that assertion is
 updated without accepting missing arguments. Integrated attempt log:
 `/private/tmp/arkdeck-resume-integrated-unified-20260919.log` (exit 1).
+
+The next integrated attempt passed checkout checks, then found main's HAR CLI
+`include_str!` fixtures absent from both isolated contract input views. The two
+native argv fixtures now use the existing `rust/tests/fixtures/current-cli-argv`
+source-view mechanism; `verify_current_cli_argv` verifies byte identity against
+the Swift originals. No fixture expectation changes. Failed attempt log:
+`/private/tmp/arkdeck-resume-integrated-final-20260919.log`.
