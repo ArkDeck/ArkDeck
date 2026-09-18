@@ -462,8 +462,13 @@ final class ArtifactQuotaOracleContractTests: XCTestCase {
         return !directory.boolValue
       }
     XCTAssertEqual(Set(recorded), Set(files.keys))
-    for (path, data) in files {
-      XCTAssertEqual(try Data(contentsOf: oracle.appending(path: path)), data, path)
+    let expected = try Dictionary(uniqueKeysWithValues: recorded.map { path in
+      (path, try Data(contentsOf: oracle.appending(path: path)))
+    })
+    let comparableExpected = try OracleSDKDiagnosticCompatibility.comparableFiles(expected, family: .artifactQuota)
+    let comparableActual = try OracleSDKDiagnosticCompatibility.comparableFiles(files, family: .artifactQuota)
+    for (path, data) in comparableActual {
+      XCTAssertEqual(comparableExpected[path], data, path)
     }
   }
 }

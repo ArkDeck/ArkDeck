@@ -56,6 +56,7 @@ class PathClassificationTests(unittest.TestCase):
 
     def test_app_package_target_sources_run_both_composition_lanes(self):
         for target in (
+            "ArkDeckClientKit",
             "ArkDeckCore",
             "ArkDeckProcess",
             "ArkDeckRuntime",

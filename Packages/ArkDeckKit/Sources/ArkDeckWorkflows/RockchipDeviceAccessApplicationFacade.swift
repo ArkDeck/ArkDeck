@@ -1,3 +1,4 @@
+import ArkDeckClientKit
 import Foundation
 
 public enum RockchipDeviceAccessPresentationAvailability: Sendable, Equatable {

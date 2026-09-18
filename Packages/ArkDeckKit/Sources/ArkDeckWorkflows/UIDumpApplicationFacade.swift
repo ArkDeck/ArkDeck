@@ -1,3 +1,4 @@
+import ArkDeckClientKit
 // App-facing Viewer projection over the Runtime's typed XPC door.
 //
 // Viewer is deliberately not a command surface. It submits only the

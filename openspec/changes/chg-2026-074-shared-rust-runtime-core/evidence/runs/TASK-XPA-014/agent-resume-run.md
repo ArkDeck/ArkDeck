@@ -66,3 +66,10 @@ These are local macOS fixture tests and process-exit simulations, not hardware
 acceptance. CLI resume, production USB source activation, installed switching,
 unknown-outcome recovery and GJ-1–5 remain outside this slice. PR review/merge,
 full local gate and CI remain outstanding.
+
+Integration for final validation: this branch explicitly merges original PR #1976
+commit `b710252d1d7844f1fcd361e58c66429a06173493` after the resume implementation
+commit. Its ClientKit extraction and SDK compatibility remain that PR's reviewed
+scope; they were not copied or rewritten into this feature. Both #1975 and #1976
+are dependencies while unmerged. Final unified verification runs this actual
+stacked branch, not a detached source view with unrecorded SDK modifications.

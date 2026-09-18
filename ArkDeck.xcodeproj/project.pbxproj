@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		A19000000000000000000001 /* ArkDeckClientKit in Frameworks */ = {isa = PBXBuildFile; productRef = A19000000000000000000002 /* ArkDeckClientKit */; };
+		A19000000000000000000003 /* ArkDeckClientKit in Test Frameworks */ = {isa = PBXBuildFile; productRef = A19000000000000000000002 /* ArkDeckClientKit */; };
 		F30000000000000000000201 /* DebugRemoteBuildBrowserViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F30000000000000000000101 /* DebugRemoteBuildBrowserViewModel.swift */; };
 		F30000000000000000000202 /* SettingsWorkspaceViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F30000000000000000000102 /* SettingsWorkspaceViewModel.swift */; };
 		F30000000000000000000203 /* HistoryFilterDependencies.swift in Sources */ = {isa = PBXBuildFile; fileRef = F30000000000000000000103 /* HistoryFilterDependencies.swift */; };
@@ -171,6 +173,7 @@
 			files = (
 				A10000000000000000000012 /* ArkDeckCore in Frameworks */,
 				A10000000000000000000016 /* ArkDeckWorkflows in Frameworks */,
+				A19000000000000000000001 /* ArkDeckClientKit in Frameworks */,
 				C20000000000000000000003 /* ArkTraceAppSupport in Frameworks */,
 				C20000000000000000000004 /* ArkTraceAnalysis in Frameworks */,
 				C20000000000000000000005 /* ArkTraceCore in Frameworks */,
@@ -184,6 +187,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F30000000000000000000301 /* ArkDeckWorkflows in Test Frameworks */,
+				A19000000000000000000003 /* ArkDeckClientKit in Test Frameworks */,
 				F30000000000000000000302 /* ArkTraceRendering in Test Frameworks */,
 				F30000000000000000000303 /* ArkDeckCore in Test Frameworks */,
 			);
@@ -468,6 +472,7 @@
 			packageProductDependencies = (
 				A10000000000000000000091 /* ArkDeckCore */,
 				A10000000000000000000093 /* ArkDeckWorkflows */,
+				A19000000000000000000002 /* ArkDeckClientKit */,
 				C20000000000000000000091 /* ArkTraceAppSupport */,
 				C20000000000000000000092 /* ArkTraceAnalysis */,
 				C20000000000000000000093 /* ArkTraceCore */,
@@ -494,6 +499,7 @@
 			packageProductDependencies = (
 				A10000000000000000000091 /* ArkDeckCore */,
 				A10000000000000000000093 /* ArkDeckWorkflows */,
+				A19000000000000000000002 /* ArkDeckClientKit */,
 				C20000000000000000000094 /* ArkTraceRendering */,
 			);
 			productName = ArkDeckHDCUITests;
@@ -894,6 +900,11 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		A19000000000000000000002 /* ArkDeckClientKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A10000000000000000000090 /* XCLocalSwiftPackageReference "Packages/ArkDeckKit" */;
+			productName = ArkDeckClientKit;
+		};
 		A10000000000000000000091 /* ArkDeckCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = A10000000000000000000090 /* XCLocalSwiftPackageReference "Packages/ArkDeckKit" */;
