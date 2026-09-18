@@ -4,7 +4,13 @@ mod bootstrap_readers;
 mod facade;
 #[cfg(target_os = "macos")]
 mod facade_owners;
+#[cfg(all(test, target_os = "macos"))]
+mod hdc_status_control;
 mod host;
+#[cfg(all(test, target_os = "macos"))]
+mod operation_availability_control;
+#[cfg(all(test, target_os = "macos"))]
+mod target_observation_control;
 
 use arkdeck_contract::MAX_REQUEST_BYTES;
 use arkdeck_control::Control;
@@ -111,6 +117,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             "jobs-state",
             "targets-state",
             "agent-executions",
+            "human-action-snapshots",
         ] {
             directory.private_child(name)?;
         }
@@ -134,6 +141,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
                 root.join("jobs-state"),
                 root.join("targets-state"),
                 root.join("agent-executions"),
+                root.join("human-action-snapshots"),
             ],
         )?;
         host.with_targets(arkdeck_hoststore::TargetStore::open(
@@ -156,6 +164,11 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         // executions; each owns a Job of this owner.
         .with_agent_executions(arkdeck_hoststore::AgentExecutionStore::open(
             &root.join("agent-executions"),
+        )?)
+        // Swift's combined human-action owner pages the executions' actions
+        // in its own directory beside them.
+        .with_human_actions(arkdeck_hoststore::HumanActionResources::open(
+            &root.join("human-action-snapshots"),
         )?)
         // Beside the Job state, as the Swift engine keeps it: read only.
         .with_capabilities(arkdeck_hoststore::CapabilityStore::open(

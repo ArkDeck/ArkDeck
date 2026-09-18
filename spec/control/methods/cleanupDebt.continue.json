@@ -22,6 +22,9 @@
     "request": {
       "additionalProperties": false,
       "properties": {
+        "bundleName": {
+          "type": "string"
+        },
         "jobId": {
           "type": "string"
         },
@@ -64,8 +67,8 @@
   "x-arkdeck-method": "cleanupDebt.continue",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 2,
-    "request": 4,
+    "error": 1,
+    "request": 3,
     "result": 2
   }
 }

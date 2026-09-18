@@ -302,6 +302,9 @@ pub(crate) fn mutation_error(error: ClientError, method: &str) -> CliError {
                     "job.cancel" => {
                         "the Job cancellation reply is unconfirmed; read the Job with job status to learn whether it was cancelled"
                     }
+                    "target.adopt" => {
+                        "the target adoption reply is unconfirmed; read the device candidates and the target list to learn whether it was adopted"
+                    }
                     _ => {
                         "the Job run reply is unconfirmed; read the Job with job status instead of running it again"
                     }

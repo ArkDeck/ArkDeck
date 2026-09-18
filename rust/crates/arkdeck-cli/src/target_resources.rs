@@ -57,7 +57,8 @@ pub(crate) fn configure(
         .transpose()?;
     let required: &[&str] = match command {
         "target.list" => &[],
-        "target.show" => &["targetId"],
+        "target.show" | "target.availability" => &["targetId"],
+        "target.adopt" => &["candidate", "observationId", "observationGeneration"],
         "target.display-name.set" => &["targetId", "expectedGeneration", "name"],
         "target.display-name.clear" => &["targetId", "expectedGeneration"],
         "device.display-name.set" => &[
@@ -78,6 +79,14 @@ pub(crate) fn configure(
         return Err(CliError::new(
             "invalidOption",
             "Target command requires its exact identity, generation and name options",
+        ));
+    }
+    // Swift `target adopt` reads its generation through the positive-integer
+    // option grammar, so a non-canonical one is a usage error, never sent.
+    if command == "target.adopt" && positive(&fields["observationGeneration"]).is_none() {
+        return Err(CliError::new(
+            "invalidOption",
+            "--observation-generation must be a canonical positive integer",
         ));
     }
     if fields
@@ -182,6 +191,39 @@ pub fn validate_target_response(invocation: &Invocation, value: &Value) -> Resul
         )
     };
     let params = invocation.params.as_ref().ok_or_else(invalid)?;
+    if method == "target.adopt" {
+        // Swift `target adopt`: exactly this observation's complete receipt.
+        let receipt = exact(
+            value,
+            &[
+                "outcome",
+                "targetId",
+                "bindingRevision",
+                "observationId",
+                "snapshotGeneration",
+            ],
+        ) && value["outcome"] == "adopted"
+            && value["targetId"]
+                .as_str()
+                .is_some_and(|target| !target.is_empty())
+            && value["bindingRevision"]
+                .as_i64()
+                .is_some_and(|revision| revision > 0)
+            && value["observationId"] == params["observationId"]
+            && value["snapshotGeneration"] == params["observationGeneration"];
+        return if receipt {
+            Ok(())
+        } else {
+            Err(CliError::new(
+                "outcomeUnknown",
+                "target adoption returned no matching complete receipt",
+            ))
+        };
+    }
+    if method == "target.availability" {
+        // One Runtime-owned aggregate, emitted as the Runtime answered it.
+        return Ok(());
+    }
     let valid = if method == "target.list" {
         value.as_array().is_some_and(|rows| {
             rows.len() <= 4096

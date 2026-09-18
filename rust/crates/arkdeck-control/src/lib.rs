@@ -8,6 +8,7 @@ use arkdeck_contract::{
 };
 use serde_json::{Value, json};
 mod operation_description;
+mod target_availability;
 
 /// The composition root supplies local resources and device observations.
 /// This interface provides no device mutation or authority administration.
@@ -18,6 +19,17 @@ pub enum BootstrapRegistryKind {
 }
 
 pub trait HostServices: Send + Sync {
+    /// Fresh host-scoped provider/dispatcher/Artifact availability. None means
+    /// no provider is registered; an empty reason list means available on this
+    /// host, never target admission. Implementations must not dispatch.
+    fn operation_availability(
+        &self,
+        _reference: &str,
+        _provider: &str,
+    ) -> Option<Vec<(&'static str, String)>> {
+        None
+    }
+
     fn import_resource(
         &self,
         _method: &str,
@@ -135,6 +147,20 @@ pub trait HostServices: Send + Sync {
     /// read, list and abandon agent executions. A host without an agent
     /// execution owner answers as the read-only foundation always has.
     fn agent_execution(
+        &self,
+        _method: &str,
+        _params: &serde_json::Map<String, Value>,
+    ) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "rejected".into(),
+            message: "this method is unavailable in the read-only Rust foundation".into(),
+            details: None,
+        })
+    }
+    /// `human-action.list` and `human-action.show` read the physical
+    /// assistance agent executions ask for. A host without the human-action
+    /// owner answers as the read-only foundation always has.
+    fn human_action(
         &self,
         _method: &str,
         _params: &serde_json::Map<String, Value>,
@@ -264,6 +290,15 @@ pub trait HostServices: Send + Sync {
             details: None,
         })
     }
+    /// `runtime.hdc.status`: the live HDC status the Runtime answers. A host
+    /// without it keeps the foundation's refusal.
+    fn runtime_hdc_status(&self) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "rejected".into(),
+            message: "this method is unavailable in the read-only Rust foundation".into(),
+            details: None,
+        })
+    }
     fn history_filter(
         &self,
         _method: &str,
@@ -317,6 +352,29 @@ pub trait HostServices: Send + Sync {
             ])),
         })
     }
+    /// `device.observations` following an observation reference. A host
+    /// without a retained snapshot answers that this Runtime does not retain
+    /// it.
+    fn observations_following(
+        &self,
+        reference: &Value,
+    ) -> Result<DeviceObservationsResult, WireError> {
+        Err(observation_refusal(
+            "resourceConflict",
+            "the referenced observation is not retained by this Runtime",
+            Some(reference),
+        ))
+    }
+    /// `target.adopt`: the device of one exact observation adopted as a
+    /// Target. A host without the Target observation owner keeps the
+    /// foundation's refusal.
+    fn target_adopt(&self, _params: &serde_json::Map<String, Value>) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "rejected".into(),
+            message: "this method is unavailable in the read-only Rust foundation".into(),
+            details: None,
+        })
+    }
     fn observed_at(&self) -> String;
     fn hdc_status(&self, deep: bool) -> HdcStatus;
     fn observations(&self) -> Result<DeviceObservationsResult, WireError>;
@@ -348,6 +406,7 @@ impl HdcStatus {
 pub struct Control<H> {
     host: H,
     operations: Value,
+    providers: Vec<String>,
 }
 
 impl<H: HostServices> Control<H> {
@@ -357,9 +416,9 @@ impl<H: HostServices> Control<H> {
         }
         let catalog: Vec<Value> =
             serde_json::from_str(CATALOG_CANONICAL_JSON).map_err(|_| ContractError::Malformed)?;
-        // This foundation owns discovery, not the full HDC operation provider.
-        // Advertising an available operation before its lowering exists would
-        // claim an execution path the daemon cannot provide.
+        // Cache only Catalog metadata and the unregistered fallback. Fresh
+        // host availability replaces that fallback at each discovery request;
+        // publishing a descriptor alone never registers its provider.
         let operations = Value::Array(catalog.iter().map(|d| {
             let reference = match d["version"].as_u64() {
                 Some(version) => format!("{}@{version}", d["id"].as_str().expect("Catalog id")),
@@ -371,7 +430,57 @@ impl<H: HostServices> Control<H> {
                 "reasons":[format!("provider {} is not registered",d["provider"].as_str().expect("Catalog provider"))]})
         }).collect());
         validate_method_value("operation.list", "result", &operations)?;
-        Ok(Self { host, operations })
+        let providers = catalog
+            .iter()
+            .map(|d| d["provider"].as_str().expect("Catalog provider").to_owned())
+            .collect();
+        Ok(Self {
+            host,
+            operations,
+            providers,
+        })
+    }
+
+    /// The same fresh projection feeds discovery and descriptor views. Keep
+    /// metadata cached, but never cache provider or executable availability.
+    pub fn operation_availability(&self) -> Value {
+        let items: Vec<_> = self
+            .operations
+            .as_array()
+            .expect("Catalog operations")
+            .iter()
+            .zip(&self.providers)
+            .map(|(base, provider)| {
+                let mut item = base.clone();
+                if let Some(reasons) = self.host.operation_availability(
+                    base["reference"].as_str().expect("Catalog reference"),
+                    provider,
+                ) {
+                    item["availability"] = json!(if reasons.is_empty() {
+                        "available"
+                    } else {
+                        "unavailable"
+                    });
+                    item["reasons"] =
+                        json!(reasons.iter().map(|(_, reason)| reason).collect::<Vec<_>>());
+                    item["reasonCodes"] =
+                        json!(reasons.iter().map(|(code, _)| code).collect::<Vec<_>>());
+                    item["reasonOrigins"] = json!(
+                        reasons
+                            .iter()
+                            .map(|(code, _)| match *code {
+                                "provider_not_registered"
+                                | "operation_not_supported"
+                                | "workspace_preset_not_offered" => "product_build",
+                                _ => "host_configuration",
+                            })
+                            .collect::<Vec<_>>()
+                    );
+                }
+                item
+            })
+            .collect();
+        Value::Array(items)
     }
 
     /// Payload excludes its LF delimiter. Every path returns one bounded frame.
@@ -418,7 +527,7 @@ impl<H: HostServices> Control<H> {
                 Response::failure(&request.id, "invalidParams", "health accepts no parameters")
             }
             "operation.list" if params.is_empty() => {
-                Response::success(&request.id, self.operations.clone())
+                Response::success(&request.id, self.operation_availability())
             }
             "operation.list" => Response::failure(
                 &request.id,
@@ -434,8 +543,8 @@ impl<H: HostServices> Control<H> {
                     )
                 } else {
                     let reference = params["reference"].as_str().expect("checked reference");
-                    match self
-                        .operations
+                    let operations = self.operation_availability();
+                    match operations
                         .as_array()
                         .expect("Catalog operations")
                         .iter()
@@ -479,6 +588,10 @@ impl<H: HostServices> Control<H> {
                     )
                 }
             }
+            "target.availability" => Response {
+                id: request.id.clone(),
+                outcome: self.target_availability(&params),
+            },
             "target.list"
             | "target.show"
             | "target.display-name.set"
@@ -499,15 +612,16 @@ impl<H: HostServices> Control<H> {
                         None,
                     )
                 } else if let Some(reference) = params.get("following") {
-                    // No durable relation or retained snapshot exists in this
-                    // foundation. Do not turn a caller reference into identity.
+                    // Only the host's own snapshot can retain an observation;
+                    // a caller's reference never becomes identity.
                     if valid_observation_reference(reference) {
-                        observation_failure(
-                            &request.id,
-                            "resourceConflict",
-                            "the referenced observation is not retained by this Runtime",
-                            Some(reference),
-                        )
+                        Response {
+                            id: request.id.clone(),
+                            outcome: self
+                                .host
+                                .observations_following(reference)
+                                .and_then(encode_observations),
+                        }
                     } else {
                         observation_failure(
                             &request.id,
@@ -519,16 +633,14 @@ impl<H: HostServices> Control<H> {
                 } else {
                     Response {
                         id: request.id.clone(),
-                        outcome: self.host.observations().and_then(|snapshot| {
-                            serde_json::to_value(snapshot).map_err(|_| WireError {
-                                code: "internalError".into(),
-                                message: "observation encoding failed".into(),
-                                details: None,
-                            })
-                        }),
+                        outcome: self.host.observations().and_then(encode_observations),
                     }
                 }
             }
+            "target.adopt" => Response {
+                id: request.id.clone(),
+                outcome: self.host.target_adopt(&params),
+            },
             "trace.cache.purge" if params.is_empty() => Response {
                 id: request.id.clone(),
                 outcome: self.host.trace_cache_purge(),
@@ -819,6 +931,10 @@ impl<H: HostServices> Control<H> {
                 id: request.id.clone(),
                 outcome: self.host.agent_execution(&request.method, &params),
             },
+            "human-action.list" | "human-action.show" => Response {
+                id: request.id.clone(),
+                outcome: self.host.human_action(&request.method, &params),
+            },
             // Swift reads no parameter of a quota request.
             "artifact.quota" => Response {
                 id: request.id.clone(),
@@ -851,6 +967,17 @@ impl<H: HostServices> Control<H> {
                     outcome: self.host.runtime_storage(&request.method, &params),
                 }
             }
+            // As Swift's handler: a caller's facts are refused before any
+            // observation.
+            "runtime.hdc.status" if params.is_empty() => Response {
+                id: request.id.clone(),
+                outcome: self.host.runtime_hdc_status(),
+            },
+            "runtime.hdc.status" => Response::failure(
+                &request.id,
+                "invalidParams",
+                "live HDC status does not accept caller facts or paths",
+            ),
             _ => Response::failure(
                 &request.id,
                 "rejected",
@@ -1033,9 +1160,9 @@ fn valid_observation_reference(value: &Value) -> bool {
             })
 }
 
-fn observation_failure(id: &str, code: &str, message: &str, reference: Option<&Value>) -> Response {
-    // All callers are before the host entry; this proof is local, not inferred
-    // from a timeout, lost reply or external observation failure.
+/// A device observation refused before admission: no new dispatch, and the
+/// observation reference the request named, if any.
+pub fn observation_refusal(code: &str, message: &str, reference: Option<&Value>) -> WireError {
     let mut details = serde_json::Map::from_iter([
         ("phase".into(), json!("preAdmission")),
         ("newDispatchCount".into(), json!(0)),
@@ -1045,14 +1172,28 @@ fn observation_failure(id: &str, code: &str, message: &str, reference: Option<&V
             details.insert(key.into(), reference[key].clone());
         }
     }
+    WireError {
+        code: code.into(),
+        message: message.into(),
+        details: Some(details),
+    }
+}
+
+fn observation_failure(id: &str, code: &str, message: &str, reference: Option<&Value>) -> Response {
+    // All callers are before the host entry; this proof is local, not inferred
+    // from a timeout, lost reply or external observation failure.
     Response {
         id: id.into(),
-        outcome: Err(WireError {
-            code: code.into(),
-            message: message.into(),
-            details: Some(details),
-        }),
+        outcome: Err(observation_refusal(code, message, reference)),
     }
+}
+
+fn encode_observations(snapshot: DeviceObservationsResult) -> Result<Value, WireError> {
+    serde_json::to_value(snapshot).map_err(|_| WireError {
+        code: "internalError".into(),
+        message: "observation encoding failed".into(),
+        details: None,
+    })
 }
 
 fn frame_id(bytes: &[u8]) -> String {

@@ -102,3 +102,31 @@ The amend after r1 only fills in this row.
 - **Recovery epochs.** Swift's lineage check first reads the superseding recovery epochs, which
   creates their lock in the state root. Neither is served, because both are recovery.
 - No device, no real HDC.
+
+## Current-main integration (2026-09-19)
+
+PR #1968 remained open at `fcda0ca038119017fe422ea92778bbadad283aae` when
+rechecked. Merged current protected-main `1ee1d73d` into the PR branch. The two
+`agentd/host.rs` conflicts retain both the original DeviceHolds/authority wiring
+and main's Target observation, USB source and human-action owners. Main's new
+read-only HAR fixture explicitly supplies `authority: None` to the extended
+JobAdmitter; its prior behavior is preserved. No policy, capability lineage,
+allowance, dispatch or recovery semantics were changed for conflict resolution.
+
+Targeted integration checks: `cargo check -p arkdeck-agentd -p arkdeck-hoststore
+--tests` passed. Hoststore `pointer_input_submit` (3 cases including unknown
+outcome and competing-session refusals), `agent_execution`, `agent_lifecycle`
+and `agent_human_action_raise` passed (6 tests total). `cargo fmt --all --check`, both packages' all-target Clippy with `-D warnings`,
+and staged diff whitespace checks also passed.
+
+The required unified planner was run against origin/main with merge-base and
+include-worktree. The first attempt was stopped by sandbox permissions on the
+shared SwiftPM cache. The second attempt with the necessary host permissions
+passed common checks, then failed compiling unchanged main code under SDK 6.4:
+`ArkDeckOpenHarmony.swift:745` uses deprecated `String(cString:)`, treated as an
+error. Logs: `/private/tmp/arkdeck-capability-1968-unified-20260919.log` and
+`/private/tmp/arkdeck-capability-1968-unified-20260919-r2.log`. This is the known
+main SDK compatibility issue addressed in PR #1976; this capability slice does
+not duplicate that unrelated fix. At that attempt full validation had not passed,
+and the merge was left uncommitted/unpushed. The integration continuation below
+records the subsequent explicit dependency and final validation separately.

@@ -23,7 +23,11 @@ pub use job_repository::{AdmissionVerdict, JobWriteError};
 #[cfg(target_os = "macos")]
 mod job_plan;
 #[cfg(target_os = "macos")]
+mod operation_availability;
+#[cfg(target_os = "macos")]
 pub use job_plan::{AnalyzerProfile, JobPlanner, PlanRefusal};
+#[cfg(target_os = "macos")]
+pub use operation_availability::{OperationAvailabilityContext, operation_unavailability};
 #[cfg(target_os = "macos")]
 mod device_facts;
 #[cfg(target_os = "macos")]
@@ -41,7 +45,11 @@ pub use job_admission::{AdmissionRefusal, JobAdmitter, MutationAuthority, runtim
 #[cfg(target_os = "macos")]
 mod agent_execution;
 #[cfg(target_os = "macos")]
-pub use agent_execution::{AgentAnswer, AgentEngine, AgentExecutionStore, AgentStart};
+pub use agent_execution::{AgentAnswer, AgentEngine, AgentExecutionStore, AgentStart, Observing};
+#[cfg(target_os = "macos")]
+mod human_action;
+#[cfg(target_os = "macos")]
+pub use human_action::HumanActionResources;
 #[cfg(target_os = "macos")]
 mod analyzer_output;
 #[cfg(target_os = "macos")]

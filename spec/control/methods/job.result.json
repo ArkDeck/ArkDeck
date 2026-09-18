@@ -281,7 +281,10 @@
                       "type": "string"
                     },
                     "artifactDigest": {
-                      "type": "string"
+                      "type": [
+                        "null",
+                        "string"
+                      ]
                     },
                     "consumptionFingerprintSha256": {
                       "type": [
@@ -863,7 +866,7 @@
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
     "error": 5,
-    "request": 23,
-    "result": 18
+    "request": 34,
+    "result": 29
   }
 }

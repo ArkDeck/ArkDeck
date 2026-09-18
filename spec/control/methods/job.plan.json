@@ -72,10 +72,20 @@
         },
         "inputs": {
           "additionalProperties": {
-            "type": [
-              "boolean",
-              "integer",
-              "string"
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": [
+                  "boolean",
+                  "integer",
+                  "string"
+                ]
+              }
             ]
           },
           "type": "object"
@@ -177,7 +187,7 @@
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
     "error": 72,
-    "request": 80,
-    "result": 8
+    "request": 81,
+    "result": 9
   }
 }

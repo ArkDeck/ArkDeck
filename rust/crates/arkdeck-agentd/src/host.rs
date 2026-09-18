@@ -14,6 +14,18 @@ struct ObservationState {
     snapshot: Option<DeviceObservationsResult>,
 }
 
+/// The Target observation owner's answer as the control layer's typed result.
+#[cfg(target_os = "macos")]
+fn typed_observations(
+    answer: Result<serde_json::Value, arkdeck_hoststore::ObservationError>,
+) -> Result<DeviceObservationsResult, WireError> {
+    serde_json::from_value(answer.map_err(|error| error.wire())?).map_err(|_| WireError {
+        code: "internalError".into(),
+        message: "observation encoding failed".into(),
+        details: None,
+    })
+}
+
 /// The Artifact quota the Swift daemon composes (`ArtifactQuota()`).
 #[cfg(target_os = "macos")]
 pub(crate) const ARTIFACT_QUOTA: u64 = 8 * 1024 * 1024 * 1024;
@@ -103,6 +115,18 @@ pub struct Host {
     /// `deviceSessionHolds`).
     #[cfg(target_os = "macos")]
     holds: arkdeck_hoststore::DeviceHolds,
+    /// The Runtime's Target observation owner over the development HDC.
+    #[cfg(target_os = "macos")]
+    target_observations: arkdeck_hoststore::TargetObservations,
+    /// Who reads the live USB relations that prove an observation's
+    /// physical identity. By default nothing is read, until the ArkForge
+    /// lane's reader lands, so no observation is proved and nothing can be
+    /// adopted.
+    #[cfg(target_os = "macos")]
+    usb: std::sync::Arc<dyn arkdeck_provider_hdc::UsbRelations + Send + Sync>,
+    /// The combined human-action owner over the agent executions.
+    #[cfg(target_os = "macos")]
+    human_actions: Option<arkdeck_hoststore::HumanActionResources>,
 }
 
 impl Host {
@@ -159,6 +183,54 @@ impl Host {
         dispatch: Option<arkdeck_provider_hdc::ProcessDispatch>,
     ) -> Self {
         self.hdc = dispatch.map(std::sync::Arc::new);
+        self
+    }
+    /// The USB relations the Target observation owner reads. Only tests
+    /// compose them until a development source lands.
+    #[cfg(all(test, target_os = "macos"))]
+    pub fn with_usb_relations(
+        mut self,
+        usb: std::sync::Arc<dyn arkdeck_provider_hdc::UsbRelations + Send + Sync>,
+    ) -> Self {
+        self.usb = usb;
+        self
+    }
+    /// Runs `run` over the Target observation owner's sources — the
+    /// development HDC, the USB relations, the Target store and the clock —
+    /// when this composition has them.
+    #[cfg(target_os = "macos")]
+    fn observe<T>(&self, run: impl FnOnce(&arkdeck_hoststore::Sources<'_>) -> T) -> Option<T> {
+        let (dispatch, targets) = (self.hdc.as_ref()?, self.targets.as_ref()?);
+        Some(run(&arkdeck_hoststore::Sources {
+            dispatch: &**dispatch,
+            relations: &*self.usb,
+            targets,
+            now: &utc_now,
+        }))
+    }
+    /// The Target observation owner an execution that names no target
+    /// observes through, when this composition has its sources.
+    #[cfg(target_os = "macos")]
+    fn observing(&self) -> Option<arkdeck_hoststore::Observing<'_>> {
+        let (dispatch, targets) = (self.hdc.as_ref()?, self.targets.as_ref()?);
+        Some(arkdeck_hoststore::Observing {
+            owner: &self.target_observations,
+            sources: arkdeck_hoststore::Sources {
+                dispatch: &**dispatch,
+                relations: &*self.usb,
+                targets,
+                now: &utc_now,
+            },
+        })
+    }
+    /// `human-action.list` and `human-action.show` read the physical
+    /// assistance this owner's agent executions ask for.
+    #[cfg(target_os = "macos")]
+    pub fn with_human_actions(
+        mut self,
+        resources: arkdeck_hoststore::HumanActionResources,
+    ) -> Self {
+        self.human_actions = Some(resources);
         self
     }
     #[cfg(target_os = "macos")]
@@ -354,11 +426,48 @@ impl Host {
             agents: None,
             #[cfg(target_os = "macos")]
             holds: Default::default(),
+            #[cfg(target_os = "macos")]
+            target_observations: Default::default(),
+            #[cfg(target_os = "macos")]
+            usb: std::sync::Arc::new(arkdeck_provider_hdc::NoUsbRelations),
+            #[cfg(target_os = "macos")]
+            human_actions: None,
         }
     }
 }
 
 impl HostServices for Host {
+    #[cfg(target_os = "macos")]
+    fn operation_availability(
+        &self,
+        reference: &str,
+        provider: &str,
+    ) -> Option<Vec<(&'static str, String)>> {
+        arkdeck_hoststore::operation_unavailability(
+            reference,
+            provider,
+            &arkdeck_hoststore::OperationAvailabilityContext {
+                planning_owner: self.planning.is_some(),
+                job_owner: self.jobs.is_some(),
+                artifacts: self.artifacts.is_some(),
+                analyzer: self
+                    .planning
+                    .as_ref()
+                    .and_then(|(_, analyzer)| analyzer.as_ref()),
+                hdc_registered: self.hdc.is_some() && self.targets.is_some(),
+                hdc_tool_current: if provider == "hdc"
+                    && ["observe.device@1", "capture.diagnostics@1"].contains(&reference)
+                {
+                    self.hdc
+                        .as_ref()
+                        .is_some_and(|dispatch| dispatch.tool_identity_current())
+                } else {
+                    false
+                },
+            },
+        )
+    }
+
     #[cfg(target_os = "macos")]
     fn import_resource(
         &self,
@@ -590,6 +699,7 @@ impl HostServices for Host {
             jobs,
             admitter: &admitter,
             now: arkdeck_hoststore::runtime_precise_now,
+            observations: self.observing(),
         };
         let answer = agents.advance(method, params, &engine)?;
         if let Some(start) = answer.start {
@@ -605,6 +715,27 @@ impl HostServices for Host {
             jobs,
             &arkdeck_hoststore::JobResultReader { jobs, artifacts },
         )
+    }
+
+    /// `human-action.list` and `human-action.show`, as the Swift daemon
+    /// answers them with its combined human-action owner.
+    #[cfg(target_os = "macos")]
+    fn human_action(
+        &self,
+        method: &str,
+        params: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<serde_json::Value, WireError> {
+        let (Some(agents), Some(resources)) = (&self.agents, &self.human_actions) else {
+            return Err(WireError {
+                code: "operationUnavailable".into(),
+                message: "AgentExecution owner is unavailable".into(),
+                details: Some(serde_json::Map::from_iter([
+                    ("phase".into(), serde_json::json!("preAdmission")),
+                    ("newDispatchCount".into(), serde_json::json!(0)),
+                ])),
+            });
+        };
+        resources.answer(method, params, agents)
     }
 
     #[cfg(target_os = "macos")]
@@ -1248,6 +1379,13 @@ impl HostServices for Host {
         })?;
         store.handle(method, params, &utc_now())
     }
+    /// Swift's daemon answers from the observer its HDC host gives it, and
+    /// `unconfigured()` without one. This composition starts no managed HDC
+    /// server, so it answers as Swift's daemon without its HDC host does.
+    #[cfg(target_os = "macos")]
+    fn runtime_hdc_status(&self) -> Result<serde_json::Value, WireError> {
+        Ok(arkdeck_provider_hdc::unconfigured_status(None))
+    }
 
     fn observed_at(&self) -> String {
         utc_now()
@@ -1274,12 +1412,61 @@ impl HostServices for Host {
             reason_code: reason.into(),
         }
     }
+    #[cfg(target_os = "macos")]
+    fn observations_following(
+        &self,
+        reference: &serde_json::Value,
+    ) -> Result<DeviceObservationsResult, WireError> {
+        let empty = serde_json::Map::new();
+        let fields = reference.as_object().unwrap_or(&empty);
+        match self.observe(|sources| {
+            let reference = arkdeck_hoststore::parse_reference(fields)?;
+            self.target_observations
+                .snapshot(sources, Some(&reference))
+                .and_then(|snapshot| snapshot.answer(sources.targets))
+        }) {
+            Some(answer) => typed_observations(answer),
+            None => Err(arkdeck_control::observation_refusal(
+                "resourceConflict",
+                "the referenced observation is not retained by this Runtime",
+                Some(reference),
+            )),
+        }
+    }
+    #[cfg(target_os = "macos")]
+    fn target_adopt(
+        &self,
+        params: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<serde_json::Value, WireError> {
+        match self.observe(|sources| {
+            let reference = arkdeck_hoststore::parse_reference(params)?;
+            self.target_observations
+                .adopt(sources, &reference)
+                .map(|adopted| arkdeck_hoststore::adoption_answer(&adopted, &reference))
+        }) {
+            Some(answer) => answer.map_err(|error| error.wire()),
+            None => Err(WireError {
+                code: "rejected".into(),
+                message: "this method is unavailable in the read-only Rust foundation".into(),
+                details: None,
+            }),
+        }
+    }
     fn observations(&self) -> Result<DeviceObservationsResult, WireError> {
         let fail = |message: &str| WireError {
             code: "rejected".into(),
             message: message.into(),
             details: None,
         };
+        // With the development HDC, the Target observation owner observes.
+        #[cfg(target_os = "macos")]
+        if let Some(answer) = self.observe(|sources| {
+            self.target_observations
+                .snapshot(sources, None)
+                .and_then(|snapshot| snapshot.answer(sources.targets))
+        }) {
+            return typed_observations(answer);
+        }
         let Some(provider) = &self.provider else {
             return Err(fail(self.unavailable));
         };

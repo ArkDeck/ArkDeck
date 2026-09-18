@@ -150,6 +150,7 @@ fn owner<T>(root: &Root, now: Clock, body: impl FnOnce(&dyn Fn(&str, Value) -> A
         targets: &targets,
         jobs: &jobs,
         admitter: &admitter,
+        observations: None,
         now,
     };
     body(&|method, params| {

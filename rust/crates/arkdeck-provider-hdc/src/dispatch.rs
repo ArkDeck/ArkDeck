@@ -49,6 +49,13 @@ impl ProcessDispatch {
         std::env::var(SERVER_PORT_VARIABLE).ok()
     }
 
+    /// Revalidate the retained executable without launching a process. This
+    /// is host discovery only; dispatch still revalidates at its own boundary.
+    #[cfg(target_os = "macos")]
+    pub fn tool_identity_current(&self) -> bool {
+        self.tool.launch_identity().is_ok()
+    }
+
     pub fn tool_sha256(&self) -> &str {
         self.tool.sha256()
     }

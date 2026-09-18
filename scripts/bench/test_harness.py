@@ -123,6 +123,37 @@ class HostGuardTests(unittest.TestCase):
 
 
 class SocketPathTests(unittest.TestCase):
+    def test_unknown_runtime_is_refused_before_spawn(self) -> None:
+        with self.assertRaises(ValueError):
+            harness.IsolatedRuntime(pathlib.Path("/bin/true"), pathlib.Path("/tmp/a"),
+                                    runtime_kind="guess")
+
+    def test_launch_configuration_is_isolated_for_both_runtimes(self) -> None:
+        inherited = {"PATH": "/usr/bin", "ARKDECK_SWIFT_DAEMON": "/unexpected",
+                     "ARKDECK_ENDPOINT": "/installed.sock",
+                     "ARKDECK_DEVELOPMENT_HDC_PATH": "/fixture",
+                     "ARKDECK_HDC_PATH": "/hdc",
+                     "ARKDECK_ANALYZER_PATH": "/analyzer"}
+        for kind in ("swift", "rust"):
+            with self.subTest(kind=kind), mock.patch.dict(os.environ, inherited, clear=True), \
+                    mock.patch.object(harness.subprocess, "Popen") as spawn:
+                spawn.return_value.poll.return_value = 1
+                runtime = harness.IsolatedRuntime(pathlib.Path("/daemon"),
+                                                  pathlib.Path("/tmp/private"),
+                                                  runtime_kind=kind)
+                with self.assertRaises(harness.DaemonStartFailed):
+                    runtime.start()
+                args, kwargs = spawn.call_args
+                expected = ["/daemon"] if kind == "rust" else ["/daemon", "--state-dir", "/tmp/private"]
+                self.assertEqual(args[0], expected)
+                environment = kwargs["env"]
+                self.assertEqual(environment["PATH"], "/usr/bin")
+                arkdeck = {k: v for k, v in environment.items() if k.startswith("ARKDECK_")}
+                self.assertEqual(arkdeck, {
+                    "ARKDECK_DEVELOPMENT_STATE_ROOT": "/tmp/private",
+                    "ARKDECK_ENDPOINT": "/tmp/private/agentd.sock",
+                } if kind == "rust" else {})
+
     def test_an_over_long_socket_path_is_refused_before_spawning(self) -> None:
         long_directory = pathlib.Path("/tmp/" + "d" * 200)
         with self.assertRaises(ValueError):
@@ -160,6 +191,16 @@ class ResourceSampleTests(unittest.TestCase):
 
 
 class ControlClientTests(unittest.TestCase):
+    def test_failed_contract_verification_closes_the_connection(self) -> None:
+        client = control.ControlClient("fixture")
+        with mock.patch.object(client, "connect"), \
+                mock.patch.object(client, "verify_contract", side_effect=control.ControlError("old")), \
+                mock.patch.object(client, "close") as close:
+            with self.assertRaises(control.ControlError):
+                with client:
+                    self.fail("unverified client entered")
+            close.assert_called_once()
+
     def test_a_call_before_contract_verification_is_refused(self) -> None:
         client = control.ControlClient("/nonexistent.sock")
         with self.assertRaises(control.ControlError):

@@ -937,9 +937,17 @@ action in the same write.
 page, 100 by default); the snapshots live with the Job owner
 (`jobs-state/cli-job-snapshots`), not in the Artifact root.
 
-Not served yet: an execution without a target, so nothing here raises an action;
-`agent.resume` and `human-action.*`. A restart leaves an owned Job as it is:
-nothing resumes a run (L.1 item 13).
+An execution that names no target, for an operation that binds a device, takes
+one observation through the Target observation owner and, when a person must
+act, raises Swift's action: `connectDevice` for no device, `selectDevice` for
+several, and `trustDevice` or `connectDevice` naming the one observed device
+that is not authorized and connected. A connected device whose physical identity
+is unproved is refused with `admissionDenied`. One whose identity is proved is
+refused as not served yet: Swift adopts it inside the run, which no oracle
+records. `human-action.list` and `human-action.show` are the combined
+human-action owner's (`human_action.rs`, paged in `human-action-snapshots`).
+Not served yet: `agent.resume`, `human-action.resume` and adoption. A restart
+leaves an owned Job as it is: nothing resumes a run (L.1 item 13).
 
 `rust/tests/fixtures/agent-execution/` is the oracle Swift
 `AgentExecutionOracleContractTests` records over the shared fake HDC with the
@@ -967,8 +975,11 @@ that name no target, the actions they raise, their resumes and the human-action
 routes. `tests/agent_human_action_records.rs` seeds its execution records, the
 identities the oracle labelled (`<har-1>`) read as valid ones of their kind, and
 answers them as the oracle recorded: the waiting execution read, listed, run
-again and abandoned, and the abandoned one run again. Replaying the whole
-fixture waits for the Target observation owner and the resume path.
+again and abandoned, and the abandoned one run again.
+`tests/agent_human_action_raise.rs` replays, in recorded order over the shared
+fake, the 19 exchanges that need no adoption, resume or Job: the raises, the
+reads, and the list and show refusals. Replaying the rest waits for the resume
+path.
 
 The Rust CLI runs them as the Swift CLI does. `arkdeck agent run --operation
 <reference> --target <id> [--expected-binding-revision <n>] [--inputs-file
@@ -1002,11 +1013,20 @@ candidate names require the current Runtime observation reference and expire on
 refresh or restart. A lost or invalid name-write reply is `outcomeUnknown`; the
 CLI never replays it.
 
-The daemon's candidate observations still come from the configured HDC read-only
-provider, until its routes move to the owner below. The daemon cannot select an
-execution route or write alias history. `target.show` leaves the absent Bootstrap
-warm presentation and confirmed Job-observation sources as `null`. Existing
-adopted names can be projected onto actually observed provider addresses.
+With the development HDC, the daemon answers `device.observations` (following a
+reference too) and `target.adopt` through the owner below. Its USB relations are
+the production stand-in, which reads none until the ArkForge lane's reader lands,
+so the daemon proves and adopts nothing yet. A host composed with relations
+(`Host::with_usb_relations`, which only tests compose until a development source
+lands) proves and adopts as Swift does. Candidate display
+names stay on the provider snapshot's path until Swift's coordinator is recorded
+for them, so with the development HDC they find no current snapshot
+(`resourceConflict`). Without the development HDC, observations keep the
+read-only provider's path. The daemon cannot select an execution route or write
+alias history.
+`target.show` leaves the absent Bootstrap warm presentation and confirmed
+Job-observation sources as `null`. Existing adopted names can be projected onto
+actually observed provider addresses.
 
 `TargetObservations` (`target_observation.rs`, TASK-XPA-014) is Swift's
 `TargetObservationCoordinator`. Every device list is bracketed by two reads of
@@ -1030,7 +1050,9 @@ identity readback and a final relation read. Its refusals carry Swift's codes:
 The snapshot, the generations and the receipts live in memory, as in Swift.
 `tests/target_adoption.rs` replays Swift's `TargetAdoptionOracleContractTests`
 (`rust/tests/fixtures/target-adoption`) byte for byte: its answers, the fake's
-calls, `targets.json` and the display names.
+calls, `targets.json` and the display names. `target_observation_control.rs`, in
+agentd, replays the same fixture through `Control` with the daemon's own host, on
+the host's clock, so every time there reads as `<time>`.
 
 `rust/scripts/check-target-resources.py --swift-target-store <fixture-directory>`
 checks actual Rust endpoint/CLI behavior from bytes exported by the Swift contract
@@ -1038,6 +1060,20 @@ producer; `--cli-path` selects a current Swift consumer. The fixture is explicit
 simulated host-test data. Run it after current Swift producer recording and schema
 generation; it checks typed refusals as well as CAS, restart and binding-byte
 preservation. No hardware acceptance is claimed by this harness.
+
+The Rust CLI's `target adopt --candidate <key> --observation <id>
+--observation-generation <n>` and `target availability --target <id>` are
+Swift's leaves (TASK-XPA-014). An adoption is a mutation: its answer must be
+exactly the receipt of that observation (`adopted`, a Target, a positive binding
+revision, and the request's observation and generation), or it is
+`outcomeUnknown` (75) and never replayed. A Runtime refusal keeps its code
+(`resourceConflict`, `targetTrustPending`, `admissionDenied`, `factsDrifted`,
+`operationUnavailable`) only with the pre-admission zero-dispatch proof. The
+generation follows Swift's positive-integer grammar, so a leading zero is a usage
+error that is never sent. Availability is one bounded read of the Runtime's
+aggregate, emitted as it answered. `crates/arkdeck-cli/tests/target_adoption.rs`
+replays Swift's argv fixtures and serves every answer of the Target adoption
+oracle to the actual CLI.
 
 ## macOS HDC server identity (TASK-XPA-016, SPK-6)
 
@@ -1193,11 +1229,21 @@ Swift: a server another user owns is `hdc.identityUnknown` rather than an
 observed identity, and the deadline abandons the scan rather than
 cancelling it. `tests/hdc_status.rs` replays the Swift oracle
 (`rust/tests/fixtures/hdc-status`, twenty-two cases at a fixed root under
-the oracle's lock) byte for byte. The `runtime.hdc.status` method arm in
-`arkdeck-control`, and the corpus and schema regeneration the live-valued
-object needs (the published schema was derived from frames that carry only
-nulls for `generation`, `processId` and `clientVersion`), are the method
-owner's.
+the oracle's lock) byte for byte.
+
+The published schema admits these live values. It was re-derived (TASK-XPA-014)
+from the frames Swift's daemon answers through its handler for these cases and
+for a registered tool. `arkdeck-control` serves `runtime.hdc.status` through
+`HostServices::runtime_hdc_status`. A request that names any parameter is
+refused with `invalidParams` ("live HDC status does not accept caller facts or
+paths") before the host is asked. The macOS host of `arkdeck-agentd` starts no
+managed HDC server, so it answers `unconfigured_status(None)`, as Swift's daemon
+does without its HDC host. On other platforms the method keeps the foundation's
+refusal. `hdc_status_control.rs` in agentd sends every oracle case through
+`Control`, behind a host that composes the observer per request, and each
+answer is the oracle's snapshot byte for byte. Composing the observer over a
+managed HDC server that the daemon starts is next.
+
 ## Capture file legs (TASK-XPA-016, M1)
 
 `arkdeck_provider_hdc::FileAction` is Swift's HDC provider for the legs of

@@ -1,0 +1,162 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "target",
+        "adopt",
+        "--candidate",
+        "sample",
+        "--observation",
+        "sample",
+        "--observation-generation",
+        "1"
+      ],
+      "expected": {
+        "command": "target.adopt",
+        "handlerArguments": [
+          "target",
+          "adopt",
+          "--candidate",
+          "sample",
+          "--observation",
+          "sample",
+          "--observation-generation",
+          "1"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "target",
+        "adopt",
+        "--help"
+      ],
+      "expected": {
+        "command": "target.adopt",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "target",
+        "adopt",
+        "--candidate",
+        "sample",
+        "--observation",
+        "sample",
+        "--observation-generation",
+        "1",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "target.adopt",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "target",
+        "adopt",
+        "--candidate",
+        "sample",
+        "--observation",
+        "sample",
+        "--observation-generation",
+        "1",
+        "--candidate",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "target.adopt",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "target",
+        "adopt"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "target.adopt",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "target",
+        "adopt",
+        "--candidate",
+        "sample",
+        "--observation",
+        "sample",
+        "--observation-generation",
+        "1",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "target.adopt",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "target",
+        "adopt",
+        "--candidate",
+        "sample",
+        "--observation",
+        "sample",
+        "--observation-generation",
+        "1",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "target.adopt",
+        "handlerArguments": [
+          "target",
+          "adopt",
+          "--candidate",
+          "sample",
+          "--observation",
+          "sample",
+          "--observation-generation",
+          "1",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "target.adopt",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "target",
+    "adopt"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

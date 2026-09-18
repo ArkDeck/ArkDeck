@@ -320,15 +320,19 @@ def main() -> None:
                        ["job", "status", "--job", "JOB-unknown"], 1, "operationFailed")
                 for method in registry["methods"]:
                     expected = ("rejected" if method not in SUPPORTED or method == "device.observations" else None)
-                    if method in {"runtime.tool.inspect", "runtime.bundle.inspect", "operation.describe", "runtime.tool.register", "runtime.bundle.remove", "runtime.tool.remove", "runtime.bundle.register"}:
+                    if method in {"runtime.tool.inspect", "runtime.bundle.inspect", "operation.describe", "runtime.tool.register", "runtime.bundle.remove", "runtime.tool.remove", "runtime.bundle.register", "target.availability"}:
                         expected = "invalidParams"
                     if method in {"runtime.bundle.list", "runtime.tool.list", "artifact.inspect", "artifact.read",
                                   "artifact.export", "artifact.list"}:
                         expected = "operationUnavailable"
                     # Only the macOS daemon composes an agent execution owner; without one it
                     # answers as Swift's daemon does. Elsewhere they stay the foundation's refusal.
-                    if method in {"agent.run", "agent.status", "agent.list", "agent.abandon"} and platform.system() == "Darwin":
+                    if method in {"agent.run", "agent.status", "agent.list", "agent.abandon", "human-action.list", "human-action.show"} and platform.system() == "Darwin":
                         expected = "operationUnavailable"
+                    # The macOS daemon starts no managed HDC server, so it answers the live HDC
+                    # status as Swift's daemon without its HDC host does.
+                    if method == "runtime.hdc.status" and platform.system() == "Darwin":
+                        expected = None
                     if method in {"target.list", "target.show", "target.display-name.set", "target.display-name.clear", "device.display-name.set", "device.display-name.clear"}:
                         expected = "internalError"
                     if method in IMPORT_OWNER_METHODS:
@@ -339,6 +343,7 @@ def main() -> None:
                     "operation.describe")
                 assert wire_descriptor["result"] == descriptor["result"]
                 for name, method, params, error in [
+                    ("availability-missing-owner", "target.availability", {"targetId": "target-fixture"}, "internalError"),
                     ("descriptor-not-found", "operation.describe", {"reference": "unknown@1"}, "notFound"),
                     ("descriptor-bad-type", "operation.describe", {"reference": 1}, "invalidParams"),
                     ("descriptor-extra", "operation.describe", {"reference": reference, "extra": True}, "invalidParams"),

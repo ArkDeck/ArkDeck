@@ -121,6 +121,7 @@ fn every_unimplemented_method_is_refused_without_entering_the_host() {
             "health",
             "doctor",
             "operation.list",
+            "target.availability",
             "device.observations",
             "runtime.tool.list",
             "runtime.tool.remove",
@@ -156,6 +157,30 @@ fn every_unimplemented_method_is_refused_without_entering_the_host() {
 }
 
 #[test]
+fn target_availability_requires_identity_and_an_owner_without_observing_devices() {
+    let (control, reads) = setup();
+    assert_eq!(
+        call(&control, "target.availability", json!({}))
+            .outcome
+            .unwrap_err()
+            .code,
+        "invalidParams"
+    );
+    assert_eq!(
+        call(
+            &control,
+            "target.availability",
+            json!({"targetId":"target-fixture"})
+        )
+        .outcome
+        .unwrap_err()
+        .code,
+        "internalError"
+    );
+    assert_eq!(reads.load(Ordering::SeqCst), 0);
+}
+
+#[test]
 fn semantic_invalid_requests_do_not_trigger_observation_or_capability_paths() {
     let (control, reads) = setup();
     for (method, params, code) in [
@@ -174,6 +199,11 @@ fn semantic_invalid_requests_do_not_trigger_observation_or_capability_paths() {
         ("doctor", json!({"unknown":true}), "invalidParams"),
         ("health", json!({"padding":"x"}), "invalidParams"),
         ("operation.list", json!({"path":"/tmp"}), "invalidParams"),
+        (
+            "runtime.hdc.status",
+            json!({"path":"/tmp/hdc"}),
+            "invalidParams",
+        ),
         (
             "device.observations",
             json!({"candidateKey":"untrusted"}),

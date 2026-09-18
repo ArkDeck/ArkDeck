@@ -30,6 +30,7 @@ pub use target_resources::validate_target_response;
 mod trace_cache;
 pub use trace_cache::validate_trace_cache_response;
 mod agent_executions;
+mod human_action_resources;
 pub use agent_executions::{
     Settlement, agent_exit, execution_intent, human_action_progress, require_execution_identity,
     settle_execution, validate_execution,
@@ -107,11 +108,19 @@ impl CliError {
     pub fn from_client(error: ClientError, method: &str) -> Self {
         if matches!(
             method,
-            "job.submit" | "job.run" | "job.cancel" | "agent.run" | "agent.abandon"
+            "job.submit"
+                | "job.run"
+                | "job.cancel"
+                | "agent.run"
+                | "agent.abandon"
+                | "target.adopt"
         ) {
             return job_plan::mutation_error(error, method);
         }
-        if matches!(method, "agent.status" | "agent.list") {
+        if matches!(
+            method,
+            "agent.status" | "agent.list" | "human-action.list" | "human-action.show"
+        ) {
             return agent_executions::read_error(error, method);
         }
         if matches!(
@@ -446,6 +455,9 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                 | "--request-id"
                 | "--idempotency-key"
                 | "--execution-id"
+                | "--human-action"
+                | "--owner-kind"
+                | "--owner"
                 | "--maximum-wait"
                 | "--reviewed-plan-digest"
                 | "--timeout" => {
@@ -484,6 +496,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                         "--request-id" => "requestId",
                         "--idempotency-key" => "idempotencyKey",
                         "--execution-id" => "executionId",
+                        "--human-action" => "humanAction",
+                        "--owner-kind" => "ownerKind",
                         "--maximum-wait" => "maximumWait",
                         "--reviewed-plan-digest" => "reviewedPlanDigest",
                         other => &other[2..],
@@ -556,6 +570,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["agent", "status"] => "agent.status",
         ["agent", "list"] => "agent.list",
         ["agent", "abandon"] => "agent.abandon",
+        ["human-action", "list"] => "human-action.list",
+        ["human-action", "show"] => "human-action.show",
         ["doctor"] => "doctor",
         ["operation", "list"] => "operation.list",
         ["operation", "describe"] => "operation.describe",
@@ -574,8 +590,10 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["capability", "list"] => "capability.list",
         ["capability", "inspect"] => "capability.inspect",
         ["device", "candidates"] => "device.candidates",
+        ["target", "adopt"] => "target.adopt",
         ["target", "list"] => "target.list",
         ["target", "show"] => "target.show",
+        ["target", "availability"] => "target.availability",
         ["target", "display-name", "set"] => "target.display-name.set",
         ["target", "display-name", "clear"] => "target.display-name.clear",
         ["device", "display-name", "set"] => "device.display-name.set",
@@ -608,7 +626,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         _ => {
             return Err(CliError::new(
                 "invalidCommand",
-                "available commands: doctor, operation list, target list|show, target display-name set|clear, device display-name set|clear, device candidates, trace cache status|purge, history filter list|save|delete, runtime storage status|policy|root, session list|show|pin|unpin, session cleanup preview|apply, session export preview|apply",
+                "available commands: doctor, operation list, target adopt|list|show|availability, target display-name set|clear, device display-name set|clear, device candidates, trace cache status|purge, history filter list|save|delete, runtime storage status|policy|root, session list|show|pin|unpin, session cleanup preview|apply, session export preview|apply",
             ));
         }
     };
@@ -638,8 +656,14 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         "artifact.import.abort" => &["importRequestId", "expectedGeneration", "timeout"],
         "artifact.import.inspect" => &["importRequestId", "import", "timeout"],
 
+        "target.adopt" => &[
+            "candidate",
+            "observationId",
+            "observationGeneration",
+            "timeout",
+        ],
         "target.list" => &["timeout"],
-        "target.show" => &["targetId", "timeout"],
+        "target.show" | "target.availability" => &["targetId", "timeout"],
         "target.display-name.set" => &["targetId", "expectedGeneration", "name", "timeout"],
         "target.display-name.clear" => &["targetId", "expectedGeneration", "timeout"],
         "device.display-name.set" => &[
@@ -689,6 +713,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             "timeout",
         ],
         "agent.status" => &["executionId", "timeout"],
+        "human-action.list" => &["ownerKind", "owner", "pageSize", "cursor", "timeout"],
+        "human-action.show" => &["humanAction", "timeout"],
         "agent.list" => &[
             "state",
             "operation",
@@ -964,13 +990,16 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
     let artifact_timeout = artifact_resources::configure(command, &mut method_options, help)?;
     let target_timeout = target_resources::configure(command, &mut method_options, help)?;
     let plan_timeout = job_plan::configure(command, &mut method_options, help)?;
+    let human_action_timeout =
+        human_action_resources::configure(command, &mut method_options, help)?;
     let agent_timeout = agent_executions::configure(command, &mut method_options, help)?;
     let timeout_ms = read_only_resources::configure(command, &mut method_options, help)?
         .or(import_timeout)
         .or(artifact_timeout)
         .or(target_timeout)
         .or(plan_timeout)
-        .or(agent_timeout);
+        .or(agent_timeout)
+        .or(human_action_timeout);
     Ok(Invocation {
         command,
         method: if command == "device.candidates" {
@@ -1004,6 +1033,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             || command.starts_with("target.")
             || command.starts_with("device.display-name.")
             || command.starts_with("session.")
+            || command.starts_with("human-action.")
             || matches!(
                 command,
                 "operation.describe"
