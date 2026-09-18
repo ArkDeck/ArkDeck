@@ -31,7 +31,7 @@ Targeted validation so far:
   creation: reopened owners return unchanged status on resume, then one Job on
   the original run intent. Expired original budget yields zero Job/new probe.
 - `cargo check` and all-target Clippy with `-D warnings` for hoststore/control/agentd
-  passed. The first unified run is recorded below; final integration verification is queued.
+  passed. The complete integrated verification is recorded below.
 
 Contract compatibility: the sampled method schemas omitted existing Swift
 resume errors and required a zero-dispatch proof even where the agent handler
@@ -60,12 +60,12 @@ Native logs: `/private/tmp/arkdeck-resume-swift-record-20260919.log` and
 Final native frames: `/private/tmp/arkdeck-resume-swift-frames-unreadable-20260919/`.
 Targeted Rust `corpus_parity`: 10 passed; `control/read_only`: 16 passed.
 No producer frame was hand-authored; no failure was mapped away to generic success
-or unavailable. Final integrated repository unified validation remains pending.
+or unavailable. The final integrated repository unified validation passed; see the final result below.
 
 These are local macOS fixture tests and process-exit simulations, not hardware
 acceptance. Production USB source activation, installed switching,
 unknown-outcome recovery and GJ-1–5 remain outside this slice. PR review/merge,
-final integrated local gate and CI remain outstanding.
+CI and maintainer review/merge remain outstanding.
 
 Integration for final validation: this branch explicitly merges original PR #1976
 commit `b710252d1d7844f1fcd361e58c66429a06173493` after the resume implementation
@@ -128,6 +128,24 @@ source-view verification also passed at
 Subsequently integrated protected main `187321ea` containing #1968. The three
 new resume fixture JobAdmitter constructions explicitly set `authority: None`;
 production Host retains main's Runtime-owned MutationAuthority policy composition.
-This integration requires its own final unified validation; the preceding pass
-is retained as evidence of the pre-capability combination, not claimed for the
-new merged HEAD. No hardware or capability evidence was fabricated.
+The preceding pass is retained as evidence of the pre-capability combination;
+the final integrated result below validates this new combination. No hardware or capability evidence was fabricated.
+
+Final integrated verification: the complete repository entry point on
+`190d6c35` (including protected main `187321ea` / #1968) exited 0. Swift full and
+isolated timing tests, App build-for-testing, Rust workspace tests and Clippy,
+actual published/candidate contract source views, cargo deny and cargo vet all
+passed. No filter, skipped lane, changed timeout or weakened assertion was used.
+
+```
+CARGO_BUILD_JOBS=2 RUST_TEST_THREADS=2 \
+ARKDECK_PYTHON=/private/tmp/arkdeck-validation-venv/bin/python \
+/private/tmp/arkdeck-validation-venv/bin/python scripts/ci/plan.py \
+  --repo-root . --base-revision origin/main --head-revision HEAD \
+  --merge-base --include-worktree --run-local
+```
+
+Final log: `/private/tmp/arkdeck-resume-capability-integrated-20260919.log`.
+Contract-view receipts:
+`rust/target/readonly-check/62469e9e331940ee8f38caf8fa5a87b6`.
+Only this evidence report changes after the verified implementation commit.
