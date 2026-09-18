@@ -187,6 +187,7 @@ fn rust_runs_the_swift_agent_executions() {
         },
         jobs: &jobs,
         now: fixed_now,
+        authority: None,
     };
     let engine = AgentEngine {
         targets: &targets,

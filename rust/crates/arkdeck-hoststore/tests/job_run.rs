@@ -221,6 +221,7 @@ fn rust_runs_reproduce_the_swift_oracle() {
             },
             jobs: &jobs,
             now: fixed_now,
+            authority: None,
         }
         .handle(case["submit"].as_object().unwrap())
         .unwrap();

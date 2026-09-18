@@ -145,6 +145,7 @@ fn owner<T>(root: &Root, now: Clock, body: impl FnOnce(&dyn Fn(&str, Value) -> A
         },
         jobs: &jobs,
         now: fixed_now,
+        authority: None,
     };
     let engine = AgentEngine {
         targets: &targets,

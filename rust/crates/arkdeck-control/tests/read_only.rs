@@ -108,6 +108,7 @@ fn every_unimplemented_method_is_refused_without_entering_the_host() {
     for method in METHODS {
         if [
             "artifact.export",
+            "artifact.import.list",
             "artifact.import.begin",
             "artifact.import.append",
             "artifact.import.abort",
@@ -730,6 +731,7 @@ fn import_upload_methods_use_only_the_typed_import_owner() {
     }
     let control = Control::new(ImportHost).unwrap();
     for method in [
+        "artifact.import.list",
         "artifact.import.begin",
         "artifact.import.append",
         "artifact.import.abort",

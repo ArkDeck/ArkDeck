@@ -60,6 +60,7 @@ fn rust_cancels_the_swift_jobs() {
             },
             jobs: &jobs,
             now: fixed_now,
+            authority: None,
         }
         .handle(job["submit"].as_object().unwrap())
         .unwrap();

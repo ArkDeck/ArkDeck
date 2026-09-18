@@ -691,32 +691,35 @@ impl JobRecord {
             ("parameters".into(), self.request["inputs"].clone()),
         ])
     }
-    /// The record Swift `submitOwned` builds for a Job admitted under the
-    /// default read-only policy: the caller's request is both the execution
-    /// and the original submission request, the plan is the materialized one,
-    /// and the Job has left `queued` for `preflight`.
+    /// The record Swift `submitOwned` builds for an admitted Job: the request
+    /// it executes, which names the Runtime capability a device mutation was
+    /// authorized with; the caller's original submission; the admission
+    /// evidence, which is a default read-only policy's and absent for a
+    /// mutation until a use is consumed; the materialized plan; and the Job
+    /// gone from `queued` to `preflight`.
     #[allow(clippy::too_many_arguments)]
     pub(super) fn admitted(
         job_id: &str,
         request: Value,
+        original: Value,
         operation: &str,
         catalog: &str,
         provider: &str,
         created: &str,
         effect: &str,
-        admission: Value,
+        admission: Option<Value>,
         plan: &str,
     ) -> Self {
         Self {
             job_id: job_id.into(),
-            original_request: Some(request.clone()),
+            original_request: Some(original),
             request,
             operation: operation.into(),
             catalog: catalog.into(),
             provider: provider.into(),
             created: created.into(),
             effect: Some(effect.into()),
-            admission: Some(admission),
+            admission,
             plan: Some(plan.into()),
             identity: None,
             binding: None,

@@ -1,6 +1,7 @@
 # Rust Import commit and immutable publication — macOS
 
-Base: protected `origin/main` `1ee1d73ddeffcae6cda7ca49bf57ff22bf89d3d7`.
+Initial base: protected `origin/main` `1ee1d73ddeffcae6cda7ca49bf57ff22bf89d3d7`.
+Final validation includes merged protected main `98cb3b96`.
 This is host implementation/test evidence, not device acceptance.
 
 ## Delivered behavior
@@ -25,6 +26,7 @@ This is host implementation/test evidence, not device acceptance.
   ```
 
   Public checks, complete Rust workspace tests, published/candidate contract checks, cargo-deny (advisories/bans/licenses/sources), and cargo-vet (36 fully audited) passed. Local full log: `/private/tmp/arkdeck-import-gate.log`; contract recordings: `rust/target/readonly-check/87a6b378cb7d4cbda76995161492b0f5`.
+- Expanded-slice verification passed the full Swift suite (2,685 parallel tests plus 1 serialized process-identity test and 5 viewer-scale tests) and Rust workspace tests. Two stale test assertions still classified the newly routed `artifact.import.list` as unimplemented; the owner-route test, read-only method set and its harness expectation now agree with the production route. Targeted reruns pass (16 control tests; 35 contract-harness tests). A complete final rerun remains pending.
 - Earlier attempts encountered sandbox Unix-socket denial and a system Python missing jsonschema; final verification used authorized local test execution and the existing pinned validation environment (`jsonschema==4.26.0`, `PyYAML==6.0.3`). No check or fixture was weakened.
 - Independent review confirmed existing-index retries validate immutable payloads through `load_index`; an additional deletion/corruption test proves failure leaves the Import committing, receipt absent, and original staging retained. Patch validator negative matrix covers absolute/backslash/.git/dot/empty paths, binary/rename/copy, NUL, invalid UTF-8, and the 128-file bound. No confirmed implementation defect remained in that review.
 
@@ -32,7 +34,7 @@ This is host implementation/test evidence, not device acceptance.
 
 The actual `arkdeck` binary now runs against the independently launched `arkdeck-agentd` with an isolated development root and a copied, explicit fixture Target. No HDC tool, Swift façade, installed state, capability, or physical device is configured. `real_cli_daemon_three_kinds_restart_and_lost_commit_reply` passes: all three kinds upload and commit; daemon process restart preserves exact readback; patch read requires explicit opt-in; a proxy discards the real daemon commit reply and observes the CLI recover through request-ID inspect without replaying commit; another restart preserves the same receipt and the CLI lists all four Imports. The closed Rust `artifact import list` leaf and response checks have 10 passing Import CLI tests in total.
 
-That process test exposed previously unrecorded existing Swift shapes: nullable patch binding in Artifact list, native/patch validation in committed Import inspect/inspection/list, and Import list pagination/options. They are sampled from a real Swift daemon through the new `DurableImportContractTests` producer, then merged with existing frames by the existing generator. `import-publication-native-recording/provenance.json` identifies the exact SDK-compatible producer commit, added-test diff/hash, actual frames/hash and command; that producer depends on PR #1976 and is not presented as protected-main acceptance. No frame, binding revision, or validator facts are fabricated.
+That process test exposed previously unrecorded existing Swift shapes: nullable patch binding in Artifact list, native/patch validation in committed Import inspect/inspection/list, and Import list pagination/options. They are sampled from a real Swift daemon through the new `DurableImportContractTests` producer, then merged with existing frames by the existing generator. `import-publication-native-recording/provenance.json` identifies the exact SDK-compatible producer commit, added-test diff/hash, actual frames/hash and command; the producer used original PR #1976 commit `b710252d`, subsequently merged into protected main as `ad0ef755`. Its SDK compatibility dependency is now satisfied. This branch merged protected main `98cb3b96` before final validation; these isolated host fixtures are not real-device acceptance. No frame, binding revision, or validator facts are fabricated.
 
 ## Remaining boundaries
 

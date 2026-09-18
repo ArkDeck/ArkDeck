@@ -169,6 +169,7 @@ fn rust_lists_and_abandons_the_swift_agent_executions() {
         },
         jobs: &jobs,
         now: fixed_now,
+        authority: None,
     };
     let engine = AgentEngine {
         targets: &targets,

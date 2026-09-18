@@ -38,13 +38,13 @@ READONLY_SPEC.loader.exec_module(readonly)
 
 
 class ReadOnlyImportExpectationTests(unittest.TestCase):
-    def test_each_view_selects_one_exact_refusal_and_preserves_unimplemented_list(self):
+    def test_each_view_selects_one_exact_refusal_for_every_import_owner_route(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             directory = root / "spec/control/methods"
             directory.mkdir(parents=True)
             # Begin/append/commit already permitted the owner refusal in the
-            # published view. The other four gain it from native Import frames.
+            # published view. Remaining routes exercise a narrower old view.
             published_available = {"artifact.import.begin", "artifact.import.append", "artifact.import.commit"}
             for candidate in (False, True):
                 for method in readonly.IMPORT_OWNER_METHODS:
@@ -59,8 +59,9 @@ class ReadOnlyImportExpectationTests(unittest.TestCase):
                     with patch.object(readonly, "ROOT", root), self.subTest(candidate=candidate, method=method):
                         self.assertEqual(readonly.missing_import_owner_error(method),
                                          "operationUnavailable" if available else "internalError")
+            self.assertIn("artifact.import.list", readonly.IMPORT_OWNER_METHODS)
             with self.assertRaises(AssertionError):
-                readonly.missing_import_owner_error("artifact.import.list")
+                readonly.missing_import_owner_error("artifact.list")
             # A code alone is insufficient if the view rejects the owner details.
             schema["$defs"]["errorDetails"] = {"type": "object", "additionalProperties": False}
             path = directory / "artifact.import.commit.json"

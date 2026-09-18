@@ -111,6 +111,10 @@ pub struct Host {
     /// plan takes.
     #[cfg(target_os = "macos")]
     hdc: Option<std::sync::Arc<arkdeck_provider_hdc::ProcessDispatch>>,
+    /// The device sessions this daemon's control sessions hold (Swift
+    /// `deviceSessionHolds`).
+    #[cfg(target_os = "macos")]
+    holds: arkdeck_hoststore::DeviceHolds,
     /// The Runtime's Target observation owner over the development HDC.
     #[cfg(target_os = "macos")]
     target_observations: arkdeck_hoststore::TargetObservations,
@@ -237,6 +241,15 @@ impl Host {
             dispatch: &**dispatch,
             tool_sha256: dispatch.tool_sha256(),
             now: arkdeck_hoststore::runtime_now,
+        })
+    }
+    /// What a device mutation is authorized from: the capability store and
+    /// this daemon's device sessions. Without a store no mutation is admitted.
+    #[cfg(target_os = "macos")]
+    fn authority(&self) -> Option<arkdeck_hoststore::MutationAuthority<'_>> {
+        Some(arkdeck_hoststore::MutationAuthority {
+            capabilities: self.capabilities.as_ref()?,
+            holds: &self.holds,
         })
     }
     /// Swift `startJob`: the Job an execution has just come to own runs in
@@ -413,6 +426,8 @@ impl Host {
             hdc: None,
             #[cfg(target_os = "macos")]
             agents: None,
+            #[cfg(target_os = "macos")]
+            holds: Default::default(),
             #[cfg(target_os = "macos")]
             target_observations: Default::default(),
             #[cfg(target_os = "macos")]
@@ -744,6 +759,7 @@ impl HostServices for Host {
             },
             jobs,
             now: arkdeck_hoststore::runtime_now,
+            authority: self.authority(),
         };
         let engine = arkdeck_hoststore::AgentEngine {
             targets,
@@ -859,6 +875,7 @@ impl HostServices for Host {
             },
             jobs,
             now: arkdeck_hoststore::runtime_now,
+            authority: self.authority(),
         }
         .handle(params)
         // A refusal before the admission point proves zero dispatch; Swift
