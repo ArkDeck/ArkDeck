@@ -121,6 +121,7 @@ fn every_unimplemented_method_is_refused_without_entering_the_host() {
             "health",
             "doctor",
             "operation.list",
+            "target.availability",
             "device.observations",
             "runtime.tool.list",
             "runtime.tool.remove",
@@ -152,6 +153,30 @@ fn every_unimplemented_method_is_refused_without_entering_the_host() {
         };
         assert_eq!(response.outcome.unwrap_err().code, expected, "{method}");
     }
+    assert_eq!(reads.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn target_availability_requires_identity_and_an_owner_without_observing_devices() {
+    let (control, reads) = setup();
+    assert_eq!(
+        call(&control, "target.availability", json!({}))
+            .outcome
+            .unwrap_err()
+            .code,
+        "invalidParams"
+    );
+    assert_eq!(
+        call(
+            &control,
+            "target.availability",
+            json!({"targetId":"target-fixture"})
+        )
+        .outcome
+        .unwrap_err()
+        .code,
+        "internalError"
+    );
     assert_eq!(reads.load(Ordering::SeqCst), 0);
 }
 

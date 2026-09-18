@@ -8,7 +8,9 @@
 //! each answer under the method's published schema. The fake's calls, the
 //! Target document and the display names are Swift's, their times read alike;
 //! byte equality on the oracle's clock is hoststore's `tests/target_adoption.rs`.
-//! The availability exchanges are not this owner's.
+//! Availability reads the same durable binding without a fresh HDC dispatch.
+//! Its tool leg reflects this composition's absent managed server; its host
+//! operation entries share operation.list's current availability source.
 use arkdeck_contract::{CONTRACT_IDENTITY, PROTOCOL_VERSION, sha256_hex};
 use arkdeck_control::Control;
 use arkdeck_platform::VerifiedTool;
@@ -224,9 +226,6 @@ fn the_daemon_observes_and_adopts_the_swift_fake_device_through_the_control_laye
     for (index, exchange) in cases["exchanges"].as_array().unwrap().iter().enumerate() {
         let name = exchange["name"].as_str().unwrap();
         let method = exchange["method"].as_str().unwrap();
-        if method == "target.availability" {
-            continue;
-        }
         if let Some(mode) = exchange["mode"].as_str() {
             fs::write(root.join("hdc-mode"), format!("{mode}\n")).unwrap();
         }
@@ -247,8 +246,37 @@ fn the_daemon_observes_and_adopts_the_swift_fake_device_through_the_control_laye
             &labels.label(&String::from_utf8_lossy(reply.trim_ascii_end())),
         ))
         .unwrap();
-        let recorded: Value =
+        let mut recorded: Value =
             serde_json::from_str(&mask_times(&exchange["answer"].to_string())).unwrap();
+        if method == "target.availability" && recorded["ok"] == true {
+            // The Swift oracle supplied managed-HDC diagnostics; the Rust
+            // development composition supplies only an external executable.
+            recorded["result"]["tool"] = json!({
+                "state": "absent", "reasonCode": "runtime_tool_unavailable",
+                "reason": "Runtime has no managed HDC server",
+            });
+            let operations: Value = serde_json::from_slice(&control.handle_frame(&frame(
+                "operation.list",
+                "availability-operations",
+                json!({}),
+            )))
+            .unwrap();
+            recorded["result"]["operations"]["items"] = Value::Array(
+                operations["result"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|operation| {
+                        json!({
+                            "reference": operation["reference"],
+                            "availability": operation["availability"],
+                            "reasons": operation["reasons"],
+                            "reasonCodes": operation["reasonCodes"],
+                        })
+                    })
+                    .collect(),
+            );
+        }
         if recorded["ok"] == true {
             assert_eq!(reply["result"], recorded["result"], "{name}: {reply}");
         } else {
@@ -256,7 +284,10 @@ fn the_daemon_observes_and_adopts_the_swift_fake_device_through_the_control_laye
         }
         replayed += 1;
     }
-    assert_eq!(replayed, 18, "every observation and adoption of the oracle");
+    assert_eq!(
+        replayed, 21,
+        "every observation, adoption and availability of the oracle"
+    );
     for file in [
         "hdc-invocations.log",
         "targets-state/targets.json",
@@ -268,4 +299,52 @@ fn the_daemon_observes_and_adopts_the_swift_fake_device_through_the_control_laye
             "{file}"
         );
     }
+
+    // A cold composition resolves the persisted binding without replaying
+    // observation/adoption or changing its revision. Availability performs no
+    // device round trip even when a development HDC dispatcher exists above.
+    let restarted =
+        Control::new(crate::host::Host::from_environment().with_targets(
+            arkdeck_hoststore::TargetStore::open(&root.join("targets-state")).unwrap(),
+        ))
+        .unwrap();
+    let target = json!({"targetId":"TGT-3ba3f5f43b92"});
+    let reply: Value = serde_json::from_slice(&restarted.handle_frame(&frame(
+        "target.availability",
+        "cold-availability",
+        target.clone(),
+    )))
+    .unwrap();
+    assert_eq!(reply["ok"], true, "{reply}");
+    assert_eq!(reply["result"]["binding"]["state"], "ready");
+    assert_eq!(reply["result"]["presence"]["state"], "unresolved");
+    assert_eq!(reply["result"]["tool"]["state"], "absent");
+    for params in [
+        json!({}),
+        json!({"targetId":""}),
+        json!({"targetId":17}),
+        json!({"targetId":"TGT-3ba3f5f43b92", "refresh":true}),
+    ] {
+        let reply: Value = serde_json::from_slice(&restarted.handle_frame(&frame(
+            "target.availability",
+            "bad-availability",
+            params,
+        )))
+        .unwrap();
+        assert_eq!(reply["error"]["code"], "invalidParams", "{reply}");
+    }
+    let original = fs::read(root.join("targets-state/targets.json")).unwrap();
+    fs::write(root.join("targets-state/targets.json"), b"{broken").unwrap();
+    let reply: Value = serde_json::from_slice(&restarted.handle_frame(&frame(
+        "target.availability",
+        "broken-availability",
+        target,
+    )))
+    .unwrap();
+    assert_eq!(reply["error"]["code"], "recordUnreadable", "{reply}");
+    fs::write(root.join("targets-state/targets.json"), original).unwrap();
+    assert_eq!(
+        fs::read(root.join("hdc-invocations.log")).unwrap(),
+        fs::read(fixture.join("hdc-invocations.log")).unwrap()
+    );
 }
