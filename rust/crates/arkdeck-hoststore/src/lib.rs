@@ -23,7 +23,11 @@ pub use job_repository::{AdmissionVerdict, JobWriteError};
 #[cfg(target_os = "macos")]
 mod job_plan;
 #[cfg(target_os = "macos")]
+mod operation_availability;
+#[cfg(target_os = "macos")]
 pub use job_plan::{AnalyzerProfile, JobPlanner, PlanRefusal};
+#[cfg(target_os = "macos")]
+pub use operation_availability::{OperationAvailabilityContext, operation_unavailability};
 #[cfg(target_os = "macos")]
 mod device_facts;
 #[cfg(target_os = "macos")]
@@ -106,7 +110,7 @@ mod job_journal_writer;
 #[cfg(target_os = "macos")]
 pub use job_journal_replay::{AbandonmentFact, IntentFact, ReplayFacts, UnknownFact};
 #[cfg(target_os = "macos")]
-pub use job_journal_writer::{JournalWriteError, JournalWriter};
+pub use job_journal_writer::{JournalWriteError, JournalWriter, inspect_journal};
 
 #[cfg(target_os = "macos")]
 mod history_owner;

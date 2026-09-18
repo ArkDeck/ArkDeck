@@ -31,7 +31,7 @@ Targeted validation so far:
   creation: reopened owners return unchanged status on resume, then one Job on
   the original run intent. Expired original budget yields zero Job/new probe.
 - `cargo check` and all-target Clippy with `-D warnings` for hoststore/control/agentd
-  passed. Final unified check has not run; it remains queued by the parent.
+  passed. The first unified run is recorded below; final integration verification is queued.
 
 Contract compatibility: the sampled method schemas omitted existing Swift
 resume errors and required a zero-dispatch proof even where the agent handler
@@ -60,18 +60,17 @@ Native logs: `/private/tmp/arkdeck-resume-swift-record-20260919.log` and
 Final native frames: `/private/tmp/arkdeck-resume-swift-frames-unreadable-20260919/`.
 Targeted Rust `corpus_parity`: 10 passed; `control/read_only`: 16 passed.
 No producer frame was hand-authored; no failure was mapped away to generic success
-or unavailable. Final repository unified validation remains pending.
+or unavailable. Final integrated repository unified validation remains pending.
 
 These are local macOS fixture tests and process-exit simulations, not hardware
 acceptance. Production USB source activation, installed switching,
 unknown-outcome recovery and GJ-1–5 remain outside this slice. PR review/merge,
-full local gate and CI remain outstanding.
+final integrated local gate and CI remain outstanding.
 
 Integration for final validation: this branch explicitly merges original PR #1976
 commit `b710252d1d7844f1fcd361e58c66429a06173493` after the resume implementation
 commit. Its ClientKit extraction and SDK compatibility remain that PR's reviewed
-scope; they were not copied or rewritten into this feature. Both #1975 and #1976
-are dependencies while unmerged. Final unified verification runs this actual
+scope; they were not copied or rewritten into this feature. Both #1975 and #1976 have since merged into protected main. Final unified verification runs this actual
 stacked branch, not a detached source view with unrecorded SDK modifications.
 
 
@@ -90,3 +89,19 @@ resume leaves: the Runtime observes one request, dropped responses produce
 connection occurs. Parameter tests cover forbidden intent fields, alias/source
 exclusivity and bounded selection documents; all-target CLI Clippy also passed.
 Log: `/private/tmp/arkdeck-resume-cli-tests-20260919.log`.
+
+Main integration: merged `origin/main` `98cb3b96` after the first stacked-branch
+unified run. CLI conflict resolution preserves both main's HAR reads and the two
+resume leaves; owner conflict resolution preserves resume's exact selection and
+all adoption/crash tests. Main's live availability and soak composition are included.
+
+The initial full gate on `c41dd835` exited 1. Swift (2,685 tests), App
+build-for-testing, Rust workspace tests and Clippy passed. Contract source views
+identified two test-integration omissions: the published schema correctly rejects
+newly sampled error vocabulary as `internalError`, while the new route test had
+expected candidate errors; the read-only executable check still classified both
+resume methods as unimplemented. The test now proves both published fail-closed
+and candidate preserved errors, and the daemon check expects the actual missing
+execution-owner refusal. No production safety mapping was relaxed. Initial log:
+`/private/tmp/arkdeck-resume-unified-20260919.log`. This is not the final integrated
+gate; the complete unified entry point must pass on the actual merged branch.

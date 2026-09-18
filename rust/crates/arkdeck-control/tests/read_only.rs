@@ -121,6 +121,7 @@ fn every_unimplemented_method_is_refused_without_entering_the_host() {
             "health",
             "doctor",
             "operation.list",
+            "target.availability",
             "device.observations",
             "runtime.tool.list",
             "runtime.tool.remove",
@@ -152,6 +153,30 @@ fn every_unimplemented_method_is_refused_without_entering_the_host() {
         };
         assert_eq!(response.outcome.unwrap_err().code, expected, "{method}");
     }
+    assert_eq!(reads.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn target_availability_requires_identity_and_an_owner_without_observing_devices() {
+    let (control, reads) = setup();
+    assert_eq!(
+        call(&control, "target.availability", json!({}))
+            .outcome
+            .unwrap_err()
+            .code,
+        "invalidParams"
+    );
+    assert_eq!(
+        call(
+            &control,
+            "target.availability",
+            json!({"targetId":"target-fixture"})
+        )
+        .outcome
+        .unwrap_err()
+        .code,
+        "internalError"
+    );
     assert_eq!(reads.load(Ordering::SeqCst), 0);
 }
 
@@ -797,9 +822,15 @@ fn physical_resume_routes_reach_the_same_execution_owner() {
             } else {
                 json!({"resumeReference":"resume-missing","humanAction":"har-missing"})
             };
+            // Published source views retain their old sampled error vocabulary.
+            // Candidate views must expose the newly recorded owner refusals.
+            let supported = validate_method_value(method, "errorCode", &json!(code)).is_ok()
+                && !(method == "agent.resume"
+                    && ["recordUnreadable", "factsDrifted"].contains(&code)
+                    && validate_method_value(method, "errorDetails", &json!({})).is_err());
             assert_eq!(
                 call(&control, method, params).outcome.unwrap_err().code,
-                code
+                if supported { code } else { "internalError" }
             );
         }
     }

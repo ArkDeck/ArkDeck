@@ -64,6 +64,9 @@ def assert_boundaries() -> None:
         "arkdeck-client": {"arkdeck-contract", "arkdeck-platform"},
         "arkdeck-cli": {"arkdeck-contract", "arkdeck-client", "arkdeck-platform"},
         "arkdeck-agentd": {"arkdeck-contract", "arkdeck-control", "arkdeck-platform", "arkdeck-provider-hdc", "arkdeck-hoststore"},
+        # Measurement composition only: in-memory provider, production owners,
+        # and self-resource sampling. No client or daemon transport dependency.
+        "arkdeck-soak": {"arkdeck-hoststore", "arkdeck-platform", "arkdeck-provider-hdc"},
     }
     manifests = list((ROOT / "rust/crates").glob("*/Cargo.toml"))
     assert len(manifests) == len(allowed), "review the composition boundary for new crates"
@@ -320,14 +323,14 @@ def main() -> None:
                        ["job", "status", "--job", "JOB-unknown"], 1, "operationFailed")
                 for method in registry["methods"]:
                     expected = ("rejected" if method not in SUPPORTED or method == "device.observations" else None)
-                    if method in {"runtime.tool.inspect", "runtime.bundle.inspect", "operation.describe", "runtime.tool.register", "runtime.bundle.remove", "runtime.tool.remove", "runtime.bundle.register"}:
+                    if method in {"runtime.tool.inspect", "runtime.bundle.inspect", "operation.describe", "runtime.tool.register", "runtime.bundle.remove", "runtime.tool.remove", "runtime.bundle.register", "target.availability"}:
                         expected = "invalidParams"
                     if method in {"runtime.bundle.list", "runtime.tool.list", "artifact.inspect", "artifact.read",
                                   "artifact.export", "artifact.list"}:
                         expected = "operationUnavailable"
                     # Only the macOS daemon composes an agent execution owner; without one it
                     # answers as Swift's daemon does. Elsewhere they stay the foundation's refusal.
-                    if method in {"agent.run", "agent.status", "agent.list", "agent.abandon", "human-action.list", "human-action.show"} and platform.system() == "Darwin":
+                    if method in {"agent.run", "agent.status", "agent.list", "agent.abandon", "agent.resume", "human-action.resume", "human-action.list", "human-action.show"} and platform.system() == "Darwin":
                         expected = "operationUnavailable"
                     # The macOS daemon starts no managed HDC server, so it answers the live HDC
                     # status as Swift's daemon without its HDC host does.
@@ -343,6 +346,7 @@ def main() -> None:
                     "operation.describe")
                 assert wire_descriptor["result"] == descriptor["result"]
                 for name, method, params, error in [
+                    ("availability-missing-owner", "target.availability", {"targetId": "target-fixture"}, "internalError"),
                     ("descriptor-not-found", "operation.describe", {"reference": "unknown@1"}, "notFound"),
                     ("descriptor-bad-type", "operation.describe", {"reference": 1}, "invalidParams"),
                     ("descriptor-extra", "operation.describe", {"reference": reference, "extra": True}, "invalidParams"),

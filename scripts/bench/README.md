@@ -53,6 +53,16 @@ cd scripts
 python3 -m unittest discover -s bench -t .
 ```
 
+The reusable launcher also accepts `IsolatedRuntime(binary, directory,
+runtime_kind="rust")` for the standalone Rust owner. It launches without Swift
+arguments, sets only the private development root and endpoint, and clears
+inherited `ARKDECK_*` configuration so a measurement cannot select the paired
+facade or a device provider. Use `temporary_state_directory()` for a canonical
+macOS path. Contract verification and process stop/restart use the same harness.
+This launcher is the first XPA-025 integration step; `bench capture` and the
+scheduled lanes still require the existing Swift soak seed. An empty-store
+Rust launch/IPC probe is advisory, not a performance baseline or SPK-11 pass.
+
 ## What decides whether a run counts
 
 A capture is only baseline-eligible when all of the following hold; otherwise

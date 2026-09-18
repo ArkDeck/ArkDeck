@@ -8,6 +8,8 @@ mod facade_owners;
 mod hdc_status_control;
 mod host;
 #[cfg(all(test, target_os = "macos"))]
+mod operation_availability_control;
+#[cfg(all(test, target_os = "macos"))]
 mod target_observation_control;
 
 use arkdeck_contract::MAX_REQUEST_BYTES;
