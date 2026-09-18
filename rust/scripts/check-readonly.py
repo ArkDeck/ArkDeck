@@ -29,9 +29,9 @@ BASELINE = ROOT / "spec/baselines/swift-single-v1.json"
 CANDIDATE_INPUTS = ROOT / "spec/baselines/swift-candidate-inputs.json"
 REGISTRY = ROOT / "Packages/ArkDeckKit/Contracts/control-protocol.json"
 SUPPORTED = {"health", "doctor", "operation.list", "device.observations"}
-# Only these methods reach the Import owner. Import list remains unimplemented.
+# These methods reach the Import owner, including immutable discovery lists.
 IMPORT_OWNER_METHODS = frozenset({
-    "artifact.import.begin", "artifact.import.append", "artifact.import.abort",
+    "artifact.import.list", "artifact.import.begin", "artifact.import.append", "artifact.import.abort",
     "artifact.import.inspect", "artifact.import.inspection", "artifact.import.release",
     "artifact.import.commit",
 })
