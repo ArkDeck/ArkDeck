@@ -1,6 +1,6 @@
 # Remaining macOS Rust implementation
 
-Updated 2026-09-18 against protected main `d761372b` (#1970, merged 2026-09-15), revision 11. This list tracks
+Updated 2026-09-19 against protected main `abcb9984` (#1972, merged 2026-09-18 UTC), revision 11. This list tracks
 implementation and review, not published activation or hardware acceptance. Windows product work
 and real-device acceptance are outside this goal.
 
@@ -47,7 +47,7 @@ import json
 import re
 import subprocess
 
-ref = "d761372ba923c11b1f752eb0ea21302f8501fc0c"
+ref = "abcb9984ffe3312db7ceb300396f9e8bcb80dcb9"
 def read(path):
     return subprocess.check_output(["git", "show", f"{ref}:{path}"], text=True)
 
@@ -92,7 +92,7 @@ PYCOUNT
 | XPA-016 | in-progress | SPK-6 executor foundation; Rockchip probes/transition/alias store (#1934–#1941); HDC status (#1947); capture providers (#1949); physical relation proof port (#1952); HAP (#1951), native-library (#1955), pointer/port-rule (#1961) providers | daemon composition and M1/M2 end-to-end acceptance; M4 ArkForge-served ports after SPK-9 |
 | XPA-018 | in-progress | 66 parser command names, 63 matching registered features; agent list/abandon (#1946) and target adopt/availability (#1967) added | remaining commands including HAR, daemon support for target availability, full parity/export; Swift CLI retirement with M5 |
 | XPA-019 | ready (r11) | no ClientKit target; 13 App-facing facades | SPK-8, then the facades one by one; hard prerequisite of M5 |
-| XPA-025 | ready (r11) | Swift performance baseline; merge-lane micro-benchmarks retired (#1902) | SPK-11, then the Rust soak fixture and the lanes on the Rust daemon |
+| XPA-025 | in-progress | Swift baseline retained; isolated Rust performance launcher merged (#1972), with advisory launch/IPC/restart probes | faithful Rust seeded soak workload, full measurement and lane migration; SPK-11 remains incomplete |
 | XPA-017 | blocked | — | M5 |
 
 Spikes SPK-6..11 are defined in `tasks.md` and design §J.3; their records land under
@@ -100,6 +100,12 @@ Spikes SPK-6..11 are defined in `tasks.md` and design §J.3; their records land 
 `adr-0009-decision-package-20260914.md` in this directory.
 
 ## History
+
+2026-09-19 (`abcb9984`): #1972 merged the isolated Rust benchmark launcher.
+The six coverage counts above are unchanged: this is measurement integration,
+not another executable operation, App facade, retired target or hardware journey.
+Three empty-store probes are advisory only; full seeded soak and SPK-11 remain open.
+
 
 2026-09-18 (`d761372b`): refreshed from protected main #1970, after 38 merges since
 `b0806334` (#1929). Recounted source routes and canonical CLI names, corrected the earlier
