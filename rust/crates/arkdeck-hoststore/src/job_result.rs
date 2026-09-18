@@ -371,8 +371,9 @@ impl JobResultReader<'_> {
         Ok((rows, Ok(verified)))
     }
 
-    /// Swift `listCleanupDebt` for one Job: the outstanding ledger rows.
-    fn cleanup(&self, job_id: &str) -> Result<Vec<Value>, WireError> {
+    /// Complete outstanding cleanup census, including rows whose Job no longer
+    /// appears in the index. Unreadable ledgers fail closed.
+    pub fn outstanding_cleanup_debt(&self) -> Result<Vec<Value>, WireError> {
         let unreadable = || {
             proven(
                 "recordUnreadable",
@@ -426,7 +427,6 @@ impl JobResultReader<'_> {
         });
         outstanding
             .into_iter()
-            .filter(|row| row.0 == job_id)
             .map(|(job, _, recorded, step, identity, unknown)| {
                 let hashed = canonical_json(&json!({"identity": identity, "jobId": job, "recordedAtUtc": recorded}))
                     .map_err(|_| unreadable())?;
@@ -434,6 +434,14 @@ impl JobResultReader<'_> {
                     "stepId": step, "recordedAtUtc": recorded, "outcomeUnknown": unknown}))
             })
             .collect()
+    }
+    /// Swift `listCleanupDebt` projection for one Job.
+    fn cleanup(&self, job_id: &str) -> Result<Vec<Value>, WireError> {
+        Ok(self
+            .outstanding_cleanup_debt()?
+            .into_iter()
+            .filter(|row| row["jobId"].as_str() == Some(job_id))
+            .collect())
     }
 }
 
