@@ -64,13 +64,19 @@
                     "type": "string"
                   },
                   "sessionId": {
-                    "type": "null"
+                    "type": [
+                      "null",
+                      "string"
+                    ]
                   },
                   "status": {
                     "type": "string"
                   },
                   "targetId": {
-                    "type": "null"
+                    "type": [
+                      "null",
+                      "string"
+                    ]
                   },
                   "timeRange": {
                     "type": "string"
@@ -135,7 +141,7 @@
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
     "error": 2,
-    "request": 6,
-    "result": 4
+    "request": 7,
+    "result": 5
   }
 }

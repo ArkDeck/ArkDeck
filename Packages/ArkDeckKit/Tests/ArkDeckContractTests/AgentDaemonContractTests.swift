@@ -714,6 +714,16 @@ final class AgentDaemonContractTests: XCTestCase {
     XCTAssertEqual(query["sessionId"], .string("session-1"))
     XCTAssertEqual(query["targetId"], .string("target-1"))
 
+    // Record the list shape with actual non-null identities, not only the
+    // empty/default preset: this is a published response consumed by ClientKit.
+    let (savedListExit, savedListEnvelope) = try runObservationCLI(
+      ["history", "filter", "list"], server: server)
+    XCTAssertEqual(savedListExit, 0)
+    guard case .object(let savedList)? = savedListEnvelope["result"],
+      case .array(let savedRows)? = savedList["filters"]
+    else { return XCTFail("saved History filter must be listed") }
+    XCTAssertEqual(savedRows, [.object(saved)])
+
     let (staleExit, staleEnvelope) = try runObservationCLI([
       "history", "filter", "delete", "--expected-generation", "1",
     ], server: server)

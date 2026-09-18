@@ -69,17 +69,27 @@ actor RuntimeHistoryFilterXPCProvider: RuntimeHistoryFilterApplicationProviding 
     _ query: RuntimeHistoryFilterQuery,
     expectedGeneration: UInt64
   ) async -> RuntimeHistoryFilterMutationResult {
-    var params = query.controlParams
-    params["expectedGeneration"] = .string(String(expectedGeneration))
+    let wire = HistoryFilterSaveRequest(
+      activity: query.activity, expectedGeneration: String(expectedGeneration),
+      mode: query.mode, search: query.search,
+      sessionId: query.sessionID.map(HistoryWireNullable<String>.value) ?? .null,
+      status: query.status,
+      targetId: query.targetID.map(HistoryWireNullable<String>.value) ?? .null,
+      timeRange: query.timeRange).wire
+    guard case .object(let params) = wire else {
+      return .failed("ArkDeck could not encode its History filter request")
+    }
     return await mutate(method: "history.filter.save", params: params)
   }
 
   func deleteHistoryFilter(
     expectedGeneration: UInt64
   ) async -> RuntimeHistoryFilterMutationResult {
-    await mutate(
-      method: "history.filter.delete",
-      params: ["expectedGeneration": .string(String(expectedGeneration))])
+    let wire = HistoryFilterDeleteRequest(expectedGeneration: String(expectedGeneration)).wire
+    guard case .object(let params) = wire else {
+      return .failed("ArkDeck could not encode its History filter request")
+    }
+    return await mutate(method: "history.filter.delete", params: params)
   }
 
   private func mutate(
@@ -89,7 +99,7 @@ actor RuntimeHistoryFilterXPCProvider: RuntimeHistoryFilterApplicationProviding 
     switch await request(method, params) {
     case .failure(let reason): return .failed(reason)
     case .success(let data):
-      switch RuntimeHistoryFilterResponseDecoding.resource(data) {
+      switch RuntimeHistoryFilterResponseDecoding.resource(data, method: method) {
       case .success(let resource): return .completed(resource)
       case .failure(let reason): return .failed(reason)
       }
@@ -129,20 +139,6 @@ private actor RuntimeHistoryFilterFixtureProvider: RuntimeHistoryFilterApplicati
   }
 }
 
-extension RuntimeHistoryFilterQuery {
-  fileprivate var controlParams: [String: JSONValue] {
-    [
-      "search": .string(search),
-      "status": .string(status),
-      "mode": .string(mode),
-      "sessionId": sessionID.map(JSONValue.string) ?? .null,
-      "targetId": targetID.map(JSONValue.string) ?? .null,
-      "timeRange": .string(timeRange),
-      "activity": .string(activity),
-    ]
-  }
-}
-
 enum RuntimeHistoryFilterDecodeResult<Value> {
   case success(Value)
   case failure(String)
@@ -150,7 +146,7 @@ enum RuntimeHistoryFilterDecodeResult<Value> {
 
 enum RuntimeHistoryFilterResponseDecoding {
   static func list(_ data: Data) -> RuntimeHistoryFilterDecodeResult<RuntimeHistoryFilterResource> {
-    switch envelopeResult(data) {
+    switch envelopeResult(data, method: "history.filter.list") {
     case .failure(let reason): return .failure(reason)
     case .success(let object):
       guard Set(object.keys) == ["schemaVersion", "generation", "filters", "updatedAtUtc"],
@@ -182,16 +178,16 @@ enum RuntimeHistoryFilterResponseDecoding {
     }
   }
 
-  static func resource(_ data: Data) -> RuntimeHistoryFilterDecodeResult<
+  static func resource(_ data: Data, method: String) -> RuntimeHistoryFilterDecodeResult<
     RuntimeHistoryFilterResource
   > {
-    switch envelopeResult(data) {
+    switch envelopeResult(data, method: method) {
     case .failure(let reason): return .failure(reason)
     case .success(let object): return decodeResource(object)
     }
   }
 
-  private static func envelopeResult(_ data: Data) -> RuntimeHistoryFilterDecodeResult<
+  private static func envelopeResult(_ data: Data, method: String) -> RuntimeHistoryFilterDecodeResult<
     [String: Any]
   > {
     guard let envelope = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
@@ -204,6 +200,18 @@ enum RuntimeHistoryFilterResponseDecoding {
     guard envelope["ok"] as? Bool == true,
       let result = envelope["result"] as? [String: Any]
     else { return .failure("ArkDeck Runtime returned no History filter resource") }
+    do {
+      let bytes = try JSONSerialization.data(withJSONObject: result)
+      let wire = try JSONDecoder().decode(JSONValue.self, from: bytes)
+      switch method {
+      case "history.filter.list": _ = try HistoryFilterListResult.decode(wire)
+      case "history.filter.save": _ = try HistoryFilterSaveResult.decode(wire)
+      case "history.filter.delete": _ = try HistoryFilterDeleteResult.decode(wire)
+      default: throw HistoryWireError.invalidShape
+      }
+    } catch {
+      return .failure("ArkDeck Runtime returned an invalid History filter response")
+    }
     return .success(result)
   }
 
