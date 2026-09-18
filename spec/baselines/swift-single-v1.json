@@ -55,18 +55,18 @@
     },
     "artifact.import.inspect": {
       "errors": 3,
-      "requests": 7,
-      "successes": 4
+      "requests": 8,
+      "successes": 5
     },
     "artifact.import.inspection": {
       "errors": 2,
-      "requests": 6,
-      "successes": 4
+      "requests": 8,
+      "successes": 6
     },
     "artifact.import.list": {
-      "errors": 0,
-      "requests": 2,
-      "successes": 2
+      "errors": 3,
+      "requests": 9,
+      "successes": 6
     },
     "artifact.import.release": {
       "errors": 3,
@@ -80,8 +80,8 @@
     },
     "artifact.list": {
       "errors": 6,
-      "requests": 16,
-      "successes": 10
+      "requests": 17,
+      "successes": 11
     },
     "artifact.quota": {
       "errors": 0,
@@ -530,16 +530,16 @@
     }
   },
   "corpusRecordCounts": {
-    "errors": 318,
-    "requests": 726,
-    "successes": 408
+    "errors": 321,
+    "requests": 737,
+    "successes": 416
   },
   "directoryDigests": {
     "Catalog/operations": "16671abf96551e9d5b9c3382fe4eb08f3fcd150cff68e7419634cd10ecda4bfd",
     "Catalog/profiles": "58ca1d970d40019ba2718646fde81fefda22533c5448e620217582e30f5d648f",
-    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "22a45698f3b3e037811bba470c3b13db146bc556a5f60a771d632f9a4db550d8",
+    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "82d4d34b79507e46a9d7cade45707607d111da597f74e5decc127b174f92390c",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC": "9ae93642e7b81bcea918469216711d7f6a17135a29cf021556ceef0f2f789196",
-    "spec/control/methods": "0f1724d799f77cfeea89c9188e6c33e2d6b2799db99763d6ee6dc521c91f3908"
+    "spec/control/methods": "de1c83a8718320e38b000c25b7068633f0eee09c12d0b78eb0c33b39cb25a39a"
   },
   "files": {
     "Catalog/generated/effect-authorization-matrix.md": {
@@ -755,16 +755,16 @@
       "sha256": "707c262019a174f81cfeebd12cd9a2610dbccf39a46c39211ffee649bbca183e"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/artifact.import.inspect.jsonl": {
-      "blob": "cf1f4253cd9dc88822731de1a67ca9dbd3cf96e8",
-      "sha256": "ffab788fe3fae98b17341b056c4b5ff5f26947791d186e8d3f6f8ec12e434e00"
+      "blob": "de149ab88c89a0f5b4651867f36c368f812f6f84",
+      "sha256": "9347667fedfb05a666d2d1c2c530cc0079a65a62dbaf038888fa2b559c3560dc"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/artifact.import.inspection.jsonl": {
-      "blob": "bf8067fb8f30794c87bb45d7f07967d66e3e2da9",
-      "sha256": "79afb4710dbf692391337b3f6cd8c96af993bf9b0ce3318cec05f6f12941db36"
+      "blob": "0dee4d03dd549c9a26af8848ddd4658d1fa359b7",
+      "sha256": "8b4425c721ec280b47aa03105d2311ba70612884d0214879acae2c4e734f94ac"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/artifact.import.list.jsonl": {
-      "blob": "b6dee8a2646eac43b671b957bc16c9a130d88504",
-      "sha256": "880c767912cd89710f48396c76e95491ee54fee1defbc6fe57b1b5a93ea12a54"
+      "blob": "02566815ce59738438bf3dbac0a2c60ba2cdae10",
+      "sha256": "ec24552eb9227a3ec153829f67f19a0e06e1101ceef8ccd84ddf3d5b19da5681"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/artifact.import.release.jsonl": {
       "blob": "bc8d17342a3eb333df97a38c54cfbcf99429034d",
@@ -775,8 +775,8 @@
       "sha256": "af3c127d1540bbaff4269b39925c00fc369d0fa16123309c0cd005c8f3d964c7"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/artifact.list.jsonl": {
-      "blob": "4b225023b59eebf7dec75c346ac027424a3155d3",
-      "sha256": "c88df6b55f9fb9833e8d70d26fd627324a7bab0e970acb5cd7ebf17a6909454e"
+      "blob": "1e676f3eccc6aac6414835773be50b0c0507b507",
+      "sha256": "0be7b96d54f147b11e212e00b60fffe0676bb97411f9ddf82afa4f13b7cc4074"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/artifact.quota.jsonl": {
       "blob": "47e688830bcf1ddb08f727d073421be25cfe660d",
@@ -1351,16 +1351,16 @@
       "sha256": "b81cb339825fd78384d453732ced50c2c2cbd2479682f3b471f39db9ab9b76be"
     },
     "spec/control/methods/artifact.import.inspect.json": {
-      "blob": "9181adb2a6bbb6f4c083d2e51203e0e1fc584016",
-      "sha256": "b2d5133ea4edcf927ef71857afeea275efe136b3d90fb6dd2b766a46ad3d0698"
+      "blob": "ad9e987b542992c76c060245a5ae06c71b0b1a43",
+      "sha256": "4749e22e19a74414688712b9619c0910d21290fe3778cf00aefcf7b7a887eeb7"
     },
     "spec/control/methods/artifact.import.inspection.json": {
-      "blob": "ba1da63a91092f6c6844d2cf9dd0161965030d49",
-      "sha256": "1ecabe8435e70b8cfe88a2e609c8c569973222f50d0510c5b8a8caf32bcd3341"
+      "blob": "12fa90e871dc940227825a524209f19d6c826540",
+      "sha256": "806dafebc78e4f4342d2ae8764208f54ab92d97b503c6a06653c686e719e8317"
     },
     "spec/control/methods/artifact.import.list.json": {
-      "blob": "0d6e0c49541701ccd7b5af2b1c93d421b23b7cad",
-      "sha256": "9b76d3f1f8d99a1d3ca5cb4364a7bd9778f107848f20b3715e69afd6b670b243"
+      "blob": "7803b06983b277a9ceafde74ec3c494a25d6d78e",
+      "sha256": "a1da59d2d59625308391144df0b5949b628cb6e779f2a7060aaae4d7f9fbd396"
     },
     "spec/control/methods/artifact.import.release.json": {
       "blob": "5daba656641f779ca4d4a1ef4faac9ef9f34c2fa",
@@ -1371,8 +1371,8 @@
       "sha256": "dac35548c9781f7285e4a9708585f8fa4cc7b33779dcbb9024a803167e81856d"
     },
     "spec/control/methods/artifact.list.json": {
-      "blob": "5916f0c37572dd9360f6f98ea07a4fcfcf8b778c",
-      "sha256": "3deccc64b517008342106718eed5821cebe51f29ec1fe29b78e8df2a7607a8b0"
+      "blob": "5b708d252b59ba7e8c01c2a29d27bb21a96c27a6",
+      "sha256": "ddf8e541fe3029f1df1ba2d1a6a6fa1347b4311b41255d3c8262a06a5639c930"
     },
     "spec/control/methods/artifact.quota.json": {
       "blob": "932f1b622c75b682c6aa10603c955b715a10b1ec",
@@ -1731,7 +1731,7 @@
       "sha256": "95367cc3e57160752f7d1d724887ee650adb8d3ccc5d736444517641a5da8e64"
     }
   },
-  "inputDigest": "b720d9ec87ad0b8cfb94e5ee719be52d70a810d6ebb56c8b91fb1aed43685261",
+  "inputDigest": "b3156de75bf4a117167caea6d584abf4b32a0b00c16e266260328ddb74f66357",
   "kind": "development",
   "methodCount": 105,
   "protocolVersion": "1.0.0",

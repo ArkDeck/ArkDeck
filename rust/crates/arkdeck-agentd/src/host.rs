@@ -467,6 +467,24 @@ impl HostServices for Host {
                 ("newDispatchCount".into(), serde_json::json!(0)),
             ])),
         };
+        if method == "artifact.import.list" {
+            return self.imports.as_ref().ok_or_else(unavailable)?.list(params);
+        }
+        if method == "artifact.import.commit" {
+            return self.imports.as_ref().ok_or_else(unavailable)?.commit(
+                params,
+                &utc_now(),
+                false,
+                self.artifacts.as_ref().ok_or_else(unavailable)?,
+                ARTIFACT_QUOTA,
+                |intent| {
+                    self.targets
+                        .as_ref()
+                        .ok_or_else(unavailable)?
+                        .resolve_import_binding(intent)
+                },
+            );
+        }
         // Local control clients never inherit the App's trusted transport provenance.
         self.imports
             .as_ref()
@@ -614,6 +632,29 @@ impl HostServices for Host {
                 ("newDispatchCount".into(), serde_json::json!(0)),
             ])),
         })?;
+        if params
+            .get("owner")
+            .and_then(|v| v.get("kind"))
+            .and_then(serde_json::Value::as_str)
+            == Some("import")
+        {
+            let imports = self.imports.as_ref().ok_or_else(|| WireError {
+                code: "operationUnavailable".into(),
+                message: "Import owner is unavailable".into(),
+                details: None,
+            })?;
+            let jobs = self.jobs.as_ref().ok_or_else(|| WireError {
+                code: "operationUnavailable".into(),
+                message: "Artifact snapshot storage is unavailable".into(),
+                details: None,
+            })?;
+            return imports.artifact_resource(
+                artifacts,
+                method,
+                params,
+                &jobs.snapshot_directory(),
+            );
+        }
         if method == "artifact.list" {
             // The pages are kept in the Job owner's snapshot directory, never
             // in the Artifact root, whose every entry the quota and Trace

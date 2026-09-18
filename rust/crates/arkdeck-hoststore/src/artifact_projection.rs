@@ -1,7 +1,7 @@
-//! Job-owned Artifact inspect/read wire results, backed by the actual read store.
-//! The daemon must first perform its existing engine.jobReadSnapshot check. These
-//! types validate references, not Runtime ownership/admission facts. Import
-//! receipts/leases and transport error mapping remain with their separate owners.
+//! Tagged Artifact inspect/read projections backed by immutable storage.
+//! These types validate reference syntax, not ownership. Job routing requires
+//! the Job owner; Import routing holds its lifetime lock and checks the durable
+//! receipt before invoking the internal shared readers.
 use crate::{ArtifactReadRange, ArtifactReadStore, MAX_ARTIFACT_READ_BYTES};
 use serde_json::{Map, Value, json};
 use std::io;
@@ -13,6 +13,7 @@ const MAX_RESULT_BYTES: usize = 8 * 1024 * 1024 - 4096;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ArtifactInspectRequest {
     job_id: String,
+    owner_kind: String,
     artifact_id: String,
 }
 
@@ -72,13 +73,9 @@ pub(crate) fn job_owner(fields: &Map<String, Value>) -> io::Result<String> {
         .get("id")
         .and_then(Value::as_str)
         .ok_or_else(invalid)?;
-    if kind == "import" {
-        return Err(io::Error::new(
-            io::ErrorKind::Unsupported,
-            "Import Artifact ownership requires its Import owner",
-        ));
-    }
-    if kind != "job" || !identifier(job) || job.starts_with("imp-") {
+    if !((kind == "job" && identifier(job) && !job.starts_with("imp-"))
+        || (kind == "import" && arkdeck_contract::import_id(job)))
+    {
         return Err(invalid());
     }
     Ok(job.into())
@@ -97,20 +94,21 @@ fn reference(fields: &Map<String, Value>) -> io::Result<ArtifactInspectRequest> 
         .get("id")
         .and_then(Value::as_str)
         .ok_or_else(invalid)?;
-    if kind == "import" {
-        return Err(io::Error::new(
-            io::ErrorKind::Unsupported,
-            "Import Artifact ownership requires its Import owner",
-        ));
-    }
-    if kind != "job" {
-        return Err(invalid());
-    }
     let artifact = fields
         .get("artifactId")
         .and_then(Value::as_str)
         .ok_or_else(invalid)?;
-    ArtifactInspectRequest::new(job, artifact)
+    if kind == "import" && arkdeck_contract::import_id(job) && identifier(artifact) {
+        Ok(ArtifactInspectRequest {
+            job_id: job.into(),
+            owner_kind: kind.into(),
+            artifact_id: artifact.into(),
+        })
+    } else if kind == "job" {
+        ArtifactInspectRequest::new(job, artifact)
+    } else {
+        Err(invalid())
+    }
 }
 impl ArtifactInspectRequest {
     /// Identifiers only, never a path. A syntactically valid Job ID still needs
@@ -121,6 +119,7 @@ impl ArtifactInspectRequest {
         }
         Ok(Self {
             job_id: job_id.into(),
+            owner_kind: "job".into(),
             artifact_id: artifact_id.into(),
         })
     }
@@ -243,7 +242,7 @@ pub(crate) fn inspect_result(
         json!({"startUtc":window["startUTC"],"endUtc":window["endUTC"]})
     };
     Ok(
-        json!({"schemaVersion":"arkdeck.artifact/1","owner":{"kind":"job","id":request.job_id},
+        json!({"schemaVersion":"arkdeck.artifact/1","owner":{"kind":request.owner_kind,"id":request.job_id},
         "artifactId":request.artifact_id,"name":metadata["name"],"mediaType":metadata["mediaType"],
         "privacy":metadata["privacy"],"byteCount":metadata["byteCount"],
         "artifactDigest":if hash.is_empty(){Value::Null}else{json!(hash)},"status":status,

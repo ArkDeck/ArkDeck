@@ -945,6 +945,7 @@ impl<H: HostServices> Control<H> {
             | "artifact.import.abort"
             | "artifact.import.inspect"
             | "artifact.import.inspection"
+            | "artifact.import.list"
             | "artifact.import.commit"
             | "artifact.import.release" => Response {
                 id: request.id.clone(),

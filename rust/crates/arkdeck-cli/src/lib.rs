@@ -561,6 +561,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["artifact", "import", "flash-bundle"] => "artifact.import.flash-bundle",
         ["artifact", "import", "abort"] => "artifact.import.abort",
         ["artifact", "import", "inspect"] => "artifact.import.inspect",
+        ["artifact", "import", "list"] => "artifact.import.list",
         ["artifact", "inspect"] => "artifact.inspect",
         ["artifact", "read"] => "artifact.read",
         ["artifact", "export"] => "artifact.export",
@@ -655,6 +656,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ],
         "artifact.import.abort" => &["importRequestId", "expectedGeneration", "timeout"],
         "artifact.import.inspect" => &["importRequestId", "import", "timeout"],
+        "artifact.import.list" => &["targetId", "state", "pageSize", "cursor", "timeout"],
 
         "target.adopt" => &[
             "candidate",
@@ -1006,7 +1008,13 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             "device.observations"
         } else if command == "artifact.import.inspect" {
             "artifact.import.inspection"
-        } else if command.starts_with("artifact.import.") && command != "artifact.import.abort" {
+        } else if matches!(
+            command,
+            "artifact.import.hap"
+                | "artifact.import.native-library"
+                | "artifact.import.workspace-patch"
+                | "artifact.import.flash-bundle"
+        ) {
             "artifact.import.begin"
         } else if command == "operation.example" {
             "operation.describe"
