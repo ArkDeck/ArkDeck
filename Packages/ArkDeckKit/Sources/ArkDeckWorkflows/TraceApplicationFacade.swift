@@ -1,3 +1,4 @@
+import ArkDeckClientKit
 // App-facing Trace projection over Runtime's closed typed XPC door.
 //
 // capture.diagnostics@1 publishes a typed traceCategories leg, but the App

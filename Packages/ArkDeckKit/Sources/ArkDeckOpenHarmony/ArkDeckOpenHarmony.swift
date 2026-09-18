@@ -742,7 +742,8 @@ struct SystemHDCManagedServerProcessInspector: HDCManagedServerProcessInspecting
       let start = cursor
       while cursor < actualSize && buffer[cursor] != 0 { cursor += 1 }
       guard cursor < actualSize else { return nil }
-      values.append(String(cString: Array(buffer[start...cursor])))
+      values.append(
+        String(decoding: buffer[start..<cursor].map { UInt8(bitPattern: $0) }, as: UTF8.self))
     }
     guard !values.isEmpty else { return nil }
     return Array(values.dropFirst())

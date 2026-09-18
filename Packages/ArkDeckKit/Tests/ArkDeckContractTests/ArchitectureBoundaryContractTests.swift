@@ -42,6 +42,7 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
   /// deliberately narrow.
   private static let allowedImports: [String: Set<String>] = [
     "ArkDeckCore": [],
+    "ArkDeckClientKit": ["ArkDeckCore"],
     "ArkDeckProcess": ["ArkDeckCore"],
     "ArkDeckRuntime": ["ArkDeckCore"],
     "ArkDeckOpenHarmony": ["ArkDeckCore", "ArkDeckProcess"],
@@ -49,7 +50,9 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
     "ArkDeckTraceAdapter": [],
     // ArkForgeProtocol and ArkForgeClient are external SDK products owned by
     // ArkForge. This matrix lists only ArkDeck-to-ArkDeck edges.
+    // CHG-2026-074: unmigrated facades reuse the extracted client transport.
     "ArkDeckWorkflows": [
+      "ArkDeckClientKit",
       "ArkDeckCore", "ArkDeckProcess", "ArkDeckRuntime", "ArkDeckOpenHarmony", "ArkDeckStorage",
     ],
     "ArkDeckAgentComposition": [
@@ -59,7 +62,9 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
     "ArkDeckAgentClient": ["ArkDeckCore"],
     "ArkDeckBootstrap": ["ArkDeckCore"],
     "ArkDeckLaunchAgent": ["ArkDeckCore"],
-    "ArkDeckAgentDaemon": ["ArkDeckCore", "ArkDeckStorage", "ArkDeckWorkflows"],
+    "ArkDeckAgentDaemon": [
+      "ArkDeckClientKit", "ArkDeckCore", "ArkDeckStorage", "ArkDeckWorkflows",
+    ],
     "ArkDeckCLI": [
       "ArkDeckCore", "ArkDeckRuntime", "ArkDeckWorkflows", "ArkDeckAgentComposition",
       "ArkDeckAgentClient", "ArkDeckBootstrap", "ArkDeckLaunchAgent",
@@ -77,6 +82,7 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
   /// be scanned under that target's name instead.
   private static let targetRoots: [(target: String, path: String, carveOuts: [String])] = [
     ("ArkDeckCore", "Sources/ArkDeckCore", []),
+    ("ArkDeckClientKit", "Sources/ArkDeckClientKit", []),
     ("ArkDeckProcess", "Sources/ArkDeckProcess", []),
     ("ArkDeckRuntime", "Sources/ArkDeckRuntime", []),
     ("ArkDeckOpenHarmony", "Sources/ArkDeckOpenHarmony", []),
@@ -570,7 +576,8 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
 
     let repoRoot = packageRoot().deletingLastPathComponent().deletingLastPathComponent()
     let historyFacade = try String(
-      contentsOf: sourceRoot.appending(path: "ArkDeckWorkflows/RuntimeHistoryApplicationFacade.swift"),
+      contentsOf: sourceRoot.appending(
+        path: "ArkDeckWorkflows/RuntimeHistoryApplicationFacade.swift"),
       encoding: .utf8)
     let flashActivityStart = try XCTUnwrap(historyFacade.range(of: "public var flashActivityJobs:"))
     let flashActivityTail = historyFacade[flashActivityStart.lowerBound...]

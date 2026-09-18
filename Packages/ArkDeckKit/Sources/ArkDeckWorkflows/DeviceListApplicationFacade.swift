@@ -1,3 +1,4 @@
+import ArkDeckClientKit
 // App-facing device discovery read.
 //
 // One question, answered honestly: which device candidates did HDC most

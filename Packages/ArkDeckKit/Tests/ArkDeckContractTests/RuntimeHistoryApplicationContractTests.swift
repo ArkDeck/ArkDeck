@@ -1,3 +1,4 @@
+@testable import ArkDeckClientKit
 // What the App is allowed to conclude from a daemon answer.
 //
 // The dangerous failure for a read-only history surface is not a crash, it is

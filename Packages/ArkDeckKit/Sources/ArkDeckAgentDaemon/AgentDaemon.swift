@@ -1,3 +1,4 @@
+import ArkDeckClientKit
 // arkdeck-agentd: local device-runtime control plane (CHG-2026-047, T07).
 //
 // One composition root for device execution. Transport is a user-private
