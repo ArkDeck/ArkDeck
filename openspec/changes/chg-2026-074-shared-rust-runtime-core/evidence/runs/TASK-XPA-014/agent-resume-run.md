@@ -63,7 +63,7 @@ No producer frame was hand-authored; no failure was mapped away to generic succe
 or unavailable. Final repository unified validation remains pending.
 
 These are local macOS fixture tests and process-exit simulations, not hardware
-acceptance. CLI resume, production USB source activation, installed switching,
+acceptance. Production USB source activation, installed switching,
 unknown-outcome recovery and GJ-1–5 remain outside this slice. PR review/merge,
 full local gate and CI remain outstanding.
 
@@ -73,3 +73,20 @@ commit. Its ClientKit extraction and SDK compatibility remain that PR's reviewed
 scope; they were not copied or rewritten into this feature. Both #1975 and #1976
 are dependencies while unmerged. Final unified verification runs this actual
 stacked branch, not a detached source view with unrecorded SDK modifications.
+
+
+CLI continuation: `agent resume` and physical `human-action resume` now send the
+same exact references once, then reuse the existing execution validator and
+read-only `agent.status` settling loop. `--resume-token` is an alias of the exact
+Runtime reference. Selection and a strict JSON string selection file (64 KiB
+maximum) are exclusive; timeout bounds only the client wait. New budget, Target,
+inputs or capability options are rejected. Impact-approval/challenge responses
+remain `humanActionRequired`: this physical slice does not implement the separate
+interactive control-action approval flow or respond to a challenge automatically.
+
+All CLI tests passed, including the new binary/private-socket test for both
+resume leaves: the Runtime observes one request, dropped responses produce
+`outcomeUnknown` with `controlRequestRetryable: false`, and no replay or second
+connection occurs. Parameter tests cover forbidden intent fields, alias/source
+exclusivity and bounded selection documents; all-target CLI Clippy also passed.
+Log: `/private/tmp/arkdeck-resume-cli-tests-20260919.log`.

@@ -1,4 +1,4 @@
-//! `agent run`, `agent status`, `agent list` and `agent abandon`: Swift
+//! `agent run/status/list/abandon/resume` and physical HAR resume: Swift
 //! `RuntimeCLI.runRuntimeExecution` for the agent family. A run's intent is
 //! built from its options or from a typed request document and checked as
 //! Swift's `AgentExecutionIntent` checks it before anything is sent; an
@@ -241,12 +241,30 @@ pub(super) fn configure(
     if help
         || !matches!(
             command,
-            "agent.run" | "agent.status" | "agent.list" | "agent.abandon"
+            "agent.run"
+                | "agent.status"
+                | "agent.list"
+                | "agent.abandon"
+                | "agent.resume"
+                | "human-action.resume"
         )
     {
         return Ok(None);
     }
-    if matches!(command, "agent.status" | "agent.abandon") {
+    if matches!(command, "agent.resume" | "human-action.resume") {
+        if fields.contains_key("resumeReference") == fields.contains_key("resumeToken") {
+            return Err(usage("resume requires exactly one exact resume reference"));
+        }
+        if command == "human-action.resume" && !fields.contains_key("humanAction") {
+            return Err(usage("human-action resume requires --human-action"));
+        }
+        if fields.contains_key("selection") && fields.contains_key("selectionFile") {
+            return Err(usage("selection sources are exclusive"));
+        }
+        if let Some(token) = fields.remove("resumeToken") {
+            fields.insert("resumeReference".into(), token);
+        }
+    } else if matches!(command, "agent.status" | "agent.abandon") {
         if !fields.contains_key("executionId") {
             return Err(usage(format!(
                 "agent {} requires --execution-id",
@@ -339,22 +357,59 @@ pub fn require_execution_identity(params: &Map<String, Value>) -> Result<(), Cli
 /// Swift `executionInputDocument`: a bounded strict UTF-8 JSON document read
 /// from a path, or from standard input for `-`.
 fn document(path: &str) -> Result<Value, CliError> {
+    document_bounded(path, MAX_DOCUMENT)
+}
+
+fn document_bounded(path: &str, maximum: usize) -> Result<Value, CliError> {
     let unreadable = || invalid_input("cannot read a bounded strict UTF-8 JSON document");
     let mut bytes = Vec::new();
-    let limit = (MAX_DOCUMENT + 1) as u64;
+    let limit = (maximum + 1) as u64;
     let read = if path == "-" {
         std::io::stdin().lock().take(limit).read_to_end(&mut bytes)
     } else {
         std::fs::File::open(path).and_then(|file| file.take(limit).read_to_end(&mut bytes))
     };
     read.map_err(|_| unreadable())?;
-    if bytes.len() > MAX_DOCUMENT {
+    if bytes.len() > maximum {
         return Err(CliError::new(
             "inputTooLarge",
             "input document exceeds its byte bound",
         ));
     }
     strict_json(&bytes).map_err(|_| unreadable())
+}
+
+/// Physical resume supplies references only; the Runtime retains the intent
+/// and deadline. A selection document is a bounded opaque JSON string.
+pub fn resume_params(invocation: &Invocation) -> Result<Map<String, Value>, CliError> {
+    let mut params = invocation.params.clone().unwrap_or_default();
+    for key in if invocation.command == "human-action.resume" {
+        &["resumeReference", "humanAction"][..]
+    } else {
+        &["resumeReference"][..]
+    } {
+        if !params
+            .get(*key)
+            .and_then(Value::as_str)
+            .is_some_and(valid_identifier)
+        {
+            return Err(invalid_input(
+                "an exact resume/action reference is required",
+            ));
+        }
+    }
+    if let Some(path) = params.remove("selectionFile") {
+        let value = document_bounded(
+            path.as_str()
+                .ok_or_else(|| invalid_input("invalid selection file"))?,
+            65_536,
+        )?;
+        if !value.is_string() {
+            return Err(invalid_input("selection must be an opaque JSON string"));
+        }
+        params.insert("selection".into(), value);
+    }
+    Ok(params)
 }
 
 /// The fields of a typed operation request the intent carries (Swift
