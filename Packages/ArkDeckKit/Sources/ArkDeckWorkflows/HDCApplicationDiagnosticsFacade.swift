@@ -1,3 +1,4 @@
+import ArkDeckClientKit
 import ArkDeckCore
 import ArkDeckOpenHarmony
 import CryptoKit

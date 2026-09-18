@@ -55,7 +55,7 @@ graph TD
     RT --> CORE
     WORKFLOWS --> CORE
     CLIENT --> CORE
-    CLIENTKIT[ArkDeckClientKit<br/>App IPC transport + History filter] --> CORE
+    CLIENTKIT[ArkDeckClientKit<br/>App IPC transport + History filter + Device list] --> CORE
     WORKFLOWS --> CLIENTKIT
     DAEMON --> CLIENTKIT
 ```
@@ -93,7 +93,7 @@ AgentDaemon  → Core, ClientKit, Storage, Workflows
 CLI / AgentDaemonMain(可执行组合根)→ 宽,但仍在矩阵内
 ```
 
-CHG-2026-074 迁移期间，ClientKit 持有 App 的 IPC transport 与 History filter 展示模型，
+CHG-2026-074 迁移期间，ClientKit 持有 App 的 IPC transport、History filter 与 Device list 展示模型，
 不依赖 Workflows、Runtime 或 Storage；旧 façade 和 Swift daemon 暂时消费这些共享类型。
 此提取不代表所有 App façade 已脱钩或 Swift Runtime 已退役。
 
