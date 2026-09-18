@@ -45,3 +45,10 @@ The new relevant shapes are retained in the committed ControlFrames corpus.
 The full unified gate, Rust published/candidate parity, signed standalone Rust
 App acceptance and SPK-8 completion remain pending. This is a host-only Swift
 oracle/ClientKit contract run, not installed activation or real-device evidence.
+
+Checkpoint `8fd38984` preserves the focused-tested slice. Main `187321ea` was
+subsequently merged without conflicts. The published/candidate contract views
+must both run in the final unified gate because method schemas and the Swift
+corpus changed. Its standard Rust lane runs `test_contract_checks.py` and
+`check-contracts.py`, alongside manifest and workspace validation; targeted
+ClientKit/schema tests alone do not satisfy that requirement.
