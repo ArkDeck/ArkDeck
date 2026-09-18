@@ -61,3 +61,8 @@ conflicts. The dashboard records one extracted ClientKit facade and the merged
 Rust owner soak tool separately from signed App/installed Runtime/physical
 acceptance, which remain incomplete. Source counts were reproduced unchanged.
 The post-merge unified gate remains pending.
+
+Integrated main `187321ea` after #1968 and #1979 merged, without conflicts.
+The dashboard now records pointer capability admission separately from missing
+consumption/dispatch: executable operations remain 3/30. The source recount is
+unchanged. Final post-merge unified validation remains pending.
