@@ -126,6 +126,7 @@ impl Owners {
 
     fn planner<'a>(&'a self, hdc: &'a HdcComposition<'a>) -> JobPlanner<'a> {
         JobPlanner {
+            imports: None,
             artifacts: Some(&self.artifacts),
             analyzer: None,
             state_root: &self.root,

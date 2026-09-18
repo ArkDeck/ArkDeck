@@ -109,3 +109,17 @@ Validation: `RUST_TEST_THREADS=2 cargo test -p arkdeck-hoststore --test import_u
 --jobs 2 -- --nocapture` passed: 32 tests, zero failures, one intentionally ignored
 SIGKILL child fixture (exercised by its parent test), 4.74 seconds. This is targeted
 host validation, not the pending unified gate or real-device acceptance.
+
+## Protected-main capability-admission integration
+
+Integrated protected main `187321ea397419353ac430a8bd48e027f56cd02e` through
+publication merge `43b9ac1a`, retaining the Import owner and RAII hold across
+preauthorization and durable admission. The two new host-only admission fixtures
+explicitly use `authority: None`; the incoming pointer-admission fixture uses
+`imports: None`. Materialized's lifetime is explicit in the authority helper.
+Daemon authority wiring and original-submission fingerprint preservation remain
+unchanged. This is not capability consumption or imported device deployment.
+
+`cargo check --workspace --all-targets --jobs 1` passed after integration in
+16.74 seconds; formatting and diff checks passed. Final unified validation remains
+pending its serialized slot.

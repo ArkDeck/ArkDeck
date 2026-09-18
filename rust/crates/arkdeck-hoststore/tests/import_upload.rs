@@ -1484,6 +1484,7 @@ fn admitted_import_is_retained_across_restart_and_retries_without_new_hold() {
     let profile = arkdeck_hoststore::AnalyzerProfile::crash_signature(&analyzer).unwrap();
     let request = analyzer_request(&committed["receipt"]["lease"]);
     let admit = arkdeck_hoststore::JobAdmitter {
+        authority: None,
         planner: arkdeck_hoststore::JobPlanner {
             imports: Some(&store),
             artifacts: Some(&artifacts),
@@ -1606,6 +1607,7 @@ fn missing_terminal_job_directory_cannot_clear_import_references() {
     let profile = arkdeck_hoststore::AnalyzerProfile::crash_signature(&analyzer).unwrap();
     let request = analyzer_request(&committed["receipt"]["lease"]);
     let admit = arkdeck_hoststore::JobAdmitter {
+        authority: None,
         planner: arkdeck_hoststore::JobPlanner {
             imports: Some(&store),
             artifacts: Some(&artifacts),
