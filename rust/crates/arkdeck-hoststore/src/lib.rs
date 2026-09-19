@@ -26,6 +26,10 @@ pub use job_record::JobRecord;
 #[cfg(target_os = "macos")]
 pub use job_repository::{AdmissionVerdict, JobWriteError};
 #[cfg(target_os = "macos")]
+mod mutation_execution;
+#[cfg(target_os = "macos")]
+pub use mutation_execution::MutationExecution;
+#[cfg(target_os = "macos")]
 mod job_plan;
 #[cfg(target_os = "macos")]
 mod operation_availability;

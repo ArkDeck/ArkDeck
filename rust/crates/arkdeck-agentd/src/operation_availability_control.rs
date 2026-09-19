@@ -213,9 +213,20 @@ fn live_discovery_and_describe_follow_actual_executors_and_executable_drift_with
         }
     }
     for reference in ["input.tap@1", "input.long-press@1", "input.swipe@1"] {
+        // The executor exists, but this development composition cannot acquire
+        // the account-fixed Runtime mutation owner or grant dispatch authority.
+        assert_eq!(entry(&rows, reference)["availability"], "unavailable");
         assert_eq!(
             entry(&rows, reference)["reasonCodes"],
-            json!(["operation_not_supported"])
+            json!(["provider_tool_unavailable"])
+        );
+        assert_eq!(
+            entry(&rows, reference)["reasons"],
+            json!(["runtime.mutationOwnerUnavailable"])
+        );
+        assert_eq!(
+            entry(&rows, reference)["reasonOrigins"],
+            json!(["host_configuration"])
         );
     }
     let original = fs::read(fixture.0.join("analyzer")).unwrap();

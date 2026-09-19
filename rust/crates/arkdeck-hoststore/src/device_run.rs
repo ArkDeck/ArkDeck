@@ -27,9 +27,7 @@ use crate::job_record::JobRecord;
 use crate::job_run::{JobRunner, Run, RunRefusal, failure, uncertain};
 use crate::operation_catalog::{CatalogArtifact, CatalogOperation, CatalogStep};
 use crate::session_json;
-use arkdeck_provider_hdc::{
-    Action, DispatchFailure, Expected, Outcome, Persisted, ProcessPlan, Receipt,
-};
+use arkdeck_provider_hdc::{DispatchFailure, Expected, Outcome, ProcessPlan, Receipt};
 use serde_json::{Map, Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -107,12 +105,14 @@ fn preflight_complete(accumulator: &Value) -> bool {
         })
 }
 
-fn persisted_value(value: Persisted) -> Value {
-    match value {
-        Persisted::Text(text) => json!(text),
-        Persisted::Integer(number) => json!(number),
-        Persisted::Texts(texts) => json!(texts),
-    }
+/// A partly carried readback cannot renew the session cache's original age.
+fn preflight_fresh(accumulator: &Value) -> bool {
+    preflight_complete(accumulator)
+        && accumulator["steps"].as_array().is_some_and(|steps| {
+            steps
+                .iter()
+                .all(|step| step.get("carriedFromUTC").is_none())
+        })
 }
 
 /// What every product one Job publishes shares: its owner, operation,
@@ -166,8 +166,22 @@ fn declaration<'a>(descriptor: &'a CatalogOperation, name: &str) -> Option<&'a C
 }
 
 impl JobRunner<'_> {
-    /// Swift `runOwned` for a device-bound HDC operation.
     pub(crate) fn execute_device(
+        &self,
+        run: &mut Run,
+        hdc: &HdcComposition<'_>,
+    ) -> Result<(), RunRefusal> {
+        self.execute_device_inner(run, hdc)?;
+        let outcome = if run.record.state == "waitingForRecovery" {
+            crate::capability_store::UseOutcome::OutcomeUnknown
+        } else {
+            crate::capability_store::UseOutcome::Confirmed
+        };
+        self.settle_mutation(run, outcome)
+    }
+
+    /// Swift `runOwned` for a device-bound HDC operation.
+    fn execute_device_inner(
         &self,
         run: &mut Run,
         hdc: &HdcComposition<'_>,
@@ -335,6 +349,9 @@ impl JobRunner<'_> {
                     )));
                 }
             }
+            if gated && evidence && self.carry_session_evidence(run, descriptor, step)? {
+                continue;
+            }
             let Some(now) = (hdc.now)() else {
                 return Err(Stop::Refused(uncertain()));
             };
@@ -353,11 +370,31 @@ impl JobRunner<'_> {
                 }
                 Err(_) => return Err(Stop::Refused(uncertain())),
             };
-            // No pointer gesture is dispatched here yet: `DEVICE_OPERATIONS`
-            // keeps the operations that inject one out of this lane.
-            let device_steps::StepAction::Hdc(action) = action else {
-                return Err(Stop::Refused(uncertain()));
-            };
+            if matches!(&action, device_steps::StepAction::Pointer(_)) {
+                let facts = facts.as_ref().ok_or_else(|| {
+                    Stop::Failed("authorizationRequired: fresh device facts unavailable".into())
+                })?;
+                let authority = self.consume_pointer_authority(run, descriptor, facts);
+                if matches!(
+                    &authority,
+                    Ok(crate::mutation_execution::MutationConsumption::PersistenceUncertain)
+                ) {
+                    return Err(Stop::Refused(uncertain()));
+                }
+
+                // Cancellation is re-read after fresh materialization and after
+                // durable consumption; neither boundary may enter the WAL.
+                if self.cancellation.is_some_and(RunCancellation::pending)
+                    || matches!(
+                        &authority,
+                        Ok(crate::mutation_execution::MutationConsumption::Cancelled)
+                    )
+                {
+                    self.carry(run)?;
+                    return Err(Stop::Cancelled);
+                }
+                authority.map_err(Stop::Failed)?;
+            }
             let plan = action
                 .lower(
                     &step.step_id,
@@ -437,7 +474,7 @@ impl JobRunner<'_> {
         hdc: &HdcComposition<'_>,
         descriptor: &CatalogOperation,
         step: &CatalogStep,
-        action: &Action,
+        action: &device_steps::StepAction,
         plan: &ProcessPlan,
         facts: Option<&DeviceFacts>,
         target_id: &str,
@@ -451,11 +488,7 @@ impl JobRunner<'_> {
             .as_object()
             .cloned()
             .unwrap_or_default();
-        let Some(arguments) = device_steps::journal_arguments(
-            step,
-            &inputs,
-            &device_steps::StepAction::Hdc(action.clone()),
-        ) else {
+        let Some(arguments) = device_steps::journal_arguments(step, &inputs, action) else {
             return Err(Stop::Refused(uncertain()));
         };
         let journal_step = json!({
@@ -478,10 +511,6 @@ impl JobRunner<'_> {
         .map_err(|_| Stop::Refused(uncertain()))?;
         // The exact typed action is durable before its intent can be.
         let (kind, persisted) = action.persisted();
-        let persisted: Map<String, Value> = persisted
-            .into_iter()
-            .map(|(key, value)| (key.to_owned(), persisted_value(value)))
-            .collect();
         run.record.set_recovery(
             Some(&step.step_id),
             Some(&intent_id),
@@ -574,6 +603,96 @@ impl JobRunner<'_> {
                 Err(Stop::Unknown(reason))
             }
         }
+    }
+
+    /// A session may carry model/firmware only after this Job re-proved identity.
+    /// The original complete readback never has its lifetime renewed by carrying.
+    fn carry_session_evidence(
+        &self,
+        run: &mut Run,
+        descriptor: &CatalogOperation,
+        step: &CatalogStep,
+    ) -> Result<bool, Stop> {
+        if !["read-evidence-model", "read-evidence-firmware"].contains(&step.step_id.as_str()) {
+            return Ok(false);
+        }
+        let inputs = run.record.request["inputs"]
+            .as_object()
+            .ok_or_else(|| Stop::Refused(uncertain()))?;
+        if !crate::capability_policy::session_scoped(descriptor, inputs) {
+            return Ok(false);
+        }
+        let Some(owner) = self.mutation else {
+            return Ok(false);
+        };
+        let Some(mut accumulator) = run.record.evidence_preflight().cloned() else {
+            return Ok(false);
+        };
+        let Some(steps) = accumulator["steps"].as_array() else {
+            return Ok(false);
+        };
+        if steps
+            .first()
+            .is_none_or(|s| s["stepID"] != "confirm-evidence-target")
+            || EVIDENCE_STEPS.get(steps.len()) != Some(&step.step_id.as_str())
+        {
+            return Ok(false);
+        }
+        let key = format!(
+            "{}\n{}",
+            accumulator["stableIdentitySHA256"]
+                .as_str()
+                .unwrap_or_default(),
+            accumulator["bindingRevision"]
+        );
+        let Some(carried) = owner.authority.holds.session_evidence(&key) else {
+            return Ok(false);
+        };
+        if carried["stableIdentitySHA256"] != accumulator["stableIdentitySHA256"] {
+            return Ok(false);
+        }
+        let now = run.clock()?;
+        let Some(read_at) = carried["confirmedAtUTC"].as_str() else {
+            return Ok(false);
+        };
+        let (Some(before), Some(current)) = (
+            crate::format_time::plain_utc_seconds(read_at),
+            crate::format_time::plain_utc_seconds(&now),
+        ) else {
+            return Ok(false);
+        };
+        if current < before || current - before >= 3600 {
+            return Ok(false);
+        }
+        if step.step_id == "read-evidence-model" {
+            accumulator["model"] = carried["model"].clone();
+        } else {
+            accumulator["firmware"] = carried["firmware"].clone();
+            accumulator["confirmedAtUTC"] = json!(now);
+        }
+        accumulator["steps"].as_array_mut().unwrap().push(json!({"stepID":step.step_id,"stepKind":step.kind,"outcomeAtUTC":now,"carriedFromUTC":read_at}));
+        run.record.set_evidence_preflight(accumulator.clone());
+        run.record.timeline.push(format!(
+            "evidence-preflight {} carried from session readback at {read_at}",
+            step.step_id
+        ));
+        if preflight_complete(&accumulator) {
+            let mut observation = accumulator;
+            let fields = observation
+                .as_object_mut()
+                .ok_or_else(|| Stop::Refused(uncertain()))?;
+            let steps = fields.remove("steps").unwrap_or_default();
+            fields.insert("preflightSteps".into(), steps);
+            fields.insert(
+                "confirmationMethod".into(),
+                json!("machineReadbackSessionCarried"),
+            );
+            run.record.set_evidence_observation(observation);
+            run.record
+                .timeline
+                .push("evidence-preflight complete".into());
+        }
+        Ok(true)
     }
 
     /// Swift `captureEvidencePreflightFragmentIfEligible`: a fragment is
@@ -669,7 +788,19 @@ impl JobRunner<'_> {
             if let Some(fields) = observation.as_object_mut() {
                 let steps = fields.remove("steps").unwrap_or_default();
                 fields.insert("preflightSteps".into(), steps);
-                fields.insert("confirmationMethod".into(), json!("machineReadback"));
+                let carried = fields["preflightSteps"].as_array().is_some_and(|steps| {
+                    steps
+                        .iter()
+                        .any(|step| step.get("carriedFromUTC").is_some())
+                });
+                fields.insert(
+                    "confirmationMethod".into(),
+                    json!(if carried {
+                        "machineReadbackSessionCarried"
+                    } else {
+                        "machineReadback"
+                    }),
+                );
             }
             run.record.set_evidence_observation(observation);
             // observe.device publishes its evidence-bearing products from the
@@ -681,7 +812,22 @@ impl JobRunner<'_> {
         }
         run.persist(self.jobs).map_err(|_| {
             incomplete("could not persist preflight fragment: the Job record is unwritable")
-        })
+        })?;
+        if preflight_fresh(&accumulator)
+            && let (Some(owner), Some(descriptor), Some(inputs)) = (
+                self.mutation,
+                descriptor(run.record.operation()),
+                run.record.request["inputs"].as_object(),
+            )
+            && crate::capability_policy::session_scoped(descriptor, inputs)
+        {
+            let key = format!("{}\n{}", facts.identity, facts.binding_revision);
+            owner
+                .authority
+                .holds
+                .remember_session_evidence(key, accumulator);
+        }
+        Ok(())
     }
 
     /// Swift `publishDeclaredArtifacts`: the products this step declares,
@@ -899,4 +1045,24 @@ fn facts(name: &str, record: &JobRecord, summary: &BTreeMap<String, String>) -> 
         }
     }
     session_json::encode_canonical_pretty(&Value::Object(fields)).unwrap_or_else(|_| b"{}".to_vec())
+}
+
+#[cfg(test)]
+mod session_cache_tests {
+    use super::*;
+
+    #[test]
+    fn a_carried_fragment_does_not_renew_cache_after_expiry_or_clock_rollback() {
+        let mut accumulator = json!({"transport":"usb", "confirmedAtUTC":"2026-09-19T01:00:00Z", "model":"model", "firmware":"firmware", "steps": EVIDENCE_STEPS.map(|id| json!({"stepID":id}))});
+        assert!(preflight_fresh(&accumulator));
+        // Model was carried just before expiry; firmware was read freshly
+        // after expiry (or after the clock rolled back). The complete mixed
+        // accumulator must never replace the original cache timestamp.
+        accumulator["steps"][1]["carriedFromUTC"] = json!("2026-09-19T00:00:00Z");
+        for time in ["2026-09-19T01:00:00Z", "2026-09-18T23:59:59Z"] {
+            accumulator["confirmedAtUTC"] = json!(time);
+            assert!(preflight_complete(&accumulator));
+            assert!(!preflight_fresh(&accumulator));
+        }
+    }
 }

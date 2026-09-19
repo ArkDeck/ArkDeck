@@ -1,4 +1,4 @@
-//! First standalone App composition: health and the durable History filter.
+//! Standalone App composition: health, History filters and History reads.
 //! This is deliberately opt-in on the isolated development owner. It neither
 //! activates a LaunchAgent nor changes the installed service. The transport
 //! authenticates the actual XPC connection, never an identity in request JSON.
@@ -143,7 +143,16 @@ impl<H: HostServices> HistoryIngress<H> {
         };
         if !matches!(
             request.method.as_str(),
-            "health" | "history.filter.list" | "history.filter.save" | "history.filter.delete"
+            "health"
+                | "history.filter.list"
+                | "history.filter.save"
+                | "history.filter.delete"
+                | "job.list"
+                | "job.show"
+                | "job.timeline"
+                | "job.evidence"
+                | "artifact.list"
+                | "artifact.read"
         ) {
             return refusal(
                 &request.id,
@@ -168,6 +177,20 @@ impl<H: HostServices> HistoryIngress<H> {
 }
 fn closed_parameters(request: &Request) -> bool {
     let params = request.params.clone().unwrap_or_default();
+    // Read schemas close every parameter object, including Artifact owner.
+    // Resource owners retain defaults, identity/range/cursor validation and
+    // sensitive-content admission; this boundary grants no execution authority.
+    if matches!(
+        request.method.as_str(),
+        "job.list"
+            | "job.show"
+            | "job.timeline"
+            | "job.evidence"
+            | "artifact.list"
+            | "artifact.read"
+    ) {
+        return validate_method_value(&request.method, "request", &Value::Object(params)).is_ok();
+    }
     let keys: &[&str] = match request.method.as_str() {
         "health" | "history.filter.list" => &[],
         "history.filter.delete" => &["expectedGeneration"],

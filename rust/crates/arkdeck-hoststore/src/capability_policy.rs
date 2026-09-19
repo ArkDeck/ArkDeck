@@ -270,7 +270,11 @@ pub(crate) fn issue(
 /// device, in this daemon's memory. Only a session-scoped request takes a
 /// hold, and while one is live another client's device mutation is refused.
 #[derive(Default)]
-pub struct DeviceHolds(Mutex<HashMap<String, Hold>>);
+pub struct DeviceHolds(
+    Mutex<HashMap<String, Hold>>,
+    Mutex<()>,
+    Mutex<HashMap<String, Value>>,
+);
 
 struct Hold {
     client: String,
@@ -279,6 +283,25 @@ struct Hold {
 }
 
 impl DeviceHolds {
+    pub(crate) fn remember_session_evidence(&self, key: String, evidence: Value) {
+        if let Ok(mut cache) = self.2.lock() {
+            cache.insert(key, evidence);
+        }
+    }
+    pub(crate) fn session_evidence(&self, key: &str) -> Option<Value> {
+        self.2.lock().ok()?.get(key).cloned()
+    }
+
+    /// Serializes the cross-capability lineage check with durable reservation
+    /// and Job evidence. It neither changes the client's hold nor grants authority.
+    pub(crate) fn mutation_reservation_guard(
+        &self,
+    ) -> Result<std::sync::MutexGuard<'_, ()>, String> {
+        self.1
+            .lock()
+            .map_err(|_| "mutation reservation serialization is untrusted".into())
+    }
+
     /// Swift `admitAgainstDeviceHold`. A hold outlives its last act by two
     /// minutes. The refusal is Swift's message.
     pub(crate) fn admit(

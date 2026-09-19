@@ -74,6 +74,11 @@ fn valid_port(value: &str) -> Option<u16> {
 }
 
 impl HdcDispatch for ProcessDispatch {
+    #[cfg(target_os = "macos")]
+    fn mutation_identity_current(&self) -> bool {
+        self.tool_identity_current()
+    }
+
     /// Swift `DescriptorBoundProcessDispatcher.execute`: an exited child is a
     /// receipt with its exit status, both streams and whether either went
     /// past the plan's capture; a timeout or a signal leaves the outcome
