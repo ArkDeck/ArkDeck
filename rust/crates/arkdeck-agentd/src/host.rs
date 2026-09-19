@@ -131,8 +131,9 @@ pub struct Host {
     /// The combined human-action owner over the agent executions.
     #[cfg(target_os = "macos")]
     human_actions: Option<arkdeck_hoststore::HumanActionResources>,
-    /// The union control-action owner, over no HDC and no tool-selection
-    /// owner: this daemon starts no managed HDC server.
+    /// The union control-action owner, over the HDC control-action owner
+    /// when the isolated owner starts a managed HDC server, and never over a
+    /// tool-selection owner.
     #[cfg(target_os = "macos")]
     control_actions: Option<arkdeck_hoststore::ControlActionResources>,
 }
@@ -264,7 +265,8 @@ impl Host {
         self
     }
     /// `control-action.list`, `.show` and `.reconcile` page and look up the
-    /// control actions of this union owner, which holds none.
+    /// control actions of this union owner; `runtime.hdc.impact-preview`
+    /// previews through its HDC control-action owner, if it has one.
     #[cfg(target_os = "macos")]
     pub fn with_control_actions(
         mut self,
@@ -916,19 +918,69 @@ impl HostServices for Host {
 
     /// `runtime.hdc.impact-preview`, `runtime.hdc.restart` and
     /// `control-action.list`, `.show` and `.reconcile`, as Swift's daemon
-    /// answers them without a managed HDC server: with the union owner the
-    /// isolated composition makes, or, without it, as Swift's handler answers
-    /// with no control-action owner.
+    /// answers them: with the union owner the isolated composition makes —
+    /// over the HDC control-action owner and the impact source of its managed
+    /// HDC server, when it started one — or, without it, as Swift's handler
+    /// answers with no control-action owner.
     #[cfg(target_os = "macos")]
     fn control_action(
         &self,
         method: &str,
         params: &serde_json::Map<String, serde_json::Value>,
     ) -> Result<serde_json::Value, WireError> {
-        match &self.control_actions {
-            Some(owner) => owner.answer(method, params),
-            None => arkdeck_hoststore::control_action_without_owner(method, params),
-        }
+        let Some(owner) = &self.control_actions else {
+            return arkdeck_hoststore::control_action_without_owner(method, params);
+        };
+        let (Some(hdc), Some(targets), Some(jobs)) = (&self.hdc, &self.targets, &self.jobs) else {
+            return owner.answer(method, params, None);
+        };
+        let Some(managed) = hdc.managed() else {
+            return owner.answer(method, params, None);
+        };
+        // Swift `host.controlImpactSource`: the managed server's executable,
+        // endpoint and launch; the Job owner, the Target store and the
+        // Target observation owner over this daemon's development HDC, whose
+        // gate refuses any command once the server is not the one launched.
+        let launch = || managed.active_launch();
+        let identity = arkdeck_provider_hdc::CommandlessIdentity::default();
+        let current_jobs = || jobs.current_jobs().map_err(|error| error.message);
+        let target_records = || targets.records().map_err(|error| error.message);
+        let devices = || {
+            let sources = arkdeck_hoststore::Sources {
+                dispatch: &**hdc,
+                relations: &*self.usb,
+                targets,
+                now: &utc_now,
+            };
+            self.target_observations
+                .snapshot(&sources, None)
+                .map(|snapshot| arkdeck_hoststore::DeviceReading {
+                    generation: snapshot.generation,
+                    rows: snapshot
+                        .observations
+                        .iter()
+                        .map(|observation| arkdeck_hoststore::DeviceRow {
+                            observation_id: observation.observation_id.clone(),
+                            state: observation.candidate.state.clone(),
+                            relation: observation.relation.clone(),
+                        })
+                        .collect(),
+                })
+                .map_err(|error| error.wire().message)
+        };
+        let source = arkdeck_hoststore::ManagedServerImpact {
+            executable: managed.executable().clone(),
+            endpoint: managed.endpoint().to_owned(),
+            launch: &launch,
+            identity: &identity,
+            signature: &arkdeck_provider_hdc::NativeSignature,
+            verifier: &arkdeck_provider_hdc::SystemManagedProcess,
+            dispatch: &**hdc,
+            jobs: &current_jobs,
+            targets: &target_records,
+            devices: &devices,
+        };
+        owner.answer(method, params, Some(&source))
     }
 
     #[cfg(target_os = "macos")]

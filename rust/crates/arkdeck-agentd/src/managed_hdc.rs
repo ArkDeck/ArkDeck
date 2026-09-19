@@ -70,9 +70,19 @@ impl ManagedHdc {
         })
     }
 
+    /// The configured executable, by the path it was configured with.
+    pub(crate) fn executable(&self) -> &StatusExecutable {
+        &self.executable
+    }
+
+    /// The endpoint the server was started on, as its selection spells it.
+    pub(crate) fn endpoint(&self) -> &str {
+        &self.startup.endpoint
+    }
+
     /// Swift `activeLaunch()`: the spawn record while the server runs and is
     /// not being stopped.
-    fn active_launch(&self) -> Option<ManagedLaunch> {
+    pub(crate) fn active_launch(&self) -> Option<ManagedLaunch> {
         let mut server = self.server.lock().ok()?;
         let server = server.as_mut()?;
         if server.exited() {

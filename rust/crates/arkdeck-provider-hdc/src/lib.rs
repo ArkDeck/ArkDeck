@@ -104,7 +104,7 @@ pub use status::{
     CommandlessIdentity, HdcStatusObserver, IdentityObservation, IdentityObserver, ManagedLaunch,
     ManagedProcessVerifier, NativeSignature, STATUS_SCHEMA_VERSION, SignatureInspector,
     StartupDiagnostics, StatusExecutable, SupervisedServer, SupervisorState, SystemManagedProcess,
-    server_endpoint_ref, unconfigured_status,
+    published_client_version, server_endpoint_ref, unconfigured_status,
 };
 pub use target_observation::{
     BootstrapFailure, DAYU200_NORMAL_PRODUCT_ID, NoUsbRelations, ObservedCandidate,

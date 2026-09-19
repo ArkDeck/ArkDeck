@@ -66,6 +66,16 @@ mod control_action;
 #[cfg(target_os = "macos")]
 pub use control_action::{ControlActionResources, control_action_without_owner};
 #[cfg(target_os = "macos")]
+mod hdc_control_action;
+#[cfg(target_os = "macos")]
+pub use hdc_control_action::{
+    HdcControlActions, Impact, ImpactReading, ImpactSource, OwnerContext, Record,
+};
+#[cfg(target_os = "macos")]
+mod hdc_impact_source;
+#[cfg(target_os = "macos")]
+pub use hdc_impact_source::{CurrentJob, DeviceReading, DeviceRow, ManagedServerImpact};
+#[cfg(target_os = "macos")]
 mod analyzer_output;
 #[cfg(target_os = "macos")]
 mod artifact_publication;
