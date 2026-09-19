@@ -1,0 +1,98 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "runtime",
+        "storage",
+        "status"
+      ],
+      "expected": {
+        "command": "runtime.storage.status",
+        "handlerArguments": [
+          "runtime",
+          "storage",
+          "status"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "runtime",
+        "storage",
+        "status",
+        "--help"
+      ],
+      "expected": {
+        "command": "runtime.storage.status",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "runtime",
+        "storage",
+        "status",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.storage.status",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "runtime",
+        "storage",
+        "status",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.storage.status",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "runtime",
+        "storage",
+        "status",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "runtime.storage.status",
+        "handlerArguments": [
+          "runtime",
+          "storage",
+          "status",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "runtime.storage.status",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "runtime",
+    "storage",
+    "status"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

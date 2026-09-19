@@ -34,12 +34,14 @@ pub use hdc_control::hdc_control_action_params;
 mod trace_cache;
 pub use trace_cache::validate_trace_cache_response;
 mod agent_executions;
+mod command_registry;
 mod human_action_resources;
 pub use agent_executions::{
     Settlement, agent_exit, execution_intent, human_action_progress, require_execution_identity,
     resume_params, settle_execution, validate_execution,
 };
 pub use artifact_resources::validate_artifact_page;
+pub use command_registry::{command_registry, command_registry_human};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Invocation {
@@ -730,6 +732,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["history", "filter", "list"] => "history.filter.list",
         ["history", "filter", "save"] => "history.filter.save",
         ["history", "filter", "delete"] => "history.filter.delete",
+        ["commands"] => "commands",
         [] if help => "help",
         _ => {
             return Err(CliError::new(
@@ -738,6 +741,13 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             ));
         }
     };
+    // Swift's `commands` leaf takes only `--output`: it never reaches a Runtime.
+    if command == "commands" && (id.is_some() || socket.is_some()) {
+        return Err(CliError::new(
+            "invalidOption",
+            "the option is not available for this command",
+        ));
+    }
     if raw && command != "artifact.read" {
         return Err(CliError::new(
             "invalidOption",
@@ -1280,6 +1290,13 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         socket,
         timeout_ms,
     })
+}
+
+/// A result no Runtime answered (Swift `CLIResultEnvelope.success`): its
+/// meta names no control protocol.
+pub fn local_success_envelope(command: &str, result: Value, id: &str) -> Value {
+    json!({"schemaVersion":"arkdeck.cli.result/1","command":command,"ok":true,"result":result,
+        "meta":{"controlRequestId":id,"cliVersion":"0.1.0"}})
 }
 
 pub fn success_envelope(command: &str, result: Value, id: &str) -> Value {

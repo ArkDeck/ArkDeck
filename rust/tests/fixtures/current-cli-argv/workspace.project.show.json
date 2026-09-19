@@ -1,0 +1,144 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "workspace",
+        "project",
+        "show",
+        "--project",
+        "sample"
+      ],
+      "expected": {
+        "command": "workspace.project.show",
+        "handlerArguments": [
+          "workspace",
+          "project",
+          "show",
+          "--project",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "workspace",
+        "project",
+        "show",
+        "--help"
+      ],
+      "expected": {
+        "command": "workspace.project.show",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "workspace",
+        "project",
+        "show",
+        "--project",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "workspace.project.show",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "workspace",
+        "project",
+        "show",
+        "--project",
+        "sample",
+        "--project",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "workspace.project.show",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "workspace",
+        "project",
+        "show"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "workspace.project.show",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "workspace",
+        "project",
+        "show",
+        "--project",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "workspace.project.show",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "workspace",
+        "project",
+        "show",
+        "--project",
+        "sample",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "workspace.project.show",
+        "handlerArguments": [
+          "workspace",
+          "project",
+          "show",
+          "--project",
+          "sample",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "workspace.project.show",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "workspace",
+    "project",
+    "show"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

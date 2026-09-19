@@ -1,0 +1,144 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "history",
+        "filter",
+        "save",
+        "--expected-generation",
+        "1"
+      ],
+      "expected": {
+        "command": "history.filter.save",
+        "handlerArguments": [
+          "history",
+          "filter",
+          "save",
+          "--expected-generation",
+          "1"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "history",
+        "filter",
+        "save",
+        "--help"
+      ],
+      "expected": {
+        "command": "history.filter.save",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "history",
+        "filter",
+        "save",
+        "--expected-generation",
+        "1",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "history.filter.save",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "history",
+        "filter",
+        "save",
+        "--expected-generation",
+        "1",
+        "--expected-generation",
+        "1"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "history.filter.save",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "history",
+        "filter",
+        "save"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "history.filter.save",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "history",
+        "filter",
+        "save",
+        "--expected-generation",
+        "1",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "history.filter.save",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "history",
+        "filter",
+        "save",
+        "--expected-generation",
+        "1",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "history.filter.save",
+        "handlerArguments": [
+          "history",
+          "filter",
+          "save",
+          "--expected-generation",
+          "1",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "history.filter.save",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "history",
+    "filter",
+    "save"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

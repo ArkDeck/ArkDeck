@@ -1,0 +1,186 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "runtime",
+        "storage",
+        "policy",
+        "--expected-generation",
+        "1",
+        "--total-quota-bytes",
+        "1",
+        "--safety-margin-bytes",
+        "1",
+        "--retention-days",
+        "1"
+      ],
+      "expected": {
+        "command": "runtime.storage.policy",
+        "handlerArguments": [
+          "runtime",
+          "storage",
+          "policy",
+          "--expected-generation",
+          "1",
+          "--total-quota-bytes",
+          "1",
+          "--safety-margin-bytes",
+          "1",
+          "--retention-days",
+          "1"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "runtime",
+        "storage",
+        "policy",
+        "--help"
+      ],
+      "expected": {
+        "command": "runtime.storage.policy",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "runtime",
+        "storage",
+        "policy",
+        "--expected-generation",
+        "1",
+        "--total-quota-bytes",
+        "1",
+        "--safety-margin-bytes",
+        "1",
+        "--retention-days",
+        "1",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.storage.policy",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "runtime",
+        "storage",
+        "policy",
+        "--expected-generation",
+        "1",
+        "--total-quota-bytes",
+        "1",
+        "--safety-margin-bytes",
+        "1",
+        "--retention-days",
+        "1",
+        "--expected-generation",
+        "1"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.storage.policy",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "runtime",
+        "storage",
+        "policy"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.storage.policy",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "runtime",
+        "storage",
+        "policy",
+        "--expected-generation",
+        "1",
+        "--total-quota-bytes",
+        "1",
+        "--safety-margin-bytes",
+        "1",
+        "--retention-days",
+        "1",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.storage.policy",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "runtime",
+        "storage",
+        "policy",
+        "--expected-generation",
+        "1",
+        "--total-quota-bytes",
+        "1",
+        "--safety-margin-bytes",
+        "1",
+        "--retention-days",
+        "1",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "runtime.storage.policy",
+        "handlerArguments": [
+          "runtime",
+          "storage",
+          "policy",
+          "--expected-generation",
+          "1",
+          "--total-quota-bytes",
+          "1",
+          "--safety-margin-bytes",
+          "1",
+          "--retention-days",
+          "1",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "runtime.storage.policy",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "runtime",
+    "storage",
+    "policy"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

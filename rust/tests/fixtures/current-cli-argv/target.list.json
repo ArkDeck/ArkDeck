@@ -1,0 +1,90 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "target",
+        "list"
+      ],
+      "expected": {
+        "command": "target.list",
+        "handlerArguments": [
+          "target",
+          "list"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "target",
+        "list",
+        "--help"
+      ],
+      "expected": {
+        "command": "target.list",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "target",
+        "list",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "target.list",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "target",
+        "list",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "target.list",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "target",
+        "list",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "target.list",
+        "handlerArguments": [
+          "target",
+          "list",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "target.list",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "target",
+    "list"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

@@ -1,0 +1,82 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "doctor"
+      ],
+      "expected": {
+        "command": "doctor",
+        "handlerArguments": [
+          "doctor"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "doctor",
+        "--help"
+      ],
+      "expected": {
+        "command": "doctor",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "doctor",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "doctor",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "doctor",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "doctor",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "doctor",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "doctor",
+        "handlerArguments": [
+          "doctor",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "doctor",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "doctor"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}
