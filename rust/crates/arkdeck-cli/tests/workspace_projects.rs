@@ -103,7 +103,11 @@ mod runtime {
                     answer["id"] = request["id"].clone();
                     writeln!(reader.get_mut(), "{answer}").unwrap();
                 }
-                reader.get_mut().shutdown(Shutdown::Write).unwrap();
+                // The CLI may already have read the answer and closed its end;
+                // only a failure other than that is the fake's.
+                if let Err(error) = reader.get_mut().shutdown(Shutdown::Write) {
+                    assert_eq!(error.kind(), std::io::ErrorKind::NotConnected, "{error}");
+                }
                 let mut extra = Vec::new();
                 reader.read_to_end(&mut extra).unwrap();
                 assert!(extra.is_empty(), "the CLI never replays a request");
