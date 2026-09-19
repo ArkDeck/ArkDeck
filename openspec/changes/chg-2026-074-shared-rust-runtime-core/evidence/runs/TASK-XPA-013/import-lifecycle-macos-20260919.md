@@ -123,3 +123,24 @@ unchanged. This is not capability consumption or imported device deployment.
 `cargo check --workspace --all-targets --jobs 1` passed after integration in
 16.74 seconds; formatting and diff checks passed. Final unified validation remains
 pending its serialized slot.
+
+## Static integration after publication review
+
+Integrated publication `590d09f2` (PR #1983) and protected main `94b28966`;
+merge HEAD was `69378fcd`. The only textual conflict was the CLI command summary,
+resolved by retaining both resume commands and Import release. Three new resume
+fixture `JobPlanner` initializers explicitly use `imports: None`.
+
+Static review confirmed the same Arc-owned Import owner reaches foreground and
+background Job runners and all planners; daemon `authority()` wiring remains on
+both admitters. The private Materialized hold lives across preauthorization and
+durable admission, and its Drop still takes only the uses mutex. Import release
+remains in the owner → uses → Job activity → retention lock order. CLI release
+still accepts only exact Import identity/generation; resume parsing is retained.
+The published-method compatibility test is retained unchanged, while the candidate
+process journey adds materialization, admission, active-reference refusal, restart
+execution and durable release/history checks.
+
+No build or test was run for this merge while another slice occupied the heavy
+validation slot. Prior targeted passes and complete-gate failures are retained as
+historical evidence, not promoted to this merged revision's final validation.

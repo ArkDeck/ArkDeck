@@ -843,6 +843,7 @@ fn physical_resume_keeps_original_intent_and_unique_job() {
         };
         let admitter = JobAdmitter {
             planner: JobPlanner {
+                imports: None,
                 artifacts: Some(&artifacts),
                 analyzer: None,
                 state_root: root,
@@ -1029,6 +1030,7 @@ fn physical_resume_keeps_original_intent_and_unique_job() {
                         };
                         let admitter = JobAdmitter {
                             planner: JobPlanner {
+                                imports: None,
                                 artifacts: Some(artifacts),
                                 analyzer: None,
                                 state_root: root,
@@ -1189,6 +1191,7 @@ fn resolved_resume_commit_gap_preserves_status_then_run_continuation() {
         };
         let admitter = JobAdmitter {
             planner: JobPlanner {
+                imports: None,
                 artifacts: Some(&artifacts),
                 analyzer: None,
                 state_root: root,
