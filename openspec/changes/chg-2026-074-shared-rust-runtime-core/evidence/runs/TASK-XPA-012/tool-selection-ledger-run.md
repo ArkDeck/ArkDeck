@@ -95,4 +95,12 @@ Every check of #2055 passed on its head `da40fed8`; its `swift-tests` lane ran
 
 ## CI
 
-Recorded once this PR's CI finishes.
+#2060 merged (squash `674c2ed7`, head `b1f07753`) before this record could carry its CI. Every check
+passed on head `b1f07753`:
+
+| Check | Run | Result |
+| --- | --- | --- |
+| `open-pr` | 35452354498 | pass |
+| `guard`, `ds-tokens` | 35452354575 | pass |
+| `plan`; `rust-checks`: host-independent checks, Rust workspace on `ubuntu-latest`, `macos-26` and `windows-latest`; the `swift` aggregate | 35452354740 | pass |
+| `swift-tests`, `app-build`, `ds-interactions` | 35452354740 | skipped by the plan (no Swift, App or design-system input changed) |
