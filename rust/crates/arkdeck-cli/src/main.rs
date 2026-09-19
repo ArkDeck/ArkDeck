@@ -88,7 +88,10 @@ fn execute(invocation: &Invocation, id: &str) -> Result<Value, CliError> {
         }
         return Ok(result);
     }
-    if invocation.command == "agent.run" {
+    if matches!(
+        invocation.command,
+        "agent.run" | "agent.resume" | "human-action.resume"
+    ) {
         return run_agent(invocation, id, &endpoint, &identity);
     }
     if matches!(
@@ -268,7 +271,7 @@ fn stopped() -> CliError {
     )
 }
 
-/// Swift `runRuntimeExecution` for `agent run`: the intent is built and
+/// Swift `runRuntimeExecution` for run and physical resume: parameters are built and
 /// checked before any connection, then the execution is read with
 /// `agent.status`, backing off from 100 ms to 2 s, until it settles or
 /// `--timeout` ends the client's wait (never the execution or its Job).
@@ -278,7 +281,11 @@ fn run_agent(
     endpoint: &LocalEndpoint,
     identity: &ServerIdentity,
 ) -> Result<Value, CliError> {
-    let params = arkdeck_cli::execution_intent(invocation)?;
+    let params = if invocation.command == "agent.run" {
+        arkdeck_cli::execution_intent(invocation)?
+    } else {
+        arkdeck_cli::resume_params(invocation)?
+    };
     let deadline = invocation
         .timeout_ms
         .map(|milliseconds| Instant::now() + Duration::from_millis(milliseconds));
@@ -300,7 +307,7 @@ fn run_agent(
             .request(id, method, Some(body))
             .map_err(|error| CliError::from_client(error, method))
     };
-    let mut execution = params["executionId"].clone();
+    let mut execution = params.get("executionId").cloned().unwrap_or(Value::Null);
     let attach = |mut error: CliError, execution: &Value| {
         if execution.is_string() {
             error
@@ -309,7 +316,19 @@ fn run_agent(
         }
         error
     };
-    let mut answer = request("agent.run", params).map_err(|error| attach(error, &execution))?;
+    let mut answer =
+        request(invocation.method, params).map_err(|error| attach(error, &execution))?;
+    if invocation.command == "human-action.resume"
+        && (answer["schemaVersion"] == "arkdeck.impact-approval-challenge/1"
+            || answer["owner"]["kind"] == "controlAction")
+    {
+        let mut error = CliError::new(
+            "humanActionRequired",
+            "impact approval requires its supported foreground interactive console",
+        );
+        error.details.insert("humanAction".into(), answer);
+        return Err(error);
+    }
     let mut interval = 100;
     loop {
         let fields =
@@ -371,7 +390,7 @@ fn main() -> std::process::ExitCode {
     };
     if invocation.help {
         println!(
-            "ArkDeck commands:\n  doctor [--deep] [--require-healthy]\n  operation list\n  operation describe|example --operation <reference>\n  job status|show|evidence|result --job <id> [--timeout <duration>]\n  job timeline --job <id> [--page-size <n>] [--cursor <cursor>] [--timeout <duration>]\n  job events --job <id> [--page-size <n>] [--after-cursor <cursor>] [--timeout <duration>]\n  job plan --request-file <path> | --target <id> --operation <reference> [--inputs-file <path>] [--expected-binding-revision <n>] [--request-id <id>] [--idempotency-key <key>] [--timeout <duration>]\n  job submit --request-file <path> | --target <id> --operation <reference> [--inputs-file <path>] [--expected-binding-revision <n>] [--request-id <id>] [--idempotency-key <key>] [--timeout <duration>]\n  job run --job <id> [--timeout <duration>]\n  job cancel --job <id>\n  capability list\n  capability inspect --capability <id>\n  job list [--page-size <n>] [--cursor <cursor>] [--order <order>] [--include-current] [--include-timeline] [--state <state>] [--operation <reference>] [--target <id>] [--thread <id>] [--timeout <duration>]\n  artifact import hap|native-library|workspace-patch|flash-bundle --import-request-id <id> --target <id> --file <path> [--timeout <duration>]\n  artifact import release --import <id> --generation <n> [--timeout <duration>]\n  artifact import list [--target <id>] [--state <state>] [--page-size <n>] [--cursor <cursor>] [--timeout <duration>]\n  artifact import abort --import-request-id <id> --expected-generation <n> [--timeout <duration>]\n  artifact import inspect --import-request-id <id>|--import <id> [--timeout <duration>]\n  artifact inspect --job <id>|--import <id> --artifact <id> [--timeout <duration>]\n  artifact read --job <id>|--import <id> --artifact <id> [--offset <n>] [--max-bytes <n>] [--allow-sensitive] [--raw] [--timeout <duration>]\n  artifact export --job <id>|--import <id> --artifact <id> --destination <directory> [--allow-sensitive] [--overwrite] [--timeout <duration>]\n  artifact quota\n  artifact list --job <id>|--import <id> [--page-size <n>] [--cursor <cursor>] [--timeout <duration>]\n  agent run --operation <reference> [--target <id>] [--expected-binding-revision <n>] [--inputs-file <path>] [--request-id <id>] [--idempotency-key <key>] [--capability <id>] [--reviewed-plan-digest <sha256>] | --request-file <path>, [--execution-id <id>] [--maximum-wait <duration>] [--timeout <duration>]\n  agent status --execution-id <id> [--timeout <duration>]\n  agent list [--state <state>] [--operation <reference>] [--target <id>] [--page-size <n>] [--cursor <cursor>] [--timeout <duration>]\n  agent abandon --execution-id <id> --expected-generation <n> [--timeout <duration>]\n  human-action list [--owner-kind agentExecution|controlAction --owner <id>] [--page-size <n>] [--cursor <cursor>] [--timeout <duration>]\n  human-action show --human-action <id> [--timeout <duration>]\n  device candidates\n  target adopt --candidate <key> --observation <id> --observation-generation <n> [--timeout <duration>]\n  target list\n  target show --target <id> [--timeout <duration>]\n  target availability --target <id> [--timeout <duration>]\n  target display-name set|clear --target <id> --expected-generation <n> [--name <text>]\n  device display-name set|clear --candidate <key> --observation <id> --observation-generation <n> [--name <text>]\n  trace cache status|purge\n  history filter list\n  history filter save --expected-generation <n> [--search <text>] [--status <status>] [--mode <mode>] [--session <id>] [--target <id>] [--time <range>] [--activity <activity>]\n  history filter delete --expected-generation <n>\n  runtime tool register --kind deveco --root <absolute-path>\n  runtime tool register --kind hdc --file <absolute-path>\n  runtime tool list [--page-size <n>] [--cursor <cursor>]\n  runtime tool remove --tool <reference> --expected-generation <n>\n  runtime tool inspect --tool <reference>\n  runtime bundle register --kind daemon-bundle --file <absolute-path>\n  runtime bundle inspect --bundle <reference>\n  runtime bundle list [--page-size <n>] [--cursor <cursor>]\n  runtime bundle remove --bundle <reference> --expected-generation <n>\n  runtime storage status\n  runtime storage policy --expected-generation <n> --total-quota-bytes <bytes> --safety-margin-bytes <bytes> --retention-days <days>\n  runtime storage root --expected-generation <n> (--root <path> | --default)\n  session list [--page-size <n>] [--cursor <cursor>]\n  session show --session <id>\n  session pin|unpin --session <id> --expected-generation <n>\n  session cleanup preview\n  session cleanup apply --preview-id <uuid> --preview-digest <sha256>\n  session export preview --session <id> --destination <path> [--allow-sensitive]\n  session export apply --preview-id <uuid> --preview-digest <sha256>\n\nOptions: --output human|json, --control-request-id <id>\nA private local Runtime must be running. Windows requires the installed daemon identity."
+            "ArkDeck commands:\n  doctor [--deep] [--require-healthy]\n  operation list\n  operation describe|example --operation <reference>\n  job status|show|evidence|result --job <id> [--timeout <duration>]\n  job timeline --job <id> [--page-size <n>] [--cursor <cursor>] [--timeout <duration>]\n  job events --job <id> [--page-size <n>] [--after-cursor <cursor>] [--timeout <duration>]\n  job plan --request-file <path> | --target <id> --operation <reference> [--inputs-file <path>] [--expected-binding-revision <n>] [--request-id <id>] [--idempotency-key <key>] [--timeout <duration>]\n  job submit --request-file <path> | --target <id> --operation <reference> [--inputs-file <path>] [--expected-binding-revision <n>] [--request-id <id>] [--idempotency-key <key>] [--timeout <duration>]\n  job run --job <id> [--timeout <duration>]\n  job cancel --job <id>\n  capability list\n  capability inspect --capability <id>\n  job list [--page-size <n>] [--cursor <cursor>] [--order <order>] [--include-current] [--include-timeline] [--state <state>] [--operation <reference>] [--target <id>] [--thread <id>] [--timeout <duration>]\n  artifact import hap|native-library|workspace-patch|flash-bundle --import-request-id <id> --target <id> --file <path> [--timeout <duration>]\n  artifact import list [--target <id>] [--state <state>] [--page-size <n>] [--cursor <cursor>] [--timeout <duration>]\n  artifact import abort --import-request-id <id> --expected-generation <n> [--timeout <duration>]\n  artifact import release --import <id> --generation <n> [--timeout <duration>]\n  artifact import inspect --import-request-id <id>|--import <id> [--timeout <duration>]\n  artifact inspect --job <id>|--import <id> --artifact <id> [--timeout <duration>]\n  artifact read --job <id>|--import <id> --artifact <id> [--offset <n>] [--max-bytes <n>] [--allow-sensitive] [--raw] [--timeout <duration>]\n  artifact export --job <id>|--import <id> --artifact <id> --destination <directory> [--allow-sensitive] [--overwrite] [--timeout <duration>]\n  artifact quota\n  artifact list --job <id>|--import <id> [--page-size <n>] [--cursor <cursor>] [--timeout <duration>]\n  agent run --operation <reference> [--target <id>] [--expected-binding-revision <n>] [--inputs-file <path>] [--request-id <id>] [--idempotency-key <key>] [--capability <id>] [--reviewed-plan-digest <sha256>] | --request-file <path>, [--execution-id <id>] [--maximum-wait <duration>] [--timeout <duration>]\n  agent status --execution-id <id> [--timeout <duration>]\n  agent list [--state <state>] [--operation <reference>] [--target <id>] [--page-size <n>] [--cursor <cursor>] [--timeout <duration>]\n  agent abandon --execution-id <id> --expected-generation <n> [--timeout <duration>]\n  human-action list [--owner-kind agentExecution|controlAction --owner <id>] [--page-size <n>] [--cursor <cursor>] [--timeout <duration>]\n  human-action show --human-action <id> [--timeout <duration>]\n  agent resume --resume-reference <ref>|--resume-token <ref> [--selection <choice>|--selection-file <path>] [--timeout <duration>]\n  human-action resume --human-action <id> --resume-reference <ref> [--selection <choice>|--selection-file <path>] [--timeout <duration>]\n  device candidates\n  target adopt --candidate <key> --observation <id> --observation-generation <n> [--timeout <duration>]\n  target list\n  target show --target <id> [--timeout <duration>]\n  target availability --target <id> [--timeout <duration>]\n  target display-name set|clear --target <id> --expected-generation <n> [--name <text>]\n  device display-name set|clear --candidate <key> --observation <id> --observation-generation <n> [--name <text>]\n  trace cache status|purge\n  history filter list\n  history filter save --expected-generation <n> [--search <text>] [--status <status>] [--mode <mode>] [--session <id>] [--target <id>] [--time <range>] [--activity <activity>]\n  history filter delete --expected-generation <n>\n  runtime tool register --kind deveco --root <absolute-path>\n  runtime tool register --kind hdc --file <absolute-path>\n  runtime tool list [--page-size <n>] [--cursor <cursor>]\n  runtime tool remove --tool <reference> --expected-generation <n>\n  runtime tool inspect --tool <reference>\n  runtime bundle register --kind daemon-bundle --file <absolute-path>\n  runtime bundle inspect --bundle <reference>\n  runtime bundle list [--page-size <n>] [--cursor <cursor>]\n  runtime bundle remove --bundle <reference> --expected-generation <n>\n  runtime storage status\n  runtime storage policy --expected-generation <n> --total-quota-bytes <bytes> --safety-margin-bytes <bytes> --retention-days <days>\n  runtime storage root --expected-generation <n> (--root <path> | --default)\n  session list [--page-size <n>] [--cursor <cursor>]\n  session show --session <id>\n  session pin|unpin --session <id> --expected-generation <n>\n  session cleanup preview\n  session cleanup apply --preview-id <uuid> --preview-digest <sha256>\n  session export preview --session <id> --destination <path> [--allow-sensitive]\n  session export apply --preview-id <uuid> --preview-digest <sha256>\n\nOptions: --output human|json, --control-request-id <id>\nA private local Runtime must be running. Windows requires the installed daemon identity."
         );
         return 0.into();
     }
@@ -397,7 +416,9 @@ fn main() -> std::process::ExitCode {
                             "Job outcome or evidence requires attention".to_owned(),
                         )
                     }),
-                "agent.run" => arkdeck_cli::agent_exit(&result),
+                "agent.run" | "agent.resume" | "human-action.resume" => {
+                    arkdeck_cli::agent_exit(&result)
+                }
                 _ => None,
             };
             let exit: u8 = if invocation.command == "job.evidence" {

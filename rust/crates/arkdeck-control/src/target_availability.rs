@@ -27,11 +27,10 @@ impl<H: HostServices> Control<H> {
                 }
                 error
             })?;
-        // Share operation.list's host catalog projection. This is explicitly
-        // not target resolution; its current provider availability resolver is
-        // still the foundation's. Do not promote these entries to readiness.
-        let operations: Vec<_> = self
-            .operations
+        // Share operation.list's fresh host availability, without promoting
+        // a host-ready operation to target resolution or execution admission.
+        let availability = self.operation_availability();
+        let operations: Vec<_> = availability
             .as_array()
             .expect("validated operation list")
             .iter()
