@@ -182,3 +182,25 @@ Static formatting and `git diff --check` passed. No build/tests were run during
 this integration. Next verification must cover the three new lifecycle safety
 tests, all Import lifecycle/CLI/daemon paths, Pointer execution/authority tests,
 and the full repository unified gate on this combined branch.
+
+## Integrated lifecycle and Pointer targeted validation
+
+**PASS — exit 0**, session `53461`, 2026-09-19, source `bc504d04`.
+The three additional safety regressions each passed individually. The subsequent
+complete Import suite passed 35 tests (one intentionally ignored child fixture is
+executed by its SIGKILL parent test). Pointer plan/execute/admit passed 1/9/4 tests,
+capability writes 4, mutation-state continuity 7, Import CLI 11, and the actual
+Rust CLI/daemon three-format restart/lost-reply/lifecycle journey 1. Commands used
+`CARGO_BUILD_JOBS=1 RUST_TEST_THREADS=1` and authorized native test execution.
+No production changes, timeouts or assertions were needed to make them pass.
+All roots and dispatches are isolated host fixtures, not real hardware evidence.
+
+Command script: `/private/tmp/arkdeck-lifecycle-targeted-20260919.sh`.
+Log: `/private/tmp/arkdeck-lifecycle-pointer-targeted-20260919.log`.
+
+The branch is based on main `510b4650` plus Pointer commit `79338c83`. The latter's
+Git tree is `c48c8b9947d2bfe4e963978f6c49a09426a46c14`, independently verified equal
+to protected-main Pointer squash `bda735df496bc078a37caa05ecf1a6ffea17ad55`.
+This describes identical integrated source content, not ancestry from that squash.
+The full repository gate below will still use the frozen `origin/main` at
+`510b4650`; no shared ref is changed during another slice's validation.
