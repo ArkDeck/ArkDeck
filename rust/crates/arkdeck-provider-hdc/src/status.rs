@@ -348,6 +348,12 @@ pub fn unconfigured_status(daemon_version: Option<&str>) -> Value {
     Value::Object(fields)
 }
 
+/// Swift `HDCCommandlessServerIdentity.clientVersion(sha256:)`: the client
+/// version a registered executable digest publishes, if it is one.
+pub fn published_client_version(executable_sha256: &str) -> Option<&'static str> {
+    registered_version(std::env::consts::OS, executable_sha256)
+}
+
 /// The object's `serverEndpointRef`: `hdc-endpoint:` and the SHA-256 of the
 /// endpoint's spelling.
 pub fn server_endpoint_ref(endpoint: &str) -> String {

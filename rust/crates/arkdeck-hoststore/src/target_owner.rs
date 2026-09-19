@@ -635,6 +635,18 @@ impl TargetStore {
             Ok((target_name(names,id),true))
         })
     }
+    /// Swift `RuntimeTargetStore.list()`: every durable Target record,
+    /// aliases included, in stored order, as its document spells it.
+    pub fn records(&self) -> Result<Vec<Value>, WireError> {
+        self.transaction("", |targets, _| {
+            Ok((
+                serde_json::to_value(&targets.targets).map_err(|_| unreadable(""))?,
+                false,
+            ))
+        })
+        .map(|value| value.as_array().cloned().unwrap_or_default())
+    }
+
     /// Presentation lookup from provider-observed addresses. This does not select
     /// an execution route or establish freshness/physical continuity.
     pub fn candidate_presentations(&self, keys: &[String]) -> Result<Value, WireError> {

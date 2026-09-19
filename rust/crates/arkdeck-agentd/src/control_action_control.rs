@@ -8,15 +8,15 @@
 //! control-action owner, and every refusal Swift's handler gives before it
 //! consults an owner. Refusals compare whole (code, message, details); a page
 //! compares whole once its random `snapshotRevision` is checked and set aside.
-//! The exchanges of a daemon whose HDC server host started need a managed
-//! server and are counted, not replayed: the success frames of an impact
-//! source (a preview, an approval request, a record read twice and a listed
-//! action), the answers `ControlActionWithHostContractTests` recorded over the
-//! production impact source (previews, records read, reconciled and paged),
-//! and the lifecycle refusals of an HDC control-action owner. The control
-//! layer admits each answer under the compiled method schema: a view whose
-//! schemas predate the no-host frames answers what they do not publish with
-//! `internalError`.
+//! The exchanges of a daemon whose HDC server host started are counted here:
+//! the success frames of an impact source (a preview, an approval request, a
+//! record read twice and a listed action), the answers
+//! `ControlActionWithHostContractTests` recorded over the production impact
+//! source (previews, records read, reconciled and paged), and the lifecycle
+//! refusals of an HDC control-action owner. `control_action_host_control.rs`
+//! replays them over the HDC control-action owner. The control layer admits
+//! each answer under the compiled method schema: a view whose schemas predate
+//! the no-host frames answers what they do not publish with `internalError`.
 use arkdeck_contract::{
     CONTRACT_IDENTITY, CONTRACT_INPUTS, PROTOCOL_VERSION, sha256_hex, strict_json,
     validate_method_value,

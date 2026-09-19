@@ -4,6 +4,8 @@ mod app_ingress;
 mod bootstrap_readers;
 #[cfg(all(test, target_os = "macos"))]
 mod control_action_control;
+#[cfg(all(test, target_os = "macos"))]
+mod control_action_host_control;
 #[cfg(target_os = "macos")]
 mod development_usb;
 #[cfg(unix)]
@@ -209,12 +211,15 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             "human-action-snapshots",
             "workspace-projects",
             // Swift's union control-action owner pages here. Its HDC owner's
-            // `hdc-control-actions` needs a managed HDC server, which this
-            // daemon never starts, so that directory is never made.
+            // `hdc-control-actions` exists only beside a managed HDC server.
             "control-action-snapshots",
         ] {
             directory.private_child(name)?;
         }
+        // The managed HDC server this owner is asked to start, whose HDC
+        // control-action owner keeps its actions in `hdc-control-actions`.
+        let managed_server = std::env::var_os("ARKDECK_DEVELOPMENT_HDC_SERVER")
+            .is_some_and(|mode| mode == "managed");
         directory.validate_path(&root)?;
         let artifacts = root.join("artifacts");
         let trace_parent = directory.child("trace-cache")?;
@@ -237,7 +242,10 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
                 root.join("agent-executions"),
                 root.join("human-action-snapshots"),
                 root.join("control-action-snapshots"),
-            ],
+            ]
+            .into_iter()
+            .chain(managed_server.then(|| root.join("hdc-control-actions")))
+            .collect(),
         )?;
         let host = host
             .with_targets(arkdeck_hoststore::TargetStore::open(
@@ -269,11 +277,26 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             .with_human_actions(arkdeck_hoststore::HumanActionResources::open(
                 &root.join("human-action-snapshots"),
             )?)
-            // Swift's daemon without its HDC server host: the union
-            // control-action owner over no HDC and no tool-selection owner.
-            .with_control_actions(arkdeck_hoststore::ControlActionResources::open(
-                &root.join("control-action-snapshots"),
-            )?)
+            // Swift's union control-action owner, over no tool-selection
+            // owner, and over the HDC control-action owner only with the
+            // managed HDC server this owner starts below (a failed start ends
+            // the daemon).
+            .with_control_actions({
+                let resources = arkdeck_hoststore::ControlActionResources::open(
+                    &root.join("control-action-snapshots"),
+                )?;
+                if managed_server {
+                    let actions = directory.private_child("hdc-control-actions")?;
+                    actions.validate_path(&root.join("hdc-control-actions"))?;
+                    resources.with_hdc(arkdeck_hoststore::HdcControlActions::open(
+                        &root.join("hdc-control-actions"),
+                        arkdeck_hoststore::OwnerContext::production()
+                            .map_err(|error| error.message)?,
+                    )?)
+                } else {
+                    resources
+                }
+            })
             // Beside the Job state, as the Swift engine keeps it: read only.
             .with_capabilities(arkdeck_hoststore::CapabilityStore::open(
                 &root.join("jobs-state").join("capabilities"),

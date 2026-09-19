@@ -1,14 +1,18 @@
 //! Swift `RuntimeControlPlaneHandler.hdcControlActionRequest` (CHG-2026-074,
-//! TASK-XPA-014) as the production daemon answers it without a managed HDC
-//! server: `runtime.hdc.impact-preview`, `runtime.hdc.restart` and
-//! `control-action.list`, `.show` and `.reconcile`. `ArkDeckAgentDaemonMain`
-//! then composes no HDC control-action owner and no tool-selection owner, and
-//! the union owner (`RuntimeControlActionResourceCoordinator`) over neither,
-//! paging in its own directory (`control-action-snapshots`). No control action
-//! can exist, so the lifecycle methods are unavailable before any parameter is
-//! read, an exact identity is not found and a listing is one empty snapshot
-//! page. Records, the impact source, human actions and recovery need a
-//! managed server and are not here.
+//! TASK-XPA-014): `runtime.hdc.impact-preview`, `runtime.hdc.restart` and
+//! `control-action.list`, `.show` and `.reconcile`, over the union owner
+//! (`RuntimeControlActionResourceCoordinator`) the production daemon always
+//! composes, paging in its own directory (`control-action-snapshots`).
+//!
+//! Without a managed HDC server `ArkDeckAgentDaemonMain` composes no HDC
+//! control-action owner and no tool-selection owner: no control action can
+//! exist, the lifecycle methods are unavailable before any parameter is read,
+//! an exact identity is not found and a listing is one empty snapshot page.
+//! Once its HDC server host has started the union owner routes to the HDC
+//! control-action owner (`hdc_control_action.rs`), which previews and holds
+//! the actions; the tool-selection owner is not composed here, and
+//! `runtime.hdc.restart` stays unavailable: its impact approval is not here.
+use crate::hdc_control_action::{HdcControlActions, ImpactSource};
 use crate::snapshot_pager::SnapshotPager;
 use arkdeck_contract::WireError;
 use serde_json::{Map, Value, json};
@@ -23,24 +27,11 @@ const ORDER: &str = "createdAtThenControlActionId";
 const KINDS: [&str; 2] = ["hdcLifecycle", "runtimeToolSelection"];
 
 /// Swift `RuntimeControlActionResourceCoordinator.states`.
-const STATES: [&str; 12] = [
-    "observing",
-    "previewReady",
-    "awaitingImpactApproval",
-    "approvalRecorded",
-    "dispatchPrepared",
-    "dispatching",
-    "succeeded",
-    "failed",
-    "outcomeUnknown",
-    "blocked",
-    "expired",
-    "previewDrifted",
-];
+use crate::hdc_control_action::STATES;
 
 /// Swift's handler answers every refusal of these routes with the
 /// zero-dispatch proof and nothing else.
-fn refused(code: &str, message: impl Into<String>) -> WireError {
+pub(crate) fn refused(code: &str, message: impl Into<String>) -> WireError {
     WireError {
         code: code.into(),
         message: message.into(),
@@ -59,7 +50,7 @@ fn hdc_owner_unavailable() -> WireError {
 
 /// Swift `HDCControlValue.identifier`: 1 to 128 bytes, an ASCII letter or
 /// digit first, then letters, digits, `-`, `.`, `:` and `_`.
-fn identifier(text: &str) -> bool {
+pub(crate) fn identifier(text: &str) -> bool {
     (1..=128).contains(&text.len())
         && text.as_bytes()[0].is_ascii_alphanumeric()
         && text
@@ -133,14 +124,17 @@ fn unknown_method() -> WireError {
     }
 }
 
-/// The union control-action owner over no HDC and no tool-selection owner,
-/// with its private pager directory.
+/// The union control-action owner, with its private pager directory, over
+/// the HDC control-action owner when the daemon's HDC server host started,
+/// and never over a tool-selection owner.
 pub struct ControlActionResources {
     /// Swift's `RuntimeSnapshotPager` over the owner's directory.
     pages: SnapshotPager,
-    /// Swift's owner is an actor: one request at a time. So, as Swift's
+    /// Swift's owners are actors: one request at a time. So, as Swift's
     /// pager, this one keeps no lock document beside its snapshots.
     gate: Mutex<()>,
+    /// Swift's `hdc` owner.
+    hdc: Option<HdcControlActions>,
 }
 
 impl ControlActionResources {
@@ -150,30 +144,72 @@ impl ControlActionResources {
         Ok(Self {
             pages: SnapshotPager::open_serialized(path)?,
             gate: Mutex::new(()),
+            hdc: None,
         })
     }
 
+    /// The union owner over the HDC control-action owner, as the daemon
+    /// composes it once its HDC server host started.
+    pub fn with_hdc(mut self, hdc: HdcControlActions) -> Self {
+        self.hdc = Some(hdc);
+        self
+    }
+
     /// The handler's answer, with its checks in its order, over this owner.
-    pub fn answer(&self, method: &str, params: &Map<String, Value>) -> Result<Value, WireError> {
+    /// `source` is the impact source of the daemon's HDC server host; the
+    /// HDC owner takes part only with it.
+    pub fn answer(
+        &self,
+        method: &str,
+        params: &Map<String, Value>,
+        source: Option<&dyn ImpactSource>,
+    ) -> Result<Value, WireError> {
+        let hdc = self.hdc.as_ref().zip(source);
         match method {
-            "runtime.hdc.impact-preview" | "runtime.hdc.restart" => Err(hdc_owner_unavailable()),
+            "runtime.hdc.impact-preview" => {
+                let Some((hdc, source)) = hdc else {
+                    return Err(hdc_owner_unavailable());
+                };
+                let _gate = self.gate.lock().map_err(|_| unreadable())?;
+                hdc.preview(params, source)
+            }
+            // The impact approval a restart requests is not composed here,
+            // so this answers as a daemon without its HDC owner does, before
+            // any parameter is read.
+            "runtime.hdc.restart" => Err(hdc_owner_unavailable()),
             "control-action.show" | "control-action.reconcile" => {
-                exact_identity(params)?;
-                // Neither an HDC nor a tool-selection owner holds it.
-                Err(refused("resourceNotFound", "control action does not exist"))
+                let id = exact_identity(params)?;
+                let _gate = self.gate.lock().map_err(|_| unreadable())?;
+                // Swift `actionOwner`: the one owner holding the identity.
+                let Some((hdc, source)) = hdc else {
+                    return Err(refused("resourceNotFound", "control action does not exist"));
+                };
+                if !hdc.list_records()?.iter().any(|record| record.id() == id) {
+                    return Err(refused("resourceNotFound", "control action does not exist"));
+                }
+                if method == "control-action.show" {
+                    hdc.show(id)
+                } else {
+                    hdc.reconcile(id, source)
+                }
             }
             "control-action.list" => {
                 let request = list_request(params)?;
                 let _gate = self.gate.lock().map_err(|_| unreadable())?;
-                self.list(request)
+                self.list(request, hdc.map(|(hdc, _)| hdc))
             }
             _ => Err(unknown_method()),
         }
     }
 
     /// Swift's union `list`: its filter check, then every action the owners
-    /// hold (none), paged through a stored snapshot a cursor names.
-    fn list(&self, request: ListRequest<'_>) -> Result<Value, WireError> {
+    /// hold, refreshed and in creation-then-identity order, paged through a
+    /// stored snapshot a cursor names.
+    fn list(
+        &self,
+        request: ListRequest<'_>,
+        hdc: Option<&HdcControlActions>,
+    ) -> Result<Value, WireError> {
         let known = |key: &str, allowed: &[&str]| {
             request
                 .filters
@@ -186,6 +222,43 @@ impl ControlActionResources {
                 "unsupported control-action discovery filter",
             ));
         }
+        // The actions are read before the pager, even for a cursor: reading
+        // refreshes their age, as in Swift.
+        let mut values = Vec::new();
+        if let Some(hdc) = hdc
+            && request
+                .filters
+                .get("kind")
+                .is_none_or(|kind| kind == "hdcLifecycle")
+        {
+            values.extend(hdc.list_records()?.iter().map(|record| record.projection()));
+        }
+        if let Some(state) = request.filters.get("state") {
+            values.retain(|value| value.get("state") == Some(state));
+        }
+        let mut identities = std::collections::BTreeSet::new();
+        if !values.iter().all(|value| {
+            value
+                .get("controlActionId")
+                .and_then(Value::as_str)
+                .is_some_and(|id| identities.insert(id.to_owned()))
+        }) {
+            return Err(refused(
+                "recordUnreadable",
+                "control-action identity has multiple owners",
+            ));
+        }
+        let key = |value: &Value| {
+            let text = |key: &str| {
+                value
+                    .get(key)
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_owned()
+            };
+            (text("createdAt"), text("controlActionId"))
+        };
+        values.sort_by_key(key);
         self.pages
             .page_filtered(
                 "control-action.list",
@@ -193,8 +266,7 @@ impl ControlActionResources {
                 ORDER,
                 request.size,
                 request.cursor,
-                // No HDC or tool-selection owner holds a control action.
-                || Ok(Vec::new()),
+                || Ok(values),
             )
             .map_err(|error| {
                 // The pager's refusals are the owner's own in Swift, with the
@@ -212,7 +284,7 @@ impl ControlActionResources {
 }
 
 /// Swift's handler for a failure that is not an owner's refusal.
-fn unreadable() -> WireError {
+pub(crate) fn unreadable() -> WireError {
     refused(
         "recordUnreadable",
         "control-action state cannot be read or persisted",

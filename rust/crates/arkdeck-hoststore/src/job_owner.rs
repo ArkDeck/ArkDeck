@@ -246,6 +246,35 @@ impl JobStore {
         action(&active)
     }
 
+    /// Swift `RuntimeJobEngine.listCurrentJobs`, from this owner's durable
+    /// rows: every Job not in a terminal state, holding outstanding cleanup
+    /// residue, or of unknown outcome, in identity order. Swift lets an
+    /// established recovery epoch or a Target alias resolution settle an
+    /// unknown outcome; this owner holds neither index, so an outcome-unknown
+    /// Job stays current. An unreadable row fails the whole read.
+    pub fn current_jobs(&self) -> Result<Vec<crate::hdc_impact_source::CurrentJob>, WireError> {
+        self.root.validate_path(&self.path).map_err(unreadable)?;
+        let rows = self.repository.rows(None).map_err(unreadable)?;
+        let mut jobs = Vec::new();
+        for row in &rows {
+            let record = JobRecord::from_row(row)?;
+            let residues = record.residues().unwrap_or(0);
+            if residues > 0
+                || record.outcome_unknown()
+                || !crate::job_record::terminal(&record.state)
+            {
+                jobs.push(crate::hdc_impact_source::CurrentJob {
+                    job_id: record.job_id.clone(),
+                    state: record.state.clone(),
+                    outcome_unknown: record.outcome_unknown(),
+                    residues,
+                });
+            }
+        }
+        jobs.sort_by(|left, right| left.job_id.cmp(&right.job_id));
+        Ok(jobs)
+    }
+
     pub fn read_snapshot(&self, id: &str) -> Result<JobRecord, WireError> {
         if !identifier(id) {
             return Err(failure(

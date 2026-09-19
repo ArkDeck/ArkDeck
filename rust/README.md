@@ -1347,16 +1347,33 @@ Swift's `hdcControlActionRequest` reads its own parameters; a host without it
 keeps the foundation's refusal. Without a managed HDC server the macOS host
 answers them as Swift's daemon does (`arkdeck_hoststore::ControlActionResources`):
 the lifecycle methods are `operationUnavailable` before any parameter is read.
-The isolated owner composes Swift's union control-action owner over no HDC and
-no tool-selection owner, paging in `control-action-snapshots` (it never makes
-`hdc-control-actions`): an exact identity is `resourceNotFound`, and a listing
-is one empty snapshot page kept as Swift's pager keeps it. A daemon outside an
-isolated root keeps no state and answers as Swift's handler with no owner at
-all, except that show and reconcile of an exact identity keep the foundation's
-refusal, since their schemas do not publish Swift's `operationUnavailable`.
-`control_action_control.rs` in agentd replays every no-host exchange of the
-corpora through `Control`. Previews, restarts, records and their recovery need
-the managed server.
+The isolated owner composes Swift's union control-action owner over no
+tool-selection owner, paging in `control-action-snapshots`. Without a managed
+server it holds no HDC owner and never makes `hdc-control-actions`: an exact
+identity is `resourceNotFound`, and a listing is one empty snapshot page kept as
+Swift's pager keeps it. With `ARKDECK_DEVELOPMENT_HDC_SERVER=managed` it also
+composes the HDC control-action owner (`arkdeck_hoststore::HdcControlActions`)
+in `hdc-control-actions/{records,snapshots}`: `runtime.hdc.impact-preview`
+checks the exact restart intent, returns an existing action of the request
+identity, refuses another endpoint, then writes one owner-only
+`action-<sha256(requestId)>.json` under a per-transaction `.lock` and observes it
+once through the managed server's impact source (`ManagedServerImpact`: the
+pinned executable and its signature, the server identity — `checkserver`
+between two observations for the registered 3.2.0d executable — the Job
+owner's current Jobs, the durable Targets and a Target observation through the
+development HDC). The preview is `previewReady` or `blocked` in Swift's blocker
+order, or the action `previewDrifted` when the impact is unavailable. Show,
+list and reconcile read the actions, invalidating an expired one, one of an
+earlier daemon start or of another catalog when they read it; restart stays
+`operationUnavailable`, since the impact approval, its challenge, the lifecycle
+and its recovery are not here. A daemon outside an isolated root keeps no state
+and answers as Swift's handler with no owner at all, except that show and
+reconcile of an exact identity keep the foundation's refusal, since their
+schemas do not publish Swift's `operationUnavailable`. In agentd
+`control_action_control.rs` replays every no-host exchange of the corpora
+through `Control`, `control_action_host_control.rs` every exchange of a daemon
+with an HDC server host but the approval request, and
+`tests/control_action_host_process.rs` drives the managed fake server.
 
 ## Capture file legs (TASK-XPA-016, M1)
 
