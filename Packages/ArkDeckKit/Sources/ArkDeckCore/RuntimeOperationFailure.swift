@@ -6,7 +6,6 @@
 // that text. Nothing in this projection grants dispatch, retry or recovery
 // authority.
 
-import ArkDeckCore
 import Foundation
 
 public enum RuntimeOperationFailureCode: String, Codable, Sendable, CaseIterable {
