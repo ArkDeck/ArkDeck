@@ -742,13 +742,28 @@ impl HostServices for Host {
             now: arkdeck_hoststore::runtime_precise_now,
             observations: self.observing(),
         };
-        let answer = agents.advance(method, params, &engine)?;
+        let answer = agents
+            .advance(method, params, &engine)
+            .map_err(|mut error| {
+                // The combined Swift HAR handler attaches its pre-admission proof
+                // to physical owner refusals; internal/storage uncertainty keeps
+                // the existing internal-error envelope.
+                if method == "human-action.resume" && error.code != "internalError" {
+                    let details = error.details.get_or_insert_with(Default::default);
+                    details.insert("phase".into(), serde_json::json!("preAdmission"));
+                    details.insert("newDispatchCount".into(), serde_json::json!(0));
+                }
+                error
+            })?;
         if let Some(start) = answer.start {
             self.start_agent_run(start);
         }
-        // Swift projects the owned Job over a run's and a status read's
-        // answer only; a page and an abandonment answer as the owner wrote.
-        if !matches!(method, "agent.run" | "agent.status") {
+        // Swift projects the owned Job over run, status and physical resume;
+        // pages and abandonment answer as the owner wrote.
+        if !matches!(
+            method,
+            "agent.run" | "agent.status" | "agent.resume" | "human-action.resume"
+        ) {
             return Ok(answer.value);
         }
         arkdeck_hoststore::AgentExecutionStore::project(
