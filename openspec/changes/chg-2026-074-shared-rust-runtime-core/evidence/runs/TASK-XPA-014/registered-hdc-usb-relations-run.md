@@ -92,7 +92,33 @@ full gate was not rerun locally, since CI is now the unified gate.
 
 ## CI
 
-Recorded after the PR's CI reports (`guard` + `swift`).
+PR #2023, head `aba996f8` (base `74c3b2b1`), all green. It merged on 2026-09-19 as `3828f2ed`, on
+main `4312af34`.
+
+| Check | Run | Conclusion |
+| --- | --- | --- |
+| SDD Guard `guard` | 35444126606 | success |
+| Swift CI `plan` | 35444126723 | success |
+| Rust host-independent checks | 35444126723 | success |
+| Rust workspace, `ubuntu-latest` | 35444126723 | success |
+| Rust workspace, `macos-26` | 35444126723 | success |
+| Rust workspace, `windows-latest` | 35444126723 | success |
+| `swift` aggregate | 35444126723 | success |
+
+`swift-tests`, `app-build` and `ds-interactions` were not selected for this diff and were skipped.
+
+The merge commit's base carries #2017, which also changed `agentd/src/main.rs`, and #2022. Before the
+merge, this change was rebased onto `4312af34` without conflict. The targeted checks were run again
+on that tree:
+
+- `cargo fmt --all --check`;
+- `cargo clippy -p arkdeck-agentd --all-targets --locked -- -D warnings`;
+- `cargo test -p arkdeck-agentd --locked`: 33 unit tests and 8 process tests;
+- `check-sdd`.
+
+All exited 0. That tree is byte-identical to the merge commit `3828f2ed` (`git diff 3828f2ed
+e4f3eac6` is empty). These rows were added by a follow-up documentation PR, since the PR merged as
+soon as it was green.
 
 ## Not run
 
