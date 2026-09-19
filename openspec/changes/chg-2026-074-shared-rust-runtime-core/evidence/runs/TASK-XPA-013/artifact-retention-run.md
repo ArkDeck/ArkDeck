@@ -131,8 +131,20 @@ depends on `arkdeck-hoststore`.
 
 ## CI
 
-The PR's CI (`guard` + `swift`) is the unified gate. Its run ids and conclusion are recorded by the
-next slice or a documentation follow-up, as the coordination rule of 2026-09-19 asks.
+PR #2039, head `d904d0ea`, all green. It merged on 2026-09-19 as `28605092`.
+
+| Check | Run | Conclusion |
+| --- | --- | --- |
+| SDD Guard `guard` | 35447143069 | success |
+| Swift CI `plan` | 35447143174 | success |
+| Rust host-independent checks | 35447143174 | success |
+| Rust workspace, `ubuntu-latest` | 35447143174 | success |
+| Rust workspace, `macos-26` | 35447143174 | success |
+| Rust workspace, `windows-latest` | 35447143174 | success |
+| `swift` aggregate | 35447143174 | success |
+
+`swift-tests`, `app-build` and `ds-interactions` were not selected for this diff and were skipped.
+These rows were added by a documentation follow-up, since the PR merged as soon as it was green.
 
 ## Not run
 
