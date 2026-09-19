@@ -1,8 +1,10 @@
 # ClientKit History read and client JobControl extraction
 
-Date: 2026-09-19. Stacked base: PR #1976, commit
-`b710252d1d7844f1fcd361e58c66429a06173493`. This slice depends on that PR's
-ClientKit target/transport; it does not presume the PR has merged.
+Date: 2026-09-19. Integrated protected-main base:
+`08509db045d7a149642a6c67dc611f7e3f335687` (#1981), including the merged
+ClientKit target/transport (#1976) and isolated Rust History ingress (#1980).
+The original focused validation used stacked #1976 commit
+`b710252d1d7844f1fcd361e58c66429a06173493`.
 
 ## Production change
 
@@ -50,8 +52,17 @@ sample/analyzer byte-equivalence test passes. Log:
 confirms unchanged History, JobControl, workspace-kind and read-resource
 algorithms, apart from import/access modifiers and the shared trace-name source.
 
-Unified repository gate and App build-for-testing: pending. No installation,
-launchctl, signing change or device execution was performed.
+Final unified repository gate: **PASS**, exit 0, against integrated main
+`08509db045d7a149642a6c67dc611f7e3f335687`. The root command used
+`--base-revision origin/main --head-revision HEAD --merge-base --include-worktree --run-local`
+with the pinned Python venv and bounded build/test workers. Selected common,
+Swift and App checks passed: 2,686 parallel Swift tests, 1 serialized process
+identity race test, 5 Viewer scale tests (2,692 total), and Xcode
+`TEST BUILD SUCCEEDED`. Log:
+`/private/tmp/arkdeck-clientkit-history-read-unified-20260919.log`.
+No local check filters or skipped builds were supplied; serialized test
+partitions are the repository runner's standard full lane.
+No installation, launchctl, signing change or device execution was performed.
 
 ## Remaining scope
 
