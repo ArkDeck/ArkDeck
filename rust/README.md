@@ -1669,6 +1669,17 @@ Swift daemon over the same directory in between as the positive control.
 Swift children get a disposable `CFFIXED_USER_HOME`, so nothing installed is
 opened. Installed activation follows the normal helper update.
 
+The facade pairs with its authority over a socket in a directory it creates
+for that one process, `/private/tmp/arkdeck-facade-<nonce>`. It removes exactly
+that directory, with the authority's socket in it, on every exit it can
+observe: a startup failure, its authority's exit, and a stop by SIGTERM or
+SIGINT, which its accept loop takes as the isolated Rust daemon and the Swift
+daemon do (`arkdeck_platform::StopSignal`) and answers by returning, so the
+process ends with status 0. After SIGKILL the paired Swift daemon unlinks its
+socket and removes the directory when the pairing pipe closes. The harness's
+fixture authority does the same, so the facade tests leave nothing under
+`/private/tmp`.
+
 ## macOS owner lifecycle soak
 
 `arkdeck-soak` runs a simulated-provider workload through production Rust owners
