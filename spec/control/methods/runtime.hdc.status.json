@@ -154,7 +154,10 @@
                   "type": "string"
                 },
                 "teamIdentifier": {
-                  "type": "null"
+                  "type": [
+                    "null",
+                    "string"
+                  ]
                 }
               },
               "required": [
@@ -231,8 +234,8 @@
   "x-arkdeck-method": "runtime.hdc.status",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 3,
-    "request": 33,
-    "result": 30
+    "error": 1,
+    "request": 8,
+    "result": 7
   }
 }

@@ -85,7 +85,8 @@ mod runtime {
             .into_iter()
             .filter(|frame| frame["ok"] == true)
             .collect();
-        assert_eq!(recorded.len(), 6);
+        // A floor: a later recording only appends to the corpus.
+        assert!(recorded.len() >= 6, "{} answers", recorded.len());
         for frame in recorded {
             let (output, envelope) = status(json!({"ok": true, "result": frame["result"]}));
             // An unavailable or unknown status is still an answer, as in Swift.

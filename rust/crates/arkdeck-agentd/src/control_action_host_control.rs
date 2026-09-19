@@ -9,10 +9,12 @@
 //! read, listed and reconciled) and `ControlActionWithHostContractTests` (the
 //! production impact source over the fixture HDC: the with-host refusals, an
 //! unobserved and a blocked preview, a restart and an expiry, and a listing
-//! over two pages). Answers compare whole; a page's random snapshot revision
-//! and next cursor are checked and set aside, and the second page is asked
-//! through the cursor this owner issued. The approval request the fake
-//! source's restart made is counted, not replayed: restart is not here.
+//! over two pages; then a blocked preview of a team-signed tool, and one whose
+//! Target inventory changed while it was read, each read, reconciled and
+//! listed). Answers compare whole; a page's random snapshot revision and next
+//! cursor are checked and set aside, and the second page is asked through the
+//! cursor this owner issued. The approval request the fake source's restart
+//! made is counted, not replayed: restart is not here.
 use arkdeck_contract::{
     CATALOG_DIGEST, CONTRACT_IDENTITY, DeviceObservationsResult, PROTOCOL_VERSION, WireError,
     sha256_hex,
@@ -171,6 +173,16 @@ impl Corpora {
             lines,
             replayed: BTreeSet::new(),
         }
+    }
+
+    /// Whether a line shows the action of a request identity. The published
+    /// view's corpora can predate an action a later recording added.
+    fn shows(&self, request: &str) -> bool {
+        self.lines.iter().any(|(_, _, frame)| {
+            records(frame)
+                .iter()
+                .any(|record| record["actionRequestId"] == request)
+        })
     }
 
     /// The action of a request identity, from every line that shows it.
@@ -572,6 +584,31 @@ fn every_with_host_exchange_of_the_corpora_is_answered_as_swift_recorded_it() {
     replay(&mut corpora, &control, page, None);
     drop(control);
     drop(scenario);
+
+    // A team-signed tool, and a Target inventory that changed while the impact
+    // was read (the critical Job gate unknown, with its reason): each a blocked
+    // preview, read, reconciled over the same impact and listed alone.
+    for request in ["host-team-signed", "host-inventory-changed"] {
+        if !corpora.shows(request) {
+            continue;
+        }
+        let action = corpora.action(request);
+        assert_eq!(action.catalog, CATALOG_DIGEST);
+        let scenario = Scenario::new(HOST_START);
+        let control = scenario.start("epoch-1", CATALOG_DIGEST);
+        scenario.identities(&action);
+        scenario.observe(Some(&action));
+        let line = corpora.answered("runtime.hdc.impact-preview", request, "blocked");
+        replay(&mut corpora, &control, line, None);
+        for method in ["control-action.show", "control-action.reconcile"] {
+            let line = corpora.answered(method, request, "blocked");
+            replay(&mut corpora, &control, line, None);
+        }
+        let page = corpora.page(json!({}), &[request]);
+        replay(&mut corpora, &control, page, None);
+        drop(control);
+        drop(scenario);
+    }
 
     // Every with-host line is reproduced but the approval request.
     let unreplayed: Vec<_> = corpora

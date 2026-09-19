@@ -22,6 +22,15 @@ import XCTest
 /// proved, and nothing runs the executable. The isolated Rust daemon's managed
 /// server is such a fixture too. A run with `ARKDECK_CONTROL_FRAME_LOG` set
 /// records these answers for the method schemas.
+///
+/// Two more previews carry what that one does not. A tool signed with a team
+/// identifier: a copy of an executable DevEco signs with its team
+/// (`HDCStatusControlFramesContractTests.teamSignedExecutable`, skipped on a
+/// host without it; its digest has no identity family either). And a critical
+/// Job gate left unknown, with its reason, by a Target inventory that changed
+/// while the impact was read: the fixture port removes the durable Target
+/// document while the device list is read, so no Job, Target or device row
+/// remains to name.
 final class ControlActionWithHostContractTests: XCTestCase {
   /// 2026-09-19T00:00:00Z, as the records spell it.
   private static let start = Date(timeIntervalSince1970: 1_789_776_000)
@@ -62,13 +71,19 @@ final class ControlActionWithHostContractTests: XCTestCase {
     private let lock = NSLock()
     private var answers = true
     private var lists = 0
+    private var during: (@Sendable () -> Void)?
     func setAnswers(_ value: Bool) { lock.withLock { answers = value } }
+    /// Something that happens on the host while each later list is read.
+    func setDuringList(_ action: @escaping @Sendable () -> Void) {
+      lock.withLock { during = action }
+    }
     var listCount: Int { lock.withLock { lists } }
     func observeToolVersion() async throws -> String {
       throw BootstrapError.observationFailed("tool version could not be verified")
     }
     func listCandidates() async throws -> [BootstrapCandidate] {
-      try lock.withLock {
+      if let action = lock.withLock({ during }) { action() }
+      return try lock.withLock {
         lists += 1
         guard answers else { throw BootstrapError.observationFailed("empty observation output") }
         return []
@@ -134,7 +149,8 @@ final class ControlActionWithHostContractTests: XCTestCase {
     }
   }
 
-  private func makeHost() throws -> Host {
+  /// The host over a copy of `tool`, by default the fixture HDC executable.
+  private func makeHost(tool: URL? = nil) throws -> Host {
     let state = root.appending(path: "state")
     let capabilities = try RuntimeCapabilityStore(directoryURL: root.appending(path: "caps"))
     let dispatcher = RuntimeAgentExecutionContractTests.Dispatcher()
@@ -149,7 +165,7 @@ final class ControlActionWithHostContractTests: XCTestCase {
       nowUTC: { "2026-09-19T00:00:00Z" })
     let path = root.appending(path: "hdc")
     try FileManager.default.copyItem(
-      at: Bundle(for: Self.self).bundleURL.deletingLastPathComponent().appending(
+      at: tool ?? Bundle(for: Self.self).bundleURL.deletingLastPathComponent().appending(
         path: "ArkDeckFakeHDCFixture"),
       to: path)
     let executable = ResolvedExecutable(
@@ -271,9 +287,13 @@ final class ControlActionWithHostContractTests: XCTestCase {
   }
 
   /// The preview a fixture HDC yields: no generation, version or health, the
-  /// fixture's digest and native signature, and an empty participant set.
+  /// fixture's digest and native signature, an empty participant set, and
+  /// the critical Job gate, clear unless the inventory changed during the read.
   private func assertUnprovedPreview(
     _ record: [String: JSONValue], host: Host, created: Date,
+    gate: JSONValue = .object([
+      "state": .string("clear"), "blocking": .array([]), "reasonCode": .null,
+    ]),
     file: StaticString = #filePath, line: UInt = #line
   ) throws {
     let preview = try XCTUnwrap(Self.object(record["preview"]), file: file, line: line)
@@ -318,9 +338,7 @@ final class ControlActionWithHostContractTests: XCTestCase {
         "affectedTargetIds": .array([]), "affectedJobIds": .array([]),
         "detectedOtherClientIds": .array([]), "otherClientsMayExist": .bool(true),
         "affectedDeviceObservations": .array([]),
-        "criticalJobGate": .object([
-          "state": .string("clear"), "blocking": .array([]), "reasonCode": .null,
-        ]),
+        "criticalJobGate": gate,
         "interruption": .object([
           "kind": .string("hdcEndpointUnavailable"), "affectsAllParticipants": .bool(true),
         ]),
@@ -522,5 +540,88 @@ final class ControlActionWithHostContractTests: XCTestCase {
     let listed = try await daemon.answer("control-action.list", [:])
     XCTAssertEqual(listed["items"], .array([.object(restarted), .object(expired)]))
     XCTAssertEqual(host.dispatcher.dispatchCount, 0)
+  }
+
+  /// A blocked preview is read, reconciled over the same impact without any
+  /// change, and listed alone, as the fixture's blocked one is.
+  private func assertReadReconciledAndListed(
+    _ preview: [String: JSONValue], daemon: Daemon, host: Host,
+    file: StaticString = #filePath, line: UInt = #line
+  ) async throws {
+    let id = try XCTUnwrap(Self.string(preview["controlActionId"]), file: file, line: line)
+    let shown = try await daemon.answer("control-action.show", ["controlAction": .string(id)])
+    XCTAssertEqual(shown, preview, file: file, line: line)
+    let reconciled = try await daemon.answer(
+      "control-action.reconcile", ["controlAction": .string(id)])
+    XCTAssertEqual(reconciled, preview, file: file, line: line)
+    XCTAssertEqual(host.port.listCount, 2, "reconciling observed again", file: file, line: line)
+    let listed = try await daemon.answer("control-action.list", [:])
+    XCTAssertEqual(listed["items"], .array([.object(preview)]), file: file, line: line)
+    XCTAssertEqual(listed["hasMore"], .bool(false), file: file, line: line)
+    XCTAssertEqual(host.dispatcher.dispatchCount, 0, file: file, line: line)
+    let jobs = try await host.engine.listJobs()
+    XCTAssertTrue(jobs.isEmpty, file: file, line: line)
+  }
+
+  func testATeamSignedToolIsPreviewedWithItsTeamIdentifier() async throws {
+    let published = HDCStatusControlFramesContractTests.teamSignedExecutable
+    guard FileManager.default.fileExists(atPath: published.path) else {
+      throw XCTSkip("DevEco is not installed; no team-signed executable to preview")
+    }
+    let host = try makeHost(tool: published)
+    guard
+      case .object(let signature) = try HeadlessHDCStatusObserver.signature(
+        URL(filePath: host.executable.path)),
+      case .string(_)? = signature["teamIdentifier"]
+    else { throw XCTSkip("the DevEco executable carries no team identifier") }
+    let daemon = try start(host, clock: Clock(Self.start))
+
+    let preview = try await daemon.answer(
+      "runtime.hdc.impact-preview", intent("host-team-signed"))
+    try assertRecord(
+      preview, request: "host-team-signed", state: "blocked", generation: "2",
+      blocker: "hdc.serverIdentityUnproven", created: Self.start, observed: Self.start)
+    try assertUnprovedPreview(preview, host: host, created: Self.start)
+    // The tool's signature is its static signing facts as read: verified,
+    // with the team that signed it.
+    let tool = try XCTUnwrap(Self.object(Self.object(preview["preview"])?["tool"]))
+    XCTAssertEqual(tool["signature"], .object(signature))
+    XCTAssertEqual(signature["state"], .string("verified"))
+    try await assertReadReconciledAndListed(preview, daemon: daemon, host: host)
+  }
+
+  func testAnInventoryChangedWhileTheImpactIsReadLeavesTheCriticalJobGateUnknown() async throws {
+    let host = try makeHost()
+    _ = try host.targets.adopt(
+      stableIdentitySHA256: String(repeating: "c", count: 64), connectKey: "synthetic-participant",
+      toolVersion: "fixture", nowUTC: "2026-09-19T00:00:00Z")
+    let document = root.appending(path: "targets/targets.json")
+    let adopted = try Data(contentsOf: document)
+    XCTAssertEqual(try host.targets.list().count, 1)
+    // The durable Target document is removed while each device list is read:
+    // the inventory read after the devices is not the one read before them.
+    host.port.setDuringList { try? FileManager.default.removeItem(at: document) }
+    let daemon = try start(host, clock: Clock(Self.start))
+
+    let preview = try await daemon.answer(
+      "runtime.hdc.impact-preview", intent("host-inventory-changed"))
+    try assertRecord(
+      preview, request: "host-inventory-changed", state: "blocked", generation: "2",
+      blocker: "hdc.serverIdentityUnproven", created: Self.start, observed: Self.start)
+    // The gate is unknown, with its reason, although no Job, Target or device
+    // remains to name: every Target the preview names is one read after the
+    // devices, and none is left.
+    try assertUnprovedPreview(
+      preview, host: host, created: Self.start,
+      gate: .object([
+        "state": .string("unknown"), "blocking": .array([]),
+        "reasonCode": .string("hdc.participantInventoryUnproven"),
+      ]))
+    XCTAssertTrue(try host.targets.list().isEmpty)
+    // Reconciling reads the inventory again, restored first, and it changes
+    // the same way: the same impact.
+    try adopted.write(to: document)
+    try await assertReadReconciledAndListed(preview, daemon: daemon, host: host)
+    XCTAssertTrue(try host.targets.list().isEmpty)
   }
 }
