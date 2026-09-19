@@ -1,6 +1,9 @@
 # Device list ClientKit extraction
 
-Base: protected main `94b2896609c549177fa052512aa2b800dfc4e25e`.
+Base: protected main `510b46508d8719318114a17c2567b701297efb65`.
+The normalized production comparison was performed against `94b28966`; the
+subsequent Artifact publication integration at `c1d97133` does not change these
+Swift production files.
 TASK-XPA-019 / SPK-8 remain incomplete.
 
 The App-facing DeviceList facade, candidate/history decoration models, bounded
