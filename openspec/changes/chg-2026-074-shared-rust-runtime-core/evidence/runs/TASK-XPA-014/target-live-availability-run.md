@@ -66,3 +66,26 @@ Integrated main `187321ea` after #1968 and #1979 merged, without conflicts.
 The dashboard now records pointer capability admission separately from missing
 consumption/dispatch: executable operations remain 3/30. The source recount is
 unchanged. Final post-merge unified validation remains pending.
+
+## Final integrated-branch validation
+
+The final unified entry completed with exit 0 on `210c800051201a6d8c3b4cfe35d4b24c3bde482a`
+against merge-base main `187321ea`. Common checks, Rust formatting, strict
+workspace Clippy, workspace tests, 35 contract-check tests, actual published and
+candidate contract views, deny and vet all passed (36 fully audited packages).
+Swift/App/design-system lanes were not selected for this four-file Rust/docs
+diff. No extra HAR fixture patch was needed. Only this evidence changed after
+the successful run; there was no subsequent production-code edit.
+
+```sh
+ARKDECK_PYTHON=/private/tmp/arkdeck-validation-venv/bin/python \
+CARGO_BUILD_JOBS=2 RUST_TEST_THREADS=2 ARKDECK_TEST_WORKERS=2 \
+/private/tmp/arkdeck-validation-venv/bin/python scripts/ci/plan.py \
+  --repo-root . --base-revision origin/main --head-revision HEAD \
+  --merge-base --include-worktree --run-local
+```
+
+Log: `/private/tmp/arkdeck-target-live-final-20260919.log`.
+SHA-256: `0f725862b97f8f39c59cd20b8f24e576180a53ecbb955c87b0ab8ff8456357ec`.
+Contract recordings: `rust/target/readonly-check/1d6066db8418428490391c74e2ecfb40`.
+No device execution, installed activation or real-device acceptance occurred.
