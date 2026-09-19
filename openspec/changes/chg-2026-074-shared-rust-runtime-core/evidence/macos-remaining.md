@@ -1,19 +1,21 @@
 # Remaining macOS Rust implementation
 
-Updated 2026-09-19 against protected main `abcb9984` (#1972, merged 2026-09-18 UTC), revision 11. This list tracks
-implementation and review, not published activation or hardware acceptance. Windows product work
-and real-device acceptance are outside this goal.
+Updated 2026-09-19 against protected main `187321ea` (#1968), revision 11. This list tracks
+implementation, installed activation and macOS real-device acceptance separately. The current
+goal includes pure-Rust macOS GJ-1–5 acceptance; Windows and Linux product work are outside scope.
 
 ## Dashboard (update on every merge)
 
 | Routed methods on the standalone Rust daemon | Operations executable in Rust | Golden Journeys on Rust | App facades on ClientKit | Registered CLI feature names on Rust | Swift targets deleted |
 | --- | --- | --- | --- | --- | --- |
-| 68 / 105 (64.8%; installed facade serves 3 locally) | 3 / 30 (10%; analyzer, observe, default diagnostic capture) | 0 / 5 | 0 / 13 | 63 / 256 (24.6%; 66 parser command names total) | 0 / 6 |
+| 69 / 105 (65.7%; installed facade serves 3 locally) | 3 / 30 (10%; analyzer, observe, default diagnostic capture) | 0 / 5 | 1 / 13 | 65 / 256 (25.4%; 68 parser command names total) | 0 / 6 |
 
 These are separate coverage measures, not a weighted completion percentage. A routed method or
 CLI entry is not proof of complete behavior, installed activation or hardware acceptance. In
-particular, Import commit/release/inspection still refuse, and the CLI's `target.availability`
-has no corresponding native daemon route yet.
+particular, Import commit/release/inspection still refuse. Target availability and HAR list/show
+CLI routes are delivered (#1974); live operation discovery is delivered (#1973). At the pinned
+main, the Target aggregate still uses the static fallback; this PR's live-projection integration
+is pending review and does not add a route, executable operation or target-readiness claim.
 
 How each number is measured at the pinned main:
 
@@ -26,15 +28,18 @@ How each number is measured at the pinned main:
   `capture.diagnostics@1`. `job_plan.rs` also materializes `input.tap@1`, `input.long-press@1`
   and `input.swipe@1`, but planning and provider implementations alone do not qualify them as
   executable operations. `device_steps.rs` still admits only observe and capture to its device
-  operation set; pointer admission PR #1968 is not merged into this baseline.
+  operation set. Pointer capability admission (#1968) is merged, but use
+  consumption, mutation dispatch and outcomes remain unimplemented, so the
+  executable-operation count stays 3/30.
 - **Golden Journeys:** `REAL_DEVICE_PASS` records on the pure Rust daemon. Fake-HDC/oracle
   replay and the earlier paired-facade acceptance do not increase this count.
 - **App / retirement:** the 13 App-facing facades switched to `ArkDeckClientKit`, and the six
-  Swift targets removed by XPA-017. The ClientKit target is still absent and all six Swift
-  targets remain in `Packages/ArkDeckKit/Package.swift`.
+  Swift targets removed by XPA-017. History filter and its transport/models are extracted to ClientKit (#1976); the
+  other facades and all six Swift targets remain. This structural extraction is
+  not signed standalone Rust App acceptance; SPK-8 remains incomplete.
 - **CLI:** unique canonical names returned by the positional-command match in
   `rust/crates/arkdeck-cli/src/lib.rs`, intersected with `feature` in
-  `openspec/contracts/cli-feature-coverage.json`. There are 66 parser names, of which 63 match
+  `openspec/contracts/cli-feature-coverage.json`. There are 68 parser names, of which 65 match
   the 256 registered feature names. `artifact.import.hap`, `artifact.import.native-library`
   and `device.candidates` are the three unmatched names; they are not added to this numerator.
   Internal RPC strings such as `artifact.import.append` are not CLI command leaves.
@@ -47,7 +52,7 @@ import json
 import re
 import subprocess
 
-ref = "abcb9984ffe3312db7ceb300396f9e8bcb80dcb9"
+ref = "187321ea397419353ac430a8bd48e027f56cd02e"
 def read(path):
     return subprocess.check_output(["git", "show", f"{ref}:{path}"], text=True)
 
@@ -75,8 +80,8 @@ PYCOUNT
 
 | Milestone | Golden Journey | Delivers | Lane | State |
 | --- | --- | --- | --- | --- |
-| M1 | GJ-1 | `observe.device@1`, `capture.diagnostics@1`, `agent.*` with HAR, `human-action.*`, `target.adopt/availability`, `runtime.hdc.*`, restart carry-over | A (+ B for the executor) | in progress: observe/capture and agent run/status (#1920, #1932, #1938), agent list/abandon (#1945, CLI #1946), waiting-execution records (#1953), Target owner/routes (#1959, #1966; CLI #1967), HDC status (#1956), physical-assistance raise and human-action list/show (#1970). Remaining: adoption within agent run/resume, resume routes and subsequent Job, development USB relation source and real-daemon replay, daemon target availability, HAR CLI, remaining HDC lifecycle routes and GJ-1 acceptance |
-| M2 | GJ-2/3 | Artifact publication and import commit, capability mint/reserve/consume, `debug.*`, `deploy.native-library.app-owned@1`, `capability.*`, `cleanupDebt.*` | A (+ B) | foundations delivered: HAP provider (#1951), native-library provider (#1955), pointer/port-rule providers (#1961), capability store install/consume/outcome writes (#1963), pointer planning (#1964). These are not complete operation admission/run paths; Artifact import completion, authority integration and GJ-2/3 acceptance remain |
+| M1 | GJ-1 | `observe.device@1`, `capture.diagnostics@1`, `agent.*` with HAR, `human-action.*`, `target.adopt/availability`, `runtime.hdc.*`, restart carry-over | A (+ B for the executor) | in progress: observe/capture and agent run/status (#1920, #1932, #1938), agent list/abandon (#1945, CLI #1946), waiting-execution records (#1953), Target owner/routes (#1959, #1966; CLI #1967), HDC status (#1956), physical-assistance raise and human-action list/show (#1970), host operation availability (#1973), bounded Target availability and HAR CLI reads (#1974), proved Target adoption inside agent.run with commit-gap restart coverage (#1975). Remaining: adoption within agent resume, resume routes and subsequent Job, trusted USB relation source and real-daemon replay, remaining HDC lifecycle routes and GJ-1 acceptance |
+| M2 | GJ-2/3 | Artifact publication and import commit, capability mint/reserve/consume, `debug.*`, `deploy.native-library.app-owned@1`, `capability.*`, `cleanupDebt.*` | A (+ B) | foundations delivered: HAP provider (#1951), native-library provider (#1955), pointer/port-rule providers (#1961), capability store install/consume/outcome writes (#1963), pointer planning (#1964), pointer Runtime capability admission (#1968). These are not complete operation run paths; Artifact import completion, authority integration and GJ-2/3 acceptance remain |
 | M3 | GJ-5 | 13 `workspace.*` operations, `workspace.preset/project.*`, registered toolchain, hap-sign-tool, Keychain | D | after SPK-10 |
 | M4 | GJ-4 | ArkForge lane through `arkforge-client`, `flash.*`, Rockchip probes, DEC-016 recovery epoch | A + D | Rockchip live-mode probe (#1934), post-flash observation (#1936), Loader transition (#1937) and alias-store primitives/oracle/store (#1939–#1941) are merged. ArkForge lane and flash methods still wait for SPK-9 prerequisites and the §L.1 item 13 ruling |
 | M5 | cutover | G.4 preflight, LaunchAgent to the standalone Rust binary, deletions, DMG, lock and traceability flip (TASK-XPA-017) | all | after 018, 019, 025 |
@@ -87,12 +92,12 @@ PYCOUNT
 | --- | --- | --- | --- |
 | XPA-012 | in-progress | Isolated Rust owners for History, Session, Trace cache, Bootstrap, DevEco/HDC registration, tool/bundle registry, Target queries; facade History filter owner (#1888); owner locks unlock on drop (#1903) | tool selection writes, trace database preparation; installed per-store composition withdrawn (r11) — activation only at M5 |
 | XPA-013 | in-progress | Artifact read/inspect/export, durable Import upload (#1881), quota query (#1911), device Import binding identity fix (#1969) | Import commit/publication, release and reference inspection; leases, active-use/release and GC integration — inside M2 |
-| XPA-014 | in-progress | Job journal/index/records and analyzer lifecycle; observe/capture and agent run/status/list/abandon; Target observation/adoption routes; HDC status; physical-assistance raise and human-action reads; capability store writes and pointer planning (#1963, #1964) | M1 HAR resume/adoption and remaining routes; M2 integrated authority and device operation execution; M3/M4; recovery after the §L.1 item 13 ruling |
+| XPA-014 | in-progress | Job journal/index/records and analyzer lifecycle; observe/capture and agent run/status/list/abandon; Target observation/adoption/availability routes; live host operation availability (#1973/#1974); agent.run Target adoption (#1975); HDC status; physical-assistance raise and human-action reads; capability store writes, pointer planning and capability admission (#1963, #1964, #1968) | M1 HAR resume and remaining routes; M2 integrated authority and device operation execution; M3/M4; recovery after the §L.1 item 13 ruling |
 | XPA-015 | ready (r11) | HDC observation/parsers and process foundation | SPK-10, then M3; the three ArkTrace/hilog analyzers after M4 |
 | XPA-016 | in-progress | SPK-6 executor foundation; Rockchip probes/transition/alias store (#1934–#1941); HDC status (#1947); capture providers (#1949); physical relation proof port (#1952); HAP (#1951), native-library (#1955), pointer/port-rule (#1961) providers | daemon composition and M1/M2 end-to-end acceptance; M4 ArkForge-served ports after SPK-9 |
-| XPA-018 | in-progress | 66 parser command names, 63 matching registered features; agent list/abandon (#1946) and target adopt/availability (#1967) added | remaining commands including HAR, daemon support for target availability, full parity/export; Swift CLI retirement with M5 |
-| XPA-019 | ready (r11) | no ClientKit target; 13 App-facing facades | SPK-8, then the facades one by one; hard prerequisite of M5 |
-| XPA-025 | in-progress | Swift baseline retained; isolated Rust performance launcher merged (#1972), with advisory launch/IPC/restart probes | faithful Rust seeded soak workload, full measurement and lane migration; SPK-11 remains incomplete |
+| XPA-018 | in-progress | 68 parser command names, 65 matching registered features; target adopt/availability (#1967), HAR list/show (#1974) | remaining commands including HAR resume, full parity/export; Swift CLI retirement with M5 |
+| XPA-019 | in-progress | ClientKit transport/models and History filter extraction merged (#1976) | SPK-8 acceptance, remaining facades; hard prerequisite of M5 |
+| XPA-025 | in-progress | Rust benchmark launcher/probe (#1972), Rust performance lane integration (#1979); isolated Rust owner soak tool merged (#1977), successful/cancelled/reopen workload; Swift performance baseline; merge-lane micro-benchmarks retired (#1902) | SPK-11 repeated measurements, Rust soak and remaining lanes on the Rust daemon |
 | XPA-017 | blocked | — | M5 |
 
 Spikes SPK-6..11 are defined in `tasks.md` and design §J.3; their records land under
@@ -101,11 +106,28 @@ Spikes SPK-6..11 are defined in `tasks.md` and design §J.3; their records land 
 
 ## History
 
-2026-09-19 (`abcb9984`): #1972 merged the isolated Rust benchmark launcher.
-The six coverage counts above are unchanged: this is measurement integration,
-not another executable operation, App facade, retired target or hardware journey.
-Three empty-store probes are advisory only; full seeded soak and SPK-11 remain open.
+2026-09-19 (`187321ea`): #1968 merges pointer capability admission, retaining
+unknown-outcome and competing-session refusals. Consumption and pointer
+execution are not delivered, so executable operations remain 3/30. #1979 merges
+the Rust performance lane plumbing; qualified measurements and installed-daemon
+acceptance remain outstanding.
 
+2026-09-19 (`98cb3b96`): #1976 merges the ClientKit transport and History filter
+extraction (1/13 facades; zero Swift targets retired). #1977 merges the isolated
+Rust owner soak workload with local smoke evidence; full installed-daemon IPC,
+performance/soak acceptance and SPK-11 remain incomplete. Neither change adds
+real-device Golden Journey evidence or installed activation.
+
+2026-09-19 (`bef94236`): #1975 delivers proved Target adoption inside agent.run
+and commit-gap restart coverage. This extends an existing execution path and
+does not add a route, executable operation or real-device Golden Journey. The
+six coverage counts remain unchanged.
+
+2026-09-19 (`1ee1d73d`): #1972 delivers the Rust benchmark launcher/probe, #1973
+live operation discovery, and #1974 bounded Target availability plus HAR list/show
+CLI. Recounted 69 routes, 68 parser names and 65 registered CLI names independently;
+executable operations, GJ evidence, ClientKit and Swift-retirement counts remain
+unchanged. The current goal includes macOS real-device acceptance.
 
 2026-09-18 (`d761372b`): refreshed from protected main #1970, after 38 merges since
 `b0806334` (#1929). Recounted source routes and canonical CLI names, corrected the earlier

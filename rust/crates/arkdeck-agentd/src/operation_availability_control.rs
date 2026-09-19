@@ -42,6 +42,67 @@ impl Fixture {
         }
         Self(root)
     }
+    fn adopt(&self) -> String {
+        use arkdeck_hoststore::{ObservationReference, Sources, TargetObservations};
+        use arkdeck_provider_hdc::{
+            DispatchFailure, HdcDispatch, ProcessPlan, Receipt, UsbRelation,
+        };
+        // Seed the durable binding through the real adoption owner, using an
+        // in-memory source explicitly confined to this synthetic host test.
+        struct AdoptionFixture;
+        impl HdcDispatch for AdoptionFixture {
+            fn dispatch(&self, plan: &ProcessPlan) -> Result<Receipt, DispatchFailure> {
+                let argv: Vec<_> = plan.arguments.iter().map(String::as_str).collect();
+                let stdout = match argv.as_slice() {
+                    ["-v"] => "Ver: 3.2.0f\n",
+                    ["list", "targets", "-v"] => "fixture-device\t\tUSB\tConnected\tlocalhost\n",
+                    _ => {
+                        return Err(DispatchFailure::Refused(
+                            "unexpected adoption action".into(),
+                        ));
+                    }
+                };
+                Ok(Receipt {
+                    exit_status: 0,
+                    stdout: stdout.as_bytes().to_vec(),
+                    stderr: Vec::new(),
+                    truncated: false,
+                    duration: std::time::Duration::ZERO,
+                })
+            }
+        }
+        let targets = TargetStore::open(&self.0.join("targets")).unwrap();
+        let observer = TargetObservations::default();
+        let usb = || {
+            Ok(vec![UsbRelation {
+                serial: "fixture-device".into(),
+                location: "1".into(),
+                attachment_id: 1,
+                vendor_id: 0x2207,
+                product_id: 0x5000,
+            }])
+        };
+        let now = || "2026-09-19T00:00:00Z".to_owned();
+        let sources = Sources {
+            dispatch: &AdoptionFixture,
+            relations: &usb,
+            targets: &targets,
+            now: &now,
+        };
+        let snapshot = observer.snapshot(&sources, None).unwrap();
+        observer
+            .adopt(
+                &sources,
+                &ObservationReference {
+                    candidate: snapshot.observations[0].candidate.connect_key.clone(),
+                    observation_id: snapshot.observations[0].observation_id.clone(),
+                    generation: snapshot.generation,
+                },
+            )
+            .unwrap()
+            .target_id
+    }
+
     fn host(&self, artifacts: bool, jobs: bool) -> crate::host::Host {
         let mut host = crate::host::Host::from_environment()
             .with_targets(TargetStore::open(&self.0.join("targets")).unwrap())
@@ -90,11 +151,34 @@ fn entry<'a>(rows: &'a Value, reference: &str) -> &'a Value {
         .find(|v| v["reference"] == reference)
         .unwrap()
 }
+fn assert_target_operations(control: &Control<crate::host::Host>, target: &str, rows: &Value) {
+    let aggregate = call(control, "target.availability", json!({"targetId":target}));
+    let projected: Vec<_> = rows
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|row| {
+            json!({
+                "reference":row["reference"], "availability":row["availability"],
+                "reasons":row["reasons"], "reasonCodes":row["reasonCodes"],
+            })
+        })
+        .collect();
+    assert_eq!(aggregate["operations"]["items"], json!(projected));
+    assert_eq!(aggregate["operations"]["scope"], "host");
+    assert_eq!(aggregate["operations"]["targetResolution"], "unresolved");
+    assert_eq!(aggregate["binding"]["state"], "ready");
+    assert_eq!(aggregate["presence"]["state"], "unresolved");
+    assert_eq!(aggregate["profile"]["state"], "unresolved");
+}
+
 #[test]
 fn live_discovery_and_describe_follow_actual_executors_and_executable_drift_without_dispatch() {
     let fixture = Fixture::new();
+    let target = fixture.adopt();
     let control = Control::new(fixture.host(true, true)).unwrap();
     let rows = call(&control, "operation.list", json!({}));
+    assert_target_operations(&control, &target, &rows);
     let available: Vec<_> = rows
         .as_array()
         .unwrap()
@@ -135,7 +219,9 @@ fn live_discovery_and_describe_follow_actual_executors_and_executable_drift_with
         );
     }
     let original = fs::read(fixture.0.join("analyzer")).unwrap();
-    fs::write(fixture.0.join("analyzer"), b"#!/bin/sh\nexit 81\n").unwrap();
+    let mut changed = original.clone();
+    changed.extend_from_slice(b"# analyzer identity drift\n");
+    fs::write(fixture.0.join("analyzer"), changed).unwrap();
     let descriptor = call(
         &control,
         "operation.describe",
@@ -150,14 +236,23 @@ fn live_discovery_and_describe_follow_actual_executors_and_executable_drift_with
         descriptor["availabilityReasonOrigins"],
         json!(["host_configuration"])
     );
+    assert_target_operations(
+        &control,
+        &target,
+        &call(&control, "operation.list", json!({})),
+    );
     fs::write(fixture.0.join("analyzer"), original).unwrap();
     let rows = call(&control, "operation.list", json!({}));
+    assert_target_operations(&control, &target, &rows);
     assert_eq!(
         entry(&rows, "analyzer.extract-crash-signature@1")["availability"],
         "available"
     );
-    fs::write(fixture.0.join("hdc"), b"#!/bin/sh\nexit 82\n").unwrap();
+    let mut changed = fs::read(fixture.0.join("hdc")).unwrap();
+    changed.extend_from_slice(b"# HDC identity drift\n");
+    fs::write(fixture.0.join("hdc"), changed).unwrap();
     let rows = call(&control, "operation.list", json!({}));
+    assert_target_operations(&control, &target, &rows);
     assert_eq!(
         entry(&rows, "observe.device@1")["reasonCodes"],
         json!(["tool_identity_drift"])

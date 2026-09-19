@@ -762,3 +762,77 @@ fn import_upload_methods_use_only_the_typed_import_owner() {
         }
     }
 }
+
+#[test]
+fn physical_resume_routes_reach_the_same_execution_owner() {
+    struct ResumeHost(Arc<AtomicUsize>, &'static str);
+    impl HostServices for ResumeHost {
+        fn observations(&self) -> Result<DeviceObservationsResult, WireError> {
+            panic!("resume routes must reach their execution owner")
+        }
+
+        fn observed_at(&self) -> String {
+            "2026-09-14T00:00:00Z".into()
+        }
+        fn hdc_status(&self, deep: bool) -> HdcStatus {
+            HdcStatus::unavailable(deep, "hdc.notConfigured")
+        }
+        fn agent_execution(
+            &self,
+            method: &str,
+            params: &serde_json::Map<String, Value>,
+        ) -> Result<Value, WireError> {
+            assert!(matches!(method, "agent.resume" | "human-action.resume"));
+            assert_eq!(params["resumeReference"], "resume-missing");
+            self.0.fetch_add(1, Ordering::SeqCst);
+            Err(WireError {
+                code: self.1.into(),
+                message: "human action does not exist".into(),
+                details: Some(
+                    serde_json::from_value(
+                        if method == "agent.resume"
+                            && ["recordUnreadable", "factsDrifted"].contains(&self.1)
+                        {
+                            json!({})
+                        } else {
+                            json!({"phase":"preAdmission","newDispatchCount":0})
+                        },
+                    )
+                    .unwrap(),
+                ),
+            })
+        }
+    }
+    let calls = Arc::new(AtomicUsize::new(0));
+    for code in [
+        "resourceNotFound",
+        "idempotencyConflict",
+        "orchestrationClockUntrusted",
+        "orchestrationBudgetExpired",
+        "admissionDenied",
+        "resourceConflict",
+        "reviewedPlanMismatch",
+        "recordUnreadable",
+        "factsDrifted",
+    ] {
+        let control = Control::new(ResumeHost(calls.clone(), code)).unwrap();
+        for method in ["agent.resume", "human-action.resume"] {
+            let params = if method == "agent.resume" {
+                json!({"resumeReference":"resume-missing"})
+            } else {
+                json!({"resumeReference":"resume-missing","humanAction":"har-missing"})
+            };
+            // Published source views retain their old sampled error vocabulary.
+            // Candidate views must expose the newly recorded owner refusals.
+            let supported = validate_method_value(method, "errorCode", &json!(code)).is_ok()
+                && !(method == "agent.resume"
+                    && ["recordUnreadable", "factsDrifted"].contains(&code)
+                    && validate_method_value(method, "errorDetails", &json!({})).is_err());
+            assert_eq!(
+                call(&control, method, params).outcome.unwrap_err().code,
+                if supported { code } else { "internalError" }
+            );
+        }
+    }
+    assert_eq!(calls.load(Ordering::SeqCst), 18);
+}

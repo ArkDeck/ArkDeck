@@ -368,11 +368,23 @@ fn rust_raises_and_reads_the_physical_assistance_swift_asked_for() {
 
 thread_local! {
     static ADOPTION_EXPIRED: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    static RESUME_CLOCK_ROLLBACK: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    static RESUME_CRASH_COUNTDOWN: std::cell::Cell<u8> = const { std::cell::Cell::new(0) };
     static ADOPTION_CRASH_PENDING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 fn adoption_now() -> Option<String> {
+    let countdown = RESUME_CRASH_COUNTDOWN.get();
+    if countdown == 1 {
+        std::process::exit(79);
+    }
+    if countdown > 1 {
+        RESUME_CRASH_COUNTDOWN.set(countdown - 1);
+    }
     if ADOPTION_CRASH_PENDING.get() {
         std::process::exit(79);
+    }
+    if RESUME_CLOCK_ROLLBACK.get() {
+        return Some("2026-09-13T23:59:59.000Z".into());
     }
     Some(
         if ADOPTION_EXPIRED.get() {
@@ -730,6 +742,487 @@ fn crash_between_target_and_execution_commit_reopens_all_owners_and_keeps_origin
                 },
             }),
         };
+        ADOPTION_EXPIRED.set(expired);
+        let outcome = agents.advance("agent.run", request, &engine);
+        if expired {
+            let error = outcome.err().expect("original deadline must refuse retry");
+            assert_eq!(error.code, "orchestrationBudgetExpired");
+            assert!(
+                fs::read(fake.join("hdc-invocations.log"))
+                    .unwrap()
+                    .is_empty()
+            );
+        } else {
+            let answer = outcome.unwrap();
+            let job = answer.start.expect("one newly admitted Job").job;
+            assert_eq!(
+                answer.value["targetId"],
+                target_before["targets"][0]["targetID"]
+            );
+            let calls = fs::read(fake.join("hdc-invocations.log")).unwrap();
+            let retry = agents.advance("agent.run", request, &engine).unwrap();
+            assert_eq!(retry.value["jobId"], job);
+            assert!(retry.start.is_none());
+            assert_eq!(fs::read(fake.join("hdc-invocations.log")).unwrap(), calls);
+        }
+        let after: Value = serde_json::from_slice(&fs::read(&record_path).unwrap()).unwrap();
+        assert_eq!(after["createdAt"], before["createdAt"]);
+        assert_eq!(after["deadline"], before["deadline"]);
+        let target_after: Value = serde_json::from_slice(&fs::read(target_path).unwrap()).unwrap();
+        assert_eq!(target_after, target_before);
+        let inventory = jobs.handle_resource("job.list", &Map::new()).unwrap();
+        assert_eq!(
+            inventory["items"].as_array().unwrap().len(),
+            if expired { 0 } else { 1 }
+        );
+        ADOPTION_EXPIRED.set(false);
+    }
+}
+
+#[test]
+fn physical_resume_keeps_original_intent_and_unique_job() {
+    use arkdeck_hoststore::HdcComposition;
+    use std::cell::Cell;
+    for scenario in [
+        "connect",
+        "trust-restart",
+        "select-restart",
+        "select-drift",
+        "select",
+        "expired",
+        "rollback",
+        "adoption-expired",
+    ] {
+        let _lock = exclusive();
+        ADOPTION_EXPIRED.set(false);
+        let fixture = support::fixture("agent-human-action");
+        let cases: Value =
+            serde_json::from_slice(&fs::read(fixture.join("cases.json")).unwrap()).unwrap();
+        let exchanges = cases["exchanges"].as_array().unwrap();
+        let request = exchanges
+            .iter()
+            .find(|v| v["name"] == "connect.run")
+            .unwrap()["params"]
+            .as_object()
+            .unwrap()
+            .clone();
+        let plugged = relations(
+            &exchanges
+                .iter()
+                .find(|v| {
+                    v["name"]
+                        == if scenario.starts_with("select") {
+                            "ambiguous.run"
+                        } else {
+                            "connect.resume"
+                        }
+                })
+                .unwrap()["usbRelations"],
+        );
+        let fake = install_fake(&fixture);
+        fs::write(fake.join("hdc-mode"), "normal\n").unwrap();
+        let state = State::new(&fixture);
+        let root = &state.0;
+        let target_path = root.join("targets-state/targets.json");
+        let _initial = fs::read(&target_path).unwrap();
+        let targets = TargetStore::open(&root.join("targets-state")).unwrap();
+        let artifacts = ArtifactReadStore::open(&root.join("artifacts")).unwrap();
+        let jobs = JobStore::open_owner(&root.join("jobs-state")).unwrap();
+        let agents = AgentExecutionStore::open(&root.join("agent-executions")).unwrap();
+        let digest = sha256_hex(&fs::read(fake.join("hdc")).unwrap());
+        let dispatch =
+            ProcessDispatch::new(VerifiedTool::open(fake.join("hdc"), &digest).unwrap(), None);
+        let hdc = HdcComposition {
+            targets: &targets,
+            dispatch: &dispatch,
+            tool_sha256: &digest,
+            now: fixed_now,
+        };
+        let admitter = JobAdmitter {
+            planner: JobPlanner {
+                artifacts: Some(&artifacts),
+                analyzer: None,
+                state_root: root,
+                hdc: Some(&hdc),
+            },
+            jobs: &jobs,
+            now: fixed_now,
+            authority: None,
+        };
+        let reads = Cell::new(0);
+        let usb = || {
+            reads.set(reads.get() + 1);
+            if scenario == "adoption-expired" && reads.get() == 5 {
+                ADOPTION_EXPIRED.set(true);
+            }
+            Ok::<_, String>(plugged.clone())
+        };
+        let clock_calls = Cell::new(0);
+        let clock = || {
+            clock_calls.set(clock_calls.get() + 1);
+            if std::env::var_os("ARKDECK_RESUME_CRASH_CHILD").is_some() && clock_calls.get() == 4 {
+                RESUME_CRASH_COUNTDOWN.set(2);
+            }
+            "2026-09-14T00:00:00Z".to_owned()
+        };
+        let observer = TargetObservations::default();
+        let engine = AgentEngine {
+            targets: &targets,
+            jobs: &jobs,
+            admitter: &admitter,
+            now: adoption_now,
+            observations: Some(Observing {
+                owner: &observer,
+                sources: Sources {
+                    dispatch: &dispatch,
+                    relations: &usb,
+                    targets: &targets,
+                    now: &clock,
+                },
+            }),
+        };
+
+        fs::write(
+            fake.join("hdc-mode"),
+            if scenario == "trust-restart" {
+                "unauthorized\n"
+            } else if scenario.starts_with("select") {
+                "twoDevices\n"
+            } else {
+                "offline\n"
+            },
+        )
+        .unwrap();
+        let waiting = agents
+            .advance("agent.run", &request, &engine)
+            .unwrap()
+            .value;
+        assert_eq!(waiting["state"], "waitingForHuman");
+        let reference = waiting["humanAction"]["resumeReference"].clone();
+        let action = waiting["humanAction"]["actionId"].clone();
+        let mut params = json!({"resumeReference":reference,"humanAction":action});
+        if scenario.starts_with("select") {
+            params["selection"] = waiting["humanAction"]["selectionSchema"]["enum"][0].clone();
+        }
+        for bad in [
+            json!({"resumeReference":reference,"selection":"raw-device"}),
+            json!({"resumeReference":reference,"targetId":"other"}),
+            json!({"resumeReference":reference,"humanAction":"har-wrong"}),
+        ] {
+            let method = if bad.get("humanAction").is_some() {
+                "human-action.resume"
+            } else {
+                "agent.resume"
+            };
+            assert!(
+                agents
+                    .advance(method, bad.as_object().unwrap(), &engine)
+                    .is_err()
+            );
+        }
+        if scenario == "expired" || scenario == "rollback" {
+            ADOPTION_EXPIRED.set(scenario == "expired");
+            RESUME_CLOCK_ROLLBACK.set(scenario == "rollback");
+            let before = fs::read(fake.join("hdc-invocations.log")).unwrap();
+            let error = agents
+                .advance("human-action.resume", params.as_object().unwrap(), &engine)
+                .err()
+                .unwrap();
+            assert_eq!(
+                error.code,
+                if scenario == "expired" {
+                    "humanActionExpired"
+                } else {
+                    "orchestrationClockUntrusted"
+                }
+            );
+            assert_eq!(fs::read(fake.join("hdc-invocations.log")).unwrap(), before);
+            ADOPTION_EXPIRED.set(false);
+            RESUME_CLOCK_ROLLBACK.set(false);
+            continue;
+        }
+        fs::write(
+            fake.join("hdc-mode"),
+            if scenario == "select" {
+                "twoDevices\n"
+            } else {
+                "normal\n"
+            },
+        )
+        .unwrap();
+        let restarted_observer = TargetObservations::default();
+        let restarted_engine = AgentEngine {
+            observations: Some(Observing {
+                owner: &restarted_observer,
+                sources: Sources {
+                    dispatch: &dispatch,
+                    relations: &usb,
+                    targets: &targets,
+                    now: &clock,
+                },
+            }),
+            ..engine
+        };
+        let engine = if scenario.ends_with("restart") {
+            &restarted_engine
+        } else {
+            &engine
+        };
+        if scenario.ends_with("restart") || scenario == "select-drift" {
+            let refreshed = agents
+                .advance("human-action.resume", params.as_object().unwrap(), engine)
+                .unwrap();
+            assert!(refreshed.start.is_none());
+            assert_eq!(refreshed.value["state"], "waitingForHuman");
+            assert_eq!(
+                refreshed.value["humanAction"]["category"],
+                "ambiguousIdentity"
+            );
+            assert_ne!(refreshed.value["humanAction"]["resumeReference"], reference);
+            assert!(
+                agents
+                    .advance("human-action.resume", params.as_object().unwrap(), engine)
+                    .is_err()
+            );
+            params = json!({"resumeReference":refreshed.value["humanAction"]["resumeReference"], "humanAction":refreshed.value["humanAction"]["actionId"], "selection":refreshed.value["humanAction"]["selectionSchema"]["enum"][0]});
+        }
+        if scenario == "adoption-expired" {
+            let error = agents
+                .advance("human-action.resume", params.as_object().unwrap(), engine)
+                .err()
+                .unwrap();
+            assert_eq!(error.code, "orchestrationBudgetExpired");
+            assert_eq!(fs::read(&target_path).unwrap(), _initial);
+            ADOPTION_EXPIRED.set(false);
+            continue;
+        }
+        let resumed = if scenario == "connect"
+            && std::env::var_os("ARKDECK_RESUME_CRASH_CHILD").is_none()
+        {
+            std::thread::scope(|scope| {
+                let mut handles = Vec::new();
+                for _ in 0..4 {
+                    let (
+                        agents,
+                        targets,
+                        jobs,
+                        artifacts,
+                        dispatch,
+                        digest,
+                        plugged,
+                        observer,
+                        params,
+                    ) = (
+                        &agents, &targets, &jobs, &artifacts, &dispatch, &digest, &plugged,
+                        &observer, &params,
+                    );
+                    handles.push(scope.spawn(move || {
+                        let usb = || Ok::<_, String>(plugged.clone());
+                        let hdc = HdcComposition {
+                            targets,
+                            dispatch,
+                            tool_sha256: digest,
+                            now: fixed_now,
+                        };
+                        let admitter = JobAdmitter {
+                            planner: JobPlanner {
+                                artifacts: Some(artifacts),
+                                analyzer: None,
+                                state_root: root,
+                                hdc: Some(&hdc),
+                            },
+                            jobs,
+                            now: fixed_now,
+                            authority: None,
+                        };
+                        let engine = AgentEngine {
+                            targets,
+                            jobs,
+                            admitter: &admitter,
+                            now: fixed_precise_now,
+                            observations: Some(Observing {
+                                owner: observer,
+                                sources: Sources {
+                                    dispatch,
+                                    relations: &usb,
+                                    targets,
+                                    now: &|| fixed_now().unwrap(),
+                                },
+                            }),
+                        };
+                        agents
+                            .advance("human-action.resume", params.as_object().unwrap(), &engine)
+                            .unwrap()
+                    }));
+                }
+                let answers: Vec<_> = handles.into_iter().map(|h| h.join().unwrap()).collect();
+                assert_eq!(answers.iter().filter(|a| a.start.is_some()).count(), 1);
+                assert!(
+                    answers
+                        .iter()
+                        .all(|a| a.value["jobId"] == answers[0].value["jobId"])
+                );
+                answers.into_iter().find(|a| a.start.is_some()).unwrap()
+            })
+        } else {
+            agents
+                .advance("human-action.resume", params.as_object().unwrap(), engine)
+                .unwrap()
+        };
+        assert_eq!(resumed.value["state"], "jobOwned", "{scenario}");
+        assert!(resumed.start.is_some());
+        if scenario == "select" {
+            let mut changed = params.clone();
+            changed["selection"] = waiting["humanAction"]["selectionSchema"]["enum"][1].clone();
+            assert_eq!(
+                agents
+                    .advance("human-action.resume", changed.as_object().unwrap(), engine)
+                    .err()
+                    .unwrap()
+                    .code,
+                "idempotencyConflict"
+            );
+        }
+        let before = fs::read(fake.join("hdc-invocations.log")).unwrap();
+        let repeated = agents
+            .advance("human-action.resume", params.as_object().unwrap(), engine)
+            .unwrap();
+        assert!(repeated.start.is_none());
+        assert_eq!(repeated.value["jobId"], resumed.value["jobId"]);
+        assert_eq!(fs::read(fake.join("hdc-invocations.log")).unwrap(), before);
+        let rerun = agents.advance("agent.run", &request, engine).unwrap();
+        assert_eq!(rerun.value["jobId"], resumed.value["jobId"]);
+        let record: Value = serde_json::from_slice(
+            &fs::read(
+                root.join("agent-executions")
+                    .join(execution_file("har-connect")),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            record["actions"].as_array().unwrap().last().unwrap()["status"],
+            "resolvedByFreshProbe"
+        );
+        assert_eq!(record["createdAt"], "2026-09-14T00:00:00.000Z");
+    }
+}
+
+#[test]
+fn resolved_resume_commit_gap_preserves_status_then_run_continuation() {
+    use arkdeck_hoststore::HdcComposition;
+    for expired in [false, true] {
+        let mut child = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "physical_resume_keeps_original_intent_and_unique_job",
+                "--nocapture",
+            ])
+            .env("ARKDECK_RESUME_CRASH_CHILD", "1")
+            .spawn()
+            .unwrap();
+        let root = std::env::temp_dir()
+            .canonicalize()
+            .unwrap()
+            .join(format!("agent-human-action-raise-{}", child.id()));
+        assert_eq!(child.wait().unwrap().code(), Some(79));
+        let _lock = exclusive();
+        let state = State(root);
+        let root = &state.0;
+        let target_path = root.join("targets-state/targets.json");
+        let target_before: Value =
+            serde_json::from_slice(&fs::read(&target_path).unwrap()).unwrap();
+        assert_eq!(target_before["targets"].as_array().unwrap().len(), 1);
+        let record_path = fs::read_dir(root.join("agent-executions"))
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .find(|path| {
+                path.file_name()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .starts_with("execution-")
+            })
+            .unwrap();
+        let before: Value = serde_json::from_slice(&fs::read(&record_path).unwrap()).unwrap();
+        assert_eq!(before["state"], "orchestrating");
+        assert!(before.get("target").is_some());
+        assert_eq!(before["actions"][0]["status"], "resolvedByFreshProbe");
+        assert!(before.get("jobID").is_none());
+        assert_eq!(before["deadline"], "2026-09-14T00:05:00.000Z");
+        let fixture = support::fixture("agent-human-action");
+        let cases: Value =
+            serde_json::from_slice(&fs::read(fixture.join("cases.json")).unwrap()).unwrap();
+        let exchanges = cases["exchanges"].as_array().unwrap();
+        let request = exchanges
+            .iter()
+            .find(|v| v["name"] == "connect.run")
+            .unwrap()["params"]
+            .as_object()
+            .unwrap();
+        let plugged = relations(
+            &exchanges
+                .iter()
+                .find(|v| v["name"] == "connect.resume")
+                .unwrap()["usbRelations"],
+        );
+        let fake = install_fake(&fixture);
+        fs::write(fake.join("hdc-mode"), "normal\n").unwrap();
+        // New owners and a new observation source: no in-memory receipt from
+        // the exited process is available to make this retry pass.
+        let targets = TargetStore::open(&root.join("targets-state")).unwrap();
+        let artifacts = ArtifactReadStore::open(&root.join("artifacts")).unwrap();
+        let jobs = JobStore::open_owner(&root.join("jobs-state")).unwrap();
+        let agents = AgentExecutionStore::open(&root.join("agent-executions")).unwrap();
+        let observer = TargetObservations::default();
+        let digest = sha256_hex(&fs::read(fake.join("hdc")).unwrap());
+        let dispatch =
+            ProcessDispatch::new(VerifiedTool::open(fake.join("hdc"), &digest).unwrap(), None);
+        let hdc = HdcComposition {
+            targets: &targets,
+            dispatch: &dispatch,
+            tool_sha256: &digest,
+            now: fixed_now,
+        };
+        let admitter = JobAdmitter {
+            planner: JobPlanner {
+                artifacts: Some(&artifacts),
+                analyzer: None,
+                state_root: root,
+                hdc: Some(&hdc),
+            },
+            jobs: &jobs,
+            now: fixed_now,
+            authority: None,
+        };
+        let usb = || Ok::<_, String>(plugged.clone());
+        let clock = || "2026-09-14T00:00:00Z".to_owned();
+        let engine = AgentEngine {
+            targets: &targets,
+            jobs: &jobs,
+            admitter: &admitter,
+            now: adoption_now,
+            observations: Some(Observing {
+                owner: &observer,
+                sources: Sources {
+                    dispatch: &dispatch,
+                    relations: &usb,
+                    targets: &targets,
+                    now: &clock,
+                },
+            }),
+        };
+        let resume = json!({"resumeReference":before["actions"][0]["resumeReference"]});
+        let repeated = agents
+            .advance("agent.resume", resume.as_object().unwrap(), &engine)
+            .unwrap();
+        assert_eq!(repeated.value["state"], "orchestrating");
+        assert!(repeated.start.is_none());
+        assert!(
+            fs::read(fake.join("hdc-invocations.log"))
+                .unwrap()
+                .is_empty()
+        );
         ADOPTION_EXPIRED.set(expired);
         let outcome = agents.advance("agent.run", request, &engine);
         if expired {
