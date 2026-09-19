@@ -2,17 +2,24 @@
   "$defs": {
     "errorCode": {
       "enum": [
+        "admissionDenied",
         "conflict",
+        "factsDrifted",
         "humanActionExpired",
+        "idempotencyConflict",
         "internalError",
         "invalidInput",
         "invalidParams",
         "malformedFrame",
         "notFound",
         "operationUnavailable",
+        "orchestrationBudgetExpired",
+        "orchestrationClockUntrusted",
         "recordUnreadable",
         "rejected",
+        "resourceConflict",
         "resourceNotFound",
+        "reviewedPlanMismatch",
         "unknownMethod",
         "unsupportedProtocolVersion",
         "workspaceReferenceNotFound"
@@ -21,6 +28,9 @@
     "errorDetails": {
       "additionalProperties": false,
       "properties": {
+        "executionId": {
+          "type": "string"
+        },
         "newDispatchCount": {
           "type": "integer"
         },
@@ -1437,8 +1447,8 @@
   "x-arkdeck-method": "human-action.resume",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 10,
-    "request": 33,
-    "result": 23
+    "error": 16,
+    "request": 24,
+    "result": 8
   }
 }

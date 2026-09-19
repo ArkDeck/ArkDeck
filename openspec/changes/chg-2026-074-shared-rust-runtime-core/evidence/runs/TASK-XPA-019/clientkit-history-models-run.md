@@ -76,3 +76,17 @@ The temporary contract source views were automatically removed by the runner.
 New main resume contracts landed during the run; integration must retain both
 resume and History corpus changes and regenerate their shared manifest before
 the next complete unified attempt.
+
+Integrated main `76612c9f` after the failed attempt. The only conflict was the
+shared generated manifest; regenerating from the merged inputs retains both
+resume and History recordings (105 methods, 737 shapes, same protocol identity).
+The manifest and ClientKit generation drift checks pass; no build was started.
+The merged main now implements resume, so its native `invalidOption` expectation
+is retained rather than the older unimplemented-command expectation.
+
+Runner audit: `ARKDECK_TEST_WORKERS=2` only limited Swift test workers in the
+previous full run. The existing `run-swiftpm.sh` has no build-jobs environment
+setting, so Swift compilation had no explicit jobs limit. The earlier focused
+recording/tests did explicitly use `--jobs 2`. The next full attempt must enforce
+an explicit Swift compiler job limit through the shared-lock runner. No timing
+assertion is changed to accommodate host pressure.
