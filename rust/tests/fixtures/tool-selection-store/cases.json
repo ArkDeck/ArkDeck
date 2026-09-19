@@ -1,0 +1,212 @@
+{
+  "oracle-approved" : {
+    "file" : "records/action-5c20754466239a8fed4b5f067ff43dfb1d0b3c043dff1dd6c2f46ae753849358.json",
+    "generation" : "5",
+    "state" : "approvalRecorded",
+    "steps" : [
+      "begin",
+      "publishing",
+      "requestingImpactApproval",
+      "issuingInteractiveChallenge",
+      "recordingInteractiveApproval"
+    ]
+  },
+  "oracle-awaiting" : {
+    "file" : "records/action-acac063e54e67f2d8b8ce88405ed167497f2e87b3739ccbaa35e12de7f01201e.json",
+    "generation" : "3",
+    "state" : "awaitingImpactApproval",
+    "steps" : [
+      "begin",
+      "publishing",
+      "requestingImpactApproval"
+    ]
+  },
+  "oracle-blocked" : {
+    "file" : "records/action-1775b421fea566ff92447ee50d1d99fa6b359c8f43f15ce194a17aac457484c3.json",
+    "generation" : "2",
+    "state" : "blocked",
+    "steps" : [
+      "begin",
+      "publishing(blocked)"
+    ]
+  },
+  "oracle-blocked-expired" : {
+    "file" : "records/action-93d8099422800949714ff141f0ec2a723aeadd2c5852b3f06e7d48768b9ab304.json",
+    "generation" : "3",
+    "state" : "expired",
+    "steps" : [
+      "begin",
+      "publishing(blocked)",
+      "invalidated(controlAction.expired)"
+    ]
+  },
+  "oracle-challenged" : {
+    "file" : "records/action-0a39bab35ad5b49873ea3bb908414788fb44d0e6fde0a4b1f96bda744e411ce8.json",
+    "generation" : "4",
+    "state" : "awaitingImpactApproval",
+    "steps" : [
+      "begin",
+      "publishing",
+      "requestingImpactApproval",
+      "issuingInteractiveChallenge"
+    ]
+  },
+  "oracle-expired" : {
+    "file" : "records/action-da46aa60196d1fae54b643516c2b3e13d4e73f67fc485d44352f00938c869aaa.json",
+    "generation" : "4",
+    "state" : "expired",
+    "steps" : [
+      "begin",
+      "publishing",
+      "requestingImpactApproval",
+      "invalidated(controlAction.expired)"
+    ]
+  },
+  "oracle-facts-unavailable" : {
+    "file" : "records/action-fadfa4f45ebc6dc0b2c06e43b98e9bb20ce10927b84592fbc5d2b8342ab532aa.json",
+    "generation" : "2",
+    "state" : "previewDrifted",
+    "steps" : [
+      "begin",
+      "invalidated(tool.selectionFactsUnavailable)"
+    ]
+  },
+  "oracle-failed-after-launch" : {
+    "file" : "records/action-cd2a2db3519d351eb38ecc103b9a8517d5a46b2ea765040cbc8059c38e61a642.json",
+    "generation" : "12",
+    "state" : "failed",
+    "steps" : [
+      "begin",
+      "publishing",
+      "requestingImpactApproval",
+      "issuingInteractiveChallenge",
+      "recordingInteractiveApproval",
+      "prepared",
+      "appendingLifecycleAudit(impactPreview)",
+      "appendingLifecycleAudit(confirmation)",
+      "appendingLifecycleAudit(intent)",
+      "appendingLifecycleAudit(actualCommand)",
+      "appendingLifecycleAudit(launchWindowEntered)",
+      "settled(failed, tool.selectionPublishFailed)"
+    ]
+  },
+  "oracle-failed-before-launch" : {
+    "file" : "records/action-a97305122e9664d8b1924fa04c7caa44c893172c791db2fb658efbbd9b9a000c.json",
+    "generation" : "7",
+    "state" : "failed",
+    "steps" : [
+      "begin",
+      "publishing",
+      "requestingImpactApproval",
+      "issuingInteractiveChallenge",
+      "recordingInteractiveApproval",
+      "prepared",
+      "failedBeforeLaunch(tool.lifecycleFailedBeforeLaunch)"
+    ]
+  },
+  "oracle-launched" : {
+    "file" : "records/action-c0e931a0a220dded2a348a7a8ae5506e58210dfa80ecbaebdbbc7f3391753bf9.json",
+    "generation" : "11",
+    "state" : "outcomeUnknown",
+    "steps" : [
+      "begin",
+      "publishing",
+      "requestingImpactApproval",
+      "issuingInteractiveChallenge",
+      "recordingInteractiveApproval",
+      "prepared",
+      "appendingLifecycleAudit(impactPreview)",
+      "appendingLifecycleAudit(confirmation)",
+      "appendingLifecycleAudit(intent)",
+      "appendingLifecycleAudit(actualCommand)",
+      "appendingLifecycleAudit(launchWindowEntered)"
+    ]
+  },
+  "oracle-lifecycle" : {
+    "file" : "records/action-b597bfa557ebde5dc73d875eb317ca31c1ab20949de8956f3397838ab01a0681.json",
+    "generation" : "13",
+    "state" : "outcomeUnknown",
+    "steps" : [
+      "begin",
+      "publishing",
+      "requestingImpactApproval",
+      "issuingInteractiveChallenge",
+      "recordingInteractiveApproval",
+      "markSelectionPrepared",
+      "lifecycle Supervisor and executor"
+    ]
+  },
+  "oracle-observing" : {
+    "file" : "records/action-92324e1deb5f79678786138fa19f9db0ba5c363e09e3a0c1791d0f6079db4b85.json",
+    "generation" : "1",
+    "state" : "observing",
+    "steps" : [
+      "begin"
+    ]
+  },
+  "oracle-prepared" : {
+    "file" : "records/action-08a7aa84e550f691ba0c15a2ce0b406ba3a9ffa7d49eaedc66a41b3a9acc0213.json",
+    "generation" : "6",
+    "state" : "dispatchPrepared",
+    "steps" : [
+      "begin",
+      "publishing",
+      "requestingImpactApproval",
+      "issuingInteractiveChallenge",
+      "recordingInteractiveApproval",
+      "prepared"
+    ]
+  },
+  "oracle-preview-drifted" : {
+    "file" : "records/action-77c50d9677f4d84f6b1fd7a9ed37de6c336ef80786cadc896ff37288859e25b0.json",
+    "generation" : "3",
+    "state" : "previewDrifted",
+    "steps" : [
+      "begin",
+      "publishing",
+      "invalidated(tool.selectionPreviewDrifted)"
+    ]
+  },
+  "oracle-preview-ready" : {
+    "file" : "records/action-72cc3e0f12c9c1c220b9906d4ef658aece5fb936a405c3de20ef6c7b178bbb97.json",
+    "generation" : "2",
+    "state" : "previewReady",
+    "steps" : [
+      "begin",
+      "publishing"
+    ]
+  },
+  "oracle-restarted" : {
+    "file" : "records/action-69fc63699d476a24b0767562c08c75164b22c0bb303ec48895dd5e9093035ac4.json",
+    "generation" : "5",
+    "state" : "previewDrifted",
+    "steps" : [
+      "begin",
+      "publishing",
+      "requestingImpactApproval",
+      "issuingInteractiveChallenge",
+      "invalidated(controlAction.runtimeRestarted)"
+    ]
+  },
+  "oracle-succeeded" : {
+    "file" : "records/action-76e9101b88450afa0aaac8b63f29bf4a101c42f362610e1f0245cc29f63b1bfe.json",
+    "generation" : "14",
+    "state" : "succeeded",
+    "steps" : [
+      "begin",
+      "publishing",
+      "requestingImpactApproval",
+      "issuingInteractiveChallenge",
+      "recordingInteractiveApproval",
+      "prepared",
+      "appendingLifecycleAudit(impactPreview)",
+      "appendingLifecycleAudit(confirmation)",
+      "appendingLifecycleAudit(intent)",
+      "appendingLifecycleAudit(actualCommand)",
+      "appendingLifecycleAudit(launchWindowEntered)",
+      "appendingLifecycleAudit(outcome)",
+      "appendingLifecycleAudit(reconciliation)",
+      "settled(succeeded)"
+    ]
+  }
+}

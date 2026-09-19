@@ -1,0 +1,2532 @@
+[
+  {
+    "action" : "select",
+    "actionRequestId" : "oracle-observing",
+    "blockerReasonCode" : null,
+    "catalogDigest" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "controlActionId" : "control-action-aab5a146-6c55-4f31-96be-388f9a15c91b",
+    "createdAt" : "2026-09-01T00:16:40.000Z",
+    "dispatchCount" : 0,
+    "expiresAt" : "2026-09-01T00:21:40.000Z",
+    "fingerprintAlgorithm" : "sha256-jcs",
+    "generation" : "1",
+    "humanAction" : null,
+    "kind" : "runtimeToolSelection",
+    "lastObservedAt" : "2026-09-01T00:16:40.000Z",
+    "nextAction" : {
+      "kind" : "reconcile",
+      "owner" : {
+        "id" : "control-action-aab5a146-6c55-4f31-96be-388f9a15c91b",
+        "kind" : "controlAction"
+      },
+      "reasonCode" : "controlAction.previewAvailable",
+      "resource" : {
+        "id" : "control-action-aab5a146-6c55-4f31-96be-388f9a15c91b",
+        "kind" : "controlAction"
+      }
+    },
+    "owner" : {
+      "id" : "control-action-aab5a146-6c55-4f31-96be-388f9a15c91b",
+      "kind" : "controlAction"
+    },
+    "preview" : null,
+    "requestFingerprint" : "9f6e947983b226aa2a3821418620e5a809d9bb9446961342eb7060f2e4f6d3c2",
+    "schemaVersion" : "arkdeck.control-action/1",
+    "state" : "observing"
+  },
+  {
+    "action" : "select",
+    "actionRequestId" : "oracle-facts-unavailable",
+    "blockerReasonCode" : "tool.selectionFactsUnavailable",
+    "catalogDigest" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "controlActionId" : "control-action-e0bb93b9-8820-4437-b182-dabdb233ac38",
+    "createdAt" : "2026-09-01T00:33:20.000Z",
+    "dispatchCount" : 0,
+    "expiresAt" : "2026-09-01T00:38:20.000Z",
+    "fingerprintAlgorithm" : "sha256-jcs",
+    "generation" : "2",
+    "humanAction" : null,
+    "kind" : "runtimeToolSelection",
+    "lastObservedAt" : "2026-09-01T00:33:21.000Z",
+    "nextAction" : {
+      "kind" : "reconcile",
+      "owner" : {
+        "id" : "control-action-e0bb93b9-8820-4437-b182-dabdb233ac38",
+        "kind" : "controlAction"
+      },
+      "reasonCode" : "tool.selectionFactsUnavailable",
+      "resource" : {
+        "id" : "control-action-e0bb93b9-8820-4437-b182-dabdb233ac38",
+        "kind" : "controlAction"
+      }
+    },
+    "owner" : {
+      "id" : "control-action-e0bb93b9-8820-4437-b182-dabdb233ac38",
+      "kind" : "controlAction"
+    },
+    "preview" : null,
+    "requestFingerprint" : "9f6e947983b226aa2a3821418620e5a809d9bb9446961342eb7060f2e4f6d3c2",
+    "schemaVersion" : "arkdeck.control-action/1",
+    "state" : "previewDrifted"
+  },
+  {
+    "action" : "select",
+    "actionRequestId" : "oracle-preview-ready",
+    "blockerReasonCode" : null,
+    "catalogDigest" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "controlActionId" : "control-action-f08341e9-58b4-4409-9af3-a5f7825fdf9c",
+    "createdAt" : "2026-09-01T00:50:00.000Z",
+    "dispatchCount" : 0,
+    "expiresAt" : "2026-09-01T00:55:00.000Z",
+    "fingerprintAlgorithm" : "sha256-jcs",
+    "generation" : "2",
+    "humanAction" : null,
+    "kind" : "runtimeToolSelection",
+    "lastObservedAt" : "2026-09-01T00:50:01.000Z",
+    "nextAction" : {
+      "kind" : "reconcile",
+      "owner" : {
+        "id" : "control-action-f08341e9-58b4-4409-9af3-a5f7825fdf9c",
+        "kind" : "controlAction"
+      },
+      "reasonCode" : "controlAction.previewAvailable",
+      "resource" : {
+        "id" : "control-action-f08341e9-58b4-4409-9af3-a5f7825fdf9c",
+        "kind" : "controlAction"
+      }
+    },
+    "owner" : {
+      "id" : "control-action-f08341e9-58b4-4409-9af3-a5f7825fdf9c",
+      "kind" : "controlAction"
+    },
+    "preview" : {
+      "action" : "select",
+      "affectedDeviceObservations" : [
+
+      ],
+      "affectedJobIds" : [
+
+      ],
+      "affectedTargetIds" : [
+
+      ],
+      "confirmationRequired" : true,
+      "controlActionId" : "control-action-f08341e9-58b4-4409-9af3-a5f7825fdf9c",
+      "createdAt" : "2026-09-01T00:50:01.000Z",
+      "criticalJobGate" : {
+        "blocking" : [
+
+        ],
+        "reasonCode" : null,
+        "state" : "clear"
+      },
+      "detectedOtherClientIds" : [
+
+      ],
+      "digestAlgorithm" : "sha256-jcs",
+      "dispatchCount" : 0,
+      "endpoint" : "127.0.0.1:8710",
+      "expectedActiveGeneration" : "1",
+      "expiresAt" : "2026-09-01T00:55:00.000Z",
+      "interruption" : {
+        "affectsAllParticipants" : true,
+        "kind" : "hdcEndpointUnavailable"
+      },
+      "kind" : "runtimeToolSelection",
+      "newTool" : {
+        "contentSHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "executableSHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "recordGeneration" : "1",
+        "signature" : {
+          "codeDirectoryIdentitySHA256" : "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "identifier" : "com.huawei.hdc",
+          "state" : "verified",
+          "teamIdentifier" : "FIXTURETEAM"
+        },
+        "toolRef" : "tool:sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "trust" : {
+          "executionAssessment" : "notPerformed",
+          "platformTrust" : "unverified",
+          "policy" : "arkdeck.host-tool-inspection/1",
+          "profileReferences" : [
+            "fixture-profile",
+            "hdc-3.2"
+          ],
+          "registeredIdentity" : true
+        },
+        "version" : "3.2.0f"
+      },
+      "oldTool" : {
+        "contentSHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "executableSHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "recordGeneration" : "1",
+        "signature" : {
+          "codeDirectoryIdentitySHA256" : null,
+          "identifier" : null,
+          "state" : "adHoc",
+          "teamIdentifier" : null
+        },
+        "toolRef" : "tool:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "trust" : {
+          "executionAssessment" : "notPerformed",
+          "platformTrust" : "unverified",
+          "policy" : "arkdeck.host-tool-inspection/1",
+          "profileReferences" : [
+
+          ],
+          "registeredIdentity" : true
+        },
+        "version" : "3.2.0-test"
+      },
+      "otherClientsMayExist" : true,
+      "owner" : {
+        "id" : "control-action-f08341e9-58b4-4409-9af3-a5f7825fdf9c",
+        "kind" : "controlAction"
+      },
+      "previewDigest" : "aaf4dfb7ae0668c3e5188f40c5a54680b390229e877b1e5c94b4f272bcd2f3c2",
+      "previewId" : "preview-32f0fe92-806d-48c2-a320-868f98df7390",
+      "recovery" : {
+        "kind" : "statusThenReconcile",
+        "replayAllowed" : false
+      },
+      "schemaVersion" : "arkdeck.tool-selection-preview/1",
+      "serverEndpointRef" : "hdc-endpoint:a29f70813dca5c16bc287e590177e3b9da8354d2d3409abcede8b1c0d0bd420e",
+      "serverGeneration" : "100000023",
+      "serverHealth" : "healthy",
+      "serverOwnership" : "arkDeckManaged",
+      "serverVersion" : "3.2.0-test",
+      "tool" : {
+        "executablePath" : "/retained/hdc",
+        "reference" : null,
+        "sha256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "signature" : null,
+        "source" : "runtimeConfiguration",
+        "trust" : "verified",
+        "version" : "3.2.0-test"
+      }
+    },
+    "requestFingerprint" : "9f6e947983b226aa2a3821418620e5a809d9bb9446961342eb7060f2e4f6d3c2",
+    "schemaVersion" : "arkdeck.control-action/1",
+    "state" : "previewReady"
+  },
+  {
+    "action" : "select",
+    "actionRequestId" : "oracle-blocked",
+    "blockerReasonCode" : "hdc.criticalJobsUnresolved",
+    "catalogDigest" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "controlActionId" : "control-action-a85c88ca-6480-437d-bba0-b3b62ba981c3",
+    "createdAt" : "2026-09-01T01:06:40.000Z",
+    "dispatchCount" : 0,
+    "expiresAt" : "2026-09-01T01:11:40.000Z",
+    "fingerprintAlgorithm" : "sha256-jcs",
+    "generation" : "2",
+    "humanAction" : null,
+    "kind" : "runtimeToolSelection",
+    "lastObservedAt" : "2026-09-01T01:06:41.000Z",
+    "nextAction" : {
+      "kind" : "reconcile",
+      "owner" : {
+        "id" : "control-action-a85c88ca-6480-437d-bba0-b3b62ba981c3",
+        "kind" : "controlAction"
+      },
+      "reasonCode" : "hdc.criticalJobsUnresolved",
+      "resource" : {
+        "id" : "control-action-a85c88ca-6480-437d-bba0-b3b62ba981c3",
+        "kind" : "controlAction"
+      }
+    },
+    "owner" : {
+      "id" : "control-action-a85c88ca-6480-437d-bba0-b3b62ba981c3",
+      "kind" : "controlAction"
+    },
+    "preview" : {
+      "action" : "select",
+      "affectedDeviceObservations" : [
+        {
+          "authorization" : "unknown",
+          "generation" : "3",
+          "health" : "offline",
+          "observationId" : "observation-1"
+        },
+        {
+          "authorization" : "authorized",
+          "generation" : "4",
+          "health" : "connected",
+          "observationId" : "observation-2"
+        }
+      ],
+      "affectedJobIds" : [
+        "job-1",
+        "job-2"
+      ],
+      "affectedTargetIds" : [
+        "target-a",
+        "target-b"
+      ],
+      "confirmationRequired" : true,
+      "controlActionId" : "control-action-a85c88ca-6480-437d-bba0-b3b62ba981c3",
+      "createdAt" : "2026-09-01T01:06:41.000Z",
+      "criticalJobGate" : {
+        "blocking" : [
+          {
+            "jobId" : "job-1",
+            "recovery" : "reconcileJob",
+            "safeBoundary" : "blocked",
+            "state" : "running",
+            "stepId" : "capture"
+          },
+          {
+            "jobId" : "job-2",
+            "recovery" : "waitForJob",
+            "safeBoundary" : "unknown",
+            "state" : "running",
+            "stepId" : null
+          }
+        ],
+        "reasonCode" : "hdc.criticalJobsUnresolved",
+        "state" : "blocked"
+      },
+      "detectedOtherClientIds" : [
+        "client-9"
+      ],
+      "digestAlgorithm" : "sha256-jcs",
+      "dispatchCount" : 0,
+      "endpoint" : "127.0.0.1:8710",
+      "expectedActiveGeneration" : "1",
+      "expiresAt" : "2026-09-01T01:11:40.000Z",
+      "interruption" : {
+        "affectsAllParticipants" : true,
+        "kind" : "hdcEndpointUnavailable"
+      },
+      "kind" : "runtimeToolSelection",
+      "newTool" : {
+        "contentSHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "executableSHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "recordGeneration" : "1",
+        "signature" : {
+          "codeDirectoryIdentitySHA256" : "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "identifier" : "com.huawei.hdc",
+          "state" : "verified",
+          "teamIdentifier" : "FIXTURETEAM"
+        },
+        "toolRef" : "tool:sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "trust" : {
+          "executionAssessment" : "notPerformed",
+          "platformTrust" : "unverified",
+          "policy" : "arkdeck.host-tool-inspection/1",
+          "profileReferences" : [
+            "fixture-profile",
+            "hdc-3.2"
+          ],
+          "registeredIdentity" : true
+        },
+        "version" : "3.2.0f"
+      },
+      "oldTool" : {
+        "contentSHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "executableSHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "recordGeneration" : "1",
+        "signature" : {
+          "codeDirectoryIdentitySHA256" : null,
+          "identifier" : null,
+          "state" : "adHoc",
+          "teamIdentifier" : null
+        },
+        "toolRef" : "tool:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "trust" : {
+          "executionAssessment" : "notPerformed",
+          "platformTrust" : "unverified",
+          "policy" : "arkdeck.host-tool-inspection/1",
+          "profileReferences" : [
+
+          ],
+          "registeredIdentity" : true
+        },
+        "version" : "3.2.0-test"
+      },
+      "otherClientsMayExist" : true,
+      "owner" : {
+        "id" : "control-action-a85c88ca-6480-437d-bba0-b3b62ba981c3",
+        "kind" : "controlAction"
+      },
+      "previewDigest" : "e683b3375d2a066661133dc424c282daffa08f6a36a913f54924427cd66f74a7",
+      "previewId" : "preview-a679b623-7888-4479-98b0-35ca31616c1e",
+      "recovery" : {
+        "kind" : "statusThenReconcile",
+        "replayAllowed" : false
+      },
+      "schemaVersion" : "arkdeck.tool-selection-preview/1",
+      "serverEndpointRef" : "hdc-endpoint:a29f70813dca5c16bc287e590177e3b9da8354d2d3409abcede8b1c0d0bd420e",
+      "serverGeneration" : "100000023",
+      "serverHealth" : "healthy",
+      "serverOwnership" : "arkDeckManaged",
+      "serverVersion" : "3.2.0-test",
+      "tool" : {
+        "executablePath" : "/retained/hdc",
+        "reference" : null,
+        "sha256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "signature" : null,
+        "source" : "runtimeConfiguration",
+        "trust" : "verified",
+        "version" : "3.2.0-test"
+      }
+    },
+    "requestFingerprint" : "9f6e947983b226aa2a3821418620e5a809d9bb9446961342eb7060f2e4f6d3c2",
+    "schemaVersion" : "arkdeck.control-action/1",
+    "state" : "blocked"
+  },
+  {
+    "action" : "select",
+    "actionRequestId" : "oracle-blocked-expired",
+    "blockerReasonCode" : "controlAction.expired",
+    "catalogDigest" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "controlActionId" : "control-action-f3353ba0-9b05-4251-ba04-f6255d84002a",
+    "createdAt" : "2026-09-01T01:23:20.000Z",
+    "dispatchCount" : 0,
+    "expiresAt" : "2026-09-01T01:28:20.000Z",
+    "fingerprintAlgorithm" : "sha256-jcs",
+    "generation" : "3",
+    "humanAction" : null,
+    "kind" : "runtimeToolSelection",
+    "lastObservedAt" : "2026-09-01T01:28:21.000Z",
+    "nextAction" : {
+      "kind" : "reconcile",
+      "owner" : {
+        "id" : "control-action-f3353ba0-9b05-4251-ba04-f6255d84002a",
+        "kind" : "controlAction"
+      },
+      "reasonCode" : "controlAction.expired",
+      "resource" : {
+        "id" : "control-action-f3353ba0-9b05-4251-ba04-f6255d84002a",
+        "kind" : "controlAction"
+      }
+    },
+    "owner" : {
+      "id" : "control-action-f3353ba0-9b05-4251-ba04-f6255d84002a",
+      "kind" : "controlAction"
+    },
+    "preview" : {
+      "action" : "select",
+      "affectedDeviceObservations" : [
+        {
+          "authorization" : "unknown",
+          "generation" : "3",
+          "health" : "offline",
+          "observationId" : "observation-1"
+        },
+        {
+          "authorization" : "authorized",
+          "generation" : "4",
+          "health" : "connected",
+          "observationId" : "observation-2"
+        }
+      ],
+      "affectedJobIds" : [
+        "job-1",
+        "job-2"
+      ],
+      "affectedTargetIds" : [
+        "target-a",
+        "target-b"
+      ],
+      "confirmationRequired" : true,
+      "controlActionId" : "control-action-f3353ba0-9b05-4251-ba04-f6255d84002a",
+      "createdAt" : "2026-09-01T01:23:21.000Z",
+      "criticalJobGate" : {
+        "blocking" : [
+          {
+            "jobId" : "job-1",
+            "recovery" : "reconcileJob",
+            "safeBoundary" : "blocked",
+            "state" : "running",
+            "stepId" : "capture"
+          },
+          {
+            "jobId" : "job-2",
+            "recovery" : "waitForJob",
+            "safeBoundary" : "unknown",
+            "state" : "running",
+            "stepId" : null
+          }
+        ],
+        "reasonCode" : "hdc.criticalJobsUnresolved",
+        "state" : "blocked"
+      },
+      "detectedOtherClientIds" : [
+        "client-9"
+      ],
+      "digestAlgorithm" : "sha256-jcs",
+      "dispatchCount" : 0,
+      "endpoint" : "127.0.0.1:8710",
+      "expectedActiveGeneration" : "1",
+      "expiresAt" : "2026-09-01T01:28:20.000Z",
+      "interruption" : {
+        "affectsAllParticipants" : true,
+        "kind" : "hdcEndpointUnavailable"
+      },
+      "kind" : "runtimeToolSelection",
+      "newTool" : {
+        "contentSHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "executableSHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "recordGeneration" : "1",
+        "signature" : {
+          "codeDirectoryIdentitySHA256" : "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "identifier" : "com.huawei.hdc",
+          "state" : "verified",
+          "teamIdentifier" : "FIXTURETEAM"
+        },
+        "toolRef" : "tool:sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "trust" : {
+          "executionAssessment" : "notPerformed",
+          "platformTrust" : "unverified",
+          "policy" : "arkdeck.host-tool-inspection/1",
+          "profileReferences" : [
+            "fixture-profile",
+            "hdc-3.2"
+          ],
+          "registeredIdentity" : true
+        },
+        "version" : "3.2.0f"
+      },
+      "oldTool" : {
+        "contentSHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "executableSHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "recordGeneration" : "1",
+        "signature" : {
+          "codeDirectoryIdentitySHA256" : null,
+          "identifier" : null,
+          "state" : "adHoc",
+          "teamIdentifier" : null
+        },
+        "toolRef" : "tool:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "trust" : {
+          "executionAssessment" : "notPerformed",
+          "platformTrust" : "unverified",
+          "policy" : "arkdeck.host-tool-inspection/1",
+          "profileReferences" : [
+
+          ],
+          "registeredIdentity" : true
+        },
+        "version" : "3.2.0-test"
+      },
+      "otherClientsMayExist" : true,
+      "owner" : {
+        "id" : "control-action-f3353ba0-9b05-4251-ba04-f6255d84002a",
+        "kind" : "controlAction"
+      },
+      "previewDigest" : "ca3164a3180d58013e955903555ca4242328a30bf7a261819c63f965ef7a7c6b",
+      "previewId" : "preview-3d2028ed-a941-424f-b7c2-91093b4854bb",
+      "recovery" : {
+        "kind" : "statusThenReconcile",
+        "replayAllowed" : false
+      },
+      "schemaVersion" : "arkdeck.tool-selection-preview/1",
+      "serverEndpointRef" : "hdc-endpoint:a29f70813dca5c16bc287e590177e3b9da8354d2d3409abcede8b1c0d0bd420e",
+      "serverGeneration" : "100000023",
+      "serverHealth" : "healthy",
+      "serverOwnership" : "arkDeckManaged",
+      "serverVersion" : "3.2.0-test",
+      "tool" : {
+        "executablePath" : "/retained/hdc",
+        "reference" : null,
+        "sha256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "signature" : null,
+        "source" : "runtimeConfiguration",
+        "trust" : "verified",
+        "version" : "3.2.0-test"
+      }
+    },
+    "requestFingerprint" : "9f6e947983b226aa2a3821418620e5a809d9bb9446961342eb7060f2e4f6d3c2",
+    "schemaVersion" : "arkdeck.control-action/1",
+    "state" : "expired"
+  },
+  {
+    "action" : "select",
+    "actionRequestId" : "oracle-preview-drifted",
+    "blockerReasonCode" : "tool.selectionPreviewDrifted",
+    "catalogDigest" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "controlActionId" : "control-action-4d7d233f-60fb-40b2-a94f-47fe176ff62a",
+    "createdAt" : "2026-09-01T01:40:00.000Z",
+    "dispatchCount" : 0,
+    "expiresAt" : "2026-09-01T01:45:00.000Z",
+    "fingerprintAlgorithm" : "sha256-jcs",
+    "generation" : "3",
+    "humanAction" : null,
+    "kind" : "runtimeToolSelection",
+    "lastObservedAt" : "2026-09-01T01:40:02.000Z",
+    "nextAction" : {
+      "kind" : "reconcile",
+      "owner" : {
+        "id" : "control-action-4d7d233f-60fb-40b2-a94f-47fe176ff62a",
+        "kind" : "controlAction"
+      },
+      "reasonCode" : "tool.selectionPreviewDrifted",
+      "resource" : {
+        "id" : "control-action-4d7d233f-60fb-40b2-a94f-47fe176ff62a",
+        "kind" : "controlAction"
+      }
+    },
+    "owner" : {
+      "id" : "control-action-4d7d233f-60fb-40b2-a94f-47fe176ff62a",
+      "kind" : "controlAction"
+    },
+    "preview" : {
+      "action" : "select",
+      "affectedDeviceObservations" : [
+
+      ],
+      "affectedJobIds" : [
+
+      ],
+      "affectedTargetIds" : [
+
+      ],
+      "confirmationRequired" : true,
+      "controlActionId" : "control-action-4d7d233f-60fb-40b2-a94f-47fe176ff62a",
+      "createdAt" : "2026-09-01T01:40:01.000Z",
+      "criticalJobGate" : {
+        "blocking" : [
+
+        ],
+        "reasonCode" : null,
+        "state" : "clear"
+      },
+      "detectedOtherClientIds" : [
+
+      ],
+      "digestAlgorithm" : "sha256-jcs",
+      "dispatchCount" : 0,
+      "endpoint" : "127.0.0.1:8710",
+      "expectedActiveGeneration" : "1",
+      "expiresAt" : "2026-09-01T01:45:00.000Z",
+      "interruption" : {
+        "affectsAllParticipants" : true,
+        "kind" : "hdcEndpointUnavailable"
+      },
+      "kind" : "runtimeToolSelection",
+      "newTool" : {
+        "contentSHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "executableSHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "recordGeneration" : "1",
+        "signature" : {
+          "codeDirectoryIdentitySHA256" : "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "identifier" : "com.huawei.hdc",
+          "state" : "verified",
+          "teamIdentifier" : "FIXTURETEAM"
+        },
+        "toolRef" : "tool:sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "trust" : {
+          "executionAssessment" : "notPerformed",
+          "platformTrust" : "unverified",
+          "policy" : "arkdeck.host-tool-inspection/1",
+          "profileReferences" : [
+            "fixture-profile",
+            "hdc-3.2"
+          ],
+          "registeredIdentity" : true
+        },
+        "version" : "3.2.0f"
+      },
+      "oldTool" : {
+        "contentSHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "executableSHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "recordGeneration" : "1",
+        "signature" : {
+          "codeDirectoryIdentitySHA256" : null,
+          "identifier" : null,
+          "state" : "adHoc",
+          "teamIdentifier" : null
+        },
+        "toolRef" : "tool:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "trust" : {
+          "executionAssessment" : "notPerformed",
+          "platformTrust" : "unverified",
+          "policy" : "arkdeck.host-tool-inspection/1",
+          "profileReferences" : [
+
+          ],
+          "registeredIdentity" : true
+        },
+        "version" : "3.2.0-test"
+      },
+      "otherClientsMayExist" : true,
+      "owner" : {
+        "id" : "control-action-4d7d233f-60fb-40b2-a94f-47fe176ff62a",
+        "kind" : "controlAction"
+      },
+      "previewDigest" : "6e3351856171c321c2f2b1ecb61f76f23bc41c0e24e71c9dd87e76fab1678b9f",
+      "previewId" : "preview-b6395843-d73c-4b09-ac49-c584db75b1f1",
+      "recovery" : {
+        "kind" : "statusThenReconcile",
+        "replayAllowed" : false
+      },
+      "schemaVersion" : "arkdeck.tool-selection-preview/1",
+      "serverEndpointRef" : "hdc-endpoint:a29f70813dca5c16bc287e590177e3b9da8354d2d3409abcede8b1c0d0bd420e",
+      "serverGeneration" : "100000023",
+      "serverHealth" : "healthy",
+      "serverOwnership" : "arkDeckManaged",
+      "serverVersion" : "3.2.0-test",
+      "tool" : {
+        "executablePath" : "/retained/hdc",
+        "reference" : null,
+        "sha256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "signature" : null,
+        "source" : "runtimeConfiguration",
+        "trust" : "verified",
+        "version" : "3.2.0-test"
+      }
+    },
+    "requestFingerprint" : "9f6e947983b226aa2a3821418620e5a809d9bb9446961342eb7060f2e4f6d3c2",
+    "schemaVersion" : "arkdeck.control-action/1",
+    "state" : "previewDrifted"
+  },
+  {
+    "action" : "select",
+    "actionRequestId" : "oracle-awaiting",
+    "blockerReasonCode" : null,
+    "catalogDigest" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "controlActionId" : "control-action-99e4c0a9-3ccf-4412-b92e-aad936aa055b",
+    "createdAt" : "2026-09-01T01:56:40.000Z",
+    "dispatchCount" : 0,
+    "expiresAt" : "2026-09-01T02:01:40.000Z",
+    "fingerprintAlgorithm" : "sha256-jcs",
+    "generation" : "3",
+    "humanAction" : {
+      "actionId" : "har-0cdaa7fc-5c65-4996-a7a8-e2b4d6b6288b",
+      "binding" : {
+        "controlActionId" : "control-action-99e4c0a9-3ccf-4412-b92e-aad936aa055b",
+        "generation" : "3",
+        "previewDigest" : "38bb3ee569117aec479277d8752e43e0789927ae000a2de39403dfad0e556dbe",
+        "previewId" : "preview-a4fe2cc8-471c-4d74-bc67-c4fbe0558b5f"
+      },
+      "category" : "impactApproval",
+      "choices" : [
+
+      ],
+      "createdAt" : "2026-09-01T01:56:42.000Z",
+      "expiresAt" : "2026-09-01T02:01:40.000Z",
+      "minimumAction" : "human.reviewImpact",
+      "newDispatchCount" : 0,
+      "owner" : {
+        "id" : "control-action-99e4c0a9-3ccf-4412-b92e-aad936aa055b",
+        "kind" : "controlAction"
+      },
+      "prohibitedAutomation" : [
+        "selfApproval"
+      ],
+      "reasonCode" : "policy.impactApprovalRequired",
+      "resumeReference" : "resume-80f4e190-f6f8-478a-8fac-19b26306e1c6",
+      "schemaVersion" : "arkdeck.human-action/1",
+      "selectionSchema" : null,
+      "status" : "waiting"
+    },
+    "kind" : "runtimeToolSelection",
+    "lastObservedAt" : "2026-09-01T01:56:42.000Z",
+    "nextAction" : {
+      "kind" : "humanAction",
+      "owner" : {
+        "id" : "control-action-99e4c0a9-3ccf-4412-b92e-aad936aa055b",
+        "kind" : "controlAction"
+      },
+      "reasonCode" : "policy.impactApprovalRequired",
+      "resource" : {
+        "id" : "har-0cdaa7fc-5c65-4996-a7a8-e2b4d6b6288b",
+        "kind" : "humanAction"
+      }
+    },
+    "owner" : {
+      "id" : "control-action-99e4c0a9-3ccf-4412-b92e-aad936aa055b",
+      "kind" : "controlAction"
+    },
+    "preview" : {
+      "action" : "select",
+      "affectedDeviceObservations" : [
+
+      ],
+      "affectedJobIds" : [
+
+      ],
+      "affectedTargetIds" : [
+
+      ],
+      "confirmationRequired" : true,
+      "controlActionId" : "control-action-99e4c0a9-3ccf-4412-b92e-aad936aa055b",
+      "createdAt" : "2026-09-01T01:56:41.000Z",
+      "criticalJobGate" : {
+        "blocking" : [
+
+        ],
+        "reasonCode" : null,
+        "state" : "clear"
+      },
+      "detectedOtherClientIds" : [
+
+      ],
+      "digestAlgorithm" : "sha256-jcs",
+      "dispatchCount" : 0,
+      "endpoint" : "127.0.0.1:8710",
+      "expectedActiveGeneration" : "1",
+      "expiresAt" : "2026-09-01T02:01:40.000Z",
+      "interruption" : {
+        "affectsAllParticipants" : true,
+        "kind" : "hdcEndpointUnavailable"
+      },
+      "kind" : "runtimeToolSelection",
+      "newTool" : {
+        "contentSHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "executableSHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "recordGeneration" : "1",
+        "signature" : {
+          "codeDirectoryIdentitySHA256" : "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "identifier" : "com.huawei.hdc",
+          "state" : "verified",
+          "teamIdentifier" : "FIXTURETEAM"
+        },
+        "toolRef" : "tool:sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "trust" : {
+          "executionAssessment" : "notPerformed",
+          "platformTrust" : "unverified",
+          "policy" : "arkdeck.host-tool-inspection/1",
+          "profileReferences" : [
+            "fixture-profile",
+            "hdc-3.2"
+          ],
+          "registeredIdentity" : true
+        },
+        "version" : "3.2.0f"
+      },
+      "oldTool" : {
+        "contentSHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "executableSHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "recordGeneration" : "1",
+        "signature" : {
+          "codeDirectoryIdentitySHA256" : null,
+          "identifier" : null,
+          "state" : "adHoc",
+          "teamIdentifier" : null
+        },
+        "toolRef" : "tool:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "trust" : {
+          "executionAssessment" : "notPerformed",
+          "platformTrust" : "unverified",
+          "policy" : "arkdeck.host-tool-inspection/1",
+          "profileReferences" : [
+
+          ],
+          "registeredIdentity" : true
+        },
+        "version" : "3.2.0-test"
+      },
+      "otherClientsMayExist" : true,
+      "owner" : {
+        "id" : "control-action-99e4c0a9-3ccf-4412-b92e-aad936aa055b",
+        "kind" : "controlAction"
+      },
+      "previewDigest" : "38bb3ee569117aec479277d8752e43e0789927ae000a2de39403dfad0e556dbe",
+      "previewId" : "preview-a4fe2cc8-471c-4d74-bc67-c4fbe0558b5f",
+      "recovery" : {
+        "kind" : "statusThenReconcile",
+        "replayAllowed" : false
+      },
+      "schemaVersion" : "arkdeck.tool-selection-preview/1",
+      "serverEndpointRef" : "hdc-endpoint:a29f70813dca5c16bc287e590177e3b9da8354d2d3409abcede8b1c0d0bd420e",
+      "serverGeneration" : "100000023",
+      "serverHealth" : "healthy",
+      "serverOwnership" : "arkDeckManaged",
+      "serverVersion" : "3.2.0-test",
+      "tool" : {
+        "executablePath" : "/retained/hdc",
+        "reference" : null,
+        "sha256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "signature" : null,
+        "source" : "runtimeConfiguration",
+        "trust" : "verified",
+        "version" : "3.2.0-test"
+      }
+    },
+    "requestFingerprint" : "9f6e947983b226aa2a3821418620e5a809d9bb9446961342eb7060f2e4f6d3c2",
+    "schemaVersion" : "arkdeck.control-action/1",
+    "state" : "awaitingImpactApproval"
+  },
+  {
+    "action" : "select",
+    "actionRequestId" : "oracle-expired",
+    "blockerReasonCode" : "controlAction.expired",
+    "catalogDigest" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "controlActionId" : "control-action-aab75d65-febc-48ed-bfc0-ca6a14caa186",
+    "createdAt" : "2026-09-01T02:13:20.000Z",
+    "dispatchCount" : 0,
+    "expiresAt" : "2026-09-01T02:18:20.000Z",
+    "fingerprintAlgorithm" : "sha256-jcs",
+    "generation" : "4",
+    "humanAction" : {
+      "actionId" : "har-ed3d851c-b903-4546-b384-a8c13295fb27",
+      "binding" : {
+        "controlActionId" : "control-action-aab75d65-febc-48ed-bfc0-ca6a14caa186",
+        "generation" : "3",
+        "previewDigest" : "b47732d08293df008d167dc43193359e9f56e5f22058725e78c970833bbb5d2c",
+        "previewId" : "preview-7ded5261-9253-42ba-a596-43f553fc725c"
+      },
+      "category" : "impactApproval",
+      "choices" : [
+
+      ],
+      "createdAt" : "2026-09-01T02:13:22.000Z",
+      "expiresAt" : "2026-09-01T02:18:20.000Z",
+      "minimumAction" : "human.reviewImpact",
+      "newDispatchCount" : 0,
+      "owner" : {
+        "id" : "control-action-aab75d65-febc-48ed-bfc0-ca6a14caa186",
+        "kind" : "controlAction"
+      },
+      "prohibitedAutomation" : [
+        "selfApproval"
+      ],
+      "reasonCode" : "policy.impactApprovalRequired",
+      "resumeReference" : "resume-5dd6f291-5998-45ba-a98b-1eff3576f402",
+      "schemaVersion" : "arkdeck.human-action/1",
+      "selectionSchema" : null,
+      "status" : "expired"
+    },
+    "kind" : "runtimeToolSelection",
+    "lastObservedAt" : "2026-09-01T02:18:21.000Z",
+    "nextAction" : {
+      "kind" : "reconcile",
+      "owner" : {
+        "id" : "control-action-aab75d65-febc-48ed-bfc0-ca6a14caa186",
+        "kind" : "controlAction"
+      },
+      "reasonCode" : "controlAction.expired",
+      "resource" : {
+        "id" : "control-action-aab75d65-febc-48ed-bfc0-ca6a14caa186",
+        "kind" : "controlAction"
+      }
+    },
+    "owner" : {
+      "id" : "control-action-aab75d65-febc-48ed-bfc0-ca6a14caa186",
+      "kind" : "controlAction"
+    },
+    "preview" : {
+      "action" : "select",
+      "affectedDeviceObservations" : [
+
+      ],
+      "affectedJobIds" : [
+
+      ],
+      "affectedTargetIds" : [
+
+      ],
+      "confirmationRequired" : true,
+      "controlActionId" : "control-action-aab75d65-febc-48ed-bfc0-ca6a14caa186",
+      "createdAt" : "2026-09-01T02:13:21.000Z",
+      "criticalJobGate" : {
+        "blocking" : [
+
+        ],
+        "reasonCode" : null,
+        "state" : "clear"
+      },
+      "detectedOtherClientIds" : [
+
+      ],
+      "digestAlgorithm" : "sha256-jcs",
+      "dispatchCount" : 0,
+      "endpoint" : "127.0.0.1:8710",
+      "expectedActiveGeneration" : "1",
+      "expiresAt" : "2026-09-01T02:18:20.000Z",
+      "interruption" : {
+        "affectsAllParticipants" : true,
+        "kind" : "hdcEndpointUnavailable"
+      },
+      "kind" : "runtimeToolSelection",
+      "newTool" : {
+        "contentSHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "executableSHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "recordGeneration" : "1",
+        "signature" : {
+          "codeDirectoryIdentitySHA256" : "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "identifier" : "com.huawei.hdc",
+          "state" : "verified",
+          "teamIdentifier" : "FIXTURETEAM"
+        },
+        "toolRef" : "tool:sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "trust" : {
+          "executionAssessment" : "notPerformed",
+          "platformTrust" : "unverified",
+          "policy" : "arkdeck.host-tool-inspection/1",
+          "profileReferences" : [
+            "fixture-profile",
+            "hdc-3.2"
+          ],
+          "registeredIdentity" : true
+        },
+        "version" : "3.2.0f"
+      },
+      "oldTool" : {
+        "contentSHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "executableSHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "recordGeneration" : "1",
+        "signature" : {
+          "codeDirectoryIdentitySHA256" : null,
+          "identifier" : null,
+          "state" : "adHoc",
+          "teamIdentifier" : null
+        },
+        "toolRef" : "tool:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "trust" : {
+          "executionAssessment" : "notPerformed",
+          "platformTrust" : "unverified",
+          "policy" : "arkdeck.host-tool-inspection/1",
+          "profileReferences" : [
+
+          ],
+          "registeredIdentity" : true
+        },
+        "version" : "3.2.0-test"
+      },
+      "otherClientsMayExist" : true,
+      "owner" : {
+        "id" : "control-action-aab75d65-febc-48ed-bfc0-ca6a14caa186",
+        "kind" : "controlAction"
+      },
+      "previewDigest" : "b47732d08293df008d167dc43193359e9f56e5f22058725e78c970833bbb5d2c",
+      "previewId" : "preview-7ded5261-9253-42ba-a596-43f553fc725c",
+      "recovery" : {
+        "kind" : "statusThenReconcile",
+        "replayAllowed" : false
+      },
+      "schemaVersion" : "arkdeck.tool-selection-preview/1",
+      "serverEndpointRef" : "hdc-endpoint:a29f70813dca5c16bc287e590177e3b9da8354d2d3409abcede8b1c0d0bd420e",
+      "serverGeneration" : "100000023",
+      "serverHealth" : "healthy",
+      "serverOwnership" : "arkDeckManaged",
+      "serverVersion" : "3.2.0-test",
+      "tool" : {
+        "executablePath" : "/retained/hdc",
+        "reference" : null,
+        "sha256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "signature" : null,
+        "source" : "runtimeConfiguration",
+        "trust" : "verified",
+        "version" : "3.2.0-test"
+      }
+    },
+    "requestFingerprint" : "9f6e947983b226aa2a3821418620e5a809d9bb9446961342eb7060f2e4f6d3c2",
+    "schemaVersion" : "arkdeck.control-action/1",
+    "state" : "expired"
+  },
+  {
+    "action" : "select",
+    "actionRequestId" : "oracle-challenged",
+    "blockerReasonCode" : null,
+    "catalogDigest" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "controlActionId" : "control-action-b0ffcf39-0048-46f2-8844-d29046f3434a",
+    "createdAt" : "2026-09-01T02:30:00.000Z",
+    "dispatchCount" : 0,
+    "expiresAt" : "2026-09-01T02:35:00.000Z",
+    "fingerprintAlgorithm" : "sha256-jcs",
+    "generation" : "4",
+    "humanAction" : {
+      "actionId" : "har-1f7ec070-d617-4973-bf9f-3df8370b31c2",
+      "binding" : {
+        "controlActionId" : "control-action-b0ffcf39-0048-46f2-8844-d29046f3434a",
+        "generation" : "3",
+        "previewDigest" : "4d9d040346f03bc44921d470b233126771c64ebeb7fd59c8b265fad236211e34",
+        "previewId" : "preview-b6ee49d1-44ed-475a-9071-8941276e0d21"
+      },
+      "category" : "impactApproval",
+      "choices" : [
+
+      ],
+      "createdAt" : "2026-09-01T02:30:02.000Z",
+      "expiresAt" : "2026-09-01T02:35:00.000Z",
+      "minimumAction" : "human.reviewImpact",
+      "newDispatchCount" : 0,
+      "owner" : {
+        "id" : "control-action-b0ffcf39-0048-46f2-8844-d29046f3434a",
+        "kind" : "controlAction"
+      },
+      "prohibitedAutomation" : [
+        "selfApproval"
+      ],
+      "reasonCode" : "policy.impactApprovalRequired",
+      "resumeReference" : "resume-c929644e-8771-4435-8173-f5f18d313b0f",
+      "schemaVersion" : "arkdeck.human-action/1",
+      "selectionSchema" : null,
+      "status" : "waiting"
+    },
+    "kind" : "runtimeToolSelection",
+    "lastObservedAt" : "2026-09-01T02:30:03.000Z",
+    "nextAction" : {
+      "kind" : "humanAction",
+      "owner" : {
+        "id" : "control-action-b0ffcf39-0048-46f2-8844-d29046f3434a",
+        "kind" : "controlAction"
+      },
+      "reasonCode" : "policy.impactApprovalRequired",
+      "resource" : {
+        "id" : "har-1f7ec070-d617-4973-bf9f-3df8370b31c2",
+        "kind" : "humanAction"
+      }
+    },
+    "owner" : {
+      "id" : "control-action-b0ffcf39-0048-46f2-8844-d29046f3434a",
+      "kind" : "controlAction"
+    },
+    "preview" : {
+      "action" : "select",
+      "affectedDeviceObservations" : [
+
+      ],
+      "affectedJobIds" : [
+
+      ],
+      "affectedTargetIds" : [
+
+      ],
+      "confirmationRequired" : true,
+      "controlActionId" : "control-action-b0ffcf39-0048-46f2-8844-d29046f3434a",
+      "createdAt" : "2026-09-01T02:30:01.000Z",
+      "criticalJobGate" : {
+        "blocking" : [
+
+        ],
+        "reasonCode" : null,
+        "state" : "clear"
+      },
+      "detectedOtherClientIds" : [
+
+      ],
+      "digestAlgorithm" : "sha256-jcs",
+      "dispatchCount" : 0,
+      "endpoint" : "127.0.0.1:8710",
+      "expectedActiveGeneration" : "1",
+      "expiresAt" : "2026-09-01T02:35:00.000Z",
+      "interruption" : {
+        "affectsAllParticipants" : true,
+        "kind" : "hdcEndpointUnavailable"
+      },
+      "kind" : "runtimeToolSelection",
+      "newTool" : {
+        "contentSHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "executableSHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "recordGeneration" : "1",
+        "signature" : {
+          "codeDirectoryIdentitySHA256" : "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "identifier" : "com.huawei.hdc",
+          "state" : "verified",
+          "teamIdentifier" : "FIXTURETEAM"
+        },
+        "toolRef" : "tool:sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "trust" : {
+          "executionAssessment" : "notPerformed",
+          "platformTrust" : "unverified",
+          "policy" : "arkdeck.host-tool-inspection/1",
+          "profileReferences" : [
+            "fixture-profile",
+            "hdc-3.2"
+          ],
+          "registeredIdentity" : true
+        },
+        "version" : "3.2.0f"
+      },
+      "oldTool" : {
+        "contentSHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "executableSHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "recordGeneration" : "1",
+        "signature" : {
+          "codeDirectoryIdentitySHA256" : null,
+          "identifier" : null,
+          "state" : "adHoc",
+          "teamIdentifier" : null
+        },
+        "toolRef" : "tool:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "trust" : {
+          "executionAssessment" : "notPerformed",
+          "platformTrust" : "unverified",
+          "policy" : "arkdeck.host-tool-inspection/1",
+          "profileReferences" : [
+
+          ],
+          "registeredIdentity" : true
+        },
+        "version" : "3.2.0-test"
+      },
+      "otherClientsMayExist" : true,
+      "owner" : {
+        "id" : "control-action-b0ffcf39-0048-46f2-8844-d29046f3434a",
+        "kind" : "controlAction"
+      },
+      "previewDigest" : "4d9d040346f03bc44921d470b233126771c64ebeb7fd59c8b265fad236211e34",
+      "previewId" : "preview-b6ee49d1-44ed-475a-9071-8941276e0d21",
+      "recovery" : {
+        "kind" : "statusThenReconcile",
+        "replayAllowed" : false
+      },
+      "schemaVersion" : "arkdeck.tool-selection-preview/1",
+      "serverEndpointRef" : "hdc-endpoint:a29f70813dca5c16bc287e590177e3b9da8354d2d3409abcede8b1c0d0bd420e",
+      "serverGeneration" : "100000023",
+      "serverHealth" : "healthy",
+      "serverOwnership" : "arkDeckManaged",
+      "serverVersion" : "3.2.0-test",
+      "tool" : {
+        "executablePath" : "/retained/hdc",
+        "reference" : null,
+        "sha256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "signature" : null,
+        "source" : "runtimeConfiguration",
+        "trust" : "verified",
+        "version" : "3.2.0-test"
+      }
+    },
+    "requestFingerprint" : "9f6e947983b226aa2a3821418620e5a809d9bb9446961342eb7060f2e4f6d3c2",
+    "schemaVersion" : "arkdeck.control-action/1",
+    "state" : "awaitingImpactApproval"
+  },
+  {
+    "action" : "select",
+    "actionRequestId" : "oracle-restarted",
+    "blockerReasonCode" : "controlAction.runtimeRestarted",
+    "catalogDigest" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "controlActionId" : "control-action-04bb1ca3-b6b9-446c-b9f2-7fe3174fc479",
+    "createdAt" : "2026-09-01T02:46:40.000Z",
+    "dispatchCount" : 0,
+    "expiresAt" : "2026-09-01T02:51:40.000Z",
+    "fingerprintAlgorithm" : "sha256-jcs",
+    "generation" : "5",
+    "humanAction" : {
+      "actionId" : "har-a8acff2b-f530-4a86-bc5b-ebb947f4f579",
+      "binding" : {
+        "controlActionId" : "control-action-04bb1ca3-b6b9-446c-b9f2-7fe3174fc479",
+        "generation" : "3",
+        "previewDigest" : "741dfdb4d2587807fb5891e64e833a56a0b2b31e1dd2b16ca0fea4e34556aeb2",
+        "previewId" : "preview-7064a955-7a03-4099-808b-fc6f82ad685e"
+      },
+      "category" : "impactApproval",
+      "choices" : [
+
+      ],
+      "createdAt" : "2026-09-01T02:46:42.000Z",
+      "expiresAt" : "2026-09-01T02:51:40.000Z",
+      "minimumAction" : "human.reviewImpact",
+      "newDispatchCount" : 0,
+      "owner" : {
+        "id" : "control-action-04bb1ca3-b6b9-446c-b9f2-7fe3174fc479",
+        "kind" : "controlAction"
+      },
+      "prohibitedAutomation" : [
+        "selfApproval"
+      ],
+      "reasonCode" : "policy.impactApprovalRequired",
+      "resumeReference" : "resume-9678f2ba-7c10-476e-8f82-f618e6986ebd",
+      "schemaVersion" : "arkdeck.human-action/1",
+      "selectionSchema" : null,
+      "status" : "expired"
+    },
+    "kind" : "runtimeToolSelection",
+    "lastObservedAt" : "2026-09-01T02:46:44.000Z",
+    "nextAction" : {
+      "kind" : "reconcile",
+      "owner" : {
+        "id" : "control-action-04bb1ca3-b6b9-446c-b9f2-7fe3174fc479",
+        "kind" : "controlAction"
+      },
+      "reasonCode" : "controlAction.runtimeRestarted",
+      "resource" : {
+        "id" : "control-action-04bb1ca3-b6b9-446c-b9f2-7fe3174fc479",
+        "kind" : "controlAction"
+      }
+    },
+    "owner" : {
+      "id" : "control-action-04bb1ca3-b6b9-446c-b9f2-7fe3174fc479",
+      "kind" : "controlAction"
+    },
+    "preview" : {
+      "action" : "select",
+      "affectedDeviceObservations" : [
+
+      ],
+      "affectedJobIds" : [
+
+      ],
+      "affectedTargetIds" : [
+
+      ],
+      "confirmationRequired" : true,
+      "controlActionId" : "control-action-04bb1ca3-b6b9-446c-b9f2-7fe3174fc479",
+      "createdAt" : "2026-09-01T02:46:41.000Z",
+      "criticalJobGate" : {
+        "blocking" : [
+
+        ],
+        "reasonCode" : null,
+        "state" : "clear"
+      },
+      "detectedOtherClientIds" : [
+
+      ],
+      "digestAlgorithm" : "sha256-jcs",
+      "dispatchCount" : 0,
+      "endpoint" : "127.0.0.1:8710",
+      "expectedActiveGeneration" : "1",
+      "expiresAt" : "2026-09-01T02:51:40.000Z",
+      "interruption" : {
+        "affectsAllParticipants" : true,
+        "kind" : "hdcEndpointUnavailable"
+      },
+      "kind" : "runtimeToolSelection",
+      "newTool" : {
+        "contentSHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "executableSHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "recordGeneration" : "1",
+        "signature" : {
+          "codeDirectoryIdentitySHA256" : "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "identifier" : "com.huawei.hdc",
+          "state" : "verified",
+          "teamIdentifier" : "FIXTURETEAM"
+        },
+        "toolRef" : "tool:sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "trust" : {
+          "executionAssessment" : "notPerformed",
+          "platformTrust" : "unverified",
+          "policy" : "arkdeck.host-tool-inspection/1",
+          "profileReferences" : [
+            "fixture-profile",
+            "hdc-3.2"
+          ],
+          "registeredIdentity" : true
+        },
+        "version" : "3.2.0f"
+      },
+      "oldTool" : {
+        "contentSHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "executableSHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "recordGeneration" : "1",
+        "signature" : {
+          "codeDirectoryIdentitySHA256" : null,
+          "identifier" : null,
+          "state" : "adHoc",
+          "teamIdentifier" : null
+        },
+        "toolRef" : "tool:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "trust" : {
+          "executionAssessment" : "notPerformed",
+          "platformTrust" : "unverified",
+          "policy" : "arkdeck.host-tool-inspection/1",
+          "profileReferences" : [
+
+          ],
+          "registeredIdentity" : true
+        },
+        "version" : "3.2.0-test"
+      },
+      "otherClientsMayExist" : true,
+      "owner" : {
+        "id" : "control-action-04bb1ca3-b6b9-446c-b9f2-7fe3174fc479",
+        "kind" : "controlAction"
+      },
+      "previewDigest" : "741dfdb4d2587807fb5891e64e833a56a0b2b31e1dd2b16ca0fea4e34556aeb2",
+      "previewId" : "preview-7064a955-7a03-4099-808b-fc6f82ad685e",
+      "recovery" : {
+        "kind" : "statusThenReconcile",
+        "replayAllowed" : false
+      },
+      "schemaVersion" : "arkdeck.tool-selection-preview/1",
+      "serverEndpointRef" : "hdc-endpoint:a29f70813dca5c16bc287e590177e3b9da8354d2d3409abcede8b1c0d0bd420e",
+      "serverGeneration" : "100000023",
+      "serverHealth" : "healthy",
+      "serverOwnership" : "arkDeckManaged",
+      "serverVersion" : "3.2.0-test",
+      "tool" : {
+        "executablePath" : "/retained/hdc",
+        "reference" : null,
+        "sha256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "signature" : null,
+        "source" : "runtimeConfiguration",
+        "trust" : "verified",
+        "version" : "3.2.0-test"
+      }
+    },
+    "requestFingerprint" : "9f6e947983b226aa2a3821418620e5a809d9bb9446961342eb7060f2e4f6d3c2",
+    "schemaVersion" : "arkdeck.control-action/1",
+    "state" : "previewDrifted"
+  },
+  {
+    "action" : "select",
+    "actionRequestId" : "oracle-approved",
+    "blockerReasonCode" : null,
+    "catalogDigest" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "controlActionId" : "control-action-e1bd96af-4d52-40ee-a69a-df95a0af57e7",
+    "createdAt" : "2026-09-01T03:03:20.000Z",
+    "dispatchCount" : 0,
+    "expiresAt" : "2026-09-01T03:08:20.000Z",
+    "fingerprintAlgorithm" : "sha256-jcs",
+    "generation" : "5",
+    "humanAction" : {
+      "actionId" : "har-c44d8bda-2b63-4eb2-90b1-b76d861abb95",
+      "binding" : {
+        "controlActionId" : "control-action-e1bd96af-4d52-40ee-a69a-df95a0af57e7",
+        "generation" : "3",
+        "previewDigest" : "da508e9c8031932b8f93bcd174c65427290fc44c86105fc59fb98d5cc66445c0",
+        "previewId" : "preview-5c95b5f2-a96d-4565-a09d-bc649a5e61cd"
+      },
+      "category" : "impactApproval",
+      "choices" : [
+
+      ],
+      "createdAt" : "2026-09-01T03:03:22.000Z",
+      "expiresAt" : "2026-09-01T03:08:20.000Z",
+      "minimumAction" : "human.reviewImpact",
+      "newDispatchCount" : 0,
+      "owner" : {
+        "id" : "control-action-e1bd96af-4d52-40ee-a69a-df95a0af57e7",
+        "kind" : "controlAction"
+      },
+      "prohibitedAutomation" : [
+        "selfApproval"
+      ],
+      "reasonCode" : "policy.impactApprovalRequired",
+      "resumeReference" : "resume-256cfe13-f40e-48bf-8a24-1d77e41b27f2",
+      "schemaVersion" : "arkdeck.human-action/1",
+      "selectionSchema" : null,
+      "status" : "resolved"
+    },
+    "kind" : "runtimeToolSelection",
+    "lastObservedAt" : "2026-09-01T03:03:24.000Z",
+    "nextAction" : {
+      "kind" : "reconcile",
+      "owner" : {
+        "id" : "control-action-e1bd96af-4d52-40ee-a69a-df95a0af57e7",
+        "kind" : "controlAction"
+      },
+      "reasonCode" : "controlAction.previewAvailable",
+      "resource" : {
+        "id" : "control-action-e1bd96af-4d52-40ee-a69a-df95a0af57e7",
+        "kind" : "controlAction"
+      }
+    },
+    "owner" : {
+      "id" : "control-action-e1bd96af-4d52-40ee-a69a-df95a0af57e7",
+      "kind" : "controlAction"
+    },
+    "preview" : {
+      "action" : "select",
+      "affectedDeviceObservations" : [
+
+      ],
+      "affectedJobIds" : [
+
+      ],
+      "affectedTargetIds" : [
+
+      ],
+      "confirmationRequired" : true,
+      "controlActionId" : "control-action-e1bd96af-4d52-40ee-a69a-df95a0af57e7",
+      "createdAt" : "2026-09-01T03:03:21.000Z",
+      "criticalJobGate" : {
+        "blocking" : [
+
+        ],
+        "reasonCode" : null,
+        "state" : "clear"
+      },
+      "detectedOtherClientIds" : [
+
+      ],
+      "digestAlgorithm" : "sha256-jcs",
+      "dispatchCount" : 0,
+      "endpoint" : "127.0.0.1:8710",
+      "expectedActiveGeneration" : "1",
+      "expiresAt" : "2026-09-01T03:08:20.000Z",
+      "interruption" : {
+        "affectsAllParticipants" : true,
+        "kind" : "hdcEndpointUnavailable"
+      },
+      "kind" : "runtimeToolSelection",
+      "newTool" : {
+        "contentSHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "executableSHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "recordGeneration" : "1",
+        "signature" : {
+          "codeDirectoryIdentitySHA256" : "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "identifier" : "com.huawei.hdc",
+          "state" : "verified",
+          "teamIdentifier" : "FIXTURETEAM"
+        },
+        "toolRef" : "tool:sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "trust" : {
+          "executionAssessment" : "notPerformed",
+          "platformTrust" : "unverified",
+          "policy" : "arkdeck.host-tool-inspection/1",
+          "profileReferences" : [
+            "fixture-profile",
+            "hdc-3.2"
+          ],
+          "registeredIdentity" : true
+        },
+        "version" : "3.2.0f"
+      },
+      "oldTool" : {
+        "contentSHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "executableSHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "recordGeneration" : "1",
+        "signature" : {
+          "codeDirectoryIdentitySHA256" : null,
+          "identifier" : null,
+          "state" : "adHoc",
+          "teamIdentifier" : null
+        },
+        "toolRef" : "tool:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "trust" : {
+          "executionAssessment" : "notPerformed",
+          "platformTrust" : "unverified",
+          "policy" : "arkdeck.host-tool-inspection/1",
+          "profileReferences" : [
+
+          ],
+          "registeredIdentity" : true
+        },
+        "version" : "3.2.0-test"
+      },
+      "otherClientsMayExist" : true,
+      "owner" : {
+        "id" : "control-action-e1bd96af-4d52-40ee-a69a-df95a0af57e7",
+        "kind" : "controlAction"
+      },
+      "previewDigest" : "da508e9c8031932b8f93bcd174c65427290fc44c86105fc59fb98d5cc66445c0",
+      "previewId" : "preview-5c95b5f2-a96d-4565-a09d-bc649a5e61cd",
+      "recovery" : {
+        "kind" : "statusThenReconcile",
+        "replayAllowed" : false
+      },
+      "schemaVersion" : "arkdeck.tool-selection-preview/1",
+      "serverEndpointRef" : "hdc-endpoint:a29f70813dca5c16bc287e590177e3b9da8354d2d3409abcede8b1c0d0bd420e",
+      "serverGeneration" : "100000023",
+      "serverHealth" : "healthy",
+      "serverOwnership" : "arkDeckManaged",
+      "serverVersion" : "3.2.0-test",
+      "tool" : {
+        "executablePath" : "/retained/hdc",
+        "reference" : null,
+        "sha256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "signature" : null,
+        "source" : "runtimeConfiguration",
+        "trust" : "verified",
+        "version" : "3.2.0-test"
+      }
+    },
+    "requestFingerprint" : "9f6e947983b226aa2a3821418620e5a809d9bb9446961342eb7060f2e4f6d3c2",
+    "schemaVersion" : "arkdeck.control-action/1",
+    "state" : "approvalRecorded"
+  },
+  {
+    "action" : "select",
+    "actionRequestId" : "oracle-failed-before-launch",
+    "blockerReasonCode" : "tool.lifecycleFailedBeforeLaunch",
+    "catalogDigest" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "controlActionId" : "control-action-76f3385f-1b0a-4e42-9bbd-7d73cc6f1467",
+    "createdAt" : "2026-09-01T03:20:00.000Z",
+    "dispatchCount" : 0,
+    "expiresAt" : "2026-09-01T03:25:00.000Z",
+    "fingerprintAlgorithm" : "sha256-jcs",
+    "generation" : "7",
+    "humanAction" : {
+      "actionId" : "har-c14a6b00-83f5-415c-997f-b0dd6e034b18",
+      "binding" : {
+        "controlActionId" : "control-action-76f3385f-1b0a-4e42-9bbd-7d73cc6f1467",
+        "generation" : "3",
+        "previewDigest" : "4264bb1d2fd8160daa3afffcd04f3bf3ca66b16ef7e11e890cfdc5f73a5030e7",
+        "previewId" : "preview-ef4484fa-66ee-4db1-866b-680f8b1596c5"
+      },
+      "category" : "impactApproval",
+      "choices" : [
+
+      ],
+      "createdAt" : "2026-09-01T03:20:02.000Z",
+      "expiresAt" : "2026-09-01T03:25:00.000Z",
+      "minimumAction" : "human.reviewImpact",
+      "newDispatchCount" : 0,
+      "owner" : {
+        "id" : "control-action-76f3385f-1b0a-4e42-9bbd-7d73cc6f1467",
+        "kind" : "controlAction"
+      },
+      "prohibitedAutomation" : [
+        "selfApproval"
+      ],
+      "reasonCode" : "policy.impactApprovalRequired",
+      "resumeReference" : "resume-b7ae887d-1eab-4c41-b48c-2fadaff0851c",
+      "schemaVersion" : "arkdeck.human-action/1",
+      "selectionSchema" : null,
+      "status" : "resolved"
+    },
+    "kind" : "runtimeToolSelection",
+    "lastObservedAt" : "2026-09-01T03:20:06.000Z",
+    "nextAction" : {
+      "kind" : "none",
+      "owner" : {
+        "id" : "control-action-76f3385f-1b0a-4e42-9bbd-7d73cc6f1467",
+        "kind" : "controlAction"
+      },
+      "reasonCode" : "tool.lifecycleFailedBeforeLaunch",
+      "resource" : {
+        "id" : "control-action-76f3385f-1b0a-4e42-9bbd-7d73cc6f1467",
+        "kind" : "controlAction"
+      }
+    },
+    "owner" : {
+      "id" : "control-action-76f3385f-1b0a-4e42-9bbd-7d73cc6f1467",
+      "kind" : "controlAction"
+    },
+    "preview" : {
+      "action" : "select",
+      "affectedDeviceObservations" : [
+
+      ],
+      "affectedJobIds" : [
+
+      ],
+      "affectedTargetIds" : [
+
+      ],
+      "confirmationRequired" : true,
+      "controlActionId" : "control-action-76f3385f-1b0a-4e42-9bbd-7d73cc6f1467",
+      "createdAt" : "2026-09-01T03:20:01.000Z",
+      "criticalJobGate" : {
+        "blocking" : [
+
+        ],
+        "reasonCode" : null,
+        "state" : "clear"
+      },
+      "detectedOtherClientIds" : [
+
+      ],
+      "digestAlgorithm" : "sha256-jcs",
+      "dispatchCount" : 0,
+      "endpoint" : "127.0.0.1:8710",
+      "expectedActiveGeneration" : "1",
+      "expiresAt" : "2026-09-01T03:25:00.000Z",
+      "interruption" : {
+        "affectsAllParticipants" : true,
+        "kind" : "hdcEndpointUnavailable"
+      },
+      "kind" : "runtimeToolSelection",
+      "newTool" : {
+        "contentSHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "executableSHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "recordGeneration" : "1",
+        "signature" : {
+          "codeDirectoryIdentitySHA256" : "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "identifier" : "com.huawei.hdc",
+          "state" : "verified",
+          "teamIdentifier" : "FIXTURETEAM"
+        },
+        "toolRef" : "tool:sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "trust" : {
+          "executionAssessment" : "notPerformed",
+          "platformTrust" : "unverified",
+          "policy" : "arkdeck.host-tool-inspection/1",
+          "profileReferences" : [
+            "fixture-profile",
+            "hdc-3.2"
+          ],
+          "registeredIdentity" : true
+        },
+        "version" : "3.2.0f"
+      },
+      "oldTool" : {
+        "contentSHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "executableSHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "recordGeneration" : "1",
+        "signature" : {
+          "codeDirectoryIdentitySHA256" : null,
+          "identifier" : null,
+          "state" : "adHoc",
+          "teamIdentifier" : null
+        },
+        "toolRef" : "tool:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "trust" : {
+          "executionAssessment" : "notPerformed",
+          "platformTrust" : "unverified",
+          "policy" : "arkdeck.host-tool-inspection/1",
+          "profileReferences" : [
+
+          ],
+          "registeredIdentity" : true
+        },
+        "version" : "3.2.0-test"
+      },
+      "otherClientsMayExist" : true,
+      "owner" : {
+        "id" : "control-action-76f3385f-1b0a-4e42-9bbd-7d73cc6f1467",
+        "kind" : "controlAction"
+      },
+      "previewDigest" : "4264bb1d2fd8160daa3afffcd04f3bf3ca66b16ef7e11e890cfdc5f73a5030e7",
+      "previewId" : "preview-ef4484fa-66ee-4db1-866b-680f8b1596c5",
+      "recovery" : {
+        "kind" : "statusThenReconcile",
+        "replayAllowed" : false
+      },
+      "schemaVersion" : "arkdeck.tool-selection-preview/1",
+      "serverEndpointRef" : "hdc-endpoint:a29f70813dca5c16bc287e590177e3b9da8354d2d3409abcede8b1c0d0bd420e",
+      "serverGeneration" : "100000023",
+      "serverHealth" : "healthy",
+      "serverOwnership" : "arkDeckManaged",
+      "serverVersion" : "3.2.0-test",
+      "tool" : {
+        "executablePath" : "/retained/hdc",
+        "reference" : null,
+        "sha256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "signature" : null,
+        "source" : "runtimeConfiguration",
+        "trust" : "verified",
+        "version" : "3.2.0-test"
+      }
+    },
+    "requestFingerprint" : "9f6e947983b226aa2a3821418620e5a809d9bb9446961342eb7060f2e4f6d3c2",
+    "schemaVersion" : "arkdeck.control-action/1",
+    "state" : "failed"
+  },
+  {
+    "action" : "select",
+    "actionRequestId" : "oracle-prepared",
+    "blockerReasonCode" : null,
+    "catalogDigest" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "controlActionId" : "control-action-92fe025c-5a4f-4aa0-943e-aed25166074c",
+    "createdAt" : "2026-09-01T03:36:40.000Z",
+    "dispatchCount" : 0,
+    "expiresAt" : "2026-09-01T03:41:40.000Z",
+    "fingerprintAlgorithm" : "sha256-jcs",
+    "generation" : "6",
+    "humanAction" : {
+      "actionId" : "har-9bc4e649-3742-4af0-8d7d-2e12a6f0b025",
+      "binding" : {
+        "controlActionId" : "control-action-92fe025c-5a4f-4aa0-943e-aed25166074c",
+        "generation" : "3",
+        "previewDigest" : "5690c532aad7f3bfde5bd0fc6d861490e75087af12075ac2994119bc0c5f81de",
+        "previewId" : "preview-31f440f3-7ded-4d16-85ff-96adc12ce0ec"
+      },
+      "category" : "impactApproval",
+      "choices" : [
+
+      ],
+      "createdAt" : "2026-09-01T03:36:42.000Z",
+      "expiresAt" : "2026-09-01T03:41:40.000Z",
+      "minimumAction" : "human.reviewImpact",
+      "newDispatchCount" : 0,
+      "owner" : {
+        "id" : "control-action-92fe025c-5a4f-4aa0-943e-aed25166074c",
+        "kind" : "controlAction"
+      },
+      "prohibitedAutomation" : [
+        "selfApproval"
+      ],
+      "reasonCode" : "policy.impactApprovalRequired",
+      "resumeReference" : "resume-44f5a028-35fd-4326-9ef6-42cc86dbf521",
+      "schemaVersion" : "arkdeck.human-action/1",
+      "selectionSchema" : null,
+      "status" : "resolved"
+    },
+    "kind" : "runtimeToolSelection",
+    "lastObservedAt" : "2026-09-01T03:36:45.000Z",
+    "nextAction" : {
+      "kind" : "reconcile",
+      "owner" : {
+        "id" : "control-action-92fe025c-5a4f-4aa0-943e-aed25166074c",
+        "kind" : "controlAction"
+      },
+      "reasonCode" : "controlAction.previewAvailable",
+      "resource" : {
+        "id" : "control-action-92fe025c-5a4f-4aa0-943e-aed25166074c",
+        "kind" : "controlAction"
+      }
+    },
+    "owner" : {
+      "id" : "control-action-92fe025c-5a4f-4aa0-943e-aed25166074c",
+      "kind" : "controlAction"
+    },
+    "preview" : {
+      "action" : "select",
+      "affectedDeviceObservations" : [
+
+      ],
+      "affectedJobIds" : [
+
+      ],
+      "affectedTargetIds" : [
+
+      ],
+      "confirmationRequired" : true,
+      "controlActionId" : "control-action-92fe025c-5a4f-4aa0-943e-aed25166074c",
+      "createdAt" : "2026-09-01T03:36:41.000Z",
+      "criticalJobGate" : {
+        "blocking" : [
+
+        ],
+        "reasonCode" : null,
+        "state" : "clear"
+      },
+      "detectedOtherClientIds" : [
+
+      ],
+      "digestAlgorithm" : "sha256-jcs",
+      "dispatchCount" : 0,
+      "endpoint" : "127.0.0.1:8710",
+      "expectedActiveGeneration" : "1",
+      "expiresAt" : "2026-09-01T03:41:40.000Z",
+      "interruption" : {
+        "affectsAllParticipants" : true,
+        "kind" : "hdcEndpointUnavailable"
+      },
+      "kind" : "runtimeToolSelection",
+      "newTool" : {
+        "contentSHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "executableSHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "recordGeneration" : "1",
+        "signature" : {
+          "codeDirectoryIdentitySHA256" : "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "identifier" : "com.huawei.hdc",
+          "state" : "verified",
+          "teamIdentifier" : "FIXTURETEAM"
+        },
+        "toolRef" : "tool:sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "trust" : {
+          "executionAssessment" : "notPerformed",
+          "platformTrust" : "unverified",
+          "policy" : "arkdeck.host-tool-inspection/1",
+          "profileReferences" : [
+            "fixture-profile",
+            "hdc-3.2"
+          ],
+          "registeredIdentity" : true
+        },
+        "version" : "3.2.0f"
+      },
+      "oldTool" : {
+        "contentSHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "executableSHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "recordGeneration" : "1",
+        "signature" : {
+          "codeDirectoryIdentitySHA256" : null,
+          "identifier" : null,
+          "state" : "adHoc",
+          "teamIdentifier" : null
+        },
+        "toolRef" : "tool:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "trust" : {
+          "executionAssessment" : "notPerformed",
+          "platformTrust" : "unverified",
+          "policy" : "arkdeck.host-tool-inspection/1",
+          "profileReferences" : [
+
+          ],
+          "registeredIdentity" : true
+        },
+        "version" : "3.2.0-test"
+      },
+      "otherClientsMayExist" : true,
+      "owner" : {
+        "id" : "control-action-92fe025c-5a4f-4aa0-943e-aed25166074c",
+        "kind" : "controlAction"
+      },
+      "previewDigest" : "5690c532aad7f3bfde5bd0fc6d861490e75087af12075ac2994119bc0c5f81de",
+      "previewId" : "preview-31f440f3-7ded-4d16-85ff-96adc12ce0ec",
+      "recovery" : {
+        "kind" : "statusThenReconcile",
+        "replayAllowed" : false
+      },
+      "schemaVersion" : "arkdeck.tool-selection-preview/1",
+      "serverEndpointRef" : "hdc-endpoint:a29f70813dca5c16bc287e590177e3b9da8354d2d3409abcede8b1c0d0bd420e",
+      "serverGeneration" : "100000023",
+      "serverHealth" : "healthy",
+      "serverOwnership" : "arkDeckManaged",
+      "serverVersion" : "3.2.0-test",
+      "tool" : {
+        "executablePath" : "/retained/hdc",
+        "reference" : null,
+        "sha256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "signature" : null,
+        "source" : "runtimeConfiguration",
+        "trust" : "verified",
+        "version" : "3.2.0-test"
+      }
+    },
+    "requestFingerprint" : "9f6e947983b226aa2a3821418620e5a809d9bb9446961342eb7060f2e4f6d3c2",
+    "schemaVersion" : "arkdeck.control-action/1",
+    "state" : "dispatchPrepared"
+  },
+  {
+    "action" : "select",
+    "actionRequestId" : "oracle-launched",
+    "blockerReasonCode" : null,
+    "catalogDigest" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "controlActionId" : "control-action-b7728ff0-caca-4f49-91fd-05125dac30c8",
+    "createdAt" : "2026-09-01T03:53:20.000Z",
+    "dispatchCount" : 1,
+    "expiresAt" : "2026-09-01T03:58:20.000Z",
+    "fingerprintAlgorithm" : "sha256-jcs",
+    "generation" : "11",
+    "humanAction" : {
+      "actionId" : "har-cbb45fd6-f863-4e1a-b709-0dbc4d90e219",
+      "binding" : {
+        "controlActionId" : "control-action-b7728ff0-caca-4f49-91fd-05125dac30c8",
+        "generation" : "3",
+        "previewDigest" : "08af3de0e23d59e78678c8fdd882e81e0a484a3647fafaca35fb05d6f36022b9",
+        "previewId" : "preview-dc1ef26a-10f3-420c-bea8-617fe88aec6d"
+      },
+      "category" : "impactApproval",
+      "choices" : [
+
+      ],
+      "createdAt" : "2026-09-01T03:53:22.000Z",
+      "expiresAt" : "2026-09-01T03:58:20.000Z",
+      "minimumAction" : "human.reviewImpact",
+      "newDispatchCount" : 0,
+      "owner" : {
+        "id" : "control-action-b7728ff0-caca-4f49-91fd-05125dac30c8",
+        "kind" : "controlAction"
+      },
+      "prohibitedAutomation" : [
+        "selfApproval"
+      ],
+      "reasonCode" : "policy.impactApprovalRequired",
+      "resumeReference" : "resume-265512ee-2841-4dd4-a46a-d7691c77263e",
+      "schemaVersion" : "arkdeck.human-action/1",
+      "selectionSchema" : null,
+      "status" : "resolved"
+    },
+    "kind" : "runtimeToolSelection",
+    "lastObservedAt" : "2026-09-01T03:53:30.000Z",
+    "nextAction" : {
+      "kind" : "reconcile",
+      "owner" : {
+        "id" : "control-action-b7728ff0-caca-4f49-91fd-05125dac30c8",
+        "kind" : "controlAction"
+      },
+      "reasonCode" : "tool.selectionRecomposePending",
+      "resource" : {
+        "id" : "control-action-b7728ff0-caca-4f49-91fd-05125dac30c8",
+        "kind" : "controlAction"
+      }
+    },
+    "owner" : {
+      "id" : "control-action-b7728ff0-caca-4f49-91fd-05125dac30c8",
+      "kind" : "controlAction"
+    },
+    "preview" : {
+      "action" : "select",
+      "affectedDeviceObservations" : [
+
+      ],
+      "affectedJobIds" : [
+
+      ],
+      "affectedTargetIds" : [
+
+      ],
+      "confirmationRequired" : true,
+      "controlActionId" : "control-action-b7728ff0-caca-4f49-91fd-05125dac30c8",
+      "createdAt" : "2026-09-01T03:53:21.000Z",
+      "criticalJobGate" : {
+        "blocking" : [
+
+        ],
+        "reasonCode" : null,
+        "state" : "clear"
+      },
+      "detectedOtherClientIds" : [
+
+      ],
+      "digestAlgorithm" : "sha256-jcs",
+      "dispatchCount" : 0,
+      "endpoint" : "127.0.0.1:8710",
+      "expectedActiveGeneration" : "1",
+      "expiresAt" : "2026-09-01T03:58:20.000Z",
+      "interruption" : {
+        "affectsAllParticipants" : true,
+        "kind" : "hdcEndpointUnavailable"
+      },
+      "kind" : "runtimeToolSelection",
+      "newTool" : {
+        "contentSHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "executableSHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "recordGeneration" : "1",
+        "signature" : {
+          "codeDirectoryIdentitySHA256" : "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "identifier" : "com.huawei.hdc",
+          "state" : "verified",
+          "teamIdentifier" : "FIXTURETEAM"
+        },
+        "toolRef" : "tool:sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "trust" : {
+          "executionAssessment" : "notPerformed",
+          "platformTrust" : "unverified",
+          "policy" : "arkdeck.host-tool-inspection/1",
+          "profileReferences" : [
+            "fixture-profile",
+            "hdc-3.2"
+          ],
+          "registeredIdentity" : true
+        },
+        "version" : "3.2.0f"
+      },
+      "oldTool" : {
+        "contentSHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "executableSHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "recordGeneration" : "1",
+        "signature" : {
+          "codeDirectoryIdentitySHA256" : null,
+          "identifier" : null,
+          "state" : "adHoc",
+          "teamIdentifier" : null
+        },
+        "toolRef" : "tool:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "trust" : {
+          "executionAssessment" : "notPerformed",
+          "platformTrust" : "unverified",
+          "policy" : "arkdeck.host-tool-inspection/1",
+          "profileReferences" : [
+
+          ],
+          "registeredIdentity" : true
+        },
+        "version" : "3.2.0-test"
+      },
+      "otherClientsMayExist" : true,
+      "owner" : {
+        "id" : "control-action-b7728ff0-caca-4f49-91fd-05125dac30c8",
+        "kind" : "controlAction"
+      },
+      "previewDigest" : "08af3de0e23d59e78678c8fdd882e81e0a484a3647fafaca35fb05d6f36022b9",
+      "previewId" : "preview-dc1ef26a-10f3-420c-bea8-617fe88aec6d",
+      "recovery" : {
+        "kind" : "statusThenReconcile",
+        "replayAllowed" : false
+      },
+      "schemaVersion" : "arkdeck.tool-selection-preview/1",
+      "serverEndpointRef" : "hdc-endpoint:a29f70813dca5c16bc287e590177e3b9da8354d2d3409abcede8b1c0d0bd420e",
+      "serverGeneration" : "100000023",
+      "serverHealth" : "healthy",
+      "serverOwnership" : "arkDeckManaged",
+      "serverVersion" : "3.2.0-test",
+      "tool" : {
+        "executablePath" : "/retained/hdc",
+        "reference" : null,
+        "sha256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "signature" : null,
+        "source" : "runtimeConfiguration",
+        "trust" : "verified",
+        "version" : "3.2.0-test"
+      }
+    },
+    "requestFingerprint" : "9f6e947983b226aa2a3821418620e5a809d9bb9446961342eb7060f2e4f6d3c2",
+    "schemaVersion" : "arkdeck.control-action/1",
+    "state" : "outcomeUnknown"
+  },
+  {
+    "action" : "select",
+    "actionRequestId" : "oracle-succeeded",
+    "blockerReasonCode" : null,
+    "catalogDigest" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "controlActionId" : "control-action-1ad04064-75a3-41d0-b37c-85fd910fff67",
+    "createdAt" : "2026-09-01T04:10:00.000Z",
+    "dispatchCount" : 1,
+    "expiresAt" : "2026-09-01T04:15:00.000Z",
+    "fingerprintAlgorithm" : "sha256-jcs",
+    "generation" : "14",
+    "humanAction" : {
+      "actionId" : "har-8b5b6f92-a315-45e8-a365-1dcbec217526",
+      "binding" : {
+        "controlActionId" : "control-action-1ad04064-75a3-41d0-b37c-85fd910fff67",
+        "generation" : "3",
+        "previewDigest" : "ee1531343bde9ad2be91713bc0bd0c7c6e0f0a606e986f95dbb5d4623d481c9b",
+        "previewId" : "preview-11d1b7df-d0b9-43a3-b1b8-8813c48245f9"
+      },
+      "category" : "impactApproval",
+      "choices" : [
+
+      ],
+      "createdAt" : "2026-09-01T04:10:02.000Z",
+      "expiresAt" : "2026-09-01T04:15:00.000Z",
+      "minimumAction" : "human.reviewImpact",
+      "newDispatchCount" : 0,
+      "owner" : {
+        "id" : "control-action-1ad04064-75a3-41d0-b37c-85fd910fff67",
+        "kind" : "controlAction"
+      },
+      "prohibitedAutomation" : [
+        "selfApproval"
+      ],
+      "reasonCode" : "policy.impactApprovalRequired",
+      "resumeReference" : "resume-d78d0105-614c-4f0d-a49b-a1e3e0dc7205",
+      "schemaVersion" : "arkdeck.human-action/1",
+      "selectionSchema" : null,
+      "status" : "resolved"
+    },
+    "kind" : "runtimeToolSelection",
+    "lastObservedAt" : "2026-09-01T04:10:13.000Z",
+    "nextAction" : {
+      "kind" : "none",
+      "owner" : {
+        "id" : "control-action-1ad04064-75a3-41d0-b37c-85fd910fff67",
+        "kind" : "controlAction"
+      },
+      "reasonCode" : "controlAction.completed",
+      "resource" : {
+        "id" : "control-action-1ad04064-75a3-41d0-b37c-85fd910fff67",
+        "kind" : "controlAction"
+      }
+    },
+    "owner" : {
+      "id" : "control-action-1ad04064-75a3-41d0-b37c-85fd910fff67",
+      "kind" : "controlAction"
+    },
+    "preview" : {
+      "action" : "select",
+      "affectedDeviceObservations" : [
+
+      ],
+      "affectedJobIds" : [
+
+      ],
+      "affectedTargetIds" : [
+
+      ],
+      "confirmationRequired" : true,
+      "controlActionId" : "control-action-1ad04064-75a3-41d0-b37c-85fd910fff67",
+      "createdAt" : "2026-09-01T04:10:01.000Z",
+      "criticalJobGate" : {
+        "blocking" : [
+
+        ],
+        "reasonCode" : null,
+        "state" : "clear"
+      },
+      "detectedOtherClientIds" : [
+
+      ],
+      "digestAlgorithm" : "sha256-jcs",
+      "dispatchCount" : 0,
+      "endpoint" : "127.0.0.1:8710",
+      "expectedActiveGeneration" : "1",
+      "expiresAt" : "2026-09-01T04:15:00.000Z",
+      "interruption" : {
+        "affectsAllParticipants" : true,
+        "kind" : "hdcEndpointUnavailable"
+      },
+      "kind" : "runtimeToolSelection",
+      "newTool" : {
+        "contentSHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "executableSHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "recordGeneration" : "1",
+        "signature" : {
+          "codeDirectoryIdentitySHA256" : "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "identifier" : "com.huawei.hdc",
+          "state" : "verified",
+          "teamIdentifier" : "FIXTURETEAM"
+        },
+        "toolRef" : "tool:sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "trust" : {
+          "executionAssessment" : "notPerformed",
+          "platformTrust" : "unverified",
+          "policy" : "arkdeck.host-tool-inspection/1",
+          "profileReferences" : [
+            "fixture-profile",
+            "hdc-3.2"
+          ],
+          "registeredIdentity" : true
+        },
+        "version" : "3.2.0f"
+      },
+      "oldTool" : {
+        "contentSHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "executableSHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "recordGeneration" : "1",
+        "signature" : {
+          "codeDirectoryIdentitySHA256" : null,
+          "identifier" : null,
+          "state" : "adHoc",
+          "teamIdentifier" : null
+        },
+        "toolRef" : "tool:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "trust" : {
+          "executionAssessment" : "notPerformed",
+          "platformTrust" : "unverified",
+          "policy" : "arkdeck.host-tool-inspection/1",
+          "profileReferences" : [
+
+          ],
+          "registeredIdentity" : true
+        },
+        "version" : "3.2.0-test"
+      },
+      "otherClientsMayExist" : true,
+      "owner" : {
+        "id" : "control-action-1ad04064-75a3-41d0-b37c-85fd910fff67",
+        "kind" : "controlAction"
+      },
+      "previewDigest" : "ee1531343bde9ad2be91713bc0bd0c7c6e0f0a606e986f95dbb5d4623d481c9b",
+      "previewId" : "preview-11d1b7df-d0b9-43a3-b1b8-8813c48245f9",
+      "recovery" : {
+        "kind" : "statusThenReconcile",
+        "replayAllowed" : false
+      },
+      "schemaVersion" : "arkdeck.tool-selection-preview/1",
+      "serverEndpointRef" : "hdc-endpoint:a29f70813dca5c16bc287e590177e3b9da8354d2d3409abcede8b1c0d0bd420e",
+      "serverGeneration" : "100000023",
+      "serverHealth" : "healthy",
+      "serverOwnership" : "arkDeckManaged",
+      "serverVersion" : "3.2.0-test",
+      "tool" : {
+        "executablePath" : "/retained/hdc",
+        "reference" : null,
+        "sha256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "signature" : null,
+        "source" : "runtimeConfiguration",
+        "trust" : "verified",
+        "version" : "3.2.0-test"
+      }
+    },
+    "requestFingerprint" : "9f6e947983b226aa2a3821418620e5a809d9bb9446961342eb7060f2e4f6d3c2",
+    "schemaVersion" : "arkdeck.control-action/1",
+    "state" : "succeeded"
+  },
+  {
+    "action" : "select",
+    "actionRequestId" : "oracle-failed-after-launch",
+    "blockerReasonCode" : "tool.selectionPublishFailed",
+    "catalogDigest" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "controlActionId" : "control-action-b1b2d4c7-4726-4f22-bdbd-206b15acca5c",
+    "createdAt" : "2026-09-01T04:26:40.000Z",
+    "dispatchCount" : 1,
+    "expiresAt" : "2026-09-01T04:31:40.000Z",
+    "fingerprintAlgorithm" : "sha256-jcs",
+    "generation" : "12",
+    "humanAction" : {
+      "actionId" : "har-72fb21b6-3871-4a3b-a335-6a77204c6d4f",
+      "binding" : {
+        "controlActionId" : "control-action-b1b2d4c7-4726-4f22-bdbd-206b15acca5c",
+        "generation" : "3",
+        "previewDigest" : "f4a9f8638a42afabd5000fd513049878b77d60345151421b26f90af4291d6c7c",
+        "previewId" : "preview-543e10ae-5c47-4065-92cc-2f0b70af6a5b"
+      },
+      "category" : "impactApproval",
+      "choices" : [
+
+      ],
+      "createdAt" : "2026-09-01T04:26:42.000Z",
+      "expiresAt" : "2026-09-01T04:31:40.000Z",
+      "minimumAction" : "human.reviewImpact",
+      "newDispatchCount" : 0,
+      "owner" : {
+        "id" : "control-action-b1b2d4c7-4726-4f22-bdbd-206b15acca5c",
+        "kind" : "controlAction"
+      },
+      "prohibitedAutomation" : [
+        "selfApproval"
+      ],
+      "reasonCode" : "policy.impactApprovalRequired",
+      "resumeReference" : "resume-1f17dd11-6c4f-439d-b5e1-f7bbd4751c45",
+      "schemaVersion" : "arkdeck.human-action/1",
+      "selectionSchema" : null,
+      "status" : "resolved"
+    },
+    "kind" : "runtimeToolSelection",
+    "lastObservedAt" : "2026-09-01T04:26:51.000Z",
+    "nextAction" : {
+      "kind" : "none",
+      "owner" : {
+        "id" : "control-action-b1b2d4c7-4726-4f22-bdbd-206b15acca5c",
+        "kind" : "controlAction"
+      },
+      "reasonCode" : "tool.selectionPublishFailed",
+      "resource" : {
+        "id" : "control-action-b1b2d4c7-4726-4f22-bdbd-206b15acca5c",
+        "kind" : "controlAction"
+      }
+    },
+    "owner" : {
+      "id" : "control-action-b1b2d4c7-4726-4f22-bdbd-206b15acca5c",
+      "kind" : "controlAction"
+    },
+    "preview" : {
+      "action" : "select",
+      "affectedDeviceObservations" : [
+
+      ],
+      "affectedJobIds" : [
+
+      ],
+      "affectedTargetIds" : [
+
+      ],
+      "confirmationRequired" : true,
+      "controlActionId" : "control-action-b1b2d4c7-4726-4f22-bdbd-206b15acca5c",
+      "createdAt" : "2026-09-01T04:26:41.000Z",
+      "criticalJobGate" : {
+        "blocking" : [
+
+        ],
+        "reasonCode" : null,
+        "state" : "clear"
+      },
+      "detectedOtherClientIds" : [
+
+      ],
+      "digestAlgorithm" : "sha256-jcs",
+      "dispatchCount" : 0,
+      "endpoint" : "127.0.0.1:8710",
+      "expectedActiveGeneration" : "1",
+      "expiresAt" : "2026-09-01T04:31:40.000Z",
+      "interruption" : {
+        "affectsAllParticipants" : true,
+        "kind" : "hdcEndpointUnavailable"
+      },
+      "kind" : "runtimeToolSelection",
+      "newTool" : {
+        "contentSHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "executableSHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "recordGeneration" : "1",
+        "signature" : {
+          "codeDirectoryIdentitySHA256" : "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "identifier" : "com.huawei.hdc",
+          "state" : "verified",
+          "teamIdentifier" : "FIXTURETEAM"
+        },
+        "toolRef" : "tool:sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "trust" : {
+          "executionAssessment" : "notPerformed",
+          "platformTrust" : "unverified",
+          "policy" : "arkdeck.host-tool-inspection/1",
+          "profileReferences" : [
+            "fixture-profile",
+            "hdc-3.2"
+          ],
+          "registeredIdentity" : true
+        },
+        "version" : "3.2.0f"
+      },
+      "oldTool" : {
+        "contentSHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "executableSHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "recordGeneration" : "1",
+        "signature" : {
+          "codeDirectoryIdentitySHA256" : null,
+          "identifier" : null,
+          "state" : "adHoc",
+          "teamIdentifier" : null
+        },
+        "toolRef" : "tool:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "trust" : {
+          "executionAssessment" : "notPerformed",
+          "platformTrust" : "unverified",
+          "policy" : "arkdeck.host-tool-inspection/1",
+          "profileReferences" : [
+
+          ],
+          "registeredIdentity" : true
+        },
+        "version" : "3.2.0-test"
+      },
+      "otherClientsMayExist" : true,
+      "owner" : {
+        "id" : "control-action-b1b2d4c7-4726-4f22-bdbd-206b15acca5c",
+        "kind" : "controlAction"
+      },
+      "previewDigest" : "f4a9f8638a42afabd5000fd513049878b77d60345151421b26f90af4291d6c7c",
+      "previewId" : "preview-543e10ae-5c47-4065-92cc-2f0b70af6a5b",
+      "recovery" : {
+        "kind" : "statusThenReconcile",
+        "replayAllowed" : false
+      },
+      "schemaVersion" : "arkdeck.tool-selection-preview/1",
+      "serverEndpointRef" : "hdc-endpoint:a29f70813dca5c16bc287e590177e3b9da8354d2d3409abcede8b1c0d0bd420e",
+      "serverGeneration" : "100000023",
+      "serverHealth" : "healthy",
+      "serverOwnership" : "arkDeckManaged",
+      "serverVersion" : "3.2.0-test",
+      "tool" : {
+        "executablePath" : "/retained/hdc",
+        "reference" : null,
+        "sha256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "signature" : null,
+        "source" : "runtimeConfiguration",
+        "trust" : "verified",
+        "version" : "3.2.0-test"
+      }
+    },
+    "requestFingerprint" : "9f6e947983b226aa2a3821418620e5a809d9bb9446961342eb7060f2e4f6d3c2",
+    "schemaVersion" : "arkdeck.control-action/1",
+    "state" : "failed"
+  },
+  {
+    "action" : "select",
+    "actionRequestId" : "oracle-lifecycle",
+    "blockerReasonCode" : null,
+    "catalogDigest" : "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "controlActionId" : "control-action-0c1d9ae6-7212-4efd-8de2-90a84263efaa",
+    "createdAt" : "2026-09-01T04:43:20.000Z",
+    "dispatchCount" : 1,
+    "expiresAt" : "2026-09-01T04:48:20.000Z",
+    "fingerprintAlgorithm" : "sha256-jcs",
+    "generation" : "13",
+    "humanAction" : {
+      "actionId" : "har-b5efae75-ef90-4b13-8024-0e33d30ce7ab",
+      "binding" : {
+        "controlActionId" : "control-action-0c1d9ae6-7212-4efd-8de2-90a84263efaa",
+        "generation" : "3",
+        "previewDigest" : "9c8e0ec4ec5088ebd4d84d96c1d050e4b4a93972ed9e432ec74a6862774079c5",
+        "previewId" : "preview-90b43664-b6c0-4b1e-a148-5239c1501f80"
+      },
+      "category" : "impactApproval",
+      "choices" : [
+
+      ],
+      "createdAt" : "2026-09-01T04:43:22.000Z",
+      "expiresAt" : "2026-09-01T04:48:20.000Z",
+      "minimumAction" : "human.reviewImpact",
+      "newDispatchCount" : 0,
+      "owner" : {
+        "id" : "control-action-0c1d9ae6-7212-4efd-8de2-90a84263efaa",
+        "kind" : "controlAction"
+      },
+      "prohibitedAutomation" : [
+        "selfApproval"
+      ],
+      "reasonCode" : "policy.impactApprovalRequired",
+      "resumeReference" : "resume-36463408-656d-4627-bfd2-46828f3047a4",
+      "schemaVersion" : "arkdeck.human-action/1",
+      "selectionSchema" : null,
+      "status" : "resolved"
+    },
+    "kind" : "runtimeToolSelection",
+    "lastObservedAt" : "2026-09-01T04:43:25.000Z",
+    "nextAction" : {
+      "kind" : "reconcile",
+      "owner" : {
+        "id" : "control-action-0c1d9ae6-7212-4efd-8de2-90a84263efaa",
+        "kind" : "controlAction"
+      },
+      "reasonCode" : "tool.selectionRecomposePending",
+      "resource" : {
+        "id" : "control-action-0c1d9ae6-7212-4efd-8de2-90a84263efaa",
+        "kind" : "controlAction"
+      }
+    },
+    "owner" : {
+      "id" : "control-action-0c1d9ae6-7212-4efd-8de2-90a84263efaa",
+      "kind" : "controlAction"
+    },
+    "preview" : {
+      "action" : "select",
+      "affectedDeviceObservations" : [
+
+      ],
+      "affectedJobIds" : [
+
+      ],
+      "affectedTargetIds" : [
+
+      ],
+      "confirmationRequired" : true,
+      "controlActionId" : "control-action-0c1d9ae6-7212-4efd-8de2-90a84263efaa",
+      "createdAt" : "2026-09-01T04:43:21.000Z",
+      "criticalJobGate" : {
+        "blocking" : [
+
+        ],
+        "reasonCode" : null,
+        "state" : "clear"
+      },
+      "detectedOtherClientIds" : [
+
+      ],
+      "digestAlgorithm" : "sha256-jcs",
+      "dispatchCount" : 0,
+      "endpoint" : "127.0.0.1:8710",
+      "expectedActiveGeneration" : "1",
+      "expiresAt" : "2026-09-01T04:48:20.000Z",
+      "interruption" : {
+        "affectsAllParticipants" : true,
+        "kind" : "hdcEndpointUnavailable"
+      },
+      "kind" : "runtimeToolSelection",
+      "newTool" : {
+        "contentSHA256" : "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "executableSHA256" : "a9dcbecd913db549323a33fed66d9549890ad88a6cdc471ca6381520467802f8",
+        "recordGeneration" : "1",
+        "signature" : {
+          "codeDirectoryIdentitySHA256" : "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "identifier" : "com.huawei.hdc",
+          "state" : "verified",
+          "teamIdentifier" : "FIXTURETEAM"
+        },
+        "toolRef" : "tool:sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "trust" : {
+          "executionAssessment" : "notPerformed",
+          "platformTrust" : "unverified",
+          "policy" : "arkdeck.host-tool-inspection/1",
+          "profileReferences" : [
+            "fixture-profile",
+            "hdc-3.2"
+          ],
+          "registeredIdentity" : true
+        },
+        "version" : "3.2.0f"
+      },
+      "oldTool" : {
+        "contentSHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "executableSHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "recordGeneration" : "1",
+        "signature" : {
+          "codeDirectoryIdentitySHA256" : null,
+          "identifier" : null,
+          "state" : "adHoc",
+          "teamIdentifier" : null
+        },
+        "toolRef" : "tool:sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "trust" : {
+          "executionAssessment" : "notPerformed",
+          "platformTrust" : "unverified",
+          "policy" : "arkdeck.host-tool-inspection/1",
+          "profileReferences" : [
+
+          ],
+          "registeredIdentity" : true
+        },
+        "version" : "3.2.0-test"
+      },
+      "otherClientsMayExist" : true,
+      "owner" : {
+        "id" : "control-action-0c1d9ae6-7212-4efd-8de2-90a84263efaa",
+        "kind" : "controlAction"
+      },
+      "previewDigest" : "9c8e0ec4ec5088ebd4d84d96c1d050e4b4a93972ed9e432ec74a6862774079c5",
+      "previewId" : "preview-90b43664-b6c0-4b1e-a148-5239c1501f80",
+      "recovery" : {
+        "kind" : "statusThenReconcile",
+        "replayAllowed" : false
+      },
+      "schemaVersion" : "arkdeck.tool-selection-preview/1",
+      "serverEndpointRef" : "hdc-endpoint:a29f70813dca5c16bc287e590177e3b9da8354d2d3409abcede8b1c0d0bd420e",
+      "serverGeneration" : "7",
+      "serverHealth" : "healthy",
+      "serverOwnership" : "external",
+      "serverVersion" : "3.2.0-test",
+      "tool" : {
+        "executablePath" : "/retained/hdc",
+        "reference" : null,
+        "sha256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "signature" : null,
+        "source" : "runtimeConfiguration",
+        "trust" : "verified",
+        "version" : "3.2.0-test"
+      }
+    },
+    "requestFingerprint" : "9f6e947983b226aa2a3821418620e5a809d9bb9446961342eb7060f2e4f6d3c2",
+    "schemaVersion" : "arkdeck.control-action/1",
+    "state" : "outcomeUnknown"
+  }
+]
