@@ -1155,7 +1155,7 @@ flowchart TD
 10. **Windows 打包**：MSIX packaged + self-contained Windows App SDK + Azure Artifact Signing + App Installer 更新（本文推荐）vs unpackaged 自研安装器。
 11. **Windows daemon 生命周期**：客户端自启动 + 单实例（推荐）vs 登录计划任务 vs 两者。
 12. **FFI kernel 是否立项**（XPA-024）：仅当 §I 测量证明需要。
-13. **ADR-0009 悬案**：决策 2/4 今日承载点仍未裁决（`0009:3-14`），Rust 移植 recovery 前必须定案，否则 Rust 会固化一个未裁决语义。（r11：决策包 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/adr-0009-decision-package-20260914.md` 逐行点名承载代码并提议原样移植；本条仍待维护者裁决，r11 合入不构成裁决。）
+13. **ADR-0009 悬案（已裁，维护者 lvye 2026-09-19）**：决策 2/4 今日承载点仍未裁决（`0009:3-14`），Rust 移植 recovery 前必须定案，否则 Rust 会固化一个未裁决语义。（r11：决策包 `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/adr-0009-decision-package-20260914.md` 逐行点名承载代码并提议原样移植；本条仍待维护者裁决，r11 合入不构成裁决。）**裁决（2026-09-19）**：按决策包点名的承载代码原样移植。决策 2 与 4 继续约束当前 runtime，承载点即决策包 §1、§2 的表；Rust 原样移植这些承载点（durable 格式 T0，迁移与拒绝 T1），不新增 recovery 语义，四个已删符号保持缺席。裁决记录见决策包末尾 Ruling 节与 ADR-0009 头注；移植由 TASK-XPA-014 按该节的顺序逐刀进行。
 14. **硬件与主机**：新增 Windows 11 x64 与 ARM64 验证主机；DAYU200 窗口与 HardwareCampaign 授权（GJ-4）。（r11 提议并随合入 attestation：SPK-7 在 fake HDC 上通过后每天固定 1 小时接板窗口；GJ-4 仍逐次 go。）
 15. **idle RSS 上限**（r2 新增，当前证据见 §I.2 注 2）：冷 idle 独立采样与两电平已交付；启动 plateau 73.71 MB、steady 21.53 MB 对拟定 64 MiB 得出不同结果。仍需决定上限约束哪个阶段、是否分别预算，并复测当前单 v1 二进制；本次不提高上限或宣布稳态预算已批准。
 16. **分页投影预算**（r2 新增，当前证据见 §I.2 注 1）：行数已机械记录为 30，尚需多规模测量来分离固定开销与每行成本。当前记录推导的 `≤ 19.5 ms p95` 仅作该规模回归参考，不作发布门。
