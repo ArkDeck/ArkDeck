@@ -61,7 +61,7 @@ fn result(bytes: &[u8], method: &str) -> Value {
     decode_response(bytes.trim_ascii_end(), "request-1", method)
         .unwrap()
         .outcome
-        .unwrap()
+        .unwrap_or_else(|error| panic!("{method}: {error:?}"))
 }
 fn code(bytes: &[u8]) -> String {
     serde_json::from_slice::<Value>(bytes).unwrap()["error"]["code"]
@@ -160,6 +160,12 @@ fn rejected_origins_methods_frames_and_parameters_never_enter_control() {
             "history.filter.list",
             "history.filter.save",
             "history.filter.delete",
+            "job.list",
+            "job.show",
+            "job.timeline",
+            "job.evidence",
+            "artifact.list",
+            "artifact.read",
         ]
         .contains(method)
         {
@@ -201,6 +207,18 @@ fn rejected_origins_methods_frames_and_parameters_never_enter_control() {
         ("history.filter.delete", json!({})),
         ("history.filter.delete", json!({"expectedGeneration":1})),
         ("history.filter.save", json!({})),
+        ("job.list", json!({"path":"/tmp/foreign"})),
+        ("job.show", json!({"jobId":5})),
+        ("job.timeline", json!({"jobId":"JOB-1","pageSize":false})),
+        ("job.evidence", json!({"jobId":"JOB-1","authorization":{}})),
+        (
+            "artifact.list",
+            json!({"owner":{"kind":"job","id":"JOB-1","path":"/tmp"}}),
+        ),
+        (
+            "artifact.read",
+            json!({"artifactId":"ART-1","allowSensitive":"true"}),
+        ),
     ] {
         let reply = ingress.handle(&frame(method, params), root.peer());
         assert_eq!(
@@ -242,3 +260,6 @@ fn opt_in_root_is_private_physical_and_separate_from_installed_state() {
     assert!(!root.0.join("missing").exists());
     assert_eq!(fs::read_dir(&installed).unwrap().count(), 0);
 }
+
+#[path = "read_tests.rs"]
+mod reads;
