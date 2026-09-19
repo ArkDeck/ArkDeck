@@ -22,6 +22,7 @@ fn native_swift_plans_match_with_nothing_admitted_or_dispatched() {
     let hdc = HdcComposition {
         targets: &targets,
         dispatch: &NoDispatch,
+        receive_root: None,
         tool_sha256: &digest,
         now: fixed_now,
         code_sign_helper: None,
@@ -125,6 +126,7 @@ fn entry_and_additional_imports_are_held_until_success_or_preflight_refusal() {
         let hdc = HdcComposition {
             targets: &targets,
             dispatch: &NoDispatch,
+            receive_root: None,
             tool_sha256: &digest,
             now: fixed_now,
             code_sign_helper: None,

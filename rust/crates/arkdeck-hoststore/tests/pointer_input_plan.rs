@@ -74,6 +74,7 @@ fn rust_plans_the_swift_pointer_gestures() {
     let hdc = HdcComposition {
         targets: &targets,
         dispatch: &NoDispatch,
+        receive_root: None,
         tool_sha256: &digest,
         now: fixed_now,
         code_sign_helper: None,

@@ -4,16 +4,22 @@
 //! no binding, route or observation is created here.
 use crate::TargetStore;
 use arkdeck_provider_hdc::{CodeSignHelper, HdcDispatch, stable_identity_sha256};
+use std::path::Path;
 
 /// The HDC composition a device-bound operation plans and runs with: the
-/// Target owner its facts come from, the executor its steps dispatch to, the
-/// executable's digest the facts carry (Swift
+/// Target owner its facts come from, the executor its steps dispatch to, where
+/// the files it receives land, the executable's digest the facts carry (Swift
 /// `TargetStoreFactsPort.executableSHA256`), the clock the provider's
 /// context reads, and the code-sign helper a native library deployment
 /// stages.
 pub struct HdcComposition<'a> {
     pub targets: &'a TargetStore,
     pub dispatch: &'a (dyn HdcDispatch + Sync),
+    /// Swift `HDCObservationProviderAdapter.hostReceiveRoot`: the host
+    /// directory a received file lands in, under the remote file's own name.
+    /// The receive argv names it, so it reaches the materialized plan and its
+    /// digest. Without one no file is received.
+    pub receive_root: Option<&'a Path>,
     pub tool_sha256: &'a str,
     /// Swift `ProviderExecutionContext.nowUTC`, the engine's clock: a pointer
     /// gesture's frame is judged fresh or stale against it when its plan is

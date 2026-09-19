@@ -1,6 +1,6 @@
-//! Replays the capability stores the four M2 oracles leave behind
+//! Replays the capability stores the five M2 oracles leave behind
 //! (`rust/tests/fixtures/{pointer-input,port-forward,debug-hap,
-//! deploy-native-library}/store/capabilities`, recorded by Swift's oracle
+//! deploy-native-library,screen-sequence}/store/capabilities`, recorded by Swift's oracle
 //! contract tests) through the Rust store's writes, and checks the store's
 //! refusals over synthetic capabilities in temporary stores.
 //!
@@ -249,6 +249,7 @@ fn rust_writes_reproduce_the_m2_oracles_capability_stores() {
         "port-forward",
         "debug-hap",
         "deploy-native-library",
+        "screen-sequence",
     ]
     .into_iter()
     .map(replay)

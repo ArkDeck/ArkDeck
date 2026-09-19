@@ -172,6 +172,7 @@ fn rust_runs_the_swift_agent_executions() {
     let hdc = HdcComposition {
         targets: &targets,
         dispatch: &dispatch,
+        receive_root: None,
         tool_sha256: &digest,
         now: fixed_now,
         code_sign_helper: None,
@@ -214,6 +215,7 @@ fn rust_runs_the_swift_agent_executions() {
         let hdc = HdcComposition {
             targets: &targets,
             dispatch: &dispatch,
+            receive_root: None,
             tool_sha256: &digest,
             now: fixed_now,
             code_sign_helper: None,

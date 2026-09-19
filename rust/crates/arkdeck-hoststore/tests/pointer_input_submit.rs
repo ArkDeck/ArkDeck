@@ -121,6 +121,7 @@ impl Owners {
         HdcComposition {
             targets: &self.targets,
             dispatch: &NoDispatch,
+            receive_root: None,
             tool_sha256: &self.digest,
             now: fixed_now,
             code_sign_helper: None,

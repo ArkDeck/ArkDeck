@@ -104,6 +104,12 @@ pub struct Host {
     /// Swift `NSHomeDirectory()`, which Artifact redaction replaces.
     #[cfg(target_os = "macos")]
     home: String,
+    /// Where the files a device-bound Job receives land: Swift's
+    /// `HDCObservationProviderAdapter` default,
+    /// `FileManager.default.temporaryDirectory/arkdeck-receive`, which the
+    /// receive argv, and so the plan digest, names.
+    #[cfg(target_os = "macos")]
+    receive_root: std::path::PathBuf,
     #[cfg(target_os = "macos")]
     default_mutation_root: Option<std::path::PathBuf>,
     /// Swift `HostStorageCoordinator`'s claims, held by the Session
@@ -281,6 +287,7 @@ impl Host {
         Some(arkdeck_hoststore::HdcComposition {
             targets,
             dispatch: &**dispatch,
+            receive_root: Some(&self.receive_root),
             tool_sha256: dispatch.tool_sha256(),
             now: arkdeck_hoststore::runtime_now,
             code_sign_helper: None,
@@ -319,6 +326,7 @@ impl Host {
             self.home.clone(),
         );
         let imports = self.imports.clone();
+        let receive_root = self.receive_root.clone();
         let default_mutation_root = self.default_mutation_root.clone();
         let capabilities = self.capabilities.clone();
         let holds = self.holds.clone();
@@ -343,6 +351,7 @@ impl Host {
                 (Some(dispatch), Some(targets)) => Some(arkdeck_hoststore::HdcComposition {
                     targets,
                     dispatch: &**dispatch,
+                    receive_root: Some(&receive_root),
                     tool_sha256: dispatch.tool_sha256(),
                     now: arkdeck_hoststore::runtime_now,
                     code_sign_helper: None,
@@ -496,6 +505,9 @@ impl Host {
             #[cfg(target_os = "macos")]
             home: arkdeck_platform::runtime_home().unwrap_or_default(),
             #[cfg(target_os = "macos")]
+            receive_root: arkdeck_platform::foundation_temporary_directory()
+                .join("arkdeck-receive"),
+            #[cfg(target_os = "macos")]
             default_mutation_root: arkdeck_platform::runtime_home()
                 .map(std::path::PathBuf::from)
                 .filter(|home| home.is_absolute())
@@ -553,6 +565,7 @@ impl HostServices for Host {
                         "port-forward.create@1",
                         "port-forward.remove@1",
                         "debug.hap@1",
+                        "capture.screen-sequence@1",
                     ]
                     .contains(&reference)
                 {

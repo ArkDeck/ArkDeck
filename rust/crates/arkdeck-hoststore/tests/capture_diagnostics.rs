@@ -134,6 +134,7 @@ fn rust_captures_diagnostics_of_the_swift_fake_device() {
     let hdc = HdcComposition {
         targets: &targets,
         dispatch: &dispatch,
+        receive_root: None,
         tool_sha256: &digest,
         now: fixed_now,
         code_sign_helper: None,
