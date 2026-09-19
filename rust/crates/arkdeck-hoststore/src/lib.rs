@@ -528,8 +528,8 @@ pub use deveco_registry_owner::DevEcoRegistryStore;
 mod artifact_read_owner;
 #[cfg(target_os = "macos")]
 pub use artifact_read_owner::{
-    ArtifactReadPage, ArtifactReadRange, ArtifactReadSnapshot, ArtifactReadStore,
-    MAX_ARTIFACT_READ_BYTES,
+    ArtifactPublicationFault, ArtifactReadPage, ArtifactReadRange, ArtifactReadSnapshot,
+    ArtifactReadStore, MAX_ARTIFACT_READ_BYTES,
 };
 
 #[cfg(target_os = "macos")]
