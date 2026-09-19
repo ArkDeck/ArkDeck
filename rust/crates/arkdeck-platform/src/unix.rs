@@ -1,15 +1,16 @@
 #[cfg(not(target_os = "macos"))]
 use crate::VerifiedTool;
-use crate::{LocalEndpoint, ServerIdentity, denied, invalid};
+use crate::{Latch, LocalEndpoint, ServerIdentity, StopSignal, denied, invalid};
 use std::fs::{self, DirBuilder};
 use std::io::{self, IoSlice, Read, Write};
+use std::net::Shutdown;
 #[cfg(not(target_os = "macos"))]
 use std::net::SocketAddrV4;
 use std::os::fd::AsRawFd;
 use std::os::unix::fs::{DirBuilderExt, FileTypeExt, MetadataExt, PermissionsExt};
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 pub fn default_user_endpoint() -> io::Result<LocalEndpoint> {
     // Separate from the published Swift socket: this skeleton has no authority.
@@ -106,7 +107,28 @@ pub struct LocalListener {
     path: PathBuf,
     device: u64,
     inode: u64,
-    _directory_lock: Option<fs::File>,
+    _directory_lock: Option<DirectoryLock>,
+}
+
+/// The facade's kernel lock on its transport directory, released explicitly
+/// when dropped: a descriptor a spawned child still shares must not keep the
+/// directory owned after this listener's owner is gone.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+struct DirectoryLock(fs::File);
+
+impl Drop for DirectoryLock {
+    fn drop(&mut self) {
+        // SAFETY: live directory descriptor this lock owns.
+        unsafe {
+            libc::flock(self.0.as_raw_fd(), libc::LOCK_UN);
+        }
+    }
+}
+
+/// What a listener that stopped listening still holds: the transport
+/// directory's lock, if it was bound as the facade, until this is dropped.
+pub struct ListenerLock {
+    _lock: Option<DirectoryLock>,
 }
 
 impl LocalListener {
@@ -151,6 +173,7 @@ impl LocalListener {
             Err(error) if error.kind() == io::ErrorKind::NotFound => {}
             Err(error) => return Err(error),
         }
+        let lock = DirectoryLock(lock);
         let mut listener = Self::bind(endpoint)?;
         listener._directory_lock = Some(lock);
         Ok(listener)
@@ -160,6 +183,66 @@ impl LocalListener {
         let (stream, _) = self.listener.accept()?;
         authenticate(&stream)?;
         Ok(LocalConnection(stream))
+    }
+
+    /// The next authenticated connection, or `None` once `stop` has been
+    /// requested, whichever is ready first; a requested stop wins over a
+    /// waiting connection, which is then never accepted.
+    pub fn accept_until(&mut self, stop: &StopSignal) -> io::Result<Option<LocalConnection>> {
+        loop {
+            let mut descriptors = [
+                libc::pollfd {
+                    fd: stop.as_raw_fd(),
+                    events: libc::POLLIN,
+                    revents: 0,
+                },
+                libc::pollfd {
+                    fd: self.listener.as_raw_fd(),
+                    events: libc::POLLIN,
+                    revents: 0,
+                },
+            ];
+            // SAFETY: two live descriptors in writable storage; no timeout.
+            if unsafe { libc::poll(descriptors.as_mut_ptr(), 2, -1) } < 0 {
+                let error = io::Error::last_os_error();
+                if error.kind() == io::ErrorKind::Interrupted {
+                    continue;
+                }
+                return Err(error);
+            }
+            if descriptors[0].revents != 0 {
+                return Ok(None);
+            }
+            if descriptors[1].revents == 0 {
+                continue;
+            }
+            // A connection its peer abandoned after poll leaves nothing to
+            // accept: the listener must not block then.
+            self.listener.set_nonblocking(true)?;
+            let accepted = self.listener.accept();
+            self.listener.set_nonblocking(false)?;
+            match accepted {
+                Ok((stream, _)) => {
+                    // An accepted BSD socket inherits the listener's O_NONBLOCK.
+                    stream.set_nonblocking(false)?;
+                    authenticate(&stream)?;
+                    return Ok(Some(LocalConnection(stream)));
+                }
+                Err(error) if error.kind() == io::ErrorKind::WouldBlock => continue,
+                Err(error) => return Err(error),
+            }
+        }
+    }
+
+    /// Stops listening, as dropping the listener does: the socket is closed
+    /// and this listener's own name removed, so a client is refused from now
+    /// on. The transport directory's lock is handed back instead, to be
+    /// released only once the owner has drained, so that no second owner
+    /// starts while this one still answers.
+    pub fn stop_listening(mut self) -> ListenerLock {
+        ListenerLock {
+            _lock: self._directory_lock.take(),
+        }
     }
 }
 
@@ -186,12 +269,76 @@ impl LocalConnection {
         Ok(Self(stream))
     }
 
+    /// A second handle that ends this connection from another thread.
+    pub fn closer(&self) -> io::Result<ConnectionCloser> {
+        Ok(ConnectionCloser(self.0.try_clone()?))
+    }
+
+    /// Waits until this connection has something to read (or its peer has
+    /// gone, which the read then reports), the latch is set, or `timeout`
+    /// passes; a set latch is seen first. Nothing is read.
+    pub fn wait_readable(&self, latch: &Latch, timeout: Duration) -> io::Result<Readiness> {
+        let deadline = Instant::now() + timeout;
+        loop {
+            let left = deadline.saturating_duration_since(Instant::now());
+            let wait = libc::c_int::try_from(left.as_millis()).unwrap_or(libc::c_int::MAX);
+            let mut descriptors = [
+                libc::pollfd {
+                    fd: latch.as_raw_fd(),
+                    events: libc::POLLIN,
+                    revents: 0,
+                },
+                libc::pollfd {
+                    fd: self.0.as_raw_fd(),
+                    events: libc::POLLIN,
+                    revents: 0,
+                },
+            ];
+            // SAFETY: two live descriptors in writable storage.
+            if unsafe { libc::poll(descriptors.as_mut_ptr(), 2, wait) } < 0 {
+                let error = io::Error::last_os_error();
+                if error.kind() == io::ErrorKind::Interrupted {
+                    continue;
+                }
+                return Err(error);
+            }
+            if descriptors[0].revents != 0 {
+                return Ok(Readiness::Latched);
+            }
+            if descriptors[1].revents != 0 {
+                return Ok(Readiness::Readable);
+            }
+            if Instant::now() >= deadline {
+                return Ok(Readiness::TimedOut);
+            }
+        }
+    }
+
     pub fn set_read_timeout(&self, timeout: Option<Duration>) -> io::Result<()> {
         self.0.set_read_timeout(timeout)
     }
 
     pub fn set_write_timeout(&self, timeout: Option<Duration>) -> io::Result<()> {
         self.0.set_write_timeout(timeout)
+    }
+}
+
+/// What [`LocalConnection::wait_readable`] saw first.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Readiness {
+    Readable,
+    Latched,
+    TimedOut,
+}
+
+/// Ends a connection from outside the thread that serves it: both
+/// directions are shut down, so a read waiting on it returns at once and a
+/// later write fails.
+pub struct ConnectionCloser(UnixStream);
+
+impl ConnectionCloser {
+    pub fn close(&self) {
+        let _ = self.0.shutdown(Shutdown::Both);
     }
 }
 

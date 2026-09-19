@@ -12,7 +12,7 @@ use arkdeck_platform::{
 };
 use std::ffi::OsString;
 use std::io;
-use std::net::{SocketAddr, SocketAddrV4, TcpStream};
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpStream};
 use std::time::{Duration, Instant};
 
 /// Swift `HDCServerEndpointSelection.childEnvironment`: the server port is
@@ -24,6 +24,38 @@ const FOREGROUND_CAPTURE_BYTES: usize = 256 * 1024;
 const PROBE_CAPTURE_BYTES: usize = 8 * 1024 * 1024;
 /// Swift `loopbackListenerIsReachable`: a nonblocking connect polled 100 ms.
 const REACHABILITY_PROBE: Duration = Duration::from_millis(100);
+
+/// Swift `HDCServerEndpointSelection.defaultPort`.
+const DEFAULT_PORT: u16 = 8710;
+
+/// Swift `HDCServerEndpointSelector.select()` as the daemon's host calls it,
+/// with no explicit endpoint: the inherited `OHOS_HDC_SERVER_PORT` on the
+/// IPv4 loopback (`inheritedEnvironment`), else the documented default
+/// `127.0.0.1:8710` (`default`). A port that is set but not an integer in
+/// 1...65535 is refused (Swift `invalidInheritedPort`), never replaced by the
+/// default.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct EndpointSelection {
+    pub endpoint: SocketAddrV4,
+    pub source: &'static str,
+}
+
+impl EndpointSelection {
+    pub fn select(inherited_port: Option<&str>) -> Result<Self, String> {
+        match inherited_port {
+            Some(value) => crate::dispatch::valid_port(value)
+                .map(|port| Self {
+                    endpoint: SocketAddrV4::new(Ipv4Addr::LOCALHOST, port),
+                    source: "inheritedEnvironment",
+                })
+                .ok_or_else(|| format!("{SERVER_PORT_VARIABLE} is not a port in 1...65535")),
+            None => Ok(Self {
+                endpoint: SocketAddrV4::new(Ipv4Addr::LOCALHOST, DEFAULT_PORT),
+                source: "default",
+            }),
+        }
+    }
+}
 
 /// Swift `awaitReadiness`: the whole startup within 30 s, polled every 100 ms,
 /// each `checkserver` given 2 s.
@@ -179,6 +211,12 @@ impl ManagedHdcServer {
 
     pub fn endpoint(&self) -> SocketAddrV4 {
         self.endpoint
+    }
+
+    /// The server has ended on its own, or its wait status can no longer be
+    /// read (Swift's host then holds no active launch).
+    pub fn exited(&mut self) -> bool {
+        !matches!(self.server.exit(), Ok(None))
     }
 
     /// The server is still the one started: it has not ended, its PID still

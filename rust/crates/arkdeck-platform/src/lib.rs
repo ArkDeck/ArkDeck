@@ -37,7 +37,14 @@ pub use host_signature::{
 #[cfg(all(unix, not(target_os = "macos")))]
 pub use unix::LoopbackServerLease;
 #[cfg(unix)]
-pub use unix::{LocalConnection, LocalListener, default_user_endpoint};
+pub use unix::{
+    ConnectionCloser, ListenerLock, LocalConnection, LocalListener, Readiness,
+    default_user_endpoint,
+};
+#[cfg(unix)]
+mod stop_signal;
+#[cfg(unix)]
+pub use stop_signal::{Latch, StopSignal};
 #[cfg(target_os = "macos")]
 mod macos_server;
 #[cfg(target_os = "macos")]
