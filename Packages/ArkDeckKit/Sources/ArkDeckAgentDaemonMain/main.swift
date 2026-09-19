@@ -7,6 +7,7 @@
 import ArkDeckAgentComposition
 import ArkDeckAgentDaemon
 import ArkDeckBootstrap
+import ArkDeckClientKit
 import ArkDeckCore
 import ArkDeckLaunchAgent
 import ArkDeckRuntime

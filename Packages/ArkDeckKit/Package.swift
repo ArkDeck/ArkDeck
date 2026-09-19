@@ -148,7 +148,7 @@ let package = Package(
     .executableTarget(
       name: "ArkDeckAgentDaemonMain",
       dependencies: [
-        "ArkDeckAgentDaemon", "ArkDeckAgentComposition", "ArkDeckCore",
+        "ArkDeckAgentDaemon", "ArkDeckAgentComposition", "ArkDeckClientKit", "ArkDeckCore",
         "ArkDeckBootstrap", "ArkDeckLaunchAgent", "ArkDeckRuntime", "ArkDeckStorage",
         "ArkDeckTraceAdapter",
         "ArkDeckWorkflows",
