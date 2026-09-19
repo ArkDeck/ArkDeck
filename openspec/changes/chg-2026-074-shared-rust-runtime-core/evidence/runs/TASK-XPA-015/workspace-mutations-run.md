@@ -153,5 +153,17 @@ parameters; they now answer Swift's `invalidParams`, and the script expects it.
 
 ## CI
 
-The PR's `guard` and `swift` aggregate are the unified gate. Their result is
-added by the next slice.
+The PR's `guard` and `swift` aggregate are the unified gate. They were green
+at head `a085d694`, and #2056 merged as `098b811e`. This result is recorded by
+the next slice, the DevEco toolchain pin oracle.
+
+| Workflow run | Job | Result |
+|---|---|---|
+| Swift CI 35451919436 | `swift` aggregate | pass |
+| Swift CI 35451919436 | Rust workspace on macos-26, ubuntu-latest and windows-latest; host-independent checks | pass (5m3s, 1m35s, 3m11s, 28s) |
+| Swift CI 35451919436 | `swift-tests`, `app-build`, `ds-interactions` | skipped by the plan: no Swift source changed |
+| SDD Guard 35451919259 | `guard`, `ds-tokens` | pass |
+| Agent PR 35451919281 | `open-pr` | pass |
+
+The two runs before it failed on ubuntu, for the two causes the local checks
+above describe; both are fixed in the merged head.
