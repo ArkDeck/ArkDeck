@@ -3,6 +3,8 @@ mod app_ingress;
 #[cfg(target_os = "macos")]
 mod bootstrap_readers;
 #[cfg(all(test, target_os = "macos"))]
+mod cleanup_debt_control;
+#[cfg(all(test, target_os = "macos"))]
 mod control_action_control;
 #[cfg(all(test, target_os = "macos"))]
 mod control_action_host_control;

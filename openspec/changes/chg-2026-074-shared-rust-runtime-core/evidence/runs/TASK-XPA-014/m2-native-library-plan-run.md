@@ -155,6 +155,24 @@ rollback row the plan replay fails; without the library's facts the submission r
 Before the rebase, trial merges with the then-open #2004, #2006, #2007 and #2008 were
 conflict-free, and none of them constructs an `HdcComposition`.
 
+## CI
+
+PR #2011, head `9bd9341b`, all green. It merged on 2026-09-19 as `111fc8a2`.
+
+| Check | Run | Conclusion |
+| --- | --- | --- |
+| SDD Guard `guard` | 35439839460 | success |
+| Swift CI `plan` | 35439839577 | success |
+| Rust host-independent checks | 35439839577 | success |
+| Rust workspace, `ubuntu-latest` | 35439839577 | success |
+| Rust workspace, `macos-26` | 35439839577 | success |
+| Rust workspace, `windows-latest` | 35439839577 | success |
+| `swift` aggregate | 35439839577 | success |
+
+`swift-tests`, `app-build` and `ds-interactions` were not selected for this diff and were skipped.
+These rows were added by the `cleanupDebt.list` slice, since the PR merged as soon as it was
+green.
+
 ## Not run
 
 - The runs of a deployment, its failure lane, debt and readers: the next slice

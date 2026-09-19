@@ -5,9 +5,9 @@
 //! replays run under: the account-fixed Job root, each Job's one capability
 //! use consumed before its first mutation's intent and continued by every
 //! later mutation and compensation of the same run, and the use settled once
-//! the Job is terminal or parked. Every exchange before the cleanup debt
-//! continuations (`cleanupDebt.*`, not served by this Runtime) answers as
-//! Swift answered it, message included:
+//! the Job is terminal or parked. Every exchange but the cleanup debt
+//! continuations (`cleanupDebt.continue`, not served by this Runtime) and the
+//! list after them answers as Swift answered it, message included:
 //! - the success lanes: a HAP debugged on its own and with an additional
 //!   package, sent into the Job's owned staging, installed and started as
 //!   dispatches the package and process readbacks believe, its HiLog read,
@@ -19,7 +19,8 @@
 //!   again;
 //! - the debts: an uninstall that leaves the bundle, as an optional cleanup,
 //!   and a staging cleanup that fails as a required one are each owed in the
-//!   cleanup debt ledger with the exact action that failed;
+//!   cleanup debt ledger with the exact action that failed, and
+//!   `cleanupDebt.list` lists both;
 //! - an empty HiLog capture, which parks its Job with its intent outstanding.
 //!
 //! The fake receives Swift's first 103 calls in order, and everything the
@@ -57,13 +58,13 @@ const CALLS: usize = 103;
 /// The runs whose debts the continuations settle.
 const CONTINUED: [&str; 2] = ["stillInstalled", "cleanupDebt"];
 
-/// Every recorded request but the continuations, answered in order by the
-/// Rust owners. Every answer must be Swift's, its message included, and so
-/// must each call the fake received, the Target document and everything the
-/// replay leaves below the root.
+/// Every recorded request but the continuations and the list after them,
+/// answered in order by the Rust owners. Every answer must be Swift's, its
+/// message included, and so must each call the fake received, the Target
+/// document and everything the replay leaves below the root.
 #[test]
 fn rust_runs_every_swift_debug_hap_as_swift_does() {
-    hdc_oracle::assert_replays_before_continuations("debug-hap", &CONTINUED, 59, CALLS);
+    hdc_oracle::assert_replays_before_continuations("debug-hap", &CONTINUED, 60, CALLS);
 }
 
 /// The installed case admitted as Swift admitted it, with the fake in `mode`.

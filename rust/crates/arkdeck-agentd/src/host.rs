@@ -1251,6 +1251,28 @@ impl HostServices for Host {
                 details: None,
             })
     }
+    /// `cleanupDebt.list` reads the cleanup debt ledger beside this owner's
+    /// Artifacts as the Swift daemon lists it, and writes nothing. Swift
+    /// answers any failure of the store as an internal error.
+    #[cfg(target_os = "macos")]
+    fn cleanup_debt(
+        &self,
+        _method: &str,
+        _params: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<serde_json::Value, WireError> {
+        let Some(artifacts) = &self.artifacts else {
+            return Err(WireError {
+                code: "rejected".into(),
+                message: "this method is unavailable in the read-only Rust foundation".into(),
+                details: None,
+            });
+        };
+        arkdeck_hoststore::list_cleanup_debt(artifacts).map_err(|message| WireError {
+            code: "internalError".into(),
+            message,
+            details: None,
+        })
+    }
     /// `job.cancel` cancels an admitted Job in the owner that admitted it. A
     /// Job this owner is running is cancelled by its run, which alone writes
     /// the Job's Journal. A run of a Job no run holds waits the cancellation

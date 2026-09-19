@@ -195,6 +195,20 @@ pub trait HostServices: Send + Sync {
             details: None,
         })
     }
+    /// `cleanupDebt.list` reads the Job cleanup debt ledger beside the
+    /// Artifacts. A host without an Artifact owner answers as the read-only
+    /// foundation always has.
+    fn cleanup_debt(
+        &self,
+        _method: &str,
+        _params: &serde_json::Map<String, Value>,
+    ) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "rejected".into(),
+            message: "this method is unavailable in the read-only Rust foundation".into(),
+            details: None,
+        })
+    }
     fn bootstrap_register_bundle(&self, _file: &str) -> Result<Value, WireError> {
         Err(WireError {
             code: "operationUnavailable".into(),
@@ -1006,6 +1020,11 @@ impl<H: HostServices> Control<H> {
             "capability.list" | "capability.inspect" => Response {
                 id: request.id.clone(),
                 outcome: self.host.capability_resource(&request.method, &params),
+            },
+            // Swift reads no parameter of a list request.
+            "cleanupDebt.list" => Response {
+                id: request.id.clone(),
+                outcome: self.host.cleanup_debt(&request.method, &params),
             },
             "artifact.list" | "artifact.inspect" | "artifact.read" | "artifact.export" => {
                 Response {
