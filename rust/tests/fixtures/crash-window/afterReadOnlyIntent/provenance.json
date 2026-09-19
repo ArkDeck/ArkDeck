@@ -1,0 +1,33 @@
+{
+  "availableBytes" : 1099511627776,
+  "files" : {
+    "cases.json" : "4e274af1f578d891685146c8344b0884d1886c42cadbbbc98c4ceb85b59b5b3e",
+    "hdc" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+    "hdc-answers.sh" : "9ba42334b18f187246af2cac2a762a51f97109999f4a1883fc6287b467d26c2b",
+    "hdc-invocations.log" : "fcabd1f03733eed4def0f8bfb003d625c9c92c91911f53f74a02a6ea6a61205c",
+    "session-owner/.session-storage.lock" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "sessions/.arkdeck-retention-catalog.json" : "b761f3d20c2b3f1d1b1b2c1cc43e66e638530fac7ea45ec7340b47681ee49fa1",
+    "sessions/.arkdeck-retention-catalog.lock" : "6922e93e3827642ce4b883c756b31abf80036649d3614bf5fcb3adda43b8ea32",
+    "store/capabilities/.runtime-capabilities.lock" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "store/capabilities/runtime-capabilities.json" : "c57d27d3a2ebc04d00db205fa5409f26b650dc9f306a854b9d71090ffd46bdef",
+    "store/index.json" : "865247e1aa99c070596154c4e33b7d64c17542721ad88bfd7a8524a8a234d033",
+    "store/jobs/job-170e24af76bacc6d8185503ed380ebea/.manifest.lock" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "store/jobs/job-170e24af76bacc6d8185503ed380ebea/job-record.json" : "3217ee53612cda6fc3d49ed0ec665c2fee35c83da00417427839cfd89c6cf3b9",
+    "store/jobs/job-170e24af76bacc6d8185503ed380ebea/journal.jsonl" : "358cd710bfdf7658bd100a345d9c9ad1eebfddea61f85913a0a7aacf775f489c",
+    "store/jobs/job-8cf8355a414968b938968e7f8064fd0e/.manifest.lock" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "store/jobs/job-8cf8355a414968b938968e7f8064fd0e/job-record.json" : "89530a82c8239818b836ee86bd916f08a5b7de5f0ac4f11d1ad4ded1124abc5e",
+    "store/jobs/job-8cf8355a414968b938968e7f8064fd0e/journal.jsonl" : "86c5e7139fb03e0ebe5de794444090c1b3cbe5a350fd63cf8d99de8a6c0c6fe4",
+    "targets-state/targets.json" : "219caf0d443d902a3fa31adf44d28f1e3611bd25df00ee3a53e696e855077b22",
+    "tree.json" : "d0b04f1338b906530e5700d8c8c477f015cc2bbf7511b906c390277b48af2089"
+  },
+  "hdcSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+  "home" : "/private/tmp/arkdeck-hdc-oracle/home",
+  "nowPreciseUTC" : "2026-09-14T00:00:00.000Z",
+  "nowUTC" : "2026-09-14T00:00:00Z",
+  "producer" : "CrashWindowOracleContractTests.testSwiftRecoversATapFromEachCrashWindowWithoutReplay",
+  "quotaBytes" : 8589934592,
+  "root" : "/private/tmp/arkdeck-hdc-oracle",
+  "sessionOwner" : "/private/tmp/arkdeck-hdc-oracle/session-owner",
+  "sessionsRoot" : "/private/tmp/arkdeck-hdc-oracle/Sessions",
+  "targetId" : "TGT-3ba3f5f43b92"
+}

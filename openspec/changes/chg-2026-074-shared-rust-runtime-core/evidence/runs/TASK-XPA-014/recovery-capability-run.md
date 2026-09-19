@@ -52,5 +52,6 @@ Log: scratchpad `logs/checks-s2c.log`, SHA-256
 
 ## CI
 
-The PR's `guard` and `swift` aggregate (Rust lane, plus the Swift lane for 2c-a's test while it is
-in the diff): recorded after the run completes.
+| PR | Head | Runs | Result |
+| --- | --- | --- | --- |
+| #2034 (stacked on 2c-a, #2033) | `3f7db50e` | 35446195556, 35446195559, 35446195749 | 11 checks passed, `app-build` skipped; merged as `2af5c806`, after #2033 |

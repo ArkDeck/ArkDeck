@@ -149,7 +149,10 @@ enum HDCOracleHarness {
   /// landing path is in the receive argv, so in the materialized plan and its
   /// digest — and the oracle records what is left in it. With
   /// `fixedInvocationSeconds`, every dispatched child reports that duration
-  /// (`FixedDurationDispatcher`). Neither is applied unless an oracle names it.
+  /// (`FixedDurationDispatcher`). With `testHooks`, the engine calls the
+  /// package-only hooks of `RuntimeJobEngine.Configuration.TestHooks` (none
+  /// unless an oracle names them). None of these is applied unless an oracle
+  /// names it.
   static func composition(
     hdc: URL, targetStore: RuntimeTargetStore, targets: URL, settings: Settings,
     nativeCodeSignHelper: HDCNativeCodeSignHelperArtifact? = nil, agentExecutions: Bool = false,
@@ -157,7 +160,8 @@ enum HDCOracleHarness {
     usbRelations: @escaping @Sendable () throws -> [TargetUSBRelation] = { [] },
     hdcRuntimeDiagnostics: HDCManagedRuntimeDiagnostics? = nil,
     hostReceiveRoot: URL? = nil,
-    fixedInvocationSeconds: Double? = nil
+    fixedInvocationSeconds: Double? = nil,
+    testHooks: RuntimeJobEngine.Configuration.TestHooks = .none
   ) throws -> Composition {
     let root = settings.root
     let artifacts = root.appending(path: "artifacts", directoryHint: .isDirectory)
@@ -196,7 +200,8 @@ enum HDCOracleHarness {
       fixedInvocationSeconds.map { FixedDurationDispatcher(base: processes, seconds: $0) }
       ?? processes
     let engine = try RuntimeJobEngine(
-      configuration: .init(stateDirectory: jobsState, sessionPublicationWriter: writer),
+      configuration: .init(
+        stateDirectory: jobsState, testHooks: testHooks, sessionPublicationWriter: writer),
       providers: providers,
       dispatcher: dispatcher,
       capabilityStore: capabilities, artifactStore: store,

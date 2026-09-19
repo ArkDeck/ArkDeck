@@ -1,0 +1,28 @@
+{
+  "availableBytes" : 1099511627776,
+  "files" : {
+    "cases.json" : "603dbd02bce83a12685e1776e5ebb3a63881cd2a27227ea72a0ff602ade074b4",
+    "hdc" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+    "hdc-answers.sh" : "9ba42334b18f187246af2cac2a762a51f97109999f4a1883fc6287b467d26c2b",
+    "hdc-invocations.log" : "aea1e4ff1fed08a5c83debf8f50507ba3da886b55f108d0ab223f629e6726a46",
+    "store/capabilities/.runtime-capabilities.lock" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "store/capabilities/runtime-capabilities.json" : "c57d27d3a2ebc04d00db205fa5409f26b650dc9f306a854b9d71090ffd46bdef",
+    "store/capabilities/runtime-capabilities.ledger" : "8fccaea043de4243ddd708a4178ef947b96284f121e8e9230153cfa3ed39d2d8",
+    "store/index.json" : "0a085ee3622904647f983feb440dc8ef78791cce0742e1bf3f22e3bf635f3b24",
+    "store/jobs/job-170e24af76bacc6d8185503ed380ebea/.manifest.lock" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "store/jobs/job-170e24af76bacc6d8185503ed380ebea/job-record.json" : "2d9d252de2c7047dd4bae310fa1a6cf0f20659a634c17d9a9b7d24d68fc9a1b7",
+    "store/jobs/job-170e24af76bacc6d8185503ed380ebea/journal.jsonl" : "634df4ffb3b9a568448cd19f8ecc21b25f4c909c269f2c858b124c95af1354fc",
+    "targets-state/targets.json" : "219caf0d443d902a3fa31adf44d28f1e3611bd25df00ee3a53e696e855077b22",
+    "tree.json" : "1d916f3ecb1966e562a8226597df736948a1f836a13de5b89894e27d42aa97dc"
+  },
+  "hdcSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+  "home" : "/private/tmp/arkdeck-hdc-oracle/home",
+  "nowPreciseUTC" : "2026-09-14T00:00:00.000Z",
+  "nowUTC" : "2026-09-14T00:00:00Z",
+  "producer" : "CrashWindowOracleContractTests.testSwiftRecoversATapFromEachCrashWindowWithoutReplay",
+  "quotaBytes" : 8589934592,
+  "root" : "/private/tmp/arkdeck-hdc-oracle",
+  "sessionOwner" : "/private/tmp/arkdeck-hdc-oracle/session-owner",
+  "sessionsRoot" : "/private/tmp/arkdeck-hdc-oracle/Sessions",
+  "targetId" : "TGT-3ba3f5f43b92"
+}
