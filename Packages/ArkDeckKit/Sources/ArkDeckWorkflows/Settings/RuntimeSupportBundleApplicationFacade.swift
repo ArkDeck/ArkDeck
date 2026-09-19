@@ -68,10 +68,6 @@ public enum RuntimeSupportBundleApplicationFacade {
   public static func make() -> any RuntimeSupportBundleProviding {
     ProductionRuntimeSupportBundleProvider(bundle: .main)
   }
-
-  package static func make(bundle: Bundle) -> any RuntimeSupportBundleProviding {
-    ProductionRuntimeSupportBundleProvider(bundle: bundle)
-  }
 }
 
 private actor ProductionRuntimeSupportBundleProvider: RuntimeSupportBundleProviding {

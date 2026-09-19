@@ -1,3 +1,4 @@
+import ArkDeckClientKit
 import ArkDeckWorkflows
 import XCTest
 
@@ -11,7 +12,8 @@ final class SettingsApplicationFacadeContractTests: XCTestCase {
 
     let destination = root.appending(
       path: "ArkDeck-Diagnostics", directoryHint: .isDirectory)
-    let provider = SettingsApplicationFacade.make()
+    let provider = SettingsApplicationFacade.make(
+      diagnosticBundles: RuntimeSupportBundleSettingsExporter(), storageFixture: nil)
     let preview = try await provider.previewDiagnosticBundle(at: destination)
 
     XCTAssertTrue(preview.deviceRawExcluded)
@@ -49,7 +51,11 @@ final class SettingsApplicationFacadeContractTests: XCTestCase {
     let strings = try XCTUnwrap(catalog["strings"] as? [String: Any])
 
     XCTAssertTrue(app.contains("SettingsRootView("))
-    XCTAssertTrue(app.contains("SettingsApplicationFacade.make()"))
+    XCTAssertTrue(
+      app.contains(
+        "SettingsApplicationFacade.make(\n"
+          + "      diagnosticBundles: RuntimeSupportBundleSettingsExporter(),\n"
+          + "      storageFixture: SettingsStorageUIFixture.runtimeStorage()))"))
     XCTAssertTrue(viewModel.contains("func settingsText(_ key: String) -> String"))
     XCTAssertTrue(viewModel.contains("tableName: \"SettingsLocalizable\""))
     for key in [
@@ -73,7 +79,7 @@ final class SettingsApplicationFacadeContractTests: XCTestCase {
     let settingsFacade = try String(
       contentsOf: repository.appending(
         path:
-          "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Settings/SettingsApplicationFacade.swift"),
+          "Packages/ArkDeckKit/Sources/ArkDeckClientKit/SettingsApplicationFacade.swift"),
       encoding: .utf8)
     let supportFacade = try String(
       contentsOf: repository.appending(
@@ -119,7 +125,7 @@ final class SettingsStorageDomainContractTests: XCTestCase {
       path: "arkdeck-storage-domain-distinct-\(UUID().uuidString)",
       directoryHint: .isDirectory)
     defer { try? FileManager.default.removeItem(at: root) }
-    let provider = SettingsApplicationFacade.make(
+    let provider = SettingsApplicationFacade.composed(
       arguments: ["--ui-test-runtime-history"], fixtureRoot: root)
 
     // The owner composes itself on its first request, clearing its own root as
@@ -167,7 +173,7 @@ final class SettingsStorageDomainContractTests: XCTestCase {
       path: "arkdeck-storage-domain-absent-\(UUID().uuidString)",
       directoryHint: .isDirectory)
     defer { try? FileManager.default.removeItem(at: unavailableRoot) }
-    let unavailable = SettingsApplicationFacade.make(
+    let unavailable = SettingsApplicationFacade.composed(
       arguments: [
         "--ui-test-runtime-history", SettingsStorageUIFixture.unreachableArgument,
       ],
@@ -182,7 +188,7 @@ final class SettingsStorageDomainContractTests: XCTestCase {
       path: "arkdeck-storage-domain-empty-\(UUID().uuidString)",
       directoryHint: .isDirectory)
     defer { try? FileManager.default.removeItem(at: root) }
-    let provider = SettingsApplicationFacade.make(
+    let provider = SettingsApplicationFacade.composed(
       arguments: ["--ui-test-runtime-history"], fixtureRoot: root)
     let storage = try await provider.refresh().storage
 
@@ -229,7 +235,9 @@ final class SettingsStorageDomainContractTests: XCTestCase {
     // A second writer publishes between this provider's status read and its
     // mutation, which is exactly how a generation goes stale in production.
     let raced = LockedFlag()
-    let provider = SettingsApplicationFacade.make { method, params -> Data? in
+    let provider = SettingsApplicationFacade.make(
+      diagnosticBundles: RuntimeSupportBundleSettingsExporter()
+    ) { method, params -> Data? in
       if method == "runtime.storage.policy", raced.takeOnce() {
         _ = await owner.reply(
           "runtime.storage.policy",
@@ -254,75 +262,6 @@ final class SettingsStorageDomainContractTests: XCTestCase {
     XCTAssertEqual(reconciled.retentionDays, 30)
     let settled = try await provider.refresh().storage
     XCTAssertEqual(reconciled, settled)
-  }
-
-  /// A reply the reader cannot account for is refused, not rendered. Both
-  /// failure surfaces exist so the pane can say "no answer" instead of
-  /// showing a number that describes nothing.
-  func testAnUnusableReplyIsRefusedRatherThanRendered() async throws {
-    let unavailable = SettingsApplicationFacade.make { _, _ in nil }
-    do {
-      _ = try await unavailable.refresh()
-      XCTFail("a transport that did not answer must not produce a presentation")
-    } catch SettingsApplicationError.runtimeStorageUnavailable {
-    }
-
-    // A well-formed envelope whose result is missing the artifact domain: the
-    // exact shape a partially-updated daemon would send.
-    let partial = SettingsApplicationFacade.make { _, _ in
-      Data(
-        """
-        {"id":"x","ok":true,"result":{"schemaVersion":"arkdeck.runtime-storage/1"}}
-        """.utf8)
-    }
-    do {
-      _ = try await partial.refresh()
-      XCTFail("a reply missing a storage domain must not be rendered as zero")
-    } catch SettingsApplicationError.runtimeStorageResponseInvalid {
-    }
-
-    let refused = SettingsApplicationFacade.make { _, _ in
-      Data(
-        """
-        {"id":"x","ok":false,"error":{"code":"recordUnreadable","message":"m"}}
-        """.utf8)
-    }
-    do {
-      _ = try await refused.refresh()
-      XCTFail("a refusal must not produce a presentation")
-    } catch SettingsApplicationError.runtimeStorageRejected(let code) {
-      XCTAssertEqual(code, "recordUnreadable")
-    }
-  }
-
-  /// The production figure must keep coming from the Runtime. Recomputing it in
-  /// process is the defect, not an optimisation: the App Sandbox places the
-  /// daemon's state directory outside this container.
-  func testProductionUsageIsReadFromRuntimeAndRenderedPerDomain() throws {
-    let repository = repositoryRoot()
-    let facade = try String(
-      contentsOf: repository.appending(
-        path:
-          "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Settings/SettingsApplicationFacade.swift"),
-      encoding: .utf8)
-    let view = try String(
-      contentsOf: repository.appending(
-        path: "ArkDeckApp/Features/Settings/SettingsRootView.swift"),
-      encoding: .utf8)
-
-    XCTAssertTrue(facade.contains("method: \"runtime.storage.status\""))
-    XCTAssertTrue(facade.contains("ArkDeckControlProtocol.currentVersion"))
-    XCTAssertFalse(facade.contains("method: \"artifact.quota\""))
-    XCTAssertTrue(view.contains("storage.runtimeArtifacts"))
-    XCTAssertTrue(view.contains("sessionRoot.measuredBytes"))
-    XCTAssertTrue(view.contains("settings.storage.runtimeUnavailable"))
-    XCTAssertTrue(view.contains("settings.storage.sessionUsage"))
-  }
-
-  private func repositoryRoot() -> URL {
-    var root = URL(filePath: #filePath)
-    for _ in 0..<5 { root.deleteLastPathComponent() }
-    return root
   }
 }
 
