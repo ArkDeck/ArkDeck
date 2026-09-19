@@ -110,6 +110,8 @@ App 侧 SSH 远程构建源（`RemoteBuildSourceApplicationFacade`：Keychain �
 Citadel/NIOSSH/NIOCore/swift-crypto/swift-log 随之由 ClientKit 而非 Workflows 链接（外部包，不是 ArkDeck 依赖边）；
 Workflows 的 Debug facade 经既有的 Workflows → ClientKit 边使用它。远程构建源用到的 `DebugTypedValueValidator`
 （Catalog 标识符与原生库文件名规则）也随之移到 ClientKit，Workflows、daemon 与 App 共用这一份，不另抄规则。
+Overview 运行记录与「开始新一次」行的投影（`OverviewRunRecordProjection`、`OverviewActionProjection`）是只读展示逻辑，也在 ClientKit；
+`RuntimeWorkspaceContinuation`（依赖 ArkDeckRuntime、CLI 也在用）暂留 Workflows。
 
 ## 3. Ownership Rules(事实源唯一)
 
