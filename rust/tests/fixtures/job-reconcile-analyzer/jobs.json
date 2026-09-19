@@ -1,0 +1,38 @@
+[
+  {
+    "jobId" : "job-bd431d3ab6fe3b03b38dbdbe92c241d3",
+    "mode" : "signal",
+    "name" : "parked",
+    "runs" : true,
+    "submit" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-run-parked-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-4782cd8adbca94506c2af7ecf453800e\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-run-parked\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    }
+  },
+  {
+    "jobId" : "job-a3b9503ec0f740f04133c0c85be778b3",
+    "mode" : "signal",
+    "name" : "parkedSourceRemoved",
+    "runs" : true,
+    "submit" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-run-parkedSourceRemoved-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source-removed:ART-d4c9a0873db797d0448b5cd6211d6104\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-run-parkedSourceRemoved\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    }
+  },
+  {
+    "jobId" : "job-7e6c03dd2126fed73de39f82c2485c8e",
+    "mode" : "answered",
+    "name" : "succeeded",
+    "runs" : true,
+    "submit" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-run-succeeded-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-73deeb970a032e1b7fdecf34c4fc5511\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-run-succeeded\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    }
+  },
+  {
+    "jobId" : "job-082b8363fce0462b4571a62147751099",
+    "mode" : "answered",
+    "name" : "admitted",
+    "runs" : false,
+    "submit" : {
+      "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-oracle-run-admitted-0001\",\"inputs\":{\"sourceArtifactRef\":\"lease-v1:job-oracle-source:ART-990a17a6b9ca251b17028e7c824f7b8b\"},\"operation\":{\"id\":\"analyzer.extract-crash-signature\",\"version\":1},\"requestId\":\"req-oracle-run-admitted\",\"schemaVersion\":\"1.0.0\",\"target\":{\"targetId\":\"TGT-ORACLE\"}}"
+    }
+  }
+]
