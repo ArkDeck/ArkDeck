@@ -106,6 +106,10 @@ Settings 的展示模型、provider 协议、facade 与 `runtime.storage.*` 请�
 （经 Storage 读本机文件，CLI 共用）与 `--ui-test-runtime-history` 启动时代替 daemon 应答的存储 owner 仍在 Workflows，
 ClientKit 只声明 `SettingsDiagnosticBundleExporting` 与 `SettingsRuntimeStorageFixture`，由 App 组合
 `RuntimeSupportBundleSettingsExporter` 与 `SettingsStorageUIFixture.runtimeStorage()`，不新增依赖边。
+App 侧 SSH 远程构建源（`RemoteBuildSourceApplicationFacade`：Keychain 凭据、SFTP 只读浏览与有界拉取）整体在 ClientKit，
+Citadel/NIOSSH/NIOCore/swift-crypto/swift-log 随之由 ClientKit 而非 Workflows 链接（外部包，不是 ArkDeck 依赖边）；
+Workflows 的 Debug facade 经既有的 Workflows → ClientKit 边使用它。远程构建源用到的 `DebugTypedValueValidator`
+（Catalog 标识符与原生库文件名规则）也随之移到 ClientKit，Workflows、daemon 与 App 共用这一份，不另抄规则。
 
 ## 3. Ownership Rules(事实源唯一)
 
