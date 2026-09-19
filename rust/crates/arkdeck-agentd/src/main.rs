@@ -62,6 +62,10 @@ struct DevelopmentHdc {
 /// commandless identity proof binds the endpoint's listener to that very
 /// launch. A registered HDC is then accepted, and every dispatch addresses
 /// that server while it is still the one launched.
+///
+/// Development USB relations are read beside a fixture; beside a registered
+/// HDC only when the owner starts it as its managed server and the caller
+/// acknowledges them (`development_usb::admit`).
 #[cfg(target_os = "macos")]
 fn development_hdc() -> Result<Option<DevelopmentHdc>, Box<dyn std::error::Error>> {
     let managed = match std::env::var_os("ARKDECK_DEVELOPMENT_HDC_SERVER") {
@@ -69,12 +73,17 @@ fn development_hdc() -> Result<Option<DevelopmentHdc>, Box<dyn std::error::Error
         Some(mode) if mode == "managed" => true,
         Some(_) => return Err("ARKDECK_DEVELOPMENT_HDC_SERVER accepts only managed".into()),
     };
+    let relations = std::env::var_os("ARKDECK_DEVELOPMENT_USB_RELATIONS").is_some();
+    let acknowledged = development_usb::acknowledged(
+        std::env::var_os(development_usb::REGISTERED_HDC_ACKNOWLEDGMENT).as_deref(),
+    )?;
     let Some(path) = std::env::var_os("ARKDECK_DEVELOPMENT_HDC_PATH") else {
         if managed {
             return Err(
                 "a managed development HDC server needs ARKDECK_DEVELOPMENT_HDC_PATH".into(),
             );
         }
+        development_usb::admit(false, false, relations, acknowledged)?;
         return Ok(None);
     };
     let path = std::path::PathBuf::from(path);
@@ -93,12 +102,14 @@ fn development_hdc() -> Result<Option<DevelopmentHdc>, Box<dyn std::error::Error
                 .into(),
         );
     }
-    // A harness's relations stand in for the ArkForge lane's reader only
-    // beside a fixture: for a registered HDC they would be a trusted fact
-    // about a real device that no physical relation proved.
-    if registered && std::env::var_os("ARKDECK_DEVELOPMENT_USB_RELATIONS").is_some() {
-        return Err("development USB relations are configured only beside a fixture HDC".into());
-    }
+    // A harness's relations stand in for the ArkForge lane's reader beside a
+    // fixture. For a registered HDC they would be a trusted fact about a real
+    // device that no physical relation proved, so they are refused there
+    // unless the owner starts that HDC as its managed server and the caller
+    // acknowledges them: the maintainer's option A of 2026-09-19, whose
+    // results are development-root evidence, never REAL_DEVICE_PASS. Decided
+    // before any server is started.
+    development_usb::admit(registered, managed, relations, acknowledged)?;
     let managed = if managed {
         let selection = arkdeck_provider_hdc::EndpointSelection::select(
             std::env::var_os(arkdeck_provider_hdc::SERVER_PORT_VARIABLE)
@@ -151,6 +162,17 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         .any(|key| std::env::var_os(key).is_some())
     {
         return Err("a development HDC is configured only for an isolated development root".into());
+    }
+    // The standalone daemon and the facade never read development relations,
+    // acknowledged or not.
+    if development.is_none()
+        && std::env::var_os("ARKDECK_DEVELOPMENT_USB_RELATIONS_WITH_REGISTERED_HDC").is_some()
+    {
+        return Err(
+            "development USB relations beside a registered HDC are acknowledged only for an \
+             isolated development root"
+                .into(),
+        );
     }
     if std::env::var_os("ARKDECK_DEVELOPMENT_USB_RELATIONS").is_some()
         && std::env::var_os("ARKDECK_DEVELOPMENT_HDC_PATH").is_none()
@@ -301,8 +323,9 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             Some(DevelopmentHdc { dispatch, .. }) => host.with_development_hdc(Some(dispatch)),
             None => host.with_development_hdc(None),
         };
-        // Only beside the development HDC's fixture: the relations a harness
-        // names stand in for the ArkForge lane's reader.
+        // Beside the development HDC's fixture, or acknowledged beside the
+        // registered HDC it started as its managed server (`development_hdc`):
+        // the relations the file names stand in for the ArkForge lane's reader.
         match development_usb::DevelopmentUsbRelations::from_environment()? {
             Some(usb) => host.with_usb_relations(std::sync::Arc::new(usb)),
             None => host,
