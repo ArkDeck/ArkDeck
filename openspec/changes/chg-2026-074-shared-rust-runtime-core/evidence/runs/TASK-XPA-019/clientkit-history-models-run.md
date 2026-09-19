@@ -129,3 +129,31 @@ SHA-256: `53e829e11d49e4338daa0b79a1151643ba75ebdce3b0097c0ec21c78adbf843b`.
 Retained provenance: `rust/target/readonly-check/01388b861f0e4fbc964fd611b57ba3c7`.
 Signed standalone Rust App acceptance, installed activation, hardware journeys
 and SPK-8 completion are not claimed.
+
+## Final validation with published Artifact import
+
+Integrated protected main `510b46508d8719318114a17c2567b701297efb65`.
+Only the shared manifest conflicted; the existing generator regenerated it
+from merged inputs: 105 methods, 748 recorded shapes, unchanged protocol
+identity. All four publication corpora remained byte-identical to that main,
+and the two changed History corpora remained byte-identical to the previously
+validated branch. No new recordings were fabricated or discarded.
+
+The complete unified command above ran again with `CARGO_BUILD_JOBS=1` and
+`RUST_TEST_THREADS=1`; the Swift executable wrapper, Swift test workers 2,
+Xcode build tasks 2, explicit validation venv and all other arguments were
+unchanged. Tested source: `ee6ad0255d16b0b3f2983c729bdfd8a4beae44e8`.
+The planner selected Swift, App, design-system and Rust against main `510b4650`.
+The actual process exited 0. Common checks, 2,691 parallel Swift tests plus
+runner-owned serial sets, App build-for-testing, Rust workspace/strict Clippy,
+35 contract-check tests, both full published/candidate views, cargo deny and
+cargo vet (36 fully audited) passed. Both view provenance records are complete
+and successful. This is the final locally validated combination; later main
+commits are not claimed as tested here, and branch CI is not merge-result CI.
+
+Log: `/private/tmp/arkdeck-clientkit-models-main510-final-20260919.log`.
+SHA-256: `edc55d0ad1224d2bbc8abe4b0af3b41ccad60385a4628efc12186ec80f9e5f7c`.
+Provenance: `rust/target/readonly-check/97b7b3fe44e64ba28966b880211daf23`.
+The previous failed and passed attempts above retain their distinct baselines.
+No signed App, installed Runtime activation, hardware journey or SPK-8
+completion is claimed.
