@@ -8,6 +8,7 @@
 #![allow(dead_code)]
 
 pub mod debug_hap;
+pub mod hdc_oracle;
 pub mod native_library;
 
 use arkdeck_hoststore::{StorageProbe, StorageSnapshot};

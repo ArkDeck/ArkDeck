@@ -23,7 +23,8 @@ mod support;
 use arkdeck_hoststore::AdmissionRefusal;
 use std::fs;
 use support::debug_hap::{self, NoDispatch};
-use support::native_library::{self, FIXTURE, Owners, answer, exchange};
+use support::hdc_oracle::{Owners, exchange};
+use support::native_library::{self, FIXTURE, answer};
 
 #[test]
 fn rust_plans_the_swift_native_library_requests() {
@@ -59,7 +60,7 @@ fn rust_plans_the_swift_native_library_requests() {
     assert!(differences.is_empty(), "{}", differences.join("\n"));
     assert_eq!((plans, materialized), (9, 5), "five plans, four refusals");
     // A plan admits no Job and dispatches nothing.
-    let jobs = owners.store.join("jobs");
+    let jobs = owners.default_root.join("jobs");
     assert!(
         !jobs.exists() || fs::read_dir(&jobs).unwrap().next().is_none(),
         "planning admits nothing"
@@ -98,7 +99,7 @@ fn rust_refuses_a_native_deployment_without_a_verified_code_sign_helper() {
     // The same refusal answers a submission, before anything is admitted.
     let submitted = exchange(&cases, "deployed.submit");
     let denied = owners
-        .admitter(&hdc)
+        .admitter(&hdc, &owners.default_root)
         .handle(submitted["params"].as_object().unwrap())
         .unwrap_err();
     assert_eq!(

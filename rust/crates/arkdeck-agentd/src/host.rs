@@ -555,6 +555,9 @@ impl HostServices for Host {
                     .authority()
                     .zip(self.jobs.as_deref())
                     .is_some_and(|(authority, jobs)| authority.require_state(jobs).is_ok()),
+                // The daemon composes no code-sign helper yet
+                // (`HdcComposition::code_sign_helper`).
+                code_sign_helper: false,
                 hdc_tool_current: if provider == "hdc"
                     && [
                         "observe.device@1",
@@ -566,6 +569,7 @@ impl HostServices for Host {
                         "port-forward.remove@1",
                         "debug.hap@1",
                         "capture.screen-sequence@1",
+                        "deploy.native-library.app-owned@1",
                     ]
                     .contains(&reference)
                 {

@@ -9,9 +9,10 @@
 //!   the exact inputs and by the library, whose identity, digest and size are
 //!   among the facts it is authorized by, and no use of it is consumed;
 //! - each Job's request, original submission and materialization, its
-//!   admission row and the start of its journal, as Swift persisted them;
-//! - `job.run` and an agent execution refuse a deployment with zero dispatch
-//!   until this Runtime runs one.
+//!   admission row and the start of its journal, as Swift persisted them.
+//!
+//! An agent execution admits the deployment it will run, as `job.submit`
+//! does; the runs themselves are `native_library_run.rs`'s.
 //!
 //! A library GJ-3 hands the Runtime as an Import is planned and admitted from
 //! the Import's lease, which must be bound to the Target, and the Job keeps
@@ -24,14 +25,14 @@ mod support;
 
 use arkdeck_hoststore::{
     AdmissionRefusal, AgentEngine, AgentExecutionStore, ImportUploadStore, JobAdmitter, JobPlanner,
-    JobRunner, MutationExecution,
 };
-use serde_json::{Map, Value, json};
+use serde_json::{Value, json};
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use support::debug_hap::{self, NoDispatch};
-use support::native_library::{self, FIXTURE, Owners, answer, exchange};
+use support::hdc_oracle::{Owners, exchange};
+use support::native_library::{self, FIXTURE, answer};
 use support::{fixed_now, fixed_precise_now};
 
 const CHECKPOINT: &str = "runtime-capabilities.json";
@@ -58,7 +59,7 @@ fn rust_admits_the_swift_native_library_submissions_under_the_capability_swift_i
     let cases = support::document(&fixture, "cases.json");
     let owners = Owners::open(&fixture);
     let hdc = owners.hdc(&NoDispatch);
-    let admitter = owners.admitter(&hdc);
+    let admitter = owners.admitter(&hdc, &owners.default_root);
     let (mut plans, mut submissions, mut differences) = (0, 0, Vec::new());
     for exchange in cases["exchanges"].as_array().unwrap() {
         let params = exchange["params"].as_object().unwrap();
@@ -96,7 +97,7 @@ fn rust_admits_the_swift_native_library_submissions_under_the_capability_swift_i
     let checkpoint = |store: &Path| fs::read(store.join("capabilities").join(CHECKPOINT)).unwrap();
     let (swift_bytes, issued_bytes) = (
         checkpoint(&fixture.join("store")),
-        checkpoint(&owners.store),
+        checkpoint(&owners.default_root),
     );
     let swift: Value = serde_json::from_slice(&swift_bytes).unwrap();
     let issued: Value = serde_json::from_slice(&issued_bytes).unwrap();
@@ -116,7 +117,13 @@ fn rust_admits_the_swift_native_library_submissions_under_the_capability_swift_i
         );
         assert_eq!(record["remainingUses"], record["capability"]["maximumUses"]);
     }
-    assert!(!owners.store.join("capabilities").join(LEDGER).exists());
+    assert!(
+        !owners
+            .default_root
+            .join("capabilities")
+            .join(LEDGER)
+            .exists()
+    );
 
     // Each Job runs the request naming its capability; the caller's own is
     // its original submission. What admission wrote is Swift's: these
@@ -124,7 +131,7 @@ fn rust_admits_the_swift_native_library_submissions_under_the_capability_swift_i
     // events, byte for byte.
     for (case, job) in cases["jobs"].as_object().unwrap() {
         let job = job.as_str().unwrap();
-        let directory = owners.store.join("jobs").join(job);
+        let directory = owners.default_root.join("jobs").join(job);
         let recorded = fixture.join("store/jobs").join(job);
         let ours = read(&directory.join("job-record.json"));
         let theirs = read(&recorded.join("job-record.json"));
@@ -169,96 +176,15 @@ fn rust_admits_the_swift_native_library_submissions_under_the_capability_swift_i
         }
     }
 
-    // `job.run` refuses every admitted deployment before its run starts, with
-    // the zero-dispatch proof, even with the mutation owner present.
-    let runner = JobRunner {
-        mutation: Some(MutationExecution {
-            authority: owners.authority(),
-            state_root: &owners.root,
-        }),
-        jobs: &owners.jobs,
-        artifacts: &owners.artifacts,
-        imports: None,
-        analyzer: None,
-        quota: 128 * 1024 * 1024,
-        home: "/private/tmp",
-        now: fixed_now,
-        precise_now: fixed_precise_now,
-        sessions: None,
-        cancellation: None,
-        after_commit: None,
-        hdc: Some(&hdc),
-    };
-    let jobs_before = debug_hap::tree_bytes(&owners.store.join("jobs"));
-    let capabilities_before = debug_hap::tree_bytes(&owners.store.join("capabilities"));
-    for job in cases["jobs"].as_object().unwrap().values() {
-        let job = job.as_str().unwrap();
-        let refusal = runner
-            .handle(&Map::from_iter([("jobId".into(), json!(job))]))
-            .unwrap_err();
-        assert_eq!(
-            json!({"code": refusal.code, "message": refusal.message, "details": refusal.details}),
-            json!({"code": "rejected",
-                "message": format!("job {job} runs deploy.native-library.app-owned@1, \
-                    which the Rust Runtime does not execute yet"),
-                "details": native_library::proof()})
-        );
-    }
-    // An agent execution starts the Job it owns at once, so it admits no
-    // deployment while this Runtime cannot run one: refused before admission.
-    let executions = owners.root.join("agent-executions");
-    fs::create_dir(&executions).unwrap();
-    fs::set_permissions(&executions, fs::Permissions::from_mode(0o700)).unwrap();
-    let agents = AgentExecutionStore::open(&executions).unwrap();
-    let engine = AgentEngine {
-        targets: &owners.targets,
-        jobs: &owners.jobs,
-        admitter: &admitter,
-        now: fixed_precise_now,
-        observations: None,
-    };
-    let deployed: Value = serde_json::from_str(
-        exchange(&cases, "deployed.submit")["params"]["requestJson"]
-            .as_str()
-            .unwrap(),
-    )
-    .unwrap();
-    let run = json!({
-        "schemaVersion": "arkdeck.agent-execution-request/1", "executionId": "native-agent",
-        "operation": "deploy.native-library.app-owned@1", "inputs": deployed["inputs"],
-        "maximumWaitMilliseconds": "300000",
-        "target": {"targetId": deployed["target"]["targetId"]},
-    });
-    let Err(refused) = agents.advance("agent.run", run.as_object().unwrap(), &engine) else {
-        panic!("an agent execution admitted a deployment this Runtime cannot run");
-    };
-    assert_eq!(
-        refused.message,
-        "deploy.native-library.app-owned@1 is not executed by the Rust Runtime yet"
-    );
-    assert_eq!(
-        Value::Object(refused.details.unwrap_or_default())["newDispatchCount"],
-        json!(0)
-    );
-    assert_eq!(
-        debug_hap::tree_bytes(&owners.store.join("jobs")),
-        jobs_before,
-        "a refused run or agent execution writes no Job"
-    );
-    assert_eq!(
-        debug_hap::tree_bytes(&owners.store.join("capabilities")),
-        capabilities_before,
-        "a refused run or agent execution issues and consumes nothing"
-    );
     assert!(
         debug_hap::invocations(&owners.root).is_empty(),
-        "admission and the refused runs dispatch nothing"
+        "admission dispatches nothing"
     );
 
     // The admission rows are Swift's: identity, request hash, sequence and
     // creation. Their state, version and record come with the runs. The index
     // is read once the Job owner is closed.
-    let store = owners.store.clone();
+    let store = owners.default_root.clone();
     drop(owners);
     let index = support::index(&store);
     let recorded = support::document(&fixture, "store/index.json");
@@ -366,14 +292,14 @@ fn a_deployment_of_an_imported_library_is_admitted_and_keeps_its_import_from_rel
     );
     let admitter = JobAdmitter {
         planner: planner(),
-        ..owners.admitter(&hdc)
+        ..owners.admitter(&hdc, &owners.default_root)
     };
     let job = admitter
         .submit(&serde_json::to_vec(&request).unwrap())
         .unwrap()["jobId"]
         .clone();
     // The Runtime issued the library's capability for these exact inputs.
-    let issued = read(&owners.store.join("capabilities").join(CHECKPOINT));
+    let issued = read(&owners.default_root.join("capabilities").join(CHECKPOINT));
     assert_eq!(envelopes(&issued).len(), 1);
     assert_eq!(envelopes(&issued)[0]["exactInputs"], request["inputs"]);
     assert_eq!(issued["records"][0]["consumptions"], json!([]));
@@ -400,5 +326,75 @@ fn a_deployment_of_an_imported_library_is_admitted_and_keeps_its_import_from_rel
             .code,
         "resourceConflict"
     );
+    assert!(debug_hap::invocations(&owners.root).is_empty());
+}
+
+/// An agent execution starts the Job it comes to own at once, and this
+/// Runtime now runs a native deployment: `agent.run` admits it under the
+/// capability Swift issues, as `job.submit` does, and hands the Job to its
+/// caller to start. Admission dispatches nothing and consumes no use.
+#[test]
+fn an_agent_run_admits_the_deployment_it_will_run() {
+    let _lock = debug_hap::exclusive();
+    let fixture = support::fixture(FIXTURE);
+    let cases = support::document(&fixture, "cases.json");
+    let owners = Owners::open(&fixture);
+    let hdc = owners.hdc(&NoDispatch);
+    let admitter = owners.admitter(&hdc, &owners.default_root);
+    let executions = owners.root.join("agent-executions");
+    fs::create_dir(&executions).unwrap();
+    fs::set_permissions(&executions, fs::Permissions::from_mode(0o700)).unwrap();
+    let agents = AgentExecutionStore::open(&executions).unwrap();
+    let engine = AgentEngine {
+        targets: &owners.targets,
+        jobs: &owners.jobs,
+        admitter: &admitter,
+        now: fixed_precise_now,
+        observations: None,
+    };
+    let deployed: Value = serde_json::from_str(
+        exchange(&cases, "deployed.submit")["params"]["requestJson"]
+            .as_str()
+            .unwrap(),
+    )
+    .unwrap();
+    let run = json!({
+        "schemaVersion": "arkdeck.agent-execution-request/1", "executionId": "native-agent",
+        "operation": "deploy.native-library.app-owned@1", "inputs": deployed["inputs"],
+        "maximumWaitMilliseconds": "300000",
+        "target": {"targetId": deployed["target"]["targetId"]},
+    });
+    let answer = agents
+        .advance("agent.run", run.as_object().unwrap(), &engine)
+        .unwrap_or_else(|refusal| panic!("{}: {}", refusal.code, refusal.message));
+    let start = answer
+        .start
+        .expect("the execution owns the Job it will run");
+    assert_eq!(start.execution, "native-agent");
+    let record = read(
+        &owners
+            .default_root
+            .join("jobs")
+            .join(&start.job)
+            .join("job-record.json"),
+    );
+    assert_eq!(
+        (&record["state"], &record["operationReference"]),
+        (
+            &json!("preflight"),
+            &json!("deploy.native-library.app-owned@1")
+        )
+    );
+    assert!(record.get("admissionEvidence").is_none());
+    // The capability Swift issues for these exact inputs and this library,
+    // with its whole budget.
+    let issued = read(&owners.default_root.join("capabilities").join(CHECKPOINT));
+    let swift = read(&fixture.join("store/capabilities").join(CHECKPOINT));
+    assert_eq!(envelopes(&issued), envelopes(&swift));
+    assert_eq!(
+        record["request"]["authorization"]["capabilityId"],
+        envelopes(&issued)[0]["capabilityID"]
+    );
+    assert_eq!(issued["records"][0]["consumptions"], json!([]));
     assert!(debug_hap::invocations(&owners.root).is_empty());
 }

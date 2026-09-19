@@ -1,8 +1,9 @@
 //! Swift `RuntimeJobEngine.runOwned` over `executeSteps` and `dispatchWithWAL`
 //! for an admitted device-bound HDC Job (`observe.device@1`, the default legs
-//! of `capture.diagnostics@1`, the pointer gestures, the port rules and
-//! `debug.hap@1`), as the isolated Rust owner runs it through its HDC
-//! composition: the running transition; every catalog step in
+//! of `capture.diagnostics@1`, the pointer gestures, the port rules,
+//! `debug.hap@1` and `deploy.native-library.app-owned@1`), as the isolated
+//! Rust owner runs it through its HDC composition: the running transition;
+//! every catalog step in
 //! order — the engine's own recorded, the host storage preflight among them;
 //! an optional step the request did not select recorded as skipped, with the
 //! products it owned recorded missing; the provider's dispatched, each with
@@ -34,11 +35,22 @@
 //! root. What its run of stills measured stays on the record, and its received
 //! archive is published from the landed file, which then does not outlive the
 //! publication (`device_screen_sequence.rs`).
+//!
+//! A native deployment's library is verified on the host, then resolved again
+//! and read for each of its device steps, which run only against the Target
+//! identity and binding its plan was materialized for. Its send is believed
+//! only through the staging readback after it. A confirmed failure of a
+//! required step is compensated inside the step loop before the Job fails
+//! (`device_native.rs`), and an optional cleanup that fails owes a debt for
+//! what it left behind.
 use crate::artifact_publication::{ArtifactPublisher, Product};
 use crate::artifact_read_owner::{LeasedArtifact, swift_string};
 use crate::capture_documents;
+use crate::cleanup_debt::{self, Residue};
 use crate::device_facts::{self, DeviceFacts, HdcComposition};
-use crate::device_steps::{self, ActionRefusal, StepAction, StepContext, StepInputs};
+use crate::device_steps::{
+    self, ActionRefusal, LeasedLibrary, StepAction, StepContext, StepInputs,
+};
 use crate::job_cancel::RunCancellation;
 use crate::job_journal_events::{self as events, Target};
 use crate::job_record::JobRecord;
@@ -55,6 +67,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 #[path = "device_hap_failure.rs"]
 mod hap_failure;
+#[path = "device_native.rs"]
+mod native;
 #[path = "device_screen_sequence.rs"]
 mod screen_sequence;
 
@@ -195,6 +209,42 @@ fn port_readback(descriptor: &CatalogOperation, step: &CatalogStep, outcome: Out
         }
         .into(),
     }
+}
+
+/// Swift's interpolation of the `RuntimeDispatchFailure` a dispatch ended
+/// with, as the lanes after it name it; none for a stop that is not one.
+fn dispatch_failure(stop: &Stop) -> Option<String> {
+    match stop {
+        Stop::Failed(reason) => Some(format!("failed({})", swift_string(reason))),
+        Stop::Unknown(reason) => Some(format!("outcomeUnknown({})", swift_string(reason))),
+        _ => None,
+    }
+}
+
+/// Swift `validateMaterializedTargetFacts`: the Target's facts hold for the
+/// request and still name the identity and binding revision the Job's plan
+/// was materialized against.
+fn materialized_facts(
+    record: &JobRecord,
+    facts: Option<&DeviceFacts>,
+    target_id: &str,
+    revision: Option<i64>,
+) -> Result<(), Stop> {
+    let facts = facts.ok_or_else(|| {
+        Stop::Failed(
+            "evidenceIncomplete: target/binding/routing/tool facts are absent or mismatched".into(),
+        )
+    })?;
+    device_facts::validate(facts, target_id, revision)
+        .map_err(|reason| Stop::Failed(reason.into()))?;
+    if record.materialized_identity() != Some(facts.identity.as_str())
+        || record.materialized_binding() != Some(facts.binding_revision)
+    {
+        return Err(Stop::Failed(
+            "target identity or binding revision drifted after plan materialization".into(),
+        ));
+    }
+    Ok(())
 }
 
 /// What every product one Job publishes shares: its owner, operation,
@@ -385,6 +435,9 @@ impl JobRunner<'_> {
                     // a native library; a debug HAP's packages are resolved
                     // again at each step given them.
                     "verifyArtifact" if reference == HAP => {}
+                    "verifyArtifact" | "hashFile" if reference == device_steps::NATIVE => {
+                        self.verify_native_library(run, step)?;
+                    }
                     _ => return Err(Stop::Refused(uncertain())),
                 }
                 run.record
@@ -407,13 +460,11 @@ impl JobRunner<'_> {
                 self.skip(run, descriptor, step, &reason, &mut skipped);
                 continue;
             }
-            // A debug HAP's packages are resolved from their leases again
-            // before each step given them; the other operations take none.
-            let resolved = self.resolve_inputs(
-                run,
-                device_steps::step_inputs(&reference, &step.kind),
-                &step.step_id,
-            )?;
+            // A step's input Artifacts are resolved from their leases again
+            // before anything else of it (a debug HAP's packages for the steps
+            // given them, a native deployment's library, read for the step,
+            // for each of its device steps); the other operations take none.
+            let (resolved, library) = self.step_artifacts(run, &reference, step)?;
             let evidence = device_steps::evidence_preflight_step(step);
             let facts = if step.binding == "confirmedDevice" {
                 match hdc.facts(&target_id) {
@@ -459,6 +510,11 @@ impl JobRunner<'_> {
             if gated && evidence && self.carry_session_evidence(run, descriptor, step)? {
                 continue;
             }
+            // A native deployment's device step runs only against the Target
+            // its plan was materialized for.
+            if reference == device_steps::NATIVE && step.binding == "confirmedDevice" {
+                materialized_facts(&run.record, facts.as_ref(), &target_id, revision)?;
+            }
             let Some(now) = (hdc.now)() else {
                 return Err(Stop::Refused(uncertain()));
             };
@@ -466,8 +522,8 @@ impl JobRunner<'_> {
             let context = StepContext {
                 job_id: &job_id,
                 resolved: &resolved,
-                library: None,
-                helper: None,
+                library: library.as_ref(),
+                helper: hdc.code_sign_helper,
             };
             let action = match device_steps::action_in(step, &reference, &inputs, &now, &context) {
                 Ok(action) => action,
@@ -535,14 +591,31 @@ impl JobRunner<'_> {
                 }
                 // Optional steps are the partial-success surface: one that
                 // fails is skipped with its failure and the Job goes on. An
-                // unknown outcome is never tolerated.
+                // unknown outcome is never tolerated. A cleanup that ran and
+                // failed also owes a record of what it left behind.
                 Err(Stop::Failed(reason)) if step.optional => {
                     let reason = format!("failed({})", swift_string(&reason));
                     self.skip(run, descriptor, step, &reason, &mut skipped);
+                    if let Some(residue) = device_steps::cleanup_residue(&action) {
+                        self.owe_cleanup(run, &step.step_id, &residue, &reason, &action);
+                    }
                 }
-                // A port rule that changed before the failure is restored
-                // first.
+                // A native deployment first undoes what it changed, and a port
+                // rule that changed before the failure is restored.
                 Err(Stop::Failed(reason)) => {
+                    if let StepAction::Native(native) = &action {
+                        self.compensate_native_library(
+                            run,
+                            hdc,
+                            descriptor,
+                            native.deployment(),
+                            &completed,
+                            &step.step_id,
+                            &reason,
+                            &target_id,
+                            revision,
+                        )?;
+                    }
                     self.compensate_port_rule(
                         run, hdc, descriptor, &action, &completed, &target_id, revision,
                     )?;
@@ -610,6 +683,36 @@ impl JobRunner<'_> {
         }
     }
 
+    /// Swift `recordCleanupDebt`, then `refreshResidueCount`, each a best
+    /// effort as Swift makes them: what a failed cleanup left behind appended
+    /// to the ledger with the exact action that failed, then the Job's
+    /// outstanding residue counted again from the ledger and made durable.
+    fn owe_cleanup(
+        &self,
+        run: &mut Run,
+        step_id: &str,
+        residue: &Residue,
+        reason: &str,
+        action: &StepAction,
+    ) {
+        let (kind, arguments) = action.persisted();
+        if let Some(now) = (self.now)() {
+            let _ = cleanup_debt::append(
+                self.artifacts,
+                &run.record.job_id,
+                step_id,
+                residue,
+                reason,
+                &json!({"kind": kind, "arguments": arguments}),
+                &now,
+            );
+        }
+        let owed = cleanup_debt::outstanding(self.artifacts, &run.record.job_id).unwrap_or(0);
+        run.record
+            .set_residues(i64::try_from(owed).unwrap_or(i64::MAX));
+        let _ = run.persist(self.jobs);
+    }
+
     /// Swift's `preflightHostStorage` step: the room the capture may take,
     /// asked of the Artifact store before any device is touched.
     fn preflight_host_storage(&self, run: &Run, descriptor: &CatalogOperation) -> Result<(), Stop> {
@@ -638,6 +741,52 @@ impl JobRunner<'_> {
         given: StepInputs,
         step_id: &str,
     ) -> Result<Vec<ResolvedArtifact>, Stop> {
+        self.leased_inputs(run, given, step_id)?
+            .into_iter()
+            .map(resolved_input)
+            .collect()
+    }
+
+    /// A step's input Artifacts, resolved from their leases again immediately
+    /// before it, and for a native deployment its library as its provider
+    /// reads it for the step (Swift `nativeLibraryAction` reads it there). A
+    /// library that cannot be read leaves the provider no action for the
+    /// step.
+    fn step_artifacts(
+        &self,
+        run: &Run,
+        reference: &str,
+        step: &CatalogStep,
+    ) -> Result<(Vec<ResolvedArtifact>, Option<LeasedLibrary>), Stop> {
+        let leased = self.leased_inputs(
+            run,
+            device_steps::step_inputs(reference, &step.kind),
+            &step.step_id,
+        )?;
+        let library = leased
+            .first()
+            .filter(|_| reference == device_steps::NATIVE)
+            .and_then(|library| {
+                Some(LeasedLibrary {
+                    bytes: crate::job_plan::read_library(&library.path).ok()?,
+                    byte_count: library.row["byteCount"].as_i64()?,
+                })
+            });
+        let resolved = leased
+            .into_iter()
+            .map(resolved_input)
+            .collect::<Result<_, _>>()?;
+        Ok((resolved, library))
+    }
+
+    /// The leases `given` names, the entry first (a debug HAP's entry
+    /// package, or a native deployment's library), each resolved and bound.
+    fn leased_inputs(
+        &self,
+        run: &Run,
+        given: StepInputs,
+        step_id: &str,
+    ) -> Result<Vec<LeasedArtifact>, Stop> {
         if given == StepInputs::None {
             return Ok(Vec::new());
         }
@@ -648,7 +797,14 @@ impl JobRunner<'_> {
                 swift_string(message)
             ))
         };
-        let Some(entry) = request["inputs"]["hapArtifactLease"].as_str() else {
+        // Swift `resolvedInputArtifact`: the lease the operation's entry
+        // input names.
+        let entry = if run.record.operation() == device_steps::NATIVE {
+            "libraryArtifactLease"
+        } else {
+            "hapArtifactLease"
+        };
+        let Some(entry) = request["inputs"][entry].as_str() else {
             return Err(Stop::Refused(uncertain()));
         };
         let mut leases = vec![entry];
@@ -674,15 +830,7 @@ impl JobRunner<'_> {
                 if let Some(refusal) = unbound(&leased, &run.record) {
                     return Err(rejected(refusal));
                 }
-                let sha256 = leased.row["sha256"]
-                    .as_str()
-                    .ok_or_else(|| Stop::Refused(uncertain()))?
-                    .to_owned();
-                Ok(ResolvedArtifact {
-                    artifact_id: leased.artifact_id,
-                    sha256,
-                    path: leased.path,
-                })
+                Ok(leased)
             })
             .collect()
     }
@@ -1225,16 +1373,7 @@ impl JobRunner<'_> {
         let facts = hdc
             .facts(target_id)
             .map_err(|_| Stop::Refused(uncertain()))?;
-        // Swift `validateMaterializedTargetFacts`.
-        device_facts::validate(&facts, target_id, revision)
-            .map_err(|reason| Stop::Failed(reason.into()))?;
-        if run.record.materialized_identity() != Some(facts.identity.as_str())
-            || run.record.materialized_binding() != Some(facts.binding_revision)
-        {
-            return Err(Stop::Failed(
-                "target identity or binding revision drifted after plan materialization".into(),
-            ));
-        }
+        materialized_facts(&run.record, Some(&facts), target_id, revision)?;
         let (kind, change) = if inverse == "port-forward.remove@1" {
             ("removePortForward", PortAction::Remove(rule.clone()))
         } else {
@@ -1305,21 +1444,14 @@ impl JobRunner<'_> {
                     .push(format!("compensated port rule to {inverse}"));
                 Ok(())
             }
-            Err(Stop::Failed(reason)) => {
-                run.record.timeline.push(format!(
-                    "port-rule compensation failed closed: failed({})",
-                    swift_string(&reason)
-                ));
-                Err(Stop::Failed(reason))
+            Err(stop) => {
+                if let Some(failure) = dispatch_failure(&stop) {
+                    run.record
+                        .timeline
+                        .push(format!("port-rule compensation failed closed: {failure}"));
+                }
+                Err(stop)
             }
-            Err(Stop::Unknown(reason)) => {
-                run.record.timeline.push(format!(
-                    "port-rule compensation failed closed: outcomeUnknown({})",
-                    swift_string(&reason)
-                ));
-                Err(Stop::Unknown(reason))
-            }
-            Err(stop) => Err(stop),
         }
     }
 
@@ -1474,6 +1606,20 @@ impl JobRunner<'_> {
         }
         Ok(())
     }
+}
+
+/// A resolved input as its provider is given it: its identity, its digest
+/// and where its bytes are.
+fn resolved_input(leased: LeasedArtifact) -> Result<ResolvedArtifact, Stop> {
+    let sha256 = leased.row["sha256"]
+        .as_str()
+        .ok_or_else(|| Stop::Refused(uncertain()))?
+        .to_owned();
+    Ok(ResolvedArtifact {
+        artifact_id: leased.artifact_id,
+        sha256,
+        path: leased.path,
+    })
 }
 
 /// Swift `validateArtifactBinding` for a device-bound input: the lease's
