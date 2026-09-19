@@ -1138,3 +1138,34 @@ fn trace_retention_refuses_corrupt_indices_and_unsafe_nested_imports_before_acti
         assert_eq!(fs::read(payload).unwrap(), b"retain");
     }
 }
+
+#[test]
+fn trace_retention_reads_past_4096_entries_and_still_refuses_what_it_cannot_read() {
+    let mut fixture = Fixture::new();
+    fixture.add("payload", b"retained");
+    // JOB-1, its index and its payload, and 4094 Job directories: 4097
+    // entries, one more than the census once read before it refused every
+    // publication and purge.
+    for n in 0..4094 {
+        fs::DirBuilder::new()
+            .mode(0o700)
+            .create(fixture.root.join(format!("JOB-EMPTY-{n:04}")))
+            .unwrap();
+    }
+    let store = fixture.store();
+    assert!(store.with_trace_retention(|retain| retain).unwrap());
+    // At that size it still refuses, before its action, a corrupt index in
+    // the last Job it reads and a link inside it.
+    let last = fixture.root.join("JOB-EMPTY-4093");
+    let index = last.join("index.json");
+    fs::write(&index, b"{}").unwrap();
+    fs::set_permissions(&index, fs::Permissions::from_mode(0o600)).unwrap();
+    let mut called = false;
+    assert!(store.with_trace_retention(|_| called = true).is_err());
+    fs::remove_file(&index).unwrap();
+    symlink(fixture.root.join("JOB-1/index.json"), last.join("link")).unwrap();
+    assert!(store.with_trace_retention(|_| called = true).is_err());
+    assert!(!called, "an unreadable census cannot reach Trace deletion");
+    fs::remove_file(last.join("link")).unwrap();
+    assert!(store.with_trace_retention(|retain| retain).unwrap());
+}

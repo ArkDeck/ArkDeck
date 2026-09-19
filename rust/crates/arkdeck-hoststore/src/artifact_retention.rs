@@ -24,9 +24,8 @@
 //! a cleanup, and each exact Artifact an active Job names as an input lease is
 //! kept wherever it lives: ADR-0007 decision 5's "not referenced by an active
 //! Job". The sweep holds the Artifact retention guard's lock, which every
-//! publication and Trace maintenance take, but not the Trace census, which
-//! refuses a tree of more than 4096 entries: the sweep must still run on a
-//! store that has grown past it.
+//! publication and Trace maintenance take, and not the Trace census, which
+//! only Trace maintenance reads.
 //!
 //! Swift's per-Job payload-verification cache is not written here, so nothing
 //! of it is forgotten either.
@@ -404,24 +403,70 @@ mod tests {
         assert_eq!((before("job-a"), before("job-b")), (a, b));
     }
 
+    /// Every entry under `path`, counted as the Trace census once counted
+    /// them against its bound of 4096.
+    fn entries(path: &Path) -> usize {
+        fs::read_dir(path)
+            .unwrap()
+            .map(|entry| {
+                let entry = entry.unwrap();
+                1 + if entry.file_type().unwrap().is_dir() {
+                    entries(&entry.path())
+                } else {
+                    0
+                }
+            })
+            .sum()
+    }
+
     #[test]
-    fn the_sweep_runs_over_a_tree_the_trace_census_refuses() {
+    fn a_store_past_4096_entries_still_publishes_sweeps_and_takes_the_trace_census() {
         let root = root();
         let (store, _) = sample(&root.0);
-        for n in 0..4100 {
-            fs::DirBuilder::new()
-                .mode(0o700)
-                .create(root.0.join(format!("job-empty-{n:04}")))
-                .unwrap();
+        // Jobs the sweep emptied keep their directory and an empty index, as
+        // Swift's do: a week of captures leaves this many and more.
+        for n in 0..2048 {
+            let job = root.0.join(format!("job-empty-{n:04}"));
+            fs::DirBuilder::new().mode(0o700).create(&job).unwrap();
+            let index = job.join("index.json");
+            fs::write(&index, br#"{"schemaVersion": "1.0.0", "artifacts": []}"#).unwrap();
+            fs::set_permissions(&index, fs::Permissions::from_mode(0o600)).unwrap();
         }
+        assert!(entries(&root.0) > 4096);
+        // Publication takes only the guard's lock: a new Job's product and a
+        // missing one go in as they would in an empty store.
+        let publisher = publisher(&store);
+        publisher
+            .publish(&product("job-c", "week.bin", "default"), b"job-c week.bin")
+            .unwrap();
+        publisher
+            .record_missing(&product("job-c", "missing.bin", "default"), "not produced")
+            .unwrap();
+        // The Trace census reads the whole store, and any Job retains every
+        // Trace entry.
+        assert!(store.with_trace_retention(|retain| retain).unwrap());
+        // Nor does publication read what only the census reads: a link inside
+        // another Job's directory refuses the census, not a publication, and
+        // Swift's publication never looks there either.
+        let link = root.0.join("job-empty-2047").join("link");
+        std::os::unix::fs::symlink(root.0.join("job-a").join("index.json"), &link).unwrap();
         assert!(store.with_trace_retention(|_| ()).is_err());
-        let reclaimed = publisher(&store)
+        publisher
+            .publish(&product("job-c", "day.bin", "shortLived"), b"job-c day.bin")
+            .unwrap();
+        fs::remove_file(&link).unwrap();
+        assert_eq!(
+            names(&root.0, "job-c"),
+            ["week.bin", "missing.bin", "day.bin"]
+        );
+        let reclaimed = publisher
             .collect_garbage(&RetentionKeep::default(), "2026-09-21T00:00:00Z")
             .unwrap();
-        assert_eq!(reclaimed.len(), 6);
+        assert_eq!(reclaimed.len(), 9);
         for job in ["job-a", "job-b"] {
             assert_eq!(names(&root.0, job), ["pinned.bin"]);
         }
+        assert!(names(&root.0, "job-c").is_empty());
     }
 
     #[test]

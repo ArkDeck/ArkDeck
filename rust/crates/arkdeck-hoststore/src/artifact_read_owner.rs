@@ -13,6 +13,13 @@ const MAX_INDEX: usize = 16 * 1024 * 1024;
 const IMPORT_NAMESPACE: &str = ".imports-v1";
 const IMPORT_OWNER_LOCK: &str = ".owner.lock";
 const IMPORT_SKELETON: [&str; 3] = ["records", "identities", "payloads"];
+/// The most entries one listing of the Trace retention census reads: the
+/// Artifact root's Job directories, bounded as the quota census and the
+/// retention sweep bound them, or the members of one directory below it. The
+/// census bounds each listing and the depth, not the store as a whole: its
+/// cost grows with the store one directory at a time, and nothing but Trace
+/// maintenance waits on it.
+const CENSUS_LISTING_BOUND: usize = 100_000;
 pub const MAX_ARTIFACT_READ_BYTES: usize = 4_194_304;
 
 pub struct ArtifactReadStore {
@@ -239,12 +246,16 @@ impl ArtifactReadStore {
     /// preserves every Trace entry. The Import owner creates its empty
     /// `.imports-v1` skeleton at startup; that namespace retains Trace data
     /// only while it holds an upload record, identity or payload, or anything
-    /// this owner does not recognise. Future Artifact writers must join this
-    /// guard before publication.
+    /// this owner does not recognise. The census reads the whole store, one
+    /// bounded listing at a time (`CENSUS_LISTING_BOUND`), and refuses what
+    /// it cannot read safely, whatever the store's size. Artifact writers take
+    /// only the guard's lock (`with_retention_lock`): they never read
+    /// the census's answer, and a publication must not depend on the size of
+    /// the rest of the store.
     pub fn with_trace_retention<R>(&self, action: impl FnOnce(bool) -> R) -> io::Result<R> {
         let _guard = self.trace_retention.lock().map_err(|_| corrupt())?;
         self.root.validate_path(&self.path)?;
-        let names = self.root.names(4096)?;
+        let names = self.root.names(CENSUS_LISTING_BOUND)?;
         let mut retain_all = false;
         for name in &names {
             if name == IMPORT_NAMESPACE
@@ -255,8 +266,7 @@ impl ArtifactReadStore {
                 retain_all = true;
             }
         }
-        let mut visited = 0;
-        Self::inspect_retained_tree(&self.root, 0, &mut visited)?;
+        Self::inspect_retained_tree(&self.root, 0)?;
         // Validate supported Job indices rather than hiding corrupt known
         // metadata behind a nonempty-directory signal. Unknown namespaces are
         // retained, never decoded into a guessed inactive interpretation.
@@ -272,7 +282,7 @@ impl ArtifactReadStore {
                 }
             }
         }
-        if self.root.names(4096)? != names {
+        if self.root.names(CENSUS_LISTING_BOUND)? != names {
             return Err(corrupt());
         }
         self.root.validate_path(&self.path)?;
@@ -281,10 +291,11 @@ impl ArtifactReadStore {
         Ok(result)
     }
 
-    /// The retention guard's lock alone, for the retention sweep: it excludes
-    /// every publication and Trace maintenance, as the guard does, without
-    /// the Trace census, whose bound on the Artifact tree the sweep exists to
-    /// bring the store back under.
+    /// The retention guard's lock alone, which every Artifact writer takes:
+    /// Job product publication, the Import owner's publication and unpin, and
+    /// the retention sweep. It excludes Trace maintenance, which holds it
+    /// through its census and purge, and reads nothing beyond the store's own
+    /// path, so no writer waits on the rest of the store.
     pub(crate) fn with_retention_lock<R>(&self, action: impl FnOnce() -> R) -> io::Result<R> {
         let _guard = self.trace_retention.lock().map_err(|_| corrupt())?;
         self.root.validate_path(&self.path)?;
@@ -298,10 +309,13 @@ impl ArtifactReadStore {
     /// entry, is retained state this read owner cannot interpret.
     fn import_namespace_retains(imports: &HostDirectory) -> io::Result<bool> {
         let mut retained = false;
-        for name in imports.names(4096)? {
+        for name in imports.names(CENSUS_LISTING_BOUND)? {
             match imports.owned_kind_and_size(&name)?.0 {
                 HostEntryKind::Directory if IMPORT_SKELETON.contains(&name.as_str()) => {
-                    retained |= !imports.child(&name)?.names(4096)?.is_empty();
+                    retained |= !imports
+                        .child(&name)?
+                        .names(CENSUS_LISTING_BOUND)?
+                        .is_empty();
                 }
                 HostEntryKind::Regular if name == IMPORT_OWNER_LOCK => (),
                 HostEntryKind::Other => return Err(corrupt()),
@@ -311,22 +325,14 @@ impl ArtifactReadStore {
         Ok(retained)
     }
 
-    fn inspect_retained_tree(
-        directory: &HostDirectory,
-        depth: usize,
-        visited: &mut usize,
-    ) -> io::Result<()> {
-        for name in directory.names(4096)? {
-            *visited += 1;
-            if *visited > 4096 {
-                return Err(corrupt());
-            }
+    fn inspect_retained_tree(directory: &HostDirectory, depth: usize) -> io::Result<()> {
+        for name in directory.names(CENSUS_LISTING_BOUND)? {
             match directory.owned_kind_and_size(&name)?.0 {
                 HostEntryKind::Directory => {
                     if depth >= 8 {
                         return Err(corrupt());
                     }
-                    Self::inspect_retained_tree(&directory.child(&name)?, depth + 1, visited)?;
+                    Self::inspect_retained_tree(&directory.child(&name)?, depth + 1)?;
                 }
                 HostEntryKind::Regular => {
                     directory.document_metadata(&name)?;

@@ -3,10 +3,11 @@
 //! default redaction, the content-derived identity, a quota that refuses a new
 //! product and never evicts an old one, the payload written and sealed owner
 //! read-only before the index names it, and the index rewritten whole in
-//! Swift's pretty spelling. Publication joins the read owner's Trace
-//! retention guard. A refusal is the `RuntimeArtifactError` Swift throws,
-//! spelled as Swift interpolates it, because the Job timeline and a missing
-//! product's reason carry that spelling.
+//! Swift's pretty spelling. Publication takes the lock of the read owner's
+//! Trace retention guard, never its census. A refusal is the
+//! `RuntimeArtifactError` Swift throws, spelled as Swift interpolates it,
+//! because the Job timeline and a missing product's reason carry that
+//! spelling.
 //!
 //! Unlike Swift, whose census is cached per process, every publication
 //! recounts the published bytes of every Job index; other Jobs' payloads are
@@ -68,7 +69,7 @@ impl ArtifactPublisher<'_> {
     /// Swift `publish`: the stored metadata, or Swift's refusal.
     pub(crate) fn publish(&self, product: &Product<'_>, contents: &[u8]) -> Result<Value, String> {
         self.store
-            .with_trace_retention(|_| self.publish_guarded(product, contents))
+            .with_retention_lock(|| self.publish_guarded(product, contents))
             .map_err(|error| io_failure(&format!("cannot inspect artifact retention: {error}")))?
     }
 
@@ -80,7 +81,7 @@ impl ArtifactPublisher<'_> {
         reason: &str,
     ) -> Result<Value, String> {
         self.store
-            .with_trace_retention(|_| {
+            .with_retention_lock(|| {
                 let identity =
                     sha256_hex(format!("{}\0{}\0missing", product.job_id, product.name).as_bytes());
                 let created = self.clock()?;
@@ -238,7 +239,7 @@ impl ArtifactPublisher<'_> {
         after_payload: impl FnOnce() -> Result<(), String>,
     ) -> Result<Value, String> {
         self.store
-            .with_trace_retention(|_| {
+            .with_retention_lock(|| {
                 let identity = sha256_hex(
                     format!("{}\0{}\0{digest}", product.job_id, product.name).as_bytes(),
                 );
@@ -350,7 +351,7 @@ impl ArtifactPublisher<'_> {
         retention: &Value,
     ) -> Result<(), String> {
         self.store
-            .with_trace_retention(|_| {
+            .with_retention_lock(|| {
                 let directory = match self.store.root().child(id) {
                     Ok(directory) => directory,
                     Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
