@@ -1446,6 +1446,27 @@ composition, with or without a managed server (TASK-XPA-012): Swift composes its
 tool-selection owner only beside a started HDC server host, the HDC impact
 source and the registry adapter, no Rust composition has one yet, and no
 selection writes anything.
+`arkdeck_hoststore::ToolSelectionRecords` is Swift's
+`RuntimeToolSelectionControlActionStore` over its records (`ToolSelectionRecord`):
+one `action-<sha256(requestId)>.json` per request identity as canonical JSON,
+changed under a non-blocking `.lock` transaction and replaced only by the exact
+next generation on Swift's conditions (the transition table, an immutable intent,
+lifetime, epoch, catalog and published preview, an approval that only changes its
+status, a receipt bound to the challenge it answers, an audit that grows one row at
+a time). Every record transition of Swift's owner is here, taking its instant and
+the identities Swift draws from the caller: the preview, the impact approval
+(`ImpactApproval`), its console challenge (`InteractionChallenge`) and receipt
+(`InteractionReceipt`), the prepared dispatch, lifecycle audit rows, the settled or
+failed selection and invalidation. The store's mechanics are shared with the HDC
+control-action owner's records (`control_action_store.rs`), and the approval values
+are ready for the HDC restart. `tool_selection_tests.rs` reads the 17 records Swift's
+production store wrote (`rust/tests/fixtures/tool-selection-store`, recorded by
+`ToolSelectionStoreOracleContractTests`) as their own canonical bytes and Swift's
+projections, and plays 16 of their timelines again to Swift's bytes; the records it
+writes itself (`rust/tests/fixtures/tool-selection-store-rust`) are read back and
+carried further by Swift (`ToolSelectionStoreRustReadbackContractTests`). No owner
+composes the store yet: observing the impact and the restart it approves wait for
+the HDC lifecycle restart and a maintainer ruling on the isolated daemon's selection.
 The isolated owner composes Swift's union control-action owner over no
 tool-selection owner, paging in `control-action-snapshots`. Without a managed
 server it holds no HDC owner and never makes `hdc-control-actions`: an exact

@@ -74,10 +74,24 @@ mod control_action;
 #[cfg(target_os = "macos")]
 pub use control_action::{ControlActionResources, control_action_without_owner};
 #[cfg(target_os = "macos")]
+mod control_action_approval;
+#[cfg(target_os = "macos")]
+pub use control_action_approval::{ImpactApproval, InteractionChallenge, InteractionReceipt};
+#[cfg(target_os = "macos")]
+mod control_action_store;
+#[cfg(target_os = "macos")]
+mod control_action_value;
+#[cfg(target_os = "macos")]
 mod hdc_control_action;
 #[cfg(target_os = "macos")]
 pub use hdc_control_action::{
     HdcControlActions, Impact, ImpactReading, ImpactSource, OwnerContext, Record,
+};
+#[cfg(target_os = "macos")]
+mod tool_selection;
+#[cfg(target_os = "macos")]
+pub use tool_selection::{
+    SelectionImpact, ToolFacts, ToolSelectionIntent, ToolSelectionRecord, ToolSelectionRecords,
 };
 #[cfg(target_os = "macos")]
 mod hdc_impact_source;

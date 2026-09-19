@@ -5,6 +5,7 @@
 use super::*;
 use std::collections::VecDeque;
 use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
