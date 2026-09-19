@@ -1,0 +1,52 @@
+{
+  "epochs" : [
+    {
+      "artifactSHA256" : "3333333333333333333333333333333333333333333333333333333333333333",
+      "bindingRevision" : 2,
+      "confirmedStepIDs" : [
+        "flash-partitions",
+        "verify-flash-readback"
+      ],
+      "coverageContractVersion" : "1.0.0",
+      "coveredEffectSetSHA256" : "1111111111111111111111111111111111111111111111111111111111111111",
+      "coveredIntents" : [
+        {
+          "intentEventID" : "job-old-a-intent-7",
+          "jobID" : "job-old-a",
+          "observedAtUTC" : "2026-08-08T00:00:00Z",
+          "operationReference" : "flash.dayu200",
+          "possibleEffects" : [
+            "partition:system",
+            "partition:userdata"
+          ],
+          "profileReference" : "dayu200"
+        },
+        {
+          "intentEventID" : "job-old-b-intent-7",
+          "jobID" : "job-old-b",
+          "observedAtUTC" : "2026-08-08T00:00:00Z",
+          "operationReference" : "flash.dayu200",
+          "possibleEffects" : [
+            "partition:userdata",
+            "partition:vendor"
+          ],
+          "profileReference" : "dayu200"
+        }
+      ],
+      "epochID" : "recovery-epoch-ecca2887446b09e855074c8919440ed8",
+      "epochSHA256" : "d7bd3ca1bcbf47ae471c44aa63afb01313dc2f828aa1199012f069d0ad2db5da",
+      "establishedAtUTC" : "2026-08-08T00:20:00Z",
+      "materializedPlanDigestSHA256" : "2222222222222222222222222222222222222222222222222222222222222222",
+      "operationReference" : "flash.dayu200",
+      "profileReference" : "dayu200",
+      "providerExecutableSHA256" : "4444444444444444444444444444444444444444444444444444444444444444",
+      "recoveryIntentEventID" : "job-recovery-intent-9",
+      "recoveryJobID" : "job-recovery",
+      "resultingTargetEpochSHA256" : "7777777777777777777777777777777777777777777777777777777777777777",
+      "source" : "historicalRecognition",
+      "stableTargetIdentitySHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "uncertainEffectSetSHA256" : "2a28def44f2bec3dcf31e352b63d0afa9b0e330bd773526d583744ab787f7afe"
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

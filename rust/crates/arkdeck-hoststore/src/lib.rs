@@ -14,6 +14,14 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 #[cfg(target_os = "macos")]
 mod job_owner;
 #[cfg(target_os = "macos")]
+mod recovery_epoch;
+#[cfg(target_os = "macos")]
+pub use recovery_epoch::{
+    RECOVERY_EPOCH_DOCUMENT, RECOVERY_EPOCH_LOCK, RecoveryEpoch, RecoveryEpochDraft,
+    RecoveryEpochError, RecoverySource, SupersededIntent, append_recovery_epoch,
+    list_recovery_epochs,
+};
+#[cfg(target_os = "macos")]
 mod job_record;
 #[cfg(target_os = "macos")]
 mod job_record_fields;

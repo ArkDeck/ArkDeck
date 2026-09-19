@@ -1,0 +1,1957 @@
+[
+  {
+    "input" : null,
+    "name" : "list-empty",
+    "operation" : "list",
+    "outcome" : {
+      "epochs" : [
+
+      ]
+    },
+    "root" : {
+      ".superseding-recovery-epochs.lock" : {
+        "bytes" : 0,
+        "file" : "steps/01-list-empty/.superseding-recovery-epochs.lock",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "seed" : null,
+    "store" : "main"
+  },
+  {
+    "input" : {
+      "artifactSHA256" : "3333333333333333333333333333333333333333333333333333333333333333",
+      "bindingRevision" : 2,
+      "confirmedStepIDs" : [
+        "flash-partitions",
+        "verify-flash-readback"
+      ],
+      "coverageContractVersion" : "1.0.0",
+      "coveredEffectSetSHA256" : "1111111111111111111111111111111111111111111111111111111111111111",
+      "coveredIntents" : [
+        {
+          "intentEventID" : "job-old-a-intent-7",
+          "jobID" : "job-old-a",
+          "observedAtUTC" : "2026-08-08T00:00:00Z",
+          "operationReference" : "flash.dayu200",
+          "possibleEffects" : [
+            "partition:system",
+            "partition:userdata"
+          ],
+          "profileReference" : "dayu200"
+        },
+        {
+          "intentEventID" : "job-old-b-intent-7",
+          "jobID" : "job-old-b",
+          "observedAtUTC" : "2026-08-08T00:00:00Z",
+          "operationReference" : "flash.dayu200",
+          "possibleEffects" : [
+            "partition:userdata",
+            "partition:vendor"
+          ],
+          "profileReference" : "dayu200"
+        }
+      ],
+      "establishedAtUTC" : "2026-08-08T00:20:00Z",
+      "materializedPlanDigestSHA256" : "2222222222222222222222222222222222222222222222222222222222222222",
+      "operationReference" : "flash.dayu200",
+      "profileReference" : "dayu200",
+      "providerExecutableSHA256" : "4444444444444444444444444444444444444444444444444444444444444444",
+      "recoveryIntentEventID" : "job-recovery-intent-9",
+      "recoveryJobID" : "job-recovery",
+      "resultingTargetEpochSHA256" : "7777777777777777777777777777777777777777777777777777777777777777",
+      "source" : "historicalRecognition",
+      "stableTargetIdentitySHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "uncertainEffectSetSHA256" : "2a28def44f2bec3dcf31e352b63d0afa9b0e330bd773526d583744ab787f7afe"
+    },
+    "name" : "append-first",
+    "operation" : "append",
+    "outcome" : {
+      "epoch" : {
+        "artifactSHA256" : "3333333333333333333333333333333333333333333333333333333333333333",
+        "bindingRevision" : 2,
+        "confirmedStepIDs" : [
+          "flash-partitions",
+          "verify-flash-readback"
+        ],
+        "coverageContractVersion" : "1.0.0",
+        "coveredEffectSetSHA256" : "1111111111111111111111111111111111111111111111111111111111111111",
+        "coveredIntents" : [
+          {
+            "intentEventID" : "job-old-a-intent-7",
+            "jobID" : "job-old-a",
+            "observedAtUTC" : "2026-08-08T00:00:00Z",
+            "operationReference" : "flash.dayu200",
+            "possibleEffects" : [
+              "partition:system",
+              "partition:userdata"
+            ],
+            "profileReference" : "dayu200"
+          },
+          {
+            "intentEventID" : "job-old-b-intent-7",
+            "jobID" : "job-old-b",
+            "observedAtUTC" : "2026-08-08T00:00:00Z",
+            "operationReference" : "flash.dayu200",
+            "possibleEffects" : [
+              "partition:userdata",
+              "partition:vendor"
+            ],
+            "profileReference" : "dayu200"
+          }
+        ],
+        "epochID" : "recovery-epoch-ecca2887446b09e855074c8919440ed8",
+        "epochSHA256" : "d7bd3ca1bcbf47ae471c44aa63afb01313dc2f828aa1199012f069d0ad2db5da",
+        "establishedAtUTC" : "2026-08-08T00:20:00Z",
+        "materializedPlanDigestSHA256" : "2222222222222222222222222222222222222222222222222222222222222222",
+        "operationReference" : "flash.dayu200",
+        "profileReference" : "dayu200",
+        "providerExecutableSHA256" : "4444444444444444444444444444444444444444444444444444444444444444",
+        "recoveryIntentEventID" : "job-recovery-intent-9",
+        "recoveryJobID" : "job-recovery",
+        "resultingTargetEpochSHA256" : "7777777777777777777777777777777777777777777777777777777777777777",
+        "source" : "historicalRecognition",
+        "stableTargetIdentitySHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "uncertainEffectSetSHA256" : "2a28def44f2bec3dcf31e352b63d0afa9b0e330bd773526d583744ab787f7afe"
+      }
+    },
+    "root" : {
+      ".superseding-recovery-epochs.lock" : {
+        "bytes" : 0,
+        "file" : "steps/02-append-first/.superseding-recovery-epochs.lock",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "superseding-recovery-epochs.json" : {
+        "bytes" : 2131,
+        "file" : "steps/02-append-first/superseding-recovery-epochs.json",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "195010753aa42eac9d038320a4fd9176491a66456480905c677ee855b0fe4aa3"
+      }
+    },
+    "seed" : null,
+    "store" : "main"
+  },
+  {
+    "input" : {
+      "artifactSHA256" : "3333333333333333333333333333333333333333333333333333333333333333",
+      "bindingRevision" : 2,
+      "confirmedStepIDs" : [
+        "flash-partitions",
+        "verify-flash-readback"
+      ],
+      "coverageContractVersion" : "1.0.0",
+      "coveredEffectSetSHA256" : "1111111111111111111111111111111111111111111111111111111111111111",
+      "coveredIntents" : [
+        {
+          "intentEventID" : "job-old-a-intent-7",
+          "jobID" : "job-old-a",
+          "observedAtUTC" : "2026-08-08T00:00:00Z",
+          "operationReference" : "flash.dayu200",
+          "possibleEffects" : [
+            "partition:system",
+            "partition:userdata"
+          ],
+          "profileReference" : "dayu200"
+        },
+        {
+          "intentEventID" : "job-old-b-intent-7",
+          "jobID" : "job-old-b",
+          "observedAtUTC" : "2026-08-08T00:00:00Z",
+          "operationReference" : "flash.dayu200",
+          "possibleEffects" : [
+            "partition:userdata",
+            "partition:vendor"
+          ],
+          "profileReference" : "dayu200"
+        }
+      ],
+      "establishedAtUTC" : "2026-08-08T00:20:00Z",
+      "materializedPlanDigestSHA256" : "2222222222222222222222222222222222222222222222222222222222222222",
+      "operationReference" : "flash.dayu200",
+      "profileReference" : "dayu200",
+      "providerExecutableSHA256" : "4444444444444444444444444444444444444444444444444444444444444444",
+      "recoveryIntentEventID" : "job-recovery-intent-9",
+      "recoveryJobID" : "job-recovery",
+      "resultingTargetEpochSHA256" : "7777777777777777777777777777777777777777777777777777777777777777",
+      "source" : "historicalRecognition",
+      "stableTargetIdentitySHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "uncertainEffectSetSHA256" : "2a28def44f2bec3dcf31e352b63d0afa9b0e330bd773526d583744ab787f7afe"
+    },
+    "name" : "append-first-again",
+    "operation" : "append",
+    "outcome" : {
+      "epoch" : {
+        "artifactSHA256" : "3333333333333333333333333333333333333333333333333333333333333333",
+        "bindingRevision" : 2,
+        "confirmedStepIDs" : [
+          "flash-partitions",
+          "verify-flash-readback"
+        ],
+        "coverageContractVersion" : "1.0.0",
+        "coveredEffectSetSHA256" : "1111111111111111111111111111111111111111111111111111111111111111",
+        "coveredIntents" : [
+          {
+            "intentEventID" : "job-old-a-intent-7",
+            "jobID" : "job-old-a",
+            "observedAtUTC" : "2026-08-08T00:00:00Z",
+            "operationReference" : "flash.dayu200",
+            "possibleEffects" : [
+              "partition:system",
+              "partition:userdata"
+            ],
+            "profileReference" : "dayu200"
+          },
+          {
+            "intentEventID" : "job-old-b-intent-7",
+            "jobID" : "job-old-b",
+            "observedAtUTC" : "2026-08-08T00:00:00Z",
+            "operationReference" : "flash.dayu200",
+            "possibleEffects" : [
+              "partition:userdata",
+              "partition:vendor"
+            ],
+            "profileReference" : "dayu200"
+          }
+        ],
+        "epochID" : "recovery-epoch-ecca2887446b09e855074c8919440ed8",
+        "epochSHA256" : "d7bd3ca1bcbf47ae471c44aa63afb01313dc2f828aa1199012f069d0ad2db5da",
+        "establishedAtUTC" : "2026-08-08T00:20:00Z",
+        "materializedPlanDigestSHA256" : "2222222222222222222222222222222222222222222222222222222222222222",
+        "operationReference" : "flash.dayu200",
+        "profileReference" : "dayu200",
+        "providerExecutableSHA256" : "4444444444444444444444444444444444444444444444444444444444444444",
+        "recoveryIntentEventID" : "job-recovery-intent-9",
+        "recoveryJobID" : "job-recovery",
+        "resultingTargetEpochSHA256" : "7777777777777777777777777777777777777777777777777777777777777777",
+        "source" : "historicalRecognition",
+        "stableTargetIdentitySHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "uncertainEffectSetSHA256" : "2a28def44f2bec3dcf31e352b63d0afa9b0e330bd773526d583744ab787f7afe"
+      }
+    },
+    "root" : {
+      ".superseding-recovery-epochs.lock" : {
+        "bytes" : 0,
+        "file" : "steps/03-append-first-again/.superseding-recovery-epochs.lock",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "superseding-recovery-epochs.json" : {
+        "bytes" : 2131,
+        "file" : "steps/03-append-first-again/superseding-recovery-epochs.json",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "195010753aa42eac9d038320a4fd9176491a66456480905c677ee855b0fe4aa3"
+      }
+    },
+    "seed" : null,
+    "store" : "main"
+  },
+  {
+    "input" : {
+      "artifactSHA256" : "3333333333333333333333333333333333333333333333333333333333333333",
+      "bindingRevision" : 2,
+      "confirmedStepIDs" : [
+        "flash-partitions",
+        "verify-flash-readback"
+      ],
+      "coverageContractVersion" : "1.0.0",
+      "coveredEffectSetSHA256" : "1111111111111111111111111111111111111111111111111111111111111111",
+      "coveredIntents" : [
+        {
+          "intentEventID" : "job-old-a-intent-7",
+          "jobID" : "job-old-a",
+          "observedAtUTC" : "2026-08-08T00:00:00Z",
+          "operationReference" : "flash.dayu200",
+          "possibleEffects" : [
+            "partition:system",
+            "partition:userdata"
+          ],
+          "profileReference" : "dayu200"
+        },
+        {
+          "intentEventID" : "job-old-b-intent-7",
+          "jobID" : "job-old-b",
+          "observedAtUTC" : "2026-08-08T00:00:00Z",
+          "operationReference" : "flash.dayu200",
+          "possibleEffects" : [
+            "partition:userdata",
+            "partition:vendor"
+          ],
+          "profileReference" : "dayu200"
+        }
+      ],
+      "establishedAtUTC" : "2026-08-08T00:20:00Z",
+      "materializedPlanDigestSHA256" : "2222222222222222222222222222222222222222222222222222222222222222",
+      "operationReference" : "flash.dayu200",
+      "profileReference" : "dayu200",
+      "providerExecutableSHA256" : "5555555555555555555555555555555555555555555555555555555555555555",
+      "recoveryIntentEventID" : "job-recovery-intent-9",
+      "recoveryJobID" : "job-recovery",
+      "resultingTargetEpochSHA256" : "7777777777777777777777777777777777777777777777777777777777777777",
+      "source" : "historicalRecognition",
+      "stableTargetIdentitySHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "uncertainEffectSetSHA256" : "2a28def44f2bec3dcf31e352b63d0afa9b0e330bd773526d583744ab787f7afe"
+    },
+    "name" : "append-drifted-proof",
+    "operation" : "append",
+    "outcome" : {
+      "epochId" : "recovery-epoch-ecca2887446b09e855074c8919440ed8",
+      "refused" : "conflictingEpoch"
+    },
+    "root" : {
+      ".superseding-recovery-epochs.lock" : {
+        "bytes" : 0,
+        "file" : "steps/04-append-drifted-proof/.superseding-recovery-epochs.lock",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "superseding-recovery-epochs.json" : {
+        "bytes" : 2131,
+        "file" : "steps/04-append-drifted-proof/superseding-recovery-epochs.json",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "195010753aa42eac9d038320a4fd9176491a66456480905c677ee855b0fe4aa3"
+      }
+    },
+    "seed" : null,
+    "store" : "main"
+  },
+  {
+    "input" : {
+      "artifactSHA256" : "3333333333333333333333333333333333333333333333333333333333333333",
+      "bindingRevision" : 2,
+      "confirmedStepIDs" : [
+        "flash-partitions",
+        "verify-flash-readback"
+      ],
+      "coverageContractVersion" : "1.0.0",
+      "coveredEffectSetSHA256" : "1111111111111111111111111111111111111111111111111111111111111111",
+      "coveredIntents" : [
+        {
+          "intentEventID" : "job-old-c-intent-7",
+          "jobID" : "job-old-c",
+          "observedAtUTC" : "2026-08-08T00:00:00Z",
+          "operationReference" : "flash.dayu200",
+          "possibleEffects" : [
+            "partition:system",
+            "partition:userdata",
+            "partition:vendor"
+          ],
+          "profileReference" : "dayu200"
+        }
+      ],
+      "establishedAtUTC" : "2026-08-08T00:20:00Z",
+      "materializedPlanDigestSHA256" : "2222222222222222222222222222222222222222222222222222222222222222",
+      "operationReference" : "flash.dayu200",
+      "profileReference" : "dayu200",
+      "providerExecutableSHA256" : "4444444444444444444444444444444444444444444444444444444444444444",
+      "recoveryIntentEventID" : "job-recovery-intent-9",
+      "recoveryJobID" : "job-recovery",
+      "resultingTargetEpochSHA256" : "7777777777777777777777777777777777777777777777777777777777777777",
+      "source" : "historicalRecognition",
+      "stableTargetIdentitySHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "uncertainEffectSetSHA256" : "2a28def44f2bec3dcf31e352b63d0afa9b0e330bd773526d583744ab787f7afe"
+    },
+    "name" : "append-identity-taken",
+    "operation" : "append",
+    "outcome" : {
+      "epochId" : "recovery-epoch-ecca2887446b09e855074c8919440ed8",
+      "refused" : "conflictingEpoch"
+    },
+    "root" : {
+      ".superseding-recovery-epochs.lock" : {
+        "bytes" : 0,
+        "file" : "steps/05-append-identity-taken/.superseding-recovery-epochs.lock",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "superseding-recovery-epochs.json" : {
+        "bytes" : 2131,
+        "file" : "steps/05-append-identity-taken/superseding-recovery-epochs.json",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "195010753aa42eac9d038320a4fd9176491a66456480905c677ee855b0fe4aa3"
+      }
+    },
+    "seed" : null,
+    "store" : "main"
+  },
+  {
+    "input" : {
+      "artifactSHA256" : "3333333333333333333333333333333333333333333333333333333333333333",
+      "bindingRevision" : 2,
+      "confirmedStepIDs" : [
+        "flash-partitions"
+      ],
+      "coverageContractVersion" : "1.0.0",
+      "coveredEffectSetSHA256" : "1111111111111111111111111111111111111111111111111111111111111111",
+      "coveredIntents" : [
+        {
+          "intentEventID" : "job-old-d-intent-7",
+          "jobID" : "job-old-d",
+          "observedAtUTC" : "2026-08-08T00:00:00Z",
+          "operationReference" : "flash.dayu200",
+          "possibleEffects" : [
+            "partition:boot"
+          ],
+          "profileReference" : "dayu200"
+        }
+      ],
+      "establishedAtUTC" : "2026-08-08T05:00:00Z",
+      "materializedPlanDigestSHA256" : "2222222222222222222222222222222222222222222222222222222222222222",
+      "operationReference" : "flash.dayu200",
+      "profileReference" : "dayu200",
+      "providerExecutableSHA256" : "6666666666666666666666666666666666666666666666666666666666666666",
+      "recoveryIntentEventID" : "job-recovery-2-intent-4",
+      "recoveryJobID" : "job-recovery-2",
+      "resultingTargetEpochSHA256" : "7777777777777777777777777777777777777777777777777777777777777777",
+      "source" : "distinctRecoveryExecution",
+      "stableTargetIdentitySHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "uncertainEffectSetSHA256" : "2bfa3acc319e3a8a460706fa2117d252328b70a3a6df2b0938abd50c5d336b70"
+    },
+    "name" : "append-second",
+    "operation" : "append",
+    "outcome" : {
+      "epoch" : {
+        "artifactSHA256" : "3333333333333333333333333333333333333333333333333333333333333333",
+        "bindingRevision" : 2,
+        "confirmedStepIDs" : [
+          "flash-partitions"
+        ],
+        "coverageContractVersion" : "1.0.0",
+        "coveredEffectSetSHA256" : "1111111111111111111111111111111111111111111111111111111111111111",
+        "coveredIntents" : [
+          {
+            "intentEventID" : "job-old-d-intent-7",
+            "jobID" : "job-old-d",
+            "observedAtUTC" : "2026-08-08T00:00:00Z",
+            "operationReference" : "flash.dayu200",
+            "possibleEffects" : [
+              "partition:boot"
+            ],
+            "profileReference" : "dayu200"
+          }
+        ],
+        "epochID" : "recovery-epoch-f921c7c98bc5ce109a77c531b7e5e6a8",
+        "epochSHA256" : "fbf5b1b67e26d4f8e5aa77e6da2e5a07f761a0247ada2b30659acab924fd72b0",
+        "establishedAtUTC" : "2026-08-08T05:00:00Z",
+        "materializedPlanDigestSHA256" : "2222222222222222222222222222222222222222222222222222222222222222",
+        "operationReference" : "flash.dayu200",
+        "previousEpochSHA256" : "d7bd3ca1bcbf47ae471c44aa63afb01313dc2f828aa1199012f069d0ad2db5da",
+        "profileReference" : "dayu200",
+        "providerExecutableSHA256" : "6666666666666666666666666666666666666666666666666666666666666666",
+        "recoveryIntentEventID" : "job-recovery-2-intent-4",
+        "recoveryJobID" : "job-recovery-2",
+        "resultingTargetEpochSHA256" : "7777777777777777777777777777777777777777777777777777777777777777",
+        "source" : "distinctRecoveryExecution",
+        "stableTargetIdentitySHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "uncertainEffectSetSHA256" : "2bfa3acc319e3a8a460706fa2117d252328b70a3a6df2b0938abd50c5d336b70"
+      }
+    },
+    "root" : {
+      ".superseding-recovery-epochs.lock" : {
+        "bytes" : 0,
+        "file" : "steps/06-append-second/.superseding-recovery-epochs.lock",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "superseding-recovery-epochs.json" : {
+        "bytes" : 3892,
+        "file" : "steps/06-append-second/superseding-recovery-epochs.json",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "7934acfafd408891ec359c3e48ab7657ec48c86a6b606b9452a471b4002fb456"
+      }
+    },
+    "seed" : null,
+    "store" : "main"
+  },
+  {
+    "input" : {
+      "artifactSHA256" : "3333333333333333333333333333333333333333333333333333333333333333",
+      "bindingRevision" : 0,
+      "confirmedStepIDs" : [
+        "flash-partitions",
+        "verify-flash-readback"
+      ],
+      "coverageContractVersion" : "1.0.0",
+      "coveredEffectSetSHA256" : "1111111111111111111111111111111111111111111111111111111111111111",
+      "coveredIntents" : [
+        {
+          "intentEventID" : "job-old-a-intent-7",
+          "jobID" : "job-old-a",
+          "observedAtUTC" : "2026-08-08T00:00:00Z",
+          "operationReference" : "flash.dayu200",
+          "possibleEffects" : [
+            "partition:system",
+            "partition:userdata"
+          ],
+          "profileReference" : "dayu200"
+        },
+        {
+          "intentEventID" : "job-old-b-intent-7",
+          "jobID" : "job-old-b",
+          "observedAtUTC" : "2026-08-08T00:00:00Z",
+          "operationReference" : "flash.dayu200",
+          "possibleEffects" : [
+            "partition:userdata",
+            "partition:vendor"
+          ],
+          "profileReference" : "dayu200"
+        }
+      ],
+      "establishedAtUTC" : "2026-08-08T00:20:00Z",
+      "materializedPlanDigestSHA256" : "2222222222222222222222222222222222222222222222222222222222222222",
+      "operationReference" : "flash.dayu200",
+      "profileReference" : "dayu200",
+      "providerExecutableSHA256" : "4444444444444444444444444444444444444444444444444444444444444444",
+      "recoveryIntentEventID" : "job-recovery-intent-9",
+      "recoveryJobID" : "job-invalid",
+      "resultingTargetEpochSHA256" : "7777777777777777777777777777777777777777777777777777777777777777",
+      "source" : "historicalRecognition",
+      "stableTargetIdentitySHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "uncertainEffectSetSHA256" : "2a28def44f2bec3dcf31e352b63d0afa9b0e330bd773526d583744ab787f7afe"
+    },
+    "name" : "invalid-binding-revision",
+    "operation" : "append",
+    "outcome" : {
+      "refused" : "invalidEpoch"
+    },
+    "root" : {
+      ".superseding-recovery-epochs.lock" : {
+        "bytes" : 0,
+        "file" : "steps/07-invalid-binding-revision/.superseding-recovery-epochs.lock",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "superseding-recovery-epochs.json" : {
+        "bytes" : 3892,
+        "file" : "steps/07-invalid-binding-revision/superseding-recovery-epochs.json",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "7934acfafd408891ec359c3e48ab7657ec48c86a6b606b9452a471b4002fb456"
+      }
+    },
+    "seed" : null,
+    "store" : "main"
+  },
+  {
+    "input" : {
+      "artifactSHA256" : "3333333333333333333333333333333333333333333333333333333333333333",
+      "bindingRevision" : 2,
+      "confirmedStepIDs" : [
+        "flash-partitions",
+        "verify-flash-readback"
+      ],
+      "coverageContractVersion" : "1.0.0",
+      "coveredEffectSetSHA256" : "1111111111111111111111111111111111111111111111111111111111111111",
+      "coveredIntents" : [
+        {
+          "intentEventID" : "job-old-a-intent-7",
+          "jobID" : "job-old-a",
+          "observedAtUTC" : "2026-08-08T00:00:00Z",
+          "operationReference" : "flash.dayu200",
+          "possibleEffects" : [
+            "partition:system",
+            "partition:userdata"
+          ],
+          "profileReference" : "dayu200"
+        },
+        {
+          "intentEventID" : "job-old-b-intent-7",
+          "jobID" : "job-old-b",
+          "observedAtUTC" : "2026-08-08T00:00:00Z",
+          "operationReference" : "flash.dayu200",
+          "possibleEffects" : [
+            "partition:userdata",
+            "partition:vendor"
+          ],
+          "profileReference" : "dayu200"
+        }
+      ],
+      "establishedAtUTC" : "2026-08-08T00:20:00Z",
+      "materializedPlanDigestSHA256" : "2222222222222222222222222222222222222222222222222222222222222222",
+      "operationReference" : "flash.dayu200",
+      "profileReference" : "dayu200",
+      "providerExecutableSHA256" : "4444444444444444444444444444444444444444444444444444444444444444",
+      "recoveryIntentEventID" : "job-recovery-intent-9",
+      "recoveryJobID" : "job-invalid",
+      "resultingTargetEpochSHA256" : "7777777777777777777777777777777777777777777777777777777777777777",
+      "source" : "historicalRecognition",
+      "stableTargetIdentitySHA256" : "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "uncertainEffectSetSHA256" : "2a28def44f2bec3dcf31e352b63d0afa9b0e330bd773526d583744ab787f7afe"
+    },
+    "name" : "invalid-identity-uppercase",
+    "operation" : "append",
+    "outcome" : {
+      "refused" : "invalidEpoch"
+    },
+    "root" : {
+      ".superseding-recovery-epochs.lock" : {
+        "bytes" : 0,
+        "file" : "steps/08-invalid-identity-uppercase/.superseding-recovery-epochs.lock",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "superseding-recovery-epochs.json" : {
+        "bytes" : 3892,
+        "file" : "steps/08-invalid-identity-uppercase/superseding-recovery-epochs.json",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "7934acfafd408891ec359c3e48ab7657ec48c86a6b606b9452a471b4002fb456"
+      }
+    },
+    "seed" : null,
+    "store" : "main"
+  },
+  {
+    "input" : {
+      "artifactSHA256" : "3333333333333333333333333333333333333333333333333333333333333333",
+      "bindingRevision" : 2,
+      "confirmedStepIDs" : [
+        "flash-partitions",
+        "verify-flash-readback"
+      ],
+      "coverageContractVersion" : "1.0.0",
+      "coveredEffectSetSHA256" : "1111111111111111111111111111111111111111111111111111111111111111",
+      "coveredIntents" : [
+
+      ],
+      "establishedAtUTC" : "2026-08-08T00:20:00Z",
+      "materializedPlanDigestSHA256" : "2222222222222222222222222222222222222222222222222222222222222222",
+      "operationReference" : "flash.dayu200",
+      "profileReference" : "dayu200",
+      "providerExecutableSHA256" : "4444444444444444444444444444444444444444444444444444444444444444",
+      "recoveryIntentEventID" : "job-recovery-intent-9",
+      "recoveryJobID" : "job-invalid",
+      "resultingTargetEpochSHA256" : "7777777777777777777777777777777777777777777777777777777777777777",
+      "source" : "historicalRecognition",
+      "stableTargetIdentitySHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "uncertainEffectSetSHA256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "name" : "invalid-no-intents",
+    "operation" : "append",
+    "outcome" : {
+      "refused" : "invalidEpoch"
+    },
+    "root" : {
+      ".superseding-recovery-epochs.lock" : {
+        "bytes" : 0,
+        "file" : "steps/09-invalid-no-intents/.superseding-recovery-epochs.lock",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "superseding-recovery-epochs.json" : {
+        "bytes" : 3892,
+        "file" : "steps/09-invalid-no-intents/superseding-recovery-epochs.json",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "7934acfafd408891ec359c3e48ab7657ec48c86a6b606b9452a471b4002fb456"
+      }
+    },
+    "seed" : null,
+    "store" : "main"
+  },
+  {
+    "input" : {
+      "artifactSHA256" : "3333333333333333333333333333333333333333333333333333333333333333",
+      "bindingRevision" : 2,
+      "confirmedStepIDs" : [
+        "flash-partitions",
+        "verify-flash-readback"
+      ],
+      "coverageContractVersion" : "1.0.0",
+      "coveredEffectSetSHA256" : "1111111111111111111111111111111111111111111111111111111111111111",
+      "coveredIntents" : [
+        {
+          "intentEventID" : "job-old-e-intent-7",
+          "jobID" : "job-old-e",
+          "observedAtUTC" : "2026-08-08T00:00:00Z",
+          "operationReference" : "flash.dayu200",
+          "possibleEffects" : [
+            "partition:boot"
+          ],
+          "profileReference" : "dayu200"
+        },
+        {
+          "intentEventID" : "job-old-e-intent-7",
+          "jobID" : "job-old-e",
+          "observedAtUTC" : "2026-08-08T00:00:00Z",
+          "operationReference" : "flash.dayu200",
+          "possibleEffects" : [
+            "partition:boot"
+          ],
+          "profileReference" : "dayu200"
+        }
+      ],
+      "establishedAtUTC" : "2026-08-08T00:20:00Z",
+      "materializedPlanDigestSHA256" : "2222222222222222222222222222222222222222222222222222222222222222",
+      "operationReference" : "flash.dayu200",
+      "profileReference" : "dayu200",
+      "providerExecutableSHA256" : "4444444444444444444444444444444444444444444444444444444444444444",
+      "recoveryIntentEventID" : "job-recovery-intent-9",
+      "recoveryJobID" : "job-invalid",
+      "resultingTargetEpochSHA256" : "7777777777777777777777777777777777777777777777777777777777777777",
+      "source" : "historicalRecognition",
+      "stableTargetIdentitySHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "uncertainEffectSetSHA256" : "2bfa3acc319e3a8a460706fa2117d252328b70a3a6df2b0938abd50c5d336b70"
+    },
+    "name" : "invalid-duplicate-intent",
+    "operation" : "append",
+    "outcome" : {
+      "refused" : "invalidEpoch"
+    },
+    "root" : {
+      ".superseding-recovery-epochs.lock" : {
+        "bytes" : 0,
+        "file" : "steps/10-invalid-duplicate-intent/.superseding-recovery-epochs.lock",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "superseding-recovery-epochs.json" : {
+        "bytes" : 3892,
+        "file" : "steps/10-invalid-duplicate-intent/superseding-recovery-epochs.json",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "7934acfafd408891ec359c3e48ab7657ec48c86a6b606b9452a471b4002fb456"
+      }
+    },
+    "seed" : null,
+    "store" : "main"
+  },
+  {
+    "input" : {
+      "artifactSHA256" : "3333333333333333333333333333333333333333333333333333333333333333",
+      "bindingRevision" : 2,
+      "confirmedStepIDs" : [
+        "flash-partitions",
+        "verify-flash-readback"
+      ],
+      "coverageContractVersion" : "1.0.0",
+      "coveredEffectSetSHA256" : "1111111111111111111111111111111111111111111111111111111111111111",
+      "coveredIntents" : [
+        {
+          "intentEventID" : "job-old-f-intent-7",
+          "jobID" : "job-old-f",
+          "observedAtUTC" : "2026-08-08T00:00:00Z",
+          "operationReference" : "flash.dayu200",
+          "possibleEffects" : [
+
+          ],
+          "profileReference" : "dayu200"
+        }
+      ],
+      "establishedAtUTC" : "2026-08-08T00:20:00Z",
+      "materializedPlanDigestSHA256" : "2222222222222222222222222222222222222222222222222222222222222222",
+      "operationReference" : "flash.dayu200",
+      "profileReference" : "dayu200",
+      "providerExecutableSHA256" : "4444444444444444444444444444444444444444444444444444444444444444",
+      "recoveryIntentEventID" : "job-recovery-intent-9",
+      "recoveryJobID" : "job-invalid",
+      "resultingTargetEpochSHA256" : "7777777777777777777777777777777777777777777777777777777777777777",
+      "source" : "historicalRecognition",
+      "stableTargetIdentitySHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "uncertainEffectSetSHA256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "name" : "invalid-empty-effects",
+    "operation" : "append",
+    "outcome" : {
+      "refused" : "invalidEpoch"
+    },
+    "root" : {
+      ".superseding-recovery-epochs.lock" : {
+        "bytes" : 0,
+        "file" : "steps/11-invalid-empty-effects/.superseding-recovery-epochs.lock",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "superseding-recovery-epochs.json" : {
+        "bytes" : 3892,
+        "file" : "steps/11-invalid-empty-effects/superseding-recovery-epochs.json",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "7934acfafd408891ec359c3e48ab7657ec48c86a6b606b9452a471b4002fb456"
+      }
+    },
+    "seed" : null,
+    "store" : "main"
+  },
+  {
+    "input" : {
+      "artifactSHA256" : "3333333333333333333333333333333333333333333333333333333333333333",
+      "bindingRevision" : 2,
+      "confirmedStepIDs" : [
+        "flash-partitions",
+        "verify-flash-readback"
+      ],
+      "coverageContractVersion" : "1.0.0",
+      "coveredEffectSetSHA256" : "1111111111111111111111111111111111111111111111111111111111111111",
+      "coveredIntents" : [
+        {
+          "intentEventID" : "job-old-g-intent-7",
+          "jobID" : "job-old-g",
+          "observedAtUTC" : "2026-08-08T00:00:00Z",
+          "operationReference" : "flash.dayu200",
+          "possibleEffects" : [
+            "partition:boot",
+            "partition:boot"
+          ],
+          "profileReference" : "dayu200"
+        }
+      ],
+      "establishedAtUTC" : "2026-08-08T00:20:00Z",
+      "materializedPlanDigestSHA256" : "2222222222222222222222222222222222222222222222222222222222222222",
+      "operationReference" : "flash.dayu200",
+      "profileReference" : "dayu200",
+      "providerExecutableSHA256" : "4444444444444444444444444444444444444444444444444444444444444444",
+      "recoveryIntentEventID" : "job-recovery-intent-9",
+      "recoveryJobID" : "job-invalid",
+      "resultingTargetEpochSHA256" : "7777777777777777777777777777777777777777777777777777777777777777",
+      "source" : "historicalRecognition",
+      "stableTargetIdentitySHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "uncertainEffectSetSHA256" : "2bfa3acc319e3a8a460706fa2117d252328b70a3a6df2b0938abd50c5d336b70"
+    },
+    "name" : "invalid-duplicate-effect",
+    "operation" : "append",
+    "outcome" : {
+      "refused" : "invalidEpoch"
+    },
+    "root" : {
+      ".superseding-recovery-epochs.lock" : {
+        "bytes" : 0,
+        "file" : "steps/12-invalid-duplicate-effect/.superseding-recovery-epochs.lock",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "superseding-recovery-epochs.json" : {
+        "bytes" : 3892,
+        "file" : "steps/12-invalid-duplicate-effect/superseding-recovery-epochs.json",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "7934acfafd408891ec359c3e48ab7657ec48c86a6b606b9452a471b4002fb456"
+      }
+    },
+    "seed" : null,
+    "store" : "main"
+  },
+  {
+    "input" : {
+      "artifactSHA256" : "3333333333333333333333333333333333333333333333333333333333333333",
+      "bindingRevision" : 2,
+      "confirmedStepIDs" : [
+        "flash-partitions",
+        "verify-flash-readback"
+      ],
+      "coverageContractVersion" : "1.0.0",
+      "coveredEffectSetSHA256" : "1111111111111111111111111111111111111111111111111111111111111111",
+      "coveredIntents" : [
+        {
+          "intentEventID" : "job-old-a-intent-7",
+          "jobID" : "job-old-a",
+          "observedAtUTC" : "2026-08-08T00:00:00Z",
+          "operationReference" : "flash.dayu200",
+          "possibleEffects" : [
+            "partition:system",
+            "partition:userdata"
+          ],
+          "profileReference" : "dayu200"
+        },
+        {
+          "intentEventID" : "job-old-b-intent-7",
+          "jobID" : "job-old-b",
+          "observedAtUTC" : "2026-08-08T00:00:00Z",
+          "operationReference" : "flash.dayu200",
+          "possibleEffects" : [
+            "partition:userdata",
+            "partition:vendor"
+          ],
+          "profileReference" : "dayu200"
+        }
+      ],
+      "establishedAtUTC" : "2026-08-08T00:20:00Z",
+      "materializedPlanDigestSHA256" : "2222222222222222222222222222222222222222222222222222222222222222",
+      "operationReference" : "flash.dayu200",
+      "profileReference" : "dayu200",
+      "providerExecutableSHA256" : "4444444444444444444444444444444444444444444444444444444444444444",
+      "recoveryIntentEventID" : "job-recovery-intent-9",
+      "recoveryJobID" : "job-invalid",
+      "resultingTargetEpochSHA256" : "7777777777777777777777777777777777777777777777777777777777777777",
+      "source" : "historicalRecognition",
+      "stableTargetIdentitySHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "uncertainEffectSetSHA256" : "9999999999999999999999999999999999999999999999999999999999999999"
+    },
+    "name" : "invalid-uncertain-digest",
+    "operation" : "append",
+    "outcome" : {
+      "refused" : "invalidEpoch"
+    },
+    "root" : {
+      ".superseding-recovery-epochs.lock" : {
+        "bytes" : 0,
+        "file" : "steps/13-invalid-uncertain-digest/.superseding-recovery-epochs.lock",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "superseding-recovery-epochs.json" : {
+        "bytes" : 3892,
+        "file" : "steps/13-invalid-uncertain-digest/superseding-recovery-epochs.json",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "7934acfafd408891ec359c3e48ab7657ec48c86a6b606b9452a471b4002fb456"
+      }
+    },
+    "seed" : null,
+    "store" : "main"
+  },
+  {
+    "input" : {
+      "artifactSHA256" : "3333333333333333333333333333333333333333333333333333333333333333",
+      "bindingRevision" : 2,
+      "confirmedStepIDs" : [
+
+      ],
+      "coverageContractVersion" : "1.0.0",
+      "coveredEffectSetSHA256" : "1111111111111111111111111111111111111111111111111111111111111111",
+      "coveredIntents" : [
+        {
+          "intentEventID" : "job-old-a-intent-7",
+          "jobID" : "job-old-a",
+          "observedAtUTC" : "2026-08-08T00:00:00Z",
+          "operationReference" : "flash.dayu200",
+          "possibleEffects" : [
+            "partition:system",
+            "partition:userdata"
+          ],
+          "profileReference" : "dayu200"
+        },
+        {
+          "intentEventID" : "job-old-b-intent-7",
+          "jobID" : "job-old-b",
+          "observedAtUTC" : "2026-08-08T00:00:00Z",
+          "operationReference" : "flash.dayu200",
+          "possibleEffects" : [
+            "partition:userdata",
+            "partition:vendor"
+          ],
+          "profileReference" : "dayu200"
+        }
+      ],
+      "establishedAtUTC" : "2026-08-08T00:20:00Z",
+      "materializedPlanDigestSHA256" : "2222222222222222222222222222222222222222222222222222222222222222",
+      "operationReference" : "flash.dayu200",
+      "profileReference" : "dayu200",
+      "providerExecutableSHA256" : "4444444444444444444444444444444444444444444444444444444444444444",
+      "recoveryIntentEventID" : "job-recovery-intent-9",
+      "recoveryJobID" : "job-invalid",
+      "resultingTargetEpochSHA256" : "7777777777777777777777777777777777777777777777777777777777777777",
+      "source" : "historicalRecognition",
+      "stableTargetIdentitySHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "uncertainEffectSetSHA256" : "2a28def44f2bec3dcf31e352b63d0afa9b0e330bd773526d583744ab787f7afe"
+    },
+    "name" : "invalid-no-confirmed-step",
+    "operation" : "append",
+    "outcome" : {
+      "refused" : "invalidEpoch"
+    },
+    "root" : {
+      ".superseding-recovery-epochs.lock" : {
+        "bytes" : 0,
+        "file" : "steps/14-invalid-no-confirmed-step/.superseding-recovery-epochs.lock",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "superseding-recovery-epochs.json" : {
+        "bytes" : 3892,
+        "file" : "steps/14-invalid-no-confirmed-step/superseding-recovery-epochs.json",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "7934acfafd408891ec359c3e48ab7657ec48c86a6b606b9452a471b4002fb456"
+      }
+    },
+    "seed" : null,
+    "store" : "main"
+  },
+  {
+    "input" : {
+      "artifactSHA256" : "3333333333333333333333333333333333333333333333333333333333333333",
+      "bindingRevision" : 2,
+      "confirmedStepIDs" : [
+        "flash-partitions",
+        "flash-partitions"
+      ],
+      "coverageContractVersion" : "1.0.0",
+      "coveredEffectSetSHA256" : "1111111111111111111111111111111111111111111111111111111111111111",
+      "coveredIntents" : [
+        {
+          "intentEventID" : "job-old-a-intent-7",
+          "jobID" : "job-old-a",
+          "observedAtUTC" : "2026-08-08T00:00:00Z",
+          "operationReference" : "flash.dayu200",
+          "possibleEffects" : [
+            "partition:system",
+            "partition:userdata"
+          ],
+          "profileReference" : "dayu200"
+        },
+        {
+          "intentEventID" : "job-old-b-intent-7",
+          "jobID" : "job-old-b",
+          "observedAtUTC" : "2026-08-08T00:00:00Z",
+          "operationReference" : "flash.dayu200",
+          "possibleEffects" : [
+            "partition:userdata",
+            "partition:vendor"
+          ],
+          "profileReference" : "dayu200"
+        }
+      ],
+      "establishedAtUTC" : "2026-08-08T00:20:00Z",
+      "materializedPlanDigestSHA256" : "2222222222222222222222222222222222222222222222222222222222222222",
+      "operationReference" : "flash.dayu200",
+      "profileReference" : "dayu200",
+      "providerExecutableSHA256" : "4444444444444444444444444444444444444444444444444444444444444444",
+      "recoveryIntentEventID" : "job-recovery-intent-9",
+      "recoveryJobID" : "job-invalid",
+      "resultingTargetEpochSHA256" : "7777777777777777777777777777777777777777777777777777777777777777",
+      "source" : "historicalRecognition",
+      "stableTargetIdentitySHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "uncertainEffectSetSHA256" : "2a28def44f2bec3dcf31e352b63d0afa9b0e330bd773526d583744ab787f7afe"
+    },
+    "name" : "invalid-duplicate-confirmed-step",
+    "operation" : "append",
+    "outcome" : {
+      "refused" : "invalidEpoch"
+    },
+    "root" : {
+      ".superseding-recovery-epochs.lock" : {
+        "bytes" : 0,
+        "file" : "steps/15-invalid-duplicate-confirmed-step/.superseding-recovery-epochs.lock",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "superseding-recovery-epochs.json" : {
+        "bytes" : 3892,
+        "file" : "steps/15-invalid-duplicate-confirmed-step/superseding-recovery-epochs.json",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "7934acfafd408891ec359c3e48ab7657ec48c86a6b606b9452a471b4002fb456"
+      }
+    },
+    "seed" : null,
+    "store" : "main"
+  },
+  {
+    "input" : {
+      "artifactSHA256" : "3333333333333333333333333333333333333333333333333333333333333333",
+      "bindingRevision" : 2,
+      "confirmedStepIDs" : [
+        "flash-partitions",
+        "verify-flash-readback"
+      ],
+      "coverageContractVersion" : "1.0.0",
+      "coveredEffectSetSHA256" : "1111111111111111111111111111111111111111111111111111111111111111",
+      "coveredIntents" : [
+        {
+          "intentEventID" : "-intent-7",
+          "jobID" : "",
+          "observedAtUTC" : "2026-08-08T00:00:00Z",
+          "operationReference" : "flash.dayu200",
+          "possibleEffects" : [
+            "partition:boot"
+          ],
+          "profileReference" : "dayu200"
+        }
+      ],
+      "establishedAtUTC" : "2026-08-08T00:20:00Z",
+      "materializedPlanDigestSHA256" : "2222222222222222222222222222222222222222222222222222222222222222",
+      "operationReference" : "flash.dayu200",
+      "profileReference" : "dayu200",
+      "providerExecutableSHA256" : "4444444444444444444444444444444444444444444444444444444444444444",
+      "recoveryIntentEventID" : "job-recovery-intent-9",
+      "recoveryJobID" : "job-invalid",
+      "resultingTargetEpochSHA256" : "7777777777777777777777777777777777777777777777777777777777777777",
+      "source" : "historicalRecognition",
+      "stableTargetIdentitySHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "uncertainEffectSetSHA256" : "2bfa3acc319e3a8a460706fa2117d252328b70a3a6df2b0938abd50c5d336b70"
+    },
+    "name" : "invalid-empty-intent-job",
+    "operation" : "append",
+    "outcome" : {
+      "refused" : "invalidEpoch"
+    },
+    "root" : {
+      ".superseding-recovery-epochs.lock" : {
+        "bytes" : 0,
+        "file" : "steps/16-invalid-empty-intent-job/.superseding-recovery-epochs.lock",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "superseding-recovery-epochs.json" : {
+        "bytes" : 3892,
+        "file" : "steps/16-invalid-empty-intent-job/superseding-recovery-epochs.json",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "7934acfafd408891ec359c3e48ab7657ec48c86a6b606b9452a471b4002fb456"
+      }
+    },
+    "seed" : null,
+    "store" : "main"
+  },
+  {
+    "input" : null,
+    "name" : "list-two",
+    "operation" : "list",
+    "outcome" : {
+      "epochs" : [
+        {
+          "artifactSHA256" : "3333333333333333333333333333333333333333333333333333333333333333",
+          "bindingRevision" : 2,
+          "confirmedStepIDs" : [
+            "flash-partitions",
+            "verify-flash-readback"
+          ],
+          "coverageContractVersion" : "1.0.0",
+          "coveredEffectSetSHA256" : "1111111111111111111111111111111111111111111111111111111111111111",
+          "coveredIntents" : [
+            {
+              "intentEventID" : "job-old-a-intent-7",
+              "jobID" : "job-old-a",
+              "observedAtUTC" : "2026-08-08T00:00:00Z",
+              "operationReference" : "flash.dayu200",
+              "possibleEffects" : [
+                "partition:system",
+                "partition:userdata"
+              ],
+              "profileReference" : "dayu200"
+            },
+            {
+              "intentEventID" : "job-old-b-intent-7",
+              "jobID" : "job-old-b",
+              "observedAtUTC" : "2026-08-08T00:00:00Z",
+              "operationReference" : "flash.dayu200",
+              "possibleEffects" : [
+                "partition:userdata",
+                "partition:vendor"
+              ],
+              "profileReference" : "dayu200"
+            }
+          ],
+          "epochID" : "recovery-epoch-ecca2887446b09e855074c8919440ed8",
+          "epochSHA256" : "d7bd3ca1bcbf47ae471c44aa63afb01313dc2f828aa1199012f069d0ad2db5da",
+          "establishedAtUTC" : "2026-08-08T00:20:00Z",
+          "materializedPlanDigestSHA256" : "2222222222222222222222222222222222222222222222222222222222222222",
+          "operationReference" : "flash.dayu200",
+          "profileReference" : "dayu200",
+          "providerExecutableSHA256" : "4444444444444444444444444444444444444444444444444444444444444444",
+          "recoveryIntentEventID" : "job-recovery-intent-9",
+          "recoveryJobID" : "job-recovery",
+          "resultingTargetEpochSHA256" : "7777777777777777777777777777777777777777777777777777777777777777",
+          "source" : "historicalRecognition",
+          "stableTargetIdentitySHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "uncertainEffectSetSHA256" : "2a28def44f2bec3dcf31e352b63d0afa9b0e330bd773526d583744ab787f7afe"
+        },
+        {
+          "artifactSHA256" : "3333333333333333333333333333333333333333333333333333333333333333",
+          "bindingRevision" : 2,
+          "confirmedStepIDs" : [
+            "flash-partitions"
+          ],
+          "coverageContractVersion" : "1.0.0",
+          "coveredEffectSetSHA256" : "1111111111111111111111111111111111111111111111111111111111111111",
+          "coveredIntents" : [
+            {
+              "intentEventID" : "job-old-d-intent-7",
+              "jobID" : "job-old-d",
+              "observedAtUTC" : "2026-08-08T00:00:00Z",
+              "operationReference" : "flash.dayu200",
+              "possibleEffects" : [
+                "partition:boot"
+              ],
+              "profileReference" : "dayu200"
+            }
+          ],
+          "epochID" : "recovery-epoch-f921c7c98bc5ce109a77c531b7e5e6a8",
+          "epochSHA256" : "fbf5b1b67e26d4f8e5aa77e6da2e5a07f761a0247ada2b30659acab924fd72b0",
+          "establishedAtUTC" : "2026-08-08T05:00:00Z",
+          "materializedPlanDigestSHA256" : "2222222222222222222222222222222222222222222222222222222222222222",
+          "operationReference" : "flash.dayu200",
+          "previousEpochSHA256" : "d7bd3ca1bcbf47ae471c44aa63afb01313dc2f828aa1199012f069d0ad2db5da",
+          "profileReference" : "dayu200",
+          "providerExecutableSHA256" : "6666666666666666666666666666666666666666666666666666666666666666",
+          "recoveryIntentEventID" : "job-recovery-2-intent-4",
+          "recoveryJobID" : "job-recovery-2",
+          "resultingTargetEpochSHA256" : "7777777777777777777777777777777777777777777777777777777777777777",
+          "source" : "distinctRecoveryExecution",
+          "stableTargetIdentitySHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "uncertainEffectSetSHA256" : "2bfa3acc319e3a8a460706fa2117d252328b70a3a6df2b0938abd50c5d336b70"
+        }
+      ]
+    },
+    "root" : {
+      ".superseding-recovery-epochs.lock" : {
+        "bytes" : 0,
+        "file" : "steps/17-list-two/.superseding-recovery-epochs.lock",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "superseding-recovery-epochs.json" : {
+        "bytes" : 3892,
+        "file" : "steps/17-list-two/superseding-recovery-epochs.json",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "7934acfafd408891ec359c3e48ab7657ec48c86a6b606b9452a471b4002fb456"
+      }
+    },
+    "seed" : null,
+    "store" : "main"
+  },
+  {
+    "input" : null,
+    "name" : "load-changed-material",
+    "operation" : "list",
+    "outcome" : {
+      "refused" : "corrupt"
+    },
+    "root" : {
+      ".superseding-recovery-epochs.lock" : {
+        "bytes" : 0,
+        "file" : "steps/18-load-changed-material/.superseding-recovery-epochs.lock",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "superseding-recovery-epochs.json" : {
+        "bytes" : 3892,
+        "file" : "steps/18-load-changed-material/superseding-recovery-epochs.json",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "bee8dd132b411e684eb965c4c6879b7a70417a12c9cd0801019f1dffaacba3e7"
+      }
+    },
+    "seed" : {
+      "document" : "load-changed-material"
+    },
+    "store" : "load-changed-material"
+  },
+  {
+    "input" : null,
+    "name" : "load-reordered",
+    "operation" : "list",
+    "outcome" : {
+      "refused" : "corrupt"
+    },
+    "root" : {
+      ".superseding-recovery-epochs.lock" : {
+        "bytes" : 0,
+        "file" : "steps/19-load-reordered/.superseding-recovery-epochs.lock",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "superseding-recovery-epochs.json" : {
+        "bytes" : 3892,
+        "file" : "steps/19-load-reordered/superseding-recovery-epochs.json",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "3e8cdb5aa0a475e1443e3fe5c59d0adce9a78bfb70c535fba4780f462fd72e26"
+      }
+    },
+    "seed" : {
+      "document" : "load-reordered"
+    },
+    "store" : "load-reordered"
+  },
+  {
+    "input" : null,
+    "name" : "load-first-removed",
+    "operation" : "list",
+    "outcome" : {
+      "refused" : "corrupt"
+    },
+    "root" : {
+      ".superseding-recovery-epochs.lock" : {
+        "bytes" : 0,
+        "file" : "steps/20-load-first-removed/.superseding-recovery-epochs.lock",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "superseding-recovery-epochs.json" : {
+        "bytes" : 1811,
+        "file" : "steps/20-load-first-removed/superseding-recovery-epochs.json",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "4cc9a3b84a1992eb1f445ec2dfcec166aaf4b9429397475f6c483c5fe1626ff2"
+      }
+    },
+    "seed" : {
+      "document" : "load-first-removed"
+    },
+    "store" : "load-first-removed"
+  },
+  {
+    "input" : null,
+    "name" : "load-schema-version",
+    "operation" : "list",
+    "outcome" : {
+      "refused" : "corrupt"
+    },
+    "root" : {
+      ".superseding-recovery-epochs.lock" : {
+        "bytes" : 0,
+        "file" : "steps/21-load-schema-version/.superseding-recovery-epochs.lock",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "superseding-recovery-epochs.json" : {
+        "bytes" : 3892,
+        "file" : "steps/21-load-schema-version/superseding-recovery-epochs.json",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "16424124b52680dd3d435d843c9bba03923efe2cc71d3793f29eb6862791f159"
+      }
+    },
+    "seed" : {
+      "document" : "load-schema-version"
+    },
+    "store" : "load-schema-version"
+  },
+  {
+    "input" : null,
+    "name" : "load-invalid-epoch",
+    "operation" : "list",
+    "outcome" : {
+      "refused" : "invalidEpoch"
+    },
+    "root" : {
+      ".superseding-recovery-epochs.lock" : {
+        "bytes" : 0,
+        "file" : "steps/22-load-invalid-epoch/.superseding-recovery-epochs.lock",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "superseding-recovery-epochs.json" : {
+        "bytes" : 3892,
+        "file" : "steps/22-load-invalid-epoch/superseding-recovery-epochs.json",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "404d87c9cf2016db180c1414b4f0e50781c9cea2e69a2af900c047074be25177"
+      }
+    },
+    "seed" : {
+      "document" : "load-invalid-epoch"
+    },
+    "store" : "load-invalid-epoch"
+  },
+  {
+    "input" : null,
+    "name" : "load-epoch-member-missing",
+    "operation" : "list",
+    "outcome" : {
+      "refused" : "corrupt"
+    },
+    "root" : {
+      ".superseding-recovery-epochs.lock" : {
+        "bytes" : 0,
+        "file" : "steps/23-load-epoch-member-missing/.superseding-recovery-epochs.lock",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "superseding-recovery-epochs.json" : {
+        "bytes" : 3799,
+        "file" : "steps/23-load-epoch-member-missing/superseding-recovery-epochs.json",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "6b181d6c2193dbc9e10a43d70374e1ff6d3ff83533324cf755ba1b8669ddf7c2"
+      }
+    },
+    "seed" : {
+      "document" : "load-epoch-member-missing"
+    },
+    "store" : "load-epoch-member-missing"
+  },
+  {
+    "input" : null,
+    "name" : "load-epoch-member-unknown",
+    "operation" : "list",
+    "outcome" : {
+      "epochs" : [
+        {
+          "artifactSHA256" : "3333333333333333333333333333333333333333333333333333333333333333",
+          "bindingRevision" : 2,
+          "confirmedStepIDs" : [
+            "flash-partitions",
+            "verify-flash-readback"
+          ],
+          "coverageContractVersion" : "1.0.0",
+          "coveredEffectSetSHA256" : "1111111111111111111111111111111111111111111111111111111111111111",
+          "coveredIntents" : [
+            {
+              "intentEventID" : "job-old-a-intent-7",
+              "jobID" : "job-old-a",
+              "observedAtUTC" : "2026-08-08T00:00:00Z",
+              "operationReference" : "flash.dayu200",
+              "possibleEffects" : [
+                "partition:system",
+                "partition:userdata"
+              ],
+              "profileReference" : "dayu200"
+            },
+            {
+              "intentEventID" : "job-old-b-intent-7",
+              "jobID" : "job-old-b",
+              "observedAtUTC" : "2026-08-08T00:00:00Z",
+              "operationReference" : "flash.dayu200",
+              "possibleEffects" : [
+                "partition:userdata",
+                "partition:vendor"
+              ],
+              "profileReference" : "dayu200"
+            }
+          ],
+          "epochID" : "recovery-epoch-ecca2887446b09e855074c8919440ed8",
+          "epochSHA256" : "d7bd3ca1bcbf47ae471c44aa63afb01313dc2f828aa1199012f069d0ad2db5da",
+          "establishedAtUTC" : "2026-08-08T00:20:00Z",
+          "materializedPlanDigestSHA256" : "2222222222222222222222222222222222222222222222222222222222222222",
+          "operationReference" : "flash.dayu200",
+          "profileReference" : "dayu200",
+          "providerExecutableSHA256" : "4444444444444444444444444444444444444444444444444444444444444444",
+          "recoveryIntentEventID" : "job-recovery-intent-9",
+          "recoveryJobID" : "job-recovery",
+          "resultingTargetEpochSHA256" : "7777777777777777777777777777777777777777777777777777777777777777",
+          "source" : "historicalRecognition",
+          "stableTargetIdentitySHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "uncertainEffectSetSHA256" : "2a28def44f2bec3dcf31e352b63d0afa9b0e330bd773526d583744ab787f7afe"
+        },
+        {
+          "artifactSHA256" : "3333333333333333333333333333333333333333333333333333333333333333",
+          "bindingRevision" : 2,
+          "confirmedStepIDs" : [
+            "flash-partitions"
+          ],
+          "coverageContractVersion" : "1.0.0",
+          "coveredEffectSetSHA256" : "1111111111111111111111111111111111111111111111111111111111111111",
+          "coveredIntents" : [
+            {
+              "intentEventID" : "job-old-d-intent-7",
+              "jobID" : "job-old-d",
+              "observedAtUTC" : "2026-08-08T00:00:00Z",
+              "operationReference" : "flash.dayu200",
+              "possibleEffects" : [
+                "partition:boot"
+              ],
+              "profileReference" : "dayu200"
+            }
+          ],
+          "epochID" : "recovery-epoch-f921c7c98bc5ce109a77c531b7e5e6a8",
+          "epochSHA256" : "fbf5b1b67e26d4f8e5aa77e6da2e5a07f761a0247ada2b30659acab924fd72b0",
+          "establishedAtUTC" : "2026-08-08T05:00:00Z",
+          "materializedPlanDigestSHA256" : "2222222222222222222222222222222222222222222222222222222222222222",
+          "operationReference" : "flash.dayu200",
+          "previousEpochSHA256" : "d7bd3ca1bcbf47ae471c44aa63afb01313dc2f828aa1199012f069d0ad2db5da",
+          "profileReference" : "dayu200",
+          "providerExecutableSHA256" : "6666666666666666666666666666666666666666666666666666666666666666",
+          "recoveryIntentEventID" : "job-recovery-2-intent-4",
+          "recoveryJobID" : "job-recovery-2",
+          "resultingTargetEpochSHA256" : "7777777777777777777777777777777777777777777777777777777777777777",
+          "source" : "distinctRecoveryExecution",
+          "stableTargetIdentitySHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "uncertainEffectSetSHA256" : "2bfa3acc319e3a8a460706fa2117d252328b70a3a6df2b0938abd50c5d336b70"
+        }
+      ]
+    },
+    "root" : {
+      ".superseding-recovery-epochs.lock" : {
+        "bytes" : 0,
+        "file" : "steps/24-load-epoch-member-unknown/.superseding-recovery-epochs.lock",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "superseding-recovery-epochs.json" : {
+        "bytes" : 3935,
+        "file" : "steps/24-load-epoch-member-unknown/superseding-recovery-epochs.json",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "2e72e84b30776ea1d3f608d49bddb1d25bb05ed45c1f3973ef19c4a1d77b9cc7"
+      }
+    },
+    "seed" : {
+      "document" : "load-epoch-member-unknown"
+    },
+    "store" : "load-epoch-member-unknown"
+  },
+  {
+    "input" : null,
+    "name" : "load-document-member-unknown",
+    "operation" : "list",
+    "outcome" : {
+      "epochs" : [
+        {
+          "artifactSHA256" : "3333333333333333333333333333333333333333333333333333333333333333",
+          "bindingRevision" : 2,
+          "confirmedStepIDs" : [
+            "flash-partitions",
+            "verify-flash-readback"
+          ],
+          "coverageContractVersion" : "1.0.0",
+          "coveredEffectSetSHA256" : "1111111111111111111111111111111111111111111111111111111111111111",
+          "coveredIntents" : [
+            {
+              "intentEventID" : "job-old-a-intent-7",
+              "jobID" : "job-old-a",
+              "observedAtUTC" : "2026-08-08T00:00:00Z",
+              "operationReference" : "flash.dayu200",
+              "possibleEffects" : [
+                "partition:system",
+                "partition:userdata"
+              ],
+              "profileReference" : "dayu200"
+            },
+            {
+              "intentEventID" : "job-old-b-intent-7",
+              "jobID" : "job-old-b",
+              "observedAtUTC" : "2026-08-08T00:00:00Z",
+              "operationReference" : "flash.dayu200",
+              "possibleEffects" : [
+                "partition:userdata",
+                "partition:vendor"
+              ],
+              "profileReference" : "dayu200"
+            }
+          ],
+          "epochID" : "recovery-epoch-ecca2887446b09e855074c8919440ed8",
+          "epochSHA256" : "d7bd3ca1bcbf47ae471c44aa63afb01313dc2f828aa1199012f069d0ad2db5da",
+          "establishedAtUTC" : "2026-08-08T00:20:00Z",
+          "materializedPlanDigestSHA256" : "2222222222222222222222222222222222222222222222222222222222222222",
+          "operationReference" : "flash.dayu200",
+          "profileReference" : "dayu200",
+          "providerExecutableSHA256" : "4444444444444444444444444444444444444444444444444444444444444444",
+          "recoveryIntentEventID" : "job-recovery-intent-9",
+          "recoveryJobID" : "job-recovery",
+          "resultingTargetEpochSHA256" : "7777777777777777777777777777777777777777777777777777777777777777",
+          "source" : "historicalRecognition",
+          "stableTargetIdentitySHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "uncertainEffectSetSHA256" : "2a28def44f2bec3dcf31e352b63d0afa9b0e330bd773526d583744ab787f7afe"
+        },
+        {
+          "artifactSHA256" : "3333333333333333333333333333333333333333333333333333333333333333",
+          "bindingRevision" : 2,
+          "confirmedStepIDs" : [
+            "flash-partitions"
+          ],
+          "coverageContractVersion" : "1.0.0",
+          "coveredEffectSetSHA256" : "1111111111111111111111111111111111111111111111111111111111111111",
+          "coveredIntents" : [
+            {
+              "intentEventID" : "job-old-d-intent-7",
+              "jobID" : "job-old-d",
+              "observedAtUTC" : "2026-08-08T00:00:00Z",
+              "operationReference" : "flash.dayu200",
+              "possibleEffects" : [
+                "partition:boot"
+              ],
+              "profileReference" : "dayu200"
+            }
+          ],
+          "epochID" : "recovery-epoch-f921c7c98bc5ce109a77c531b7e5e6a8",
+          "epochSHA256" : "fbf5b1b67e26d4f8e5aa77e6da2e5a07f761a0247ada2b30659acab924fd72b0",
+          "establishedAtUTC" : "2026-08-08T05:00:00Z",
+          "materializedPlanDigestSHA256" : "2222222222222222222222222222222222222222222222222222222222222222",
+          "operationReference" : "flash.dayu200",
+          "previousEpochSHA256" : "d7bd3ca1bcbf47ae471c44aa63afb01313dc2f828aa1199012f069d0ad2db5da",
+          "profileReference" : "dayu200",
+          "providerExecutableSHA256" : "6666666666666666666666666666666666666666666666666666666666666666",
+          "recoveryIntentEventID" : "job-recovery-2-intent-4",
+          "recoveryJobID" : "job-recovery-2",
+          "resultingTargetEpochSHA256" : "7777777777777777777777777777777777777777777777777777777777777777",
+          "source" : "distinctRecoveryExecution",
+          "stableTargetIdentitySHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "uncertainEffectSetSHA256" : "2bfa3acc319e3a8a460706fa2117d252328b70a3a6df2b0938abd50c5d336b70"
+        }
+      ]
+    },
+    "root" : {
+      ".superseding-recovery-epochs.lock" : {
+        "bytes" : 0,
+        "file" : "steps/25-load-document-member-unknown/.superseding-recovery-epochs.lock",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "superseding-recovery-epochs.json" : {
+        "bytes" : 3931,
+        "file" : "steps/25-load-document-member-unknown/superseding-recovery-epochs.json",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "833644c42df955af0039738fa1d9eb4591a20ba05ebbe432ebb5258afee5b25f"
+      }
+    },
+    "seed" : {
+      "document" : "load-document-member-unknown"
+    },
+    "store" : "load-document-member-unknown"
+  },
+  {
+    "input" : null,
+    "name" : "load-not-json",
+    "operation" : "list",
+    "outcome" : {
+      "refused" : "corrupt"
+    },
+    "root" : {
+      ".superseding-recovery-epochs.lock" : {
+        "bytes" : 0,
+        "file" : "steps/26-load-not-json/.superseding-recovery-epochs.lock",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "superseding-recovery-epochs.json" : {
+        "bytes" : 40,
+        "file" : "steps/26-load-not-json/superseding-recovery-epochs.json",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "f7b4ffcae4d2179a0ebeb65769b2acbbb75f10e46c1f582d1aec8983ff6bceb4"
+      }
+    },
+    "seed" : {
+      "document" : "load-not-json"
+    },
+    "store" : "load-not-json"
+  },
+  {
+    "input" : null,
+    "name" : "load-document-mode-0644",
+    "operation" : "list",
+    "outcome" : {
+      "refused" : "corrupt"
+    },
+    "root" : {
+      ".superseding-recovery-epochs.lock" : {
+        "bytes" : 0,
+        "file" : "steps/27-load-document-mode-0644/.superseding-recovery-epochs.lock",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "superseding-recovery-epochs.json" : {
+        "bytes" : 3892,
+        "file" : "steps/27-load-document-mode-0644/superseding-recovery-epochs.json",
+        "links" : 1,
+        "mode" : "644",
+        "sha256" : "7934acfafd408891ec359c3e48ab7657ec48c86a6b606b9452a471b4002fb456"
+      }
+    },
+    "seed" : {
+      "document" : "list-two",
+      "documentMode" : "644"
+    },
+    "store" : "load-document-mode-0644"
+  },
+  {
+    "input" : null,
+    "name" : "load-document-linked",
+    "operation" : "list",
+    "outcome" : {
+      "refused" : "corrupt"
+    },
+    "root" : {
+      ".superseding-recovery-epochs.lock" : {
+        "bytes" : 0,
+        "file" : "steps/28-load-document-linked/.superseding-recovery-epochs.lock",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "second-name.json" : {
+        "bytes" : 3892,
+        "file" : "steps/28-load-document-linked/second-name.json",
+        "links" : 2,
+        "mode" : "600",
+        "sha256" : "7934acfafd408891ec359c3e48ab7657ec48c86a6b606b9452a471b4002fb456"
+      },
+      "superseding-recovery-epochs.json" : {
+        "bytes" : 3892,
+        "file" : "steps/28-load-document-linked/superseding-recovery-epochs.json",
+        "links" : 2,
+        "mode" : "600",
+        "sha256" : "7934acfafd408891ec359c3e48ab7657ec48c86a6b606b9452a471b4002fb456"
+      }
+    },
+    "seed" : {
+      "document" : "list-two",
+      "hardLink" : "second-name.json"
+    },
+    "store" : "load-document-linked"
+  },
+  {
+    "input" : null,
+    "name" : "load-document-oversized",
+    "operation" : "list",
+    "outcome" : {
+      "refused" : "corrupt"
+    },
+    "root" : {
+      ".superseding-recovery-epochs.lock" : {
+        "bytes" : 0,
+        "file" : "steps/29-load-document-oversized/.superseding-recovery-epochs.lock",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "superseding-recovery-epochs.json" : {
+        "bytes" : 1048577,
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "7bcac15125d3aa0e78ed20f4f4cfbc5e08b901bbf3be57dcd5f5959e251315ad"
+      }
+    },
+    "seed" : {
+      "appendSpacesTo" : 1048577,
+      "document" : "list-two"
+    },
+    "store" : "load-document-oversized"
+  },
+  {
+    "input" : null,
+    "name" : "lock-mode-0644-list",
+    "operation" : "list",
+    "outcome" : {
+      "refused" : "corrupt"
+    },
+    "root" : {
+      ".superseding-recovery-epochs.lock" : {
+        "bytes" : 0,
+        "file" : "steps/30-lock-mode-0644-list/.superseding-recovery-epochs.lock",
+        "links" : 1,
+        "mode" : "644",
+        "sha256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "superseding-recovery-epochs.json" : {
+        "bytes" : 3892,
+        "file" : "steps/30-lock-mode-0644-list/superseding-recovery-epochs.json",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "7934acfafd408891ec359c3e48ab7657ec48c86a6b606b9452a471b4002fb456"
+      }
+    },
+    "seed" : {
+      "document" : "list-two",
+      "lockMode" : "644"
+    },
+    "store" : "lock-mode-0644"
+  },
+  {
+    "input" : {
+      "artifactSHA256" : "3333333333333333333333333333333333333333333333333333333333333333",
+      "bindingRevision" : 2,
+      "confirmedStepIDs" : [
+        "flash-partitions",
+        "verify-flash-readback"
+      ],
+      "coverageContractVersion" : "1.0.0",
+      "coveredEffectSetSHA256" : "1111111111111111111111111111111111111111111111111111111111111111",
+      "coveredIntents" : [
+        {
+          "intentEventID" : "job-old-a-intent-7",
+          "jobID" : "job-old-a",
+          "observedAtUTC" : "2026-08-08T00:00:00Z",
+          "operationReference" : "flash.dayu200",
+          "possibleEffects" : [
+            "partition:system",
+            "partition:userdata"
+          ],
+          "profileReference" : "dayu200"
+        },
+        {
+          "intentEventID" : "job-old-b-intent-7",
+          "jobID" : "job-old-b",
+          "observedAtUTC" : "2026-08-08T00:00:00Z",
+          "operationReference" : "flash.dayu200",
+          "possibleEffects" : [
+            "partition:userdata",
+            "partition:vendor"
+          ],
+          "profileReference" : "dayu200"
+        }
+      ],
+      "establishedAtUTC" : "2026-08-08T00:20:00Z",
+      "materializedPlanDigestSHA256" : "2222222222222222222222222222222222222222222222222222222222222222",
+      "operationReference" : "flash.dayu200",
+      "profileReference" : "dayu200",
+      "providerExecutableSHA256" : "4444444444444444444444444444444444444444444444444444444444444444",
+      "recoveryIntentEventID" : "job-recovery-3-intent-2",
+      "recoveryJobID" : "job-recovery-3",
+      "resultingTargetEpochSHA256" : "7777777777777777777777777777777777777777777777777777777777777777",
+      "source" : "historicalRecognition",
+      "stableTargetIdentitySHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "uncertainEffectSetSHA256" : "2a28def44f2bec3dcf31e352b63d0afa9b0e330bd773526d583744ab787f7afe"
+    },
+    "name" : "lock-mode-0644-append",
+    "operation" : "append",
+    "outcome" : {
+      "refused" : "corrupt"
+    },
+    "root" : {
+      ".superseding-recovery-epochs.lock" : {
+        "bytes" : 0,
+        "file" : "steps/31-lock-mode-0644-append/.superseding-recovery-epochs.lock",
+        "links" : 1,
+        "mode" : "644",
+        "sha256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "superseding-recovery-epochs.json" : {
+        "bytes" : 3892,
+        "file" : "steps/31-lock-mode-0644-append/superseding-recovery-epochs.json",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "7934acfafd408891ec359c3e48ab7657ec48c86a6b606b9452a471b4002fb456"
+      }
+    },
+    "seed" : null,
+    "store" : "lock-mode-0644"
+  },
+  {
+    "input" : {
+      "artifactSHA256" : "3333333333333333333333333333333333333333333333333333333333333333",
+      "bindingRevision" : 2,
+      "confirmedStepIDs" : [
+        "flash-partitions",
+        "verify-flash-readback"
+      ],
+      "coverageContractVersion" : "1.0.0",
+      "coveredEffectSetSHA256" : "1111111111111111111111111111111111111111111111111111111111111111",
+      "coveredIntents" : [
+        {
+          "intentEventID" : "job-old-a-intent-7",
+          "jobID" : "job-old-a",
+          "observedAtUTC" : "2026-08-08T00:00:00Z",
+          "operationReference" : "flash.dayu200",
+          "possibleEffects" : [
+            "partition:system",
+            "partition:userdata"
+          ],
+          "profileReference" : "dayu200"
+        },
+        {
+          "intentEventID" : "job-old-b-intent-7",
+          "jobID" : "job-old-b",
+          "observedAtUTC" : "2026-08-08T00:00:00Z",
+          "operationReference" : "flash.dayu200",
+          "possibleEffects" : [
+            "partition:userdata",
+            "partition:vendor"
+          ],
+          "profileReference" : "dayu200"
+        }
+      ],
+      "establishedAtUTC" : "2026-08-08T00:20:00Z",
+      "materializedPlanDigestSHA256" : "2222222222222222222222222222222222222222222222222222222222222222",
+      "operationReference" : "flash.dayu200",
+      "profileReference" : "dayu200",
+      "providerExecutableSHA256" : "4444444444444444444444444444444444444444444444444444444444444444",
+      "recoveryIntentEventID" : "job-recovery-3-intent-2",
+      "recoveryJobID" : "job-recovery-3",
+      "resultingTargetEpochSHA256" : "7777777777777777777777777777777777777777777777777777777777777777",
+      "source" : "historicalRecognition",
+      "stableTargetIdentitySHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "uncertainEffectSetSHA256" : "2a28def44f2bec3dcf31e352b63d0afa9b0e330bd773526d583744ab787f7afe"
+    },
+    "name" : "continue-chain",
+    "operation" : "append",
+    "outcome" : {
+      "epoch" : {
+        "artifactSHA256" : "3333333333333333333333333333333333333333333333333333333333333333",
+        "bindingRevision" : 2,
+        "confirmedStepIDs" : [
+          "flash-partitions",
+          "verify-flash-readback"
+        ],
+        "coverageContractVersion" : "1.0.0",
+        "coveredEffectSetSHA256" : "1111111111111111111111111111111111111111111111111111111111111111",
+        "coveredIntents" : [
+          {
+            "intentEventID" : "job-old-a-intent-7",
+            "jobID" : "job-old-a",
+            "observedAtUTC" : "2026-08-08T00:00:00Z",
+            "operationReference" : "flash.dayu200",
+            "possibleEffects" : [
+              "partition:system",
+              "partition:userdata"
+            ],
+            "profileReference" : "dayu200"
+          },
+          {
+            "intentEventID" : "job-old-b-intent-7",
+            "jobID" : "job-old-b",
+            "observedAtUTC" : "2026-08-08T00:00:00Z",
+            "operationReference" : "flash.dayu200",
+            "possibleEffects" : [
+              "partition:userdata",
+              "partition:vendor"
+            ],
+            "profileReference" : "dayu200"
+          }
+        ],
+        "epochID" : "recovery-epoch-6c942fbca7da05754fd67b0dadee7b38",
+        "epochSHA256" : "17a91a7995ed9f27e1055197f546186bf64f89dc1de92a38761a4172994cc5f8",
+        "establishedAtUTC" : "2026-08-08T00:20:00Z",
+        "materializedPlanDigestSHA256" : "2222222222222222222222222222222222222222222222222222222222222222",
+        "operationReference" : "flash.dayu200",
+        "previousEpochSHA256" : "fbf5b1b67e26d4f8e5aa77e6da2e5a07f761a0247ada2b30659acab924fd72b0",
+        "profileReference" : "dayu200",
+        "providerExecutableSHA256" : "4444444444444444444444444444444444444444444444444444444444444444",
+        "recoveryIntentEventID" : "job-recovery-3-intent-2",
+        "recoveryJobID" : "job-recovery-3",
+        "resultingTargetEpochSHA256" : "7777777777777777777777777777777777777777777777777777777777777777",
+        "source" : "historicalRecognition",
+        "stableTargetIdentitySHA256" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "uncertainEffectSetSHA256" : "2a28def44f2bec3dcf31e352b63d0afa9b0e330bd773526d583744ab787f7afe"
+      }
+    },
+    "root" : {
+      ".superseding-recovery-epochs.lock" : {
+        "bytes" : 0,
+        "file" : "steps/32-continue-chain/.superseding-recovery-epochs.lock",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "superseding-recovery-epochs.json" : {
+        "bytes" : 6075,
+        "file" : "steps/32-continue-chain/superseding-recovery-epochs.json",
+        "links" : 1,
+        "mode" : "600",
+        "sha256" : "535f598c4a7255c70c07a92d09ab0508f54a126187316afe4be80d32cfc53eca"
+      }
+    },
+    "seed" : {
+      "document" : "list-two"
+    },
+    "store" : "continue-chain"
+  }
+]
