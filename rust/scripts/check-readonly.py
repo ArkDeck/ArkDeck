@@ -61,6 +61,9 @@ def assert_boundaries() -> None:
         # actions (the design's crate graph: RUNTIME --> PHDC).
         "arkdeck-hoststore": {"arkdeck-contract", "arkdeck-platform", "arkdeck-provider-hdc"},
         "arkdeck-provider-hdc": {"arkdeck-platform"},
+        # Workspace signing and credentials (SPK-10): measured files, the
+        # Keychain and the signer's terminal all come from the platform crate.
+        "arkdeck-provider-workspace": {"arkdeck-platform"},
         "arkdeck-client": {"arkdeck-contract", "arkdeck-platform"},
         "arkdeck-cli": {"arkdeck-contract", "arkdeck-client", "arkdeck-platform"},
         "arkdeck-agentd": {"arkdeck-contract", "arkdeck-control", "arkdeck-platform", "arkdeck-provider-hdc", "arkdeck-hoststore"},

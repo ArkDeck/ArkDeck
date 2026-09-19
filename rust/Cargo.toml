@@ -15,6 +15,7 @@ arkdeck-platform = { path = "crates/arkdeck-platform" }
 arkdeck-control = { path = "crates/arkdeck-control" }
 arkdeck-hoststore = { path = "crates/arkdeck-hoststore" }
 arkdeck-provider-hdc = { path = "crates/arkdeck-provider-hdc" }
+arkdeck-provider-workspace = { path = "crates/arkdeck-provider-workspace" }
 arkdeck-client = { path = "crates/arkdeck-client" }
 serde = { version = "=1.0.228", features = ["derive"] }
 serde_json = { version = "1.0.151", features = ["float_roundtrip"] }

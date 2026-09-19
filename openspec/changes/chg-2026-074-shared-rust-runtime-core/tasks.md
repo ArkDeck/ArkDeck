@@ -990,7 +990,7 @@ this scope PR does not modify either script. See `evidence/runs/TASK-XPA-003/run
 
 ## TASK-XPA-015 — Port analyzer and workspace providers to Rust (shared with Windows)
 
-- Status:ready（2026-09-14, r11: the provider port depends on the isolated Rust daemon and the analyzer/workspace contracts as delivered, and on SPK-10 for the signing path; it no longer waits for TASK-XPA-014 `done`. The GJ-5 acceptance still needs the M1/M2 authority of TASK-XPA-014 for the device-bound hops. Readiness pins instantiated at `main` `6cf99fb6`）
+- Status:in-progress（2026-09-19: SPK-10 is go on the reference host — Keychain through `SecItem*` with Swift's non-interactive `LAContext`, the DevEco password decoder, and hap-sign-tool and Hvigor through registered identities all run in Rust, so signing needs no executor sidecar; its signed-digest criterion is restated for review because hap-sign-tool output differs from run to run (`evidence/runs/TASK-XPA-015/spk-10-run.md`). The `workspace.project.register/list/show` owner is on `main`; the other project and preset methods, the 13 `workspace.*` operations, the three analyzers and the GJ-5 acceptance remain）
 - Platform:macos
 - Requirements:CLI-REQ-022, POL-PRIVACY-001, `PRODUCT-LOOP.md:412-448`
 - Acceptance:XPA-AC-1, XPA-AC-10; macOS GJ-5 re-pass

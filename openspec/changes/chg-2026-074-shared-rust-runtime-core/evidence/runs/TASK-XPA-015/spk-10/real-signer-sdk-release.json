@@ -1,0 +1,51 @@
+{
+  "input": {
+    "byteCount": 2743431,
+    "sha256": "e3e485a700a1e749e6683cc08f2f196a11ec41cab1626a1c105c66a1683cbc90"
+  },
+  "passwordSource": "public-sdk",
+  "runs": [
+    {
+      "job": "spk10-real-0-e0c1946e",
+      "seconds": 6.725043,
+      "summary": {
+        "appCertificateSha256": "b5c1d6254faa91eab645a32fc3ce136128c94d88a739a0e956e6a49b331387e5",
+        "certificateChainReadbackSha256": "5358faac7e78e3d89755a0b5da6c0ffe847c66f8dec02cce313e1f4b1b867de4",
+        "javaSha256": "dab75514fef8a40908a71f24eccc1b092238228023de57deca3c4a64b7364f72",
+        "keystoreSha256": "7a5efc3ea9245596d157f6ccbbdc5b8ae7cd714e7086c3c1645986c9d495d071",
+        "profileReadbackSha256": "ddec2a15ed25e7f8eaa59a142ca80356e8f07972b8a3a04139a84f5c215a15be",
+        "projectRef": "spk10-probe",
+        "signedHapByteCount": "2808563",
+        "signedHapSha256": "1f5d7230bf5a6cadebfa87d4e28928f62d6b76580062172aeceff67e3528c97e",
+        "signedProfileSha256": "ddec2a15ed25e7f8eaa59a142ca80356e8f07972b8a3a04139a84f5c215a15be",
+        "signerJarSha256": "a434b6747e6c5d0b14e73837a46b39f4816ab25b42d1833d6f767bf867cf616d",
+        "signingPresetRef": "spk10-probe-signing",
+        "sourceArtifactId": "ART-SPK10-INPUT",
+        "sourceByteCount": "2743431",
+        "sourceSha256": "e3e485a700a1e749e6683cc08f2f196a11ec41cab1626a1c105c66a1683cbc90",
+        "verification": "verified"
+      }
+    },
+    {
+      "job": "spk10-real-1-f0dfc642",
+      "seconds": 6.378679667,
+      "summary": {
+        "appCertificateSha256": "b5c1d6254faa91eab645a32fc3ce136128c94d88a739a0e956e6a49b331387e5",
+        "certificateChainReadbackSha256": "5358faac7e78e3d89755a0b5da6c0ffe847c66f8dec02cce313e1f4b1b867de4",
+        "javaSha256": "dab75514fef8a40908a71f24eccc1b092238228023de57deca3c4a64b7364f72",
+        "keystoreSha256": "7a5efc3ea9245596d157f6ccbbdc5b8ae7cd714e7086c3c1645986c9d495d071",
+        "profileReadbackSha256": "ddec2a15ed25e7f8eaa59a142ca80356e8f07972b8a3a04139a84f5c215a15be",
+        "projectRef": "spk10-probe",
+        "signedHapByteCount": "2808564",
+        "signedHapSha256": "54a30a56b157e75d0530416514e95cca929ae3e323ed748f7aea257be5cfd29c",
+        "signedProfileSha256": "ddec2a15ed25e7f8eaa59a142ca80356e8f07972b8a3a04139a84f5c215a15be",
+        "signerJarSha256": "a434b6747e6c5d0b14e73837a46b39f4816ab25b42d1833d6f767bf867cf616d",
+        "signingPresetRef": "spk10-probe-signing",
+        "sourceArtifactId": "ART-SPK10-INPUT",
+        "sourceByteCount": "2743431",
+        "sourceSha256": "e3e485a700a1e749e6683cc08f2f196a11ec41cab1626a1c105c66a1683cbc90",
+        "verification": "verified"
+      }
+    }
+  ]
+}

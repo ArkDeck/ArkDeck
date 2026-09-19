@@ -336,6 +336,8 @@ boundary and holds the HDC typed actions of the device operations, which the
 Job engine in `arkdeck-hoststore` lowers its device steps through.
 `arkdeck-client` owns same-connection health and refusal handling;
 `arkdeck-cli` presents the current CLI envelope; `arkdeck-agentd` composes them.
+`arkdeck-provider-workspace` is the workspace provider's signing and credential
+layer and depends only on `arkdeck-platform`.
 The black-box check also verifies these dependency edges.
 
 The macOS cleanup path retains each signal error and the owned child PID while
@@ -1738,6 +1740,39 @@ The `UsbProbe` port gains `single_loader`; `LoaderObserver` gains
 cache keyed by the managed-control step id stays with the executor.
 `tests/rockchip_loader.rs` drives the shared fake HDC driver and asserts the
 command's argv and the refusal it prints.
+
+## Workspace provider (TASK-XPA-015)
+
+`arkdeck-provider-workspace` is the Rust side of Swift's `WorkspaceProvider`.
+Its first layer, from SPK-10, signs a HAP without Swift. `signing_preset` reads
+`preset-v1.json` (`arkdeck-openharmony-signing/v1`) with Swift's exact keys and
+refuses one more. It re-measures the pinned Java launcher, hap-sign-tool JAR,
+keystore, certificate and profile the way Swift's `measure` does, including
+Foundation's `/private` spelling. It also checks the installed daemon's code
+identity. `secret_envelope` reads the Keychain value Swift writes.
+`deveco_password` opens DevEco Studio's password ciphertext with PBKDF2 and
+AES-128-GCM. `signer::sign_hap` runs `sign-app` and `verify-app` through the
+registered identities. The JAR and the staged input are bound by inode, and
+both passwords go only through `run_pty_exchange`. The run ends in Swift's
+`signing-result.json`, with Swift's refused-before-spawn and outcome-unknown
+failure classes.
+
+`arkdeck_platform::KeychainItems` is the `SecItem*` store under it. Production
+reads use the Data Protection Keychain in the helpers' access group, with
+Swift's non-interactive `LAContext` created through the Objective-C runtime. A
+file-based keychain at an exact path is the test scope.
+`trusted_daemon_fingerprint` reproduces the receipt's
+`trustedDaemonApplicationSHA256`.
+
+`tests/fake_hap_signer.rs` compiles `ArkDeckFakeHapSignerFixture` with
+`swiftc` from its byte-identical copy in `tests/fixtures/fake-hap-signer/`. It
+keeps the envelope in a keychain made by `security create-keychain`. It reads
+the running signer's argv and environment from the kernel to show no password
+reaches them. `tests/deveco_password.rs` replays vectors Swift produced. The
+`spk10_probe` and hoststore `spk10_hvigor` examples are the by-hand probes of
+the real signer, the real DevEco material and Hvigor through a registered
+DevEco toolchain. The Job composition of the 13 `workspace.*` operations is M3
+work.
 
 ## macOS facade host owners (TASK-XPA-012)
 

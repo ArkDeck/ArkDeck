@@ -1,0 +1,20 @@
+[package]
+name = "arkdeck-provider-workspace"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+arkdeck-platform.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+hmac.workspace = true
+# The Job event cursor's pinned AES-GCM (TASK-XPA-014, rust/supply-chain/README.md);
+# here AES-128-GCM opens DevEco's password envelopes.
+aes-gcm = { version = "=0.10.3", default-features = false, features = ["aes", "alloc"] }
+
+[lints]
+workspace = true

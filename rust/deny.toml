@@ -30,6 +30,7 @@ allow = [
     "arkdeck-hoststore@0.1.0",
     "arkdeck-platform@0.1.0",
     "arkdeck-provider-hdc@0.1.0",
+    "arkdeck-provider-workspace@0.1.0",
     "arkdeck-soak@0.1.0",
     "aead@0.5.2",
     "aes@0.8.4",
