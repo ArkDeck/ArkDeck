@@ -5,9 +5,19 @@ import ArkDeckClientKit
 /// Job. The typed Runtime request for it (Catalog reference, expected binding
 /// revision, workspace thread, idempotency key) is still built beside the Debug
 /// facade, so the App composes this runner into the ClientKit Overview facade.
-/// It answers only the terminal facts that row renders.
+/// It answers only the terminal facts that row renders, read the way the Debug
+/// workspace reads them.
 public struct DebugWindowInventoryJobRunner: OverviewWindowInventoryJobRunning {
-  public init() {}
+  private let send: DebugTemplateJobSubmission.Request
+
+  public init() {
+    self.init(send: { await DebugXPCReadTransport.request(method: $0, params: $1) })
+  }
+
+  /// Test seam: the Runtime requests this runner makes, answered in-process.
+  init(send: @escaping DebugTemplateJobSubmission.Request) {
+    self.send = send
+  }
 
   public func runWindowInventory(
     targetID: String, bindingRevision: Int
@@ -15,7 +25,8 @@ public struct DebugWindowInventoryJobRunner: OverviewWindowInventoryJobRunning {
     switch await DebugTemplateJobExecution.run(
       targetID: targetID,
       bindingRevision: bindingRevision,
-      templateID: DebugRuntimeCommandTemplate.windowInventory.rawValue)
+      templateID: DebugRuntimeCommandTemplate.windowInventory.rawValue,
+      send: send)
     {
     case .completed(let terminal):
       return .completed(

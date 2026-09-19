@@ -821,6 +821,34 @@ enum DebugTemplateJobSubmission {
   }
 }
 
+/// Runs one admitted Debug Job and reads its terminal facts. `job.run` answers
+/// the Job's `arkdeck.job-status/1` projection, which carries no timeline, so
+/// the facts come from the Job's status presentation once the run returns:
+/// `job.show`, with `job.timeline` pages when the timeline does not fit inline.
+/// The Debug workspace and the Overview's window-inventory Job both run
+/// through here, so neither can go back to reading a timeline from `job.run`.
+enum DebugJobRunExecution {
+  static func run(
+    jobID: String,
+    send: DebugTemplateJobSubmission.Request = {
+      await DebugXPCReadTransport.request(method: $0, params: $1)
+    }
+  ) async -> DebugLogJobRunResult {
+    do {
+      _ = try DebugRuntimeResponseDecoding.resultObject(
+        await send("job.run", ["jobId": .string(jobID)]))
+      let result = try await RuntimeAppReadResources.statusPresentation(jobID: jobID) { method, params in
+        try await send(method, params).get()
+      }
+      return .completed(try DebugRuntimeResponseDecoding.terminal(result, jobID: jobID))
+    } catch let failure as DebugXPCReadFailure {
+      return .failed(failure.message)
+    } catch {
+      return .failed(String(describing: error))
+    }
+  }
+}
+
 enum DebugTemplateJobExecution {
   static func run(
     targetID: String,
@@ -837,16 +865,7 @@ enum DebugTemplateJobExecution {
     case .failed(let failure):
       return .failed(failure)
     case .submitted(let acceptance):
-      do {
-        let result = try DebugRuntimeResponseDecoding.resultObject(
-          await send("job.run", ["jobId": .string(acceptance.jobID)]))
-        return .completed(
-          try DebugRuntimeResponseDecoding.terminal(result, jobID: acceptance.jobID))
-      } catch let failure as DebugXPCReadFailure {
-        return .failed(failure.message)
-      } catch {
-        return .failed(String(describing: error))
-      }
+      return await DebugJobRunExecution.run(jobID: acceptance.jobID, send: send)
     }
   }
 }
@@ -1290,19 +1309,7 @@ private actor DebugProductionApplicationProvider: DebugApplicationProviding {
   }
 
   func run(jobID: String) async -> DebugLogJobRunResult {
-    do {
-      _ = try DebugRuntimeResponseDecoding.resultObject(
-        await DebugXPCReadTransport.request(
-          method: "job.run", params: ["jobId": .string(jobID)]))
-      let result = try await RuntimeAppReadResources.statusPresentation(jobID: jobID) { method, params in
-        try await DebugXPCReadTransport.request(method: method, params: params).get()
-      }
-      return .completed(try DebugRuntimeResponseDecoding.terminal(result, jobID: jobID))
-    } catch let failure as DebugXPCReadFailure {
-      return .failed(failure.message)
-    } catch {
-      return .failed(String(describing: error))
-    }
+    await DebugJobRunExecution.run(jobID: jobID)
   }
 
   func cancel(jobID: String) async -> Bool {

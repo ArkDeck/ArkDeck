@@ -223,7 +223,10 @@
           "type": "string"
         },
         "threadId": {
-          "type": "null"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "waitingForHuman": {
           "type": "boolean"
@@ -269,8 +272,8 @@
   "x-arkdeck-method": "job.run",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 7,
-    "request": 25,
-    "result": 18
+    "error": 3,
+    "request": 11,
+    "result": 8
   }
 }
