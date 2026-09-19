@@ -1,0 +1,11 @@
+{
+  "files" : {
+    "cases.json" : "022831fabf72eff9f4fd2f4affe208147ce21d07d09a91beaa145498bca29d0e",
+    "store/capabilities/.runtime-capabilities.lock" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "store/capabilities/runtime-capabilities.json" : "a0594af338c6e1fec3dd6078ddda51800fa902a3dd0cd061a89633af0b69e504",
+    "store/capabilities/runtime-capabilities.ledger" : "0e40d6f30fb23089b4074d09259f496941ba2c50564c8099665a23a72c17f1f5",
+    "tree.json" : "f11dd8939740c958d628736e11a17f39b7fa16cf0e556aaa72821dc2bb7dcfe2"
+  },
+  "producer" : "CapabilityResolveOracleContractTests.testSwiftResolvesUnknownOutcomesAndRefusesEveryOtherChange",
+  "store" : "RuntimeCapabilityStore (a test-owned temporary directory)"
+}
