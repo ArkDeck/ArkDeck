@@ -1,5 +1,5 @@
 //! Swift `RuntimeAgentExecutionCoordinator` and `RuntimeAgentExecutionStore`
-//! for an execution that names its target (CHG-2026-074, TASK-XPA-014): the
+//! for typed executions (CHG-2026-074, TASK-XPA-014): the
 //! intent a caller declares, the record the owner keeps for it under
 //! `agent-executions`, the orchestration that resolves the target, prepares
 //! the exact Job request, submits it and owns the Job, and the answer the
@@ -14,8 +14,8 @@
 //! execution without a target observes the devices through the Target
 //! observation owner and, when a person must act, raises the action Swift's
 //! owner raises; the combined human-action owner lists and shows those
-//! actions. Adopting an observed device and resuming an action are not
-//! served here yet.
+//! actions. Physical resume follows fresh exact observations and guarded
+//! adoption, preserving the original intent, deadline and unique Job identity.
 
 use crate::format_time::{precise_utc_millis, utc_precise_from_millis};
 use crate::job_record::terminal;
@@ -1357,6 +1357,7 @@ impl AgentExecutionStore {
         let _gate = self.gate.lock().map_err(|_| internal(UNREADABLE))?;
         let value = match method {
             "agent.run" => return self.run(params, engine),
+            "agent.resume" | "human-action.resume" => return self.resume(method, params, engine),
             "agent.status" => {
                 exact(params, &["executionId"])?;
                 self.status(identity(params, "executionId")?, engine)?
@@ -1380,6 +1381,200 @@ impl AgentExecutionStore {
             _ => return Err(internal("unknown execution method")),
         };
         Ok(AgentAnswer { value, start: None })
+    }
+
+    /// Swift `resumeOwned`: only fresh Runtime observations resolve physical assistance.
+    fn resume(
+        &self,
+        method: &str,
+        params: &Map<String, Value>,
+        engine: &AgentEngine<'_>,
+    ) -> Result<AgentAnswer, WireError> {
+        let required = if method == "agent.resume" {
+            vec!["resumeReference"]
+        } else {
+            vec!["resumeReference", "humanAction"]
+        };
+        // The combined HAR wire also carries an impact challenge. Like Swift,
+        // the physical-action owner ignores it; only its own exact action can
+        // resolve here, and no challenge contributes admission authority.
+        if required.iter().any(|key| !params.contains_key(*key))
+            || params.keys().any(|key| {
+                !required.contains(&key.as_str())
+                    && key != "selection"
+                    && !(method == "human-action.resume" && key == "challengeResponse")
+            })
+        {
+            return Err(failure(
+                "invalidInput",
+                "resume fields do not match the closed physical-action contract",
+            ));
+        }
+        let reference = identity(params, "resumeReference")?;
+        let action_id = if method == "human-action.resume" {
+            Some(identity(params, "humanAction")?)
+        } else {
+            None
+        };
+        let mut found = Vec::new();
+        self.each_record(|record| {
+            for (index, action) in record.actions.iter().enumerate() {
+                if action.resume == reference && action_id.is_none_or(|id| action.id == id) {
+                    found.push((record.clone(), index));
+                }
+            }
+        })?;
+        if found.len() > 1 {
+            return Err(failure(
+                "recordUnreadable",
+                "resume reference has multiple owners",
+            ));
+        }
+        let (mut record, index) = found
+            .pop()
+            .ok_or_else(|| failure("resourceNotFound", "human action does not exist"))?;
+        let action = record.actions[index].clone();
+        if action.status == "expired" {
+            return Err(failure(
+                "humanActionExpired",
+                "the exact human action expired",
+            ));
+        }
+        let choice = if action.kind == "selectDevice" {
+            let value = params.get("selection").and_then(Value::as_str);
+            Some(
+                action
+                    .selections
+                    .iter()
+                    .find(|choice| Some(choice.reference.as_str()) == value)
+                    .ok_or_else(|| {
+                        failure(
+                            "invalidInput",
+                            "selection must be an opaque value from this action's schema",
+                        )
+                    })?
+                    .clone(),
+            )
+        } else {
+            if params.contains_key("selection") {
+                return Err(failure(
+                    "invalidInput",
+                    "this physical action accepts no selection",
+                ));
+            }
+            None
+        };
+        if action.status == "resolvedByFreshProbe" {
+            if action.resolved != choice.as_ref().map(|choice| choice.reference.clone()) {
+                return Err(failure(
+                    "idempotencyConflict",
+                    "resolved human action selection changed",
+                ));
+            }
+            return Ok(AgentAnswer {
+                value: self.status(&record.intent.execution, engine)?,
+                start: None,
+            });
+        }
+        if record.state != "waitingForHuman"
+            || record
+                .waiting()
+                .is_none_or(|waiting| waiting.id != action.id)
+        {
+            return Err(failure(
+                "humanActionExpired",
+                "this action is no longer the execution's waiting action",
+            ));
+        }
+        if record.catalog != CATALOG_DIGEST {
+            return Err(failure(
+                "resourceConflict",
+                "the Catalog changed during physical assistance",
+            ));
+        }
+        self.observe_budget(&mut record, engine.now)
+            .map_err(|mut error| {
+                if error.code == "orchestrationBudgetExpired" {
+                    error.code = "humanActionExpired".into();
+                }
+                error
+            })?;
+        let selected = if action.kind == "connectDevice" {
+            None
+        } else {
+            choice
+                .as_ref()
+                .map(|choice| &choice.observed)
+                .or(action.observation.as_ref())
+        };
+        let reference = selected.map(|selected| crate::target_owner::ObservationReference {
+            candidate: selected.candidate.clone(),
+            observation_id: selected.id.clone(),
+            generation: selected.generation,
+        });
+        let observing = engine
+            .observations
+            .as_ref()
+            .ok_or_else(|| internal(ADVANCE))?;
+        let snapshot = observing
+            .owner
+            .snapshot(&observing.sources, reference.as_ref())
+            .map_err(|error| match error {
+                ObservationError::Refused { ref code, .. } if code == "resourceConflict" => {
+                    failure("resourceConflict", "candidate observation changed")
+                }
+                error => observation_failure(error),
+            })
+            .and_then(|snapshot| {
+                if action.kind == "selectDevice"
+                    && selected.is_some_and(|selected| selected.generation != snapshot.generation)
+                {
+                    Err(failure(
+                        "resourceConflict",
+                        "candidate selection generation changed",
+                    ))
+                } else {
+                    Ok(snapshot)
+                }
+            });
+        let snapshot = match snapshot {
+            Ok(snapshot) => snapshot,
+            Err(error) if error.code == "resourceConflict" => {
+                let fresh = observing
+                    .owner
+                    .snapshot(&observing.sources, None)
+                    .map_err(observation_failure)?;
+                self.guard_budget(&mut record, engine.now)?;
+                self.raise_action(
+                    if fresh.observations.is_empty() {
+                        "connectDevice"
+                    } else {
+                        "selectDevice"
+                    },
+                    &mut record,
+                    &fresh,
+                    None,
+                )?;
+                return Ok(AgentAnswer {
+                    value: record.projection(),
+                    start: None,
+                });
+            }
+            Err(error) => return Err(error),
+        };
+        self.guard_budget(&mut record, engine.now)?;
+        let Some(target) = self.resolve_snapshot(&snapshot, &mut record, engine, selected)? else {
+            return Ok(AgentAnswer {
+                value: record.projection(),
+                start: None,
+            });
+        };
+        record.actions[index].status = "resolvedByFreshProbe".into();
+        record.actions[index].resolved = choice.map(|choice| choice.reference);
+        record.target = Some(target);
+        record.state = "orchestrating".into();
+        self.commit(&mut record)?;
+        self.drive(record, engine)
     }
 
     /// Swift `run`: the execution created, or found under the same intent,
@@ -1667,7 +1862,7 @@ impl AgentExecutionStore {
             .snapshot(&observing.sources, None)
             .map_err(observation_failure)?;
         self.guard_budget(record, engine.now)?;
-        self.resolve_snapshot(&snapshot, record, engine)
+        self.resolve_snapshot(&snapshot, record, engine, None)
     }
 
     /// Swift `budget.check()` inside `drive`, whose expiry `serialize`
@@ -1710,8 +1905,30 @@ impl AgentExecutionStore {
         snapshot: &Snapshot,
         record: &mut Record,
         engine: &AgentEngine<'_>,
+        selected: Option<&Observed>,
     ) -> Result<Option<(String, Option<i64>)>, WireError> {
-        let [row] = snapshot.observations.as_slice() else {
+        let row = if let Some(selected) = selected {
+            let Some(row) = snapshot.observations.iter().find(|row| {
+                row.observation_id == selected.id
+                    && row.candidate.connect_key == selected.candidate
+                    && row.relation.is_some()
+            }) else {
+                self.raise_action(
+                    if snapshot.observations.is_empty() {
+                        "connectDevice"
+                    } else {
+                        "selectDevice"
+                    },
+                    record,
+                    snapshot,
+                    None,
+                )?;
+                return Ok(None);
+            };
+            row
+        } else if let [row] = snapshot.observations.as_slice() {
+            row
+        } else {
             let kind = if snapshot.observations.is_empty() {
                 "connectDevice"
             } else {
