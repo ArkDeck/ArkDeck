@@ -1,3 +1,4 @@
+@testable import ArkDeckClientKit
 // Architecture boundary contract (docs/ArchitectureRules.md).
 //
 // These tests are structural fitness functions: they read Package.swift and
@@ -535,7 +536,7 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
     let allowedAliasFiles: Set<String> = [
       "ArkDeckCore/ArkForgeFlashOperation.swift",
       "ArkDeckCore/RuntimeOperationCatalogGenerated.swift",
-      "ArkDeckWorkflows/RuntimeHistoryApplicationFacade.swift",
+      "ArkDeckClientKit/RuntimeHistoryApplicationFacade.swift",
     ]
     guard
       let enumerator = FileManager.default.enumerator(
@@ -577,7 +578,7 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
     let repoRoot = packageRoot().deletingLastPathComponent().deletingLastPathComponent()
     let historyFacade = try String(
       contentsOf: sourceRoot.appending(
-        path: "ArkDeckWorkflows/RuntimeHistoryApplicationFacade.swift"),
+        path: "ArkDeckClientKit/RuntimeHistoryApplicationFacade.swift"),
       encoding: .utf8)
     let flashActivityStart = try XCTUnwrap(historyFacade.range(of: "public var flashActivityJobs:"))
     let flashActivityTail = historyFacade[flashActivityStart.lowerBound...]
