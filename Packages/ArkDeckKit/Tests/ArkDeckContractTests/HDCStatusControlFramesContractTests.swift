@@ -11,6 +11,12 @@
 // A second test answers through the handler for a copy of the installed
 // DevEco hdc when its digest is a registered one, the only way the status
 // carries a client version; a host without it skips that test.
+//
+// A third answers for a tool signed with a team identifier, which the
+// production signature inspection reports. No registered hdc is one: the
+// installed DevEco hdc is signed ad hoc. DevEco signs the executables of its
+// own bundle with its team, so a copy of one stands in (`teamSignedExecutable`)
+// and nothing runs it; a host without it skips that test.
 import Darwin
 import Foundation
 import XCTest
@@ -36,6 +42,11 @@ final class HDCStatusControlFramesContractTests: XCTestCase {
   private static let root = URL(
     filePath: "/private/tmp/arkdeck-hdc-status-oracle", directoryHint: .isDirectory)
   private static let nowUTC = "2026-09-14T00:00:00Z"
+  /// An executable DevEco publishes in its own bundle, signed by DevEco's
+  /// team: the stand-in for a team-signed hdc (`ControlActionWithHostContractTests`
+  /// previews it too).
+  static let teamSignedExecutable = URL(
+    filePath: "/Applications/DevEco-Studio.app/Contents/bin/fsnotifier")
   private enum Failure: Error { case malformed(String) }
 
   /// One case as the oracle recorded its inputs.
@@ -243,6 +254,35 @@ final class HDCStatusControlFramesContractTests: XCTestCase {
     XCTAssertEqual(dispatcher.dispatchCount, 0)
   }
 
+  /// The production observer for `tool` observed as launched at the default
+  /// endpoint: the managed launch's identity at generation 100000023 and
+  /// process 42, verified as the managed process, with the production
+  /// signature inspection; and the startup facts it was started with.
+  private static func launched(
+    _ tool: URL, sha256: String
+  ) throws -> (startup: HDCManagedRuntimeDiagnostics, observer: HeadlessHDCStatusObserver) {
+    let endpoint = "127.0.0.1:8710"
+    let receipt = HDCServerProcessIdentityReceipt(
+      pid: 42, startSeconds: 100, startMicroseconds: 23, executablePath: tool,
+      executableSHA256: sha256, endpoint: HDCServerEndpoint(endpoint))
+    let launch = HDCManagedProcessLaunch(
+      pid: 42, startSeconds: 100, startMicroseconds: 23, executablePath: tool.path,
+      executableSHA256: sha256, arguments: ["-s", endpoint, "-m"])
+    let result = HDCSupervisorObservationResult(
+      classification: .observed(generation: try XCTUnwrap(receipt.stableGeneration)),
+      identity: receipt)
+    let startup = HDCManagedRuntimeDiagnostics(
+      executableSHA256: sha256, clientVersion: "cached-client", serverVersion: "cached-server",
+      endpoint: endpoint, endpointSource: "default")
+    let observer = HeadlessHDCStatusObserver(
+      executable: ResolvedExecutable(path: tool.path, sha256: sha256), startup: startup,
+      daemonVersion: "0.0.0-oracle", managedLaunch: { launch },
+      observeIdentity: { _, _ in result },
+      inspectSignature: HeadlessHDCStatusObserver.signature,
+      validateManagedProcess: { _, _ in true }, nowUTC: { Self.nowUTC })
+    return (startup, observer)
+  }
+
   func testTheHandlerAnswersTheClientVersionOfARegisteredTool() async throws {
     let installed = URL(
       filePath: "/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/toolchains/hdc")
@@ -255,25 +295,7 @@ final class HDCStatusControlFramesContractTests: XCTestCase {
     guard let version = HDCCommandlessServerIdentity.clientVersion(sha256: sha256) else {
       throw XCTSkip("the installed hdc is not a registered one")
     }
-    let endpoint = "127.0.0.1:8710"
-    let receipt = HDCServerProcessIdentityReceipt(
-      pid: 42, startSeconds: 100, startMicroseconds: 23, executablePath: copy,
-      executableSHA256: sha256, endpoint: HDCServerEndpoint(endpoint))
-    let launch = HDCManagedProcessLaunch(
-      pid: 42, startSeconds: 100, startMicroseconds: 23, executablePath: copy.path,
-      executableSHA256: sha256, arguments: ["-s", endpoint, "-m"])
-    let result = HDCSupervisorObservationResult(
-      classification: .observed(generation: try XCTUnwrap(receipt.stableGeneration)),
-      identity: receipt)
-    let startup = HDCManagedRuntimeDiagnostics(
-      executableSHA256: sha256, clientVersion: "cached-client", serverVersion: "cached-server",
-      endpoint: endpoint, endpointSource: "default")
-    let observer = HeadlessHDCStatusObserver(
-      executable: ResolvedExecutable(path: copy.path, sha256: sha256), startup: startup,
-      daemonVersion: "0.0.0-oracle", managedLaunch: { launch },
-      observeIdentity: { _, _ in result },
-      inspectSignature: HeadlessHDCStatusObserver.signature,
-      validateManagedProcess: { _, _ in true }, nowUTC: { Self.nowUTC })
+    let (startup, observer) = try Self.launched(copy, sha256: sha256)
 
     let answer = try Self.fields(
       try await status(handler(startup: startup, observer: observer), id: "status-registered"))
@@ -289,6 +311,42 @@ final class HDCStatusControlFramesContractTests: XCTestCase {
     XCTAssertTrue(
       [JSONValue.string("adHoc"), .string("verified")].contains(try XCTUnwrap(signature["state"])))
     XCTAssertEqual(signature["executionAssessment"], .string("notPerformed"))
+    XCTAssertEqual(dispatcher.dispatchCount, 0)
+  }
+
+  func testTheHandlerAnswersTheTeamIdentifierOfATeamSignedTool() async throws {
+    guard FileManager.default.fileExists(atPath: Self.teamSignedExecutable.path) else {
+      throw XCTSkip("DevEco is not installed; no team-signed executable to answer for")
+    }
+    let copy = state.appending(path: "hdc")
+    try FileManager.default.copyItem(at: Self.teamSignedExecutable, to: copy)
+    let signature = try Self.fields(try HeadlessHDCStatusObserver.signature(copy))
+    guard case .string(let team)? = signature["teamIdentifier"] else {
+      throw XCTSkip("the DevEco executable carries no team identifier")
+    }
+    let sha256 = SHA256Hex.string(of: try Data(contentsOf: copy))
+    XCTAssertNil(HDCCommandlessServerIdentity.clientVersion(sha256: sha256), "not a registered hdc")
+    let (startup, observer) = try Self.launched(copy, sha256: sha256)
+
+    let answer = try Self.fields(
+      try await status(handler(startup: startup, observer: observer), id: "status-team-signed"))
+    // The static signing facts as the inspection read them: a verified
+    // signature with its identifier and team, no platform trust and no
+    // execution assessment.
+    XCTAssertEqual(answer["signature"], .object(signature))
+    XCTAssertEqual(signature["state"], .string("verified"))
+    XCTAssertNotEqual(signature["identifier"], .null)
+    XCTAssertEqual(team.utf8.count, 10, team)
+    XCTAssertEqual(signature["platformTrust"], .string("unverified"))
+    XCTAssertEqual(signature["executionAssessment"], .string("notPerformed"))
+    XCTAssertEqual(answer["clientVersion"], .null, "an unregistered digest has no version")
+    XCTAssertEqual(answer["clientVersionSource"], .null)
+    XCTAssertEqual(answer["availability"], .string("available"))
+    XCTAssertEqual(answer["ownership"], .string("arkDeckManaged"))
+    XCTAssertEqual(answer["reasonCode"], .string("hdc.identityObserved"))
+    XCTAssertEqual(answer["generation"], .string("100000023"))
+    XCTAssertEqual(answer["processId"], .integer(42))
+    XCTAssertEqual(answer["serverVersion"], .null)
     XCTAssertEqual(dispatcher.dispatchCount, 0)
   }
 }

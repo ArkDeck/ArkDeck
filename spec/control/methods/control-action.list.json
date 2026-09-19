@@ -198,7 +198,10 @@
                             "type": "array"
                           },
                           "reasonCode": {
-                            "type": "null"
+                            "type": [
+                              "null",
+                              "string"
+                            ]
                           },
                           "state": {
                             "type": "string"
@@ -340,7 +343,10 @@
                                     "type": "string"
                                   },
                                   "teamIdentifier": {
-                                    "type": "null"
+                                    "type": [
+                                      "null",
+                                      "string"
+                                    ]
                                   }
                                 },
                                 "required": [
@@ -497,7 +503,7 @@
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
     "error": 6,
-    "request": 17,
-    "result": 11
+    "request": 19,
+    "result": 13
   }
 }
