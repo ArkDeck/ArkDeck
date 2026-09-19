@@ -409,9 +409,50 @@ pub trait HostServices: Send + Sync {
             details: None,
         })
     }
+    /// What `doctor` reads from the host's owners beyond the Catalog and the
+    /// HDC status. The default is a host with none of them.
+    fn doctor_facts(&self, _deep: bool) -> DoctorFacts {
+        DoctorFacts::default()
+    }
     fn observed_at(&self) -> String;
     fn hdc_status(&self, deep: bool) -> HdcStatus;
     fn observations(&self) -> Result<DeviceObservationsResult, WireError>;
+}
+
+/// Swift `doctorReport`'s owner inputs: the Runtime Artifact store's quota
+/// (read in deep mode), the durable Target store's active Targets (read in
+/// both modes), whether device discovery is composed (Swift's
+/// `DeviceBootstrapMachine`), and the outstanding cleanup debt (read in deep
+/// mode; `None` when it cannot be read, as for an engine without an Artifact
+/// store).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct DoctorFacts {
+    pub artifacts: ArtifactStoreFacts,
+    pub targets: TargetStoreFacts,
+    pub discovery: bool,
+    pub cleanup_debt: Option<u64>,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ArtifactStoreFacts {
+    #[default]
+    NotConfigured,
+    /// Configured; its quota is read only in deep mode.
+    NotChecked,
+    Quota {
+        total: u64,
+        used: u64,
+    },
+    Unreadable,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum TargetStoreFacts {
+    #[default]
+    NotConfigured,
+    /// Readable, with this many active Targets.
+    Adopted(u64),
+    Unreadable,
 }
 
 /// Swift `HDCManagedRuntimeDiagnostics` as `target.availability`'s tool leg
@@ -1097,16 +1138,24 @@ impl<H: HostServices> Control<H> {
         response_bytes(response)
     }
 
+    /// Swift `RuntimeControlPlaneHandler.doctorReport(deep:)`: every finding
+    /// from the host's owners as they are now. Two Swift findings come from
+    /// start-up recovery, which is not ported (design §L.1 item 13), and are
+    /// never emitted: `runtime.jobRecordUnreadable` (the recovery
+    /// quarantine) and `runtime.durableRecordsUnreadable` (the deep census of
+    /// undecodable Job records).
     fn doctor(&self, deep: bool) -> Value {
         let hdc = self.host.hdc_status(deep);
-        let count = self
-            .operations
-            .as_array()
-            .expect("Catalog operations")
-            .len();
+        let facts = self.host.doctor_facts(deep);
         let mut findings = Vec::new();
+        let (mut blockers, mut warnings) = (0_usize, 0_usize);
         let mut add =
             |code: &str, severity: &str, scope: &str, summary: &str, details: Option<Value>| {
+                match severity {
+                    "blocker" => blockers += 1,
+                    "warning" => warnings += 1,
+                    _ => {}
+                }
                 let mut row =
                     json!({"code":code,"severity":severity,"scope":scope,"summary":summary});
                 if let Some(details) = details {
@@ -1121,55 +1170,177 @@ impl<H: HostServices> Control<H> {
             "the target control protocol is serving bounded diagnostic requests",
             None,
         );
-        add(
-            "catalog.noAvailableOperations",
-            "blocker",
-            "catalog",
-            "the published Catalog has no operation available on this Runtime",
-            None,
-        );
-        add(
-            "catalog.unavailableOperations",
-            "warning",
-            "catalog",
-            "some published operations are unavailable with the current host configuration",
-            Some(json!({ "unavailableOperationCount": count })),
-        );
-        add(
-            "provider.noneRegistered",
-            "blocker",
-            "provider",
-            "the Runtime has no registered provider",
-            None,
-        );
-        if !hdc.configured {
+
+        // Swift `engine.operationAvailability()` and `providerIDs`: an
+        // operation is available when the host answers it with no reason, and
+        // a provider is registered when the host answers any of its
+        // operations at all (otherwise `provider_not_registered`).
+        let mut available = 0_usize;
+        let mut registered = std::collections::BTreeSet::new();
+        let operations = self.operations.as_array().expect("Catalog operations");
+        for (base, provider) in operations.iter().zip(&self.providers) {
+            if let Some(reasons) = self.host.operation_availability(
+                base["reference"].as_str().expect("Catalog reference"),
+                provider,
+            ) {
+                registered.insert(provider.clone());
+                available += usize::from(reasons.is_empty());
+            }
+        }
+        let unavailable = operations.len() - available;
+        if available == 0 {
             add(
-                &hdc.reason_code,
+                "catalog.noAvailableOperations",
                 "blocker",
-                "hdc",
-                if hdc.reason_code == "hdc.notConfigured" {
-                    "the Runtime has no bounded HDC status observer"
-                } else {
-                    "the selected HDC tool or platform observation evidence is unavailable"
-                },
+                "catalog",
+                "the published Catalog has no operation available on this Runtime",
                 None,
             );
-        } else if deep && hdc.availability != "available" {
+        } else {
             add(
-                "hdc.identityUnavailable",
+                "catalog.availableOperations",
+                "info",
+                "catalog",
+                "the Runtime can materialize at least one published operation",
+                Some(json!({ "availableOperationCount": available })),
+            );
+        }
+        if unavailable > 0 {
+            add(
+                "catalog.unavailableOperations",
+                "warning",
+                "catalog",
+                "some published operations are unavailable with the current host configuration",
+                Some(json!({ "unavailableOperationCount": unavailable })),
+            );
+        }
+        if registered.is_empty() {
+            add(
+                "provider.noneRegistered",
+                "blocker",
+                "provider",
+                "the Runtime has no registered provider",
+                None,
+            );
+        } else {
+            add(
+                "provider.registered",
+                "info",
+                "provider",
+                "the Runtime has registered providers",
+                Some(json!({ "providerCount": registered.len() })),
+            );
+        }
+
+        let mut hdc_check = json!({
+            "checked": deep, "configured": hdc.configured,
+            "availability": if deep { "unknown" } else { "notChecked" },
+            "ownership": "unknown", "serverHealth": "unknown",
+            "reasonCode": if deep { "hdc.statusUnavailable" } else { "doctor.deepNotRequested" },
+        });
+        if !hdc.configured {
+            add(
+                "hdc.notConfigured",
                 "blocker",
                 "hdc",
-                "the selected HDC server identity is unavailable or not Runtime-managed",
+                "the Runtime has no bounded HDC status observer",
+                None,
+            );
+            hdc_check["availability"] = json!("unavailable");
+            hdc_check["reasonCode"] = json!("hdc.notConfigured");
+        } else if deep {
+            hdc_check["availability"] = json!(hdc.availability);
+            hdc_check["ownership"] = json!(hdc.ownership);
+            hdc_check["serverHealth"] = json!(hdc.server_health);
+            hdc_check["reasonCode"] = json!(hdc.reason_code);
+            if hdc.availability == "available" && hdc.ownership == "arkDeckManaged" {
+                add(
+                    "hdc.identityReady",
+                    "info",
+                    "hdc",
+                    "the selected HDC server has a live Runtime-managed identity",
+                    None,
+                );
+            } else {
+                let reason = if hdc.reason_code.is_empty() {
+                    String::new()
+                } else {
+                    format!(": {}", hdc.reason_code)
+                };
+                add(
+                    "hdc.identityUnavailable",
+                    "blocker",
+                    "hdc",
+                    &format!(
+                        "the selected HDC server identity is unavailable or not Runtime-managed{reason}"
+                    ),
+                    None,
+                );
+            }
+        } else {
+            add(
+                "hdc.deepCheckSkipped",
+                "info",
+                "hdc",
+                "live HDC identity was not requested; use doctor --deep to check it",
                 None,
             );
         }
-        add(
-            "storage.artifactStoreNotConfigured",
-            "blocker",
-            "storage",
-            "the Runtime Artifact store is not configured",
-            None,
-        );
+
+        let mut runtime_artifacts = json!({
+            "checked": deep,
+            "configured": facts.artifacts != ArtifactStoreFacts::NotConfigured,
+            "totalBytes": null, "usedBytes": null, "remainingBytes": null,
+        });
+        match facts.artifacts {
+            ArtifactStoreFacts::NotConfigured => add(
+                "storage.artifactStoreNotConfigured",
+                "blocker",
+                "storage",
+                "the Runtime Artifact store is not configured",
+                None,
+            ),
+            _ if !deep => add(
+                "storage.deepCheckSkipped",
+                "info",
+                "storage",
+                "Artifact quota accounting was not requested; use doctor --deep to check it",
+                None,
+            ),
+            ArtifactStoreFacts::Quota { total, used } => {
+                let remaining = total.saturating_sub(used);
+                runtime_artifacts["totalBytes"] = json!(total);
+                runtime_artifacts["usedBytes"] = json!(used);
+                runtime_artifacts["remainingBytes"] = json!(remaining);
+                if remaining == 0 {
+                    add(
+                        "storage.quotaExhausted",
+                        "blocker",
+                        "storage",
+                        "the Runtime Artifact store has no remaining quota",
+                        None,
+                    );
+                } else {
+                    add(
+                        "storage.artifactStoreReady",
+                        "info",
+                        "storage",
+                        "the Runtime Artifact store is readable and has remaining quota",
+                        None,
+                    );
+                }
+            }
+            ArtifactStoreFacts::NotChecked | ArtifactStoreFacts::Unreadable => add(
+                "storage.artifactStoreUnreadable",
+                "blocker",
+                "storage",
+                "the Runtime Artifact store could not produce bounded quota facts",
+                None,
+            ),
+        }
+        // The App-owned Session output root and the Runtime Artifact root are
+        // separate stores; until a Runtime owner for Session output is
+        // published, the gap is reported and never combined into one number.
         add(
             "storage.sessionOutputOwnerUnavailable",
             "warning",
@@ -1177,14 +1348,47 @@ impl<H: HostServices> Control<H> {
             "Session output storage has no published Runtime owner",
             None,
         );
-        add(
-            "target.storeNotConfigured",
-            "blocker",
-            "target",
-            "the durable target store is not configured",
-            None,
-        );
-        if !hdc.configured {
+
+        let mut target_check = json!({
+            "configured": facts.targets != TargetStoreFacts::NotConfigured,
+            "bootstrapConfigured": facts.discovery,
+            "adoptedTargetCount": null,
+        });
+        match facts.targets {
+            TargetStoreFacts::Adopted(count) => {
+                target_check["adoptedTargetCount"] = json!(count);
+                let (code, summary) = if count == 0 {
+                    (
+                        "target.noneAdopted",
+                        "the target store is readable and has no adopted target",
+                    )
+                } else {
+                    ("target.storeReady", "the target store is readable")
+                };
+                add(
+                    code,
+                    "info",
+                    "target",
+                    summary,
+                    Some(json!({ "adoptedTargetCount": count })),
+                );
+            }
+            TargetStoreFacts::Unreadable => add(
+                "target.storeUnreadable",
+                "blocker",
+                "target",
+                "the durable target store could not be read",
+                None,
+            ),
+            TargetStoreFacts::NotConfigured => add(
+                "target.storeNotConfigured",
+                "blocker",
+                "target",
+                "the durable target store is not configured",
+                None,
+            ),
+        }
+        if !facts.discovery {
             add(
                 "target.discoveryNotConfigured",
                 "blocker",
@@ -1193,14 +1397,41 @@ impl<H: HostServices> Control<H> {
                 None,
             );
         }
+
+        let mut recovery_check = json!({"checked": deep, "outstandingCleanupCount": null});
         if deep {
-            add(
-                "recovery.notConfigured",
-                "blocker",
-                "recovery",
-                "the Runtime cleanup debt owner is not configured",
-                None,
-            );
+            match facts.cleanup_debt {
+                Some(count) => {
+                    recovery_check["outstandingCleanupCount"] = json!(count);
+                    let (code, severity, summary) = if count == 0 {
+                        (
+                            "recovery.noCleanupDebt",
+                            "info",
+                            "the Runtime has no outstanding cleanup debt",
+                        )
+                    } else {
+                        (
+                            "recovery.cleanupDebtOutstanding",
+                            "blocker",
+                            "the Runtime has outstanding cleanup debt",
+                        )
+                    };
+                    add(
+                        code,
+                        severity,
+                        "recovery",
+                        summary,
+                        Some(json!({ "outstandingCleanupCount": count })),
+                    );
+                }
+                None => add(
+                    "recovery.cleanupDebtUnreadable",
+                    "blocker",
+                    "recovery",
+                    "the Runtime could not inspect outstanding cleanup debt",
+                    None,
+                ),
+            }
         } else {
             add(
                 "recovery.deepCheckSkipped",
@@ -1210,19 +1441,27 @@ impl<H: HostServices> Control<H> {
                 None,
             );
         }
-        let counts = |kind: &str| findings.iter().filter(|v| v["severity"] == kind).count();
+
+        let overall = if blockers > 0 {
+            "blocked"
+        } else if warnings > 0 {
+            "degraded"
+        } else {
+            "healthy"
+        };
+        let info = findings.len().saturating_sub(blockers + warnings);
         json!({"schemaVersion":"arkdeck.doctor-report/1","mode":if deep {"deep"} else {"standard"},
-        "observedAt":self.host.observed_at(),"overall":"blocked","ready":false,
-        "findingCounts":{"blocker":counts("blocker"),"warning":counts("warning"),"info":counts("info")},"findings":findings,
+        "observedAt":self.host.observed_at(),"overall":overall,"ready":blockers == 0,
+        "findingCounts":{"blocker":blockers,"warning":warnings,"info":info},"findings":findings,
         "checks":{
             "runtime":{"protocolVersion":PROTOCOL_VERSION,"runtimeRequestSchemaVersion":"1.0.0"},
-            "catalog":{"digest":CATALOG_DIGEST,"operationCount":count,"availableOperationCount":0,"unavailableOperationCount":count},
-            "providers":{"registered":[]},
-            "hdc":{"configured":hdc.configured,"checked":hdc.checked,"availability":hdc.availability,"ownership":hdc.ownership,"serverHealth":hdc.server_health,"reasonCode":hdc.reason_code},
-            "storage":{"runtimeArtifacts":{"configured":false,"checked":false,"totalBytes":null,"usedBytes":null,"remainingBytes":null},
+            "catalog":{"digest":CATALOG_DIGEST,"operationCount":operations.len(),"availableOperationCount":available,"unavailableOperationCount":unavailable},
+            "providers":{"registered":registered},
+            "hdc":hdc_check,
+            "storage":{"runtimeArtifacts":runtime_artifacts,
                 "sessionOutput":{"availability":"unavailable","checked":false,"reasonCode":"storage.sessionOutputOwnerNotPublished"}},
-            "target":{"configured":false,"bootstrapConfigured":hdc.configured,"adoptedTargetCount":null},
-            "recovery":{"checked":false,"outstandingCleanupCount":null}
+            "target":target_check,
+            "recovery":recovery_check
         }})
     }
 }

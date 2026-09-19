@@ -182,6 +182,27 @@ impl Runtime {
         serde_json::from_str(&line).unwrap()
     }
 
+    /// The Rust CLI against this daemon's socket, as the daemon it names.
+    fn cli(&self, arguments: &[&str]) -> std::process::ExitStatus {
+        // Cargo builds both binary packages before running workspace tests.
+        let cli = Path::new(env!("CARGO_BIN_EXE_arkdeck-agentd")).with_file_name("arkdeck");
+        let mut command = Command::new(cli);
+        for (key, _) in std::env::vars_os() {
+            if key.to_string_lossy().starts_with("ARKDECK_") {
+                command.env_remove(key);
+            }
+        }
+        command
+            .args(arguments)
+            .args(["--output", "json", "--socket"])
+            .arg(self.socket())
+            .env("ARKDECK_DAEMON_PATH", env!("CARGO_BIN_EXE_arkdeck-agentd"))
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .unwrap()
+    }
+
     /// SIGTERM, then the daemon's end within `within`: its status and stdout.
     fn terminate(&mut self, within: Duration) -> (std::process::ExitStatus, String) {
         let mut child = self.child.take().unwrap();
@@ -294,6 +315,61 @@ fn the_managed_server_answers_status_and_availability_and_stops_with_the_daemon(
             "state": "ready", "toolSha256": digest, "clientVersion": "3.2.0d",
             "serverVersion": "3.2.0d", "endpointSource": "inheritedEnvironment",
         })
+    );
+
+    // doctor: standard mode does not observe the identity, and the report is
+    // ready (degraded only by the Session output owner Swift does not
+    // publish). Deep mode observes it: the fake's digest has no commandless
+    // identity family, so the identity is a blocker naming why.
+    let standard = runtime.call("doctor", json!({}));
+    let report = &standard["result"];
+    validate_method_value("doctor", "result", report).unwrap();
+    assert_eq!(report["ready"], true, "{report}");
+    assert_eq!(report["overall"], "degraded");
+    assert_eq!(report["checks"]["hdc"]["configured"], true);
+    assert_eq!(
+        report["checks"]["hdc"]["reasonCode"],
+        "doctor.deepNotRequested"
+    );
+    assert_eq!(report["checks"]["target"]["adoptedTargetCount"], 1);
+    assert_eq!(report["checks"]["target"]["bootstrapConfigured"], true);
+    let deep = runtime.call("doctor", json!({"deep": true}));
+    let report = &deep["result"];
+    validate_method_value("doctor", "result", report).unwrap();
+    assert_eq!(report["ready"], false, "{report}");
+    let blockers: Vec<_> = report["findings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|finding| finding["severity"] == "blocker")
+        .map(|finding| finding["summary"].as_str().unwrap().to_owned())
+        .collect();
+    assert_eq!(
+        blockers,
+        [
+            "the selected HDC server identity is unavailable or not Runtime-managed: \
+          hdc.identityFamilyUnavailable"
+        ]
+    );
+    assert_eq!(
+        report["checks"]["recovery"],
+        json!({"checked": true, "outstandingCleanupCount": 0})
+    );
+    assert_eq!(
+        report["checks"]["storage"]["runtimeArtifacts"]["checked"],
+        true
+    );
+    // The CLI's gate over those reports: `--require-healthy` passes the
+    // standard report and refuses the deep one with 69.
+    assert_eq!(
+        runtime.cli(&["doctor", "--require-healthy"]).code(),
+        Some(0)
+    );
+    assert_eq!(
+        runtime
+            .cli(&["doctor", "--deep", "--require-healthy"])
+            .code(),
+        Some(69)
     );
 
     // An idle connection is ended by the drain, not left to its read timeout.

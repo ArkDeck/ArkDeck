@@ -1622,7 +1622,97 @@ impl HostServices for Host {
     fn observed_at(&self) -> String {
         utc_now()
     }
+    /// Swift `doctorReport`'s owner inputs, read from this composition's
+    /// owners as they are now.
+    fn doctor_facts(&self, deep: bool) -> arkdeck_control::DoctorFacts {
+        #[cfg(target_os = "macos")]
+        {
+            use arkdeck_control::{ArtifactStoreFacts, TargetStoreFacts};
+            // Swift `totalBytesUsed()` and `quotaTotalBytes`, read in deep mode.
+            let artifacts = match &self.storage {
+                None => ArtifactStoreFacts::NotConfigured,
+                Some(_) if !deep => ArtifactStoreFacts::NotChecked,
+                Some(storage) => storage
+                    .1
+                    .quota()
+                    .ok()
+                    .and_then(|quota| {
+                        Some(ArtifactStoreFacts::Quota {
+                            total: quota["totalBytes"].as_u64()?,
+                            used: quota["usedBytes"].as_u64()?,
+                        })
+                    })
+                    .unwrap_or(ArtifactStoreFacts::Unreadable),
+            };
+            // Swift `targetStore.listActive()`, read in both modes.
+            let targets = match &self.targets {
+                None => TargetStoreFacts::NotConfigured,
+                Some(targets) => targets
+                    .handle("target.list", &serde_json::Map::new(), &utc_now())
+                    .ok()
+                    .and_then(|rows| rows.as_array().map(Vec::len))
+                    .map_or(TargetStoreFacts::Unreadable, |count| {
+                        TargetStoreFacts::Adopted(count as u64)
+                    }),
+            };
+            // Swift `engine.listCleanupDebt()`: the Job cleanup ledger beside
+            // the Artifacts, unreadable without its owners.
+            let cleanup_debt = match (deep, &self.jobs, &self.artifacts) {
+                (true, Some(jobs), Some(artifacts)) => {
+                    arkdeck_hoststore::JobResultReader { jobs, artifacts }
+                        .outstanding_cleanup_debt()
+                        .ok()
+                        .map(|debts| debts.len() as u64)
+                }
+                _ => None,
+            };
+            arkdeck_control::DoctorFacts {
+                artifacts,
+                targets,
+                // Swift's `DeviceBootstrapMachine`: what answers device
+                // discovery here — the Target observation owner's sources, or
+                // the registered read-only provider.
+                discovery: (self.hdc.is_some() && self.targets.is_some())
+                    || self.provider.is_some(),
+                cleanup_debt,
+            }
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            let _ = deep;
+            arkdeck_control::DoctorFacts {
+                discovery: self.provider.is_some(),
+                ..arkdeck_control::DoctorFacts::default()
+            }
+        }
+    }
     fn hdc_status(&self, deep: bool) -> HdcStatus {
+        // Swift's status observer exists exactly when its HDC host started:
+        // here, when the isolated owner started its managed server.
+        #[cfg(target_os = "macos")]
+        if let Some(managed) = self.managed_hdc() {
+            if !deep {
+                return HdcStatus {
+                    configured: true,
+                    checked: false,
+                    availability: "notChecked".into(),
+                    ownership: "unknown".into(),
+                    server_health: "unknown".into(),
+                    reason_code: "doctor.deepNotRequested".into(),
+                };
+            }
+            let snapshot = managed.status(&utc_now);
+            let member =
+                |key: &str, missing: &str| snapshot[key].as_str().unwrap_or(missing).to_owned();
+            return HdcStatus {
+                configured: true,
+                checked: true,
+                availability: member("availability", "unknown"),
+                ownership: member("ownership", "unknown"),
+                server_health: member("serverHealth", "unknown"),
+                reason_code: member("reasonCode", "hdc.statusIncomplete"),
+            };
+        }
         let Some(provider) = &self.provider else {
             return HdcStatus::unavailable(deep, self.unavailable);
         };
