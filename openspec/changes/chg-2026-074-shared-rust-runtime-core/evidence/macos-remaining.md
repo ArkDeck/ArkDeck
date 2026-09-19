@@ -143,6 +143,13 @@ Spikes SPK-6..11 are defined in `tasks.md` and design §J.3; their records land 
 
 ## History
 
+2026-09-19 (20:30, maintainer): verification policy — before pushing, agents run only targeted
+local checks (fmt, clippy/tests of the changed crates, contract/SDD checks when their inputs
+change, affected Swift test classes); the unified gate is the PR's GitHub CI (`guard` + `swift`),
+and a full local gate is run only to reproduce a red CI lane, one at a time on the host. Run
+records carry "Local targeted checks" and "CI" sections. `AGENTS.md` and the chain prompt carry
+the rule; the dashboard counts are unchanged.
+
 2026-09-19 (`2b88705f`): #2000–#2008 merged. Recounted 80 routes (+5: `runtime.hdc.impact-preview`,
 `runtime.hdc.restart` and `control-action.list/show/reconcile`, answered as Swift's daemon
 without a managed server, #2003), 81 parser and 78 registered CLI names (unchanged), and six

@@ -204,6 +204,9 @@ GJ-1..5 已在该 digest 上 PASS（09-02/03 Swift、09-09/10 façade）。设�
   开窗（`operation list` 30/30），跑完不带 campaign 再 update 关窗（28/30）；DEC-016 允许具名 campaign
   在四小时预算后授权 complete-overwrite recovery epoch，准入被拒时按 `capability list`/`job show`/
   `recovery flash-invocation` 读出原因并报告。记录只放脱敏 target 身份。
+- **验证（2026-09-19 起）**：push 前本地只跑针对性检查（§5.3）；统一门是 PR 上的 GitHub CI（`guard` +
+  `swift` 聚合），本地不再跑完整统一门，只在 CI 红需要复现时跑红的那一道车道，本机同一时刻最多一道。
+  run 记录写「Local targeted checks」+「CI」两段，不为凑本地日志 SHA 跑全门。
 - **一个切片一个 PR，一个 PR 一个 Task token**；每个合入后的 `main` 必须可构建全绿、façade 对可服务
   App 与 CLI、没有「客户端链接已删模块」的中间态。跨 Task 的硬前置（例如 013 的 publication 需要 014
   的 Job owner 写路径）拆成独立 PR、各挂各的 token，不在一个 PR 里混两个 Task。
@@ -434,23 +437,31 @@ daemon 上跑通 runbook §2」），不是单个 RPC 方法；oracle 只录 T0 
 journal/record/receipt/index），之后 Rust 切片不改 Swift 文件、planner 只选 Rust 车道；不为 T2 输出写 swiftc
 探针。穿刺（SPK-N）不是切片：它只产出事实与库，随下一个切片 PR 一起提交。
 
-### 5.3 本地门（最终 commit 后、push 前，全部要过）
+### 5.3 push 前的针对性检查与 CI 统一门（2026-09-19 起）
+
+push 前本地只跑针对性检查（目标 10 分钟内，不拿门锁、不等别的门，`CARGO_BUILD_JOBS=2`，多工作树不共用
+cargo target）：`cargo fmt --all --check`；改动 crate 及其直接依赖方的 `cargo clippy -p <crate> --all-targets
+-- -D warnings`（本机 target）与 `cargo test -p <crate>`（spawn 子进程的测试独占 test 二进制）；改了契约输入
+才 `python rust/scripts/generate-contract.py --check`；改了 `openspec/**`/`docs/**`/`AGENTS.md` 才跑
+`ARKDECK_PYTHON=<repo>/.venv-sdd/bin/python sh scripts/check-sdd.sh`；Swift 只跑受影响测试类
+`run-swiftpm.sh test --filter <类>`。
+
+统一门是 PR 上的 GitHub CI（`guard` + `swift` 聚合；CI 里的 `plan.py` 与本地 `--run-local` 同一套选车道
+逻辑）。本地完整统一门只用于复现 CI 红的那一道车道：按 `plan.py` 的 `local_commands` 手工跑该车道命令（或只跑
+CI 日志里失败的那一条），本机同一时刻最多一道：
 
 ```bash
-ARKDECK_PYTHON=<repo>/.venv-sdd/bin/python sh scripts/check-sdd.sh
+python3 scripts/ci/plan.py --repo-root . --base-revision origin/main --head-revision HEAD --merge-base --include-worktree
 ```
 
-```bash
-python3 scripts/ci/plan.py --repo-root . --base-revision origin/main --head-revision HEAD --merge-base --include-worktree --run-local
-```
+（不带 `--run-local` 只打印选中的车道。）
 
 - 统一闸按 diff 选 Swift / App build-for-testing / design-system / Rust 车道；rust 车道的 Python 需要
   `PyYAML==6.0.3` + `jsonschema==4.26.0`（自建 venv 后用它的解释器启动 `plan.py`，`ARKDECK_PYTHON` 仍指
   `.venv-sdd`）；cargo 的 cwd 是 `rust/`；`check-contracts.py` 约 10 分钟；`plan.py` 遇首个失败即停，
   后续步骤可按 `local_commands` 顺序手工补跑。
-- Rust 三平台 clippy 本地先过：`cargo clippy --workspace --all-targets --target x86_64-pc-windows-msvc`
-  与 `--target x86_64-unknown-linux-gnu`（`rustup target add`；check-only 不需链接器），避免 macOS-only
-  代码在 Linux/Windows job 报 unused。
+- Linux/Windows 的 clippy 交给 CI 的三平台 Rust 车道；只有 CI 在那两个平台红了才本地用
+  `--target x86_64-unknown-linux-gnu`/`x86_64-pc-windows-msvc` 复现（`rustup target add`；check-only 不需链接器）。
 - 已知 flake 族：负载敏感墙钟断言（`arkdeck-client/tests/bounded.rs`、`DispatchedInvocationDurationContractTests`
   等）——与 diff 无关时按族判读，修法是等真实完成条件，不是放宽 margin；`swift test --parallel` 每个
   method 一个进程，固定 fixture 目录会互删；Foundation `Process.waitUntilExit()` 在非主线程会挂，用
@@ -461,7 +472,7 @@ python3 scripts/ci/plan.py --repo-root . --base-revision origin/main --head-revi
 ### 5.4 提交、rebase、冲突、推送、循环
 
 - 分支 `agent/xpa-0NN-<slug>-<YYYYMMDD>`，从最新 `origin/main` 建；**每次 commit 前** `git fetch origin
-  && git rebase origin/main`（本地跑过全量门后若 rebase 带进了新 main 提交，至少重跑受影响车道）。
+  && git rebase origin/main`（rebase 带进了新 main 提交就重跑受影响的针对性检查；统一门由 PR 的 CI 跑）。
 - **推送前查冲突**：`gh pr list --state open --json number,headRefName,files` 取每个开着的 PR 的文件集，
   与 `git diff --name-only origin/main..HEAD` 求交集；有交集就读对方 diff：语义无关 → 在 commit 正文
   写明重叠文件与合并顺序；语义相关 → 把分支 rebase 到对方分支上并在正文写「合并本 PR 连带前序内容，
@@ -518,7 +529,8 @@ python3 scripts/ci/plan.py --repo-root . --base-revision origin/main --head-revi
 
 Base commit；readiness pins 实际值；「已在 main / 本切片交付 / 仍剩余」三栏；每条 Acceptance 的命令、
 退出码、结果、判据；differential/shadow 的比对范围与结果；crash-window 矩阵；cutover preflight 的阻断/
-parked 实测；旧目录保留/归档与快照摘要；真机 GJ 的 Job ID 与记录文件；统一闸摘要（log 路径 + SHA-256）；
+parked 实测；旧目录保留/归档与快照摘要；真机 GJ 的 Job ID 与记录文件；「Local targeted checks」（命令、exit、
+日志路径）与「CI」（PR 号、run id、结论）；
 未执行项及原因；残留与归属；待维护者裁决项。真实运行结果本身是一等证据，schema 表达力不足只写一行兼容
 说明，不阻塞状态推进（PRODUCT-LOOP §2）。
 
