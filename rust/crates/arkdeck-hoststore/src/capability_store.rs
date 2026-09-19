@@ -483,10 +483,10 @@ impl CapabilityStore {
     }
 
     /// Swift `recordOutcome`: a pending use settled by the Job that owns it.
-    /// The same outcome again changes nothing. A recorded outcome is never
-    /// changed here: settling an unknown one is recovery, which ADR-0009 has
-    /// not placed yet (decisions 2 and 4), and Swift refuses every other
-    /// change as this refuses them all.
+    /// The same outcome again changes nothing. Outcomes are appended, never
+    /// replaced, and the only change one may take is Swift's `resolvesUnknown`:
+    /// an `outcomeUnknown` use settled `confirmed` or `safeToReflash` by a
+    /// later readback. Every other change is refused, as Swift refuses it.
     pub fn record_outcome(
         &self,
         capability_id: &str,
@@ -537,11 +537,18 @@ impl CapabilityStore {
                 {
                     return Ok(());
                 }
-                return Err(conflict(format!(
-                    "cannot change {} to {}",
-                    current.outcome.raw(),
-                    outcome.raw()
-                )));
+                // Swift `resolvesUnknown`, the one change an outcome may take
+                // (ADR-0009 decision 4, ruled 2026-09-19): a readback settles an
+                // unknown use as confirmed or safe to reflash, appended after it.
+                let resolves_unknown = current.outcome == UseOutcome::OutcomeUnknown
+                    && matches!(outcome, UseOutcome::Confirmed | UseOutcome::SafeToReflash);
+                if !resolves_unknown {
+                    return Err(conflict(format!(
+                        "cannot change {} to {}",
+                        current.outcome.raw(),
+                        outcome.raw()
+                    )));
+                }
             }
             let mut settlement = Outcome {
                 job: job_id.to_owned(),
