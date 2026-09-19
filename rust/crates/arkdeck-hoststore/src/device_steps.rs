@@ -12,7 +12,13 @@ use serde_json::{Map, Value, json};
 use std::collections::BTreeSet;
 
 /// The device-bound operations this Runtime plans and runs.
-pub(crate) const DEVICE_OPERATIONS: [&str; 2] = ["observe.device@1", "capture.diagnostics@1"];
+pub(crate) const DEVICE_OPERATIONS: [&str; 5] = [
+    "observe.device@1",
+    "capture.diagnostics@1",
+    "input.tap@1",
+    "input.long-press@1",
+    "input.swipe@1",
+];
 
 /// Swift `evidenceEligibleOperations`: the operations whose device steps wait
 /// for a complete evidence preflight.
@@ -107,6 +113,38 @@ pub(crate) enum StepAction {
 }
 
 impl StepAction {
+    pub(crate) fn persisted(&self) -> (&'static str, Map<String, Value>) {
+        match self {
+            Self::Pointer(action) => action.persisted(),
+            Self::Hdc(action) => {
+                let (kind, arguments) = action.persisted();
+                let values = arguments
+                    .into_iter()
+                    .map(|(key, value)| {
+                        let value = match value {
+                            arkdeck_provider_hdc::Persisted::Text(text) => json!(text),
+                            arkdeck_provider_hdc::Persisted::Integer(number) => json!(number),
+                            arkdeck_provider_hdc::Persisted::Texts(texts) => json!(texts),
+                        };
+                        (key.to_owned(), value)
+                    })
+                    .collect();
+                (kind, values)
+            }
+        }
+    }
+
+    pub(crate) fn verify(
+        &self,
+        receipt: &arkdeck_provider_hdc::Receipt,
+        expected: arkdeck_provider_hdc::Expected<'_>,
+    ) -> arkdeck_provider_hdc::Outcome {
+        match self {
+            Self::Hdc(action) => action.verify(receipt, expected),
+            Self::Pointer(action) => action.verify(receipt),
+        }
+    }
+
     pub(crate) fn effect(&self) -> &'static str {
         match self {
             Self::Hdc(action) => action.effect(),

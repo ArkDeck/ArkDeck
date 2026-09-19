@@ -479,6 +479,16 @@ impl JobRecord {
     pub(super) fn operation(&self) -> &str {
         &self.operation
     }
+    pub(crate) fn materialized_plan(&self) -> Option<&str> {
+        self.plan.as_deref()
+    }
+    pub(crate) fn admission_evidence(&self) -> Option<&Value> {
+        self.admission.as_ref()
+    }
+    pub(crate) fn set_admission_evidence(&mut self, evidence: Value) {
+        self.admission = Some(evidence);
+    }
+
     pub(super) fn materialized_identity(&self) -> Option<&str> {
         self.identity.as_deref()
     }
@@ -885,5 +895,30 @@ impl JobRecord {
             rows.push(json!({"entryIndex":index.to_string(), "partIndex":part.to_string(), "text":&entry[start..], "lastPart":true}));
         }
         rows
+    }
+}
+
+#[cfg(test)]
+mod mutation_provenance_tests {
+    use super::*;
+
+    #[test]
+    fn publication_source_rejects_capability_correlation_changed_from_its_job() {
+        let bytes = include_bytes!(
+            "../../../tests/fixtures/pointer-input/store/jobs/job-4ac2c3640786ad0e831952ab62bb71bc/job-record.json"
+        );
+        JobRecord::decode(bytes).expect("native Swift consumed pointer record");
+        let original: Value = serde_json::from_slice(bytes).unwrap();
+        for (field, replacement) in [
+            ("reservationID", json!("another-job-reservation")),
+            ("planDigestSHA256", json!("0".repeat(64))),
+            ("targetBindingDigestSHA256", json!("0".repeat(64))),
+            ("stepSetDigestSHA256", json!("malformed")),
+        ] {
+            let mut changed = original.clone();
+            changed["admissionEvidence"]["runtimeCapabilityCorrelation"][field] = replacement;
+            let error = JobRecord::decode(&serde_json::to_vec(&changed).unwrap()).unwrap_err();
+            assert_eq!(error.code, "recordUnreadable", "{field}");
+        }
     }
 }
