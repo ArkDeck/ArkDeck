@@ -1,0 +1,62 @@
+[
+  {
+    "capabilityID" : "CAP-RT-RESOLVE-CONFIRMED",
+    "jobID" : "job-c1",
+    "name" : "resolvedConfirmedToUnknown",
+    "outcome" : "outcomeUnknown",
+    "recordedAtUTC" : "2026-07-17T00:00:00Z",
+    "refused" : "outcomeConflict(\"cannot change confirmed to outcomeUnknown\")",
+    "reservationID" : "res-c1",
+    "terminalState" : "waitingForRecovery"
+  },
+  {
+    "capabilityID" : "CAP-RT-RESOLVE-CONFIRMED",
+    "jobID" : "job-c1",
+    "name" : "resolvedConfirmedToSafe",
+    "outcome" : "safeToReflash",
+    "recordedAtUTC" : "2026-07-17T00:00:00Z",
+    "refused" : "outcomeConflict(\"cannot change confirmed to safeToReflash\")",
+    "reservationID" : "res-c1",
+    "terminalState" : "failed"
+  },
+  {
+    "capabilityID" : "CAP-RT-RESOLVE-CONFIRMED",
+    "jobID" : "job-c2",
+    "name" : "confirmedToUnknown",
+    "outcome" : "outcomeUnknown",
+    "recordedAtUTC" : "2026-07-17T00:00:00Z",
+    "refused" : "outcomeConflict(\"cannot change confirmed to outcomeUnknown\")",
+    "reservationID" : "res-c2",
+    "terminalState" : "waitingForRecovery"
+  },
+  {
+    "capabilityID" : "CAP-RT-RESOLVE-SAFE",
+    "jobID" : "job-s1",
+    "name" : "safeToConfirmed",
+    "outcome" : "confirmed",
+    "recordedAtUTC" : "2026-07-17T00:00:00Z",
+    "refused" : "outcomeConflict(\"cannot change safeToReflash to confirmed\")",
+    "reservationID" : "res-s1",
+    "terminalState" : "succeeded"
+  },
+  {
+    "capabilityID" : "CAP-RT-RESOLVE-SAFE",
+    "jobID" : "job-s1",
+    "name" : "safeToUnknown",
+    "outcome" : "outcomeUnknown",
+    "recordedAtUTC" : "2026-07-17T00:00:00Z",
+    "refused" : "outcomeConflict(\"cannot change safeToReflash to outcomeUnknown\")",
+    "reservationID" : "res-s1",
+    "terminalState" : "waitingForRecovery"
+  },
+  {
+    "capabilityID" : "CAP-RT-RESOLVE-CONFIRMED",
+    "jobID" : "job-c2",
+    "name" : "confirmedOtherTerminal",
+    "outcome" : "confirmed",
+    "recordedAtUTC" : "2026-07-17T00:00:00Z",
+    "refused" : "outcomeConflict(\"cannot change confirmed to confirmed\")",
+    "reservationID" : "res-c2",
+    "terminalState" : "failed"
+  }
+]
