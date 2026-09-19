@@ -999,3 +999,25 @@ mod hap_provenance_tests {
         assert!(JobRecord::decode(&serde_json::to_vec(&changed).unwrap()).is_err());
     }
 }
+
+#[cfg(test)]
+mod preflight_table_tests {
+    use super::*;
+    use arkdeck_contract::{JobStateClass, job_state_class, job_states};
+
+    /// The Runtime's Job states are the shared preflight table's
+    /// (`spec/recovery/job-state-preflight.json`, design §G.4), terminal
+    /// exactly where the table says so.
+    #[test]
+    fn the_job_states_are_the_shared_preflight_tables() {
+        let listed: std::collections::BTreeSet<&str> = job_states().collect();
+        assert_eq!(listed, STATES.iter().copied().collect());
+        for state in STATES {
+            assert_eq!(
+                terminal(state),
+                job_state_class(state) == JobStateClass::Terminal,
+                "{state}"
+            );
+        }
+    }
+}

@@ -327,7 +327,14 @@ with the paired native ArkTrace receipt; it does not establish parser or device
 acceptance.
 
 `arkdeck-contract` contains generated schemas, strict framing, canonical encoders
-and digest functions. `arkdeck-control` has transport-free observation and local-resource handlers.
+and digest functions. It also compiles in the shared Job-state preflight table
+(design §G.4; `spec/recovery/job-state-preflight.json`, whose copy Swift's
+`JobStatePreflightTableContractTests` records under
+`rust/tests/fixtures/job-state-preflight/`) and its two classifiers:
+`classify_restart`, `runtime service restart`'s carry-over of current Jobs as
+Swift's `RuntimeCLI.classifyAgentdRestartCurrentJobs` decides it (replayed on that
+oracle), and `cutover_preflight`, the M5 preflight over a state root's Jobs, agent
+executions and capability uses. Neither has a caller yet. `arkdeck-control` has transport-free observation and local-resource handlers.
 `arkdeck-platform` owns the unsafe OS boundary; all other crates forbid unsafe
 code. `arkdeck-provider-hdc` lowers one fixed observation argv through that
 boundary and holds the HDC typed actions of the device operations, which the
