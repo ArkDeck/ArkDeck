@@ -296,6 +296,22 @@ reproduces every answer and leaves every root untouched, and
 `scripts/check-artifact-quota.py` compares a fresh Swift daemon and a fresh Rust
 owner, and both CLIs, over each root.
 
+Before it serves, the isolated daemon sweeps its Artifact root once, as Swift's
+daemon runs `collectGarbage` at startup (`collect_expired_artifacts`,
+`artifact_retention.rs`). Outside the Jobs it keeps, a row whose deadline has
+passed (`deadline <= now`, parsed as Swift parses it) and that is not pinned is
+removed from its index first, then its payload is unlinked; a pinned or
+undated row never goes, and nothing is evicted for quota. The sweep keeps more
+than Swift does, never less: every Job the Job owner's census cannot prove
+settled (`job_retention_census.rs`: not terminal, of unknown outcome, or a
+terminal record or journal that does not verify), every Job the cleanup ledger
+says still owes a cleanup, and each exact Artifact an active Job names as an
+input lease. It prints `reclaimed N expired artifact(s)` when it reclaims
+anything, and a failure (an unexpected root entry, a payload that no longer
+verifies, an unreadable census or ledger) is printed and never stops the
+daemon. `tests/artifact_retention.rs` and `agentd/tests/artifact_retention_process.rs`
+check it over real Job owners and a real daemon.
+
 ## Contract and ownership boundaries
 
 The isolated macOS host serves `trace cache status` and `trace cache purge` from

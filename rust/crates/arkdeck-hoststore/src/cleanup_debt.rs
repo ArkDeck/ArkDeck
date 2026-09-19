@@ -185,6 +185,18 @@ pub(crate) fn outstanding(artifacts: &ArtifactReadStore, job_id: &str) -> Result
         .count())
 }
 
+/// The Jobs `outstandingCleanupDebt()` names: every Job still owing a
+/// cleanup, whose Artifacts the retention sweep keeps.
+pub(crate) fn outstanding_jobs(
+    artifacts: &ArtifactReadStore,
+) -> Result<std::collections::BTreeSet<String>, String> {
+    Ok(load(artifacts)?
+        .iter()
+        .filter(|record| record.get("settledAtUTC").is_none())
+        .filter_map(|record| record["jobID"].as_str().map(str::to_owned))
+        .collect())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

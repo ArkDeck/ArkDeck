@@ -18,6 +18,11 @@ use arkdeck_platform::{DocumentPublishError, HostDirectory, HostEntryKind, Paylo
 use serde_json::{Value, json};
 use std::io;
 
+#[path = "artifact_retention.rs"]
+mod retention;
+pub(crate) use retention::RetentionKeep;
+pub use retention::collect_expired_artifacts;
+
 const MAX_INDEX: usize = 16 * 1024 * 1024;
 const MAX_PAYLOAD: usize = 512 * 1024 * 1024;
 const DEFAULT_LIFETIME: u64 = 7 * 24 * 60 * 60;
@@ -489,6 +494,12 @@ impl ArtifactPublisher<'_> {
             row["artifactID"] != metadata["artifactID"] && row["name"] != metadata["name"]
         });
         rows.push(metadata);
+        Self::persist_index(job, rows)
+    }
+
+    /// Swift `persistIndex`: the whole index, in Swift's pretty spelling,
+    /// published in place of the old one.
+    fn persist_index(job: &HostDirectory, rows: Vec<Value>) -> Result<(), String> {
         let document = json!({"schemaVersion": "1.0.0", "artifacts": rows});
         let bytes = crate::session_json::encode_pretty(&document)
             .map_err(|_| io_failure("cannot encode artifact index"))?;
