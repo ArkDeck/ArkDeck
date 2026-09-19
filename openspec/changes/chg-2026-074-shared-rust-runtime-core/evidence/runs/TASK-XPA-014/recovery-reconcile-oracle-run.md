@@ -88,7 +88,9 @@ and comparing through `sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --filt
 
 ## CI
 
-The PR's `guard` and `swift` aggregate: recorded after the run completes.
+| PR | Head | Runs | Result |
+| --- | --- | --- | --- |
+| #2030 | `a95a11ff` | 35445407243, 35445407244, 35445407322 | 11 checks passed, `app-build` skipped; merged as `ac018033` |
 
 ## Not in this slice
 

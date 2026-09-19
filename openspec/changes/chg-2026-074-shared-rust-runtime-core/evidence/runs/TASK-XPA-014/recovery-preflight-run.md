@@ -68,7 +68,7 @@ Log: scratchpad `logs/checks-s4b.log`, SHA-256
 | --- | --- | --- | --- |
 | #2026 (slice 4a) | `e04af9a1` | 35444830272, 35444830418, 35444830491 | all checks passed or skipped; merged |
 | #2028 (this slice, stacked on 4a) | `35fb4e96` | 35445066649, 35445066705, 35445066758 | all checks passed or skipped |
-| #2028 after the rebase | this head | — | pending |
+| #2028 after the rebase | `9a74352b` | 35445650080, 35445650085, 35445650146 | 9 checks passed; `swift-tests`, `app-build`, `ds-interactions` skipped (a Rust-only diff); merged as `658f3e00` |
 
 ## Not in this slice
 
