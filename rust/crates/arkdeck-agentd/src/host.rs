@@ -131,6 +131,10 @@ pub struct Host {
     /// The combined human-action owner over the agent executions.
     #[cfg(target_os = "macos")]
     human_actions: Option<arkdeck_hoststore::HumanActionResources>,
+    /// The union control-action owner, over no HDC and no tool-selection
+    /// owner: this daemon starts no managed HDC server.
+    #[cfg(target_os = "macos")]
+    control_actions: Option<arkdeck_hoststore::ControlActionResources>,
 }
 
 impl Host {
@@ -235,6 +239,16 @@ impl Host {
         resources: arkdeck_hoststore::HumanActionResources,
     ) -> Self {
         self.human_actions = Some(resources);
+        self
+    }
+    /// `control-action.list`, `.show` and `.reconcile` page and look up the
+    /// control actions of this union owner, which holds none.
+    #[cfg(target_os = "macos")]
+    pub fn with_control_actions(
+        mut self,
+        resources: arkdeck_hoststore::ControlActionResources,
+    ) -> Self {
+        self.control_actions = Some(resources);
         self
     }
     #[cfg(target_os = "macos")]
@@ -474,6 +488,8 @@ impl Host {
             usb: std::sync::Arc::new(arkdeck_provider_hdc::NoUsbRelations),
             #[cfg(target_os = "macos")]
             human_actions: None,
+            #[cfg(target_os = "macos")]
+            control_actions: None,
         }
     }
 }
@@ -871,6 +887,23 @@ impl HostServices for Host {
             });
         };
         resources.answer(method, params, agents)
+    }
+
+    /// `runtime.hdc.impact-preview`, `runtime.hdc.restart` and
+    /// `control-action.list`, `.show` and `.reconcile`, as Swift's daemon
+    /// answers them without a managed HDC server: with the union owner the
+    /// isolated composition makes, or, without it, as Swift's handler answers
+    /// with no control-action owner.
+    #[cfg(target_os = "macos")]
+    fn control_action(
+        &self,
+        method: &str,
+        params: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<serde_json::Value, WireError> {
+        match &self.control_actions {
+            Some(owner) => owner.answer(method, params),
+            None => arkdeck_hoststore::control_action_without_owner(method, params),
+        }
     }
 
     #[cfg(target_os = "macos")]

@@ -299,6 +299,21 @@ pub trait HostServices: Send + Sync {
             details: None,
         })
     }
+    /// `runtime.hdc.impact-preview`, `runtime.hdc.restart` and
+    /// `control-action.list`, `.show` and `.reconcile`: Swift's
+    /// `hdcControlActionRequest`, parameters and all. A host without its
+    /// control-action owners keeps the foundation's refusal.
+    fn control_action(
+        &self,
+        _method: &str,
+        _params: &serde_json::Map<String, Value>,
+    ) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "rejected".into(),
+            message: "this method is unavailable in the read-only Rust foundation".into(),
+            details: None,
+        })
+    }
     fn workspace_project(
         &self,
         _method: &str,
@@ -1027,6 +1042,16 @@ impl<H: HostServices> Control<H> {
                 "invalidParams",
                 "live HDC status does not accept caller facts or paths",
             ),
+            // Swift's handler checks each of these against its owners itself:
+            // the lifecycle methods before any parameter, the others after.
+            "runtime.hdc.impact-preview"
+            | "runtime.hdc.restart"
+            | "control-action.list"
+            | "control-action.show"
+            | "control-action.reconcile" => Response {
+                id: request.id.clone(),
+                outcome: self.host.control_action(&request.method, &params),
+            },
             _ => Response::failure(
                 &request.id,
                 "rejected",

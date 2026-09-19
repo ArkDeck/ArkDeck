@@ -2,6 +2,8 @@
 mod app_ingress;
 #[cfg(target_os = "macos")]
 mod bootstrap_readers;
+#[cfg(all(test, target_os = "macos"))]
+mod control_action_control;
 #[cfg(target_os = "macos")]
 mod development_usb;
 #[cfg(target_os = "macos")]
@@ -132,6 +134,10 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             "agent-executions",
             "human-action-snapshots",
             "workspace-projects",
+            // Swift's union control-action owner pages here. Its HDC owner's
+            // `hdc-control-actions` needs a managed HDC server, which this
+            // daemon never starts, so that directory is never made.
+            "control-action-snapshots",
         ] {
             directory.private_child(name)?;
         }
@@ -156,6 +162,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
                 root.join("targets-state"),
                 root.join("agent-executions"),
                 root.join("human-action-snapshots"),
+                root.join("control-action-snapshots"),
             ],
         )?;
         let host = host
@@ -187,6 +194,11 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             // in its own directory beside them.
             .with_human_actions(arkdeck_hoststore::HumanActionResources::open(
                 &root.join("human-action-snapshots"),
+            )?)
+            // Swift's daemon without its HDC server host: the union
+            // control-action owner over no HDC and no tool-selection owner.
+            .with_control_actions(arkdeck_hoststore::ControlActionResources::open(
+                &root.join("control-action-snapshots"),
             )?)
             // Beside the Job state, as the Swift engine keeps it: read only.
             .with_capabilities(arkdeck_hoststore::CapabilityStore::open(
