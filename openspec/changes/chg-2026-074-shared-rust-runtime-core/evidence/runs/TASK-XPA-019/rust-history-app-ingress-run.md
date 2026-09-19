@@ -1,7 +1,7 @@
 # Standalone Rust History App ingress — implementation evidence
 
-Date: 2026-09-19. Base: protected-main commit
-`1ee1d73ddeffcae6cda7ca49bf57ff22bf89d3d7` (#1974). Scope: macOS,
+Date: 2026-09-19. Integrated base: protected-main commit
+`187321ea397419353ac430a8bd48e027f56cd02e` (#1968). Scope: macOS,
 TASK-XPA-019 / SPK-8, first isolated standalone composition. This is **not**
 signed App UI acceptance, installation cutover, Swift retirement or a real-device
 result.
@@ -46,7 +46,18 @@ result.
 - `cargo clippy --offline --locked -p arkdeck-agentd --all-targets -- -D warnings`
   **PASS** (all agentd targets); `cargo fmt --all -- --check` and
   `git diff --check`: **PASS**.
-- Unified repository gate remains pending coordination with the parent task.
+- After merging protected main through #1968, `cargo check --offline --locked
+  --workspace --all-targets -j 1`: **PASS**. This checks the combined Host authority
+  composition; it does not establish device mutation consumption or signed XPC
+  acceptance. Log: `/private/tmp/arkdeck-app-ingress-integrated-check-20260919.log`.
+- Final unified repository gate against `origin/main` `187321ea` with
+  `--merge-base --include-worktree --run-local`: **PASS**. The common and Rust
+  lanes selected for this diff completed, including workspace tests, contract
+  checks, Cargo deny and vet. No filters or skipped builds were used.
+  Run: `/private/tmp/arkdeck-app-ingress-final-gate-20260919.log` (exit 0).
+  The fixed venv supplied Python dependencies; Cargo build/test concurrency was
+  limited to one while a separate slice ran its gate.
+- An earlier environment-only failure was retained:
   A direct system-Python invocation of `check-readonly.py` stopped at missing
   `jsonschema`; it did not run its workload and is not counted as a pass.
 
