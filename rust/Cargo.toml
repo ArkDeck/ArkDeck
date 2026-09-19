@@ -27,6 +27,13 @@ unicode-segmentation = "=1.13.3"
 [workspace.lints.rust]
 unsafe_code = "forbid"
 
+# A registered tool is identified by the SHA-256 of its bytes, and a
+# commandless HDC identity observation hashes the 6 MB hdc three times (open
+# and two revalidations). Unoptimized, that alone passes Swift's 1000 ms
+# observation budget, so a debug daemon reported every server unobserved.
+[profile.dev.package.sha2]
+opt-level = 3
+
 [profile.release]
 panic = "abort"
 lto = "thin"
