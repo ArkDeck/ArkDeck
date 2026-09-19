@@ -1,7 +1,9 @@
 # Rust Import commit and immutable publication — macOS
 
 Initial base: protected `origin/main` `1ee1d73ddeffcae6cda7ca49bf57ff22bf89d3d7`.
-Final validation includes merged protected main `98cb3b96`.
+Final validation tested commit `6d8ed90b`, including protected main `76612c9f`.
+Later unrelated main `94b28966` is left to the PR merge-state CI; it was not part
+of this local run.
 This is host implementation/test evidence, not device acceptance.
 
 ## Delivered behavior
@@ -19,14 +21,14 @@ This is host implementation/test evidence, not device acceptance.
 - `cargo check --manifest-path rust/Cargo.toml -p arkdeck-agentd`: pass.
 - `cargo clippy --manifest-path rust/Cargo.toml -p arkdeck-hoststore -p arkdeck-agentd --all-targets -- -D warnings`: pass; repeated by the final unified gate.
 - `import_upload`: 22 passing tests; `artifact_read_owner`: 26 passing tests; dedicated patch-validator boundary matrix: pass. These cover HAP/native/patch positive publication, unchanged exact bytes, sensitive opt-in, native valid ELF without required OH block refusal, partial/digest/binding/quota/format refusals, four commit durability windows, partial-copy recovery and linked-copy refusal, receipt/metadata poisoning, explicit export, restart, snapshot filtering/pagination, and existing Job Artifact behavior.
-- Initial owner implementation unified gate: **PASS**, exit 0, 2026-09-19, before the later process test exposed incomplete recorded schemas and the missing CLI/Control list dispatch. The final expanded-slice gate remains pending. Command:
+- Initial owner implementation unified gate: **PASS**, exit 0, 2026-09-19, before the later process test exposed incomplete recorded schemas and the missing CLI/Control list dispatch. The final expanded-slice gate passed in the final run recorded below. Command:
 
   ```sh
   ARKDECK_PYTHON=/private/tmp/arkdeck-validation-venv/bin/python /private/tmp/arkdeck-validation-venv/bin/python scripts/ci/plan.py --repo-root . --base-revision origin/main --head-revision HEAD --merge-base --include-worktree --run-local
   ```
 
   Public checks, complete Rust workspace tests, published/candidate contract checks, cargo-deny (advisories/bans/licenses/sources), and cargo-vet (36 fully audited) passed. Local full log: `/private/tmp/arkdeck-import-gate.log`; contract recordings: `rust/target/readonly-check/87a6b378cb7d4cbda76995161492b0f5`.
-- Expanded-slice verification passed the full Swift suite (2,685 parallel tests plus 1 serialized process-identity test and 5 viewer-scale tests) and Rust workspace tests. Two stale test assertions still classified the newly routed `artifact.import.list` as unimplemented; the owner-route test, read-only method set and its harness expectation now agree with the production route. Targeted reruns pass (16 control tests; 35 contract-harness tests). A complete final rerun remains pending.
+- Expanded-slice verification passed the full Swift suite (2,685 parallel tests plus 1 serialized process-identity test and 5 viewer-scale tests) and Rust workspace tests. Two stale test assertions still classified the newly routed `artifact.import.list` as unimplemented; the owner-route test, read-only method set and its harness expectation now agree with the production route. Targeted reruns pass (16 control tests; 35 contract-harness tests). The complete final rerun passed as recorded below.
 - Earlier attempts encountered sandbox Unix-socket denial and a system Python missing jsonschema; final verification used authorized local test execution and the existing pinned validation environment (`jsonschema==4.26.0`, `PyYAML==6.0.3`). No check or fixture was weakened.
 - Independent review confirmed existing-index retries validate immutable payloads through `load_index`; an additional deletion/corruption test proves failure leaves the Import committing, receipt absent, and original staging retained. Patch validator negative matrix covers absolute/backslash/.git/dot/empty paths, binary/rename/copy, NUL, invalid UTF-8, and the 128-file bound. No confirmed implementation defect remained in that review.
 
@@ -42,7 +44,7 @@ Import lease consumption, materialization/Job-reference inspection (`artifact.im
 
 ## Exact published-method compatibility
 
-The final expanded gate remains pending. The latest full attempt passed Swift and
+An earlier expanded gate failed. That attempt passed Swift and
 the development/candidate Rust paths, but the published view exposed an actual
 phase-specific contract mismatch: its workspace-patch commit succeeds, while the
 subsequent request-ID inspect after restart refuses the receipt shape. The runner
@@ -64,3 +66,25 @@ Targeted current-schema process test passed (3.51 seconds). The existing source-
 view materializer generated an isolated published view from `08509db`; its actual
 CLI/daemon process test passed (1.38 seconds) with the final proxy assertions.
 Production validators, schema pins and the full-gate selection were not relaxed.
+
+## Final expanded-slice validation
+
+**PASS — exit 0**, 2026-09-19, authoritative session `88244`, tested source
+`6d8ed90b` with protected main `76612c9f`. Exact command from repository root:
+
+```sh
+ARKDECK_PYTHON=/private/tmp/arkdeck-validation-venv/bin/python CARGO_BUILD_JOBS=2 RUST_TEST_THREADS=2 /private/tmp/arkdeck-validation-venv/bin/python scripts/ci/plan.py --repo-root . --base-revision origin/main --head-revision HEAD --merge-base --include-worktree --run-local
+```
+
+Public checks, 2,686 parallel Swift tests plus the serialized process-identity and
+five viewer-scale tests, complete Rust workspace tests, strict published/candidate
+contract views, cargo-deny advisories/bans/licenses/sources, and cargo-vet (36 fully
+audited) passed. Published Import process coverage passed in 0.72 seconds; candidate
+three-format/lost-reply/restart coverage passed in 1.43 seconds. No timeout,
+contract validator or fixture expectation was relaxed.
+
+Complete log: `/private/tmp/arkdeck-import-gate-main766.log`. Contract recordings:
+`rust/target/readonly-check/be2e232cbcca4abb99411ce3822c588f`. The earlier failures
+remain documented above; this result is from a complete fresh unified run, not a
+composition of partial reruns. The publication slice is ready for maintainer
+review; it is not merged or real-device accepted by this evidence.
