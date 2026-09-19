@@ -98,8 +98,11 @@ private final class ArkDeckAppModelStore {
 
   @ObservationIgnored lazy var hdcDiagnostics = HDCStatusViewModel(
     provider: HDCApplicationDiagnosticsFacade.make())
+  // The matrix reads through ClientKit; only its hidumper row's read-only
+  // debug.template@1 Job is still submitted by the Debug workspace's runner.
   @ObservationIgnored lazy var overviewCapabilities = OverviewCapabilityViewModel(
-    provider: OverviewCapabilityApplicationFacade.make())
+    provider: OverviewCapabilityApplicationFacade.make(
+      windowInventory: DebugWindowInventoryJobRunner()))
   @ObservationIgnored lazy var overviewRemoteServer = OverviewRemoteServerViewModel()
   @ObservationIgnored lazy var flashWorkspace = FlashWorkspaceViewModel(
     provider: FlashApplicationFacade.make())

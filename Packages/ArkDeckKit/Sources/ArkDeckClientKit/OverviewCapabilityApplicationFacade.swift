@@ -1,4 +1,3 @@
-import ArkDeckClientKit
 import ArkDeckCore
 import Foundation
 
@@ -128,21 +127,83 @@ public protocol OverviewCapabilityApplicationProviding: Sendable {
   func refresh(targetID: String?) async -> OverviewCapabilityMatrixPresentation
 }
 
+/// Terminal facts of the read-only `debug.template@1` window-inventory Job
+/// that proves the hidumper row: exactly what that row renders.
+public enum OverviewWindowInventoryJobResult: Sendable, Equatable {
+  case completed(jobID: String, state: String, outcomeUnknown: Bool)
+  case failed(String)
+}
+
+/// Submits and runs the read-only `debug.template@1` window-inventory Job on
+/// the resolved target. Its typed Runtime request (Catalog reference, expected
+/// binding revision, workspace thread, idempotency key) belongs to the Debug
+/// workspace, which is still in ArkDeckWorkflows, so the App supplies the
+/// runner; this facade never composes a Runtime operation request itself.
+public protocol OverviewWindowInventoryJobRunning: Sendable {
+  func runWindowInventory(
+    targetID: String, bindingRevision: Int
+  ) async -> OverviewWindowInventoryJobResult
+}
+
 public enum OverviewCapabilityApplicationFacade {
   public static func make(
+    windowInventory: any OverviewWindowInventoryJobRunning,
     arguments: [String] = ProcessInfo.processInfo.arguments
   ) -> any OverviewCapabilityApplicationProviding {
     if arguments.contains("--ui-test-hdc-diagnostics") {
       return OverviewCapabilityFixtureProvider(arguments: arguments)
     }
-    return OverviewCapabilityProductionProvider()
+    return OverviewCapabilityProductionProvider(windowInventory: windowInventory)
   }
 }
 
-private actor OverviewCapabilityProductionProvider: OverviewCapabilityApplicationProviding {
+/// The provider's read failure. Its one case keeps the texts, and their
+/// `String(describing:)` form, that the Debug read transport produced.
+enum OverviewCapabilityReadFailure: Error, Sendable, Equatable {
+  case transport(String)
+
+  var message: String {
+    switch self {
+    case .transport(let message): message
+    }
+  }
+}
+
+/// `trace.probe`'s per-tool verdict as the Runtime spells it. It mirrors the
+/// Provider's `TraceRuntimeToolDisposition` wire values for display only;
+/// ClientKit does not import the Provider layer. An unknown value still reads
+/// as an omitted probe result.
+enum OverviewTraceToolDisposition: String, CaseIterable, Sendable {
+  case captureEligible
+  case probeOnly
+  case unrecognized
+  case probeFailed
+}
+
+actor OverviewCapabilityProductionProvider: OverviewCapabilityApplicationProviding {
+  typealias Request =
+    @Sendable (String, [String: JSONValue]?) async
+    -> Result<Data, OverviewCapabilityReadFailure>
+
+  private let windowInventory: any OverviewWindowInventoryJobRunning
+  private let request: Request
+
+  init(
+    windowInventory: any OverviewWindowInventoryJobRunning,
+    request: @escaping Request = { method, params in
+      await RuntimeXPCRequestTransport.request(method: method, params: params)
+        .mapError { OverviewCapabilityReadFailure.transport($0.message) }
+    }
+  ) {
+    self.windowInventory = windowInventory
+    self.request = request
+  }
+
   func refresh(targetID requested: String?) async -> OverviewCapabilityMatrixPresentation {
-    async let operationResponse = DebugXPCReadTransport.request(method: "operation.list")
-    async let targetResponse = DebugXPCReadTransport.request(method: "target.list")
+    let request = self.request
+    let windowInventory = self.windowInventory
+    async let operationResponse = request("operation.list", nil)
+    async let targetResponse = request("target.list", nil)
     let operations: [[String: Any]]
     let targets: [[String: Any]]
     do {
@@ -193,12 +254,10 @@ private actor OverviewCapabilityProductionProvider: OverviewCapabilityApplicatio
     let targetID = resolved.id
     let bindingRevision = resolved.bindingRevision
 
-    async let traceResponse = DebugXPCReadTransport.request(
-      method: "trace.probe", params: ["targetId": .string(targetID)])
-    async let hidumperRun = DebugTemplateJobExecution.run(
+    async let traceResponse = request("trace.probe", ["targetId": .string(targetID)])
+    async let hidumperRun = windowInventory.runWindowInventory(
       targetID: targetID,
-      bindingRevision: bindingRevision,
-      templateID: DebugRuntimeCommandTemplate.windowInventory.rawValue)
+      bindingRevision: bindingRevision)
 
     var items: [OverviewCapabilityItemPresentation] = []
     switch await traceResponse {
@@ -221,7 +280,7 @@ private actor OverviewCapabilityProductionProvider: OverviewCapabilityApplicatio
   }
 
   private static func resultArray(
-    _ response: Result<Data, DebugXPCReadFailure>
+    _ response: Result<Data, OverviewCapabilityReadFailure>
   ) throws -> [[String: Any]] {
     let data: Data
     switch response {
@@ -230,20 +289,20 @@ private actor OverviewCapabilityProductionProvider: OverviewCapabilityApplicatio
     }
     let envelope = try resultEnvelope(data)
     guard let result = envelope["result"] as? [[String: Any]] else {
-      throw DebugXPCReadFailure.transport("Runtime returned no result list")
+      throw OverviewCapabilityReadFailure.transport("Runtime returned no result list")
     }
     return result
   }
 
   private static func resultEnvelope(_ data: Data) throws -> [String: Any] {
     guard let envelope = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-    else { throw DebugXPCReadFailure.transport("Runtime returned an unreadable response") }
+    else { throw OverviewCapabilityReadFailure.transport("Runtime returned an unreadable response") }
     if let error = envelope["error"] as? [String: Any] {
-      throw DebugXPCReadFailure.transport(
+      throw OverviewCapabilityReadFailure.transport(
         "Runtime refused the request: " + (error["message"] as? String ?? "no message"))
     }
     guard envelope["ok"] as? Bool == true else {
-      throw DebugXPCReadFailure.transport("Runtime returned an unsuccessful response")
+      throw OverviewCapabilityReadFailure.transport("Runtime returned an unsuccessful response")
     }
     return envelope
   }
@@ -259,11 +318,11 @@ private actor OverviewCapabilityProductionProvider: OverviewCapabilityApplicatio
       result["bindingRevision"] as? Int == revision,
       let rows = result["tools"] as? [[String: Any]],
       let tags = result["supportedTags"] as? [String]
-    else { throw DebugXPCReadFailure.transport("Runtime returned mismatched Trace facts") }
+    else { throw OverviewCapabilityReadFailure.transport("Runtime returned mismatched Trace facts") }
     return ["hitrace", "bytrace"].map { tool in
       guard let row = rows.first(where: { $0["tool"] as? String == tool }),
         let raw = row["disposition"] as? String,
-        let disposition = TraceRuntimeToolDisposition(rawValue: raw)
+        let disposition = OverviewTraceToolDisposition(rawValue: raw)
       else {
         return OverviewCapabilityItemPresentation(
           id: tool, name: tool, state: .unknown,
@@ -307,18 +366,18 @@ private actor OverviewCapabilityProductionProvider: OverviewCapabilityApplicatio
   }
 
   private static func hidumperCapability(
-    from run: DebugLogJobRunResult
+    from run: OverviewWindowInventoryJobResult
   ) -> OverviewCapabilityItemPresentation {
     switch run {
-    case .completed(let terminal)
-      where terminal.state == JobState.succeeded.rawValue && !terminal.outcomeUnknown:
+    case .completed(let jobID, let state, let outcomeUnknown)
+      where state == JobState.succeeded.rawValue && !outcomeUnknown:
       return OverviewCapabilityItemPresentation(
         id: "hidumper", name: "hidumper", state: .available,
-        evidence: "debug.template@1 Job succeeded · \(terminal.jobID)")
-    case .completed(let terminal):
+        evidence: "debug.template@1 Job succeeded · \(jobID)")
+    case .completed(let jobID, let state, _):
       return OverviewCapabilityItemPresentation(
         id: "hidumper", name: "hidumper", state: .unknown,
-        evidence: "debug.template@1 Job \(terminal.state) · \(terminal.jobID)")
+        evidence: "debug.template@1 Job \(state) · \(jobID)")
     case .failed(let failure):
       return OverviewCapabilityItemPresentation(
         id: "hidumper", name: "hidumper", state: .unknown,
