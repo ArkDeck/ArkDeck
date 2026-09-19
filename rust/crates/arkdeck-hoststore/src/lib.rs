@@ -54,6 +54,8 @@ mod capture_documents;
 #[cfg(target_os = "macos")]
 mod cleanup_debt;
 #[cfg(target_os = "macos")]
+pub use cleanup_debt::list_cleanup_debt;
+#[cfg(target_os = "macos")]
 mod device_run;
 #[cfg(target_os = "macos")]
 mod device_steps;

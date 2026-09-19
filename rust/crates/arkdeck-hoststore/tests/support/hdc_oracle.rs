@@ -2,19 +2,20 @@
 //! (`HDCOracleFake`, at the fixed root `support/debug_hap.rs` rebuilds) share
 //! when their Jobs mutate a device under Runtime capabilities: the owners a
 //! daemon composes over that root, the code-sign helper where the oracle
-//! composed one, and the replay of every recorded request before the
-//! oracle's cleanup debt continuations (`cleanupDebt.*`, not served by this
-//! Runtime), each run while the fake answers in the mode the oracle names with
-//! its application state cleared first, as each oracle clears it. What the
-//! replay leaves is Swift's byte for byte, the Jobs whose debts the
-//! continuations settle and the ledger as they stood before them.
+//! composed one, and the replay of every recorded request but the oracle's
+//! cleanup debt continuations (`cleanupDebt.continue`, not served by this
+//! Runtime) and the list that follows them, each run while the fake answers
+//! in the mode the oracle names with its application state cleared first, as
+//! each oracle clears it. What the replay leaves is Swift's byte for byte, the
+//! Jobs whose debts the continuations settle and the ledger as they stood
+//! before them.
 use super::native_library::code_sign_helper;
 use super::{OracleProbe, debug_hap, document, fixed_now, fixed_precise_now};
 use arkdeck_contract::sha256_hex;
 use arkdeck_hoststore::{
     ArtifactReadStore, CapabilityStore, DeviceHolds, HdcComposition, JobAdmitter, JobPlanner,
     JobResultReader, JobRunner, JobStore, MutationAuthority, MutationExecution, SessionPublisher,
-    SessionStore, StorageClaims, TargetStore,
+    SessionStore, StorageClaims, TargetStore, list_cleanup_debt,
 };
 use arkdeck_platform::VerifiedTool;
 use arkdeck_provider_hdc::{CodeSignHelper, HdcDispatch, ProcessDispatch};
@@ -249,9 +250,10 @@ fn before_continuations(path: &str, bytes: Vec<u8>, continued: &[String]) -> Vec
     bytes
 }
 
-/// Every recorded request of the oracle `name` before its cleanup debt
-/// continuations, answered in order by the Rust owners: `exchanges` of them,
-/// each answered as Swift answered it, message included. The fake must have
+/// Every recorded request of the oracle `name` but its cleanup debt
+/// continuations and the lists after them, answered in order by the Rust
+/// owners: `exchanges` of them, each answered as Swift answered it, message
+/// included; the list before them lists the debts its runs owe. The fake must have
 /// received Swift's first `calls` calls, each Job must have consumed its one
 /// use before its first mutation (every later mutation of its run continued
 /// under it), and everything the replay leaves below the root must be
@@ -278,10 +280,11 @@ pub fn assert_replays_before_continuations(
         jobs: &owners.jobs,
         artifacts: &owners.artifacts,
     };
-    let (mut differences, mut replayed) = (Vec::new(), 0);
+    let (mut differences, mut replayed, mut continued_yet) = (Vec::new(), 0, false);
     for exchange in cases["exchanges"].as_array().unwrap() {
         let (name, method) = (&exchange["name"], exchange["method"].as_str().unwrap());
-        if method.starts_with("cleanupDebt.") {
+        continued_yet |= method == "cleanupDebt.continue";
+        if continued_yet && method.starts_with("cleanupDebt.") {
             continue;
         }
         replayed += 1;
@@ -333,6 +336,10 @@ pub fn assert_replays_before_continuations(
                     Err(error) => refused(error.code, error.message, None),
                 }
             }
+            "cleanupDebt.list" => match list_cleanup_debt(&owners.artifacts) {
+                Ok(result) => json!({"ok": true, "result": result}),
+                Err(message) => refused("internalError", message, None),
+            },
             other => panic!("{name}: the oracle sent {other}"),
         };
         if actual != exchange["answer"] {
@@ -345,7 +352,7 @@ pub fn assert_replays_before_continuations(
     assert!(differences.is_empty(), "{}", differences.join("\n"));
     assert_eq!(
         replayed, exchanges,
-        "every exchange before the continuations"
+        "every exchange but the continuations and the lists after them"
     );
 
     // The fake received Swift's calls, in order, up to the continuations.

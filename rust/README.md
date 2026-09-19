@@ -681,10 +681,11 @@ and skipped on the normal path), and the Job fails with its original failure; a
 lane that cannot conclude parks the Job. `job.result` and `job.evidence` read
 these Jobs, their step kinds those the journal proves (Swift
 `durableActualStepKinds`). `tests/debug_hap_run.rs` replays the
-debug-hap oracle up to its debt continuations: every answer, the fake's first
-103 calls, and every file byte for byte (the two continued Jobs and the ledger
-as they stood before them). `cleanupDebt.list`/`continue` and continuing a
-parked or `finalizing` HAP wait for recovery (L.1 item 13).
+debug-hap oracle but its debt continuations and the list after them: every
+answer, the debt list before them included, the fake's first 103 calls, and
+every file byte for byte (the two continued Jobs and the ledger as they stood
+before them). `cleanupDebt.continue` and continuing a parked or `finalizing`
+HAP follow the recovery port (L.1 item 13, ruled 2026-09-19).
 
 `deploy.native-library.app-owned@1` runs as Swift runs it (`device_native.rs`).
 `verify-elf-locally` and `hash-library` verify the leased library on the host
@@ -706,13 +707,22 @@ the Job fails with its original failure. An optional cleanup that fails is
 skipped and owed with the exact action that failed (`recordCleanupDebt`: a
 plain append, not deduplicated), the Job's residue is counted again, and the
 Job succeeds. `job.result` and `job.evidence` read these Jobs.
-`tests/native_library_run.rs` replays the native-library oracle up to its debt
-continuation through `tests/support/hdc_oracle.rs`, which the debug HAP replay
-shares: every answer, the fake's first 210 calls, the four Jobs the continuation
-leaves alone byte for byte and the continued one and the ledger as they stood
-before it; three faulted runs cover a failed rollback, a failed compensation
-cleanup and one whose outcome is lost. The daemon composes no code-sign helper,
-so the isolated daemon lists the operation as unavailable and plans none.
+`tests/native_library_run.rs` replays the native-library oracle but its debt
+continuation and the list after it through `tests/support/hdc_oracle.rs`, which
+the debug HAP replay shares: every answer, the fake's first 210 calls, the four
+Jobs the continuation leaves alone byte for byte and the continued one and the
+ledger as they stood before it; three faulted runs cover a failed rollback, a
+failed compensation cleanup and one whose outcome is lost. The daemon composes
+no code-sign helper, so the isolated daemon lists the operation as unavailable
+and plans none.
+
+`cleanupDebt.list` reads the ledger as Swift's daemon lists it
+(`listCleanupDebt`, `encodeCleanupDebt`): every record not settled, ordered by
+Job, remote path and when it was owed, each with its residue's identity and
+whether a retry of it ever started; a ledger that cannot be read or decoded
+fails the whole list with Swift's store error, and nothing is written. The
+daemon answers it from its Artifact owner. The three device oracles' lists
+before their continuations and the committed corpus are replayed through it.
 
 `rust/tests/fixtures/job-run-analyzer/` is the oracle Swift
 `JobRunAnalyzerOracleContractTests` records with the real descriptor-bound

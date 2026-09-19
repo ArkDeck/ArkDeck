@@ -7,9 +7,8 @@
 //! intent and continued by its cleanup, and the use settled once the Job is
 //! terminal or parked. The composition names the oracle's host receive root,
 //! and its dispatcher reports every child at the oracle's fixed duration, as
-//! Swift's `FixedDurationDispatcher` did. Every exchange but
-//! `cleanupDebt.list` (not served by this Runtime) answers as Swift answered
-//! it, message included:
+//! Swift's `FixedDurationDispatcher` did. Every exchange answers as Swift
+//! answered it, message included:
 //! - three captures (JPEG by default, a scaled PNG run, and one whose second
 //!   still fails, which is a gap and not a failure) each receive their
 //!   archive, publish it as `frames.tar` from the landed file, remove the
@@ -18,7 +17,7 @@
 //!   consumed;
 //! - an empty archive fails at the capture and a cleanup that leaves the frame
 //!   directory fails after `frames.tar` is published, neither with a debt or
-//!   a compensation, as Swift's;
+//!   a compensation, as Swift's, so `cleanupDebt.list` lists nothing;
 //! - an archive the readback cannot find parks its Job with its intent
 //!   outstanding, and its unknown use refuses `afterUnknown`;
 //! - a lone scaled dimension and a single frame are refused at planning.
@@ -37,7 +36,7 @@ use arkdeck_contract::sha256_hex;
 use arkdeck_hoststore::{
     ArtifactReadStore, CapabilityStore, DeviceHolds, HdcComposition, JobAdmitter, JobPlanner,
     JobResultReader, JobRunner, JobStore, MutationAuthority, MutationExecution, SessionPublisher,
-    SessionStore, StorageClaims, TargetStore,
+    SessionStore, StorageClaims, TargetStore, list_cleanup_debt,
 };
 use arkdeck_platform::VerifiedTool;
 use arkdeck_provider_hdc::{DispatchFailure, HdcDispatch, ProcessDispatch, ProcessPlan, Receipt};
@@ -273,12 +272,6 @@ fn rust_captures_every_swift_screen_sequence_as_swift_does() {
     let (mut differences, mut replayed) = (Vec::new(), 0);
     for exchange in cases["exchanges"].as_array().unwrap() {
         let (name, method) = (&exchange["name"], exchange["method"].as_str().unwrap());
-        // Not served by this Runtime: its one fact here, that nothing is
-        // owed, is the ledger's absence, checked below.
-        if method == "cleanupDebt.list" {
-            assert_eq!(exchange["answer"], json!({"ok": true, "result": []}));
-            continue;
-        }
         replayed += 1;
         let params = exchange["params"].as_object().unwrap();
         let actual = match method {
@@ -328,6 +321,10 @@ fn rust_captures_every_swift_screen_sequence_as_swift_does() {
                     Err(error) => refused(error.code, error.message, None),
                 }
             }
+            "cleanupDebt.list" => match list_cleanup_debt(&owners.artifacts) {
+                Ok(result) => json!({"ok": true, "result": result}),
+                Err(message) => refused("internalError", message, None),
+            },
             other => panic!("{name}: the oracle sent {other}"),
         };
         if actual != exchange["answer"] {
@@ -338,7 +335,7 @@ fn rust_captures_every_swift_screen_sequence_as_swift_does() {
         }
     }
     assert!(differences.is_empty(), "{}", differences.join("\n"));
-    assert!(replayed >= 50, "{replayed} exchanges replayed");
+    assert!(replayed >= 51, "{replayed} exchanges replayed");
 
     // The fake received Swift's calls, in order.
     let swift = fs::read_to_string(fixture.join("hdc-invocations.log")).unwrap();

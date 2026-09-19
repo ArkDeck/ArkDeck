@@ -3,9 +3,10 @@
 //! `NativeLibraryOracleContractTests` over the shared fake HDC) through the
 //! production Rust planner, admitter, runner, result reader and capability
 //! reads, under the durable mutation authority the pointer, port-rule and
-//! debug HAP replays run under, up to its cleanup debt continuation
-//! (`cleanupDebt.*`, not served by this Runtime). Every exchange before it
-//! answers as Swift answered it, message included:
+//! debug HAP replays run under, and its cleanup debt list, up to its cleanup
+//! debt continuation (`cleanupDebt.continue`, not served by this Runtime).
+//! Every exchange but it and the list after it answers as Swift answered it,
+//! message included:
 //! - the deployments. The library is verified on the host, sent into the
 //!   Job's owned staging with the code-sign helper and believed only through
 //!   its staging readback, backed up, published by the helper with its
@@ -18,7 +19,7 @@
 //!   fails with its original failure;
 //! - the debt. A cleanup that removes nothing is skipped and owed in the
 //!   cleanup debt ledger with the exact action that failed, and its Job
-//!   succeeds with the residue counted.
+//!   succeeds with the residue counted; `cleanupDebt.list` lists it.
 //!
 //! Each Job consumes its one capability use before its send, every later
 //! mutation and the compensations run under it, and it is settled with the
@@ -51,10 +52,10 @@ use support::hdc_oracle::{self, Owners, exchange};
 const CALLS: usize = 210;
 /// The run whose debt the continuation settles.
 const CONTINUED: [&str; 1] = ["cleanupFailure"];
-/// Every exchange before the continuation: nine plans, five submissions, five
-/// runs and a refused rerun, the three reads of each Job, and the two
-/// capability reads.
-const EXCHANGES: usize = 37;
+/// Every exchange but the continuation and the list after it: nine plans,
+/// five submissions, five runs and a refused rerun, the three reads of each
+/// Job, the list of the debt, and the two capability reads.
+const EXCHANGES: usize = 38;
 
 #[test]
 fn rust_runs_every_swift_native_library_deployment_as_swift_does() {

@@ -178,8 +178,21 @@ Before #2015, two full local gates ran, serialized behind the shared gate lock:
 
 ## CI
 
-The PR's checks (`guard` and the `swift` aggregate with the rust lane) are the gate; their run id and
-conclusion are reported with the PR.
+PR #2027, head `a1f05ac7`, all green. It merged on 2026-09-19 as `33847c4e`.
+
+| Check | Run | Conclusion |
+| --- | --- | --- |
+| SDD Guard `guard` | 35445019354 | success |
+| Swift CI `plan` | 35445019465 | success |
+| Rust host-independent checks | 35445019465 | success |
+| Rust workspace, `ubuntu-latest` | 35445019465 | success |
+| Rust workspace, `macos-26` | 35445019465 | success |
+| Rust workspace, `windows-latest` | 35445019465 | success |
+| `swift` aggregate | 35445019465 | success |
+
+`swift-tests`, `app-build` and `ds-interactions` were not selected for this diff and were skipped.
+These rows were added by the `cleanupDebt.list` slice, since the PR merged as soon as it was
+green.
 
 ## Not run
 
