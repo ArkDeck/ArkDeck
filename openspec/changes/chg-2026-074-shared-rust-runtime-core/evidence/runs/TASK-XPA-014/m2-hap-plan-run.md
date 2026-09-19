@@ -41,3 +41,35 @@ Implementation reference: the current Swift RuntimeJobEngine materialization
 and `RuntimeDebugHAPFailureFinalization`, plus the already ported HAP Provider.
 Historical unpublished `cfffc029` was consulted for equivalent journal argument
 shapes; its admission and capability changes were not imported.
+
+## Additional unrun boundary tests
+
+The native Swift producer now contains two additional plan-only cases: all
+optional defaults omitted, and a package set with `cleanupPolicy=retain` plus
+`postRunAbilityState=running`. The latter still binds failure-only stop/staging
+compensations while its successful path omits stop and uninstall. The Rust replay
+expects all 15 native exchanges (10 positive); the committed 13-case fixture is
+intentionally unchanged until actual recording. This intermediate checkpoint
+therefore requires recording before its oracle replay can pass. No expected
+digest has been authored manually.
+
+The Import hold test now also independently varies the additional package's
+Target, binding revision and stable identity. Each is a valid isolated Import
+for its own fixture binding, then refused against the requested HAP Target.
+The tests require the additional-lease binding error, both holds present while
+paused, release conflicts for both, and both holds cleared/releasable afterward.
+Existing bounded channels and unwind release protection cover all five cases.
+
+Minimal pending native sampling command, from the repository root (destination
+must not exist):
+
+```sh
+ARKDECK_RUST_DEBUG_HAP_RECORD=/private/tmp/arkdeck-hap-plan-native-20260919 \
+  sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --jobs 2 \
+  --filter DebugHapOracleContractTests/testSwiftDebugsAHapOnTheSharedFakeDevice
+```
+
+This command has not been run. It uses the existing isolated fake-device oracle,
+never a device, and produces no GJ evidence. Copying verified native outputs and
+checking their producer provenance, then targeted tests and full gate, remain
+pending. Static `cargo fmt` and `git diff --check` passed for this addition.

@@ -50,6 +50,8 @@ final class DebugHapOracleContractTests: XCTestCase {
     var bundleName = "com.example.demo"
     /// Whether the feature package rides along as an additional lease.
     var packageSet = false
+    var omittedDefaults = false
+    var retainRunning = false
   }
 
   private static let cases: [Case] = [
@@ -68,6 +70,10 @@ final class DebugHapOracleContractTests: XCTestCase {
       name: "unknownLease",
       lease: "lease-v1:job-input-hap:ART-00000000000000000000000000000000"),
     Case(name: "badBundleName", bundleName: "demo"),
+    // Plan-only: the digest must include the failure-only compensations even
+    // when the success path retains the installation and running ability.
+    Case(name: "omittedDefaults", omittedDefaults: true),
+    Case(name: "retainRunning", packageSet: true, retainRunning: true),
   ]
 
   private static let repository: URL = {
@@ -189,6 +195,16 @@ final class DebugHapOracleContractTests: XCTestCase {
       "captureDiagnostics": .bool(true),
       "diagnosticsDurationSeconds": .integer(10),
     ]
+    if item.omittedDefaults {
+      for key in ["installPolicy", "cleanupPolicy", "postRunAbilityState",
+                  "captureDiagnostics", "diagnosticsDurationSeconds"] {
+        inputs.removeValue(forKey: key)
+      }
+    }
+    if item.retainRunning {
+      inputs["cleanupPolicy"] = .string("retain")
+      inputs["postRunAbilityState"] = .string("running")
+    }
     if item.packageSet {
       inputs["additionalHapArtifactLeases"] = .array([.string(feature)])
     }

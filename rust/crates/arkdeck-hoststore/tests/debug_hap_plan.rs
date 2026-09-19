@@ -190,7 +190,7 @@ fn native_swift_plans_match_but_hap_admission_remains_closed() {
         );
         assert_eq!(tree_bytes(&root.join("jobs-state")), before, "{name}");
     }
-    assert_eq!((count, positive), (13, 8));
+    assert_eq!((count, positive), (15, 10));
     assert!(
         fs::read(root.join("hdc-invocations.log"))
             .unwrap()
@@ -244,7 +244,8 @@ fn entry_and_additional_imports_are_held_until_success_or_preflight_refusal() {
         .unwrap();
     let original: serde_json::Value =
         serde_json::from_str(valid["params"]["requestJson"].as_str().unwrap()).unwrap();
-    for should_succeed in [true, false] {
+    for scenario in ["success", "duplicate", "target", "revision", "identity"] {
+        let should_succeed = scenario == "success";
         let root = rebuild(&fixture);
         let targets = TargetStore::open(&root.join("targets-state")).unwrap();
         let artifacts = ArtifactReadStore::open(&root.join("artifacts")).unwrap();
@@ -276,26 +277,40 @@ fn entry_and_additional_imports_are_held_until_success_or_preflight_refusal() {
         .unwrap();
         let target =
             support::document(&fixture.join("targets-state"), "targets.json")["targets"][0].clone();
-        let binding = |intent: &ImportIntent| -> Result<ImportBinding, WireError> {
-            Ok(ImportBinding {
-                target_id: intent.target_id.clone(),
-                binding_revision: target["bindingRevision"].as_u64(),
-                stable_identity_sha256: Some(
-                    target["stablePhysicalIdentitySHA256"]
-                        .as_str()
-                        .unwrap()
-                        .into(),
-                ),
-            })
-        };
         let now = fixed_now().unwrap();
         let mut receipts = Vec::new();
         for name in ["entry", "additional"] {
+            let mismatch = name == "additional";
+            let target_id = if mismatch && scenario == "target" {
+                "TGT-fixture-other"
+            } else {
+                target["targetID"].as_str().unwrap()
+            };
+            let revision = if mismatch && scenario == "revision" {
+                2
+            } else {
+                1
+            };
+            let identity = if mismatch && scenario == "identity" {
+                "b".repeat(64)
+            } else {
+                target["stablePhysicalIdentitySHA256"]
+                    .as_str()
+                    .unwrap()
+                    .into()
+            };
+            let binding = |intent: &ImportIntent| -> Result<ImportBinding, WireError> {
+                Ok(ImportBinding {
+                    target_id: intent.target_id.clone(),
+                    binding_revision: Some(revision),
+                    stable_identity_sha256: Some(identity.clone()),
+                })
+            };
             // Deliberate structural HAP fixture, not a signed application or hardware evidence.
             let bytes = format!("PK\u{3}\u{4}isolated-{name}").into_bytes();
             let begin = imports.handle_resource("artifact.import.begin", json!({
                 "schemaVersion": "arkdeck.import-intent/1", "importRequestId": format!("hap-hold-{name}"),
-                "kind": "hap", "targetId": target["targetID"], "bindingRevision": "1", "deviceProfile": null,
+                "kind": "hap", "targetId": target_id, "bindingRevision": revision.to_string(), "deviceProfile": null,
                 "name": format!("{name}.hap"), "byteCount": bytes.len().to_string(), "sha256": sha256_hex(&bytes)
             }).as_object().unwrap(), &now, false, binding).unwrap();
             let id = begin["importId"].as_str().unwrap();
@@ -320,10 +335,10 @@ fn entry_and_additional_imports_are_held_until_success_or_preflight_refusal() {
         let mut request = original.clone();
         request["inputs"]["hapArtifactLease"] = receipts[0]["receipt"]["lease"].clone();
         let additional = receipts[1]["receipt"]["lease"].clone();
-        request["inputs"]["additionalHapArtifactLeases"] = if should_succeed {
-            json!([additional])
-        } else {
+        request["inputs"]["additionalHapArtifactLeases"] = if scenario == "duplicate" {
             json!([additional.clone(), additional])
+        } else {
+            json!([additional])
         };
         let request = serde_json::to_vec(&request).unwrap();
         let lifecycle = |verb: &str, fields: serde_json::Value| {
@@ -362,7 +377,19 @@ fn entry_and_additional_imports_are_held_until_success_or_preflight_refusal() {
             }
             drop(guard);
             let result = worker.join().unwrap();
-            assert_eq!(result.is_ok(), should_succeed, "{result:?}");
+            assert_eq!(result.is_ok(), should_succeed, "{scenario}: {result:?}");
+            if matches!(scenario, "target" | "revision" | "identity") {
+                let refused = result.unwrap_err();
+                assert_eq!(refused.code, "invalidInput");
+                assert!(
+                    refused
+                        .message
+                        .starts_with("additional HAP Artifact lease is not resolvable:")
+                );
+                assert!(refused.message.contains(
+                    "Artifact lease target/binding/identity does not match the materialized request"
+                ));
+            }
         });
         for receipt in &receipts {
             let id = &receipt["importId"];
