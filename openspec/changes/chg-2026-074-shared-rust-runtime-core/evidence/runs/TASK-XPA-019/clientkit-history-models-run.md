@@ -90,3 +90,42 @@ setting, so Swift compilation had no explicit jobs limit. The earlier focused
 recording/tests did explicitly use `--jobs 2`. The next full attempt must enforce
 an explicit Swift compiler job limit through the shared-lock runner. No timing
 assertion is changed to accommodate host pressure.
+
+## Complete unified validation after History extraction
+
+Integrated protected main `94b2896609c549177fa052512aa2b800dfc4e25e`
+without conflicts. The validated source is
+`c0ba7fc1207fc9112349b7bbb0369f6dc79cf9b3`. Both generated drift checks
+passed with 105 methods and 737 recorded shapes.
+
+The complete repository entry exited 0:
+
+```sh
+ARKDECK_PYTHON=/private/tmp/arkdeck-validation-venv/bin/python \
+ARKDECK_SWIFT_EXECUTABLE=/private/tmp/arkdeck-swift-jobs2.sh \
+CARGO_BUILD_JOBS=2 RUST_TEST_THREADS=2 ARKDECK_TEST_WORKERS=2 ARKDECK_XCODE_JOBS=2 \
+/private/tmp/arkdeck-validation-venv/bin/python scripts/ci/plan.py \
+  --repo-root . --base-revision origin/main --head-revision HEAD \
+  --merge-base --include-worktree --run-local
+```
+
+The local Swift executable wrapper (SHA-256
+`a50ddb92710750ab1970ba0c82988f6745c299e6b7c6df59bcfecb03976d5723`)
+only execs the real Xcode Swift with `--jobs 2` for build/test. Repository
+locking, cache paths, warnings-as-errors, complete tests and exit status remain
+unchanged. Actual SwiftPM argv contained `--jobs 2` and `--num-workers 2`.
+Xcode received `-jobs 2`, limiting build tasks; this does not claim all internal
+SwiftDriver threads were restricted to two.
+
+Common/design-system checks, 2,690 parallel Swift tests and the runner's serial
+sets, App build-for-testing, Rust workspace/strict Clippy, contract-check tests,
+both published/candidate views, cargo deny and cargo vet (36 fully audited)
+passed. The unchanged output-overflow process time bound passed in both views.
+The earlier failed attempt above remains part of the record; this rerun does
+not establish its cause or relax its assertion.
+
+Log: `/private/tmp/arkdeck-clientkit-models-unified-jobs2-20260919.log`.
+SHA-256: `53e829e11d49e4338daa0b79a1151643ba75ebdce3b0097c0ec21c78adbf843b`.
+Retained provenance: `rust/target/readonly-check/01388b861f0e4fbc964fd611b57ba3c7`.
+Signed standalone Rust App acceptance, installed activation, hardware journeys
+and SPK-8 completion are not claimed.
