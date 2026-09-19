@@ -99,6 +99,9 @@ JobControl 仍受 daemon 的 typed App job ownership gate 约束，不增加取�
 此提取不代表所有 App façade 已脱钩或 Swift Runtime 已退役。
 Trace cache 维护的 App 侧模型、XPC provider 与应答解码也在 ClientKit；守护进程侧的
 `RuntimeTraceCacheMaintaining` 协议留在 Workflows，`AgentDaemonMain` 组合它的实现，因此也 import ClientKit。
+Overview 能力矩阵的展示模型、在线目标投影、读请求与应答解码也在 ClientKit；证明 hidumper 行的只读
+`debug.template@1` 窗口清单 Job 仍由 Workflows 的 `DebugWindowInventoryJobRunner` 按 Debug 工作区的 typed 请求提交，
+ClientKit 只声明 `OverviewWindowInventoryJobRunning`，由 App 组合，不新增依赖边。
 
 ## 3. Ownership Rules(事实源唯一)
 
