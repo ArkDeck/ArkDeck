@@ -66,8 +66,17 @@ the two bases, and no Swift file changed between them. The full local unified ga
 
 ## CI
 
-Recorded by the next slice, because a green head is merged without an amend. The AutoUpdate
-slice's CI (#2054) is recorded in its own run record by this commit.
+PR #2057. On head `0cbb6b3e` (base `6592bcce`) every check passed:
+
+| Workflow run | Jobs | Conclusion |
+| --- | --- | --- |
+| Swift CI `35451498876` | `plan`, `swift-tests`, `app-build`, `ds-interactions` and the required `swift` aggregate; `rust-checks` skipped, as the plan selected no Rust lane | success |
+| SDD Guard `35451498564` | the required `guard`, `ds-tokens` | success |
+| Agent PR `35451498649` | `open-pr` | success |
+
+A green head is merged without an amend, so the workspace continuation slice records this
+section. This slice's commit recorded the AutoUpdate slice's CI (#2054) in that slice's own run
+record.
 
 ## Not run
 

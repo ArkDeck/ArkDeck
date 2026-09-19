@@ -59,8 +59,21 @@ the changed crate's fmt, clippy and tests, and the failing Swift test. The PR's 
 | Check | Command | Result |
 | --- | --- | --- |
 | Rust, the changed crate | `cargo fmt --all --check`, `cargo test -p arkdeck-hoststore`, `cargo clippy -p arkdeck-hoststore --all-targets -- -D warnings` (in `rust/`, with this worktree's own `rust/target`) | exit 0, all three. 50 test binaries: 423 passed, 0 failed, 13 ignored. `tests/job_plan.rs` (3 passed) replays the edited oracle against the Rust planner with the edited string. Log `/private/tmp/claude-501/-Users-fuhanfeng-Dropbox-Code-Github-ArkDeck--claude-worktrees-blissful-goldstine-c7d922/26822f74-e8f8-4647-9226-2234ed41e115/scratchpad/logs/msgfix-rust-r1.log`, SHA-256 `a702dc308c2224cc061221ce6f7b7c4f3445c084081d83f4306886e2fe6b3b20` |
-| Swift, the failing test | `sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --filter 'JobPlanAnalyzerOracleContractTests'` | Still waiting for the shared build lock when this was pushed, because main was failing for every PR and the fix went out first. The PR's `swift-tests` job runs the same test. The next slice records the local result. Log `/private/tmp/claude-501/-Users-fuhanfeng-Dropbox-Code-Github-ArkDeck--claude-worktrees-blissful-goldstine-c7d922/26822f74-e8f8-4647-9226-2234ed41e115/scratchpad/logs/msgfix-swift-r1.log` |
+| Swift, the failing test | `sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --filter 'JobPlanAnalyzerOracleContractTests'` | It was still waiting for the shared build lock when this was pushed, because main was failing for every PR and the fix went out first. It then passed, on the same tree as the pushed head: exit 0, `testSwiftPlansTheSharedAnalyzerOracle` passed in 0.208s, so Swift's answers match the edited oracle byte for byte. The workspace continuation slice records this, as the coordination session asked. Log `/private/tmp/claude-501/-Users-fuhanfeng-Dropbox-Code-Github-ArkDeck--claude-worktrees-blissful-goldstine-c7d922/26822f74-e8f8-4647-9226-2234ed41e115/scratchpad/logs/msgfix-swift-r1.log`, SHA-256 `0b6ecb69075db06aa8b19fc6dd8d48ec95952a26f2474902457c6ebfa01ecceb` |
 
 ## CI
 
-Recorded by the next slice, because a green head is merged without an amend.
+PR #2062, merged as `30a0c85f`. On head `ebc96cea` (base `c3870c3d`) every selected check passed:
+
+| Workflow run | Jobs | Conclusion |
+| --- | --- | --- |
+| Swift CI `35453090738` | `plan` and the required `swift` aggregate; `rust-checks` ran its four jobs — host-independent checks, and the workspace on macos-26, ubuntu-latest and windows-latest | success |
+| SDD Guard `35453090602` | the required `guard`, `ds-tokens` | success |
+| Agent PR `35453090577` | `open-pr` | success |
+
+`swift-tests`, `app-build` and `ds-interactions` were skipped: the planner selects the Swift lane from
+changed paths, and this PR changed only Rust sources, `rust/tests/fixtures` and openspec records. So
+CI did not run the failing test, and the local run above is the only check of the Swift side before
+the merge. The coordination session filed that planner gap as its own slice under TASK-XPA-002:
+a change under `rust/tests/fixtures/` should select the Swift lane, because 29 Swift test files read
+those fixtures.
