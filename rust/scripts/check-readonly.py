@@ -336,6 +336,12 @@ def main() -> None:
                     # status as Swift's daemon without its HDC host does.
                     if method == "runtime.hdc.status" and platform.system() == "Darwin":
                         expected = None
+                    # Keeping no state, it composes no control-action owner either: it answers as
+                    # Swift's handler without one, which wants an exact identity for show and reconcile.
+                    if method in {"runtime.hdc.impact-preview", "runtime.hdc.restart", "control-action.list"} and platform.system() == "Darwin":
+                        expected = "operationUnavailable"
+                    if method in {"control-action.show", "control-action.reconcile"} and platform.system() == "Darwin":
+                        expected = "invalidInput"
                     if method in {"target.list", "target.show", "target.display-name.set", "target.display-name.clear", "device.display-name.set", "device.display-name.clear"}:
                         expected = "internalError"
                     if method in {"workspace.project.register", "workspace.project.show"}:

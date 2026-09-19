@@ -217,6 +217,96 @@ fn workspace_project_parameters_are_checked_before_owner_availability() {
     assert_eq!(reads.load(Ordering::SeqCst), 0);
 }
 
+/// Swift's `hdcControlActionRequest` reads these five methods' parameters
+/// itself, so the control layer hands each request to the host's
+/// control-action service unread, and no other method reaches it. The host's
+/// answer then passes the method's schema like any other.
+#[test]
+fn the_control_action_methods_reach_their_host_service_unread() {
+    const ROUTED: [&str; 5] = [
+        "control-action.list",
+        "control-action.reconcile",
+        "control-action.show",
+        "runtime.hdc.impact-preview",
+        "runtime.hdc.restart",
+    ];
+    struct ControlActionHost {
+        asked: Arc<std::sync::Mutex<Vec<(String, Value)>>>,
+    }
+    impl HostServices for ControlActionHost {
+        fn observed_at(&self) -> String {
+            "2026-09-19T00:00:00Z".into()
+        }
+        fn hdc_status(&self, deep: bool) -> HdcStatus {
+            HdcStatus::unavailable(deep, "hdc.notConfigured")
+        }
+        fn observations(&self) -> Result<DeviceObservationsResult, WireError> {
+            Err(WireError {
+                code: "rejected".into(),
+                message: "device observations are not served here".into(),
+                details: None,
+            })
+        }
+        fn control_action(
+            &self,
+            method: &str,
+            params: &serde_json::Map<String, Value>,
+        ) -> Result<Value, WireError> {
+            self.asked
+                .lock()
+                .unwrap()
+                .push((method.into(), Value::Object(params.clone())));
+            Err(WireError {
+                code: "operationUnavailable".into(),
+                message: "the Runtime HDC control-action owner is unavailable".into(),
+                details: Some(serde_json::Map::from_iter([(
+                    "newDispatchCount".into(),
+                    json!(0),
+                )])),
+            })
+        }
+    }
+    let asked = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let control = Control::new(ControlActionHost {
+        asked: Arc::clone(&asked),
+    })
+    .unwrap();
+    for method in METHODS {
+        let _ = call(&control, method, json!({}));
+    }
+    let mut routed: Vec<_> = asked
+        .lock()
+        .unwrap()
+        .drain(..)
+        .map(|(method, _)| method)
+        .collect();
+    routed.sort();
+    assert_eq!(routed, ROUTED);
+    for method in ROUTED {
+        let params = json!({"controlAction":"control action/1", "pageSize":0, "extra":[1]});
+        let error = call(&control, method, params.clone()).outcome.unwrap_err();
+        assert_eq!(
+            asked.lock().unwrap().pop(),
+            Some((method.to_owned(), params)),
+            "{method}"
+        );
+        // Show and reconcile do not publish it: the schema check rewrites it.
+        let published =
+            validate_method_value(method, "errorCode", &json!("operationUnavailable")).is_ok();
+        assert_eq!(
+            published,
+            !matches!(method, "control-action.show" | "control-action.reconcile"),
+            "{method}"
+        );
+        let expected = if published {
+            "operationUnavailable"
+        } else {
+            "internalError"
+        };
+        assert_eq!(error.code, expected, "{method}");
+    }
+}
+
 #[test]
 fn target_availability_requires_identity_and_an_owner_without_observing_devices() {
     let (control, reads) = setup();

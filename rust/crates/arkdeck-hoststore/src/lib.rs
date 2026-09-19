@@ -60,6 +60,10 @@ mod human_action;
 #[cfg(target_os = "macos")]
 pub use human_action::HumanActionResources;
 #[cfg(target_os = "macos")]
+mod control_action;
+#[cfg(target_os = "macos")]
+pub use control_action::{ControlActionResources, control_action_without_owner};
+#[cfg(target_os = "macos")]
 mod analyzer_output;
 #[cfg(target_os = "macos")]
 mod artifact_publication;

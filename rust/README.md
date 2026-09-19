@@ -1283,6 +1283,23 @@ refusal. `hdc_status_control.rs` in agentd sends every oracle case through
 answer is the oracle's snapshot byte for byte. Composing the observer over a
 managed HDC server that the daemon starts is next.
 
+`runtime.hdc.impact-preview`, `runtime.hdc.restart` and `control-action.list`,
+`.show` and `.reconcile` reach `HostServices::control_action` unread, since
+Swift's `hdcControlActionRequest` reads its own parameters; a host without it
+keeps the foundation's refusal. Without a managed HDC server the macOS host
+answers them as Swift's daemon does (`arkdeck_hoststore::ControlActionResources`):
+the lifecycle methods are `operationUnavailable` before any parameter is read.
+The isolated owner composes Swift's union control-action owner over no HDC and
+no tool-selection owner, paging in `control-action-snapshots` (it never makes
+`hdc-control-actions`): an exact identity is `resourceNotFound`, and a listing
+is one empty snapshot page kept as Swift's pager keeps it. A daemon outside an
+isolated root keeps no state and answers as Swift's handler with no owner at
+all, except that show and reconcile of an exact identity keep the foundation's
+refusal, since their schemas do not publish Swift's `operationUnavailable`.
+`control_action_control.rs` in agentd replays every no-host exchange of the
+corpora through `Control`. Previews, restarts, records and their recovery need
+the managed server.
+
 ## Capture file legs (TASK-XPA-016, M1)
 
 `arkdeck_provider_hdc::FileAction` is Swift's HDC provider for the legs of
