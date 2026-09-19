@@ -111,8 +111,15 @@ and `arkdeck-agentd`'s `artifact_retention_process`, 2 passed (`6e5f2d7d…`).
 
 ## CI
 
-The PR's CI (`guard` + `swift`) is the unified gate; its run ids and conclusion are recorded by the
-next slice or a documentation follow-up.
+The PR's CI (`guard` + `swift`) is the unified gate. #2059, head `af06e1b3`, merged as `c3870c3d`:
+
+| Workflow | Run | Conclusion |
+| --- | --- | --- |
+| SDD Guard (`guard`, `ds-tokens`) | 35452264687 | success |
+| Swift CI (`swift`) | 35452264858 | success: `plan`, Rust host-independent checks, and the Rust workspace on macOS 26, Ubuntu and Windows; the Swift, design-system and App lanes skipped by the planner |
+
+The macOS Rust workspace job finished after the merge, green. Recorded by the next slice,
+TASK-XPA-014's `fixture-deadlines-run.md`.
 
 ## Not run
 

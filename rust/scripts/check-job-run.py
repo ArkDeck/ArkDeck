@@ -53,8 +53,10 @@ from __future__ import annotations
 import argparse
 import collections
 import contextlib
+import datetime
 import fcntl
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -71,6 +73,10 @@ import time
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = ROOT / 'rust/tests/fixtures/job-run-analyzer'
 SOURCES = ('job-oracle-source', 'job-oracle-source-removed')
+_deadlines_spec = importlib.util.spec_from_file_location(
+    'fixture_deadlines', Path(__file__).with_name('fixture-deadlines.py'))
+fixture_deadlines = importlib.util.module_from_spec(_deadlines_spec)
+_deadlines_spec.loader.exec_module(fixture_deadlines)
 TIME = re.compile(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z')
 # A `hold` source answers only once released, and both daemons compose the 30 s
 # production budget; the timeout lane runs in the oracle replay instead, at 2 s.
@@ -176,9 +182,10 @@ def unreleased_hold():
         os.close(descriptor)
 
 
-def seed(state: Path, analyzer: Path, cases: list[dict]) -> None:
-    """The oracle's sources as Swift published them before any run, the one
-    a case later removes rebuilt from its mode."""
+def seed(state: Path, analyzer: Path, cases: list[dict], moved_by: datetime.timedelta) -> None:
+    """The oracle's sources as Swift published them before any run, their
+    deadlines moved `moved_by`, the one a case later removes rebuilt from its
+    mode."""
     state.mkdir(mode=0o700)
     artifacts = state / 'artifacts'
     artifacts.mkdir(mode=0o700)
@@ -186,7 +193,7 @@ def seed(state: Path, analyzer: Path, cases: list[dict]) -> None:
         destination = artifacts / job
         destination.mkdir(mode=0o700)
         for source in sorted((FIXTURE / 'artifacts' / job).iterdir()):
-            shutil.copyfile(source, destination / source.name)
+            fixture_deadlines.copy(source, destination / source.name, moved_by)
             (destination / source.name).chmod(0o600 if source.name == 'index.json' else 0o400)
     for case in cases:
         if 'removesSourcePayload' in case:
@@ -270,6 +277,8 @@ def main() -> None:
     tools = ROOT / 'rust/target' / f'job-run-harness-{os.getpid()}'
     shutil.rmtree(tools, ignore_errors=True)
     tools.mkdir(mode=0o700, parents=True)
+    moved_by = fixture_deadlines.shift(sorted(FIXTURE / 'artifacts' / job / 'index.json' for job in SOURCES))
+
     with tempfile.TemporaryDirectory(prefix='xpa014-job-run-', dir='/private/tmp') as temporary:
         base = Path(temporary).resolve()
         state, home, analyzer = base / 'state', base / 'home', tools.resolve() / 'analyzer'
@@ -403,7 +412,7 @@ def main() -> None:
         try:
             # Phase A: the standalone Swift daemon runs over the oracle's
             # sources and publishes its Sessions beside its state directory.
-            seed(state, analyzer, cases)
+            seed(state, analyzer, cases, moved_by)
             swift_socket = state / 'agentd.sock'
             swift = start([str(swift_daemon), '--state-dir', str(state)], clean, swift_socket)
             swift_answers, swift_reads, swift_cli_runs, _ = drive(
@@ -417,7 +426,7 @@ def main() -> None:
 
             # Phase B: the isolated Rust owner runs over a fresh copy at the same
             # path and publishes its Sessions inside its root.
-            seed(state, analyzer, cases)
+            seed(state, analyzer, cases, moved_by)
             rust_socket = state / 'control.sock'
             rust_env = dict(clean, ARKDECK_DEVELOPMENT_STATE_ROOT=str(state), ARKDECK_ENDPOINT=str(rust_socket))
             rust = start([str(rust_daemon)], rust_env, rust_socket)
@@ -565,7 +574,7 @@ def main() -> None:
                 'analyzerSHA256': sha256(analyzer),
                 'rustDaemonSHA256': sha256(rust_daemon), 'rustCliSHA256': sha256(rust_cli),
                 'swiftDaemonSHA256': sha256(swift_daemon), 'swiftCliSHA256': sha256(swift_cli),
-                'deviceDispatchCount': 0,
+                'recordedDeadlinesMovedDays': moved_by.days, 'deviceDispatchCount': 0,
             }
         finally:
             for child in children:
