@@ -209,14 +209,14 @@
       "successes": 2
     },
     "history.filter.delete": {
-      "errors": 2,
-      "requests": 3,
+      "errors": 3,
+      "requests": 4,
       "successes": 1
     },
     "history.filter.list": {
       "errors": 2,
-      "requests": 5,
-      "successes": 3
+      "requests": 6,
+      "successes": 4
     },
     "history.filter.save": {
       "errors": 2,
@@ -530,16 +530,16 @@
     }
   },
   "corpusRecordCounts": {
-    "errors": 330,
-    "requests": 746,
-    "successes": 416
+    "errors": 331,
+    "requests": 748,
+    "successes": 417
   },
   "directoryDigests": {
     "Catalog/operations": "16671abf96551e9d5b9c3382fe4eb08f3fcd150cff68e7419634cd10ecda4bfd",
     "Catalog/profiles": "58ca1d970d40019ba2718646fde81fefda22533c5448e620217582e30f5d648f",
-    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "83edd478d620d0d29bbe925e118626375bca368adb132e9d9da1c3557badaee6",
+    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "05d9c0afeaef3c82abda35f9166425360491ce3b4ba2cb713015686138f5799e",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC": "9ae93642e7b81bcea918469216711d7f6a17135a29cf021556ceef0f2f789196",
-    "spec/control/methods": "f14346817f8d9afc5c6bc32fbc2ea82be6ed51191f45cad5eadcee3a6388027b"
+    "spec/control/methods": "2c486e6a8ac24a7e2b3aa091f3883502a23a93e45048d0d183841908eddfe312"
   },
   "files": {
     "Catalog/generated/effect-authorization-matrix.md": {
@@ -879,12 +879,12 @@
       "sha256": "9d6f8c4c5cb0f3f787c2761a638039b25c4af1c4b502d59ebf19c80d34abdffa"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/history.filter.delete.jsonl": {
-      "blob": "f66d50d734bf1e47515180c75e0a24cae0b383d4",
-      "sha256": "bc22086af74139f8560747c3f9429a5f25930e16cde9fa804aa05d7296ebe0a9"
+      "blob": "be6601cbc978c6f9dd2606af26d77be30119bc19",
+      "sha256": "006b5e9a6a4c76e07da88f650cdfea71e9cf38de2a74f7ba84716aeefbe12224"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/history.filter.list.jsonl": {
-      "blob": "4b2331635ead74515a78aa6b1547d3ec29d2cd9e",
-      "sha256": "23711b59e2549f8d8e33a26bab87b83a304ab8bab2fd671c2f232982776d75a5"
+      "blob": "04bdba9d92fe9e10959d10a03b3298088782c7d3",
+      "sha256": "3d5007143ef16b2e3bdc3089a1bf8f1da448e2753f5d54d6503e7639b143a9fe"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/history.filter.save.jsonl": {
       "blob": "d5cd8ed1f30868df747574e5f2f2b62ca768a5a3",
@@ -1475,16 +1475,16 @@
       "sha256": "14cd766f97d05b74ee1798a1cecb7620a079c927c9d51b5f30b1644000ed34ee"
     },
     "spec/control/methods/history.filter.delete.json": {
-      "blob": "8801aa6f3431981e11b83840309686f19ac8e41f",
-      "sha256": "170a9e28b1014a4afb2d1fac2af3dd979b9971beb03df807298164093073193f"
+      "blob": "0c9c3dda977e11c3c6a433084e4f07d3a10b0903",
+      "sha256": "6872ffeb7c3015ddef55ee1cbad97fa69542960cfed4a66c3fa1b3cee989f5ae"
     },
     "spec/control/methods/history.filter.list.json": {
-      "blob": "226d1f39d86bed226a284ac80d90136116f5b1a7",
-      "sha256": "c1d1f9e8c1e02bc796d900715b08d20c77ade2effcb826a90f6352f376068d6c"
+      "blob": "d083375b92a945e150214a433fe95b28d6601f9f",
+      "sha256": "fff2c686d7525ea87f0f63c846c84e7ee583a9a4c4aa1efcbb3f455edd3eb65a"
     },
     "spec/control/methods/history.filter.save.json": {
-      "blob": "a6acfe52903ed0cbac96343a816c44b23b2af7d0",
-      "sha256": "4eaecfbc6e6878dbd8365ab6b99ebba3d85939431148826cdbe12ed0a104c585"
+      "blob": "723fe8a127562de4c6b8c616ca6cb857148484ea",
+      "sha256": "87bd812ba74a7eafc8821cb1dbaac0d42d412728b95d59fa00e773b45418af3b"
     },
     "spec/control/methods/human-action.list.json": {
       "blob": "75749565bb88df7c660737fee77c25abcd14a6f3",
@@ -1731,7 +1731,7 @@
       "sha256": "95367cc3e57160752f7d1d724887ee650adb8d3ccc5d736444517641a5da8e64"
     }
   },
-  "inputDigest": "8cc9089a9c3afe4a5815e7cafa7355cb3e98a7527795aae07bc1c951dbe1b7ef",
+  "inputDigest": "c96fab529e35b1b651c0208c963b745043a843bd73223dee4f350d9840bbed17",
   "kind": "development",
   "methodCount": 105,
   "protocolVersion": "1.0.0",
