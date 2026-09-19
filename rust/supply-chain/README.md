@@ -86,3 +86,9 @@ added. These packages preserve Swift's AES-256-GCM presentation cursor format;
 they are not admission or device authority. The checked registry facts, dates,
 checksums, missing source-audit chains, and explicit authorization are recorded
 in `openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-014/job-events-dependency-review.md`.
+
+On 2026-09-19 `arkdeck-provider-workspace` (TASK-XPA-015, SPK-10) took the same
+locked `aes-gcm 0.10.3` (with `aes`, `alloc`) and the existing `hmac`/`sha2` to
+open DevEco Studio's AES-128-GCM password envelopes at the signing install
+boundary. No crate, version, checksum or trust entry changes; the new use is a
+dependency edge on already-locked releases and is named here for review.

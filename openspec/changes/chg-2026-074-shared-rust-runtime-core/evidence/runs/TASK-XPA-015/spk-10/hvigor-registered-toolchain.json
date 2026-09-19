@@ -1,0 +1,13 @@
+{
+  "environmentKeys": [
+    "DEVECO_SDK_HOME",
+    "HOME",
+    "TMPDIR"
+  ],
+  "hvigorSha256": "aa1f2431652ceb06706022150a6a4137abc9c6887bd7c0c5fdf7c2919204ff01",
+  "nodeSha256": "b98965e9a1cb8efffde21f63d360d5e99d6ef1b0b826dad922c1554d5c86e644",
+  "reference": "toolchain:sha256:9cee08f1e191112cb68a24ec3aa941f8d5342482224258ee3e34cdd122855e27",
+  "seconds": 7.608919791,
+  "stdout": "5.14.2-td-rc.2851",
+  "termination": "Exited(0)"
+}

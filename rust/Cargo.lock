@@ -125,6 +125,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "arkdeck-provider-workspace"
+version = "0.1.0"
+dependencies = [
+ "aes-gcm",
+ "arkdeck-platform",
+ "hmac",
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
 name = "arkdeck-soak"
 version = "0.1.0"
 dependencies = [

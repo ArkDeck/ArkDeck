@@ -48,3 +48,20 @@ pub fn application_support_directory() -> Option<PathBuf> {
 pub fn arkdeck_application_support_root() -> Option<PathBuf> {
     application_support_directory().map(|directory| directory.join("ArkDeck"))
 }
+
+/// The effective user ID of this process, for ownership checks.
+pub fn effective_user_id() -> u32 {
+    // SAFETY: geteuid has no preconditions and cannot fail.
+    unsafe { libc::geteuid() }
+}
+
+/// Whether this process may execute `path` now (`access(2)` with `X_OK`,
+/// evaluated with the real user and group IDs as Swift's `access` is).
+pub fn executable_by_caller(path: &std::path::Path) -> bool {
+    use std::os::unix::ffi::OsStrExt;
+    let Ok(path) = std::ffi::CString::new(path.as_os_str().as_bytes()) else {
+        return false;
+    };
+    // SAFETY: `path` is a live NUL-terminated string for the call.
+    unsafe { libc::access(path.as_ptr(), libc::X_OK) == 0 }
+}

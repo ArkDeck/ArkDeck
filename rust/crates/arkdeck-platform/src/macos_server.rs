@@ -424,11 +424,13 @@ fn is_loopback_or_wildcard(family: i32, address: &[u8; 16]) -> bool {
             || is_registered_listener_address(family, &address[..]))
 }
 
-/// Swift `arguments(for:)`: the complete argv of a process after argv[0], as
-/// the kernel keeps it (`KERN_PROCARGS2`: the argument count, the executable
-/// path, then the NUL-separated arguments). `None` when the kernel refuses
-/// or the record is not shaped so.
-pub fn process_arguments(pid: i32) -> Option<Vec<String>> {
+/// The kernel's complete launch record of a process (`KERN_PROCARGS2`): the
+/// argument count, the executable path, the NUL-separated arguments and then
+/// the environment, byte for byte. `None` when the kernel refuses (another
+/// user's process, a process that has exited). A privacy check scans these
+/// bytes for a secret that must never have reached a child's argv or
+/// environment.
+pub fn process_argument_record(pid: i32) -> Option<Vec<u8>> {
     // <sys/sysctl.h>
     const KERN_ARGMAX: libc::c_int = 8;
     const KERN_PROCARGS2: libc::c_int = 49;
@@ -469,6 +471,17 @@ pub fn process_arguments(pid: i32) -> Option<Vec<String>> {
     if status != 0 || actual <= std::mem::size_of::<i32>() || actual > buffer.len() {
         return None;
     }
+    buffer.truncate(actual);
+    Some(buffer)
+}
+
+/// Swift `arguments(for:)`: the complete argv of a process after argv[0], as
+/// the kernel keeps it (`KERN_PROCARGS2`: the argument count, the executable
+/// path, then the NUL-separated arguments). `None` when the kernel refuses
+/// or the record is not shaped so.
+pub fn process_arguments(pid: i32) -> Option<Vec<String>> {
+    let buffer = process_argument_record(pid)?;
+    let actual = buffer.len();
     let count = i32::from_ne_bytes(buffer[..4].try_into().ok()?);
     let count = usize::try_from(count).ok().filter(|count| *count > 0)?;
     let mut cursor = std::mem::size_of::<i32>();

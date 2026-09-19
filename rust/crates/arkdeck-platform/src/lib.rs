@@ -27,11 +27,23 @@ pub use process::{ProcessLimits, ProcessOutput, VerifiedTool};
 #[cfg(unix)]
 mod account;
 #[cfg(unix)]
-pub use account::{application_support_directory, arkdeck_application_support_root, runtime_home};
+pub use account::{
+    application_support_directory, arkdeck_application_support_root, effective_user_id,
+    executable_by_caller, runtime_home,
+};
 #[cfg(unix)]
 mod temporary_directory;
 #[cfg(unix)]
 pub use temporary_directory::foundation_temporary_directory;
+mod secret;
+pub use secret::{Secret, wipe};
+#[cfg(target_os = "macos")]
+mod keychain;
+#[cfg(target_os = "macos")]
+pub use keychain::{
+    DAEMON_KEYCHAIN_ACCESS_GROUP, KeychainError, KeychainItems, KeychainPresence,
+    trusted_daemon_fingerprint,
+};
 #[cfg(target_os = "macos")]
 mod host_signature;
 #[cfg(target_os = "macos")]
@@ -53,7 +65,8 @@ pub use stop_signal::{Latch, StopSignal};
 mod macos_server;
 #[cfg(target_os = "macos")]
 pub use macos_server::{
-    LoopbackServerLease, ServerIdentityReceipt, process_arguments, verifies_managed_process,
+    LoopbackServerLease, ServerIdentityReceipt, process_argument_record, process_arguments,
+    verifies_managed_process,
 };
 #[cfg(windows)]
 pub use windows::{LocalConnection, LocalListener, LoopbackServerLease, default_user_endpoint};
