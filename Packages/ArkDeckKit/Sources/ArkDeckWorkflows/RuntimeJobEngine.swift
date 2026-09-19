@@ -1,3 +1,4 @@
+import ArkDeckClientKit
 // Durable Runtime Job Engine (CHG-2026-047, T08).
 //
 // Reuses the proven primitives - JobStateMachine's transition graph via the

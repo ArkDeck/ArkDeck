@@ -1,7 +1,7 @@
+@testable import ArkDeckClientKit
 import Foundation
 import XCTest
 
-@testable import ArkDeckWorkflows
 
 /// Exercises the production cache dependencies without launching the App or
 /// contacting a daemon. These fixture records prove presentation only.

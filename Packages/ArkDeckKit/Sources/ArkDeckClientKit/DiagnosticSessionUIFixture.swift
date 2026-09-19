@@ -92,21 +92,44 @@ enum DiagnosticHilogSummaryUIFixture {
       workspaceKind: .diagnostics, actualEffect: "hostOnly", finishedAtUTC: "2026-08-29T08:00:10Z")
   }
 
-  static func document(_ variant: String) throws -> Data {
+  // Fixed display samples, not an analyzer implementation. Their equivalence
+  // to the existing analyzer is checked by the remaining Runtime test target.
+  static func source(_ variant: String) -> String {
     let header = "08-29 01:02:03.004 123 124 I C01234/Test: UI fixture only\n"
-    let raw: String = switch variant {
+    return switch variant {
     case "partial": header + "wrapped line without a header\n\n"
     case "unrecognized": "UI fixture only: nondefault format\n"
     case "empty": " \n\t\n"
     default: header + "08-29 01:02:03.005 123 124 E C01234/Test: UI fixture only\n"
     }
-    let report = try HilogSummaryDerivedAnalyzer.analyze(Data(raw.utf8))
-    let result = try JSONDecoder().decode(HilogSummaryAnalysis.self, from: report)
-    return try CanonicalJSONEncoders.canonical().encode(HilogSummaryDerivedArtifact(
-      sourceArtifactID: "fixture-hilog-source-\(variant)",
-      analyzerExecutableSHA256: String(repeating: "b", count: 64),
-      analyzerOutputSHA256: SHA256Hex.string(of: report), analyzerOutputByteCount: report.count,
-      result: result))
+  }
+
+  static func document(_ variant: String) throws -> Data {
+    let raw = Data(source(variant).utf8)
+    let counts: (coverage: String, lines: Int, blanks: Int, unknown: Int, info: Int, error: Int)
+    switch variant {
+    case "partial": counts = ("partial", 3, 1, 1, 1, 0)
+    case "unrecognized": counts = ("unrecognized", 1, 0, 1, 0, 0)
+    case "empty": counts = ("empty", 2, 2, 0, 0, 0)
+    default: counts = ("complete", 2, 0, 0, 1, 1)
+    }
+    let result: JSONValue = .object([
+      "schemaVersion": .string("1.0.0"), "analyzerRef": .string("hilog-summary@1"),
+      "analyzerVersion": .string("1.0.0"), "scope": .string("default-hilog-header-lines"),
+      "redaction": .string("content-and-identifiers-omitted"),
+      "sourceSHA256": .string(SHA256Hex.string(of: raw)), "sourceByteCount": .integer(Int64(raw.count)),
+      "headerCoverage": .string(counts.coverage), "lineCount": .integer(Int64(counts.lines)),
+      "blankLineCount": .integer(Int64(counts.blanks)), "unrecognizedLineCount": .integer(Int64(counts.unknown)),
+      "levelCounts": .object(["D": .integer(0), "I": .integer(Int64(counts.info)),
+        "W": .integer(0), "E": .integer(Int64(counts.error)), "F": .integer(0)]),
+    ])
+    let report = try CanonicalJSONEncoders.canonical().encode(result)
+    return try CanonicalJSONEncoders.canonical().encode(JSONValue.object([
+      "sourceArtifactID": .string("fixture-hilog-source-\(variant)"),
+      "analyzerExecutableSHA256": .string(String(repeating: "b", count: 64)),
+      "analyzerOutputSHA256": .string(SHA256Hex.string(of: report)),
+      "analyzerOutputByteCount": .integer(Int64(report.count)), "result": result,
+    ]))
   }
 
   static func detail(_ variant: String, document supplied: Data? = nil) throws -> RuntimeJobDetailPresentation {

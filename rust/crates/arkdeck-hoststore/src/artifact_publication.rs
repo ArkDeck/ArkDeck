@@ -208,6 +208,75 @@ impl ArtifactPublisher<'_> {
         Ok(metadata)
     }
 
+    /// Import bytes are already attested by their registered format validator.
+    /// No redaction or caller-provided publication descriptor is involved.
+    pub(crate) fn publish_import(
+        &self,
+        product: &Product<'_>,
+        source: &arkdeck_platform::HostUploadFile,
+        expected: u64,
+        digest: &str,
+        created: &str,
+        after_payload: impl FnOnce() -> Result<(), String>,
+    ) -> Result<Value, String> {
+        self.store
+            .with_trace_retention(|_| {
+                let identity = sha256_hex(
+                    format!("{}\0{}\0{digest}", product.job_id, product.name).as_bytes(),
+                );
+                let artifact = format!("ART-{}", &identity[..32]);
+                let metadata = self.metadata(
+                    product,
+                    &artifact,
+                    expected,
+                    digest,
+                    created,
+                    json!({"published": {}}),
+                    false,
+                )?;
+                let directory = self.job_directory(product.job_id)?;
+                if let Some(existing) = self
+                    .load_index(&directory, product.job_id)?
+                    .iter()
+                    .find(|row| row["name"] == product.name && published(row))
+                {
+                    if existing["artifactID"] != artifact
+                        || !same_immutable_publication(existing, &metadata)
+                    {
+                        return Err(artifact_error(
+                            "artifactConflict",
+                            "Import name already has different immutable content",
+                        ));
+                    }
+                    return Ok(existing.clone());
+                }
+                let exists = match directory.document_metadata(&artifact) {
+                    Ok(_) => {
+                        self.validate_payload(&directory, &artifact, expected, digest)?;
+                        true
+                    }
+                    Err(error) if error.kind() == io::ErrorKind::NotFound => false,
+                    Err(error) => return Err(io_failure(&error.to_string())),
+                };
+                let used = self.used_bytes()?;
+                if used.saturating_add(expected) > self.quota {
+                    return Err(format!(
+                        "quotaExceeded(requestedBytes: {expected}, remainingBytes: {})",
+                        self.quota.saturating_sub(used)
+                    ));
+                }
+                if !exists {
+                    source
+                        .publish_immutable(&directory, &artifact, expected, digest)
+                        .map_err(|e| io_failure(&e.to_string()))?;
+                }
+                after_payload()?;
+                self.upsert(&directory, product.job_id, metadata.clone())?;
+                Ok(metadata)
+            })
+            .map_err(|e| io_failure(&e.to_string()))?
+    }
+
     fn clock(&self) -> Result<String, String> {
         (self.now)().ok_or_else(|| io_failure("the Runtime clock is unavailable"))
     }

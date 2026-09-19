@@ -1,8 +1,8 @@
+@testable import ArkDeckClientKit
 import Foundation
 import XCTest
 
 @testable import ArkDeckCore
-@testable import ArkDeckWorkflows
 
 final class RuntimeHistoryPagingContractTests: XCTestCase {
   func testPagingRemainsBoundedAndRetryKeepsTheSameCursor() async throws {

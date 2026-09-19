@@ -1,8 +1,8 @@
+@testable import ArkDeckClientKit
 import Foundation
 import XCTest
 
 @testable import ArkDeckCore
-@testable import ArkDeckWorkflows
 
 final class RuntimeAppReadResourcesContractTests: XCTestCase {
   private let jobID = "job-app-read"
