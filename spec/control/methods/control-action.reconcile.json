@@ -10,6 +10,7 @@
         "notFound",
         "recordUnreadable",
         "rejected",
+        "resourceNotFound",
         "unknownMethod",
         "unsupportedProtocolVersion",
         "workspaceReferenceNotFound"
@@ -391,8 +392,8 @@
   "x-arkdeck-method": "control-action.reconcile",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 2,
+    "error": 3,
     "request": 4,
-    "result": 2
+    "result": 1
   }
 }

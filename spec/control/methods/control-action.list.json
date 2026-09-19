@@ -4,6 +4,8 @@
       "enum": [
         "conflict",
         "internalError",
+        "invalidCursor",
+        "invalidInput",
         "invalidParams",
         "malformedFrame",
         "notFound",
@@ -30,8 +32,17 @@
     "request": {
       "additionalProperties": false,
       "properties": {
+        "cursor": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
         "pageSize": {
           "type": "integer"
+        },
+        "state": {
+          "type": "string"
         }
       },
       "type": "object"
@@ -427,8 +438,8 @@
   "x-arkdeck-method": "control-action.list",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 2,
-    "request": 4,
-    "result": 2
+    "error": 7,
+    "request": 13,
+    "result": 6
   }
 }
