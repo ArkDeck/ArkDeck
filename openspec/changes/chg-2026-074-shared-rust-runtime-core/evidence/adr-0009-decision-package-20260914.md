@@ -195,3 +195,51 @@ design §G.4), `job.reconcile` with `finishReconcile`'s three outcomes, the capa
 — in that order, each against the tests of §3 as oracle. Until then the Rust owner keeps refusing
 resumable Jobs, `job.reconcile` and recovery epochs, as every TASK-XPA-014 run record since
 2026-09-14 states.
+
+## Ruling
+
+Recorded 2026-09-19 against protected main `9c58e484`. The Repo Agent wrote this section from the
+maintainer's instruction; merging it is the maintainer's attestation of the record.
+
+- **Date:** 2026-09-19.
+- **Ruled by:** lvye (maintainer), on design §L.1 item 13.
+- **Ruling:** 「按本包点名的承载代码原样移植」: port recovery exactly as the carrier code this
+  package names.
+
+This adopts the proposed ruling above. ADR-0009 decisions 2 and 4 bind the current runtime. What
+carries them is what §1 and §2 name. The Rust port reproduces those carriers unchanged (T0 for the
+durable formats, T1 for the transitions and refusals), adds no recovery semantics of its own, and
+keeps the four symbols of §5 missing. The carrier tables above are kept exactly as prepared and
+are the binding list:
+
+| Decision | Carrier tables | Oracles |
+| --- | --- | --- |
+| 2: a crashed attempt stays `outcomeUnknown` and is never described or treated as recoverable | §1a (classification and park), §1b (refusal to replay or re-dispatch), §1c (the only sanctioned exits) | §3 |
+| 4: an existing proof is never discarded | §2 | §3 |
+
+§5 stays a list of flagged gaps. None of its four items is ruled a carrier, and the port neither
+revives nor renames them.
+
+Line numbers remain those of `6cf99fb6`. Between that commit and `9c58e484` the named Swift
+sources changed only by one added first line: `import ArkDeckClientKit` in
+`RuntimeJobEngine.swift`, `AgentDaemon.swift` and `DebugApplicationFacade.swift`, and
+`@testable import ArkDeckClientKit` in `CompleteOverwriteRecoveryContractTests.swift` and
+`JobReadResourcesContractTests.swift`. A line cited in those five files is one higher on
+`9c58e484`; every other named source and test file is byte-identical.
+
+### Port order (TASK-XPA-014)
+
+Each slice reads the carriers it ports from the tables above and records itself in
+`runs/TASK-XPA-014/recovery-<slice>-run.md`.
+
+1. Recovery manifests and `RecoveryManifestContract` (the last row of §2): T0 format, the exact
+   Swift key set, and read-back by the Swift strict validator.
+2. Recoverable Job classification and `job.reconcile` with `finishReconcile`'s three outcomes
+   (§1a, §1b, §1c and the first two rows of §2).
+3. The superseding recovery epoch relation (`RecoveryCoordination.swift` in §1c and §2): append-only,
+   hash-chained, continuing from the highest existing ordinal.
+4. The design §G.4 preflight predicate table, shared by `runtime service restart` carry-over (M1)
+   and the M5 preflight.
+
+The recovered row of `cleanupDebt.continue`, `debug.start/status/evaluate` (the Flash recovery
+broker) and DEC-016's `completeOverwriteAdmission` follow in M2/M4, after these four.

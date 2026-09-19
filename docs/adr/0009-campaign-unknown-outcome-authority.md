@@ -12,6 +12,14 @@
 > 保持 `outcomeUnknown`、不得被描述为可恢复)与决策 4(已存在的证明不得丢弃)
 > 是否仍然约束当前 runtime,以及它们今天由什么承载。** 这是安全语义判断,留待
 > 维护者签发;本注记只登记可复查的事实,不代为裁决,也不改变本 ADR 的现有效力。
+>
+> **2026-09-19 裁决(lvye,设计 §L.1 第 13 条)。** 决策 2(崩溃尝试保持
+> `outcomeUnknown`、不得被描述为可恢复)与决策 4(已存在的证明不得丢弃)继续约束
+> 当前 runtime。它们今天由决策包
+> [`adr-0009-decision-package-20260914.md`](../../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/adr-0009-decision-package-20260914.md)
+> §1、§2 逐行点名的代码承载;Rust 按该包原样移植这些承载点,不新增 recovery
+> 语义,正文点名的四个已删符号保持缺席。裁决原文与承载点表见该包末尾的 Ruling 节。
+> 上段所列的未决问题就此结案;正文仍按惯例保留不改写。
 
 - Status: accepted(CHG-2026-025 r17,TASK-AIN-020,2026-08-07)
 - Deciders: lvye(merge 即批准)
