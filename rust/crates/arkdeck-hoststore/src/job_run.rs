@@ -137,6 +137,7 @@ struct Exited {
 }
 
 pub struct JobRunner<'a> {
+    pub mutation: Option<crate::mutation_execution::MutationExecution<'a>>,
     pub jobs: &'a JobStore,
     pub artifacts: &'a ArtifactReadStore,
     pub analyzer: Option<&'a AnalyzerProfile>,

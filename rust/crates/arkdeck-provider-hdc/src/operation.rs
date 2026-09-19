@@ -161,6 +161,12 @@ pub enum DispatchFailure {
 /// Runs one lowered plan. The implementation owns the executable, and any
 /// server endpoint and environment it may name; the plan never carries them.
 pub trait HdcDispatch {
+    /// A mutation requires a retained executable identity revalidated by its
+    /// Runtime-owned dispatcher. Unknown implementations cannot grant it.
+    fn mutation_identity_current(&self) -> bool {
+        false
+    }
+
     fn dispatch(&self, plan: &ProcessPlan) -> Result<Receipt, DispatchFailure>;
 }
 

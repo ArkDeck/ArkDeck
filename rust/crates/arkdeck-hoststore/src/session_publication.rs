@@ -862,19 +862,68 @@ fn device_context(
     {
         return Err(unaudited());
     }
-    // This Runtime admits under the default read-only policy only; a
-    // consumed Runtime capability's audit is not ported.
-    if admission["kind"] != "defaultReadOnlyPolicy" {
-        return Err(refused(
-            "missing or inconsistent consumed Runtime capability audit",
-        ));
-    }
-    if mutation
-        || !member("validUntilUTC").is_null()
-        || !member("consumptionFingerprintSHA256").is_null()
-        || !member("runtimeCapabilityCorrelation").is_null()
-    {
-        return Err(refused("read-only policy cannot substantiate a mutation"));
+    let mut authority = json!({
+        "kind": member("kind"), "reference": member("reference"),
+        "admittedAtUtc": member("admittedAtUTC"), "validUntilUtc": member("validUntilUTC"),
+        "consumptionFingerprintSha256": member("consumptionFingerprintSHA256"),
+        "reservationId": null, "useOrdinal": null, "planDigest": null,
+        "stepSetDigest": null, "targetBindingDigest": null, "artifactDigest": null,
+    });
+    match admission["kind"].as_str() {
+        Some("defaultReadOnlyPolicy") => {
+            if mutation
+                || !member("validUntilUTC").is_null()
+                || !member("consumptionFingerprintSHA256").is_null()
+                || !member("runtimeCapabilityCorrelation").is_null()
+            {
+                return Err(refused("read-only policy cannot substantiate a mutation"));
+            }
+        }
+        Some("runtimeCapability") => {
+            let correlation = &admission["runtimeCapabilityCorrelation"];
+            if !correlation["reservationID"]
+                .as_str()
+                .is_some_and(|s| !s.is_empty())
+                || !correlation["useOrdinal"].as_u64().is_some_and(|n| n > 0)
+                || !admission["consumptionFingerprintSHA256"]
+                    .as_str()
+                    .is_some_and(lowercase_sha256)
+                || !seconds(admission["validUntilUTC"].as_str())
+                    .zip(admitted)
+                    .is_some_and(|(expiry, start)| start < expiry)
+                || correlation["planDigestSHA256"].as_str() != record.materialized_plan()
+                || ![
+                    "planDigestSHA256",
+                    "stepSetDigestSHA256",
+                    "targetBindingDigestSHA256",
+                ]
+                .iter()
+                .all(|key| correlation[*key].as_str().is_some_and(lowercase_sha256))
+                || (!correlation["artifactSHA256"].is_null()
+                    && !correlation["artifactSHA256"]
+                        .as_str()
+                        .is_some_and(lowercase_sha256))
+            {
+                return Err(refused(
+                    "missing or inconsistent consumed Runtime capability audit",
+                ));
+            }
+            for (destination, source) in [
+                ("reservationId", "reservationID"),
+                ("useOrdinal", "useOrdinal"),
+                ("planDigest", "planDigestSHA256"),
+                ("stepSetDigest", "stepSetDigestSHA256"),
+                ("targetBindingDigest", "targetBindingDigestSHA256"),
+                ("artifactDigest", "artifactSHA256"),
+            ] {
+                authority[destination] = correlation[source].clone();
+            }
+        }
+        _ => {
+            return Err(refused(
+                "missing or inconsistent consumed Runtime capability audit",
+            ));
+        }
     }
     let snapshot = json!({"targetId": target_id, "stableIdentitySHA256": identity,
         "model": model, "firmware": firmware});
@@ -893,13 +942,7 @@ fn device_context(
         toolchain: json!({"kind": "runtimeProvider", "providerIdentity": provider,
             "profileIdentifier": record.operation(), "reportedVersion": tool_version,
             "sha256": tool_sha256}),
-        authority: json!({
-            "kind": member("kind"), "reference": member("reference"),
-            "admittedAtUtc": member("admittedAtUTC"), "validUntilUtc": member("validUntilUTC"),
-            "consumptionFingerprintSha256": member("consumptionFingerprintSHA256"),
-            "reservationId": null, "useOrdinal": null, "planDigest": null,
-            "stepSetDigest": null, "targetBindingDigest": null, "artifactDigest": null,
-        }),
+        authority,
     }))
 }
 
