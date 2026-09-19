@@ -88,6 +88,8 @@ mod analyzer_output;
 #[cfg(target_os = "macos")]
 mod artifact_publication;
 #[cfg(target_os = "macos")]
+pub use artifact_publication::collect_expired_artifacts;
+#[cfg(target_os = "macos")]
 mod job_run;
 #[cfg(target_os = "macos")]
 pub use job_run::{JobRunner, RunRefusal, runtime_precise_now};

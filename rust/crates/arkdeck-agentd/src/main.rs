@@ -360,6 +360,25 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
     if development.is_some() {
         return Err("development host-store owner is not yet supported on this platform".into());
     }
+    // As Swift's daemon, once, before serving: expired Artifacts are
+    // reclaimed. Swift sweeps after its Job recovery; once that is ported
+    // (design §L.1 item 13) it runs first, though the sweep's census keeps
+    // every Job not proven settled either way. A failure is reported and
+    // never stops the daemon, since an un-reclaimable store is what the sweep
+    // exists to make visible.
+    #[cfg(target_os = "macos")]
+    if let Some(sweep) = host.collect_expired_artifacts() {
+        match sweep {
+            Ok(reclaimed) if reclaimed.is_empty() => {}
+            Ok(reclaimed) => println!("reclaimed {} expired artifact(s)", reclaimed.len()),
+            Err(error) => {
+                println!(
+                    "artifact retention sweep failed; the store may approach its quota: {error}"
+                )
+            }
+        }
+        let _ = io::stdout().flush();
+    }
     let control = Arc::new(Control::new(host)?);
     #[cfg(target_os = "macos")]
     let mut listener = if let Some(listener) = development_listener {

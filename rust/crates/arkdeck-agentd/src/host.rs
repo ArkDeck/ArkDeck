@@ -190,6 +190,17 @@ impl Host {
         self.artifacts = Some(std::sync::Arc::new(artifacts));
         self
     }
+    /// Swift's daemon startup `collectGarbage`: the expired Artifacts this
+    /// host's owners may reclaim, reclaimed now, or why nothing more was;
+    /// `None` without a Job and an Artifact owner.
+    #[cfg(target_os = "macos")]
+    pub fn collect_expired_artifacts(&self) -> Option<Result<Vec<String>, String>> {
+        let (jobs, artifacts) = (self.jobs.as_ref()?, self.artifacts.as_ref()?);
+        Some(match arkdeck_hoststore::runtime_now() {
+            Some(now) => arkdeck_hoststore::collect_expired_artifacts(jobs, artifacts, &now),
+            None => Err("the Runtime clock is unavailable".into()),
+        })
+    }
     /// Device-bound Jobs plan against the Target owner and run through this
     /// development HDC; without one no HDC provider is registered.
     #[cfg(target_os = "macos")]

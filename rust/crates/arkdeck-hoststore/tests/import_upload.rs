@@ -1309,6 +1309,106 @@ fn release_is_durable_idempotent_and_preserves_historical_artifact_reads() {
     );
 }
 #[test]
+fn the_retention_sweep_reclaims_a_released_import_at_its_deadline_and_keeps_its_history() {
+    let fixture = Fixture::new();
+    let store = fixture.store();
+    let artifacts = arkdeck_hoststore::ArtifactReadStore::open(&fixture.artifacts).unwrap();
+    let jobs = jobs(&fixture);
+    let (pinned_bytes, released_bytes) = (b"PK\x03\x04kept-pinned", b"PK\x03\x04released");
+    let pinned = call(&store, "begin", fixture.metadata("pinned", pinned_bytes)).unwrap();
+    let pinned = pinned["importId"].as_str().unwrap().to_owned();
+    append(&store, &pinned, 0, pinned_bytes).unwrap();
+    commit(&store, &artifacts, &pinned).unwrap();
+    let begin = call(
+        &store,
+        "begin",
+        fixture.metadata("released", released_bytes),
+    )
+    .unwrap();
+    let id = begin["importId"].as_str().unwrap();
+    append(&store, id, 0, released_bytes).unwrap();
+    let committed = commit(&store, &artifacts, id).unwrap();
+    let artifact = committed["receipt"]["artifactId"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let release = lifecycle(
+        &store,
+        &artifacts,
+        &jobs,
+        "release",
+        json!({"importId":id,"generation":"2"}),
+    )
+    .unwrap();
+    // Released at NOW, the Import keeps Swift's default week.
+    assert_eq!(release["retention"]["deadlineUtc"], "2026-09-19T00:00:00Z");
+    let sweep = |now: &str| arkdeck_hoststore::collect_expired_artifacts(&jobs, &artifacts, now);
+    assert_eq!(sweep("2026-09-18T23:59:59Z").unwrap(), Vec::<String>::new());
+    assert!(fixture.artifacts.join(id).join(&artifact).exists());
+    assert_eq!(
+        sweep("2026-09-19T00:00:00Z").unwrap(),
+        std::slice::from_ref(&artifact)
+    );
+    assert!(!fixture.artifacts.join(id).join(&artifact).exists());
+    assert_eq!(
+        read(&fixture.artifacts.join(id).join("index.json"))["artifacts"],
+        json!([])
+    );
+    // The unreleased Import stays pinned, however late the sweep.
+    assert_eq!(sweep("2100-01-01T00:00:00Z").unwrap(), Vec::<String>::new());
+    assert_eq!(
+        read(&fixture.artifacts.join(&pinned).join("index.json"))["artifacts"][0]["retention"],
+        json!({"retentionClass":"pinnedUntilVerified","pinned":true})
+    );
+    // The released Import's history stays: its record and receipt, an
+    // idempotent release retry across a restart, and an Artifact listing that
+    // no longer holds the reclaimed product.
+    drop(store);
+    let store = fixture.store();
+    let inspected = call(&store, "inspect", json!({"importId":id})).unwrap();
+    assert_eq!(inspected["state"], "released");
+    assert_eq!(
+        lifecycle(
+            &store,
+            &artifacts,
+            &jobs,
+            "release",
+            json!({"importId":id,"generation":"2"})
+        )
+        .unwrap(),
+        release
+    );
+    let snapshots = fixture.root.join("snapshots");
+    fs::DirBuilder::new()
+        .mode(0o700)
+        .create(&snapshots)
+        .unwrap();
+    let listed = store
+        .artifact_resource(
+            &artifacts,
+            "artifact.list",
+            json!({"owner":{"kind":"import","id":id},"pageSize":10})
+                .as_object()
+                .unwrap(),
+            &snapshots,
+        )
+        .unwrap();
+    assert_eq!(listed["items"], json!([]));
+    let request = json!({"owner":{"kind":"import","id":id},"artifactId":artifact});
+    assert_eq!(
+        store
+            .artifact_resource(
+                &artifacts,
+                "artifact.inspect",
+                request.as_object().unwrap(),
+                &snapshots,
+            )
+            .unwrap_err()
+            .code,
+        "resourceNotFound"
+    );
+}
+#[test]
 fn release_crash_windows_recover_the_same_deadline_without_reviving_a_pin() {
     for fault in [
         ImportUploadFault::AfterReleaseCheckpoint,

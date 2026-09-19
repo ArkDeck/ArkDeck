@@ -250,6 +250,18 @@ impl ArtifactReadStore {
         Ok(result)
     }
 
+    /// The retention guard's lock alone, for the retention sweep: it excludes
+    /// every publication and Trace maintenance, as the guard does, without
+    /// the Trace census, whose bound on the Artifact tree the sweep exists to
+    /// bring the store back under.
+    pub(crate) fn with_retention_lock<R>(&self, action: impl FnOnce() -> R) -> io::Result<R> {
+        let _guard = self.trace_retention.lock().map_err(|_| corrupt())?;
+        self.root.validate_path(&self.path)?;
+        let result = action();
+        self.root.validate_path(&self.path)?;
+        Ok(result)
+    }
+
     /// The idle Import skeleton is `records`, `identities` and `payloads`
     /// beside the owner lock. Any member of those directories, and any other
     /// entry, is retained state this read owner cannot interpret.
