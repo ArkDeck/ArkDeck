@@ -24,16 +24,25 @@ use std::time::{Duration, Instant};
 const FAKE_HDC: &str = include_str!("../../../tests/fixtures/managed-hdc/fake-hdc.c");
 const TARGET: &str = "TGT-3ba3f5f43b92";
 
-/// A loopback port no other test of this binary was handed.
-fn free_port() -> u16 {
-    static ISSUED: Mutex<BTreeSet<u16>> = Mutex::new(BTreeSet::new());
+/// Every loopback port a test of this binary was handed: the kernel may
+/// hand a port just released straight back to the next `bind(0)`, so a port
+/// is issued once, whether it is released at once or held.
+static ISSUED: Mutex<BTreeSet<u16>> = Mutex::new(BTreeSet::new());
+
+/// A listener on a loopback port no other test of this binary was handed.
+fn issued_listener() -> TcpListener {
     loop {
         let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
         let port = listener.local_addr().unwrap().port();
         if ISSUED.lock().unwrap().insert(port) {
-            return port;
+            return listener;
         }
     }
+}
+
+/// A loopback port no other test of this binary was handed.
+fn free_port() -> u16 {
+    issued_listener().local_addr().unwrap().port()
 }
 
 fn reachable(port: u16) -> bool {
@@ -104,6 +113,18 @@ impl Runtime {
 
     fn hdc(&self) -> PathBuf {
         self.root.join("tools/hdc")
+    }
+
+    /// Whether any process still runs this test's own fake: the managed
+    /// server a daemon started, whatever port it listens on. A port that is
+    /// merely reachable may belong to another test's server.
+    fn fake_running(&self) -> bool {
+        Command::new("/usr/bin/pgrep")
+            .args(["-f", &self.hdc().to_string_lossy()])
+            .stdout(Stdio::null())
+            .status()
+            .unwrap()
+            .success()
     }
 
     fn state(&self) -> PathBuf {
@@ -200,7 +221,10 @@ impl Runtime {
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .status()
-            .unwrap()
+            .expect(
+                "the arkdeck CLI beside the daemon: run the workspace tests, or \
+                 `cargo build -p arkdeck-cli` before testing this crate alone",
+            )
     }
 
     /// SIGTERM, then the daemon's end within `within`: its status and stdout.
@@ -394,10 +418,7 @@ fn the_managed_server_answers_status_and_availability_and_stops_with_the_daemon(
     idle.read_to_end(&mut rest).unwrap();
     assert!(rest.is_empty());
     assert!(!runtime.socket().exists(), "the socket's name is removed");
-    assert!(
-        !reachable(runtime.port),
-        "no server is left on the endpoint"
-    );
+    assert!(!runtime.fake_running(), "no managed server is left");
 }
 
 #[test]
@@ -406,7 +427,7 @@ fn a_foreign_listener_on_the_endpoint_never_becomes_the_managed_server() {
     // Another process's listener on the selected endpoint, held from the
     // moment its port is found: the fake's own `-m` cannot bind, and the
     // listener answering is not its launch.
-    let foreign = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+    let foreign = issued_listener();
     runtime.port = foreign.local_addr().unwrap().port();
     let port = runtime.port.to_string();
     let output = runtime.refused(&[
@@ -420,10 +441,7 @@ fn a_foreign_listener_on_the_endpoint_never_becomes_the_managed_server() {
     );
     assert!(output.stdout.is_empty());
     drop(foreign);
-    assert!(
-        !reachable(runtime.port),
-        "no managed server was left behind"
-    );
+    assert!(!runtime.fake_running(), "no managed server was left behind");
 }
 
 #[test]
@@ -530,7 +548,7 @@ fn development_usb_relations_beside_a_registered_hdc_are_acknowledged_only_as_na
         assert!(stderr.contains(message), "{environment:?}: {stderr}");
         assert!(output.stdout.is_empty(), "{environment:?}");
         assert!(
-            !reachable(runtime.port),
+            !runtime.fake_running(),
             "{environment:?}: no managed server was started"
         );
     }
@@ -557,5 +575,5 @@ fn development_usb_relations_beside_a_registered_hdc_are_acknowledged_only_as_na
         "development USB relations beside a registered HDC are acknowledged only for an \
              isolated development root"
     ));
-    assert!(!reachable(runtime.port));
+    assert!(!runtime.fake_running());
 }
