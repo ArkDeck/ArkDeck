@@ -12,7 +12,7 @@ use std::sync::OnceLock;
 pub(crate) struct CatalogField {
     pub(crate) name: String,
     pub(crate) kind: String,
-    required: bool,
+    pub(crate) required: bool,
     enum_values: Option<Vec<String>>,
     max_length: Option<u64>,
     pattern: Option<String>,

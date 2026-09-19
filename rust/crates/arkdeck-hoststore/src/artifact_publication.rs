@@ -323,6 +323,64 @@ impl ArtifactPublisher<'_> {
             .map_err(|error| io_failure(&format!("cannot create artifact directory: {error}")))
     }
 
+    /// Called with Import lifetime ownership. The release receipt is already
+    /// durable; only its original bounded retention may replace the pin.
+    pub(crate) fn finish_import_unpin(
+        &self,
+        id: &str,
+        expected: &Value,
+        retention: &Value,
+    ) -> Result<(), String> {
+        self.store
+            .with_trace_retention(|_| {
+                let directory = match self.store.root().child(id) {
+                    Ok(directory) => directory,
+                    Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+                    Err(error) => return Err(io_failure(&error.to_string())),
+                };
+                let rows = self.load_index(&directory, id)?;
+                let Some(mut row) = rows
+                    .into_iter()
+                    .find(|row| row["artifactID"] == expected["artifactID"])
+                else {
+                    return Ok(());
+                };
+                if !published(&row) {
+                    return Err(corrupted("released Import publication status drifted"));
+                }
+                for key in [
+                    "jobID",
+                    "artifactID",
+                    "name",
+                    "sessionID",
+                    "stepID",
+                    "sourceOperation",
+                    "providerID",
+                    "sha256",
+                    "byteCount",
+                    "bindingSnapshot",
+                    "privacy",
+                    "mediaType",
+                    "redactionApplied",
+                ] {
+                    if row[key] != expected[key] {
+                        return Err(corrupted("released Import identity drifted"));
+                    }
+                }
+                if row["retention"] == *retention {
+                    return Ok(());
+                }
+                if row["retention"]
+                    != json!({"retentionClass":"pinnedUntilVerified", "pinned":true})
+                {
+                    return Err(corrupted("released Import retention drifted"));
+                }
+                row["retention"] = retention.clone();
+                self.upsert(&directory, id, row)
+            })
+            .map_err(|error| io_failure(&error.to_string()))?
+    }
+
     /// Swift `loadIndex`: an absent index is empty; every row belongs to this
     /// Job under a unique identity and name; every published payload holds
     /// exactly its bytes.
@@ -451,7 +509,7 @@ fn published(row: &Value) -> bool {
 
 /// Swift `ArtifactRetentionPolicy.retention`: a week by default, a day when
 /// short-lived, and no deadline when pinned until verified.
-fn retention(class: &str, created: &str) -> Result<Value, String> {
+pub(crate) fn retention(class: &str, created: &str) -> Result<Value, String> {
     if class == "pinnedUntilVerified" {
         return Ok(json!({"retentionClass": class, "pinned": true}));
     }

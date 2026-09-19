@@ -46,6 +46,7 @@ impl Composition<'_> {
         after_commit: Option<&'b (dyn Fn(&str) + Sync)>,
     ) -> JobRunner<'b> {
         JobRunner {
+            imports: None,
             mutation: None,
             jobs: self.jobs,
             artifacts: self.artifacts,
@@ -132,6 +133,7 @@ fn rust_cancels_the_swift_running_jobs() {
     for case in cases {
         let accepted = JobAdmitter {
             planner: JobPlanner {
+                imports: None,
                 artifacts: Some(&artifact_store),
                 analyzer: Some(&profile),
                 state_root: &root,

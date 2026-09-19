@@ -145,12 +145,14 @@ fn rust_captures_diagnostics_of_the_swift_fake_device() {
         probe: &probe,
     };
     let planner = || JobPlanner {
+        imports: None,
         artifacts: Some(&artifacts),
         analyzer: None,
         state_root: &root,
         hdc: Some(&hdc),
     };
     let runner = JobRunner {
+        imports: None,
         mutation: None,
         jobs: &jobs,
         artifacts: &artifacts,

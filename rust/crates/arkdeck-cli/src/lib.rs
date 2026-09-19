@@ -419,6 +419,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                 | "--candidate"
                 | "--observation"
                 | "--observation-generation"
+                | "--generation"
                 | "--expected-generation"
                 | "--page-size"
                 | "--cursor"
@@ -571,6 +572,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["artifact", "import", "abort"] => "artifact.import.abort",
         ["artifact", "import", "inspect"] => "artifact.import.inspect",
         ["artifact", "import", "list"] => "artifact.import.list",
+        ["artifact", "import", "release"] => "artifact.import.release",
         ["artifact", "inspect"] => "artifact.inspect",
         ["artifact", "read"] => "artifact.read",
         ["artifact", "export"] => "artifact.export",
@@ -666,6 +668,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             "timeout",
         ],
         "artifact.import.abort" => &["importRequestId", "expectedGeneration", "timeout"],
+        "artifact.import.release" => &["import", "generation", "timeout"],
         "artifact.import.inspect" => &["importRequestId", "import", "timeout"],
         "artifact.import.list" => &["targetId", "state", "pageSize", "cursor", "timeout"],
 

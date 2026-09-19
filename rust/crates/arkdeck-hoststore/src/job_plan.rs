@@ -123,6 +123,7 @@ fn internal_failure() -> PlanRefusal {
 /// permits Swift consults while materializing.
 pub struct JobPlanner<'a> {
     pub artifacts: Option<&'a ArtifactReadStore>,
+    pub imports: Option<&'a crate::ImportUploadStore>,
     pub analyzer: Option<&'a AnalyzerProfile>,
     pub state_root: &'a Path,
     /// The HDC composition a device-bound operation materializes against;
@@ -132,7 +133,8 @@ pub struct JobPlanner<'a> {
 
 /// A materialized plan: its digest and, for a device-bound plan, the Target
 /// identity and binding revision it binds.
-pub(crate) struct Materialized {
+pub(crate) struct Materialized<'a> {
+    _import_use: Option<crate::import_upload::ImportUse<'a>>,
     pub(crate) digest: String,
     pub(crate) identity: Option<String>,
     pub(crate) binding_revision: Option<i64>,
@@ -165,7 +167,7 @@ pub(crate) fn request_json(params: &Map<String, Value>) -> Result<&str, PlanRefu
     Ok(text)
 }
 
-impl JobPlanner<'_> {
+impl<'a> JobPlanner<'a> {
     /// The `job.plan` control parameters: exactly one bounded `requestJson`.
     pub fn handle(&self, params: &Map<String, Value>) -> Result<Value, PlanRefusal> {
         self.plan(request_json(params)?.as_bytes())
@@ -262,12 +264,32 @@ impl JobPlanner<'_> {
         &self,
         request: &OperationRequest,
         descriptor: &CatalogOperation,
-    ) -> Result<Materialized, PlanRefusal> {
-        self.refuse_import_leases(request, descriptor)?;
+    ) -> Result<Materialized<'a>, PlanRefusal> {
+        let references = crate::job_owner::import_references::ImportReference::inputs(
+            &request.inputs,
+            descriptor,
+        )
+        .map_err(|_| refusal("invalidInput", "Import input references are malformed"))?;
+        let hold = if references.is_empty() {
+            None
+        } else {
+            let owner = self
+                .imports
+                .ok_or_else(|| refusal("invalidInput", "Import input owner is unavailable"))?;
+            let artifacts = self
+                .artifacts
+                .ok_or_else(|| refusal("invalidInput", "Artifact owner is unavailable"))?;
+            owner
+                .acquire_inputs(artifacts, &references)
+                .map_err(|error| refusal("invalidInput", error.message))?
+        };
         if descriptor.provider == "hdc" {
-            return self.materialize_device(request, descriptor);
+            let mut materialized = self.materialize_device(request, descriptor)?;
+            materialized._import_use = hold;
+            return Ok(materialized);
         }
         Ok(Materialized {
+            _import_use: hold,
             digest: self.materialize(request, descriptor)?,
             identity: None,
             binding_revision: None,
@@ -299,7 +321,7 @@ impl JobPlanner<'_> {
         &self,
         request: &OperationRequest,
         descriptor: &CatalogOperation,
-    ) -> Result<Materialized, PlanRefusal> {
+    ) -> Result<Materialized<'a>, PlanRefusal> {
         let reference = descriptor.reference();
         let Some(hdc) = self.hdc else {
             return Err(refusal(
@@ -410,61 +432,11 @@ impl JobPlanner<'_> {
         });
         let bytes = session_json::encode(&document).map_err(|_| internal_failure())?;
         Ok(Materialized {
+            _import_use: None,
             digest: sha256_hex(&bytes),
             identity: Some(facts.identity),
             binding_revision: Some(facts.binding_revision),
         })
-    }
-
-    /// Swift `RuntimeImportLeaseReference.inputs`: a malformed Import lease is
-    /// refused as Swift refuses it. A well-formed one needs the committed
-    /// Import owner, which this Runtime does not resolve yet.
-    fn refuse_import_leases(
-        &self,
-        request: &OperationRequest,
-        descriptor: &CatalogOperation,
-    ) -> Result<(), PlanRefusal> {
-        let malformed = || refusal("invalidInput", "Import input references are malformed");
-        for field in &descriptor.inputs {
-            let values: Vec<&Value> = match (field.kind.as_str(), request.inputs.get(&field.name)) {
-                ("artifactLease" | "artifactReference", Some(value)) => vec![value],
-                ("artifactLeaseArray", Some(Value::Array(items))) => items.iter().collect(),
-                ("artifactLeaseArray", Some(_)) => return Err(malformed()),
-                _ => continue,
-            };
-            for value in values {
-                let text = value.as_str().ok_or_else(malformed)?;
-                let parts: Vec<&str> = text.split(':').collect();
-                if parts.len() < 2 || parts[0] != "lease-v1" || !parts[1].starts_with("imp-") {
-                    continue;
-                }
-                let uuid = &parts[1][4..];
-                let canonical_uuid = uuid.len() == 36
-                    && uuid.bytes().enumerate().all(|(index, byte)| {
-                        if [8, 13, 18, 23].contains(&index) {
-                            byte == b'-'
-                        } else {
-                            byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)
-                        }
-                    });
-                let artifact = parts.get(2).copied().unwrap_or("");
-                if parts.len() != 3
-                    || !canonical_uuid
-                    || !artifact.starts_with("ART-")
-                    || artifact.len() != 36
-                    || !artifact[4..]
-                        .bytes()
-                        .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-                {
-                    return Err(malformed());
-                }
-                return Err(refusal(
-                    "rejected",
-                    "an imported Artifact lease is not resolved by the Rust Runtime yet",
-                ));
-            }
-        }
-        Ok(())
     }
 
     /// Swift `RuntimeArtifactStore.resolveLease` plus
@@ -472,11 +444,22 @@ impl JobPlanner<'_> {
     /// Artifact collected from the request's own target. A refusal is the
     /// error Swift interpolates into its message.
     fn resolve_lease(
+        &self,
         artifacts: &ArtifactReadStore,
         lease: &str,
         request: &OperationRequest,
     ) -> Result<LeasedArtifact, String> {
-        let leased = artifacts.lease(lease)?;
+        let leased = if let Some(reference) =
+            crate::job_owner::import_references::ImportReference::parse(lease)
+                .map_err(|error| error.message)?
+        {
+            self.imports
+                .ok_or("Import owner is unavailable")?
+                .resolve_input(artifacts, &reference)
+                .map_err(|error| error.message)?
+        } else {
+            artifacts.lease(lease)?
+        };
         // Swift `validateArtifactBinding` lets a host-only analyzer read an
         // Artifact collected from exactly its own target.
         if leased.row["bindingSnapshot"]["targetID"] != request.target_id.as_str() {
@@ -528,12 +511,14 @@ impl JobPlanner<'_> {
                 format!("{reference} requires a configured Artifact lease store"),
             ));
         };
-        let leased = Self::resolve_lease(artifacts, lease, request).map_err(|reason| {
-            refusal(
-                "invalidInput",
-                format!("analyzer source artifact Artifact lease is not resolvable: {reason}"),
-            )
-        })?;
+        let leased = self
+            .resolve_lease(artifacts, lease, request)
+            .map_err(|reason| {
+                refusal(
+                    "invalidInput",
+                    format!("analyzer source artifact Artifact lease is not resolvable: {reason}"),
+                )
+            })?;
         self.refuse_debug_permit(request)?;
         let path = leased
             .path

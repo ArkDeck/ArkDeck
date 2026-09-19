@@ -137,6 +137,7 @@ fn owner<T>(root: &Root, now: Clock, body: impl FnOnce(&dyn Fn(&str, Value) -> A
     let agents = AgentExecutionStore::open(&root.0.join("agent-executions")).unwrap();
     let admitter = JobAdmitter {
         planner: JobPlanner {
+            imports: None,
             artifacts: Some(&artifacts),
             analyzer: None,
             state_root: &root.0,

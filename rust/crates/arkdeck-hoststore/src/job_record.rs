@@ -265,6 +265,29 @@ impl JobRecord {
     pub(super) fn requires_session_retention(&self) -> bool {
         self.unknown || !terminal(&self.state)
     }
+    /// Verify the original typed submission, allowing only Runtime authorization
+    /// enrichment in the execution request. Never reconstruct a missing original.
+    pub(super) fn verifies_submission(&self, fingerprint: &str) -> bool {
+        let decode = |value: &Value| {
+            crate::operation_request::OperationRequest::decode(&serde_json::to_vec(value).ok()?)
+                .ok()
+        };
+        let Some(execution) = decode(&self.request) else {
+            return false;
+        };
+        let Some(original) = &self.original_request else {
+            return execution.fingerprint() == fingerprint;
+        };
+        let Some(mut submitted) = decode(original) else {
+            return false;
+        };
+        if submitted.fingerprint() != fingerprint {
+            return false;
+        }
+        submitted.capability_id = execution.capability_id.clone();
+        submitted.canonical_value() == execution.canonical_value()
+    }
+
     pub(super) fn from_row(row: &JobRow) -> Result<Self, WireError> {
         let record = Self::decode(&row.record)?;
         if record.job_id != row.id

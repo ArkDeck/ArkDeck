@@ -265,7 +265,7 @@ impl JobAdmitter<'_> {
         request: &OperationRequest,
         descriptor: &CatalogOperation,
         effect: &str,
-        materialized: &Materialized,
+        materialized: &Materialized<'_>,
     ) -> Result<String, AdmissionRefusal> {
         let reference = descriptor.reference();
         let unserved = || {
