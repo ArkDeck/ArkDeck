@@ -1,0 +1,364 @@
+[
+  {
+    "canonical" : "canonical/01-base.json",
+    "document" : "documents/01-base.json",
+    "name" : "base",
+    "outcome" : "accepted"
+  },
+  {
+    "canonical" : "canonical/02-minimal.json",
+    "document" : "documents/02-minimal.json",
+    "name" : "minimal",
+    "outcome" : "accepted"
+  },
+  {
+    "canonical" : "canonical/03-process-notStarted.json",
+    "document" : "documents/03-process-notStarted.json",
+    "name" : "process-notStarted",
+    "outcome" : "accepted"
+  },
+  {
+    "canonical" : "canonical/04-process-stoppedAtSafeBoundary.json",
+    "document" : "documents/04-process-stoppedAtSafeBoundary.json",
+    "name" : "process-stoppedAtSafeBoundary",
+    "outcome" : "accepted"
+  },
+  {
+    "canonical" : "canonical/05-process-stillRunningUnknown.json",
+    "document" : "documents/05-process-stillRunningUnknown.json",
+    "name" : "process-stillRunningUnknown",
+    "outcome" : "accepted"
+  },
+  {
+    "canonical" : "canonical/06-process-notApplicable.json",
+    "document" : "documents/06-process-notApplicable.json",
+    "name" : "process-notApplicable",
+    "outcome" : "accepted"
+  },
+  {
+    "canonical" : "canonical/07-hazard-vocabulary.json",
+    "document" : "documents/07-hazard-vocabulary.json",
+    "name" : "hazard-vocabulary",
+    "outcome" : "accepted"
+  },
+  {
+    "canonical" : "canonical/08-hazard-duplicate.json",
+    "document" : "documents/08-hazard-duplicate.json",
+    "name" : "hazard-duplicate",
+    "outcome" : "accepted"
+  },
+  {
+    "canonical" : "canonical/09-guide-automatic.json",
+    "document" : "documents/09-guide-automatic.json",
+    "name" : "guide-automatic",
+    "outcome" : "accepted"
+  },
+  {
+    "canonical" : "canonical/10-recovery-of-pair.json",
+    "document" : "documents/10-recovery-of-pair.json",
+    "name" : "recovery-of-pair",
+    "outcome" : "accepted"
+  },
+  {
+    "canonical" : "canonical/11-confirmation-offset-fraction.json",
+    "document" : "documents/11-confirmation-offset-fraction.json",
+    "name" : "confirmation-offset-fraction",
+    "outcome" : "accepted"
+  },
+  {
+    "canonical" : "canonical/12-identifier-bounds.json",
+    "document" : "documents/12-identifier-bounds.json",
+    "name" : "identifier-bounds",
+    "outcome" : "accepted"
+  },
+  {
+    "canonical" : "canonical/13-unicode-and-solidus.json",
+    "document" : "documents/13-unicode-and-solidus.json",
+    "name" : "unicode-and-solidus",
+    "outcome" : "accepted"
+  },
+  {
+    "canonical" : "canonical/14-compensation.json",
+    "document" : "documents/14-compensation.json",
+    "name" : "compensation",
+    "outcome" : "accepted"
+  },
+  {
+    "canonical" : "canonical/15-compensation-uppercase-hash.json",
+    "document" : "documents/15-compensation-uppercase-hash.json",
+    "name" : "compensation-uppercase-hash",
+    "outcome" : "accepted"
+  },
+  {
+    "canonical" : "canonical/16-compensation-unverified-hash.json",
+    "document" : "documents/16-compensation-unverified-hash.json",
+    "name" : "compensation-unverified-hash",
+    "outcome" : "accepted"
+  },
+  {
+    "canonical" : "canonical/17-pretty-printed.json",
+    "document" : "documents/17-pretty-printed.json",
+    "name" : "pretty-printed",
+    "outcome" : "accepted"
+  },
+  {
+    "document" : "documents/18-extra-member.json",
+    "name" : "extra-member",
+    "outcome" : "unknownOrMissingFields"
+  },
+  {
+    "document" : "documents/19-missing-member.json",
+    "name" : "missing-member",
+    "outcome" : "unknownOrMissingFields"
+  },
+  {
+    "document" : "documents/20-attention-not-bool.json",
+    "name" : "attention-not-bool",
+    "outcome" : "decoding"
+  },
+  {
+    "document" : "documents/21-reason-empty.json",
+    "name" : "reason-empty",
+    "outcome" : "invalidField(recovery)"
+  },
+  {
+    "document" : "documents/22-audit-duplicate.json",
+    "name" : "audit-duplicate",
+    "outcome" : "invalidField(recovery)"
+  },
+  {
+    "document" : "documents/23-audit-leading-space.json",
+    "name" : "audit-leading-space",
+    "outcome" : "invalidField(recovery)"
+  },
+  {
+    "document" : "documents/24-audit-leading-dot.json",
+    "name" : "audit-leading-dot",
+    "outcome" : "invalidField(recovery)"
+  },
+  {
+    "document" : "documents/25-audit-too-long.json",
+    "name" : "audit-too-long",
+    "outcome" : "invalidField(recovery)"
+  },
+  {
+    "document" : "documents/26-audit-without-confirmation.json",
+    "name" : "audit-without-confirmation",
+    "outcome" : "invalidField(recovery)"
+  },
+  {
+    "document" : "documents/27-last-step-invalid.json",
+    "name" : "last-step-invalid",
+    "outcome" : "invalidField(recovery)"
+  },
+  {
+    "document" : "documents/28-process-unknown.json",
+    "name" : "process-unknown",
+    "outcome" : "invalidField(recovery)"
+  },
+  {
+    "document" : "documents/29-recovery-of-session-invalid.json",
+    "name" : "recovery-of-session-invalid",
+    "outcome" : "invalidField(recovery)"
+  },
+  {
+    "document" : "documents/30-recovery-of-job-invalid.json",
+    "name" : "recovery-of-job-invalid",
+    "outcome" : "invalidField(recovery)"
+  },
+  {
+    "document" : "documents/31-duplicate-member.json",
+    "name" : "duplicate-member",
+    "outcome" : "strictJSON"
+  },
+  {
+    "document" : "documents/32-trailing-bytes.json",
+    "name" : "trailing-bytes",
+    "outcome" : "strictJSON"
+  },
+  {
+    "document" : "documents/33-not-an-object.json",
+    "name" : "not-an-object",
+    "outcome" : "decoding"
+  },
+  {
+    "document" : "documents/34-hazard-extra-member.json",
+    "name" : "hazard-extra-member",
+    "outcome" : "unknownOrMissingFields"
+  },
+  {
+    "document" : "documents/35-hazard-missing-member.json",
+    "name" : "hazard-missing-member",
+    "outcome" : "unknownOrMissingFields"
+  },
+  {
+    "document" : "documents/36-hazard-certainty-mixed.json",
+    "name" : "hazard-certainty-mixed",
+    "outcome" : "invalidField(hazard)"
+  },
+  {
+    "document" : "documents/37-hazard-certainty-not-applicable.json",
+    "name" : "hazard-certainty-not-applicable",
+    "outcome" : "invalidField(hazard)"
+  },
+  {
+    "document" : "documents/38-hazard-severity-unknown.json",
+    "name" : "hazard-severity-unknown",
+    "outcome" : "invalidField(hazard)"
+  },
+  {
+    "document" : "documents/39-hazard-summary-empty.json",
+    "name" : "hazard-summary-empty",
+    "outcome" : "invalidField(hazard)"
+  },
+  {
+    "document" : "documents/40-hazard-code-invalid.json",
+    "name" : "hazard-code-invalid",
+    "outcome" : "invalidField(hazard)"
+  },
+  {
+    "document" : "documents/41-hazard-not-object.json",
+    "name" : "hazard-not-object",
+    "outcome" : "decoding"
+  },
+  {
+    "document" : "documents/42-mode-unknown-extra-member.json",
+    "name" : "mode-unknown-extra-member",
+    "outcome" : "unknownOrMissingFields"
+  },
+  {
+    "document" : "documents/43-mode-known-without-evidence.json",
+    "name" : "mode-known-without-evidence",
+    "outcome" : "invalidField(lastDeviceMode)"
+  },
+  {
+    "document" : "documents/44-mode-known-empty-evidence.json",
+    "name" : "mode-known-empty-evidence",
+    "outcome" : "invalidField(lastDeviceMode)"
+  },
+  {
+    "document" : "documents/45-mode-known-empty-value.json",
+    "name" : "mode-known-empty-value",
+    "outcome" : "invalidField(lastDeviceMode)"
+  },
+  {
+    "document" : "documents/46-mode-known-value-not-string.json",
+    "name" : "mode-known-value-not-string",
+    "outcome" : "invalidField(lastDeviceMode)"
+  },
+  {
+    "document" : "documents/47-mode-known-extra-member.json",
+    "name" : "mode-known-extra-member",
+    "outcome" : "invalidField(lastDeviceMode)"
+  },
+  {
+    "document" : "documents/48-mode-state-unknown-word.json",
+    "name" : "mode-state-unknown-word",
+    "outcome" : "invalidField(lastDeviceMode.state)"
+  },
+  {
+    "document" : "documents/49-mode-state-missing.json",
+    "name" : "mode-state-missing",
+    "outcome" : "decoding"
+  },
+  {
+    "document" : "documents/50-guide-extra-member.json",
+    "name" : "guide-extra-member",
+    "outcome" : "unknownOrMissingFields"
+  },
+  {
+    "document" : "documents/51-guide-steps-empty.json",
+    "name" : "guide-steps-empty",
+    "outcome" : "invalidField(recoveryGuide)"
+  },
+  {
+    "document" : "documents/52-guide-step-empty.json",
+    "name" : "guide-step-empty",
+    "outcome" : "invalidField(recoveryGuide)"
+  },
+  {
+    "document" : "documents/53-guide-provider-empty.json",
+    "name" : "guide-provider-empty",
+    "outcome" : "invalidField(recoveryGuide)"
+  },
+  {
+    "document" : "documents/54-guide-summary-empty.json",
+    "name" : "guide-summary-empty",
+    "outcome" : "invalidField(recoveryGuide)"
+  },
+  {
+    "document" : "documents/55-guide-automatic-not-bool.json",
+    "name" : "guide-automatic-not-bool",
+    "outcome" : "decoding"
+  },
+  {
+    "document" : "documents/56-confirmation-extra-member.json",
+    "name" : "confirmation-extra-member",
+    "outcome" : "unknownOrMissingFields"
+  },
+  {
+    "document" : "documents/57-confirmation-missing-member.json",
+    "name" : "confirmation-missing-member",
+    "outcome" : "unknownOrMissingFields"
+  },
+  {
+    "document" : "documents/58-confirmation-actor-agent.json",
+    "name" : "confirmation-actor-agent",
+    "outcome" : "invalidField(userConfirmation)"
+  },
+  {
+    "document" : "documents/59-confirmation-decision-other.json",
+    "name" : "confirmation-decision-other",
+    "outcome" : "invalidField(userConfirmation)"
+  },
+  {
+    "document" : "documents/60-confirmation-date-invalid.json",
+    "name" : "confirmation-date-invalid",
+    "outcome" : "invalidField(userConfirmation)"
+  },
+  {
+    "document" : "documents/61-confirmation-id-invalid.json",
+    "name" : "confirmation-id-invalid",
+    "outcome" : "invalidField(userConfirmation)"
+  },
+  {
+    "document" : "documents/62-compensation-extra-member.json",
+    "name" : "compensation-extra-member",
+    "outcome" : "compensation"
+  },
+  {
+    "document" : "documents/63-compensation-kind-not-compensating.json",
+    "name" : "compensation-kind-not-compensating",
+    "outcome" : "compensation"
+  },
+  {
+    "document" : "documents/64-compensation-hash-short.json",
+    "name" : "compensation-hash-short",
+    "outcome" : "compensation"
+  },
+  {
+    "document" : "documents/65-compensation-argument-missing.json",
+    "name" : "compensation-argument-missing",
+    "outcome" : "compensation"
+  },
+  {
+    "document" : "documents/66-compensation-effect-understated.json",
+    "name" : "compensation-effect-understated",
+    "outcome" : "invalidField(unexecutedCompensations.policy)"
+  },
+  {
+    "document" : "documents/67-compensation-binding-understated.json",
+    "name" : "compensation-binding-understated",
+    "outcome" : "invalidField(unexecutedCompensations.policy)"
+  },
+  {
+    "document" : "documents/68-compensation-trigger-unknown.json",
+    "name" : "compensation-trigger-unknown",
+    "outcome" : "decoding"
+  },
+  {
+    "document" : "documents/69-compensation-not-object.json",
+    "name" : "compensation-not-object",
+    "outcome" : "decoding"
+  }
+]
