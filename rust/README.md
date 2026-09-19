@@ -236,12 +236,19 @@ Run `rust/scripts/check-tool-list.py` and `rust/scripts/check-tool-retirement.py
 with the configured Python interpreter against candidate binaries. Both use
 fresh temporary registries; `--native-registry` copies an explicit temporary
 Swift-produced registry to cover DevEco alongside HDC, and `--cli-path` selects
-the Swift consumer. These checks do not activate the installed Runtime.
+the Swift consumer. These checks do not activate the installed Runtime. Every
+isolated host check (`check-*-register.py`, `check-*-list.py`,
+`check-*-retirement.py`) works in one fresh `/private/tmp` run directory of
+daemon logs, frames and reports (`rust/scripts/run-directory.py`): a passing run
+removes it, a failed run keeps it and names it on stderr, and `--keep-run-dir`
+keeps a passing run's directory too, for example to read its registry back
+natively.
 
 For an explicit native macOS check, build the candidate binaries in release mode
 and run `python3 rust/scripts/check-deveco-register.py --bin-dir <release-dir>
---source-root /Applications/DevEco-Studio.app/Contents`. The harness retains a
-fresh temporary registry, checks restart/idempotence and verifies that installed
+--source-root /Applications/DevEco-Studio.app/Contents`. The harness works in a
+fresh temporary registry, kept only after a failure or with `--keep-run-dir`,
+checks restart/idempotence and verifies that installed
 Bootstrap metadata and source content remain unchanged. `--cli-path <swift-cli>`
 checks the Swift registration consumer against the Rust owner. Missing native
 content is reported as SKIP; this is separate from portable contract CI and is

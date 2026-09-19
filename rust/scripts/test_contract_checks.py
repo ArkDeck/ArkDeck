@@ -2,6 +2,7 @@
 """Regression checks for the checkout manifest, the merge-base published view and candidate isolation."""
 from __future__ import annotations
 
+import argparse
 import contextlib
 import importlib.util
 import io
@@ -35,6 +36,11 @@ READONLY_SPEC = importlib.util.spec_from_file_location(
     "arkdeck_readonly_checks", SCRIPT.with_name("check-readonly.py"))
 readonly = importlib.util.module_from_spec(READONLY_SPEC)
 READONLY_SPEC.loader.exec_module(readonly)
+
+RUN_DIRECTORY_SPEC = importlib.util.spec_from_file_location(
+    "arkdeck_run_directory", SCRIPT.with_name("run-directory.py"))
+run_directory = importlib.util.module_from_spec(RUN_DIRECTORY_SPEC)
+RUN_DIRECTORY_SPEC.loader.exec_module(run_directory)
 
 
 class ReadOnlyImportExpectationTests(unittest.TestCase):
@@ -690,6 +696,87 @@ class SchemaVocabularyTests(unittest.TestCase):
                     and (value == "0" or value[0] != "0") and int(value) <= maximum)
 
         self.assert_pattern_matches("nonnegativeInt64Decimal", values, expected)
+
+
+class RunDirectoryTests(unittest.TestCase):
+    """An isolated host check's run directory outlives only a failed run, or a kept one."""
+
+    # Every check that check-contracts.py runs in its own /private/tmp run directory.
+    ISOLATED_HOST_CHECKS = (
+        "check-bundle-list.py", "check-bundle-register.py", "check-bundle-retirement.py",
+        "check-deveco-register.py", "check-hdc-register.py", "check-tool-list.py",
+        "check-tool-retirement.py",
+    )
+
+    def setUp(self):
+        self.parent = tempfile.TemporaryDirectory(prefix="arkdeck-run-directory-tests-")
+        self.addCleanup(self.parent.cleanup)
+        self.stderr = io.StringIO()
+
+    def run_directory(self, keep=False):
+        return run_directory.RunDirectory("check-", keep=keep, parent=self.parent.name)
+
+    def test_a_passing_run_removes_its_directory_without_a_word(self):
+        with contextlib.redirect_stderr(self.stderr), self.run_directory() as directory:
+            path = directory.path
+            self.assertEqual(path.parent, Path(self.parent.name).resolve())
+            self.assertTrue(path.name.startswith("check-"))
+            self.assertEqual(path.stat().st_mode & 0o777, 0o700)
+            (path / "daemon-0.log").write_bytes(b"log")
+            (path / "state").mkdir()
+            directory.passed = True
+        self.assertFalse(path.exists())
+        self.assertEqual(self.stderr.getvalue(), "")
+
+    def test_a_failed_run_keeps_its_directory_and_names_it_on_stderr(self):
+        with self.assertRaisesRegex(AssertionError, "did not bind"):
+            with contextlib.redirect_stderr(self.stderr), self.run_directory() as directory:
+                path = directory.path
+                (path / "report.json").write_bytes(b"{}")
+                raise AssertionError("temporary daemon did not bind")
+        self.assertEqual((path / "report.json").read_bytes(), b"{}")
+        self.assertEqual(self.stderr.getvalue(), f"run directory retained after a failed run: {path}\n")
+
+    def test_a_run_that_never_passed_is_kept_like_a_failure(self):
+        # A check that reports FAIL and returns 1 raises nothing.
+        with contextlib.redirect_stderr(self.stderr), self.run_directory() as directory:
+            path = directory.path
+        self.assertTrue(path.is_dir())
+        self.assertEqual(self.stderr.getvalue(), f"run directory retained after a failed run: {path}\n")
+
+    def test_keep_run_dir_keeps_a_passing_run_and_says_so(self):
+        with contextlib.redirect_stderr(self.stderr), self.run_directory(keep=True) as directory:
+            path = directory.path
+            directory.passed = True
+        self.assertTrue(path.is_dir())
+        self.assertEqual(self.stderr.getvalue(), f"run directory kept by --keep-run-dir: {path}\n")
+
+    def test_the_flag_is_off_by_default(self):
+        parser = argparse.ArgumentParser()
+        run_directory.add_argument(parser)
+        self.assertFalse(parser.parse_args([]).keep_run_dir)
+        self.assertTrue(parser.parse_args(["--keep-run-dir"]).keep_run_dir)
+
+    @unittest.skipIf(sys.platform == "win32", "the isolated host checks import fcntl")
+    def test_every_isolated_host_check_offers_keep_run_dir(self):
+        for name in self.ISOLATED_HOST_CHECKS:
+            with self.subTest(check=name):
+                result = subprocess.run([sys.executable, str(SCRIPT.with_name(name)), "--help"],
+                                        capture_output=True, text=True, timeout=120)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn("--keep-run-dir", result.stdout)
+
+    def test_check_contracts_runs_the_isolated_host_checks_without_keeping_their_directories(self):
+        view = Path(self.parent.name) / "view"
+        with patch.object(sys, "platform", "darwin"):
+            commands = runner.commands(view, view / "output", owners=True)
+        checks = {Path(argv[1]).name: argv for argv, _ in commands if argv[0] == sys.executable}
+        # DevEco registration needs an installed DevEco Studio and runs by hand.
+        expected = [name for name in self.ISOLATED_HOST_CHECKS if name != "check-deveco-register.py"]
+        self.assertEqual([name for name in self.ISOLATED_HOST_CHECKS if name in checks], expected)
+        for name in expected:
+            with self.subTest(check=name):
+                self.assertNotIn("--keep-run-dir", checks[name])
 
 
 if __name__ == "__main__":
