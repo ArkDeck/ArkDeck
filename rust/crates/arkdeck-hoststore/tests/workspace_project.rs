@@ -60,10 +60,12 @@ fn call(
     verb: &str,
     params: Value,
 ) -> Result<Value, arkdeck_contract::WireError> {
+    // Registration, listing and reading never consult the Job census.
     owner.handle(
         &format!("workspace.project.{verb}"),
         params.as_object().unwrap(),
-        NOW,
+        &|| NOW.into(),
+        &|_| panic!("only a project mutation consults the Job census"),
     )
 }
 #[test]

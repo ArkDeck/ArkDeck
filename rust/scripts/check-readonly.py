@@ -347,7 +347,13 @@ def main() -> None:
                         expected = "invalidInput"
                     if method in {"target.list", "target.show", "target.display-name.set", "target.display-name.clear", "device.display-name.set", "device.display-name.clear"}:
                         expected = "internalError"
-                    if method in {"workspace.project.register", "workspace.project.show"}:
+                    # Without parameters, as Swift's handler, every workspace method but the
+                    # project list is refused before its owner is asked.
+                    if method in {"workspace.project.register", "workspace.project.show",
+                                  "workspace.project.update", "workspace.project.remove",
+                                  "workspace.preset.list", "workspace.preset.show",
+                                  "workspace.preset.register", "workspace.preset.update",
+                                  "workspace.preset.remove"}:
                         expected = "invalidParams"
                     if method == "workspace.project.list":
                         schema = read_json(ROOT / "spec/control/methods" / f"{method}.json")

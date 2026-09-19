@@ -1829,6 +1829,23 @@ both passwords go only through `run_pty_exchange`. The run ends in Swift's
 `signing-result.json`, with Swift's refused-before-spawn and outcome-unknown
 failure classes.
 
+The registration owner is `arkdeck_hoststore::WorkspaceProjectStore`. It
+serves `workspace.project.*` and `workspace.preset.*` over Swift's
+`projects.json`, with the key sets frozen and a record with one key more
+refused. A project or preset update or removal first asks the durable Job
+census, `JobStore::require_no_active_workspace_project_reference` or
+`require_no_active_workspace_preset_reference`, whether an active or uncertain
+workspace Job names it. A preset that pins a DevEco toolchain or a signing
+credential goes through Swift's crash-recovered dependency transaction: the
+intent is written first, completed by the next access if the process dies, and
+abandoned if a pin is refused. The pins go through the
+`WorkspaceToolchainPinning` and `WorkspaceCredentialPinning` owners the
+composition root passes to `with_dependency_pinning`. The isolated daemon
+passes none yet, so such a preset is refused as Swift refuses it without them.
+`AgentDaemonContractTests.testWorkspacePresetAndProjectMutationControlFramesRecordTheirRefusals`
+is the Swift oracle, and `tests/workspace_mutation_oracle.rs` replays its 78
+frames in order.
+
 `arkdeck_platform::KeychainItems` is the `SecItem*` store under it. Production
 reads use the Data Protection Keychain in the helpers' access group, with
 Swift's non-interactive `LAContext` created through the Objective-C runtime. A

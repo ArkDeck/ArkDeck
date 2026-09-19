@@ -47,6 +47,318 @@ fn workspace_project_arguments_are_closed() {
         assert!(parse(&args(&argv)).is_err(), "{argv:?}");
     }
 }
+/// The four leaves the Rust owner gained first with the mutation oracle, as
+/// the Swift argv samples spell them, and their closed refusals.
+#[test]
+fn workspace_mutation_and_preset_arguments_are_closed() {
+    for (argv, method, params) in [
+        (
+            vec![
+                "workspace",
+                "project",
+                "update",
+                "--project",
+                "sample",
+                "--expected-generation",
+                "1",
+                "--kind",
+                "arkdeck",
+                "--root",
+                "/private/tmp/project",
+            ],
+            "workspace.project.update",
+            json!({"projectRef": "sample", "expectedGeneration": "1", "kind": "arkdeck",
+                   "root": "/private/tmp/project"}),
+        ),
+        (
+            vec![
+                "workspace",
+                "project",
+                "remove",
+                "--project",
+                "sample",
+                "--expected-generation",
+                "1",
+            ],
+            "workspace.project.remove",
+            json!({"projectRef": "sample", "expectedGeneration": "1"}),
+        ),
+        (
+            vec!["workspace", "preset", "list", "--project", "sample"],
+            "workspace.preset.list",
+            json!({"projectRef": "sample"}),
+        ),
+        (
+            vec![
+                "workspace",
+                "preset",
+                "list",
+                "--project",
+                "sample",
+                "--kind",
+                "symbol",
+            ],
+            "workspace.preset.list",
+            json!({"projectRef": "sample", "kind": "symbol"}),
+        ),
+        (
+            vec![
+                "workspace",
+                "preset",
+                "show",
+                "--project",
+                "sample",
+                "--preset",
+                "preset-sample",
+            ],
+            "workspace.preset.show",
+            json!({"projectRef": "sample", "presetRef": "preset-sample"}),
+        ),
+    ] {
+        let invocation = parse(&args(&argv)).unwrap();
+        assert_eq!(invocation.method, method, "{argv:?}");
+        assert_eq!(
+            Value::Object(invocation.params.unwrap()),
+            params,
+            "{argv:?}"
+        );
+    }
+    for argv in [
+        vec![
+            "workspace",
+            "project",
+            "update",
+            "--project",
+            "sample",
+            "--expected-generation",
+            "1",
+            "--kind",
+            "arkdeck",
+        ],
+        vec![
+            "workspace",
+            "project",
+            "update",
+            "--project",
+            "sample",
+            "--expected-generation",
+            "1",
+            "--kind",
+            "sideways",
+            "--root",
+            "/tmp",
+        ],
+        vec!["workspace", "project", "remove", "--project", "sample"],
+        vec!["workspace", "preset", "list"],
+        vec![
+            "workspace",
+            "preset",
+            "list",
+            "--project",
+            "sample",
+            "--kind",
+            "sideways",
+        ],
+        vec!["workspace", "preset", "show", "--project", "sample"],
+        vec![
+            "workspace",
+            "preset",
+            "show",
+            "--project",
+            "sample",
+            "--preset",
+            "p",
+            "--root",
+            "/tmp",
+        ],
+    ] {
+        assert!(parse(&args(&argv)).is_err(), "{argv:?}");
+    }
+}
+/// The three preset mutation leaves as the Swift argv samples spell them:
+/// each dispatches, renders its help, and refuses an unknown or repeated
+/// option, a missing required one and `--output jsonl`; `--socket` is kept.
+#[test]
+fn workspace_preset_mutation_arguments_follow_the_swift_samples() {
+    let register = [
+        "workspace",
+        "preset",
+        "register",
+        "--registration-request-id",
+        "sample",
+        "--project",
+        "sample",
+        "--kind",
+        "build",
+        "--template",
+        "sample",
+        "--timeout-seconds",
+        "1",
+    ];
+    let update = [
+        "workspace",
+        "preset",
+        "update",
+        "--mutation-request-id",
+        "sample",
+        "--project",
+        "sample",
+        "--preset",
+        "sample",
+        "--expected-generation",
+        "1",
+        "--kind",
+        "build",
+        "--template",
+        "sample",
+        "--timeout-seconds",
+        "1",
+    ];
+    let remove = [
+        "workspace",
+        "preset",
+        "remove",
+        "--mutation-request-id",
+        "sample",
+        "--project",
+        "sample",
+        "--preset",
+        "sample",
+        "--expected-generation",
+        "1",
+    ];
+    for (valid, method, duplicate, params) in [
+        (
+            &register[..],
+            "workspace.preset.register",
+            "--registration-request-id",
+            json!({"registrationRequestId":"sample", "projectRef":"sample", "kind":"build",
+                   "templateRef":"sample", "timeoutSeconds":"1"}),
+        ),
+        (
+            &update[..],
+            "workspace.preset.update",
+            "--mutation-request-id",
+            json!({"mutationRequestId":"sample", "projectRef":"sample", "presetRef":"sample",
+                   "expectedGeneration":"1", "kind":"build", "templateRef":"sample",
+                   "timeoutSeconds":"1"}),
+        ),
+        (
+            &remove[..],
+            "workspace.preset.remove",
+            "--mutation-request-id",
+            json!({"mutationRequestId":"sample", "projectRef":"sample", "presetRef":"sample",
+                   "expectedGeneration":"1"}),
+        ),
+    ] {
+        let invocation = parse(&args(valid)).unwrap();
+        assert_eq!(invocation.method, method);
+        assert_eq!(
+            Value::Object(invocation.params.unwrap()),
+            params,
+            "{method}"
+        );
+        assert!(
+            parse(&args(&[&valid[..3], &["--help"]].concat()))
+                .unwrap()
+                .help
+        );
+        // `--socket` is the macOS compatibility option; elsewhere it is refused.
+        let with_socket = parse(&args(&[valid, &["--socket", "sample"]].concat()));
+        if cfg!(target_os = "macos") {
+            assert_eq!(with_socket.unwrap().method, method);
+        } else {
+            assert_eq!(with_socket.unwrap_err().code, "unsupportedOnPlatform");
+        }
+        for extra in [
+            vec!["--no-such-option"],
+            vec![duplicate, "sample"],
+            vec!["--output", "jsonl"],
+        ] {
+            let error = parse(&args(&[valid, &extra[..]].concat())).unwrap_err();
+            assert_eq!(error.code, "invalidOption", "{method} {extra:?}");
+        }
+        let missing = parse(&args(&valid[..3])).unwrap_err();
+        assert_eq!(missing.code, "invalidOption", "{method}");
+    }
+    // Every definition option maps to the typed field Swift's handler reads.
+    let full = parse(&args(&[
+        "workspace",
+        "preset",
+        "register",
+        "--registration-request-id",
+        "preset-signing",
+        "--project",
+        "project-a",
+        "--kind",
+        "signing",
+        "--template",
+        "openharmony.local-sign@1",
+        "--toolchain",
+        "toolchain:sha256:b",
+        "--toolchain-generation",
+        "1",
+        "--credential",
+        "credential:sha256-c",
+        "--timeout-seconds",
+        "3600",
+        "--module",
+        "entry",
+        "--product",
+        "default",
+        "--build-mode",
+        "debug",
+        "--relative-source-map",
+        "entry/a.map",
+    ]))
+    .unwrap();
+    assert_eq!(
+        Value::Object(full.params.unwrap()),
+        json!({"registrationRequestId":"preset-signing", "projectRef":"project-a",
+               "kind":"signing", "templateRef":"openharmony.local-sign@1",
+               "toolchainRef":"toolchain:sha256:b", "toolchainGeneration":"1",
+               "credentialRef":"credential:sha256-c", "timeoutSeconds":"3600",
+               "module":"entry", "product":"default", "buildMode":"debug",
+               "relativeSourceMap":"entry/a.map"})
+    );
+    // The registry's value grammars refuse before any request is sent.
+    for (valid, option, value) in [
+        (&register[..], "--kind", "sideways"),
+        (&register[..], "--timeout-seconds", "3601"),
+        (&register[..], "--timeout-seconds", "0600"),
+        (&update[..], "--expected-generation", "0"),
+        (&remove[..], "--expected-generation", "01"),
+    ] {
+        let mut argv = valid.to_vec();
+        let at = argv.iter().position(|a| *a == option).unwrap();
+        argv[at + 1] = value;
+        assert_eq!(
+            parse(&args(&argv)).unwrap_err().code,
+            "invalidOption",
+            "{option} {value}"
+        );
+    }
+    let mut generation = register.to_vec();
+    generation.extend(["--toolchain-generation", "0"]);
+    assert_eq!(parse(&args(&generation)).unwrap_err().code, "invalidOption");
+    let mut project = vec![
+        "workspace",
+        "project",
+        "update",
+        "--project",
+        "sample",
+        "--expected-generation",
+        "0",
+        "--kind",
+        "arkdeck",
+        "--root",
+        "/tmp",
+    ];
+    assert_eq!(parse(&args(&project)).unwrap_err().code, "invalidOption");
+    project[6] = "1";
+    assert!(parse(&args(&project)).is_ok());
+}
+
 #[cfg(target_os = "macos")]
 mod runtime {
     use super::*;

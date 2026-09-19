@@ -1679,18 +1679,46 @@ impl HostServices for Host {
     ) -> Result<serde_json::Value, WireError> {
         #[cfg(target_os = "macos")]
         if let Some(owner) = &self.workspace_projects {
+            use arkdeck_hoststore::WorkspaceReference;
+            // A project or preset mutation is refused while an active or
+            // uncertain workspace Job names it; without the Job owner nothing
+            // proves that none does.
+            let census = |reference: WorkspaceReference<'_>| match (&self.jobs, reference) {
+                (Some(jobs), WorkspaceReference::Project(project)) => {
+                    jobs.require_no_active_workspace_project_reference(project)
+                }
+                (Some(jobs), WorkspaceReference::Preset(preset)) => {
+                    jobs.require_no_active_workspace_preset_reference(preset)
+                }
+                (None, _) => Err(WireError {
+                    code: "recordUnreadable".into(),
+                    message: "workspace Job references cannot be verified".into(),
+                    details: Some(serde_json::Map::from_iter([
+                        ("phase".into(), serde_json::json!("workspaceProjectOwner")),
+                        ("newDispatchCount".into(), serde_json::json!(0)),
+                    ])),
+                }),
+            };
             return owner.handle(
                 method,
                 params,
-                &arkdeck_hoststore::runtime_now().unwrap_or_default(),
+                &|| arkdeck_hoststore::runtime_now().unwrap_or_default(),
+                &census,
             );
         }
-        let _ = (method, params);
+        let _ = params;
+        // Swift answers a preset method without its owner under the preset
+        // owner's phase.
+        let phase = if method.starts_with("workspace.preset.") {
+            "workspacePresetOwner"
+        } else {
+            "workspaceProjectOwner"
+        };
         Err(WireError {
             code: "operationUnavailable".into(),
             message: "workspace project owner is unavailable".into(),
             details: Some(serde_json::Map::from_iter([
-                ("phase".into(), serde_json::json!("workspaceProjectOwner")),
+                ("phase".into(), serde_json::json!(phase)),
                 ("newDispatchCount".into(), serde_json::json!(0)),
             ])),
         })

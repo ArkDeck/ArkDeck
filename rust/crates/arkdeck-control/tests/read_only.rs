@@ -110,6 +110,13 @@ fn every_unimplemented_method_is_refused_without_entering_the_host() {
             "workspace.project.register",
             "workspace.project.list",
             "workspace.project.show",
+            "workspace.project.update",
+            "workspace.project.remove",
+            "workspace.preset.list",
+            "workspace.preset.show",
+            "workspace.preset.register",
+            "workspace.preset.update",
+            "workspace.preset.remove",
             "artifact.export",
             "artifact.import.list",
             "artifact.import.begin",
@@ -160,6 +167,166 @@ fn every_unimplemented_method_is_refused_without_entering_the_host() {
     assert_eq!(reads.load(Ordering::SeqCst), 0);
 }
 
+/// Swift's handler refuses a malformed workspace mutation or preset request
+/// with its own message and no owner details, before it asks for the owner.
+#[test]
+fn workspace_mutation_and_preset_parameters_answer_swift_s_refusals() {
+    let (control, reads) = setup();
+    // A symbol definition under `identity`, then `extra` over both.
+    let symbol = |identity: serde_json::Value, extra: serde_json::Value| {
+        let mut fields = json!({"kind":"symbol", "templateRef":"openharmony.arkts-symbol@1",
+            "timeoutSeconds":"600", "relativeSourceMap":"entry/a.map"});
+        for (key, value) in identity
+            .as_object()
+            .unwrap()
+            .iter()
+            .chain(extra.as_object().unwrap())
+        {
+            fields[key] = value.clone();
+        }
+        fields
+    };
+    let register = |extra| {
+        symbol(
+            json!({"registrationRequestId":"r", "projectRef":"p"}),
+            extra,
+        )
+    };
+    let update = |extra| {
+        symbol(
+            json!({"mutationRequestId":"m", "projectRef":"p", "presetRef":"preset-x",
+                   "expectedGeneration":"1"}),
+            extra,
+        )
+    };
+    let project_update =
+        "workspace project update requires exact project, generation, kind and root";
+    let project_remove = "workspace project remove requires exact project and generation";
+    let preset_register = "workspace preset register requires one closed typed definition";
+    let preset_update =
+        "workspace preset update requires identity, exact generation and definition";
+    let preset_remove = "workspace preset remove requires identity and exact generation";
+    for (method, params, message) in [
+        ("workspace.project.update", json!({}), project_update),
+        (
+            "workspace.project.update",
+            json!({"projectRef":"p", "expectedGeneration":"0", "kind":"openharmony", "root":"/tmp"}),
+            project_update,
+        ),
+        (
+            "workspace.project.remove",
+            json!({"projectRef":"p", "expectedGeneration":"01"}),
+            project_remove,
+        ),
+        ("workspace.preset.list", json!({}), "projectRef is required"),
+        (
+            "workspace.preset.list",
+            json!({"projectRef":"p", "extra":"x"}),
+            "workspace preset list accepts only projectRef and kind",
+        ),
+        (
+            "workspace.preset.list",
+            json!({"projectRef":"p", "kind":3}),
+            "kind must be text",
+        ),
+        (
+            "workspace.preset.show",
+            json!({"projectRef":"p", "presetRef":""}),
+            "projectRef and presetRef are required",
+        ),
+        (
+            "workspace.preset.show",
+            json!({"projectRef":"p", "presetRef":"preset-x", "extra":"x"}),
+            "workspace preset show requires exact projectRef and presetRef",
+        ),
+        ("workspace.preset.register", json!({}), preset_register),
+        (
+            "workspace.preset.register",
+            json!({"registrationRequestId":"preset-missing"}),
+            preset_register,
+        ),
+        (
+            "workspace.preset.register",
+            register(json!({"timeoutSeconds":"0600"})),
+            preset_register,
+        ),
+        (
+            "workspace.preset.register",
+            register(json!({"toolchainGeneration":1})),
+            preset_register,
+        ),
+        (
+            "workspace.preset.register",
+            register(json!({"credentialRef":null})),
+            preset_register,
+        ),
+        (
+            "workspace.preset.register",
+            register(json!({"note":"x"})),
+            preset_register,
+        ),
+        (
+            "workspace.preset.register",
+            register(json!({"projectRef":7})),
+            preset_register,
+        ),
+        ("workspace.preset.update", json!({}), preset_update),
+        (
+            "workspace.preset.update",
+            update(json!({"expectedGeneration":"0"})),
+            preset_update,
+        ),
+        (
+            "workspace.preset.update",
+            json!({"mutationRequestId":"m", "projectRef":"p", "presetRef":"preset-x",
+                   "expectedGeneration":"2"}),
+            preset_update,
+        ),
+        ("workspace.preset.remove", json!({}), preset_remove),
+        (
+            "workspace.preset.remove",
+            json!({"mutationRequestId":"m", "projectRef":"p", "presetRef":"preset-x",
+                   "expectedGeneration":"1", "kind":"symbol"}),
+            preset_remove,
+        ),
+    ] {
+        let error = call(&control, method, params.clone()).outcome.unwrap_err();
+        assert_eq!(
+            (error.code.as_str(), error.message.as_str(), error.details),
+            ("invalidParams", message, None),
+            "{method} {params}"
+        );
+    }
+    assert_eq!(reads.load(Ordering::SeqCst), 0);
+    // A well-formed request reaches the owner.
+    for (method, params) in [
+        ("workspace.preset.register", register(json!({}))),
+        (
+            "workspace.preset.register",
+            register(
+                json!({"kind":"build", "templateRef":"openharmony.hvigor-build@1",
+                "toolchainRef":"toolchain:sha256:x", "toolchainGeneration":"1",
+                "module":"entry", "product":"default", "buildMode":"debug"}),
+            ),
+        ),
+        ("workspace.preset.update", update(json!({}))),
+        (
+            "workspace.preset.remove",
+            json!({"mutationRequestId":"m", "projectRef":"p", "presetRef":"preset-x",
+                   "expectedGeneration":"1"}),
+        ),
+    ] {
+        assert_ne!(
+            call(&control, method, params.clone())
+                .outcome
+                .unwrap_err()
+                .code,
+            "invalidParams",
+            "{method} {params}"
+        );
+    }
+}
+
 #[test]
 fn workspace_project_parameters_are_checked_before_owner_availability() {
     let (control, reads) = setup();
@@ -180,6 +347,31 @@ fn workspace_project_parameters_are_checked_before_owner_availability() {
             json!({"projectRef":"project-fixture", "extra":true}),
         ),
         ("workspace.project.list", json!({"root":"/tmp/project"})),
+        ("workspace.project.update", json!({})),
+        (
+            "workspace.project.update",
+            json!({"projectRef":"p", "expectedGeneration":"0", "kind":"openharmony", "root":"/tmp"}),
+        ),
+        (
+            "workspace.project.update",
+            json!({"projectRef":"p", "expectedGeneration":"1", "kind":"openharmony"}),
+        ),
+        ("workspace.project.remove", json!({"projectRef":"p"})),
+        (
+            "workspace.project.remove",
+            json!({"projectRef":"p", "expectedGeneration":"01"}),
+        ),
+        ("workspace.preset.list", json!({})),
+        ("workspace.preset.list", json!({"projectRef":"p", "kind":3})),
+        (
+            "workspace.preset.list",
+            json!({"projectRef":"p", "extra":"x"}),
+        ),
+        ("workspace.preset.show", json!({"projectRef":"p"})),
+        (
+            "workspace.preset.show",
+            json!({"projectRef":"p", "presetRef":""}),
+        ),
     ] {
         assert_eq!(
             call(&control, method, params).outcome.unwrap_err().code,

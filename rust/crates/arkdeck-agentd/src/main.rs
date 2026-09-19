@@ -276,6 +276,9 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
                 &root.join("targets-state"),
             )?)
             .with_history(arkdeck_hoststore::HistoryStore::open(&root)?)
+            // No DevEco toolchain or signing credential owner acquires or
+            // releases a preset pin in Rust yet, so a preset that pins either
+            // is refused as Swift's store refuses it without those owners.
             .with_workspace_projects(arkdeck_hoststore::WorkspaceProjectStore::open(
                 &root.join("workspace-projects"),
             )?)
