@@ -47,6 +47,7 @@ impl Composition<'_> {
     ) -> JobRunner<'b> {
         JobRunner {
             imports: None,
+            mutation: None,
             jobs: self.jobs,
             artifacts: self.artifacts,
             analyzer: Some(self.profile),

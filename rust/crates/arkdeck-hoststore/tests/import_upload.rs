@@ -2284,6 +2284,7 @@ fn replacing_import_payload_or_receipt_after_admission_dispatches_no_analyzer() 
         let store = fixture.store();
         let jid = accepted["jobId"].as_str().unwrap();
         let status = arkdeck_hoststore::JobRunner {
+            mutation: None,
             imports: Some(&store),
             jobs: &jobs,
             artifacts: &artifacts,

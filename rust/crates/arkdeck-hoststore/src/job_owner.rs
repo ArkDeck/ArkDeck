@@ -15,6 +15,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[path = "mutation_state_continuity.rs"]
+mod mutation_state_continuity;
+
 pub struct JobStore {
     repository: JobRepository,
     path: PathBuf,

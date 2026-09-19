@@ -75,6 +75,7 @@ fn rust_cancels_the_swift_jobs() {
     };
     let runner = JobRunner {
         imports: None,
+        mutation: None,
         jobs: &jobs,
         artifacts: &artifact_store,
         analyzer: Some(&profile),

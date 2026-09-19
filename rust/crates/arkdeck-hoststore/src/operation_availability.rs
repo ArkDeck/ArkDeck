@@ -9,6 +9,7 @@ pub struct OperationAvailabilityContext<'a> {
     pub analyzer: Option<&'a AnalyzerProfile>,
     pub hdc_registered: bool,
     pub hdc_tool_current: bool,
+    pub mutation_owner: bool,
 }
 
 /// Swift RuntimeJobEngine.operationAvailability's provider, dispatcher and
@@ -27,6 +28,14 @@ pub fn operation_unavailability(
         return None;
     }
     let mut reasons = Vec::new();
+    let pointer = ["input.tap@1", "input.long-press@1", "input.swipe@1"].contains(&reference);
+    if pointer && !context.mutation_owner {
+        reasons.push((
+            "provider_tool_unavailable",
+            "runtime.mutationOwnerUnavailable".into(),
+        ));
+    }
+
     let supported = match provider {
         "hdc" => crate::device_run::runs(reference),
         "analyzer" => reference == "analyzer.extract-crash-signature@1",
@@ -57,7 +66,7 @@ pub fn operation_unavailability(
             "runtime.jobOwnerUnavailable".into(),
         ));
     }
-    // All three implemented operations publish through the Artifact owner.
+    // All implemented operations publish through the Artifact owner.
     // Unsupported operations remain unavailable without pretending to resolve
     // their not-yet-implemented Artifact requirements.
     if supported && !context.artifacts {
@@ -80,6 +89,7 @@ mod tests {
             analyzer: None,
             hdc_registered: true,
             hdc_tool_current: true,
+            mutation_owner: false,
         }
     }
     #[test]
@@ -92,17 +102,26 @@ mod tests {
                     .is_empty()
             );
         }
-        for reference in [
-            "input.tap@1",
-            "input.long-press@1",
-            "input.swipe@1",
-            "debug.hap@1",
-        ] {
+        for reference in ["input.tap@1", "input.long-press@1", "input.swipe@1"] {
             assert_eq!(
-                operation_unavailability(reference, "hdc", &c).unwrap()[0].0,
-                "operation_not_supported"
+                operation_unavailability(reference, "hdc", &c).unwrap()[0],
+                (
+                    "provider_tool_unavailable",
+                    "runtime.mutationOwnerUnavailable".into()
+                )
             );
+            c.mutation_owner = true;
+            assert!(
+                operation_unavailability(reference, "hdc", &c)
+                    .unwrap()
+                    .is_empty()
+            );
+            c.mutation_owner = false;
         }
+        assert_eq!(
+            operation_unavailability("debug.hap@1", "hdc", &c).unwrap()[0].0,
+            "operation_not_supported"
+        );
         assert_eq!(
             operation_unavailability("analyzer.extract-crash-signature@1", "analyzer", &c).unwrap()
                 [0],

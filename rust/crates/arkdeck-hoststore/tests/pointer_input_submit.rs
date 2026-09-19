@@ -99,6 +99,7 @@ struct Owners {
     capabilities: CapabilityStore,
     holds: DeviceHolds,
     digest: String,
+    default_root: PathBuf,
 }
 
 impl Owners {
@@ -111,6 +112,7 @@ impl Owners {
             capabilities: CapabilityStore::open(&root.join("jobs-state/capabilities")).unwrap(),
             holds: DeviceHolds::default(),
             digest: sha256_hex(&fs::read(fixture.join("hdc")).unwrap()),
+            default_root: root.join("jobs-state"),
             root,
         }
     }
@@ -140,6 +142,8 @@ impl Owners {
             jobs: &self.jobs,
             now: fixed_now,
             authority: Some(MutationAuthority {
+                default_root: &self.default_root,
+                sessions: None,
                 capabilities: &self.capabilities,
                 holds: &self.holds,
             }),
@@ -344,4 +348,35 @@ fn another_client_is_refused_while_a_control_session_holds_the_device() {
     assert_eq!(submit("first", "idem-first-2")["ok"], true);
     let issued = read(&owners.root.join("jobs-state/capabilities").join(CHECKPOINT));
     assert_eq!(issued["records"].as_array().unwrap().len(), 1);
+}
+
+#[test]
+fn selected_state_root_override_cannot_issue_mutation_authority() {
+    let fixture = support::fixture("pointer-input");
+    let cases = support::document(&fixture, "cases.json");
+    let mut owners = Owners::open(&fixture, "override-refused");
+    owners.default_root = owners.root.join("fixed-installed-runtime-root");
+    let hdc = owners.hdc();
+    let params = cases["exchanges"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|exchange| exchange["name"] == "tap.submit")
+        .unwrap()["params"]
+        .as_object()
+        .unwrap();
+    let refusal = owners.admitter(&hdc).handle(params).unwrap_err();
+    assert_eq!(refusal.code, "admissionDenied");
+    assert!(
+        !owners
+            .root
+            .join("jobs-state/capabilities/runtime-capabilities.json")
+            .exists()
+    );
+    assert!(
+        !owners
+            .root
+            .join("jobs-state/capabilities/runtime-capabilities.ledger")
+            .exists()
+    );
 }

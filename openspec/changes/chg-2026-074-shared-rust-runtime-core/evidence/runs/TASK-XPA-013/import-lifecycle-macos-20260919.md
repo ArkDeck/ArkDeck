@@ -162,3 +162,23 @@ production budget or acceptance threshold changes.
 
 These new tests have only been formatted and statically reviewed. Their execution
 and the final integrated unified gate remain pending the allocated validation slot.
+
+### Static Pointer/main integration (not yet compiled)
+
+Merged protected main `510b4650` after verifying every conflicting publication
+file was byte-identical to the already integrated `590d09f2`; retained the
+lifecycle additions rather than dropping release/inspection/history semantics.
+This ancestry merge is `642262a4` and has no tree delta.
+
+Integrated Pointer execution `79338c83`. Constructor conflicts combine both
+`imports` and `mutation`, including foreground/background Host composition.
+Pointer test planners/runners explicitly have no Import owner; the lifecycle
+corruption test explicitly has no mutation owner. The fresh mutation planner
+carries `self.imports` through the combined interface. The Pointer authority
+fields, state-root checks and lifecycle `Materialized<'_>` hold remain intact.
+No execution policy, capability semantics or recovery behavior was changed.
+
+Static formatting and `git diff --check` passed. No build/tests were run during
+this integration. Next verification must cover the three new lifecycle safety
+tests, all Import lifecycle/CLI/daemon paths, Pointer execution/authority tests,
+and the full repository unified gate on this combined branch.

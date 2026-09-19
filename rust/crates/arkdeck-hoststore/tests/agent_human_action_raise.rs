@@ -588,6 +588,7 @@ fn adopting_run(
         };
         JobRunner {
             imports: None,
+            mutation: None,
             jobs: &jobs,
             artifacts: &artifacts,
             analyzer: None,
