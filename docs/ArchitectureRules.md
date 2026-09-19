@@ -37,7 +37,7 @@ graph TD
     OH[ArkDeckOpenHarmony<br/>HDC 探针/服务器生命周期]
     PROC[ArkDeckProcess<br/>identity-bound posix_spawn]
     RT[ArkDeckRuntime<br/>runtime 契约 + 宿主设施]
-    CORE[ArkDeckCore<br/>catalog/JobState/Capability/Target]
+    CORE[ArkDeckCore<br/>catalog/JobState/Capability/Target<br/>v2 请求 DTO]
 
     DMAIN --> DAEMON
     DMAIN --> COMP
@@ -66,9 +66,11 @@ graph TD
 - **不存在进程内决策平面**(CHG-2026-064)。`ArkDeckHarness` target 已删除;
   架构测试断言它不得以任何名义回归,任何调用方(人、App、外部 agent)进入
   执行的唯一门是「已发布 operation reference + typed inputs 经 admission」。
-- `ArkDeckRuntime` 是**共享契约层**(v2 请求 DTO、`HumanActionRequired`、
-  crash-ledger 分析 schema、AgentStrictJSON)加宿主设施(clock/power/
-  single-instance),它不依赖任何上层。
+- `ArkDeckRuntime` 是**共享契约层**(`HumanActionRequired`、crash-ledger 分析 schema、
+  AgentStrictJSON)加宿主设施(clock/power/single-instance),它不依赖任何上层。
+  v2 请求 DTO(`RuntimeOperationRequest` 及其组成部分、`RuntimeOperationFailure` 投影)
+  在 ArkDeckCore:App 的客户端库 ClientKit 只依赖 Core,也要构造这些请求,而 M5 删除
+  Swift Runtime 后 App 仍要构造 v2 请求(§6 判例 1)。
 - `ArkDeckAgentComposition` 物理上位于
   `Sources/ArkDeckWorkflows/AgentComposition/`(目录内嵌 target;
   PRODUCT-LOOP §20 冻结大规模目录搬迁,目录外提是解冻后的一次纯 `git mv`),
@@ -151,7 +153,7 @@ git 可执行 -> 只有 WorkspaceOperationsProvider 一个声明点(集合精确
 「无 ArkDeckHarness target」断言)、逐文件 import 矩阵、决策平面移除保持、
 raw-command 公开 API 扫描、全仓零模型面(空白名单)、chat 组合体保持删除、
 git 执行点收敛、存储任务无知、
-carve-out `exclude:` 防回流。
+carve-out `exclude:` 防回流、v2 请求契约声明在 Core 而非 Runtime。
 文件级扫描不是 manifest 检查的冗余:SwiftPM 允许同包未声明依赖的 import
 通过编译,测试是那个洞的唯一护栏。
 
@@ -169,7 +171,8 @@ git 面只有 status/diff/stash-create + 只读 plumbing)、自动 merge/push、
 
 1. **一个类型被组合层与 Workflows 同时需要** → 下沉到 ArkDeckRuntime
    (契约)或 ArkDeckCore(全局模型),不要制造反向 import。
-   判例:crash-ledger schema、`HumanActionRequired`。
+   判例:crash-ledger schema、`HumanActionRequired`;v2 请求 DTO 下沉到 Core
+   (App 客户端库 ClientKit 只依赖 Core,也要构造请求)。
 2. **想给 ArkDeck 加"决策能力"** → 不加。决策属于外部 agent;ArkDeck 提供
    已发布 operation、admission 与证据(CHG-2026-064 判例:整个任务平面)。
 3. **Provider 想读调用方上下文** → 不读。provider 只见 Operation/Input/

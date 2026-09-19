@@ -842,6 +842,39 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
       """)
   }
 
+  // MARK: - 9. The v2 request contract is declared in Core
+
+  /// `RuntimeOperationRequest`, its parts and the `RuntimeOperationFailure`
+  /// projection are declared in ArkDeckCore, not ArkDeckRuntime. The App's
+  /// client library depends on Core alone and has to build these requests too,
+  /// and it still will once the Swift Runtime is deleted at M5
+  /// (docs/ArchitectureRules.md §1, §6 example 1). A declaration drifting back
+  /// into Runtime would cut ClientKit off from the requests it sends.
+  func testTheV2RequestContractIsDeclaredInCore() throws {
+    let contract: Set<String> = [
+      "RuntimeOperationRequest", "RuntimeOperationReference", "DurableTargetReference",
+      "RuntimeClientContext", "RuntimeRequestedOutput", "RuntimeCapabilityReference",
+      "RuntimeOperationErrorCode", "RuntimeOperationRequestRejection", "RuntimeOperationFailure",
+    ]
+    func declared(under path: String) throws -> Set<String> {
+      var found: Set<String> = []
+      for file in try swiftFiles(under: path, skippingSubdirectories: []) {
+        let code = try codeWithoutComments(of: file)
+        for name in contract
+        where code.range(
+          of: "(struct|enum|class|actor|typealias) \(name)\\b", options: .regularExpression)
+          != nil
+        {
+          found.insert(name)
+        }
+      }
+      return found
+    }
+    XCTAssertEqual(try declared(under: "Sources/ArkDeckCore"), contract)
+    XCTAssertEqual(
+      try declared(under: "Sources/ArkDeckRuntime"), [],
+      "the v2 request contract moved back into ArkDeckRuntime, which ClientKit may not import")
+  }
 }
 
 /// `AFA-AC-1`: the Rockchip lowering is gone from product code.

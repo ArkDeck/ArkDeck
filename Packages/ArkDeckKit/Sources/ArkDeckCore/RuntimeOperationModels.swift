@@ -1,7 +1,6 @@
 // Current strict Runtime request contract. Format identity is exact; operation
 // versions and binding revisions retain their independent business meaning.
 
-import ArkDeckCore
 import Foundation
 
 public enum RuntimeOperationErrorCode: String, Codable, Sendable, CaseIterable {
