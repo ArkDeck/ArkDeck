@@ -1016,9 +1016,12 @@ CLI never replays it.
 With the development HDC, the daemon answers `device.observations` (following a
 reference too) and `target.adopt` through the owner below. Its USB relations are
 the production stand-in, which reads none until the ArkForge lane's reader lands,
-so the daemon proves and adopts nothing yet. A host composed with relations
-(`Host::with_usb_relations`, which only tests compose until a development source
-lands) proves and adopts as Swift does. Candidate display
+so the daemon proves and adopts nothing yet, unless the isolated development
+owner names a development source: `ARKDECK_DEVELOPMENT_USB_RELATIONS`, an absolute
+path beside the development HDC's fixture, read on every call
+(`{"relations": [...]}`, with `"after": {"reads": n, "relations": [...]}` for a
+replug the oracle times by its reads). A host composed with relations
+(`Host::with_usb_relations`) proves and adopts as Swift does. Candidate display
 names stay on the provider snapshot's path until Swift's coordinator is recorded
 for them, so with the development HDC they find no current snapshot
 (`resourceConflict`). Without the development HDC, observations keep the
