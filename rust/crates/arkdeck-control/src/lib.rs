@@ -299,6 +299,20 @@ pub trait HostServices: Send + Sync {
             details: None,
         })
     }
+    fn workspace_project(
+        &self,
+        _method: &str,
+        _params: &serde_json::Map<String, Value>,
+    ) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "operationUnavailable".into(),
+            message: "workspace project owner is unavailable".into(),
+            details: Some(serde_json::Map::from_iter([
+                ("phase".into(), json!("workspaceProjectOwner")),
+                ("newDispatchCount".into(), json!(0)),
+            ])),
+        })
+    }
     fn history_filter(
         &self,
         _method: &str,
@@ -972,8 +986,37 @@ impl<H: HostServices> Control<H> {
                     outcome: self.host.runtime_storage(&request.method, &params),
                 }
             }
-            // As Swift's handler: a caller's facts are refused before any
-            // observation.
+            "workspace.project.register" | "workspace.project.list" | "workspace.project.show" => {
+                let valid = match request.method.as_str() {
+                    "workspace.project.register" => {
+                        params.len() == 3
+                            && ["registrationRequestId", "kind", "root"]
+                                .iter()
+                                .all(|key| params.get(*key).is_some_and(Value::is_string))
+                    }
+                    "workspace.project.show" => {
+                        params.len() == 1
+                            && params
+                                .get("projectRef")
+                                .and_then(Value::as_str)
+                                .is_some_and(|reference| !reference.is_empty())
+                    }
+                    _ => params.is_empty(),
+                };
+                if !valid {
+                    Response::failure(
+                        &request.id,
+                        "invalidParams",
+                        "workspace project parameters are invalid",
+                    )
+                } else {
+                    Response {
+                        id: request.id.clone(),
+                        outcome: self.host.workspace_project(&request.method, &params),
+                    }
+                }
+            }
+            // As Swift's handler: a caller's facts are refused before any observation.
             "runtime.hdc.status" if params.is_empty() => Response {
                 id: request.id.clone(),
                 outcome: self.host.runtime_hdc_status(),

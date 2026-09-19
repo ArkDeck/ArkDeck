@@ -13,6 +13,8 @@ mod host;
 mod operation_availability_control;
 #[cfg(all(test, target_os = "macos"))]
 mod target_observation_control;
+#[cfg(all(test, target_os = "macos"))]
+mod workspace_project_control;
 
 use arkdeck_contract::MAX_REQUEST_BYTES;
 use arkdeck_control::Control;
@@ -122,6 +124,7 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             "targets-state",
             "agent-executions",
             "human-action-snapshots",
+            "workspace-projects",
         ] {
             directory.private_child(name)?;
         }
@@ -152,6 +155,9 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             &root.join("targets-state"),
         )?)
         .with_history(arkdeck_hoststore::HistoryStore::open(&root)?)
+        .with_workspace_projects(arkdeck_hoststore::WorkspaceProjectStore::open(
+            &root.join("workspace-projects"),
+        )?)
         .with_imports(arkdeck_hoststore::ImportUploadStore::open(&artifacts)?)
         .with_artifacts(arkdeck_hoststore::ArtifactReadStore::open(&artifacts)?)
         .with_trace_cache(arkdeck_hoststore::TraceCacheStore::open(&trace_cache)?)

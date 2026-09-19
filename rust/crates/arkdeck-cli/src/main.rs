@@ -240,6 +240,7 @@ fn execute(invocation: &Invocation, id: &str) -> Result<Value, CliError> {
             CliError::from_client(error, invocation.method)
         }
     })?;
+    arkdeck_cli::validate_workspace_project_response(invocation, &result)?;
     arkdeck_cli::validate_target_response(invocation, &result)?;
     arkdeck_cli::validate_session_response(invocation, &result)?;
     arkdeck_cli::validate_trace_cache_response(invocation, &result)?;

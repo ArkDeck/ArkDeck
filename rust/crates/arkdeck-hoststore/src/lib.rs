@@ -4,6 +4,11 @@
 //! HistoryStore is a separate writer, used only by the explicitly configured
 //! development daemon. No decoder or inventory comparison performs a write.
 
+#[cfg(target_os = "macos")]
+mod workspace_project;
+#[cfg(target_os = "macos")]
+pub use workspace_project::WorkspaceProjectStore;
+
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 
 #[cfg(target_os = "macos")]
