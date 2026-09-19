@@ -275,8 +275,8 @@
     },
     "job.run": {
       "errors": 3,
-      "requests": 7,
-      "successes": 4
+      "requests": 9,
+      "successes": 6
     },
     "job.show": {
       "errors": 2,
@@ -531,15 +531,15 @@
   },
   "corpusRecordCounts": {
     "errors": 356,
-    "requests": 794,
-    "successes": 438
+    "requests": 796,
+    "successes": 440
   },
   "directoryDigests": {
     "Catalog/operations": "16671abf96551e9d5b9c3382fe4eb08f3fcd150cff68e7419634cd10ecda4bfd",
     "Catalog/profiles": "58ca1d970d40019ba2718646fde81fefda22533c5448e620217582e30f5d648f",
-    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "115b4d67202ed44ec993fce775a559214af90544c5977348289bd6202b568396",
+    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "a2f84b3fa8d3fcdc59e258037062a94ec71804f13867ff1c9f26b1f136ff2b7f",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC": "9ae93642e7b81bcea918469216711d7f6a17135a29cf021556ceef0f2f789196",
-    "spec/control/methods": "4ceb3c58d9bcbe78e5d3d9c1c39e8da7d2b61a677b027291e22a73ea1af99c74"
+    "spec/control/methods": "dd1b7cc0bf1ede9611aa8b403a21d5af4c417256e5e897e22c4787f8ae253036"
   },
   "files": {
     "Catalog/generated/effect-authorization-matrix.md": {
@@ -931,8 +931,8 @@
       "sha256": "2a451391bd1ac9a4732dc9efd03d035ee7df77d33f40118f4ef31bb863da58dc"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.run.jsonl": {
-      "blob": "c8c66377329be20a286c63e55d0dfd64dfd5595a",
-      "sha256": "ff1606291c2ff33abcf96a9092b913f7073f5f305a69345692a1c30ace5b9371"
+      "blob": "2f49d25760c03428d9d0d1743e54bb5bd460e963",
+      "sha256": "8b7ae038393ff97740319b8f0665288066304e43075fdd132822c3464856ebc6"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/job.show.jsonl": {
       "blob": "0c8e014c03d36e39dbbc39850b19daedb6509083",
@@ -1527,8 +1527,8 @@
       "sha256": "7eab2467084c8db5e8ac30b1f21542dc43651c07c896ecc2e32b64c88b3e5187"
     },
     "spec/control/methods/job.run.json": {
-      "blob": "e04ef2b6f69deee8b35d405951c8f7e8cd47b9c9",
-      "sha256": "1b80f1632212dfa568df7ddf1782a2687c7ca7b152a17d4c3c7e0609145f468d"
+      "blob": "42e732c1afb983365f957ac1346ca44557db31e8",
+      "sha256": "5d7be98aa38e0104f77cc74a3a7900f6b4633545201856efcf8c2f4526c4e89b"
     },
     "spec/control/methods/job.show.json": {
       "blob": "6abc959bb680b1ae459276d48bf144641c66e590",
@@ -1731,7 +1731,7 @@
       "sha256": "95367cc3e57160752f7d1d724887ee650adb8d3ccc5d736444517641a5da8e64"
     }
   },
-  "inputDigest": "964cec3449974d973c134b5ce5ab6afbb89d2e3b754b83f74ac8431aa87dfd8e",
+  "inputDigest": "29f416d62711cb21c6e73a6c8103a3630852f63a900d6ea9031888a901466684",
   "kind": "development",
   "methodCount": 105,
   "protocolVersion": "1.0.0",
