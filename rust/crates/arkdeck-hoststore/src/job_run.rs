@@ -806,7 +806,7 @@ fn binding_refusal(leased: &LeasedArtifact, record: &JobRecord) -> Option<String
     }
     let rejected = |message: &str| {
         Some(format!(
-            "rejected(ArkDeckRuntime.RuntimeOperationErrorCode.invalidInput, {})",
+            "rejected(ArkDeckCore.RuntimeOperationErrorCode.invalidInput, {})",
             swift_string(message)
         ))
     };

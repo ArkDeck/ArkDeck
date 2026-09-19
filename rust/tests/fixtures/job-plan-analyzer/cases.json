@@ -1203,7 +1203,7 @@
           "newDispatchCount" : 0,
           "phase" : "preAdmission"
         },
-        "message" : "analyzer source artifact Artifact lease is not resolvable: rejected(ArkDeckRuntime.RuntimeOperationErrorCode.invalidInput, \"Artifact lease target/binding/identity does not match the materialized request\")"
+        "message" : "analyzer source artifact Artifact lease is not resolvable: rejected(ArkDeckCore.RuntimeOperationErrorCode.invalidInput, \"Artifact lease target/binding/identity does not match the materialized request\")"
       },
       "ok" : false
     }

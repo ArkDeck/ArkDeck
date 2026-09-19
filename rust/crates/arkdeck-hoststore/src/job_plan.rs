@@ -510,7 +510,7 @@ impl<'a> JobPlanner<'a> {
         // Artifact collected from exactly its own target.
         if leased.row["bindingSnapshot"]["targetID"] != request.target_id.as_str() {
             return Err(format!(
-                "rejected(ArkDeckRuntime.RuntimeOperationErrorCode.invalidInput, {})",
+                "rejected(ArkDeckCore.RuntimeOperationErrorCode.invalidInput, {})",
                 swift_string(
                     "Artifact lease target/binding/identity does not match the materialized request"
                 )
