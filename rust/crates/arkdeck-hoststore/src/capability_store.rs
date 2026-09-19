@@ -187,6 +187,16 @@ impl UnresolvedUse {
     }
 }
 
+/// One entry of Swift's `RuntimeCapabilityStatus.lineage`, as the lineage
+/// repairs of a lost outcome read it: the capability, the Job the use was
+/// taken for, its binding revision, and where the use stands now.
+pub(crate) struct LineageUse {
+    pub(crate) capability: String,
+    pub(crate) job: String,
+    pub(crate) binding_revision: Option<i64>,
+    pub(crate) outcome: UseOutcome,
+}
+
 /// A refused `capability.list` or `capability.inspect`: Swift's code and
 /// message. Swift attaches no details to either.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -398,6 +408,26 @@ impl CapabilityStore {
                 }
             }
             Ok(None)
+        })
+    }
+
+    /// Swift `list()` as the lineage repairs of a lost outcome read it: every
+    /// use of every capability, in store order. It writes nothing but the
+    /// lock file, as every read here.
+    pub(crate) fn lineage(&self) -> Result<Vec<LineageUse>, CapabilityStoreError> {
+        self.locked(|_, document, _| {
+            Ok(document
+                .records
+                .iter()
+                .flat_map(|record| {
+                    record.consumptions.iter().map(|use_| LineageUse {
+                        capability: record.capability.id.clone(),
+                        job: use_.job.clone(),
+                        binding_revision: use_.binding_revision,
+                        outcome: use_.current(),
+                    })
+                })
+                .collect())
         })
     }
 

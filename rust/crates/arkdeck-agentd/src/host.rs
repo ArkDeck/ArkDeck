@@ -1427,12 +1427,18 @@ impl HostServices for Host {
                     claims: &self.claims,
                     probe: &probe,
                 });
+        // A device-bound Job is reconciled against fresh facts through the
+        // HDC composition its runs use, and its use settled in the store its
+        // admission reserved it in.
+        let hdc = self.hdc();
         let reconciler = arkdeck_hoststore::JobReconciler {
             jobs,
             artifacts,
             imports: self.imports.as_deref(),
             now: arkdeck_hoststore::runtime_now,
             sessions: publisher.as_ref(),
+            hdc: hdc.as_ref(),
+            capabilities: self.capabilities.as_deref(),
         };
         // Swift attaches no details to any `job.reconcile` refusal.
         let uncertain = || WireError {

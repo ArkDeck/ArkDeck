@@ -677,20 +677,43 @@ only decisions the journal already holds are completed, the record gains its
 a runtime capability's use outcome is re-asserted; nothing is dispatched or
 published. A record it cannot read is quarantined; an ArkForge execution and a
 complete-overwrite recovery Job are refused untouched. `job.reconcile`
-(`job_reconcile.rs`) reconciles an analyzer Job whose outcome is unknown: its
-source is resolved again, the provider confirms the intent not executed only
-for the source it named, the decision is journaled with the `confirmedNotExecuted`
-step outcome, and the Job fails and is published as a Session, or stays parked;
-what a failed reconcile journaled stays resident in memory, as Swift's engine
-keeps it. A Job of any other operation is answered only where Swift writes
-nothing, and refused otherwise. `tests/job_reconcile.rs` replays
-`rust/tests/fixtures/job-reconcile-analyzer/` (Swift
-`testSwiftRecoversAndReconcilesTheParkedAnalyzerJobs`, re-recorded with
-`ARKDECK_RUST_JOB_RECONCILE_RECORD=/private/tmp/<new>`): two starts and eight
-reconciles, every answer, read and store snapshot byte for byte;
-`tests/job_recovery.rs` covers the branches it does not reach. `job.run` still
-refuses a Job in any resumable state, or whose journal has left `preflight`:
-resumption is a later slice. Also landed: `recovery_manifest.rs`, Swift's
+(`job_reconcile.rs`) reconciles a Job whose outcome is unknown against its
+durable intent and never resends the original. An analyzer Job's source is
+resolved again, and the provider confirms the intent not executed only for the
+source it named. A device-bound Job's Target facts are resolved fresh and
+validated, and its parked action is materialized again from its record
+(`job_reconcile_device.rs`): an action below `deviceMutation` is confirmed not
+executed, a pointer gesture has no dedicated readback and stays unknown, and a
+port rule's create or remove is read back once (`fport ls`, lowered under the
+reconcile's own step identity) and concluded completed, not executed or
+unknown. The decision is journaled as Swift journals it, the correlated step
+outcome carrying `confirmedNotExecuted` for a non-execution; the Job then fails
+and is published as a Session, its capability use resolved `safeToReflash`; or
+waits at its confirmed safe boundary, its use still `outcomeUnknown` until it
+resumes; or stays parked. As in Swift, the Session of a device-bound Job
+reconciled before any of its steps confirmed a binding is refused
+(`SessionManifestJournalValidator`: the decision's binding revision is not in
+the Manifest's binding history). A terminal Job's capability outcome that a
+crash lost is repaired from its journal's proof, on reconcile and before the
+next device mutation's submission materializes (`job_lineage_repair.rs`), with
+nothing dispatched; what a failed reconcile journaled stays resident in memory,
+as Swift's engine keeps it. A debug HAP, a native library deployment whose
+outcome is unknown and a Job parked on any other action (an owned remote path,
+a package, staging, a screen sequence, or a read-only action Swift's provider
+has no reconcile source for) are answered only where Swift writes nothing, and
+refused otherwise, with nothing written or dispatched. `tests/job_reconcile.rs`,
+`tests/device_reconcile.rs` and `tests/readback_reconcile.rs` replay
+`rust/tests/fixtures/job-reconcile-analyzer/`, `device-reconcile/` and
+`readback-reconcile/` (Swift `testSwiftRecoversAndReconcilesTheParkedAnalyzerJobs`,
+`DeviceReconcileOracleContractTests` and `ReadbackReconcileOracleContractTests`,
+re-recorded with `ARKDECK_RUST_JOB_RECONCILE_RECORD`,
+`ARKDECK_RUST_DEVICE_RECONCILE_RECORD` and
+`ARKDECK_RUST_READBACK_RECONCILE_RECORD=/private/tmp/<new>`): every start,
+reconcile, answer, read and store snapshot byte for byte, the capability store
+and the fake's calls included; `tests/job_recovery.rs` and the other tests of
+`tests/readback_reconcile.rs` cover the branches they do not reach. `job.run`
+still refuses a Job in any resumable state, or whose journal has left
+`preflight`: resumption is a later slice. Also landed: `recovery_manifest.rs`, Swift's
 `RecoveryManifestCodec` (the Session manifest's `recovery` member, which the
 Session reader now decodes through it before checking its relations to the
 Session's steps); its unit tests replay `rust/tests/fixtures/recovery-manifest/`
@@ -849,8 +872,8 @@ the receipt once the catalog holds the entry, `awaitingStorage` when the volume
 has no room, a confirmed failure otherwise; reads report the publication fact
 from it. A parked Job, whose outcome is unknown, publishes nothing. As in
 Swift, a restart never resumes a publication and nothing retries one;
-`job.reconcile` publishes an analyzer Job's Session once it confirms the parked
-intent not executed (see Job run).
+`job.reconcile` publishes a Job's Session once it confirms the parked intent not
+executed (see Job run).
 
 `rust/tests/fixtures/job-publication-analyzer/` is the oracle Swift
 `JobRunAnalyzerOracleContractTests.testSwiftPublishesTheSharedAnalyzerSessions`

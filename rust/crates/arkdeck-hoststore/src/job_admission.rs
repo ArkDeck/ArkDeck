@@ -215,6 +215,22 @@ impl JobAdmitter<'_> {
             AdmissionVerdict::Admitted => (),
         }
         let effect = descriptor.effective_effect(&request.inputs);
+        // Swift `repairProvablyTerminalCapabilityOutcomeGaps`, before the
+        // plan is materialized: a use whose Job's journal already proves it
+        // settled is recorded again, and nothing is dispatched.
+        if !matches!(effect.as_str(), "hostOnly" | "readOnly")
+            && let (Some(revision), Some(authority)) =
+                (request.expected_binding_revision, self.authority)
+        {
+            crate::job_lineage_repair::repair_outcome_gaps(
+                self.jobs,
+                authority.capabilities,
+                &request.target_id,
+                revision,
+                self.now,
+            )
+            .map_err(|_| uncertain())?;
+        }
         let job_id = format!(
             "job-{}",
             &sha256_hex(format!("{}\n{fingerprint}", request.idempotency_key).as_bytes())[..32]
