@@ -234,3 +234,91 @@ fn rust_adopts_the_swift_fake_device() {
         );
     }
 }
+
+/// Every completed reading is published for live route selection, as Swift's
+/// coordinator publishes it (`recordLiveHDCCandidates`). A Target whose proven
+/// post-Flash alias the fake does not list, while it lists the Target's own
+/// adopted key Connected, then routes to that key: an HDC Import on it binds
+/// the identity that key names, where before the reading it bound the alias's.
+#[test]
+fn a_reading_routes_a_proven_alias_target_to_its_connected_key() {
+    let _lock = exclusive();
+    let fixture = support::fixture("target-adoption");
+    let root = rebuild(&fixture);
+    let digest = sha256_hex(&fs::read(root.join("hdc")).unwrap());
+    // The fake lists this key Connected in its normal mode.
+    let (key, alias_key) = ("a".repeat(32), "post-flash-hdc-address");
+    let alias_identity = sha256_hex(alias_key.as_bytes());
+    let (canonical, alias) = (
+        "TGT-canonical0001",
+        format!("TGT-{}", &alias_identity[..12]),
+    );
+    let seed = sha256_hex(format!("{alias}\n{canonical}\njob-fixture").as_bytes());
+    let mut resolution = json!({
+        "resolutionID": format!("target-alias-resolution-{}", &seed[..32]),
+        "aliasTargetID": alias, "aliasStableIdentitySHA256": alias_identity,
+        "aliasBindingRevision": 1, "canonicalTargetID": canonical,
+        "canonicalStableIdentitySHA256": "b".repeat(64), "canonicalBindingRevision": 2,
+        "routedHDCIdentitySHA256": alias_identity, "routedUSBTopology": "100",
+        "establishingFlashJobID": "job-fixture",
+        "establishingFlashPlanDigestSHA256": "c".repeat(64),
+        "confirmedStepIDs": ["enter-loader-mode", "flash-partitions", "verify-flash-readback",
+            "reboot-device", "wait-for-hdc", "rebind-and-verify-build"],
+        "coveredUnknownIntents": [{"jobID": "job-unknown", "intentEventID": "intent-fixture",
+            "stepID": "enter-loader-mode", "effect": "deviceMutation"}],
+        "establishedAtUTC": "2026-09-12T00:00:00Z",
+    });
+    resolution["resolutionSHA256"] = json!(sha256_hex(&serde_json::to_vec(&resolution).unwrap()));
+    let path = root.join("targets-state/targets.json");
+    fs::write(
+        &path,
+        serde_json::to_vec(&json!({"schemaVersion": "1.0.0", "targets": [
+            {"targetID": canonical, "stablePhysicalIdentitySHA256": "b".repeat(64),
+             "bindingRevision": 2, "connectKey": key, "toolVersion": "3.2.0d",
+             "adoptedAtUTC": "2026-09-12T00:00:00Z"},
+            {"targetID": alias, "stablePhysicalIdentitySHA256": alias_identity,
+             "bindingRevision": 1, "connectKey": alias_key, "toolVersion": "3.2.0d",
+             "adoptedAtUTC": "2026-09-12T00:00:00Z"}],
+            "aliasResolutions": [resolution]}))
+        .unwrap(),
+    )
+    .unwrap();
+    chmod(&path, 0o600);
+    let targets = TargetStore::open(&root.join("targets-state")).unwrap();
+    let bound = || {
+        let intent = arkdeck_contract::ImportIntent::from_wire(
+            json!({"schemaVersion": "arkdeck.import-intent/1", "importRequestId": "route-hap",
+                "kind": "hap", "targetId": canonical, "bindingRevision": "2",
+                "deviceProfile": null, "name": "fixture.hap", "byteCount": "64",
+                "sha256": sha256_hex(&[b'a'; 64])})
+            .as_object()
+            .unwrap(),
+        )
+        .unwrap();
+        targets
+            .resolve_import_binding(&intent)
+            .unwrap()
+            .stable_identity_sha256
+    };
+    assert_eq!(
+        bound(),
+        Some(arkdeck_provider_hdc::stable_identity_sha256(alias_key))
+    );
+    let dispatch =
+        ProcessDispatch::new(VerifiedTool::open(root.join("hdc"), &digest).unwrap(), None);
+    let unplugged = || Ok::<_, String>(Vec::new());
+    let now = || "2026-09-12T00:00:00Z".to_owned();
+    let sources = Sources {
+        dispatch: &dispatch,
+        relations: &unplugged,
+        targets: &targets,
+        now: &now,
+    };
+    TargetObservations::default()
+        .snapshot(&sources, None)
+        .unwrap();
+    assert_eq!(
+        bound(),
+        Some(arkdeck_provider_hdc::stable_identity_sha256(&key))
+    );
+}

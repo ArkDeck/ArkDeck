@@ -154,17 +154,40 @@ fn missing_stale_or_injected_authority_never_creates_an_import() {
     }
 }
 #[test]
-fn native_alias_requires_real_route_owner_for_hdc_imports_but_keeps_other_kind_semantics() {
+fn native_alias_routes_hdc_imports_through_the_proven_alias_and_keeps_other_kind_semantics() {
     let f = Fixture::new("alias");
     let targets = TargetStore::open(&f.root.join("targets")).unwrap();
+    let document: Value =
+        serde_json::from_slice(&fs::read(f.root.join("targets/targets.json")).unwrap()).unwrap();
+    let resolution = &document["aliasResolutions"][0];
+    let alias = document["targets"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|target| target["targetID"] == resolution["aliasTargetID"])
+        .unwrap();
     for kind in ["hap", "native-library", "workspace-patch", "flash-bundle"] {
         let intent = ImportIntent::from_wire(f.intent(kind).as_object().unwrap()).unwrap();
-        let result = targets.resolve_import_binding(&intent);
+        let binding = targets.resolve_import_binding(&intent).unwrap();
+        assert_eq!(binding.target_id, f.target["targetID"].as_str().unwrap());
         if ["hap", "native-library"].contains(&kind) {
-            assert_eq!(result.unwrap_err().code, "operationUnavailable");
-        } else {
-            let binding = result.unwrap();
-            assert_eq!(binding.target_id, f.target["targetID"].as_str().unwrap());
+            // Swift `hdcExecutionRoute` before any live observation: the
+            // canonical Target's revision, addressed through its proven alias.
+            assert_eq!(
+                binding.binding_revision,
+                f.target["bindingRevision"].as_u64()
+            );
+            assert_eq!(
+                binding.stable_identity_sha256.as_deref(),
+                Some(sha256_hex(alias["connectKey"].as_str().unwrap().as_bytes()).as_str())
+            );
+            assert_eq!(
+                binding.stable_identity_sha256.as_ref(),
+                resolution["routedHDCIdentitySHA256"]
+                    .as_str()
+                    .map(str::to_owned)
+                    .as_ref()
+            );
         }
     }
 }
