@@ -1,0 +1,50 @@
+{
+  "executables" : {
+    "a" : {
+      "base64" : "z/rt/gwAAAEAAAAAAgAAAAEAAAAYAAAAAAAAAAAAAAAbAAAAGAAAAKGhoaGhoaGhoaGhoaGhoaE=",
+      "published" : true,
+      "sha256" : "dab2a09f7196f97a256c26752c9c903cd61a024a2d53d33c7301908312c63737",
+      "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96"
+    },
+    "b" : {
+      "base64" : "z/rt/gwAAAEAAAAAAgAAAAEAAAAYAAAAAAAAAAAAAAAbAAAAGAAAALKysrKysrKysrKysrKysrI=",
+      "published" : true,
+      "sha256" : "629f7402ee92d66908335ef5646610eec5b734df677fe2c97694c4b155e54fc2",
+      "toolRef" : "tool:sha256:3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d"
+    },
+    "c" : {
+      "base64" : "z/rt/gwAAAEAAAAAAgAAAAEAAAAYAAAAAAAAAAAAAAAbAAAAGAAAAMPDw8PDw8PDw8PDw8PDw8M=",
+      "published" : true,
+      "sha256" : "25d5ec1fa903c8ab589db092c25c405d7b12e2146f1f1ab6de91d2acb07da332",
+      "toolRef" : "tool:sha256:09a43a46ad9c0626786d87ae0872695c8c6d18298e8508fee1361a1a1317fa08"
+    },
+    "unpublished" : {
+      "base64" : "z/rt/gwAAAEAAAAAAgAAAAEAAAAYAAAAAAAAAAAAAAAbAAAAGAAAANTU1NTU1NTU1NTU1NTU1NQ=",
+      "published" : false,
+      "sha256" : "5dd5de23030c15cec9d406278e49bd7085e81ae25c5308926584298e49588146",
+      "toolRef" : "tool:sha256:e25c5c47799e607e35f05159ae63225f4605c549fdf38407e7bb46205d921a88"
+    },
+    "unrelocatable" : {
+      "base64" : "z/rt/gwAAAEAAAAAAgAAAAEAAAA4AAAAAAAAAAAAAAAMAAAAOAAAABgAAAAAAAAAAAAAAAAAAAAvb3B0L2ZpeHR1cmUvbGliZml4dHVyZS5keWxpYgAAAA==",
+      "published" : true,
+      "sha256" : "7df9794889870595f4f09c4e428e4986858584d52996d32433e042352051953b",
+      "toolRef" : "tool:sha256:754e66c3356a7677f30b0a198126d76ac55e8209c9c1cda95ef579025657c990"
+    }
+  },
+  "producer" : "ToolSelectionRegistryOracleContractTests.testTheProductionRegistryKeepsTheSelectionLedgerAsRecorded",
+  "publishedIdentity" : {
+    "profileReferences" : [
+      "fixture-profile"
+    ],
+    "version" : "fixture-1"
+  },
+  "registeredAt" : "2026-09-01T00:00:00Z",
+  "store" : {
+    "encoding" : "JSONEncoder [.sortedKeys, .withoutEscapingSlashes]",
+    "index" : "tools.json",
+    "indexSchemaVersion" : "arkdeck.bootstrap-tools/2",
+    "lock" : ".lock",
+    "productionDirectory" : "~/Library/Application Support/ArkDeck/Bootstrap/v1",
+    "type" : "BootstrapToolRegistry"
+  }
+}
