@@ -93,6 +93,16 @@ because this phase has no operation execution provider. Without a usable HDC
 observation provider, candidates returns a structured refusal, not an empty
 successful snapshot. The wire method is `device.observations`.
 
+`arkdeck commands --output json` needs no daemon (TASK-XPA-018): it answers Swift's
+registry projection (`CLIRegistryProjection`, published as
+`openspec/contracts/cli-command-registry.yaml`) for exactly the leaves this CLI
+serves, from `crates/arkdeck-cli/src/command_registry.json`, which
+`CLIRustCommandRegistryCopyContractTests` holds to Swift's projection.
+`crates/arkdeck-cli/tests/argv_fixtures.rs` replays the Swift argv fixture of every
+served leaf, copied unchanged into `tests/fixtures/current-cli-argv`, and pins the
+cases this parser still answers otherwise; TASK-XPA-018's `cli-parity-audit.py`
+classifies the 256 coverage entries from these.
+
 The Unix default endpoint is a private development socket under the temporary
 directory, separate from the published Swift socket. Windows uses a local
 logon-scoped named pipe and requires an installed daemon identity. Development

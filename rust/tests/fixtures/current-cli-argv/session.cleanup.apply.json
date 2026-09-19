@@ -1,0 +1,158 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "session",
+        "cleanup",
+        "apply",
+        "--preview-id",
+        "sample",
+        "--preview-digest",
+        "0000000000000000000000000000000000000000000000000000000000000000"
+      ],
+      "expected": {
+        "command": "session.cleanup.apply",
+        "handlerArguments": [
+          "session",
+          "cleanup",
+          "apply",
+          "--preview-id",
+          "sample",
+          "--preview-digest",
+          "0000000000000000000000000000000000000000000000000000000000000000"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "session",
+        "cleanup",
+        "apply",
+        "--help"
+      ],
+      "expected": {
+        "command": "session.cleanup.apply",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "session",
+        "cleanup",
+        "apply",
+        "--preview-id",
+        "sample",
+        "--preview-digest",
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "session.cleanup.apply",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "session",
+        "cleanup",
+        "apply",
+        "--preview-id",
+        "sample",
+        "--preview-digest",
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "--preview-id",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "session.cleanup.apply",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "session",
+        "cleanup",
+        "apply"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "session.cleanup.apply",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "session",
+        "cleanup",
+        "apply",
+        "--preview-id",
+        "sample",
+        "--preview-digest",
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "session.cleanup.apply",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "session",
+        "cleanup",
+        "apply",
+        "--preview-id",
+        "sample",
+        "--preview-digest",
+        "0000000000000000000000000000000000000000000000000000000000000000",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "session.cleanup.apply",
+        "handlerArguments": [
+          "session",
+          "cleanup",
+          "apply",
+          "--preview-id",
+          "sample",
+          "--preview-digest",
+          "0000000000000000000000000000000000000000000000000000000000000000",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "session.cleanup.apply",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "session",
+    "cleanup",
+    "apply"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

@@ -1,0 +1,116 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "agent",
+        "resume",
+        "--resume-token",
+        "sample"
+      ],
+      "expected": {
+        "command": "agent.resume",
+        "handlerArguments": [
+          "agent",
+          "resume",
+          "--resume-token",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "agent",
+        "resume",
+        "--help"
+      ],
+      "expected": {
+        "command": "agent.resume",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "agent",
+        "resume",
+        "--resume-token",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "agent.resume",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "agent",
+        "resume"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "agent.resume",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "agent",
+        "resume",
+        "--resume-token",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "agent.resume",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "agent",
+        "resume",
+        "--resume-token",
+        "sample",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "agent.resume",
+        "handlerArguments": [
+          "agent",
+          "resume",
+          "--resume-token",
+          "sample",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "agent.resume",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "agent",
+    "resume"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

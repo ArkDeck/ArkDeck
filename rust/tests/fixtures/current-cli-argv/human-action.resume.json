@@ -1,0 +1,148 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "human-action",
+        "resume",
+        "--human-action",
+        "sample",
+        "--resume-reference",
+        "sample"
+      ],
+      "expected": {
+        "command": "human-action.resume",
+        "handlerArguments": [
+          "human-action",
+          "resume",
+          "--human-action",
+          "sample",
+          "--resume-reference",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "human-action",
+        "resume",
+        "--help"
+      ],
+      "expected": {
+        "command": "human-action.resume",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "human-action",
+        "resume",
+        "--human-action",
+        "sample",
+        "--resume-reference",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "human-action.resume",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "human-action",
+        "resume",
+        "--human-action",
+        "sample",
+        "--resume-reference",
+        "sample",
+        "--human-action",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "human-action.resume",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "human-action",
+        "resume"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "human-action.resume",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "human-action",
+        "resume",
+        "--human-action",
+        "sample",
+        "--resume-reference",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "human-action.resume",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "human-action",
+        "resume",
+        "--human-action",
+        "sample",
+        "--resume-reference",
+        "sample",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "human-action.resume",
+        "handlerArguments": [
+          "human-action",
+          "resume",
+          "--human-action",
+          "sample",
+          "--resume-reference",
+          "sample",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "human-action.resume",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "human-action",
+    "resume"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

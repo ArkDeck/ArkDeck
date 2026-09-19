@@ -1,0 +1,98 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "history",
+        "filter",
+        "list"
+      ],
+      "expected": {
+        "command": "history.filter.list",
+        "handlerArguments": [
+          "history",
+          "filter",
+          "list"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "history",
+        "filter",
+        "list",
+        "--help"
+      ],
+      "expected": {
+        "command": "history.filter.list",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "history",
+        "filter",
+        "list",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "history.filter.list",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "history",
+        "filter",
+        "list",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "history.filter.list",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "history",
+        "filter",
+        "list",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "history.filter.list",
+        "handlerArguments": [
+          "history",
+          "filter",
+          "list",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "history.filter.list",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "history",
+    "filter",
+    "list"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

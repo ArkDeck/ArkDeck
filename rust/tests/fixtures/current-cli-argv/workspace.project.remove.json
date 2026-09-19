@@ -1,0 +1,158 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "workspace",
+        "project",
+        "remove",
+        "--project",
+        "sample",
+        "--expected-generation",
+        "1"
+      ],
+      "expected": {
+        "command": "workspace.project.remove",
+        "handlerArguments": [
+          "workspace",
+          "project",
+          "remove",
+          "--project",
+          "sample",
+          "--expected-generation",
+          "1"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "workspace",
+        "project",
+        "remove",
+        "--help"
+      ],
+      "expected": {
+        "command": "workspace.project.remove",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "workspace",
+        "project",
+        "remove",
+        "--project",
+        "sample",
+        "--expected-generation",
+        "1",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "workspace.project.remove",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "workspace",
+        "project",
+        "remove",
+        "--project",
+        "sample",
+        "--expected-generation",
+        "1",
+        "--project",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "workspace.project.remove",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "workspace",
+        "project",
+        "remove"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "workspace.project.remove",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "workspace",
+        "project",
+        "remove",
+        "--project",
+        "sample",
+        "--expected-generation",
+        "1",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "workspace.project.remove",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "workspace",
+        "project",
+        "remove",
+        "--project",
+        "sample",
+        "--expected-generation",
+        "1",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "workspace.project.remove",
+        "handlerArguments": [
+          "workspace",
+          "project",
+          "remove",
+          "--project",
+          "sample",
+          "--expected-generation",
+          "1",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "workspace.project.remove",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "workspace",
+    "project",
+    "remove"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

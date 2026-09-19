@@ -1,0 +1,144 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "history",
+        "filter",
+        "delete",
+        "--expected-generation",
+        "1"
+      ],
+      "expected": {
+        "command": "history.filter.delete",
+        "handlerArguments": [
+          "history",
+          "filter",
+          "delete",
+          "--expected-generation",
+          "1"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "history",
+        "filter",
+        "delete",
+        "--help"
+      ],
+      "expected": {
+        "command": "history.filter.delete",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "history",
+        "filter",
+        "delete",
+        "--expected-generation",
+        "1",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "history.filter.delete",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "history",
+        "filter",
+        "delete",
+        "--expected-generation",
+        "1",
+        "--expected-generation",
+        "1"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "history.filter.delete",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "history",
+        "filter",
+        "delete"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "history.filter.delete",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "history",
+        "filter",
+        "delete",
+        "--expected-generation",
+        "1",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "history.filter.delete",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "history",
+        "filter",
+        "delete",
+        "--expected-generation",
+        "1",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "history.filter.delete",
+        "handlerArguments": [
+          "history",
+          "filter",
+          "delete",
+          "--expected-generation",
+          "1",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "history.filter.delete",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "history",
+    "filter",
+    "delete"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

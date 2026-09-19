@@ -1,0 +1,158 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "runtime",
+        "storage",
+        "root",
+        "--expected-generation",
+        "1",
+        "--root",
+        "sample"
+      ],
+      "expected": {
+        "command": "runtime.storage.root",
+        "handlerArguments": [
+          "runtime",
+          "storage",
+          "root",
+          "--expected-generation",
+          "1",
+          "--root",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "runtime",
+        "storage",
+        "root",
+        "--help"
+      ],
+      "expected": {
+        "command": "runtime.storage.root",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "runtime",
+        "storage",
+        "root",
+        "--expected-generation",
+        "1",
+        "--root",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.storage.root",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "runtime",
+        "storage",
+        "root",
+        "--expected-generation",
+        "1",
+        "--root",
+        "sample",
+        "--expected-generation",
+        "1"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.storage.root",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "runtime",
+        "storage",
+        "root"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.storage.root",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "runtime",
+        "storage",
+        "root",
+        "--expected-generation",
+        "1",
+        "--root",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.storage.root",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "runtime",
+        "storage",
+        "root",
+        "--expected-generation",
+        "1",
+        "--root",
+        "sample",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "runtime.storage.root",
+        "handlerArguments": [
+          "runtime",
+          "storage",
+          "root",
+          "--expected-generation",
+          "1",
+          "--root",
+          "sample",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "runtime.storage.root",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "runtime",
+    "storage",
+    "root"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

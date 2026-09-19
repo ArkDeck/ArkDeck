@@ -1,0 +1,77 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "commands"
+      ],
+      "expected": {
+        "outcome": "commands",
+        "outputMode": "human"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "commands",
+        "--help"
+      ],
+      "expected": {
+        "command": "commands",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "commands",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "commands",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "commands",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "commands",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "commands",
+        "--endpoint",
+        "local"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "commands",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "endpointRefused"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "commands",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "commands"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

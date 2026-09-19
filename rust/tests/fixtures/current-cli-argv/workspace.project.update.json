@@ -1,0 +1,186 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "workspace",
+        "project",
+        "update",
+        "--project",
+        "sample",
+        "--expected-generation",
+        "1",
+        "--kind",
+        "arkdeck",
+        "--root",
+        "sample"
+      ],
+      "expected": {
+        "command": "workspace.project.update",
+        "handlerArguments": [
+          "workspace",
+          "project",
+          "update",
+          "--project",
+          "sample",
+          "--expected-generation",
+          "1",
+          "--kind",
+          "arkdeck",
+          "--root",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "workspace",
+        "project",
+        "update",
+        "--help"
+      ],
+      "expected": {
+        "command": "workspace.project.update",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "workspace",
+        "project",
+        "update",
+        "--project",
+        "sample",
+        "--expected-generation",
+        "1",
+        "--kind",
+        "arkdeck",
+        "--root",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "workspace.project.update",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "workspace",
+        "project",
+        "update",
+        "--project",
+        "sample",
+        "--expected-generation",
+        "1",
+        "--kind",
+        "arkdeck",
+        "--root",
+        "sample",
+        "--project",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "workspace.project.update",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "workspace",
+        "project",
+        "update"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "workspace.project.update",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "workspace",
+        "project",
+        "update",
+        "--project",
+        "sample",
+        "--expected-generation",
+        "1",
+        "--kind",
+        "arkdeck",
+        "--root",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "workspace.project.update",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "workspace",
+        "project",
+        "update",
+        "--project",
+        "sample",
+        "--expected-generation",
+        "1",
+        "--kind",
+        "arkdeck",
+        "--root",
+        "sample",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "workspace.project.update",
+        "handlerArguments": [
+          "workspace",
+          "project",
+          "update",
+          "--project",
+          "sample",
+          "--expected-generation",
+          "1",
+          "--kind",
+          "arkdeck",
+          "--root",
+          "sample",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "workspace.project.update",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "workspace",
+    "project",
+    "update"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}
