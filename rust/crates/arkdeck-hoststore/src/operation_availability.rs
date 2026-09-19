@@ -66,7 +66,7 @@ pub fn operation_unavailability(
             "runtime.jobOwnerUnavailable".into(),
         ));
     }
-    // All three implemented operations publish through the Artifact owner.
+    // All implemented operations publish through the Artifact owner.
     // Unsupported operations remain unavailable without pretending to resolve
     // their not-yet-implemented Artifact requirements.
     if supported && !context.artifacts {
