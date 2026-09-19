@@ -7,9 +7,9 @@ pending. HAP submit and execution allowlists stay closed. No device, signing
 or GJ acceptance is claimed, and no capability is fabricated or installed by
 this slice.
 
-Base: protected `main` `81957589` through Import lifecycle `92e2d667` (#1987,
-not yet merged; this slice needs its Import leases and holds). The sections
-below keep their original wording for the revisions they describe.
+Base: protected `main` `2a4a3441`, which contains the Import lifecycle (#1987, merged as `7aa8e8d3`)
+this slice needs. Earlier it was stacked on #1987's head `92e2d667`; merge `c967a77b`
+re-hung it. The sections below keep their original wording for the revisions they describe.
 
 | Already on `main` | This slice | Still remaining (`debug.hap@1`, M2) |
 |---|---|---|
@@ -154,3 +154,22 @@ SwiftPM full lane 2687 tests without failure; every cargo test summary sums to 8
 SHA-256 `21c50e2c475adb4594604a08bbee8837e5ff8e53dd8b2862cd2aa80adba62ed5`. The commit that
 records this paragraph changes only this file. Linux and Windows target clippy with
 `-D warnings` exited 0 on the same Rust sources (before the test-only fix).
+
+## Rehang after #1987 merged (2026-09-19)
+
+#1987 merged as squash `7aa8e8d3`. The rehang merge `c967a77b` takes protected main `2a4a3441` with the tree of
+`git merge-tree --merge-base=92e2d667 origin/main 6c03ceba`; its diff from `2a4a3441` (11 files,
++1371/−21 before this record's own edits) has the same stable patch-id, `fd73e92ccf49433d`, as
+`92e2d667..6c03ceba`. No file conflicted. The gate was rerun on the rehung tree (below).
+
+- Run 3 on `3128de59` (merge base `2a4a3441`), 14:48:06–15:18:40 CST: exit 1, **invalid run**. The
+  Swift (2691) and design-system lanes passed; the only failure was
+  `arkdeck-platform --test verified_process::output_overflow_kills_and_reaps_the_child`, a 2-second
+  timing assertion outside this diff, while five gates shared the host (load about 40). Log
+  `…/scratchpad/logs/hap-gate3.log`, SHA-256 `072f827e50ddd01eedba6d4badf5733953c0a63f71f614750e89ff1921ec6be0`.
+- Run 4 on the same head, serialized behind the other gates, 15:29:27–15:35:55 CST (load 3 at
+  start): **exit 0**. SwiftPM 2691 tests without failure; cargo 900 passed, 0 failed, 16 ignored;
+  design-system 83/83; contract checks, `check-sdd`, `cargo deny` and `cargo vet` passed. Log
+  `/private/tmp/claude-501/-Users-fuhanfeng-Dropbox-Code-Github-ArkDeck--claude-worktrees-macos-agent-branches-20260919-7896b5/e4ca8ae5-02b3-4669-8ede-6d7975251bb2/scratchpad/logs/hap-gate4.log`,
+  SHA-256 `853a821f5088d86b3f9591eddd4e1d0436a66659d260da2b9e6f7568a94c8980`. Linux and Windows
+  target clippy with `-D warnings` on this head: exit 0.
