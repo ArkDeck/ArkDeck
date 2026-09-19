@@ -451,6 +451,16 @@ fn replay(fault: Fault) {
                     "{ledger}"
                 );
             }
+            if fault == Fault::CancelAfterConsume {
+                let outcomes: Vec<Value> = ledger
+                    .lines()
+                    .map(|line| serde_json::from_str::<Value>(line).unwrap())
+                    .filter(|row| row["kind"] == "outcome")
+                    .collect();
+                assert_eq!(outcomes.len(), 1);
+                assert_eq!(outcomes[0]["outcome"]["outcome"], "confirmed");
+                assert_eq!(outcomes[0]["outcome"]["terminalState"], "cancelled");
+            }
             assert_eq!(
                 invocations,
                 fs::read_to_string(root.join("hdc-invocations.log")).unwrap()
