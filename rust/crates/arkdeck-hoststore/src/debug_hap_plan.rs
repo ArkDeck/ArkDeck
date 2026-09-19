@@ -78,7 +78,7 @@ impl<'a> JobPlanner<'a> {
             || binding["stableIdentitySHA256"] != facts.identity.as_str()
         {
             return Err(format!(
-                "rejected(ArkDeckRuntime.RuntimeOperationErrorCode.invalidInput, {})",
+                "rejected(ArkDeckCore.RuntimeOperationErrorCode.invalidInput, {})",
                 swift_string(
                     "Artifact lease target/binding/identity does not match the materialized request"
                 )

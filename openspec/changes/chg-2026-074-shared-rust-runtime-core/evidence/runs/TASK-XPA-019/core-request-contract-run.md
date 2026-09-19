@@ -1,7 +1,8 @@
 # v2 request contract moves from ArkDeckRuntime to ArkDeckCore
 
 Base: protected main `6592bcce`. TASK-XPA-019 / SPK-8 remain incomplete. This slice moves two
-files from one module to another and changes no behaviour or wire format.
+files from one module to another. It changes no encoded contract, but it did change the text of
+one error message: see Behaviour and wire format, corrected after merge.
 
 ## Ruling
 
@@ -75,7 +76,22 @@ The rejected options:
 
 ## Behaviour and wire format
 
-Nothing changes:
+Correction after merge: this section first said nothing changes. One message did change.
+When an Artifact lease's binding does not match the request, the rejection is built by string
+interpolation of an enum with an associated value. The interpolation is Swift's default
+description, and that description names the error code's module:
+`rejected(ArkDeckRuntime.RuntimeOperationErrorCode.invalidInput, "…")` became
+`rejected(ArkDeckCore.RuntimeOperationErrorCode.invalidInput, "…")`. The error's `code` is
+unchanged. Only its `message` text changed, by three bytes.
+
+Nothing checked by this slice's local checks saw it:
+- the Rust port copies that text byte for byte in four `arkdeck-hoststore` sources;
+- the shared `job.plan` oracle, `rust/tests/fixtures/job-plan-analyzer/cases.json`, records it;
+- `JobPlanAnalyzerOracleContractTests` compares against that oracle, and was not among the
+  targeted classes.
+
+The follow-up fix (`core-request-contract-message-fix-run.md`) moves the oracle and the four
+Rust copies to `ArkDeckCore`. The rest of this section held:
 - Codable encodes property names, not module names.
 - The coding keys, canonical encoding, strict duplicate-key validation and the request checks
   moved verbatim.
@@ -106,7 +122,17 @@ unified gate is not run (AGENTS.md "验证与完成"); the PR's CI is the gate.
 
 ## CI
 
-Recorded by the next slice, because a green head is merged without an amend.
+PR #2058 was merged at 15:38:42Z, before its CI finished: `swift-tests` was still running, and
+the required `swift` aggregate had not reported. On head `5561eea1` (base `6592bcce`):
+
+| Workflow run | Jobs | Conclusion |
+| --- | --- | --- |
+| Swift CI `35452126984` | `plan`, `app-build` and `ds-interactions` succeeded, and `rust-checks` was skipped. `swift-tests` failed at 15:41:42Z: `JobPlanAnalyzerOracleContractTests.testSwiftPlansTheSharedAnalyzerOracle` found `cases.json` 3 bytes short and `provenance.json`'s digest different. That made the required `swift` aggregate fail | failure |
+| SDD Guard `35452126786` | the required `guard`, `ds-tokens` | success |
+| Agent PR `35452126785` | `open-pr` | success |
+
+Main carried that failure from the merge until the follow-up fix landed. The cause and the fix
+are in `core-request-contract-message-fix-run.md`.
 
 ## Not run
 

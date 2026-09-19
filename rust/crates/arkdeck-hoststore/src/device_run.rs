@@ -793,7 +793,7 @@ impl JobRunner<'_> {
         let request = &run.record.request;
         let rejected = |message: &str| {
             Stop::Failed(format!(
-                "rejected(ArkDeckRuntime.RuntimeOperationErrorCode.invalidInput, {})",
+                "rejected(ArkDeckCore.RuntimeOperationErrorCode.invalidInput, {})",
                 swift_string(message)
             ))
         };

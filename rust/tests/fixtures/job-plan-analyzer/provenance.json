@@ -4,7 +4,7 @@
     "artifacts/job-oracle-source/ART-24be29d93f921d13584e7be5ca071f2a" : "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "artifacts/job-oracle-source/ART-cf645cc2f23c16cf9965b179bcb35b5e" : "d00960e959e3e9e022f914b985cf9d834e5800b17ecab4c07a29834b211c5035",
     "artifacts/job-oracle-source/index.json" : "e46785c83df623c2927ff7ce0304d5fcf915bb094db6ffe48ead5f2a477750cf",
-    "cases.json" : "e9c1c382230d151024455496cc334a4445c0c6532b05f074d8d678995f6691c5"
+    "cases.json" : "406cd9173f59da4369dee540d905c2f2bb404e7e9628b5ab68c33d1ab8beb147"
   },
   "nowUTC" : "2026-09-14T00:00:00Z",
   "producer" : "JobPlanAnalyzerOracleContractTests/testSwiftPlansTheSharedAnalyzerOracle",
