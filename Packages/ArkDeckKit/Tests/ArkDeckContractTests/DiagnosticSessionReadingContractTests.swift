@@ -1,3 +1,4 @@
+@testable import ArkDeckClientKit
 import Foundation
 import XCTest
 
@@ -309,6 +310,18 @@ final class DiagnosticSessionReadingContractTests: XCTestCase {
     XCTAssertEqual(result, .unavailable("diagnostics_job_correlation_unavailable"))
     let reads = await fixture.provider.readNames()
     XCTAssertTrue(reads.isEmpty)
+  }
+
+  func testClientDisplaySamplesMatchTheExistingAnalyzerWithoutLinkingIt() throws {
+    for variant in DiagnosticHilogSummaryUIFixture.variants {
+      let bytes = try DiagnosticHilogSummaryUIFixture.document(variant)
+      let document = try JSONDecoder().decode(HilogSummaryDerivedArtifact.self, from: bytes)
+      let expected = try HilogSummaryDerivedAnalyzer.analyze(
+        Data(DiagnosticHilogSummaryUIFixture.source(variant).utf8))
+      XCTAssertEqual(try document.result.canonicalData(), expected)
+      XCTAssertEqual(document.analyzerOutputByteCount, expected.count)
+      XCTAssertEqual(document.analyzerOutputSHA256, SHA256Hex.string(of: expected))
+    }
   }
 
   func testHilogSummaryReaderReusesProviderAcrossRepeatedReadsOfEveryCoverageState() async throws {
