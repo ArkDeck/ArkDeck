@@ -1,0 +1,1598 @@
+{
+  "blockingJobIds" : [
+    "job-awaitingRebindConfirmation-closed-unknown",
+    "job-awaitingRebindConfirmation-finished-empty",
+    "job-awaitingRebindConfirmation-human",
+    "job-awaitingRebindConfirmation-known",
+    "job-awaitingRebindConfirmation-process",
+    "job-awaitingRebindConfirmation-residue",
+    "job-awaitingRebindConfirmation-unfinished",
+    "job-cancelRequested-closed-unknown",
+    "job-cancelRequested-finished-empty",
+    "job-cancelRequested-human",
+    "job-cancelRequested-known",
+    "job-cancelRequested-process",
+    "job-cancelRequested-residue",
+    "job-cancelRequested-unfinished",
+    "job-cancelled-closed-unknown",
+    "job-cancelled-finished-empty",
+    "job-cancelled-human",
+    "job-cancelled-known",
+    "job-cancelled-process",
+    "job-cancelled-residue",
+    "job-cancelled-unfinished",
+    "job-cancellingAtSafeBoundary-closed-unknown",
+    "job-cancellingAtSafeBoundary-finished-empty",
+    "job-cancellingAtSafeBoundary-human",
+    "job-cancellingAtSafeBoundary-known",
+    "job-cancellingAtSafeBoundary-process",
+    "job-cancellingAtSafeBoundary-residue",
+    "job-cancellingAtSafeBoundary-unfinished",
+    "job-failed-closed-unknown",
+    "job-failed-finished-empty",
+    "job-failed-human",
+    "job-failed-known",
+    "job-failed-process",
+    "job-failed-residue",
+    "job-failed-unfinished",
+    "job-finalizing-closed-unknown",
+    "job-finalizing-finished-empty",
+    "job-finalizing-human",
+    "job-finalizing-known",
+    "job-finalizing-process",
+    "job-finalizing-residue",
+    "job-finalizing-unfinished",
+    "job-futureState-closed-unknown",
+    "job-futureState-finished-empty",
+    "job-futureState-human",
+    "job-futureState-known",
+    "job-futureState-process",
+    "job-futureState-residue",
+    "job-futureState-unfinished",
+    "job-interrupted-closed-unknown",
+    "job-interrupted-finished-empty",
+    "job-interrupted-human",
+    "job-interrupted-known",
+    "job-interrupted-process",
+    "job-interrupted-residue",
+    "job-interrupted-unfinished",
+    "job-planned-closed-unknown",
+    "job-planned-finished-empty",
+    "job-planned-human",
+    "job-planned-known",
+    "job-planned-process",
+    "job-planned-residue",
+    "job-planned-unfinished",
+    "job-planning-closed-unknown",
+    "job-planning-finished-empty",
+    "job-planning-human",
+    "job-planning-known",
+    "job-planning-process",
+    "job-planning-residue",
+    "job-planning-unfinished",
+    "job-preflight-closed-unknown",
+    "job-preflight-finished-empty",
+    "job-preflight-human",
+    "job-preflight-known",
+    "job-preflight-process",
+    "job-preflight-residue",
+    "job-preflight-unfinished",
+    "job-queued-closed-unknown",
+    "job-queued-finished-empty",
+    "job-queued-human",
+    "job-queued-known",
+    "job-queued-process",
+    "job-queued-residue",
+    "job-queued-unfinished",
+    "job-reconciling-closed-unknown",
+    "job-reconciling-finished-empty",
+    "job-reconciling-human",
+    "job-reconciling-known",
+    "job-reconciling-process",
+    "job-reconciling-residue",
+    "job-reconciling-unfinished",
+    "job-recovered-closed-unknown",
+    "job-recovered-finished-empty",
+    "job-recovered-human",
+    "job-recovered-known",
+    "job-recovered-process",
+    "job-recovered-residue",
+    "job-recovered-unfinished",
+    "job-recoveringByCompleteOverwrite-closed-unknown",
+    "job-recoveringByCompleteOverwrite-finished-empty",
+    "job-recoveringByCompleteOverwrite-human",
+    "job-recoveringByCompleteOverwrite-known",
+    "job-recoveringByCompleteOverwrite-process",
+    "job-recoveringByCompleteOverwrite-residue",
+    "job-recoveringByCompleteOverwrite-unfinished",
+    "job-resumeAtConfirmedSafeBoundary-closed-unknown",
+    "job-resumeAtConfirmedSafeBoundary-finished-empty",
+    "job-resumeAtConfirmedSafeBoundary-human",
+    "job-resumeAtConfirmedSafeBoundary-known",
+    "job-resumeAtConfirmedSafeBoundary-process",
+    "job-resumeAtConfirmedSafeBoundary-residue",
+    "job-resumeAtConfirmedSafeBoundary-unfinished",
+    "job-running-closed-unknown",
+    "job-running-finished-empty",
+    "job-running-human",
+    "job-running-known",
+    "job-running-process",
+    "job-running-residue",
+    "job-running-unfinished",
+    "job-succeeded-closed-unknown",
+    "job-succeeded-finished-empty",
+    "job-succeeded-human",
+    "job-succeeded-known",
+    "job-succeeded-process",
+    "job-succeeded-residue",
+    "job-succeeded-unfinished",
+    "job-userAbandonRequested-closed-unknown",
+    "job-userAbandonRequested-finished-empty",
+    "job-userAbandonRequested-human",
+    "job-userAbandonRequested-known",
+    "job-userAbandonRequested-process",
+    "job-userAbandonRequested-residue",
+    "job-userAbandonRequested-unfinished",
+    "job-waitingForDevice-closed-unknown",
+    "job-waitingForDevice-finished-empty",
+    "job-waitingForDevice-human",
+    "job-waitingForDevice-known",
+    "job-waitingForDevice-process",
+    "job-waitingForDevice-residue",
+    "job-waitingForDevice-unfinished",
+    "job-waitingForRecovery-finished-empty",
+    "job-waitingForRecovery-human",
+    "job-waitingForRecovery-known",
+    "job-waitingForRecovery-process",
+    "job-waitingForRecovery-residue",
+    "job-waitingForRecovery-unfinished"
+  ],
+  "preservedUnknownJobIds" : [
+    "job-waitingForRecovery-closed-unknown"
+  ],
+  "refusals" : [
+    {
+      "exitCode" : 69,
+      "name" : "missing-job-id",
+      "row" : {
+        "state" : "waitingForRecovery"
+      }
+    },
+    {
+      "exitCode" : 69,
+      "name" : "empty-job-id",
+      "row" : {
+        "finishedAtUtc" : "2026-08-09T03:15:26Z",
+        "jobId" : "",
+        "outcomeUnknown" : true,
+        "outstandingResidueCount" : 0,
+        "processProgress" : null,
+        "state" : "waitingForRecovery",
+        "waitingForHuman" : false
+      }
+    },
+    {
+      "exitCode" : 69,
+      "name" : "state-not-string",
+      "row" : {
+        "finishedAtUtc" : "2026-08-09T03:15:26Z",
+        "jobId" : "job-a",
+        "outcomeUnknown" : true,
+        "outstandingResidueCount" : 0,
+        "processProgress" : null,
+        "state" : 1,
+        "waitingForHuman" : false
+      }
+    },
+    {
+      "exitCode" : 69,
+      "name" : "unknown-not-bool",
+      "row" : {
+        "finishedAtUtc" : "2026-08-09T03:15:26Z",
+        "jobId" : "job-a",
+        "outcomeUnknown" : "true",
+        "outstandingResidueCount" : 0,
+        "processProgress" : null,
+        "state" : "waitingForRecovery",
+        "waitingForHuman" : false
+      }
+    },
+    {
+      "exitCode" : 69,
+      "name" : "residue-not-integer",
+      "row" : {
+        "finishedAtUtc" : "2026-08-09T03:15:26Z",
+        "jobId" : "job-a",
+        "outcomeUnknown" : true,
+        "outstandingResidueCount" : 0.5,
+        "processProgress" : null,
+        "state" : "waitingForRecovery",
+        "waitingForHuman" : false
+      }
+    },
+    {
+      "exitCode" : 69,
+      "name" : "human-missing",
+      "row" : {
+        "finishedAtUtc" : "2026-08-09T03:15:26Z",
+        "jobId" : "job-a",
+        "outcomeUnknown" : true,
+        "outstandingResidueCount" : 0,
+        "processProgress" : null,
+        "state" : "waitingForRecovery"
+      }
+    },
+    {
+      "exitCode" : 69,
+      "name" : "not-an-object",
+      "row" : "job-a"
+    }
+  ],
+  "rows" : [
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-queued-closed-unknown",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "queued",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-queued-known",
+      "outcomeUnknown" : false,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "queued",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-queued-human",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "queued",
+      "waitingForHuman" : true
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-queued-residue",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 1,
+      "processProgress" : null,
+      "state" : "queued",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-queued-process",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : {
+        "phase" : "running"
+      },
+      "state" : "queued",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : null,
+      "jobId" : "job-queued-unfinished",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "queued",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "",
+      "jobId" : "job-queued-finished-empty",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "queued",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-preflight-closed-unknown",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "preflight",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-preflight-known",
+      "outcomeUnknown" : false,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "preflight",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-preflight-human",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "preflight",
+      "waitingForHuman" : true
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-preflight-residue",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 1,
+      "processProgress" : null,
+      "state" : "preflight",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-preflight-process",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : {
+        "phase" : "running"
+      },
+      "state" : "preflight",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : null,
+      "jobId" : "job-preflight-unfinished",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "preflight",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "",
+      "jobId" : "job-preflight-finished-empty",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "preflight",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-running-closed-unknown",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "running",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-running-known",
+      "outcomeUnknown" : false,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "running",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-running-human",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "running",
+      "waitingForHuman" : true
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-running-residue",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 1,
+      "processProgress" : null,
+      "state" : "running",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-running-process",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : {
+        "phase" : "running"
+      },
+      "state" : "running",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : null,
+      "jobId" : "job-running-unfinished",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "running",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "",
+      "jobId" : "job-running-finished-empty",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "running",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-waitingForDevice-closed-unknown",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "waitingForDevice",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-waitingForDevice-known",
+      "outcomeUnknown" : false,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "waitingForDevice",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-waitingForDevice-human",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "waitingForDevice",
+      "waitingForHuman" : true
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-waitingForDevice-residue",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 1,
+      "processProgress" : null,
+      "state" : "waitingForDevice",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-waitingForDevice-process",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : {
+        "phase" : "running"
+      },
+      "state" : "waitingForDevice",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : null,
+      "jobId" : "job-waitingForDevice-unfinished",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "waitingForDevice",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "",
+      "jobId" : "job-waitingForDevice-finished-empty",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "waitingForDevice",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-awaitingRebindConfirmation-closed-unknown",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "awaitingRebindConfirmation",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-awaitingRebindConfirmation-known",
+      "outcomeUnknown" : false,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "awaitingRebindConfirmation",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-awaitingRebindConfirmation-human",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "awaitingRebindConfirmation",
+      "waitingForHuman" : true
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-awaitingRebindConfirmation-residue",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 1,
+      "processProgress" : null,
+      "state" : "awaitingRebindConfirmation",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-awaitingRebindConfirmation-process",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : {
+        "phase" : "running"
+      },
+      "state" : "awaitingRebindConfirmation",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : null,
+      "jobId" : "job-awaitingRebindConfirmation-unfinished",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "awaitingRebindConfirmation",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "",
+      "jobId" : "job-awaitingRebindConfirmation-finished-empty",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "awaitingRebindConfirmation",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-planning-closed-unknown",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "planning",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-planning-known",
+      "outcomeUnknown" : false,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "planning",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-planning-human",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "planning",
+      "waitingForHuman" : true
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-planning-residue",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 1,
+      "processProgress" : null,
+      "state" : "planning",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-planning-process",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : {
+        "phase" : "running"
+      },
+      "state" : "planning",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : null,
+      "jobId" : "job-planning-unfinished",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "planning",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "",
+      "jobId" : "job-planning-finished-empty",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "planning",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-cancelRequested-closed-unknown",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "cancelRequested",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-cancelRequested-known",
+      "outcomeUnknown" : false,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "cancelRequested",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-cancelRequested-human",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "cancelRequested",
+      "waitingForHuman" : true
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-cancelRequested-residue",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 1,
+      "processProgress" : null,
+      "state" : "cancelRequested",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-cancelRequested-process",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : {
+        "phase" : "running"
+      },
+      "state" : "cancelRequested",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : null,
+      "jobId" : "job-cancelRequested-unfinished",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "cancelRequested",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "",
+      "jobId" : "job-cancelRequested-finished-empty",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "cancelRequested",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-cancellingAtSafeBoundary-closed-unknown",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "cancellingAtSafeBoundary",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-cancellingAtSafeBoundary-known",
+      "outcomeUnknown" : false,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "cancellingAtSafeBoundary",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-cancellingAtSafeBoundary-human",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "cancellingAtSafeBoundary",
+      "waitingForHuman" : true
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-cancellingAtSafeBoundary-residue",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 1,
+      "processProgress" : null,
+      "state" : "cancellingAtSafeBoundary",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-cancellingAtSafeBoundary-process",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : {
+        "phase" : "running"
+      },
+      "state" : "cancellingAtSafeBoundary",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : null,
+      "jobId" : "job-cancellingAtSafeBoundary-unfinished",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "cancellingAtSafeBoundary",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "",
+      "jobId" : "job-cancellingAtSafeBoundary-finished-empty",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "cancellingAtSafeBoundary",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-waitingForRecovery-closed-unknown",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "waitingForRecovery",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-waitingForRecovery-known",
+      "outcomeUnknown" : false,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "waitingForRecovery",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-waitingForRecovery-human",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "waitingForRecovery",
+      "waitingForHuman" : true
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-waitingForRecovery-residue",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 1,
+      "processProgress" : null,
+      "state" : "waitingForRecovery",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-waitingForRecovery-process",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : {
+        "phase" : "running"
+      },
+      "state" : "waitingForRecovery",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : null,
+      "jobId" : "job-waitingForRecovery-unfinished",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "waitingForRecovery",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "",
+      "jobId" : "job-waitingForRecovery-finished-empty",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "waitingForRecovery",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-reconciling-closed-unknown",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "reconciling",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-reconciling-known",
+      "outcomeUnknown" : false,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "reconciling",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-reconciling-human",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "reconciling",
+      "waitingForHuman" : true
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-reconciling-residue",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 1,
+      "processProgress" : null,
+      "state" : "reconciling",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-reconciling-process",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : {
+        "phase" : "running"
+      },
+      "state" : "reconciling",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : null,
+      "jobId" : "job-reconciling-unfinished",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "reconciling",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "",
+      "jobId" : "job-reconciling-finished-empty",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "reconciling",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-recoveringByCompleteOverwrite-closed-unknown",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "recoveringByCompleteOverwrite",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-recoveringByCompleteOverwrite-known",
+      "outcomeUnknown" : false,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "recoveringByCompleteOverwrite",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-recoveringByCompleteOverwrite-human",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "recoveringByCompleteOverwrite",
+      "waitingForHuman" : true
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-recoveringByCompleteOverwrite-residue",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 1,
+      "processProgress" : null,
+      "state" : "recoveringByCompleteOverwrite",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-recoveringByCompleteOverwrite-process",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : {
+        "phase" : "running"
+      },
+      "state" : "recoveringByCompleteOverwrite",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : null,
+      "jobId" : "job-recoveringByCompleteOverwrite-unfinished",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "recoveringByCompleteOverwrite",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "",
+      "jobId" : "job-recoveringByCompleteOverwrite-finished-empty",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "recoveringByCompleteOverwrite",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-resumeAtConfirmedSafeBoundary-closed-unknown",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "resumeAtConfirmedSafeBoundary",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-resumeAtConfirmedSafeBoundary-known",
+      "outcomeUnknown" : false,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "resumeAtConfirmedSafeBoundary",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-resumeAtConfirmedSafeBoundary-human",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "resumeAtConfirmedSafeBoundary",
+      "waitingForHuman" : true
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-resumeAtConfirmedSafeBoundary-residue",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 1,
+      "processProgress" : null,
+      "state" : "resumeAtConfirmedSafeBoundary",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-resumeAtConfirmedSafeBoundary-process",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : {
+        "phase" : "running"
+      },
+      "state" : "resumeAtConfirmedSafeBoundary",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : null,
+      "jobId" : "job-resumeAtConfirmedSafeBoundary-unfinished",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "resumeAtConfirmedSafeBoundary",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "",
+      "jobId" : "job-resumeAtConfirmedSafeBoundary-finished-empty",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "resumeAtConfirmedSafeBoundary",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-userAbandonRequested-closed-unknown",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "userAbandonRequested",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-userAbandonRequested-known",
+      "outcomeUnknown" : false,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "userAbandonRequested",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-userAbandonRequested-human",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "userAbandonRequested",
+      "waitingForHuman" : true
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-userAbandonRequested-residue",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 1,
+      "processProgress" : null,
+      "state" : "userAbandonRequested",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-userAbandonRequested-process",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : {
+        "phase" : "running"
+      },
+      "state" : "userAbandonRequested",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : null,
+      "jobId" : "job-userAbandonRequested-unfinished",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "userAbandonRequested",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "",
+      "jobId" : "job-userAbandonRequested-finished-empty",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "userAbandonRequested",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-finalizing-closed-unknown",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "finalizing",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-finalizing-known",
+      "outcomeUnknown" : false,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "finalizing",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-finalizing-human",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "finalizing",
+      "waitingForHuman" : true
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-finalizing-residue",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 1,
+      "processProgress" : null,
+      "state" : "finalizing",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-finalizing-process",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : {
+        "phase" : "running"
+      },
+      "state" : "finalizing",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : null,
+      "jobId" : "job-finalizing-unfinished",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "finalizing",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "",
+      "jobId" : "job-finalizing-finished-empty",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "finalizing",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-planned-closed-unknown",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "planned",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-planned-known",
+      "outcomeUnknown" : false,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "planned",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-planned-human",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "planned",
+      "waitingForHuman" : true
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-planned-residue",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 1,
+      "processProgress" : null,
+      "state" : "planned",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-planned-process",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : {
+        "phase" : "running"
+      },
+      "state" : "planned",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : null,
+      "jobId" : "job-planned-unfinished",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "planned",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "",
+      "jobId" : "job-planned-finished-empty",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "planned",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-succeeded-closed-unknown",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "succeeded",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-succeeded-known",
+      "outcomeUnknown" : false,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "succeeded",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-succeeded-human",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "succeeded",
+      "waitingForHuman" : true
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-succeeded-residue",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 1,
+      "processProgress" : null,
+      "state" : "succeeded",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-succeeded-process",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : {
+        "phase" : "running"
+      },
+      "state" : "succeeded",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : null,
+      "jobId" : "job-succeeded-unfinished",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "succeeded",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "",
+      "jobId" : "job-succeeded-finished-empty",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "succeeded",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-recovered-closed-unknown",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "recovered",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-recovered-known",
+      "outcomeUnknown" : false,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "recovered",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-recovered-human",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "recovered",
+      "waitingForHuman" : true
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-recovered-residue",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 1,
+      "processProgress" : null,
+      "state" : "recovered",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-recovered-process",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : {
+        "phase" : "running"
+      },
+      "state" : "recovered",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : null,
+      "jobId" : "job-recovered-unfinished",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "recovered",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "",
+      "jobId" : "job-recovered-finished-empty",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "recovered",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-failed-closed-unknown",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "failed",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-failed-known",
+      "outcomeUnknown" : false,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "failed",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-failed-human",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "failed",
+      "waitingForHuman" : true
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-failed-residue",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 1,
+      "processProgress" : null,
+      "state" : "failed",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-failed-process",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : {
+        "phase" : "running"
+      },
+      "state" : "failed",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : null,
+      "jobId" : "job-failed-unfinished",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "failed",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "",
+      "jobId" : "job-failed-finished-empty",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "failed",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-cancelled-closed-unknown",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "cancelled",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-cancelled-known",
+      "outcomeUnknown" : false,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "cancelled",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-cancelled-human",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "cancelled",
+      "waitingForHuman" : true
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-cancelled-residue",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 1,
+      "processProgress" : null,
+      "state" : "cancelled",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-cancelled-process",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : {
+        "phase" : "running"
+      },
+      "state" : "cancelled",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : null,
+      "jobId" : "job-cancelled-unfinished",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "cancelled",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "",
+      "jobId" : "job-cancelled-finished-empty",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "cancelled",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-interrupted-closed-unknown",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "interrupted",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-interrupted-known",
+      "outcomeUnknown" : false,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "interrupted",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-interrupted-human",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "interrupted",
+      "waitingForHuman" : true
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-interrupted-residue",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 1,
+      "processProgress" : null,
+      "state" : "interrupted",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-interrupted-process",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : {
+        "phase" : "running"
+      },
+      "state" : "interrupted",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : null,
+      "jobId" : "job-interrupted-unfinished",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "interrupted",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "",
+      "jobId" : "job-interrupted-finished-empty",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "interrupted",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-futureState-closed-unknown",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "futureState",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-futureState-known",
+      "outcomeUnknown" : false,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "futureState",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-futureState-human",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "futureState",
+      "waitingForHuman" : true
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-futureState-residue",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 1,
+      "processProgress" : null,
+      "state" : "futureState",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "2026-08-09T03:15:26Z",
+      "jobId" : "job-futureState-process",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : {
+        "phase" : "running"
+      },
+      "state" : "futureState",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : null,
+      "jobId" : "job-futureState-unfinished",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "futureState",
+      "waitingForHuman" : false
+    },
+    {
+      "finishedAtUtc" : "",
+      "jobId" : "job-futureState-finished-empty",
+      "outcomeUnknown" : true,
+      "outstandingResidueCount" : 0,
+      "processProgress" : null,
+      "state" : "futureState",
+      "waitingForHuman" : false
+    }
+  ]
+}

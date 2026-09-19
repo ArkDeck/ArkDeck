@@ -8,6 +8,7 @@ against it by contract tests, and read by generators rather than restated.
 | Directory | Contract | Fact source and gate |
 | --- | --- | --- |
 | `control/methods/` | one typed schema per control-plane method of the single current protocol (`Packages/ArkDeckKit/Contracts/control-protocol.json`) | frames recorded from the Swift daemon; `ControlMethodSchemaContractTests` (see `control/README.md`) |
+| `recovery/job-state-preflight.json` | which Job states, agent executions and capability uses block a daemon restart or the M5 cutover and which are carried over as they are (design §G.4; `runtime service restart`'s classifier) | `JobState`, `AgentExecutionState`, `RuntimeCapabilityUseOutcome` and `RuntimeCLI.classifyAgentdRestartCurrentJobs`; `JobStatePreflightTableContractTests`, which also records the Rust replay's oracle |
 
 `spec/` holds data only. The method set, the protocol version, the contract
 identity and the Catalog remain stated once in their registries
