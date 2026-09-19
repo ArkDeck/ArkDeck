@@ -1,0 +1,3052 @@
+[
+  {
+    "name" : "fresh-store",
+    "steps" : [
+      {
+        "answer" : null,
+        "arguments" : {
+
+        },
+        "index" : "7a0452f09d57234c6883404f9049020190fee827dc9c5596427d74f7f4ac3353",
+        "operation" : "startupSelection",
+        "published" : true
+      },
+      {
+        "answer" : {
+          "outcome" : "absent"
+        },
+        "arguments" : {
+          "actionID" : "select-a"
+        },
+        "index" : "7a0452f09d57234c6883404f9049020190fee827dc9c5596427d74f7f4ac3353",
+        "operation" : "selectionOutcome",
+        "published" : false
+      },
+      {
+        "answer" : null,
+        "arguments" : {
+          "actionID" : "select-a"
+        },
+        "index" : "7a0452f09d57234c6883404f9049020190fee827dc9c5596427d74f7f4ac3353",
+        "operation" : "acknowledgeSelectionOutcome",
+        "published" : false
+      },
+      {
+        "arguments" : {
+          "expectedActiveGeneration" : "1",
+          "newToolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+          "pendingActionID" : null
+        },
+        "index" : "7a0452f09d57234c6883404f9049020190fee827dc9c5596427d74f7f4ac3353",
+        "operation" : "selectionCandidate",
+        "published" : false,
+        "refusal" : {
+          "code" : "resourceConflict",
+          "message" : "active tool selection generation does not match"
+        }
+      },
+      {
+        "arguments" : {
+          "actionID" : "select-a",
+          "expectedActiveGeneration" : "1",
+          "newToolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96"
+        },
+        "index" : "7a0452f09d57234c6883404f9049020190fee827dc9c5596427d74f7f4ac3353",
+        "operation" : "prepareSelection",
+        "published" : false,
+        "refusal" : {
+          "code" : "resourceConflict",
+          "message" : "active tool selection generation does not match"
+        }
+      },
+      {
+        "arguments" : {
+          "actionID" : "select-a"
+        },
+        "index" : "7a0452f09d57234c6883404f9049020190fee827dc9c5596427d74f7f4ac3353",
+        "operation" : "publishPendingSelection",
+        "published" : false,
+        "refusal" : {
+          "code" : "resourceConflict",
+          "message" : "the exact pending tool selection does not exist"
+        }
+      },
+      {
+        "arguments" : {
+          "actionID" : "select-a",
+          "reasonCode" : "tool.selectedStartupVerificationFailed"
+        },
+        "index" : "7a0452f09d57234c6883404f9049020190fee827dc9c5596427d74f7f4ac3353",
+        "operation" : "failPendingSelection",
+        "published" : false,
+        "refusal" : {
+          "code" : "resourceConflict",
+          "message" : "the exact pending tool selection does not exist"
+        }
+      },
+      {
+        "arguments" : {
+          "actionID" : "select-a",
+          "reasonCode" : "not a reason"
+        },
+        "index" : "7a0452f09d57234c6883404f9049020190fee827dc9c5596427d74f7f4ac3353",
+        "operation" : "failPendingSelection",
+        "published" : false,
+        "refusal" : {
+          "code" : "invalidInput",
+          "message" : "invalid tool selection failure reason"
+        }
+      },
+      {
+        "arguments" : {
+          "expectedGeneration" : "1",
+          "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96"
+        },
+        "index" : "7a0452f09d57234c6883404f9049020190fee827dc9c5596427d74f7f4ac3353",
+        "operation" : "initializeServiceSelection",
+        "published" : false,
+        "refusal" : {
+          "code" : "resourceNotFound",
+          "message" : "tool reference does not exist"
+        }
+      },
+      {
+        "arguments" : {
+          "expectedGeneration" : "1",
+          "toolRef" : "hdc"
+        },
+        "index" : "7a0452f09d57234c6883404f9049020190fee827dc9c5596427d74f7f4ac3353",
+        "operation" : "initializeServiceSelection",
+        "published" : false,
+        "refusal" : {
+          "code" : "invalidInput",
+          "message" : "expected a content-addressed HDC tool reference"
+        }
+      },
+      {
+        "arguments" : {
+
+        },
+        "index" : "7a0452f09d57234c6883404f9049020190fee827dc9c5596427d74f7f4ac3353",
+        "lockHeldByAnotherOwner" : true,
+        "operation" : "startupSelection",
+        "published" : false,
+        "refusal" : {
+          "code" : "resourceConflict",
+          "message" : "another bootstrap operation holds the store; retry after it completes"
+        }
+      },
+      {
+        "answer" : [
+
+        ],
+        "arguments" : {
+
+        },
+        "index" : "7a0452f09d57234c6883404f9049020190fee827dc9c5596427d74f7f4ac3353",
+        "operation" : "list",
+        "published" : false
+      }
+    ]
+  },
+  {
+    "name" : "initialized-then-published",
+    "steps" : [
+      {
+        "answer" : {
+          "activeSelectionGeneration" : null,
+          "byteCount" : "56",
+          "contentDigest" : "a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+          "contentRetained" : true,
+          "contentSchemaVersion" : "arkdeck.tool-content/1",
+          "dependencies" : [
+
+          ],
+          "dependencyLayout" : "hdc-sibling-libusb/1",
+          "digestAlgorithm" : "sha256-jcs",
+          "executableSHA256" : "dab2a09f7196f97a256c26752c9c903cd61a024a2d53d33c7301908312c63737",
+          "generation" : "1",
+          "kind" : "hdc",
+          "platform" : "macos",
+          "quarantineSHA256" : null,
+          "references" : [
+
+          ],
+          "registeredAt" : "2026-09-01T00:00:00Z",
+          "relocatable" : true,
+          "schemaVersion" : "arkdeck.runtime-tool/1",
+          "selected" : false,
+          "source" : "registeredCopy",
+          "state" : "available",
+          "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+          "trust" : {
+            "codeDirectoryIdentitySHA256" : null,
+            "executionAssessment" : "notPerformed",
+            "platformTrust" : "unverified",
+            "policy" : "arkdeck.host-tool-inspection/1",
+            "profileReferences" : [
+              "fixture-profile"
+            ],
+            "registeredIdentity" : true,
+            "signature" : "unsigned",
+            "signingIdentifier" : null,
+            "teamIdentifier" : null,
+            "toolVersion" : "fixture-1",
+            "versionSource" : "publishedProfileDigestMatch"
+          }
+        },
+        "arguments" : {
+          "executable" : "a"
+        },
+        "index" : "83e15f636ddc2ac3c32b48775ce7f13b628f8bc17e97f3d70978f4663697a95f",
+        "operation" : "register",
+        "published" : true
+      },
+      {
+        "answer" : {
+          "activeSelectionGeneration" : null,
+          "byteCount" : "56",
+          "contentDigest" : "3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d",
+          "contentRetained" : true,
+          "contentSchemaVersion" : "arkdeck.tool-content/1",
+          "dependencies" : [
+
+          ],
+          "dependencyLayout" : "hdc-sibling-libusb/1",
+          "digestAlgorithm" : "sha256-jcs",
+          "executableSHA256" : "629f7402ee92d66908335ef5646610eec5b734df677fe2c97694c4b155e54fc2",
+          "generation" : "1",
+          "kind" : "hdc",
+          "platform" : "macos",
+          "quarantineSHA256" : null,
+          "references" : [
+
+          ],
+          "registeredAt" : "2026-09-01T00:00:00Z",
+          "relocatable" : true,
+          "schemaVersion" : "arkdeck.runtime-tool/1",
+          "selected" : false,
+          "source" : "registeredCopy",
+          "state" : "available",
+          "toolRef" : "tool:sha256:3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d",
+          "trust" : {
+            "codeDirectoryIdentitySHA256" : null,
+            "executionAssessment" : "notPerformed",
+            "platformTrust" : "unverified",
+            "policy" : "arkdeck.host-tool-inspection/1",
+            "profileReferences" : [
+              "fixture-profile"
+            ],
+            "registeredIdentity" : true,
+            "signature" : "unsigned",
+            "signingIdentifier" : null,
+            "teamIdentifier" : null,
+            "toolVersion" : "fixture-1",
+            "versionSource" : "publishedProfileDigestMatch"
+          }
+        },
+        "arguments" : {
+          "executable" : "b"
+        },
+        "index" : "13e554a7de008969f666a8772978a5e5bb79542310c06ec0643b4de625f16221",
+        "operation" : "register",
+        "published" : true
+      },
+      {
+        "answer" : {
+          "activeGeneration" : "1",
+          "dependencies" : [
+
+          ],
+          "executable" : "tool-a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96.hdc/hdc",
+          "executableSHA256" : "dab2a09f7196f97a256c26752c9c903cd61a024a2d53d33c7301908312c63737",
+          "pendingControlActionId" : null,
+          "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96"
+        },
+        "arguments" : {
+          "expectedGeneration" : "1",
+          "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96"
+        },
+        "index" : "c8d0bf41e641a59416710432cf8a289b3485710ddcce840ee0c754416219ba9e",
+        "operation" : "initializeServiceSelection",
+        "published" : true
+      },
+      {
+        "answer" : {
+          "activeGeneration" : "1",
+          "dependencies" : [
+
+          ],
+          "executable" : "tool-a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96.hdc/hdc",
+          "executableSHA256" : "dab2a09f7196f97a256c26752c9c903cd61a024a2d53d33c7301908312c63737",
+          "pendingControlActionId" : null,
+          "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96"
+        },
+        "arguments" : {
+          "expectedGeneration" : "1",
+          "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96"
+        },
+        "index" : "c8d0bf41e641a59416710432cf8a289b3485710ddcce840ee0c754416219ba9e",
+        "operation" : "initializeServiceSelection",
+        "published" : false
+      },
+      {
+        "arguments" : {
+          "expectedGeneration" : "2",
+          "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96"
+        },
+        "index" : "c8d0bf41e641a59416710432cf8a289b3485710ddcce840ee0c754416219ba9e",
+        "operation" : "initializeServiceSelection",
+        "published" : false,
+        "refusal" : {
+          "code" : "resourceConflict",
+          "message" : "initial service tool is removed or its generation changed"
+        }
+      },
+      {
+        "arguments" : {
+          "expectedGeneration" : "1",
+          "toolRef" : "tool:sha256:3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d"
+        },
+        "index" : "c8d0bf41e641a59416710432cf8a289b3485710ddcce840ee0c754416219ba9e",
+        "operation" : "initializeServiceSelection",
+        "published" : false,
+        "refusal" : {
+          "code" : "resourceConflict",
+          "message" : "an existing or unreconciled HDC selection can change only through runtime tool select"
+        }
+      },
+      {
+        "answer" : {
+          "newTool" : {
+            "activeSelectionGeneration" : null,
+            "byteCount" : "56",
+            "contentDigest" : "3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d",
+            "contentRetained" : true,
+            "contentSchemaVersion" : "arkdeck.tool-content/1",
+            "dependencies" : [
+
+            ],
+            "dependencyLayout" : "hdc-sibling-libusb/1",
+            "digestAlgorithm" : "sha256-jcs",
+            "executableSHA256" : "629f7402ee92d66908335ef5646610eec5b734df677fe2c97694c4b155e54fc2",
+            "generation" : "1",
+            "kind" : "hdc",
+            "platform" : "macos",
+            "quarantineSHA256" : null,
+            "references" : [
+
+            ],
+            "registeredAt" : "2026-09-01T00:00:00Z",
+            "relocatable" : true,
+            "schemaVersion" : "arkdeck.runtime-tool/1",
+            "selected" : false,
+            "source" : "registeredCopy",
+            "state" : "available",
+            "toolRef" : "tool:sha256:3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d",
+            "trust" : {
+              "codeDirectoryIdentitySHA256" : null,
+              "executionAssessment" : "notPerformed",
+              "platformTrust" : "unverified",
+              "policy" : "arkdeck.host-tool-inspection/1",
+              "profileReferences" : [
+                "fixture-profile"
+              ],
+              "registeredIdentity" : true,
+              "signature" : "unsigned",
+              "signingIdentifier" : null,
+              "teamIdentifier" : null,
+              "toolVersion" : "fixture-1",
+              "versionSource" : "publishedProfileDigestMatch"
+            }
+          },
+          "selection" : {
+            "activeGeneration" : "1",
+            "activeTool" : {
+              "activeSelectionGeneration" : "1",
+              "byteCount" : "56",
+              "contentDigest" : "a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+              "contentRetained" : true,
+              "contentSchemaVersion" : "arkdeck.tool-content/1",
+              "dependencies" : [
+
+              ],
+              "dependencyLayout" : "hdc-sibling-libusb/1",
+              "digestAlgorithm" : "sha256-jcs",
+              "executableSHA256" : "dab2a09f7196f97a256c26752c9c903cd61a024a2d53d33c7301908312c63737",
+              "generation" : "1",
+              "kind" : "hdc",
+              "platform" : "macos",
+              "quarantineSHA256" : null,
+              "references" : [
+                {
+                  "id" : "runtime-hdc-selection",
+                  "kind" : "activeSelection"
+                }
+              ],
+              "registeredAt" : "2026-09-01T00:00:00Z",
+              "relocatable" : true,
+              "schemaVersion" : "arkdeck.runtime-tool/1",
+              "selected" : true,
+              "source" : "registeredCopy",
+              "state" : "available",
+              "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+              "trust" : {
+                "codeDirectoryIdentitySHA256" : null,
+                "executionAssessment" : "notPerformed",
+                "platformTrust" : "unverified",
+                "policy" : "arkdeck.host-tool-inspection/1",
+                "profileReferences" : [
+                  "fixture-profile"
+                ],
+                "registeredIdentity" : true,
+                "signature" : "unsigned",
+                "signingIdentifier" : null,
+                "teamIdentifier" : null,
+                "toolVersion" : "fixture-1",
+                "versionSource" : "publishedProfileDigestMatch"
+              }
+            },
+            "activeToolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+            "pendingControlActionId" : null,
+            "pendingToolRef" : null,
+            "schemaVersion" : "arkdeck.runtime-tool-selection/1"
+          }
+        },
+        "arguments" : {
+          "expectedActiveGeneration" : "1",
+          "newToolRef" : "tool:sha256:3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d",
+          "pendingActionID" : null
+        },
+        "index" : "c8d0bf41e641a59416710432cf8a289b3485710ddcce840ee0c754416219ba9e",
+        "operation" : "selectionCandidate",
+        "published" : false
+      },
+      {
+        "arguments" : {
+          "expectedActiveGeneration" : "2",
+          "newToolRef" : "tool:sha256:3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d",
+          "pendingActionID" : null
+        },
+        "index" : "c8d0bf41e641a59416710432cf8a289b3485710ddcce840ee0c754416219ba9e",
+        "operation" : "selectionCandidate",
+        "published" : false,
+        "refusal" : {
+          "code" : "resourceConflict",
+          "message" : "active tool selection generation does not match"
+        }
+      },
+      {
+        "arguments" : {
+          "expectedActiveGeneration" : "1",
+          "newToolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+          "pendingActionID" : null
+        },
+        "index" : "c8d0bf41e641a59416710432cf8a289b3485710ddcce840ee0c754416219ba9e",
+        "operation" : "selectionCandidate",
+        "published" : false,
+        "refusal" : {
+          "code" : "resourceConflict",
+          "message" : "candidate is already the active HDC tool"
+        }
+      },
+      {
+        "answer" : {
+          "activeGeneration" : "1",
+          "activeTool" : {
+            "activeSelectionGeneration" : "1",
+            "byteCount" : "56",
+            "contentDigest" : "a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+            "contentRetained" : true,
+            "contentSchemaVersion" : "arkdeck.tool-content/1",
+            "dependencies" : [
+
+            ],
+            "dependencyLayout" : "hdc-sibling-libusb/1",
+            "digestAlgorithm" : "sha256-jcs",
+            "executableSHA256" : "dab2a09f7196f97a256c26752c9c903cd61a024a2d53d33c7301908312c63737",
+            "generation" : "1",
+            "kind" : "hdc",
+            "platform" : "macos",
+            "quarantineSHA256" : null,
+            "references" : [
+              {
+                "id" : "runtime-hdc-selection",
+                "kind" : "activeSelection"
+              },
+              {
+                "id" : "select-b",
+                "kind" : "controlAction"
+              }
+            ],
+            "registeredAt" : "2026-09-01T00:00:00Z",
+            "relocatable" : true,
+            "schemaVersion" : "arkdeck.runtime-tool/1",
+            "selected" : true,
+            "source" : "registeredCopy",
+            "state" : "available",
+            "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+            "trust" : {
+              "codeDirectoryIdentitySHA256" : null,
+              "executionAssessment" : "notPerformed",
+              "platformTrust" : "unverified",
+              "policy" : "arkdeck.host-tool-inspection/1",
+              "profileReferences" : [
+                "fixture-profile"
+              ],
+              "registeredIdentity" : true,
+              "signature" : "unsigned",
+              "signingIdentifier" : null,
+              "teamIdentifier" : null,
+              "toolVersion" : "fixture-1",
+              "versionSource" : "publishedProfileDigestMatch"
+            }
+          },
+          "activeToolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+          "pendingControlActionId" : "select-b",
+          "pendingToolRef" : "tool:sha256:3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d",
+          "schemaVersion" : "arkdeck.runtime-tool-selection/1"
+        },
+        "arguments" : {
+          "actionID" : "select-b",
+          "expectedActiveGeneration" : "1",
+          "newToolRef" : "tool:sha256:3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d"
+        },
+        "index" : "4f50525bac82367ad0ceaa9a8b82ca8502eb16fb6aeae28c1f591cc291b3fd0f",
+        "operation" : "prepareSelection",
+        "published" : true
+      },
+      {
+        "answer" : {
+          "activeGeneration" : "1",
+          "activeTool" : {
+            "activeSelectionGeneration" : "1",
+            "byteCount" : "56",
+            "contentDigest" : "a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+            "contentRetained" : true,
+            "contentSchemaVersion" : "arkdeck.tool-content/1",
+            "dependencies" : [
+
+            ],
+            "dependencyLayout" : "hdc-sibling-libusb/1",
+            "digestAlgorithm" : "sha256-jcs",
+            "executableSHA256" : "dab2a09f7196f97a256c26752c9c903cd61a024a2d53d33c7301908312c63737",
+            "generation" : "1",
+            "kind" : "hdc",
+            "platform" : "macos",
+            "quarantineSHA256" : null,
+            "references" : [
+              {
+                "id" : "runtime-hdc-selection",
+                "kind" : "activeSelection"
+              },
+              {
+                "id" : "select-b",
+                "kind" : "controlAction"
+              }
+            ],
+            "registeredAt" : "2026-09-01T00:00:00Z",
+            "relocatable" : true,
+            "schemaVersion" : "arkdeck.runtime-tool/1",
+            "selected" : true,
+            "source" : "registeredCopy",
+            "state" : "available",
+            "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+            "trust" : {
+              "codeDirectoryIdentitySHA256" : null,
+              "executionAssessment" : "notPerformed",
+              "platformTrust" : "unverified",
+              "policy" : "arkdeck.host-tool-inspection/1",
+              "profileReferences" : [
+                "fixture-profile"
+              ],
+              "registeredIdentity" : true,
+              "signature" : "unsigned",
+              "signingIdentifier" : null,
+              "teamIdentifier" : null,
+              "toolVersion" : "fixture-1",
+              "versionSource" : "publishedProfileDigestMatch"
+            }
+          },
+          "activeToolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+          "pendingControlActionId" : "select-b",
+          "pendingToolRef" : "tool:sha256:3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d",
+          "schemaVersion" : "arkdeck.runtime-tool-selection/1"
+        },
+        "arguments" : {
+          "actionID" : "select-b",
+          "expectedActiveGeneration" : "1",
+          "newToolRef" : "tool:sha256:3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d"
+        },
+        "index" : "4f50525bac82367ad0ceaa9a8b82ca8502eb16fb6aeae28c1f591cc291b3fd0f",
+        "operation" : "prepareSelection",
+        "published" : false
+      },
+      {
+        "answer" : {
+          "outcome" : "pending"
+        },
+        "arguments" : {
+          "actionID" : "select-b"
+        },
+        "index" : "4f50525bac82367ad0ceaa9a8b82ca8502eb16fb6aeae28c1f591cc291b3fd0f",
+        "operation" : "selectionOutcome",
+        "published" : false
+      },
+      {
+        "answer" : {
+          "activeGeneration" : "1",
+          "dependencies" : [
+
+          ],
+          "executable" : "tool-3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d.hdc/hdc",
+          "executableSHA256" : "629f7402ee92d66908335ef5646610eec5b734df677fe2c97694c4b155e54fc2",
+          "pendingControlActionId" : "select-b",
+          "toolRef" : "tool:sha256:3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d"
+        },
+        "arguments" : {
+
+        },
+        "index" : "4f50525bac82367ad0ceaa9a8b82ca8502eb16fb6aeae28c1f591cc291b3fd0f",
+        "operation" : "startupSelection",
+        "published" : false
+      },
+      {
+        "arguments" : {
+          "expectedActiveGeneration" : "1",
+          "newToolRef" : "tool:sha256:3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d",
+          "pendingActionID" : null
+        },
+        "index" : "4f50525bac82367ad0ceaa9a8b82ca8502eb16fb6aeae28c1f591cc291b3fd0f",
+        "operation" : "selectionCandidate",
+        "published" : false,
+        "refusal" : {
+          "code" : "resourceConflict",
+          "message" : "a prior tool selection requires reconciliation"
+        }
+      },
+      {
+        "answer" : {
+          "newTool" : {
+            "activeSelectionGeneration" : null,
+            "byteCount" : "56",
+            "contentDigest" : "3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d",
+            "contentRetained" : true,
+            "contentSchemaVersion" : "arkdeck.tool-content/1",
+            "dependencies" : [
+
+            ],
+            "dependencyLayout" : "hdc-sibling-libusb/1",
+            "digestAlgorithm" : "sha256-jcs",
+            "executableSHA256" : "629f7402ee92d66908335ef5646610eec5b734df677fe2c97694c4b155e54fc2",
+            "generation" : "1",
+            "kind" : "hdc",
+            "platform" : "macos",
+            "quarantineSHA256" : null,
+            "references" : [
+              {
+                "id" : "select-b",
+                "kind" : "controlAction"
+              }
+            ],
+            "registeredAt" : "2026-09-01T00:00:00Z",
+            "relocatable" : true,
+            "schemaVersion" : "arkdeck.runtime-tool/1",
+            "selected" : false,
+            "source" : "registeredCopy",
+            "state" : "available",
+            "toolRef" : "tool:sha256:3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d",
+            "trust" : {
+              "codeDirectoryIdentitySHA256" : null,
+              "executionAssessment" : "notPerformed",
+              "platformTrust" : "unverified",
+              "policy" : "arkdeck.host-tool-inspection/1",
+              "profileReferences" : [
+                "fixture-profile"
+              ],
+              "registeredIdentity" : true,
+              "signature" : "unsigned",
+              "signingIdentifier" : null,
+              "teamIdentifier" : null,
+              "toolVersion" : "fixture-1",
+              "versionSource" : "publishedProfileDigestMatch"
+            }
+          },
+          "selection" : {
+            "activeGeneration" : "1",
+            "activeTool" : {
+              "activeSelectionGeneration" : "1",
+              "byteCount" : "56",
+              "contentDigest" : "a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+              "contentRetained" : true,
+              "contentSchemaVersion" : "arkdeck.tool-content/1",
+              "dependencies" : [
+
+              ],
+              "dependencyLayout" : "hdc-sibling-libusb/1",
+              "digestAlgorithm" : "sha256-jcs",
+              "executableSHA256" : "dab2a09f7196f97a256c26752c9c903cd61a024a2d53d33c7301908312c63737",
+              "generation" : "1",
+              "kind" : "hdc",
+              "platform" : "macos",
+              "quarantineSHA256" : null,
+              "references" : [
+                {
+                  "id" : "runtime-hdc-selection",
+                  "kind" : "activeSelection"
+                },
+                {
+                  "id" : "select-b",
+                  "kind" : "controlAction"
+                }
+              ],
+              "registeredAt" : "2026-09-01T00:00:00Z",
+              "relocatable" : true,
+              "schemaVersion" : "arkdeck.runtime-tool/1",
+              "selected" : true,
+              "source" : "registeredCopy",
+              "state" : "available",
+              "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+              "trust" : {
+                "codeDirectoryIdentitySHA256" : null,
+                "executionAssessment" : "notPerformed",
+                "platformTrust" : "unverified",
+                "policy" : "arkdeck.host-tool-inspection/1",
+                "profileReferences" : [
+                  "fixture-profile"
+                ],
+                "registeredIdentity" : true,
+                "signature" : "unsigned",
+                "signingIdentifier" : null,
+                "teamIdentifier" : null,
+                "toolVersion" : "fixture-1",
+                "versionSource" : "publishedProfileDigestMatch"
+              }
+            },
+            "activeToolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+            "pendingControlActionId" : "select-b",
+            "pendingToolRef" : "tool:sha256:3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d",
+            "schemaVersion" : "arkdeck.runtime-tool-selection/1"
+          }
+        },
+        "arguments" : {
+          "expectedActiveGeneration" : "1",
+          "newToolRef" : "tool:sha256:3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d",
+          "pendingActionID" : "select-b"
+        },
+        "index" : "4f50525bac82367ad0ceaa9a8b82ca8502eb16fb6aeae28c1f591cc291b3fd0f",
+        "operation" : "selectionCandidate",
+        "published" : false
+      },
+      {
+        "arguments" : {
+          "expectedActiveGeneration" : "1",
+          "newToolRef" : "tool:sha256:3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d",
+          "pendingActionID" : "select-other"
+        },
+        "index" : "4f50525bac82367ad0ceaa9a8b82ca8502eb16fb6aeae28c1f591cc291b3fd0f",
+        "operation" : "selectionCandidate",
+        "published" : false,
+        "refusal" : {
+          "code" : "resourceConflict",
+          "message" : "a prior tool selection requires reconciliation"
+        }
+      },
+      {
+        "arguments" : {
+          "expectedGeneration" : "1",
+          "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96"
+        },
+        "index" : "4f50525bac82367ad0ceaa9a8b82ca8502eb16fb6aeae28c1f591cc291b3fd0f",
+        "operation" : "remove",
+        "published" : false,
+        "refusal" : {
+          "code" : "resourceConflict",
+          "message" : "tool is selected or retained by an installation, Job, execution, recovery, action or lease"
+        }
+      },
+      {
+        "arguments" : {
+          "expectedGeneration" : "1",
+          "toolRef" : "tool:sha256:3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d"
+        },
+        "index" : "4f50525bac82367ad0ceaa9a8b82ca8502eb16fb6aeae28c1f591cc291b3fd0f",
+        "operation" : "remove",
+        "published" : false,
+        "refusal" : {
+          "code" : "resourceConflict",
+          "message" : "tool is selected or retained by an installation, Job, execution, recovery, action or lease"
+        }
+      },
+      {
+        "answer" : {
+          "activeGeneration" : "2",
+          "activeTool" : {
+            "activeSelectionGeneration" : "2",
+            "byteCount" : "56",
+            "contentDigest" : "3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d",
+            "contentRetained" : true,
+            "contentSchemaVersion" : "arkdeck.tool-content/1",
+            "dependencies" : [
+
+            ],
+            "dependencyLayout" : "hdc-sibling-libusb/1",
+            "digestAlgorithm" : "sha256-jcs",
+            "executableSHA256" : "629f7402ee92d66908335ef5646610eec5b734df677fe2c97694c4b155e54fc2",
+            "generation" : "1",
+            "kind" : "hdc",
+            "platform" : "macos",
+            "quarantineSHA256" : null,
+            "references" : [
+              {
+                "id" : "runtime-hdc-selection",
+                "kind" : "activeSelection"
+              }
+            ],
+            "registeredAt" : "2026-09-01T00:00:00Z",
+            "relocatable" : true,
+            "schemaVersion" : "arkdeck.runtime-tool/1",
+            "selected" : true,
+            "source" : "registeredCopy",
+            "state" : "available",
+            "toolRef" : "tool:sha256:3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d",
+            "trust" : {
+              "codeDirectoryIdentitySHA256" : null,
+              "executionAssessment" : "notPerformed",
+              "platformTrust" : "unverified",
+              "policy" : "arkdeck.host-tool-inspection/1",
+              "profileReferences" : [
+                "fixture-profile"
+              ],
+              "registeredIdentity" : true,
+              "signature" : "unsigned",
+              "signingIdentifier" : null,
+              "teamIdentifier" : null,
+              "toolVersion" : "fixture-1",
+              "versionSource" : "publishedProfileDigestMatch"
+            }
+          },
+          "activeToolRef" : "tool:sha256:3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d",
+          "pendingControlActionId" : null,
+          "pendingToolRef" : null,
+          "schemaVersion" : "arkdeck.runtime-tool-selection/1"
+        },
+        "arguments" : {
+          "actionID" : "select-b"
+        },
+        "index" : "57fa99d3d8fbc7db0b9952cb537538fa2497a026932a02bec7c51ab3c06e26d0",
+        "operation" : "publishPendingSelection",
+        "published" : true
+      },
+      {
+        "arguments" : {
+          "actionID" : "select-b"
+        },
+        "index" : "57fa99d3d8fbc7db0b9952cb537538fa2497a026932a02bec7c51ab3c06e26d0",
+        "operation" : "publishPendingSelection",
+        "published" : false,
+        "refusal" : {
+          "code" : "resourceConflict",
+          "message" : "the exact pending tool selection does not exist"
+        }
+      },
+      {
+        "answer" : {
+          "activeGeneration" : "2",
+          "activeToolRef" : "tool:sha256:3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d",
+          "outcome" : "succeeded"
+        },
+        "arguments" : {
+          "actionID" : "select-b"
+        },
+        "index" : "57fa99d3d8fbc7db0b9952cb537538fa2497a026932a02bec7c51ab3c06e26d0",
+        "operation" : "selectionOutcome",
+        "published" : false
+      },
+      {
+        "answer" : {
+          "outcome" : "absent"
+        },
+        "arguments" : {
+          "actionID" : "select-other"
+        },
+        "index" : "57fa99d3d8fbc7db0b9952cb537538fa2497a026932a02bec7c51ab3c06e26d0",
+        "operation" : "selectionOutcome",
+        "published" : false
+      },
+      {
+        "arguments" : {
+          "expectedActiveGeneration" : "2",
+          "newToolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+          "pendingActionID" : null
+        },
+        "index" : "57fa99d3d8fbc7db0b9952cb537538fa2497a026932a02bec7c51ab3c06e26d0",
+        "operation" : "selectionCandidate",
+        "published" : false,
+        "refusal" : {
+          "code" : "resourceConflict",
+          "message" : "a prior tool selection requires reconciliation"
+        }
+      },
+      {
+        "arguments" : {
+          "actionID" : "select-a",
+          "expectedActiveGeneration" : "2",
+          "newToolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96"
+        },
+        "index" : "57fa99d3d8fbc7db0b9952cb537538fa2497a026932a02bec7c51ab3c06e26d0",
+        "operation" : "prepareSelection",
+        "published" : false,
+        "refusal" : {
+          "code" : "resourceConflict",
+          "message" : "the previous tool selection outcome is not reconciled"
+        }
+      },
+      {
+        "arguments" : {
+          "expectedGeneration" : "1",
+          "toolRef" : "tool:sha256:3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d"
+        },
+        "index" : "57fa99d3d8fbc7db0b9952cb537538fa2497a026932a02bec7c51ab3c06e26d0",
+        "operation" : "initializeServiceSelection",
+        "published" : false,
+        "refusal" : {
+          "code" : "resourceConflict",
+          "message" : "an existing or unreconciled HDC selection can change only through runtime tool select"
+        }
+      },
+      {
+        "answer" : null,
+        "arguments" : {
+          "actionID" : "select-other"
+        },
+        "index" : "57fa99d3d8fbc7db0b9952cb537538fa2497a026932a02bec7c51ab3c06e26d0",
+        "operation" : "acknowledgeSelectionOutcome",
+        "published" : false
+      },
+      {
+        "answer" : null,
+        "arguments" : {
+          "actionID" : "select-b"
+        },
+        "index" : "f95332501f1670aab8162f292bb88ca7952877b4356ad716f182c5759a3d30dd",
+        "operation" : "acknowledgeSelectionOutcome",
+        "published" : true
+      },
+      {
+        "answer" : {
+          "outcome" : "absent"
+        },
+        "arguments" : {
+          "actionID" : "select-b"
+        },
+        "index" : "f95332501f1670aab8162f292bb88ca7952877b4356ad716f182c5759a3d30dd",
+        "operation" : "selectionOutcome",
+        "published" : false
+      },
+      {
+        "answer" : {
+          "activeGeneration" : "2",
+          "dependencies" : [
+
+          ],
+          "executable" : "tool-3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d.hdc/hdc",
+          "executableSHA256" : "629f7402ee92d66908335ef5646610eec5b734df677fe2c97694c4b155e54fc2",
+          "pendingControlActionId" : null,
+          "toolRef" : "tool:sha256:3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d"
+        },
+        "arguments" : {
+
+        },
+        "index" : "f95332501f1670aab8162f292bb88ca7952877b4356ad716f182c5759a3d30dd",
+        "operation" : "startupSelection",
+        "published" : false
+      },
+      {
+        "answer" : {
+          "activeGeneration" : "2",
+          "dependencies" : [
+
+          ],
+          "executable" : "tool-3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d.hdc/hdc",
+          "executableSHA256" : "629f7402ee92d66908335ef5646610eec5b734df677fe2c97694c4b155e54fc2",
+          "pendingControlActionId" : null,
+          "toolRef" : "tool:sha256:3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d"
+        },
+        "arguments" : {
+          "expectedGeneration" : "1",
+          "toolRef" : "tool:sha256:3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d"
+        },
+        "index" : "f95332501f1670aab8162f292bb88ca7952877b4356ad716f182c5759a3d30dd",
+        "operation" : "initializeServiceSelection",
+        "published" : false
+      },
+      {
+        "answer" : {
+          "activeSelectionGeneration" : null,
+          "byteCount" : "56",
+          "contentDigest" : "a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+          "contentRetained" : true,
+          "contentSchemaVersion" : "arkdeck.tool-content/1",
+          "dependencies" : [
+
+          ],
+          "dependencyLayout" : "hdc-sibling-libusb/1",
+          "digestAlgorithm" : "sha256-jcs",
+          "executableSHA256" : "dab2a09f7196f97a256c26752c9c903cd61a024a2d53d33c7301908312c63737",
+          "generation" : "2",
+          "kind" : "hdc",
+          "platform" : "macos",
+          "quarantineSHA256" : null,
+          "references" : [
+
+          ],
+          "registeredAt" : "2026-09-01T00:00:00Z",
+          "relocatable" : true,
+          "schemaVersion" : "arkdeck.runtime-tool/1",
+          "selected" : false,
+          "source" : "registeredCopy",
+          "state" : "removed",
+          "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+          "trust" : {
+            "codeDirectoryIdentitySHA256" : null,
+            "executionAssessment" : "notPerformed",
+            "platformTrust" : "unverified",
+            "policy" : "arkdeck.host-tool-inspection/1",
+            "profileReferences" : [
+              "fixture-profile"
+            ],
+            "registeredIdentity" : true,
+            "signature" : "unsigned",
+            "signingIdentifier" : null,
+            "teamIdentifier" : null,
+            "toolVersion" : "fixture-1",
+            "versionSource" : "publishedProfileDigestMatch"
+          }
+        },
+        "arguments" : {
+          "expectedGeneration" : "1",
+          "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96"
+        },
+        "index" : "6ed211f30d58f227f6890583b268747c9e30d28903c4079b127ab41c06f9527a",
+        "operation" : "remove",
+        "published" : true
+      },
+      {
+        "answer" : [
+          {
+            "activeSelectionGeneration" : "2",
+            "byteCount" : "56",
+            "contentDigest" : "3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d",
+            "contentRetained" : true,
+            "contentSchemaVersion" : "arkdeck.tool-content/1",
+            "dependencies" : [
+
+            ],
+            "dependencyLayout" : "hdc-sibling-libusb/1",
+            "digestAlgorithm" : "sha256-jcs",
+            "executableSHA256" : "629f7402ee92d66908335ef5646610eec5b734df677fe2c97694c4b155e54fc2",
+            "generation" : "1",
+            "kind" : "hdc",
+            "platform" : "macos",
+            "quarantineSHA256" : null,
+            "references" : [
+              {
+                "id" : "runtime-hdc-selection",
+                "kind" : "activeSelection"
+              }
+            ],
+            "registeredAt" : "2026-09-01T00:00:00Z",
+            "relocatable" : true,
+            "schemaVersion" : "arkdeck.runtime-tool/1",
+            "selected" : true,
+            "source" : "registeredCopy",
+            "state" : "available",
+            "toolRef" : "tool:sha256:3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d",
+            "trust" : {
+              "codeDirectoryIdentitySHA256" : null,
+              "executionAssessment" : "notPerformed",
+              "platformTrust" : "unverified",
+              "policy" : "arkdeck.host-tool-inspection/1",
+              "profileReferences" : [
+                "fixture-profile"
+              ],
+              "registeredIdentity" : true,
+              "signature" : "unsigned",
+              "signingIdentifier" : null,
+              "teamIdentifier" : null,
+              "toolVersion" : "fixture-1",
+              "versionSource" : "publishedProfileDigestMatch"
+            }
+          },
+          {
+            "activeSelectionGeneration" : null,
+            "byteCount" : "56",
+            "contentDigest" : "a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+            "contentRetained" : true,
+            "contentSchemaVersion" : "arkdeck.tool-content/1",
+            "dependencies" : [
+
+            ],
+            "dependencyLayout" : "hdc-sibling-libusb/1",
+            "digestAlgorithm" : "sha256-jcs",
+            "executableSHA256" : "dab2a09f7196f97a256c26752c9c903cd61a024a2d53d33c7301908312c63737",
+            "generation" : "2",
+            "kind" : "hdc",
+            "platform" : "macos",
+            "quarantineSHA256" : null,
+            "references" : [
+
+            ],
+            "registeredAt" : "2026-09-01T00:00:00Z",
+            "relocatable" : true,
+            "schemaVersion" : "arkdeck.runtime-tool/1",
+            "selected" : false,
+            "source" : "registeredCopy",
+            "state" : "removed",
+            "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+            "trust" : {
+              "codeDirectoryIdentitySHA256" : null,
+              "executionAssessment" : "notPerformed",
+              "platformTrust" : "unverified",
+              "policy" : "arkdeck.host-tool-inspection/1",
+              "profileReferences" : [
+                "fixture-profile"
+              ],
+              "registeredIdentity" : true,
+              "signature" : "unsigned",
+              "signingIdentifier" : null,
+              "teamIdentifier" : null,
+              "toolVersion" : "fixture-1",
+              "versionSource" : "publishedProfileDigestMatch"
+            }
+          }
+        ],
+        "arguments" : {
+
+        },
+        "index" : "6ed211f30d58f227f6890583b268747c9e30d28903c4079b127ab41c06f9527a",
+        "operation" : "list",
+        "published" : false
+      }
+    ]
+  },
+  {
+    "name" : "adopted-then-failed",
+    "steps" : [
+      {
+        "answer" : {
+          "activeGeneration" : "1",
+          "activeTool" : {
+            "activeSelectionGeneration" : "1",
+            "byteCount" : "56",
+            "contentDigest" : "a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+            "contentRetained" : true,
+            "contentSchemaVersion" : "arkdeck.tool-content/1",
+            "dependencies" : [
+
+            ],
+            "dependencyLayout" : "hdc-sibling-libusb/1",
+            "digestAlgorithm" : "sha256-jcs",
+            "executableSHA256" : "dab2a09f7196f97a256c26752c9c903cd61a024a2d53d33c7301908312c63737",
+            "generation" : "1",
+            "kind" : "hdc",
+            "platform" : "macos",
+            "quarantineSHA256" : null,
+            "references" : [
+              {
+                "id" : "runtime-hdc-selection",
+                "kind" : "activeSelection"
+              }
+            ],
+            "registeredAt" : "2026-09-01T00:00:00Z",
+            "relocatable" : true,
+            "schemaVersion" : "arkdeck.runtime-tool/1",
+            "selected" : true,
+            "source" : "registeredCopy",
+            "state" : "available",
+            "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+            "trust" : {
+              "codeDirectoryIdentitySHA256" : null,
+              "executionAssessment" : "notPerformed",
+              "platformTrust" : "unverified",
+              "policy" : "arkdeck.host-tool-inspection/1",
+              "profileReferences" : [
+                "fixture-profile"
+              ],
+              "registeredIdentity" : true,
+              "signature" : "unsigned",
+              "signingIdentifier" : null,
+              "teamIdentifier" : null,
+              "toolVersion" : "fixture-1",
+              "versionSource" : "publishedProfileDigestMatch"
+            }
+          },
+          "activeToolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+          "pendingControlActionId" : null,
+          "pendingToolRef" : null,
+          "schemaVersion" : "arkdeck.runtime-tool-selection/1"
+        },
+        "arguments" : {
+          "executable" : "a"
+        },
+        "index" : "7ce754c207ac740b4946ab48b10dc544436c4cb21b271954e5c3a549da4dcae9",
+        "operation" : "adoptInstalledHDC",
+        "published" : true
+      },
+      {
+        "answer" : {
+          "activeGeneration" : "1",
+          "activeTool" : {
+            "activeSelectionGeneration" : "1",
+            "byteCount" : "56",
+            "contentDigest" : "a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+            "contentRetained" : true,
+            "contentSchemaVersion" : "arkdeck.tool-content/1",
+            "dependencies" : [
+
+            ],
+            "dependencyLayout" : "hdc-sibling-libusb/1",
+            "digestAlgorithm" : "sha256-jcs",
+            "executableSHA256" : "dab2a09f7196f97a256c26752c9c903cd61a024a2d53d33c7301908312c63737",
+            "generation" : "1",
+            "kind" : "hdc",
+            "platform" : "macos",
+            "quarantineSHA256" : null,
+            "references" : [
+              {
+                "id" : "runtime-hdc-selection",
+                "kind" : "activeSelection"
+              }
+            ],
+            "registeredAt" : "2026-09-01T00:00:00Z",
+            "relocatable" : true,
+            "schemaVersion" : "arkdeck.runtime-tool/1",
+            "selected" : true,
+            "source" : "registeredCopy",
+            "state" : "available",
+            "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+            "trust" : {
+              "codeDirectoryIdentitySHA256" : null,
+              "executionAssessment" : "notPerformed",
+              "platformTrust" : "unverified",
+              "policy" : "arkdeck.host-tool-inspection/1",
+              "profileReferences" : [
+                "fixture-profile"
+              ],
+              "registeredIdentity" : true,
+              "signature" : "unsigned",
+              "signingIdentifier" : null,
+              "teamIdentifier" : null,
+              "toolVersion" : "fixture-1",
+              "versionSource" : "publishedProfileDigestMatch"
+            }
+          },
+          "activeToolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+          "pendingControlActionId" : null,
+          "pendingToolRef" : null,
+          "schemaVersion" : "arkdeck.runtime-tool-selection/1"
+        },
+        "arguments" : {
+          "executable" : "a"
+        },
+        "index" : "7ce754c207ac740b4946ab48b10dc544436c4cb21b271954e5c3a549da4dcae9",
+        "operation" : "adoptInstalledHDC",
+        "published" : false
+      },
+      {
+        "answer" : {
+          "activeGeneration" : "1",
+          "activeTool" : {
+            "activeSelectionGeneration" : "1",
+            "byteCount" : "56",
+            "contentDigest" : "a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+            "contentRetained" : true,
+            "contentSchemaVersion" : "arkdeck.tool-content/1",
+            "dependencies" : [
+
+            ],
+            "dependencyLayout" : "hdc-sibling-libusb/1",
+            "digestAlgorithm" : "sha256-jcs",
+            "executableSHA256" : "dab2a09f7196f97a256c26752c9c903cd61a024a2d53d33c7301908312c63737",
+            "generation" : "1",
+            "kind" : "hdc",
+            "platform" : "macos",
+            "quarantineSHA256" : null,
+            "references" : [
+              {
+                "id" : "runtime-hdc-selection",
+                "kind" : "activeSelection"
+              }
+            ],
+            "registeredAt" : "2026-09-01T00:00:00Z",
+            "relocatable" : true,
+            "schemaVersion" : "arkdeck.runtime-tool/1",
+            "selected" : true,
+            "source" : "registeredCopy",
+            "state" : "available",
+            "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+            "trust" : {
+              "codeDirectoryIdentitySHA256" : null,
+              "executionAssessment" : "notPerformed",
+              "platformTrust" : "unverified",
+              "policy" : "arkdeck.host-tool-inspection/1",
+              "profileReferences" : [
+                "fixture-profile"
+              ],
+              "registeredIdentity" : true,
+              "signature" : "unsigned",
+              "signingIdentifier" : null,
+              "teamIdentifier" : null,
+              "toolVersion" : "fixture-1",
+              "versionSource" : "publishedProfileDigestMatch"
+            }
+          },
+          "activeToolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+          "pendingControlActionId" : null,
+          "pendingToolRef" : null,
+          "schemaVersion" : "arkdeck.runtime-tool-selection/1"
+        },
+        "arguments" : {
+          "executable" : "b"
+        },
+        "index" : "c8d0bf41e641a59416710432cf8a289b3485710ddcce840ee0c754416219ba9e",
+        "operation" : "adoptInstalledHDC",
+        "published" : true
+      },
+      {
+        "answer" : {
+          "activeGeneration" : "1",
+          "activeTool" : {
+            "activeSelectionGeneration" : "1",
+            "byteCount" : "56",
+            "contentDigest" : "a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+            "contentRetained" : true,
+            "contentSchemaVersion" : "arkdeck.tool-content/1",
+            "dependencies" : [
+
+            ],
+            "dependencyLayout" : "hdc-sibling-libusb/1",
+            "digestAlgorithm" : "sha256-jcs",
+            "executableSHA256" : "dab2a09f7196f97a256c26752c9c903cd61a024a2d53d33c7301908312c63737",
+            "generation" : "1",
+            "kind" : "hdc",
+            "platform" : "macos",
+            "quarantineSHA256" : null,
+            "references" : [
+              {
+                "id" : "runtime-hdc-selection",
+                "kind" : "activeSelection"
+              },
+              {
+                "id" : "select-b",
+                "kind" : "controlAction"
+              }
+            ],
+            "registeredAt" : "2026-09-01T00:00:00Z",
+            "relocatable" : true,
+            "schemaVersion" : "arkdeck.runtime-tool/1",
+            "selected" : true,
+            "source" : "registeredCopy",
+            "state" : "available",
+            "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+            "trust" : {
+              "codeDirectoryIdentitySHA256" : null,
+              "executionAssessment" : "notPerformed",
+              "platformTrust" : "unverified",
+              "policy" : "arkdeck.host-tool-inspection/1",
+              "profileReferences" : [
+                "fixture-profile"
+              ],
+              "registeredIdentity" : true,
+              "signature" : "unsigned",
+              "signingIdentifier" : null,
+              "teamIdentifier" : null,
+              "toolVersion" : "fixture-1",
+              "versionSource" : "publishedProfileDigestMatch"
+            }
+          },
+          "activeToolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+          "pendingControlActionId" : "select-b",
+          "pendingToolRef" : "tool:sha256:3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d",
+          "schemaVersion" : "arkdeck.runtime-tool-selection/1"
+        },
+        "arguments" : {
+          "actionID" : "select-b",
+          "expectedActiveGeneration" : "1",
+          "newToolRef" : "tool:sha256:3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d"
+        },
+        "index" : "4f50525bac82367ad0ceaa9a8b82ca8502eb16fb6aeae28c1f591cc291b3fd0f",
+        "operation" : "prepareSelection",
+        "published" : true
+      },
+      {
+        "arguments" : {
+          "actionID" : "select-c",
+          "expectedActiveGeneration" : "1",
+          "newToolRef" : "tool:sha256:3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d"
+        },
+        "index" : "4f50525bac82367ad0ceaa9a8b82ca8502eb16fb6aeae28c1f591cc291b3fd0f",
+        "operation" : "prepareSelection",
+        "published" : false,
+        "refusal" : {
+          "code" : "resourceConflict",
+          "message" : "another tool selection is already pending"
+        }
+      },
+      {
+        "arguments" : {
+          "actionID" : "select-b",
+          "expectedActiveGeneration" : "1",
+          "newToolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96"
+        },
+        "index" : "4f50525bac82367ad0ceaa9a8b82ca8502eb16fb6aeae28c1f591cc291b3fd0f",
+        "operation" : "prepareSelection",
+        "published" : false,
+        "refusal" : {
+          "code" : "resourceConflict",
+          "message" : "another tool selection is already pending"
+        }
+      },
+      {
+        "arguments" : {
+          "expectedGeneration" : "1",
+          "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96"
+        },
+        "index" : "4f50525bac82367ad0ceaa9a8b82ca8502eb16fb6aeae28c1f591cc291b3fd0f",
+        "operation" : "initializeServiceSelection",
+        "published" : false,
+        "refusal" : {
+          "code" : "resourceConflict",
+          "message" : "an existing or unreconciled HDC selection can change only through runtime tool select"
+        }
+      },
+      {
+        "arguments" : {
+
+        },
+        "index" : "4f50525bac82367ad0ceaa9a8b82ca8502eb16fb6aeae28c1f591cc291b3fd0f",
+        "lockHeldByAnotherOwner" : true,
+        "operation" : "startupSelection",
+        "published" : false,
+        "refusal" : {
+          "code" : "resourceConflict",
+          "message" : "another bootstrap operation holds the store; retry after it completes"
+        }
+      },
+      {
+        "arguments" : {
+          "actionID" : "select-c",
+          "reasonCode" : "tool.selectedStartupVerificationFailed"
+        },
+        "index" : "4f50525bac82367ad0ceaa9a8b82ca8502eb16fb6aeae28c1f591cc291b3fd0f",
+        "operation" : "failPendingSelection",
+        "published" : false,
+        "refusal" : {
+          "code" : "resourceConflict",
+          "message" : "the exact pending tool selection does not exist"
+        }
+      },
+      {
+        "answer" : {
+          "activeGeneration" : "1",
+          "activeTool" : {
+            "activeSelectionGeneration" : "1",
+            "byteCount" : "56",
+            "contentDigest" : "a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+            "contentRetained" : true,
+            "contentSchemaVersion" : "arkdeck.tool-content/1",
+            "dependencies" : [
+
+            ],
+            "dependencyLayout" : "hdc-sibling-libusb/1",
+            "digestAlgorithm" : "sha256-jcs",
+            "executableSHA256" : "dab2a09f7196f97a256c26752c9c903cd61a024a2d53d33c7301908312c63737",
+            "generation" : "1",
+            "kind" : "hdc",
+            "platform" : "macos",
+            "quarantineSHA256" : null,
+            "references" : [
+              {
+                "id" : "runtime-hdc-selection",
+                "kind" : "activeSelection"
+              }
+            ],
+            "registeredAt" : "2026-09-01T00:00:00Z",
+            "relocatable" : true,
+            "schemaVersion" : "arkdeck.runtime-tool/1",
+            "selected" : true,
+            "source" : "registeredCopy",
+            "state" : "available",
+            "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+            "trust" : {
+              "codeDirectoryIdentitySHA256" : null,
+              "executionAssessment" : "notPerformed",
+              "platformTrust" : "unverified",
+              "policy" : "arkdeck.host-tool-inspection/1",
+              "profileReferences" : [
+                "fixture-profile"
+              ],
+              "registeredIdentity" : true,
+              "signature" : "unsigned",
+              "signingIdentifier" : null,
+              "teamIdentifier" : null,
+              "toolVersion" : "fixture-1",
+              "versionSource" : "publishedProfileDigestMatch"
+            }
+          },
+          "activeToolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+          "pendingControlActionId" : null,
+          "pendingToolRef" : null,
+          "schemaVersion" : "arkdeck.runtime-tool-selection/1"
+        },
+        "arguments" : {
+          "actionID" : "select-b",
+          "reasonCode" : "tool.selectedStartupVerificationFailed"
+        },
+        "index" : "864ec7e45ccf6d2b8b0b735ad4b1c25ffb95173f08a14dfc34af50aed76d3321",
+        "operation" : "failPendingSelection",
+        "published" : true
+      },
+      {
+        "answer" : {
+          "activeGeneration" : "1",
+          "activeToolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+          "outcome" : "failed",
+          "reasonCode" : "tool.selectedStartupVerificationFailed"
+        },
+        "arguments" : {
+          "actionID" : "select-b"
+        },
+        "index" : "864ec7e45ccf6d2b8b0b735ad4b1c25ffb95173f08a14dfc34af50aed76d3321",
+        "operation" : "selectionOutcome",
+        "published" : false
+      },
+      {
+        "arguments" : {
+          "actionID" : "select-b",
+          "reasonCode" : "tool.selectedStartupVerificationFailed"
+        },
+        "index" : "864ec7e45ccf6d2b8b0b735ad4b1c25ffb95173f08a14dfc34af50aed76d3321",
+        "operation" : "failPendingSelection",
+        "published" : false,
+        "refusal" : {
+          "code" : "resourceConflict",
+          "message" : "the exact pending tool selection does not exist"
+        }
+      },
+      {
+        "arguments" : {
+          "actionID" : "select-b"
+        },
+        "index" : "864ec7e45ccf6d2b8b0b735ad4b1c25ffb95173f08a14dfc34af50aed76d3321",
+        "operation" : "publishPendingSelection",
+        "published" : false,
+        "refusal" : {
+          "code" : "resourceConflict",
+          "message" : "the exact pending tool selection does not exist"
+        }
+      },
+      {
+        "answer" : {
+          "activeSelectionGeneration" : null,
+          "byteCount" : "56",
+          "contentDigest" : "3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d",
+          "contentRetained" : true,
+          "contentSchemaVersion" : "arkdeck.tool-content/1",
+          "dependencies" : [
+
+          ],
+          "dependencyLayout" : "hdc-sibling-libusb/1",
+          "digestAlgorithm" : "sha256-jcs",
+          "executableSHA256" : "629f7402ee92d66908335ef5646610eec5b734df677fe2c97694c4b155e54fc2",
+          "generation" : "2",
+          "kind" : "hdc",
+          "platform" : "macos",
+          "quarantineSHA256" : null,
+          "references" : [
+
+          ],
+          "registeredAt" : "2026-09-01T00:00:00Z",
+          "relocatable" : true,
+          "schemaVersion" : "arkdeck.runtime-tool/1",
+          "selected" : false,
+          "source" : "registeredCopy",
+          "state" : "removed",
+          "toolRef" : "tool:sha256:3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d",
+          "trust" : {
+            "codeDirectoryIdentitySHA256" : null,
+            "executionAssessment" : "notPerformed",
+            "platformTrust" : "unverified",
+            "policy" : "arkdeck.host-tool-inspection/1",
+            "profileReferences" : [
+              "fixture-profile"
+            ],
+            "registeredIdentity" : true,
+            "signature" : "unsigned",
+            "signingIdentifier" : null,
+            "teamIdentifier" : null,
+            "toolVersion" : "fixture-1",
+            "versionSource" : "publishedProfileDigestMatch"
+          }
+        },
+        "arguments" : {
+          "expectedGeneration" : "1",
+          "toolRef" : "tool:sha256:3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d"
+        },
+        "index" : "189a6c5097cf092b97c1ae7d6f73ae6afb7bfe7f338e28314effcb3f4af67064",
+        "operation" : "remove",
+        "published" : true
+      },
+      {
+        "answer" : null,
+        "arguments" : {
+          "actionID" : "select-b"
+        },
+        "index" : "633383ba9289713bf2948edf2ade0b749c91508530b629dea7089eeacb8b08e6",
+        "operation" : "acknowledgeSelectionOutcome",
+        "published" : true
+      },
+      {
+        "arguments" : {
+          "actionID" : "select-b2",
+          "expectedActiveGeneration" : "1",
+          "newToolRef" : "tool:sha256:3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d"
+        },
+        "index" : "633383ba9289713bf2948edf2ade0b749c91508530b629dea7089eeacb8b08e6",
+        "operation" : "prepareSelection",
+        "published" : false,
+        "refusal" : {
+          "code" : "operationUnavailable",
+          "message" : "tool selection requires distinct available published HDC identities"
+        }
+      },
+      {
+        "answer" : {
+          "activeGeneration" : "1",
+          "dependencies" : [
+
+          ],
+          "executable" : "tool-a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96.hdc/hdc",
+          "executableSHA256" : "dab2a09f7196f97a256c26752c9c903cd61a024a2d53d33c7301908312c63737",
+          "pendingControlActionId" : null,
+          "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96"
+        },
+        "arguments" : {
+
+        },
+        "index" : "633383ba9289713bf2948edf2ade0b749c91508530b629dea7089eeacb8b08e6",
+        "operation" : "startupSelection",
+        "published" : false
+      },
+      {
+        "answer" : [
+          {
+            "activeSelectionGeneration" : null,
+            "byteCount" : "56",
+            "contentDigest" : "3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d",
+            "contentRetained" : true,
+            "contentSchemaVersion" : "arkdeck.tool-content/1",
+            "dependencies" : [
+
+            ],
+            "dependencyLayout" : "hdc-sibling-libusb/1",
+            "digestAlgorithm" : "sha256-jcs",
+            "executableSHA256" : "629f7402ee92d66908335ef5646610eec5b734df677fe2c97694c4b155e54fc2",
+            "generation" : "2",
+            "kind" : "hdc",
+            "platform" : "macos",
+            "quarantineSHA256" : null,
+            "references" : [
+
+            ],
+            "registeredAt" : "2026-09-01T00:00:00Z",
+            "relocatable" : true,
+            "schemaVersion" : "arkdeck.runtime-tool/1",
+            "selected" : false,
+            "source" : "registeredCopy",
+            "state" : "removed",
+            "toolRef" : "tool:sha256:3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d",
+            "trust" : {
+              "codeDirectoryIdentitySHA256" : null,
+              "executionAssessment" : "notPerformed",
+              "platformTrust" : "unverified",
+              "policy" : "arkdeck.host-tool-inspection/1",
+              "profileReferences" : [
+                "fixture-profile"
+              ],
+              "registeredIdentity" : true,
+              "signature" : "unsigned",
+              "signingIdentifier" : null,
+              "teamIdentifier" : null,
+              "toolVersion" : "fixture-1",
+              "versionSource" : "publishedProfileDigestMatch"
+            }
+          },
+          {
+            "activeSelectionGeneration" : "1",
+            "byteCount" : "56",
+            "contentDigest" : "a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+            "contentRetained" : true,
+            "contentSchemaVersion" : "arkdeck.tool-content/1",
+            "dependencies" : [
+
+            ],
+            "dependencyLayout" : "hdc-sibling-libusb/1",
+            "digestAlgorithm" : "sha256-jcs",
+            "executableSHA256" : "dab2a09f7196f97a256c26752c9c903cd61a024a2d53d33c7301908312c63737",
+            "generation" : "1",
+            "kind" : "hdc",
+            "platform" : "macos",
+            "quarantineSHA256" : null,
+            "references" : [
+              {
+                "id" : "runtime-hdc-selection",
+                "kind" : "activeSelection"
+              }
+            ],
+            "registeredAt" : "2026-09-01T00:00:00Z",
+            "relocatable" : true,
+            "schemaVersion" : "arkdeck.runtime-tool/1",
+            "selected" : true,
+            "source" : "registeredCopy",
+            "state" : "available",
+            "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+            "trust" : {
+              "codeDirectoryIdentitySHA256" : null,
+              "executionAssessment" : "notPerformed",
+              "platformTrust" : "unverified",
+              "policy" : "arkdeck.host-tool-inspection/1",
+              "profileReferences" : [
+                "fixture-profile"
+              ],
+              "registeredIdentity" : true,
+              "signature" : "unsigned",
+              "signingIdentifier" : null,
+              "teamIdentifier" : null,
+              "toolVersion" : "fixture-1",
+              "versionSource" : "publishedProfileDigestMatch"
+            }
+          }
+        ],
+        "arguments" : {
+
+        },
+        "index" : "633383ba9289713bf2948edf2ade0b749c91508530b629dea7089eeacb8b08e6",
+        "operation" : "list",
+        "published" : false
+      }
+    ]
+  },
+  {
+    "name" : "refusals-by-tool",
+    "steps" : [
+      {
+        "answer" : {
+          "activeSelectionGeneration" : null,
+          "byteCount" : "56",
+          "contentDigest" : "a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+          "contentRetained" : true,
+          "contentSchemaVersion" : "arkdeck.tool-content/1",
+          "dependencies" : [
+
+          ],
+          "dependencyLayout" : "hdc-sibling-libusb/1",
+          "digestAlgorithm" : "sha256-jcs",
+          "executableSHA256" : "dab2a09f7196f97a256c26752c9c903cd61a024a2d53d33c7301908312c63737",
+          "generation" : "1",
+          "kind" : "hdc",
+          "platform" : "macos",
+          "quarantineSHA256" : null,
+          "references" : [
+
+          ],
+          "registeredAt" : "2026-09-01T00:00:00Z",
+          "relocatable" : true,
+          "schemaVersion" : "arkdeck.runtime-tool/1",
+          "selected" : false,
+          "source" : "registeredCopy",
+          "state" : "available",
+          "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+          "trust" : {
+            "codeDirectoryIdentitySHA256" : null,
+            "executionAssessment" : "notPerformed",
+            "platformTrust" : "unverified",
+            "policy" : "arkdeck.host-tool-inspection/1",
+            "profileReferences" : [
+              "fixture-profile"
+            ],
+            "registeredIdentity" : true,
+            "signature" : "unsigned",
+            "signingIdentifier" : null,
+            "teamIdentifier" : null,
+            "toolVersion" : "fixture-1",
+            "versionSource" : "publishedProfileDigestMatch"
+          }
+        },
+        "arguments" : {
+          "executable" : "a"
+        },
+        "index" : "83e15f636ddc2ac3c32b48775ce7f13b628f8bc17e97f3d70978f4663697a95f",
+        "operation" : "register",
+        "published" : true
+      },
+      {
+        "answer" : {
+          "activeSelectionGeneration" : null,
+          "byteCount" : "56",
+          "contentDigest" : "09a43a46ad9c0626786d87ae0872695c8c6d18298e8508fee1361a1a1317fa08",
+          "contentRetained" : true,
+          "contentSchemaVersion" : "arkdeck.tool-content/1",
+          "dependencies" : [
+
+          ],
+          "dependencyLayout" : "hdc-sibling-libusb/1",
+          "digestAlgorithm" : "sha256-jcs",
+          "executableSHA256" : "25d5ec1fa903c8ab589db092c25c405d7b12e2146f1f1ab6de91d2acb07da332",
+          "generation" : "1",
+          "kind" : "hdc",
+          "platform" : "macos",
+          "quarantineSHA256" : null,
+          "references" : [
+
+          ],
+          "registeredAt" : "2026-09-01T00:00:00Z",
+          "relocatable" : true,
+          "schemaVersion" : "arkdeck.runtime-tool/1",
+          "selected" : false,
+          "source" : "registeredCopy",
+          "state" : "available",
+          "toolRef" : "tool:sha256:09a43a46ad9c0626786d87ae0872695c8c6d18298e8508fee1361a1a1317fa08",
+          "trust" : {
+            "codeDirectoryIdentitySHA256" : null,
+            "executionAssessment" : "notPerformed",
+            "platformTrust" : "unverified",
+            "policy" : "arkdeck.host-tool-inspection/1",
+            "profileReferences" : [
+              "fixture-profile"
+            ],
+            "registeredIdentity" : true,
+            "signature" : "unsigned",
+            "signingIdentifier" : null,
+            "teamIdentifier" : null,
+            "toolVersion" : "fixture-1",
+            "versionSource" : "publishedProfileDigestMatch"
+          }
+        },
+        "arguments" : {
+          "executable" : "c"
+        },
+        "index" : "f1bae89b3b5de603590783c13e7647dcff297e382ff5e9d1bd5c65bccc3e17ae",
+        "operation" : "register",
+        "published" : true
+      },
+      {
+        "answer" : {
+          "activeSelectionGeneration" : null,
+          "byteCount" : "56",
+          "contentDigest" : "e25c5c47799e607e35f05159ae63225f4605c549fdf38407e7bb46205d921a88",
+          "contentRetained" : true,
+          "contentSchemaVersion" : "arkdeck.tool-content/1",
+          "dependencies" : [
+
+          ],
+          "dependencyLayout" : "hdc-sibling-libusb/1",
+          "digestAlgorithm" : "sha256-jcs",
+          "executableSHA256" : "5dd5de23030c15cec9d406278e49bd7085e81ae25c5308926584298e49588146",
+          "generation" : "1",
+          "kind" : "hdc",
+          "platform" : "macos",
+          "quarantineSHA256" : null,
+          "references" : [
+
+          ],
+          "registeredAt" : "2026-09-01T00:00:00Z",
+          "relocatable" : true,
+          "schemaVersion" : "arkdeck.runtime-tool/1",
+          "selected" : false,
+          "source" : "registeredCopy",
+          "state" : "available",
+          "toolRef" : "tool:sha256:e25c5c47799e607e35f05159ae63225f4605c549fdf38407e7bb46205d921a88",
+          "trust" : {
+            "codeDirectoryIdentitySHA256" : null,
+            "executionAssessment" : "notPerformed",
+            "platformTrust" : "unverified",
+            "policy" : "arkdeck.host-tool-inspection/1",
+            "profileReferences" : [
+
+            ],
+            "registeredIdentity" : false,
+            "signature" : "unsigned",
+            "signingIdentifier" : null,
+            "teamIdentifier" : null,
+            "toolVersion" : null,
+            "versionSource" : null
+          }
+        },
+        "arguments" : {
+          "executable" : "unpublished"
+        },
+        "index" : "88e3718a6d3ae8db11e1f89fdd02e703d598a599f9636b3d332f9f0982821c55",
+        "operation" : "register",
+        "published" : true
+      },
+      {
+        "answer" : {
+          "activeSelectionGeneration" : null,
+          "byteCount" : "88",
+          "contentDigest" : "754e66c3356a7677f30b0a198126d76ac55e8209c9c1cda95ef579025657c990",
+          "contentRetained" : true,
+          "contentSchemaVersion" : "arkdeck.tool-content/1",
+          "dependencies" : [
+
+          ],
+          "dependencyLayout" : "hdc-sibling-libusb/1",
+          "digestAlgorithm" : "sha256-jcs",
+          "executableSHA256" : "7df9794889870595f4f09c4e428e4986858584d52996d32433e042352051953b",
+          "generation" : "1",
+          "kind" : "hdc",
+          "platform" : "macos",
+          "quarantineSHA256" : null,
+          "references" : [
+
+          ],
+          "registeredAt" : "2026-09-01T00:00:00Z",
+          "relocatable" : false,
+          "schemaVersion" : "arkdeck.runtime-tool/1",
+          "selected" : false,
+          "source" : "registeredCopy",
+          "state" : "available",
+          "toolRef" : "tool:sha256:754e66c3356a7677f30b0a198126d76ac55e8209c9c1cda95ef579025657c990",
+          "trust" : {
+            "codeDirectoryIdentitySHA256" : null,
+            "executionAssessment" : "notPerformed",
+            "platformTrust" : "unverified",
+            "policy" : "arkdeck.host-tool-inspection/1",
+            "profileReferences" : [
+              "fixture-profile"
+            ],
+            "registeredIdentity" : true,
+            "signature" : "unsigned",
+            "signingIdentifier" : null,
+            "teamIdentifier" : null,
+            "toolVersion" : "fixture-1",
+            "versionSource" : "publishedProfileDigestMatch"
+          }
+        },
+        "arguments" : {
+          "executable" : "unrelocatable"
+        },
+        "index" : "7593adecee26c0141d82e1f37b494dc3c29112cae7fd5bace74df57d343c5203",
+        "operation" : "register",
+        "published" : true
+      },
+      {
+        "arguments" : {
+          "expectedGeneration" : "1",
+          "toolRef" : "tool:sha256:e25c5c47799e607e35f05159ae63225f4605c549fdf38407e7bb46205d921a88"
+        },
+        "index" : "7593adecee26c0141d82e1f37b494dc3c29112cae7fd5bace74df57d343c5203",
+        "operation" : "initializeServiceSelection",
+        "published" : false,
+        "refusal" : {
+          "code" : "operationUnavailable",
+          "message" : "initial service tool must be an exact available published relocatable HDC identity"
+        }
+      },
+      {
+        "arguments" : {
+          "expectedGeneration" : "1",
+          "toolRef" : "tool:sha256:754e66c3356a7677f30b0a198126d76ac55e8209c9c1cda95ef579025657c990"
+        },
+        "index" : "7593adecee26c0141d82e1f37b494dc3c29112cae7fd5bace74df57d343c5203",
+        "operation" : "initializeServiceSelection",
+        "published" : false,
+        "refusal" : {
+          "code" : "operationUnavailable",
+          "message" : "initial service tool must be an exact available published relocatable HDC identity"
+        }
+      },
+      {
+        "answer" : {
+          "activeSelectionGeneration" : null,
+          "byteCount" : "56",
+          "contentDigest" : "09a43a46ad9c0626786d87ae0872695c8c6d18298e8508fee1361a1a1317fa08",
+          "contentRetained" : true,
+          "contentSchemaVersion" : "arkdeck.tool-content/1",
+          "dependencies" : [
+
+          ],
+          "dependencyLayout" : "hdc-sibling-libusb/1",
+          "digestAlgorithm" : "sha256-jcs",
+          "executableSHA256" : "25d5ec1fa903c8ab589db092c25c405d7b12e2146f1f1ab6de91d2acb07da332",
+          "generation" : "2",
+          "kind" : "hdc",
+          "platform" : "macos",
+          "quarantineSHA256" : null,
+          "references" : [
+
+          ],
+          "registeredAt" : "2026-09-01T00:00:00Z",
+          "relocatable" : true,
+          "schemaVersion" : "arkdeck.runtime-tool/1",
+          "selected" : false,
+          "source" : "registeredCopy",
+          "state" : "removed",
+          "toolRef" : "tool:sha256:09a43a46ad9c0626786d87ae0872695c8c6d18298e8508fee1361a1a1317fa08",
+          "trust" : {
+            "codeDirectoryIdentitySHA256" : null,
+            "executionAssessment" : "notPerformed",
+            "platformTrust" : "unverified",
+            "policy" : "arkdeck.host-tool-inspection/1",
+            "profileReferences" : [
+              "fixture-profile"
+            ],
+            "registeredIdentity" : true,
+            "signature" : "unsigned",
+            "signingIdentifier" : null,
+            "teamIdentifier" : null,
+            "toolVersion" : "fixture-1",
+            "versionSource" : "publishedProfileDigestMatch"
+          }
+        },
+        "arguments" : {
+          "expectedGeneration" : "1",
+          "toolRef" : "tool:sha256:09a43a46ad9c0626786d87ae0872695c8c6d18298e8508fee1361a1a1317fa08"
+        },
+        "index" : "cebda7b1fd9478e52514e4cc8be73e4991ddd85965b85776da3d169a4b28970e",
+        "operation" : "remove",
+        "published" : true
+      },
+      {
+        "arguments" : {
+          "expectedGeneration" : "1",
+          "toolRef" : "tool:sha256:09a43a46ad9c0626786d87ae0872695c8c6d18298e8508fee1361a1a1317fa08"
+        },
+        "index" : "cebda7b1fd9478e52514e4cc8be73e4991ddd85965b85776da3d169a4b28970e",
+        "operation" : "initializeServiceSelection",
+        "published" : false,
+        "refusal" : {
+          "code" : "resourceConflict",
+          "message" : "initial service tool is removed or its generation changed"
+        }
+      },
+      {
+        "answer" : {
+          "activeSelectionGeneration" : null,
+          "byteCount" : "56",
+          "contentDigest" : "a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+          "contentRetained" : true,
+          "contentSchemaVersion" : "arkdeck.tool-content/1",
+          "dependencies" : [
+
+          ],
+          "dependencyLayout" : "hdc-sibling-libusb/1",
+          "digestAlgorithm" : "sha256-jcs",
+          "executableSHA256" : "dab2a09f7196f97a256c26752c9c903cd61a024a2d53d33c7301908312c63737",
+          "generation" : "1",
+          "kind" : "hdc",
+          "platform" : "macos",
+          "quarantineSHA256" : null,
+          "references" : [
+            {
+              "id" : "runtime-hdc-selection",
+              "kind" : "activeSelection"
+            }
+          ],
+          "registeredAt" : "2026-09-01T00:00:00Z",
+          "relocatable" : true,
+          "schemaVersion" : "arkdeck.runtime-tool/1",
+          "selected" : true,
+          "source" : "registeredCopy",
+          "state" : "available",
+          "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+          "trust" : {
+            "codeDirectoryIdentitySHA256" : null,
+            "executionAssessment" : "notPerformed",
+            "platformTrust" : "unverified",
+            "policy" : "arkdeck.host-tool-inspection/1",
+            "profileReferences" : [
+              "fixture-profile"
+            ],
+            "registeredIdentity" : true,
+            "signature" : "unsigned",
+            "signingIdentifier" : null,
+            "teamIdentifier" : null,
+            "toolVersion" : "fixture-1",
+            "versionSource" : "publishedProfileDigestMatch"
+          }
+        },
+        "arguments" : {
+          "expectedGeneration" : "1",
+          "owner" : {
+            "id" : "runtime-hdc-selection",
+            "kind" : "activeSelection"
+          },
+          "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96"
+        },
+        "index" : "703863a1a70dfd2042f616a8728f479788376c34c7df5093bbbc39dc771d0d5b",
+        "operation" : "acquire",
+        "published" : true
+      },
+      {
+        "answer" : null,
+        "arguments" : {
+
+        },
+        "index" : "703863a1a70dfd2042f616a8728f479788376c34c7df5093bbbc39dc771d0d5b",
+        "operation" : "startupSelection",
+        "published" : false
+      },
+      {
+        "arguments" : {
+          "expectedGeneration" : "1",
+          "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96"
+        },
+        "index" : "703863a1a70dfd2042f616a8728f479788376c34c7df5093bbbc39dc771d0d5b",
+        "operation" : "initializeServiceSelection",
+        "published" : false,
+        "refusal" : {
+          "code" : "recordUnreadable",
+          "message" : "an active tool pin exists without its selection ledger"
+        }
+      },
+      {
+        "answer" : null,
+        "arguments" : {
+          "owner" : {
+            "id" : "runtime-hdc-selection",
+            "kind" : "activeSelection"
+          },
+          "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96"
+        },
+        "index" : "cebda7b1fd9478e52514e4cc8be73e4991ddd85965b85776da3d169a4b28970e",
+        "operation" : "release",
+        "published" : true
+      },
+      {
+        "answer" : null,
+        "arguments" : {
+          "owner" : {
+            "id" : "runtime-hdc-selection",
+            "kind" : "activeSelection"
+          },
+          "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96"
+        },
+        "index" : "cebda7b1fd9478e52514e4cc8be73e4991ddd85965b85776da3d169a4b28970e",
+        "operation" : "release",
+        "published" : true
+      },
+      {
+        "answer" : {
+          "activeGeneration" : "1",
+          "dependencies" : [
+
+          ],
+          "executable" : "tool-a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96.hdc/hdc",
+          "executableSHA256" : "dab2a09f7196f97a256c26752c9c903cd61a024a2d53d33c7301908312c63737",
+          "pendingControlActionId" : null,
+          "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96"
+        },
+        "arguments" : {
+          "expectedGeneration" : "1",
+          "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96"
+        },
+        "index" : "5aa44e6b21e766bef6c1e1626fb34b404c25d470fe189055d324111a40209dfc",
+        "operation" : "initializeServiceSelection",
+        "published" : true
+      },
+      {
+        "arguments" : {
+          "expectedActiveGeneration" : "1",
+          "newToolRef" : "tool:sha256:e25c5c47799e607e35f05159ae63225f4605c549fdf38407e7bb46205d921a88",
+          "pendingActionID" : null
+        },
+        "index" : "5aa44e6b21e766bef6c1e1626fb34b404c25d470fe189055d324111a40209dfc",
+        "operation" : "selectionCandidate",
+        "published" : false,
+        "refusal" : {
+          "code" : "operationUnavailable",
+          "message" : "candidate has no published HDC executable identity"
+        }
+      },
+      {
+        "arguments" : {
+          "expectedActiveGeneration" : "1",
+          "newToolRef" : "tool:sha256:09a43a46ad9c0626786d87ae0872695c8c6d18298e8508fee1361a1a1317fa08",
+          "pendingActionID" : null
+        },
+        "index" : "5aa44e6b21e766bef6c1e1626fb34b404c25d470fe189055d324111a40209dfc",
+        "operation" : "selectionCandidate",
+        "published" : false,
+        "refusal" : {
+          "code" : "operationUnavailable",
+          "message" : "candidate has no published HDC executable identity"
+        }
+      },
+      {
+        "arguments" : {
+          "expectedActiveGeneration" : "1",
+          "newToolRef" : "tool:sha256:0000000000000000000000000000000000000000000000000000000000000000",
+          "pendingActionID" : null
+        },
+        "index" : "5aa44e6b21e766bef6c1e1626fb34b404c25d470fe189055d324111a40209dfc",
+        "operation" : "selectionCandidate",
+        "published" : false,
+        "refusal" : {
+          "code" : "resourceNotFound",
+          "message" : "tool reference does not exist"
+        }
+      },
+      {
+        "arguments" : {
+          "actionID" : "select-unpublished",
+          "expectedActiveGeneration" : "1",
+          "newToolRef" : "tool:sha256:e25c5c47799e607e35f05159ae63225f4605c549fdf38407e7bb46205d921a88"
+        },
+        "index" : "5aa44e6b21e766bef6c1e1626fb34b404c25d470fe189055d324111a40209dfc",
+        "operation" : "prepareSelection",
+        "published" : false,
+        "refusal" : {
+          "code" : "operationUnavailable",
+          "message" : "tool selection requires distinct available published HDC identities"
+        }
+      },
+      {
+        "arguments" : {
+          "actionID" : "select-c",
+          "expectedActiveGeneration" : "1",
+          "newToolRef" : "tool:sha256:09a43a46ad9c0626786d87ae0872695c8c6d18298e8508fee1361a1a1317fa08"
+        },
+        "index" : "5aa44e6b21e766bef6c1e1626fb34b404c25d470fe189055d324111a40209dfc",
+        "operation" : "prepareSelection",
+        "published" : false,
+        "refusal" : {
+          "code" : "operationUnavailable",
+          "message" : "tool selection requires distinct available published HDC identities"
+        }
+      },
+      {
+        "arguments" : {
+          "actionID" : "select-a",
+          "expectedActiveGeneration" : "1",
+          "newToolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96"
+        },
+        "index" : "5aa44e6b21e766bef6c1e1626fb34b404c25d470fe189055d324111a40209dfc",
+        "operation" : "prepareSelection",
+        "published" : false,
+        "refusal" : {
+          "code" : "operationUnavailable",
+          "message" : "tool selection requires distinct available published HDC identities"
+        }
+      },
+      {
+        "arguments" : {
+          "actionID" : "select unrelocatable",
+          "expectedActiveGeneration" : "1",
+          "newToolRef" : "tool:sha256:754e66c3356a7677f30b0a198126d76ac55e8209c9c1cda95ef579025657c990"
+        },
+        "index" : "5aa44e6b21e766bef6c1e1626fb34b404c25d470fe189055d324111a40209dfc",
+        "operation" : "prepareSelection",
+        "published" : false,
+        "refusal" : {
+          "code" : "invalidInput",
+          "message" : "invalid bundle reference owner"
+        }
+      },
+      {
+        "answer" : {
+          "activeGeneration" : "1",
+          "activeTool" : {
+            "activeSelectionGeneration" : "1",
+            "byteCount" : "56",
+            "contentDigest" : "a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+            "contentRetained" : true,
+            "contentSchemaVersion" : "arkdeck.tool-content/1",
+            "dependencies" : [
+
+            ],
+            "dependencyLayout" : "hdc-sibling-libusb/1",
+            "digestAlgorithm" : "sha256-jcs",
+            "executableSHA256" : "dab2a09f7196f97a256c26752c9c903cd61a024a2d53d33c7301908312c63737",
+            "generation" : "1",
+            "kind" : "hdc",
+            "platform" : "macos",
+            "quarantineSHA256" : null,
+            "references" : [
+              {
+                "id" : "runtime-hdc-selection",
+                "kind" : "activeSelection"
+              },
+              {
+                "id" : "select-unrelocatable",
+                "kind" : "controlAction"
+              }
+            ],
+            "registeredAt" : "2026-09-01T00:00:00Z",
+            "relocatable" : true,
+            "schemaVersion" : "arkdeck.runtime-tool/1",
+            "selected" : true,
+            "source" : "registeredCopy",
+            "state" : "available",
+            "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+            "trust" : {
+              "codeDirectoryIdentitySHA256" : null,
+              "executionAssessment" : "notPerformed",
+              "platformTrust" : "unverified",
+              "policy" : "arkdeck.host-tool-inspection/1",
+              "profileReferences" : [
+                "fixture-profile"
+              ],
+              "registeredIdentity" : true,
+              "signature" : "unsigned",
+              "signingIdentifier" : null,
+              "teamIdentifier" : null,
+              "toolVersion" : "fixture-1",
+              "versionSource" : "publishedProfileDigestMatch"
+            }
+          },
+          "activeToolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+          "pendingControlActionId" : "select-unrelocatable",
+          "pendingToolRef" : "tool:sha256:754e66c3356a7677f30b0a198126d76ac55e8209c9c1cda95ef579025657c990",
+          "schemaVersion" : "arkdeck.runtime-tool-selection/1"
+        },
+        "arguments" : {
+          "actionID" : "select-unrelocatable",
+          "expectedActiveGeneration" : "1",
+          "newToolRef" : "tool:sha256:754e66c3356a7677f30b0a198126d76ac55e8209c9c1cda95ef579025657c990"
+        },
+        "index" : "c7a106c183e37ea6c59854aed2555bfc67ebac90ec52edf1cff32eb71afce94e",
+        "operation" : "prepareSelection",
+        "published" : true
+      },
+      {
+        "answer" : {
+          "activeGeneration" : "1",
+          "dependencies" : [
+
+          ],
+          "executable" : "tool-754e66c3356a7677f30b0a198126d76ac55e8209c9c1cda95ef579025657c990.hdc/hdc",
+          "executableSHA256" : "7df9794889870595f4f09c4e428e4986858584d52996d32433e042352051953b",
+          "pendingControlActionId" : "select-unrelocatable",
+          "toolRef" : "tool:sha256:754e66c3356a7677f30b0a198126d76ac55e8209c9c1cda95ef579025657c990"
+        },
+        "arguments" : {
+
+        },
+        "index" : "c7a106c183e37ea6c59854aed2555bfc67ebac90ec52edf1cff32eb71afce94e",
+        "operation" : "startupSelection",
+        "published" : false
+      },
+      {
+        "answer" : {
+          "activeGeneration" : "2",
+          "activeTool" : {
+            "activeSelectionGeneration" : "2",
+            "byteCount" : "88",
+            "contentDigest" : "754e66c3356a7677f30b0a198126d76ac55e8209c9c1cda95ef579025657c990",
+            "contentRetained" : true,
+            "contentSchemaVersion" : "arkdeck.tool-content/1",
+            "dependencies" : [
+
+            ],
+            "dependencyLayout" : "hdc-sibling-libusb/1",
+            "digestAlgorithm" : "sha256-jcs",
+            "executableSHA256" : "7df9794889870595f4f09c4e428e4986858584d52996d32433e042352051953b",
+            "generation" : "1",
+            "kind" : "hdc",
+            "platform" : "macos",
+            "quarantineSHA256" : null,
+            "references" : [
+              {
+                "id" : "runtime-hdc-selection",
+                "kind" : "activeSelection"
+              }
+            ],
+            "registeredAt" : "2026-09-01T00:00:00Z",
+            "relocatable" : false,
+            "schemaVersion" : "arkdeck.runtime-tool/1",
+            "selected" : true,
+            "source" : "registeredCopy",
+            "state" : "available",
+            "toolRef" : "tool:sha256:754e66c3356a7677f30b0a198126d76ac55e8209c9c1cda95ef579025657c990",
+            "trust" : {
+              "codeDirectoryIdentitySHA256" : null,
+              "executionAssessment" : "notPerformed",
+              "platformTrust" : "unverified",
+              "policy" : "arkdeck.host-tool-inspection/1",
+              "profileReferences" : [
+                "fixture-profile"
+              ],
+              "registeredIdentity" : true,
+              "signature" : "unsigned",
+              "signingIdentifier" : null,
+              "teamIdentifier" : null,
+              "toolVersion" : "fixture-1",
+              "versionSource" : "publishedProfileDigestMatch"
+            }
+          },
+          "activeToolRef" : "tool:sha256:754e66c3356a7677f30b0a198126d76ac55e8209c9c1cda95ef579025657c990",
+          "pendingControlActionId" : null,
+          "pendingToolRef" : null,
+          "schemaVersion" : "arkdeck.runtime-tool-selection/1"
+        },
+        "arguments" : {
+          "actionID" : "select-unrelocatable"
+        },
+        "index" : "5dc8a65d828371efc13843735b3b612eb8473751c1c17bb41bd47c278708e9e2",
+        "operation" : "publishPendingSelection",
+        "published" : true
+      },
+      {
+        "answer" : null,
+        "arguments" : {
+          "actionID" : "select-unrelocatable"
+        },
+        "index" : "2c2d02e11f9a1580d4f60be9a9711e5b369b2d63e590ab7bb7d3cff2e896903c",
+        "operation" : "acknowledgeSelectionOutcome",
+        "published" : true
+      },
+      {
+        "answer" : {
+          "activeGeneration" : "2",
+          "dependencies" : [
+
+          ],
+          "executable" : "tool-754e66c3356a7677f30b0a198126d76ac55e8209c9c1cda95ef579025657c990.hdc/hdc",
+          "executableSHA256" : "7df9794889870595f4f09c4e428e4986858584d52996d32433e042352051953b",
+          "pendingControlActionId" : null,
+          "toolRef" : "tool:sha256:754e66c3356a7677f30b0a198126d76ac55e8209c9c1cda95ef579025657c990"
+        },
+        "arguments" : {
+
+        },
+        "index" : "2c2d02e11f9a1580d4f60be9a9711e5b369b2d63e590ab7bb7d3cff2e896903c",
+        "operation" : "startupSelection",
+        "published" : false
+      },
+      {
+        "answer" : [
+          {
+            "activeSelectionGeneration" : null,
+            "byteCount" : "56",
+            "contentDigest" : "09a43a46ad9c0626786d87ae0872695c8c6d18298e8508fee1361a1a1317fa08",
+            "contentRetained" : true,
+            "contentSchemaVersion" : "arkdeck.tool-content/1",
+            "dependencies" : [
+
+            ],
+            "dependencyLayout" : "hdc-sibling-libusb/1",
+            "digestAlgorithm" : "sha256-jcs",
+            "executableSHA256" : "25d5ec1fa903c8ab589db092c25c405d7b12e2146f1f1ab6de91d2acb07da332",
+            "generation" : "2",
+            "kind" : "hdc",
+            "platform" : "macos",
+            "quarantineSHA256" : null,
+            "references" : [
+
+            ],
+            "registeredAt" : "2026-09-01T00:00:00Z",
+            "relocatable" : true,
+            "schemaVersion" : "arkdeck.runtime-tool/1",
+            "selected" : false,
+            "source" : "registeredCopy",
+            "state" : "removed",
+            "toolRef" : "tool:sha256:09a43a46ad9c0626786d87ae0872695c8c6d18298e8508fee1361a1a1317fa08",
+            "trust" : {
+              "codeDirectoryIdentitySHA256" : null,
+              "executionAssessment" : "notPerformed",
+              "platformTrust" : "unverified",
+              "policy" : "arkdeck.host-tool-inspection/1",
+              "profileReferences" : [
+                "fixture-profile"
+              ],
+              "registeredIdentity" : true,
+              "signature" : "unsigned",
+              "signingIdentifier" : null,
+              "teamIdentifier" : null,
+              "toolVersion" : "fixture-1",
+              "versionSource" : "publishedProfileDigestMatch"
+            }
+          },
+          {
+            "activeSelectionGeneration" : "2",
+            "byteCount" : "88",
+            "contentDigest" : "754e66c3356a7677f30b0a198126d76ac55e8209c9c1cda95ef579025657c990",
+            "contentRetained" : true,
+            "contentSchemaVersion" : "arkdeck.tool-content/1",
+            "dependencies" : [
+
+            ],
+            "dependencyLayout" : "hdc-sibling-libusb/1",
+            "digestAlgorithm" : "sha256-jcs",
+            "executableSHA256" : "7df9794889870595f4f09c4e428e4986858584d52996d32433e042352051953b",
+            "generation" : "1",
+            "kind" : "hdc",
+            "platform" : "macos",
+            "quarantineSHA256" : null,
+            "references" : [
+              {
+                "id" : "runtime-hdc-selection",
+                "kind" : "activeSelection"
+              }
+            ],
+            "registeredAt" : "2026-09-01T00:00:00Z",
+            "relocatable" : false,
+            "schemaVersion" : "arkdeck.runtime-tool/1",
+            "selected" : true,
+            "source" : "registeredCopy",
+            "state" : "available",
+            "toolRef" : "tool:sha256:754e66c3356a7677f30b0a198126d76ac55e8209c9c1cda95ef579025657c990",
+            "trust" : {
+              "codeDirectoryIdentitySHA256" : null,
+              "executionAssessment" : "notPerformed",
+              "platformTrust" : "unverified",
+              "policy" : "arkdeck.host-tool-inspection/1",
+              "profileReferences" : [
+                "fixture-profile"
+              ],
+              "registeredIdentity" : true,
+              "signature" : "unsigned",
+              "signingIdentifier" : null,
+              "teamIdentifier" : null,
+              "toolVersion" : "fixture-1",
+              "versionSource" : "publishedProfileDigestMatch"
+            }
+          },
+          {
+            "activeSelectionGeneration" : null,
+            "byteCount" : "56",
+            "contentDigest" : "a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+            "contentRetained" : true,
+            "contentSchemaVersion" : "arkdeck.tool-content/1",
+            "dependencies" : [
+
+            ],
+            "dependencyLayout" : "hdc-sibling-libusb/1",
+            "digestAlgorithm" : "sha256-jcs",
+            "executableSHA256" : "dab2a09f7196f97a256c26752c9c903cd61a024a2d53d33c7301908312c63737",
+            "generation" : "1",
+            "kind" : "hdc",
+            "platform" : "macos",
+            "quarantineSHA256" : null,
+            "references" : [
+
+            ],
+            "registeredAt" : "2026-09-01T00:00:00Z",
+            "relocatable" : true,
+            "schemaVersion" : "arkdeck.runtime-tool/1",
+            "selected" : false,
+            "source" : "registeredCopy",
+            "state" : "available",
+            "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+            "trust" : {
+              "codeDirectoryIdentitySHA256" : null,
+              "executionAssessment" : "notPerformed",
+              "platformTrust" : "unverified",
+              "policy" : "arkdeck.host-tool-inspection/1",
+              "profileReferences" : [
+                "fixture-profile"
+              ],
+              "registeredIdentity" : true,
+              "signature" : "unsigned",
+              "signingIdentifier" : null,
+              "teamIdentifier" : null,
+              "toolVersion" : "fixture-1",
+              "versionSource" : "publishedProfileDigestMatch"
+            }
+          },
+          {
+            "activeSelectionGeneration" : null,
+            "byteCount" : "56",
+            "contentDigest" : "e25c5c47799e607e35f05159ae63225f4605c549fdf38407e7bb46205d921a88",
+            "contentRetained" : true,
+            "contentSchemaVersion" : "arkdeck.tool-content/1",
+            "dependencies" : [
+
+            ],
+            "dependencyLayout" : "hdc-sibling-libusb/1",
+            "digestAlgorithm" : "sha256-jcs",
+            "executableSHA256" : "5dd5de23030c15cec9d406278e49bd7085e81ae25c5308926584298e49588146",
+            "generation" : "1",
+            "kind" : "hdc",
+            "platform" : "macos",
+            "quarantineSHA256" : null,
+            "references" : [
+
+            ],
+            "registeredAt" : "2026-09-01T00:00:00Z",
+            "relocatable" : true,
+            "schemaVersion" : "arkdeck.runtime-tool/1",
+            "selected" : false,
+            "source" : "registeredCopy",
+            "state" : "available",
+            "toolRef" : "tool:sha256:e25c5c47799e607e35f05159ae63225f4605c549fdf38407e7bb46205d921a88",
+            "trust" : {
+              "codeDirectoryIdentitySHA256" : null,
+              "executionAssessment" : "notPerformed",
+              "platformTrust" : "unverified",
+              "policy" : "arkdeck.host-tool-inspection/1",
+              "profileReferences" : [
+
+              ],
+              "registeredIdentity" : false,
+              "signature" : "unsigned",
+              "signingIdentifier" : null,
+              "teamIdentifier" : null,
+              "toolVersion" : null,
+              "versionSource" : null
+            }
+          }
+        ],
+        "arguments" : {
+
+        },
+        "index" : "2c2d02e11f9a1580d4f60be9a9711e5b369b2d63e590ab7bb7d3cff2e896903c",
+        "operation" : "list",
+        "published" : false
+      }
+    ]
+  },
+  {
+    "name" : "lost-index",
+    "steps" : [
+      {
+        "answer" : {
+          "activeSelectionGeneration" : null,
+          "byteCount" : "56",
+          "contentDigest" : "a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+          "contentRetained" : true,
+          "contentSchemaVersion" : "arkdeck.tool-content/1",
+          "dependencies" : [
+
+          ],
+          "dependencyLayout" : "hdc-sibling-libusb/1",
+          "digestAlgorithm" : "sha256-jcs",
+          "executableSHA256" : "dab2a09f7196f97a256c26752c9c903cd61a024a2d53d33c7301908312c63737",
+          "generation" : "1",
+          "kind" : "hdc",
+          "platform" : "macos",
+          "quarantineSHA256" : null,
+          "references" : [
+
+          ],
+          "registeredAt" : "2026-09-01T00:00:00Z",
+          "relocatable" : true,
+          "schemaVersion" : "arkdeck.runtime-tool/1",
+          "selected" : false,
+          "source" : "registeredCopy",
+          "state" : "available",
+          "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+          "trust" : {
+            "codeDirectoryIdentitySHA256" : null,
+            "executionAssessment" : "notPerformed",
+            "platformTrust" : "unverified",
+            "policy" : "arkdeck.host-tool-inspection/1",
+            "profileReferences" : [
+              "fixture-profile"
+            ],
+            "registeredIdentity" : true,
+            "signature" : "unsigned",
+            "signingIdentifier" : null,
+            "teamIdentifier" : null,
+            "toolVersion" : "fixture-1",
+            "versionSource" : "publishedProfileDigestMatch"
+          }
+        },
+        "arguments" : {
+          "executable" : "a"
+        },
+        "index" : "83e15f636ddc2ac3c32b48775ce7f13b628f8bc17e97f3d70978f4663697a95f",
+        "operation" : "register",
+        "published" : true
+      },
+      {
+        "answer" : null,
+        "arguments" : {
+
+        },
+        "index" : null,
+        "operation" : "harness.removeIndex",
+        "published" : false
+      },
+      {
+        "arguments" : {
+
+        },
+        "index" : null,
+        "operation" : "startupSelection",
+        "published" : false,
+        "refusal" : {
+          "code" : "recordUnreadable",
+          "message" : "tool index is missing beside retained tool state"
+        }
+      },
+      {
+        "arguments" : {
+          "expectedGeneration" : "1",
+          "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96"
+        },
+        "index" : null,
+        "operation" : "initializeServiceSelection",
+        "published" : false,
+        "refusal" : {
+          "code" : "recordUnreadable",
+          "message" : "tool index is missing beside retained tool state"
+        }
+      },
+      {
+        "arguments" : {
+
+        },
+        "index" : null,
+        "operation" : "list",
+        "published" : false,
+        "refusal" : {
+          "code" : "recordUnreadable",
+          "message" : "tool index is missing beside retained tool state"
+        }
+      }
+    ]
+  },
+  {
+    "name" : "unpinned-ledger",
+    "steps" : [
+      {
+        "answer" : {
+          "activeSelectionGeneration" : null,
+          "byteCount" : "56",
+          "contentDigest" : "a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+          "contentRetained" : true,
+          "contentSchemaVersion" : "arkdeck.tool-content/1",
+          "dependencies" : [
+
+          ],
+          "dependencyLayout" : "hdc-sibling-libusb/1",
+          "digestAlgorithm" : "sha256-jcs",
+          "executableSHA256" : "dab2a09f7196f97a256c26752c9c903cd61a024a2d53d33c7301908312c63737",
+          "generation" : "1",
+          "kind" : "hdc",
+          "platform" : "macos",
+          "quarantineSHA256" : null,
+          "references" : [
+
+          ],
+          "registeredAt" : "2026-09-01T00:00:00Z",
+          "relocatable" : true,
+          "schemaVersion" : "arkdeck.runtime-tool/1",
+          "selected" : false,
+          "source" : "registeredCopy",
+          "state" : "available",
+          "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+          "trust" : {
+            "codeDirectoryIdentitySHA256" : null,
+            "executionAssessment" : "notPerformed",
+            "platformTrust" : "unverified",
+            "policy" : "arkdeck.host-tool-inspection/1",
+            "profileReferences" : [
+              "fixture-profile"
+            ],
+            "registeredIdentity" : true,
+            "signature" : "unsigned",
+            "signingIdentifier" : null,
+            "teamIdentifier" : null,
+            "toolVersion" : "fixture-1",
+            "versionSource" : "publishedProfileDigestMatch"
+          }
+        },
+        "arguments" : {
+          "executable" : "a"
+        },
+        "index" : "83e15f636ddc2ac3c32b48775ce7f13b628f8bc17e97f3d70978f4663697a95f",
+        "operation" : "register",
+        "published" : true
+      },
+      {
+        "answer" : {
+          "activeGeneration" : "1",
+          "dependencies" : [
+
+          ],
+          "executable" : "tool-a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96.hdc/hdc",
+          "executableSHA256" : "dab2a09f7196f97a256c26752c9c903cd61a024a2d53d33c7301908312c63737",
+          "pendingControlActionId" : null,
+          "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96"
+        },
+        "arguments" : {
+          "expectedGeneration" : "1",
+          "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96"
+        },
+        "index" : "7ce754c207ac740b4946ab48b10dc544436c4cb21b271954e5c3a549da4dcae9",
+        "operation" : "initializeServiceSelection",
+        "published" : true
+      },
+      {
+        "answer" : null,
+        "arguments" : {
+
+        },
+        "index" : "d98a9a14fa744e7a5fbec4580360725751524e3c15a5ce06db8bcdaefecfc006",
+        "operation" : "harness.unpinActiveTool",
+        "published" : false
+      },
+      {
+        "arguments" : {
+
+        },
+        "index" : "d98a9a14fa744e7a5fbec4580360725751524e3c15a5ce06db8bcdaefecfc006",
+        "operation" : "startupSelection",
+        "published" : false,
+        "refusal" : {
+          "code" : "recordUnreadable",
+          "message" : "tool index failed bounded schema and identity validation"
+        }
+      },
+      {
+        "arguments" : {
+          "actionID" : "select-a"
+        },
+        "index" : "d98a9a14fa744e7a5fbec4580360725751524e3c15a5ce06db8bcdaefecfc006",
+        "operation" : "selectionOutcome",
+        "published" : false,
+        "refusal" : {
+          "code" : "recordUnreadable",
+          "message" : "tool index failed bounded schema and identity validation"
+        }
+      },
+      {
+        "arguments" : {
+          "actionID" : "select-a"
+        },
+        "index" : "d98a9a14fa744e7a5fbec4580360725751524e3c15a5ce06db8bcdaefecfc006",
+        "operation" : "acknowledgeSelectionOutcome",
+        "published" : false,
+        "refusal" : {
+          "code" : "recordUnreadable",
+          "message" : "tool index failed bounded schema and identity validation"
+        }
+      }
+    ]
+  },
+  {
+    "name" : "altered-content",
+    "steps" : [
+      {
+        "answer" : {
+          "activeSelectionGeneration" : null,
+          "byteCount" : "56",
+          "contentDigest" : "a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+          "contentRetained" : true,
+          "contentSchemaVersion" : "arkdeck.tool-content/1",
+          "dependencies" : [
+
+          ],
+          "dependencyLayout" : "hdc-sibling-libusb/1",
+          "digestAlgorithm" : "sha256-jcs",
+          "executableSHA256" : "dab2a09f7196f97a256c26752c9c903cd61a024a2d53d33c7301908312c63737",
+          "generation" : "1",
+          "kind" : "hdc",
+          "platform" : "macos",
+          "quarantineSHA256" : null,
+          "references" : [
+
+          ],
+          "registeredAt" : "2026-09-01T00:00:00Z",
+          "relocatable" : true,
+          "schemaVersion" : "arkdeck.runtime-tool/1",
+          "selected" : false,
+          "source" : "registeredCopy",
+          "state" : "available",
+          "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96",
+          "trust" : {
+            "codeDirectoryIdentitySHA256" : null,
+            "executionAssessment" : "notPerformed",
+            "platformTrust" : "unverified",
+            "policy" : "arkdeck.host-tool-inspection/1",
+            "profileReferences" : [
+              "fixture-profile"
+            ],
+            "registeredIdentity" : true,
+            "signature" : "unsigned",
+            "signingIdentifier" : null,
+            "teamIdentifier" : null,
+            "toolVersion" : "fixture-1",
+            "versionSource" : "publishedProfileDigestMatch"
+          }
+        },
+        "arguments" : {
+          "executable" : "a"
+        },
+        "index" : "83e15f636ddc2ac3c32b48775ce7f13b628f8bc17e97f3d70978f4663697a95f",
+        "operation" : "register",
+        "published" : true
+      },
+      {
+        "answer" : {
+          "activeSelectionGeneration" : null,
+          "byteCount" : "56",
+          "contentDigest" : "3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d",
+          "contentRetained" : true,
+          "contentSchemaVersion" : "arkdeck.tool-content/1",
+          "dependencies" : [
+
+          ],
+          "dependencyLayout" : "hdc-sibling-libusb/1",
+          "digestAlgorithm" : "sha256-jcs",
+          "executableSHA256" : "629f7402ee92d66908335ef5646610eec5b734df677fe2c97694c4b155e54fc2",
+          "generation" : "1",
+          "kind" : "hdc",
+          "platform" : "macos",
+          "quarantineSHA256" : null,
+          "references" : [
+
+          ],
+          "registeredAt" : "2026-09-01T00:00:00Z",
+          "relocatable" : true,
+          "schemaVersion" : "arkdeck.runtime-tool/1",
+          "selected" : false,
+          "source" : "registeredCopy",
+          "state" : "available",
+          "toolRef" : "tool:sha256:3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d",
+          "trust" : {
+            "codeDirectoryIdentitySHA256" : null,
+            "executionAssessment" : "notPerformed",
+            "platformTrust" : "unverified",
+            "policy" : "arkdeck.host-tool-inspection/1",
+            "profileReferences" : [
+              "fixture-profile"
+            ],
+            "registeredIdentity" : true,
+            "signature" : "unsigned",
+            "signingIdentifier" : null,
+            "teamIdentifier" : null,
+            "toolVersion" : "fixture-1",
+            "versionSource" : "publishedProfileDigestMatch"
+          }
+        },
+        "arguments" : {
+          "executable" : "b"
+        },
+        "index" : "13e554a7de008969f666a8772978a5e5bb79542310c06ec0643b4de625f16221",
+        "operation" : "register",
+        "published" : true
+      },
+      {
+        "answer" : {
+          "activeGeneration" : "1",
+          "dependencies" : [
+
+          ],
+          "executable" : "tool-a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96.hdc/hdc",
+          "executableSHA256" : "dab2a09f7196f97a256c26752c9c903cd61a024a2d53d33c7301908312c63737",
+          "pendingControlActionId" : null,
+          "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96"
+        },
+        "arguments" : {
+          "expectedGeneration" : "1",
+          "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96"
+        },
+        "index" : "c8d0bf41e641a59416710432cf8a289b3485710ddcce840ee0c754416219ba9e",
+        "operation" : "initializeServiceSelection",
+        "published" : true
+      },
+      {
+        "answer" : null,
+        "arguments" : {
+          "executable" : "b"
+        },
+        "index" : "c8d0bf41e641a59416710432cf8a289b3485710ddcce840ee0c754416219ba9e",
+        "operation" : "harness.alterContent",
+        "published" : false
+      },
+      {
+        "answer" : {
+          "activeGeneration" : "1",
+          "dependencies" : [
+
+          ],
+          "executable" : "tool-a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96.hdc/hdc",
+          "executableSHA256" : "dab2a09f7196f97a256c26752c9c903cd61a024a2d53d33c7301908312c63737",
+          "pendingControlActionId" : null,
+          "toolRef" : "tool:sha256:a755d8b629f934514b8a3cdbf950394d818eb0249f68c59170e8dab9b7200d96"
+        },
+        "arguments" : {
+
+        },
+        "index" : "c8d0bf41e641a59416710432cf8a289b3485710ddcce840ee0c754416219ba9e",
+        "operation" : "startupSelection",
+        "published" : false
+      },
+      {
+        "arguments" : {
+          "expectedActiveGeneration" : "1",
+          "newToolRef" : "tool:sha256:3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d",
+          "pendingActionID" : null
+        },
+        "index" : "c8d0bf41e641a59416710432cf8a289b3485710ddcce840ee0c754416219ba9e",
+        "operation" : "selectionCandidate",
+        "published" : false,
+        "refusal" : {
+          "code" : "recordUnreadable",
+          "message" : "registered host tool failed content, identity or trust validation"
+        }
+      },
+      {
+        "arguments" : {
+          "actionID" : "select-b",
+          "expectedActiveGeneration" : "1",
+          "newToolRef" : "tool:sha256:3320c26b5e216bd2d22350e98ac1f8caf62b622304839b5927a0a1dec8879f5d"
+        },
+        "index" : "c8d0bf41e641a59416710432cf8a289b3485710ddcce840ee0c754416219ba9e",
+        "operation" : "prepareSelection",
+        "published" : false,
+        "refusal" : {
+          "code" : "recordUnreadable",
+          "message" : "registered host tool failed content, identity or trust validation"
+        }
+      },
+      {
+        "answer" : null,
+        "arguments" : {
+          "executable" : "a"
+        },
+        "index" : "c8d0bf41e641a59416710432cf8a289b3485710ddcce840ee0c754416219ba9e",
+        "operation" : "harness.alterContent",
+        "published" : false
+      },
+      {
+        "arguments" : {
+
+        },
+        "index" : "c8d0bf41e641a59416710432cf8a289b3485710ddcce840ee0c754416219ba9e",
+        "operation" : "startupSelection",
+        "published" : false,
+        "refusal" : {
+          "code" : "recordUnreadable",
+          "message" : "registered host tool failed content, identity or trust validation"
+        }
+      },
+      {
+        "arguments" : {
+          "actionID" : "select-b"
+        },
+        "index" : "c8d0bf41e641a59416710432cf8a289b3485710ddcce840ee0c754416219ba9e",
+        "operation" : "selectionOutcome",
+        "published" : false,
+        "refusal" : {
+          "code" : "recordUnreadable",
+          "message" : "registered host tool failed content, identity or trust validation"
+        }
+      },
+      {
+        "answer" : null,
+        "arguments" : {
+          "actionID" : "select-b"
+        },
+        "index" : "c8d0bf41e641a59416710432cf8a289b3485710ddcce840ee0c754416219ba9e",
+        "operation" : "acknowledgeSelectionOutcome",
+        "published" : false
+      }
+    ]
+  }
+]
