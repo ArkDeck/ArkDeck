@@ -576,6 +576,13 @@ impl JobRecord {
         self.recovery_intent = intent.map(str::to_owned);
         self.recovery_action = action;
     }
+    /// The intent whose exact typed action the record keeps, if any.
+    pub(super) fn recovery_intent(&self) -> Option<&str> {
+        self.recovery_intent.as_deref()
+    }
+    pub(super) fn recovery_action(&self) -> Option<&Value> {
+        self.recovery_action.as_ref()
+    }
     pub(super) fn add_step_kind(&mut self, kind: &str) {
         let kinds = self.step_kinds.get_or_insert_with(Vec::new);
         if !kinds.iter().any(|known| known == kind) {
@@ -779,6 +786,15 @@ impl JobRecord {
     /// path has counted the Job's residue.
     pub(super) fn residues(&self) -> Option<i64> {
         self.residues
+    }
+    /// Swift `refreshDebugHAPResidueCount`: the Job's outstanding cleanup
+    /// debts, as the ledger counts them.
+    pub(super) fn set_residues(&mut self, count: i64) {
+        self.residues = Some(count);
+    }
+    /// The step kinds the record kept, in the order they first ran.
+    pub(super) fn step_kinds(&self) -> Option<&[String]> {
+        self.step_kinds.as_deref()
     }
     pub(super) fn status(&self) -> Value {
         let uncertain =

@@ -343,7 +343,11 @@ impl CatalogOperation {
     }
 
     /// Swift `CatalogOperationEffectResolver.resolvedInputValue`.
-    fn resolved<'a>(&'a self, name: &str, inputs: &'a Map<String, Value>) -> Option<&'a Value> {
+    pub(crate) fn resolved<'a>(
+        &'a self,
+        name: &str,
+        inputs: &'a Map<String, Value>,
+    ) -> Option<&'a Value> {
         inputs.get(name).or_else(|| {
             self.inputs
                 .iter()

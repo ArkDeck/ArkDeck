@@ -536,18 +536,29 @@ fn compose(
     } else {
         Value::Null
     };
-    let refused = || {
+    let refused = |rule: Option<&str>| {
         stop(
             "contractViolation",
-            "composed Manifest was refused by the current contract",
+            match rule {
+                Some(rule) => format!(
+                    "composed Manifest was refused by the current contract: invalidManifest({})",
+                    crate::artifact_read_owner::swift_string(rule)
+                ),
+                None => "composed Manifest was refused by the current contract".into(),
+            },
         )
     };
-    let bytes = crate::session_json::encode(&manifest).map_err(|_| refused())?;
-    // Swift `SessionManifestDocument(data:)`: the locked contract and bound.
-    if bytes.len() > MAXIMUM_MANIFEST || crate::session_manifest::decode_manifest(&bytes).is_err() {
-        return Err(refused());
+    let bytes = crate::session_json::encode(&manifest).map_err(|_| refused(None))?;
+    // Swift `SessionManifestDocument(data:)`: the locked contract and bound,
+    // a rule it names refused under that name.
+    if bytes.len() > MAXIMUM_MANIFEST {
+        return Err(refused(None));
     }
-    Ok(bytes)
+    match crate::session_manifest::decode_manifest(&bytes) {
+        Ok(_) => Ok(bytes),
+        Err(crate::session_manifest::ManifestError::Rule(rule)) => Err(refused(Some(rule))),
+        Err(_) => Err(refused(None)),
+    }
 }
 
 /// Swift `manifestSteps`: each intent's typed declaration with the tuple its

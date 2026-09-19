@@ -26,7 +26,7 @@ const MAXIMUM_ANALYZER_BYTES: u64 = 128 * 1024 * 1024;
 const MAXIMUM_ANALYZER_INPUT_BYTES: u64 = 512 * 1024 * 1024;
 /// The operations whose plans this Runtime materializes, and so plans and
 /// admits. Every other catalog operation is refused before its inputs are
-/// judged. `debug.hap@1` is admitted but not yet executed (`job_run`).
+/// judged.
 const MATERIALIZED: [&str; 9] = [
     "analyzer.extract-crash-signature@1",
     "observe.device@1",

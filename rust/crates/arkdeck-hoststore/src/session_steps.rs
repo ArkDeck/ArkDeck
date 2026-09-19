@@ -255,7 +255,10 @@ pub(super) fn validate(doc: &Object, host: bool) -> Result<()> {
             require(disposition != "outcomeUnknown")?;
         }
         if status == "succeeded" {
-            require(!["failed", "unknown"].contains(&result))?;
+            if result == "failed" {
+                return Err(ManifestError::Rule("succeeded status contains failed Step"));
+            }
+            require(result != "unknown")?;
             if standard && !consumed && mode == "execute" {
                 require(effect != "destructive")?;
             }

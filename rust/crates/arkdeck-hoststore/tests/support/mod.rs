@@ -291,13 +291,18 @@ fn pager_snapshot(relative: &Path) -> bool {
         })
 }
 
-/// Every Artifact index and payload, the verification cache aside.
+/// Every Artifact index and payload, and the root's own documents (the
+/// cleanup debt ledger), the verification cache aside.
 fn artifacts(base: &Path) -> BTreeMap<String, Vec<u8>> {
     let mut files = BTreeMap::new();
     for directory in fs::read_dir(base).unwrap() {
         let directory = directory.unwrap().path();
         let job = directory.file_name().unwrap().to_str().unwrap().to_owned();
         if job.starts_with('.') {
+            continue;
+        }
+        if directory.is_file() {
+            files.insert(format!("artifacts/{job}"), fs::read(&directory).unwrap());
             continue;
         }
         for file in fs::read_dir(&directory).unwrap() {
@@ -320,7 +325,23 @@ pub fn assert_leftovers(fixture: &Path, root: &Path) {
 }
 
 pub fn assert_leftovers_at(fixture: &Path, root: &Path, jobs: &Path) {
-    assert_eq!(index(jobs), document(fixture, "store/index.json"));
+    assert_leftovers_with(fixture, root, jobs, |_, bytes| bytes, |_| ());
+}
+
+/// As [`assert_leftovers_at`], against what the oracle recorded as `expected`
+/// reads each recorded file (by its fixture path) and `index` reads the
+/// recorded index: for the files and rows a later exchange the replay does
+/// not make changed, what they held before it.
+pub fn assert_leftovers_with(
+    fixture: &Path,
+    root: &Path,
+    jobs: &Path,
+    expected: impl Fn(&str, Vec<u8>) -> Vec<u8>,
+    index_before: impl Fn(&mut Value),
+) {
+    let mut recorded_index = document(fixture, "store/index.json");
+    index_before(&mut recorded_index);
+    assert_eq!(index(jobs), recorded_index);
     let (mut files, mut tree) = (BTreeMap::new(), Vec::new());
     let mut bases = vec![
         (jobs.join("jobs"), "store/jobs"),
@@ -361,7 +382,10 @@ pub fn assert_leftovers_at(fixture: &Path, root: &Path, jobs: &Path) {
         .iter()
         .any(|prefix| path.starts_with(prefix))
         {
-            recorded.insert(path.clone(), fs::read(fixture.join(path)).unwrap());
+            recorded.insert(
+                path.clone(),
+                expected(path, fs::read(fixture.join(path)).unwrap()),
+            );
         }
     }
     assert_eq!(

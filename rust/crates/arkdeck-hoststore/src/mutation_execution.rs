@@ -1,8 +1,21 @@
 //! Runtime-owned capability consumption immediately before a device mutation
-//! (a pointer gesture, or a port rule's change).
+//! (a pointer gesture, a port rule's change, or each of a debug HAP's).
 //! Admission alone is not authority to dispatch: the complete typed plan and
 //! binding are re-established, then the reserved use and its correlated Job
 //! evidence become durable before the step's write-ahead intent.
+//!
+//! A Job consumes one use for its whole run, before its first mutation.
+//! Swift `consumeCapabilityBeforeMutation` lets a later mutation of the same
+//! Job proceed under that use ("persisted evidence": this Job already owns
+//! it) once every fresh check has passed again: the mutation state, the whole
+//! typed plan materialized again against fresh Target facts, and the evidence
+//! naming exactly the Job's capability. A debug HAP's compensation, run while
+//! the Job is `finalizing`, also proves that use is still this Job's own,
+//! unsettled, for the same query and still authorized (`validateContinuation`),
+//! and correlated as it was consumed. This runner continues only a use it
+//! consumed itself: evidence it finds on a record it did not write is never
+//! continued, which keeps every dispatch of a resumed Job for recovery
+//! (ADR-0009, L.1 item 13).
 use crate::capability_policy;
 use crate::capability_store::{CapabilityQuery, Effect, UseOutcome};
 use crate::device_facts::{self, DeviceFacts};
@@ -23,7 +36,11 @@ pub struct MutationExecution<'a> {
 }
 
 pub(crate) enum MutationConsumption {
+    /// The Job's one use was consumed and its evidence is durable.
     Consumed,
+    /// The Job already holds the use this run consumed; nothing new is
+    /// consumed.
+    Held,
     Cancelled,
     PersistenceUncertain,
 }
@@ -49,6 +66,25 @@ impl JobRunner<'_> {
             .ok_or_else(|| reject("Runtime HDC owner unavailable".into()))?;
         if !dispatcher.dispatch.mutation_identity_current() {
             return Err(reject("fresh tool identity cannot be proved".into()));
+        }
+        // Evidence this run did not consume is never continued, whatever it
+        // names: a persisted consumption without this run's own boundary must
+        // not become a second dispatch.
+        let persisted = run.record.admission_evidence().cloned();
+        if let Some(evidence) = &persisted {
+            if run.consumed.as_ref() != Some(evidence) {
+                return Err(reject(
+                    "persisted mutation evidence cannot be replayed".into(),
+                ));
+            }
+            // Swift: the Job's own use of the capability it runs under.
+            if evidence["kind"] != "runtimeCapability"
+                || evidence["reference"] != run.record.request["authorization"]["capabilityId"]
+            {
+                return Err(reject(
+                    "persisted admission evidence does not match the mutation".into(),
+                ));
+            }
         }
         owner
             .authority
@@ -97,14 +133,60 @@ impl JobRunner<'_> {
             workspace_revision: None,
             workspace_file_scopes_digest: None,
         };
-        if run.record.admission_evidence().is_some() {
-            // This runner never resumes a dispatched Job. A persisted consumption
-            // without a new run boundary must not become a second dispatch.
-            return Err(reject(
-                "persisted mutation evidence cannot be replayed".into(),
-            ));
-        }
         let store = owner.authority.capabilities;
+        if let Some(evidence) = persisted {
+            // Swift's persisted-evidence arm: the state proven once more at
+            // the boundary, and no second use.
+            owner
+                .authority
+                .require_state(self.jobs)
+                .map_err(|e| reject(e.message))?;
+            if !dispatcher.dispatch.mutation_identity_current() {
+                return Err(reject(
+                    "fresh tool identity drifted before consumption".into(),
+                ));
+            }
+            // The failure lane dropped any request to cancel before it began
+            // (Swift `performDebugHAPFailureFinalization`); elsewhere a request
+            // that has reached the run stops it here.
+            if run.record.state != "finalizing"
+                && self
+                    .cancellation
+                    .is_some_and(crate::job_cancel::RunCancellation::pending)
+            {
+                return Ok(MutationConsumption::Cancelled);
+            }
+            // A debug HAP's compensation continues under the use its Job
+            // consumed; `reconciling`, Swift's other arm, is recovery.
+            if descriptor.reference() == "debug.hap@1" && run.record.state == "finalizing" {
+                let now = run
+                    .clock()
+                    .map_err(|_| reject("Runtime clock unavailable".into()))?;
+                let receipt = store
+                    .validate_continuation(
+                        capability,
+                        &request.idempotency_key,
+                        &run.record.job_id,
+                        &query,
+                        &now,
+                    )
+                    .map_err(|e| {
+                        reject(format!("capability denied before mutation: {}", e.swift()))
+                    })?;
+                let correlation = &evidence["runtimeCapabilityCorrelation"];
+                let step_set = crate::job_plan::step_set_digest(descriptor, &request.inputs)
+                    .map_err(|_| reject("complete step set could not be materialized".into()))?;
+                if evidence["consumptionFingerprintSHA256"]
+                    != receipt.query_fingerprint_sha256.as_str()
+                    || correlation["useOrdinal"].as_i64() != Some(receipt.ordinal)
+                    || correlation["reservationID"] != receipt.reservation_id.as_str()
+                    || correlation["stepSetDigestSHA256"] != step_set.as_str()
+                {
+                    return Err("compensation capability correlation drifted".into());
+                }
+            }
+            return Ok(MutationConsumption::Held);
+        }
         if let Some(blocker) = store
             .unresolved_use(
                 &facts.identity,
@@ -166,7 +248,7 @@ impl JobRunner<'_> {
         if let Some(digest) = fresh.artifact_facts.get("artifactSha256") {
             evidence["runtimeCapabilityCorrelation"]["artifactSHA256"] = json!(digest);
         }
-        run.record.set_admission_evidence(evidence);
+        run.record.set_admission_evidence(evidence.clone());
         run.record
             .timeline
             .push("capability consumed before first mutation".into());
@@ -175,15 +257,21 @@ impl JobRunner<'_> {
             // invent a terminal receipt, or let another Job bypass pending use.
             return Ok(MutationConsumption::PersistenceUncertain);
         }
+        run.consumed = Some(evidence);
         Ok(MutationConsumption::Consumed)
     }
 
+    /// Swift `recordCapabilityOutcome` once the Job is terminal or parked:
+    /// the use this run consumed is settled with the Job's state. A run that
+    /// consumed none settles none, whatever evidence its record carries.
     pub(crate) fn settle_mutation(&self, run: &Run, outcome: UseOutcome) -> Result<(), RunRefusal> {
-        let Some(evidence) = run.record.admission_evidence() else {
+        let Some(evidence) = run.consumed.as_ref() else {
             return Ok(());
         };
-        if evidence["kind"] != "runtimeCapability" {
-            return Ok(());
+        if run.record.admission_evidence() != Some(evidence)
+            || evidence["kind"] != "runtimeCapability"
+        {
+            return Err(uncertain());
         }
         let owner = self.mutation.ok_or_else(uncertain)?;
         owner

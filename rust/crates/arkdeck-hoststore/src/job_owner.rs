@@ -122,6 +122,21 @@ impl JobStore {
         Ok(self.path.join("jobs").join(job_id))
     }
 
+    /// A Job's journal bytes as they stand, read through no link and
+    /// creating nothing.
+    pub(crate) fn journal_bytes(&self, job_id: &str) -> io::Result<Vec<u8>> {
+        if !identifier(job_id) {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "The Job identity is not a Runtime identifier",
+            ));
+        }
+        self.root
+            .child("jobs")?
+            .child(job_id)?
+            .read("journal.jsonl", 64 * 1024 * 1024)
+    }
+
     /// Swift RuntimeJobEngine.persistRuntimeRecord: publish
     /// `jobs/<jobID>/job-record.json` atomically, then advance the index row
     /// with the same bytes. An index row must already describe this Job; once
