@@ -270,17 +270,22 @@ impl JobStore {
             })
     }
 
-    /// Whether the state root holds Swift's superseding recovery epochs,
-    /// which this Runtime does not read yet.
-    pub(crate) fn holds_recovery_epochs(&self) -> io::Result<bool> {
-        match self
-            .root
-            .document_metadata("superseding-recovery-epochs.json")
-        {
-            Ok(_) => Ok(true),
-            Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(false),
-            Err(error) => Err(error),
+    /// Swift `evidenceSnapshot`'s read of the superseding recovery epochs,
+    /// which it makes for every snapshot and which throws when they are
+    /// unreadable: whether an epoch names this Job as the Job that recovered.
+    /// An absent document names none; Swift's read would also create the
+    /// store's lock, an incidental file this read does not create.
+    pub(crate) fn recovery_epoch_names(
+        &self,
+        job_id: &str,
+    ) -> Result<bool, crate::RecoveryEpochError> {
+        match self.root.document_metadata(crate::RECOVERY_EPOCH_DOCUMENT) {
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(false),
+            _ => {}
         }
+        Ok(crate::list_recovery_epochs(&self.root)?
+            .iter()
+            .any(|epoch| crate::swift_decoding::same_text(&epoch.draft.recovery_job_id, job_id)))
     }
 
     pub fn handle_resource(

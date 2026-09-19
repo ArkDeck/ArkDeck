@@ -685,8 +685,17 @@ of the Job is refused (`resourceConflict`), and a result over 4 MiB is
 Artifact directory, reseal a payload or refresh its verification cache while it
 reads. Until their owners join, a Job of another operation or one carrying
 device observations or Trace probes is refused (`rejected`, with the zero-dispatch
-proof), and a store holding recovery epochs degrades the evidence to
-`recordUnreadable` (L.1 item 13).
+proof). The superseding recovery epochs are read as Swift reads them for every
+snapshot, through `recovery_epoch.rs` (Swift `RuntimeSupersedingRecoveryStore`,
+ported unchanged as design §L.1 item 13 was ruled on 2026-09-19): an unreadable
+document, and an epoch that names the Job as the Job that recovered (a
+`recoveryEpoch` the published schema still pins to null), degrade the evidence to
+`recordUnreadable`; any other store leaves it whole. `tests/recovery_epoch.rs`
+replays `rust/tests/fixtures/recovery-epoch/` (Swift
+`RecoveryEpochOracleContractTests`, re-recorded with
+`ARKDECK_RUST_RECOVERY_EPOCH_RECORD=/private/tmp/<new>`): 32 appends, lists and
+refusals, each root's files byte for byte. Nothing in Rust appends an epoch yet;
+the writers are on the M4 flash path.
 
 `arkdeck job result --job <id> [--timeout <duration>]` checks the whole result
 as Swift's CLI does — the status, the evidence, every inventory and cleanup row

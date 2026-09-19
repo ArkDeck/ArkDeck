@@ -321,9 +321,11 @@ impl JobResultReader<'_> {
         if !is_terminal {
             blockers.insert("resultNotReady");
         }
-        // Swift reads recovery epochs for every snapshot; this Runtime does
-        // not yet, so a store holding them degrades the evidence.
-        let degraded = self.jobs.holds_recovery_epochs().unwrap_or(true);
+        // Swift reads the recovery epochs for every snapshot and fails the
+        // read when they are unreadable. An epoch that names this Job as the
+        // Job that recovered is a `recoveryEpoch` the published evidence
+        // schema still pins to null, so that evidence degrades as well.
+        let degraded = self.jobs.recovery_epoch_names(job_id).unwrap_or(true);
         if degraded {
             blockers.insert("recordUnreadable");
         }
