@@ -1,7 +1,8 @@
-//! `runtime.hdc.impact-preview`, `runtime.hdc.restart` and
-//! `control-action.list`, `.show` and `.reconcile` through the control layer,
-//! against the daemon's own host, as Swift's daemon answers them without a
-//! managed HDC server (`ControlActionNoHostContractTests`). The isolated
+//! `runtime.hdc.impact-preview`, `runtime.hdc.restart`, `runtime.tool.select`
+//! and `control-action.list`, `.show` and `.reconcile` through the control
+//! layer, against the daemon's own host, as Swift's daemon answers them
+//! without a managed HDC server (`ControlActionNoHostContractTests`). The
+//! isolated
 //! composition's union owner, over no HDC and no tool-selection owner, answers
 //! every exchange of the committed corpora that needs no managed server; the
 //! host without that owner answers the corpus's exchange of a handler with no
@@ -14,9 +15,12 @@
 //! `ControlActionWithHostContractTests` recorded over the production impact
 //! source (previews, records read, reconciled and paged), and the lifecycle
 //! refusals of an HDC control-action owner. `control_action_host_control.rs`
-//! replays them over the HDC control-action owner. The control layer admits
-//! each answer under the compiled method schema: a view whose schemas predate
-//! the no-host frames answers what they do not publish with `internalError`.
+//! replays them over the HDC control-action owner. The selection answers of a
+//! tool-selection owner (its intent refusal and a fake success) are counted
+//! too: Swift composes that owner only beside a started HDC server host, and
+//! no Rust composition has one yet. The control layer admits each answer
+//! under the compiled method schema: a view whose schemas predate the no-host
+//! frames answers what they do not publish with `internalError`.
 use arkdeck_contract::{
     CONTRACT_IDENTITY, CONTRACT_INPUTS, PROTOCOL_VERSION, sha256_hex, strict_json,
     validate_method_value,
@@ -31,9 +35,10 @@ use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime};
 
-const METHODS: [&str; 5] = [
+const METHODS: [&str; 6] = [
     "runtime.hdc.impact-preview",
     "runtime.hdc.restart",
+    "runtime.tool.select",
     "control-action.show",
     "control-action.reconcile",
     "control-action.list",
@@ -42,6 +47,7 @@ const METHODS: [&str; 5] = [
 const ORDER: &str = "createdAtThenControlActionId";
 const IDENTITY: &str = "control-action-5f0c1a52-0b4e-4c8a-9d2e-2b7f3c6a9e10";
 const HDC_UNAVAILABLE: &str = "the Runtime HDC control-action owner is unavailable";
+const TOOL_UNAVAILABLE: &str = "the Runtime tool-selection owner is unavailable";
 const NO_OWNER: &str = "the Runtime control-action owner is unavailable";
 const IDENTITY_REQUIRED: &str = "an exact control-action identity is required";
 const UNSUPPORTED_FILTER: &str = "unsupported control-action discovery filter";
@@ -50,8 +56,9 @@ const STALE_CURSOR: &str =
 
 /// The refusals Swift's handler (`hdcControlActionRequest`) gives before it
 /// consults a control-action owner, so with or without one.
-const HANDLER_REFUSALS: [&str; 5] = [
+const HANDLER_REFUSALS: [&str; 6] = [
     HDC_UNAVAILABLE,
+    TOOL_UNAVAILABLE,
     IDENTITY_REQUIRED,
     "unknown control-action list field",
     "invalid page size",
@@ -234,12 +241,18 @@ fn every_no_host_exchange_of_the_corpora_is_answered_as_swift_recorded_it() {
     let owned = fixture.owned();
     let standalone = Control::new(crate::host::Host::from_environment()).unwrap();
     let (mut by_owner, mut without_owner, mut managed, mut lines) = (0, 0, 0, 0);
-    let (mut owner_absent, mut hdc_owner) = (0, 0);
+    let (mut owner_absent, mut hdc_owner, mut tool_owner) = (0, 0, 0);
     for method in METHODS {
         for (index, recorded) in corpus(method).into_iter().enumerate() {
             lines += 1;
             let context = format!("{method} line {}", index + 1);
             let params = recorded.get("params").cloned().unwrap_or_else(|| json!({}));
+            if method == "runtime.tool.select" && recorded["error"]["message"] != TOOL_UNAVAILABLE {
+                // Only a tool-selection owner reads a selection's parameters
+                // or answers one; without one it is unavailable.
+                tool_owner += 1;
+                continue;
+            }
             if recorded["ok"] == true {
                 if recorded["result"]["items"] != json!([]) {
                     managed += 1;
@@ -292,12 +305,19 @@ fn every_no_host_exchange_of_the_corpora_is_answered_as_swift_recorded_it() {
         "the impact sources' success frames: {managed}"
     );
     assert!(owner_absent >= 1, "the list of a handler with no owner");
-    assert_eq!(lines, by_owner + owner_absent + managed + hdc_owner);
+    assert!(
+        tool_owner >= 2,
+        "a tool-selection owner's intent refusal and success: {tool_owner}"
+    );
+    assert_eq!(
+        lines,
+        by_owner + owner_absent + managed + hdc_owner + tool_owner
+    );
     if !published_view() {
         // Every exchange the no-host run recorded, beside the corpus's own,
         // and those of a daemon whose HDC server host started.
         assert!(
-            lines >= 44 && by_owner >= 19 && without_owner >= 10 && managed >= 20,
+            lines >= 47 && by_owner >= 20 && without_owner >= 11 && managed >= 20,
             "{lines} lines: {by_owner} by the owner, {without_owner} without one, {managed} with a host"
         );
         assert!(
@@ -348,6 +368,23 @@ fn the_union_owner_pages_an_empty_listing_in_private_snapshots() {
             "runtime.hdc.restart",
             refusal("operationUnavailable", HDC_UNAVAILABLE),
             "restart",
+        );
+    }
+    // A selection is unavailable before its intent is read: an exact one, a
+    // malformed one and one naming a caller's executable alike.
+    for params in [
+        json!({"actionRequestId": "cli-selection", "expectedActiveGeneration": "1",
+            "tool": format!("tool:sha256:{}", "b".repeat(64))}),
+        json!({}),
+        json!({"actionRequestId": "caller-facts", "executablePath": "/tmp/caller-hdc",
+            "expectedActiveGeneration": "1", "tool": format!("tool:sha256:{}", "b".repeat(64))}),
+    ] {
+        let answer = reply(&owned, "runtime.tool.select", params.clone());
+        assert_refused(
+            &answer,
+            "runtime.tool.select",
+            refusal("operationUnavailable", TOOL_UNAVAILABLE),
+            &format!("select {params}"),
         );
     }
     for method in ["control-action.show", "control-action.reconcile"] {
@@ -583,6 +620,19 @@ fn without_the_owner_the_host_answers_as_swifts_handler_with_none() {
                 method,
             );
         }
+    }
+    for params in [
+        json!({}),
+        json!({"actionRequestId": "cli-selection", "expectedActiveGeneration": "1",
+            "tool": format!("tool:sha256:{}", "b".repeat(64))}),
+    ] {
+        let answer = reply(&standalone, "runtime.tool.select", params.clone());
+        assert_refused(
+            &answer,
+            "runtime.tool.select",
+            refusal("operationUnavailable", TOOL_UNAVAILABLE),
+            &format!("select {params}"),
+        );
     }
     let foundation = json!({"code": "rejected",
         "message": "this method is unavailable in the read-only Rust foundation"});

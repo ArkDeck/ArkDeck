@@ -933,12 +933,13 @@ impl HostServices for Host {
         resources.answer(method, params, agents)
     }
 
-    /// `runtime.hdc.impact-preview`, `runtime.hdc.restart` and
-    /// `control-action.list`, `.show` and `.reconcile`, as Swift's daemon
-    /// answers them: with the union owner the isolated composition makes —
-    /// over the HDC control-action owner and the impact source of its managed
-    /// HDC server, when it started one — or, without it, as Swift's handler
-    /// answers with no control-action owner.
+    /// `runtime.hdc.impact-preview`, `runtime.hdc.restart`,
+    /// `runtime.tool.select` and `control-action.list`, `.show` and
+    /// `.reconcile`, as Swift's daemon answers them: with the union owner the
+    /// isolated composition makes — over the HDC control-action owner and the
+    /// impact source of its managed HDC server, when it started one — or,
+    /// without it, as Swift's handler answers with no control-action owner.
+    /// Neither composes a tool-selection owner.
     #[cfg(target_os = "macos")]
     fn control_action(
         &self,

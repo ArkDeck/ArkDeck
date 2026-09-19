@@ -425,6 +425,28 @@ fn every_with_host_exchange_of_the_corpora_is_answered_as_swift_recorded_it() {
     }
     let page = corpora.page(json!({"pageSize": 1}), &["cli-action"]);
     replay(&mut corpora, &control, page, None);
+    // The union owner holds the HDC owner here and still no tool-selection
+    // owner (TASK-XPA-012): a selection is unavailable before its intent is
+    // read, and nothing makes the owner's directory.
+    let selection = reply(
+        &control,
+        "runtime.tool.select",
+        &json!({"actionRequestId": "cli-selection", "expectedActiveGeneration": "1",
+            "tool": format!("tool:sha256:{}", "b".repeat(64))}),
+    );
+    assert_eq!(
+        selection["error"],
+        json!({"code": "operationUnavailable",
+            "message": "the Runtime tool-selection owner is unavailable",
+            "details": {"newDispatchCount": 0}}),
+        "{selection}"
+    );
+    assert!(
+        !scenario
+            .root
+            .join("tool-selection-control-actions")
+            .exists()
+    );
     drop(control);
     drop(scenario);
 
