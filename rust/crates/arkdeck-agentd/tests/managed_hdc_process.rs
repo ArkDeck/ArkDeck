@@ -470,3 +470,92 @@ fn a_managed_server_is_configured_only_as_the_isolated_owner_names_it() {
             .contains("a development HDC is configured only for an isolated development root")
     );
 }
+
+#[test]
+fn development_usb_relations_beside_a_registered_hdc_are_acknowledged_only_as_named() {
+    // The acknowledgment (maintainer decision 2026-09-19, option A) lets the
+    // isolated owner read a relation file beside a registered HDC it starts
+    // as its managed server. The fake is no registered HDC, so every
+    // composition here is one the acknowledgment does not name: startup fails
+    // before any server starts, and without it the fixture's relations stay
+    // allowed as before.
+    const ACKNOWLEDGMENT: &str = "ARKDECK_DEVELOPMENT_USB_RELATIONS_WITH_REGISTERED_HDC";
+    let runtime = Runtime::new();
+    let relations = runtime.root.join("usb-relations.json");
+    let relations = relations.to_str().unwrap();
+    let port = runtime.port.to_string();
+    let acknowledged_only = "ARKDECK_DEVELOPMENT_USB_RELATIONS_WITH_REGISTERED_HDC is acknowledged \
+                             only with development USB relations and a registered HDC started as \
+                             the managed server";
+    for (environment, message) in [
+        (
+            vec![
+                (ACKNOWLEDGMENT, "yes"),
+                ("ARKDECK_DEVELOPMENT_USB_RELATIONS", relations),
+                ("ARKDECK_DEVELOPMENT_HDC_SERVER", "managed"),
+                ("OHOS_HDC_SERVER_PORT", port.as_str()),
+            ],
+            "ARKDECK_DEVELOPMENT_USB_RELATIONS_WITH_REGISTERED_HDC accepts only acknowledged",
+        ),
+        // A fixture started as the managed server, with relations.
+        (
+            vec![
+                (ACKNOWLEDGMENT, "acknowledged"),
+                ("ARKDECK_DEVELOPMENT_USB_RELATIONS", relations),
+                ("ARKDECK_DEVELOPMENT_HDC_SERVER", "managed"),
+                ("OHOS_HDC_SERVER_PORT", port.as_str()),
+            ],
+            acknowledged_only,
+        ),
+        // A fixture the owner does not start, with relations.
+        (
+            vec![
+                (ACKNOWLEDGMENT, "acknowledged"),
+                ("ARKDECK_DEVELOPMENT_USB_RELATIONS", relations),
+            ],
+            acknowledged_only,
+        ),
+        // No relation file at all.
+        (
+            vec![
+                (ACKNOWLEDGMENT, "acknowledged"),
+                ("ARKDECK_DEVELOPMENT_HDC_SERVER", "managed"),
+                ("OHOS_HDC_SERVER_PORT", port.as_str()),
+            ],
+            acknowledged_only,
+        ),
+    ] {
+        let output = runtime.refused(&environment);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(stderr.contains(message), "{environment:?}: {stderr}");
+        assert!(output.stdout.is_empty(), "{environment:?}");
+        assert!(
+            !reachable(runtime.port),
+            "{environment:?}: no managed server was started"
+        );
+    }
+    // No development HDC in the isolated root.
+    let output = runtime
+        .command(&[(ACKNOWLEDGMENT, "acknowledged")])
+        .env_remove("ARKDECK_DEVELOPMENT_HDC_PATH")
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(69));
+    assert!(String::from_utf8_lossy(&output.stderr).contains(acknowledged_only));
+    // The standalone daemon never reads development relations, acknowledged
+    // or not. Its endpoint is one no daemon could bind, so a daemon that
+    // did not refuse would fail on another message, never serve.
+    let output = runtime
+        .command(&[(ACKNOWLEDGMENT, "acknowledged")])
+        .env_remove("ARKDECK_DEVELOPMENT_HDC_PATH")
+        .env_remove("ARKDECK_DEVELOPMENT_STATE_ROOT")
+        .env("ARKDECK_ENDPOINT", runtime.root.join("absent/control.sock"))
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(69));
+    assert!(String::from_utf8_lossy(&output.stderr).contains(
+        "development USB relations beside a registered HDC are acknowledged only for an \
+             isolated development root"
+    ));
+    assert!(!reachable(runtime.port));
+}

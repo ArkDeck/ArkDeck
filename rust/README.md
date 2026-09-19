@@ -1102,7 +1102,8 @@ reference too) and `target.adopt` through the owner below. Its USB relations are
 the production stand-in, which reads none until the ArkForge lane's reader lands,
 so the daemon proves and adopts nothing yet, unless the isolated development
 owner names a development source: `ARKDECK_DEVELOPMENT_USB_RELATIONS`, an absolute
-path beside the development HDC's fixture, read on every call
+path beside the development HDC's fixture (beside a registered one, only as the
+HDC runtime status section below says), read on every call
 (`{"relations": [...]}`, with `"after": {"reads": n, "relations": [...]}` for a
 replug the oracle times by its reads). A host composed with relations
 (`Host::with_usb_relations`) proves and adopts as Swift does. Candidate display
@@ -1336,7 +1337,11 @@ serves: `hdc -s <endpoint> -m` on the inherited `OHOS_HDC_SERVER_PORT` or
 `127.0.0.1:8710` (a set port outside 1...65535 fails startup), ready once the
 listener answers and `checkserver` agrees, and bound to its own launch by the
 commandless identity proof (`ManagedHdcServer`); a registered HDC is then
-accepted, and development USB relations still only beside a fixture.
+accepted, and development USB relations beside it only with
+`ARKDECK_DEVELOPMENT_USB_RELATIONS_WITH_REGISTERED_HDC=acknowledged` (the
+maintainer's option A of 2026-09-19: what the owner proves about the real device
+is development-root evidence, never `REAL_DEVICE_PASS`), which startup refuses in
+any other composition and outside an isolated root.
 `runtime.hdc.status` answers the observer over that launch, and
 `target.availability`'s tool leg is `ready` with the startup facts. Swift exits
 70 when the server ends unexpectedly, for launchd to restart it (design §L.1

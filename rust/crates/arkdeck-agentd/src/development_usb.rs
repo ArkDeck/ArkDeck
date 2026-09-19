@@ -1,15 +1,75 @@
 //! The isolated owner's development USB relations: what the Target
 //! observation owner reads in place of the ArkForge lane's reader, named by
-//! `ARKDECK_DEVELOPMENT_USB_RELATIONS` and allowed only beside the
-//! development HDC's fixture. A harness rewrites the file for each exchange:
-//! `{"relations": [...]}`, or with `"after": {"reads": n, "relations": [...]}`
-//! the relations it changes to once the file has been read `n` times since
-//! it last changed, as an oracle times a replug by its reads. A missing file
-//! reads no relations.
+//! `ARKDECK_DEVELOPMENT_USB_RELATIONS`. A harness rewrites the file for each
+//! exchange: `{"relations": [...]}`, or with
+//! `"after": {"reads": n, "relations": [...]}` the relations it changes to
+//! once the file has been read `n` times since it last changed, as an oracle
+//! times a replug by its reads. A missing file reads no relations.
+//!
+//! The file is allowed beside the development HDC's fixture. Beside a
+//! registered HDC it would be a trusted fact about a real device that no
+//! physical relation proved, so it is refused there unless the isolated owner
+//! starts that HDC as its managed server and the caller acknowledges the file
+//! as its relation source ([`REGISTERED_HDC_ACKNOWLEDGMENT`]). That opt-in is
+//! the maintainer's decision of 2026-09-19 (option A of the GJ-1 preflight's
+//! second and third blockers): what the owner then proves about the real
+//! device is development-root evidence, never `REAL_DEVICE_PASS`.
 use arkdeck_provider_hdc::{UsbRelation, UsbRelations};
 use serde_json::Value;
+use std::ffi::OsStr;
 use std::path::PathBuf;
 use std::sync::Mutex;
+
+/// Names the caller's acknowledgment that its development USB relations
+/// stand in for the trusted reader beside a registered HDC; its one value is
+/// `acknowledged`.
+pub(crate) const REGISTERED_HDC_ACKNOWLEDGMENT: &str =
+    "ARKDECK_DEVELOPMENT_USB_RELATIONS_WITH_REGISTERED_HDC";
+
+/// Without the acknowledgment, as before it existed.
+const FIXTURE_ONLY: &str = "development USB relations are configured only beside a fixture HDC";
+
+/// The acknowledgment names exactly one composition.
+const ACKNOWLEDGED_ONLY: &str = "ARKDECK_DEVELOPMENT_USB_RELATIONS_WITH_REGISTERED_HDC is \
+                                 acknowledged only with development USB relations and a \
+                                 registered HDC started as the managed server";
+
+/// Whether the acknowledgment's value, if one is set, acknowledges.
+pub(crate) fn acknowledged(value: Option<&OsStr>) -> Result<bool, String> {
+    match value {
+        None => Ok(false),
+        Some(value) if value == "acknowledged" => Ok(true),
+        Some(_) => Err(format!(
+            "{REGISTERED_HDC_ACKNOWLEDGMENT} accepts only acknowledged"
+        )),
+    }
+}
+
+/// Whether the isolated owner may read development USB relations beside its
+/// development HDC: `registered` when the HDC's digest is a registered one,
+/// `managed` when the owner starts it as its managed server, `relations` when
+/// a relation file is named. Beside a fixture nothing changes; beside a
+/// registered HDC the file needs the acknowledgment and the managed server,
+/// and the acknowledgment is refused in every other composition, so that it
+/// never stands unused in a configuration.
+pub(crate) fn admit(
+    registered: bool,
+    managed: bool,
+    relations: bool,
+    acknowledged: bool,
+) -> Result<(), &'static str> {
+    if acknowledged {
+        return if registered && managed && relations {
+            Ok(())
+        } else {
+            Err(ACKNOWLEDGED_ONLY)
+        };
+    }
+    if registered && relations {
+        return Err(FIXTURE_ONLY);
+    }
+    Ok(())
+}
 
 pub(crate) struct DevelopmentUsbRelations {
     path: PathBuf,
@@ -123,5 +183,53 @@ mod tests {
         std::fs::write(&path, b"not json").unwrap();
         assert!(source.relations().is_err());
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn relations_beside_a_registered_hdc_need_the_acknowledgment_and_the_managed_server() {
+        // (registered, managed, relations, acknowledged) and the answer.
+        for (composition, expected) in [
+            // Beside the fixture, with or without its managed server, as before.
+            ((false, false, true, false), Ok(())),
+            ((false, true, true, false), Ok(())),
+            ((false, false, false, false), Ok(())),
+            // A registered HDC started as the managed server reads none...
+            ((true, true, false, false), Ok(())),
+            // ...and without the acknowledgment its relations stay refused.
+            ((true, true, true, false), Err(FIXTURE_ONLY)),
+            // The one composition the acknowledgment names.
+            ((true, true, true, true), Ok(())),
+            // Every other composition refuses the acknowledgment: no file,
+            // a fixture, a registered HDC the owner did not start, nothing.
+            ((true, true, false, true), Err(ACKNOWLEDGED_ONLY)),
+            ((false, true, true, true), Err(ACKNOWLEDGED_ONLY)),
+            ((false, false, true, true), Err(ACKNOWLEDGED_ONLY)),
+            ((true, false, true, true), Err(ACKNOWLEDGED_ONLY)),
+            ((false, false, false, true), Err(ACKNOWLEDGED_ONLY)),
+        ] {
+            let (registered, managed, relations, acknowledged) = composition;
+            assert_eq!(
+                admit(registered, managed, relations, acknowledged),
+                expected,
+                "{composition:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_acknowledgment_has_one_value() {
+        assert_eq!(acknowledged(None), Ok(false));
+        assert_eq!(acknowledged(Some(OsStr::new("acknowledged"))), Ok(true));
+        for value in ["", "yes", "true", "1", "Acknowledged", "acknowledged "] {
+            assert_eq!(
+                acknowledged(Some(OsStr::new(value))),
+                Err(
+                    "ARKDECK_DEVELOPMENT_USB_RELATIONS_WITH_REGISTERED_HDC accepts only \
+                     acknowledged"
+                        .to_owned()
+                ),
+                "{value:?}"
+            );
+        }
     }
 }
