@@ -437,3 +437,73 @@ mod upload {
         );
     }
 }
+
+#[test]
+fn import_list_maps_only_closed_discovery_options() {
+    let invocation = parse(&argv(&[
+        "artifact",
+        "import",
+        "list",
+        "--target",
+        "TGT-fixture",
+        "--state",
+        "committed",
+        "--page-size",
+        "1",
+        "--cursor",
+        "opaque",
+    ]))
+    .unwrap();
+    assert_eq!(invocation.method, "artifact.import.list");
+    assert_eq!(
+        invocation.params.unwrap(),
+        json!({"target":"TGT-fixture","state":"committed","pageSize":1,"cursor":"opaque"})
+            .as_object()
+            .unwrap()
+            .clone()
+    );
+    for args in [
+        vec!["--state", "unknown"],
+        vec!["--target", "../target"],
+        vec!["--page-size", "0"],
+        vec!["--page-size", "1001"],
+        vec!["--file", "source"],
+    ] {
+        let mut values = vec!["artifact", "import", "list"];
+        values.extend(args);
+        assert!(parse(&argv(&values)).is_err());
+    }
+}
+#[cfg(target_os = "macos")]
+#[test]
+fn import_list_rejects_malformed_paging_and_foreign_inventory_without_retry() {
+    let invocation = parse(&argv(&["artifact", "import", "list"])).unwrap();
+    let page = json!({"schemaVersion":"arkdeck.cli.page/1","pageKind":"snapshot","items":[],"order":"createdAtDescImportIdAsc","snapshotRevision":"00000000-0000-4000-8000-000000000001","hasMore":false,"nextCursor":null});
+    let mut calls = 0;
+    assert_eq!(
+        arkdeck_cli::execute_import(&invocation, |method, fields, _| {
+            calls += 1;
+            assert_eq!(method, "artifact.import.list");
+            assert!(fields.is_empty());
+            Ok(page.clone())
+        })
+        .unwrap(),
+        page
+    );
+    assert_eq!(calls, 1);
+    for (key, value) in [
+        ("snapshotRevision", json!("bad")),
+        ("hasMore", json!(true)),
+        ("nextCursor", json!("unexpected")),
+        ("order", json!("createdAtAsc")),
+    ] {
+        let mut bad = page.clone();
+        bad[key] = value;
+        assert_eq!(
+            arkdeck_cli::execute_import(&invocation, |_, _, _| Ok(bad.clone()))
+                .unwrap_err()
+                .code,
+            "recordUnreadable"
+        );
+    }
+}

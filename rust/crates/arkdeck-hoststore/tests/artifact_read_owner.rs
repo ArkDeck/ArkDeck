@@ -492,7 +492,7 @@ fn actual_swift_read_recording_is_reproduced_and_sensitive_opt_in_is_preserved()
 }
 
 #[test]
-fn wire_request_inputs_are_closed_typed_and_never_accept_paths_or_import_owners() {
+fn wire_request_inputs_are_closed_typed_and_require_exact_tagged_owners() {
     let params = json!({"owner":{"kind":"job","id":"JOB-1"},"artifactId":"ART-1"});
     let inspect = ArtifactInspectRequest::from_params(params.as_object().unwrap()).unwrap();
     assert_eq!(inspect.job_id(), "JOB-1");
@@ -538,8 +538,10 @@ fn wire_request_inputs_are_closed_typed_and_never_accept_paths_or_import_owners(
         ArtifactInspectRequest::from_params(imported.as_object().unwrap())
             .unwrap_err()
             .kind(),
-        ErrorKind::Unsupported
+        ErrorKind::InvalidInput
     );
+    imported["owner"]["id"] = json!("imp-00000000-0000-0000-0000-000000000000");
+    assert!(ArtifactInspectRequest::from_params(imported.as_object().unwrap()).is_ok());
 }
 
 #[test]
