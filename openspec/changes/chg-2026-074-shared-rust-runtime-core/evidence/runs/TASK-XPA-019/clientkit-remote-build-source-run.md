@@ -96,7 +96,15 @@ gate is not run (AGENTS.md "验证与完成"); the PR's CI is the gate.
 
 ## CI
 
-Recorded by the next slice: a green head is merged without an amend.
+PR #2044. On head `06baec89` (base `cb246207`) every check passed:
+
+| Workflow run | Jobs | Conclusion |
+| --- | --- | --- |
+| Swift CI `35448353186` | `plan`, `swift-tests`, `app-build`, `ds-interactions` and the required `swift` aggregate; `rust-checks` skipped, as the plan selected no Rust lane | success |
+| SDD Guard `35448353053` | the required `guard`, `ds-tokens` | success |
+| Agent PR `35448353054` | `open-pr` | success |
+
+A green head is merged without an amend, so the Overview projections slice records this section.
 
 ## Not run
 
