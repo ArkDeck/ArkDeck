@@ -1,7 +1,7 @@
 # Rust History App reads
 
 Date: 2026-09-19. Integrated base: protected main
-`08509db045d7a149642a6c67dc611f7e3f335687` (#1981). Focused validation below
+`94b2896609c549177fa052512aa2b800dfc4e25e` (#1982). Focused validation below
 preceded integration, on #1980 `760c527e41693373005c6d0ee1d5363248911a9b`. Scope: macOS TASK-XPA-019, standalone History ingress.
 
 ## Production behavior
