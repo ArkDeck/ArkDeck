@@ -109,7 +109,7 @@ fn rejects_unbounded_or_misrouted_arguments() {
     }
     assert_eq!(
         parse(&args(&["human-action", "resume"])).unwrap_err().code,
-        "invalidOption"
+        "invalidCommand"
     );
 }
 
