@@ -9,12 +9,16 @@
 //! read, listed and reconciled) and `ControlActionWithHostContractTests` (the
 //! production impact source over the fixture HDC: the with-host refusals, an
 //! unobserved and a blocked preview, a restart and an expiry, and a listing
-//! over two pages; then a blocked preview of a team-signed tool, and one whose
-//! Target inventory changed while it was read, each read, reconciled and
-//! listed). Answers compare whole; a page's random snapshot revision and next
-//! cursor are checked and set aside, and the second page is asked through the
-//! cursor this owner issued. The approval request the fake source's restart
-//! made is counted, not replayed: restart is not here.
+//! over two pages; then a blocked preview of a team-signed tool, of an
+//! unsigned one, and one whose Target inventory changed while it was read,
+//! each read, reconciled and listed; and the ready previews of its restart
+//! tests, whose source answers a registered healthy server's facts). Answers
+//! compare whole; a page's random snapshot revision and next cursor are
+//! checked and set aside, and the second page is asked through the cursor this
+//! owner issued. What restart made is counted, not replayed: restart is not
+//! here (C2). That is every `runtime.hdc.restart` answer and refusal, and every
+//! record or page carrying the impact approval a restart requested, which this
+//! owner refuses as unreadable.
 use arkdeck_contract::{
     CATALOG_DIGEST, CONTRACT_IDENTITY, DeviceObservationsResult, PROTOCOL_VERSION, WireError,
     sha256_hex,
@@ -94,6 +98,15 @@ fn records(frame: &Value) -> Vec<&Value> {
         Some(items) => items.iter().collect(),
         None => vec![&frame["result"]],
     }
+}
+
+/// Whether a line is what restart made (C2): a restart's answer or refusal,
+/// or a record carrying the impact approval a restart requested.
+fn restart_made(method: &str, frame: &Value) -> bool {
+    method == "runtime.hdc.restart"
+        || records(frame)
+            .iter()
+            .any(|record| record["humanAction"].is_object())
 }
 
 /// The source the replay answers with: one exact impact, or none.
@@ -585,10 +598,15 @@ fn every_with_host_exchange_of_the_corpora_is_answered_as_swift_recorded_it() {
     drop(control);
     drop(scenario);
 
-    // A team-signed tool, and a Target inventory that changed while the impact
-    // was read (the critical Job gate unknown, with its reason): each a blocked
-    // preview, read, reconciled over the same impact and listed alone.
-    for request in ["host-team-signed", "host-inventory-changed"] {
+    // A team-signed tool, an unsigned one, and a Target inventory that changed
+    // while the impact was read (the critical Job gate unknown, with its
+    // reason): each a blocked preview, read, reconciled over the same impact
+    // and listed alone.
+    for request in [
+        "host-team-signed",
+        "host-unsigned",
+        "host-inventory-changed",
+    ] {
         if !corpora.shows(request) {
             continue;
         }
@@ -610,16 +628,50 @@ fn every_with_host_exchange_of_the_corpora_is_answered_as_swift_recorded_it() {
         drop(scenario);
     }
 
-    // Every with-host line is reproduced but the approval request.
+    // The ready previews of the restart tests, whose source answers what a
+    // registered 3.2.0d server proves (fixture, unsigned and team-signed
+    // tools): each previewed over its recorded impact. The restart that
+    // followed is C2.
+    for request in [
+        "host-restart",
+        "host-unsigned-restart",
+        "host-team-signed-restart",
+    ] {
+        if !corpora.shows(request) {
+            continue;
+        }
+        let action = corpora.action(request);
+        assert_eq!(action.catalog, CATALOG_DIGEST);
+        let scenario = Scenario::new(HOST_START);
+        let control = scenario.start("epoch-1", CATALOG_DIGEST);
+        scenario.identities(&action);
+        scenario.observe(Some(&action));
+        let line = corpora.answered("runtime.hdc.impact-preview", request, "previewReady");
+        replay(&mut corpora, &control, line, None);
+        drop(control);
+        drop(scenario);
+    }
+
+    // Every with-host line is reproduced but what restart made (C2): each
+    // line is replayed or restart's, never both.
     let unreplayed: Vec<_> = corpora
         .lines
         .iter()
         .filter(|(method, index, _)| !corpora.replayed.contains(&(*method, *index)))
-        .map(|(method, index, frame)| (*method, *index, frame["result"]["state"].clone()))
         .collect();
-    assert_eq!(
-        unreplayed,
-        [("runtime.hdc.restart", 1, json!("awaitingImpactApproval"))]
-    );
+    for (method, index, frame) in &unreplayed {
+        assert!(
+            restart_made(method, frame),
+            "{method} line {index} was not replayed: {frame}"
+        );
+    }
+    let made = corpora
+        .lines
+        .iter()
+        .filter(|(method, _, frame)| restart_made(method, frame))
+        .count();
+    assert_eq!(unreplayed.len(), made, "a line restart made was replayed");
+    // The fake source's approval request is one in every view.
+    assert!(made >= 1, "{made}");
     assert!(corpora.replayed.len() >= 23, "{:?}", corpora.replayed);
 }
