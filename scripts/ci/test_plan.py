@@ -509,6 +509,8 @@ class CommandSelectionTests(unittest.TestCase):
 
     def test_test_only_plan_runs_swift_but_not_app(self):
         flattened = "\n".join(self.commands(self.plan(swift=True, app=False)))
+        self.assertIn("generate-clientkit-models.py --check", flattened)
+        self.assertIn("test_generate_clientkit_models.py", flattened)
         self.assertIn("run-test-lane.sh full", flattened)
         self.assertNotIn("xcodebuild", flattened)
 

@@ -1,6 +1,6 @@
 # Remaining macOS Rust implementation
 
-Updated 2026-09-19 against protected main `510b4650` (#1983), revision 11. This list tracks
+Updated 2026-09-19 against protected main `81957589` (#1985), revision 11. This list tracks
 implementation, installed activation and macOS real-device acceptance separately. The current
 goal includes pure-Rust macOS GJ-1–5 acceptance; Windows and Linux product work are outside scope.
 
@@ -18,7 +18,11 @@ CLI routes are delivered (#1974); live operation discovery is delivered (#1973).
 main, the Target aggregate consumes the live operation projection (#1978); this does not
 add an executable operation or target-readiness claim. HAR resume and its subsequent
 Job path are merged (#1981). The isolated authenticated App ingress (#1980) and
-ClientKit History readers/JobControl (#1982) do not establish signed App acceptance.
+ClientKit History readers/JobControl (#1982) do not establish signed App acceptance;
+#1985 lets that ingress serve the six History reads (`job.list/show/timeline/evidence`,
+`artifact.list/read`) from the Rust owners, still without a Mach listener or signed App
+UI. #1984 merges the Rust pointer execution runner, which the operations measure below
+does not count.
 
 How each number is measured at the pinned main:
 
@@ -26,14 +30,23 @@ How each number is measured at the pinned main:
   in `rust/crates/arkdeck-control/src/lib.rs`, excluding its default rejection arm. This counts
   explicit routes even when an owner refuses an unsupported branch. It does not count every
   quoted string elsewhere in the handler. The denominator is the 105 published method schemas.
-- **Operations:** the isolated daemon plans, admits and runs
-  `analyzer.extract-crash-signature@1`, `observe.device@1` and the default legs of
-  `capture.diagnostics@1`. `job_plan.rs` also materializes `input.tap@1`, `input.long-press@1`
-  and `input.swipe@1`, but planning and provider implementations alone do not qualify them as
-  executable operations. `device_steps.rs` still admits only observe and capture to its device
-  operation set. Pointer capability admission (#1968) is merged, but use
-  consumption, mutation dispatch and outcomes remain unimplemented, so the
-  executable-operation count stays 3/30.
+- **Operations:** an operation counts when the isolated Rust daemon (an
+  `ARKDECK_DEVELOPMENT_STATE_ROOT` composition) plans, admits and runs it end to end through
+  its control socket: today `analyzer.extract-crash-signature@1`, `observe.device@1` and the
+  default legs of `capture.diagnostics@1`. Since #1984, `device_steps.rs` also admits
+  `input.tap@1`, `input.long-press@1` and `input.swipe@1`, and the Rust runner consumes the
+  capability use before the step intent, dispatches the pointer Provider and records durable
+  outcomes — proven only in fixed-root host fixtures (`pointer_input_run`). The daemon's
+  mutation authority exists only when its Job store is the account-fixed default root
+  (`~/Library/Application Support/ArkDeck/Agentd`,
+  `mutation_state_continuity::require_mutation_state`); an isolated development root reports
+  the three pointer operations `unavailable` with `runtime.mutationOwnerUnavailable`
+  (`operation_availability_control`, asserted since #1984). They are therefore not
+  executable on the daemon this measure counts and stay out of the numerator: 3/30. The
+  same rule applies to every `deviceMutation`/`destructive` operation, so GJ-2/3/4 cannot
+  raise this count on an isolated root; they count when the daemon that owns the default
+  root admits and runs them (the M5 activation, or an earlier reviewed change to that
+  authority rule).
 - **Golden Journeys:** `REAL_DEVICE_PASS` records on the pure Rust daemon. Fake-HDC/oracle
   replay and the earlier paired-facade acceptance do not increase this count.
 - **App / retirement:** three `*ApplicationFacade.swift` files now reside in ClientKit:
@@ -57,7 +70,7 @@ import json
 import re
 import subprocess
 
-ref = "510b46508d8719318114a17c2567b701297efb65"
+ref = "8195758985ff1464eec0267da5f58bc080c4ecb0"
 def read(path):
     return subprocess.check_output(["git", "show", f"{ref}:{path}"], text=True)
 
@@ -93,7 +106,7 @@ PYCOUNT
 | Milestone | Golden Journey | Delivers | Lane | State |
 | --- | --- | --- | --- | --- |
 | M1 | GJ-1 | `observe.device@1`, `capture.diagnostics@1`, `agent.*` with HAR, `human-action.*`, `target.adopt/availability`, `runtime.hdc.*`, restart carry-over | A (+ B for the executor) | in progress: observe/capture and agent run/status (#1920, #1932, #1938), agent list/abandon (#1945, CLI #1946), waiting-execution records (#1953), Target owner/routes (#1959, #1966; CLI #1967), HDC status (#1956), physical-assistance raise and human-action list/show (#1970), host operation availability (#1973), bounded Target availability and HAR CLI reads (#1974), proved Target adoption inside agent.run with commit-gap restart coverage (#1975). HAR resume, adoption and subsequent Job (#1981), live Target operation projection (#1978). Remaining: trusted USB relation source, remaining HDC lifecycle routes and GJ-1 acceptance |
-| M2 | GJ-2/3 | Artifact publication and import commit, capability mint/reserve/consume, `debug.*`, `deploy.native-library.app-owned@1`, `capability.*`, `cleanupDebt.*` | A (+ B) | foundations delivered: HAP provider (#1951), native-library provider (#1955), pointer/port-rule providers (#1961), capability store install/consume/outcome writes (#1963), pointer planning (#1964), pointer Runtime capability admission (#1968). Artifact publication and CLI restart readback (#1983) are delivered. These are not complete operation run paths; reference lifecycle, authority integration and GJ-2/3 acceptance remain |
+| M2 | GJ-2/3 | Artifact publication and import commit, capability mint/reserve/consume, `debug.*`, `deploy.native-library.app-owned@1`, `capability.*`, `cleanupDebt.*` | A (+ B) | foundations delivered: HAP provider (#1951), native-library provider (#1955), pointer/port-rule providers (#1961), capability store install/consume/outcome writes (#1963), pointer planning (#1964), pointer Runtime capability admission (#1968), pointer execution runner with durable authority (#1984; fixed-root host fixtures only — an isolated root has no mutation owner). Artifact publication and CLI restart readback (#1983) are delivered. Import reference lifecycle, HAP/native-library run paths, isolated-root versus default-root mutation authority for GJ-2/3, and GJ-2/3 acceptance remain |
 | M3 | GJ-5 | 13 `workspace.*` operations, `workspace.preset/project.*`, registered toolchain, hap-sign-tool, Keychain | D | project registration/read implementation can proceed independently; toolchain, Keychain/signing and bounded AI journey still require their actual dependencies and SPK-10 evidence |
 | M4 | GJ-4 | ArkForge lane through `arkforge-client`, `flash.*`, Rockchip probes, DEC-016 recovery epoch | A + D | Rockchip live-mode probe (#1934), post-flash observation (#1936), Loader transition (#1937) and alias-store primitives/oracle/store (#1939–#1941) are merged. ArkForge lane and flash methods still wait for SPK-9 prerequisites and the §L.1 item 13 ruling |
 | M5 | cutover | G.4 preflight, LaunchAgent to the standalone Rust binary, deletions, DMG, lock and traceability flip (TASK-XPA-017) | all | after 018, 019, 025 |
@@ -104,11 +117,11 @@ PYCOUNT
 | --- | --- | --- | --- |
 | XPA-012 | in-progress | Isolated Rust owners for History, Session, Trace cache, Bootstrap, DevEco/HDC registration, tool/bundle registry, Target queries; facade History filter owner (#1888); owner locks unlock on drop (#1903) | tool selection writes, trace database preparation; installed per-store composition withdrawn (r11) — activation only at M5 |
 | XPA-013 | in-progress | Artifact read/inspect/export, durable Import upload (#1881), quota query (#1911), device Import binding identity fix (#1969), durable HAP/native-library/workspace-patch publication and CLI readback (#1983) | release and reference inspection; leases, active-use/release and GC integration — inside M2 |
-| XPA-014 | in-progress | Job journal/index/records and analyzer lifecycle; observe/capture and agent run/status/list/abandon; Target observation/adoption/availability routes; live host operation availability (#1973/#1974); agent.run Target adoption (#1975); HDC status; physical-assistance raise and human-action reads; capability store writes, pointer planning and capability admission (#1963, #1964, #1968) | M1 trusted USB relation source and remaining HDC lifecycle; M2 integrated authority and device operation execution; M3/M4; recovery after the §L.1 item 13 ruling |
+| XPA-014 | in-progress | Job journal/index/records and analyzer lifecycle; observe/capture and agent run/status/list/abandon; Target observation/adoption/availability routes; live host operation availability (#1973/#1974); agent.run Target adoption (#1975); HDC status; physical-assistance raise and human-action reads; capability store writes, pointer planning and capability admission (#1963, #1964, #1968); pointer execution runner (#1984) | M1 trusted USB relation source and remaining HDC lifecycle; M2 integrated authority and device operation execution; M3/M4; recovery after the §L.1 item 13 ruling |
 | XPA-015 | ready (r11) | HDC observation/parsers and process foundation | SPK-10, then M3; the three ArkTrace/hilog analyzers after M4 |
 | XPA-016 | in-progress | SPK-6 executor foundation; Rockchip probes/transition/alias store (#1934–#1941); HDC status (#1947); capture providers (#1949); physical relation proof port (#1952); HAP (#1951), native-library (#1955), pointer/port-rule (#1961) providers | daemon composition and M1/M2 end-to-end acceptance; M4 ArkForge-served ports after SPK-9 |
 | XPA-018 | in-progress | 71 parser command names, 68 matching registered features; target adopt/availability (#1967), HAR list/show (#1974), HAR and agent resume (#1981), workspace-patch import (#1983) | remaining commands, full parity/export; Swift CLI retirement with M5 |
-| XPA-019 | in-progress | ClientKit transport/models and History filter (#1976), History readers/JobControl (#1982); isolated Rust App ingress (#1980) | SPK-8 acceptance, remaining facades; hard prerequisite of M5 |
+| XPA-019 | in-progress | ClientKit transport/models and History filter (#1976), History readers/JobControl (#1982); isolated Rust App ingress (#1980) serving the six History reads (#1985) | SPK-8 acceptance, remaining facades; hard prerequisite of M5 |
 | XPA-025 | in-progress | Rust benchmark launcher/probe (#1972), Rust performance lane integration (#1979); isolated Rust owner soak tool merged (#1977), successful/cancelled/reopen workload; Swift performance baseline; merge-lane micro-benchmarks retired (#1902) | SPK-11 repeated measurements, Rust soak and remaining lanes on the Rust daemon |
 | XPA-017 | blocked | — | M5 |
 
@@ -118,11 +131,16 @@ Spikes SPK-6..11 are defined in `tasks.md` and design §J.3; their records land 
 
 ## History
 
-Post-baseline update: #1984 merged the Rust pointer execution runner. Its fixed-root
-mutation continuity, fresh plan/facts checks and durable capability outcomes have
-host-fixture evidence; installed Rust activation and real-device pointer/GJ
-acceptance remain outstanding. The pinned-main counts above are not increased by
-this later runner implementation.
+2026-09-19 (`81957589`): #1984 merges the Rust pointer execution runner (capability use
+consumed before the step intent, fixed-root mutation continuity, fresh plan/facts checks,
+durable outcomes; host-fixture evidence) and #1985 serves the six History reads through the
+isolated authenticated App ingress. The script recounts 72 routes, 71 parser names and 68
+registered CLI names, and three ClientKit facade files with twelve remaining in Workflows —
+all unchanged, because the App ingress is not a `handle_frame` route and neither PR adds a
+CLI leaf or moves a facade. Executable operations stay 3/30 by the rule above: the pointer
+operations are refused on the isolated root as `runtime.mutationOwnerUnavailable`. Pure-Rust
+GJ acceptance 0/5 and Swift retirement 0/6 are unchanged. Nothing here is installed
+activation or hardware evidence.
 
 2026-09-19 (`510b4650`): #1983 merges immutable publication for HAP,
 application-owned native libraries and workspace patches, durable retry receipts

@@ -1,14 +1,14 @@
-import ArkDeckWorkflows
+import ArkDeckClientKit
 import Foundation
 import Observation
 import SwiftUI
 
 /// Sidebar device rows and the authorization guidance detail.
 ///
-/// Everything here reads the `device.candidates` discovery projection. The
+/// Everything here reads the `device.observations` discovery projection. The
 /// App can list candidates and re-read their state; it cannot adopt or
 /// restart anything from this surface, and adoption is named as the CLI act
-/// it is. Workflows owns the bounded authorization polling and terminal
+/// it is. ClientKit owns the bounded authorization polling and terminal
 /// classification; the App renders its published window and result.
 @MainActor
 @Observable
@@ -17,7 +17,7 @@ final class DeviceListViewModel {
 
   /// One device's bounded trust wait. `polling` carries the App-owned
   /// deadline the countdown renders; `timedOut` is emitted only when the
-  /// Workflows provider exhausts its production polling policy.
+  /// ClientKit provider exhausts its production polling policy.
   enum AuthorizationWait: Equatable {
     case idle
     case polling(connectKey: String, deadline: Date)
@@ -510,7 +510,7 @@ struct DeviceDetailView: View {
   }
 
   /// The bounded wait's own strip. Polling shows the provider's real deadline;
-  /// terminal states come from Workflows and are not inferred from this view.
+  /// terminal states come from ClientKit and are not inferred from this view.
   @ViewBuilder
   private var authorizationWaitBlock: some View {
     switch waitState {

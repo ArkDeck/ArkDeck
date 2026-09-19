@@ -1,4 +1,3 @@
-import ArkDeckClientKit
 import ArkDeckCore
 import Foundation
 
@@ -62,14 +61,6 @@ public struct RuntimeTraceCachePurgeReport: Sendable, Equatable {
       "originalTraceArtifactRemovalCount": .integer(0),
     ])
   }
-}
-
-/// The daemon-side owner boundary for ArkTrace's lease-aware cache service.
-/// Paths are fixed when the production implementation is composed and can
-/// never arrive in a control request.
-public protocol RuntimeTraceCacheMaintaining: Sendable {
-  func inventory() async throws -> RuntimeTraceCacheInventory
-  func purgeUnused() async throws -> RuntimeTraceCachePurgeReport
 }
 
 public enum RuntimeTraceCacheLoadResult: Sendable, Equatable {

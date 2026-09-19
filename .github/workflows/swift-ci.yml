@@ -149,6 +149,11 @@ jobs:
           xcodebuild -version
           swift --version
 
+      - name: ClientKit generated wire model checks
+        run: |
+          python3 Packages/ArkDeckKit/Scripts/generate-clientkit-models.py --check
+          python3 Packages/ArkDeckKit/Scripts/test_generate_clientkit_models.py
+
       - name: SwiftPM stable-workspace contract tests
         run: python3 Packages/ArkDeckKit/Scripts/test_run_swiftpm.py
 

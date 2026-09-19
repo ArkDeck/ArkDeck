@@ -1,4 +1,3 @@
-import ArkDeckClientKit
 // App-facing device discovery read.
 //
 // One question, answered honestly: which device candidates did HDC most
@@ -10,9 +9,7 @@ import ArkDeckClientKit
 // refused by the App transport's allowlist).
 
 import ArkDeckCore
-import ArkDeckOpenHarmony
 import Foundation
-import os
 
 /// Device facts observed by the most recent succeeded `observe.device@1` job
 /// for an adopted target — model, firmware and transport as the device
@@ -122,11 +119,11 @@ public struct DeviceListPresentation: Sendable, Equatable {
 /// `.timedOut` therefore means the production reader exhausted its bounded
 /// window; it is not inferred from a view timer or a fixture-only flag.
 public struct DeviceAuthorizationWaitResult: Sendable, Equatable {
-  public let authorization: HDCAuthorizationState
+  public let authorization: DeviceAuthorizationPresentation
   public let presentation: DeviceListPresentation
 
   public init(
-    authorization: HDCAuthorizationState,
+    authorization: DeviceAuthorizationPresentation,
     presentation: DeviceListPresentation
   ) {
     self.authorization = authorization
@@ -431,12 +428,12 @@ private actor DeviceListFixtureApplicationProvider: DeviceListApplicationProvidi
   }
 }
 
-enum DeviceListXPCReadFailure: Error, Sendable, Equatable {
+package enum DeviceListXPCReadFailure: Error, Sendable, Equatable {
   case transport(String)
 }
 
-enum DeviceListXPCReadTransport {
-  static func request(
+package enum DeviceListXPCReadTransport {
+  package static func request(
     method: String, params: [String: JSONValue]? = nil
   ) async -> Result<Data, DeviceListXPCReadFailure> {
     await RuntimeXPCRequestTransport.request(method: method, params: params)

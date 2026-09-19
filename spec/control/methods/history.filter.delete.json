@@ -78,8 +78,8 @@
   "x-arkdeck-method": "history.filter.delete",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 4,
-    "request": 6,
+    "error": 3,
+    "request": 5,
     "result": 2
   }
 }

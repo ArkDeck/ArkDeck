@@ -1268,7 +1268,8 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
         "\(file) must not restore an unbounded startup history read")
     }
     let deviceList = try String(
-      contentsOf: workflow.appending(path: "DeviceListApplicationFacade.swift"),
+      contentsOf: repository.appending(
+        path: "Packages/ArkDeckKit/Sources/ArkDeckClientKit/DeviceListApplicationFacade.swift"),
       encoding: .utf8)
     XCTAssertFalse(
       deviceList.contains("method: \"job.list"),
