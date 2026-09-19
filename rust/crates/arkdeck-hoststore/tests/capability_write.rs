@@ -172,8 +172,11 @@ fn replay(oracle: &str) -> usize {
         for use_ in record["consumptions"].as_array().unwrap() {
             take(&store, &record["capability"], use_);
             let outcomes = use_["outcomes"].as_array().unwrap();
-            // A second outcome would settle an unknown one: recovery.
-            assert!(outcomes.len() <= 1, "{oracle}: {id} use settled twice");
+            // A second outcome may only resolve an unknown first one.
+            assert!(
+                outcomes.len() <= 1 || outcomes[0]["outcome"] == "outcomeUnknown",
+                "{oracle}: {id} use settled twice"
+            );
             for outcome in outcomes {
                 settle(&store, id, text(&use_["reservationID"]), outcome);
             }
@@ -250,6 +253,7 @@ fn rust_writes_reproduce_the_m2_oracles_capability_stores() {
         "debug-hap",
         "deploy-native-library",
         "screen-sequence",
+        "capability-resolve",
     ]
     .into_iter()
     .map(replay)
@@ -448,8 +452,8 @@ fn installs_uses_and_outcomes_are_refused_as_swift_refuses_them() {
     );
 
     // A use whose scope drifted from use 1's; then use 2, linked to use 1's
-    // outcome and left unknown, which blocks every later use and which this
-    // owner does not settle (recovery).
+    // outcome and left unknown, which blocks every later use until a
+    // readback resolves it.
     refused(
         store.consume(ID, "r2", Some("job-2"), &tap(1281), NOW),
         "lineageBlocked(\"operation, effect, target, binding or typed inputs drifted from authorization lineage use 1\")",
@@ -466,16 +470,91 @@ fn installs_uses_and_outcomes_are_refused_as_swift_refuses_them() {
         .record_outcome(ID, "r2", "job-2", OutcomeUnknown, "waitingForRecovery", NOW)
         .unwrap();
     refused(
-        store.record_outcome(ID, "r2", "job-2", Confirmed, "succeeded", NOW),
-        "outcomeConflict(\"cannot change outcomeUnknown to confirmed\")",
-    );
-    refused(
         store.consume(ID, "r3", Some("job-3"), &tap(1280), NOW),
         "lineageBlocked(\"previous use 2 is outcomeUnknown; new mutation dispatch is forbidden\")",
     );
     assert_eq!(
         inspect(&store, ID)["lineageBlocker"],
         "use 2 is outcomeUnknown"
+    );
+    // A readback resolves it (Swift `resolvesUnknown`): appended after the
+    // unknown outcome, which then cannot come back.
+    store
+        .record_outcome(ID, "r2", "job-2", Confirmed, "failed", NOW)
+        .unwrap();
+    let history: Vec<Value> = inspect(&store, ID)["lineage"][1]["outcomeHistory"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|outcome| outcome["outcome"].clone())
+        .collect();
+    assert_eq!(history, [json!("outcomeUnknown"), json!("confirmed")]);
+    assert_ne!(
+        inspect(&store, ID)["lineageBlocker"],
+        "use 2 is outcomeUnknown"
+    );
+    refused(
+        store.record_outcome(ID, "r2", "job-2", OutcomeUnknown, "waitingForRecovery", NOW),
+        "outcomeConflict(\"cannot change confirmed to outcomeUnknown\")",
+    );
+    let _ = fs::remove_dir_all(&root);
+}
+
+/// Every change Swift refused after the resolutions of the `capability-resolve`
+/// oracle is refused here with Swift's rendering, and writes nothing.
+#[test]
+fn a_resolved_outcome_refuses_every_further_change_as_swift_does() {
+    let oracle = fixtures().join("capability-resolve");
+    let source = oracle.join("store/capabilities");
+    let root = scratch("resolved");
+    let directory = root.join("capabilities");
+    fs::DirBuilder::new()
+        .mode(0o700)
+        .create(&directory)
+        .unwrap();
+    for name in [CHECKPOINT, LEDGER, LOCK] {
+        fs::copy(source.join(name), directory.join(name)).unwrap();
+        fs::set_permissions(directory.join(name), fs::Permissions::from_mode(0o600)).unwrap();
+    }
+    let store = CapabilityStore::open(&directory).unwrap();
+    let before = (
+        fs::read(directory.join(CHECKPOINT)).unwrap(),
+        fs::read(directory.join(LEDGER)).unwrap(),
+    );
+    let cases: Value =
+        serde_json::from_slice(&fs::read(oracle.join("cases.json")).unwrap()).unwrap();
+    let cases = cases.as_array().unwrap();
+    assert!(cases.len() >= 6, "{} cases", cases.len());
+    for case in cases {
+        refused(
+            store.record_outcome(
+                text(&case["capabilityID"]),
+                text(&case["reservationID"]),
+                text(&case["jobID"]),
+                CapabilityUseOutcome::parse(text(&case["outcome"])).unwrap(),
+                text(&case["terminalState"]),
+                text(&case["recordedAtUTC"]),
+            ),
+            text(&case["refused"]),
+        );
+    }
+    // The same resolution again, at another time, writes nothing either.
+    store
+        .record_outcome(
+            "CAP-RT-RESOLVE-SAFE",
+            "res-s1",
+            "job-s1",
+            CapabilityUseOutcome::SafeToReflash,
+            "failed",
+            "2026-07-18T00:00:00Z",
+        )
+        .unwrap();
+    assert_eq!(
+        (
+            fs::read(directory.join(CHECKPOINT)).unwrap(),
+            fs::read(directory.join(LEDGER)).unwrap(),
+        ),
+        before
     );
     let _ = fs::remove_dir_all(&root);
 }

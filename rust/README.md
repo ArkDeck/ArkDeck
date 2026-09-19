@@ -894,12 +894,16 @@ lineage's first use, then `authorizes`'s denials in Swift's order.
 into one hash-linked lineage per capability and appended to the ledger as one
 event, fully synchronized; the event after 128 is folded into a new checkpoint
 instead. Retrying a reservation answers its receipt and writes nothing. A
-drifted retry, a second pending use, a change to a recorded outcome and
-settling an unknown outcome are refused; settling one is recovery, which
-ADR-0009 has not placed yet. `tests/capability_write.rs` replays the stores
-the four M2 oracles leave (`pointer-input`, `port-forward`, `debug-hap`,
-`deploy-native-library`) through these writes, checkpoint and ledger byte for
-byte, and checks the refusals over synthetic capabilities.
+drifted retry, a second pending use and a change to a recorded outcome are
+refused, except the one change Swift permits (`resolvesUnknown`, ported as
+design §L.1 item 13 was ruled on 2026-09-19): an `outcomeUnknown` use settled
+`confirmed` or `safeToReflash` by a later readback, appended after it.
+`tests/capability_write.rs` replays the stores the M2 oracles leave
+(`pointer-input`, `port-forward`, `debug-hap`, `deploy-native-library`,
+`screen-sequence`) and Swift's `capability-resolve` store (two uses left
+unknown, then resolved) through these writes, checkpoint and ledger byte for
+byte, and checks the refusals over synthetic capabilities and the resolved
+store.
 
 `arkdeck capability list` and `arkdeck capability inspect --capability <id>`
 send what Swift's CLI sends and print the answer.
