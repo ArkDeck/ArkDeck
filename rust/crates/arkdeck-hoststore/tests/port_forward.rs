@@ -171,6 +171,7 @@ impl Owners {
             dispatch,
             tool_sha256: &self.digest,
             now: fixed_now,
+            code_sign_helper: None,
         }
     }
 

@@ -174,6 +174,7 @@ fn rust_runs_the_swift_agent_executions() {
         dispatch: &dispatch,
         tool_sha256: &digest,
         now: fixed_now,
+        code_sign_helper: None,
     };
     let probe = OracleProbe::new(&provenance);
     let claims = StorageClaims::default();
@@ -215,6 +216,7 @@ fn rust_runs_the_swift_agent_executions() {
             dispatch: &dispatch,
             tool_sha256: &digest,
             now: fixed_now,
+            code_sign_helper: None,
         };
         let _ = JobRunner {
             imports: None,

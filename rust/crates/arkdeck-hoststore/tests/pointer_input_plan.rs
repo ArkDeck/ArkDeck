@@ -76,6 +76,7 @@ fn rust_plans_the_swift_pointer_gestures() {
         dispatch: &NoDispatch,
         tool_sha256: &digest,
         now: fixed_now,
+        code_sign_helper: None,
     };
     let planner = JobPlanner {
         imports: None,

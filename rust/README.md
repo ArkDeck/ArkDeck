@@ -571,6 +571,20 @@ submission, and the refusal after an unknown outcome.
 `tests/debug_hap_submit.rs` does the same for `debug.hap@1`, whose capability is
 also named by the entry package's owner-validated facts. An admitted HAP waits in
 `preflight` for `job.run` (below); `agent.run` admits the HAP it starts at once.
+`deploy.native-library.app-owned@1` is planned and admitted as Swift does
+(`native_library_plan.rs`). Its HDC composition must carry the verified
+code-sign helper the deployment stages (`HdcComposition::code_sign_helper`);
+without one the operation is runtime unavailable, and the daemon composes none
+yet. Once the Target's facts hold, the library's lease (a Job Artifact or an
+Import) is resolved and bound to them, its bytes are read, and each step's
+action is named from them (`StepAction::Native`, claimed by the operation before
+any step kind): the provider verifies them as the expected ABI's code-signed ELF,
+still the byte count the lease records. Every provider step is lowered to its
+process sequence with Swift's journal arguments, and the plan also holds the
+rollback a failure past the publish applies. The library's facts name its
+capability. `tests/native_library_plan.rs` and `tests/native_library_submit.rs`
+replay the native-library oracle's plans and submissions; its Jobs wait in
+`preflight`, and `job.run` and `agent.run` refuse them until their runs land.
 
 ## Job run (TASK-XPA-014)
 

@@ -136,6 +136,7 @@ fn rust_captures_diagnostics_of_the_swift_fake_device() {
         dispatch: &dispatch,
         tool_sha256: &digest,
         now: fixed_now,
+        code_sign_helper: None,
     };
     let probe = OracleProbe::new(&provenance);
     let claims = StorageClaims::default();

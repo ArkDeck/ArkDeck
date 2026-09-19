@@ -154,6 +154,8 @@ pub(super) fn declares(
     let context = StepContext {
         job_id: &record.job_id,
         resolved: &[],
+        library: None,
+        helper: None,
     };
     let expected =
         device_steps::declared_descriptor(step, record.operation(), &inputs, action, &context);
@@ -249,6 +251,8 @@ impl JobRunner<'_> {
             let context = StepContext {
                 job_id: &job_id,
                 resolved: &resolved,
+                library: None,
+                helper: None,
             };
             let now = (hdc.now)().ok_or_else(uncertain)?;
             let action = device_steps::action_in(step, &reference, &inputs_of(run), &now, &context)
@@ -263,7 +267,7 @@ impl JobRunner<'_> {
                 return Err(uncertain());
             }
             let plan = action
-                .plan(&step.step_id, Some(&facts.connect_key), &resolved)
+                .plan(&step.step_id, Some(&facts.connect_key), &context)
                 .map_err(|_| uncertain())?;
             // Under the use the Job consumed; a refusal is thrown past the
             // lane as Swift throws it.
@@ -434,6 +438,8 @@ impl JobRunner<'_> {
         let context = StepContext {
             job_id: &run.record.job_id,
             resolved: &resolved,
+            library: None,
+            helper: None,
         };
         device_steps::action_in(step, &reference, &inputs_of(run), &now, &context)
             .map_err(|_| uncertain())
@@ -709,6 +715,8 @@ mod tests {
         let context = StepContext {
             job_id: &record.job_id,
             resolved: &[],
+            library: None,
+            helper: None,
         };
         let declared =
             device_steps::declared_descriptor(step, HAP, &inputs, &action, &context).unwrap();

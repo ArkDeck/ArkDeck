@@ -60,6 +60,33 @@ impl<'a> JobPlanner<'a> {
             binding_revision: Some(facts.binding_revision),
         })
     }
+    /// Swift `resolveLease`, then `validateArtifactBinding` for a device-bound
+    /// input: the lease's Artifact must name the request's target and binding
+    /// revision and the identity the Target's facts carry. A refusal is the
+    /// error Swift interpolates.
+    pub(super) fn resolve_bound_lease(
+        &self,
+        artifacts: &ArtifactReadStore,
+        lease: &str,
+        request: &OperationRequest,
+        facts: &DeviceFacts,
+    ) -> Result<LeasedArtifact, String> {
+        let leased = self.resolve_lease(artifacts, lease, request)?;
+        let binding = &leased.row["bindingSnapshot"];
+        if binding["targetID"] != request.target_id.as_str()
+            || binding["bindingRevision"].as_i64() != request.expected_binding_revision
+            || binding["stableIdentitySHA256"] != facts.identity.as_str()
+        {
+            return Err(format!(
+                "rejected(ArkDeckRuntime.RuntimeOperationErrorCode.invalidInput, {})",
+                swift_string(
+                    "Artifact lease target/binding/identity does not match the materialized request"
+                )
+            ));
+        }
+        Ok(leased)
+    }
+
     fn resolve_hap_leases(
         &self,
         request: &OperationRequest,
@@ -78,22 +105,7 @@ impl<'a> JobPlanner<'a> {
                 format!("{reference} requires a configured Artifact lease store"),
             ));
         };
-        let bound = |lease: &str| -> Result<LeasedArtifact, String> {
-            let leased = self.resolve_lease(artifacts, lease, request)?;
-            let binding = &leased.row["bindingSnapshot"];
-            if binding["targetID"] != request.target_id.as_str()
-                || binding["bindingRevision"].as_i64() != request.expected_binding_revision
-                || binding["stableIdentitySHA256"] != facts.identity.as_str()
-            {
-                return Err(format!(
-                    "rejected(ArkDeckRuntime.RuntimeOperationErrorCode.invalidInput, {})",
-                    swift_string(
-                        "Artifact lease target/binding/identity does not match the materialized request"
-                    )
-                ));
-            }
-            Ok(leased)
-        };
+        let bound = |lease: &str| self.resolve_bound_lease(artifacts, lease, request, facts);
         let resolved_artifact = |leased: LeasedArtifact| {
             let sha256 = leased.row["sha256"].as_str().unwrap_or_default().to_owned();
             ResolvedArtifact {
@@ -268,7 +280,11 @@ pub(super) fn compensations<'a>(
     .collect()
 }
 
-fn primary_facts(entry: &LeasedArtifact) -> Result<BTreeMap<String, String>, PlanRefusal> {
+/// Swift `MaterializedAdmission.artifactFacts` of a resolved input: its
+/// identity, digest and `String(byteCount)` as its owner validated them.
+pub(super) fn primary_facts(
+    entry: &LeasedArtifact,
+) -> Result<BTreeMap<String, String>, PlanRefusal> {
     Ok(BTreeMap::from([
         ("artifactId".into(), entry.artifact_id.clone()),
         (

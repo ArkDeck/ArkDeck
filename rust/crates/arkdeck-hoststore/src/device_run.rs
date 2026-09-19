@@ -459,6 +459,8 @@ impl JobRunner<'_> {
             let context = StepContext {
                 job_id: &job_id,
                 resolved: &resolved,
+                library: None,
+                helper: None,
             };
             let action = match device_steps::action_in(step, &reference, &inputs, &now, &context) {
                 Ok(action) => action,
@@ -479,7 +481,7 @@ impl JobRunner<'_> {
             let plan = match action.plan(
                 &step.step_id,
                 facts.as_ref().map(|facts| facts.connect_key.as_str()),
-                &resolved,
+                &context,
             ) {
                 Ok(plan) => plan,
                 Err(error) if gated && evidence => {
@@ -716,6 +718,8 @@ impl JobRunner<'_> {
         let context = StepContext {
             job_id: &job_id,
             resolved,
+            library: None,
+            helper: None,
         };
         let compensation = match &journaled {
             Journaled::Compensation { source, descriptor } => Some((*source, *descriptor)),
@@ -1254,7 +1258,11 @@ impl JobRunner<'_> {
         ];
         let restored = steps.iter().try_for_each(|(step, action)| {
             let plan = action
-                .plan(&step.step_id, Some(&facts.connect_key), &[])
+                .plan(
+                    &step.step_id,
+                    Some(&facts.connect_key),
+                    &device_steps::NO_CONTEXT,
+                )
                 .map_err(|_| Stop::Refused(uncertain()))?;
             if mutates(step) && !hdc.dispatch.mutation_identity_current() {
                 return Err(Stop::Failed(
