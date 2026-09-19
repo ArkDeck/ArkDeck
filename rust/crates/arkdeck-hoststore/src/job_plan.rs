@@ -17,6 +17,9 @@ use std::io;
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 
+#[path = "debug_hap_plan.rs"]
+mod debug_hap_plan;
+
 const MAXIMUM_REQUEST_JSON_BYTES: usize = 4 * 1024 * 1024;
 const MAXIMUM_ANALYZER_BYTES: u64 = 128 * 1024 * 1024;
 const MAXIMUM_ANALYZER_INPUT_BYTES: u64 = 512 * 1024 * 1024;
@@ -182,7 +185,7 @@ impl<'a> JobPlanner<'a> {
                 "planOnly does not accept or consume a Runtime capability",
             ));
         }
-        let descriptor = Self::descriptor(&request)?;
+        let descriptor = Self::descriptor_for_plan(&request)?;
         Self::validate_inputs(&request, descriptor)?;
         let fingerprint = request.fingerprint();
         let materialized = self.materialized(&request, descriptor)?;
@@ -241,6 +244,16 @@ impl<'a> JobPlanner<'a> {
             ));
         }
         Ok(descriptor)
+    }
+
+    fn descriptor_for_plan(
+        request: &OperationRequest,
+    ) -> Result<&'static CatalogOperation, PlanRefusal> {
+        if request.reference() == "debug.hap@1" {
+            return CatalogOperation::lookup(&request.operation_id, request.operation_version)
+                .ok_or_else(internal_failure);
+        }
+        Self::descriptor(request)
     }
 
     /// Swift `validateInputs`; a catalog constraint this validator does not
@@ -350,6 +363,11 @@ impl<'a> JobPlanner<'a> {
             request.expected_binding_revision,
         )
         .map_err(|reason| unmaterialized(format!("failed({})", swift_string(reason))))?;
+        // Planning HAP does not expand the admission allowlist. Its complete
+        // Artifact authorization envelope and execution owner remain separate work.
+        if reference == "debug.hap@1" {
+            return self.materialize_hap(request, descriptor, &facts);
+        }
         self.refuse_debug_permit(request)?;
         // Swift names a ring-buffered capture's coverage anchor in its
         // markers; this Runtime does not compose it yet.
