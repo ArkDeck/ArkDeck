@@ -44,6 +44,8 @@ pub use device_facts::HdcComposition;
 #[cfg(target_os = "macos")]
 mod capture_documents;
 #[cfg(target_os = "macos")]
+mod cleanup_debt;
+#[cfg(target_os = "macos")]
 mod device_run;
 #[cfg(target_os = "macos")]
 mod device_steps;

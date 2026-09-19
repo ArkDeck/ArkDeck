@@ -15,16 +15,12 @@ use std::path::{Path, PathBuf};
 pub const ROOT: &str = "/private/tmp/arkdeck-hdc-oracle";
 const LOCK: &str = "/private/tmp/arkdeck-hdc-oracle.lock";
 
-/// Planning and admission dispatch nothing, and neither does a refused run;
-/// a call here fails the replay.
+/// Planning and admission dispatch nothing; a call here fails the replay.
 pub struct NoDispatch;
 
 impl HdcDispatch for NoDispatch {
     fn dispatch(&self, plan: &ProcessPlan) -> Result<Receipt, DispatchFailure> {
-        panic!(
-            "a HAP plan, admission or refused run dispatched {:?}",
-            plan.arguments
-        )
+        panic!("a HAP plan or admission dispatched {:?}", plan.arguments)
     }
 }
 

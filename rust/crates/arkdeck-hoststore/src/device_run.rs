@@ -1,7 +1,8 @@
 //! Swift `RuntimeJobEngine.runOwned` over `executeSteps` and `dispatchWithWAL`
-//! for an admitted device-bound HDC Job (`observe.device@1` and the default
-//! legs of `capture.diagnostics@1`), as the isolated Rust owner runs it
-//! through its HDC composition: the running transition; every catalog step in
+//! for an admitted device-bound HDC Job (`observe.device@1`, the default legs
+//! of `capture.diagnostics@1`, the pointer gestures, the port rules and
+//! `debug.hap@1`), as the isolated Rust owner runs it through its HDC
+//! composition: the running transition; every catalog step in
 //! order — the engine's own recorded, the host storage preflight among them;
 //! an optional step the request did not select recorded as skipped, with the
 //! products it owned recorded missing; the provider's dispatched, each with
@@ -16,28 +17,43 @@
 //! parks the Job. Nothing is dispatched twice and no Job is resumed. A
 //! cancellation is honoured at the next step boundary, where Swift's step
 //! loop honours it. A step at or above `deviceMutation` consumes the Job's
-//! capability use before its intent can exist. A port rule's readback is
+//! capability use before its intent can exist; a later one continues under
+//! that use once every fresh check has passed again. A port rule's readback is
 //! judged against the operation it serves, and a confirmed failure after the
 //! rule changed restores it before the Job fails.
+//!
+//! A debug HAP's packages are resolved from their leases again before each
+//! step given them, each still bound to the Target and the identity the plan
+//! bound. Its install and its start succeed only as dispatches, believed by
+//! the required readback after each. Each step a failure would undo declares
+//! that compensation on its intent. A failure is compensated as Swift
+//! compensates it (`device_hap_failure.rs`), and a failed cleanup owes a debt
+//! in the Artifact root's ledger.
 use crate::artifact_publication::{ArtifactPublisher, Product};
-use crate::artifact_read_owner::swift_string;
+use crate::artifact_read_owner::{LeasedArtifact, swift_string};
 use crate::capture_documents;
 use crate::device_facts::{self, DeviceFacts, HdcComposition};
-use crate::device_steps::{self, ActionRefusal, StepAction};
+use crate::device_steps::{self, ActionRefusal, StepAction, StepContext, StepInputs};
 use crate::job_cancel::RunCancellation;
 use crate::job_journal_events::{self as events, Target};
 use crate::job_record::JobRecord;
 use crate::job_run::{JobRunner, Run, RunRefusal, failure, uncertain};
+use crate::mutation_execution::MutationConsumption;
 use crate::operation_catalog::{CatalogArtifact, CatalogOperation, CatalogStep};
 use crate::session_json;
 use arkdeck_provider_hdc::{
-    DispatchFailure, Expected, Outcome, PortAction, PortRule, ProcessPlan, Receipt,
+    DispatchFailure, Expected, FilePlan, FileReceipt, Outcome, PortAction, PortRule,
+    ResolvedArtifact,
 };
 use serde_json::{Map, Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 
+#[path = "device_hap_failure.rs"]
+mod hap_failure;
+
 const OBSERVE: &str = "observe.device@1";
 const CAPTURE: &str = "capture.diagnostics@1";
+const HAP: &str = "debug.hap@1";
 
 /// Swift's evidence preflight, in the order its fragments must arrive.
 const EVIDENCE_STEPS: [&str; 3] = [
@@ -74,6 +90,25 @@ impl From<RunRefusal> for Stop {
     fn from(refusal: RunRefusal) -> Self {
         Self::Refused(refusal)
     }
+}
+
+/// What a dispatch's intent journals: a catalog step, which declares the
+/// compensations that would undo it, or the declared compensation a debug
+/// HAP's failure lane runs under its source's declaration.
+enum Journaled<'a> {
+    Step,
+    Compensation {
+        source: &'a str,
+        descriptor: &'a Value,
+    },
+}
+
+/// The request's inputs, as the run reads them.
+fn inputs_of(run: &Run) -> Map<String, Value> {
+    run.record.request["inputs"]
+        .as_object()
+        .cloned()
+        .unwrap_or_default()
 }
 
 /// Swift's timeline spelling of a verified summary's fact names.
@@ -214,6 +249,8 @@ impl JobRunner<'_> {
         self.execute_device_inner(run, hdc)?;
         let outcome = if run.record.state == "waitingForRecovery" {
             crate::capability_store::UseOutcome::OutcomeUnknown
+        } else if self.hap_non_execution_proven(run)? {
+            crate::capability_store::UseOutcome::SafeToReflash
         } else {
             crate::capability_store::UseOutcome::Confirmed
         };
@@ -232,8 +269,19 @@ impl JobRunner<'_> {
         let Some(descriptor) = descriptor(run.record.operation()) else {
             return Err(uncertain());
         };
+        let hap = descriptor.reference() == HAP;
         match self.steps(run, hdc, descriptor) {
             Ok(()) => {}
+            // A debug HAP first compensates what its succeeded steps did.
+            Err(Stop::Failed(reason)) if hap => {
+                run.record.set_operation_failure(Some(failure(
+                    "executionFailed",
+                    "execution",
+                    "runtimeDecisionRequired",
+                    "inspectJob",
+                )));
+                return self.finalize_hap_failure(run, hdc, descriptor, &reason);
+            }
             Err(Stop::Failed(reason)) => return self.fail(run, &reason),
             Err(Stop::Unknown(reason)) => return self.park(run, &reason),
             Err(Stop::Publication(detail)) => {
@@ -243,7 +291,11 @@ impl JobRunner<'_> {
                     "notAutomatic",
                     "inspectJob",
                 )));
-                return self.close(run, &format!("artifact publication failed: {detail}"));
+                let reason = format!("artifact publication failed: {detail}");
+                if hap {
+                    return self.finalize_hap_failure(run, hdc, descriptor, &reason);
+                }
+                return self.close(run, &reason);
             }
             // Swift's step loop stops at the boundary and `runOwned` drains.
             Err(Stop::Cancelled) => {
@@ -304,10 +356,7 @@ impl JobRunner<'_> {
     ) -> Result<(), Stop> {
         let reference = descriptor.reference();
         let gated = device_steps::requires_evidence_preflight(&reference);
-        let inputs = run.record.request["inputs"]
-            .as_object()
-            .cloned()
-            .unwrap_or_default();
+        let inputs = inputs_of(run);
         let target_id = run.record.request["target"]["targetId"]
             .as_str()
             .unwrap_or_default()
@@ -325,6 +374,10 @@ impl JobRunner<'_> {
                 match step.kind.as_str() {
                     "preflightHostStorage" => self.preflight_host_storage(run, descriptor)?,
                     "postprocessArtifact" | "finalizeSession" => {}
+                    // Swift `verifyHostInputArtifact` verifies a flash image or
+                    // a native library; a debug HAP's packages are resolved
+                    // again at each step given them.
+                    "verifyArtifact" if reference == HAP => {}
                     _ => return Err(Stop::Refused(uncertain())),
                 }
                 run.record
@@ -347,6 +400,13 @@ impl JobRunner<'_> {
                 self.skip(run, descriptor, step, &reason, &mut skipped);
                 continue;
             }
+            // A debug HAP's packages are resolved from their leases again
+            // before each step given them; the other operations take none.
+            let resolved = self.resolve_inputs(
+                run,
+                device_steps::step_inputs(&reference, &step.kind),
+                &step.step_id,
+            )?;
             let evidence = device_steps::evidence_preflight_step(step);
             let facts = if step.binding == "confirmedDevice" {
                 match hdc.facts(&target_id) {
@@ -395,7 +455,12 @@ impl JobRunner<'_> {
             let Some(now) = (hdc.now)() else {
                 return Err(Stop::Refused(uncertain()));
             };
-            let action = match device_steps::action(step, &descriptor.reference(), &inputs, &now) {
+            let job_id = run.record.job_id.clone();
+            let context = StepContext {
+                job_id: &job_id,
+                resolved: &resolved,
+            };
+            let action = match device_steps::action_in(step, &reference, &inputs, &now, &context) {
                 Ok(action) => action,
                 // Swift's provider refusing an optional step skips it.
                 Err(ActionRefusal::Invalid(_)) if step.optional => {
@@ -410,50 +475,53 @@ impl JobRunner<'_> {
                 }
                 Err(_) => return Err(Stop::Refused(uncertain())),
             };
-            if mutates(step) {
-                let facts = facts.as_ref().ok_or_else(|| {
-                    Stop::Failed("authorizationRequired: fresh device facts unavailable".into())
-                })?;
-                let authority = self.consume_mutation_authority(run, descriptor, facts);
-                if matches!(
-                    &authority,
-                    Ok(crate::mutation_execution::MutationConsumption::PersistenceUncertain)
-                ) {
-                    return Err(Stop::Refused(uncertain()));
-                }
-
-                // Cancellation is re-read after fresh materialization and after
-                // durable consumption; neither boundary may enter the WAL.
-                if self.cancellation.is_some_and(RunCancellation::pending)
-                    || matches!(
-                        &authority,
-                        Ok(crate::mutation_execution::MutationConsumption::Cancelled)
-                    )
-                {
-                    self.carry(run)?;
-                    return Err(Stop::Cancelled);
-                }
-                authority.map_err(Stop::Failed)?;
-            }
-            let plan = action
-                .lower(
-                    &step.step_id,
-                    facts.as_ref().map(|facts| facts.connect_key.as_str()),
-                )
-                .map_err(|_| Stop::Refused(uncertain()))?;
-            match self.dispatch_step(
-                run,
-                hdc,
-                descriptor,
-                step,
-                &action,
-                &plan,
-                facts.as_ref(),
-                &target_id,
-                revision,
+            // Swift lowers the action before any use is consumed.
+            let plan = match action.plan(
+                &step.step_id,
+                facts.as_ref().map(|facts| facts.connect_key.as_str()),
+                &resolved,
             ) {
+                Ok(plan) => plan,
+                Err(error) if gated && evidence => {
+                    return Err(Stop::Failed(format!(
+                        "evidenceIncomplete: typed preflight could not be lowered: {error}"
+                    )));
+                }
+                Err(_) => return Err(Stop::Refused(uncertain())),
+            };
+            // A refused authority is the step's own failure, handled below as
+            // a failed dispatch is (Swift catches both in one place).
+            let authorized = if mutates(step) {
+                self.authorize_step(run, descriptor, facts.as_ref())?
+            } else {
+                Ok(())
+            };
+            match authorized.and_then(|()| {
+                self.dispatch_step(
+                    run,
+                    hdc,
+                    descriptor,
+                    step,
+                    &action,
+                    &plan,
+                    facts.as_ref(),
+                    &target_id,
+                    revision,
+                    &resolved,
+                    Journaled::Step,
+                )
+            }) {
                 Ok(()) => {
                     completed.insert(step.step_id.clone());
+                }
+                // A debug HAP's optional cleanup that failed owes its debt,
+                // then is skipped.
+                Err(Stop::Failed(_))
+                    if step.optional
+                        && reference == HAP
+                        && device_steps::cleanup_residue(&action).is_some() =>
+                {
+                    self.owe_optional_hap_cleanup(run, descriptor, step, &mut skipped)?;
                 }
                 // Optional steps are the partial-success surface: one that
                 // fails is skipped with its failure and the Job goes on. An
@@ -474,6 +542,37 @@ impl JobRunner<'_> {
             }
         }
         Ok(())
+    }
+
+    /// Swift `consumeCapabilityBeforeMutation` at a mutation step: the Job's
+    /// use consumed before its first mutation, or continued at a later one.
+    /// The outer error ends the step loop (a consumption whose persistence is
+    /// uncertain, a cancellation made durable); the inner one is the step's
+    /// own failure.
+    fn authorize_step(
+        &self,
+        run: &mut Run,
+        descriptor: &CatalogOperation,
+        facts: Option<&DeviceFacts>,
+    ) -> Result<Result<(), Stop>, Stop> {
+        let Some(facts) = facts else {
+            return Ok(Err(Stop::Failed(
+                "authorizationRequired: fresh device facts unavailable".into(),
+            )));
+        };
+        let authority = self.consume_mutation_authority(run, descriptor, facts);
+        if matches!(&authority, Ok(MutationConsumption::PersistenceUncertain)) {
+            return Err(Stop::Refused(uncertain()));
+        }
+        // Cancellation is re-read after fresh materialization and after
+        // durable consumption; neither boundary may enter the WAL.
+        if self.cancellation.is_some_and(RunCancellation::pending)
+            || matches!(&authority, Ok(MutationConsumption::Cancelled))
+        {
+            self.carry(run)?;
+            return Err(Stop::Cancelled);
+        }
+        Ok(authority.map(|_| ()).map_err(Stop::Failed))
     }
 
     /// Swift `recordSkippedOptionalStep`: the reason on the timeline and in
@@ -516,7 +615,85 @@ impl JobRunner<'_> {
             })
     }
 
-    /// Swift `dispatchWithWAL` for one HDC step.
+    /// Swift `resolvedInputArtifact`, then `resolvedAdditionalInputArtifacts`
+    /// for a step given every package: a debug HAP's input Artifacts resolved
+    /// from their leases again immediately before the step, an Import's
+    /// through its owner. Each must still be bound to the request's target and
+    /// binding revision and to the identity the plan was materialized against
+    /// (Swift `validateArtifactBinding`). One that no longer resolves, or no
+    /// longer binds, fails the Job with Swift's interpolated refusal.
+    fn resolve_inputs(
+        &self,
+        run: &Run,
+        given: StepInputs,
+        step_id: &str,
+    ) -> Result<Vec<ResolvedArtifact>, Stop> {
+        if given == StepInputs::None {
+            return Ok(Vec::new());
+        }
+        let request = &run.record.request;
+        let rejected = |message: &str| {
+            Stop::Failed(format!(
+                "rejected(ArkDeckRuntime.RuntimeOperationErrorCode.invalidInput, {})",
+                swift_string(message)
+            ))
+        };
+        let Some(entry) = request["inputs"]["hapArtifactLease"].as_str() else {
+            return Err(Stop::Refused(uncertain()));
+        };
+        let mut leases = vec![entry];
+        if given == StepInputs::All {
+            for lease in request["inputs"]["additionalHapArtifactLeases"]
+                .as_array()
+                .into_iter()
+                .flatten()
+            {
+                leases.push(lease.as_str().ok_or_else(|| {
+                    rejected("additionalHapArtifactLeases must be artifact leases")
+                })?);
+            }
+        }
+        leases
+            .into_iter()
+            .map(|lease| {
+                let leased = self.lease(lease).map_err(|error| {
+                    Stop::Failed(format!(
+                        "input Artifact lease became unreadable before {step_id}: {error}"
+                    ))
+                })?;
+                if let Some(refusal) = unbound(&leased, &run.record) {
+                    return Err(rejected(refusal));
+                }
+                let sha256 = leased.row["sha256"]
+                    .as_str()
+                    .ok_or_else(|| Stop::Refused(uncertain()))?
+                    .to_owned();
+                Ok(ResolvedArtifact {
+                    artifact_id: leased.artifact_id,
+                    sha256,
+                    path: leased.path,
+                })
+            })
+            .collect()
+    }
+
+    /// Swift `RuntimeArtifactStore.resolveLease`: an Import's lease through
+    /// the Import owner, any other through the Artifact owner.
+    fn lease(&self, lease: &str) -> Result<LeasedArtifact, String> {
+        match crate::job_owner::import_references::ImportReference::parse(lease)
+            .map_err(|error| error.message)?
+        {
+            Some(reference) => self
+                .imports
+                .ok_or_else(|| "Import owner is unavailable".to_owned())?
+                .resolve_input(self.artifacts, &reference)
+                .map_err(|error| error.message),
+            None => self.artifacts.lease(lease),
+        }
+    }
+
+    /// Swift `dispatchWithWAL` for one HDC step, or for the compensation a
+    /// debug HAP's failure lane runs under the identity its source declared.
     #[allow(clippy::too_many_arguments)]
     fn dispatch_step(
         &self,
@@ -524,47 +701,100 @@ impl JobRunner<'_> {
         hdc: &HdcComposition<'_>,
         descriptor: &CatalogOperation,
         step: &CatalogStep,
-        action: &device_steps::StepAction,
-        plan: &ProcessPlan,
+        action: &StepAction,
+        plan: &FilePlan,
         facts: Option<&DeviceFacts>,
         target_id: &str,
         revision: Option<i64>,
+        resolved: &[ResolvedArtifact],
+        journaled: Journaled<'_>,
     ) -> Result<(), Stop> {
+        let reference = descriptor.reference();
         let device = step.binding == "confirmedDevice";
-        let intent_id = format!("intent-{}", step.step_id);
+        let inputs = inputs_of(run);
+        let job_id = run.record.job_id.clone();
+        let context = StepContext {
+            job_id: &job_id,
+            resolved,
+        };
+        let compensation = match &journaled {
+            Journaled::Compensation { source, descriptor } => Some((*source, *descriptor)),
+            Journaled::Step => None,
+        };
+        // A compensation runs only inside its Job's failure finalization, as
+        // the catalog step its source declared, with exactly that action.
+        let journal_step = match compensation {
+            Some((source, declared)) => {
+                let owned = run.record.state == "finalizing"
+                    && declared["id"]
+                        .as_str()
+                        .and_then(device_steps::compensation_catalog_step)
+                        == Some(step.step_id.as_str());
+                if !owned || !hap_failure::declares(source, declared, step, action, &run.record) {
+                    return Err(Stop::Refused(uncertain()));
+                }
+                None
+            }
+            None => {
+                // Swift `debugHAPCompensationDeclaration`, within the step's
+                // own context.
+                let declarations =
+                    match device_steps::hap_compensation(descriptor, &inputs, &step.step_id) {
+                        None => Vec::new(),
+                        Some(_) => {
+                            let now = (hdc.now)().ok_or_else(|| Stop::Refused(uncertain()))?;
+                            device_steps::compensation_declarations(
+                                step, descriptor, &inputs, &now, &context,
+                            )
+                            .ok_or_else(|| Stop::Refused(uncertain()))?
+                        }
+                    };
+                let arguments =
+                    device_steps::journal_arguments_in(step, &reference, &inputs, action, &context)
+                        .ok_or_else(|| Stop::Refused(uncertain()))?;
+                Some(json!({
+                    "id": step.step_id, "kind": step.kind, "effect": step.effect,
+                    "cancellation": step.cancellation, "bindingRequirement": step.binding,
+                    "arguments": arguments, "compensationDescriptors": declarations,
+                }))
+            }
+        };
+        let journal_id = match compensation {
+            Some((_, declared)) => declared["id"]
+                .as_str()
+                .ok_or_else(|| Stop::Refused(uncertain()))?
+                .to_owned(),
+            None => step.step_id.clone(),
+        };
+        let intent_id = format!("intent-{journal_id}");
         // The journal mirrors the descriptor-bound facts without the raw key.
         let identity = facts.map_or_else(|| "0".repeat(64), |facts| facts.identity.clone());
-        let inputs = run.record.request["inputs"]
-            .as_object()
-            .cloned()
-            .unwrap_or_default();
-        let Some(arguments) =
-            device_steps::journal_arguments_for(step, &descriptor.reference(), &inputs, action)
-        else {
-            return Err(Stop::Refused(uncertain()));
+        let target = Target {
+            scope: if device { "device" } else { "host" }.into(),
+            target_id: target_id.into(),
+            connect_key: device.then(|| format!("sha256:{identity}")),
+            identity_snapshot_hash: device.then(|| identity.clone()),
         };
-        let journal_step = json!({
-            "id": step.step_id, "kind": step.kind, "effect": step.effect,
-            "cancellation": step.cancellation, "bindingRequirement": step.binding,
-            "arguments": arguments, "compensationDescriptors": [],
-        });
-        let intent = events::step_intent(
-            &run.envelope(intent_id.clone())?,
-            &journal_step,
-            &Target {
-                scope: if device { "device" } else { "host" }.into(),
-                target_id: target_id.into(),
-                connect_key: device.then(|| format!("sha256:{identity}")),
-                identity_snapshot_hash: device.then(|| identity.clone()),
-            },
-            1,
-            device.then(|| revision.unwrap_or(1)),
-        )
+        let binding = device.then(|| revision.unwrap_or(1));
+        let envelope = run.envelope(intent_id.clone())?;
+        let intent = match (compensation, &journal_step) {
+            (Some((source, declared)), _) => {
+                events::compensation_intent(&envelope, source, declared, &target, 1, binding)
+            }
+            (None, Some(journal_step)) => {
+                events::step_intent(&envelope, journal_step, &target, 1, binding)
+            }
+            (None, None) => return Err(Stop::Refused(uncertain())),
+        }
         .map_err(|_| Stop::Refused(uncertain()))?;
+        // A debug HAP's cleanup, like every compensation, keeps its exact
+        // action after a confirmed failure: the debt it owes records it.
+        let retains = compensation.is_some()
+            || (reference == HAP && device_steps::cleanup_residue(action).is_some());
         // The exact typed action is durable before its intent can be.
         let (kind, persisted) = action.persisted();
         run.record.set_recovery(
-            Some(&step.step_id),
+            Some(&journal_id),
             Some(&intent_id),
             Some(json!({"kind": kind, "arguments": persisted})),
         );
@@ -574,23 +804,48 @@ impl JobRunner<'_> {
             let _ = run.persist(self.jobs);
             return Err(Stop::Refused(uncertain()));
         }
-        run.record.timeline.push(format!("intent {}", step.step_id));
+        run.record.timeline.push(format!("intent {journal_id}"));
         run.record.add_step_kind(&step.kind);
         // A device step after the preflight is where a Job's evidence starts.
         if device && !device_steps::evidence_preflight_step(step) {
             let now = run.clock()?;
             run.record.set_first_evidence(&now);
         }
+        // The outcome correlated with the intent, under the intent's own
+        // identity; a compensation's dispatch failure is its summary.
+        let outcome =
+            |run: &mut Run, result: &str, at: &str, summary: Option<&str>| match compensation {
+                Some((source, _)) => {
+                    let envelope = run.envelope_at(format!("outcome-{journal_id}"), at.into());
+                    run.append(events::compensation_outcome(
+                        &envelope,
+                        source,
+                        &journal_id,
+                        1,
+                        &intent_id,
+                        result,
+                        "confirmed",
+                        None,
+                        summary,
+                    ))
+                }
+                None => run.step_outcome_at(&step.step_id, &intent_id, result, None, at),
+            };
+        let dispatch_failure =
+            |reason: &str| compensation.map(|_| format!("failed({})", swift_string(reason)));
         // Only now may the executor start.
         let Some(opened) = (self.precise_now)() else {
-            run.step_outcome(&step.step_id, &intent_id, "failed", None)?;
+            let reason = "dispatch refused: the Runtime clock is unavailable";
+            let at = run.clock()?;
+            outcome(run, "failed", &at, dispatch_failure(reason).as_deref())?;
             run.record.timeline.push(format!("failed {}", step.step_id));
-            run.record.set_recovery(None, None, None);
-            return Err(Stop::Failed(
-                "dispatch refused: the Runtime clock is unavailable".into(),
-            ));
+            if !retains {
+                run.record.set_recovery(None, None, None);
+            }
+            return Err(Stop::Failed(reason.into()));
         };
-        let receipt = match hdc.dispatch.dispatch(plan) {
+        // A sequence runs its processes in order, as Swift's dispatcher does.
+        let receipt = match arkdeck_provider_hdc::run(plan, hdc.dispatch) {
             Ok(receipt) => receipt,
             Err(DispatchFailure::Unobservable(reason)) => {
                 run.record.timeline.push(format!(
@@ -600,9 +855,12 @@ impl JobRunner<'_> {
                 return Err(Stop::Unknown(reason));
             }
             Err(DispatchFailure::Refused(reason)) => {
-                run.step_outcome(&step.step_id, &intent_id, "failed", None)?;
+                let at = run.clock()?;
+                outcome(run, "failed", &at, dispatch_failure(&reason).as_deref())?;
                 run.record.timeline.push(format!("failed {}", step.step_id));
-                run.record.set_recovery(None, None, None);
+                if !retains {
+                    run.record.set_recovery(None, None, None);
+                }
                 return Err(Stop::Failed(reason));
             }
         };
@@ -612,15 +870,23 @@ impl JobRunner<'_> {
             identity_sha256: facts.map(|facts| facts.identity.as_str()),
             tool_version: facts.map(|facts| facts.tool_version.as_str()),
         };
-        match port_readback(descriptor, step, action.verify(&receipt, expected)) {
+        // A package readback binds its verdict to the entry package resolved
+        // for it.
+        let entry = resolved.first().map(|artifact| artifact.sha256.as_str());
+        match port_readback(descriptor, step, action.verify(&receipt, expected, entry)) {
             Outcome::Verified(summary) => {
                 let outcome_at = run.clock()?;
-                run.step_outcome_at(&step.step_id, &intent_id, "succeeded", None, &outcome_at)?;
+                outcome(run, "succeeded", &outcome_at, None)?;
                 run.record.timeline.push(format!(
                     "verified {} {}",
                     step.step_id,
                     fact_names(&summary)
                 ));
+                // A compensation keeps its action until its lane concludes,
+                // and publishes nothing.
+                if compensation.is_some() {
+                    return Ok(());
+                }
                 run.record.set_recovery(None, None, None);
                 if device_steps::requires_evidence_preflight(run.record.operation())
                     && device_steps::evidence_preflight_step(step)
@@ -638,12 +904,30 @@ impl JobRunner<'_> {
                 self.publish(run, descriptor, step, &summary, window, &receipt)
             }
             Outcome::Failed { code, detail } => {
-                run.step_outcome(&step.step_id, &intent_id, "failed", None)?;
-                run.record.set_recovery(None, None, None);
+                let at = run.clock()?;
+                outcome(run, "failed", &at, None)?;
+                if !retains {
+                    run.record.set_recovery(None, None, None);
+                }
                 run.record
                     .timeline
                     .push(format!("failed {}: {code}: {detail}", step.step_id));
                 Err(Stop::Failed(format!("{code}: {detail}")))
+            }
+            // Swift's awaiting-readback lane: a mutation whose truth its
+            // provider delegates to the required readback after it succeeds
+            // as a dispatch, and that readback is what may believe it.
+            Outcome::Unknown(_) | Outcome::Unsupported(_)
+                if compensation.is_none()
+                    && device_steps::awaits_readback(descriptor, &step.step_id) =>
+            {
+                let at = run.clock()?;
+                outcome(run, "succeeded", &at, None)?;
+                run.record
+                    .timeline
+                    .push(format!("dispatched {}; awaiting readback", step.step_id));
+                run.record.set_recovery(None, None, None);
+                Ok(())
             }
             Outcome::Unknown(reason) | Outcome::Unsupported(reason) => {
                 // The intent stays outstanding: no outcome is invented, and
@@ -970,7 +1254,7 @@ impl JobRunner<'_> {
         ];
         let restored = steps.iter().try_for_each(|(step, action)| {
             let plan = action
-                .lower(&step.step_id, Some(&facts.connect_key))
+                .plan(&step.step_id, Some(&facts.connect_key), &[])
                 .map_err(|_| Stop::Refused(uncertain()))?;
             if mutates(step) && !hdc.dispatch.mutation_identity_current() {
                 return Err(Stop::Failed(
@@ -987,6 +1271,8 @@ impl JobRunner<'_> {
                 Some(&facts),
                 target_id,
                 revision,
+                &[],
+                Journaled::Step,
             )
         });
         // Swift names a failed compensation as it interpolates its
@@ -1027,7 +1313,7 @@ impl JobRunner<'_> {
         step: &CatalogStep,
         summary: &BTreeMap<String, String>,
         window: Option<(String, String)>,
-        receipt: &Receipt,
+        receipt: &FileReceipt,
     ) -> Result<(), Stop> {
         let owner = Owner::of(&run.record, descriptor);
         let mapping = device_steps::products(&owner.reference, &step.step_id);
@@ -1164,6 +1450,34 @@ impl JobRunner<'_> {
     }
 }
 
+/// Swift `validateArtifactBinding` for a device-bound input: the lease's
+/// Artifact must name the request's target and binding revision and the
+/// identity the plan was materialized against (or, with no materialized
+/// identity, claim no device binding at all). The refusal is Swift's message.
+fn unbound(leased: &LeasedArtifact, record: &JobRecord) -> Option<&'static str> {
+    const MISMATCH: &str =
+        "Artifact lease target/binding/identity does not match the materialized request";
+    let binding = &leased.row["bindingSnapshot"];
+    let target = &record.request["target"];
+    let revision = target
+        .get("expectedBindingRevision")
+        .filter(|revision| !revision.is_null());
+    if binding["targetID"] != target["targetId"]
+        || binding.get("bindingRevision").filter(|v| !v.is_null()) != revision
+    {
+        return Some(MISMATCH);
+    }
+    let identity = binding.get("stableIdentitySHA256").and_then(Value::as_str);
+    match record.materialized_identity() {
+        Some(expected) if identity != Some(expected) => Some(MISMATCH),
+        Some(_) => None,
+        None if revision.is_some() || identity.is_some() => {
+            Some("host-only Artifact lease must not claim a device binding or identity")
+        }
+        None => None,
+    }
+}
+
 /// Swift `RuntimeArtifactService.bindingSnapshot(for:)`: the request's target
 /// and revision, and the observed identity (the materialized one before the
 /// observation exists), absent members omitted.
@@ -1183,16 +1497,21 @@ fn binding_snapshot(record: &JobRecord) -> Value {
 }
 
 /// Swift `RuntimeArtifactService.artifactContents` for a step's product: a
-/// capture's bytes as the provider received them, or a facts product.
+/// capture's bytes as the provider received them from its one process, or a
+/// facts product.
 fn contents(
     name: &str,
     record: &JobRecord,
     summary: &BTreeMap<String, String>,
-    receipt: &Receipt,
+    receipt: &FileReceipt,
 ) -> Vec<u8> {
     match name {
         "hilog.txt" | "ui-dump.json" | "advanced-dump.txt" | "crash-index.txt"
-        | "crash-log.txt" => receipt.stdout.clone(),
+        | "crash-log.txt" | "debug-hilog.txt" => receipt
+            .subprocesses
+            .first()
+            .map(|process| process.stdout.clone())
+            .unwrap_or_default(),
         _ => facts(name, record, summary),
     }
 }

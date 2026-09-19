@@ -11,6 +11,8 @@ pub(super) type Object = Map<String, Value>;
 #[derive(Debug)]
 pub(super) enum ManifestError {
     Invalid,
+    /// A contract rule Swift names, refused as `invalidManifest(<rule>)`.
+    Rule(&'static str),
     Unsupported,
 }
 pub(super) type Result<T> = std::result::Result<T, ManifestError>;

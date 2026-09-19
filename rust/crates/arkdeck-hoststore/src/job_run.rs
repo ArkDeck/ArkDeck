@@ -60,9 +60,8 @@ const RUNNABLE: [&str; 4] = [
 ];
 
 /// Whether this Runtime executes an admitted Job of `operation`: the analyzer
-/// here, a device-bound operation through its HDC composition. Every other
-/// Job is refused before its run starts; an admitted `debug.hap@1` Job is
-/// among them until its runner is ported.
+/// here, a device-bound operation (`debug.hap@1` among them) through its HDC
+/// composition. Every other Job is refused before its run starts.
 pub(crate) fn executes(operation: &str) -> bool {
     operation == OPERATION || crate::device_run::runs(operation)
 }
@@ -178,6 +177,10 @@ pub(crate) struct Run {
     pub(crate) journal: JournalWriter,
     pub(crate) sequence: i64,
     pub(crate) now: fn() -> Option<String>,
+    /// The admission evidence of the capability use this run consumed and
+    /// made durable itself. A later mutation of the same run continues under
+    /// that use; evidence the run did not write is never continued.
+    pub(crate) consumed: Option<Value>,
 }
 
 impl Run {
@@ -188,7 +191,7 @@ impl Run {
         let timestamp = self.clock()?;
         Ok(self.envelope_at(event_id, timestamp))
     }
-    fn envelope_at(&self, event_id: String, timestamp: String) -> Envelope {
+    pub(crate) fn envelope_at(&self, event_id: String, timestamp: String) -> Envelope {
         Envelope {
             event_id,
             sequence: self.sequence,
@@ -197,18 +200,8 @@ impl Run {
             timestamp,
         }
     }
-    /// A dispatched step's confirmed outcome, correlated to its intent.
-    pub(crate) fn step_outcome(
-        &mut self,
-        step_id: &str,
-        intent_id: &str,
-        result: &str,
-        semantic_code: Option<&str>,
-    ) -> Result<(), RunRefusal> {
-        let timestamp = self.clock()?;
-        self.step_outcome_at(step_id, intent_id, result, semantic_code, &timestamp)
-    }
-    /// The same, at the time the run already read for it.
+    /// A dispatched step's confirmed outcome, correlated to its intent, at
+    /// the time the run read for it.
     pub(crate) fn step_outcome_at(
         &mut self,
         step_id: &str,
@@ -342,7 +335,10 @@ impl JobRunner<'_> {
                 Some(id),
             ));
         }
-        if !RUNNABLE.contains(&state.as_str()) {
+        // Swift continues a `finalizing` debug HAP's failure finalization;
+        // here it is refused below with every other resumption.
+        let finalizing_hap = record.operation() == "debug.hap@1" && state == "finalizing";
+        if !RUNNABLE.contains(&state.as_str()) && !finalizing_hap {
             return Err(proven(
                 "resourceConflict",
                 format!("job {id} is {state}, not runnable"),
@@ -399,6 +395,7 @@ impl JobRunner<'_> {
             journal,
             sequence: facts.last_durable_sequence.map_or(0, |last| last + 1),
             now: self.now,
+            consumed: None,
         };
         match self.hdc.filter(|_| device) {
             Some(hdc) => self.execute_device(&mut run, hdc)?,

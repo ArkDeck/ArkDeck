@@ -2,17 +2,24 @@
 //! reader alike: the steps the engine performs itself, the typed provider
 //! action a catalog step names with the request's inputs, the arguments Swift
 //! journals for it, which steps carry the evidence preflight, and the products
-//! each step owns.
+//! each step owns. For `debug.hap@1` also the Artifacts a step is given, the
+//! compensation each source step declares on its intent, the residue a
+//! failed cleanup leaves, and the mutations only a readback may believe.
+use crate::cleanup_debt::Residue;
 use crate::operation_catalog::{CatalogOperation, CatalogStep};
+use crate::session_json;
+use arkdeck_contract::sha256_hex;
 use arkdeck_provider_hdc::{
-    Action, DEFAULT_HILOG_BUDGET, FileActionError, FilePlan, PointerAction, PortAction, PortRule,
-    ProcessPlan, STORAGE_ROOT,
+    Action, DEFAULT_HILOG_BUDGET, Expected, FileActionError, FilePlan, FileReceipt, HapAction,
+    Outcome, PointerAction, PortAction, PortRule, ProcessPlan, ResolvedArtifact, STORAGE_ROOT,
 };
 use serde_json::{Map, Value, json};
 use std::collections::BTreeSet;
 
+const HAP: &str = "debug.hap@1";
+
 /// The device-bound operations this Runtime plans and runs.
-pub(crate) const DEVICE_OPERATIONS: [&str; 7] = [
+pub(crate) const DEVICE_OPERATIONS: [&str; 8] = [
     "observe.device@1",
     "capture.diagnostics@1",
     "input.tap@1",
@@ -20,6 +27,7 @@ pub(crate) const DEVICE_OPERATIONS: [&str; 7] = [
     "input.swipe@1",
     "port-forward.create@1",
     "port-forward.remove@1",
+    HAP,
 ];
 
 /// Swift `evidenceEligibleOperations`: the operations whose device steps wait
@@ -107,12 +115,22 @@ pub(crate) enum ActionRefusal {
     Invalid(String),
 }
 
+/// What a step is named, journaled and lowered within: its Job (before
+/// admission, the authorization envelope a plan is materialized for) and the
+/// Artifacts its leases resolved to, the entry package first.
+pub(crate) struct StepContext<'a> {
+    pub(crate) job_id: &'a str,
+    pub(crate) resolved: &'a [ResolvedArtifact],
+}
+
 /// A device step's typed provider action: an observation or capture action,
-/// a pointer gesture, or a port rule's change or readback.
+/// a pointer gesture, a port rule's change or readback, or a debug HAP's
+/// action.
 pub(crate) enum StepAction {
     Hdc(Action),
     Pointer(PointerAction),
     Port(PortAction),
+    Hap(HapAction),
 }
 
 impl StepAction {
@@ -120,6 +138,7 @@ impl StepAction {
         match self {
             Self::Pointer(action) => action.persisted(),
             Self::Port(action) => action.persisted(),
+            Self::Hap(action) => action.persisted(),
             Self::Hdc(action) => {
                 let (kind, arguments) = action.persisted();
                 let values = arguments
@@ -138,17 +157,23 @@ impl StepAction {
         }
     }
 
-    /// The provider's verdict on the step's receipt. A gesture's and a port
-    /// rule's name no device fact.
+    /// The provider's verdict on the step's receipt. Every action but a debug
+    /// HAP's lowers to one process and is judged by it; a gesture's and a port
+    /// rule's name no device fact. A HAP action is judged over the whole
+    /// receipt, and a package readback binds its verdict to the digest of the
+    /// entry package the Job resolved (`resolved_sha256`).
     pub(crate) fn verify(
         &self,
-        receipt: &arkdeck_provider_hdc::Receipt,
-        expected: arkdeck_provider_hdc::Expected<'_>,
-    ) -> arkdeck_provider_hdc::Outcome {
-        match self {
-            Self::Hdc(action) => action.verify(receipt, expected),
-            Self::Pointer(action) => action.verify(receipt),
-            Self::Port(action) => action.verify(receipt),
+        receipt: &FileReceipt,
+        expected: Expected<'_>,
+        resolved_sha256: Option<&str>,
+    ) -> Outcome {
+        match (self, receipt.subprocesses.first()) {
+            (Self::Hap(action), _) => action.verify(receipt, resolved_sha256),
+            (_, None) => Outcome::Unknown("dispatch produced no process result".into()),
+            (Self::Hdc(action), Some(sole)) => action.verify(sole, expected),
+            (Self::Pointer(action), Some(sole)) => action.verify(sole),
+            (Self::Port(action), Some(sole)) => action.verify(sole),
         }
     }
 
@@ -157,6 +182,7 @@ impl StepAction {
             Self::Hdc(action) => action.effect(),
             Self::Pointer(action) => action.effect(),
             Self::Port(action) => action.effect(),
+            Self::Hap(action) => action.effect(),
         }
     }
 
@@ -166,14 +192,25 @@ impl StepAction {
         step_id: &str,
         connect_key: Option<&str>,
     ) -> Result<ProcessPlan, String> {
-        let plan = match self {
-            Self::Hdc(action) => return action.lower(step_id, connect_key),
-            Self::Pointer(action) => action.lower(step_id, connect_key)?,
-            Self::Port(action) => action.lower(step_id, connect_key)?,
-        };
-        match plan {
+        match self.plan(step_id, connect_key, &[])? {
             FilePlan::Process(plan) => Ok(plan),
             _ => Err(format!("{step_id} did not lower to one process")),
+        }
+    }
+
+    /// The process or process sequence the step's executor runs, against the
+    /// Target's connect key and the Artifacts a send stages.
+    pub(crate) fn plan(
+        &self,
+        step_id: &str,
+        connect_key: Option<&str>,
+        resolved: &[ResolvedArtifact],
+    ) -> Result<FilePlan, String> {
+        match self {
+            Self::Hdc(action) => action.lower(step_id, connect_key).map(FilePlan::Process),
+            Self::Pointer(action) => action.lower(step_id, connect_key),
+            Self::Port(action) => action.lower(step_id, connect_key),
+            Self::Hap(action) => action.lower(step_id, connect_key, resolved),
         }
     }
 }
@@ -248,6 +285,284 @@ pub(crate) fn action(
         _ => return Err(ActionRefusal::Unported),
     };
     Ok(StepAction::Hdc(action))
+}
+
+/// Swift `HDCObservationProviderAdapter.action` for a step run within
+/// `context`: a debug HAP's own step kinds are its provider module's, with the
+/// owned paths minted for the Job and the Artifacts resolved for the step;
+/// every other step is named as [`action`] names it.
+pub(crate) fn action_in(
+    step: &CatalogStep,
+    reference: &str,
+    inputs: &Map<String, Value>,
+    now_utc: &str,
+    context: &StepContext<'_>,
+) -> Result<StepAction, ActionRefusal> {
+    if reference == HAP
+        && let Some(answer) = claim(
+            HapAction::for_step(
+                &step.step_id,
+                &step.kind,
+                remote_action(step),
+                inputs,
+                context.job_id,
+                context.resolved,
+            ),
+            StepAction::Hap,
+        )
+    {
+        return answer;
+    }
+    action(step, reference, inputs, now_utc)
+}
+
+/// Swift `journalStep(for:)` arguments of a debug HAP's own actions: what a
+/// send stages and from which Artifact, which package an install names, the
+/// bundle a readback, a start, a stop and an uninstall name, and the staging a
+/// cleanup removes on behalf of `job_id`.
+pub(crate) fn hap_journal_arguments(
+    action: &HapAction,
+    step: &CatalogStep,
+    inputs: &Map<String, Value>,
+    job_id: &str,
+    resolved: &[ResolvedArtifact],
+) -> Option<Value> {
+    Some(match action {
+        HapAction::SendArtifactToStaging(staged) => {
+            json!({"sourceArtifactId": resolved.first()?.artifact_id,
+                "sourceSha256": resolved.first()?.sha256, "remotePath": staged.path.remote_path})
+        }
+        HapAction::SendPackageSetToStaging(set) => {
+            json!({"sourceArtifactId": resolved.first()?.artifact_id,
+                "sourceSha256": resolved.first()?.sha256, "remotePath": set.directory.remote_path})
+        }
+        HapAction::InstallPackage { staged, .. } => {
+            json!({"packageArtifactId": staged.artifact_lease_id.rsplit(':').next()?,
+                "packageName": inputs.get("bundleName")?, "replacePolicy": "allow"})
+        }
+        HapAction::InstallPackageSet { set, .. } => {
+            json!({"packageArtifactId": set.packages.first()?.artifact_lease_id.rsplit(':').next()?,
+                "packageName": inputs.get("bundleName")?, "replacePolicy": "allow"})
+        }
+        HapAction::UninstallPackage(bundle) => json!({"packageName": bundle.bundle_name()}),
+        HapAction::StartAbility(ability) | HapAction::StopAbility(ability) => {
+            json!({"bundleName": ability.bundle.bundle_name(), "abilityName": ability.ability_name})
+        }
+        HapAction::CleanupOwnedRemotePath { path } => {
+            json!({"remotePath": path.remote_path, "ownershipEvidenceId": format!("owned-{job_id}")})
+        }
+        HapAction::CleanupStagedPackageSet(set) => {
+            json!({"remotePath": set.directory.remote_path,
+                "ownershipEvidenceId": format!("owned-{job_id}")})
+        }
+        HapAction::QueryPackageReadback(bundle) => {
+            json!({"catalogId": REMOTE_OPERATIONS, "actionId": "packageInfo",
+                "parameters": {"bundleName": bundle.bundle_name()},
+                "artifactId": format!("artifact-{}", step.step_id)})
+        }
+        HapAction::VerifyProcessState(bundle) => {
+            json!({"probeId": format!("process.{}", bundle.bundle_name()),
+                "expectedState": "running"})
+        }
+        _ => return None,
+    })
+}
+
+/// Swift `journalStep(for:)` arguments of a step run within `context`.
+pub(crate) fn journal_arguments_in(
+    step: &CatalogStep,
+    reference: &str,
+    inputs: &Map<String, Value>,
+    action: &StepAction,
+    context: &StepContext<'_>,
+) -> Option<Value> {
+    match action {
+        StepAction::Hap(hap) => {
+            hap_journal_arguments(hap, step, inputs, context.job_id, context.resolved)
+        }
+        _ => journal_arguments_for(step, reference, inputs, action),
+    }
+}
+
+/// Swift `RuntimeDebugHAPFailureFinalization.sourceSteps`, each with the
+/// catalog step that undoes it.
+const HAP_COMPENSATIONS: [(&str, &str); 3] = [
+    ("send-hap", "cleanup-remote-staging"),
+    ("install-hap", "cleanup-uninstall"),
+    ("start-ability", "stop-ability"),
+];
+
+/// Swift `RuntimeDebugHAPFailureFinalization.descriptorID(forCatalogStepID:)`.
+pub(crate) fn compensation_id(step_id: &str) -> String {
+    format!("compensation-{step_id}")
+}
+
+/// Swift `catalogStepID(forSourceStepID:)`: the catalog step that undoes a
+/// debug HAP's source step.
+pub(crate) fn hap_compensation_step(source: &str) -> Option<&'static str> {
+    HAP_COMPENSATIONS
+        .iter()
+        .find(|(step, _)| *step == source)
+        .map(|(_, compensation)| *compensation)
+}
+
+/// The source step a debug HAP's cleanup step undoes.
+pub(crate) fn hap_source_of(compensation: &str) -> Option<&'static str> {
+    HAP_COMPENSATIONS
+        .iter()
+        .find(|(_, step)| *step == compensation)
+        .map(|(source, _)| *source)
+}
+
+/// Swift `catalogStepID(forDescriptorID:)`.
+pub(crate) fn compensation_catalog_step(descriptor_id: &str) -> Option<&'static str> {
+    HAP_COMPENSATIONS
+        .iter()
+        .map(|(_, step)| *step)
+        .find(|step| compensation_id(step) == descriptor_id)
+}
+
+/// Swift `debugHAPCompensationStep(forSourceStepID:descriptor:inputs:)`: the
+/// catalog step that would undo `source`, where one applies. The uninstall
+/// applies only under the `uninstall` cleanup policy; the stop applies even
+/// when success leaves the ability running.
+pub(crate) fn hap_compensation<'a>(
+    descriptor: &'a CatalogOperation,
+    inputs: &Map<String, Value>,
+    source: &str,
+) -> Option<&'a CatalogStep> {
+    if descriptor.reference() != HAP {
+        return None;
+    }
+    let step = hap_compensation_step(source)?;
+    if source == "install-hap"
+        && descriptor.resolved("cleanupPolicy", inputs) != Some(&json!("uninstall"))
+    {
+        return None;
+    }
+    descriptor
+        .steps
+        .iter()
+        .find(|catalog| catalog.step_id == step)
+}
+
+/// Swift's `CompensationDescriptor` for a compensation step's action: its
+/// journal step under the compensation's identity, triggered on failure, with
+/// the digest of its arguments.
+pub(crate) fn declared_descriptor(
+    step: &CatalogStep,
+    reference: &str,
+    inputs: &Map<String, Value>,
+    action: &StepAction,
+    context: &StepContext<'_>,
+) -> Option<Value> {
+    let arguments = journal_arguments_in(step, reference, inputs, action, context)?;
+    let hash = sha256_hex(&session_json::encode(&arguments).ok()?);
+    Some(json!({
+        "id": compensation_id(&step.step_id), "kind": step.kind, "effect": step.effect,
+        "cancellation": step.cancellation, "bindingRequirement": step.binding,
+        "trigger": "onFailure", "arguments": arguments, "argumentsHash": hash,
+    }))
+}
+
+/// Swift `debugHAPCompensationDeclaration(for:descriptor:inputs:provider:context:)`:
+/// what a debug HAP's source step declares on its intent, the compensation
+/// that would undo it named from the provider's action within the source's
+/// own context. Every other step declares none; `None` is Swift's internal
+/// failure, a compensation whose action does not have its catalog effect.
+pub(crate) fn compensation_declarations(
+    source: &CatalogStep,
+    descriptor: &CatalogOperation,
+    inputs: &Map<String, Value>,
+    now_utc: &str,
+    context: &StepContext<'_>,
+) -> Option<Vec<Value>> {
+    let Some(step) = hap_compensation(descriptor, inputs, &source.step_id) else {
+        return Some(Vec::new());
+    };
+    let reference = descriptor.reference();
+    let action = action_in(step, &reference, inputs, now_utc, context).ok()?;
+    if action.effect() != step.effect {
+        return None;
+    }
+    Some(vec![declared_descriptor(
+        step, &reference, inputs, &action, context,
+    )?])
+}
+
+/// Swift `cleanupResidue(for:)`: what a debug HAP's cleanup was to remove, a
+/// staged path or an installed bundle. No other action owes a residue.
+pub(crate) fn cleanup_residue(action: &StepAction) -> Option<Residue> {
+    match action {
+        StepAction::Hap(HapAction::CleanupOwnedRemotePath { path }) => {
+            Some(Residue::RemotePath(path.remote_path.clone()))
+        }
+        StepAction::Hap(HapAction::CleanupStagedPackageSet(set)) => {
+            Some(Residue::RemotePath(set.directory.remote_path.clone()))
+        }
+        StepAction::Hap(HapAction::UninstallPackage(bundle)) => {
+            Some(Residue::InstalledBundle(bundle.bundle_name().to_owned()))
+        }
+        _ => None,
+    }
+}
+
+/// Swift `RuntimeJobEngine.readbackPairs`: the mutations whose truth is
+/// delegated to the readback step after them.
+const READBACK_PAIRS: [(&str, &str, &str); 4] = [
+    (HAP, "install-hap", "package-readback"),
+    (HAP, "start-ability", "process-readback"),
+    (
+        "port-forward.create@1",
+        "create-port-rule",
+        "verify-port-rule",
+    ),
+    (
+        "port-forward.remove@1",
+        "remove-port-rule",
+        "verify-port-rule",
+    ),
+];
+
+/// Swift `awaitsReadback(step:descriptor:)`: a mutation whose provider
+/// cannot believe it on its own succeeds as a dispatch when a required
+/// readback step follows, which alone may believe it.
+pub(crate) fn awaits_readback(descriptor: &CatalogOperation, step_id: &str) -> bool {
+    let reference = descriptor.reference();
+    READBACK_PAIRS
+        .iter()
+        .find(|(operation, mutation, _)| *operation == reference && *mutation == step_id)
+        .is_some_and(|(_, _, readback)| {
+            descriptor
+                .steps
+                .iter()
+                .any(|step| step.step_id == *readback && !step.optional)
+        })
+}
+
+/// Which of a Job's input Artifacts a step is given, resolved from their
+/// leases again immediately before it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum StepInputs {
+    None,
+    /// The entry package alone.
+    Entry,
+    /// The entry package, then every additional package.
+    All,
+}
+
+/// Swift's input Artifacts per step of the operations run here: a debug
+/// HAP's send is given every package it stages, its install and its approved
+/// remote reads the entry package. No other operation run here takes one.
+pub(crate) fn step_inputs(reference: &str, kind: &str) -> StepInputs {
+    if reference != HAP {
+        return StepInputs::None;
+    }
+    match kind {
+        "sendFile" => StepInputs::All,
+        "installPackage" | "runApprovedRemoteRead" => StepInputs::Entry,
+        _ => StepInputs::None,
+    }
 }
 
 /// Swift `journalStep(for:)` arguments for the kinds this Runtime
@@ -389,6 +704,9 @@ pub(crate) fn products(operation: &str, step_id: &str) -> &'static [&'static str
         ("port-forward.create@1" | "port-forward.remove@1", "verify-port-rule") => {
             &["port-rule-readback.json"]
         }
+        (HAP, "package-readback") => &["install-readback.json"],
+        (HAP, "process-readback") => &["process-readback.json"],
+        (HAP, "capture-diagnostics") => &["debug-hilog.txt"],
         _ => &[],
     }
 }

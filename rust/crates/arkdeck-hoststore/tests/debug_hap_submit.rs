@@ -8,8 +8,9 @@
 //! - every plan and submission is answered as Swift answered it; the two
 //!   capabilities are installed as Swift issued them and no use is consumed;
 //!   each Job's request, original submission, admission row and journal are
-//!   Swift's; `job.run` and an agent execution refuse a HAP with zero dispatch,
-//!   and a cancelled one closes at `preflight` with no use spent;
+//!   Swift's; an agent execution admits the HAP it will run, and a cancelled
+//!   one closes at `preflight` with no use spent (the runs themselves are
+//!   `debug_hap_run.rs`'s);
 //! - with the use each Swift run took written between the submissions, through
 //!   the store's own writes and as Swift recorded it, the admissions leave
 //!   Swift's capability store byte for byte, and after the last use's unknown
@@ -28,8 +29,8 @@ use arkdeck_contract::sha256_hex;
 use arkdeck_hoststore::{
     AdmissionRefusal, AgentEngine, AgentExecutionStore, ArtifactReadStore, CapabilityQuery,
     CapabilityStore, CapabilityUseOutcome, DeviceHolds, HdcComposition, ImportUploadStore,
-    JobAdmitter, JobCanceller, JobPlanner, JobRunner, JobStore, MutationAuthority,
-    MutationExecution, TargetStore, WorkflowEffect,
+    JobAdmitter, JobCanceller, JobPlanner, JobStore, MutationAuthority, TargetStore,
+    WorkflowEffect,
 };
 use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
@@ -311,96 +312,10 @@ fn rust_admits_the_swift_hap_submissions_under_the_capabilities_swift_issued() {
         }
     }
 
-    // `job.run` refuses every admitted HAP before its run starts, with the
-    // zero-dispatch proof, even with the mutation owner present.
-    let runner = JobRunner {
-        mutation: Some(MutationExecution {
-            authority: owners.authority(),
-            state_root: &owners.root,
-        }),
-        jobs: &owners.jobs,
-        artifacts: &owners.artifacts,
-        imports: None,
-        analyzer: None,
-        quota: 128 * 1024 * 1024,
-        home: "/private/tmp",
-        now: fixed_now,
-        precise_now: fixed_precise_now,
-        sessions: None,
-        cancellation: None,
-        after_commit: None,
-        hdc: Some(&hdc),
-    };
-    let jobs_before = debug_hap::tree_bytes(&owners.store.join("jobs"));
-    let capabilities_before = debug_hap::tree_bytes(&owners.store.join("capabilities"));
-    for job in cases["jobs"].as_object().unwrap().values() {
-        let job = job.as_str().unwrap();
-        let refusal = runner
-            .handle(&Map::from_iter([("jobId".into(), json!(job))]))
-            .unwrap_err();
-        assert_eq!(
-            json!({"code": refusal.code, "message": refusal.message, "details": refusal.details}),
-            json!({"code": "rejected",
-                "message": format!("job {job} runs debug.hap@1, which the Rust Runtime does not execute yet"),
-                "details": proof()})
-        );
-    }
-
-    // An agent execution starts the Job it owns at once, so it admits no HAP
-    // while this Runtime cannot run one: refused before admission.
-    let executions = owners.root.join("agent-executions");
-    fs::create_dir(&executions).unwrap();
-    fs::set_permissions(&executions, fs::Permissions::from_mode(0o700)).unwrap();
-    let agents = AgentExecutionStore::open(&executions).unwrap();
-    let engine = AgentEngine {
-        targets: &owners.targets,
-        jobs: &owners.jobs,
-        admitter: &admitter,
-        now: fixed_precise_now,
-        observations: None,
-    };
-    let installed = recorded_request(&cases, "installed");
-    let run = json!({
-        "schemaVersion": "arkdeck.agent-execution-request/1", "executionId": "hap-agent",
-        "operation": "debug.hap@1", "inputs": installed["inputs"],
-        "maximumWaitMilliseconds": "300000",
-        "target": {"targetId": installed["target"]["targetId"]},
-    });
-    let Err(refused) = agents.advance("agent.run", run.as_object().unwrap(), &engine) else {
-        panic!("an agent execution admitted a HAP this Runtime cannot run");
-    };
-    assert_eq!(
-        (refused.code.as_str(), refused.message.as_str()),
-        (
-            "admissionDenied",
-            "debug.hap@1 is not executed by the Rust Runtime yet"
-        )
-    );
-    let details = Value::Object(refused.details.unwrap_or_default());
-    assert_eq!(
-        (&details["newDispatchCount"], &details["executionId"]),
-        (&json!(0), &json!("hap-agent"))
-    );
-    assert_eq!(
-        debug_hap::tree_bytes(&owners.store.join("jobs")),
-        jobs_before,
-        "a refused run or agent execution writes no Job"
-    );
-    assert_eq!(
-        debug_hap::tree_bytes(&owners.store.join("capabilities")),
-        capabilities_before,
-        "a refused run or agent execution issues and consumes nothing"
-    );
-    assert!(
-        debug_hap::invocations(&owners.root).is_empty(),
-        "nothing is dispatched"
-    );
-
     // The admission rows are Swift's: identity, request hash, sequence and
     // creation. Their state, version and record come with the runs. The index
     // is read once the Job owner is closed.
     let store = owners.store.clone();
-    drop(agents);
     drop(owners);
     let index = support::index(&store);
     let recorded = support::document(&fixture, "store/index.json");
@@ -804,6 +719,67 @@ fn an_admitted_hap_keeps_its_imported_packages_from_release() {
             "resourceConflict"
         );
     }
+    assert_eq!(uses(&owners.store), 0);
+    assert!(debug_hap::invocations(&owners.root).is_empty());
+}
+
+/// An agent execution starts the Job it comes to own at once, and this
+/// Runtime now runs a HAP: `agent.run` admits it under the capability the
+/// Runtime issues, as `job.submit` does, and hands the Job to its caller to
+/// start. Admission dispatches nothing and consumes no use.
+#[test]
+fn an_agent_run_admits_the_hap_it_will_run() {
+    let _lock = debug_hap::exclusive();
+    let fixture = support::fixture("debug-hap");
+    let cases = support::document(&fixture, "cases.json");
+    let owners = Owners::open(&fixture);
+    let hdc = owners.hdc();
+    let admitter = owners.admitter(&hdc);
+    let executions = owners.root.join("agent-executions");
+    fs::create_dir(&executions).unwrap();
+    fs::set_permissions(&executions, fs::Permissions::from_mode(0o700)).unwrap();
+    let agents = AgentExecutionStore::open(&executions).unwrap();
+    let engine = AgentEngine {
+        targets: &owners.targets,
+        jobs: &owners.jobs,
+        admitter: &admitter,
+        now: fixed_precise_now,
+        observations: None,
+    };
+    let installed = recorded_request(&cases, "installed");
+    let run = json!({
+        "schemaVersion": "arkdeck.agent-execution-request/1", "executionId": "hap-agent",
+        "operation": "debug.hap@1", "inputs": installed["inputs"],
+        "maximumWaitMilliseconds": "300000",
+        "target": {"targetId": installed["target"]["targetId"]},
+    });
+    let answer = agents
+        .advance("agent.run", run.as_object().unwrap(), &engine)
+        .unwrap_or_else(|refusal| panic!("{}: {}", refusal.code, refusal.message));
+    let start = answer
+        .start
+        .expect("the execution owns the Job it will run");
+    assert_eq!(start.execution, "hap-agent");
+    let record = read(
+        &owners
+            .store
+            .join("jobs")
+            .join(&start.job)
+            .join("job-record.json"),
+    );
+    assert_eq!(
+        (&record["state"], &record["operationReference"]),
+        (&json!("preflight"), &json!("debug.hap@1"))
+    );
+    assert!(record.get("admissionEvidence").is_none());
+    // The capability the Runtime issued for these exact inputs, with its
+    // whole budget.
+    let issued = read(&owners.capability_file(CHECKPOINT));
+    assert_eq!(envelopes(&issued).len(), 1);
+    assert_eq!(
+        record["request"]["authorization"]["capabilityId"],
+        envelopes(&issued)[0]["capabilityID"]
+    );
     assert_eq!(uses(&owners.store), 0);
     assert!(debug_hap::invocations(&owners.root).is_empty());
 }

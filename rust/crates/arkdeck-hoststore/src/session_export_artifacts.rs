@@ -32,7 +32,9 @@ impl PreparedSessionExport {
             return Err(invalid());
         }
         let summary = session_manifest::decode_manifest(bytes).map_err(|e| match e {
-            session_manifest::ManifestError::Invalid => invalid(),
+            session_manifest::ManifestError::Invalid | session_manifest::ManifestError::Rule(_) => {
+                invalid()
+            }
             session_manifest::ManifestError::Unsupported => io::Error::new(
                 io::ErrorKind::Unsupported,
                 "Session export manifest has unsupported typed content",

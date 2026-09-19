@@ -122,7 +122,7 @@ fn scan_session(
     }
     let bytes = root.read("manifest.json", 16 * 1024 * 1024)?;
     let manifest = decode_manifest(&bytes).map_err(|e| match e {
-        ManifestError::Invalid => invalid(),
+        ManifestError::Invalid | ManifestError::Rule(_) => invalid(),
         ManifestError::Unsupported => coverage(),
     })?;
     if manifest.session_id != name || manifest.job_id != identity.job_id {

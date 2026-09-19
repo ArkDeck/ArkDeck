@@ -23,7 +23,7 @@ use serde_json::{Map, Value, json};
 use std::collections::BTreeSet;
 
 /// The operations whose results this Runtime reads.
-const READABLE: [&str; 8] = [
+const READABLE: [&str; 9] = [
     "analyzer.extract-crash-signature@1",
     "observe.device@1",
     "capture.diagnostics@1",
@@ -32,6 +32,7 @@ const READABLE: [&str; 8] = [
     "input.swipe@1",
     "port-forward.create@1",
     "port-forward.remove@1",
+    "debug.hap@1",
 ];
 const MAX_LEDGER: usize = 16 * 1024 * 1024;
 /// Swift `RuntimeJobReadProjection.bounded`.
@@ -94,6 +95,9 @@ impl JobResultReader<'_> {
     pub(crate) fn agent_evidence(&self, record: &JobRecord) -> Value {
         let facts = self.facts(record, true);
         let mut fields = record.evidence_fields();
+        if let Some(kinds) = self.durable_step_kinds(record) {
+            fields.insert("actualStepKinds".into(), kinds);
+        }
         for key in ["parameters", "traceProbeBefore", "traceProbeAfter"] {
             fields.remove(key);
         }
@@ -161,7 +165,10 @@ impl JobResultReader<'_> {
             ));
         }
         let facts = self.facts(&record, is_terminal);
-        let (evidence, inventory) = render(&record, &facts, is_terminal);
+        let (mut evidence, inventory) = render(&record, &facts, is_terminal);
+        if let Some(kinds) = self.durable_step_kinds(&record).filter(|_| !facts.degraded) {
+            evidence["actualStepKinds"] = kinds;
+        }
         let result = if method == "job.evidence" {
             evidence
         } else {
@@ -201,6 +208,31 @@ impl JobResultReader<'_> {
             ));
         }
         Ok(result)
+    }
+
+    /// Swift `durableActualStepKinds` for a debug HAP: the kinds its record
+    /// kept, then any its journal's step and compensation intents prove, in
+    /// journal order, so a record persisted before its last intents loses
+    /// none; `null` when the journal cannot be replayed. Every other Job
+    /// reads the kinds its record kept.
+    fn durable_step_kinds(&self, record: &JobRecord) -> Option<Value> {
+        if record.operation() != "debug.hap@1" {
+            return None;
+        }
+        let proven = self
+            .jobs
+            .journal_bytes(&record.job_id)
+            .ok()
+            .and_then(|bytes| intent_kinds(&bytes));
+        Some(proven.map_or(Value::Null, |proven| {
+            let mut kinds = record.step_kinds().unwrap_or_default().to_vec();
+            for kind in proven {
+                if !kinds.contains(&kind) {
+                    kinds.push(kind);
+                }
+            }
+            json!(kinds)
+        }))
     }
 
     /// Swift `jobReadSnapshot` from the durable index, with its refusals.
@@ -448,6 +480,29 @@ impl JobResultReader<'_> {
             .filter(|row| row["jobId"].as_str() == Some(job_id))
             .collect())
     }
+}
+
+/// The kind of every step and compensation intent a journal's complete
+/// records hold, in order, once they replay (Swift
+/// `DurableJournalRecovery.inspect`); a torn tail is not read.
+fn intent_kinds(bytes: &[u8]) -> Option<Vec<String>> {
+    let replay = crate::job_journal_replay::ReplayState::replay(bytes).ok()?;
+    let mut kinds = Vec::new();
+    for line in bytes[..replay.durable_length]
+        .split(|byte| *byte == b'\n')
+        .filter(|line| !line.is_empty())
+    {
+        let event: Value = serde_json::from_slice(line).ok()?;
+        let key = match event["kind"].as_str() {
+            Some("stepIntent") => "step",
+            Some("compensationIntent") => "descriptor",
+            _ => continue,
+        };
+        if let Some(kind) = event["payload"][key]["kind"].as_str() {
+            kinds.push(kind.to_owned());
+        }
+    }
+    Some(kinds)
 }
 
 /// Swift `RuntimeJobResourceReader.evidence`: the evidence object and the

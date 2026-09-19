@@ -299,6 +299,51 @@ impl CapabilityStore {
         })
     }
 
+    /// Swift `validateContinuation`: a Job continuing under the use it
+    /// already reserved, which must be exactly its own (the reservation and
+    /// the Job), for this very query, and not yet settled; the capability must
+    /// still authorize the query with that one use added back, as it did when
+    /// the use was charged. Nothing is reserved, replenished or written.
+    pub(crate) fn validate_continuation(
+        &self,
+        capability_id: &str,
+        reservation_id: &str,
+        job_id: &str,
+        query: &CapabilityQuery,
+        now_utc: &str,
+    ) -> Result<ConsumptionReceipt, CapabilityStoreError> {
+        self.locked(|_, document, _| {
+            let record = document
+                .records
+                .iter()
+                .find(|record| same_text(&record.capability.id, capability_id))
+                .ok_or_else(|| CapabilityStoreError::NotFound(capability_id.to_owned()))?;
+            let use_ = record
+                .consumptions
+                .iter()
+                .find(|use_| {
+                    same_text(&use_.reservation, reservation_id) && same_text(&use_.job, job_id)
+                })
+                .filter(|use_| {
+                    use_.query == fingerprint(query, true)
+                        && matches!(
+                            use_.current(),
+                            UseOutcome::Pending | UseOutcome::OutcomeUnknown
+                        )
+                })
+                .ok_or_else(|| {
+                    CapabilityStoreError::ReservationConflict(
+                        "continuation has no exact unresolved owning use".into(),
+                    )
+                })?;
+            record
+                .capability
+                .authorizes(query, now_utc, use_.remaining_after + 1)
+                .map_err(CapabilityStoreError::Denied)?;
+            Ok(use_.to_receipt(capability_id))
+        })
+    }
+
     /// Swift `inspect(capabilityID:)` as automatic issuance reads a
     /// generation: whether it exists and, if so, its remaining uses, its
     /// expiry and whether it was revoked.

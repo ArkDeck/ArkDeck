@@ -218,6 +218,7 @@ fn live_discovery_and_describe_follow_actual_executors_and_executable_drift_with
         "input.swipe@1",
         "port-forward.create@1",
         "port-forward.remove@1",
+        "debug.hap@1",
     ] {
         // The executor exists, but this development composition cannot acquire
         // the account-fixed Runtime mutation owner or grant dispatch authority.

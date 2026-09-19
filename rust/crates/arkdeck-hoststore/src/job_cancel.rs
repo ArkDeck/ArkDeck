@@ -232,6 +232,7 @@ impl JobCanceller<'_> {
             journal,
             sequence: facts.last_durable_sequence.map_or(0, |last| last + 1),
             now: self.now,
+            consumed: None,
         };
         // Swift completes this zero-dispatch decision durably at once, so an
         // abandoned submission never stays in `preflight`.

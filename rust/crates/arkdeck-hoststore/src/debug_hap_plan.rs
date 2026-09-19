@@ -1,8 +1,8 @@
-//! HAP materialization for `job.plan` and `job.submit`. Nothing here dispatches,
-//! issues or consumes a capability; admission issues one from the primary
-//! Artifact facts this returns. Mirrors RuntimeJobEngine's input binding,
-//! authorization-envelope lowering, and failure-only compensations, while
-//! retaining the enclosing Import hold.
+//! HAP materialization for `job.plan`, `job.submit` and every mutation of its
+//! run. Nothing here dispatches, issues or consumes a capability; admission
+//! issues one from the primary Artifact facts this returns. Mirrors
+//! RuntimeJobEngine's input binding, authorization-envelope lowering, and
+//! failure-only compensations, while retaining the enclosing Import hold.
 use super::*;
 use crate::device_facts::DeviceFacts;
 use crate::operation_catalog::CatalogStep;
@@ -178,8 +178,14 @@ fn materialize_step(
         if action.effect() != step.effect {
             return Err(internal_failure());
         }
-        let arguments =
-            hap_arguments(&action, resolved, &request.inputs, step).ok_or_else(internal_failure)?;
+        let arguments = device_steps::hap_journal_arguments(
+            &action,
+            step,
+            &request.inputs,
+            AUTHORIZATION_JOB,
+            resolved,
+        )
+        .ok_or_else(internal_failure)?;
         (
             action
                 .lower(&step.step_id, Some(&facts.connect_key), resolved)
@@ -236,50 +242,6 @@ fn materialize_step(
         FilePlan::Receive { .. } => return Err(internal_failure()),
     }
     Ok(document)
-}
-
-fn hap_arguments(
-    action: &HapAction,
-    resolved: &[ResolvedArtifact],
-    inputs: &Map<String, Value>,
-    step: &CatalogStep,
-) -> Option<Value> {
-    Some(match action {
-        HapAction::SendArtifactToStaging(staged) => {
-            json!({"sourceArtifactId": resolved.first()?.artifact_id,
-            "sourceSha256": resolved.first()?.sha256, "remotePath": staged.path.remote_path})
-        }
-        HapAction::SendPackageSetToStaging(set) => {
-            json!({"sourceArtifactId": resolved.first()?.artifact_id,
-            "sourceSha256": resolved.first()?.sha256, "remotePath": set.directory.remote_path})
-        }
-        HapAction::InstallPackage { staged, .. } => {
-            json!({"packageArtifactId": staged.artifact_lease_id.rsplit(':').next()?,
-            "packageName": inputs.get("bundleName")?, "replacePolicy": "allow"})
-        }
-        HapAction::InstallPackageSet { set, .. } => {
-            json!({"packageArtifactId": set.packages.first()?.artifact_lease_id.rsplit(':').next()?,
-            "packageName": inputs.get("bundleName")?, "replacePolicy": "allow"})
-        }
-        HapAction::UninstallPackage(bundle) => json!({"packageName": bundle.bundle_name()}),
-        HapAction::StartAbility(ability) | HapAction::StopAbility(ability) => {
-            json!({"bundleName": ability.bundle.bundle_name(), "abilityName": ability.ability_name})
-        }
-        HapAction::CleanupOwnedRemotePath { path } => {
-            json!({"remotePath": path.remote_path, "ownershipEvidenceId": format!("owned-{AUTHORIZATION_JOB}")})
-        }
-        HapAction::CleanupStagedPackageSet(set) => {
-            json!({"remotePath": set.directory.remote_path, "ownershipEvidenceId": format!("owned-{AUTHORIZATION_JOB}")})
-        }
-        HapAction::QueryPackageReadback(bundle) => {
-            json!({"catalogId": "arkdeck-remote-operations", "actionId": "packageInfo",
-            "parameters": {"bundleName": bundle.bundle_name()}, "artifactId": format!("artifact-{}", step.step_id)})
-        }
-        HapAction::VerifyProcessState(bundle) => {
-            json!({"probeId": format!("process.{}", bundle.bundle_name()), "expectedState": "running"})
-        }
-        _ => return None,
-    })
 }
 
 pub(super) fn compensations<'a>(

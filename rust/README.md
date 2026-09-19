@@ -570,8 +570,7 @@ the answers, the capabilities installed, each Job's request and original
 submission, and the refusal after an unknown outcome.
 `tests/debug_hap_submit.rs` does the same for `debug.hap@1`, whose capability is
 also named by the entry package's owner-validated facts. An admitted HAP waits in
-`preflight`: `job.run` refuses it, and `agent.run`, which would start it at once,
-is refused before admission until the HAP runner is ported.
+`preflight` for `job.run` (below); `agent.run` admits the HAP it starts at once.
 
 ## Job run (TASK-XPA-014)
 
@@ -603,6 +602,32 @@ Job join its one run, as Swift's callers do.
 does: 1 for a failed, cancelled or interrupted Job and 75 for an unknown outcome.
 A connect failure stays `runtimeUnavailable`; a reply that cannot prove zero
 dispatch is `outcomeUnknown`.
+
+`debug.hap@1` runs through the HDC composition as Swift's `executeSteps` and
+`dispatchWithWAL` run it. Its packages are resolved from their leases again
+before each step given them (every package for the send, the entry package for
+the install and each approved remote read), each still bound to the Target,
+binding revision and identity the plan bound; a step dispatches its whole plan, a
+process sequence included; an install and a start succeed as dispatches that
+only the required readback after each may believe; and the send, install and
+start intents declare the compensation that undoes each. The Job consumes one
+capability use before its first mutation's intent. Each later mutation, and
+each compensation, continues under that use once the mutation state, the fresh
+plan and the Target facts are proven again; a compensation also proves the use
+is still the Job's own, unsettled and authorized (`validateContinuation`). A run
+continues only a use it consumed itself, and settles only that one. A required
+failure is compensated as Swift's `performDebugHAPFailureFinalization` does: the
+compensations the succeeded steps declared run latest first, a cleanup already
+attempted is never sent again, a failed cleanup is owed in the Artifact root's
+`cleanup-debt.json` with the exact action that failed (an optional one is owed
+and skipped on the normal path), and the Job fails with its original failure; a
+lane that cannot conclude parks the Job. `job.result` and `job.evidence` read
+these Jobs, their step kinds those the journal proves (Swift
+`durableActualStepKinds`). `tests/debug_hap_run.rs` replays the
+debug-hap oracle up to its debt continuations: every answer, the fake's first
+103 calls, and every file byte for byte (the two continued Jobs and the ledger
+as they stood before them). `cleanupDebt.list`/`continue` and continuing a
+parked or `finalizing` HAP wait for recovery (L.1 item 13).
 
 `rust/tests/fixtures/job-run-analyzer/` is the oracle Swift
 `JobRunAnalyzerOracleContractTests` records with the real descriptor-bound
