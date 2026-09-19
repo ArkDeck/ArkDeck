@@ -29,6 +29,8 @@ mod workspace_projects;
 pub use workspace_projects::validate_workspace_project_response;
 mod target_resources;
 pub use target_resources::validate_target_response;
+mod hdc_control;
+pub use hdc_control::hdc_control_action_params;
 mod trace_cache;
 pub use trace_cache::validate_trace_cache_response;
 mod agent_executions;
@@ -124,6 +126,8 @@ impl CliError {
                 | "agent.resume"
                 | "human-action.resume"
                 | "target.adopt"
+                | "runtime.hdc.impact-preview"
+                | "runtime.hdc.restart"
         ) {
             return job_plan::mutation_error(error, method);
         }
@@ -451,6 +455,11 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                 | "--destination"
                 | "--preview-id"
                 | "--preview-digest"
+                | "--action"
+                | "--server-endpoint-ref"
+                | "--expected-server-generation"
+                | "--action-request-id"
+                | "--control-action"
                 | "--total-quota-bytes"
                 | "--safety-margin-bytes"
                 | "--retention-days"
@@ -512,6 +521,10 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                         "--destination" => "destinationPath",
                         "--preview-id" => "previewId",
                         "--preview-digest" => "previewDigest",
+                        "--server-endpoint-ref" => "serverEndpointRef",
+                        "--expected-server-generation" => "expectedServerGeneration",
+                        "--action-request-id" => "actionRequestId",
+                        "--control-action" => "controlAction",
                         "--total-quota-bytes" => "totalQuotaBytes",
                         "--safety-margin-bytes" => "safetyMarginBytes",
                         "--retention-days" => "retentionDays",
@@ -654,6 +667,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["runtime", "bundle", "list"] => "runtime.bundle.list",
         ["runtime", "bundle", "remove"] => "runtime.bundle.remove",
         ["runtime", "hdc", "status"] => "runtime.hdc.status",
+        ["runtime", "hdc", "impact-preview"] => "runtime.hdc.impact-preview",
+        ["runtime", "hdc", "restart"] => "runtime.hdc.restart",
         ["runtime", "storage", "status"] => "runtime.storage.status",
         ["runtime", "storage", "policy"] => "runtime.storage.policy",
         ["runtime", "storage", "root"] => "runtime.storage.root",
@@ -710,6 +725,14 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             "observationGeneration",
             "timeout",
         ],
+        "runtime.hdc.impact-preview" => &[
+            "action",
+            "serverEndpointRef",
+            "expectedServerGeneration",
+            "actionRequestId",
+            "timeout",
+        ],
+        "runtime.hdc.restart" => &["controlAction", "previewId", "previewDigest", "timeout"],
         "target.list" => &["timeout"],
         "target.show" | "target.availability" => &["targetId", "timeout"],
         "target.display-name.set" => &["targetId", "expectedGeneration", "name", "timeout"],
@@ -1059,6 +1082,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
     let human_action_timeout =
         human_action_resources::configure(command, &mut method_options, help)?;
     let agent_timeout = agent_executions::configure(command, &mut method_options, help)?;
+    let hdc_timeout = hdc_control::configure(command, &mut method_options, help)?;
     let timeout_ms = read_only_resources::configure(command, &mut method_options, help)?
         .or(import_timeout)
         .or(artifact_timeout)
@@ -1066,7 +1090,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         .or(workspace_timeout)
         .or(plan_timeout)
         .or(agent_timeout)
-        .or(human_action_timeout);
+        .or(human_action_timeout)
+        .or(hdc_timeout);
     Ok(Invocation {
         command,
         method: if command == "device.candidates" {
@@ -1130,6 +1155,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                     | "agent.abandon"
                     | "agent.resume"
                     | "human-action.resume"
+                    | "runtime.hdc.impact-preview"
+                    | "runtime.hdc.restart"
             )
         {
             Some(method_options)

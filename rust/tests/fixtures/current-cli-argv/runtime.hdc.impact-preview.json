@@ -1,0 +1,186 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "runtime",
+        "hdc",
+        "impact-preview",
+        "--action",
+        "restart",
+        "--server-endpoint-ref",
+        "sample",
+        "--expected-server-generation",
+        "1",
+        "--action-request-id",
+        "sample"
+      ],
+      "expected": {
+        "command": "runtime.hdc.impact-preview",
+        "handlerArguments": [
+          "runtime",
+          "hdc",
+          "impact-preview",
+          "--action",
+          "restart",
+          "--server-endpoint-ref",
+          "sample",
+          "--expected-server-generation",
+          "1",
+          "--action-request-id",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "runtime",
+        "hdc",
+        "impact-preview",
+        "--help"
+      ],
+      "expected": {
+        "command": "runtime.hdc.impact-preview",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "runtime",
+        "hdc",
+        "impact-preview",
+        "--action",
+        "restart",
+        "--server-endpoint-ref",
+        "sample",
+        "--expected-server-generation",
+        "1",
+        "--action-request-id",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.hdc.impact-preview",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "runtime",
+        "hdc",
+        "impact-preview",
+        "--action",
+        "restart",
+        "--server-endpoint-ref",
+        "sample",
+        "--expected-server-generation",
+        "1",
+        "--action-request-id",
+        "sample",
+        "--action",
+        "restart"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.hdc.impact-preview",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "runtime",
+        "hdc",
+        "impact-preview"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.hdc.impact-preview",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "runtime",
+        "hdc",
+        "impact-preview",
+        "--action",
+        "restart",
+        "--server-endpoint-ref",
+        "sample",
+        "--expected-server-generation",
+        "1",
+        "--action-request-id",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.hdc.impact-preview",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "runtime",
+        "hdc",
+        "impact-preview",
+        "--action",
+        "restart",
+        "--server-endpoint-ref",
+        "sample",
+        "--expected-server-generation",
+        "1",
+        "--action-request-id",
+        "sample",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "runtime.hdc.impact-preview",
+        "handlerArguments": [
+          "runtime",
+          "hdc",
+          "impact-preview",
+          "--action",
+          "restart",
+          "--server-endpoint-ref",
+          "sample",
+          "--expected-server-generation",
+          "1",
+          "--action-request-id",
+          "sample",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "runtime.hdc.impact-preview",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "runtime",
+    "hdc",
+    "impact-preview"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}
