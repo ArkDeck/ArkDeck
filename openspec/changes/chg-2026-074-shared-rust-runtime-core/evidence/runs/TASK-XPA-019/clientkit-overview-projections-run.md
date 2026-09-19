@@ -62,8 +62,16 @@ is not run (AGENTS.md "验证与完成"); the PR's CI is the gate and runs on th
 
 ## CI
 
-Recorded by the next slice, because a green head is merged without an amend. The remote build
-source slice's CI (#2044) is recorded in its own run record by this commit.
+PR #2048. On head `71660181` (base `f56481d8`) every check passed:
+
+| Workflow run | Jobs | Conclusion |
+| --- | --- | --- |
+| Swift CI `35449373411` | `plan`, `swift-tests`, `app-build`, `ds-interactions` and the required `swift` aggregate; `rust-checks` skipped, as the plan selected no Rust lane | success |
+| SDD Guard `35449373285` | the required `guard`, `ds-tokens` | success |
+| Agent PR `35449373313` | `open-pr` | success |
+
+A green head is merged without an amend, so the AutoUpdate slice records this section. This
+slice's commit recorded the remote build source slice's CI (#2044) in that slice's own run record.
 
 ## Not run
 

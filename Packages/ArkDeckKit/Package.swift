@@ -122,6 +122,10 @@ let package = Package(
       dependencies: [
         "ArkDeckCore", "ArkDeckRuntime", "ArkDeckWorkflows", "ArkDeckAgentComposition",
         "ArkDeckAgentClient", "ArkDeckBootstrap", "ArkDeckLaunchAgent",
+        // CHG-2026-074 transitional edge: the facades the App and this CLI
+        // share move to ClientKit. It disappears when the Swift CLI is
+        // deleted at M5.
+        "ArkDeckClientKit",
       ]
     ),
     .target(
