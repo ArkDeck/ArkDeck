@@ -52,3 +52,27 @@ must both run in the final unified gate because method schemas and the Swift
 corpus changed. Its standard Rust lane runs `test_contract_checks.py` and
 `check-contracts.py`, alongside manifest and workspace validation; targeted
 ClientKit/schema tests alone do not satisfy that requirement.
+
+## First complete unified attempt
+
+Integrated main `760c527e` and reused the exact three-file HAR source-view
+fixture fix (`0f282c7f` plus `fc70ffde` to preserve main's then-unimplemented
+resume refusal). Both argv copies compare byte-identically with Swift sources.
+The final net test change only redirects include paths; no assertion is relaxed.
+
+The complete unified entry on `5f19ec7c` used the validation venv, Cargo jobs 2,
+Rust test threads 2, Swift test workers 2 and Xcode jobs 2. Common/design-system
+checks, full Swift tests, App build-for-testing, Rust workspace/strict Clippy,
+35 contract-check tests and the complete published view passed. The candidate
+workspace failed `verified_process::output_overflow_kills_and_reaps_the_child`
+at its unchanged `started.elapsed() < 2 seconds` assertion. The expected
+FileTooLarge result had already passed. This does not establish the cause of
+the timing overrun and is not a successful full gate. No time bound or runtime
+implementation was changed, and nothing was pushed.
+
+Log: `/private/tmp/arkdeck-clientkit-models-unified-final-20260919.log`.
+Failure metadata: `rust/target/readonly-check/05b072dbfef04ae7b05ea7a7b7cedb29`.
+The temporary contract source views were automatically removed by the runner.
+New main resume contracts landed during the run; integration must retain both
+resume and History corpus changes and regenerate their shared manifest before
+the next complete unified attempt.
