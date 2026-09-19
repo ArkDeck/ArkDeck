@@ -1,0 +1,52 @@
+{
+  "records" : [
+    {
+      "capability" : {
+        "capabilityID" : "CAP-RT-POLICY-BAFFC4DE714B536F340EA19CC60111E6CF349478-G1",
+        "effectCeiling" : "deviceMutation",
+        "exactBindingRevision" : 1,
+        "exactInputs" : {
+          "displayHeight" : 2832,
+          "displayWidth" : 1280
+        },
+        "expiresAtUTC" : "2026-09-14T01:00:00Z",
+        "inputConstraints" : {
+          "displayHeight" : {
+            "kind" : "integerRange",
+            "maximum" : 2832,
+            "minimum" : 2832
+          },
+          "displayWidth" : {
+            "kind" : "integerRange",
+            "maximum" : 1280,
+            "minimum" : 1280
+          }
+        },
+        "issuedAtUTC" : "2026-09-14T00:00:00Z",
+        "issuer" : {
+          "kind" : "runtimeDefaultPolicy",
+          "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:input.tap@1"
+        },
+        "maximumUses" : 2000,
+        "operationScope" : [
+          {
+            "operationID" : "input.tap",
+            "version" : 1
+          }
+        ],
+        "revocation" : {
+          "state" : "active"
+        },
+        "targetScope" : {
+          "kind" : "stablePhysicalIdentity",
+          "sha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"
+        }
+      },
+      "consumptions" : [
+
+      ],
+      "remainingUses" : 2000
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

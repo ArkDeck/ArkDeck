@@ -1,0 +1,113 @@
+{
+  "actualEffect" : "readOnly",
+  "actualStepKinds" : [
+    "probeHostTool"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "kind" : "defaultReadOnlyPolicy",
+    "reference" : "default-read-only-policy"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-4bd04c47bf05674cb836addf3ffee919",
+  "materializedBindingRevision" : 1,
+  "materializedPlanDigest" : "79fe36f61a71d4852c51b00f784085ec0139b552191bd2b89d6060bec49b3d6a",
+  "materializedStableTargetIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+  "operationFailure" : {
+    "category" : "externalTool",
+    "code" : "executionConfirmedNotPerformed",
+    "recovery" : "submitNewTypedRequestAfterRuntimeProof",
+    "retryability" : "runtimeDecisionRequired",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "observe.device@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-reconcile-observeParked",
+    "inputs" : {
+
+    },
+    "operation" : {
+      "id" : "observe.device",
+      "version" : 1
+    },
+    "requestId" : "req-reconcile-observeParked",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-3ba3f5f43b92"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "hdc",
+  "request" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-reconcile-observeParked",
+    "inputs" : {
+
+    },
+    "operation" : {
+      "id" : "observe.device",
+      "version" : 1
+    },
+    "requestId" : "req-reconcile-observeParked",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-3ba3f5f43b92"
+    }
+  },
+  "sessionPublicationRecord" : {
+    "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+    "claims" : [
+
+    ],
+    "failure" : {
+      "certainty" : "confirmed",
+      "code" : "storageUnavailable",
+      "detail" : "invalidManifest(\"journal binding revision does not exist in Manifest: reconcile-outcome-8\")"
+    },
+    "phase" : "awaitingStorage",
+    "policyGeneration" : "0",
+    "relativeSessionPath" : "",
+    "root" : {
+      "device" : "0",
+      "inode" : "0",
+      "path" : "",
+      "volumeIdentity" : ""
+    },
+    "sessionID" : "session-job-4bd04c47bf05674cb836addf3ffee919"
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "failed",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "intent probe-host-tool",
+    "outcomeUnknown probe-host-tool; durable intent left outstanding",
+    "running->waitingForRecovery",
+    "reason: outcomeUnknown: empty observation output",
+    "recovered: outstanding intents or unknown outcomes; no redispatch",
+    "waitingForRecovery->reconciling",
+    "reason: begin exact typed provider reconciliation",
+    "reconcile started probe-host-tool",
+    "reconciling->finalizing",
+    "reason: persist exact typed reconcile decision: confirmed not executed; original not resent",
+    "finalizing->failed",
+    "reason: reconciliation confirmed probe-host-tool did not complete",
+    "reconciled: confirmed not executed probe-host-tool"
+  ]
+}
