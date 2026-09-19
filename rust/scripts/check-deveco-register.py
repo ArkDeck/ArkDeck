@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -17,10 +18,12 @@ import socket
 import stat
 import subprocess
 import sys
-import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
+spec = importlib.util.spec_from_file_location("run_directory", Path(__file__).with_name("run-directory.py"))
+run_directory = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(run_directory)
 SOURCE_ROLES = {
     "Resources/product-info.json": 64 * 1024,
     "sdk/default/sdk-pkg.json": 64 * 1024,
@@ -121,6 +124,7 @@ def main():
                         default=Path("/Applications/DevEco-Studio.app/Contents"))
     parser.add_argument("--record-frames", type=Path,
                         help="also save the actual direct typed exchanges to this new file")
+    run_directory.add_argument(parser)
     args = parser.parse_args()
     if sys.platform != "darwin" or not args.source_root.exists():
         print(json.dumps({"result": "SKIP", "kind": "isolated-native-host-test",
@@ -132,7 +136,14 @@ def main():
         parser.error("--source-root must be an absolute installed Contents root")
     if args.record_frames and args.record_frames.exists():
         parser.error("--record-frames must name a new output file")
+    with run_directory.RunDirectory("arkdeck-deveco-register-", keep=args.keep_run_dir) as directory:
+        code = exercise(args, directory.path)
+        directory.passed = code == 0
+    return code
 
+
+def exercise(args, run_root):
+    """The registration checks in one fresh run directory, which outlives only a failed run."""
     daemon = (args.bin_dir / "arkdeck-agentd").resolve(strict=True)
     inspect_cli = (args.bin_dir / "arkdeck").resolve(strict=True)
     register_cli = (args.cli_path or inspect_cli).resolve(strict=True)
@@ -140,7 +151,6 @@ def main():
     installed = Path.home() / "Library/Application Support/ArkDeck/Bootstrap/v1"
     registry = json.loads((ROOT / "Packages/ArkDeckKit/Contracts/control-protocol.json").read_bytes())
     identity = hashlib.sha256(canonical(registry)).hexdigest()
-    run_root = Path(tempfile.mkdtemp(prefix="arkdeck-deveco-register-", dir="/private/tmp")).resolve()
     state = run_root / "state"
     state.mkdir(mode=0o700)
     endpoint = state / "a.sock"
@@ -346,7 +356,8 @@ def main():
                 report.setdefault("failure", str(error))
         report.update(nativeVerificationPerformed=native_verified, uncertainHostPublication=uncertain,
                       registrationRetriesAfterUncertainty=0, cliCommands=len(emissions),
-                      directControlExchanges=len(frames), fixtureRetained=True)
+                      directControlExchanges=len(frames),
+                      fixtureRetained=args.keep_run_dir or report["result"] != "PASS")
         (run_root / "cli-results.jsonl").write_bytes(b"".join(canonical(row) + b"\n" for row in emissions))
         frame_bytes = b"".join(canonical(row) + b"\n" for row in frames)
         (run_root / "control-frames.jsonl").write_bytes(frame_bytes)

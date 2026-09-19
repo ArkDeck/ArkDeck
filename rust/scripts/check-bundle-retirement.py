@@ -8,16 +8,19 @@ from __future__ import annotations
 import argparse
 import fcntl
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
 import shutil
 import socket
 import subprocess
-import tempfile
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
+spec = importlib.util.spec_from_file_location("run_directory", Path(__file__).with_name("run-directory.py"))
+run_directory = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(run_directory)
 METHOD = 'runtime.bundle.remove'
 
 
@@ -32,13 +35,20 @@ def main():
     parser.add_argument('--cli-path', type=Path)
     parser.add_argument('--record-frames', type=Path)
     parser.add_argument('--native-registry', type=Path)
+    run_directory.add_argument(parser)
     args = parser.parse_args()
+    with run_directory.RunDirectory('bundle-retirement-process-', keep=args.keep_run_dir) as directory:
+        exercise(args, directory.path)
+        directory.passed = True
+
+
+def exercise(args, root):
+    """The checks in one fresh run directory, which outlives only a failed run."""
     daemon = (args.bin_dir/'arkdeck-agentd').resolve()
     cli = (args.cli_path or args.bin_dir/'arkdeck').resolve()
     registry = json.loads((ROOT/'Packages/ArkDeckKit/Contracts/control-protocol.json').read_bytes())
     assert METHOD in registry['methods'], 'Bundle retirement requires the current candidate contract'
     identity = hashlib.sha256(json.dumps(registry, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
-    root = Path(tempfile.mkdtemp(prefix='bundle-retirement-process-', dir='/private/tmp')).resolve()
     endpoint = root/'a.sock'
     native_before = None
     if args.native_registry:
@@ -181,7 +191,8 @@ def main():
             args.record_frames.write_text(''.join(json.dumps(row, sort_keys=True, separators=(',', ':'))+'\n' for row in rows))
     print(json.dumps({'result': 'PASS', 'kind': 'isolated-host-test', 'method': METHOD,
                       'controlExchanges': len(rows), 'nativeInventory': bool(args.native_registry),
-                      'deviceDispatchCount': 0, 'retainedTestRoot': str(root)}, sort_keys=True))
+                      'deviceDispatchCount': 0, 'runDirectory': str(root),
+                      'runDirectoryKept': args.keep_run_dir}, sort_keys=True))
 
 
 if __name__ == '__main__':

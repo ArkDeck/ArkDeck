@@ -18,7 +18,6 @@ import socket
 import shutil
 import subprocess
 import sys
-import tempfile
 import threading
 import time
 
@@ -27,6 +26,9 @@ spec = importlib.util.spec_from_file_location("deveco_check", Path(__file__).wit
 common = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(common)
 canonical, check = common.canonical, common.check
+spec = importlib.util.spec_from_file_location("run_directory", Path(__file__).with_name("run-directory.py"))
+run_directory = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(run_directory)
 
 
 def source_fingerprint(source):
@@ -46,17 +48,25 @@ def main():
     parser.add_argument("--source-file", type=Path, default=Path("/usr/bin/true"))
     parser.add_argument("--record-variants", action="store_true",
                         help="also record native quarantine and saved-metadata preservation fixtures; no selection operation")
+    run_directory.add_argument(parser)
     args = parser.parse_args()
     if sys.platform != "darwin":
         print(json.dumps({"result": "SKIP", "reason": "macOSRequired", "deviceAcceptance": False}))
         return 0
+    with run_directory.RunDirectory("arkdeck-hdc-rpc-", keep=args.keep_run_dir) as directory:
+        code = exercise(args, directory.path)
+        directory.passed = code == 0
+    return code
+
+
+def exercise(args, run):
+    """The registration checks in one fresh run directory, which outlives only a failed run."""
     import fcntl
     source = args.source_file
     check(source.is_absolute() and source.is_file(), "an existing absolute native source file is required")
     daemon, cli = [(args.bin_dir / name).resolve(strict=True) for name in ["arkdeck-agentd", "arkdeck"]]
     contract = json.loads((ROOT / "Packages/ArkDeckKit/Contracts/control-protocol.json").read_bytes())
     identity = hashlib.sha256(canonical(contract)).hexdigest()
-    run = Path(tempfile.mkdtemp(prefix="arkdeck-hdc-rpc-", dir="/private/tmp"))
     installed = Path.home() / "Library/Application Support/ArkDeck/Bootstrap/v1"
     before_source = source_fingerprint(source)
     before_installed = common.tree_fingerprint(installed)
@@ -337,6 +347,8 @@ def main():
             log.close()
         report["sourceUnchanged"] = source_fingerprint(source) == before_source
         report["installedMetadataUnchanged"] = common.tree_fingerprint(installed) == before_installed
+        report["runDirectoryKept"] = (args.keep_run_dir or report["result"] != "PASS"
+                                      or not (report["sourceUnchanged"] and report["installedMetadataUnchanged"]))
         (run / "report.json").write_bytes(canonical(report))
         (run / "frames.jsonl").write_bytes(b"".join(canonical(v) + b"\n" for v in frames))
         (run / "cli-results.jsonl").write_bytes(b"".join(canonical(v) + b"\n" for v in cli_rows))

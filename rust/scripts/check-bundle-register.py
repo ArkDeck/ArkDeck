@@ -9,17 +9,20 @@ state, restart, lock/quota failures and no replay after a lost owner response.
 from __future__ import annotations
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
 import socket
 import subprocess
 import sys
-import tempfile
 import threading
 import time
 
 ROOT = Path(__file__).resolve().parents[2]
+spec = importlib.util.spec_from_file_location("run_directory", Path(__file__).with_name("run-directory.py"))
+run_directory = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(run_directory)
 METHOD = "runtime.bundle.register"
 
 def encoded(value):
@@ -32,16 +35,24 @@ def require(condition, message):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bin-dir", type=Path, default=ROOT / "rust/target/debug")
+    run_directory.add_argument(parser)
     args = parser.parse_args()
     if sys.platform != "darwin":
         print(json.dumps({"result":"SKIP", "reason":"macOSRequired", "deviceAcceptance":False}))
         return 0
+    with run_directory.RunDirectory("bundle-register-process-", keep=args.keep_run_dir) as directory:
+        code = exercise(args, directory.path)
+        directory.passed = code == 0
+    return code
+
+
+def exercise(args, run):
+    """The registration checks in one fresh run directory, which outlives only a failed run."""
     import fcntl
     daemon, cli = [(args.bin_dir / name).resolve(strict=True) for name in ["arkdeck-agentd", "arkdeck"]]
     registry = json.loads((ROOT / "Packages/ArkDeckKit/Contracts/control-protocol.json").read_bytes())
     require(METHOD in registry["methods"], "candidate Bundle registration contract is required")
     identity = hashlib.sha256(encoded(registry)).hexdigest()
-    run = Path(tempfile.mkdtemp(prefix="bundle-register-process-", dir="/private/tmp"))
     source = run / "Unsigned.app"
     (source / "Contents/MacOS").mkdir(parents=True, mode=0o700)
     for directory in [source, source / "Contents"]:
@@ -158,6 +169,7 @@ def main():
         for child in children: stop(child)
         for log in logs: log.close()
         report["sourceUnchanged"] = all(p.read_bytes() == before[str(p.relative_to(source))] for p in [info, executable])
+        report["runDirectoryKept"] = args.keep_run_dir or report["result"] != "PASS" or not report["sourceUnchanged"]
         (run / "report.json").write_bytes(encoded(report))
         (run / "frames.jsonl").write_bytes(b"".join(encoded(row)+b"\n" for row in frames))
         (run / "cli-results.jsonl").write_bytes(b"".join(encoded(row)+b"\n" for row in calls))
