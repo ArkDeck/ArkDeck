@@ -58,6 +58,7 @@ graph TD
     CLIENTKIT[ArkDeckClientKit<br/>App IPC transport + History/read models + Device list] --> CORE
     WORKFLOWS --> CLIENTKIT
     DAEMON --> CLIENTKIT
+    CLI -.->|过渡边，M5 随 Swift CLI 删除| CLIENTKIT
 ```
 
 要点:
@@ -90,7 +91,7 @@ Runtime      → Core
 Core         → (nothing)
 AgentClient  → Core
 AgentDaemon  → Core, ClientKit, Storage, Workflows
-CLI / AgentDaemonMain(可执行组合根)→ 宽,但仍在矩阵内
+CLI / AgentDaemonMain(可执行组合根)→ 宽,但仍在矩阵内(CLI → ClientKit 是过渡边,见下)
 ```
 
 CHG-2026-074 迁移期间，ClientKit 持有 App 的 IPC transport、History/filter/Artifact 只读展示、Device list 展示模型与客户端 JobControl，
@@ -112,6 +113,11 @@ Workflows 的 Debug facade 经既有的 Workflows → ClientKit 边使用它。�
 （Catalog 标识符与原生库文件名规则）也随之移到 ClientKit，Workflows、daemon 与 App 共用这一份，不另抄规则。
 Overview 运行记录与「开始新一次」行的投影（`OverviewRunRecordProjection`、`OverviewActionProjection`）是只读展示逻辑，也在 ClientKit；
 `RuntimeWorkspaceContinuation`（依赖 ArkDeckRuntime、CLI 也在用）暂留 Workflows。
+App 与 CLI 共用的自动更新（feed 解析与验签、下载、状态/制品/重放文件存储、服务状态机、`RuntimeUpdateApplicationFacade` 与 UI fixture）也在 ClientKit；
+依赖 ArkDeckRuntime `SystemLogger` 的生产装配——`SystemAutoUpdateEventLogger` 与 `AutoUpdateApplicationFacade.make()`——留在 Workflows。
+CLI 因此直接 import ClientKit：CLI → ClientKit 是 CHG-2026-074 的过渡边，随第一个需要它的 CLI 代码（自动更新）同 PR 加入（§6 判例 5），
+Swift CLI 在 M5 删除时随之消失；RuntimeSupportBundle 与 `RuntimeWorkspaceContinuation` 之后各自一刀移入时沿用这条边。
+ClientKit 仍只依赖 Core，依赖图保持无环。CLI 经 Workflows → ClientKit 本就链接 ClientKit，这条边不给可执行文件增加库，只放开 CLI 源码直接点名它的类型。
 
 ## 3. Ownership Rules(事实源唯一)
 

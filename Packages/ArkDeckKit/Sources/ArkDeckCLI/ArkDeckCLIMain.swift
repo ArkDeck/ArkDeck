@@ -1,4 +1,5 @@
 import ArkDeckAgentComposition
+import ArkDeckClientKit
 import ArkDeckCore
 import ArkDeckLaunchAgent
 import ArkDeckWorkflows

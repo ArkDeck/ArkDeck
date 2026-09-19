@@ -1,11 +1,10 @@
 import ArkDeckCore
-import ArkDeckRuntime
 import CryptoKit
 import Darwin
 import Foundation
 import XCTest
 
-@testable import ArkDeckWorkflows
+@testable import ArkDeckClientKit
 
 final class AutoUpdateContractTests: XCTestCase {
   private let now = ISO8601Timestamps.parseCanonicalPlain("2026-07-24T00:00:00Z")!
@@ -823,6 +822,7 @@ final class AutoUpdateContractTests: XCTestCase {
     for relativePath in [
       "ArkDeckApp/App/ArkDeckApp.swift",
       "Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckCLIMain.swift",
+      "Packages/ArkDeckKit/Sources/ArkDeckClientKit/AutoUpdate",
       "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AutoUpdate",
     ] {
       XCTAssertFalse(
@@ -852,7 +852,7 @@ final class AutoUpdateContractTests: XCTestCase {
     XCTAssertTrue(cliSource.contains("validateUnsignedPayloadForSigning(payload)"))
     let feedSource = try String(
       contentsOf: repository.appending(
-        path: "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/AutoUpdate/UpdateFeed.swift"),
+        path: "Packages/ArkDeckKit/Sources/ArkDeckClientKit/AutoUpdate/UpdateFeed.swift"),
       encoding: .utf8)
     XCTAssertTrue(feedSource.contains("UpdateNetworkContract.allowedHosts.contains(host)"))
     XCTAssertFalse(feedSource.contains("allowedArtifactHosts"))
@@ -864,27 +864,6 @@ final class AutoUpdateContractTests: XCTestCase {
     XCTAssertTrue(releaseProcedure.contains("不得成为 CLI 参数、环境变量"))
     XCTAssertTrue(releaseProcedure.contains("30 天有效期是强制 freshness 边界"))
     XCTAssertTrue(releaseProcedure.contains("不支持同版本续期"))
-  }
-
-  func testTEST_AU_CONTRACT_001_updateDiagnosticsUseClosedPublicEventsOnly() throws {
-    let root = FileManager.default.temporaryDirectory.appending(
-      path: "arkdeck-update-logging-\(UUID().uuidString)", directoryHint: .isDirectory)
-    defer { try? FileManager.default.removeItem(at: root) }
-    let store = try StructuredDiagnosticLogStore(directory: root.appending(path: "logs"))
-    let logger = SystemAutoUpdateEventLogger(logger: SystemLogger(structuredStore: store))
-    for event in [
-      AutoUpdateLogEvent.checkStarted, .available, .noUpdate, .downloadStarted,
-      .verificationStarted, .failed, .cancelled, .handedOff,
-    ] {
-      logger.record(event)
-    }
-    let bytes = try store.snapshot().files.reduce(into: Data()) { $0.append($1.data) }
-    XCTAssertTrue(bytes.contains(Data("\"eventName\":\"update.check\"".utf8)))
-    XCTAssertTrue(bytes.contains(Data("\"eventName\":\"update.download\"".utf8)))
-    XCTAssertTrue(bytes.contains(Data("\"eventName\":\"update.verification\"".utf8)))
-    XCTAssertTrue(bytes.contains(Data("\"eventName\":\"update.handoff\"".utf8)))
-    XCTAssertFalse(bytes.contains(Data("/Users/".utf8)))
-    XCTAssertFalse(bytes.contains(Data("github.com".utf8)))
   }
 
   // MARK: - Fixtures

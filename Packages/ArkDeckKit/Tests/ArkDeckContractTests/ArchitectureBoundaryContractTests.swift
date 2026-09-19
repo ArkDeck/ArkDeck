@@ -69,6 +69,10 @@ final class ArchitectureBoundaryContractTests: XCTestCase {
     "ArkDeckCLI": [
       "ArkDeckCore", "ArkDeckRuntime", "ArkDeckWorkflows", "ArkDeckAgentComposition",
       "ArkDeckAgentClient", "ArkDeckBootstrap", "ArkDeckLaunchAgent",
+      // CHG-2026-074 transitional edge (docs/ArchitectureRules.md §2): the
+      // facades the App and the CLI share move to ClientKit. It disappears
+      // when the Swift CLI is deleted at M5.
+      "ArkDeckClientKit",
     ],
     "ArkDeckAgentDaemonMain": [
       "ArkDeckAgentDaemon", "ArkDeckAgentComposition", "ArkDeckClientKit", "ArkDeckCore",

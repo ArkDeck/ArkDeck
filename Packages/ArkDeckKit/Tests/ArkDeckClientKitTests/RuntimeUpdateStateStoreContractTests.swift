@@ -2,7 +2,7 @@ import Darwin
 import Foundation
 import XCTest
 
-@testable import ArkDeckWorkflows
+@testable import ArkDeckClientKit
 
 final class RuntimeUpdateStateStoreContractTests: XCTestCase {
   func testAppAndCLIResolveTheSameSandboxContainerDirectories() throws {

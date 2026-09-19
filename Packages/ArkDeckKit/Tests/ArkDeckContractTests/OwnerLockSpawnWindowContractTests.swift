@@ -3,6 +3,7 @@ import Foundation
 import XCTest
 
 @testable import ArkDeckBootstrap
+@testable import ArkDeckClientKit
 @testable import ArkDeckCore
 @testable import ArkDeckStorage
 @testable import ArkDeckWorkflows

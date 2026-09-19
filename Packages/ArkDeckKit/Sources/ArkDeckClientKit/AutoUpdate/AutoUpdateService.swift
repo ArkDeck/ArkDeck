@@ -1,4 +1,3 @@
-import ArkDeckRuntime
 import Foundation
 
 public enum AutoUpdateFailureCode: String, Codable, Equatable, Sendable {
@@ -355,36 +354,6 @@ public actor AutoUpdateService {
 }
 
 public enum AutoUpdateApplicationFacade {
-  public static func make() throws -> RuntimeUpdateApplicationFacade {
-    let artifactStore = try UpdateArtifactStore.production()
-    let replayStore = try FileUpdateReplayStore.production()
-    let stateStore = try RuntimeUpdateStateStore.production()
-    let trust = try UpdateFeedTrust.production
-    let preferences = UserDefaultsAutoUpdatePreferences()
-    let eventLogger: any AutoUpdateEventLogging
-    do {
-      let support = try FileManager.default.url(
-        for: .applicationSupportDirectory, in: .userDomainMask,
-        appropriateFor: nil, create: true)
-      let logger = SystemLogger(
-        structuredStore: try StructuredDiagnosticLogStore(
-          directory: support.appending(
-            path: "ArkDeck/Diagnostics", directoryHint: .isDirectory)))
-      eventLogger = SystemAutoUpdateEventLogger(logger: logger)
-    } catch {
-      eventLogger = NoOpAutoUpdateEventLogger()
-    }
-    return try RuntimeUpdateApplicationFacade(
-      streamer: URLSessionUpdateHTTPStreamer(),
-      verifier: UpdateFeedVerifier(
-        trust: trust, replayStore: replayStore),
-      artifactStore: artifactStore,
-      artifactValidator: SystemUpdateArtifactValidator(),
-      preferences: preferences,
-      stateStore: stateStore,
-      eventLogger: eventLogger)
-  }
-
   public static func currentProductIdentity(
     bundle: Bundle = .main,
     processInfo: ProcessInfo = .processInfo
