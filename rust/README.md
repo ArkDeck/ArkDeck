@@ -568,6 +568,10 @@ admitted under a Runtime capability, as Swift's `preauthorize` admits it (M2):
 `tests/pointer_input_submit.rs` replays the pointer-input oracle's submissions:
 the answers, the capabilities installed, each Job's request and original
 submission, and the refusal after an unknown outcome.
+`tests/debug_hap_submit.rs` does the same for `debug.hap@1`, whose capability is
+also named by the entry package's owner-validated facts. An admitted HAP waits in
+`preflight`: `job.run` refuses it, and `agent.run`, which would start it at once,
+is refused before admission until the HAP runner is ported.
 
 ## Job run (TASK-XPA-014)
 

@@ -7,6 +7,8 @@
 //! inode and claim generation are read as labels.
 #![allow(dead_code)]
 
+pub mod debug_hap;
+
 use arkdeck_hoststore::{StorageProbe, StorageSnapshot};
 use arkdeck_platform::{HostDirectory, HostSqlite, SqliteValue as Sql};
 use serde_json::{Value, json};
@@ -179,7 +181,7 @@ fn machine_independent(bytes: &[u8]) -> Vec<u8> {
 
 /// The facts the Swift oracle records of the Job index, each record's
 /// digest taken over its machine-independent reading.
-fn index(path: &Path) -> Value {
+pub fn index(path: &Path) -> Value {
     let mut db = HostSqlite::open(&path.join("runtime-jobs.sqlite3"), true, false).unwrap();
     let cell = |value: &Sql| match value {
         Sql::Null => Value::Null,

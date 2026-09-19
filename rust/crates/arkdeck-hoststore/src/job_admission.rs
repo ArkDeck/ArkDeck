@@ -4,8 +4,10 @@
 //! - A new read-only Job is admitted under the default read-only policy.
 //! - A device mutation the catalog authorizes with a standing capability is
 //!   admitted under the capability the caller names or, when it names none,
-//!   the one the Runtime issues (`capability_policy`). Either is checked
-//!   against its envelope and lineage; no use is reserved or consumed.
+//!   the one the Runtime issues (`capability_policy`), which for `debug.hap@1`
+//!   is also named by the entry package's owner-validated Artifact facts.
+//!   Either is checked against its envelope and lineage; no use is reserved
+//!   or consumed.
 //! - The Job's journal then starts with `jobCreated` and `queued -> preflight`,
 //!   and its record is published.
 //!
@@ -175,6 +177,25 @@ impl JobAdmitter<'_> {
     /// The `job.submit` control parameters: exactly one bounded `requestJson`.
     pub fn handle(&self, params: &Map<String, Value>) -> Result<Value, AdmissionRefusal> {
         self.submit(request_json(params)?.as_bytes())
+    }
+
+    /// Swift `submitForAgent`, as far as this Runtime serves it. An agent
+    /// execution starts the Job it comes to own at once, so it is admitted
+    /// only for an operation this Runtime also executes. Any other request
+    /// is refused with the zero-dispatch proof before anything is
+    /// materialized, as an operation outside the plan allowlist is; a
+    /// `job.submit` of it is still admitted and waits in `preflight`.
+    pub fn submit_for_agent(&self, request_json: &[u8]) -> Result<Value, AdmissionRefusal> {
+        let request = OperationRequest::decode(request_json)
+            .map_err(|rejection| refused(rejection.code.wire_code(), rejection.message))?;
+        let reference = JobPlanner::descriptor(&request)?.reference();
+        if !crate::job_run::executes(&reference) {
+            return Err(refused(
+                "rejected",
+                format!("{reference} is not executed by the Rust Runtime yet"),
+            ));
+        }
+        self.submit(request_json)
     }
 
     pub fn submit(&self, request_json: &[u8]) -> Result<Value, AdmissionRefusal> {

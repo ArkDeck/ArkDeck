@@ -1,6 +1,8 @@
-//! Plan-only HAP materialization. No dispatch, capability issue or consumption.
-//! Mirrors RuntimeJobEngine's input binding, authorization-envelope lowering,
-//! and failure-only compensations, while retaining the enclosing Import hold.
+//! HAP materialization for `job.plan` and `job.submit`. Nothing here dispatches,
+//! issues or consumes a capability; admission issues one from the primary
+//! Artifact facts this returns. Mirrors RuntimeJobEngine's input binding,
+//! authorization-envelope lowering, and failure-only compensations, while
+//! retaining the enclosing Import hold.
 use super::*;
 use crate::device_facts::DeviceFacts;
 use crate::operation_catalog::CatalogStep;

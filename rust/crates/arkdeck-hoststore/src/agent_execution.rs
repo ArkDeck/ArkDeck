@@ -1723,8 +1723,10 @@ impl AgentExecutionStore {
             )
         })?;
         // Swift checks the budget once more as the engine is about to admit.
+        // The Job starts at once, so an operation this Runtime admits but
+        // does not execute yet is refused before admission.
         self.check_budget(&record, engine.now)?;
-        match engine.admitter.submit(&request) {
+        match engine.admitter.submit_for_agent(&request) {
             Ok(accepted) => {
                 let job = accepted["jobId"]
                     .as_str()
