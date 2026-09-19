@@ -57,7 +57,9 @@ Per `AGENTS.md` on main `d732e798` (#2015) the unified gate is the PR's CI; loca
 
 ## CI
 
-The PR's `guard` and `swift` aggregate: recorded after the run completes.
+| PR | Head | Runs | Result |
+| --- | --- | --- | --- |
+| #2033 | `bdb7b4f8` | 35445912792, 35445912880, 35445913057 | 11 checks passed, `app-build` skipped; merged as `24c037d9` |
 
 ## Not in this slice
 

@@ -1,0 +1,71 @@
+{
+  "actualEffect" : "deviceMutation",
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-8cf8355a414968b938968e7f8064fd0e",
+  "materializedBindingRevision" : 1,
+  "materializedPlanDigest" : "2ba2413414359eb134a297290725ac23f9f3391369cf8efab75a153f82f1e7da",
+  "materializedStableTargetIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+  "operationReference" : "input.tap@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-crash-tapAfterCrash",
+    "inputs" : {
+      "displayHeight" : 2832,
+      "displayWidth" : 1280,
+      "screenEpochUtc" : "2026-09-14T00:00:00.000Z",
+      "x" : 640,
+      "y" : 1500
+    },
+    "operation" : {
+      "id" : "input.tap",
+      "version" : 1
+    },
+    "requestId" : "req-crash-tapAfterCrash",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-3ba3f5f43b92"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "hdc",
+  "request" : {
+    "authorization" : {
+      "capabilityId" : "CAP-RT-POLICY-BAFFC4DE714B536F340EA19CC60111E6CF349478-G1"
+    },
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-crash-tapAfterCrash",
+    "inputs" : {
+      "displayHeight" : 2832,
+      "displayWidth" : 1280,
+      "screenEpochUtc" : "2026-09-14T00:00:00.000Z",
+      "x" : 640,
+      "y" : 1500
+    },
+    "operation" : {
+      "id" : "input.tap",
+      "version" : 1
+    },
+    "requestId" : "req-crash-tapAfterCrash",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-3ba3f5f43b92"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "state" : "preflight",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight"
+  ]
+}
