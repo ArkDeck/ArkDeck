@@ -1,0 +1,67 @@
+{
+  "actualEffect" : "deviceMutation",
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-f98bab40c1609df91bd30c251cf723da",
+  "materializedBindingRevision" : 1,
+  "materializedPlanDigest" : "16ec839eade2e6a79636947ccdc59bf4e3e9bba6cb6f99467be66749a9041216",
+  "materializedStableTargetIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+  "operationReference" : "port-forward.create@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-readback-killedBefore",
+    "inputs" : {
+      "direction" : "forward",
+      "localPort" : 23461,
+      "remotePort" : 34571
+    },
+    "operation" : {
+      "id" : "port-forward.create",
+      "version" : 1
+    },
+    "requestId" : "req-readback-killedBefore",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-3ba3f5f43b92"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "hdc",
+  "request" : {
+    "authorization" : {
+      "capabilityId" : "CAP-RT-POLICY-B37795A1F67EDD9D19B7AA389F40D11C8C16EB5E-G1"
+    },
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-readback-killedBefore",
+    "inputs" : {
+      "direction" : "forward",
+      "localPort" : 23461,
+      "remotePort" : 34571
+    },
+    "operation" : {
+      "id" : "port-forward.create",
+      "version" : 1
+    },
+    "requestId" : "req-readback-killedBefore",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-3ba3f5f43b92"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "state" : "preflight",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight"
+  ]
+}

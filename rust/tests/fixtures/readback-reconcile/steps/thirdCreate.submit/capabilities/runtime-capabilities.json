@@ -1,0 +1,141 @@
+{
+  "records" : [
+    {
+      "capability" : {
+        "capabilityID" : "CAP-RT-POLICY-B37795A1F67EDD9D19B7AA389F40D11C8C16EB5E-G1",
+        "effectCeiling" : "deviceMutation",
+        "exactBindingRevision" : 1,
+        "exactInputs" : {
+          "direction" : "forward",
+          "localPort" : 23461,
+          "remotePort" : 34571
+        },
+        "expiresAtUTC" : "2026-10-14T00:00:00Z",
+        "inputConstraints" : {
+          "direction" : {
+            "kind" : "exactString",
+            "value" : "forward"
+          },
+          "localPort" : {
+            "kind" : "integerRange",
+            "maximum" : 23461,
+            "minimum" : 23461
+          },
+          "remotePort" : {
+            "kind" : "integerRange",
+            "maximum" : 34571,
+            "minimum" : 34571
+          }
+        },
+        "issuedAtUTC" : "2026-09-14T00:00:00Z",
+        "issuer" : {
+          "kind" : "runtimeDefaultPolicy",
+          "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:port-forward.create@1"
+        },
+        "maximumUses" : 10000,
+        "operationScope" : [
+          {
+            "operationID" : "port-forward.create",
+            "version" : 1
+          }
+        ],
+        "revocation" : {
+          "state" : "active"
+        },
+        "targetScope" : {
+          "kind" : "stablePhysicalIdentity",
+          "sha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"
+        }
+      },
+      "consumptions" : [
+        {
+          "authorizationScopeFingerprintSHA256" : "f4419d27d6ee071557351bd841677e7a60eb9e6fd7061d2715e45a9261a7361d",
+          "bindingRevision" : 1,
+          "consumedAtUTC" : "2026-09-14T00:00:00Z",
+          "effect" : "deviceMutation",
+          "jobID" : "job-f98bab40c1609df91bd30c251cf723da",
+          "materializedPlanDigest" : "16ec839eade2e6a79636947ccdc59bf4e3e9bba6cb6f99467be66749a9041216",
+          "operationReference" : "port-forward.create@1",
+          "ordinal" : 1,
+          "outcomes" : [
+            {
+              "jobID" : "job-f98bab40c1609df91bd30c251cf723da",
+              "outcome" : "outcomeUnknown",
+              "previousRecordSHA256" : "77a10a9bf9e385beb3f7dc42eb20de9d73ac8121e95c6c24c516c89949b5d945",
+              "recordSHA256" : "10ce0cbb352fb812bfe5c8505df21997588e8553968ee2122544c58abe5d34a9",
+              "recordedAtUTC" : "2026-09-14T00:00:00Z",
+              "terminalState" : "waitingForRecovery"
+            },
+            {
+              "jobID" : "job-f98bab40c1609df91bd30c251cf723da",
+              "outcome" : "safeToReflash",
+              "previousRecordSHA256" : "10ce0cbb352fb812bfe5c8505df21997588e8553968ee2122544c58abe5d34a9",
+              "recordSHA256" : "53a73164a96e206a1c650fa2cfd7c89d2d9f5563dc7e2616a56c665039d2adfb",
+              "recordedAtUTC" : "2026-09-14T00:00:00Z",
+              "terminalState" : "failed"
+            }
+          ],
+          "queryFingerprintSHA256" : "4fb43ec693484f344c4e90f528d90a3e1d375f3f65a8d7c0fa1e049355f1f613",
+          "receiptSHA256" : "77a10a9bf9e385beb3f7dc42eb20de9d73ac8121e95c6c24c516c89949b5d945",
+          "remainingUsesAfter" : 9999,
+          "reservationID" : "idem-readback-killedBefore",
+          "targetStableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"
+        }
+      ],
+      "remainingUses" : 9999
+    },
+    {
+      "capability" : {
+        "capabilityID" : "CAP-RT-POLICY-54EECCDB4F085DE2C4B715D877BFA1C3EC4F7423-G1",
+        "effectCeiling" : "deviceMutation",
+        "exactBindingRevision" : 1,
+        "exactInputs" : {
+          "direction" : "forward",
+          "localPort" : 23462,
+          "remotePort" : 34572
+        },
+        "expiresAtUTC" : "2026-10-14T00:00:00Z",
+        "inputConstraints" : {
+          "direction" : {
+            "kind" : "exactString",
+            "value" : "forward"
+          },
+          "localPort" : {
+            "kind" : "integerRange",
+            "maximum" : 23462,
+            "minimum" : 23462
+          },
+          "remotePort" : {
+            "kind" : "integerRange",
+            "maximum" : 34572,
+            "minimum" : 34572
+          }
+        },
+        "issuedAtUTC" : "2026-09-14T00:00:00Z",
+        "issuer" : {
+          "kind" : "runtimeDefaultPolicy",
+          "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:port-forward.create@1"
+        },
+        "maximumUses" : 10000,
+        "operationScope" : [
+          {
+            "operationID" : "port-forward.create",
+            "version" : 1
+          }
+        ],
+        "revocation" : {
+          "state" : "active"
+        },
+        "targetScope" : {
+          "kind" : "stablePhysicalIdentity",
+          "sha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"
+        }
+      },
+      "consumptions" : [
+
+      ],
+      "remainingUses" : 10000
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

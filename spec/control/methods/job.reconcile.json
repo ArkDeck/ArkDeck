@@ -170,13 +170,22 @@
           "additionalProperties": false,
           "properties": {
             "catalogGeneration": {
-              "type": "null"
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "manifestSha256": {
-              "type": "null"
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "reasonCode": {
-              "type": "string"
+              "type": [
+                "null",
+                "string"
+              ]
             },
             "state": {
               "type": "string"
@@ -191,7 +200,10 @@
           "type": "object"
         },
         "startedAtUtc": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "state": {
           "type": "string"
@@ -249,8 +261,8 @@
   "x-arkdeck-method": "job.reconcile",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 2,
-    "request": 14,
-    "result": 12
+    "error": 3,
+    "request": 9,
+    "result": 6
   }
 }
