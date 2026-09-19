@@ -1,3 +1,4 @@
+import ArkDeckClientKit
 import ArkDeckWorkflows
 import ArkDeckTraceAdapter
 import ArkTraceAppSupport
