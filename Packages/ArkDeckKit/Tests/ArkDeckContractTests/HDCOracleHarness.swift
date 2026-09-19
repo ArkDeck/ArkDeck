@@ -32,6 +32,9 @@ enum HDCOracleHarness {
 
   struct Composition {
     let handler: RuntimeControlPlaneHandler
+    /// The engine behind the handler, for what the daemon does outside a
+    /// control frame (recovering its Jobs when it starts).
+    let engine: RuntimeJobEngine
     /// The Artifact store the handler serves, for the inputs an oracle
     /// publishes before its Jobs run.
     let artifactStore: RuntimeArtifactStore
@@ -230,7 +233,8 @@ enum HDCOracleHarness {
       flashBundleImportDirectory: nil, flashBundleImportPolicy: .production,
       methodObserver: nil)
     return Composition(
-      handler: handler, artifactStore: store, targets: targets, artifacts: artifacts,
+      handler: handler, engine: engine, artifactStore: store, targets: targets,
+      artifacts: artifacts,
       jobsState: jobsState, sessions: sessions, owner: owner, agentExecutions: executions,
       humanActions: union, receive: hostReceiveRoot, invocationSeconds: fixedInvocationSeconds)
   }
