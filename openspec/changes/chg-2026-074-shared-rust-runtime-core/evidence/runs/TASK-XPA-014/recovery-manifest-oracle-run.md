@@ -108,8 +108,9 @@ affected test class runs:
 
 ## CI
 
-The PR's `guard` and `swift` aggregate (plan.py selects the Swift lane for the new test file):
-recorded after the run completes.
+| PR | Head | Runs | Result |
+| --- | --- | --- | --- |
+| #2018 | `0083c30a` | 35443714140, 35443714152, 35443714404 | 11 checks passed, `app-build` skipped; merged as `e96e51c6` |
 
 ## Not in this slice
 

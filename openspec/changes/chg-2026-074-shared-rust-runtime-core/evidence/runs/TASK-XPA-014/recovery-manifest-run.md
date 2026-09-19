@@ -89,7 +89,7 @@ warnings` clean, `cargo test -p arkdeck-hoststore --lib` 200 passed, 0 failed, 5
 | --- | --- | --- | --- |
 | #2018 (slice 1a) | `0083c30a` | 35443714140, 35443714152, 35443714404 | 11 checks passed, 1 skipped; merged |
 | #2021 (this slice, stacked on 1a) | `bda3e990` | 35443956815, 35443956825, 35443956916 | 11 checks passed, 1 skipped |
-| #2021 after the rebase | this head | — | pending |
+| #2021 after the rebase | `1ee80211` | 35444424023, 35444424065, 35444424211 | 9 checks passed; `swift-tests`, `app-build`, `ds-interactions` skipped (a Rust-only diff); merged as `9f51ec00` |
 
 ## Not run, and why
 

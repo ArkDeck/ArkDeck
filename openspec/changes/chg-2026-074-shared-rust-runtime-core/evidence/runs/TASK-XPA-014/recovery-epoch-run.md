@@ -85,8 +85,9 @@ Log: scratchpad `logs/checks-s3b.log`, SHA-256 `5791ec9a0d140c64ec2a3efefeacba6b
 
 ## CI
 
-The PR's `guard` and `swift` aggregate (plan.py selects the Rust lane, and the Swift lane for
-slice 3a's test while it is in the diff): recorded after the run completes.
+| PR | Head | Runs | Result |
+| --- | --- | --- | --- |
+| #2025 (stacked on 3a) | `03f92813` | 35444472234, 35444472281, 35444472520 | 11 checks passed, `app-build` skipped; merged as `0e78428f`, carrying slice 3a with it |
 
 ## For the maintainer
 
