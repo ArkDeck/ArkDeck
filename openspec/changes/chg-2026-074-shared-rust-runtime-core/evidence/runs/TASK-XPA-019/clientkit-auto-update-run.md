@@ -120,8 +120,17 @@ rebased head.
 
 ## CI
 
-Recorded by the next slice, because a green head is merged without an amend. The Overview
-projections slice's CI (#2048) is recorded in its own run record by this commit.
+PR #2054. On head `ac73ffaa` (base `0ae927d1`) every check passed:
+
+| Workflow run | Jobs | Conclusion |
+| --- | --- | --- |
+| Swift CI `35450711320` | `plan`, `swift-tests`, `app-build`, `ds-interactions` and the required `swift` aggregate; `rust-checks` skipped, as the plan selected no Rust lane | success |
+| SDD Guard `35450711117` | the required `guard`, `ds-tokens` | success |
+| Agent PR `35450711111` | `open-pr` | success |
+
+A green head is merged without an amend, so the RuntimeSupportBundle slice records this section.
+This slice's commit recorded the Overview projections slice's CI (#2048) in that slice's own run
+record.
 
 ## Not run
 
