@@ -2,7 +2,8 @@
 //! Every returned row has undergone fresh content and native signing checks.
 //! This API neither selects tools nor admits execution.
 use crate::{
-    decode_bundles, decode_tools,
+    decode_bundles,
+    registry::{published_identity, read_tools, tool_projection},
     tool_content::{ToolContent, inspect_tool_content},
 };
 use arkdeck_platform::{HostDirectory, NativeCodeSignature};
@@ -10,11 +11,17 @@ use serde_json::Value;
 use std::{
     io,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 const MAXIMUM_INDEX: usize = 4 * 1024 * 1024;
+/// Swift `knownIdentity`: the published HDC identity (`version`,
+/// `profileReferences`) an executable's SHA-256 matches, if any.
+pub type PublishedIdentities = Arc<dyn Fn(&str) -> Option<Value> + Send + Sync>;
 pub struct ToolRegistryStore {
     pub(crate) root: HostDirectory,
     pub(crate) path: PathBuf,
+    /// The daemon's two published identities unless a caller supplies others.
+    pub(crate) identities: PublishedIdentities,
 }
 fn corrupt() -> io::Error {
     io::Error::new(
@@ -60,7 +67,13 @@ impl ToolRegistryStore {
         Ok(Self {
             root: HostDirectory::open(path)?,
             path: path.into(),
+            identities: Arc::new(published_identity),
         })
+    }
+    /// The identities this store's rows and selection admission match.
+    pub fn with_published_identities(mut self, identities: PublishedIdentities) -> Self {
+        self.identities = identities;
+        self
     }
     pub fn list(&self) -> io::Result<Vec<Value>> {
         self.read(None).map_err(read_error)
@@ -79,8 +92,8 @@ impl ToolRegistryStore {
         let bundles = self.root.read("bundles.json", MAXIMUM_INDEX)?;
         decode_bundles(&bundles).map_err(|_| corrupt())?;
         let bytes = self.root.read("tools.json", MAXIMUM_INDEX)?;
-        let decoded = decode_tools(&bytes).map_err(|_| corrupt())?;
-        let document: Value = serde_json::from_slice(&decoded.document).map_err(|_| corrupt())?;
+        let (index, document) = read_tools(&bytes).map_err(|_| corrupt())?;
+        let document: Value = serde_json::from_slice(&document).map_err(|_| corrupt())?;
         for record in document["records"].as_array().ok_or_else(corrupt)? {
             if reference.is_some_and(|r| record["reference"] != r) {
                 continue;
@@ -94,14 +107,23 @@ impl ToolRegistryStore {
         }
         lock.validate_link(&self.root, ".lock")?;
         self.root.validate_path(&self.path)?;
-        Ok(decoded
-            .projection
-            .as_array()
-            .ok_or_else(corrupt)?
+        Ok(index
+            .records
             .iter()
-            .filter(|v| reference.is_none_or(|r| v["toolRef"] == r))
-            .cloned()
+            .filter(|r| reference.is_none_or(|reference| r.reference == reference))
+            .map(|r| tool_projection(&index, r, (self.identities)(&r.executable_sha256)))
             .collect())
+    }
+    /// `reference`'s row in the tool index `bytes`, with this store's
+    /// published identities.
+    pub(crate) fn row(&self, bytes: &[u8], reference: &str) -> Option<Value> {
+        let (index, _) = read_tools(bytes).ok()?;
+        let record = index.records.iter().find(|r| r.reference == reference)?;
+        Some(tool_projection(
+            &index,
+            record,
+            (self.identities)(&record.executable_sha256),
+        ))
     }
     pub(crate) fn verify_record(&self, record: &Value) -> io::Result<()> {
         let digest = record["contentDigest"].as_str().ok_or_else(corrupt)?;

@@ -1490,6 +1490,21 @@ writes itself (`rust/tests/fixtures/tool-selection-store-rust`) are read back an
 carried further by Swift (`ToolSelectionStoreRustReadbackContractTests`). No owner
 composes the store yet: observing the impact and the restart it approves wait for
 the HDC lifecycle restart and a maintainer ruling on the isolated daemon's selection.
+`arkdeck_hoststore::ToolRegistryStore` keeps Swift `BootstrapToolRegistry`'s HDC
+selection ledger in `tools.json` (TASK-XPA-012): `initialize_service_selection`,
+`adopt_installed_hdc`, `selection_candidate`, `prepare_selection`,
+`startup_selection`, `publish_pending_selection`, `fail_pending_selection`,
+`selection_outcome` and `acknowledge_selection_outcome`, each under the bootstrap
+owner's non-blocking `.lock` over the strictly read bundle and tool indexes (either
+created empty only beside nothing it would describe), measuring the tools it names
+against their retained content, and publishing the index only where Swift does, as
+Swift's bytes. The published HDC identities a store's rows and admissions match are
+Swift's `knownIdentity`: the daemon's two unless `with_published_identities` gives
+others. `tool_selection_ledger_tests.rs` plays the seven timelines of Swift's oracle
+(`rust/tests/fixtures/tool-selection-registry`, recorded by
+`ToolSelectionRegistryOracleContractTests` over synthetic unsigned executables, the
+same bytes on every host) and leaves Swift's index, answer or refusal and
+publication after each of its 111 steps. No daemon composes the ledger yet.
 The isolated owner composes Swift's union control-action owner over no
 tool-selection owner, paging in `control-action-snapshots`. Without a managed
 server it holds no HDC owner and never makes `hdc-control-actions`: an exact

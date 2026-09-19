@@ -77,6 +77,7 @@ impl ToolRegistryStore {
                 Ok(Self {
                     root,
                     path: path.into(),
+                    identities: std::sync::Arc::new(crate::registry::published_identity),
                 })
             }
             Err(error) => Err(error),
