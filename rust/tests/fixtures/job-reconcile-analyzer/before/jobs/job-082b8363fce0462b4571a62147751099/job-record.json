@@ -1,0 +1,61 @@
+{
+  "actualEffect" : "hostOnly",
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "kind" : "defaultReadOnlyPolicy",
+    "reference" : "default-read-only-policy"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-082b8363fce0462b4571a62147751099",
+  "materializedPlanDigest" : "7efe65d9db4345762644fd00a74b322599f478bc4a62e93da37930ba4594dd26",
+  "operationReference" : "analyzer.extract-crash-signature@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-run-admitted-0001",
+    "inputs" : {
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-990a17a6b9ca251b17028e7c824f7b8b"
+    },
+    "operation" : {
+      "id" : "analyzer.extract-crash-signature",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-run-admitted",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "analyzer",
+  "request" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-run-admitted-0001",
+    "inputs" : {
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-990a17a6b9ca251b17028e7c824f7b8b"
+    },
+    "operation" : {
+      "id" : "analyzer.extract-crash-signature",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-run-admitted",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "state" : "preflight",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight"
+  ]
+}

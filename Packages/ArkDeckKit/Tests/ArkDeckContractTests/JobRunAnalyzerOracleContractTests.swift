@@ -187,6 +187,22 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
       variable: "ARKDECK_RUST_JOB_CANCEL_RUNNING_RECORD")
   }
 
+  /// The restart and reconcile oracle of the recovery port (TASK-XPA-014,
+  /// slice 2; ADR-0009 decision 2 as ruled on 2026-09-19): Jobs parked by a
+  /// run whose outcome is unknown, one of them over a source whose payload is
+  /// then removed, a succeeded Job and an admitted one, carried over two
+  /// daemon starts (`recoverActiveJobs`) and then reconciled through
+  /// `job.reconcile`, with the refusals of an absent Job and of parameters
+  /// without a string Job identity. Record it with
+  /// `ARKDECK_RUST_JOB_RECONCILE_RECORD=/private/tmp/<new directory>`.
+  func testSwiftRecoversAndReconcilesTheParkedAnalyzerJobs() async throws {
+    let lock = try Self.lockOracleRoot()
+    defer { close(lock) }
+    try Self.recordOrCompare(
+      try await reconcileFiles(), oracle: Self.reconcileOracle,
+      variable: "ARKDECK_RUST_JOB_RECONCILE_RECORD")
+  }
+
   /// Serializes every user of the fixed root, Rust replays included.
   private static func lockOracleRoot() throws -> Int32 {
     let lock = open(lockPath, O_RDWR | O_CREAT | O_CLOEXEC, 0o600)
@@ -251,6 +267,33 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
     path: "rust/tests/fixtures/job-cancel-analyzer", directoryHint: .isDirectory)
 
   /// The cancellation oracle's Jobs, each admitted over its own source.
+  private static let reconcileOracle = repository.appending(
+    path: "rust/tests/fixtures/job-reconcile-analyzer", directoryHint: .isDirectory)
+
+  /// The reconcile oracle's Jobs: two parked by a signal death (the second
+  /// over a source whose payload is removed once it is parked), one that
+  /// succeeds, and one only admitted.
+  private static let reconcileJobs: [(name: String, mode: String, removed: Bool, runs: Bool)] = [
+    ("parked", "signal", false, true), ("parkedSourceRemoved", "signal", true, true),
+    ("succeeded", "answered", false, true), ("admitted", "answered", false, false),
+  ]
+
+  /// The reconcile oracle's requests once the daemon has started twice: each
+  /// names a Job above or carries its own parameters. Swift's answer is
+  /// recorded as it is; only the refusals the handler decides before the
+  /// engine are asserted here.
+  private static let reconcileSteps:
+    [(name: String, job: String?, params: [String: JSONValue]?, expects: String?)] = [
+      ("reconcileParked", "parked", nil, nil),
+      ("reconcileParkedAgain", "parked", nil, nil),
+      ("reconcileSourceRemoved", "parkedSourceRemoved", nil, nil),
+      ("reconcileSucceeded", "succeeded", nil, nil),
+      ("reconcileAdmitted", "admitted", nil, nil),
+      ("reconcileAbsent", nil, ["jobId": .string(absentJob)], "notFound"),
+      ("reconcileWithoutJob", nil, [:], "invalidParams"),
+      ("reconcileNumericJob", nil, ["jobId": .integer(5)], "invalidParams"),
+    ]
+
   private static let cancellationJobs: [(name: String, mode: String)] = [
     ("cancelled", "answered"), ("succeeded", "answered"), ("failed", "empty"),
     ("parked", "signal"),
@@ -517,6 +560,7 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
   /// probe that can report the volume full.
   private struct WriterComposition {
     let handler: RuntimeControlPlaneHandler
+    let engine: RuntimeJobEngine
     let store: RuntimeArtifactStore
     let probe: OracleStorageProbe
     let artifacts: URL
@@ -528,15 +572,19 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
   /// Resets the fixed root and composes the standalone daemon's engine there,
   /// with the engine's test hooks where an oracle needs a run held.
   private func writerComposition(
-    testHooks: RuntimeJobEngine.Configuration.TestHooks = .none
+    testHooks: RuntimeJobEngine.Configuration.TestHooks = .none, reopening: Bool = false
   ) throws -> WriterComposition {
     let manager = FileManager.default
-    try? manager.removeItem(at: Self.root)
-    try manager.createDirectory(
-      at: Self.root, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
     let analyzer = Self.root.appending(path: "analyzer")
-    try Self.analyzerBytes.write(to: analyzer)
-    guard chmod(analyzer.path, 0o700) == 0 else { throw POSIXError(.EPERM) }
+    if !reopening {
+      // A reopened composition is the same daemon started again over the
+      // root an earlier one left, as the daemon restarts over its state.
+      try? manager.removeItem(at: Self.root)
+      try manager.createDirectory(
+        at: Self.root, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+      try Self.analyzerBytes.write(to: analyzer)
+      guard chmod(analyzer.path, 0o700) == 0 else { throw POSIXError(.EPERM) }
+    }
     let artifacts = Self.root.appending(path: "artifacts", directoryHint: .isDirectory)
     let store = try RuntimeArtifactStore(
       rootURL: artifacts, quota: ArtifactQuota(totalBytes: Self.quotaBytes),
@@ -571,8 +619,8 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
       flashBundleImportDirectory: nil, flashBundleImportPolicy: .production,
       methodObserver: nil)
     return WriterComposition(
-      handler: handler, store: store, probe: probe, artifacts: artifacts, jobsState: jobsState,
-      sessions: sessions, owner: owner)
+      handler: handler, engine: engine, store: store, probe: probe, artifacts: artifacts,
+      jobsState: jobsState, sessions: sessions, owner: owner)
   }
 
   /// Every source first, then every admission, as the Rust replays rebuild
@@ -788,6 +836,119 @@ final class JobRunAnalyzerOracleContractTests: XCTestCase {
         "jobs.json": .array(jobs), "cases.json": .array(recorded), "reads.json": .object(reads),
       ],
       producer: "JobRunAnalyzerOracleContractTests/testSwiftCancelsTheSharedAnalyzerJobs")
+  }
+
+  /// The Job store as a reader finds it: the index and every file below the
+  /// Job directories (each Job record's machine facts as labels), under
+  /// `prefix`.
+  private func storeSnapshot(_ composition: WriterComposition, prefix: String) throws
+    -> [String: Data]
+  {
+    let manager = FileManager.default
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = [.sortedKeys, .prettyPrinted, .withoutEscapingSlashes]
+    var files: [String: Data] = [
+      "\(prefix)/index.json":
+        try encoder.encode(try Self.index(of: composition.jobsState, normalizing: true))
+        + Data("\n".utf8)
+    ]
+    let jobs = composition.jobsState.appending(path: "jobs", directoryHint: .isDirectory)
+    for path in try manager.subpathsOfDirectory(atPath: jobs.path).sorted() {
+      let url = jobs.appending(path: path)
+      var metadata = stat()
+      guard lstat(url.path, &metadata) == 0 else { throw POSIXError(.EIO) }
+      guard metadata.st_mode & S_IFMT != S_IFDIR else { continue }
+      let data = try Data(contentsOf: url)
+      files["\(prefix)/jobs/\(path)"] =
+        url.lastPathComponent == "job-record.json" ? Self.machineIndependent(data) : data
+    }
+    return files
+  }
+
+  private func reconcileFiles() async throws -> [String: Data] {
+    let first = try writerComposition()
+    defer { try? FileManager.default.removeItem(at: Self.root) }
+    let (sources, submits, jobIDs) = try await writerAdmissions(
+      first, Self.reconcileJobs.map { ($0.name, $0.mode, $0.removed) })
+    var runs: [JSONValue] = []
+    for job in Self.reconcileJobs where job.runs {
+      let response = try await exchange(
+        first.handler, "job.run", ["jobId": .string(jobIDs[job.name]!)])
+      guard case .object(let fields) = response else { throw CocoaError(.coderInvalidValue) }
+      XCTAssertEqual(fields["ok"], .bool(true), "\(job.name): \(response)")
+      runs.append(.object(["name": .string(job.name), "response": response]))
+    }
+    // The parked Job's source payload goes once its run has parked it.
+    var removed: [JSONValue] = []
+    for job in Self.reconcileJobs where job.removed {
+      let source = sources[job.name]!
+      try FileManager.default.removeItem(
+        at: first.artifacts.appending(path: source.job).appending(path: source.artifact))
+      removed.append(.string("\(source.job)/\(source.artifact)"))
+    }
+    var files = try storeSnapshot(first, prefix: "before")
+    let jobs: [JSONValue] = Self.reconcileJobs.map { job in
+      .object([
+        "name": .string(job.name), "mode": .string(job.mode), "runs": .bool(job.runs),
+        "submit": .object(submits[job.name]!), "jobId": .string(jobIDs[job.name]!),
+      ])
+    }
+
+    // The daemon starts again over the same root, and then once more.
+    var starts: [JSONValue] = []
+    var composition = first
+    for start in ["restart", "secondRestart"] {
+      composition = try writerComposition(reopening: true)
+      let recovered = try await composition.engine.recoverActiveJobs()
+      starts.append(
+        .object([
+          "name": .string(start),
+          "recovered": .array(try recovered.map { try RuntimeJobReadProjection.status($0) }),
+        ]))
+      files.merge(try storeSnapshot(composition, prefix: start)) { _, new in new }
+    }
+
+    var recorded: [JSONValue] = []
+    for step in Self.reconcileSteps {
+      let params = step.params ?? ["jobId": .string(jobIDs[step.job!]!)]
+      let response = try await exchange(composition.handler, "job.reconcile", params)
+      guard case .object(let fields) = response else { throw CocoaError(.coderInvalidValue) }
+      if let expects = step.expects {
+        guard case .object(let error)? = fields["error"] else {
+          XCTFail("\(step.name): \(response)")
+          continue
+        }
+        XCTAssertEqual(error["code"], .string(expects), "\(step.name): \(response)")
+      }
+      recorded.append(
+        .object([
+          "name": .string(step.name), "method": .string("job.reconcile"),
+          "params": .object(params), "response": response,
+        ]))
+      files.merge(try storeSnapshot(composition, prefix: "steps/\(step.name)")) { _, new in new }
+    }
+    var reads: [String: JSONValue] = [:]
+    for job in Self.reconcileJobs {
+      let jobID = jobIDs[job.name]!
+      var answers: [String: JSONValue] = [:]
+      for method in ["job.status", "job.show", "job.result", "job.evidence"] {
+        answers[method] = try await exchange(
+          composition.handler, method, ["jobId": .string(jobID)])
+      }
+      reads[jobID] = .object(answers)
+    }
+    files.merge(
+      try writerFiles(
+        composition,
+        documents: [
+          "jobs.json": .array(jobs), "runs.json": .array(runs),
+          "removed.json": .array(removed), "starts.json": .array(starts),
+          "cases.json": .array(recorded), "reads.json": .object(reads),
+        ],
+        producer: "JobRunAnalyzerOracleContractTests/testSwiftRecoversAndReconcilesTheParkedAnalyzerJobs"
+      )
+    ) { _, new in new }
+    return files
   }
 
   private func runningCancellationFiles() async throws -> [String: Data] {

@@ -1,0 +1,44 @@
+#!/bin/sh
+# ArkDeck job.run oracle analyzer. The first line of the source it is given
+# names its answer; nothing else is read.
+[ "$#" -eq 2 ] && [ "$1" = "--analyze-crash-ledger" ] || exit 64
+IFS= read -r mode < "$2" || exit 66
+case "$mode" in
+answered)
+  printf '%s\n' '{"status":"answered","schemaVersion":"1.0.0","extra":{"ignored":true},"analyzerVersion":"arkdeck-fault-log-ledger@1","analyzerRef":"crash-signature@1","entries":[{"uid":"20010045","timestamp":"20260914000000","name":"jscrash-com.example.oracle-20010045-20260914000000","kind":"jscrash","bundle":"com.example/oracle-崩溃","note":"ignored"}],"unreadableReason":null}' ;;
+unreadable)
+  printf '%s' '{"analyzerRef":"crash-signature@1","analyzerVersion":"arkdeck-fault-log-ledger@1","entries":[],"schemaVersion":"1.0.0","status":"unreadable","unreadableReason":"the listing has no Fault log list header"}' ;;
+secret)
+  printf '%s' '{"analyzerRef":"crash-signature@1","analyzerVersion":"arkdeck-fault-log-ledger@1","entries":[{"bundle":"password=hunter2hunter2","kind":"cppcrash","name":"/private/tmp/arkdeck-job-plan-oracle/home/Library/cppcrash-1","timestamp":"20260914000001","uid":"api_key: abcdef1234"}],"schemaVersion":"1.0.0","status":"answered"}' ;;
+empty) ;;
+exit) printf 'oracle analyzer failed\n' >&2; exit 3 ;;
+malformed) printf 'crash signature: none\n' ;;
+scalar) printf '"answered"' ;;
+mismatch)
+  printf '%s' '{"analyzerRef":"crash-signature@1","analyzerVersion":"arkdeck-fault-log-ledger@2","entries":[],"schemaVersion":"1.0.0","status":"answered"}' ;;
+badentry)
+  printf '%s' '{"analyzerRef":"crash-signature@1","analyzerVersion":"arkdeck-fault-log-ledger@1","entries":[{"name":"jscrash-only-a-name"}],"schemaVersion":"1.0.0","status":"answered"}' ;;
+bigstdout) /usr/bin/head -c 9437184 /dev/zero ;;
+bigstderr)
+  /usr/bin/head -c 9437184 /dev/zero >&2
+  printf '%s' '{"analyzerRef":"crash-signature@1","analyzerVersion":"arkdeck-fault-log-ledger@1","entries":[],"schemaVersion":"1.0.0","status":"answered"}' ;;
+hold)
+  # Answers nothing until an oracle creates its release file, so only a
+  # cancellation or the budget ends it first; a hold whose parent is gone
+  # ends too, so none outlives the process that ran it.
+  while [ ! -e /private/tmp/arkdeck-job-plan-oracle/release ] &&
+    kill -0 "$PPID" 2>/dev/null; do
+    /bin/sleep 0.05
+  done ;;
+signal) kill -KILL "$$" ;;
+quota)
+  printf '%s' '{"analyzerRef":"crash-signature@1","analyzerVersion":"arkdeck-fault-log-ledger@1","entries":['
+  i=0
+  while [ "$i" -lt 600 ]; do
+    [ "$i" -gt 0 ] && printf ','
+    printf '{"bundle":"com.example.quota","kind":"jscrash","name":"jscrash-com.example.quota-%d","timestamp":"20260914000000","uid":"%d"}' "$i" "$i"
+    i=$((i + 1))
+  done
+  printf '%s' '],"schemaVersion":"1.0.0","status":"answered"}' ;;
+*) exit 65 ;;
+esac

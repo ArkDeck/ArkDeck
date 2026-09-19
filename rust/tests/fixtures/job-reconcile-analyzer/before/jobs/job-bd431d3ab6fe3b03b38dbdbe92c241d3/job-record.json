@@ -1,0 +1,91 @@
+{
+  "actualEffect" : "hostOnly",
+  "actualStepKinds" : [
+    "runDeterministicAnalyzer"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "kind" : "defaultReadOnlyPolicy",
+    "reference" : "default-read-only-policy"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-bd431d3ab6fe3b03b38dbdbe92c241d3",
+  "materializedPlanDigest" : "f1cad7aa0462ec7ff1f70b6885dfef08564e621f1fbe5ca25b0d6d15af3afe7b",
+  "operationFailure" : {
+    "category" : "unknownOutcome",
+    "code" : "outcomeUnknown",
+    "recovery" : "awaitRuntimeReconciliation",
+    "retryability" : "runtimeDecisionRequired",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "analyzer.extract-crash-signature@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-run-parked-0001",
+    "inputs" : {
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-4782cd8adbca94506c2af7ecf453800e"
+    },
+    "operation" : {
+      "id" : "analyzer.extract-crash-signature",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-run-parked",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "outcomeUnknown" : true,
+  "providerID" : "analyzer",
+  "recoveryAction" : {
+    "arguments" : {
+      "analyzerRef" : "crash-signature@1",
+      "analyzerVersion" : "arkdeck-fault-log-ledger@1",
+      "sourceArtifactId" : "ART-4782cd8adbca94506c2af7ecf453800e",
+      "sourceByteCount" : 30,
+      "sourceSha256" : "57b3f46264f3cb0301bfc7f9eb7695799454ece3472d918e41ae2400f5a38a32"
+    },
+    "kind" : "analyzer.analyze"
+  },
+  "recoveryIntentEventID" : "intent-extract-crash-signature",
+  "recoveryStepID" : "extract-crash-signature",
+  "request" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-oracle-run-parked-0001",
+    "inputs" : {
+      "sourceArtifactRef" : "lease-v1:job-oracle-source:ART-4782cd8adbca94506c2af7ecf453800e"
+    },
+    "operation" : {
+      "id" : "analyzer.extract-crash-signature",
+      "version" : 1
+    },
+    "requestId" : "req-oracle-run-parked",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "targetId" : "TGT-ORACLE"
+    }
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "waitingForRecovery",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "intent extract-crash-signature",
+    "outcomeUnknown extract-crash-signature; durable intent left outstanding",
+    "running->waitingForRecovery",
+    "reason: outcomeUnknown: process died on signal 9; the child never reached its own semantic boundary. Its crash report is in ~\/Library\/Logs\/DiagnosticReports\/ (look for a same-second entry named after the executable)."
+  ]
+}
