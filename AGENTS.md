@@ -66,17 +66,28 @@ Golden Journey 风险最小的解释并说明。旧 E0/E1/E2 或确认流程不�
 
 开发时用针对性检查验证可观察行为与关键失败路径。修改 `Catalog/**`、`openspec/contracts/**`
 或生成物时保持 schema、generator vocabulary/pins、Swift validator 与 contract tests 一致。
-最终本地验证在仓库根目录运行统一入口：
 
-```bash
-python3 scripts/ci/plan.py \
-  --repo-root . --base-revision origin/main --head-revision HEAD \
-  --merge-base --include-worktree --run-local
-```
+push 前本地只跑针对性检查（目标 10 分钟内；不拿门锁，不等别的门）：
 
-它执行公共检查，再按完整 diff 选择 Swift、App build-for-testing、design-system、Rust 测试；
-可信 base 不可得时选择全部车道。`--filter`/`--skip-build` 仅用于开发反馈。
-通过后，仅因新改动、失败或未解决风险扩大或重复测试。未执行检查及原因如实写入交付说明。
+- `cargo fmt --all --check --manifest-path rust/Cargo.toml`；改动的 crate 及直接依赖它的 crate：
+  `cargo clippy --manifest-path rust/Cargo.toml -p <crate> --all-targets -- -D warnings`（本机 target）与
+  `cargo test --manifest-path rust/Cargo.toml -p <crate>`，带 `CARGO_BUILD_JOBS=2`，多个工作树不共用
+  cargo target；
+- 改了契约输入（`control-protocol.json`、`spec/control/methods/**`、ControlFrames、CLI argv 语料）才跑
+  `python rust/scripts/generate-contract.py --check`；改了 `openspec/**`、`docs/**`、`AGENTS.md` 才跑
+  `sh scripts/check-sdd.sh`；
+- Swift 只跑受影响的测试类：`sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --filter <类>`；App 改动
+  只对受影响 scheme 做 build-for-testing（`scripts/ci/run-xcodebuild.sh`）。
+
+统一门是 PR 上的 GitHub CI：push 到 `agent/**` 自动开 PR，CI 里的 `scripts/ci/plan.py` 按完整 diff
+选择 Swift、App build-for-testing、design-system、Rust 车道（可信 base 不可得时选择全部车道），与本地
+`--run-local` 是同一套逻辑。本地不再跑完整统一门；只有 CI 红且需要本地复现时，才只跑红的那一道车道——
+按 `plan.py` 的 `local_commands` 手工跑该车道的命令，或只跑 CI 日志里失败的那一条——本机同一时刻最多一道。
+判红先看失败步骤：代码红就修了再推，不放宽断言、不加 sleep；红在本 PR 未改动的负载敏感测试时，按无效 run
+四判据（失败不在改动范围、已知负载/端口竞争、单跑稳定通过、与 diff 无关）记录后重跑 CI。交付说明与 run 记录
+写两段：「Local targeted checks」（命令、exit、日志路径）与「CI」（PR 号、run id、结论；PR 绿后 amend 补上或
+下一刀顺手补）。未执行检查及原因如实写入交付说明。性能测量仍要求安静主机（没有 `plan.py`、`cargo test/build`、
+`xcodebuild` 在跑，1 分钟负载 < 4）。
 
 protected `main` 的 required status checks 是 SDD Guard 的 `guard` 与 Swift CI 的 `swift` 聚合
 job（后者始终上报，被选中的车道任一失败即失败）。这是 GitHub 分支保护设置而非仓内文件，
