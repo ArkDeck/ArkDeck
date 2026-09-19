@@ -1,10 +1,19 @@
 # Rust HAP planning and authority foundation
 
-Status: HAP planning was verified at `716346b1`; the subsequent Lifecycle/
-Pointer integration and authority-foundation changes have only static checks.
-Full unified validation and the complete HAP runner remain pending. HAP submit
-and execution allowlists stay closed. No device, signing or GJ acceptance is
-claimed, and no capability is fabricated or installed by this slice.
+Status: `job.plan` for `debug.hap@1` and the authority foundation pass their
+targeted tests on `66fe52a8` (stacked on the Import lifecycle PR #1987); the
+unified gate result is in the last section. The complete HAP runner remains
+pending. HAP submit and execution allowlists stay closed. No device, signing
+or GJ acceptance is claimed, and no capability is fabricated or installed by
+this slice.
+
+Base: protected `main` `81957589` through Import lifecycle `92e2d667` (#1987,
+not yet merged; this slice needs its Import leases and holds). The sections
+below keep their original wording for the revisions they describe.
+
+| Already on `main` | This slice | Still remaining (`debug.hap@1`, M2) |
+|---|---|---|
+| HAP Provider typed lowering (#1951); Pointer device execution with durable authority (#1984); Import publication (#1983); native `DebugHapOracleContractTests` fixtures under `rust/tests/fixtures/debug-hap` | `job.plan` accepts `debug.hap@1` (exact entry/additional leases, Import holds, complete success and failure plan) matching 15 native Swift plan exchanges; owner-validated primary Artifact facts in `Materialized`; the shared Swift step-set digest with HAP compensations; HAP record reopen checks | open the submit allowlist (automatic issuance, consume before step intent, lineage block), the HAP runner through the Provider with T0 journal/receipt against the GJ-2 oracle, `cleanupDebt.*`, GJ-2 on the isolated daemon and on hardware |
 
 ## Production scope
 
@@ -88,3 +97,60 @@ Artifact correlation and changed current-Catalog step-set provenance on reopen.
 validate these later changes. Compile, targeted tests, full unified entry, and
 complete runner behavior remain required before delivery. No dashboard counts
 changed.
+
+## Stacked on Import lifecycle and targeted verification (2026-09-19)
+
+The uncommitted foundation from 11:24 was committed unchanged as `9948a4ba`, then
+merge `66fe52a8` took the Import lifecycle PR head `92e2d667` (#1987, which
+itself carries protected `main` `81957589`) without conflicts. Relative to
+`92e2d667` this slice is 11 files, +1371/−21.
+
+Targeted commands in `rust/` with `CARGO_BUILD_JOBS=3`, 13:35:39–13:36:07 CST,
+all exit 0:
+
+- `cargo test --locked -p arkdeck-hoststore --test debug_hap_plan`: 2 passed
+  (15 native plan exchanges, HAP admission still refused with unchanged Job and
+  capability files, additional-package failures, five bounded hold/release
+  cases).
+- `cargo test --locked -p arkdeck-hoststore --lib -- debug_hap_plan::tests
+  job_record::hap_provenance_tests mutation_provenance_tests`: 4 passed. The new
+  unit tests reproduce the native Swift capability policy identity from the
+  primary facts' canonical bytes (any changed or missing fact changes it), the
+  native consumed step-set digest including ordered compensations, and reject a
+  reopened HAP record without `artifactSHA256` or with a changed step-set
+  digest.
+- `cargo test --locked -p arkdeck-hoststore --test pointer_input_plan --test
+  pointer_input_submit --test pointer_input_run --test job_admission --test
+  import_upload`: `import_upload` 35 passed (+1 ignored child fixture driven by
+  its SIGKILL parent), `job_admission` 1, `pointer_input_plan` 1,
+  `pointer_input_run` 9, `pointer_input_submit` 4 — admission and consumption
+  now read `Materialized.artifact_facts`, which stay empty for every non-HAP
+  operation.
+
+Log: `/private/tmp/claude-501/-Users-fuhanfeng-Dropbox-Code-Github-ArkDeck--claude-worktrees-macos-agent-branches-20260919-7896b5/e4ca8ae5-02b3-4669-8ede-6d7975251bb2/scratchpad/logs/hap-targeted-66fe52a8.log`,
+SHA-256 `925c807c7f802adb0d3bda602d2108da7265f35750c59ab7af2b400fa47b4013`.
+
+## Unified gate
+
+Run 1 on `d2cab649` (merge base `81957589`), 2026-09-19 13:41:20–13:46:12 CST:
+**exit 1**, a real failure rather than an invalid run. The swift lane passed (all 2687
+SwiftPM tests), then `workspace-tests.py` stopped at
+`arkdeck-hoststore --test job_plan::rust_refuses_plans_it_cannot_materialize_yet`:
+main's test still used `debug.hap@1` as its example of an operation the Rust planner
+does not materialize, and this slice makes the planner materialize it (admission keeps
+refusing it through `JobPlanner::descriptor`). The targeted runs above had not included
+that suite. Fix: the example becomes `deploy.native-library.app-owned@1`, still
+unmaterialized, with its exact refusal; no production code changed. Afterwards
+`cargo test --workspace --locked --no-fail-fast` passed 853 tests with no failure. Log
+of run 1: `/private/tmp/claude-501/-Users-fuhanfeng-Dropbox-Code-Github-ArkDeck--claude-worktrees-macos-agent-branches-20260919-7896b5/e4ca8ae5-02b3-4669-8ede-6d7975251bb2/scratchpad/logs/hap-gate-d2cab649.log`,
+SHA-256 `add0cfc0462dccca6d8c4dceeb06d81dc716b5b6a5284f40a270b7cafaf7e14a`.
+
+Run 2 on `38ccf47e` (the fix above; merge base `81957589`), 2026-09-19 13:52:52–14:04:53 CST:
+**exit 0**. Lanes: swift, rust and design-system (the diff includes the Swift oracle test).
+SwiftPM full lane 2687 tests without failure; every cargo test summary sums to 899 passed,
+0 failed, 16 ignored; design-system 83/83; published and candidate contract checks,
+`check-sdd` (0 errors), `cargo deny` and `cargo vet` passed. Log:
+`/private/tmp/claude-501/-Users-fuhanfeng-Dropbox-Code-Github-ArkDeck--claude-worktrees-macos-agent-branches-20260919-7896b5/e4ca8ae5-02b3-4669-8ede-6d7975251bb2/scratchpad/logs/hap-gate2-38ccf47e.log`,
+SHA-256 `21c50e2c475adb4594604a08bbee8837e5ff8e53dd8b2862cd2aa80adba62ed5`. The commit that
+records this paragraph changes only this file. Linux and Windows target clippy with
+`-D warnings` exited 0 on the same Rust sources (before the test-only fix).
