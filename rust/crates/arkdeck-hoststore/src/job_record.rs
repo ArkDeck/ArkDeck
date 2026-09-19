@@ -792,6 +792,14 @@ impl JobRecord {
     pub(super) fn set_residues(&mut self, count: i64) {
         self.residues = Some(count);
     }
+    /// Swift `RuntimeJobRecord.screenSequence`: what a run of stills measured,
+    /// which only the record and `sequence.json` keep.
+    pub(super) fn screen_sequence(&self) -> Option<&Value> {
+        self.screen.as_ref()
+    }
+    pub(super) fn set_screen_sequence(&mut self, measured: Value) {
+        self.screen = Some(measured);
+    }
     /// The step kinds the record kept, in the order they first ran.
     pub(super) fn step_kinds(&self) -> Option<&[String]> {
         self.step_kinds.as_deref()

@@ -29,6 +29,11 @@
 //! that compensation on its intent. A failure is compensated as Swift
 //! compensates it (`device_hap_failure.rs`), and a failed cleanup owes a debt
 //! in the Artifact root's ledger.
+//!
+//! A screen sequence's file legs lower within the composition's host receive
+//! root. What its run of stills measured stays on the record, and its received
+//! archive is published from the landed file, which then does not outlive the
+//! publication (`device_screen_sequence.rs`).
 use crate::artifact_publication::{ArtifactPublisher, Product};
 use crate::artifact_read_owner::{LeasedArtifact, swift_string};
 use crate::capture_documents;
@@ -50,6 +55,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 #[path = "device_hap_failure.rs"]
 mod hap_failure;
+#[path = "device_screen_sequence.rs"]
+mod screen_sequence;
 
 const OBSERVE: &str = "observe.device@1";
 const CAPTURE: &str = "capture.diagnostics@1";
@@ -478,10 +485,11 @@ impl JobRunner<'_> {
                 Err(_) => return Err(Stop::Refused(uncertain())),
             };
             // Swift lowers the action before any use is consumed.
-            let plan = match action.plan(
+            let plan = match action.plan_in(
                 &step.step_id,
                 facts.as_ref().map(|facts| facts.connect_key.as_str()),
                 &context,
+                hdc.receive_root,
             ) {
                 Ok(plan) => plan,
                 Err(error) if gated && evidence => {
@@ -886,6 +894,11 @@ impl JobRunner<'_> {
                     step.step_id,
                     fact_names(&summary)
                 ));
+                // The timeline names the facts a step verified, not their
+                // values; what a run of stills measured is kept on the record.
+                if let Some(measured) = screen_sequence::measured(&summary) {
+                    run.record.set_screen_sequence(measured);
+                }
                 // A compensation keeps its action until its lane concludes,
                 // and publishes nothing.
                 if compensation.is_some() {
@@ -1338,6 +1351,11 @@ impl JobRunner<'_> {
                 continue;
             };
             let product = owner.product(&step.step_id, declaration, window.clone());
+            // A received product is the received bytes or nothing.
+            if device_steps::FILE_BACKED.contains(&name) {
+                self.publish_received(run, &product, declaration, receipt)?;
+                continue;
+            }
             let contents = contents(name, &run.record, summary, receipt);
             if owner.reference == CAPTURE {
                 let budget = byte_budget(&run.record);

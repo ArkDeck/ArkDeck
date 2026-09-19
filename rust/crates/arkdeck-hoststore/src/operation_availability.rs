@@ -14,13 +14,14 @@ pub struct OperationAvailabilityContext<'a> {
 
 /// The executable operations that mutate a device: each consumes a Runtime
 /// capability use first, so none is available without the mutation owner.
-const MUTATIONS: [&str; 6] = [
+const MUTATIONS: [&str; 7] = [
     "input.tap@1",
     "input.long-press@1",
     "input.swipe@1",
     "port-forward.create@1",
     "port-forward.remove@1",
     "debug.hap@1",
+    "capture.screen-sequence@1",
 ];
 
 /// Swift RuntimeJobEngine.operationAvailability's provider, dispatcher and
@@ -119,6 +120,7 @@ mod tests {
             "port-forward.create@1",
             "port-forward.remove@1",
             "debug.hap@1",
+            "capture.screen-sequence@1",
         ] {
             assert_eq!(
                 operation_unavailability(reference, "hdc", &c).unwrap()[0],

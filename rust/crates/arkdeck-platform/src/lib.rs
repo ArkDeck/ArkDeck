@@ -28,6 +28,10 @@ pub use process::{ProcessLimits, ProcessOutput, VerifiedTool};
 mod account;
 #[cfg(unix)]
 pub use account::{application_support_directory, arkdeck_application_support_root, runtime_home};
+#[cfg(unix)]
+mod temporary_directory;
+#[cfg(unix)]
+pub use temporary_directory::foundation_temporary_directory;
 #[cfg(target_os = "macos")]
 mod host_signature;
 #[cfg(target_os = "macos")]

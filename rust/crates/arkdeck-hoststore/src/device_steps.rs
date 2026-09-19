@@ -6,11 +6,14 @@
 //! compensation each source step declares on its intent, the residue a
 //! failed cleanup leaves, and the mutations only a readback may believe. For
 //! `deploy.native-library.app-owned@1` the provider's own action of each
-//! step, claimed by the operation, and the rollback its plan holds.
+//! step, claimed by the operation, and the rollback its plan holds. For
+//! `capture.screen-sequence@1` its file legs, the product a receive lands and
+//! the document its finalization writes.
 use crate::cleanup_debt::Residue;
 use crate::operation_catalog::{CatalogOperation, CatalogStep};
 use crate::session_json;
 use arkdeck_contract::sha256_hex;
+use arkdeck_provider_hdc::FileAction;
 use arkdeck_provider_hdc::{
     Action, CodeSignHelper, DEFAULT_HILOG_BUDGET, Deployment, Expected, FileActionError, FilePlan,
     FileReceipt, HapAction, Inspection, NativeAction, Outcome, PointerAction, PortAction, PortRule,
@@ -18,6 +21,7 @@ use arkdeck_provider_hdc::{
 };
 use serde_json::{Map, Value, json};
 use std::collections::BTreeSet;
+use std::path::Path;
 
 const HAP: &str = "debug.hap@1";
 /// The native library deployment, whose device steps are its provider's
@@ -26,9 +30,11 @@ pub(crate) const NATIVE: &str = "deploy.native-library.app-owned@1";
 /// Swift `HDCAppOwnedNativeLibraryDeployment.entryAbility`: the ability a
 /// native deployment's target is restarted through.
 const NATIVE_ABILITY: &str = "EntryAbility";
+/// The bounded run of stills, whose capture, receive and cleanup are file legs.
+pub(crate) const SCREEN_SEQUENCE: &str = "capture.screen-sequence@1";
 
 /// The device-bound operations this Runtime plans and runs.
-pub(crate) const DEVICE_OPERATIONS: [&str; 8] = [
+pub(crate) const DEVICE_OPERATIONS: [&str; 9] = [
     "observe.device@1",
     "capture.diagnostics@1",
     "input.tap@1",
@@ -37,6 +43,7 @@ pub(crate) const DEVICE_OPERATIONS: [&str; 8] = [
     "port-forward.create@1",
     "port-forward.remove@1",
     HAP,
+    SCREEN_SEQUENCE,
 ];
 
 /// Swift `evidenceEligibleOperations`: the operations whose device steps wait
@@ -163,6 +170,13 @@ pub(crate) enum StepAction {
     Port(PortAction),
     Hap(HapAction),
     Native(Box<NativeAction>),
+    /// A screen sequence's capture, receive or cleanup, with the clock of the
+    /// provider context it was named in (Swift `context.nowUTC`, which a file
+    /// leg's verdict may read).
+    File {
+        action: FileAction,
+        now_utc: String,
+    },
 }
 
 impl StepAction {
@@ -172,6 +186,14 @@ impl StepAction {
             Self::Port(action) => action.persisted(),
             Self::Hap(action) => action.persisted(),
             Self::Native(action) => action.persisted(),
+            Self::File { action, .. } => {
+                let (kind, arguments) = action.persisted();
+                let values = arguments
+                    .into_iter()
+                    .map(|(key, value)| (key.to_owned(), persisted_value(value)))
+                    .collect();
+                (kind, values)
+            }
             Self::Hdc(action) => {
                 let (kind, arguments) = action.persisted();
                 let values = arguments
@@ -191,11 +213,12 @@ impl StepAction {
     }
 
     /// The provider's verdict on the step's receipt. Every action but a debug
-    /// HAP's and a native deployment's lowers to one process and is judged by
-    /// it; a gesture's and a port rule's name no device fact. A HAP action and
-    /// a native action are judged over the whole receipt, and a package
-    /// readback binds its verdict to the digest of the entry package the Job
-    /// resolved (`resolved_sha256`).
+    /// HAP's, a native deployment's and a screen sequence's file leg lowers to
+    /// one process and is judged by it; a gesture's and a port rule's name no
+    /// device fact. A HAP action, a native action and a file leg are judged
+    /// over the whole receipt (a file leg's landed bytes included), and a
+    /// package readback binds its verdict to the digest of the entry package
+    /// the Job resolved (`resolved_sha256`).
     pub(crate) fn verify(
         &self,
         receipt: &FileReceipt,
@@ -205,6 +228,7 @@ impl StepAction {
         match (self, receipt.subprocesses.first()) {
             (Self::Hap(action), _) => action.verify(receipt, resolved_sha256),
             (Self::Native(action), _) => action.verify(receipt),
+            (Self::File { action, now_utc }, _) => action.verify(receipt, now_utc),
             (_, None) => Outcome::Unknown("dispatch produced no process result".into()),
             (Self::Hdc(action), Some(sole)) => action.verify(sole, expected),
             (Self::Pointer(action), Some(sole)) => action.verify(sole),
@@ -219,6 +243,7 @@ impl StepAction {
             Self::Port(action) => action.effect(),
             Self::Hap(action) => action.effect(),
             Self::Native(action) => action.effect(),
+            Self::File { action, .. } => action.effect(),
         }
     }
 
@@ -257,6 +282,25 @@ impl StepAction {
                 context.library.map(|library| library.byte_count),
                 context.helper,
             ),
+            Self::File { .. } => Err(format!(
+                "{step_id} lowers only within a composition that names its host receive root"
+            )),
+        }
+    }
+
+    /// [`Self::plan`] within an HDC composition: a file leg lowers with the
+    /// composition's host receive root (Swift `hostReceiveRoot`), where a
+    /// received file lands; a composition without one runs no file leg.
+    pub(crate) fn plan_in(
+        &self,
+        step_id: &str,
+        connect_key: Option<&str>,
+        context: &StepContext<'_>,
+        receive_root: Option<&Path>,
+    ) -> Result<FilePlan, String> {
+        match (self, receive_root) {
+            (Self::File { action, .. }, Some(root)) => action.lower(step_id, connect_key, root),
+            _ => self.plan(step_id, connect_key, context),
         }
     }
 }
@@ -338,7 +382,8 @@ pub(crate) fn action(
 /// by the operation before any step kind, since the other providers share
 /// those kinds; a debug HAP's own step kinds are its provider module's, with
 /// the owned paths minted for the Job and the Artifacts resolved for the
-/// step; every other step is named as [`action`] names it.
+/// step; a screen sequence's capture, receive and cleanup are its file legs
+/// for the Job; every other step is named as [`action`] names it.
 pub(crate) fn action_in(
     step: &CatalogStep,
     reference: &str,
@@ -363,6 +408,32 @@ pub(crate) fn action_in(
         )
     {
         return answer;
+    }
+    // A screen sequence's capture, receive and cleanup are its file legs,
+    // each naming the Job's own frame directory and archive.
+    if reference == SCREEN_SEQUENCE {
+        let named = FileAction::for_step(
+            &step.step_id,
+            &step.kind,
+            catalog_action(step),
+            inputs,
+            context.job_id,
+        );
+        match named {
+            Ok(Some(action)) => {
+                return Ok(StepAction::File {
+                    action,
+                    now_utc: now_utc.to_owned(),
+                });
+            }
+            Ok(None) => {}
+            Err(FileActionError::Unsupported(detail)) => {
+                return Err(ActionRefusal::Invalid(detail));
+            }
+            Err(FileActionError::Request(error)) => {
+                return Err(ActionRefusal::Invalid(error.to_string()));
+            }
+        }
     }
     action(step, reference, inputs, now_utc)
 }
@@ -546,6 +617,7 @@ pub(crate) fn journal_arguments_in(
             hap_journal_arguments(hap, step, inputs, context.job_id, context.resolved)
         }
         StepAction::Native(native) => native_arguments(step, native, context),
+        StepAction::File { action, .. } => file_journal_arguments(action, step, context.job_id),
         _ => journal_arguments_for(step, reference, inputs, action),
     }
 }
@@ -873,6 +945,7 @@ pub(crate) fn products(operation: &str, step_id: &str) -> &'static [&'static str
         (HAP, "package-readback") => &["install-readback.json"],
         (HAP, "process-readback") => &["process-readback.json"],
         (HAP, "capture-diagnostics") => &["debug-hilog.txt"],
+        (SCREEN_SEQUENCE, "receive-screen-sequence") => &["frames.tar"],
         _ => &[],
     }
 }
@@ -887,6 +960,7 @@ pub(crate) fn finalize_products(operation: &str) -> &'static [&'static str] {
             "artifact-index.json",
             "capture-summary.json",
         ],
+        SCREEN_SEQUENCE => &["sequence.json"],
         _ => &[],
     }
 }
@@ -960,4 +1034,66 @@ pub(crate) fn omitted_products(
         );
     }
     names
+}
+
+/// Swift `RuntimeArtifactService.fileBackedArtifacts`: a received product is
+/// the bytes that landed on the host or nothing, published from the landed
+/// file; the receive's stdout is only a transfer banner.
+pub(crate) const FILE_BACKED: [&str; 6] = [
+    "trace.htrace",
+    "screenshot.png",
+    "screenshot.jpeg",
+    "frames.tar",
+    "signed.hap",
+    "unsigned.hap",
+];
+
+/// Swift `journalStep(for:)` arguments of a screen sequence's file legs, for
+/// the Job `job_id` (before admission, the authorization envelope): the
+/// capture's frames, type, directory and archive; the archive a receive takes
+/// and where it lands among the Job's raw products; and the two owned paths
+/// a cleanup removes. None of them declares a compensation.
+pub(crate) fn file_journal_arguments(
+    action: &FileAction,
+    step: &CatalogStep,
+    job_id: &str,
+) -> Option<Value> {
+    Some(match action {
+        FileAction::CaptureScreenSequence {
+            request,
+            frames,
+            archive,
+        } => json!({
+            "catalogId": "trace-presets", "actionId": "custom",
+            "parameters": {"frameCount": request.frame_count,
+                "imageType": request.image_type.raw(), "framesDirectory": frames.remote_path},
+            "artifactId": format!("artifact-{}", step.step_id),
+            "ownedRemotePath": archive.remote_path,
+        }),
+        FileAction::ReceiveOwnedArtifact(artifact) if step.step_id == "receive-screen-sequence" => {
+            let mut arguments = json!({"remotePath": artifact.path.remote_path,
+                "artifactId": format!("artifact-{}", step.step_id),
+                "localRelativePath": "artifacts/raw/frames.tar"});
+            if let Some(expected) = &artifact.expected_sha256 {
+                arguments["expectedSha256"] = json!(expected);
+            }
+            arguments
+        }
+        FileAction::CleanupScreenSequence {
+            frames, archive, ..
+        } => json!({
+            "remotePath": archive.remote_path, "framesDirectory": frames.remote_path,
+            "ownershipEvidenceId": format!("owned-{job_id}"),
+        }),
+        _ => return None,
+    })
+}
+
+/// A persisted argument as Swift's `JSONValue` holds it.
+fn persisted_value(value: arkdeck_provider_hdc::Persisted) -> Value {
+    match value {
+        arkdeck_provider_hdc::Persisted::Text(text) => json!(text),
+        arkdeck_provider_hdc::Persisted::Integer(number) => json!(number),
+        arkdeck_provider_hdc::Persisted::Texts(texts) => json!(texts),
+    }
 }

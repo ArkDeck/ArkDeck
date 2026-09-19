@@ -442,6 +442,7 @@ fn adopting_run(
     let hdc = HdcComposition {
         targets: &targets,
         dispatch: &dispatch,
+        receive_root: None,
         tool_sha256: &digest,
         now: fixed_now,
         code_sign_helper: None,
@@ -715,6 +716,7 @@ fn crash_between_target_and_execution_commit_reopens_all_owners_and_keeps_origin
         let hdc = HdcComposition {
             targets: &targets,
             dispatch: &dispatch,
+            receive_root: None,
             tool_sha256: &digest,
             now: fixed_now,
             code_sign_helper: None,
@@ -841,6 +843,7 @@ fn physical_resume_keeps_original_intent_and_unique_job() {
         let hdc = HdcComposition {
             targets: &targets,
             dispatch: &dispatch,
+            receive_root: None,
             tool_sha256: &digest,
             now: fixed_now,
             code_sign_helper: None,
@@ -1029,6 +1032,7 @@ fn physical_resume_keeps_original_intent_and_unique_job() {
                         let hdc = HdcComposition {
                             targets,
                             dispatch,
+                            receive_root: None,
                             tool_sha256: digest,
                             now: fixed_now,
                             code_sign_helper: None,
@@ -1191,6 +1195,7 @@ fn resolved_resume_commit_gap_preserves_status_then_run_continuation() {
         let hdc = HdcComposition {
             targets: &targets,
             dispatch: &dispatch,
+            receive_root: None,
             tool_sha256: &digest,
             now: fixed_now,
             code_sign_helper: None,

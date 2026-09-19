@@ -250,6 +250,7 @@ fn execute_cycle(root: &Path, run_id: &str, cycle: u64, count: u64) -> Result<(u
     let hdc = HdcComposition {
         targets: &owners.targets,
         dispatch: &fake,
+        receive_root: None,
         tool_sha256: DIGEST,
         now: runtime_now,
         code_sign_helper: None,

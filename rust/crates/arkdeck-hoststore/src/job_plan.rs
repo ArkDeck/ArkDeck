@@ -22,6 +22,8 @@ use std::path::{Path, PathBuf};
 mod debug_hap_plan;
 #[path = "native_library_plan.rs"]
 mod native_library_plan;
+#[path = "screen_sequence_plan.rs"]
+mod screen_sequence_plan;
 
 const MAXIMUM_REQUEST_JSON_BYTES: usize = 4 * 1024 * 1024;
 const MAXIMUM_ANALYZER_BYTES: u64 = 128 * 1024 * 1024;
@@ -29,7 +31,7 @@ const MAXIMUM_ANALYZER_INPUT_BYTES: u64 = 512 * 1024 * 1024;
 /// The operations whose plans this Runtime materializes, and so plans and
 /// admits. Every other catalog operation is refused before its inputs are
 /// judged.
-const MATERIALIZED: [&str; 10] = [
+const MATERIALIZED: [&str; 11] = [
     "analyzer.extract-crash-signature@1",
     "observe.device@1",
     "capture.diagnostics@1",
@@ -40,6 +42,7 @@ const MATERIALIZED: [&str; 10] = [
     "port-forward.remove@1",
     "debug.hap@1",
     device_steps::NATIVE,
+    "capture.screen-sequence@1",
 ];
 
 /// Swift `AnalyzerProfile` for `crash-signature@1`, the analyzer a host names
@@ -384,6 +387,11 @@ impl<'a> JobPlanner<'a> {
         // expected ABI's code-signed ELF, whose facts name its capability.
         if reference == device_steps::NATIVE {
             return self.materialize_native(request, descriptor, &facts);
+        }
+        // A screen sequence's file legs are named for the authorization
+        // envelope and lowered against the composition's host receive root.
+        if reference == device_steps::SCREEN_SEQUENCE {
+            return self.materialize_screen_sequence(request, descriptor, &facts);
         }
         self.refuse_debug_permit(request)?;
         // Swift names a ring-buffered capture's coverage anchor in its

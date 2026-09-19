@@ -3,8 +3,9 @@
 //! timeline as the run finalizes; its markers are the host's own marks and
 //! what the run already knows, with what it could not derive said so; its
 //! index and summary state every other declared product's final status, so a
-//! partial capture can never read as a whole one. Built from the record and
-//! the Artifact index alone: no product's bytes are opened.
+//! partial capture can never read as a whole one. A screen sequence's
+//! `sequence.json` is what its run of stills measured. Built from the record
+//! and the Artifact index alone: no product's bytes are opened.
 use crate::job_record::JobRecord;
 use crate::operation_catalog::CatalogOperation;
 use crate::session_json;
@@ -38,6 +39,9 @@ pub(crate) fn contents(
     }
     if reference == CAPTURE && name == "markers.json" {
         return markers(record, recorded);
+    }
+    if reference == crate::device_steps::SCREEN_SEQUENCE && name == "sequence.json" {
+        return sequence(record);
     }
     let finalized = |name: &str| finalize_names.contains(&name);
     let mut artifacts = Map::new();
@@ -159,5 +163,62 @@ fn markers(record: &JobRecord, recorded: &[Value]) -> Result<Vec<u8>, String> {
         ],
     });
     session_json::encode_canonical_pretty(&document)
+        .map_err(|_| "the document cannot be encoded".into())
+}
+
+/// Swift `sequenceDocument`: what the run achieved, so its frames can be laid
+/// out on the spacing they were taken at — the counts, each frame's own
+/// span, the rate over their sum and how many frames are missing — or, with
+/// nothing measured, that absence rather than an empty run. Foundation's
+/// `JSONEncoder` with sorted keys, pretty printed.
+fn sequence(record: &JobRecord) -> Result<Vec<u8>, String> {
+    let mut document = Map::from_iter([("schemaVersion".to_owned(), json!("1.0.0"))]);
+    match record.screen_sequence() {
+        Some(sequence) => {
+            let integer = |key: &str| {
+                sequence[key]
+                    .as_i64()
+                    .ok_or_else(|| format!("the recorded {key} is not an integer"))
+            };
+            let (requested, captured) = (
+                integer("requestedFrameCount")?,
+                integer("capturedFrameCount")?,
+            );
+            let durations: Vec<f64> = sequence["frameDurationsSeconds"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .map(|duration| {
+                    duration
+                        .as_f64()
+                        .ok_or_else(|| "a recorded frame duration is not a number".to_owned())
+                })
+                .collect::<Result<_, _>>()?;
+            // Swift `RuntimeScreenSequence.framesPerSecond`: frames over the
+            // span they covered, summed in capture order, or zero.
+            let elapsed: f64 = durations.iter().sum();
+            let rate = if elapsed > 0.0 {
+                captured as f64 / elapsed
+            } else {
+                0.0
+            };
+            document.insert("requestedFrameCount".into(), json!(requested));
+            document.insert("capturedFrameCount".into(), json!(captured));
+            document.insert(
+                "frameDurationsSeconds".into(),
+                sequence["frameDurationsSeconds"].clone(),
+            );
+            document.insert("observedFramesPerSecond".into(), json!(rate));
+            document.insert("framesMissing".into(), json!((requested - captured).max(0)));
+        }
+        None => {
+            document.insert("measured".into(), json!(false));
+            document.insert(
+                "reason".into(),
+                json!("the capture step published no observed frame timings"),
+            );
+        }
+    }
+    session_json::encode_pretty(&Value::Object(document))
         .map_err(|_| "the document cannot be encoded".into())
 }

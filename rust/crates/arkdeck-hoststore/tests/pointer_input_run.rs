@@ -221,6 +221,7 @@ fn replay(fault: Fault) {
     let hdc = HdcComposition {
         targets: &targets,
         dispatch: &dispatch,
+        receive_root: None,
         tool_sha256: &digest,
         now: fixed_now,
         code_sign_helper: None,
@@ -323,6 +324,7 @@ fn replay(fault: Fault) {
                             let thread_hdc = HdcComposition {
                                 targets: targets_ref,
                                 dispatch: dispatch_ref,
+                                receive_root: None,
                                 tool_sha256: digest_ref,
                                 now: fixed_now,
                                 code_sign_helper: None,
@@ -593,6 +595,7 @@ fn restart_after_consumption_or_intent_never_replays_and_blocks_new_gesture() {
         let hdc = HdcComposition {
             targets: &targets,
             dispatch: &dispatch,
+            receive_root: None,
             tool_sha256: &digest,
             now: fixed_now,
             code_sign_helper: None,
