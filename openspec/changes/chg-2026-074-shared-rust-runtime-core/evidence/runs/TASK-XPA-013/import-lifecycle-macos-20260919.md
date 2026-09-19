@@ -2,7 +2,14 @@
 
 Implementation worktree: `agent/rust-import-lifecycle-20260919`, initially based on
 publication commit `c01b23d17596e50be207a30cdccdbf96318e6f59`. This is host implementation
-and isolated fixture evidence, not hardware acceptance. Final validation is pending.
+and isolated fixture evidence, not hardware acceptance. The delivered revision is the
+merge with protected `main` `81957589`; its unified gate passed (last section). The
+sections in between are the chronological development record and keep their
+original "pending" wording for the revisions they describe.
+
+| Already on `main` | This slice | Still remaining (TASK-XPA-013) |
+|---|---|---|
+| Import begin/append/abort/inspect/list and commit/publication with durable receipts (#1983); Job Artifact read/inspect/export; Pointer execution with durable authority (#1984) | Import leases resolved only in Catalog Artifact input slots; RAII hold through durable admission; `artifact.import.inspection` Job-reference census; `artifact.import.release` with the generation-3 release receipt and bounded-deadline recovery; `arkdeck artifact import release`; daemon and host analyzer runner share one Import owner | quota/retention/GC and cleanup-debt, the canonical alias HDC route, the publish crash-window matrix, owner activation at the M5 cutover, GJ-1/2/3 re-pass; `debug.hap@1` and `deploy.native-library.app-owned@1` are the first device consumers of these leases |
 
 ## Ownership and behavior
 
@@ -182,3 +189,66 @@ Static formatting and `git diff --check` passed. No build/tests were run during
 this integration. Next verification must cover the three new lifecycle safety
 tests, all Import lifecycle/CLI/daemon paths, Pointer execution/authority tests,
 and the full repository unified gate on this combined branch.
+
+## Integrated lifecycle and Pointer targeted validation
+
+**PASS — exit 0**, session `53461`, 2026-09-19, source `bc504d04`.
+The three additional safety regressions each passed individually. The subsequent
+complete Import suite passed 35 tests (one intentionally ignored child fixture is
+executed by its SIGKILL parent test). Pointer plan/execute/admit passed 1/9/4 tests,
+capability writes 4, mutation-state continuity 7, Import CLI 11, and the actual
+Rust CLI/daemon three-format restart/lost-reply/lifecycle journey 1. Commands used
+`CARGO_BUILD_JOBS=1 RUST_TEST_THREADS=1` and authorized native test execution.
+No production changes, timeouts or assertions were needed to make them pass.
+All roots and dispatches are isolated host fixtures, not real hardware evidence.
+
+Command script: `/private/tmp/arkdeck-lifecycle-targeted-20260919.sh`.
+Log: `/private/tmp/arkdeck-lifecycle-pointer-targeted-20260919.log`.
+
+The branch is based on main `510b4650` plus Pointer commit `79338c83`. The latter's
+Git tree is `c48c8b9947d2bfe4e963978f6c49a09426a46c14`, independently verified equal
+to protected-main Pointer squash `bda735df496bc078a37caa05ecf1a6ffea17ad55`.
+This describes identical integrated source content, not ancestry from that squash.
+The full repository gate below will still use the frozen `origin/main` at
+`510b4650`; no shared ref is changed during another slice's validation.
+
+## Unified gate on the 510b4650 base (recorded after the fact)
+
+The gate announced above ran on `d3883c29` with merge base `510b4650` and exited 0
+(`plan.py ... --run-local` with `CARGO_BUILD_JOBS=1 RUST_TEST_THREADS=1`; rust lane
+only). The executing session stopped at its usage limit before writing the result,
+so it is recorded here: log `/private/tmp/arkdeck-lifecycle-unified-main510-pointer-20260919.log`,
+SHA-256 `df72217a68eba421e11981c98520d32685cecd2deeacdfa82665b0de07cdf547`. The
+targeted log above has SHA-256
+`192d6301fa6b7fb09cbf34a743f969e770c2e0d80aa450dd2f46c430fdbad682`.
+
+## Protected-main 81957589 integration and final unified gate
+
+Protected main squash-merged Pointer execution as `bda735df` (#1984), whose tree
+equals this branch's Pointer ancestor `79338c83`, then App History reads as
+`81957589` (#1985). A plain three-way merge from `510b4650` reports false
+conflicts in 13 files wherever lifecycle edits overlap Pointer hunks, so merge
+`3be24565` (parents `d3883c29`, `81957589`) takes its tree from
+`git merge-tree --write-tree --merge-base=79338c83 origin/main d3883c29`. Its diff
+from `81957589` (37 files, +2389/−111) has the same stable patch-id,
+`41a048d4ef1cfc45`, as `79338c83..d3883c29`: exactly the lifecycle delta. #1985
+touches no lifecycle file.
+
+Gate: `ARKDECK_PYTHON=/private/tmp/arkdeck-validation-venv/bin/python
+/private/tmp/arkdeck-validation-venv/bin/python scripts/ci/plan.py --repo-root .
+--base-revision origin/main --head-revision HEAD --merge-base --include-worktree
+--run-local` on `3be24565`, merge base `81957589`, 2026-09-19 13:28:01–13:30:51 CST,
+**exit 0**. Lanes: rust only (the diff has no Swift, App or design-system file).
+Every cargo test summary in the log (development, candidate and published views)
+sums to 894 passed, 0 failed, 16 ignored; published and candidate contract checks,
+`check-sdd` (0 errors), `generate-contract.py --check`, `cargo deny` and
+`cargo vet` passed. Log: `/private/tmp/claude-501/-Users-fuhanfeng-Dropbox-Code-Github-ArkDeck--claude-worktrees-macos-agent-branches-20260919-7896b5/e4ca8ae5-02b3-4669-8ede-6d7975251bb2/scratchpad/logs/lifecycle-gate-3be24565.log`,
+SHA-256 `c502ffdf162fa2c73c6e21e76c8f7f9acfd280b6fc16ec2936c404b258448c80`.
+
+`cargo clippy --workspace --all-targets --locked --target <t> -- -D warnings` for
+`x86_64-unknown-linux-gnu` and `x86_64-pc-windows-msvc`: both exit 0.
+
+Not run: Swift, App build-for-testing and UI lanes (not selected; no Swift file
+changed); no real device, installed Runtime or Golden Journey — nothing here is
+hardware evidence. Maintainer gates: none consumed; recovery semantics beyond the
+release receipt's own bounded deadline stay behind design §L.1 item 13.
