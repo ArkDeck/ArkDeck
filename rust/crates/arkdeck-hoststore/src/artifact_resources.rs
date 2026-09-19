@@ -71,6 +71,21 @@ impl ArtifactReadStore {
         params: &Map<String, Value>,
         require_job: impl FnOnce(&str) -> Result<(), WireError>,
     ) -> Result<Value, WireError> {
+        if params.get("owner").and_then(|v| v.get("kind")) == Some(&json!("import")) {
+            return Err(failure(
+                "operationUnavailable",
+                "Import Artifact ownership requires its Import owner",
+            ));
+        }
+        self.handle_owned_resource(method, params, require_job)
+    }
+
+    pub(crate) fn handle_owned_resource(
+        &self,
+        method: &str,
+        params: &Map<String, Value>,
+        require_job: impl FnOnce(&str) -> Result<(), WireError>,
+    ) -> Result<Value, WireError> {
         let request = match method {
             "artifact.inspect" => ResourceRequest::Inspect(
                 ArtifactInspectRequest::from_params(params).map_err(map_error)?,
@@ -103,6 +118,21 @@ impl ArtifactReadStore {
     /// index verifies, each the projection `artifact.inspect` answers, newest
     /// first and then by Artifact identity.
     pub fn handle_list(
+        &self,
+        params: &Map<String, Value>,
+        snapshots: &Path,
+        require_job: impl FnOnce(&str) -> Result<(), WireError>,
+    ) -> Result<Value, WireError> {
+        if params.get("owner").and_then(|v| v.get("kind")) == Some(&json!("import")) {
+            return Err(failure(
+                "operationUnavailable",
+                "Import Artifact ownership requires its Import owner",
+            ));
+        }
+        self.handle_owned_list(params, snapshots, require_job)
+    }
+
+    pub(crate) fn handle_owned_list(
         &self,
         params: &Map<String, Value>,
         snapshots: &Path,
@@ -145,7 +175,7 @@ impl ArtifactReadStore {
         pager
             .page_filtered(
                 "artifact.list",
-                &json!({"owner": {"kind": "job", "id": job}}),
+                &json!({"owner": params["owner"]}),
                 "createdAtDescArtifactIdAsc",
                 page_size,
                 cursor,
@@ -155,8 +185,11 @@ impl ArtifactReadStore {
                         .iter()
                         .map(|row| {
                             let artifact = row["artifactID"].as_str().unwrap_or_default();
-                            let request =
-                                ArtifactInspectRequest::new(&job, artifact).map_err(map_error)?;
+                            let request = ArtifactInspectRequest::from_params(&Map::from_iter([
+                                ("owner".into(), params["owner"].clone()),
+                                ("artifactId".into(), json!(artifact)),
+                            ]))
+                            .map_err(map_error)?;
                             crate::artifact_projection::inspect_result(row, &request)
                                 .map_err(map_error)
                         })

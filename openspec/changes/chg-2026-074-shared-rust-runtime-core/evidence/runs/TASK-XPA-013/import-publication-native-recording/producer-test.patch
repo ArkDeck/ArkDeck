@@ -1,0 +1,42 @@
+diff --git a/Packages/ArkDeckKit/Tests/ArkDeckContractTests/DurableImportContractTests.swift b/Packages/ArkDeckKit/Tests/ArkDeckContractTests/DurableImportContractTests.swift
+index fe213dc7..2511d0fd 100644
+--- a/Packages/ArkDeckKit/Tests/ArkDeckContractTests/DurableImportContractTests.swift
++++ b/Packages/ArkDeckKit/Tests/ArkDeckContractTests/DurableImportContractTests.swift
+@@ -640,6 +640,37 @@ final class DurableImportContractTests: XCTestCase {
+     XCTAssertEqual(dispatcher.dispatchCount, 0)
+   }
+ 
++  /// Record the real daemon views for every locally registered publication kind.
++  /// A workspace patch deliberately has a nullable binding revision; no device runs.
++  func testCommittedImportViewsPreserveEveryRegisteredValidationAndNullablePatchBinding() async throws {
++    try startServer()
++    let client = try AgentClient(socketPath: XCTUnwrap(server).socketURL.path)
++    let patch = Data("diff --git a/a b/a\n--- a/a\n+++ b/a\n+token=exact-source\n".utf8)
++    for (kind, name, bytes) in [("hap", "view.hap", hap), ("workspace-patch", "view.patch", patch),
++      ("native-library", "libview.so", NativeLibraryTestFixture.arm64ELF())] {
++      let file = root.appending(path: name); try bytes.write(to: file)
++      let response = try cli(["artifact", "import", kind, "--import-request-id", "view-" + kind,
++        "--target", target.targetID, "--file", file.path])
++      XCTAssertEqual(response.0, 0, "\(response.1)")
++      let imported = try ArtifactImportProjection(XCTUnwrap(response.1["result"]))
++      let inspected = try client.request(method: "artifact.import.inspect", params: ["importRequestId": .string("view-" + kind)])
++      XCTAssertEqual(inspected, imported.value)
++      _ = try client.request(method: "artifact.import.inspection", params: ["importId": .string(imported.id)])
++      let owner: JSONValue = .object(["kind": .string("import"), "id": .string(imported.id)])
++      let listed = try object(client.request(method: "artifact.list", params: ["owner": owner]))
++      guard case .array(let items)? = listed["items"], let item = items.first else { return XCTFail("missing publication") }
++      let artifact = try object(item)
++      if kind == "workspace-patch" { XCTAssertEqual(try object(XCTUnwrap(artifact["binding"]))["bindingRevision"], .null) }
++      _ = try client.request(method: "artifact.inspect", params: ["owner": owner, "artifactId": try XCTUnwrap(artifact["artifactId"])])
++    }
++    _ = try client.request(method: "artifact.import.list", params: [:])
++    _ = try client.request(method: "artifact.import.list", params: ["target": .string(target.targetID), "state": .string("committed")])
++    let first = try object(client.request(method: "artifact.import.list", params: ["pageSize": .integer(1)]))
++    let cursor = try XCTUnwrap(first["nextCursor"])
++    _ = try client.request(method: "artifact.import.list", params: ["pageSize": .integer(1), "cursor": cursor])
++    XCTAssertEqual(dispatcher.dispatchCount, 0)
++  }
++
+   func testCLILostBeginAppendAndCommitRepliesRediscoverOneImportWithoutResendingBytes() async throws {
+     try startServer()
+     let handler = try XCTUnwrap(self.handler)
