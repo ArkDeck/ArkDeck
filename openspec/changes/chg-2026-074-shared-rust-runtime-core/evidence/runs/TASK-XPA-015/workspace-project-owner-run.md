@@ -10,8 +10,8 @@ methods (M3)") assigns these methods to XPA-015; the record and its native
 recording moved from `runs/TASK-XPA-014/` and the final commit declares XPA-015
 only.
 
-Base: protected `main` `81957589` (merge `c4ce3c1c`); owner checkpoint `58ea9b71`,
-recording and client verification `94d76ccf`.
+Base: protected `main` `2a4a3441` (merges `c4ce3c1c` and the rehang merge after #1986/#1988 below);
+owner checkpoint `58ea9b71`, recording and client verification `94d76ccf`.
 
 | Already on `main` | This slice | Still remaining (M3) |
 |---|---|---|
@@ -109,12 +109,22 @@ design-system 83/83; published and candidate contract checks, `generate-contract
 SHA-256 `38faf1d62e48868bfc6a94845203e34187c05a12f70167e0f45d20b2e736fd0a`. The
 commit recording this section changes only this file.
 
-Overlap to resolve at merge time: open PR #1986 also regenerates
-`spec/baselines/swift-single-v1.json` (and edits `AgentDaemonContractTests.swift` in
-another test); the generated baseline conflicts textually. #1986 was pushed first, so
-after it merges this branch merges main and reruns `python
-rust/scripts/generate-contract.py --write` (`--check` must then be clean) instead of
-hand-merging the file.
+Overlap resolved after the fact: #1986 (ClientKit History models) and #1988 (development USB
+relations) merged first. Merging protected main `2a4a3441` conflicted in two places:
+`spec/baselines/swift-single-v1.json` was taken from main and regenerated with
+`rust/scripts/generate-contract.py --write` (`--check` clean; the only remaining difference from
+main is the three workspace methods' pins), and `rust/crates/arkdeck-agentd/src/main.rs` keeps
+#1988's `let host = …; match development_usb … {}` composition with this slice's
+`with_workspace_projects` after `with_history`. `AgentDaemonContractTests.swift`, the host and
+the CLI files merged without conflict. The gate was rerun on the merged tree (below).
+
+Gate on the merged tree (`1f1b1860`, merge base `2a4a3441`), 2026-09-19 14:49:25–15:29:15 CST (load
+108/44/22 at start while five gates shared the host): **exit 0**. Lanes: swift, rust, design-system.
+SwiftPM full lane 2692 tests without failure; cargo 2577 passed, 0 failed, 48 ignored across every
+summary; design-system 83/83; published and candidate contract checks, `generate-contract.py
+--check`, `check-sdd`, `cargo deny` and `cargo vet` passed. Linux and Windows target clippy exit 0.
+Log: `/private/tmp/claude-501/-Users-fuhanfeng-Dropbox-Code-Github-ArkDeck--claude-worktrees-macos-agent-branches-20260919-7896b5/e4ca8ae5-02b3-4669-8ede-6d7975251bb2/scratchpad/logs/workspace-gate3.log`,
+SHA-256 `5e0e38fb3a2170ede121fcfaef47345b66a40e1f57391d3651e92d487d8253f9`.
 
 ## CI run 1 and the test-root fix
 
