@@ -1,7 +1,9 @@
 # Rust pointer execution and capability consumption
 
 Status: implementation and targeted validation; final integrated repository gate pending.
-Base: protected main `187321ea` (Runtime capability admission). This is macOS host
+Implementation base: protected main `187321ea` (Runtime capability admission).
+The implementation checkpoint `d8b39c56` was integrated with protected main
+`76612c9f` at `8301a443`, including resume and the App history ingress. This is macOS host
 fixture evidence, not installed Runtime activation or real-device acceptance.
 
 The three pointer operations (`input.tap@1`, `input.long-press@1`, `input.swipe@1`)
@@ -16,7 +18,10 @@ use checks and consumption are serialized by the Runtime owner.
 Admission and consumption require state continuity: the account-fixed Runtime
 root, retained capability checkpoint/history, and readable configured/default
 Session journals without unknown mutation intent or torn tails. A development
-state-root override cannot issue or consume mutation authority. Missing account
+state-root override cannot issue or consume mutation authority and advertises
+the pointer operations unavailable. The current installed Runtime has not switched
+to Rust. Candidate runner implementation, isolated operation availability, and
+real-device journey acceptance are separate facts. Missing account
 home disables the mutation owner. Retired authorization state, root/symlink drift,
 SQLite-only mutation history and nested Session journals fail closed. Root's
 continuity implementation is part of this slice; it is read-only.
@@ -46,9 +51,15 @@ observations. No public capability administration or recovery policy is added.
   corruption tests passed. Reservation, plan and target-binding mismatches refuse
   durable decode. The historical decoder checks step-set digest shape as Swift
   does; it does not claim independent reauthorization of historical data.
-- `cargo check -p arkdeck-agentd --locked` passed. Initial broad owner unit run:
+- Hoststore/agentd all-target integrated `cargo check` passed. Hoststore, agentd
+  and HDC Provider all-target Clippy with `-D warnings` passed before integration.
+  Initial broad owner unit run:
   163 passed, five native signing tests were denied by the sandbox; all 22 related
   native tool tests passed when rerun with authorized native inspection access.
+
+Integrated targeted run on `8301a443`: nine execution tests, four admission tests,
+eight continuity/correlation tests and one mixed-cache test passed; all-target
+compilation passed.
 
 Local logs: `/private/tmp/arkdeck-pointer-concurrent-20260919.log`,
 `/private/tmp/arkdeck-pointer-submit-20260919.log`,
