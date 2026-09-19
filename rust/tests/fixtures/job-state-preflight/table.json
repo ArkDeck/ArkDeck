@@ -1,0 +1,82 @@
+{
+  "agentExecutionStates": {
+    "abandoned": "terminal",
+    "budgetExpired": "terminal",
+    "clockUntrusted": "terminal",
+    "completed": "terminal",
+    "creatingJob": "active",
+    "failed": "terminal",
+    "jobOwned": "active",
+    "orchestrating": "active",
+    "waitingForHuman": "active"
+  },
+  "capabilityUseOutcomes": {
+    "confirmed": "settled",
+    "outcomeUnknown": "parked",
+    "pending": "unsettled",
+    "safeToReflash": "settled"
+  },
+  "classes": {
+    "blocking": "execution in flight, a coordination or recovery running, or a human decision pending: a restart or cutover is refused and the Job is listed",
+    "parked": "an outcomeUnknown lane with nothing in flight: carried over as it is, advanced only by job.reconcile's readback or a complete POL-RECOVERY-001 proof, never replayed",
+    "terminal": "carried over as it is"
+  },
+  "cutover": {
+    "blockingWhen": [
+      "the Job's state is blocking, or not listed",
+      "the Job's journal holds an outstanding intent, an unknown outcome or a torn tail while its state is not parked",
+      "an agent execution is active, unless it is jobOwned by a Job whose state is parked or terminal",
+      "a capability use is unsettled"
+    ],
+    "carriedAsIs": [
+      "a Job whose state is parked or terminal",
+      "a capability use that is parked or settled"
+    ],
+    "scope": "every Job of the state root; each Job takes the most conservative class its index row, record and journal give"
+  },
+  "restart": {
+    "malformedRow": "refused before any classification",
+    "otherwise": "blocking",
+    "preservedWhen": {
+      "finishedAtUtc": "a non-empty string",
+      "outcomeUnknown": true,
+      "outstandingResidueCount": 0,
+      "processProgress": null,
+      "state": "waitingForRecovery",
+      "waitingForHuman": false
+    },
+    "scope": "the current Jobs of every job.list page requested with includeCurrent"
+  },
+  "schemaVersion": "arkdeck.job-state-preflight/1",
+  "sources": {
+    "agentExecutionStates": "Packages/ArkDeckKit/Sources/ArkDeckCore/AgentExecutionContract.swift AgentExecutionState",
+    "capabilityUseOutcomes": "Packages/ArkDeckKit/Sources/ArkDeckStorage/RuntimeCapabilityStore.swift RuntimeCapabilityUseOutcome",
+    "cutover": "docs/design/cross-platform/rust-core-cross-platform-architecture.md §G.4",
+    "jobStates": "Packages/ArkDeckKit/Sources/ArkDeckCore/JobStateMachine.swift JobState",
+    "restart": "Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckRuntimeCommands.swift RuntimeCLI.classifyAgentdRestartCurrentJobs",
+    "ruling": "openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/adr-0009-decision-package-20260914.md, Ruling"
+  },
+  "states": {
+    "awaitingRebindConfirmation": "blocking",
+    "cancelRequested": "blocking",
+    "cancelled": "terminal",
+    "cancellingAtSafeBoundary": "blocking",
+    "failed": "terminal",
+    "finalizing": "blocking",
+    "interrupted": "terminal",
+    "planned": "terminal",
+    "planning": "blocking",
+    "preflight": "blocking",
+    "queued": "blocking",
+    "reconciling": "blocking",
+    "recovered": "terminal",
+    "recoveringByCompleteOverwrite": "blocking",
+    "resumeAtConfirmedSafeBoundary": "blocking",
+    "running": "blocking",
+    "succeeded": "terminal",
+    "userAbandonRequested": "blocking",
+    "waitingForDevice": "blocking",
+    "waitingForRecovery": "parked"
+  },
+  "unlistedState": "blocking"
+}

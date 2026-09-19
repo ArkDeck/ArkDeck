@@ -1,0 +1,9 @@
+{
+  "files" : {
+    "restart.json" : "262150b6f7982e1a76226e84c6a482cca27d73feb78697ac11b1e4d47929a2f1",
+    "table.json" : "f23187580083ba2f5f6f44124e76df6b991d9737703aaf66d6c43ef68cb0a2a4"
+  },
+  "producer" : "JobStatePreflightTableContractTests.testTheTableIsSwiftsJobStatesAndRecordsTheRestartOracle",
+  "restartClassifier" : "Packages/ArkDeckKit/Sources/ArkDeckCLI/ArkDeckRuntimeCommands.swift RuntimeCLI.classifyAgentdRestartCurrentJobs",
+  "table" : "spec/recovery/job-state-preflight.json"
+}
