@@ -1,11 +1,11 @@
 # Rust pointer execution and capability consumption
 
-Status: implementation and targeted validation; final integrated repository gate pending.
+Status: implementation and complete unified local validation passed; CI and maintainer review pending.
 Implementation base: protected main `187321ea` (Runtime capability admission).
 The implementation checkpoint `d8b39c56` was integrated with protected main
 `76612c9f` at `8301a443`, then `510b4650` at `d6cffa4a`, including resume,
 ClientKit extraction and Artifact publication. Targeted results below precede the
-latest integration; the complete unified gate remains pending. This is macOS host
+latest integration; the complete unified gate below validates the integrated code. This is macOS host
 fixture evidence, not installed Runtime activation or real-device acceptance.
 
 The three pointer operations (`input.tap@1`, `input.long-press@1`, `input.swipe@1`)
@@ -71,9 +71,39 @@ Local logs: `/private/tmp/arkdeck-pointer-concurrent-20260919.log`,
 Earlier attempts retained the exact oracle failures and their fixes; no fixture
 bytes or accepted assertions were weakened.
 
+## Complete unified local validation
+
+The repository root unified entrypoint passed with exit 0 on 2026-09-19 for
+`5581425f88349e1530569641fe1774e98fb4463b`, against protected-main
+`510b46508d8719318114a17c2567b701297efb65`. The unfiltered planner selected
+common checks and the Rust lane; Swift/App lanes were not selected for this diff.
+Rust workspace tests, all-target Clippy, published and candidate contract checks,
+`cargo deny` and `cargo vet` (36 fully audited) passed. Both isolated contract
+recording runs completed; neither represents device acceptance.
+
+Command (repository root):
+
+```sh
+ARKDECK_PYTHON=/private/tmp/arkdeck-validation-venv/bin/python \
+ARKDECK_SWIFT_EXECUTABLE=/private/tmp/arkdeck-swift-jobs2.sh \
+ARKDECK_XCODE_JOBS=2 CARGO_BUILD_JOBS=1 RUST_TEST_THREADS=1 ARKDECK_TEST_WORKERS=2 \
+/private/tmp/arkdeck-validation-venv/bin/python scripts/ci/plan.py \
+  --repo-root . --base-revision origin/main --head-revision HEAD \
+  --merge-base --include-worktree --run-local
+```
+
+Log: `/private/tmp/arkdeck-pointer-unified-main510-r3-20260919.log`.
+Recordings: `rust/target/readonly-check/22210b583f124f438be3719b83af198c`.
+Earlier full attempts remain retained: the first failed Clippy's collapsible-if
+lint in a new test (fixed in `24a87560`); the second exposed a stale availability
+test expectation (fixed in `5581425f`). That test now verifies the exact
+`provider_tool_unavailable` / `runtime.mutationOwnerUnavailable` /
+`host_configuration` refusal for the development state root. No mutation authority,
+accepted production assertion or timing threshold was relaxed.
+
 ## Remaining boundaries
 
-Final main integration and unified local gate, CI and maintainer review remain.
+CI and maintainer review remain.
 This slice is not M1/M2 completion. Installed signed Runtime composition, App/CLI
 journeys on that Runtime, real USB facts and GJ hardware acceptance remain separate
 requirements. Neither fake transport nor this production-owner replay proves them.
