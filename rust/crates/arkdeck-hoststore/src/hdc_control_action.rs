@@ -23,19 +23,18 @@
 //! request run while a preview awaits its observation and joins the
 //! observation in flight; here that request waits instead.
 use crate::control_action::{identifier, refused, unreadable};
-use crate::format_time::{precise_utc_millis, utc_precise_from_millis};
-use arkdeck_contract::{CATALOG_DIGEST, WireError, canonical_json, sha256_hex, strict_json};
-use arkdeck_platform::{DocumentPublishError, HostDirectory};
+use crate::control_action_store::{ActionStore, StoredAction};
+use crate::control_action_value::{
+    digest, exact_keys, generation, hash, one_of, optional_digest, optional_generation,
+    optional_identifier, optional_text, owner, record_unreadable, time, timestamp,
+};
+use arkdeck_contract::{CATALOG_DIGEST, WireError, canonical_json, sha256_hex};
+use arkdeck_platform::HostDirectory;
 use serde_json::{Map, Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
-/// `RuntimeHDCControlActionStore`'s bounds.
-const MAX_RECORDS: usize = 4096;
-const MAX_RECORD: usize = 1024 * 1024;
-const MAX_STORE: usize = 64 * 1024 * 1024;
-const MAX_TEMPORARIES: usize = 8;
 /// An action's and its preview's life: `expiresAt` is `createdAt` plus 300 s.
 const LIFETIME_MS: u64 = 300_000;
 /// `HDCControlImpact`'s canonical bound.
@@ -77,91 +76,6 @@ const OPEN: [&str; 5] = [
     "approvalRecorded",
     "blocked",
 ];
-
-// --- values (`HDCControlValue`) -------------------------------------------
-
-/// 64 lowercase hex digits.
-fn digest(text: &str) -> bool {
-    text.len() == 64
-        && text
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-}
-
-/// A canonical decimal from 1 to `Int64.max`.
-fn generation(text: &str) -> Option<u64> {
-    let number = text.parse::<u64>().ok()?;
-    (number > 0 && number <= i64::MAX as u64 && number.to_string() == text).then_some(number)
-}
-
-fn optional_generation(value: Option<&Value>) -> bool {
-    match value {
-        Some(Value::Null) => true,
-        Some(Value::String(text)) => generation(text).is_some(),
-        _ => false,
-    }
-}
-
-fn optional_identifier(value: Option<&Value>) -> bool {
-    match value {
-        Some(Value::Null) => true,
-        Some(Value::String(text)) => identifier(text),
-        _ => false,
-    }
-}
-
-fn optional_digest(value: Option<&Value>) -> bool {
-    match value {
-        Some(Value::Null) => true,
-        Some(Value::String(text)) => digest(text),
-        _ => false,
-    }
-}
-
-/// Printable text of 1 to `maximum` bytes, or null.
-fn optional_text(value: Option<&Value>, maximum: usize) -> bool {
-    match value {
-        Some(Value::Null) => true,
-        Some(Value::String(text)) => {
-            (1..=maximum).contains(&text.len())
-                && text
-                    .chars()
-                    .all(|scalar| scalar as u32 >= 32 && scalar as u32 != 127)
-        }
-        _ => false,
-    }
-}
-
-fn one_of(value: Option<&Value>, allowed: &[&str]) -> bool {
-    value
-        .and_then(Value::as_str)
-        .is_some_and(|text| allowed.contains(&text))
-}
-
-/// The SHA-256 of the RFC 8785 canonical bytes.
-fn hash(value: &Value) -> Result<String, WireError> {
-    Ok(sha256_hex(
-        &canonical_json(value).map_err(|_| unreadable())?,
-    ))
-}
-
-/// An instant as the records spell it: UTC with milliseconds, and only the
-/// spelling that reads back to itself.
-fn time(text: &str) -> Option<u64> {
-    precise_utc_millis(text)
-}
-
-fn timestamp(milliseconds: u64) -> String {
-    utc_precise_from_millis(milliseconds)
-}
-
-fn exact_keys(fields: &Map<String, Value>, keys: &[&str]) -> bool {
-    fields.len() == keys.len() && keys.iter().all(|key| fields.contains_key(*key))
-}
-
-fn owner(id: &str) -> Value {
-    json!({"kind": "controlAction", "id": id})
-}
 
 // --- intent (`HDCControlActionIntent`) ------------------------------------
 
@@ -653,10 +567,6 @@ pub struct Record {
     epoch: String,
 }
 
-fn record_unreadable(message: &str) -> WireError {
-    refused("recordUnreadable", message)
-}
-
 /// Swift's continuity binding, private to the record: one proved USB relation
 /// of an observation the preview names.
 fn relation_id(relation: &Value) -> Option<(String, String)> {
@@ -1033,161 +943,57 @@ impl Record {
 
 // --- store (`RuntimeHDCControlActionStore`) -------------------------------
 
-fn filename(request: &str) -> String {
-    format!("action-{}.json", sha256_hex(request.as_bytes()))
-}
+impl StoredAction for Record {
+    fn parse(value: Map<String, Value>) -> Result<Self, WireError> {
+        Record::parse(value)
+    }
 
-/// A pre-rename publication: Swift's `.action-<digest>.json.<uuid>.tmp` or
-/// the shared Rust publisher's `.action-<digest>.json.<32 hex>.part`.
-fn temporary(name: &str) -> bool {
-    let Some(rest) = name.strip_prefix(".action-") else {
-        return false;
-    };
-    let Some((hex, rest)) = rest.split_once(".json.") else {
-        return false;
-    };
-    if !digest(hex) {
-        return false;
+    fn value(&self) -> &Map<String, Value> {
+        &self.value
     }
-    if let Some(uuid) = rest.strip_suffix(".tmp") {
-        return uuid.len() == 36
-            && uuid.bytes().enumerate().all(|(index, byte)| {
-                if [8, 13, 18, 23].contains(&index) {
-                    byte == b'-'
-                } else {
-                    byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)
-                }
-            });
+
+    fn id(&self) -> &str {
+        &self.id
     }
-    rest.strip_suffix(".part").is_some_and(|nonce| {
-        nonce.len() == 32
-            && nonce
-                .bytes()
-                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-    })
+
+    fn request(&self) -> &str {
+        &self.intent.request
+    }
+
+    fn generation(&self) -> u64 {
+        self.generation
+    }
+
+    fn created(&self) -> &str {
+        &self.created
+    }
+
+    /// Never its intent, lifetime, epoch, catalog or published preview, and
+    /// only over a permitted transition.
+    fn replaces(previous: &Self, next: &Self) -> bool {
+        previous.intent == next.intent
+            && previous.created == next.created
+            && previous.expires == next.expires
+            && previous.epoch == next.epoch
+            && previous.value.get("catalogDigest") == next.value.get("catalogDigest")
+            && (previous.preview.is_none() || previous.preview == next.preview)
+            && (previous.preview.is_none()
+                || previous.value.get("observationRelations")
+                    == next.value.get("observationRelations"))
+            && time(&previous.observed)
+                .zip(time(&next.observed))
+                .is_some_and(|(old, new)| new >= old)
+            && permits(&previous.state, &next.state)
+    }
 }
 
 /// The owner's records, one document per request identity, changed only
 /// under the transaction lock beside them.
-struct Store {
-    path: PathBuf,
-    root: HostDirectory,
-}
+struct Store(ActionStore<Record>);
 
 impl Store {
     fn open(path: &Path) -> io::Result<Self> {
-        Ok(Self {
-            root: HostDirectory::open(path)?,
-            path: path.into(),
-        })
-    }
-
-    fn validate_directory(&self) -> Result<(), WireError> {
-        self.root
-            .validate_path(&self.path)
-            .map_err(|_| record_unreadable("control-action directory identity changed"))
-    }
-
-    /// One transaction: the directory still this one, its lock held without
-    /// waiting, and both still so after `body`.
-    fn transaction<T>(&self, body: impl FnOnce() -> Result<T, WireError>) -> Result<T, WireError> {
-        self.validate_directory()?;
-        let lock = self.root.lock_document(".lock").map_err(|error| {
-            if error.kind() == io::ErrorKind::WouldBlock {
-                refused(
-                    "resourceConflict",
-                    "another Runtime owner holds the control-action transaction",
-                )
-            } else {
-                record_unreadable("control-action lock cannot be opened")
-            }
-        })?;
-        if !self
-            .root
-            .document_metadata(".lock")
-            .is_ok_and(|metadata| metadata.len() == 0)
-        {
-            return Err(record_unreadable("unsafe control-action lock"));
-        }
-        self.validate_directory()?;
-        let result = body()?;
-        self.validate_directory()?;
-        lock.validate_link(&self.root, ".lock")
-            .map_err(|_| record_unreadable("control-action lock changed during transaction"))?;
-        Ok(result)
-    }
-
-    /// Every record, in file-name order; an interrupted publication's
-    /// temporary file is removed.
-    fn records(&self) -> Result<Vec<Record>, WireError> {
-        let bound = || record_unreadable("control-action directory exceeds its bound");
-        let names = self
-            .root
-            .names(MAX_RECORDS + MAX_TEMPORARIES + 1)
-            .map_err(|_| bound())?;
-        let (mut files, mut temporaries) = (Vec::new(), Vec::new());
-        for name in names {
-            if name == ".lock" {
-                continue;
-            }
-            if temporary(&name) {
-                temporaries.push(name);
-            } else if name
-                .strip_prefix("action-")
-                .and_then(|rest| rest.strip_suffix(".json"))
-                .is_some_and(digest)
-            {
-                files.push(name);
-            } else {
-                return Err(record_unreadable(
-                    "unexpected content in control-action directory",
-                ));
-            }
-            if files.len() > MAX_RECORDS || temporaries.len() > MAX_TEMPORARIES {
-                return Err(bound());
-            }
-        }
-        let (mut total, mut records, mut identities) = (0, Vec::new(), BTreeSet::new());
-        for name in files {
-            let bytes = self
-                .root
-                .read(&name, MAX_RECORD)
-                .ok()
-                .filter(|bytes| !bytes.is_empty())
-                .ok_or_else(|| {
-                    record_unreadable("control-action record has unsafe identity or size")
-                })?;
-            total += bytes.len();
-            if total > MAX_STORE {
-                return Err(record_unreadable(
-                    "control-action store exceeds its byte bound",
-                ));
-            }
-            let Ok(Value::Object(fields)) = strict_json(&bytes) else {
-                return Err(unreadable());
-            };
-            let record = Record::parse(fields)?;
-            if name != filename(&record.intent.request) || !identities.insert(record.id.clone()) {
-                return Err(record_unreadable(
-                    "control-action record name or identity is inconsistent",
-                ));
-            }
-            records.push(record);
-        }
-        for name in temporaries {
-            let removed = self
-                .root
-                .document_metadata(&name)
-                .ok()
-                .filter(|metadata| metadata.len() <= MAX_RECORD as u64)
-                .is_some_and(|metadata| self.root.remove_document(&name, &metadata).is_ok());
-            if !removed {
-                return Err(record_unreadable(
-                    "unsafe interrupted control-action publication",
-                ));
-            }
-        }
-        Ok(records)
+        Ok(Self(ActionStore::open(path)?))
     }
 
     fn begin(
@@ -1198,143 +1004,31 @@ impl Store {
         now: u64,
         action_id: &str,
     ) -> Result<Record, WireError> {
-        self.transaction(|| {
-            let all = self.records()?;
-            if let Some(existing) = all
-                .iter()
-                .find(|record| record.intent.request == intent.request)
-            {
-                if existing.intent != *intent {
-                    return Err(refused(
-                        "idempotencyConflict",
-                        "action request identity already belongs to a different intent",
-                    ));
-                }
-                return Ok(existing.clone());
-            }
-            if all.len() >= MAX_RECORDS {
-                return Err(refused(
-                    "operationUnavailable",
-                    "control-action record limit reached",
-                ));
-            }
-            let record = Record::new(intent, catalog, epoch, now, action_id)?;
-            self.write(&record, None, &all)?;
-            Ok(record)
-        })
+        self.0.begin(
+            &intent.request,
+            |existing| existing.intent == *intent,
+            || Record::new(intent, catalog, epoch, now, action_id),
+        )
     }
 
     fn load(&self, id: &str) -> Result<Option<Record>, WireError> {
-        if !identifier(id) {
-            return Err(refused("invalidInput", "invalid control-action identity"));
-        }
-        self.transaction(|| Ok(self.records()?.into_iter().find(|record| record.id == id)))
+        self.0.load(id)
     }
 
     fn load_request(&self, request: &str) -> Result<Option<Record>, WireError> {
-        if !identifier(request) {
-            return Err(refused("invalidInput", "invalid action request identity"));
-        }
-        self.transaction(|| {
-            Ok(self
-                .records()?
-                .into_iter()
-                .find(|record| record.intent.request == request))
-        })
+        self.0.load_request(request)
     }
 
     /// Creation time, then identity in byte order.
     fn list(&self) -> Result<Vec<Record>, WireError> {
-        self.transaction(|| {
-            let mut records = self.records()?;
-            records.sort_by(|left, right| {
-                (left.created.as_bytes(), left.id.as_bytes())
-                    .cmp(&(right.created.as_bytes(), right.id.as_bytes()))
-            });
-            Ok(records)
-        })
+        self.0.list()
     }
 
     /// The exact next generation of the same action, over a permitted
     /// transition, never replacing its identity, intent, lifetime, epoch,
     /// catalog or published preview.
     fn replace(&self, record: &Record, expected: u64) -> Result<(), WireError> {
-        self.transaction(|| {
-            let all = self.records()?;
-            let consistent =
-                all.iter()
-                    .find(|previous| previous.id == record.id)
-                    .filter(|previous| {
-                        previous.generation == expected
-                            && expected < i64::MAX as u64
-                            && record.generation == expected + 1
-                            && previous.intent == record.intent
-                            && previous.created == record.created
-                            && previous.expires == record.expires
-                            && previous.epoch == record.epoch
-                            && previous.value.get("catalogDigest")
-                                == record.value.get("catalogDigest")
-                            && (previous.preview.is_none() || previous.preview == record.preview)
-                            && (previous.preview.is_none()
-                                || previous.value.get("observationRelations")
-                                    == record.value.get("observationRelations"))
-                            && time(&previous.observed)
-                                .zip(time(&record.observed))
-                                .is_some_and(|(old, new)| new >= old)
-                            && permits(&previous.state, &record.state)
-                    });
-            let Some(previous) = consistent else {
-                return Err(refused(
-                    "resourceConflict",
-                    "control action changed or update replaces immutable facts",
-                ));
-            };
-            let previous = previous.clone();
-            self.write(record, Some(&previous), &all)
-        })
-    }
-
-    fn write(
-        &self,
-        record: &Record,
-        replacing: Option<&Record>,
-        all: &[Record],
-    ) -> Result<(), WireError> {
-        Record::parse(record.value.clone())?;
-        let bytes =
-            canonical_json(&Value::Object(record.value.clone())).map_err(|_| unreadable())?;
-        if bytes.len() > MAX_RECORD {
-            return Err(refused(
-                "inputTooLarge",
-                "control-action record is too large",
-            ));
-        }
-        let mut total = bytes.len();
-        for other in all
-            .iter()
-            .filter(|other| Some(other.id.as_str()) != replacing.map(|record| record.id.as_str()))
-        {
-            total += canonical_json(&Value::Object(other.value.clone()))
-                .map_err(|_| unreadable())?
-                .len();
-        }
-        if total > MAX_STORE {
-            return Err(refused(
-                "operationUnavailable",
-                "control-action store byte limit reached",
-            ));
-        }
-        self.validate_directory()?;
-        self.root
-            .publish_document(&filename(&record.intent.request), &bytes, MAX_RECORD)
-            .map_err(|error| match error {
-                DocumentPublishError::BeforePublication(_) => {
-                    record_unreadable("control-action temporary file cannot be created")
-                }
-                DocumentPublishError::OutcomeUnknown(_) => {
-                    record_unreadable("control-action atomic publication failed")
-                }
-            })
+        self.0.replace(record, expected)
     }
 }
 
