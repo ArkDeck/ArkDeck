@@ -1,7 +1,21 @@
 # macOS workspace project registration owner
 
-Status: implementation and targeted verification passed; unified gate pending. This record does not claim Task,
+Status: implementation, targeted verification and the unified gate on the
+`81957589` merge passed (last section). This record does not claim Task,
 workspace integration, installation cutover, or hardware acceptance completion.
+
+Task: TASK-XPA-015. The branch's working commits carried TASK-XPA-014, but the r11
+card (`tasks.md` TASK-XPA-015, "lane D ... the `workspace.preset/project.*`
+methods (M3)") assigns these methods to XPA-015; the record and its native
+recording moved from `runs/TASK-XPA-014/` and the final commit declares XPA-015
+only.
+
+Base: protected `main` `81957589` (merge `c4ce3c1c`); owner checkpoint `58ea9b71`,
+recording and client verification `94d76ccf`.
+
+| Already on `main` | This slice | Still remaining (M3) |
+|---|---|---|
+| Swift `RuntimeWorkspaceProjectStore` behind the façade; no Rust workspace owner | Rust `workspace.project.register/list/show` owner (`arkdeck-hoststore`), isolated-daemon Control routes, `arkdeck workspace project register/list/show`, the three method schemas re-derived from 15 recorded native frames | `workspace.project.update/remove`, the five `workspace.preset.*` methods, the 13 `workspace.*` operations (build/sign only after SPK-10), GJ-5 on the isolated Rust daemon |
 
 ## Scope and compatibility
 
@@ -78,3 +92,47 @@ build window; static formatting and diff checks alone are not acceptance.
   failures), `/private/tmp/arkdeck-workspace-host-fixed-20260919.log`.
 - Both contract generators' `--check` drift checks pass. Full repository unified
   validation has not run for this slice.
+
+## Unified gate on the 81957589 merge
+
+`ARKDECK_PYTHON=/private/tmp/arkdeck-validation-venv/bin/python
+/private/tmp/arkdeck-validation-venv/bin/python scripts/ci/plan.py --repo-root .
+--base-revision origin/main --head-revision HEAD --merge-base --include-worktree
+--run-local` on `5cb09fac` (merge base `81957589`), 2026-09-19 13:35:07–13:49:42 CST:
+**exit 0**. Lanes: swift, rust and design-system (the diff includes a Swift contract
+test and the ControlFrames corpus; no App file, so no App build-for-testing). The
+full SwiftPM lane ran 2688 tests without failure (one more than main: the new
+producer test); every cargo test summary sums to 2532 passed, 0 failed, 45 ignored;
+design-system 83/83; published and candidate contract checks, `generate-contract.py
+--check`, `check-sdd` (0 errors), `cargo deny` and `cargo vet` passed. Log:
+`/private/tmp/claude-501/-Users-fuhanfeng-Dropbox-Code-Github-ArkDeck--claude-worktrees-macos-agent-branches-20260919-7896b5/e4ca8ae5-02b3-4669-8ede-6d7975251bb2/scratchpad/logs/workspace-gate-5cb09fac.log`,
+SHA-256 `38faf1d62e48868bfc6a94845203e34187c05a12f70167e0f45d20b2e736fd0a`. The
+commit recording this section changes only this file.
+
+Overlap to resolve at merge time: open PR #1986 also regenerates
+`spec/baselines/swift-single-v1.json` (and edits `AgentDaemonContractTests.swift` in
+another test); the generated baseline conflicts textually. #1986 was pushed first, so
+after it merges this branch merges main and reruns `python
+rust/scripts/generate-contract.py --write` (`--check` must then be clean) instead of
+hand-merging the file.
+
+## CI run 1 and the test-root fix
+
+PR #1989 at `c3fc2e02`: `Rust workspace (macos-26)` failed in
+`workspace_project::completed_presets_are_validated_and_preserved_without_acquiring_dependencies`
+at `Root::new` with `EEXIST` (job 105849540400). Every test of the file names its
+temporary root from the process id and `SystemTime` nanoseconds; the tests run as
+threads of one process and the macOS wall clock is coarser than their start spacing,
+so two roots could get the same name. The local gate had passed by timing alone.
+Fix (test-only): each root name also takes a process-wide `AtomicUsize` sequence
+number, so names are unique within a run regardless of the clock. The fixed test
+binary passed 60 consecutive runs locally. No production code changed.
+
+Gate rerun on the fixed head `a9dddfaa` (merge base `81957589`), 2026-09-19
+14:00:54–14:12:45 CST: **exit 0**, the same lanes; SwiftPM full lane 2688 tests without
+failure; cargo 2532 passed, 0 failed, 45 ignored; design-system 83/83. Log:
+`/private/tmp/claude-501/-Users-fuhanfeng-Dropbox-Code-Github-ArkDeck--claude-worktrees-macos-agent-branches-20260919-7896b5/e4ca8ae5-02b3-4669-8ede-6d7975251bb2/scratchpad/logs/workspace-gate2.log`,
+SHA-256 `84be24fcd12e8d5bb77ee84c5b509694d302da9614e108e86884dbcc0ace8fd9`. Linux and
+Windows target clippy with `-D warnings`: exit 0.
+
+Not run: no device, installed Runtime or GJ-5; UI lanes (no App change).

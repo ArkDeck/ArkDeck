@@ -6,15 +6,22 @@ use std::{
     fs,
     os::unix::fs::{DirBuilderExt, PermissionsExt, symlink},
     path::PathBuf,
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
 };
 const NOW: &str = "2026-09-19T00:00:00.000Z";
+/// Tests run as threads of one process, and the clock's resolution is
+/// coarser than their start spacing: each root also takes a sequence number.
+static ROOTS: AtomicUsize = AtomicUsize::new(0);
 struct Root(PathBuf);
 impl Root {
     fn new() -> Self {
         let path = std::env::temp_dir().canonicalize().unwrap().join(format!(
-            "arkdeck-workspace-project-{}-{}",
+            "arkdeck-workspace-project-{}-{}-{}",
             std::process::id(),
+            ROOTS.fetch_add(1, Ordering::Relaxed),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
