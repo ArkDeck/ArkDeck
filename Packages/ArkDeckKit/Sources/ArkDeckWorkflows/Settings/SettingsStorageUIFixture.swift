@@ -1,3 +1,4 @@
+import ArkDeckClientKit
 import ArkDeckCore
 import Foundation
 
@@ -79,6 +80,15 @@ public enum SettingsStorageUIFixture {
         ?? FileManager.default.temporaryDirectory.appending(
           path: directoryName, directoryHint: .isDirectory),
       launchArguments: arguments, stateFileURL: stateFileURL)
+  }
+
+  /// The storage fixture the App composes into the ClientKit Settings facade:
+  /// the owner for a launch that selects the Runtime fixture, `nil` for every
+  /// ordinary launch, which then reaches the Runtime over XPC.
+  public static func runtimeStorage(
+    arguments: [String] = ProcessInfo.processInfo.arguments
+  ) -> (any SettingsRuntimeStorageFixture)? {
+    owner(arguments: arguments)
   }
 
   /// The in-process stand-in for the daemon's storage resource handler: the
@@ -266,5 +276,13 @@ public enum SettingsStorageUIFixture {
     }
 
     private static let replyID = "settings-storage-ui-fixture"
+  }
+}
+
+extension SettingsStorageUIFixture.Owner: SettingsRuntimeStorageFixture {
+  /// No reply while the Runtime this owner stands in for does not answer,
+  /// just as an unreachable daemon gives none.
+  package func runtimeStorageReply(_ method: String, _ params: [String: JSONValue]?) -> Data? {
+    isReachable() ? reply(method, params) : nil
   }
 }

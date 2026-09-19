@@ -1,3 +1,4 @@
+import ArkDeckClientKit
 import ArkDeckCore
 import ArkDeckWorkflows
 import XCTest
@@ -13,10 +14,16 @@ final class SettingsStorageUIFixtureContractTests: XCTestCase {
     XCTAssertFalse(
       SettingsStorageUIFixture.isSelected(arguments: ["--ui-test-devices", "--ui-test-flash"]))
     XCTAssertNil(SettingsStorageUIFixture.owner(arguments: ["--ui-test-viewer"]))
+    // What the App composes into the ClientKit facade: nothing, so the
+    // ordinary launch reaches the Runtime over XPC.
+    XCTAssertNil(SettingsStorageUIFixture.runtimeStorage(arguments: ["/Applications/ArkDeck.app"]))
 
     XCTAssertTrue(SettingsStorageUIFixture.isSelected(arguments: ["--ui-test-runtime-history"]))
     XCTAssertNotNil(
       SettingsStorageUIFixture.owner(
+        arguments: ["/Applications/ArkDeck.app", "--ui-test-runtime-history"]))
+    XCTAssertNotNil(
+      SettingsStorageUIFixture.runtimeStorage(
         arguments: ["/Applications/ArkDeck.app", "--ui-test-runtime-history"]))
   }
 
@@ -28,7 +35,7 @@ final class SettingsStorageUIFixtureContractTests: XCTestCase {
     // processes, and two owners on the App's one fixed path would race.
     let root = uniqueRoot("facade")
     defer { try? FileManager.default.removeItem(at: root) }
-    let provider = SettingsApplicationFacade.make(
+    let provider = SettingsApplicationFacade.composed(
       arguments: ["--ui-test-runtime-history"], fixtureRoot: root)
     let initial = try await provider.refresh().storage
 
@@ -150,7 +157,7 @@ final class SettingsStorageUIFixtureContractTests: XCTestCase {
       try? FileManager.default.removeItem(at: stateFile)
       try? FileManager.default.removeItem(at: root)
     }
-    let provider = SettingsApplicationFacade.make(
+    let provider = SettingsApplicationFacade.composed(
       arguments: ["--ui-test-runtime-history", "--ui-test-fixture-state", stateFile.path],
       fixtureRoot: root)
     do {
@@ -169,7 +176,7 @@ final class SettingsStorageUIFixtureContractTests: XCTestCase {
 
     // At launch, with no state file, the argument alone is the switch. The
     // owner is never composed, so this root is never created.
-    let atLaunch = SettingsApplicationFacade.make(
+    let atLaunch = SettingsApplicationFacade.composed(
       arguments: ["--ui-test-runtime-history", SettingsStorageUIFixture.unreachableArgument],
       fixtureRoot: uniqueRoot("at-launch"))
     do {
@@ -198,5 +205,20 @@ final class SettingsStorageUIFixtureContractTests: XCTestCase {
   private func code(of envelope: [String: Any]) throws -> String {
     let error = try XCTUnwrap(envelope["error"] as? [String: Any])
     return try XCTUnwrap(error["code"] as? String)
+  }
+}
+
+extension SettingsApplicationFacade {
+  /// What the App composes for a launch with these arguments — the support
+  /// bundle exporter and, when the arguments select it, the storage fixture —
+  /// with the fixture's owner rooted where the test says: the suite runs its
+  /// methods in parallel processes, and two owners on the App's one fixed path
+  /// would race.
+  static func composed(
+    arguments: [String], fixtureRoot: URL
+  ) -> any SettingsApplicationProviding {
+    make(
+      diagnosticBundles: RuntimeSupportBundleSettingsExporter(),
+      storageFixture: SettingsStorageUIFixture.owner(arguments: arguments, root: fixtureRoot))
   }
 }

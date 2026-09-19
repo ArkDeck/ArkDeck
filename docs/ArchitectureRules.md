@@ -102,6 +102,10 @@ Trace cache 维护的 App 侧模型、XPC provider 与应答解码也在 ClientK
 Overview 能力矩阵的展示模型、在线目标投影、读请求与应答解码也在 ClientKit；证明 hidumper 行的只读
 `debug.template@1` 窗口清单 Job 仍由 Workflows 的 `DebugWindowInventoryJobRunner` 按 Debug 工作区的 typed 请求提交，
 ClientKit 只声明 `OverviewWindowInventoryJobRunning`，由 App 组合，不新增依赖边。
+Settings 的展示模型、provider 协议、facade 与 `runtime.storage.*` 请求及精确形状校验也在 ClientKit；本地诊断包导出
+（经 Storage 读本机文件，CLI 共用）与 `--ui-test-runtime-history` 启动时代替 daemon 应答的存储 owner 仍在 Workflows，
+ClientKit 只声明 `SettingsDiagnosticBundleExporting` 与 `SettingsRuntimeStorageFixture`，由 App 组合
+`RuntimeSupportBundleSettingsExporter` 与 `SettingsStorageUIFixture.runtimeStorage()`，不新增依赖边。
 
 ## 3. Ownership Rules(事实源唯一)
 

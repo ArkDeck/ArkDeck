@@ -1,6 +1,4 @@
-import ArkDeckClientKit
 import ArkDeckCore
-import ArkDeckStorage
 import Foundation
 
 /// App-facing Settings values. The App receives bounded presentation data and
@@ -180,33 +178,53 @@ public protocol SettingsApplicationProviding: Sendable {
   ) async throws -> URL
 }
 
-public enum SettingsApplicationFacade {
-  /// The production provider — or, for a launch that declares the Runtime a
-  /// fixture, the same provider answered by `SettingsStorageUIFixture` in
-  /// place of the daemon. Validation and the presentation mapping are shared;
-  /// only the transport differs. A launch without that argument never reaches
-  /// the fixture.
-  public static func make(
-    arguments: [String] = ProcessInfo.processInfo.arguments
-  ) -> any SettingsApplicationProviding {
-    make(arguments: arguments, fixtureRoot: nil)
-  }
+/// Previews and exports the local support bundle the Settings pane offers.
+///
+/// The exporter reads this host's files through ArkDeckStorage, which
+/// ClientKit does not import, so it stays in ArkDeckWorkflows beside the CLI's
+/// use of the same support-bundle contract, and the App composes its adapter
+/// into this facade. The facade never writes a bundle itself.
+public protocol SettingsDiagnosticBundleExporting: Sendable {
+  /// The exact scope an export to `destination` would write. Writes nothing.
+  func preview(at destination: URL) async throws -> SettingsDiagnosticBundlePreview
+  /// Writes the bundle only while its scope is still the approved one, and
+  /// returns the directory written.
+  func export(to destination: URL, approvedScopeSHA256: String) async throws -> URL
+}
 
-  /// Test seam: the fixture launch with its owner rooted where the test says,
-  /// so contract tests running in parallel processes never share the App's
-  /// one fixed owner directory. Production is unreachable from here: without
-  /// the selecting argument the root is ignored and the XPC provider is made.
-  package static func make(
-    arguments: [String], fixtureRoot: URL?
+/// Answers the three `runtime.storage.*` requests in place of the Runtime for
+/// a UI-automation launch.
+///
+/// The one the App composes stays in ArkDeckWorkflows: it answers from the
+/// daemon's own storage owner, so a fixture launch still exercises this
+/// facade's request framing, exact-shape validation, generation-bound
+/// mutation and presentation mapping. An ordinary launch composes none.
+public protocol SettingsRuntimeStorageFixture: Sendable {
+  /// The framed reply, or `nil` while the Runtime it stands in for does not
+  /// answer.
+  func runtimeStorageReply(_ method: String, _ params: [String: JSONValue]?) async -> Data?
+}
+
+public enum SettingsApplicationFacade {
+  /// The production provider over XPC — or, when the App composes a storage
+  /// fixture for a UI-automation launch, the same provider answered by that
+  /// fixture in place of the daemon. Validation and the presentation mapping
+  /// are shared; only the transport differs.
+  public static func make(
+    diagnosticBundles: any SettingsDiagnosticBundleExporting,
+    storageFixture: (any SettingsRuntimeStorageFixture)?
   ) -> any SettingsApplicationProviding {
-    if let owner = SettingsStorageUIFixture.owner(arguments: arguments, root: fixtureRoot) {
-      return ProductionSettingsApplicationProvider(
-        runtimeRequest: { method, params in
-          guard await owner.isReachable() else { return .failure(.unavailable("fixture")) }
-          return .success(await owner.reply(method, params))
-        })
+    guard let storageFixture else {
+      return ProductionSettingsApplicationProvider(diagnosticBundles: diagnosticBundles)
     }
-    return ProductionSettingsApplicationProvider()
+    return ProductionSettingsApplicationProvider(
+      runtimeRequest: { method, params in
+        guard let framed = await storageFixture.runtimeStorageReply(method, params) else {
+          return .failure(.unavailable("fixture"))
+        }
+        return .success(framed)
+      },
+      diagnosticBundles: diagnosticBundles)
   }
 
   /// Test seam: the production provider over a caller-supplied transport.
@@ -219,16 +237,19 @@ public enum SettingsApplicationFacade {
   /// `nil` stands for the transport not answering at all, which is the one
   /// distinction above the framed reply that the pane has to make.
   package static func make(
+    diagnosticBundles: any SettingsDiagnosticBundleExporting,
     reply: @escaping @Sendable (
       _ method: String, _ params: [String: JSONValue]?
     ) async -> Data?
   ) -> any SettingsApplicationProviding {
-    ProductionSettingsApplicationProvider(runtimeRequest: { method, params in
-      guard let framed = await reply(method, params) else {
-        return .failure(.unavailable("test transport"))
-      }
-      return .success(framed)
-    })
+    ProductionSettingsApplicationProvider(
+      runtimeRequest: { method, params in
+        guard let framed = await reply(method, params) else {
+          return .failure(.unavailable("test transport"))
+        }
+        return .success(framed)
+      },
+      diagnosticBundles: diagnosticBundles)
   }
 }
 
@@ -241,7 +262,7 @@ private actor ProductionSettingsApplicationProvider: SettingsApplicationProvidin
   ) async -> RuntimeXPCRequestTransport.ResultValue
 
   private let runtimeRequest: RuntimeRequest
-  private let supportBundleProvider: any RuntimeSupportBundleProviding
+  private let diagnosticBundles: any SettingsDiagnosticBundleExporting
   private let general: SettingsGeneralPresentation
 
   init(
@@ -250,10 +271,11 @@ private actor ProductionSettingsApplicationProvider: SettingsApplicationProvidin
         method: method, params: params,
         protocolVersion: ArkDeckControlProtocol.currentVersion)
     },
+    diagnosticBundles: any SettingsDiagnosticBundleExporting,
     bundle: Bundle = .main
   ) {
     self.runtimeRequest = runtimeRequest
-    supportBundleProvider = RuntimeSupportBundleApplicationFacade.make(bundle: bundle)
+    self.diagnosticBundles = diagnosticBundles
     general = Self.makeGeneralPresentation(bundle: bundle)
   }
 
@@ -436,22 +458,15 @@ private actor ProductionSettingsApplicationProvider: SettingsApplicationProvidin
   func previewDiagnosticBundle(at destination: URL) async throws
     -> SettingsDiagnosticBundlePreview
   {
-    let preview = try await supportBundleProvider.preview(at: destination)
-    return SettingsDiagnosticBundlePreview(
-      scopeSHA256: preview.scopeSHA256,
-      includedEntries: preview.includedEntries,
-      estimatedBytes: preview.estimatedBytes,
-      deviceRawExcluded: preview.deviceRawExcluded,
-      sensitiveDataWarning: preview.sensitiveDataWarning)
+    try await diagnosticBundles.preview(at: destination)
   }
 
   func exportDiagnosticBundle(
     to destination: URL,
     approvedPreview: SettingsDiagnosticBundlePreview
   ) async throws -> URL {
-    let receipt = try await supportBundleProvider.export(
+    try await diagnosticBundles.export(
       to: destination, approvedScopeSHA256: approvedPreview.scopeSHA256)
-    return URL(filePath: receipt.destination, directoryHint: .isDirectory)
   }
 
   private static func makeGeneralPresentation(bundle: Bundle) -> SettingsGeneralPresentation {
