@@ -51,7 +51,18 @@ let package = Package(
       revision: "9172c9525f954ec397e0555d7d03cd4367f3efcf"),
   ],
   targets: [
-    .target(name: "ArkDeckClientKit", dependencies: ["ArkDeckCore"]),
+    // The App's client library. It carries the App-side SSH remote build
+    // source, so the SSH stack is linked here rather than by Workflows.
+    .target(
+      name: "ArkDeckClientKit",
+      dependencies: [
+        "ArkDeckCore",
+        .product(name: "Citadel", package: "Citadel"),
+        .product(name: "Crypto", package: "swift-crypto"),
+        .product(name: "NIOCore", package: "swift-nio"),
+        .product(name: "NIOSSH", package: "swift-nio-ssh"),
+        .product(name: "Logging", package: "swift-log"),
+      ]),
     .target(
       name: "ArkDeckCore",
       swiftSettings: [.strictMemorySafety()]),
@@ -70,11 +81,6 @@ let package = Package(
         "ArkDeckClientKit",
         "ArkDeckCore", "ArkDeckProcess", "ArkDeckRuntime", "ArkDeckOpenHarmony",
         "ArkDeckStorage",
-        .product(name: "Citadel", package: "Citadel"),
-        .product(name: "Crypto", package: "swift-crypto"),
-        .product(name: "NIOCore", package: "swift-nio"),
-        .product(name: "NIOSSH", package: "swift-nio-ssh"),
-        .product(name: "Logging", package: "swift-log"),
         .product(name: "ArkForgeProtocol", package: "ArkForge"),
         .product(name: "ArkForgeClient", package: "ArkForge"),
       ],

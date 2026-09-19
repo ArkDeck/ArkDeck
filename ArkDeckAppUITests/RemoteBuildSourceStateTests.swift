@@ -1,8 +1,7 @@
-import ArkDeckClientKit
 import Foundation
 import XCTest
 
-@testable import ArkDeckWorkflows
+@testable import ArkDeckClientKit
 
 /// Headless tests of the same App view-model sources compiled into this runner.
 /// The controlled provider never opens SSH, Keychain, the Runtime, or a device.

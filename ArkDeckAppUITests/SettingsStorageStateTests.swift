@@ -2,8 +2,6 @@ import ArkDeckClientKit
 import Foundation
 import XCTest
 
-@testable import ArkDeckWorkflows
-
 /// Headless tests of the Settings view model compiled into this runner. The
 /// controlled provider never reaches the Runtime, a device or the Keychain.
 @MainActor
