@@ -223,7 +223,9 @@ lock. Re-registration preserves the reference and metadata; uncertain publicatio
 returns `outcomeUnknown` without replay. The current Swift registration CLI uses
 the typed RPC for DevEco. Rust HDC registration through the same typed method
 merged in PR #1860 (`d00e4ec`); the Swift HDC registration path remains in process.
-Selection and installed activation remain pending.
+`runtime tool select` is parsed and checked as Swift's CLI does and answered as
+Swift's daemon answers it without a tool-selection owner (below); the selection
+writes themselves and installed activation remain pending.
 
 The existing `runtime tool list` and `runtime tool remove` leaves now use typed
 Runtime calls in both CLI consumers. The Rust owner merges HDC and DevEco
@@ -1399,12 +1401,17 @@ stopped, `arkdeck-agentd stopped` is printed and the daemon exits 0; its locks
 go only with the process. `tests/managed_hdc_process.rs` drives this with a fake
 HDC compiled from `tests/fixtures/managed-hdc/fake-hdc.c`.
 
-`runtime.hdc.impact-preview`, `runtime.hdc.restart` and `control-action.list`,
-`.show` and `.reconcile` reach `HostServices::control_action` unread, since
-Swift's `hdcControlActionRequest` reads its own parameters; a host without it
-keeps the foundation's refusal. Without a managed HDC server the macOS host
-answers them as Swift's daemon does (`arkdeck_hoststore::ControlActionResources`):
+`runtime.hdc.impact-preview`, `runtime.hdc.restart`, `runtime.tool.select` and
+`control-action.list`, `.show` and `.reconcile` reach `HostServices::control_action`
+unread, since Swift's `hdcControlActionRequest` reads its own parameters; a host
+without it keeps the foundation's refusal. Without a managed HDC server the macOS
+host answers them as Swift's daemon does (`arkdeck_hoststore::ControlActionResources`):
 the lifecycle methods are `operationUnavailable` before any parameter is read.
+A tool selection is `operationUnavailable` before any parameter is read in every
+composition, with or without a managed server (TASK-XPA-012): Swift composes its
+tool-selection owner only beside a started HDC server host, the HDC impact
+source and the registry adapter, no Rust composition has one yet, and no
+selection writes anything.
 The isolated owner composes Swift's union control-action owner over no
 tool-selection owner, paging in `control-action-snapshots`. Without a managed
 server it holds no HDC owner and never makes `hdc-control-actions`: an exact

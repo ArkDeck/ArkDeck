@@ -1,0 +1,172 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "runtime",
+        "tool",
+        "select",
+        "--tool",
+        "sample",
+        "--expected-active-generation",
+        "1",
+        "--action-request-id",
+        "sample"
+      ],
+      "expected": {
+        "command": "runtime.tool.select",
+        "handlerArguments": [
+          "runtime",
+          "tool",
+          "select",
+          "--tool",
+          "sample",
+          "--expected-active-generation",
+          "1",
+          "--action-request-id",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "runtime",
+        "tool",
+        "select",
+        "--help"
+      ],
+      "expected": {
+        "command": "runtime.tool.select",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "runtime",
+        "tool",
+        "select",
+        "--tool",
+        "sample",
+        "--expected-active-generation",
+        "1",
+        "--action-request-id",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.tool.select",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "runtime",
+        "tool",
+        "select",
+        "--tool",
+        "sample",
+        "--expected-active-generation",
+        "1",
+        "--action-request-id",
+        "sample",
+        "--tool",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.tool.select",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "runtime",
+        "tool",
+        "select"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.tool.select",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "runtime",
+        "tool",
+        "select",
+        "--tool",
+        "sample",
+        "--expected-active-generation",
+        "1",
+        "--action-request-id",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "runtime.tool.select",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "runtime",
+        "tool",
+        "select",
+        "--tool",
+        "sample",
+        "--expected-active-generation",
+        "1",
+        "--action-request-id",
+        "sample",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "runtime.tool.select",
+        "handlerArguments": [
+          "runtime",
+          "tool",
+          "select",
+          "--tool",
+          "sample",
+          "--expected-active-generation",
+          "1",
+          "--action-request-id",
+          "sample",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "runtime.tool.select",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "runtime",
+    "tool",
+    "select"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

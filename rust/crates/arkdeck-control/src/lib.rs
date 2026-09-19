@@ -304,10 +304,10 @@ pub trait HostServices: Send + Sync {
             details: None,
         })
     }
-    /// `runtime.hdc.impact-preview`, `runtime.hdc.restart` and
-    /// `control-action.list`, `.show` and `.reconcile`: Swift's
-    /// `hdcControlActionRequest`, parameters and all. A host without its
-    /// control-action owners keeps the foundation's refusal.
+    /// `runtime.hdc.impact-preview`, `runtime.hdc.restart`,
+    /// `runtime.tool.select` and `control-action.list`, `.show` and
+    /// `.reconcile`: Swift's `hdcControlActionRequest`, parameters and all. A
+    /// host without its control-action owners keeps the foundation's refusal.
     fn control_action(
         &self,
         _method: &str,
@@ -1100,9 +1100,11 @@ impl<H: HostServices> Control<H> {
                 "live HDC status does not accept caller facts or paths",
             ),
             // Swift's handler checks each of these against its owners itself:
-            // the lifecycle methods before any parameter, the others after.
+            // the lifecycle and selection methods before any parameter, the
+            // others after.
             "runtime.hdc.impact-preview"
             | "runtime.hdc.restart"
+            | "runtime.tool.select"
             | "control-action.list"
             | "control-action.show"
             | "control-action.reconcile" => Response {

@@ -1,7 +1,9 @@
 //! Swift's HDC control-action leaves (`CLICommandRegistry`'s `runtime hdc`
-//! and `control-action` nodes, `CLIHDCControlActions.swift`): the registry's
-//! option grammar when parsing, and the handler's checks before any
-//! connection. Swift classes every one of them as mutation-capable.
+//! and `control-action` nodes, `CLIHDCControlActions.swift`) and the tool
+//! selection leaf beside them (`runtime tool select`, `CLIBootstrapTools.swift`):
+//! the registry's option grammar when parsing, and the handler's checks
+//! before any connection. Swift classes every one of them as
+//! mutation-capable.
 use crate::{CliError, Invocation};
 use serde_json::{Map, Value, json};
 
@@ -59,7 +61,7 @@ fn generation(text: &str) -> bool {
 /// - each leaf's options are required, except `control-action list`'s
 ///   filters;
 /// - `--action` is only `restart`;
-/// - the generation is a positive integer;
+/// - the server and active generations are positive integers;
 /// - the digest is 64 lowercase hexadecimal digits;
 /// - `--kind` is only `hdcLifecycle`;
 /// - `--state` is one of the twelve control-action states;
@@ -83,6 +85,11 @@ pub(crate) fn configure(
             ("--control-action", "controlAction"),
             ("--preview-id", "previewId"),
             ("--preview-digest", "previewDigest"),
+        ],
+        "runtime.tool.select" => &[
+            ("--tool", "tool"),
+            ("--expected-active-generation", "expectedActiveGeneration"),
+            ("--action-request-id", "actionRequestId"),
         ],
         "control-action.show" | "control-action.reconcile" => {
             &[("--control-action", "controlAction")]
@@ -125,6 +132,9 @@ pub(crate) fn configure(
         "runtime.hdc.impact-preview" if !generation(text("expectedServerGeneration")) => {
             Some("`--expected-server-generation` must be a positive integer")
         }
+        "runtime.tool.select" if !generation(text("expectedActiveGeneration")) => {
+            Some("`--expected-active-generation` must be a positive integer")
+        }
         "control-action.list" if present("kind") && text("kind") != "hdcLifecycle" => {
             Some("`--kind` must be hdcLifecycle")
         }
@@ -156,9 +166,12 @@ pub(crate) fn configure(
     Ok(timeout)
 }
 
-/// The checks Swift's `runHDCControlAction` makes before any connection:
+/// The checks Swift's `runHDCControlAction` and `runBootstrapTool` make
+/// before any connection:
 /// - an impact preview's exact restart intent (`HDCControlActionIntent`);
 /// - a restart's exact control-action preview tuple;
+/// - a selection's exact intent (`RuntimeToolSelectionIntent`): a request
+///   identity, a content-addressed tool reference and an active generation;
 /// - a control action's exact identity.
 ///
 /// It returns the parameters as the Runtime receives them.
@@ -180,6 +193,14 @@ pub fn hdc_control_action_params(invocation: &Invocation) -> Result<Map<String, 
                 && identifier(text("previewId"))
                 && digest(text("previewDigest")),
             "restart requires one exact control-action preview tuple",
+        ),
+        "runtime.tool.select" => (
+            identifier(text("actionRequestId"))
+                && text("tool")
+                    .strip_prefix("tool:sha256:")
+                    .is_some_and(digest)
+                && generation(text("expectedActiveGeneration")),
+            "tool-selection intent failed validation",
         ),
         "control-action.show" | "control-action.reconcile" => (
             identifier(text("controlAction")),

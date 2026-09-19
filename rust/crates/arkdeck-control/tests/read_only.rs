@@ -217,18 +217,19 @@ fn workspace_project_parameters_are_checked_before_owner_availability() {
     assert_eq!(reads.load(Ordering::SeqCst), 0);
 }
 
-/// Swift's `hdcControlActionRequest` reads these five methods' parameters
+/// Swift's `hdcControlActionRequest` reads these six methods' parameters
 /// itself, so the control layer hands each request to the host's
 /// control-action service unread, and no other method reaches it. The host's
 /// answer then passes the method's schema like any other.
 #[test]
 fn the_control_action_methods_reach_their_host_service_unread() {
-    const ROUTED: [&str; 5] = [
+    const ROUTED: [&str; 6] = [
         "control-action.list",
         "control-action.reconcile",
         "control-action.show",
         "runtime.hdc.impact-preview",
         "runtime.hdc.restart",
+        "runtime.tool.select",
     ];
     struct ControlActionHost {
         asked: Arc<std::sync::Mutex<Vec<(String, Value)>>>,

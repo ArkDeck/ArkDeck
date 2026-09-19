@@ -128,6 +128,7 @@ impl CliError {
                 | "target.adopt"
                 | "runtime.hdc.impact-preview"
                 | "runtime.hdc.restart"
+                | "runtime.tool.select"
                 | "control-action.list"
                 | "control-action.show"
                 | "control-action.reconcile"
@@ -461,6 +462,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                 | "--action"
                 | "--server-endpoint-ref"
                 | "--expected-server-generation"
+                | "--expected-active-generation"
                 | "--action-request-id"
                 | "--control-action"
                 | "--total-quota-bytes"
@@ -526,6 +528,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                         "--preview-digest" => "previewDigest",
                         "--server-endpoint-ref" => "serverEndpointRef",
                         "--expected-server-generation" => "expectedServerGeneration",
+                        "--expected-active-generation" => "expectedActiveGeneration",
                         "--action-request-id" => "actionRequestId",
                         "--control-action" => "controlAction",
                         "--total-quota-bytes" => "totalQuotaBytes",
@@ -665,6 +668,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["runtime", "tool", "list"] => "runtime.tool.list",
         ["runtime", "tool", "remove"] => "runtime.tool.remove",
         ["runtime", "tool", "inspect"] => "runtime.tool.inspect",
+        ["runtime", "tool", "select"] => "runtime.tool.select",
         ["runtime", "bundle", "register"] => "runtime.bundle.register",
         ["runtime", "bundle", "inspect"] => "runtime.bundle.inspect",
         ["runtime", "bundle", "list"] => "runtime.bundle.list",
@@ -739,6 +743,12 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             "timeout",
         ],
         "runtime.hdc.restart" => &["controlAction", "previewId", "previewDigest", "timeout"],
+        "runtime.tool.select" => &[
+            "tool",
+            "expectedActiveGeneration",
+            "actionRequestId",
+            "timeout",
+        ],
         "control-action.list" => &["pageSize", "cursor", "kind", "state", "timeout"],
         "control-action.show" | "control-action.reconcile" => &["controlAction", "timeout"],
         "target.list" => &["timeout"],
@@ -1165,6 +1175,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                     | "human-action.resume"
                     | "runtime.hdc.impact-preview"
                     | "runtime.hdc.restart"
+                    | "runtime.tool.select"
                     | "control-action.list"
                     | "control-action.show"
                     | "control-action.reconcile"

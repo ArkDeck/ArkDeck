@@ -312,6 +312,9 @@ pub(crate) fn mutation_error(error: ClientError, method: &str) -> CliError {
                     | "control-action.reconcile" => {
                         "the HDC control-action reply is unconfirmed; no request was replayed"
                     }
+                    "runtime.tool.select" => {
+                        "the tool-selection reply is unconfirmed; select again with the same action request ID to read the same control action, never a new one"
+                    }
                     _ => {
                         "the Job run reply is unconfirmed; read the Job with job status instead of running it again"
                     }

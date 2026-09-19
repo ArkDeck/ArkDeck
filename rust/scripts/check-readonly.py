@@ -338,7 +338,7 @@ def main() -> None:
                         expected = None
                     # Keeping no state, it composes no control-action owner either: it answers as
                     # Swift's handler without one, which wants an exact identity for show and reconcile.
-                    if method in {"runtime.hdc.impact-preview", "runtime.hdc.restart", "control-action.list"} and platform.system() == "Darwin":
+                    if method in {"runtime.hdc.impact-preview", "runtime.hdc.restart", "runtime.tool.select", "control-action.list"} and platform.system() == "Darwin":
                         expected = "operationUnavailable"
                     if method in {"control-action.show", "control-action.reconcile"} and platform.system() == "Darwin":
                         expected = "invalidInput"

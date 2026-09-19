@@ -1,6 +1,7 @@
 //! Swift `RuntimeControlPlaneHandler.hdcControlActionRequest` (CHG-2026-074,
-//! TASK-XPA-014): `runtime.hdc.impact-preview`, `runtime.hdc.restart` and
-//! `control-action.list`, `.show` and `.reconcile`, over the union owner
+//! TASK-XPA-014, TASK-XPA-012): `runtime.hdc.impact-preview`,
+//! `runtime.hdc.restart`, `runtime.tool.select` and `control-action.list`,
+//! `.show` and `.reconcile`, over the union owner
 //! (`RuntimeControlActionResourceCoordinator`) the production daemon always
 //! composes, paging in its own directory (`control-action-snapshots`).
 //!
@@ -10,7 +11,8 @@
 //! an exact identity is not found and a listing is one empty snapshot page.
 //! Once its HDC server host has started the union owner routes to the HDC
 //! control-action owner (`hdc_control_action.rs`), which previews and holds
-//! the actions; the tool-selection owner is not composed here, and
+//! the actions; the tool-selection owner is not composed here, so a
+//! selection is unavailable before any parameter is read, and
 //! `runtime.hdc.restart` stays unavailable: its impact approval is not here.
 use crate::hdc_control_action::{HdcControlActions, ImpactSource};
 use crate::snapshot_pager::SnapshotPager;
@@ -45,6 +47,17 @@ fn hdc_owner_unavailable() -> WireError {
     refused(
         "operationUnavailable",
         "the Runtime HDC control-action owner is unavailable",
+    )
+}
+
+/// The handler checks for its tool-selection owner before it reads any
+/// parameter, as for the lifecycle methods. Swift composes that owner only
+/// beside a started HDC server host, its impact source and the registry
+/// adapter; no composition here has one, with or without a managed server.
+fn tool_selection_owner_unavailable() -> WireError {
+    refused(
+        "operationUnavailable",
+        "the Runtime tool-selection owner is unavailable",
     )
 }
 
@@ -177,6 +190,7 @@ impl ControlActionResources {
             // so this answers as a daemon without its HDC owner does, before
             // any parameter is read.
             "runtime.hdc.restart" => Err(hdc_owner_unavailable()),
+            "runtime.tool.select" => Err(tool_selection_owner_unavailable()),
             "control-action.show" | "control-action.reconcile" => {
                 let id = exact_identity(params)?;
                 let _gate = self.gate.lock().map_err(|_| unreadable())?;
@@ -303,6 +317,7 @@ pub fn control_action_without_owner(
 ) -> Result<Value, WireError> {
     match method {
         "runtime.hdc.impact-preview" | "runtime.hdc.restart" => Err(hdc_owner_unavailable()),
+        "runtime.tool.select" => Err(tool_selection_owner_unavailable()),
         "control-action.show" | "control-action.reconcile" => {
             exact_identity(params)?;
             Err(WireError {
