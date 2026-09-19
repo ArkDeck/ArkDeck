@@ -97,8 +97,20 @@ else changed.
 
 ## CI
 
-The PR's CI (`guard` + `swift`) is the unified gate; its run ids and conclusion are recorded by the
-next slice or a documentation follow-up.
+PR #2045, head `0a44ccd8`, all green. It merged on 2026-09-19 as `f56481d8`.
+
+| Check | Run | Conclusion |
+| --- | --- | --- |
+| SDD Guard `guard` | 35448678754 | success |
+| Swift CI `plan` | 35448678823 | success |
+| Rust host-independent checks | 35448678823 | success |
+| Rust workspace, `ubuntu-latest` | 35448678823 | success |
+| Rust workspace, `macos-26` | 35448678823 | success |
+| Rust workspace, `windows-latest` | 35448678823 | success |
+| `swift` aggregate | 35448678823 | success |
+
+`swift-tests`, `app-build` and `ds-interactions` were not selected for this diff and were skipped.
+These rows were added by a documentation follow-up, since the PR merged as soon as it was green.
 
 ## Not run
 
