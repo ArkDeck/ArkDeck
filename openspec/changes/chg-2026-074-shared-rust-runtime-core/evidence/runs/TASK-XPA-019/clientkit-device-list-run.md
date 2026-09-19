@@ -1,6 +1,6 @@
 # Device list ClientKit extraction
 
-Base: protected main `187321ea397419353ac430a8bd48e027f56cd02e`.
+Base: protected main `94b2896609c549177fa052512aa2b800dfc4e25e`.
 TASK-XPA-019 / SPK-8 remain incomplete.
 
 The App-facing DeviceList facade, candidate/history decoration models, bounded
