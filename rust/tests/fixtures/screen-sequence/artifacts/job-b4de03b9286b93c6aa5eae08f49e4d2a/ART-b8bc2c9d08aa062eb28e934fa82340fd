@@ -1,0 +1,13 @@
+{
+  "capturedFrameCount" : 3,
+  "frameDurationsSeconds" : [
+    0.5,
+    0.5,
+    0.5,
+    0.5
+  ],
+  "framesMissing" : 1,
+  "observedFramesPerSecond" : 1.5,
+  "requestedFrameCount" : 4,
+  "schemaVersion" : "1.0.0"
+}

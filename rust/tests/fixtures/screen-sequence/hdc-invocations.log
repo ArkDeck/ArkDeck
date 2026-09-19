@@ -1,0 +1,84 @@
+listtargets-v
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.product.name
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.ohos.fullname
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashelldf-k/data/local/tmp
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellmkdir-p/data/local/tmp/arkdeck-job-1198f33479543de487d86dc88ce0f332-capture-screen-sequence-owned-frames
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsnapshot_display-tjpeg-f/data/local/tmp/arkdeck-job-1198f33479543de487d86dc88ce0f332-capture-screen-sequence-owned-frames/0001.jpeg
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsnapshot_display-tjpeg-f/data/local/tmp/arkdeck-job-1198f33479543de487d86dc88ce0f332-capture-screen-sequence-owned-frames/0002.jpeg
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsnapshot_display-tjpeg-f/data/local/tmp/arkdeck-job-1198f33479543de487d86dc88ce0f332-capture-screen-sequence-owned-frames/0003.jpeg
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashelltar-c-f/data/local/tmp/arkdeck-job-1198f33479543de487d86dc88ce0f332-capture-screen-sequence-owned.tar-C/data/local/tmp/arkdeck-job-1198f33479543de487d86dc88ce0f332-capture-screen-sequence-owned-frames.
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-l/data/local/tmp/arkdeck-job-1198f33479543de487d86dc88ce0f332-capture-screen-sequence-owned.tar
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaafilerecv/data/local/tmp/arkdeck-job-1198f33479543de487d86dc88ce0f332-capture-screen-sequence-owned.tar/private/tmp/arkdeck-hdc-oracle/receive/arkdeck-job-1198f33479543de487d86dc88ce0f332-capture-screen-sequence-owned.tar
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/local/tmp/arkdeck-job-1198f33479543de487d86dc88ce0f332-capture-screen-sequence-owned-frames/0001.jpeg/data/local/tmp/arkdeck-job-1198f33479543de487d86dc88ce0f332-capture-screen-sequence-owned-frames/0002.jpeg/data/local/tmp/arkdeck-job-1198f33479543de487d86dc88ce0f332-capture-screen-sequence-owned-frames/0003.jpeg
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/local/tmp/arkdeck-job-1198f33479543de487d86dc88ce0f332-capture-screen-sequence-owned.tar
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrmdir/data/local/tmp/arkdeck-job-1198f33479543de487d86dc88ce0f332-capture-screen-sequence-owned-frames
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/local/tmp/arkdeck-job-1198f33479543de487d86dc88ce0f332-capture-screen-sequence-owned-frames
+listtargets-v
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.product.name
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.ohos.fullname
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashelldf-k/data/local/tmp
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellmkdir-p/data/local/tmp/arkdeck-job-a6bdb7f0262b45b3cfa7ef91019b2327-capture-screen-sequence-owned-frames
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsnapshot_display-tpng-w360-h640-i0-f/data/local/tmp/arkdeck-job-a6bdb7f0262b45b3cfa7ef91019b2327-capture-screen-sequence-owned-frames/0001.png
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsnapshot_display-tpng-w360-h640-i0-f/data/local/tmp/arkdeck-job-a6bdb7f0262b45b3cfa7ef91019b2327-capture-screen-sequence-owned-frames/0002.png
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashelltar-c-f/data/local/tmp/arkdeck-job-a6bdb7f0262b45b3cfa7ef91019b2327-capture-screen-sequence-owned.tar-C/data/local/tmp/arkdeck-job-a6bdb7f0262b45b3cfa7ef91019b2327-capture-screen-sequence-owned-frames.
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-l/data/local/tmp/arkdeck-job-a6bdb7f0262b45b3cfa7ef91019b2327-capture-screen-sequence-owned.tar
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaafilerecv/data/local/tmp/arkdeck-job-a6bdb7f0262b45b3cfa7ef91019b2327-capture-screen-sequence-owned.tar/private/tmp/arkdeck-hdc-oracle/receive/arkdeck-job-a6bdb7f0262b45b3cfa7ef91019b2327-capture-screen-sequence-owned.tar
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/local/tmp/arkdeck-job-a6bdb7f0262b45b3cfa7ef91019b2327-capture-screen-sequence-owned-frames/0001.png/data/local/tmp/arkdeck-job-a6bdb7f0262b45b3cfa7ef91019b2327-capture-screen-sequence-owned-frames/0002.png
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/local/tmp/arkdeck-job-a6bdb7f0262b45b3cfa7ef91019b2327-capture-screen-sequence-owned.tar
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrmdir/data/local/tmp/arkdeck-job-a6bdb7f0262b45b3cfa7ef91019b2327-capture-screen-sequence-owned-frames
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/local/tmp/arkdeck-job-a6bdb7f0262b45b3cfa7ef91019b2327-capture-screen-sequence-owned-frames
+listtargets-v
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.product.name
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.ohos.fullname
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashelldf-k/data/local/tmp
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellmkdir-p/data/local/tmp/arkdeck-job-b4de03b9286b93c6aa5eae08f49e4d2a-capture-screen-sequence-owned-frames
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsnapshot_display-tjpeg-f/data/local/tmp/arkdeck-job-b4de03b9286b93c6aa5eae08f49e4d2a-capture-screen-sequence-owned-frames/0001.jpeg
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsnapshot_display-tjpeg-f/data/local/tmp/arkdeck-job-b4de03b9286b93c6aa5eae08f49e4d2a-capture-screen-sequence-owned-frames/0002.jpeg
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsnapshot_display-tjpeg-f/data/local/tmp/arkdeck-job-b4de03b9286b93c6aa5eae08f49e4d2a-capture-screen-sequence-owned-frames/0003.jpeg
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsnapshot_display-tjpeg-f/data/local/tmp/arkdeck-job-b4de03b9286b93c6aa5eae08f49e4d2a-capture-screen-sequence-owned-frames/0004.jpeg
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashelltar-c-f/data/local/tmp/arkdeck-job-b4de03b9286b93c6aa5eae08f49e4d2a-capture-screen-sequence-owned.tar-C/data/local/tmp/arkdeck-job-b4de03b9286b93c6aa5eae08f49e4d2a-capture-screen-sequence-owned-frames.
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-l/data/local/tmp/arkdeck-job-b4de03b9286b93c6aa5eae08f49e4d2a-capture-screen-sequence-owned.tar
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaafilerecv/data/local/tmp/arkdeck-job-b4de03b9286b93c6aa5eae08f49e4d2a-capture-screen-sequence-owned.tar/private/tmp/arkdeck-hdc-oracle/receive/arkdeck-job-b4de03b9286b93c6aa5eae08f49e4d2a-capture-screen-sequence-owned.tar
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/local/tmp/arkdeck-job-b4de03b9286b93c6aa5eae08f49e4d2a-capture-screen-sequence-owned-frames/0001.jpeg/data/local/tmp/arkdeck-job-b4de03b9286b93c6aa5eae08f49e4d2a-capture-screen-sequence-owned-frames/0002.jpeg/data/local/tmp/arkdeck-job-b4de03b9286b93c6aa5eae08f49e4d2a-capture-screen-sequence-owned-frames/0003.jpeg/data/local/tmp/arkdeck-job-b4de03b9286b93c6aa5eae08f49e4d2a-capture-screen-sequence-owned-frames/0004.jpeg
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/local/tmp/arkdeck-job-b4de03b9286b93c6aa5eae08f49e4d2a-capture-screen-sequence-owned.tar
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrmdir/data/local/tmp/arkdeck-job-b4de03b9286b93c6aa5eae08f49e4d2a-capture-screen-sequence-owned-frames
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/local/tmp/arkdeck-job-b4de03b9286b93c6aa5eae08f49e4d2a-capture-screen-sequence-owned-frames
+listtargets-v
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.product.name
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.ohos.fullname
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashelldf-k/data/local/tmp
+listtargets-v
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.product.name
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.ohos.fullname
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashelldf-k/data/local/tmp
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellmkdir-p/data/local/tmp/arkdeck-job-e6f4a623b3135c9738a8fe14f2048796-capture-screen-sequence-owned-frames
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsnapshot_display-tjpeg-f/data/local/tmp/arkdeck-job-e6f4a623b3135c9738a8fe14f2048796-capture-screen-sequence-owned-frames/0001.jpeg
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsnapshot_display-tjpeg-f/data/local/tmp/arkdeck-job-e6f4a623b3135c9738a8fe14f2048796-capture-screen-sequence-owned-frames/0002.jpeg
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsnapshot_display-tjpeg-f/data/local/tmp/arkdeck-job-e6f4a623b3135c9738a8fe14f2048796-capture-screen-sequence-owned-frames/0003.jpeg
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashelltar-c-f/data/local/tmp/arkdeck-job-e6f4a623b3135c9738a8fe14f2048796-capture-screen-sequence-owned.tar-C/data/local/tmp/arkdeck-job-e6f4a623b3135c9738a8fe14f2048796-capture-screen-sequence-owned-frames.
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-l/data/local/tmp/arkdeck-job-e6f4a623b3135c9738a8fe14f2048796-capture-screen-sequence-owned.tar
+listtargets-v
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.product.name
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.ohos.fullname
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashelldf-k/data/local/tmp
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellmkdir-p/data/local/tmp/arkdeck-job-ff742c7fb81f120c5aa5fce0b9d2d847-capture-screen-sequence-owned-frames
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsnapshot_display-tjpeg-f/data/local/tmp/arkdeck-job-ff742c7fb81f120c5aa5fce0b9d2d847-capture-screen-sequence-owned-frames/0001.jpeg
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsnapshot_display-tjpeg-f/data/local/tmp/arkdeck-job-ff742c7fb81f120c5aa5fce0b9d2d847-capture-screen-sequence-owned-frames/0002.jpeg
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsnapshot_display-tjpeg-f/data/local/tmp/arkdeck-job-ff742c7fb81f120c5aa5fce0b9d2d847-capture-screen-sequence-owned-frames/0003.jpeg
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashelltar-c-f/data/local/tmp/arkdeck-job-ff742c7fb81f120c5aa5fce0b9d2d847-capture-screen-sequence-owned.tar-C/data/local/tmp/arkdeck-job-ff742c7fb81f120c5aa5fce0b9d2d847-capture-screen-sequence-owned-frames.
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-l/data/local/tmp/arkdeck-job-ff742c7fb81f120c5aa5fce0b9d2d847-capture-screen-sequence-owned.tar
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaafilerecv/data/local/tmp/arkdeck-job-ff742c7fb81f120c5aa5fce0b9d2d847-capture-screen-sequence-owned.tar/private/tmp/arkdeck-hdc-oracle/receive/arkdeck-job-ff742c7fb81f120c5aa5fce0b9d2d847-capture-screen-sequence-owned.tar
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/local/tmp/arkdeck-job-ff742c7fb81f120c5aa5fce0b9d2d847-capture-screen-sequence-owned-frames/0001.jpeg/data/local/tmp/arkdeck-job-ff742c7fb81f120c5aa5fce0b9d2d847-capture-screen-sequence-owned-frames/0002.jpeg/data/local/tmp/arkdeck-job-ff742c7fb81f120c5aa5fce0b9d2d847-capture-screen-sequence-owned-frames/0003.jpeg
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrm-f/data/local/tmp/arkdeck-job-ff742c7fb81f120c5aa5fce0b9d2d847-capture-screen-sequence-owned.tar
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellrmdir/data/local/tmp/arkdeck-job-ff742c7fb81f120c5aa5fce0b9d2d847-capture-screen-sequence-owned-frames
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-ld/data/local/tmp/arkdeck-job-ff742c7fb81f120c5aa5fce0b9d2d847-capture-screen-sequence-owned-frames
+listtargets-v
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.product.name
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellparamgetconst.ohos.fullname
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashelldf-k/data/local/tmp
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellmkdir-p/data/local/tmp/arkdeck-job-3ff50dc0d1e7c9f4bd80177e40f5b071-capture-screen-sequence-owned-frames
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsnapshot_display-tjpeg-f/data/local/tmp/arkdeck-job-3ff50dc0d1e7c9f4bd80177e40f5b071-capture-screen-sequence-owned-frames/0001.jpeg
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsnapshot_display-tjpeg-f/data/local/tmp/arkdeck-job-3ff50dc0d1e7c9f4bd80177e40f5b071-capture-screen-sequence-owned-frames/0002.jpeg
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellsnapshot_display-tjpeg-f/data/local/tmp/arkdeck-job-3ff50dc0d1e7c9f4bd80177e40f5b071-capture-screen-sequence-owned-frames/0003.jpeg
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashelltar-c-f/data/local/tmp/arkdeck-job-3ff50dc0d1e7c9f4bd80177e40f5b071-capture-screen-sequence-owned.tar-C/data/local/tmp/arkdeck-job-3ff50dc0d1e7c9f4bd80177e40f5b071-capture-screen-sequence-owned-frames.
+-taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaashellls-l/data/local/tmp/arkdeck-job-3ff50dc0d1e7c9f4bd80177e40f5b071-capture-screen-sequence-owned.tar

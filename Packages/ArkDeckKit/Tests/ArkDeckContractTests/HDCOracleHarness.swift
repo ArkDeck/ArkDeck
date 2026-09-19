@@ -44,6 +44,53 @@ enum HDCOracleHarness {
     var agentExecutions: (owner: RuntimeAgentExecutionCoordinator, directory: URL)? = nil
     /// The daemon's human-action owner over those executions, when composed.
     var humanActions: RuntimeHumanActionResourceCoordinator? = nil
+    /// The host directory received files land in, when an oracle fixed it.
+    var receive: URL? = nil
+    /// The duration every dispatched child reports, when an oracle fixed it.
+    var invocationSeconds: Double? = nil
+  }
+
+  /// The process dispatcher with every invocation reported as having run for
+  /// exactly `seconds`. How long a child ran is measured on the host's
+  /// monotonic clock, so a verdict that keeps it — a screen sequence's
+  /// per-frame durations and its rate, which reach the Job record, the
+  /// sequence document and its digest — would differ on every run. Nothing
+  /// else of the receipt changes: the same children run, in the same order,
+  /// with the same exits, output and landed file.
+  struct FixedDurationDispatcher: RuntimeProcessDispatching {
+    let base: any RuntimeProcessDispatching
+    let seconds: Double
+
+    func unavailableReason(providerID: String) -> String? {
+      base.unavailableReason(providerID: providerID)
+    }
+
+    func dispatch(_ plan: TypedProcessPlan) async throws -> ProviderProcessReceipt {
+      fixed(try await base.dispatch(plan))
+    }
+
+    func dispatch(
+      _ plan: TypedProcessPlan, progress: @escaping RuntimeProcessProgressHandler
+    ) async throws -> ProviderProcessReceipt {
+      fixed(try await base.dispatch(plan, progress: progress))
+    }
+
+    /// A sequence's duration is the sum of its children's, as the process
+    /// dispatcher reports it.
+    private func fixed(_ receipt: ProviderProcessReceipt) -> ProviderProcessReceipt {
+      let subprocesses = receipt.subprocesses.map {
+        ProviderSubprocessReceipt(
+          exitStatus: $0.exitStatus, stdout: $0.stdout, stderr: $0.stderr,
+          stdoutTruncated: $0.stdoutTruncated, durationSeconds: seconds)
+      }
+      return ProviderProcessReceipt(
+        exitStatus: receipt.exitStatus, stdout: receipt.stdout, stderr: receipt.stderr,
+        stdoutTruncated: receipt.stdoutTruncated,
+        durationSeconds: subprocesses.isEmpty ? seconds : seconds * Double(subprocesses.count),
+        hostManagedRecordID: receipt.hostManagedRecordID,
+        hostManagedSummary: receipt.hostManagedSummary,
+        landedArtifact: receipt.landedArtifact, subprocesses: subprocesses)
+    }
   }
 
   /// The daemon's `TargetStoreFactsPort` with the oracle's clock: the adopted
@@ -94,13 +141,20 @@ enum HDCOracleHarness {
   /// over the executions, its pages under `human-action-snapshots` as the
   /// daemon keeps them. With `hdcRuntimeDiagnostics`, the handler has what
   /// the daemon's managed HDC server reported at startup, as the daemon gives
-  /// it (none unless an oracle names it).
+  /// it (none unless an oracle names it). With `hostReceiveRoot`, received
+  /// files land there instead of in this user's temporary directory — the
+  /// landing path is in the receive argv, so in the materialized plan and its
+  /// digest — and the oracle records what is left in it. With
+  /// `fixedInvocationSeconds`, every dispatched child reports that duration
+  /// (`FixedDurationDispatcher`). Neither is applied unless an oracle names it.
   static func composition(
     hdc: URL, targetStore: RuntimeTargetStore, targets: URL, settings: Settings,
     nativeCodeSignHelper: HDCNativeCodeSignHelperArtifact? = nil, agentExecutions: Bool = false,
     humanActions: Bool = false,
     usbRelations: @escaping @Sendable () throws -> [TargetUSBRelation] = { [] },
-    hdcRuntimeDiagnostics: HDCManagedRuntimeDiagnostics? = nil
+    hdcRuntimeDiagnostics: HDCManagedRuntimeDiagnostics? = nil,
+    hostReceiveRoot: URL? = nil,
+    fixedInvocationSeconds: Double? = nil
   ) throws -> Composition {
     let root = settings.root
     let artifacts = root.appending(path: "artifacts", directoryHint: .isDirectory)
@@ -119,16 +173,25 @@ enum HDCOracleHarness {
     let factsPort = OracleFactsPort(
       targetStore: targetStore, executableSHA256: SHA256Hex.string(of: HDCOracleFake.driver),
       nowUTC: settings.nowUTC)
-    let provider =
-      nativeCodeSignHelper.map {
-        HDCObservationProviderAdapter(
-          factsPort: factsPort,
-          hostReceiveRoot: root.appending(path: "receive", directoryHint: .isDirectory),
-          nativeCodeSignHelper: $0)
-      } ?? HDCObservationProviderAdapter(factsPort: factsPort)
+    let provider: HDCObservationProviderAdapter
+    if let nativeCodeSignHelper {
+      provider = HDCObservationProviderAdapter(
+        factsPort: factsPort,
+        hostReceiveRoot: hostReceiveRoot
+          ?? root.appending(path: "receive", directoryHint: .isDirectory),
+        nativeCodeSignHelper: nativeCodeSignHelper)
+    } else if let hostReceiveRoot {
+      provider = HDCObservationProviderAdapter(
+        factsPort: factsPort, hostReceiveRoot: hostReceiveRoot)
+    } else {
+      provider = HDCObservationProviderAdapter(factsPort: factsPort)
+    }
     let providers = DeviceProviderRegistry(providers: [provider])
-    let dispatcher = DescriptorBoundProcessDispatcher(
+    let processes = DescriptorBoundProcessDispatcher(
       resolver: try FixedExecutableResolver.hashing(path: hdc.path, providerID: "hdc"))
+    let dispatcher: any RuntimeProcessDispatching =
+      fixedInvocationSeconds.map { FixedDurationDispatcher(base: processes, seconds: $0) }
+      ?? processes
     let engine = try RuntimeJobEngine(
       configuration: .init(stateDirectory: jobsState, sessionPublicationWriter: writer),
       providers: providers,
@@ -169,7 +232,7 @@ enum HDCOracleHarness {
     return Composition(
       handler: handler, artifactStore: store, targets: targets, artifacts: artifacts,
       jobsState: jobsState, sessions: sessions, owner: owner, agentExecutions: executions,
-      humanActions: union)
+      humanActions: union, receive: hostReceiveRoot, invocationSeconds: fixedInvocationSeconds)
   }
 
   /// One recorded request and its answer; a run names the fake's mode.
@@ -281,6 +344,11 @@ enum HDCOracleHarness {
     if let executions = composition.agentExecutions {
       roots.append((executions.directory, "agent-executions"))
     }
+    // What the Jobs left where received files land: a published file is the
+    // store's, so its landing copy does not outlive the publication.
+    if let receive = composition.receive, manager.fileExists(atPath: receive.path) {
+      roots.append((receive, "receive"))
+    }
     for (directory, prefix) in roots {
       for path in try manager.subpathsOfDirectory(atPath: directory.path).sorted() {
         let url = directory.appending(path: path)
@@ -327,6 +395,12 @@ enum HDCOracleHarness {
     ]
     if let executions = composition.agentExecutions {
       provenance["agentExecutions"] = .string(executions.directory.path)
+    }
+    if let receive = composition.receive {
+      provenance["receiveRoot"] = .string(receive.path)
+    }
+    if let seconds = composition.invocationSeconds {
+      provenance["invocationSeconds"] = .number(seconds)
     }
     files["provenance.json"] =
       try encoder.encode(JSONValue.object(provenance)) + Data("\n".utf8)

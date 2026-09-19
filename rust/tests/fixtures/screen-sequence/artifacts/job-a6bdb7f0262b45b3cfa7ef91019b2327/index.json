@@ -1,0 +1,69 @@
+{
+  "artifacts" : [
+    {
+      "artifactID" : "ART-9d16c9f42b9c0df7ada3aba4c93eb108",
+      "bindingSnapshot" : {
+        "bindingRevision" : 1,
+        "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "targetID" : "TGT-3ba3f5f43b92"
+      },
+      "byteCount" : 34,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-a6bdb7f0262b45b3cfa7ef91019b2327",
+      "mediaType" : "application\/x-tar",
+      "name" : "frames.tar",
+      "observationWindow" : {
+        "endUTC" : "2026-09-14T00:00:00.000Z",
+        "startUTC" : "2026-09-14T00:00:00.000Z"
+      },
+      "privacy" : "sensitive",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-a6bdb7f0262b45b3cfa7ef91019b2327",
+      "sha256" : "d4b7371bf9e4ade916b51dca8af42362dbd3d00edcede94057b08f5c77685a43",
+      "sourceOperation" : "capture.screen-sequence@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "receive-screen-sequence"
+    },
+    {
+      "artifactID" : "ART-96024fe5750cbd9662f46408be187620",
+      "bindingSnapshot" : {
+        "bindingRevision" : 1,
+        "stableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+        "targetID" : "TGT-3ba3f5f43b92"
+      },
+      "byteCount" : 196,
+      "createdAtUTC" : "2026-09-14T00:00:00Z",
+      "jobID" : "job-a6bdb7f0262b45b3cfa7ef91019b2327",
+      "mediaType" : "application\/json",
+      "name" : "sequence.json",
+      "privacy" : "standard",
+      "providerID" : "hdc",
+      "redactionApplied" : false,
+      "retention" : {
+        "deadlineUTC" : "2026-09-21T00:00:00Z",
+        "pinned" : false,
+        "retentionClass" : "default"
+      },
+      "sessionID" : "session-job-a6bdb7f0262b45b3cfa7ef91019b2327",
+      "sha256" : "c5e135c91e535795e2358fd6ec3ebcdc44e932f68c55dceb10917bd03964586e",
+      "sourceOperation" : "capture.screen-sequence@1",
+      "status" : {
+        "published" : {
+
+        }
+      },
+      "stepID" : "finalize-session"
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}

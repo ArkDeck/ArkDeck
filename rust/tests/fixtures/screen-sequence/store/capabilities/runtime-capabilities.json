@@ -1,0 +1,199 @@
+{
+  "records" : [
+    {
+      "capability" : {
+        "capabilityID" : "CAP-RT-POLICY-8AE3BC8B315C2275F2E33FACBBB74D84562467BA-G1",
+        "effectCeiling" : "deviceMutation",
+        "exactBindingRevision" : 1,
+        "exactInputs" : {
+          "frameCount" : 3
+        },
+        "expiresAtUTC" : "2026-10-14T00:00:00Z",
+        "inputConstraints" : {
+          "frameCount" : {
+            "kind" : "integerRange",
+            "maximum" : 3,
+            "minimum" : 3
+          }
+        },
+        "issuedAtUTC" : "2026-09-14T00:00:00Z",
+        "issuer" : {
+          "kind" : "runtimeDefaultPolicy",
+          "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:capture.screen-sequence@1"
+        },
+        "maximumUses" : 10000,
+        "operationScope" : [
+          {
+            "operationID" : "capture.screen-sequence",
+            "version" : 1
+          }
+        ],
+        "revocation" : {
+          "state" : "active"
+        },
+        "targetScope" : {
+          "kind" : "stablePhysicalIdentity",
+          "sha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"
+        }
+      },
+      "consumptions" : [
+        {
+          "authorizationScopeFingerprintSHA256" : "a1b9d24860c4ffc1a7fbf1f5abd68687fcab980eda2397ec831071c525e9952a",
+          "bindingRevision" : 1,
+          "consumedAtUTC" : "2026-09-14T00:00:00Z",
+          "effect" : "deviceMutation",
+          "jobID" : "job-1198f33479543de487d86dc88ce0f332",
+          "materializedPlanDigest" : "b1c13bfc75c617c256c368ad809d9472959666f9fe0d1fae1fc6d22ffc8afc40",
+          "operationReference" : "capture.screen-sequence@1",
+          "ordinal" : 1,
+          "outcomes" : [
+            {
+              "jobID" : "job-1198f33479543de487d86dc88ce0f332",
+              "outcome" : "confirmed",
+              "previousRecordSHA256" : "57a669146c22c4df26df562a919e9eef9751cc8dda54f5287713e33edcd6b584",
+              "recordSHA256" : "fe8fb58ee9031c6bda770ac12321a09e92c7a67c9171c598837cf289fe03f465",
+              "recordedAtUTC" : "2026-09-14T00:00:00Z",
+              "terminalState" : "succeeded"
+            }
+          ],
+          "queryFingerprintSHA256" : "742f50729ff8054457ee6ad23c9a58591b150d50a74a8eed7839e48c33c82547",
+          "receiptSHA256" : "57a669146c22c4df26df562a919e9eef9751cc8dda54f5287713e33edcd6b584",
+          "remainingUsesAfter" : 9999,
+          "reservationID" : "idem-sequence-captured",
+          "targetStableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"
+        }
+      ],
+      "remainingUses" : 9999
+    },
+    {
+      "capability" : {
+        "capabilityID" : "CAP-RT-POLICY-020E41F9C3FFBAF8B834D3A11A100E50F4EB835F-G1",
+        "effectCeiling" : "deviceMutation",
+        "exactBindingRevision" : 1,
+        "exactInputs" : {
+          "displayId" : 0,
+          "frameCount" : 2,
+          "height" : 640,
+          "imageType" : "png",
+          "width" : 360
+        },
+        "expiresAtUTC" : "2026-10-14T00:00:00Z",
+        "inputConstraints" : {
+          "displayId" : {
+            "kind" : "integerRange",
+            "maximum" : 0,
+            "minimum" : 0
+          },
+          "frameCount" : {
+            "kind" : "integerRange",
+            "maximum" : 2,
+            "minimum" : 2
+          },
+          "height" : {
+            "kind" : "integerRange",
+            "maximum" : 640,
+            "minimum" : 640
+          },
+          "imageType" : {
+            "kind" : "exactString",
+            "value" : "png"
+          },
+          "width" : {
+            "kind" : "integerRange",
+            "maximum" : 360,
+            "minimum" : 360
+          }
+        },
+        "issuedAtUTC" : "2026-09-14T00:00:00Z",
+        "issuer" : {
+          "kind" : "runtimeDefaultPolicy",
+          "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:capture.screen-sequence@1"
+        },
+        "maximumUses" : 10000,
+        "operationScope" : [
+          {
+            "operationID" : "capture.screen-sequence",
+            "version" : 1
+          }
+        ],
+        "revocation" : {
+          "state" : "active"
+        },
+        "targetScope" : {
+          "kind" : "stablePhysicalIdentity",
+          "sha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"
+        }
+      },
+      "consumptions" : [
+        {
+          "authorizationScopeFingerprintSHA256" : "06c1056b5bc43b71cb005e0f4e9dec53315e5020a6606e0a5dea1c34e6f0a3de",
+          "bindingRevision" : 1,
+          "consumedAtUTC" : "2026-09-14T00:00:00Z",
+          "effect" : "deviceMutation",
+          "jobID" : "job-a6bdb7f0262b45b3cfa7ef91019b2327",
+          "materializedPlanDigest" : "2c79e97100d8e57eda5fac26f0bd60fb9d37cd641d6bc002d7ddb1cb056ae384",
+          "operationReference" : "capture.screen-sequence@1",
+          "ordinal" : 1,
+          "outcomes" : [
+            {
+              "jobID" : "job-a6bdb7f0262b45b3cfa7ef91019b2327",
+              "outcome" : "confirmed",
+              "previousRecordSHA256" : "a9963e855f36da8fd1a90d7750e90e17bbb19d372a4e62b593047cb35b9cd9e8",
+              "recordSHA256" : "71686e033137010d386d4d0d199e3f4b134afac866aa26d8633a24063140c822",
+              "recordedAtUTC" : "2026-09-14T00:00:00Z",
+              "terminalState" : "succeeded"
+            }
+          ],
+          "queryFingerprintSHA256" : "0b30d391a693941680951fe84334a5f5c33c4ee83f786256747079c400e0678f",
+          "receiptSHA256" : "a9963e855f36da8fd1a90d7750e90e17bbb19d372a4e62b593047cb35b9cd9e8",
+          "remainingUsesAfter" : 9999,
+          "reservationID" : "idem-sequence-scaled",
+          "targetStableIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"
+        }
+      ],
+      "remainingUses" : 9999
+    },
+    {
+      "capability" : {
+        "capabilityID" : "CAP-RT-POLICY-2691908EAF30165BB25288DB18B16D17EB1A6ED7-G1",
+        "effectCeiling" : "deviceMutation",
+        "exactBindingRevision" : 1,
+        "exactInputs" : {
+          "frameCount" : 4
+        },
+        "expiresAtUTC" : "2026-10-14T00:00:00Z",
+        "inputConstraints" : {
+          "frameCount" : {
+            "kind" : "integerRange",
+            "maximum" : 4,
+            "minimum" : 4
+          }
+        },
+        "issuedAtUTC" : "2026-09-14T00:00:00Z",
+        "issuer" : {
+          "kind" : "runtimeDefaultPolicy",
+          "reference" : "catalog:508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684:capture.screen-sequence@1"
+        },
+        "maximumUses" : 10000,
+        "operationScope" : [
+          {
+            "operationID" : "capture.screen-sequence",
+            "version" : 1
+          }
+        ],
+        "revocation" : {
+          "state" : "active"
+        },
+        "targetScope" : {
+          "kind" : "stablePhysicalIdentity",
+          "sha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547"
+        }
+      },
+      "consumptions" : [
+
+      ],
+      "remainingUses" : 10000
+    }
+  ],
+  "schemaVersion" : "1.0.0"
+}
