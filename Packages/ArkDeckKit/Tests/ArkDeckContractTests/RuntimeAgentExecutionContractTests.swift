@@ -588,6 +588,92 @@ final class RuntimeAgentExecutionContractTests: XCTestCase {
     XCTAssertEqual(dispatcher.dispatchCount, 0)
   }
 
+  /// Producer frames for existing coordinator failures absent from the sampled
+  /// resume vocabulary. The in-memory observation port never touches hardware.
+  func testResumeControlFramesPreserveBudgetClockAndIdentityRefusals() async throws {
+    let capturedClock = clock!
+    let capturedPort = port!
+    let owner = try owner()
+    let resources = try RuntimeHumanActionResourceCoordinator(
+      directory: directory.appending(path: "resume-human-actions"), agents: owner, controlResources: nil)
+    let handler = RuntimeControlPlaneHandler(
+      engine: engine, capabilityStore: try RuntimeCapabilityStore(directoryURL: directory.appending(path: "resume-capabilities")),
+      providerIDs: ["hdc"], nowUTC: { RuntimeAgentTime.format(capturedClock.now()) },
+      targetStore: targets, agentExecutions: owner, humanActionResources: resources)
+    func send(_ method: String, _ params: [String: JSONValue]) async throws -> AgentWireProtocol.Response {
+      let bytes = try JSONEncoder().encode(AgentWireProtocol.Request(id: UUID().uuidString, method: method, params: params))
+      return await handler.handleFrame(bytes)
+    }
+    for method in ["agent.resume", "human-action.resume"] {
+      for condition in ["rollback", "expired", "duringProbe", "unproved"] {
+        capturedPort.setState("Offline")
+        capturedPort.setRelations([TargetObservationCoordinatorContractTests.Port.relation()])
+        capturedPort.onIdentity({})
+        let start = try await send("agent.run", request("resume-\(method)-\(condition)", budget: 1000))
+        XCTAssertTrue(start.ok, start.error?.message ?? "-")
+        let waiting = try action(XCTUnwrap(start.result))
+        var params: [String: JSONValue] = ["resumeReference": .string(waiting.reference)]
+        if method == "human-action.resume" { params["humanAction"] = waiting.fields["actionId"] }
+        capturedPort.setState("Connected")
+        let expected: String
+        switch condition {
+        case "rollback": capturedClock.advance(-1); expected = "orchestrationClockUntrusted"
+        case "expired": capturedClock.advance(2); expected = "humanActionExpired"
+        case "duringProbe": capturedPort.onIdentity { capturedClock.advance(2) }; expected = "orchestrationBudgetExpired"
+        default: capturedPort.setRelations([]); expected = "admissionDenied"
+        }
+        let answer = try await send(method, params)
+        XCTAssertFalse(answer.ok)
+        XCTAssertEqual(answer.error?.code, expected)
+        XCTAssertEqual(dispatcher.dispatchCount, 0)
+        if condition == "rollback" { capturedClock.advance(1) }
+      }
+    }
+    XCTAssertEqual(try targets.list().count, 0)
+    capturedPort.onIdentity({})
+    capturedPort.setRelations([TargetObservationCoordinatorContractTests.Port.relation()])
+    let target = try targets.adopt(
+      stableIdentitySHA256: DeviceBootstrapMachine.stableIdentitySHA256(serial: "150100424a544e4600"),
+      connectKey: "150100424a544e4600", toolVersion: "3.2.0f",
+      nowUTC: RuntimeAgentTime.format(capturedClock.now())).record
+    let existing = try RuntimeOperationRequest(
+      requestID: "resume-existing-request", idempotencyKey: "resume-conflicting-job",
+      target: .init(targetID: target.targetID, expectedBindingRevision: target.bindingRevision),
+      operation: .init(id: "observe.device", version: 1), inputs: [:],
+      requestedOutputs: [.derivedArtifacts], authorization: nil, clientContext: nil)
+    _ = try await engine.submit(RuntimeOperationCodec.encodeRequest(existing))
+    for method in ["agent.resume", "human-action.resume"] {
+      capturedPort.setState("Offline")
+      var intent = request("resume-idempotency-\(method)")
+      intent["idempotencyKey"] = .string("resume-conflicting-job")
+      let start = try await send("agent.run", intent)
+      XCTAssertTrue(start.ok, start.error?.message ?? "-")
+      let waiting = try action(XCTUnwrap(start.result))
+      var params: [String: JSONValue] = ["resumeReference": .string(waiting.reference)]
+      if method == "human-action.resume" { params["humanAction"] = waiting.fields["actionId"] }
+      capturedPort.setState("Connected")
+      let answer = try await send(method, params)
+      XCTAssertEqual(answer.error?.code, "idempotencyConflict")
+      XCTAssertEqual(dispatcher.dispatchCount, 0)
+    }
+    // Damage only this test's owned execution document. No hardware fact,
+    // Target, capability, or acceptance evidence is changed.
+    let files = try FileManager.default.contentsOfDirectory(
+      at: directory.appending(path: "executions"), includingPropertiesForKeys: nil)
+    let file = try XCTUnwrap(files.first { $0.lastPathComponent.hasPrefix("execution-") && $0.pathExtension == "json" })
+    let original = try Data(contentsOf: file)
+    defer { try? original.write(to: file) }
+    try Data("{".utf8).write(to: file)
+    for method in ["agent.resume", "human-action.resume"] {
+      var params: [String: JSONValue] = ["resumeReference": .string("resume-owned-corrupt-record")]
+      if method == "human-action.resume" { params["humanAction"] = .string("har-owned-corrupt-record") }
+      let answer = try await send(method, params)
+      XCTAssertEqual(answer.error?.code, "recordUnreadable")
+      if method == "agent.resume" { XCTAssertEqual(answer.error?.details, [:]) }
+      else { XCTAssertEqual(answer.error?.details?["newDispatchCount"], .integer(0)) }
+    }
+  }
+
   func testTrustResumeAfterRestartRequiresFreshSelectionInsteadOfFollowingAReusedKey() async throws {
     port.setState("Unauthorized")
     let first = try action(await owner().run(request()))
