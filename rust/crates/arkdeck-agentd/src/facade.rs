@@ -7,8 +7,8 @@ use arkdeck_contract::{
     sha256_hex, strict_json,
 };
 use arkdeck_platform::{
-    LocalConnection, LocalEndpoint, LocalListener, PeerOrigin, ServerIdentity, listen_mach,
-    random_bytes, read_frame,
+    LocalConnection, LocalEndpoint, LocalListener, PeerOrigin, ServerIdentity, StopSignal,
+    listen_mach, random_bytes, read_frame,
 };
 use serde::Serialize;
 use serde_json::json;
@@ -16,7 +16,7 @@ use std::{
     fs,
     io::{self, BufReader, IoSlice, Write},
     os::unix::fs::DirBuilderExt,
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::{Command, Stdio},
     sync::{
         Arc,
@@ -159,6 +159,13 @@ fn interrupted(id: &str) -> Vec<u8> {
     )
 }
 
+/// Removes this facade's own private socket directory with whatever its
+/// authority left in it (its socket). Absence is not an error: the authority
+/// or an earlier exit path may already have removed it.
+fn remove_private_directory(private: &Path) {
+    let _ = fs::remove_dir_all(private);
+}
+
 pub fn serve(swift: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     if std::env::args_os().len() != 1 {
         return Err("facade accepts no request or device arguments".into());
@@ -184,16 +191,28 @@ pub fn serve(swift: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     // directory: passed below as --state-dir, or Swift's installed default.
     let owners = Arc::new(FacadeOwners::new(parent.to_owned())?);
     let mut listener = LocalListener::bind_facade(&LocalEndpoint::new(public.clone()))?;
+    // As the paired Swift daemon and the isolated Rust daemon: SIGTERM and
+    // SIGINT are recorded from here on, and the accept loop below stops for
+    // them. Recorded before the private directory exists, so no instant has
+    // a directory without a stop that removes it; a caught signal is reset
+    // across exec, so the authority keeps its own default dispositions.
+    let stop = StopSignal::install()?;
     let nonce = random_bytes::<16>()?
         .iter()
         .map(|b| format!("{b:02x}"))
         .collect::<String>();
     let private = PathBuf::from("/private/tmp").join(format!("arkdeck-facade-{nonce}"));
+    // The facade removes exactly the directory it creates here, on every exit
+    // it can observe: returning from this function, on a stop or a startup
+    // failure, and its authority's exit below. No other instance's directory
+    // is ever named. SIGKILL is not observable; the paired Swift then unlinks
+    // its socket and removes this directory itself when the pairing pipe
+    // closes (AgentDaemonServer.drainAndStop).
     fs::DirBuilder::new().mode(0o700).create(&private)?;
     struct Directory(PathBuf);
     impl Drop for Directory {
         fn drop(&mut self) {
-            let _ = fs::remove_dir(&self.0);
+            remove_private_directory(&self.0);
         }
     }
     let _directory = Directory(private.clone());
@@ -227,6 +246,11 @@ pub fn serve(swift: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
         if forwarder.connect().is_ok() {
             break;
         }
+        if stop.requested() {
+            // Stopped before the authority answered: as Swift cancels its
+            // startup, nothing is served. The authority sees the pipe close.
+            return Ok(());
+        }
         if Instant::now() >= deadline {
             return Err("Swift private socket startup timed out".into());
         }
@@ -234,9 +258,12 @@ pub fn serve(swift: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     }
     // Keep the pairing pipe open for exactly the facade lifetime. EOF also
     // handles SIGKILL, which cannot run a Rust destructor or retry a frame.
+    // exit runs no destructor either, so the directory goes explicitly.
+    let exited = private.clone();
     std::thread::spawn(move || {
         let _lifetime = lifetime;
         let _ = child.wait();
+        remove_private_directory(&exited);
         std::process::exit(69);
     });
     if std::env::var_os("ARKDECK_ENDPOINT").is_none() {
@@ -267,8 +294,14 @@ pub fn serve(swift: PathBuf) -> Result<(), Box<dyn std::error::Error>> {
     }
     let active = Arc::new(AtomicUsize::new(0));
     loop {
-        let socket = match listener.accept() {
-            Ok(socket) => socket,
+        let socket = match listener.accept_until(&stop) {
+            Ok(Some(socket)) => socket,
+            // A stop was requested: as Swift's drainAndStop, no further
+            // connection is accepted. The facade holds no durable state and
+            // never replays, so it returns at once: the guard above removes
+            // the directory, the listener's name goes, the authority drains
+            // itself once the pairing pipe closes, and the process ends 0.
+            Ok(None) => return Ok(()),
             Err(e)
                 if matches!(
                     e.kind(),

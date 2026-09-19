@@ -188,6 +188,8 @@ extension AgentFacadeContractTests {
     childEnvironment["XPA_REAL_SWIFT"] = swift
     childEnvironment["XPA_REPLY_MARKER"] = marker.path
     childEnvironment["XPA_SWIFT_PID_FILE"] = root.appending(path: "authority.pid").path
+    let facadeSocketFile = root.appending(path: "facade-socket.path")
+    childEnvironment["XPA_FACADE_SOCKET_FILE"] = facadeSocketFile.path
     let process = Process()
     process.executableURL = URL(filePath: facade)
     process.environment = childEnvironment
@@ -225,7 +227,24 @@ extension AgentFacadeContractTests {
       killedPID = try XCTUnwrap(Int32(String(contentsOf: root.appending(path: "authority.pid"), encoding: .utf8)))
     } else { killedPID = process.processIdentifier }
     XCTAssertEqual(kill(killedPID, SIGKILL), 0)
-    process.waitUntilExit()
+    // Not waitUntilExit: off the main thread it spins a run loop that nothing
+    // wakes once the child is gone. isRunning is set from Foundation's own
+    // dispatch source, so a bounded poll observes the exit on any thread.
+    let exitDeadline = Date().addingTimeInterval(30)
+    while process.isRunning, Date() < exitDeadline {
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    XCTAssertFalse(process.isRunning, "facade did not exit after its peer died")
+    if killAuthority {
+      // The facade saw its authority exit and removed the private socket
+      // directory it had created, with both sockets left in it, before it
+      // exited. A facade killed by SIGKILL leaves that to its authority's
+      // drain, which the wrapper performs below as the Swift daemon does.
+      let facadeSocket = try String(contentsOf: facadeSocketFile, encoding: .utf8)
+      let privateDirectory = URL(filePath: facadeSocket).deletingLastPathComponent().path
+      XCTAssertFalse(FileManager.default.fileExists(atPath: privateDirectory),
+        "facade left its private socket directory behind: \(privateDirectory)")
+    }
     let neutral = await pending.value
     XCTAssertTrue(neutral, "an interrupted forwarded frame cannot claim zero dispatch")
 
@@ -266,19 +285,29 @@ import json,os,socket,subprocess,sys,threading,time
 from pathlib import Path
 secret=sys.stdin.buffer.readline()
 public=Path(os.environ['ARKDECK_PRIVATE_SOCKET'])
+Path(os.environ['XPA_FACADE_SOCKET_FILE']).write_text(str(public))
 private=public.with_name('authority.sock')
 env=dict(os.environ);env['ARKDECK_PRIVATE_SOCKET']=str(private)
 child=subprocess.Popen([os.environ['XPA_REAL_SWIFT'],*sys.argv[1:]],env=env,stdin=subprocess.PIPE)
 child.stdin.write(secret);child.stdin.flush()
 Path(os.environ['XPA_SWIFT_PID_FILE']).write_text(str(child.pid))
+draining=threading.Event()
 def authority_exit():
-    child.wait();os._exit(69)
+    # The authority died on its own: exit as the Swift daemon's wrapper would,
+    # and the facade removes its directory. A drain below owns the exit instead.
+    child.wait()
+    if not draining.is_set(): os._exit(69)
 threading.Thread(target=authority_exit,daemon=True).start()
 def drain():
-    sys.stdin.buffer.read()
+    sys.stdin.buffer.read();draining.set()
     child.stdin.close()
     try: child.wait(timeout=25)
     except subprocess.TimeoutExpired: child.terminate();child.wait(timeout=5)
+    # As the paired Swift daemon's drainAndStop after the facade is gone: its
+    # socket goes, then the facade's directory, once the real Swift left too.
+    for remove,target in ((os.unlink,public),(os.rmdir,public.parent)):
+        try: remove(target)
+        except OSError: pass
     os._exit(0)
 threading.Thread(target=drain,daemon=True).start()
 end=time.monotonic()+25
