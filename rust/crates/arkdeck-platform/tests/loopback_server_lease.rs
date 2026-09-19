@@ -69,14 +69,10 @@ impl Executable {
     }
 }
 
-/// A port nothing listened on a moment ago.
-fn free_port() -> u16 {
-    TcpListener::bind((Ipv4Addr::LOCALHOST, 0))
-        .unwrap()
-        .local_addr()
-        .unwrap()
-        .port()
+mod loopback_ports {
+    include!("../../../tests/support/loopback_ports.rs");
 }
+use loopback_ports::free_port;
 
 struct Listener(Child);
 

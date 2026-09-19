@@ -10,40 +10,22 @@
 #![cfg(target_os = "macos")]
 use arkdeck_contract::{CONTRACT_IDENTITY, PROTOCOL_VERSION, sha256_hex, validate_method_value};
 use serde_json::{Value, json};
-use std::collections::BTreeSet;
 use std::fs;
 use std::io::{BufRead, BufReader, Read, Write};
-use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpListener, TcpStream};
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpStream};
 use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
 use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Output, Stdio};
-use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 const FAKE_HDC: &str = include_str!("../../../tests/fixtures/managed-hdc/fake-hdc.c");
 const TARGET: &str = "TGT-3ba3f5f43b92";
 
-/// Every loopback port a test of this binary was handed: the kernel may
-/// hand a port just released straight back to the next `bind(0)`, so a port
-/// is issued once, whether it is released at once or held.
-static ISSUED: Mutex<BTreeSet<u16>> = Mutex::new(BTreeSet::new());
-
-/// A listener on a loopback port no other test of this binary was handed.
-fn issued_listener() -> TcpListener {
-    loop {
-        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
-        let port = listener.local_addr().unwrap().port();
-        if ISSUED.lock().unwrap().insert(port) {
-            return listener;
-        }
-    }
+mod loopback_ports {
+    include!("../../../tests/support/loopback_ports.rs");
 }
-
-/// A loopback port no other test of this binary was handed.
-fn free_port() -> u16 {
-    issued_listener().local_addr().unwrap().port()
-}
+use loopback_ports::{free_port, issued_listener};
 
 fn reachable(port: u16) -> bool {
     TcpStream::connect_timeout(

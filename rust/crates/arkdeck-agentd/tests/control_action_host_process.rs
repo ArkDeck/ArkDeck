@@ -14,31 +14,22 @@ use arkdeck_contract::{
     CATALOG_DIGEST, CONTRACT_IDENTITY, PROTOCOL_VERSION, sha256_hex, validate_method_value,
 };
 use serde_json::{Value, json};
-use std::collections::BTreeSet;
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
-use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpListener, TcpStream};
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4, TcpStream};
 use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
 use std::os::unix::net::UnixStream;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 const FAKE_HDC: &str = include_str!("../../../tests/fixtures/managed-hdc/fake-hdc.c");
 const INTENT_REQUIRED: &str = "an exact restart intent and request identity are required";
 
-/// A loopback port no other test of this binary was handed.
-fn free_port() -> u16 {
-    static ISSUED: Mutex<BTreeSet<u16>> = Mutex::new(BTreeSet::new());
-    loop {
-        let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
-        let port = listener.local_addr().unwrap().port();
-        if ISSUED.lock().unwrap().insert(port) {
-            return port;
-        }
-    }
+mod loopback_ports {
+    include!("../../../tests/support/loopback_ports.rs");
 }
+use loopback_ports::free_port;
 
 fn reachable(port: u16) -> bool {
     TcpStream::connect_timeout(
