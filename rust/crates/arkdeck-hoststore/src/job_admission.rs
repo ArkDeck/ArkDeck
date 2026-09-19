@@ -138,8 +138,28 @@ fn denial_code(error: &CapabilityStoreError) -> &'static str {
 /// device sessions this daemon holds.
 #[derive(Clone, Copy)]
 pub struct MutationAuthority<'a> {
+    pub default_root: &'a std::path::Path,
+    pub sessions: Option<&'a crate::SessionStore>,
     pub capabilities: &'a CapabilityStore,
     pub holds: &'a DeviceHolds,
+}
+
+impl MutationAuthority<'_> {
+    pub fn require_state(&self, jobs: &JobStore) -> Result<(), arkdeck_contract::WireError> {
+        let mut roots = Vec::new();
+        if let Some(sessions) = self.sessions {
+            let status = sessions.handle("runtime.storage.status", &Map::new())?;
+            let root = status["rootPath"]
+                .as_str()
+                .ok_or_else(|| arkdeck_contract::WireError {
+                    code: "recordUnreadable".into(),
+                    message: "Runtime Session root is unreadable".into(),
+                    details: None,
+                })?;
+            roots.push(std::path::PathBuf::from(root));
+        }
+        jobs.require_mutation_state(self.default_root, &roots)
+    }
 }
 
 /// The owners an admission writes: the Job store, through the planner's
@@ -259,6 +279,9 @@ impl JobAdmitter<'_> {
         let (Some(authority), Some(parsed)) = (self.authority, Effect::parse(effect)) else {
             return Err(unserved());
         };
+        authority
+            .require_state(self.jobs)
+            .map_err(|error| refused("admissionDenied", error.message))?;
         let session_scoped = capability_policy::session_scoped(descriptor, &request.inputs);
         let client = request
             .client_context

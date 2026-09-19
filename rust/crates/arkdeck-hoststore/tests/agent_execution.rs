@@ -216,6 +216,7 @@ fn rust_runs_the_swift_agent_executions() {
             now: fixed_now,
         };
         let _ = JobRunner {
+            mutation: None,
             jobs: &jobs,
             artifacts: &artifacts,
             analyzer: None,

@@ -573,6 +573,7 @@ fn adopting_run(
             probe: &probe,
         };
         JobRunner {
+            mutation: None,
             jobs: &jobs,
             artifacts: &artifacts,
             analyzer: None,

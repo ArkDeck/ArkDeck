@@ -65,6 +65,7 @@ fn rust_publishes_the_swift_sessions() {
         probe: &probe,
     };
     let runner = JobRunner {
+        mutation: None,
         jobs: &jobs,
         artifacts: &artifact_store,
         analyzer: Some(&profile),

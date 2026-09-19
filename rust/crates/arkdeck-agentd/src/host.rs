@@ -75,7 +75,7 @@ pub struct Host {
     #[cfg(target_os = "macos")]
     agents: Option<std::sync::Arc<arkdeck_hoststore::AgentExecutionStore>>,
     #[cfg(target_os = "macos")]
-    capabilities: Option<arkdeck_hoststore::CapabilityStore>,
+    capabilities: Option<std::sync::Arc<arkdeck_hoststore::CapabilityStore>>,
     #[cfg(target_os = "macos")]
     planning: Option<(
         std::path::PathBuf,
@@ -102,6 +102,8 @@ pub struct Host {
     /// Swift `NSHomeDirectory()`, which Artifact redaction replaces.
     #[cfg(target_os = "macos")]
     home: String,
+    #[cfg(target_os = "macos")]
+    default_mutation_root: Option<std::path::PathBuf>,
     /// Swift `HostStorageCoordinator`'s claims, held by the Session
     /// publications this process makes.
     #[cfg(target_os = "macos")]
@@ -114,7 +116,7 @@ pub struct Host {
     /// The device sessions this daemon's control sessions hold (Swift
     /// `deviceSessionHolds`).
     #[cfg(target_os = "macos")]
-    holds: arkdeck_hoststore::DeviceHolds,
+    holds: std::sync::Arc<arkdeck_hoststore::DeviceHolds>,
     /// The Runtime's Target observation owner over the development HDC.
     #[cfg(target_os = "macos")]
     target_observations: arkdeck_hoststore::TargetObservations,
@@ -156,7 +158,7 @@ impl Host {
     /// `capability.list` and `capability.inspect` read this capability store.
     #[cfg(target_os = "macos")]
     pub fn with_capabilities(mut self, capabilities: arkdeck_hoststore::CapabilityStore) -> Self {
-        self.capabilities = Some(capabilities);
+        self.capabilities = Some(std::sync::Arc::new(capabilities));
         self
     }
     /// `job.plan` reads the Artifact owner, the configured analyzer and the
@@ -248,6 +250,8 @@ impl Host {
     #[cfg(target_os = "macos")]
     fn authority(&self) -> Option<arkdeck_hoststore::MutationAuthority<'_>> {
         Some(arkdeck_hoststore::MutationAuthority {
+            default_root: self.default_mutation_root.as_deref()?,
+            sessions: self.storage.as_ref().map(|storage| &storage.0),
             capabilities: self.capabilities.as_ref()?,
             holds: &self.holds,
         })
@@ -273,6 +277,10 @@ impl Host {
             self.running.clone(),
             self.home.clone(),
         );
+        let default_mutation_root = self.default_mutation_root.clone();
+        let capabilities = self.capabilities.clone();
+        let holds = self.holds.clone();
+        let state_root = self.planning.as_ref().map(|(root, _)| root.clone());
         let slot = std::sync::Arc::new(RunSlot::default());
         match running.lock() {
             Ok(mut runs) if !runs.contains_key(&start.job) => {
@@ -302,6 +310,21 @@ impl Host {
                 serde_json::Map::from_iter([("jobId".into(), serde_json::json!(start.job))]);
             let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                 arkdeck_hoststore::JobRunner {
+                    mutation: capabilities
+                        .as_deref()
+                        .zip(state_root.as_deref())
+                        .zip(default_mutation_root.as_deref())
+                        .map(|((capabilities, state_root), default_root)| {
+                            arkdeck_hoststore::MutationExecution {
+                                authority: arkdeck_hoststore::MutationAuthority {
+                                    default_root,
+                                    sessions: storage.as_ref().map(|storage| &storage.0),
+                                    capabilities,
+                                    holds: &holds,
+                                },
+                                state_root,
+                            }
+                        }),
                     jobs: &jobs,
                     artifacts: &artifacts,
                     analyzer: None,
@@ -419,6 +442,11 @@ impl Host {
             #[cfg(target_os = "macos")]
             home: arkdeck_platform::runtime_home().unwrap_or_default(),
             #[cfg(target_os = "macos")]
+            default_mutation_root: arkdeck_platform::runtime_home()
+                .map(std::path::PathBuf::from)
+                .filter(|home| home.is_absolute())
+                .map(|home| home.join("Library/Application Support/ArkDeck/Agentd")),
+            #[cfg(target_os = "macos")]
             claims: Default::default(),
             #[cfg(target_os = "macos")]
             hdc: None,
@@ -455,8 +483,19 @@ impl HostServices for Host {
                     .as_ref()
                     .and_then(|(_, analyzer)| analyzer.as_ref()),
                 hdc_registered: self.hdc.is_some() && self.targets.is_some(),
+                mutation_owner: self
+                    .authority()
+                    .zip(self.jobs.as_deref())
+                    .is_some_and(|(authority, jobs)| authority.require_state(jobs).is_ok()),
                 hdc_tool_current: if provider == "hdc"
-                    && ["observe.device@1", "capture.diagnostics@1"].contains(&reference)
+                    && [
+                        "observe.device@1",
+                        "capture.diagnostics@1",
+                        "input.tap@1",
+                        "input.long-press@1",
+                        "input.swipe@1",
+                    ]
+                    .contains(&reference)
                 {
                     self.hdc
                         .as_ref()
@@ -872,6 +911,12 @@ impl HostServices for Host {
         let hdc = self.hdc();
         let run = |cancellation: Option<&arkdeck_hoststore::RunCancellation>| {
             arkdeck_hoststore::JobRunner {
+                mutation: self.authority().zip(self.planning.as_ref()).map(
+                    |(authority, (state_root, _))| arkdeck_hoststore::MutationExecution {
+                        authority,
+                        state_root,
+                    },
+                ),
                 jobs,
                 artifacts,
                 analyzer: analyzer.as_ref(),
