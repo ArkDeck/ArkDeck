@@ -1,7 +1,8 @@
 # Rust HAP planning checkpoint
 
-Status: implementation and test code written; compilation, test execution and
-unified validation are pending the shared host validation window. This is not
+Status: native Swift recording and targeted Rust verification passed. Full
+unified validation remains pending. Earlier unrun checkpoints below are retained
+as execution history and superseded by the final development results. This is not
 an execution, capability, signing or Golden Journey acceptance result.
 
 Base: Import lifecycle checkpoint `23b402bd`, which contains publication
@@ -73,3 +74,29 @@ This command has not been run. It uses the existing isolated fake-device oracle,
 never a device, and produces no GJ evidence. Copying verified native outputs and
 checking their producer provenance, then targeted tests and full gate, remain
 pending. Static `cargo fmt` and `git diff --check` passed for this addition.
+
+
+## Native recording and targeted verification
+
+On producer commit `8be18a6ea18794dd1e0f51d64f2e84c2f15361de`, the native
+Swift sampling command ran through the repository wrapper with
+`ARKDECK_SWIFT_EXECUTABLE=/private/tmp/arkdeck-swift-jobs2.sh` (the wrapper
+supplies jobs 2, so the command omitted another `--jobs`). Session 18368 exited
+0: one test, zero failures, 4.862 seconds. Log:
+`/private/tmp/arkdeck-hap-plan-native-20260919.log`.
+
+The new recording contains 15 plan exchanges, including both new successful
+plans. Every old exchange is unchanged; all fixture files other than
+`cases.json` and `provenance.json` are byte-identical. Those two files were copied
+from the actual native output. `hap-plan-native-recording/provenance.json`
+records producer commit, command, old/new SHA-256 values and preservation checks.
+No expected digest or frame was constructed manually.
+
+`CARGO_BUILD_JOBS=2 RUST_TEST_THREADS=2 cargo test --manifest-path rust/Cargo.toml
+-p arkdeck-hoststore --test debug_hap_plan` exited 0 (session 78414): 2 tests,
+0 failures, 1.07 seconds after 21.95 seconds compilation. Log:
+`/private/tmp/arkdeck-hap-plan-rust-20260919.log`. This passed the exact 15-plan
+native replay, valid-plan submit refusal with unchanged Job/capability storage,
+additional package input failures, and all five Import hold scenarios including
+individual target/revision/identity mismatches. No repair or test relaxation was
+needed in this validation. No full gate or hardware acceptance is claimed.

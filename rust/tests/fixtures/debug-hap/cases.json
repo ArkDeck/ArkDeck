@@ -1885,6 +1885,290 @@
     },
     {
       "answer" : {
+        "ok" : true,
+        "result" : {
+          "authorizationPolicy" : "standingCapability",
+          "bindingRevision" : 1,
+          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "dispatchDisposition" : "notDispatched",
+          "effectiveEffect" : "deviceMutation",
+          "executionMode" : "planOnly",
+          "inputs" : {
+            "abilityName" : "EntryAbility",
+            "bundleName" : "com.example.demo",
+            "hapArtifactLease" : "lease-v1:job-input-hap:ART-ce40ab95d8ec5ac89835a46e2d301004"
+          },
+          "jobAdmitted" : false,
+          "materializedPlanDigest" : "48e0ad142af425c0403d070ba1db03aef478c0ae819d7b2362e50f1da947d69a",
+          "operation" : "debug.hap@1",
+          "providerAdmissionBlocker" : null,
+          "providerId" : "hdc",
+          "requestFingerprintSha256" : "c790230a904e350fc31b296a17e92aaa552c21f493296bed8b819b8395aab5b1",
+          "schemaVersion" : "arkdeck.job-plan/1",
+          "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+          "steps" : [
+            {
+              "binding" : "none",
+              "cancellation" : "immediate",
+              "effect" : "hostOnly",
+              "kind" : "verifyArtifact",
+              "optional" : false,
+              "stepId" : "verify-hap-artifact"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "probeDevice",
+              "optional" : false,
+              "stepId" : "confirm-evidence-target"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "runApprovedRemoteRead",
+              "optional" : false,
+              "stepId" : "read-evidence-model"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "runApprovedRemoteRead",
+              "optional" : false,
+              "stepId" : "read-evidence-firmware"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "atSafeBoundary",
+              "effect" : "deviceMutation",
+              "kind" : "sendFile",
+              "optional" : false,
+              "stepId" : "send-hap"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "atSafeBoundary",
+              "effect" : "deviceMutation",
+              "kind" : "installPackage",
+              "optional" : false,
+              "stepId" : "install-hap"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "runApprovedRemoteRead",
+              "optional" : false,
+              "stepId" : "package-readback"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "atSafeBoundary",
+              "effect" : "deviceMutation",
+              "kind" : "startApplication",
+              "optional" : false,
+              "stepId" : "start-ability"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "verifyRemoteState",
+              "optional" : false,
+              "stepId" : "process-readback"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "captureRemoteStdout",
+              "optional" : true,
+              "stepId" : "capture-diagnostics"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "atSafeBoundary",
+              "effect" : "deviceMutation",
+              "kind" : "stopApplication",
+              "optional" : false,
+              "stepId" : "stop-ability"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "atSafeBoundary",
+              "effect" : "deviceMutation",
+              "kind" : "uninstallPackage",
+              "optional" : true,
+              "stepId" : "cleanup-uninstall"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "atSafeBoundary",
+              "effect" : "deviceMutation",
+              "kind" : "cleanupOwnedRemotePath",
+              "optional" : false,
+              "stepId" : "cleanup-remote-staging"
+            },
+            {
+              "binding" : "none",
+              "cancellation" : "atSafeBoundary",
+              "effect" : "hostOnly",
+              "kind" : "finalizeSession",
+              "optional" : false,
+              "stepId" : "finalize-session"
+            }
+          ],
+          "targetId" : "TGT-3ba3f5f43b92"
+        }
+      },
+      "method" : "job.plan",
+      "name" : "omittedDefaults.plan",
+      "params" : {
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-hap-omittedDefaults\",\"inputs\":{\"abilityName\":\"EntryAbility\",\"bundleName\":\"com.example.demo\",\"hapArtifactLease\":\"lease-v1:job-input-hap:ART-ce40ab95d8ec5ac89835a46e2d301004\"},\"operation\":{\"id\":\"debug.hap\",\"version\":1},\"requestId\":\"req-hap-omittedDefaults\",\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-3ba3f5f43b92\"}}"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "authorizationPolicy" : "standingCapability",
+          "bindingRevision" : 1,
+          "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+          "dispatchDisposition" : "notDispatched",
+          "effectiveEffect" : "deviceMutation",
+          "executionMode" : "planOnly",
+          "inputs" : {
+            "abilityName" : "EntryAbility",
+            "additionalHapArtifactLeases" : [
+              "lease-v1:job-input-hap:ART-2ab8ee3a91b3198ef6404e610ed5179f"
+            ],
+            "bundleName" : "com.example.demo",
+            "captureDiagnostics" : true,
+            "cleanupPolicy" : "retain",
+            "diagnosticsDurationSeconds" : 10,
+            "hapArtifactLease" : "lease-v1:job-input-hap:ART-ce40ab95d8ec5ac89835a46e2d301004",
+            "installPolicy" : "installOrReplace",
+            "postRunAbilityState" : "running"
+          },
+          "jobAdmitted" : false,
+          "materializedPlanDigest" : "5686f467b14c7798a29be32d47a83343be20d91914fe9c5a0e713774ebc2757d",
+          "operation" : "debug.hap@1",
+          "providerAdmissionBlocker" : null,
+          "providerId" : "hdc",
+          "requestFingerprintSha256" : "8583ffb8d18c2a9528f89ca9f6c70d0f25aa74731a3d5d7b326993f37636fb6e",
+          "schemaVersion" : "arkdeck.job-plan/1",
+          "stableIdentitySha256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+          "steps" : [
+            {
+              "binding" : "none",
+              "cancellation" : "immediate",
+              "effect" : "hostOnly",
+              "kind" : "verifyArtifact",
+              "optional" : false,
+              "stepId" : "verify-hap-artifact"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "probeDevice",
+              "optional" : false,
+              "stepId" : "confirm-evidence-target"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "runApprovedRemoteRead",
+              "optional" : false,
+              "stepId" : "read-evidence-model"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "runApprovedRemoteRead",
+              "optional" : false,
+              "stepId" : "read-evidence-firmware"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "atSafeBoundary",
+              "effect" : "deviceMutation",
+              "kind" : "sendFile",
+              "optional" : false,
+              "stepId" : "send-hap"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "atSafeBoundary",
+              "effect" : "deviceMutation",
+              "kind" : "installPackage",
+              "optional" : false,
+              "stepId" : "install-hap"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "runApprovedRemoteRead",
+              "optional" : false,
+              "stepId" : "package-readback"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "atSafeBoundary",
+              "effect" : "deviceMutation",
+              "kind" : "startApplication",
+              "optional" : false,
+              "stepId" : "start-ability"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "verifyRemoteState",
+              "optional" : false,
+              "stepId" : "process-readback"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "immediate",
+              "effect" : "readOnly",
+              "kind" : "captureRemoteStdout",
+              "optional" : true,
+              "stepId" : "capture-diagnostics"
+            },
+            {
+              "binding" : "confirmedDevice",
+              "cancellation" : "atSafeBoundary",
+              "effect" : "deviceMutation",
+              "kind" : "cleanupOwnedRemotePath",
+              "optional" : false,
+              "stepId" : "cleanup-remote-staging"
+            },
+            {
+              "binding" : "none",
+              "cancellation" : "atSafeBoundary",
+              "effect" : "hostOnly",
+              "kind" : "finalizeSession",
+              "optional" : false,
+              "stepId" : "finalize-session"
+            }
+          ],
+          "targetId" : "TGT-3ba3f5f43b92"
+        }
+      },
+      "method" : "job.plan",
+      "name" : "retainRunning.plan",
+      "params" : {
+        "requestJson" : "{\"documentType\":\"runtime-operation-request\",\"idempotencyKey\":\"idem-hap-retainRunning\",\"inputs\":{\"abilityName\":\"EntryAbility\",\"additionalHapArtifactLeases\":[\"lease-v1:job-input-hap:ART-2ab8ee3a91b3198ef6404e610ed5179f\"],\"bundleName\":\"com.example.demo\",\"captureDiagnostics\":true,\"cleanupPolicy\":\"retain\",\"diagnosticsDurationSeconds\":10,\"hapArtifactLease\":\"lease-v1:job-input-hap:ART-ce40ab95d8ec5ac89835a46e2d301004\",\"installPolicy\":\"installOrReplace\",\"postRunAbilityState\":\"running\"},\"operation\":{\"id\":\"debug.hap\",\"version\":1},\"requestId\":\"req-hap-retainRunning\",\"schemaVersion\":\"1.0.0\",\"target\":{\"expectedBindingRevision\":1,\"targetId\":\"TGT-3ba3f5f43b92\"}}"
+      }
+    },
+    {
+      "answer" : {
         "error" : {
           "code" : "resourceConflict",
           "details" : {
