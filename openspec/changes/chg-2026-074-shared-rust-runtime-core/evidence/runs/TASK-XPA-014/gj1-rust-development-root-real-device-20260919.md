@@ -255,9 +255,9 @@ Verified Artifacts, full run:
      then the two `revalidate` calls in `acquire`. The two process scans take tens of milliseconds.
    - **What it does not affect.** Dispatch: the managed server's start proof has no deadline, and the
      availability tool leg answers the startup facts.
-   - **Owner.** TASK-XPA-016, lane B: `agent/xpa-016-sha2-dev-opt-20260919` (`c0bd61aa`,
-     `[profile.dev.package.sha2] opt-level = 3`). Its author measured open and the two revalidations
-     on a debug build falling from 930–1123 ms to 56–73 ms. That change was not run on the device.
+   - **Owner.** TASK-XPA-016, lane B: #2022 (`5dac73dc`, `[profile.dev.package.sha2] opt-level = 3`),
+     merged after this run. Its author measured open and the two revalidations on a debug build
+     falling from 930–1123 ms to 56–73 ms. It has not been run on the device.
 2. **Answers that touch the registered tool are slow (T2, not compared).**
    - **Times.** `operation list` 6.45 s, `operation describe` 7.27 s and 4.00 s, `target availability`
      6.91 s, `target adopt` 4.70 s, `doctor` 5.01 s. The same reads took 0.03–0.08 s with the fake's
@@ -267,7 +267,7 @@ Verified Artifacts, full run:
    - **Job times.** The Jobs themselves ran from first evidence step to finish in under 1 s (observe)
      and 13 s (capture, with its 5 s capture). The whole `agent run` took 12.2 s and 20.0 s. The 09-09
      Swift Jobs took 1 s and 8 s from creation to finish.
-   - Remeasure after the change in item 1.
+   - Remeasure with #2022 (item 1).
 3. **Binding revision 1, not 2.** The isolated root adopts afresh. The Target ID is the same
    (`TGT-958780b2ffb7`), since it is derived from the identity.
 4. **The firmware string changed on the device.**
@@ -366,7 +366,7 @@ The fields of `arkdeck.gj-headless-rerun/1` that apply. It is not a file under
   "remaining": [
     "runbook §2.1 HAR crash-resume and the restart carry-over (design §L.1 item 13, ruled in #2016)",
     "runtime service status/verify/restart and --version on the Rust CLI",
-    "runtime.hdc.status and doctor --deep within the identity observation deadline (debug build: lane B sha2 dev-opt)",
+    "runtime.hdc.status and doctor --deep within the identity observation deadline (debug build: #2022, merged, not yet run on the device)",
     "installed activation of the Rust daemon at M5, then REAL_DEVICE_PASS on the installed Runtime"
   ]
 }
@@ -379,7 +379,7 @@ the full run. It is a listing answered by a host server, not a device command.
 
 - Runbook §2.1 (HAR crash-resume), and GJ-2 to GJ-5.
 - The `runtime service` leaves, which are not in the Rust CLI.
-- A second device window to remeasure with lane B's dev-profile change.
+- A second device window to remeasure with lane B's dev-profile change (#2022).
 - The installed Runtime's own GJ-1. It was not needed, since its answers for this digest are recorded in
   the 09-09/10 facade records.
 
@@ -395,4 +395,13 @@ The record was also scanned for the device serial and for home-directory paths, 
 
 ## CI
 
-Recorded after the PR's CI reports (`guard` + `swift`).
+PR #2024, head `b8faab05`, documentation only, all green. It merged on 2026-09-19 as `61f415f6`.
+
+| Check | Run | Conclusion |
+| --- | --- | --- |
+| SDD Guard `guard` | 35444446457 | success |
+| Swift CI `plan` | 35444446812 | success |
+| `swift` aggregate | 35444446812 | success |
+
+The Rust, Swift and App lanes were not selected and were skipped. These rows were added by a
+follow-up documentation PR, since the PR merged as soon as it was green.
