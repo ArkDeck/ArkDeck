@@ -1273,6 +1273,412 @@ final class AgentDaemonContractTests: XCTestCase {
     }
   }
 
+  /// Native frames for the workspace project mutations and every preset
+  /// method (TASK-XPA-015, M3): their answers, each refusal the owner raises,
+  /// the pending-dependency and unreadable-document refusals and the storage
+  /// failures, so that their published schemas carry the vocabulary a Rust
+  /// owner replays. Dependency pinning is test-owned and accepts every pin
+  /// except one foreign credential; every path is a test-owned root.
+  func testWorkspacePresetAndProjectMutationControlFramesRecordTheirRefusals() async throws {
+    let roots = stateDirectory.appending(path: "workspace-mutation-roots")
+    try FileManager.default.createDirectory(at: roots, withIntermediateDirectories: true)
+    guard let physicalPath = realpath(roots.path, nil) else { throw POSIXError(.ENOENT) }
+    defer { free(physicalPath) }
+    let physicalRoots = URL(filePath: String(cString: physicalPath), directoryHint: .isDirectory)
+    let first = physicalRoots.appending(path: "first")
+    let second = physicalRoots.appending(path: "second")
+    let third = physicalRoots.appending(path: "third")
+    let fourth = physicalRoots.appending(path: "fourth")
+    for root in [first, second, third, fourth] {
+      try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    }
+    let toolchain = "toolchain:sha256:" + String(repeating: "b", count: 64)
+    let credential = "credential:sha256-" + String(repeating: "c", count: 64)
+    let foreign = "credential:sha256-" + String(repeating: "d", count: 64)
+    func pinnedStore(_ name: String, nowUTC: @escaping @Sendable () -> String = {
+      "2026-09-19T00:00:00.000Z"
+    }) throws -> RuntimeWorkspaceProjectStore {
+      try RuntimeWorkspaceProjectStore(
+        rootURL: stateDirectory.appending(path: name),
+        toolchainPinning: RuntimeWorkspaceToolchainPinning(
+          acquire: { _, _, _ in }, release: { _, _ in }),
+        credentialPinning: RuntimeWorkspaceCredentialPinning(
+          validateBinding: { reference, _ in
+            if reference == foreign {
+              throw RuntimeWorkspaceProjectFailure(
+                "resourceConflict", "signing credential belongs to another project")
+            }
+          },
+          acquire: { _, _, _ in }, release: { _, _ in }),
+        nowUTC: nowUTC)
+    }
+    let ownerURL = stateDirectory.appending(path: "workspace-mutation-owner")
+    let store = try pinnedStore("workspace-mutation-owner")
+    let (handler, _) = try makeStack(workspaceProjectStore: store)
+    func answer(
+      _ method: String, _ params: [String: JSONValue], _ code: String? = nil,
+      file: StaticString = #filePath, line: UInt = #line
+    ) async throws -> [String: JSONValue] {
+      let response = try await request(handler, method: method, params: params)
+      if let code {
+        XCTAssertEqual(response.error?.code, code, "\(method) \(params)", file: file, line: line)
+        return [:]
+      }
+      XCTAssertTrue(response.ok, "\(method): \(String(describing: response.error))", file: file, line: line)
+      guard case .object(let result)? = response.result else { return [:] }
+      return result
+    }
+    func project(_ request: String, _ root: URL) async throws -> String {
+      let result = try await answer(
+        "workspace.project.register",
+        ["registrationRequestId": .string(request), "kind": .string("openharmony"),
+         "root": .string(root.path)])
+      guard case .string(let reference)? = result["projectRef"] else {
+        XCTFail("registration must name its project"); return ""
+      }
+      return reference
+    }
+    let alpha = try await project("mutation-alpha", first)
+    let beta = try await project("mutation-beta", second)
+    // Removed only: a project whose presets were removed cannot be removed
+    // without leaving preset records that name no project, which every later
+    // load refuses, so the removal frame comes from a project with none.
+    let gamma = try await project("mutation-gamma", fourth)
+
+    func definition(
+      _ kind: String, template: String? = nil, timeout: String = "600",
+      toolchain toolchainRef: String? = nil, toolchainGeneration: String? = nil,
+      credential credentialRef: String? = nil, module: String? = nil,
+      product: String? = nil, buildMode: String? = nil, sourceMap: String? = nil
+    ) -> [String: JSONValue] {
+      let templates = [
+        "build": "openharmony.hvigor-build@1", "test": "openharmony.hvigor-test@1",
+        "signing": "openharmony.local-sign@1", "symbol": "openharmony.arkts-symbol@1",
+      ]
+      var fields: [String: JSONValue] = [
+        "kind": .string(kind), "templateRef": .string(template ?? templates[kind] ?? kind),
+        "timeoutSeconds": .string(timeout),
+      ]
+      for (key, value) in [
+        ("toolchainRef", toolchainRef), ("toolchainGeneration", toolchainGeneration),
+        ("credentialRef", credentialRef), ("module", module), ("product", product),
+        ("buildMode", buildMode), ("relativeSourceMap", sourceMap),
+      ] {
+        if let value { fields[key] = .string(value) }
+      }
+      return fields
+    }
+    func register(
+      _ request: String, _ projectRef: String, _ fields: [String: JSONValue],
+      _ code: String? = nil
+    ) async throws -> [String: JSONValue] {
+      try await answer(
+        "workspace.preset.register",
+        fields.merging(
+          ["registrationRequestId": .string(request), "projectRef": .string(projectRef)],
+          uniquingKeysWith: { _, new in new }),
+        code)
+    }
+    let build = definition(
+      "build", toolchain: toolchain, toolchainGeneration: "1",
+      module: "entry", product: "default", buildMode: "debug")
+    let symbol = definition("symbol", sourceMap: "entry/build/sourceMaps.map")
+    let signing = definition(
+      "signing", toolchain: toolchain, toolchainGeneration: "1", credential: credential)
+
+    // Registration: each kind, a replay, and every refusal of the owner.
+    let buildPreset = try await register("preset-build", alpha, build)
+    guard case .string(let buildRef)? = buildPreset["presetRef"] else {
+      return XCTFail("preset registration must name its preset")
+    }
+    let replayedBuild = try await register("preset-build", alpha, build)
+    XCTAssertEqual(replayedBuild, buildPreset)
+    let symbolPreset = try await register("preset-symbol", alpha, symbol)
+    guard case .string(let symbolRef)? = symbolPreset["presetRef"] else {
+      return XCTFail("preset registration must name its preset")
+    }
+    _ = try await register("preset-signing", beta, signing)
+    _ = try await register("preset-build", alpha, symbol, "idempotencyConflict")
+    _ = try await register("preset-unknown-project", "project-unknown", symbol, "workspaceReferenceNotFound")
+    _ = try await register("preset-foreign", beta, definition(
+      "signing", toolchain: toolchain, toolchainGeneration: "1", credential: foreign),
+      "resourceConflict")
+    for (label, fields) in [
+      ("kind", definition("sideways", template: "openharmony.hvigor-build@1")),
+      ("template", definition("build", template: "openharmony.hvigor-test@1",
+        toolchain: toolchain, toolchainGeneration: "1", module: "entry",
+        product: "default", buildMode: "debug")),
+      ("timeout", definition("symbol", timeout: "3601", sourceMap: "entry/a.map")),
+      ("toolchain", definition("build", toolchain: "toolchain:md5:abc",
+        toolchainGeneration: "1", module: "entry", product: "default", buildMode: "debug")),
+      ("generation", definition("build", toolchain: toolchain, module: "entry",
+        product: "default", buildMode: "debug")),
+      ("credential", definition("signing", toolchain: toolchain,
+        toolchainGeneration: "1", credential: "credential:bad/ref")),
+      ("constraints", definition("build", toolchain: toolchain, toolchainGeneration: "1",
+        module: "entry", product: "default")),
+      ("source-map", definition("symbol", sourceMap: "../escape.map")),
+    ] {
+      _ = try await register("preset-invalid-\(label)", alpha, fields, "invalidInput")
+    }
+    _ = try await register("bad/request", alpha, symbol, "invalidInput")
+    _ = try await answer(
+      "workspace.preset.register", ["registrationRequestId": .string("preset-missing")],
+      "invalidParams")
+
+    // Reads: a whole project, one kind, and their refusals.
+    let listed = try await answer("workspace.preset.list", ["projectRef": .string(alpha)])
+    guard case .array(let presets)? = listed["presets"] else { return XCTFail("list shape") }
+    XCTAssertEqual(presets.count, 2)
+    _ = try await answer(
+      "workspace.preset.list", ["projectRef": .string(alpha), "kind": .string("symbol")])
+    _ = try await answer(
+      "workspace.preset.list", ["projectRef": .string("project-unknown")],
+      "workspaceReferenceNotFound")
+    _ = try await answer(
+      "workspace.preset.list", ["projectRef": .string("bad/reference")], "invalidInput")
+    _ = try await answer(
+      "workspace.preset.list", ["projectRef": .string(alpha), "extra": .string("x")],
+      "invalidParams")
+    _ = try await answer(
+      "workspace.preset.show", ["projectRef": .string(alpha), "presetRef": .string(symbolRef)])
+    _ = try await answer(
+      "workspace.preset.show", ["projectRef": .string(beta), "presetRef": .string(symbolRef)],
+      "workspaceReferenceNotFound")
+
+    // Updates: a new definition, its replay and every refusal.
+    func mutation(
+      _ request: String, _ projectRef: String, _ presetRef: String, _ generation: String
+    ) -> [String: JSONValue] {
+      ["mutationRequestId": .string(request), "projectRef": .string(projectRef),
+       "presetRef": .string(presetRef), "expectedGeneration": .string(generation)]
+    }
+    let longer = definition("symbol", timeout: "900", sourceMap: "entry/build/sourceMaps.map")
+    let updateFields = mutation("symbol-update", alpha, symbolRef, "1")
+      .merging(longer, uniquingKeysWith: { _, new in new })
+    let updated = try await answer("workspace.preset.update", updateFields)
+    XCTAssertEqual(updated["generation"], .string("2"))
+    let replayedUpdate = try await answer("workspace.preset.update", updateFields)
+    XCTAssertEqual(replayedUpdate, updated)
+    _ = try await answer(
+      "workspace.preset.update",
+      mutation("symbol-update", alpha, symbolRef, "1").merging(
+        symbol, uniquingKeysWith: { _, new in new }),
+      "idempotencyConflict")
+    _ = try await answer(
+      "workspace.preset.update",
+      mutation("symbol-stale", alpha, symbolRef, "1").merging(
+        symbol, uniquingKeysWith: { _, new in new }),
+      "resourceConflict")
+    _ = try await answer(
+      "workspace.preset.update",
+      mutation("symbol-elsewhere", beta, symbolRef, "2").merging(
+        symbol, uniquingKeysWith: { _, new in new }),
+      "workspaceReferenceNotFound")
+    _ = try await answer(
+      "workspace.preset.update",
+      mutation("symbol-invalid", alpha, symbolRef, "2").merging(
+        definition("symbol", timeout: "3601", sourceMap: "entry/a.map"),
+        uniquingKeysWith: { _, new in new }),
+      "invalidInput")
+    _ = try await answer(
+      "workspace.preset.update", mutation("symbol-partial", alpha, symbolRef, "2"),
+      "invalidParams")
+
+    // A project with a registered preset keeps its kind and its registration.
+    func projectMutation(
+      _ projectRef: String, _ generation: String, kind: String? = nil, root: URL? = nil
+    ) -> [String: JSONValue] {
+      var fields: [String: JSONValue] = [
+        "projectRef": .string(projectRef), "expectedGeneration": .string(generation),
+      ]
+      if let kind { fields["kind"] = .string(kind) }
+      if let root { fields["root"] = .string(root.path) }
+      return fields
+    }
+    _ = try await answer(
+      "workspace.project.update", projectMutation(alpha, "1", kind: "arkdeck", root: first),
+      "resourceConflict")
+    _ = try await answer(
+      "workspace.project.update", projectMutation(alpha, "1", kind: "openharmony", root: second),
+      "resourceConflict")
+    _ = try await answer(
+      "workspace.project.update", projectMutation(alpha, "7", kind: "openharmony", root: third),
+      "resourceConflict")
+    _ = try await answer(
+      "workspace.project.update",
+      projectMutation("project-unknown", "1", kind: "openharmony", root: third),
+      "workspaceReferenceNotFound")
+    _ = try await answer(
+      "workspace.project.update", projectMutation(alpha, "1", kind: "sideways", root: third),
+      "invalidInput")
+    _ = try await answer(
+      "workspace.project.update",
+      projectMutation(alpha, "1", kind: "openharmony", root: third.appending(path: "absent")),
+      "invalidInput")
+    let moved = try await answer(
+      "workspace.project.update", projectMutation(alpha, "1", kind: "openharmony", root: third))
+    XCTAssertEqual(moved["generation"], .string("2"))
+    _ = try await answer("workspace.project.remove", projectMutation(alpha, "2"), "resourceConflict")
+    _ = try await answer("workspace.project.remove", projectMutation(alpha, "1"), "resourceConflict")
+    _ = try await answer(
+      "workspace.project.remove", projectMutation("project-unknown", "1"),
+      "workspaceReferenceNotFound")
+    _ = try await answer(
+      "workspace.project.remove", projectMutation("bad/reference", "1"), "invalidInput")
+
+    // Removals: a preset, its replay and every refusal; then the project.
+    let removeSymbol = mutation("symbol-remove", alpha, symbolRef, "2")
+    let removed = try await answer("workspace.preset.remove", removeSymbol)
+    XCTAssertEqual(removed["configurationStatus"], .string("removed"))
+    let replayedRemoval = try await answer("workspace.preset.remove", removeSymbol)
+    XCTAssertEqual(replayedRemoval, removed)
+    _ = try await answer(
+      "workspace.preset.remove", mutation("symbol-remove", alpha, symbolRef, "1"),
+      "idempotencyConflict")
+    _ = try await answer(
+      "workspace.preset.remove", mutation("build-stale", alpha, buildRef, "3"),
+      "resourceConflict")
+    _ = try await answer(
+      "workspace.preset.remove", mutation("build-elsewhere", beta, buildRef, "1"),
+      "workspaceReferenceNotFound")
+    _ = try await answer(
+      "workspace.preset.remove", mutation("bad/request", alpha, buildRef, "1"), "invalidInput")
+    _ = try await answer("workspace.preset.remove", mutation("build-remove", alpha, buildRef, "1"))
+    let gone = try await answer("workspace.project.remove", projectMutation(gamma, "1"))
+    XCTAssertEqual(gone["configurationStatus"], .string("removed"))
+    XCTAssertEqual(gone["availability"], .string("removed"))
+
+    // Without a toolchain owner, a pinned preset is refused before any write.
+    let (unpinnedHandler, _) = try makeStack(
+      workspaceProjectStore: try RuntimeWorkspaceProjectStore(
+        rootURL: ownerURL, nowUTC: { "2026-09-19T00:00:00.000Z" }))
+    let unpinned = try await request(
+      unpinnedHandler, method: "workspace.preset.register",
+      params: build.merging(
+        ["registrationRequestId": .string("preset-unpinned"), "projectRef": .string(beta)],
+        uniquingKeysWith: { _, new in new }))
+    XCTAssertEqual(unpinned.error?.code, "operationUnavailable")
+
+    // A full owner reaches the preset quota before a 257th record.
+    let quotaStore = try pinnedStore("workspace-mutation-quota")
+    let quotaProject = try quotaStore.register(
+      requestID: "quota-project", kind: "openharmony", rootPath: first.path)
+    for n in 0..<256 {
+      _ = try quotaStore.registerPreset(
+        requestID: "quota-\(n)", projectRef: quotaProject.projectRef, kind: "symbol",
+        templateRef: "openharmony.arkts-symbol@1", toolchainRef: nil,
+        toolchainGeneration: nil, credentialRef: nil, timeoutSeconds: 60,
+        constraints: RuntimeWorkspacePresetConstraints(relativeSourceMap: "entry/\(n).map"))
+    }
+    let (quotaHandler, _) = try makeStack(workspaceProjectStore: quotaStore)
+    let quota = try await request(
+      quotaHandler, method: "workspace.preset.register",
+      params: symbol.merging(
+        ["registrationRequestId": .string("quota-overflow"),
+         "projectRef": .string(quotaProject.projectRef)],
+        uniquingKeysWith: { _, new in new }))
+    XCTAssertEqual(quota.error?.code, "quotaExceeded")
+
+    // A retained pending dependency mutation, then an unreadable document,
+    // refuse every method without rewriting the owner's file.
+    let projects = ownerURL.appending(path: "workspace-projects/projects.json")
+    let original = try Data(contentsOf: projects)
+    var document = try XCTUnwrap(
+      JSONSerialization.jsonObject(with: original) as? [String: Any])
+    document["pendingToolchainMutation"] = [
+      "action": "release", "toolchainRef": toolchain, "toolchainGeneration": 1,
+      "presetRef": "preset-retained",
+    ]
+    let pending = try JSONSerialization.data(withJSONObject: document, options: [.sortedKeys])
+    let retained: [(String, [String: JSONValue])] = [
+      ("workspace.project.update", projectMutation(beta, "1", kind: "openharmony", root: third)),
+      ("workspace.project.remove", projectMutation(beta, "1")),
+      ("workspace.preset.register", symbol.merging(
+        ["registrationRequestId": .string("preset-retained"), "projectRef": .string(beta)],
+        uniquingKeysWith: { _, new in new })),
+      ("workspace.preset.update", mutation("retained", beta, symbolRef, "1").merging(
+        symbol, uniquingKeysWith: { _, new in new })),
+      ("workspace.preset.remove", mutation("retained", beta, symbolRef, "1")),
+      ("workspace.preset.list", ["projectRef": .string(beta)]),
+      ("workspace.preset.show", ["projectRef": .string(beta), "presetRef": .string(symbolRef)]),
+    ]
+    for (unreadable, bytes) in [(false, pending), (true, Data("{broken".utf8))] {
+      try bytes.write(to: projects)
+      // Only an owner without dependency pins leaves the mutation retained.
+      for (method, params) in retained {
+        let response = try await request(unpinnedHandler, method: method, params: params)
+        XCTAssertEqual(
+          response.error?.code, unreadable ? "recordUnreadable" : "operationUnavailable", method)
+        XCTAssertEqual(try Data(contentsOf: projects), bytes, method)
+      }
+    }
+    try original.write(to: projects)
+
+    // Existing injected clocks run after load but before durable publication;
+    // they deterministically expose the real staging and rename failure paths.
+    // Each attempt gets its own owner, holding one project and one preset.
+    let longerSymbol = definition("symbol", timeout: "900", sourceMap: "entry/a.map")
+    for failure in ["ioFailure", "outcomeUnknown"] {
+      for (index, method) in [
+        "workspace.project.update", "workspace.project.remove", "workspace.preset.register",
+        "workspace.preset.update", "workspace.preset.remove",
+      ].enumerated() {
+        let name = "workspace-mutation-\(failure)-\(index)"
+        let privateDirectory = stateDirectory.appending(path: "\(name)/workspace-projects")
+        let prepared = try pinnedStore(name)
+        let faultProject = try prepared.register(
+          requestID: "fault-project", kind: "openharmony", rootPath: first.path)
+        var presetRef = ""
+        if method != "workspace.project.remove" {
+          presetRef = try prepared.registerPreset(
+            requestID: "fault-preset", projectRef: faultProject.projectRef, kind: "symbol",
+            templateRef: "openharmony.arkts-symbol@1", toolchainRef: nil,
+            toolchainGeneration: nil, credentialRef: nil, timeoutSeconds: 60,
+            constraints: RuntimeWorkspacePresetConstraints(relativeSourceMap: "entry/a.map")
+          ).presetRef
+        }
+        let faulty = try pinnedStore(name, nowUTC: {
+          if failure == "ioFailure" {
+            _ = chmod(privateDirectory.path, 0o500)
+          } else {
+            let document = privateDirectory.appending(path: "projects.json")
+            try? FileManager.default.removeItem(at: document)
+            try? FileManager.default.createDirectory(at: document, withIntermediateDirectories: false)
+          }
+          return "2026-09-19T00:00:00.000Z"
+        })
+        defer { _ = chmod(privateDirectory.path, 0o700) }
+        let (faultHandler, _) = try makeStack(workspaceProjectStore: faulty)
+        let project = faultProject.projectRef
+        let params: [String: JSONValue]
+        switch method {
+        case "workspace.project.update":
+          params = projectMutation(project, "1", kind: "openharmony", root: second)
+        case "workspace.project.remove":
+          params = projectMutation(project, "1")
+        case "workspace.preset.register":
+          params = symbol.merging(
+            ["registrationRequestId": .string("fault-register"), "projectRef": .string(project)],
+            uniquingKeysWith: { _, new in new })
+        case "workspace.preset.update":
+          params = mutation("fault-update", project, presetRef, "1").merging(
+            longerSymbol, uniquingKeysWith: { _, new in new })
+        default:
+          params = mutation("fault-remove", project, presetRef, "1")
+        }
+        if method == "workspace.project.remove" {
+          // Removal reads no clock: a read-only directory fails its staging
+          // write, and it has no rename failure to inject.
+          if failure == "outcomeUnknown" { continue }
+          _ = chmod(privateDirectory.path, 0o500)
+        }
+        let response = try await request(faultHandler, method: method, params: params)
+        XCTAssertEqual(response.error?.code, failure, "\(failure) \(method)")
+      }
+    }
+  }
+
   func testTargetCLIRegistersUpdatesAndRemovesAWorkspaceProjectWithoutPublishingItsRoot() throws {
     var firstRoot = stateDirectory.appending(path: "private-project-a", directoryHint: .isDirectory)
     var secondRoot = stateDirectory.appending(path: "private-project-b", directoryHint: .isDirectory)

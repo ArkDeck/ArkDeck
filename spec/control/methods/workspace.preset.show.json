@@ -8,6 +8,7 @@
         "invalidParams",
         "malformedFrame",
         "notFound",
+        "operationUnavailable",
         "recordUnreadable",
         "rejected",
         "unknownMethod",
@@ -60,13 +61,11 @@
             },
             "product": {
               "type": "string"
+            },
+            "relativeSourceMap": {
+              "type": "string"
             }
           },
-          "required": [
-            "buildMode",
-            "module",
-            "product"
-          ],
           "type": "object"
         },
         "credentialRef": {
@@ -97,10 +96,16 @@
           "type": "integer"
         },
         "toolchainGeneration": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "toolchainRef": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "updatedAtUtc": {
           "type": "string"
@@ -133,8 +138,8 @@
   "x-arkdeck-method": "workspace.preset.show",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 4,
-    "request": 6,
+    "error": 5,
+    "request": 7,
     "result": 2
   }
 }

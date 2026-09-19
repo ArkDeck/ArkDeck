@@ -3,12 +3,18 @@
     "errorCode": {
       "enum": [
         "conflict",
+        "idempotencyConflict",
         "internalError",
+        "invalidInput",
         "invalidParams",
+        "ioFailure",
         "malformedFrame",
         "notFound",
+        "operationUnavailable",
+        "outcomeUnknown",
         "recordUnreadable",
         "rejected",
+        "resourceConflict",
         "unknownMethod",
         "unsupportedProtocolVersion",
         "workspaceReferenceNotFound"
@@ -16,7 +22,18 @@
     },
     "errorDetails": {
       "additionalProperties": false,
-      "properties": {},
+      "properties": {
+        "newDispatchCount": {
+          "type": "integer"
+        },
+        "phase": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "newDispatchCount",
+        "phase"
+      ],
       "type": "object"
     },
     "request": {
@@ -54,13 +71,11 @@
             },
             "product": {
               "type": "string"
+            },
+            "relativeSourceMap": {
+              "type": "string"
             }
           },
-          "required": [
-            "buildMode",
-            "module",
-            "product"
-          ],
           "type": "object"
         },
         "credentialRef": {
@@ -91,10 +106,16 @@
           "type": "integer"
         },
         "toolchainGeneration": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "toolchainRef": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "updatedAtUtc": {
           "type": "string"
@@ -127,8 +148,8 @@
   "x-arkdeck-method": "workspace.preset.remove",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 2,
-    "request": 4,
-    "result": 2
+    "error": 9,
+    "request": 13,
+    "result": 4
   }
 }

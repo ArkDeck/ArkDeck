@@ -211,8 +211,12 @@ listener-churn flake family, not a regression.
 
 ## CI
 
-The PR's `guard` and `swift` aggregate are the unified gate. Their result is
-added here once the PR is green.
+PR #2031 merged as `200c4f37`. Its unified gate was green at head `d054553f`.
+Swift CI run 35445599573 passed the `swift` aggregate, with the Rust workspace
+jobs on macOS, Ubuntu and Windows and the host-independent checks passing; the
+planner skipped the Swift tests, the App build and the design-system
+interactions. SDD Guard run 35445599434 passed `guard`. The macOS job ran the
+Keychain and fake-signer tests on GitHub's runner.
 
 ## Residue and privacy
 

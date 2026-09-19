@@ -479,29 +479,29 @@
       "successes": 1
     },
     "workspace.preset.list": {
-      "errors": 2,
-      "requests": 4,
-      "successes": 2
+      "errors": 7,
+      "requests": 11,
+      "successes": 4
     },
     "workspace.preset.register": {
-      "errors": 1,
-      "requests": 2,
-      "successes": 1
+      "errors": 16,
+      "requests": 19,
+      "successes": 3
     },
     "workspace.preset.remove": {
-      "errors": 1,
-      "requests": 2,
-      "successes": 1
+      "errors": 9,
+      "requests": 11,
+      "successes": 2
     },
     "workspace.preset.show": {
-      "errors": 2,
-      "requests": 3,
-      "successes": 1
+      "errors": 5,
+      "requests": 7,
+      "successes": 2
     },
     "workspace.preset.update": {
-      "errors": 1,
-      "requests": 2,
-      "successes": 1
+      "errors": 10,
+      "requests": 12,
+      "successes": 2
     },
     "workspace.project.list": {
       "errors": 2,
@@ -514,8 +514,8 @@
       "successes": 1
     },
     "workspace.project.remove": {
-      "errors": 1,
-      "requests": 2,
+      "errors": 7,
+      "requests": 8,
       "successes": 1
     },
     "workspace.project.show": {
@@ -524,22 +524,22 @@
       "successes": 2
     },
     "workspace.project.update": {
-      "errors": 1,
-      "requests": 2,
+      "errors": 8,
+      "requests": 9,
       "successes": 1
     }
   },
   "corpusRecordCounts": {
-    "errors": 356,
-    "requests": 796,
-    "successes": 440
+    "errors": 409,
+    "requests": 856,
+    "successes": 447
   },
   "directoryDigests": {
     "Catalog/operations": "16671abf96551e9d5b9c3382fe4eb08f3fcd150cff68e7419634cd10ecda4bfd",
     "Catalog/profiles": "58ca1d970d40019ba2718646fde81fefda22533c5448e620217582e30f5d648f",
-    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "a2f84b3fa8d3fcdc59e258037062a94ec71804f13867ff1c9f26b1f136ff2b7f",
+    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "6dfcd672867494689dafd9ca98d0402e711ecfa2b03ca14ad50f6157ea0bfc6c",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC": "9ae93642e7b81bcea918469216711d7f6a17135a29cf021556ceef0f2f789196",
-    "spec/control/methods": "dd1b7cc0bf1ede9611aa8b403a21d5af4c417256e5e897e22c4787f8ae253036"
+    "spec/control/methods": "65bbf282b79193bd164d1a6774b079c67e8233581e7191becc56e8780b329bc6"
   },
   "files": {
     "Catalog/generated/effect-authorization-matrix.md": {
@@ -1095,24 +1095,24 @@
       "sha256": "abb774db34ad703822024f159e5bc4acf8c8b29ec2ca656f9fc231eddba2a4d1"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/workspace.preset.list.jsonl": {
-      "blob": "4bf9c81576ba52d2a1efe3754b9adceea53f7482",
-      "sha256": "02a541f16c1953b90c561df3aad59f37b7b4a91de8a0180a4783a67730b674a3"
+      "blob": "95d731f01eeb32bf10b41a0365c0a8e56b8c47bf",
+      "sha256": "73512009d3ac9f9146c83cb76a9da8a533d71a93ed682470a8b4f21813781e50"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/workspace.preset.register.jsonl": {
-      "blob": "05b578f5d9c9f485e35a7c0fbdd278c9b852b931",
-      "sha256": "9b3045ab8ca21114e6dbe330744026149814c1a0367c2a9cbceec4b7aef5818a"
+      "blob": "fc24182184abb37229d1d43ed19a8cf4270bbd95",
+      "sha256": "93f52ab86c55e5ffc48ce81853592a98e9bf3fb7b069425a94226ed0cad8e36c"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/workspace.preset.remove.jsonl": {
-      "blob": "1cedb964ab20d2db9afdc4ccda90e7c5edc6b7f1",
-      "sha256": "b556858a81f7afeab1cd5dc8106efb35522656969166f483b727daf8a0355a46"
+      "blob": "3cea0759e9408deedd01f078ee7680223691248c",
+      "sha256": "65e6ab814e9ffdcd602ca8839e9388ca8b9336f59f41c84ff7d021d6b67bad5b"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/workspace.preset.show.jsonl": {
-      "blob": "f07d9fb92312fad7cc5aeac321ae10f09680423c",
-      "sha256": "418070224fb56841cdd63243abec26fec81a759c5f264a36e7c89d3527de74d3"
+      "blob": "beb6629f0a7d60909db334ac593bd81baa420bfc",
+      "sha256": "c0ca82752a5fe2dac7bfb45de4c5a8449e68e870ce8201136fbd3c8c396283ee"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/workspace.preset.update.jsonl": {
-      "blob": "c9f958e9a4d9d7189b2cf288c064cb2cacb77788",
-      "sha256": "d8a03fe975bca5eb1de277e5b6b40bd0f28876a6b556edf9384859b6a8ff9c28"
+      "blob": "1853cb9efab39746018a26d559ecdc27fa0c84f1",
+      "sha256": "bf26779aef7eed493fa30c5b1a7859bb88702db725be113280146a24a7fac32a"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/workspace.project.list.jsonl": {
       "blob": "6a96dcd43813c26987a5bb2aff5121774953b2ef",
@@ -1123,16 +1123,16 @@
       "sha256": "e943859917aae5911186e5965d3fa7ae1221a6dc2b18cbfe86c060dde3b4e4f1"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/workspace.project.remove.jsonl": {
-      "blob": "f511ea52ace96ea8a71620ee0f514104361c14be",
-      "sha256": "74dfc875c8fe6846972ba52bb1e1ee808d3082ad6ae39635c2497af819be3eae"
+      "blob": "7ec11a1ee552c43e2756057e3c10b69f75941076",
+      "sha256": "7ec6d670aefd5c4407a5010251b0614c0d274733548bd62886da43d77829d2ff"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/workspace.project.show.jsonl": {
       "blob": "dd0b018c90bd94e53b336ed4747597ba3aa2714f",
       "sha256": "2a2316aa86dd06ae4ff014a782a43f6a28d1721b9e2ea288f5db129c593a8d6e"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/workspace.project.update.jsonl": {
-      "blob": "8768a05e268a87e622f50d7244f8ea2e49ccaaea",
-      "sha256": "c8a8515fbe451ba12293dcc87a3c25962aad9bd715ecc4af857ad206f8416e41"
+      "blob": "43ab04f6daf2c6da4a5f9760da1535d025bf94f4",
+      "sha256": "8858ef176c76924448e2faa40fdd1fb4a87d73f56725fea79b724dd830b8b713"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC/Golden/1.0.0/.gitattributes": {
       "blob": "cad3807e35a0d88c584e1801d5b90bb16280ce2d",
@@ -1691,24 +1691,24 @@
       "sha256": "e26381fe8ae39e1501a5d5ee30078a0d05bdc1435548b8065bca4320f5da40e0"
     },
     "spec/control/methods/workspace.preset.list.json": {
-      "blob": "c183da93e7d1505069a9eb0bb0641360ab5965e6",
-      "sha256": "2b1b963ccde55476c33ff052b714e640e37afb8f55b142bf99550de814ed9e9f"
+      "blob": "8f944ed7330a28a126e2667369aaf69369c2f836",
+      "sha256": "c9379660d0cef8471d2ecfba5cce571e76a770c3be9edae394cc566074d2058d"
     },
     "spec/control/methods/workspace.preset.register.json": {
-      "blob": "1b47e86fa1b7c93c79ea4a6ea8dc25b2dc8540bb",
-      "sha256": "98d9943805a3e7f3908fe44edc7b8e263854afd5f495ae6249553104c3e678bd"
+      "blob": "29a629788f2d941f0e1b414443394b3a43d5dbf1",
+      "sha256": "b01852fa331d6662499a696de5800d2f4bfbfc3396be442f67c67def6075e063"
     },
     "spec/control/methods/workspace.preset.remove.json": {
-      "blob": "9122a53397e1a66de35f412b52f0777109f46100",
-      "sha256": "1d3838720f3bae25f006472d749a738b15272f206e359c77ebf71760956876ba"
+      "blob": "2af8115f3db88edd11a40be73ccae2f324d82f6d",
+      "sha256": "44f6c79fec4f3e91d37bcd2d09f40e82f65cc23bb26490a50d73489a67666c70"
     },
     "spec/control/methods/workspace.preset.show.json": {
-      "blob": "5cd17ada7858afdf84cfa50f64d92760d5ec4993",
-      "sha256": "193dee5aed02774567880b2903a4b5d245cc13545eafa4f2c3b42d4e24212ca1"
+      "blob": "a1bc043c91c31cdf044c7eb1da92532b2544097f",
+      "sha256": "001eb84a76eec49015251ae686d5a400e95146cf4e122d7cd401d091297477b1"
     },
     "spec/control/methods/workspace.preset.update.json": {
-      "blob": "8c82662ba2016cd62250a7c23babfd03523869a4",
-      "sha256": "4a20e64c15ba1dc580afdc3b89b7b79c24e072f5dd586ed154babb89ab68dba0"
+      "blob": "04227e7779dc2c4bfff594e6deeaa1a59e81b3a0",
+      "sha256": "3d309ee7f91e4faaacb2108653b8652cf3fdaa53946871579a94282c4dcfb454"
     },
     "spec/control/methods/workspace.project.list.json": {
       "blob": "03cdc215e425bbeafb09faef7820b45bcd383c1b",
@@ -1719,19 +1719,19 @@
       "sha256": "79a33ff03cff7a2428cdc172055a3611b882eacd2c0b12d2d706bf2f7310878e"
     },
     "spec/control/methods/workspace.project.remove.json": {
-      "blob": "82bb646ae967d9256788ffa6591f80137c349788",
-      "sha256": "a978496131063a2c669f9a4e0b047adff1acdff82b686f508acc3f736a794bf4"
+      "blob": "23a65381eb7840470e9d864562d8166042ee4aae",
+      "sha256": "e5d37d46aa786902d438f622c699ac442df4a16fd953b5567b395892ff6fd7de"
     },
     "spec/control/methods/workspace.project.show.json": {
       "blob": "8830adb95cebdf083e155e8b5cbb5791cbfe0503",
       "sha256": "e816caebf057c751ffe2d787247fc0682aa31c8a928e7485b0bb9dfd92c03f22"
     },
     "spec/control/methods/workspace.project.update.json": {
-      "blob": "441f195e6683a39d45572350a94b735d71328799",
-      "sha256": "95367cc3e57160752f7d1d724887ee650adb8d3ccc5d736444517641a5da8e64"
+      "blob": "0d82b68c9ae8083abdcc55b098f48cf19414ba92",
+      "sha256": "c3a4af1a193b0273926fdf46bdda5e3f178c135476014651408f7c73dd1d3a77"
     }
   },
-  "inputDigest": "29f416d62711cb21c6e73a6c8103a3630852f63a900d6ea9031888a901466684",
+  "inputDigest": "ca83f0c5a1f77737984c78879648cc5c3d741d097928ca747e91e2f66191fc33",
   "kind": "development",
   "methodCount": 105,
   "protocolVersion": "1.0.0",

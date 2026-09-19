@@ -4,11 +4,16 @@
       "enum": [
         "conflict",
         "internalError",
+        "invalidInput",
         "invalidParams",
+        "ioFailure",
         "malformedFrame",
         "notFound",
+        "operationUnavailable",
+        "outcomeUnknown",
         "recordUnreadable",
         "rejected",
+        "resourceConflict",
         "unknownMethod",
         "unsupportedProtocolVersion",
         "workspaceReferenceNotFound"
@@ -16,7 +21,18 @@
     },
     "errorDetails": {
       "additionalProperties": false,
-      "properties": {},
+      "properties": {
+        "newDispatchCount": {
+          "type": "integer"
+        },
+        "phase": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "newDispatchCount",
+        "phase"
+      ],
       "type": "object"
     },
     "request": {
@@ -106,8 +122,8 @@
   "x-arkdeck-method": "workspace.project.update",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 2,
-    "request": 4,
+    "error": 11,
+    "request": 13,
     "result": 2
   }
 }

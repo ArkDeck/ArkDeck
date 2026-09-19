@@ -1,0 +1,9 @@
+{
+  "command": "ARKDECK_CONTROL_FRAME_LOG=<scratch>/frames-workspace-mutations sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --jobs 2 --filter AgentDaemonContractTests/testWorkspacePresetAndProjectMutationControlFramesRecordTheirRefusals",
+  "derivation": "Packages/ArkDeckKit/Scripts/generate-control-contract.py --derive-method-schemas <source>, where <source> holds, for each of the seven methods only, the committed corpus plus these frames; then rust/scripts/generate-contract.py --write",
+  "framesSHA256": "e97b23815d0f6d6c59230872fb388ad7f030445345266d5bf66f959e7c448ef7",
+  "frameCount": 78,
+  "productionSwiftBase": "7b5872f1 (no change to ArkDeckWorkflows/WorkspaceProvider, ArkDeckAgentDaemon or ArkDeckCore up to 2af5c806)",
+  "scope": "test-owned roots and owner directories only; production daemon handler and RuntimeWorkspaceProjectStore; test-owned dependency pinning that accepts every pin but one foreign credential; no device dispatch",
+  "testResult": "1 test, 0 failures (10.8 s)"
+}
