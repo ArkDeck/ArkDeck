@@ -11,7 +11,7 @@
 //! Unlike Swift, whose census is cached per process, every publication
 //! recounts the published bytes of every Job index; other Jobs' payloads are
 //! not rehashed for that count.
-use crate::artifact_read_owner::{ArtifactReadStore, swift_string};
+use crate::artifact_read_owner::{ArtifactPublicationFault, ArtifactReadStore, swift_string};
 use crate::artifact_usage::decode_index;
 use arkdeck_contract::sha256_hex;
 use arkdeck_platform::{DocumentPublishError, HostDirectory, HostEntryKind, PayloadCheck};
@@ -175,10 +175,15 @@ impl ArtifactPublisher<'_> {
             ));
         }
         // Recover only an exact payload left between the payload write and
-        // the index write; anything else at the derived name is poison.
+        // the index write; anything else at the derived name is poison. A
+        // publication stopped before its seal left the payload owner-writable:
+        // as Swift's `validateStoredPayload` does after its full hash, it is
+        // sealed before any index names it.
         let exists = match job.document_metadata(&artifact_id) {
             Ok(_) => {
                 self.validate_payload(&job, &artifact_id, payload.len() as u64, &digest)?;
+                job.seal_document(&artifact_id)
+                    .map_err(|error| io_failure(&format!("cannot seal artifact bytes: {error}")))?;
                 true
             }
             Err(error) if error.kind() == io::ErrorKind::NotFound => false,
@@ -196,6 +201,11 @@ impl ArtifactPublisher<'_> {
                 self.quota.saturating_sub(used)
             ));
         }
+        let fault = |point| {
+            self.store
+                .publication_fault(point)
+                .map_err(|error| io_failure(&error.to_string()))
+        };
         if !exists {
             job.publish_document(&artifact_id, &payload, MAX_PAYLOAD)
                 .map_err(|error| {
@@ -205,11 +215,14 @@ impl ArtifactPublisher<'_> {
                     };
                     io_failure(&format!("cannot persist artifact bytes: {error}"))
                 })?;
+            fault(ArtifactPublicationFault::AfterPayload)?;
             self.validate_payload(&job, &artifact_id, payload.len() as u64, &digest)?;
             job.seal_document(&artifact_id)
                 .map_err(|error| io_failure(&format!("cannot seal artifact bytes: {error}")))?;
         }
+        fault(ArtifactPublicationFault::AfterSeal)?;
         self.upsert(&job, product.job_id, metadata.clone())?;
+        fault(ArtifactPublicationFault::AfterIndex)?;
         Ok(metadata)
     }
 
@@ -695,6 +708,108 @@ fn value_char(c: char) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
+
+    /// A publication stopped at each step, then retried by a fresh owner:
+    /// before its index write the product is never named, and the retry
+    /// recovers the exact payload, sealing it owner read-only first, as
+    /// Swift's `validateStoredPayload` does, so no index ever names a
+    /// writable payload.
+    #[test]
+    fn a_publication_stopped_at_any_step_recovers_one_sealed_indexed_payload() {
+        use std::os::unix::fs::MetadataExt;
+        for stop in [
+            ArtifactPublicationFault::AfterPayload,
+            ArtifactPublicationFault::AfterSeal,
+            ArtifactPublicationFault::AfterIndex,
+        ] {
+            let root = std::env::temp_dir().canonicalize().unwrap().join(format!(
+                "artifact-publication-stop-{:032x}",
+                u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
+            ));
+            std::fs::DirBuilder::new()
+                .mode(0o700)
+                .create(&root)
+                .unwrap();
+            let product = Product {
+                job_id: "job-stopped",
+                session_id: "session-job-stopped",
+                step_id: "analyze",
+                name: "crash-signature.json",
+                media_type: "application/octet-stream",
+                privacy: "standard",
+                retention_class: "default",
+                source_operation: "analyzer.extract-crash-signature@1",
+                provider_id: "analyzer",
+                binding: json!({"targetID": "TGT-fixture"}),
+                observation_window: None,
+            };
+            fn publisher(store: &ArtifactReadStore) -> ArtifactPublisher<'_> {
+                ArtifactPublisher {
+                    store,
+                    quota: u64::MAX,
+                    home: "/Users/nobody",
+                    now: || Some("2026-09-14T00:00:00Z".into()),
+                }
+            }
+            let stopped = ArtifactReadStore::open_with_fault(
+                &root,
+                std::sync::Arc::new(move |point| {
+                    if point == stop {
+                        Err(io::Error::other("stopped"))
+                    } else {
+                        Ok(())
+                    }
+                }),
+            )
+            .unwrap();
+            assert!(publisher(&stopped).publish(&product, b"signature").is_err());
+            let directory = root.join("job-stopped");
+            let payloads: Vec<_> = std::fs::read_dir(&directory)
+                .unwrap()
+                .map(|entry| entry.unwrap())
+                .filter(|entry| entry.file_name().to_string_lossy().starts_with("ART-"))
+                .collect();
+            assert_eq!(payloads.len(), 1, "{stop:?}");
+            let payload = payloads[0].path();
+            let mode = std::fs::metadata(&payload).unwrap().mode() & 0o777;
+            let indexed = || {
+                std::fs::read(directory.join("index.json"))
+                    .map(|bytes| {
+                        serde_json::from_slice::<Value>(&bytes).unwrap()["artifacts"].clone()
+                    })
+                    .unwrap_or(json!([]))
+            };
+            match stop {
+                ArtifactPublicationFault::AfterPayload => {
+                    assert_eq!(mode, 0o600);
+                    assert_eq!(indexed(), json!([]));
+                }
+                ArtifactPublicationFault::AfterSeal => {
+                    assert_eq!(mode, 0o400);
+                    assert_eq!(indexed(), json!([]));
+                }
+                ArtifactPublicationFault::AfterIndex => {
+                    assert_eq!(mode, 0o400);
+                    assert_eq!(indexed().as_array().unwrap().len(), 1);
+                }
+            }
+            drop(stopped);
+            let store = ArtifactReadStore::open(&root).unwrap();
+            let metadata = publisher(&store).publish(&product, b"signature").unwrap();
+            assert_eq!(
+                payload.file_name().unwrap().to_str(),
+                metadata["artifactID"].as_str(),
+                "{stop:?}"
+            );
+            assert_eq!(indexed(), json!([metadata]), "{stop:?}");
+            assert_eq!(std::fs::metadata(&payload).unwrap().mode() & 0o777, 0o400);
+            // The recovered product reads back as any other.
+            assert_eq!(store.list("job-stopped").unwrap().len(), 1);
+            std::fs::set_permissions(&payload, std::fs::Permissions::from_mode(0o600)).unwrap();
+            std::fs::remove_dir_all(&root).unwrap();
+        }
+    }
 
     /// Every expected spelling is Swift's own: `replacingOccurrences` with the
     /// policy pattern, probed on the pinned macOS toolchain.

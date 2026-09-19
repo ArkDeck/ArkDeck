@@ -20,7 +20,21 @@ pub struct ArtifactReadStore {
     pub(crate) path: PathBuf,
     pub(crate) export_lock: std::sync::Mutex<()>,
     trace_retention: std::sync::Mutex<()>,
+    fault: Option<PublicationFault>,
 }
+
+/// Where a Job product's publication can be stopped for a crash test.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ArtifactPublicationFault {
+    /// The payload has its final name, still owner-writable; no index names it.
+    AfterPayload,
+    /// The payload is sealed owner read-only; no index names it.
+    AfterSeal,
+    /// The index names the product.
+    AfterIndex,
+}
+type PublicationFault =
+    std::sync::Arc<dyn Fn(ArtifactPublicationFault) -> io::Result<()> + Send + Sync>;
 
 /// An in-memory immutable snapshot; it is deliberately not a Runtime wire cursor.
 /// Holding this value retains its metadata even if the source index changes.
@@ -137,7 +151,24 @@ impl ArtifactReadStore {
             path: path.into(),
             export_lock: std::sync::Mutex::new(()),
             trace_retention: std::sync::Mutex::new(()),
+            fault: None,
         })
+    }
+
+    /// Bounded host fault injection for crash tests, never a wire field: the
+    /// production composition opens the store with `open`.
+    pub fn open_with_fault(path: &Path, fault: PublicationFault) -> io::Result<Self> {
+        Ok(Self {
+            fault: Some(fault),
+            ..Self::open(path)?
+        })
+    }
+
+    pub(crate) fn publication_fault(&self, point: ArtifactPublicationFault) -> io::Result<()> {
+        match &self.fault {
+            Some(fault) => fault(point),
+            None => Ok(()),
+        }
     }
 
     pub(crate) fn root(&self) -> &HostDirectory {

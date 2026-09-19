@@ -312,6 +312,15 @@ verifies, an unreadable census or ledger) is printed and never stops the
 daemon. `tests/artifact_retention.rs` and `agentd/tests/artifact_retention_process.rs`
 check it over real Job owners and a real daemon.
 
+A Job product is published in three steps: its payload under the derived name,
+the payload sealed owner read-only, then the whole index rewritten. A process
+killed after any of them leaves a consistent index, naming the product with its
+sealed, verified bytes or not at all, and a quota that counts only what the
+index names (`tests/artifact_publication_process_death.rs`, a real analyzer Job
+run in a child process and SIGKILLed at each step through
+`ArtifactReadStore::open_with_fault`). A retried publication recovers a payload
+left before its index, sealing it first as Swift's `validateStoredPayload` does.
+
 ## Contract and ownership boundaries
 
 The isolated macOS host serves `trace cache status` and `trace cache purge` from
