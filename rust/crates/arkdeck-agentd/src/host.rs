@@ -281,6 +281,7 @@ impl Host {
             dispatch: &**dispatch,
             tool_sha256: dispatch.tool_sha256(),
             now: arkdeck_hoststore::runtime_now,
+            code_sign_helper: None,
         })
     }
     /// What a device mutation is authorized from: the capability store and
@@ -342,6 +343,7 @@ impl Host {
                     dispatch: &**dispatch,
                     tool_sha256: dispatch.tool_sha256(),
                     now: arkdeck_hoststore::runtime_now,
+                    code_sign_helper: None,
                 }),
                 _ => None,
             };

@@ -3,13 +3,14 @@
 //! and the engine's `validateEvidenceFacts`. Facts are read, never written:
 //! no binding, route or observation is created here.
 use crate::TargetStore;
-use arkdeck_provider_hdc::{HdcDispatch, stable_identity_sha256};
+use arkdeck_provider_hdc::{CodeSignHelper, HdcDispatch, stable_identity_sha256};
 
 /// The HDC composition a device-bound operation plans and runs with: the
 /// Target owner its facts come from, the executor its steps dispatch to, the
 /// executable's digest the facts carry (Swift
-/// `TargetStoreFactsPort.executableSHA256`), and the clock the provider's
-/// context reads.
+/// `TargetStoreFactsPort.executableSHA256`), the clock the provider's
+/// context reads, and the code-sign helper a native library deployment
+/// stages.
 pub struct HdcComposition<'a> {
     pub targets: &'a TargetStore,
     pub dispatch: &'a (dyn HdcDispatch + Sync),
@@ -18,6 +19,11 @@ pub struct HdcComposition<'a> {
     /// gesture's frame is judged fresh or stale against it when its plan is
     /// materialized.
     pub now: fn() -> Option<String>,
+    /// Swift `HDCObservationProviderAdapter.nativeCodeSignHelper`: the
+    /// verified helper a native library deployment stages beside the
+    /// library. Without one, `deploy.native-library.app-owned@1` is runtime
+    /// unavailable.
+    pub code_sign_helper: Option<&'a CodeSignHelper>,
 }
 
 /// Swift `ProviderFacts` for an HDC Target, as the facts port resolves them.

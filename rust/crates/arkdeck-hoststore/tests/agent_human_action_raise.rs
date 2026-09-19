@@ -444,6 +444,7 @@ fn adopting_run(
         dispatch: &dispatch,
         tool_sha256: &digest,
         now: fixed_now,
+        code_sign_helper: None,
     };
     let admitter = JobAdmitter {
         planner: JobPlanner {
@@ -716,6 +717,7 @@ fn crash_between_target_and_execution_commit_reopens_all_owners_and_keeps_origin
             dispatch: &dispatch,
             tool_sha256: &digest,
             now: fixed_now,
+            code_sign_helper: None,
         };
         let admitter = JobAdmitter {
             planner: JobPlanner {
@@ -841,6 +843,7 @@ fn physical_resume_keeps_original_intent_and_unique_job() {
             dispatch: &dispatch,
             tool_sha256: &digest,
             now: fixed_now,
+            code_sign_helper: None,
         };
         let admitter = JobAdmitter {
             planner: JobPlanner {
@@ -1028,6 +1031,7 @@ fn physical_resume_keeps_original_intent_and_unique_job() {
                             dispatch,
                             tool_sha256: digest,
                             now: fixed_now,
+                            code_sign_helper: None,
                         };
                         let admitter = JobAdmitter {
                             planner: JobPlanner {
@@ -1189,6 +1193,7 @@ fn resolved_resume_commit_gap_preserves_status_then_run_continuation() {
             dispatch: &dispatch,
             tool_sha256: &digest,
             now: fixed_now,
+            code_sign_helper: None,
         };
         let admitter = JobAdmitter {
             planner: JobPlanner {

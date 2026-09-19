@@ -20,6 +20,8 @@ use std::path::{Path, PathBuf};
 
 #[path = "debug_hap_plan.rs"]
 mod debug_hap_plan;
+#[path = "native_library_plan.rs"]
+mod native_library_plan;
 
 const MAXIMUM_REQUEST_JSON_BYTES: usize = 4 * 1024 * 1024;
 const MAXIMUM_ANALYZER_BYTES: u64 = 128 * 1024 * 1024;
@@ -27,7 +29,7 @@ const MAXIMUM_ANALYZER_INPUT_BYTES: u64 = 512 * 1024 * 1024;
 /// The operations whose plans this Runtime materializes, and so plans and
 /// admits. Every other catalog operation is refused before its inputs are
 /// judged.
-const MATERIALIZED: [&str; 9] = [
+const MATERIALIZED: [&str; 10] = [
     "analyzer.extract-crash-signature@1",
     "observe.device@1",
     "capture.diagnostics@1",
@@ -37,6 +39,7 @@ const MATERIALIZED: [&str; 9] = [
     "port-forward.create@1",
     "port-forward.remove@1",
     "debug.hap@1",
+    device_steps::NATIVE,
 ];
 
 /// Swift `AnalyzerProfile` for `crash-signature@1`, the analyzer a host names
@@ -339,6 +342,18 @@ impl<'a> JobPlanner<'a> {
                 format!("provider {} is not registered", descriptor.provider),
             ));
         };
+        // Swift `runtimeAvailability`: a native deployment stages the
+        // code-sign helper its composition verified, and without one the
+        // operation is unavailable.
+        if reference == device_steps::NATIVE && hdc.code_sign_helper.is_none() {
+            return Err(refusal(
+                "invalidInput",
+                format!(
+                    "{reference} is runtime unavailable: bundled arm64 OpenHarmony code-sign \
+                     helper cannot be verified"
+                ),
+            ));
+        }
         if self.artifacts.is_none() {
             return Err(refusal(
                 "invalidInput",
@@ -364,6 +379,11 @@ impl<'a> JobPlanner<'a> {
         // capability it is admitted under; its execution owner is separate work.
         if reference == "debug.hap@1" {
             return self.materialize_hap(request, descriptor, &facts);
+        }
+        // A native deployment binds its leased library, verified as the
+        // expected ABI's code-signed ELF, whose facts name its capability.
+        if reference == device_steps::NATIVE {
+            return self.materialize_native(request, descriptor, &facts);
         }
         self.refuse_debug_permit(request)?;
         // Swift names a ring-buffered capture's coverage anchor in its

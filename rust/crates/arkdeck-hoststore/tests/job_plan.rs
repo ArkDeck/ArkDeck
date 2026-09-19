@@ -256,20 +256,21 @@ fn rust_refuses_plans_it_cannot_materialize_yet() {
         });
         Map::from_iter([("requestJson".into(), json!(request.to_string()))])
     };
-    // debug.hap@1 is planned and admitted now (debug_hap_plan.rs,
-    // debug_hap_submit.rs); an operation this Runtime still does not
-    // materialize is refused before its inputs are judged.
+    // debug.hap@1 and deploy.native-library.app-owned@1 are planned and
+    // admitted now (debug_hap_plan.rs, native_library_plan.rs); an operation
+    // this Runtime still does not materialize is refused before its inputs
+    // are judged.
     let refusal = planner
         .handle(&device_request(
-            "deploy.native-library.app-owned",
-            "idem-rust-native-0001",
+            "flash.full-restore",
+            "idem-rust-flash-0001",
         ))
         .unwrap_err();
     assert_eq!(
         (refusal.code, refusal.message.as_str()),
         (
             "rejected",
-            "deploy.native-library.app-owned@1 is not materialized by the Rust Runtime yet"
+            "flash.full-restore@1 is not materialized by the Rust Runtime yet"
         )
     );
     // Swift's daemon without an HDC registration: no provider plans it.

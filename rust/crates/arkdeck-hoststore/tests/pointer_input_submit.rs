@@ -123,6 +123,7 @@ impl Owners {
             dispatch: &NoDispatch,
             tool_sha256: &self.digest,
             now: fixed_now,
+            code_sign_helper: None,
         }
     }
 

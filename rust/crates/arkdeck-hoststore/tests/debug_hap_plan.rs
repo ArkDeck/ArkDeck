@@ -24,6 +24,7 @@ fn native_swift_plans_match_with_nothing_admitted_or_dispatched() {
         dispatch: &NoDispatch,
         tool_sha256: &digest,
         now: fixed_now,
+        code_sign_helper: None,
     };
     let planner = || JobPlanner {
         artifacts: Some(&artifacts),
@@ -126,6 +127,7 @@ fn entry_and_additional_imports_are_held_until_success_or_preflight_refusal() {
             dispatch: &NoDispatch,
             tool_sha256: &digest,
             now: fixed_now,
+            code_sign_helper: None,
         };
         let (entered_tx, entered) = sync_channel(1);
         let (resume, resume_rx) = sync_channel(1);

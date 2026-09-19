@@ -223,6 +223,7 @@ fn replay(fault: Fault) {
         dispatch: &dispatch,
         tool_sha256: &digest,
         now: fixed_now,
+        code_sign_helper: None,
     };
     let probe = OracleProbe::new(&provenance);
     let claims = StorageClaims::default();
@@ -324,6 +325,7 @@ fn replay(fault: Fault) {
                                 dispatch: dispatch_ref,
                                 tool_sha256: digest_ref,
                                 now: fixed_now,
+                                code_sign_helper: None,
                             };
                             JobRunner {
                                 imports: None,
@@ -593,6 +595,7 @@ fn restart_after_consumption_or_intent_never_replays_and_blocks_new_gesture() {
             dispatch: &dispatch,
             tool_sha256: &digest,
             now: fixed_now,
+            code_sign_helper: None,
         };
         let default_root = root.join("store");
         let authority = arkdeck_hoststore::MutationAuthority {

@@ -4,19 +4,28 @@
 //! journals for it, which steps carry the evidence preflight, and the products
 //! each step owns. For `debug.hap@1` also the Artifacts a step is given, the
 //! compensation each source step declares on its intent, the residue a
-//! failed cleanup leaves, and the mutations only a readback may believe.
+//! failed cleanup leaves, and the mutations only a readback may believe. For
+//! `deploy.native-library.app-owned@1` the provider's own action of each
+//! step, claimed by the operation, and the rollback its plan holds.
 use crate::cleanup_debt::Residue;
 use crate::operation_catalog::{CatalogOperation, CatalogStep};
 use crate::session_json;
 use arkdeck_contract::sha256_hex;
 use arkdeck_provider_hdc::{
-    Action, DEFAULT_HILOG_BUDGET, Expected, FileActionError, FilePlan, FileReceipt, HapAction,
-    Outcome, PointerAction, PortAction, PortRule, ProcessPlan, ResolvedArtifact, STORAGE_ROOT,
+    Action, CodeSignHelper, DEFAULT_HILOG_BUDGET, Deployment, Expected, FileActionError, FilePlan,
+    FileReceipt, HapAction, Inspection, NativeAction, Outcome, PointerAction, PortAction, PortRule,
+    ProcessPlan, ResolvedArtifact, STORAGE_ROOT,
 };
 use serde_json::{Map, Value, json};
 use std::collections::BTreeSet;
 
 const HAP: &str = "debug.hap@1";
+/// The native library deployment, whose device steps are its provider's
+/// alone.
+pub(crate) const NATIVE: &str = "deploy.native-library.app-owned@1";
+/// Swift `HDCAppOwnedNativeLibraryDeployment.entryAbility`: the ability a
+/// native deployment's target is restarted through.
+const NATIVE_ABILITY: &str = "EntryAbility";
 
 /// The device-bound operations this Runtime plans and runs.
 pub(crate) const DEVICE_OPERATIONS: [&str; 8] = [
@@ -115,22 +124,45 @@ pub(crate) enum ActionRefusal {
     Invalid(String),
 }
 
-/// What a step is named, journaled and lowered within: its Job (before
-/// admission, the authorization envelope a plan is materialized for) and the
-/// Artifacts its leases resolved to, the entry package first.
+/// What a step is named, journaled and lowered within (Swift
+/// `ProviderExecutionContext`): its Job (before admission, the authorization
+/// envelope a plan is materialized for), the Artifacts its leases resolved
+/// to, the entry package first, and for a native deployment the leased
+/// library as read for the step and the code-sign helper its composition
+/// verified.
 pub(crate) struct StepContext<'a> {
     pub(crate) job_id: &'a str,
     pub(crate) resolved: &'a [ResolvedArtifact],
+    pub(crate) library: Option<&'a LeasedLibrary>,
+    pub(crate) helper: Option<&'a CodeSignHelper>,
+}
+
+/// The context of a step given nothing: no Job's paths, no Artifact, no
+/// library and no helper.
+pub(crate) const NO_CONTEXT: StepContext<'static> = StepContext {
+    job_id: "",
+    resolved: &[],
+    library: None,
+    helper: None,
+};
+
+/// A leased native library as the Job owner read it for a step: its bytes,
+/// and the byte count its lease records (Swift
+/// `ProviderResolvedInputArtifact.byteCount`).
+pub(crate) struct LeasedLibrary {
+    pub(crate) bytes: Vec<u8>,
+    pub(crate) byte_count: i64,
 }
 
 /// A device step's typed provider action: an observation or capture action,
-/// a pointer gesture, a port rule's change or readback, or a debug HAP's
-/// action.
+/// a pointer gesture, a port rule's change or readback, a debug HAP's action,
+/// or a native library deployment's.
 pub(crate) enum StepAction {
     Hdc(Action),
     Pointer(PointerAction),
     Port(PortAction),
     Hap(HapAction),
+    Native(Box<NativeAction>),
 }
 
 impl StepAction {
@@ -139,6 +171,7 @@ impl StepAction {
             Self::Pointer(action) => action.persisted(),
             Self::Port(action) => action.persisted(),
             Self::Hap(action) => action.persisted(),
+            Self::Native(action) => action.persisted(),
             Self::Hdc(action) => {
                 let (kind, arguments) = action.persisted();
                 let values = arguments
@@ -158,10 +191,11 @@ impl StepAction {
     }
 
     /// The provider's verdict on the step's receipt. Every action but a debug
-    /// HAP's lowers to one process and is judged by it; a gesture's and a port
-    /// rule's name no device fact. A HAP action is judged over the whole
-    /// receipt, and a package readback binds its verdict to the digest of the
-    /// entry package the Job resolved (`resolved_sha256`).
+    /// HAP's and a native deployment's lowers to one process and is judged by
+    /// it; a gesture's and a port rule's name no device fact. A HAP action and
+    /// a native action are judged over the whole receipt, and a package
+    /// readback binds its verdict to the digest of the entry package the Job
+    /// resolved (`resolved_sha256`).
     pub(crate) fn verify(
         &self,
         receipt: &FileReceipt,
@@ -170,6 +204,7 @@ impl StepAction {
     ) -> Outcome {
         match (self, receipt.subprocesses.first()) {
             (Self::Hap(action), _) => action.verify(receipt, resolved_sha256),
+            (Self::Native(action), _) => action.verify(receipt),
             (_, None) => Outcome::Unknown("dispatch produced no process result".into()),
             (Self::Hdc(action), Some(sole)) => action.verify(sole, expected),
             (Self::Pointer(action), Some(sole)) => action.verify(sole),
@@ -183,6 +218,7 @@ impl StepAction {
             Self::Pointer(action) => action.effect(),
             Self::Port(action) => action.effect(),
             Self::Hap(action) => action.effect(),
+            Self::Native(action) => action.effect(),
         }
     }
 
@@ -192,25 +228,35 @@ impl StepAction {
         step_id: &str,
         connect_key: Option<&str>,
     ) -> Result<ProcessPlan, String> {
-        match self.plan(step_id, connect_key, &[])? {
+        match self.plan(step_id, connect_key, &NO_CONTEXT)? {
             FilePlan::Process(plan) => Ok(plan),
             _ => Err(format!("{step_id} did not lower to one process")),
         }
     }
 
-    /// The process or process sequence the step's executor runs, against the
-    /// Target's connect key and the Artifacts a send stages.
+    /// The process or process sequence the step's executor runs (Swift
+    /// `lower(action:context:)`), against the Target's connect key within the
+    /// step's context: the Artifacts a send stages and, for a native
+    /// deployment, the byte count the library's lease records and the helper
+    /// its send stages.
     pub(crate) fn plan(
         &self,
         step_id: &str,
         connect_key: Option<&str>,
-        resolved: &[ResolvedArtifact],
+        context: &StepContext<'_>,
     ) -> Result<FilePlan, String> {
         match self {
             Self::Hdc(action) => action.lower(step_id, connect_key).map(FilePlan::Process),
             Self::Pointer(action) => action.lower(step_id, connect_key),
             Self::Port(action) => action.lower(step_id, connect_key),
-            Self::Hap(action) => action.lower(step_id, connect_key, resolved),
+            Self::Hap(action) => action.lower(step_id, connect_key, context.resolved),
+            Self::Native(action) => action.lower(
+                step_id,
+                connect_key,
+                context.resolved.first(),
+                context.library.map(|library| library.byte_count),
+                context.helper,
+            ),
         }
     }
 }
@@ -288,9 +334,11 @@ pub(crate) fn action(
 }
 
 /// Swift `HDCObservationProviderAdapter.action` for a step run within
-/// `context`: a debug HAP's own step kinds are its provider module's, with the
-/// owned paths minted for the Job and the Artifacts resolved for the step;
-/// every other step is named as [`action`] names it.
+/// `context`: a native deployment's steps are its provider's alone, claimed
+/// by the operation before any step kind, since the other providers share
+/// those kinds; a debug HAP's own step kinds are its provider module's, with
+/// the owned paths minted for the Job and the Artifacts resolved for the
+/// step; every other step is named as [`action`] names it.
 pub(crate) fn action_in(
     step: &CatalogStep,
     reference: &str,
@@ -298,6 +346,9 @@ pub(crate) fn action_in(
     now_utc: &str,
     context: &StepContext<'_>,
 ) -> Result<StepAction, ActionRefusal> {
+    if reference == NATIVE {
+        return native_action(step, inputs, context);
+    }
     if reference == HAP
         && let Some(answer) = claim(
             HapAction::for_step(
@@ -314,6 +365,120 @@ pub(crate) fn action_in(
         return answer;
     }
     action(step, reference, inputs, now_utc)
+}
+
+/// Swift `nativeLibraryAction`: the deployment the request names over the
+/// library its lease resolved to, as the context read it, verified by the
+/// provider as the expected ABI's code-signed ELF whose facts are the
+/// deployment's, and still the byte count the lease records; then the
+/// step's action on it. A refusal is the provider error's detail alone.
+fn native_action(
+    step: &CatalogStep,
+    inputs: &Map<String, Value>,
+    context: &StepContext<'_>,
+) -> Result<StepAction, ActionRefusal> {
+    let refused = |error: FileActionError| match error {
+        FileActionError::Unsupported(detail) => ActionRefusal::Invalid(detail),
+        FileActionError::Request(error) => ActionRefusal::Invalid(error.to_string()),
+    };
+    let bytes = context
+        .library
+        .map_or(&[][..], |library| library.bytes.as_slice());
+    let deployment = Deployment::from_inputs(
+        inputs,
+        context.job_id,
+        context.resolved.first(),
+        bytes,
+        context.helper,
+    )
+    .map_err(refused)?;
+    if context
+        .library
+        .is_some_and(|library| library.byte_count != deployment.artifact_facts.byte_count)
+    {
+        return Err(ActionRefusal::Invalid(
+            "leased native Artifact bytes drifted during materialization".into(),
+        ));
+    }
+    match NativeAction::for_step(&step.step_id, &deployment).map_err(refused)? {
+        Some(action) => Ok(StepAction::Native(Box::new(action))),
+        // A host step (`verify-elf-locally`, `hash-library`) is the engine's.
+        None => Err(ActionRefusal::Unported),
+    }
+}
+
+/// Swift `journalStep(for:)` arguments of a native deployment's actions, by
+/// the step kind journaling them: what a send stages and from which
+/// Artifact, the expectation of the staging readback, the paths, digest and
+/// build ID a backup, a publish and a rollback change under the Runtime's
+/// admission, the bundle and ability a restart names, the loader probe, and
+/// the staging a cleanup removes on behalf of the Job. Never a host path or
+/// the helper.
+fn native_arguments(
+    step: &CatalogStep,
+    action: &NativeAction,
+    context: &StepContext<'_>,
+) -> Option<Value> {
+    let deployment = action.deployment();
+    let facts = &deployment.artifact_facts;
+    let mutation = |action_id: &str| {
+        json!({"catalogId": REMOTE_OPERATIONS, "actionId": action_id,
+            "parameters": {"targetPath": deployment.target_path,
+                "stagingPath": deployment.staging_path, "backupPath": deployment.backup_path,
+                "rollbackStagingPath": deployment.rollback_staging_path,
+                "expectedSha256": facts.sha256, "buildId": facts.build_id},
+            "artifactId": "native-library-mutation",
+            "confirmationId": "runtime-capability-admission"})
+    };
+    Some(match (step.kind.as_str(), action) {
+        ("cleanupOwnedRemotePath", NativeAction::Cleanup(_)) => {
+            json!({"remotePath": deployment.staging_path,
+                "ownershipEvidenceId": format!("owned-{}", context.job_id)})
+        }
+        ("sendFile", NativeAction::SendToStaging(_)) => {
+            let resolved = context.resolved.first()?;
+            json!({"sourceArtifactId": resolved.artifact_id,
+                "remotePath": deployment.staging_path, "sourceSha256": resolved.sha256})
+        }
+        (
+            "startApplication" | "stopApplication",
+            NativeAction::StartTarget(_) | NativeAction::StopTarget(_),
+        ) => json!({"bundleName": deployment.bundle.bundle_name(), "abilityName": NATIVE_ABILITY}),
+        ("runApprovedRemoteRead", NativeAction::Inspect(_, expectation)) => {
+            json!({"catalogId": REMOTE_OPERATIONS, "actionId": "nativeLibraryInspection",
+                "parameters": {"expectation": expectation.raw(),
+                    "targetPath": deployment.target_path, "expectedSha256": facts.sha256,
+                    "buildId": facts.build_id},
+                "artifactId": "native-library-readback"})
+        }
+        ("runApprovedRemoteMutation", NativeAction::Backup(_)) => mutation("nativeLibraryBackup"),
+        ("runApprovedRemoteMutation", NativeAction::Publish(_)) => {
+            mutation("nativeLibraryAtomicPublish")
+        }
+        ("runApprovedRemoteMutation", NativeAction::Rollback(_)) => {
+            mutation("nativeLibraryRollback")
+        }
+        ("verifyRemoteState", NativeAction::Inspect(_, Inspection::TargetLoaded)) => {
+            json!({"probeId": "native-library-loader",
+                "expectedState": format!("loaded:{}", facts.sha256)})
+        }
+        _ => return None,
+    })
+}
+
+/// The rollback Swift's engine synthesizes for a native deployment: the step
+/// that restores the backed-up library after a failure past the publish,
+/// which its plan holds after every selected step.
+pub(crate) fn native_rollback() -> CatalogStep {
+    CatalogStep {
+        step_id: "rollback-native-library".into(),
+        kind: "runApprovedRemoteMutation".into(),
+        effect: "deviceMutation".into(),
+        cancellation: "atSafeBoundary".into(),
+        binding: "confirmedDevice".into(),
+        optional: false,
+        action: None,
+    }
 }
 
 /// Swift `journalStep(for:)` arguments of a debug HAP's own actions: what a
@@ -380,6 +545,7 @@ pub(crate) fn journal_arguments_in(
         StepAction::Hap(hap) => {
             hap_journal_arguments(hap, step, inputs, context.job_id, context.resolved)
         }
+        StepAction::Native(native) => native_arguments(step, native, context),
         _ => journal_arguments_for(step, reference, inputs, action),
     }
 }

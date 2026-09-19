@@ -252,6 +252,7 @@ fn execute_cycle(root: &Path, run_id: &str, cycle: u64, count: u64) -> Result<(u
         dispatch: &fake,
         tool_sha256: DIGEST,
         now: runtime_now,
+        code_sign_helper: None,
     };
     let claims = StorageClaims::default();
     let probe = SystemStorageProbe;
