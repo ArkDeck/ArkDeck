@@ -1,0 +1,9 @@
+{
+  "producerCommit": "6c17117f58c672506c94d1484803667ded192299",
+  "productionSwiftCommit": "510b46508d8719318114a17c2567b701297efb65",
+  "testPatchSHA256": "f0b40a84bc9f24d984cfe4ff0dc6c200174f6adace6502ac7e134785879e7c88",
+  "framesSHA256": "fe318f47fd7b0f4e1e4c96f8b1e3f8b3c6c4aee0c8273f59993f9f348b37037c",
+  "command": "ARKDECK_CONTROL_FRAME_LOG=/private/tmp/arkdeck-workspace-project-frames-fixed-20260919 sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --jobs 2 --filter AgentDaemonContractTests/testWorkspaceProjectControlFramesPreserveRegistrationAndStorageFailures",
+  "testResult": "1 test, 0 failures",
+  "scope": "test-owned host filesystem only; production handler and owner; no device dispatch; no synthetic factsDrifted frame"
+}

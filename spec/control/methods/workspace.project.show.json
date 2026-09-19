@@ -4,9 +4,11 @@
       "enum": [
         "conflict",
         "internalError",
+        "invalidInput",
         "invalidParams",
         "malformedFrame",
         "notFound",
+        "operationUnavailable",
         "recordUnreadable",
         "rejected",
         "unknownMethod",
@@ -114,10 +116,16 @@
           "type": "string"
         },
         "reason": {
-          "type": "null"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "reasonCode": {
-          "type": "null"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "registeredAtUtc": {
           "type": "string"
@@ -155,8 +163,8 @@
   "x-arkdeck-method": "workspace.project.show",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 4,
-    "request": 6,
+    "error": 5,
+    "request": 7,
     "result": 2
   }
 }

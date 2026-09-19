@@ -107,6 +107,9 @@ fn every_unimplemented_method_is_refused_without_entering_the_host() {
     let (control, reads) = setup();
     for method in METHODS {
         if [
+            "workspace.project.register",
+            "workspace.project.list",
+            "workspace.project.show",
             "artifact.export",
             "artifact.import.list",
             "artifact.import.begin",
@@ -153,6 +156,63 @@ fn every_unimplemented_method_is_refused_without_entering_the_host() {
             "rejected"
         };
         assert_eq!(response.outcome.unwrap_err().code, expected, "{method}");
+    }
+    assert_eq!(reads.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn workspace_project_parameters_are_checked_before_owner_availability() {
+    let (control, reads) = setup();
+    for (method, params) in [
+        ("workspace.project.register", json!({})),
+        (
+            "workspace.project.register",
+            json!({"registrationRequestId":"r", "kind":"openharmony", "root":3}),
+        ),
+        (
+            "workspace.project.register",
+            json!({"registrationRequestId":"r", "kind":"openharmony", "root":"/tmp/project", "extra":true}),
+        ),
+        ("workspace.project.show", json!({})),
+        ("workspace.project.show", json!({"projectRef":""})),
+        (
+            "workspace.project.show",
+            json!({"projectRef":"project-fixture", "extra":true}),
+        ),
+        ("workspace.project.list", json!({"root":"/tmp/project"})),
+    ] {
+        assert_eq!(
+            call(&control, method, params).outcome.unwrap_err().code,
+            "invalidParams",
+            "{method}"
+        );
+    }
+    for (method, params) in [
+        (
+            "workspace.project.register",
+            json!({"registrationRequestId":"r", "kind":"openharmony", "root":"/tmp/project"}),
+        ),
+        (
+            "workspace.project.show",
+            json!({"projectRef":"project-fixture"}),
+        ),
+        ("workspace.project.list", json!({})),
+    ] {
+        let error = call(&control, method, params).outcome.unwrap_err();
+        let expected = if validate_method_value(method, "errorCode", &json!("operationUnavailable"))
+            .is_ok()
+            && validate_method_value(
+                method,
+                "errorDetails",
+                &json!({"phase":"workspaceProjectOwner","newDispatchCount":0}),
+            )
+            .is_ok()
+        {
+            "operationUnavailable"
+        } else {
+            "internalError"
+        };
+        assert_eq!(error.code, expected, "{method}");
     }
     assert_eq!(reads.load(Ordering::SeqCst), 0);
 }

@@ -87,6 +87,8 @@ pub struct Host {
     #[cfg(target_os = "macos")]
     history: Option<arkdeck_hoststore::HistoryStore>,
     #[cfg(target_os = "macos")]
+    workspace_projects: Option<arkdeck_hoststore::WorkspaceProjectStore>,
+    #[cfg(target_os = "macos")]
     trace_cache: Option<arkdeck_hoststore::TraceCacheStore>,
     #[cfg(target_os = "macos")]
     storage: Option<
@@ -396,6 +398,14 @@ impl Host {
         self
     }
     #[cfg(target_os = "macos")]
+    pub fn with_workspace_projects(
+        mut self,
+        store: arkdeck_hoststore::WorkspaceProjectStore,
+    ) -> Self {
+        self.workspace_projects = Some(store);
+        self
+    }
+    #[cfg(target_os = "macos")]
     pub fn with_history(mut self, history: arkdeck_hoststore::HistoryStore) -> Self {
         self.history = Some(history);
         self
@@ -433,6 +443,8 @@ impl Host {
             provider,
             #[cfg(target_os = "macos")]
             history: None,
+            #[cfg(target_os = "macos")]
+            workspace_projects: None,
             #[cfg(target_os = "macos")]
             trace_cache: None,
             #[cfg(target_os = "macos")]
@@ -1495,6 +1507,30 @@ impl HostServices for Host {
         Ok(
             serde_json::json!({"schemaVersion":"arkdeck.runtime-storage/1", "sessionDomain":session, "artifactDomain":artifact}),
         )
+    }
+    #[cfg(target_os = "macos")]
+    fn workspace_project(
+        &self,
+        method: &str,
+        params: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<serde_json::Value, WireError> {
+        #[cfg(target_os = "macos")]
+        if let Some(owner) = &self.workspace_projects {
+            return owner.handle(
+                method,
+                params,
+                &arkdeck_hoststore::runtime_now().unwrap_or_default(),
+            );
+        }
+        let _ = (method, params);
+        Err(WireError {
+            code: "operationUnavailable".into(),
+            message: "workspace project owner is unavailable".into(),
+            details: Some(serde_json::Map::from_iter([
+                ("phase".into(), serde_json::json!("workspaceProjectOwner")),
+                ("newDispatchCount".into(), serde_json::json!(0)),
+            ])),
+        })
     }
     #[cfg(target_os = "macos")]
     fn history_filter(

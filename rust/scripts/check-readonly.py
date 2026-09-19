@@ -338,6 +338,14 @@ def main() -> None:
                         expected = None
                     if method in {"target.list", "target.show", "target.display-name.set", "target.display-name.clear", "device.display-name.set", "device.display-name.clear"}:
                         expected = "internalError"
+                    if method in {"workspace.project.register", "workspace.project.show"}:
+                        expected = "invalidParams"
+                    if method == "workspace.project.list":
+                        schema = read_json(ROOT / "spec/control/methods" / f"{method}.json")
+                        definitions = schema["$defs"]
+                        error_schema = jsonschema.Draft202012Validator({"$defs": definitions, "$ref": "#/$defs/errorCode"})
+                        detail_schema = jsonschema.Draft202012Validator({"$defs": definitions, "$ref": "#/$defs/errorDetails"})
+                        expected = "operationUnavailable" if error_schema.is_valid("operationUnavailable") and detail_schema.is_valid({"phase": "workspaceProjectOwner", "newDispatchCount": 0}) else "internalError"
                     if method in IMPORT_OWNER_METHODS:
                         expected = missing_import_owner_error(method)
                     exchange(endpoint, directory, rows, method, encode(request(registry, method, method)), method, expected)

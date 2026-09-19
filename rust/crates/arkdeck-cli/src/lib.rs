@@ -25,6 +25,8 @@ pub use job_plan::{
 mod session_resources;
 pub use bootstrap_resources::{validate_bootstrap_request, validate_bootstrap_response};
 pub use session_resources::validate_session_response;
+mod workspace_projects;
+pub use workspace_projects::validate_workspace_project_response;
 mod target_resources;
 pub use target_resources::validate_target_response;
 mod trace_cache;
@@ -106,6 +108,12 @@ impl CliError {
         }
     }
     pub fn from_client(error: ClientError, method: &str) -> Self {
+        if method == "workspace.project.register" && !matches!(error, ClientError::Remote(_)) {
+            return CliError::new(
+                "outcomeUnknown",
+                "workspace registration response is unconfirmed; no request was replayed",
+            );
+        }
         if matches!(
             method,
             "job.submit"
@@ -283,8 +291,21 @@ impl CliError {
                             && d.get("newDispatchCount") == Some(&json!(0))
                             && d.get("purgeScope") == Some(&json!("inactiveDerivedDatabases"))
                     });
-                let host_proof =
-                    host_proof || bootstrap_proof || artifact_proof || import_proof || trace_proof;
+                let workspace_proof = matches!(
+                    method,
+                    "workspace.project.register"
+                        | "workspace.project.list"
+                        | "workspace.project.show"
+                ) && error.details.as_ref().is_some_and(|d| {
+                    d.get("phase") == Some(&json!("workspaceProjectOwner"))
+                        && d.get("newDispatchCount") == Some(&json!(0))
+                });
+                let host_proof = host_proof
+                    || bootstrap_proof
+                    || artifact_proof
+                    || import_proof
+                    || trace_proof
+                    || workspace_proof;
                 let code = match error.code.as_str() {
                     "artifactIntegrityFailed" if artifact_proof || import_proof => {
                         "artifactIntegrityFailed"
@@ -303,7 +324,10 @@ impl CliError {
                     {
                         "fileIdentityChanged"
                     }
-                    "idempotencyConflict" if import_proof => "idempotencyConflict",
+                    "idempotencyConflict" if import_proof || workspace_proof => {
+                        "idempotencyConflict"
+                    }
+                    "factsDrifted" if workspace_proof => "factsDrifted",
                     "invalidInput" if host_proof => "invalidInput",
                     "resourceConflict" if host_proof => "resourceConflict",
                     "resourceNotFound" if host_proof => "resourceNotFound",
@@ -437,6 +461,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                 | "--target"
                 | "--time"
                 | "--activity"
+                | "--registration-request-id"
+                | "--project"
                 | "--kind"
                 | "--file"
                 | "--tool"
@@ -510,6 +536,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                         "--owner-kind" => "ownerKind",
                         "--maximum-wait" => "maximumWait",
                         "--reviewed-plan-digest" => "reviewedPlanDigest",
+                        "--registration-request-id" => "registrationRequestId",
+                        "--project" => "projectRef",
                         other => &other[2..],
                     };
                     method_options.insert(key.to_owned(), json!(value));
@@ -565,6 +593,9 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         index += 1;
     }
     let command = match positional.as_slice() {
+        ["workspace", "project", "register"] => "workspace.project.register",
+        ["workspace", "project", "list"] => "workspace.project.list",
+        ["workspace", "project", "show"] => "workspace.project.show",
         ["artifact", "import", "hap"] => "artifact.import.hap",
         ["artifact", "import", "workspace-patch"] => "artifact.import.workspace-patch",
         ["artifact", "import", "native-library"] => "artifact.import.native-library",
@@ -754,6 +785,9 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             "timeout",
         ],
         "agent.abandon" => &["executionId", "expectedGeneration", "timeout"],
+        "workspace.project.register" => &["registrationRequestId", "kind", "rootPath", "timeout"],
+        "workspace.project.list" => &["timeout"],
+        "workspace.project.show" => &["projectRef", "timeout"],
         "artifact.list" => &[
             "jobId",
             "import",
@@ -1018,6 +1052,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
     bootstrap_resources::configure(command, &mut method_options, help)?;
     let import_timeout = import_resources::configure(command, &mut method_options, help)?;
     let artifact_timeout = artifact_resources::configure(command, &mut method_options, help)?;
+    let workspace_timeout = workspace_projects::configure(command, &mut method_options, help)?;
     let target_timeout = target_resources::configure(command, &mut method_options, help)?;
     let plan_timeout = job_plan::configure(command, &mut method_options, help)?;
     let human_action_timeout =
@@ -1027,6 +1062,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         .or(import_timeout)
         .or(artifact_timeout)
         .or(target_timeout)
+        .or(workspace_timeout)
         .or(plan_timeout)
         .or(agent_timeout)
         .or(human_action_timeout);
@@ -1051,7 +1087,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         },
         params: if command == "doctor" {
             Some(serde_json::from_value(json!({"deep":deep})).unwrap())
-        } else if command.starts_with("history.filter.")
+        } else if command.starts_with("workspace.project.")
+            || command.starts_with("history.filter.")
             || command.starts_with("runtime.storage.")
             || matches!(
                 command,
