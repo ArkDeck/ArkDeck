@@ -1,22 +1,16 @@
 //! What the replays of the Swift native-library oracle share
 //! (`rust/tests/fixtures/deploy-native-library`, recorded by
 //! `NativeLibraryOracleContractTests` over the shared fake HDC at its fixed
-//! root): the root rebuilt as the oracle found it before its first request,
-//! with the library it published; the code-sign helper composed as the oracle
-//! composed it; and the owners a daemon composes over that root, the Job
-//! owner's root being the account-fixed one its mutation authority names.
-use super::debug_hap;
-use super::{document, fixed_now};
+//! root): the code-sign helper composed as the oracle composed it, an Import
+//! of the oracle's library, and the control plane's answers. The owners a
+//! daemon composes over that root, with the helper, are `hdc_oracle`'s.
+use super::document;
 use arkdeck_contract::{ImportIntent, WireError, encode_import_chunk, sha256_hex};
-use arkdeck_hoststore::{
-    AdmissionRefusal, ArtifactReadStore, CapabilityStore, DeviceHolds, HdcComposition,
-    ImportBinding, ImportUploadStore, JobAdmitter, JobPlanner, JobStore, MutationAuthority,
-    TargetStore,
-};
-use arkdeck_provider_hdc::{CodeSignHelper, CodeSignHelperFacts, HdcDispatch, NativeAbi};
+use arkdeck_hoststore::{AdmissionRefusal, ArtifactReadStore, ImportBinding, ImportUploadStore};
+use arkdeck_provider_hdc::{CodeSignHelper, CodeSignHelperFacts, NativeAbi};
 use serde_json::{Value, json};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 pub const FIXTURE: &str = "deploy-native-library";
 
@@ -131,98 +125,5 @@ pub fn answer(outcome: Result<Value, AdmissionRefusal>) -> Value {
             "message": refusal.message,
             "details": if refusal.proven { proof() } else { json!({}) },
         }}),
-    }
-}
-
-pub fn exchange<'a>(cases: &'a Value, name: &str) -> &'a Value {
-    cases["exchanges"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|exchange| exchange["name"] == name)
-        .unwrap()
-}
-
-/// The owners one replay plans and admits with, over the rebuilt root. The
-/// capability store is opened inside the Job root once the Job owner holds
-/// it, as the daemon opens it (a new Job repository takes only an empty
-/// directory).
-pub struct Owners {
-    pub root: PathBuf,
-    pub store: PathBuf,
-    pub digest: String,
-    pub targets: TargetStore,
-    pub artifacts: ArtifactReadStore,
-    pub jobs: JobStore,
-    pub capabilities: CapabilityStore,
-    pub holds: DeviceHolds,
-    pub helper: CodeSignHelper,
-}
-
-impl Owners {
-    /// The owners over the root rebuilt from `fixture`; the caller holds
-    /// [`debug_hap::exclusive`].
-    pub fn open(fixture: &Path) -> Self {
-        let cases = document(fixture, "cases.json");
-        let provenance = document(fixture, "provenance.json");
-        let root = debug_hap::rebuild(fixture);
-        let digest = sha256_hex(&fs::read(root.join("hdc")).unwrap());
-        assert_eq!(provenance["hdcSHA256"], digest.as_str());
-        let store = root.join("store");
-        let jobs = JobStore::open_owner(&store).unwrap();
-        let capabilities = CapabilityStore::open(&store.join("capabilities")).unwrap();
-        Self {
-            targets: TargetStore::open(&root.join("targets-state")).unwrap(),
-            artifacts: ArtifactReadStore::open(&root.join("artifacts")).unwrap(),
-            jobs,
-            capabilities,
-            holds: DeviceHolds::default(),
-            helper: code_sign_helper(&cases, &root),
-            digest,
-            store,
-            root,
-        }
-    }
-
-    /// The HDC composition over `dispatch`, with the oracle's helper.
-    pub fn hdc<'a>(&'a self, dispatch: &'a (dyn HdcDispatch + Sync)) -> HdcComposition<'a> {
-        HdcComposition {
-            targets: &self.targets,
-            dispatch,
-            receive_root: None,
-            tool_sha256: &self.digest,
-            now: fixed_now,
-            code_sign_helper: Some(&self.helper),
-        }
-    }
-
-    pub fn planner<'a>(&'a self, hdc: &'a HdcComposition<'a>) -> JobPlanner<'a> {
-        JobPlanner {
-            imports: None,
-            artifacts: Some(&self.artifacts),
-            analyzer: None,
-            state_root: &self.root,
-            hdc: Some(hdc),
-        }
-    }
-
-    /// The Runtime-owned authority over this root's own Job state, which the
-    /// mutation state check requires.
-    pub fn authority(&self) -> MutationAuthority<'_> {
-        MutationAuthority {
-            default_root: &self.store,
-            sessions: None,
-            capabilities: &self.capabilities,
-            holds: &self.holds,
-        }
-    }
-
-    pub fn admitter<'a>(&'a self, hdc: &'a HdcComposition<'a>) -> JobAdmitter<'a> {
-        JobAdmitter {
-            planner: self.planner(hdc),
-            jobs: &self.jobs,
-            now: fixed_now,
-            authority: Some(self.authority()),
-        }
     }
 }

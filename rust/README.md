@@ -590,8 +590,8 @@ still the byte count the lease records. Every provider step is lowered to its
 process sequence with Swift's journal arguments, and the plan also holds the
 rollback a failure past the publish applies. The library's facts name its
 capability. `tests/native_library_plan.rs` and `tests/native_library_submit.rs`
-replay the native-library oracle's plans and submissions; its Jobs wait in
-`preflight`, and `job.run` and `agent.run` refuse them until their runs land.
+replay the native-library oracle's plans and submissions; `job.run` runs the
+admitted Job (below), and `agent.run` admits the deployment it starts at once.
 
 ## Job run (TASK-XPA-014)
 
@@ -658,6 +658,34 @@ debug-hap oracle up to its debt continuations: every answer, the fake's first
 103 calls, and every file byte for byte (the two continued Jobs and the ledger
 as they stood before them). `cleanupDebt.list`/`continue` and continuing a
 parked or `finalizing` HAP wait for recovery (L.1 item 13).
+
+`deploy.native-library.app-owned@1` runs as Swift runs it (`device_native.rs`).
+`verify-elf-locally` and `hash-library` verify the leased library on the host
+(`verifyHostInputArtifact`): resolved again, the expected ABI's code-signed ELF,
+still the digest and size its lease records. Each device step resolves the lease
+again and reads the library before its Target facts, and runs only against facts
+that still name the identity and binding the plan was materialized for
+(`validateMaterializedTargetFacts`). The send succeeds as a dispatch that only
+the staging readback after it may believe (the readback pairs are Swift's whole
+table), and the publish and the loader readback publish `publish-report.json`
+and `verification-report.json`. The Job consumes its one use before the send;
+every later mutation continues under it. A required step's confirmed failure is
+compensated inside the step loop (`compensateNativeLibrary`): with the Target's
+facts proven again, `rollback-native-library` restores the backup once the
+publish was attempted, then `cleanup-native-library-compensation` removes what
+the deployment staged. Both are ordinary steps of the Job that consume nothing;
+a failed rollback is the Job's failure, a failed cleanup is owed, and otherwise
+the Job fails with its original failure. An optional cleanup that fails is
+skipped and owed with the exact action that failed (`recordCleanupDebt`: a
+plain append, not deduplicated), the Job's residue is counted again, and the
+Job succeeds. `job.result` and `job.evidence` read these Jobs.
+`tests/native_library_run.rs` replays the native-library oracle up to its debt
+continuation through `tests/support/hdc_oracle.rs`, which the debug HAP replay
+shares: every answer, the fake's first 210 calls, the four Jobs the continuation
+leaves alone byte for byte and the continued one and the ledger as they stood
+before it; three faulted runs cover a failed rollback, a failed compensation
+cleanup and one whose outcome is lost. The daemon composes no code-sign helper,
+so the isolated daemon lists the operation as unavailable and plans none.
 
 `rust/tests/fixtures/job-run-analyzer/` is the oracle Swift
 `JobRunAnalyzerOracleContractTests` records with the real descriptor-bound

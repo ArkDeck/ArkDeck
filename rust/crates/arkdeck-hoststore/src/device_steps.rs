@@ -6,9 +6,11 @@
 //! compensation each source step declares on its intent, the residue a
 //! failed cleanup leaves, and the mutations only a readback may believe. For
 //! `deploy.native-library.app-owned@1` the provider's own action of each
-//! step, claimed by the operation, and the rollback its plan holds. For
-//! `capture.screen-sequence@1` its file legs, the product a receive lands and
-//! the document its finalization writes.
+//! step, claimed by the operation, the library each step is given, the
+//! rollback its plan holds and the cleanup its failure runs, the residue a
+//! failed cleanup leaves, the send only its staging readback may believe, and
+//! its two reports. For `capture.screen-sequence@1` its file legs, the product
+//! a receive lands and the document its finalization writes.
 use crate::cleanup_debt::Residue;
 use crate::operation_catalog::{CatalogOperation, CatalogStep};
 use crate::session_json;
@@ -34,7 +36,7 @@ const NATIVE_ABILITY: &str = "EntryAbility";
 pub(crate) const SCREEN_SEQUENCE: &str = "capture.screen-sequence@1";
 
 /// The device-bound operations this Runtime plans and runs.
-pub(crate) const DEVICE_OPERATIONS: [&str; 9] = [
+pub(crate) const DEVICE_OPERATIONS: [&str; 10] = [
     "observe.device@1",
     "capture.diagnostics@1",
     "input.tap@1",
@@ -44,6 +46,7 @@ pub(crate) const DEVICE_OPERATIONS: [&str; 9] = [
     "port-forward.remove@1",
     HAP,
     SCREEN_SEQUENCE,
+    NATIVE,
 ];
 
 /// Swift `evidenceEligibleOperations`: the operations whose device steps wait
@@ -552,6 +555,21 @@ pub(crate) fn native_rollback() -> CatalogStep {
     }
 }
 
+/// The cleanup Swift's engine synthesizes after a native deployment's
+/// failure, whether or not the publish was attempted: what the deployment
+/// staged, removed as a best effort.
+pub(crate) fn native_compensation_cleanup() -> CatalogStep {
+    CatalogStep {
+        step_id: "cleanup-native-library-compensation".into(),
+        kind: "cleanupOwnedRemotePath".into(),
+        effect: "deviceMutation".into(),
+        cancellation: "atSafeBoundary".into(),
+        binding: "confirmedDevice".into(),
+        optional: true,
+        action: None,
+    }
+}
+
 /// Swift `journalStep(for:)` arguments of a debug HAP's own actions: what a
 /// send stages and from which Artifact, which package an install names, the
 /// bundle a readback, a start, a stop and an uninstall name, and the staging a
@@ -728,10 +746,17 @@ pub(crate) fn compensation_declarations(
     )?])
 }
 
-/// Swift `cleanupResidue(for:)`: what a debug HAP's cleanup was to remove, a
-/// staged path or an installed bundle. No other action owes a residue.
+/// Swift `cleanupResidue(for:)`: what a cleanup was to remove, a debug HAP's
+/// staged path or installed bundle, or a native deployment's staging. No
+/// other action owes a residue here.
 pub(crate) fn cleanup_residue(action: &StepAction) -> Option<Residue> {
     match action {
+        StepAction::Native(native) => match native.as_ref() {
+            NativeAction::Cleanup(deployment) => {
+                Some(Residue::RemotePath(deployment.staging_path.clone()))
+            }
+            _ => None,
+        },
         StepAction::Hap(HapAction::CleanupOwnedRemotePath { path }) => {
             Some(Residue::RemotePath(path.remote_path.clone()))
         }
@@ -747,9 +772,10 @@ pub(crate) fn cleanup_residue(action: &StepAction) -> Option<Residue> {
 
 /// Swift `RuntimeJobEngine.readbackPairs`: the mutations whose truth is
 /// delegated to the readback step after them.
-const READBACK_PAIRS: [(&str, &str, &str); 4] = [
+const READBACK_PAIRS: [(&str, &str, &str); 5] = [
     (HAP, "install-hap", "package-readback"),
     (HAP, "start-ability", "process-readback"),
+    (NATIVE, "send-to-staging", "verify-remote-staging"),
     (
         "port-forward.create@1",
         "create-port-rule",
@@ -783,7 +809,7 @@ pub(crate) fn awaits_readback(descriptor: &CatalogOperation, step_id: &str) -> b
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum StepInputs {
     None,
-    /// The entry package alone.
+    /// The entry package alone, or a native deployment's library.
     Entry,
     /// The entry package, then every additional package.
     All,
@@ -791,14 +817,12 @@ pub(crate) enum StepInputs {
 
 /// Swift's input Artifacts per step of the operations run here: a debug
 /// HAP's send is given every package it stages, its install and its approved
-/// remote reads the entry package. No other operation run here takes one.
+/// remote reads the entry package; every provider step of a native
+/// deployment is given its library. No other operation run here takes one.
 pub(crate) fn step_inputs(reference: &str, kind: &str) -> StepInputs {
-    if reference != HAP {
-        return StepInputs::None;
-    }
-    match kind {
-        "sendFile" => StepInputs::All,
-        "installPackage" | "runApprovedRemoteRead" => StepInputs::Entry,
+    match (reference, kind) {
+        (HAP, "sendFile") => StepInputs::All,
+        (HAP, "installPackage" | "runApprovedRemoteRead") | (NATIVE, _) => StepInputs::Entry,
         _ => StepInputs::None,
     }
 }
@@ -946,6 +970,8 @@ pub(crate) fn products(operation: &str, step_id: &str) -> &'static [&'static str
         (HAP, "process-readback") => &["process-readback.json"],
         (HAP, "capture-diagnostics") => &["debug-hilog.txt"],
         (SCREEN_SEQUENCE, "receive-screen-sequence") => &["frames.tar"],
+        (NATIVE, "atomic-publish") => &["publish-report.json"],
+        (NATIVE, "verify-loaded-library") => &["verification-report.json"],
         _ => &[],
     }
 }

@@ -237,6 +237,21 @@ fn live_discovery_and_describe_follow_actual_executors_and_executable_drift_with
             json!(["host_configuration"])
         );
     }
+    // A native library deployment also needs the verified code-sign helper,
+    // which this composition does not carry.
+    let native = entry(&rows, "deploy.native-library.app-owned@1");
+    assert_eq!(native["availability"], "unavailable");
+    assert_eq!(
+        native["reasonCodes"],
+        json!(["provider_tool_unavailable", "provider_tool_unavailable"])
+    );
+    assert_eq!(
+        native["reasons"],
+        json!([
+            "runtime.mutationOwnerUnavailable",
+            "bundled arm64 OpenHarmony code-sign helper cannot be verified"
+        ])
+    );
     let original = fs::read(fixture.0.join("analyzer")).unwrap();
     let mut changed = original.clone();
     changed.extend_from_slice(b"# analyzer identity drift\n");

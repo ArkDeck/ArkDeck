@@ -24,6 +24,7 @@ mod debug_hap_plan;
 mod native_library_plan;
 #[path = "screen_sequence_plan.rs"]
 mod screen_sequence_plan;
+pub(crate) use native_library_plan::read_library;
 
 const MAXIMUM_REQUEST_JSON_BYTES: usize = 4 * 1024 * 1024;
 const MAXIMUM_ANALYZER_BYTES: u64 = 128 * 1024 * 1024;

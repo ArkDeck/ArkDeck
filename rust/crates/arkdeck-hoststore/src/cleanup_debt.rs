@@ -1,13 +1,15 @@
-//! Swift `RuntimeArtifactStore`'s cleanup debt ledger as a debug HAP's run
-//! writes it: `cleanup-debt.json` in the Artifact root, an array of records
-//! in the order they were owed. Each names the Job, the step whose cleanup
-//! failed, the residue it left behind (a remote path, or an installed bundle),
-//! why and when, and the exact typed action that failed. Swift decodes the
-//! whole ledger into `[CleanupDebtRecord]` and writes it back with its sorted
-//! pretty Foundation encoder (escaped solidus, no trailing newline) through a
-//! fresh file renamed into place. A record is owed once per Job and step: one
-//! already there, settled or not, is never written again. Settling and
-//! retrying a debt (`cleanupDebt.continue`) are not served here.
+//! Swift `RuntimeArtifactStore`'s cleanup debt ledger as a device run writes
+//! it: `cleanup-debt.json` in the Artifact root, an array of records in the
+//! order they were owed. Each names the Job, the step whose cleanup failed,
+//! the residue it left behind (a remote path, or an installed bundle), why
+//! and when, and the exact typed action that failed. Swift decodes the whole
+//! ledger into `[CleanupDebtRecord]` and writes it back with its sorted pretty
+//! Foundation encoder (escaped solidus, no trailing newline) through a fresh
+//! file renamed into place. A debug HAP's compensation bookkeeping owes a
+//! record once per Job and step: one already there, settled or not, is never
+//! written again. Every other failed cleanup (a native deployment's) appends
+//! its record each time it fails. Settling and retrying a debt
+//! (`cleanupDebt.continue`) are not served here.
 use crate::artifact_read_owner::ArtifactReadStore;
 use crate::session_json;
 use serde_json::{Map, Value, json};
@@ -131,18 +133,29 @@ pub(crate) fn record_compensation_debt(
     action: &Value,
     now_utc: &str,
 ) -> Result<(), String> {
-    let mut records = load(artifacts)?;
-    if let Some(existing) = records
-        .iter()
-        .find(|record| owed_by(record, job_id, step_id))
-    {
-        if identity(existing) != residue.identity() || existing["persistedAction"] != *action {
+    if let Some(existing) = record(artifacts, job_id, step_id)? {
+        if identity(&existing) != residue.identity() || existing["persistedAction"] != *action {
             return Err(
                 "compensation debt differs from its original residue or exact typed action".into(),
             );
         }
         return Ok(());
     }
+    append(artifacts, job_id, step_id, residue, reason, action, now_utc)
+}
+
+/// Swift `recordCleanupDebt`: the debt appended as it is owed, whatever the
+/// ledger already holds.
+pub(crate) fn append(
+    artifacts: &ArtifactReadStore,
+    job_id: &str,
+    step_id: &str,
+    residue: &Residue,
+    reason: &str,
+    action: &Value,
+    now_utc: &str,
+) -> Result<(), String> {
+    let mut records = load(artifacts)?;
     let mut record = json!({
         "jobID": job_id, "stepID": step_id, "reason": reason, "recordedAtUTC": now_utc,
         "persistedAction": action,

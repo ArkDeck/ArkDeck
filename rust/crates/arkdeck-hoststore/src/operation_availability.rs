@@ -10,11 +10,14 @@ pub struct OperationAvailabilityContext<'a> {
     pub hdc_registered: bool,
     pub hdc_tool_current: bool,
     pub mutation_owner: bool,
+    /// Whether the HDC composition carries the verified code-sign helper a
+    /// native library deployment stages.
+    pub code_sign_helper: bool,
 }
 
 /// The executable operations that mutate a device: each consumes a Runtime
 /// capability use first, so none is available without the mutation owner.
-const MUTATIONS: [&str; 7] = [
+const MUTATIONS: [&str; 8] = [
     "input.tap@1",
     "input.long-press@1",
     "input.swipe@1",
@@ -22,6 +25,7 @@ const MUTATIONS: [&str; 7] = [
     "port-forward.remove@1",
     "debug.hap@1",
     "capture.screen-sequence@1",
+    "deploy.native-library.app-owned@1",
 ];
 
 /// Swift RuntimeJobEngine.operationAvailability's provider, dispatcher and
@@ -52,6 +56,14 @@ pub fn operation_unavailability(
         "analyzer" => reference == "analyzer.extract-crash-signature@1",
         _ => false,
     };
+    // Swift `runtimeAvailability`: a native deployment needs the helper its
+    // composition verified, whatever else holds.
+    if supported && reference == "deploy.native-library.app-owned@1" && !context.code_sign_helper {
+        reasons.push((
+            "provider_tool_unavailable",
+            "bundled arm64 OpenHarmony code-sign helper cannot be verified".into(),
+        ));
+    }
     if !supported {
         reasons.push((
             "operation_not_supported",
@@ -101,6 +113,7 @@ mod tests {
             hdc_registered: true,
             hdc_tool_current: true,
             mutation_owner: false,
+            code_sign_helper: true,
         }
     }
     #[test]
@@ -121,6 +134,7 @@ mod tests {
             "port-forward.remove@1",
             "debug.hap@1",
             "capture.screen-sequence@1",
+            "deploy.native-library.app-owned@1",
         ] {
             assert_eq!(
                 operation_unavailability(reference, "hdc", &c).unwrap()[0],
@@ -137,8 +151,26 @@ mod tests {
             );
             c.mutation_owner = false;
         }
+        // Without the verified code-sign helper a native deployment cannot
+        // run, as Swift's provider without one reports it.
+        c.mutation_owner = true;
+        c.code_sign_helper = false;
         assert_eq!(
-            operation_unavailability("deploy.native-library.app-owned@1", "hdc", &c).unwrap()[0].0,
+            operation_unavailability("deploy.native-library.app-owned@1", "hdc", &c).unwrap(),
+            [(
+                "provider_tool_unavailable",
+                "bundled arm64 OpenHarmony code-sign helper cannot be verified".to_owned()
+            )]
+        );
+        assert!(
+            operation_unavailability("input.tap@1", "hdc", &c)
+                .unwrap()
+                .is_empty()
+        );
+        c.mutation_owner = false;
+        c.code_sign_helper = true;
+        assert_eq!(
+            operation_unavailability("debug.template@1", "hdc", &c).unwrap()[0].0,
             "operation_not_supported"
         );
         assert_eq!(
