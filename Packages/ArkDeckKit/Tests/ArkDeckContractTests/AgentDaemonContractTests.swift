@@ -1194,7 +1194,9 @@ final class AgentDaemonContractTests: XCTestCase {
   func testWorkspaceProjectControlFramesPreserveRegistrationAndStorageFailures() async throws {
     let roots = stateDirectory.appending(path: "workspace-frame-roots")
     try FileManager.default.createDirectory(at: roots, withIntermediateDirectories: true)
-    let physicalRoots = roots.resolvingSymlinksInPath()
+    guard let physicalPath = realpath(roots.path, nil) else { throw POSIXError(.ENOENT) }
+    defer { free(physicalPath) }
+    let physicalRoots = URL(filePath: String(cString: physicalPath), directoryHint: .isDirectory)
     let first = physicalRoots.appending(path: "first")
     let second = physicalRoots.appending(path: "second")
     for root in [first, second] { try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true) }

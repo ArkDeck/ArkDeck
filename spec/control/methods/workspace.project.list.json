@@ -180,8 +180,8 @@
   "x-arkdeck-method": "workspace.project.list",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 2,
-    "request": 8,
-    "result": 6
+    "error": 3,
+    "request": 5,
+    "result": 2
   }
 }

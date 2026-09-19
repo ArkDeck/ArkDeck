@@ -1,6 +1,6 @@
 # macOS workspace project registration owner
 
-Status: implementation pending verification. This record does not claim Task,
+Status: implementation and targeted verification passed; unified gate pending. This record does not claim Task,
 workspace integration, installation cutover, or hardware acceptance completion.
 
 ## Scope and compatibility
@@ -38,8 +38,15 @@ The new Swift contract test invokes the existing production handler and owner
 for successful registration/show, deterministic parameter/identity/conflict/
 quota/unreadable/dependency failures, and staging/rename storage failures using
 the existing injected clock and test-owned files. No production fault hook or
-hardware fact is added. These tests have not yet run; frames and generated
-schemas are not yet updated.
+hardware fact is added. The native test passed after correcting its test-owned root canonicalization
+to use `realpath`: Foundation URL normalization retained `/var`, which the
+production owner correctly refused as symbolic ancestry in the initial run.
+The successful run recorded 15 actual handler frames. The existing generators
+merged those frames with the corpus and regenerated the three method schemas
+and baseline pins; `workspace-project-native-recording/provenance.json` records
+the source, exact command, test patch, and frame hashes. Contract identity and
+method registry remain unchanged. No manually authored frame or error enum was
+introduced.
 
 `factsDrifted` during root inspection requires an actual concurrent identity
 change. No probabilistic CI race or encoder-only frame is introduced to pretend
@@ -51,3 +58,23 @@ This is an explicit sampling/observable-error gap, never a success response.
 All tests are host filesystem/client fixtures. They provide no real-device or
 GJ acceptance evidence. Full repository validation is pending a coordinated
 build window; static formatting and diff checks alone are not acceptance.
+
+## Development validation
+
+- Integrated protected main `510b46508d8719318114a17c2567b701297efb65` into
+  checkpoint `58ea9b71`, merge `6c17117f`.
+- `CARGO_BUILD_JOBS=1 cargo check --manifest-path rust/Cargo.toml --workspace --all-targets`:
+  PASS, 34.73 seconds; `/private/tmp/arkdeck-workspace-check-20260919.log`.
+- Native Swift wrapper `test --jobs 2 --filter AgentDaemonContractTests/testWorkspaceProjectControlFramesPreserveRegistrationAndStorageFailures`:
+  PASS, one test / zero failures;
+  `/private/tmp/arkdeck-workspace-swift-sampling-fixed-20260919.log`.
+  The preceding root-canonicalization failure is retained at
+  `/private/tmp/arkdeck-workspace-swift-sampling-20260919.log`.
+- Rust targeted owner (6), actual CLI process (2), and Control (18) tests passed.
+  `/private/tmp/arkdeck-workspace-targeted-20260919.log` retains the initial
+  daemon test failure: its test adapter incorrectly supplied the LF delimiter to
+  `Control.handle_frame`, whose API accepts only the payload. The adapter now
+  matches existing daemon tests; its focused rerun passed (one test / zero
+  failures), `/private/tmp/arkdeck-workspace-host-fixed-20260919.log`.
+- Both contract generators' `--check` drift checks pass. Full repository unified
+  validation has not run for this slice.

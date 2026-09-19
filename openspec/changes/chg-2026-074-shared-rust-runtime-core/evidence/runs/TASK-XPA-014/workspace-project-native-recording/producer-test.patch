@@ -1,0 +1,85 @@
+diff --git a/Packages/ArkDeckKit/Tests/ArkDeckContractTests/AgentDaemonContractTests.swift b/Packages/ArkDeckKit/Tests/ArkDeckContractTests/AgentDaemonContractTests.swift
+index 10f92791..7b4d8700 100644
+--- a/Packages/ArkDeckKit/Tests/ArkDeckContractTests/AgentDaemonContractTests.swift
++++ b/Packages/ArkDeckKit/Tests/ArkDeckContractTests/AgentDaemonContractTests.swift
+@@ -1189,6 +1189,80 @@ final class AgentDaemonContractTests: XCTestCase {
+     XCTAssertNotNil(row["reason"], "an operator needs to know why")
+   }
+ 
++  /// Native frames for existing registration failures and not-yet-composed
++  /// project reads. All filesystem mutations are confined to test-owned roots.
++  func testWorkspaceProjectControlFramesPreserveRegistrationAndStorageFailures() async throws {
++    let roots = stateDirectory.appending(path: "workspace-frame-roots")
++    try FileManager.default.createDirectory(at: roots, withIntermediateDirectories: true)
++    guard let physicalPath = realpath(roots.path, nil) else { throw POSIXError(.ENOENT) }
++    defer { free(physicalPath) }
++    let physicalRoots = URL(filePath: String(cString: physicalPath), directoryHint: .isDirectory)
++    let first = physicalRoots.appending(path: "first")
++    let second = physicalRoots.appending(path: "second")
++    for root in [first, second] { try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true) }
++    let ownerURL = stateDirectory.appending(path: "workspace-frame-owner")
++    let store = try RuntimeWorkspaceProjectStore(rootURL: ownerURL, nowUTC: { "2026-09-19T00:00:00.000Z" })
++    let (handler, _) = try makeStack(workspaceProjectStore: store)
++    func params(_ request: String, _ root: URL, kind: String = "openharmony") -> [String: JSONValue] {
++      ["registrationRequestId": .string(request), "kind": .string(kind), "root": .string(root.path)]
++    }
++    let registered = try await request(handler, method: "workspace.project.register", params: params("workspace-frame", first))
++    XCTAssertTrue(registered.ok)
++    guard case .object(let resource)? = registered.result, case .string(let reference)? = resource["projectRef"] else { return XCTFail("missing project") }
++    let shown = try await request(handler, method: "workspace.project.show", params: ["projectRef": .string(reference)])
++    XCTAssertEqual(shown.result, registered.result)
++    for (parameters, code) in [(params("workspace-frame", second), "idempotencyConflict"), (params("workspace-other", first), "resourceConflict"), (params("workspace-invalid", first, kind: "unknown"), "invalidInput")] {
++      let answer = try await request(handler, method: "workspace.project.register", params: parameters)
++      XCTAssertEqual(answer.error?.code, code)
++    }
++    let malformed = try await request(handler, method: "workspace.project.show", params: ["projectRef": .string("bad/reference")])
++    XCTAssertEqual(malformed.error?.code, "invalidInput")
++
++    // A full owner reaches the real quota guard before any 65th write.
++    for n in 1..<64 {
++      let root = physicalRoots.appending(path: "quota-\(n)")
++      try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
++      _ = try store.register(requestID: "quota-\(n)", kind: "openharmony", rootPath: root.path)
++    }
++    let quota = try await request(handler, method: "workspace.project.register", params: params("quota-overflow", second))
++    XCTAssertEqual(quota.error?.code, "quotaExceeded")
++
++    let projects = ownerURL.appending(path: "workspace-projects/projects.json")
++    let original = try Data(contentsOf: projects)
++    var document = try XCTUnwrap(JSONSerialization.jsonObject(with: original) as? [String: Any])
++    document["pendingToolchainMutation"] = ["action": "release", "toolchainRef": "toolchain:sha256:" + String(repeating: "a", count: 64), "toolchainGeneration": 1, "presetRef": "preset-retained"]
++    let pending = try JSONSerialization.data(withJSONObject: document, options: [.sortedKeys])
++    try pending.write(to: projects)
++    for method in ["workspace.project.register", "workspace.project.list", "workspace.project.show"] {
++      let fields = method.hasSuffix("register") ? params("pending-registration", second) : method.hasSuffix("show") ? ["projectRef": JSONValue.string(reference)] : [:]
++      let answer = try await request(handler, method: method, params: fields)
++      XCTAssertEqual(answer.error?.code, "operationUnavailable")
++      XCTAssertEqual(try Data(contentsOf: projects), pending)
++    }
++    try Data("{broken".utf8).write(to: projects)
++    for method in ["workspace.project.register", "workspace.project.list", "workspace.project.show"] {
++      let fields = method.hasSuffix("register") ? params("unreadable-registration", second) : method.hasSuffix("show") ? ["projectRef": JSONValue.string(reference)] : [:]
++      let answer = try await request(handler, method: method, params: fields)
++      XCTAssertEqual(answer.error?.code, "recordUnreadable")
++    }
++
++    // Existing injected clocks run after load but before durable publication;
++    // they deterministically expose the real staging and rename failure paths.
++    for failure in ["ioFailure", "outcomeUnknown"] {
++      let faultOwner = stateDirectory.appending(path: "workspace-frame-\(failure)")
++      let privateDirectory = faultOwner.appending(path: "workspace-projects")
++      let faulty = try RuntimeWorkspaceProjectStore(rootURL: faultOwner, nowUTC: {
++        if failure == "ioFailure" { _ = chmod(privateDirectory.path, 0o500) }
++        else { try? FileManager.default.createDirectory(at: privateDirectory.appending(path: "projects.json"), withIntermediateDirectories: false) }
++        return "2026-09-19T00:00:00.000Z"
++      })
++      defer { _ = chmod(privateDirectory.path, 0o700) }
++      let (faultHandler, _) = try makeStack(workspaceProjectStore: faulty)
++      let answer = try await request(faultHandler, method: "workspace.project.register", params: params("workspace-\(failure)", second))
++      XCTAssertEqual(answer.error?.code, failure)
++    }
++  }
++
+   func testTargetCLIRegistersUpdatesAndRemovesAWorkspaceProjectWithoutPublishingItsRoot() throws {
+     var firstRoot = stateDirectory.appending(path: "private-project-a", directoryHint: .isDirectory)
+     var secondRoot = stateDirectory.appending(path: "private-project-b", directoryHint: .isDirectory)

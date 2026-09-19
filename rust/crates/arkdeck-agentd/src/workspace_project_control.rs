@@ -30,8 +30,8 @@ fn actual_host_registers_lists_and_reads_a_project_after_restart() {
             method,
             Some(serde_json::from_value(params).unwrap()),
         );
-        let bytes = control
-            .handle_frame(&encode_frame(&request, arkdeck_contract::MAX_REQUEST_BYTES).unwrap());
+        let frame = encode_frame(&request, arkdeck_contract::MAX_REQUEST_BYTES).unwrap();
+        let bytes = control.handle_frame(frame.trim_ascii_end());
         decode_response(bytes.trim_ascii_end(), "workspace-1", method)
             .unwrap()
             .outcome
