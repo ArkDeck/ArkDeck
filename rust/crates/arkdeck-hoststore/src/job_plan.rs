@@ -24,9 +24,10 @@ mod debug_hap_plan;
 const MAXIMUM_REQUEST_JSON_BYTES: usize = 4 * 1024 * 1024;
 const MAXIMUM_ANALYZER_BYTES: u64 = 128 * 1024 * 1024;
 const MAXIMUM_ANALYZER_INPUT_BYTES: u64 = 512 * 1024 * 1024;
-/// The operations whose plans this Runtime materializes. Every other catalog
-/// operation is refused before its inputs are judged.
-const MATERIALIZED: [&str; 8] = [
+/// The operations whose plans this Runtime materializes, and so plans and
+/// admits. Every other catalog operation is refused before its inputs are
+/// judged. `debug.hap@1` is admitted but not yet executed (`job_run`).
+const MATERIALIZED: [&str; 9] = [
     "analyzer.extract-crash-signature@1",
     "observe.device@1",
     "capture.diagnostics@1",
@@ -35,6 +36,7 @@ const MATERIALIZED: [&str; 8] = [
     "input.swipe@1",
     "port-forward.create@1",
     "port-forward.remove@1",
+    "debug.hap@1",
 ];
 
 /// Swift `AnalyzerProfile` for `crash-signature@1`, the analyzer a host names
@@ -189,7 +191,7 @@ impl<'a> JobPlanner<'a> {
                 "planOnly does not accept or consume a Runtime capability",
             ));
         }
-        let descriptor = Self::descriptor_for_plan(&request)?;
+        let descriptor = Self::descriptor(&request)?;
         Self::validate_inputs(&request, descriptor)?;
         let fingerprint = request.fingerprint();
         let materialized = self.materialized(&request, descriptor)?;
@@ -248,16 +250,6 @@ impl<'a> JobPlanner<'a> {
             ));
         }
         Ok(descriptor)
-    }
-
-    fn descriptor_for_plan(
-        request: &OperationRequest,
-    ) -> Result<&'static CatalogOperation, PlanRefusal> {
-        if request.reference() == "debug.hap@1" {
-            return CatalogOperation::lookup(&request.operation_id, request.operation_version)
-                .ok_or_else(internal_failure);
-        }
-        Self::descriptor(request)
     }
 
     /// Swift `validateInputs`; a catalog constraint this validator does not
@@ -368,8 +360,8 @@ impl<'a> JobPlanner<'a> {
             request.expected_binding_revision,
         )
         .map_err(|reason| unmaterialized(format!("failed({})", swift_string(reason))))?;
-        // Planning HAP does not expand the admission allowlist. Its complete
-        // Artifact authorization envelope and execution owner remain separate work.
+        // A HAP binds its leased packages, whose owner-validated facts name the
+        // capability it is admitted under; its execution owner is separate work.
         if reference == "debug.hap@1" {
             return self.materialize_hap(request, descriptor, &facts);
         }

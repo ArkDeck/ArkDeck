@@ -256,8 +256,8 @@ fn rust_refuses_plans_it_cannot_materialize_yet() {
         });
         Map::from_iter([("requestJson".into(), json!(request.to_string()))])
     };
-    // debug.hap@1 is planned now (its admission stays closed; see
-    // debug_hap_plan.rs); an operation this Runtime still does not
+    // debug.hap@1 is planned and admitted now (debug_hap_plan.rs,
+    // debug_hap_submit.rs); an operation this Runtime still does not
     // materialize is refused before its inputs are judged.
     let refusal = planner
         .handle(&device_request(

@@ -59,6 +59,14 @@ const RUNNABLE: [&str; 4] = [
     "resumeAtConfirmedSafeBoundary",
 ];
 
+/// Whether this Runtime executes an admitted Job of `operation`: the analyzer
+/// here, a device-bound operation through its HDC composition. Every other
+/// Job is refused before its run starts; an admitted `debug.hap@1` Job is
+/// among them until its runner is ported.
+pub(crate) fn executes(operation: &str) -> bool {
+    operation == OPERATION || crate::device_run::runs(operation)
+}
+
 /// A `job.run` refusal: its control-plane code, message and details.
 #[derive(Debug)]
 pub struct RunRefusal {
