@@ -1,5 +1,7 @@
 //! Single owner of the existing Import upload lifetime. Begin/append/abort and
 //! rediscovery never dispatch a device operation or mint a target binding.
+#[path = "import_publication.rs"]
+mod publication;
 use arkdeck_contract::{
     IMPORT_MAX_CHUNKS, IMPORT_MAX_RECORD_BYTES, IMPORT_MAX_RECORDS, IMPORT_STAGING_QUOTA,
     ImportIntent, ImportProjection, WireError, decode_import_chunk, import_decimal, import_digest,
@@ -175,6 +177,16 @@ impl Record {
         {
             return Err(unreadable("checkpoint"));
         }
+        if let Some(receipt) = &self.receipt {
+            let digest = sha256_hex(
+                format!("{}\0{}\0{}", self.id, self.intent.name, self.intent.sha256).as_bytes(),
+            );
+            if receipt["artifactId"] != format!("ART-{}", &digest[..32])
+                || receipt.get("validation").and_then(Value::as_object) != self.validation.as_ref()
+            {
+                return Err(unreadable("receipt identity or validation"));
+            }
+        }
         if let Some(release) = &self.release_receipt {
             validate_import_release(release, &projection).map_err(unreadable)?;
         }
@@ -199,6 +211,10 @@ pub enum ImportUploadFault {
     AfterChunkSync,
     AfterAppendCheckpoint,
     AfterAbortCheckpoint,
+    AfterCommitIntent,
+    AfterPayloadPublication,
+    AfterPublication,
+    AfterReceiptCheckpoint,
 }
 type Fault = Arc<dyn Fn(ImportUploadFault) -> io::Result<()> + Send + Sync>;
 

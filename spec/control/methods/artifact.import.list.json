@@ -4,6 +4,8 @@
       "enum": [
         "conflict",
         "internalError",
+        "invalidCursor",
+        "invalidInput",
         "invalidParams",
         "malformedFrame",
         "notFound",
@@ -16,13 +18,33 @@
     },
     "errorDetails": {
       "additionalProperties": false,
-      "properties": {},
+      "properties": {
+        "newDispatchCount": {
+          "type": "integer"
+        },
+        "phase": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "newDispatchCount",
+        "phase"
+      ],
       "type": "object"
     },
     "request": {
       "additionalProperties": false,
       "properties": {
+        "cursor": {
+          "type": "string"
+        },
+        "pageSize": {
+          "type": "integer"
+        },
         "state": {
+          "type": "string"
+        },
+        "target": {
           "type": "string"
         }
       },
@@ -164,15 +186,32 @@
                   "validation": {
                     "additionalProperties": false,
                     "properties": {
+                      "abi": {
+                        "type": "string"
+                      },
+                      "buildId": {
+                        "type": "string"
+                      },
                       "container": {
                         "type": "string"
                       },
+                      "elfClassBits": {
+                        "type": "integer"
+                      },
                       "kind": {
                         "type": "string"
+                      },
+                      "machine": {
+                        "type": "integer"
+                      },
+                      "touchedFiles": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
                       }
                     },
                     "required": [
-                      "container",
                       "kind"
                     ],
                     "type": "object"
@@ -226,7 +265,10 @@
           "type": "array"
         },
         "nextCursor": {
-          "type": "null"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "order": {
           "type": "string"
@@ -261,8 +303,8 @@
   "x-arkdeck-method": "artifact.import.list",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 0,
-    "request": 4,
-    "result": 4
+    "error": 3,
+    "request": 13,
+    "result": 10
   }
 }
