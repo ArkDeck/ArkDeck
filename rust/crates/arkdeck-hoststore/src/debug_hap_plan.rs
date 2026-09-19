@@ -15,7 +15,7 @@ impl<'a> JobPlanner<'a> {
         descriptor: &CatalogOperation,
         facts: &DeviceFacts,
     ) -> Result<Materialized<'a>, PlanRefusal> {
-        let resolved = self.resolve_hap_leases(request, descriptor, facts)?;
+        let (resolved, artifact_facts) = self.resolve_hap_leases(request, descriptor, facts)?;
         self.refuse_debug_permit(request)?;
         let now = (self.hdc.ok_or_else(internal_failure)?.now)().ok_or_else(internal_failure)?;
         let mut steps = Vec::new();
@@ -35,21 +35,8 @@ impl<'a> JobPlanner<'a> {
         }
         // Reverse source order: start, install, send. Stop is still present
         // when the successful plan intentionally leaves the ability running.
-        for id in [
-            "stop-ability",
-            "cleanup-uninstall",
-            "cleanup-remote-staging",
-        ] {
-            if id == "cleanup-uninstall"
-                && request.inputs.get("cleanupPolicy").and_then(Value::as_str) == Some("retain")
-            {
-                continue;
-            }
-            let step = descriptor
-                .steps
-                .iter()
-                .find(|step| step.step_id == id)
-                .ok_or_else(internal_failure)?;
+        for step in compensations(descriptor, &request.inputs)? {
+            let id = &step.step_id;
             steps.push(materialize_step(
                 step,
                 &format!("compensation-{id}"),
@@ -65,6 +52,7 @@ impl<'a> JobPlanner<'a> {
             "providerID": descriptor.provider, "steps": steps});
         Ok(Materialized {
             _import_use: None,
+            artifact_facts,
             digest: sha256_hex(&session_json::encode(&document).map_err(|_| internal_failure())?),
             identity: Some(facts.identity.clone()),
             binding_revision: Some(facts.binding_revision),
@@ -75,10 +63,10 @@ impl<'a> JobPlanner<'a> {
         request: &OperationRequest,
         descriptor: &CatalogOperation,
         facts: &DeviceFacts,
-    ) -> Result<Vec<ResolvedArtifact>, PlanRefusal> {
+    ) -> Result<(Vec<ResolvedArtifact>, BTreeMap<String, String>), PlanRefusal> {
         let reference = descriptor.reference();
         if reference != "debug.hap@1" {
-            return Ok(Vec::new());
+            return Err(internal_failure());
         }
         let (Some(artifacts), Some(Value::String(entry))) =
             (self.artifacts, request.inputs.get("hapArtifactLease"))
@@ -118,6 +106,9 @@ impl<'a> JobPlanner<'a> {
                 format!("HAP Artifact lease is not resolvable: {reason}"),
             )
         })?;
+        // The durable owner validates metadata and payload before this point.
+        // Preserve Swift String(byteCount), never a JSON number or caller fact.
+        let artifact_facts = primary_facts(&entry)?;
         let mut resolved = vec![resolved_artifact(entry)];
         let additional = match request.inputs.get("additionalHapArtifactLeases") {
             Some(Value::Array(leases)) => leases.as_slice(),
@@ -138,7 +129,7 @@ impl<'a> JobPlanner<'a> {
             })?;
             resolved.push(resolved_artifact(leased));
         }
-        Ok(resolved)
+        Ok((resolved, artifact_facts))
     }
 }
 
@@ -287,4 +278,160 @@ fn hap_arguments(
         }
         _ => return None,
     })
+}
+
+pub(super) fn compensations<'a>(
+    descriptor: &'a CatalogOperation,
+    inputs: &Map<String, Value>,
+) -> Result<Vec<&'a CatalogStep>, PlanRefusal> {
+    [
+        "stop-ability",
+        "cleanup-uninstall",
+        "cleanup-remote-staging",
+    ]
+    .into_iter()
+    .filter(|id| {
+        *id != "cleanup-uninstall"
+            || inputs.get("cleanupPolicy").and_then(Value::as_str) != Some("retain")
+    })
+    .map(|id| {
+        descriptor
+            .steps
+            .iter()
+            .find(|step| step.step_id == id)
+            .ok_or_else(internal_failure)
+    })
+    .collect()
+}
+
+fn primary_facts(entry: &LeasedArtifact) -> Result<BTreeMap<String, String>, PlanRefusal> {
+    Ok(BTreeMap::from([
+        ("artifactId".into(), entry.artifact_id.clone()),
+        (
+            "artifactSha256".into(),
+            entry.row["sha256"]
+                .as_str()
+                .ok_or_else(internal_failure)?
+                .to_owned(),
+        ),
+        (
+            "artifactByteCount".into(),
+            entry.row["byteCount"]
+                .as_u64()
+                .ok_or_else(internal_failure)?
+                .to_string(),
+        ),
+    ]))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::capability_store::{CapabilityQuery, Effect};
+    #[test]
+    fn owner_facts_use_swift_strings_and_reproduce_native_policy_identity() {
+        let index: Value = serde_json::from_slice(include_bytes!(
+            "../../../tests/fixtures/debug-hap/artifacts/job-input-hap/index.json"
+        ))
+        .unwrap();
+        let row = index["artifacts"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|r| r["name"] == "entry.hap")
+            .unwrap()
+            .clone();
+        let mut entry = LeasedArtifact {
+            job_id: "job-input-hap".into(),
+            artifact_id: row["artifactID"].as_str().unwrap().into(),
+            row,
+            path: PathBuf::from("/unused-owner-test"),
+        };
+        let facts = primary_facts(&entry).unwrap();
+        assert_eq!(facts.len(), 3);
+        assert_eq!(facts["artifactByteCount"], "24");
+        let encoded = session_json::encode(&serde_json::to_value(&facts).unwrap()).unwrap();
+        let expected = format!(
+            "{{\"artifactByteCount\":\"24\",\"artifactId\":\"{}\",\"artifactSha256\":\"{}\"}}",
+            entry.artifact_id,
+            entry.row["sha256"].as_str().unwrap()
+        );
+        assert_eq!(encoded, expected.as_bytes());
+        let record: Value = serde_json::from_slice(include_bytes!("../../../tests/fixtures/debug-hap/store/jobs/job-e79d1b4e261f4a13d0bfb58a97fbf163/job-record.json")).unwrap();
+        let mut query = CapabilityQuery {
+            operation_id: "debug.hap".into(),
+            operation_version: Some(1),
+            effect: Effect::DeviceMutation,
+            target_stable_identity_sha256: record["materializedStableTargetIdentitySHA256"]
+                .as_str()
+                .map(str::to_owned),
+            target_binding_revision: record["materializedBindingRevision"].as_i64(),
+            plan_digest: record["materializedPlanDigest"].as_str().map(str::to_owned),
+            inputs: record["request"]["inputs"].as_object().unwrap().clone(),
+            artifact_facts: facts,
+            workspace_identity_sha256: None,
+            workspace_revision: None,
+            workspace_file_scopes_digest: None,
+        };
+        let policy = crate::capability_policy::policy_fingerprint(&query, false);
+        assert!(
+            record["request"]["authorization"]["capabilityId"]
+                .as_str()
+                .unwrap()
+                .starts_with(&format!("CAP-RT-POLICY-{}-G", &policy[..40]))
+        );
+        for field in ["artifactId", "artifactSha256", "artifactByteCount"] {
+            let original = query.artifact_facts[field].clone();
+            query
+                .artifact_facts
+                .insert(field.into(), "different".into());
+            assert_ne!(
+                crate::capability_policy::policy_fingerprint(&query, false),
+                policy
+            );
+            query.artifact_facts.insert(field.into(), original);
+        }
+        query.artifact_facts.clear();
+        assert_ne!(
+            crate::capability_policy::policy_fingerprint(&query, false),
+            policy
+        );
+        entry.row["byteCount"] = json!("24");
+        assert!(
+            primary_facts(&entry).is_err(),
+            "metadata count must be an integer, never an injected string"
+        );
+    }
+    #[test]
+    fn native_consumed_step_digest_includes_ordered_compensations() {
+        let record: Value = serde_json::from_slice(include_bytes!("../../../tests/fixtures/debug-hap/store/jobs/job-e79d1b4e261f4a13d0bfb58a97fbf163/job-record.json")).unwrap();
+        let descriptor = CatalogOperation::lookup("debug.hap", Some(1)).unwrap();
+        let mut inputs = record["request"]["inputs"].as_object().unwrap().clone();
+        assert_eq!(
+            step_set_digest(descriptor, &inputs).unwrap(),
+            record["admissionEvidence"]["runtimeCapabilityCorrelation"]["stepSetDigestSHA256"]
+        );
+        assert_eq!(
+            compensations(descriptor, &inputs)
+                .unwrap()
+                .iter()
+                .map(|s| s.step_id.as_str())
+                .collect::<Vec<_>>(),
+            [
+                "stop-ability",
+                "cleanup-uninstall",
+                "cleanup-remote-staging"
+            ]
+        );
+        inputs.insert("cleanupPolicy".into(), json!("retain"));
+        inputs.insert("postRunAbilityState".into(), json!("running"));
+        assert_eq!(
+            compensations(descriptor, &inputs)
+                .unwrap()
+                .iter()
+                .map(|s| s.step_id.as_str())
+                .collect::<Vec<_>>(),
+            ["stop-ability", "cleanup-remote-staging"]
+        );
+    }
 }

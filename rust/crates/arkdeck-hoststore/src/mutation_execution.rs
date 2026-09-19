@@ -12,7 +12,6 @@ use crate::operation_catalog::CatalogOperation;
 use crate::operation_request::OperationRequest;
 use arkdeck_contract::sha256_hex;
 use serde_json::json;
-use std::collections::BTreeMap;
 use std::path::Path;
 
 /// The same Runtime owners used at admission, plus the source of the fresh plan.
@@ -92,7 +91,7 @@ impl JobRunner<'_> {
             target_binding_revision: fresh.binding_revision,
             plan_digest: Some(fresh.digest.clone()),
             inputs: capability_policy::subject(descriptor, &request.inputs),
-            artifact_facts: BTreeMap::new(),
+            artifact_facts: fresh.artifact_facts.clone(),
             workspace_identity_sha256: None,
             workspace_revision: None,
             workspace_file_scopes_digest: None,
@@ -146,6 +145,8 @@ impl JobRunner<'_> {
         {
             return Ok(MutationConsumption::Cancelled);
         }
+        let step_set_digest = crate::job_plan::step_set_digest(descriptor, &request.inputs)
+            .map_err(|_| reject("complete step set could not be materialized".into()))?;
         let consumed = store
             .consume(
                 capability,
@@ -155,24 +156,15 @@ impl JobRunner<'_> {
                 &now,
             )
             .map_err(|e| reject(e.swift()))?;
-        let steps = descriptor
-            .steps
-            .iter()
-            .filter(|s| descriptor.step_is_selected(s, &request.inputs))
-            .map(|s| {
-                format!(
-                    "{}|{}|{}|{}|{}",
-                    s.step_id, s.kind, s.effect, s.cancellation, s.binding
-                )
-            })
-            .collect::<Vec<_>>()
-            .join("\n");
-        let evidence = json!({"kind":"runtimeCapability", "reference":capability,
+        let mut evidence = json!({"kind":"runtimeCapability", "reference":capability,
             "admittedAtUTC":consumed.consumed_at_utc, "validUntilUTC":status["capability"]["expiresAtUTC"],
             "consumptionFingerprintSHA256":consumed.query_fingerprint_sha256,
             "runtimeCapabilityCorrelation":{"reservationID":consumed.reservation_id, "useOrdinal":consumed.ordinal,
-                "planDigestSHA256":fresh.digest, "stepSetDigestSHA256":sha256_hex(steps.as_bytes()),
+                "planDigestSHA256":fresh.digest, "stepSetDigestSHA256":step_set_digest,
                 "targetBindingDigestSHA256":sha256_hex(format!("{}\n{}",facts.identity,facts.binding_revision).as_bytes())}});
+        if let Some(digest) = fresh.artifact_facts.get("artifactSha256") {
+            evidence["runtimeCapabilityCorrelation"]["artifactSHA256"] = json!(digest);
+        }
         run.record.set_admission_evidence(evidence);
         run.record
             .timeline

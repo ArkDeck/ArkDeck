@@ -118,11 +118,14 @@ fn native_swift_plans_match_but_hap_admission_remains_closed() {
         state_root: &root,
         hdc: Some(&hdc),
     };
+    let jobs_root = root.join("jobs-state");
     let admitter = JobAdmitter {
         planner: planner(),
         jobs: &jobs,
         now: fixed_now,
         authority: Some(MutationAuthority {
+            default_root: &jobs_root,
+            sessions: None,
             capabilities: &capabilities,
             holds: &holds,
         }),

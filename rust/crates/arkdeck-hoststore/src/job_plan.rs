@@ -13,6 +13,7 @@ use crate::operation_request::OperationRequest;
 use crate::session_json;
 use arkdeck_contract::{CATALOG_DIGEST, sha256_hex};
 use serde_json::{Map, Value, json};
+use std::collections::BTreeMap;
 use std::io;
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
@@ -139,6 +140,7 @@ pub struct JobPlanner<'a> {
 pub(crate) struct Materialized<'a> {
     _import_use: Option<crate::import_upload::ImportUse<'a>>,
     pub(crate) digest: String,
+    pub(crate) artifact_facts: BTreeMap<String, String>,
     pub(crate) identity: Option<String>,
     pub(crate) binding_revision: Option<i64>,
 }
@@ -304,6 +306,7 @@ impl<'a> JobPlanner<'a> {
         Ok(Materialized {
             _import_use: hold,
             digest: self.materialize(request, descriptor)?,
+            artifact_facts: BTreeMap::new(),
             identity: None,
             binding_revision: None,
         })
@@ -451,6 +454,7 @@ impl<'a> JobPlanner<'a> {
         let bytes = session_json::encode(&document).map_err(|_| internal_failure())?;
         Ok(Materialized {
             _import_use: None,
+            artifact_facts: BTreeMap::new(),
             digest: sha256_hex(&bytes),
             identity: Some(facts.identity),
             binding_revision: Some(facts.binding_revision),
@@ -595,4 +599,31 @@ impl<'a> JobPlanner<'a> {
         let bytes = session_json::encode(&document).map_err(|_| internal_failure())?;
         Ok(sha256_hex(&bytes))
     }
+}
+
+/// Swift RuntimeJobEngine.stepSetDigest. This is provenance, never dispatch permission.
+pub(crate) fn step_set_digest(
+    descriptor: &CatalogOperation,
+    inputs: &Map<String, Value>,
+) -> Result<String, PlanRefusal> {
+    let mut lines: Vec<String> = descriptor
+        .steps
+        .iter()
+        .filter(|step| descriptor.step_is_selected(step, inputs))
+        .map(|step| {
+            format!(
+                "{}|{}|{}|{}|{}",
+                step.step_id, step.kind, step.effect, step.cancellation, step.binding
+            )
+        })
+        .collect();
+    if descriptor.reference() == "debug.hap@1" {
+        for step in debug_hap_plan::compensations(descriptor, inputs)? {
+            lines.push(format!(
+                "compensation-{}|{}|{}|{}|{}",
+                step.step_id, step.kind, step.effect, step.cancellation, step.binding
+            ));
+        }
+    }
+    Ok(sha256_hex(lines.join("\n").as_bytes()))
 }
