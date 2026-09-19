@@ -3,7 +3,9 @@
 Status: implementation and targeted validation; final integrated repository gate pending.
 Implementation base: protected main `187321ea` (Runtime capability admission).
 The implementation checkpoint `d8b39c56` was integrated with protected main
-`76612c9f` at `8301a443`, including resume and the App history ingress. This is macOS host
+`76612c9f` at `8301a443`, then `510b4650` at `d6cffa4a`, including resume,
+ClientKit extraction and Artifact publication. Targeted results below precede the
+latest integration; the complete unified gate remains pending. This is macOS host
 fixture evidence, not installed Runtime activation or real-device acceptance.
 
 The three pointer operations (`input.tap@1`, `input.long-press@1`, `input.swipe@1`)
