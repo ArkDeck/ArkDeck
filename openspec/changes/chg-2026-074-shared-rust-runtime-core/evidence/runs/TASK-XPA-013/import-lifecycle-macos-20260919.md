@@ -144,3 +144,21 @@ execution and durable release/history checks.
 No build or test was run for this merge while another slice occupied the heavy
 validation slot. Prior targeted passes and complete-gate failures are retained as
 historical evidence, not promoted to this merged revision's final validation.
+
+## Additional failure-path tests awaiting execution
+
+Added targeted regressions for successful admission handing a transient Import
+hold to a durable Job without a release clearance window; payload/receipt
+corruption between admission and execution producing a failed Job with no analyzer
+marker or Journal step intent; and a complete writer-validated unknown terminal
+history retaining its Import after restart. The latter is explicitly isolated
+history-fixture coverage, not device execution or recovery acceptance.
+
+The admission race uses bounded channels, a ten-second test-only handoff deadline,
+and a Drop guard that releases the worker before scoped-thread joining even if a
+main-thread assertion panics. A failure before the worker reaches its hold is
+bounded by receive timeout. The release loop has its own test hang guard; no
+production budget or acceptance threshold changes.
+
+These new tests have only been formatted and statically reviewed. Their execution
+and the final integrated unified gate remain pending the allocated validation slot.

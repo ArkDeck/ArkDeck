@@ -2082,3 +2082,353 @@ fn sigkill_after_release_checkpoint_and_unpin_preserves_the_original_receipt() {
         assert_eq!(index["artifacts"][0]["retention"]["pinned"], false);
     }
 }
+
+fn lifecycle_analyzer(fixture: &Fixture) -> arkdeck_hoststore::AnalyzerProfile {
+    use std::os::unix::fs::PermissionsExt;
+    let analyzer = fixture.root.join("counted-analyzer");
+    // Planning reads the executable's identity; only a dispatched child creates
+    // this sibling marker. It is an isolated host test, never a device command.
+    fs::write(&analyzer, b"#!/bin/sh\n: > \"$0.dispatched\"\nexit 73\n").unwrap();
+    fs::set_permissions(&analyzer, fs::Permissions::from_mode(0o700)).unwrap();
+    arkdeck_hoststore::AnalyzerProfile::crash_signature(&analyzer).unwrap()
+}
+
+#[test]
+fn successful_admission_hands_the_hold_to_the_durable_job_without_release_clearance() {
+    use std::sync::{
+        Mutex,
+        atomic::{AtomicBool, Ordering},
+        mpsc::{SyncSender, sync_channel},
+    };
+    use std::time::{Duration, Instant};
+    // Test hang guards only; no production operation budget is changed.
+    const HANDOFF_LIMIT: Duration = Duration::from_secs(10);
+    struct ResumeOnDrop(SyncSender<()>);
+    impl Drop for ResumeOnDrop {
+        fn drop(&mut self) {
+            let _ = self.0.try_send(());
+        }
+    }
+    let fixture = Fixture::new();
+    let (worker_enter, entered) = sync_channel(1);
+    let (resume, worker_resume) = sync_channel(1);
+    let worker_resume = Mutex::new(worker_resume);
+    let store = ImportUploadStore::open_with_fault(
+        &fixture.artifacts,
+        Arc::new(move |point| {
+            if point == ImportUploadFault::AfterInputHold {
+                worker_enter.try_send(()).map_err(io::Error::other)?;
+                worker_resume
+                    .lock()
+                    .map_err(|_| io::Error::other("handoff receiver poisoned"))?
+                    .recv_timeout(HANDOFF_LIMIT)
+                    .map_err(io::Error::other)?;
+            }
+            Ok(())
+        }),
+    )
+    .unwrap();
+    let artifacts = arkdeck_hoststore::ArtifactReadStore::open(&fixture.artifacts).unwrap();
+    let jobs = jobs(&fixture);
+    let bytes = b"PK\x03\x04hold-to-job";
+    let begin = call(&store, "begin", fixture.metadata("hold-to-job", bytes)).unwrap();
+    let id = begin["importId"].as_str().unwrap();
+    append(&store, id, 0, bytes).unwrap();
+    let committed = commit(&store, &artifacts, id).unwrap();
+    let profile = lifecycle_analyzer(&fixture);
+    let request = analyzer_request(&committed["receipt"]["lease"]);
+    let completed = AtomicBool::new(false);
+    let accepted = std::thread::scope(|scope| {
+        // On any assertion panic this guard drops before scope joins its child.
+        let resume_on_drop = ResumeOnDrop(resume);
+        let admit = arkdeck_hoststore::JobAdmitter {
+            authority: None,
+            planner: arkdeck_hoststore::JobPlanner {
+                imports: Some(&store),
+                artifacts: Some(&artifacts),
+                analyzer: Some(&profile),
+                state_root: &fixture.root,
+                hdc: None,
+            },
+            jobs: &jobs,
+            now: || Some(NOW.into()),
+        };
+        let completed_ref = &completed;
+        let worker = scope.spawn(move || {
+            let result = admit.submit(&request);
+            completed_ref.store(true, Ordering::Release);
+            result.unwrap()
+        });
+        entered
+            .recv_timeout(HANDOFF_LIMIT)
+            .expect("admission did not reach its input hold");
+        let inspection = lifecycle(
+            &store,
+            &artifacts,
+            &jobs,
+            "inspection",
+            json!({"importId":id}),
+        )
+        .unwrap();
+        assert_eq!(inspection["references"]["activeMaterializationCount"], "1");
+        assert_eq!(inspection["references"]["activeJobIds"], json!([]));
+        assert_eq!(
+            lifecycle(
+                &store,
+                &artifacts,
+                &jobs,
+                "release",
+                json!({"importId":id,"generation":"2"})
+            )
+            .unwrap_err()
+            .code,
+            "resourceConflict"
+        );
+        drop(resume_on_drop);
+        // Race release with successful admission. Both the transient and the
+        // durable side of the handoff must refuse; never accept a clear gap.
+        let deadline = Instant::now() + HANDOFF_LIMIT;
+        while !completed.load(Ordering::Acquire) {
+            assert!(
+                Instant::now() < deadline,
+                "admission/release handoff did not complete"
+            );
+            assert_eq!(
+                lifecycle(
+                    &store,
+                    &artifacts,
+                    &jobs,
+                    "release",
+                    json!({"importId":id,"generation":"2"})
+                )
+                .unwrap_err()
+                .code,
+                "resourceConflict"
+            );
+            std::thread::yield_now();
+        }
+        worker.join().unwrap()
+    });
+    let inspection = lifecycle(
+        &store,
+        &artifacts,
+        &jobs,
+        "inspection",
+        json!({"importId":id}),
+    )
+    .unwrap();
+    assert_eq!(inspection["references"]["activeMaterializationCount"], "0");
+    assert_eq!(
+        inspection["references"]["activeJobIds"],
+        json!([accepted["jobId"]])
+    );
+    assert_eq!(
+        lifecycle(
+            &store,
+            &artifacts,
+            &jobs,
+            "release",
+            json!({"importId":id,"generation":"2"})
+        )
+        .unwrap_err()
+        .code,
+        "resourceConflict"
+    );
+    assert!(!fixture.root.join("counted-analyzer.dispatched").exists());
+}
+
+#[test]
+fn replacing_import_payload_or_receipt_after_admission_dispatches_no_analyzer() {
+    use std::os::unix::fs::PermissionsExt;
+    for poison in ["payload", "receipt"] {
+        let fixture = Fixture::new();
+        let store = fixture.store();
+        let artifacts = arkdeck_hoststore::ArtifactReadStore::open(&fixture.artifacts).unwrap();
+        let jobs = jobs(&fixture);
+        let bytes = b"PK\x03\x04admitted-original";
+        let begin = call(&store, "begin", fixture.metadata("before-run", bytes)).unwrap();
+        let id = begin["importId"].as_str().unwrap();
+        append(&store, id, 0, bytes).unwrap();
+        let committed = commit(&store, &artifacts, id).unwrap();
+        let profile = lifecycle_analyzer(&fixture);
+        let accepted = arkdeck_hoststore::JobAdmitter {
+            authority: None,
+            planner: arkdeck_hoststore::JobPlanner {
+                imports: Some(&store),
+                artifacts: Some(&artifacts),
+                analyzer: Some(&profile),
+                state_root: &fixture.root,
+                hdc: None,
+            },
+            jobs: &jobs,
+            now: || Some(NOW.into()),
+        }
+        .submit(&analyzer_request(&committed["receipt"]["lease"]))
+        .unwrap();
+        if poison == "payload" {
+            let path = fixture
+                .artifacts
+                .join(id)
+                .join(committed["receipt"]["artifactId"].as_str().unwrap());
+            fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+            fs::write(&path, b"PK\x03\x04admitted-tampered").unwrap();
+            fs::set_permissions(&path, fs::Permissions::from_mode(0o400)).unwrap();
+        } else {
+            let path = fixture.record("before-run");
+            let mut record = read(&path);
+            record["receipt"]["artifactDigest"] = json!("f".repeat(64));
+            fs::write(path, serde_json::to_vec(&record).unwrap()).unwrap();
+        }
+        // A new owner must revalidate durable bytes, not reuse a planning cache.
+        drop(store);
+        let store = fixture.store();
+        let jid = accepted["jobId"].as_str().unwrap();
+        let status = arkdeck_hoststore::JobRunner {
+            imports: Some(&store),
+            jobs: &jobs,
+            artifacts: &artifacts,
+            analyzer: Some(&profile),
+            quota: 64 * 1024 * 1024,
+            home: "/isolated-test",
+            now: || Some(NOW.into()),
+            precise_now: || Some("2026-09-12T00:00:00.000Z".into()),
+            sessions: None,
+            cancellation: None,
+            after_commit: None,
+            hdc: None,
+        }
+        .handle(json!({"jobId":jid}).as_object().unwrap())
+        .unwrap();
+        assert_eq!(status["state"], "failed", "{poison}");
+        assert!(
+            !fixture.root.join("counted-analyzer.dispatched").exists(),
+            "{poison}"
+        );
+        let journal = fs::read_to_string(
+            fixture
+                .root
+                .join("jobs-state/jobs")
+                .join(jid)
+                .join("journal.jsonl"),
+        )
+        .unwrap();
+        for line in journal.lines() {
+            let event: Value = serde_json::from_str(line).unwrap();
+            assert_ne!(event["kind"], "stepIntent", "{poison}");
+        }
+    }
+}
+
+#[test]
+fn complete_unknown_terminal_history_keeps_the_import_referenced_after_restart() {
+    use arkdeck_hoststore::job_journal_events::{self as events, Envelope};
+    use arkdeck_hoststore::{JobRecord, JournalWriter};
+    let fixture = Fixture::new();
+    let store = fixture.store();
+    let artifacts = arkdeck_hoststore::ArtifactReadStore::open(&fixture.artifacts).unwrap();
+    let jobs = jobs(&fixture);
+    let bytes = b"PK\x03\x04unknown-history";
+    let begin = call(&store, "begin", fixture.metadata("unknown-history", bytes)).unwrap();
+    let id = begin["importId"].as_str().unwrap();
+    append(&store, id, 0, bytes).unwrap();
+    let committed = commit(&store, &artifacts, id).unwrap();
+    let request = arkdeck_hoststore::OperationRequest::decode(&analyzer_request(
+        &committed["receipt"]["lease"],
+    ))
+    .unwrap();
+    let jid = "job-import-unknown-fixture";
+    // Isolated durable-history fixture. This does not execute a device, issue
+    // authority, or claim a real recovery; the production writer validates every
+    // event before this census regression can use the completed history.
+    let value = json!({"jobID":jid,"request":request.canonical_value(),"originalSubmissionRequest":request.canonical_value(),"operationReference":"analyzer.extract-crash-signature@1","catalogDigest":arkdeck_contract::CATALOG_DIGEST,"providerID":"analyzer","createdAtUTC":NOW,"state":"interrupted","outcomeUnknown":true,"timeline":[],"actualStepKinds":[],"skipReasons":{}});
+    let record = JobRecord::decode(&serde_json::to_vec(&value).unwrap()).unwrap();
+    jobs.admit(&record, &request.fingerprint()).unwrap();
+    jobs.persist(&record, NOW).unwrap();
+    let directory = fixture.root.join("jobs-state/jobs").join(jid);
+    let mut writer = JournalWriter::open(&directory, true).unwrap();
+    let source = fs::read_to_string(
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/fixtures/journal-writer/unknown.jsonl"),
+    )
+    .unwrap();
+    for line in source.lines() {
+        let mut event: Value = serde_json::from_str(line).unwrap();
+        event["jobId"] = json!(jid);
+        event["sessionId"] = json!(format!("session-{jid}"));
+        writer.append(&event).unwrap();
+    }
+    let hazards = writer.facts().required_abandonment_hazards;
+    let at = |sequence: i64| Envelope {
+        event_id: format!("import-unknown-{sequence}"),
+        sequence,
+        job_id: jid.into(),
+        session_id: format!("session-{jid}"),
+        timestamp: format!("2026-09-13T00:00:{sequence:02}Z"),
+    };
+    let event = |sequence: i64, kind: &str, payload: Value| json!({"schemaVersion":"1.0.0","eventId":at(sequence).event_id,"sequence":sequence,"jobId":jid,"sessionId":format!("session-{jid}"),"timestamp":at(sequence).timestamp,"kind":kind,"payload":payload});
+    writer.append(&event(10,"abandonIntent",json!({"userConfirmationId":"fixture-abandon","lastConfirmedStep":null,"outcomeCertainty":"outcomeUnknown","managedProcessState":"notRunning","deviceHazards":hazards}))).unwrap();
+    writer
+        .append(&events::state_transition(
+            &at(11),
+            "waitingForRecovery",
+            "userAbandonRequested",
+            "fixture-abandon",
+            Some(&at(10).event_id),
+        ))
+        .unwrap();
+    writer.append(&event(12,"abandonOutcome",json!({"correlatesToAbandonIntentEventId":at(10).event_id,"result":"archivedInterrupted","releaseAuthorized":true,"unresolvedHazards":hazards}))).unwrap();
+    writer
+        .append(&events::state_transition(
+            &at(13),
+            "userAbandonRequested",
+            "interrupted",
+            "fixture-archived",
+            Some(&at(12).event_id),
+        ))
+        .unwrap();
+    writer
+        .append(&events::finalized(
+            &at(14),
+            "interrupted",
+            &"a".repeat(64),
+            "outcomeUnknown",
+        ))
+        .unwrap();
+    assert!(writer.facts().finalized);
+    assert!(!writer.facts().unknown_outcomes.is_empty());
+    drop(writer);
+    drop(jobs);
+    drop(store);
+    let store = fixture.store();
+    let jobs = crate::jobs(&fixture);
+    let inspection = lifecycle(
+        &store,
+        &artifacts,
+        &jobs,
+        "inspection",
+        json!({"importId":id}),
+    )
+    .unwrap();
+    assert_eq!(inspection["references"]["state"], "referenced");
+    assert_eq!(inspection["references"]["activeJobIds"], json!([jid]));
+    assert_eq!(
+        inspection["references"]["outcomeUnknownJobIds"],
+        json!([jid])
+    );
+    assert_eq!(
+        lifecycle(
+            &store,
+            &artifacts,
+            &jobs,
+            "release",
+            json!({"importId":id,"generation":"2"})
+        )
+        .unwrap_err()
+        .code,
+        "resourceConflict"
+    );
+    assert_eq!(
+        call(&store, "inspect", json!({"importId":id})).unwrap()["state"],
+        "committed"
+    );
+}
