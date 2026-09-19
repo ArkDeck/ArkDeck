@@ -207,7 +207,11 @@ impl HdcDispatch for DevelopmentHdc {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::net::{Ipv4Addr, SocketAddrV4, TcpListener};
+    use std::net::{Ipv4Addr, SocketAddrV4};
+
+    mod loopback_ports {
+        include!("../../../tests/support/loopback_ports.rs");
+    }
     use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
     use std::path::PathBuf;
     use std::time::{Duration, Instant};
@@ -263,11 +267,7 @@ mod tests {
     #[test]
     fn no_plan_is_dispatched_once_the_managed_server_is_not_the_one_launched() {
         let (_fake, tool) = fake();
-        let port = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))
-            .unwrap()
-            .local_addr()
-            .unwrap()
-            .port();
+        let port = loopback_ports::free_port();
         let selection = EndpointSelection {
             endpoint: SocketAddrV4::new(Ipv4Addr::LOCALHOST, port),
             source: "inheritedEnvironment",
