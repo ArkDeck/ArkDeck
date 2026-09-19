@@ -441,6 +441,8 @@ mod trace_owner;
 #[cfg(target_os = "macos")]
 pub use trace_owner::TraceCacheStore;
 
+#[cfg(target_os = "macos")]
+mod recovery_manifest;
 mod session_graphemes;
 #[cfg(target_os = "macos")]
 mod session_inventory;
@@ -448,6 +450,11 @@ mod session_inventory;
 mod session_manifest;
 #[cfg(target_os = "macos")]
 mod session_step_arguments;
+#[cfg(target_os = "macos")]
+pub use recovery_manifest::{
+    RecoveryManifest, RecoveryManifestAbandonConfirmation, RecoveryManifestDeviceMode,
+    RecoveryManifestError, RecoveryManifestGuide, RecoveryManifestHazard,
+};
 pub use session_graphemes::decode_graphemes;
 #[cfg(target_os = "macos")]
 pub use session_inventory::{session_inventory, session_inventory_owned};

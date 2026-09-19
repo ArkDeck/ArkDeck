@@ -382,124 +382,27 @@ fn recovery(
     if value.is_null() {
         return Ok(());
     }
+    // Swift `validateRecovery`: every unexecuted compensation's declared hash,
+    // then the member as `RecoveryManifestCodec.decode` reads it.
     let row = object(value)?;
-    keys(
-        row,
-        &[
-            "needsAttention",
-            "interruptedReason",
-            "deviceHazards",
-            "abandonAuditEventIds",
-            "lastConfirmedStepId",
-            "lastDeviceMode",
-            "managedHostProcessState",
-            "recoveryGuide",
-            "unexecutedCompensations",
-            "userConfirmation",
-            "recoveryOfSessionId",
-            "recoveryOfJobId",
-        ],
-        &[],
-    )?;
-    require(row["needsAttention"].is_boolean())?;
-    require(nullable_text(row, "interruptedReason")?.is_none_or(|s| !s.is_empty()))?;
-    for key in [
-        "lastConfirmedStepId",
-        "recoveryOfSessionId",
-        "recoveryOfJobId",
-    ] {
-        if let Some(id) = nullable_text(row, key)? {
-            require(identifier(&id))?;
-            if key == "lastConfirmedStepId" {
-                require(steps.contains_key(id.as_str()))?;
-            }
-        }
+    for descriptor in array(row, "unexecutedCompensations")? {
+        require(crate::recovery_manifest::compensation_hash_matches(object(
+            descriptor,
+        )?))?;
     }
-    let mut event_ids = BTreeSet::new();
-    for event in array(row, "abandonAuditEventIds")? {
-        let id = event.as_str().ok_or(ManifestError::Invalid)?;
-        require(identifier(id) && event_ids.insert(id))?;
+    let manifest = crate::recovery_manifest::RecoveryManifest::from_value(value)
+        .map_err(|_| ManifestError::Invalid)?;
+    // Swift `validateRelationships`: the last confirmed step is one of the
+    // Session's steps, and every unexecuted compensation is one a step
+    // declared, unchanged.
+    if let Some(id) = &manifest.last_confirmed_step_id {
+        require(steps.contains_key(id.as_str()))?;
     }
-    for value in array(row, "deviceHazards")? {
-        let hazard = object(value)?;
-        keys(
-            hazard,
-            &["code", "summary", "severity", "outcomeCertainty"],
-            &[],
-        )?;
-        require(identifier(text(hazard, "code")?))?;
-        nonempty(hazard, "summary")?;
-        choice(
-            hazard,
-            "severity",
-            &["warning", "blocking", "possibleBrick"],
-        )?;
-        choice(hazard, "outcomeCertainty", &["confirmed", "outcomeUnknown"])?;
-    }
-    choice(
-        row,
-        "managedHostProcessState",
-        &[
-            "notStarted",
-            "notRunning",
-            "stoppedAtSafeBoundary",
-            "stillRunningUnknown",
-            "notApplicable",
-        ],
-    )?;
-    let mode = object(&row["lastDeviceMode"])?;
-    match text(mode, "state")? {
-        "unknown" => keys(mode, &["state"], &[])?,
-        "known" => {
-            keys(mode, &["state", "value", "evidence"], &[])?;
-            nonempty(mode, "value")?;
-            nonempty(mode, "evidence")?;
-        }
-        _ => return Err(ManifestError::Invalid),
-    }
-    let guide = object(&row["recoveryGuide"])?;
-    keys(
-        guide,
-        &[
-            "providerIdentity",
-            "automaticRecoveryAvailable",
-            "summary",
-            "steps",
-        ],
-        &[],
-    )?;
-    nonempty(guide, "providerIdentity")?;
-    nonempty(guide, "summary")?;
-    require(guide["automaticRecoveryAvailable"].is_boolean())?;
-    let guidance = array(guide, "steps")?;
-    require(
-        !guidance.is_empty()
-            && guidance
-                .iter()
-                .all(|v| v.as_str().is_some_and(|s| !s.is_empty())),
-    )?;
-    let confirmation = &row["userConfirmation"];
-    require(event_ids.is_empty() || !confirmation.is_null())?;
-    if !confirmation.is_null() {
-        let confirmation = object(confirmation)?;
-        keys(
-            confirmation,
-            &["confirmationId", "actor", "decision", "confirmedAt"],
-            &[],
-        )?;
-        require(
-            identifier(text(confirmation, "confirmationId")?)
-                && text(confirmation, "actor")? == "user"
-                && text(confirmation, "decision")? == "archiveInterrupted",
-        )?;
-        timestamp(confirmation, "confirmedAt")?;
-    }
-    for value in array(row, "unexecutedCompensations")? {
-        let d = descriptor(value)?;
+    for descriptor in array(row, "unexecutedCompensations")? {
         let (_, declared) = descriptors
-            .get(text(d, "id")?)
+            .get(text(object(descriptor)?, "id")?)
             .ok_or(ManifestError::Invalid)?;
-        require(equal(value, declared)?)?;
+        require(equal(descriptor, declared)?)?;
     }
     Ok(())
 }

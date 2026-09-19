@@ -615,9 +615,18 @@ a new product and never evicts one, the payload sealed `0400` before the index
 names it. Terminal transitions and records are spelled as Swift writes them. A
 timeout, a signal death or an unobservable child leaves the intent outstanding
 and parks the Job in `waitingForRecovery`; nothing is dispatched twice. Recovery
-is not ported (ADR-0009 decisions 2/4, L.1 item 13): a Job in any resumable
-state, or whose journal has left `preflight`, is refused. Concurrent runs of one
-Job join its one run, as Swift's callers do.
+is being ported as the maintainer ruled on 2026-09-19 (design §L.1 item 13): the
+carriers the ADR-0009 decision package names, unchanged. Until the Job slices
+land, a Job in any resumable state, or whose journal has left `preflight`, is
+refused. Landed so far: `recovery_manifest.rs`, Swift's `RecoveryManifestCodec`
+(the Session manifest's `recovery` member, which the Session reader now decodes
+through it before checking its relations to the Session's steps); its unit tests
+replay `rust/tests/fixtures/recovery-manifest/` (Swift
+`RecoveryManifestOracleContractTests`, re-recorded with
+`ARKDECK_RUST_RECOVERY_MANIFEST_RECORD=/private/tmp/<new>`): every decision and
+canonical byte, and one member more or less written by Rust at each level as the
+document Swift refused. Nothing writes a non-null member, in Swift or here.
+Concurrent runs of one Job join its one run, as Swift's callers do.
 
 `arkdeck job run --job <id>` prints the Job's status and exits as Swift's CLI
 does: 1 for a failed, cancelled or interrupted Job and 75 for an unknown outcome.
