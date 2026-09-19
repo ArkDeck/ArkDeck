@@ -305,7 +305,11 @@ pub(crate) fn mutation_error(error: ClientError, method: &str) -> CliError {
                     "target.adopt" => {
                         "the target adoption reply is unconfirmed; read the device candidates and the target list to learn whether it was adopted"
                     }
-                    "runtime.hdc.impact-preview" | "runtime.hdc.restart" => {
+                    "runtime.hdc.impact-preview"
+                    | "runtime.hdc.restart"
+                    | "control-action.list"
+                    | "control-action.show"
+                    | "control-action.reconcile" => {
                         "the HDC control-action reply is unconfirmed; no request was replayed"
                     }
                     _ => {

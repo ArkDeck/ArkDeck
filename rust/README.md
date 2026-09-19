@@ -1022,6 +1022,17 @@ resume`'s at Swift's interactive console, which this CLI answers
 replays Swift's argv fixtures and serves the recorded preview, restart and
 refusals to the actual CLI.
 
+`arkdeck control-action list [--kind hdcLifecycle] [--state <state>]
+[--page-size <n>] [--cursor <cursor>]`, `arkdeck control-action show
+--control-action <id>` and `arkdeck control-action reconcile --control-action
+<id>` read and reconcile the control action a restart creates, as the Swift CLI
+does: Swift's registry grammar, an exact identity checked before any
+connection, and the answer emitted as the Runtime gave it. Swift classes all
+three as mutation-capable, so a refusal without the zero-dispatch proof, or a
+lost reply, is an unknown outcome (75). `crates/arkdeck-cli/tests/control_actions.rs`
+replays Swift's argv fixtures and serves the recorded show, list, reconciliation
+and refusals to the actual CLI.
+
 ## Target presentation owner (TASK-XPA-012)
 
 The explicitly isolated development composition owns `targets-state/` and serves

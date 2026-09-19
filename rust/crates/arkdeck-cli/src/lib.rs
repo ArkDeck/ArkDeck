@@ -128,6 +128,9 @@ impl CliError {
                 | "target.adopt"
                 | "runtime.hdc.impact-preview"
                 | "runtime.hdc.restart"
+                | "control-action.list"
+                | "control-action.show"
+                | "control-action.reconcile"
         ) {
             return job_plan::mutation_error(error, method);
         }
@@ -669,6 +672,9 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["runtime", "hdc", "status"] => "runtime.hdc.status",
         ["runtime", "hdc", "impact-preview"] => "runtime.hdc.impact-preview",
         ["runtime", "hdc", "restart"] => "runtime.hdc.restart",
+        ["control-action", "list"] => "control-action.list",
+        ["control-action", "show"] => "control-action.show",
+        ["control-action", "reconcile"] => "control-action.reconcile",
         ["runtime", "storage", "status"] => "runtime.storage.status",
         ["runtime", "storage", "policy"] => "runtime.storage.policy",
         ["runtime", "storage", "root"] => "runtime.storage.root",
@@ -733,6 +739,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             "timeout",
         ],
         "runtime.hdc.restart" => &["controlAction", "previewId", "previewDigest", "timeout"],
+        "control-action.list" => &["pageSize", "cursor", "kind", "state", "timeout"],
+        "control-action.show" | "control-action.reconcile" => &["controlAction", "timeout"],
         "target.list" => &["timeout"],
         "target.show" | "target.availability" => &["targetId", "timeout"],
         "target.display-name.set" => &["targetId", "expectedGeneration", "name", "timeout"],
@@ -1157,6 +1165,9 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                     | "human-action.resume"
                     | "runtime.hdc.impact-preview"
                     | "runtime.hdc.restart"
+                    | "control-action.list"
+                    | "control-action.show"
+                    | "control-action.reconcile"
             )
         {
             Some(method_options)
