@@ -1,0 +1,148 @@
+{
+  "actualEffect" : "deviceMutation",
+  "actualStepKinds" : [
+    "probeDevice",
+    "runApprovedRemoteRead",
+    "preflightDeviceStorage",
+    "captureRemoteFile",
+    "receiveFile",
+    "cleanupOwnedRemotePath"
+  ],
+  "admissionEvidence" : {
+    "admittedAtUTC" : "2026-09-14T00:00:00Z",
+    "consumptionFingerprintSHA256" : "742f50729ff8054457ee6ad23c9a58591b150d50a74a8eed7839e48c33c82547",
+    "kind" : "runtimeCapability",
+    "reference" : "CAP-RT-POLICY-8AE3BC8B315C2275F2E33FACBBB74D84562467BA-G1",
+    "runtimeCapabilityCorrelation" : {
+      "planDigestSHA256" : "b1c13bfc75c617c256c368ad809d9472959666f9fe0d1fae1fc6d22ffc8afc40",
+      "reservationID" : "idem-sequence-residue",
+      "stepSetDigestSHA256" : "230da2ccfdced221f7c0251792a33dfb4555dff58670a887d3e534b419583cd8",
+      "targetBindingDigestSHA256" : "4161ef10eb5d0b7dbccbff85ca94dc26fc8a1ea914df3f88faaa43bc02651090",
+      "useOrdinal" : 3
+    },
+    "validUntilUTC" : "2026-10-14T00:00:00Z"
+  },
+  "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+  "createdAtUTC" : "2026-09-14T00:00:00Z",
+  "finishedAtUTC" : "2026-09-14T00:00:00Z",
+  "firstEvidenceStepAtUTC" : "2026-09-14T00:00:00Z",
+  "jobID" : "job-ff742c7fb81f120c5aa5fce0b9d2d847",
+  "materializedBindingRevision" : 1,
+  "materializedPlanDigest" : "b1c13bfc75c617c256c368ad809d9472959666f9fe0d1fae1fc6d22ffc8afc40",
+  "materializedStableTargetIdentitySHA256" : "3ba3f5f43b92602683c19aee62a20342b084dd5971ddd33808d81a328879a547",
+  "operationFailure" : {
+    "category" : "execution",
+    "code" : "executionFailed",
+    "recovery" : "inspectJob",
+    "retryability" : "runtimeDecisionRequired",
+    "schemaVersion" : "1.0.0"
+  },
+  "operationReference" : "capture.screen-sequence@1",
+  "originalSubmissionRequest" : {
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-sequence-residue",
+    "inputs" : {
+      "frameCount" : 3
+    },
+    "operation" : {
+      "id" : "capture.screen-sequence",
+      "version" : 1
+    },
+    "requestId" : "req-sequence-residue",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-3ba3f5f43b92"
+    }
+  },
+  "outcomeUnknown" : false,
+  "providerID" : "hdc",
+  "request" : {
+    "authorization" : {
+      "capabilityId" : "CAP-RT-POLICY-8AE3BC8B315C2275F2E33FACBBB74D84562467BA-G1"
+    },
+    "documentType" : "runtime-operation-request",
+    "idempotencyKey" : "idem-sequence-residue",
+    "inputs" : {
+      "frameCount" : 3
+    },
+    "operation" : {
+      "id" : "capture.screen-sequence",
+      "version" : 1
+    },
+    "requestId" : "req-sequence-residue",
+    "requestedOutputs" : [
+      "derivedArtifacts"
+    ],
+    "schemaVersion" : "1.0.0",
+    "target" : {
+      "expectedBindingRevision" : 1,
+      "targetId" : "TGT-3ba3f5f43b92"
+    }
+  },
+  "screenSequence" : {
+    "capturedFrameCount" : 3,
+    "frameDurationsSeconds" : [
+      0.5,
+      0.5,
+      0.5
+    ],
+    "requestedFrameCount" : 3
+  },
+  "sessionPublicationRecord" : {
+    "catalogDigest" : "508783acdf9e9b13d2d4a969e7e26f6fd60094a39d1cc9e02d2198e02ea13684",
+    "claims" : [
+
+    ],
+    "failure" : {
+      "certainty" : "confirmed",
+      "code" : "sourceIntegrityFailed",
+      "detail" : "device Session: missing or inconsistent job-local target\/tool observation"
+    },
+    "phase" : "awaitingStorage",
+    "policyGeneration" : "0",
+    "relativeSessionPath" : "",
+    "root" : {
+      "device" : "0",
+      "inode" : "0",
+      "path" : "",
+      "volumeIdentity" : ""
+    },
+    "sessionID" : "session-job-ff742c7fb81f120c5aa5fce0b9d2d847"
+  },
+  "skipReasons" : {
+
+  },
+  "startedAtUTC" : "2026-09-14T00:00:00Z",
+  "state" : "failed",
+  "timeline" : [
+    "jobCreated",
+    "queued->preflight",
+    "preflight->running",
+    "reason: steps-start",
+    "host-step preflight-host-storage",
+    "intent confirm-evidence-target",
+    "verified confirm-evidence-target [\"deviceIdentitySHA256\", \"state\", \"transport\"]",
+    "intent read-evidence-model",
+    "verified read-evidence-model [\"value\"]",
+    "intent read-evidence-firmware",
+    "verified read-evidence-firmware [\"value\"]",
+    "intent preflight-device-storage",
+    "verified preflight-device-storage [\"availableBytes\"]",
+    "capability consumed before first mutation",
+    "intent capture-screen-sequence",
+    "verified capture-screen-sequence [\"capturedFrameCount\", \"frameDurationsSeconds\", \"observedFramesPerSecond\", \"remoteByteCount\", \"requestedFrameCount\"]",
+    "intent receive-screen-sequence",
+    "verified receive-screen-sequence [\"byteCount\", \"localArtifact\", \"sha256\"]",
+    "artifact frames.tar -> ART-2092c01e8faa88cb799b91f70ac786d7",
+    "intent cleanup-screen-sequence-temp",
+    "failed cleanup-screen-sequence-temp: sequenceCleanupResidue: \/data\/local\/tmp\/arkdeck-job-ff742c7fb81f120c5aa5fce0b9d2d847-capture-screen-sequence-owned-frames still exists after cleanup",
+    "running->finalizing",
+    "reason: sequenceCleanupResidue: \/data\/local\/tmp\/arkdeck-job-ff742c7fb81f120c5aa5fce0b9d2d847-capture-screen-sequence-owned-frames still exists after cleanup",
+    "finalizing->failed",
+    "reason: sequenceCleanupResidue: \/data\/local\/tmp\/arkdeck-job-ff742c7fb81f120c5aa5fce0b9d2d847-capture-screen-sequence-owned-frames still exists after cleanup"
+  ]
+}

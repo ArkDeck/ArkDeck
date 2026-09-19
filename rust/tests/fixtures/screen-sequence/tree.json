@@ -1,0 +1,172 @@
+[
+  {
+    "kind" : "directory",
+    "mode" : "700",
+    "path" : "store/jobs/job-1198f33479543de487d86dc88ce0f332"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "store/jobs/job-1198f33479543de487d86dc88ce0f332/.manifest.lock"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "store/jobs/job-1198f33479543de487d86dc88ce0f332/job-record.json"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "store/jobs/job-1198f33479543de487d86dc88ce0f332/journal.jsonl"
+  },
+  {
+    "kind" : "directory",
+    "mode" : "700",
+    "path" : "store/jobs/job-37566e5bcffbc70d17f829dd42011e15"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "store/jobs/job-37566e5bcffbc70d17f829dd42011e15/.manifest.lock"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "store/jobs/job-37566e5bcffbc70d17f829dd42011e15/job-record.json"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "store/jobs/job-37566e5bcffbc70d17f829dd42011e15/journal.jsonl"
+  },
+  {
+    "kind" : "directory",
+    "mode" : "700",
+    "path" : "store/jobs/job-3ff50dc0d1e7c9f4bd80177e40f5b071"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "store/jobs/job-3ff50dc0d1e7c9f4bd80177e40f5b071/.manifest.lock"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "store/jobs/job-3ff50dc0d1e7c9f4bd80177e40f5b071/job-record.json"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "store/jobs/job-3ff50dc0d1e7c9f4bd80177e40f5b071/journal.jsonl"
+  },
+  {
+    "kind" : "directory",
+    "mode" : "700",
+    "path" : "store/jobs/job-a6bdb7f0262b45b3cfa7ef91019b2327"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "store/jobs/job-a6bdb7f0262b45b3cfa7ef91019b2327/.manifest.lock"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "store/jobs/job-a6bdb7f0262b45b3cfa7ef91019b2327/job-record.json"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "store/jobs/job-a6bdb7f0262b45b3cfa7ef91019b2327/journal.jsonl"
+  },
+  {
+    "kind" : "directory",
+    "mode" : "700",
+    "path" : "store/jobs/job-b4de03b9286b93c6aa5eae08f49e4d2a"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "store/jobs/job-b4de03b9286b93c6aa5eae08f49e4d2a/.manifest.lock"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "store/jobs/job-b4de03b9286b93c6aa5eae08f49e4d2a/job-record.json"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "store/jobs/job-b4de03b9286b93c6aa5eae08f49e4d2a/journal.jsonl"
+  },
+  {
+    "kind" : "directory",
+    "mode" : "700",
+    "path" : "store/jobs/job-e6f4a623b3135c9738a8fe14f2048796"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "store/jobs/job-e6f4a623b3135c9738a8fe14f2048796/.manifest.lock"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "store/jobs/job-e6f4a623b3135c9738a8fe14f2048796/job-record.json"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "store/jobs/job-e6f4a623b3135c9738a8fe14f2048796/journal.jsonl"
+  },
+  {
+    "kind" : "directory",
+    "mode" : "700",
+    "path" : "store/jobs/job-ff742c7fb81f120c5aa5fce0b9d2d847"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "store/jobs/job-ff742c7fb81f120c5aa5fce0b9d2d847/.manifest.lock"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "store/jobs/job-ff742c7fb81f120c5aa5fce0b9d2d847/job-record.json"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "store/jobs/job-ff742c7fb81f120c5aa5fce0b9d2d847/journal.jsonl"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "store/capabilities/.runtime-capabilities.lock"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "store/capabilities/runtime-capabilities.json"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "store/capabilities/runtime-capabilities.ledger"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "sessions/.arkdeck-retention-catalog.json"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "sessions/.arkdeck-retention-catalog.lock"
+  },
+  {
+    "kind" : "file",
+    "mode" : "600",
+    "path" : "session-owner/.session-storage.lock"
+  }
+]
