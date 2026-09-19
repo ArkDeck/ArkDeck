@@ -135,6 +135,21 @@ fn upload_args<'a>(kind: &'a str, request: &'a str, path: &'a str) -> Vec<&'a st
 #[test]
 fn real_cli_daemon_three_kinds_restart_and_lost_commit_reply() {
     let mut runtime = Runtime::new();
+    // The exact protected-main contract before the native Swift supplement
+    // cannot represent nullable patch bindings. Keep testing that old pin's
+    // refusal, not the candidate's new success shape, in its isolated view.
+    // Every other method-schema digest must run the complete three-format success journey.
+    let inspect_schema = arkdeck_contract::METHOD_SCHEMAS
+        .iter()
+        .find(|(method, _)| *method == "artifact.import.inspect")
+        .unwrap()
+        .1;
+    if arkdeck_contract::sha256_hex(inspect_schema.as_bytes())
+        == "b2d5133ea4edcf927ef71857afeea275efe136b3d90fb6dd2b766a46ad3d0698"
+    {
+        published_contract_preserves_patch_refusal(&mut runtime);
+        return;
+    }
     let mut payloads = vec![
         (
             "hap",
@@ -316,4 +331,118 @@ fn real_cli_daemon_three_kinds_restart_and_lost_commit_reply() {
     assert!(!missing.status.success());
     let failure: Value = serde_json::from_slice(&missing.stdout).unwrap();
     assert_eq!(failure["error"]["code"], "resourceNotFound");
+}
+
+/// A real process path under the exact old published contract. Its supported
+/// HAP result remains usable; an unrepresentable patch response stays refused.
+fn published_contract_preserves_patch_refusal(runtime: &mut Runtime) {
+    let hap_bytes = b"PK\x03\x04published-contract";
+    let hap = runtime.root.join("published.hap");
+    fs::write(&hap, hap_bytes).unwrap();
+    let accepted = runtime.cli(&upload_args("hap", "published-hap", hap.to_str().unwrap()));
+    assert_eq!(accepted["state"], "committed");
+    let patch = runtime.root.join("published.patch");
+    fs::write(
+        &patch,
+        b"diff --git a/a b/a\n--- a/a\n+++ b/a\n+token=unchanged\n",
+    )
+    .unwrap();
+    let patch_receipt = runtime.cli(&upload_args(
+        "workspace-patch",
+        "published-patch",
+        patch.to_str().unwrap(),
+    ));
+    assert_eq!(patch_receipt["state"], "committed");
+    let record_path = runtime
+        .root
+        .join("artifacts/.imports-v1/records")
+        .join(format!(
+            "{}.json",
+            arkdeck_contract::sha256_hex(b"published-patch")
+        ));
+    let durable = fs::read(&record_path).unwrap();
+    runtime.stop();
+    runtime.start();
+    let payload_path = runtime
+        .root
+        .join("artifacts")
+        .join(patch_receipt["importId"].as_str().unwrap())
+        .join(patch_receipt["receipt"]["artifactId"].as_str().unwrap());
+    let payload = fs::read(&payload_path).unwrap();
+    for attempt in 0..2 {
+        let proxy_path = runtime.root.join(format!("inspect-proxy-{attempt}.sock"));
+        let listener = UnixListener::bind(&proxy_path).unwrap();
+        fs::set_permissions(&proxy_path, fs::Permissions::from_mode(0o600)).unwrap();
+        let endpoint = runtime.socket();
+        let proxy = std::thread::spawn(move || {
+            let (client, _) = listener.accept().unwrap();
+            client
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .unwrap();
+            let mut client = BufReader::new(client);
+            let upstream = UnixStream::connect(endpoint).unwrap();
+            upstream
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .unwrap();
+            let mut upstream = BufReader::new(upstream);
+            let mut methods = Vec::new();
+            loop {
+                let mut request = String::new();
+                if client.read_line(&mut request).unwrap() == 0 {
+                    break;
+                }
+                let request_value: Value = serde_json::from_str(&request).unwrap();
+                methods.push(request_value["method"].as_str().unwrap().to_owned());
+                upstream.get_mut().write_all(request.as_bytes()).unwrap();
+                let mut response = String::new();
+                assert!(upstream.read_line(&mut response).unwrap() > 0);
+                client.get_mut().write_all(response.as_bytes()).unwrap();
+            }
+            methods
+        });
+        let output = runtime.cli_at(
+            &upload_args(
+                "workspace-patch",
+                "published-patch",
+                patch.to_str().unwrap(),
+            ),
+            &proxy_path,
+            &std::env::current_exe().unwrap(),
+        );
+        let methods = proxy.join().unwrap();
+        assert_eq!(
+            methods
+                .iter()
+                .filter(|method| method.starts_with("artifact.import."))
+                .cloned()
+                .collect::<Vec<_>>(),
+            ["artifact.import.inspect"]
+        );
+        assert!(!output.status.success());
+        let envelope: Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(envelope["error"]["code"], "internalError");
+        assert_eq!(
+            envelope["error"]["details"]["method"],
+            "artifact.import.inspect"
+        );
+        assert_eq!(envelope["error"]["details"]["wireCode"], "internalError");
+        // commit already succeeded under its own published response schema.
+        // A later inspect-schema refusal must not rewrite that durable receipt.
+        assert_eq!(fs::read(&record_path).unwrap(), durable);
+        assert_eq!(fs::read(&payload_path).unwrap(), payload);
+        runtime.stop();
+        runtime.start();
+        let read = runtime.cli(&[
+            "artifact",
+            "read",
+            "--import",
+            accepted["importId"].as_str().unwrap(),
+            "--artifact",
+            accepted["receipt"]["artifactId"].as_str().unwrap(),
+        ]);
+        assert_eq!(
+            read["base64"],
+            arkdeck_contract::encode_import_chunk(hap_bytes).unwrap()
+        );
+    }
 }

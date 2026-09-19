@@ -39,3 +39,28 @@ That process test exposed previously unrecorded existing Swift shapes: nullable 
 ## Remaining boundaries
 
 Import lease consumption, materialization/Job-reference inspection (`artifact.import.inspection`), serialized release/unpin, and deployed HAP/native-library workflows are separate pending work. Import leases still fail closed in the planner; no incomplete receipt can become an input. Flash-bundle commit is unavailable until its registered bundle validator/policy is integrated. HAP ZIP-header validation and native OH signature-block structural validation do not attest certificate validity, signer trust, or device-install acceptance. This slice neither changes device authority nor claims real-device GJ evidence, signing-tool execution, App installation cutover, or Swift retirement.
+
+## Exact published-method compatibility
+
+The final expanded gate remains pending. The latest full attempt passed Swift and
+the development/candidate Rust paths, but the published view exposed an actual
+phase-specific contract mismatch: its workspace-patch commit succeeds, while the
+subsequent request-ID inspect after restart refuses the receipt shape. The runner
+continues later views after an earlier failure; advancing to candidate is not
+proof that published passed.
+
+The test recognizes only the known old `artifact.import.inspect` schema SHA-256
+`b2d5133ea4edcf927ef71857afeea275efe136b3d90fb6dd2b766a46ad3d0698`, verified
+identical in protected main `187321ea` and `08509db`. Under it, the actual CLI and
+daemon commit HAP and patch successfully, restart, and prove patch retry returns
+`internalError` for `artifact.import.inspect`. A proxy records exactly one Import
+method, inspect, with no second commit. Both receipt and payload remain byte-for-
+byte unchanged through two restart/retry cycles; HAP readback remains successful.
+No zero-commit claim is made. Every other method schema, including the new
+`4749e22e19a74414688712b9619c0910d21290fe3778cf00aefcf7b7a887eeb7`, must run
+the original complete three-format success/lost-reply journey.
+
+Targeted current-schema process test passed (3.51 seconds). The existing source-
+view materializer generated an isolated published view from `08509db`; its actual
+CLI/daemon process test passed (1.38 seconds) with the final proxy assertions.
+Production validators, schema pins and the full-gate selection were not relaxed.
