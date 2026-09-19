@@ -5,6 +5,8 @@ use arkdeck_contract::{WireError, canonical_json};
 use arkdeck_platform::{DocumentPublishError, HostDirectory, HostReadLock};
 use serde_json::{Value, json};
 use std::{fs::Metadata, io, os::unix::fs::MetadataExt, path::Path};
+#[path = "deveco_pins.rs"]
+pub(crate) mod pins;
 const MAX_INDEX: usize = 4 * 1024 * 1024;
 const BUNDLES: &str = "bundles.json";
 const TOOLS: &str = "tools.json";

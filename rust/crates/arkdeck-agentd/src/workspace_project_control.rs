@@ -355,3 +355,107 @@ fn actual_host_registers_updates_and_removes_presets_without_dependency_owners()
     drop(control);
     fs::remove_dir_all(root).unwrap();
 }
+
+/// The isolated daemon's own composition: a preset's toolchain is pinned in
+/// this owner's bootstrap registry, as Swift pins it in its DevEco registry.
+/// With nothing registered there, the registry's own refusal reaches the
+/// caller and nothing of the preset is written. A signing preset still wants
+/// the credential owner, which this composition does not have.
+#[test]
+fn actual_host_pins_a_preset_toolchain_in_its_own_bootstrap_registry() {
+    let root = std::env::temp_dir().canonicalize().unwrap().join(format!(
+        "workspace-preset-pin-{:x}",
+        u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
+    ));
+    fs::DirBuilder::new().mode(0o700).create(&root).unwrap();
+    for name in ["owner", "jobs", "bootstrap", "project"] {
+        fs::DirBuilder::new()
+            .mode(0o700)
+            .create(root.join(name))
+            .unwrap();
+    }
+    let control = Control::new(
+        crate::host::Host::from_environment()
+            .with_workspace_projects(
+                WorkspaceProjectStore::open(&root.join("owner"))
+                    .unwrap()
+                    .with_dependency_pinning(
+                        Some(crate::host::toolchain_pinning(&root.join("bootstrap")).unwrap()),
+                        None,
+                    ),
+            )
+            .with_jobs(arkdeck_hoststore::JobStore::open_owner(&root.join("jobs")).unwrap()),
+    )
+    .unwrap();
+    let call = |method: &str, params: Value| {
+        let request = Request::new(
+            "workspace-4",
+            method,
+            Some(serde_json::from_value(params).unwrap()),
+        );
+        let frame = encode_frame(&request, arkdeck_contract::MAX_REQUEST_BYTES).unwrap();
+        let bytes = control.handle_frame(frame.trim_ascii_end());
+        decode_response(bytes.trim_ascii_end(), "workspace-4", method)
+            .unwrap()
+            .outcome
+    };
+    let project = call(
+        "workspace.project.register",
+        json!({"registrationRequestId": "request-4", "kind": "openharmony",
+               "root": root.join("project").to_str().unwrap()}),
+    )
+    .unwrap()["projectRef"]
+        .clone();
+    let document = || fs::read(root.join("owner/projects.json")).unwrap();
+    let before = document();
+    let toolchain = format!("toolchain:sha256:{}", "b".repeat(64));
+    let refused = call(
+        "workspace.preset.register",
+        json!({"registrationRequestId": "build", "projectRef": project, "kind": "build",
+               "templateRef": "openharmony.hvigor-build@1", "timeoutSeconds": "600",
+               "toolchainRef": toolchain, "toolchainGeneration": "1", "module": "entry",
+               "product": "default", "buildMode": "debug"}),
+    )
+    .unwrap_err();
+    assert_eq!(
+        (
+            refused.code.as_str(),
+            refused.message.as_str(),
+            refused.details.map(|details| details["phase"].clone())
+        ),
+        (
+            "resourceNotFound",
+            "toolchain reference does not exist",
+            Some(json!("workspacePresetOwner"))
+        ),
+        "the DevEco owner's own refusal reaches the caller"
+    );
+    assert_eq!(document(), before, "a refused pin writes nothing");
+    let signing = call(
+        "workspace.preset.register",
+        json!({"registrationRequestId": "signing", "projectRef": project, "kind": "signing",
+               "templateRef": "openharmony.local-sign@1", "timeoutSeconds": "600",
+               "toolchainRef": toolchain, "toolchainGeneration": "1",
+               "credentialRef": format!("credential:sha256-{}", "c".repeat(64))}),
+    )
+    .unwrap_err();
+    assert_eq!(
+        (signing.code.as_str(), signing.message.as_str()),
+        (
+            "operationUnavailable",
+            "signing credential reference owner is unavailable"
+        )
+    );
+    assert_eq!(document(), before);
+    // A preset that pins nothing is still served in full.
+    let symbol = call(
+        "workspace.preset.register",
+        json!({"registrationRequestId": "symbol", "projectRef": project, "kind": "symbol",
+               "templateRef": "openharmony.arkts-symbol@1", "timeoutSeconds": "60",
+               "relativeSourceMap": "entry/a.map"}),
+    )
+    .unwrap();
+    assert_eq!(symbol["configurationStatus"], "runtimeRestartRequired");
+    drop(control);
+    fs::remove_dir_all(root).unwrap();
+}
