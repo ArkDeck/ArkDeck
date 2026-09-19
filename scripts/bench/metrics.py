@@ -1,9 +1,11 @@
 """The measurements themselves, and the design rows they do and do not cover.
 
-Design section I.2 lists twelve metric rows.  This module measures the ones a
-macOS host can measure honestly with no device attached, no Rust workspace and
-no UI lane, and declares every remaining row as a gap with the reason it is
-blocked.  A row is never silently dropped: an omission would read as coverage.
+Design section I.2 lists thirteen metric rows (the IPC row is split into a
+fixed-size and a paged leg).  This module measures the ones a macOS host can
+measure honestly with no device attached and no UI lane, on either the Swift or
+the Rust daemon, and declares every remaining row as a gap with the reason it
+is blocked on that daemon.  A row is never silently dropped: an omission would
+read as coverage.
 
 Noise control follows the design's own prescription for the PR lane — each run
 also times a fixed calibration workload, so a latency can be reported as a
@@ -106,18 +108,45 @@ METRIC_DEFINITIONS: dict[str, tuple[str, str, str]] = {
 }
 
 
-def gap_definitions() -> dict[str, baseline.Gap]:
-    """Design rows this host cannot measure, with the reason for each."""
+RUNTIME_KINDS = ("swift", "rust")
 
-    return {
+
+def gap_definitions(runtime_kind: str = "swift") -> dict[str, baseline.Gap]:
+    """Design rows this harness cannot measure on the given daemon, and why.
+
+    Most reasons hold for both compositions.  Two rows differ: the Swift
+    engine's recovery is measured elsewhere, while the Rust owner has not
+    ported recovery at all; and the Rust daemon additionally refuses
+    `job.reconcile`.  A reason that was true of an earlier protocol is not
+    carried forward: a committed document that states it would be wrong.
+    """
+
+    if runtime_kind not in RUNTIME_KINDS:
+        raise ValueError("runtime_kind must be swift or rust")
+    rust = runtime_kind == "rust"
+    gaps = {
         "daemon.warmStartRecovery": baseline.Gap(
             "daemon.warmStartRecovery",
             "I.2 rows 2 and 7 (warm start and 10k journal/history recovery)",
-            "measured today by JournalRecoveryContractTests under "
-            "ARKDECK_RUN_LONG_JOURNAL_TESTS=1 in the nightly slow lane; the "
-            "measurement exists but is neither archived nor comparable across "
-            "runs, so no baseline value can be carried here yet",
-            "no cross-run archiving for the existing slow lane",
+            (
+                "JournalRecoveryContractTests in the Swift nightly slow lane "
+                "time the Swift engine, not this daemon; the Rust owner has no "
+                "10k-event journal or 10k-Job fixture, and it ports journal "
+                "recovery and restart reconciliation only after design section "
+                "L.1 item 13 is ruled"
+            )
+            if rust
+            else (
+                "measured today by JournalRecoveryContractTests under "
+                "ARKDECK_RUN_LONG_JOURNAL_TESTS=1 in the nightly slow lane; the "
+                "measurement exists but is neither archived nor comparable across "
+                "runs, so no baseline value can be carried here yet"
+            ),
+            (
+                "design section L.1 item 13 (recovery ruling) and a Rust 10k fixture"
+                if rust
+                else "no cross-run archiving for the existing slow lane"
+            ),
         ),
         "app.timeToInteractive": baseline.Gap(
             "app.timeToInteractive",
@@ -132,19 +161,53 @@ def gap_definitions() -> dict[str, baseline.Gap]:
             "no named-pipe transport exists on any platform yet",
             "TASK-XPA-002 (Windows transport)",
         ),
+        "ipc.xpc": baseline.Gap(
+            "ipc.xpc",
+            "I.2 row 4 (IPC, XPC leg)",
+            "the XPC leg accepts only the signed App as its peer, and this "
+            "harness is an unsigned Unix-domain-socket client; "
+            "RuntimeXPCTransportCostTests publishes relative XPC cost only"
+            + (
+                "; the Rust daemon's XPC ingress is also opt-in "
+                "(ARKDECK_APP_INGRESS=history)"
+                if rust
+                else ""
+            ),
+            "an absolute XPC measurement from a client the daemon accepts",
+        ),
         "job.eventsWait": baseline.Gap(
             "job.eventsWait",
             "I.2 row 5 (job.events.wait idle CPU)",
-            "job.events.wait is a protocol 2.x proposal in design section F.2 "
-            "and does not exist in any published method table",
-            "the protocol 2.1.0 method table (TASK-XPA-001)",
+            "job.events.wait is a proposal in design section F.2 and is not in "
+            "the published single v1 method table; only the job.events pull "
+            "page exists",
+            "a registry, schema and client change that publishes job.events.wait",
+        ),
+        "job.journalAppend": baseline.Gap(
+            "job.journalAppend",
+            "I.2 row 5 (journal append per event)",
+            "no leg times a durable journal append: this harness only reads, "
+            "and the soak appends journals without timing them; the Swift "
+            "per-event figure came from JournalRecoveryContractTests' opt-in "
+            "journal benchmark, which times the Swift engine",
+            "a timed durable-append leg over a 1,000-event Job",
+        ),
+        "job.eventsPage": baseline.Gap(
+            "job.eventsPage",
+            "I.2 row 5 (job.events 1,000-row page)",
+            "job.events is published and read-only, but every seeded Job is an "
+            "observe.device Job carrying a handful of events, not the "
+            "1,000-event Job the budget is written for; a page of a seeded Job "
+            "would only budget its own scale",
+            "a fixture that produces a 1,000-event Job",
         ),
         "artifact.pagedRead": baseline.Gap(
             "artifact.pagedRead",
             "I.2 row 6 (large artifact transfer, paged base64 leg)",
-            "measurable in principle through artifact.read, but the 128 MiB and "
-            "1 GiB fixtures are built by the opt-in slow artifact tests rather "
-            "than by this harness",
+            "measurable in principle through artifact.read, but a seeded Job's "
+            "Artifacts total a few kilobytes and the 128 MiB and 1 GiB "
+            "fixtures are built only by the Swift opt-in slow artifact tests, "
+            "not by this harness",
             "artifact fixture generation in the perf lane",
         ),
         "artifact.open": baseline.Gap(
@@ -155,13 +218,33 @@ def gap_definitions() -> dict[str, baseline.Gap]:
             "be baselined before it is decided",
             "a maintainer ruling on the zero-copy artifact path",
         ),
+        "daemon.busyResources": baseline.Gap(
+            "daemon.busyResources",
+            "I.2 row 8 (busy resource footprint)",
+            "the resource window samples an idle daemon only; a busy footprint "
+            "needs a Golden Journey loop driving the daemon, and this harness "
+            "is read-only by construction and submits no operation",
+            "a harness leg that drives a Golden Journey loop on the isolated daemon",
+        ),
         "job.cancelReconcile": baseline.Gap(
             "job.cancelReconcile",
             "I.2 row 9 (cancel and reconcile latency)",
-            "job.cancel and job.reconcile are published only on protocol 1.x, "
-            "so a 2.x measurement client cannot reach them, and the terminal "
-            "leg needs an HDC child process on a real device",
-            "TASK-XPA-001 (2.1.0 publication) and a device window",
+            "the row times the cancellation of a running readOnly Job; this "
+            "harness is read-only by construction and never submits the Job it "
+            "would cancel, and the terminal leg needs an HDC child process on a "
+            "real device"
+            + (
+                "; the Rust daemon also refuses job.reconcile as unavailable in "
+                "its read-only foundation"
+                if rust
+                else ""
+            ),
+            (
+                "design section L.1 item 13 (recovery ruling), a harness leg that "
+                "submits and cancels a Job, and a device window"
+                if rust
+                else "a harness leg that submits and cancels a Job, and a device window"
+            ),
         ),
         "viewer.scale": baseline.Gap(
             "viewer.scale",
@@ -185,6 +268,7 @@ def gap_definitions() -> dict[str, baseline.Gap]:
             "TASK-XPA-022 (Windows packaging) and a macOS installer producer",
         ),
     }
+    return gaps
 
 
 class RunContext:

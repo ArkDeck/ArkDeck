@@ -122,6 +122,65 @@ class HostGuardTests(unittest.TestCase):
         )
 
 
+class QuietWaitTests(unittest.TestCase):
+    """The bounded wait for a quiet host before each run."""
+
+    def _wait(self, loads: list[float], budget: float, poll: float = 5.0):
+        clock = {"now": 100.0}
+        sleeps: list[float] = []
+        readings = iter(loads)
+
+        def fake_sleep(seconds: float) -> None:
+            sleeps.append(seconds)
+            clock["now"] += seconds
+
+        patches = (
+            mock.patch.object(harness, "cpu_count", return_value=8),
+            mock.patch.object(
+                harness, "load_average", side_effect=lambda: (next(readings), 0.0, 0.0)
+            ),
+            mock.patch.object(
+                harness.clocks, "elapsed_seconds", side_effect=lambda: clock["now"]
+            ),
+            mock.patch.object(harness.time, "sleep", side_effect=fake_sleep),
+        )
+        with patches[0], patches[1], patches[2], patches[3]:
+            try:
+                return harness.wait_for_quiet_host(budget, poll), sleeps
+            except harness.HostTooBusy as error:
+                return error, sleeps
+
+    def test_a_quiet_host_starts_at_once(self) -> None:
+        result, sleeps = self._wait([1.0], budget=600)
+        self.assertEqual(result, (1.0, 0.0))
+        self.assertEqual(sleeps, [])
+
+    def test_without_a_budget_a_loaded_host_is_refused_at_once(self) -> None:
+        result, sleeps = self._wait([4.1], budget=0)
+        self.assertIsInstance(result, harness.HostTooBusy)
+        self.assertEqual(sleeps, [])
+
+    def test_a_loaded_host_is_waited_for_until_it_goes_quiet(self) -> None:
+        result, sleeps = self._wait([5.0, 4.5, 3.9], budget=600)
+        self.assertEqual(result, (3.9, 10.0))
+        self.assertEqual(sleeps, [5.0, 5.0])
+
+    def test_the_ceiling_itself_counts_as_quiet(self) -> None:
+        result, _ = self._wait([4.0], budget=0)
+        self.assertEqual(result, (4.0, 0.0))
+
+    def test_the_wait_is_bounded_and_then_refuses(self) -> None:
+        result, sleeps = self._wait([9.0] * 10, budget=12)
+        self.assertIsInstance(result, harness.HostTooBusy)
+        self.assertEqual(sleeps, [5.0, 5.0])
+
+    def test_nonsense_budgets_are_refused(self) -> None:
+        with self.assertRaises(ValueError):
+            harness.wait_for_quiet_host(-1)
+        with self.assertRaises(ValueError):
+            harness.wait_for_quiet_host(10, poll_seconds=0)
+
+
 class SocketPathTests(unittest.TestCase):
     def test_unknown_runtime_is_refused_before_spawn(self) -> None:
         with self.assertRaises(ValueError):
@@ -241,41 +300,96 @@ class MetricTableTests(unittest.TestCase):
             self.assertTrue(description, name)
 
     def test_every_gap_names_a_reason_and_what_blocks_it(self) -> None:
-        for name, gap in metrics.gap_definitions().items():
-            self.assertEqual(gap.metric_id, name)
-            self.assertTrue(gap.reason, name)
-            self.assertTrue(gap.blocked_by, name)
+        for kind in metrics.RUNTIME_KINDS:
+            for name, gap in metrics.gap_definitions(kind).items():
+                self.assertEqual(gap.metric_id, name)
+                self.assertTrue(gap.reason, name)
+                self.assertTrue(gap.blocked_by, name)
 
     def test_no_metric_is_both_measured_and_a_gap(self) -> None:
-        self.assertEqual(
-            set(metrics.METRIC_DEFINITIONS) & set(metrics.gap_definitions()), set()
-        )
+        for kind in metrics.RUNTIME_KINDS:
+            self.assertEqual(
+                set(metrics.METRIC_DEFINITIONS) & set(metrics.gap_definitions(kind)),
+                set(),
+            )
 
     def test_the_twelve_design_rows_are_all_accounted_for(self) -> None:
-        rows = {
-            entry[1].split("(")[0].strip()
-            for entry in metrics.METRIC_DEFINITIONS.values()
-        } | {
-            gap.design_row.split("(")[0].strip()
-            for gap in metrics.gap_definitions().values()
-        }
-        numbered = {row for row in rows if row.startswith("I.2 row")}
+        for kind in metrics.RUNTIME_KINDS:
+            rows = {
+                entry[1].split("(")[0].strip()
+                for entry in metrics.METRIC_DEFINITIONS.values()
+            } | {
+                gap.design_row.split("(")[0].strip()
+                for gap in metrics.gap_definitions(kind).values()
+            }
+            numbered = {row for row in rows if row.startswith("I.2 row")}
+            self.assertEqual(
+                numbered,
+                {
+                    "I.2 row 1",
+                    "I.2 rows 2 and 7",
+                    "I.2 row 3",
+                    "I.2 row 4",
+                    "I.2 row 5",
+                    "I.2 row 6",
+                    "I.2 row 8",
+                    "I.2 row 9",
+                    "I.2 row 10",
+                    "I.2 row 11",
+                    "I.2 row 12",
+                },
+                kind,
+            )
+
+    def test_both_compositions_declare_the_same_gaps(self) -> None:
+        def documents(gaps: dict) -> dict:
+            return {name: gap.as_document() for name, gap in gaps.items()}
+
         self.assertEqual(
-            numbered,
-            {
-                "I.2 row 1",
-                "I.2 rows 2 and 7",
-                "I.2 row 3",
-                "I.2 row 4",
-                "I.2 row 5",
-                "I.2 row 6",
-                "I.2 row 8",
-                "I.2 row 9",
-                "I.2 row 10",
-                "I.2 row 11",
-                "I.2 row 12",
-            },
+            documents(metrics.gap_definitions()),
+            documents(metrics.gap_definitions("swift")),
         )
+        self.assertEqual(
+            set(metrics.gap_definitions("swift")), set(metrics.gap_definitions("rust"))
+        )
+
+    def test_the_legs_the_spk_1_report_found_undeclared_are_declared(self) -> None:
+        # docs/design/cross-platform/spk-1-macos-performance-baseline.md: the
+        # document under-reported its gaps by the XPC leg and the job.events page.
+        for kind in metrics.RUNTIME_KINDS:
+            gaps = metrics.gap_definitions(kind)
+            self.assertIn("ipc.xpc", gaps)
+            self.assertIn("job.eventsPage", gaps)
+            # Design row "Job event/log stream throughput" budgets three things:
+            # the durable append, the 1,000-row page and the wait's idle CPU.
+            self.assertIn("job.journalAppend", gaps)
+            self.assertIn("job.eventsWait", gaps)
+            # Design row "idle/busy CPU, RSS, threads, fd/handle" notes the busy
+            # Golden Journey loop as unmeasured; the idle window is not it.
+            self.assertIn("daemon.busyResources", gaps)
+
+    def test_rust_gaps_name_the_rust_blockers(self) -> None:
+        gaps = metrics.gap_definitions("rust")
+        recovery = gaps["daemon.warmStartRecovery"]
+        self.assertIn("L.1 item 13", recovery.reason)
+        self.assertIn("L.1 item 13", recovery.blocked_by)
+        self.assertIn("job.reconcile", gaps["job.cancelReconcile"].reason)
+        self.assertIn("ARKDECK_APP_INGRESS", gaps["ipc.xpc"].reason)
+        swift = metrics.gap_definitions("swift")
+        self.assertNotIn("L.1 item 13", swift["daemon.warmStartRecovery"].reason)
+        self.assertNotIn("job.reconcile", swift["job.cancelReconcile"].reason)
+
+    def test_no_gap_repeats_the_retired_protocol_split(self) -> None:
+        # Single v1 publishes job.cancel and job.reconcile; a reason saying a
+        # 2.x client cannot reach them would be false in a committed document.
+        for kind in metrics.RUNTIME_KINDS:
+            for gap in metrics.gap_definitions(kind).values():
+                for retired in ("1.x", "2.x", "2.1.0"):
+                    self.assertNotIn(retired, gap.reason + gap.blocked_by, gap.metric_id)
+
+    def test_an_unknown_composition_has_no_gap_table(self) -> None:
+        with self.assertRaises(ValueError):
+            metrics.gap_definitions("guess")
 
     def test_the_seed_restart_interval_is_pinned(self) -> None:
         # The soak fixture completes one cycle per restart interval, so this

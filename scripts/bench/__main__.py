@@ -52,6 +52,16 @@ def _minimum_runs(value: str) -> int:
     return parsed
 
 
+def _non_negative_seconds(value: str) -> float:
+    try:
+        parsed = float(value)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(f"{value} is not a number") from error
+    if parsed < 0:
+        raise argparse.ArgumentTypeError(f"{value} must not be negative")
+    return parsed
+
+
 def _ratio(value: str) -> float:
     try:
         parsed = float(value)
@@ -139,11 +149,14 @@ def command_capture(arguments: argparse.Namespace) -> int:
         )
 
     for index in range(arguments.runs):
+        # An advisory capture does not wait: it records the load it started at.
+        wait_budget = 0.0 if arguments.allow_loaded_host else arguments.quiet_wait_seconds
+        waited = 0.0
         try:
-            load_start = harness.assert_host_is_quiet()
+            load_start, waited = harness.wait_for_quiet_host(wait_budget)
         except harness.HostTooBusy as error:
             if not arguments.allow_loaded_host:
-                print(f"bench: {error}", file=sys.stderr)
+                print(f"bench: run {index}: {error}", file=sys.stderr)
                 return 1
             load_start = harness.load_average()[0]
             disqualifiers.append(
@@ -174,6 +187,7 @@ def command_capture(arguments: argparse.Namespace) -> int:
                 "startedAtUtc": started_at,
                 "finishedAtUtc": clocks.utc_now(),
                 "loadAverageOneMinuteStart": round(load_start, 3),
+                "quietWaitSeconds": round(waited, 1),
                 "loadAverageOneMinuteEnd": round(harness.load_average()[0], 3),
                 "measuredMetrics": sorted(samples),
                 "scale": scale,
@@ -188,12 +202,15 @@ def command_capture(arguments: argparse.Namespace) -> int:
     toolchain = _toolchain_facts(arguments.daemon, arguments.soak)
     toolchain["buildConfiguration"] = arguments.build_configuration
     toolchain["runtimeKind"] = arguments.runtime_kind
+    task, spike = baseline.document_identity(arguments.runtime_kind)
     document = baseline.build_document(
         host=harness.host_facts(),
         toolchain=toolchain,
         runs=run_records,
         metrics=results,
-        gaps=metrics.gap_definitions(),
+        gaps=metrics.gap_definitions(arguments.runtime_kind),
+        task=task,
+        spike=spike,
         baseline_eligible=not disqualifiers,
         eligibility_reason=(
             "; ".join(disqualifiers)
@@ -298,6 +315,16 @@ def build_parser() -> argparse.ArgumentParser:
     capture.add_argument("--calibration-samples", type=_positive_int, default=200)
     capture.add_argument("--seed-seconds", type=_positive_int, default=6)
     capture.add_argument("--seed-jobs-per-cycle", type=_positive_int, default=10)
+    capture.add_argument(
+        "--quiet-wait-seconds",
+        type=_non_negative_seconds,
+        default=0.0,
+        help=(
+            "before each run, wait up to this long for a loaded host to go "
+            "quiet instead of refusing at once; a run still starts only on a "
+            "quiet host, and the wait is recorded per run"
+        ),
+    )
     capture.add_argument(
         "--allow-loaded-host",
         action="store_true",
