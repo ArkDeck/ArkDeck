@@ -105,14 +105,74 @@ impl TargetDocument {
             .map(|t| t.target_id.clone())
             .collect()
     }
-    /// A canonical HDC route with a proven alias also needs the live route
-    /// observation owner. Import must not substitute the presentation digest.
-    pub fn has_hdc_alias(&self, target_id: &str) -> bool {
-        self.resolutions
+    /// Swift `RuntimeTargetStore.hdcExecutionRoute`: the Target and the
+    /// connect key its HDC commands use, or none for a Target never adopted.
+    /// A Target without a proven alias uses its adopted key. With one, the
+    /// alias Target must be exactly the one the resolution proved (identity,
+    /// revision and the digest of its key); then a fresh live observation
+    /// (`live`: each candidate's key and state) selects the sole Connected
+    /// key of the two, and without one the alias's key is used, as Swift does
+    /// before its first observation and for host-only Artifact binding.
+    /// Errors are Swift's `BootstrapError`, as Swift interpolates it.
+    pub fn hdc_route(
+        &self,
+        target_id: &str,
+        live: Option<&[(String, String)]>,
+    ) -> Result<Option<(&TargetRecord, String)>, String> {
+        let store = |detail: &str| format!("storeFailure(\"{detail}\")");
+        let mut targets = self.targets.iter().filter(|t| t.target_id == target_id);
+        let target = match (targets.next(), targets.next()) {
+            (_, Some(_)) => return Err(store("HDC execution target is ambiguous")),
+            (None, None) => return Ok(None),
+            (Some(target), None) => target,
+        };
+        let mut resolutions = self
+            .resolutions
             .as_deref()
             .unwrap_or_default()
             .iter()
-            .any(|r| r.canonical == target_id)
+            .filter(|r| r.canonical == target_id);
+        let resolution = match (resolutions.next(), resolutions.next()) {
+            (_, Some(_)) => return Err(store("HDC execution route is ambiguous")),
+            (None, None) => return Ok(Some((target, target.connect_key.clone()))),
+            (Some(resolution), None) => resolution,
+        };
+        let mut aliases = self
+            .targets
+            .iter()
+            .filter(|t| t.target_id == resolution.alias);
+        let alias = match (aliases.next(), aliases.next()) {
+            (Some(alias), None)
+                if alias.identity == resolution.alias_identity
+                    && alias.binding_revision == resolution.alias_revision
+                    && sha256_hex(alias.connect_key.as_bytes()) == resolution.routed_identity =>
+            {
+                alias
+            }
+            _ => return Err(store("HDC execution route lacks its proven alias target")),
+        };
+        let Some(live) = live else {
+            return Ok(Some((target, alias.connect_key.clone())));
+        };
+        let connected: BTreeSet<&str> = live
+            .iter()
+            .filter(|(key, state)| {
+                state == "Connected" && (*key == target.connect_key || *key == alias.connect_key)
+            })
+            .map(|(key, _)| key.as_str())
+            .collect();
+        let mut connected = connected.into_iter();
+        match (connected.next(), connected.next()) {
+            (Some(key), None) => Ok(Some((target, key.to_owned()))),
+            (None, _) => Err(format!(
+                "observationFailed(\"fresh HDC observation found no Connected proven route for \
+                 target {target_id}\")"
+            )),
+            (Some(_), Some(_)) => Err(format!(
+                "observationFailed(\"fresh HDC observation found multiple Connected proven routes \
+                 for target {target_id}\")"
+            )),
+        }
     }
     pub fn candidate_target(&self, key: &str) -> Option<&TargetRecord> {
         let direct = self.targets.iter().find(|t| matches!((crate::canonical_host_text(&t.connect_key),crate::canonical_host_text(key)),(Ok(a),Ok(b)) if a==b))?;
@@ -311,6 +371,99 @@ mod tests {
         assert_eq!(
             doc.candidate_target("alias-address").unwrap().target_id,
             "target-main"
+        );
+    }
+    fn key(
+        doc: &TargetDocument,
+        target: &str,
+        live: Option<&[(&str, &str)]>,
+    ) -> Result<Option<String>, String> {
+        let live: Option<Vec<(String, String)>> = live.map(|rows| {
+            rows.iter()
+                .map(|(key, state)| (key.to_string(), state.to_string()))
+                .collect()
+        });
+        doc.hdc_route(target, live.as_deref())
+            .map(|route| route.map(|(record, key)| format!("{}@{key}", record.target_id)))
+    }
+    /// Swift `testProvenAliasResolutionUsesOnlyFreshConnectedOwnedRouteAndPreservesHistory`.
+    #[test]
+    fn a_proven_alias_routes_the_canonical_target_as_swift_does() {
+        let doc = TargetDocument::decode(&serde_json::to_vec(&fixture()).unwrap()).unwrap();
+        let routed = |live| key(&doc, "target-main", live);
+        // Before any fresh observation: the proven alias's address.
+        assert_eq!(routed(None), Ok(Some("target-main@alias-address".into())));
+        // A fresh unique observation wins, whichever of the two it shows.
+        assert_eq!(
+            routed(Some(&[("main-address", "Connected")])),
+            Ok(Some("target-main@main-address".into()))
+        );
+        assert_eq!(
+            routed(Some(&[
+                ("alias-address", "Connected"),
+                ("elsewhere", "Connected")
+            ])),
+            Ok(Some("target-main@alias-address".into()))
+        );
+        let none = "observationFailed(\"fresh HDC observation found no Connected proven route for \
+                    target target-main\")";
+        for live in [
+            &[("main-address", "Offline"), ("alias-address", "Offline")][..],
+            &[("elsewhere", "Connected")][..],
+            &[][..],
+        ] {
+            assert_eq!(routed(Some(live)), Err(none.into()), "{live:?}");
+        }
+        assert_eq!(
+            routed(Some(&[
+                ("main-address", "Connected"),
+                ("alias-address", "Connected")
+            ])),
+            Err(
+                "observationFailed(\"fresh HDC observation found multiple Connected proven \
+                 routes for target target-main\")"
+                    .into()
+            )
+        );
+        // A Target without an alias of its own keeps its adopted key; one
+        // never adopted has no route.
+        assert_eq!(
+            key(&doc, "target-alias", Some(&[])),
+            Ok(Some("target-alias@alias-address".into()))
+        );
+        assert_eq!(key(&doc, "target-other", None), Ok(None));
+    }
+    #[test]
+    fn an_alias_target_the_resolution_did_not_prove_fails_closed() {
+        let lacks =
+            Err("storeFailure(\"HDC execution route lacks its proven alias target\")".to_owned());
+        for drift in ["connectKey", "identity", "revision"] {
+            let mut doc = TargetDocument::decode(&serde_json::to_vec(&fixture()).unwrap()).unwrap();
+            let alias = &mut doc.targets[0];
+            match drift {
+                "connectKey" => alias.connect_key = "moved-address".into(),
+                "identity" => alias.identity = "d".repeat(64),
+                _ => alias.binding_revision = 9,
+            }
+            assert_eq!(key(&doc, "target-main", None), lacks, "{drift}");
+        }
+        let mut doc = TargetDocument::decode(&serde_json::to_vec(&fixture()).unwrap()).unwrap();
+        doc.targets.remove(0);
+        assert_eq!(key(&doc, "target-main", None), lacks);
+        let mut doc = TargetDocument::decode(&serde_json::to_vec(&fixture()).unwrap()).unwrap();
+        let second: Resolution =
+            serde_json::from_value(fixture()["aliasResolutions"][0].clone()).unwrap();
+        doc.resolutions.as_mut().unwrap().push(second);
+        assert_eq!(
+            key(&doc, "target-main", None),
+            Err("storeFailure(\"HDC execution route is ambiguous\")".into())
+        );
+        let mut doc = TargetDocument::decode(&serde_json::to_vec(&fixture()).unwrap()).unwrap();
+        let duplicate = doc.targets[1].clone();
+        doc.targets.push(duplicate);
+        assert_eq!(
+            key(&doc, "target-main", None),
+            Err("storeFailure(\"HDC execution target is ambiguous\")".into())
         );
     }
     #[test]

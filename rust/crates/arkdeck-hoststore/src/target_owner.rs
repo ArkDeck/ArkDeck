@@ -41,10 +41,16 @@ impl ObservationReference {
             && same_text(&self.observation_id, &other.observation_id)
     }
 }
+/// Swift `liveHDCCandidateObservation`: the last provider-verified candidate
+/// list, each key and state, and when it was read.
+type LiveCandidates = Option<(Vec<(String, String)>, std::time::Instant)>;
 pub struct TargetStore {
     path: PathBuf,
     root: HostDirectory,
+    live: std::sync::Mutex<LiveCandidates>,
 }
+/// Swift `routeObservationFreshnessSeconds`.
+const ROUTE_OBSERVATION_FRESHNESS: std::time::Duration = std::time::Duration::from_secs(5);
 /// Swift `RuntimeTargetHDCRoute`: where an adopted Target's HDC commands go.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct HdcRoute {
@@ -239,6 +245,7 @@ impl TargetStore {
         let owner = Self {
             path: path.to_owned(),
             root: HostDirectory::open(path)?,
+            live: std::sync::Mutex::new(None),
         };
         owner
             .transaction("targetDisplayNameOwner", |targets, names| {
@@ -464,6 +471,7 @@ impl TargetStore {
         intent
             .validate()
             .map_err(|_| failure("invalidInput", "Invalid Import intent", phase))?;
+        let live = self.fresh_live_candidates();
         let mut binding = None;
         self.transaction(phase, |document, _| {
             let target = document
@@ -492,25 +500,39 @@ impl TargetStore {
                     resolved.stable_identity_sha256 = Some(target.identity.clone());
                 }
                 "hap" | "native-library" => {
-                    if document.has_hdc_alias(&target.target_id) {
-                        return Err(failure(
-                            "operationUnavailable",
-                            "Import requires the configured live alias route owner",
-                            phase,
-                        ));
-                    }
-                    // Swift hdcExecutionRoute uses the exact adopted connect key
-                    // for a Target without a proven alias, independently of live
-                    // candidate observations. The Import is bound to the
-                    // identity that key names
-                    // (`HDCObservationProviderAdapter.stableIdentitySHA256`): the
-                    // digest of the key lowercased, as the Target's device facts
-                    // and a Job's plan name it. Physical identity is not this
-                    // hash.
+                    // Swift binds the Import to the Target's current proven HDC
+                    // route (`hdcExecutionRoute`): the adopted key, or through a
+                    // proven post-Flash alias the key a fresh observation shows
+                    // Connected, else the alias's. The Import names the identity
+                    // that key names (`HDCObservationProviderAdapter
+                    // .stableIdentitySHA256`): the digest of the key lowercased,
+                    // as the Target's device facts and a Job's plan name it.
+                    // Physical identity is not this hash. A route Swift cannot
+                    // resolve falls to its handler's unreadable refusal.
+                    let key = match document.hdc_route(&target.target_id, live.as_deref()) {
+                        Ok(Some((routed, key)))
+                            if routed.binding_revision == target.binding_revision =>
+                        {
+                            key
+                        }
+                        Ok(_) => {
+                            return Err(failure(
+                                "resourceConflict",
+                                "Import requires the target's current proven HDC route",
+                                phase,
+                            ));
+                        }
+                        Err(_) => {
+                            return Err(failure(
+                                "recordUnreadable",
+                                "Import state or immutable content is unreadable",
+                                phase,
+                            ));
+                        }
+                    };
                     resolved.binding_revision = Some(target.binding_revision);
-                    resolved.stable_identity_sha256 = Some(
-                        arkdeck_provider_hdc::stable_identity_sha256(&target.connect_key),
-                    );
+                    resolved.stable_identity_sha256 =
+                        Some(arkdeck_provider_hdc::stable_identity_sha256(&key));
                 }
                 _ => return Err(failure("invalidInput", "Invalid Import kind", phase)),
             }
@@ -519,33 +541,48 @@ impl TargetStore {
         })?;
         binding.ok_or_else(|| unreadable(phase))
     }
-    /// Swift `RuntimeTargetStore.hdcExecutionRoute`: the adopted record's own
-    /// target, revision, tool version and connect key, or none for a Target
-    /// never adopted. A route through a proven alias needs the live candidate
-    /// observation Swift consults, which this owner does not hold, so such a
-    /// Target is refused rather than routed by its stale connect key.
+    /// Swift `recordLiveHDCCandidates`: one provider-verified candidate list
+    /// for live route selection, memory-only and fresh for five seconds. It
+    /// cannot create, rewrite or widen a Target or an alias.
+    pub(crate) fn record_live_candidates(
+        &self,
+        candidates: &[arkdeck_provider_hdc::DeviceCandidate],
+    ) {
+        if let Ok(mut live) = self.live.lock() {
+            *live = Some((
+                candidates
+                    .iter()
+                    .map(|candidate| (candidate.connect_key.clone(), candidate.state.clone()))
+                    .collect(),
+                std::time::Instant::now(),
+            ));
+        }
+    }
+
+    /// The live candidate list while it is fresh.
+    fn fresh_live_candidates(&self) -> Option<Vec<(String, String)>> {
+        let live = self.live.lock().ok()?;
+        let (candidates, observed_at) = live.as_ref()?;
+        (observed_at.elapsed() <= ROUTE_OBSERVATION_FRESHNESS).then(|| candidates.clone())
+    }
+
+    /// Swift `RuntimeTargetStore.hdcExecutionRoute`: the canonical record's
+    /// target, revision and tool version, and the connect key its HDC
+    /// commands use (`TargetDocument::hdc_route`: the adopted key, or through
+    /// a proven post-Flash alias the key a fresh observation shows Connected,
+    /// else the alias's), or none for a Target never adopted.
     pub(crate) fn hdc_route(&self, target_id: &str) -> Result<Option<HdcRoute>, String> {
+        let live = self.fresh_live_candidates();
         let mut route = Err("the HDC execution route could not be read".to_owned());
         self.transaction("", |document, _| {
-            let mut targets = document
-                .targets
-                .iter()
-                .filter(|target| target.target_id == target_id);
-            route = match (targets.next(), targets.next()) {
-                (_, Some(_)) => Err("storeFailure(\"HDC execution target is ambiguous\")".into()),
-                (None, None) => Ok(None),
-                (Some(_), None) if document.has_hdc_alias(target_id) => Err(
-                    "an HDC execution route through a Target alias is not resolved by the Rust \
-                     Runtime yet"
-                        .into(),
-                ),
-                (Some(target), None) => Ok(Some(HdcRoute {
+            route = document.hdc_route(target_id, live.as_deref()).map(|found| {
+                found.map(|(target, connect_key)| HdcRoute {
                     target_id: target.target_id.clone(),
                     binding_revision: target.binding_revision,
                     tool_version: target.tool_version.clone(),
-                    connect_key: target.connect_key.clone(),
-                })),
-            };
+                    connect_key,
+                })
+            });
             Ok((Value::Null, false))
         })
         .map_err(|error| error.message)?;
@@ -777,6 +814,120 @@ mod tests {
         fn drop(&mut self) {
             fs::remove_dir_all(&self.0).unwrap();
         }
+    }
+    /// Swift's own output for a canonical Target with a proven post-Flash
+    /// alias (`import-target-current/alias`): TGT-8b3d0a34cf32 at revision 2
+    /// adopted as `original-hdc-address`, its alias `post-flash-hdc-address`.
+    fn alias_root() -> Root {
+        let root = Root::new();
+        let source = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tests/fixtures/import-target-current/alias");
+        for name in ["targets.json", "target-display-names.json"] {
+            let path = root.0.join(name);
+            fs::copy(source.join(name), &path).unwrap();
+            fs::set_permissions(&path, fs::Permissions::from_mode(0o600)).unwrap();
+        }
+        root
+    }
+    const CANONICAL: &str = "TGT-8b3d0a34cf32";
+    fn candidate(key: &str, state: &str) -> arkdeck_provider_hdc::DeviceCandidate {
+        arkdeck_provider_hdc::DeviceCandidate {
+            connect_key: key.into(),
+            transport: "USB".into(),
+            state: state.into(),
+        }
+    }
+    #[test]
+    fn the_route_follows_a_fresh_live_observation_and_falls_back_once_it_is_stale() {
+        let root = alias_root();
+        let owner = root.open();
+        let route = |owner: &TargetStore| {
+            owner
+                .hdc_route(CANONICAL)
+                .map(|route| route.map(|route| (route.binding_revision, route.connect_key)))
+        };
+        assert_eq!(
+            route(&owner),
+            Ok(Some((2, "post-flash-hdc-address".into())))
+        );
+        owner.record_live_candidates(&[candidate("original-hdc-address", "Connected")]);
+        assert_eq!(route(&owner), Ok(Some((2, "original-hdc-address".into()))));
+        // Past Swift's five seconds the reading no longer selects.
+        let stale = std::time::Instant::now()
+            .checked_sub(ROUTE_OBSERVATION_FRESHNESS + std::time::Duration::from_millis(1))
+            .unwrap();
+        owner.live.lock().unwrap().as_mut().unwrap().1 = stale;
+        assert_eq!(
+            route(&owner),
+            Ok(Some((2, "post-flash-hdc-address".into())))
+        );
+        owner.record_live_candidates(&[
+            candidate("original-hdc-address", "Offline"),
+            candidate("post-flash-hdc-address", "Offline"),
+        ]);
+        assert!(
+            route(&owner)
+                .unwrap_err()
+                .starts_with("observationFailed(\"fresh HDC observation found no Connected"),
+        );
+        // A reopened owner has no reading: the durable alias only.
+        assert_eq!(
+            route(&root.open()),
+            Ok(Some((2, "post-flash-hdc-address".into())))
+        );
+    }
+    #[test]
+    fn hdc_imports_bind_the_identity_the_route_names() {
+        let root = alias_root();
+        let owner = root.open();
+        let intent = |kind: &str| {
+            arkdeck_contract::ImportIntent::from_wire(
+                json!({"schemaVersion":"arkdeck.import-intent/1","importRequestId":format!("alias-{kind}"),
+                    "kind":kind,"targetId":CANONICAL,"bindingRevision":"2","deviceProfile":null,
+                    "name":match kind {"hap" => "fixture.hap", "native-library" => "libfixture.so", _ => "fixture.patch"},"byteCount":"64",
+                    "sha256":arkdeck_contract::sha256_hex(&[b'a'; 64])})
+                .as_object()
+                .unwrap(),
+            )
+            .unwrap()
+        };
+        let bound = |owner: &TargetStore, kind: &str| {
+            owner.resolve_import_binding(&intent(kind)).map(|binding| {
+                (
+                    binding.target_id,
+                    binding.binding_revision,
+                    binding.stable_identity_sha256,
+                )
+            })
+        };
+        let identity = |key: &str| Some(arkdeck_provider_hdc::stable_identity_sha256(key));
+        for kind in ["hap", "native-library"] {
+            assert_eq!(
+                bound(&owner, kind),
+                Ok((
+                    CANONICAL.into(),
+                    Some(2),
+                    identity("post-flash-hdc-address")
+                ))
+            );
+        }
+        owner.record_live_candidates(&[candidate("original-hdc-address", "Connected")]);
+        assert_eq!(
+            bound(&owner, "hap"),
+            Ok((CANONICAL.into(), Some(2), identity("original-hdc-address")))
+        );
+        owner.record_live_candidates(&[
+            candidate("original-hdc-address", "Connected"),
+            candidate("post-flash-hdc-address", "Connected"),
+        ]);
+        let refused = bound(&owner, "native-library").unwrap_err();
+        assert_eq!(refused.code, "recordUnreadable");
+        assert_eq!(refused.details.unwrap()["phase"], json!("importOwner"));
+        // Kinds that are not HDC-routed keep their bindings.
+        assert_eq!(
+            bound(&owner, "workspace-patch"),
+            Ok((CANONICAL.into(), None, None))
+        );
     }
     fn params(generation: &str, name: Option<&str>) -> Map<String, Value> {
         let mut p = json!({"targetId":"target-fixture","expectedGeneration":generation})

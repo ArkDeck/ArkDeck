@@ -1187,8 +1187,13 @@ replug the oracle times by its reads). A host composed with relations
 names stay on the provider snapshot's path until Swift's coordinator is recorded
 for them, so with the development HDC they find no current snapshot
 (`resourceConflict`). Without the development HDC, observations keep the
-read-only provider's path. The daemon cannot select an execution route or write
-alias history.
+read-only provider's path. The daemon writes no alias history, but routes a
+Target with a proven post-Flash alias as Swift's `hdcExecutionRoute` does
+(`TargetDocument::hdc_route`, `TargetStore::hdc_route`, TASK-XPA-013): every
+completed reading is kept for five seconds as the live candidate list; while it
+is fresh the Target's HDC commands, and the identity an HAP or native-library
+Import binds, use the sole Connected key of the Target's own and its alias's,
+refusing none or both, and otherwise the alias's key.
 `target.show` leaves the absent Bootstrap warm presentation and confirmed
 Job-observation sources as `null`. Existing adopted names can be projected onto
 actually observed provider addresses.

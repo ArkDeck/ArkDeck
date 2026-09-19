@@ -435,12 +435,19 @@ impl TargetObservations {
         }
         state.last_generation = generation;
         let names = Self::names(sources.targets, &observations, generation)?;
+        // Swift's coordinator publishes every completed reading for live
+        // route selection (`recordLiveHDCCandidates`).
+        let candidates: Vec<_> = observations
+            .iter()
+            .map(|observation| observation.candidate.clone())
+            .collect();
         state.latest = Some(Snapshot {
             generation,
             observed_at: (sources.now)(),
             observations,
             names,
         });
+        sources.targets.record_live_candidates(&candidates);
         Ok(())
     }
 
