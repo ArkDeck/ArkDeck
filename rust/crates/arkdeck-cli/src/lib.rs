@@ -33,7 +33,7 @@ mod agent_executions;
 mod human_action_resources;
 pub use agent_executions::{
     Settlement, agent_exit, execution_intent, human_action_progress, require_execution_identity,
-    settle_execution, validate_execution,
+    resume_params, settle_execution, validate_execution,
 };
 pub use artifact_resources::validate_artifact_page;
 
@@ -113,6 +113,8 @@ impl CliError {
                 | "job.cancel"
                 | "agent.run"
                 | "agent.abandon"
+                | "agent.resume"
+                | "human-action.resume"
                 | "target.adopt"
         ) {
             return job_plan::mutation_error(error, method);
@@ -455,7 +457,11 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                 | "--request-id"
                 | "--idempotency-key"
                 | "--execution-id"
+                | "--resume-reference"
+                | "--resume-token"
                 | "--human-action"
+                | "--selection"
+                | "--selection-file"
                 | "--owner-kind"
                 | "--owner"
                 | "--maximum-wait"
@@ -496,7 +502,10 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                         "--request-id" => "requestId",
                         "--idempotency-key" => "idempotencyKey",
                         "--execution-id" => "executionId",
+                        "--resume-reference" => "resumeReference",
+                        "--resume-token" => "resumeToken",
                         "--human-action" => "humanAction",
+                        "--selection-file" => "selectionFile",
                         "--owner-kind" => "ownerKind",
                         "--maximum-wait" => "maximumWait",
                         "--reviewed-plan-digest" => "reviewedPlanDigest",
@@ -570,6 +579,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["agent", "status"] => "agent.status",
         ["agent", "list"] => "agent.list",
         ["agent", "abandon"] => "agent.abandon",
+        ["agent", "resume"] => "agent.resume",
+        ["human-action", "resume"] => "human-action.resume",
         ["human-action", "list"] => "human-action.list",
         ["human-action", "show"] => "human-action.show",
         ["doctor"] => "doctor",
@@ -710,6 +721,20 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             "reviewedPlanDigest",
             "executionId",
             "maximumWait",
+            "timeout",
+        ],
+        "agent.resume" => &[
+            "resumeReference",
+            "resumeToken",
+            "selection",
+            "selectionFile",
+            "timeout",
+        ],
+        "human-action.resume" => &[
+            "resumeReference",
+            "humanAction",
+            "selection",
+            "selectionFile",
             "timeout",
         ],
         "agent.status" => &["executionId", "timeout"],
@@ -1054,6 +1079,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                     | "agent.status"
                     | "agent.list"
                     | "agent.abandon"
+                    | "agent.resume"
+                    | "human-action.resume"
             )
         {
             Some(method_options)

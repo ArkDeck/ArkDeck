@@ -1,3 +1,4 @@
+@testable import ArkDeckClientKit
 // What a run-grouping thread may and may not do.
 //
 // The whole value of the label is that History can say "these runs were one

@@ -10,7 +10,6 @@ import Foundation
 import XCTest
 
 @testable import ArkDeckCore
-@testable import ArkDeckWorkflows
 
 final class RuntimeHistoryApplicationContractTests: XCTestCase {
   private func decode(_ json: String) -> RuntimeHistoryPresentation {
@@ -1051,7 +1050,7 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
   }
 
   func testTraceBeforeAndAfterFactsReachHistoryWithoutClaimingRestore() throws {
-    let names = TraceDebugParameterCatalog.definitions.map(\.name)
+    let names = RuntimeTraceParameterName.allCases.map(\.rawValue)
     let before = names.enumerated().map { index, name -> [String: Any] in
       switch index {
       case 0: return ["name": name, "state": "value", "value": "false"]
@@ -1206,7 +1205,7 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
         .deletingLastPathComponent().deletingLastPathComponent()
         .deletingLastPathComponent()
         .appending(
-          path: "Sources/ArkDeckWorkflows/RuntimeHistoryApplicationFacade.swift"),
+          path: "Sources/ArkDeckClientKit/RuntimeHistoryApplicationFacade.swift"),
       encoding: .utf8)
 
     let protocolBody = try XCTUnwrap(
@@ -1280,7 +1279,7 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
     XCTAssertTrue(engine.contains("public func latestSucceededDeviceObservations("))
     XCTAssertTrue(engine.contains("pageSize: Int = 250"))
     let policy = try String(
-      contentsOf: workflow.appending(path: "XPCConnectionBox.swift"),
+      contentsOf: repository.appending(path: "Packages/ArkDeckKit/Sources/ArkDeckClientKit/RuntimeAppReadResources.swift"),
       encoding: .utf8)
     XCTAssertTrue(policy.contains("\"pageSize\": .integer(250)"))
     XCTAssertTrue(policy.contains("\"order\": .string(\"createdAtDescJobIdAsc\")"))

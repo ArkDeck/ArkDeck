@@ -1,3 +1,4 @@
+import ArkDeckClientKit
 import Foundation
 
 public struct TraceDebugParameterDefinition: Equatable, Sendable {
@@ -12,15 +13,15 @@ public struct TraceDebugParameterDefinition: Equatable, Sendable {
 
 public enum TraceDebugParameterCatalog {
   public static let definitions: [TraceDebugParameterDefinition] = [
-    .init(name: "persist.ace.trace.syntax.enabled", profileValue: "true"),
-    .init(name: "persist.ace.trace.layout.enabled", profileValue: "true"),
-    .init(name: "persist.ace.trace.build.enabled", profileValue: "true"),
-    .init(name: "persist.ace.trace.measure.debug.enabled", profileValue: "true"),
-    .init(name: "persist.ace.trace.sync.debug.enabled", profileValue: "true"),
-    .init(name: "persist.ace.debug.enabled", profileValue: "1"),
-    .init(name: "persist.ace.performance.monitor.enabled", profileValue: "true"),
-    .init(name: "persist.sys.graphic.openDebugTrace", profileValue: "1"),
-    .init(name: "persist.rosen.animationtrace.enabled", profileValue: "1"),
+    .init(name: RuntimeTraceParameterName.syntax.rawValue, profileValue: "true"),
+    .init(name: RuntimeTraceParameterName.layout.rawValue, profileValue: "true"),
+    .init(name: RuntimeTraceParameterName.build.rawValue, profileValue: "true"),
+    .init(name: RuntimeTraceParameterName.measure.rawValue, profileValue: "true"),
+    .init(name: RuntimeTraceParameterName.sync.rawValue, profileValue: "true"),
+    .init(name: RuntimeTraceParameterName.debug.rawValue, profileValue: "1"),
+    .init(name: RuntimeTraceParameterName.performanceMonitor.rawValue, profileValue: "true"),
+    .init(name: RuntimeTraceParameterName.graphic.rawValue, profileValue: "1"),
+    .init(name: RuntimeTraceParameterName.animation.rawValue, profileValue: "1"),
   ]
 
   public static func definition(named name: String) -> TraceDebugParameterDefinition? {

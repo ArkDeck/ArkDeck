@@ -104,6 +104,15 @@ TOOL_LIST_OWNER_ERROR_CODES = [
     "invalidInput", "invalidCursor", "resourceConflict", "admissionDenied",
     "recordUnreadable", "operationUnavailable", "inputTooLarge", "fileIdentityChanged", "ioFailure", "outcomeUnknown",
 ]
+# Existing physical continuation failures of AgentExecutionCoordinator.resumeOwned
+# and its shared drive/admission path. Some require timing/Catalog drift rather
+# than an ordinary successful recording. This vocabulary grants no authority.
+AGENT_RESUME_OWNER_ERROR_CODES = [
+    "admissionDenied", "factsDrifted", "humanActionExpired", "idempotencyConflict",
+    "invalidInput", "operationUnavailable", "orchestrationBudgetExpired",
+    "orchestrationClockUntrusted", "recordUnreadable", "resourceConflict",
+    "resourceNotFound", "reviewedPlanMismatch",
+]
 # Members keyed by caller data — operation input names, Artifact fact names,
 # provenance keys — rather than records with a fixed member set. Each is
 # published as a map, `{"type": "object", "additionalProperties": <schema of
@@ -285,7 +294,8 @@ def derive_method_schemas(source):
                        | (set(BUNDLE_LIST_OWNER_ERROR_CODES) if method == "runtime.bundle.list" else set())
                        | (set(BUNDLE_RETIREMENT_OWNER_ERROR_CODES) if method == "runtime.bundle.remove" else set())
                        | (set(TOOL_RETIREMENT_OWNER_ERROR_CODES) if method == "runtime.tool.remove" else set())
-                       | (set(TOOL_LIST_OWNER_ERROR_CODES) if method == "runtime.tool.list" else set()))
+                       | (set(TOOL_LIST_OWNER_ERROR_CODES) if method == "runtime.tool.list" else set())
+                       | (set(AGENT_RESUME_OWNER_ERROR_CODES) if method in {"agent.resume", "human-action.resume"} else set()))
         maps = dict.fromkeys(MAP_VALUED_MEMBERS.get(method, []), False)
         schema = {
             "$schema": "https://json-schema.org/draft/2020-12/schema",

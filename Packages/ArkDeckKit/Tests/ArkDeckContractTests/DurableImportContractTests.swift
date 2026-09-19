@@ -1,3 +1,4 @@
+@testable import ArkDeckClientKit
 import Darwin
 import Foundation
 import XCTest

@@ -1,0 +1,134 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "human-action",
+        "show",
+        "--human-action",
+        "sample"
+      ],
+      "expected": {
+        "command": "human-action.show",
+        "handlerArguments": [
+          "human-action",
+          "show",
+          "--human-action",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "human-action",
+        "show",
+        "--help"
+      ],
+      "expected": {
+        "command": "human-action.show",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "human-action",
+        "show",
+        "--human-action",
+        "sample",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "human-action.show",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "human-action",
+        "show",
+        "--human-action",
+        "sample",
+        "--human-action",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "human-action.show",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "human-action",
+        "show"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "human-action.show",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "human-action",
+        "show",
+        "--human-action",
+        "sample",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "human-action.show",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "human-action",
+        "show",
+        "--human-action",
+        "sample",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "human-action.show",
+        "handlerArguments": [
+          "human-action",
+          "show",
+          "--human-action",
+          "sample",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "human-action.show",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "human-action",
+    "show"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}
