@@ -653,6 +653,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["runtime", "bundle", "inspect"] => "runtime.bundle.inspect",
         ["runtime", "bundle", "list"] => "runtime.bundle.list",
         ["runtime", "bundle", "remove"] => "runtime.bundle.remove",
+        ["runtime", "hdc", "status"] => "runtime.hdc.status",
         ["runtime", "storage", "status"] => "runtime.storage.status",
         ["runtime", "storage", "policy"] => "runtime.storage.policy",
         ["runtime", "storage", "root"] => "runtime.storage.root",
