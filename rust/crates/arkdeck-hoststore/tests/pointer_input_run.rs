@@ -167,10 +167,10 @@ impl HdcDispatch for CheckedDispatch {
         self.inner.dispatch(plan)
     }
     fn mutation_identity_current(&self) -> bool {
-        if let Some(cancel) = &self.cancel {
-            if !cancel.pending() {
-                request_cancel(cancel);
-            }
+        if let Some(cancel) = &self.cancel
+            && !cancel.pending()
+        {
+            request_cancel(cancel);
         }
         !self.stale && self.inner.mutation_identity_current()
     }
