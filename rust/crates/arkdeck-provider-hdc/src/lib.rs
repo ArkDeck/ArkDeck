@@ -56,7 +56,7 @@ pub use live_mode::{
     LoaderObserver, UsbProbe,
 };
 #[cfg(target_os = "macos")]
-pub use managed_server::{ManagedHdcServer, StartBudget, StartFailure};
+pub use managed_server::{EndpointSelection, ManagedHdcServer, StartBudget, StartFailure};
 pub use native_elf::{
     CodeSignFacts, MAXIMUM_LIBRARY_BYTES, NativeAbi, NativeLibraryFacts, ValidationError,
     is_static_executable, validate_elf,

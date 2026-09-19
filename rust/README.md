@@ -822,7 +822,9 @@ The isolated development composition plans, admits, runs and reads
 HDC: `ARKDECK_DEVELOPMENT_HDC_PATH` names a fixture executable, pinned by its
 digest at startup, and is accepted only beside
 `ARKDECK_DEVELOPMENT_STATE_ROOT`. A registered HDC executable is refused there,
-because it would address a real server and device. Facts come from the Target
+because it would address a real server and device, unless the owner also
+starts it as its managed server (`ARKDECK_DEVELOPMENT_HDC_SERVER=managed`,
+below). Facts come from the Target
 owner's adopted record (`<root>/targets-state/targets.json`): the connect key,
 the identity it names, the revision and the tool version. `job.plan` binds that
 identity and revision into the plan digest; `job.run` dispatches each step
@@ -1275,13 +1277,30 @@ from the frames Swift's daemon answers through its handler for these cases and
 for a registered tool. `arkdeck-control` serves `runtime.hdc.status` through
 `HostServices::runtime_hdc_status`. A request that names any parameter is
 refused with `invalidParams` ("live HDC status does not accept caller facts or
-paths") before the host is asked. The macOS host of `arkdeck-agentd` starts no
-managed HDC server, so it answers `unconfigured_status(None)`, as Swift's daemon
-does without its HDC host. On other platforms the method keeps the foundation's
+paths") before the host is asked. The macOS host of `arkdeck-agentd` answers
+`unconfigured_status(None)` without a managed HDC server, as Swift's daemon does
+without its HDC host. On other platforms the method keeps the foundation's
 refusal. `hdc_status_control.rs` in agentd sends every oracle case through
 `Control`, behind a host that composes the observer per request, and each
-answer is the oracle's snapshot byte for byte. Composing the observer over a
-managed HDC server that the daemon starts is next.
+answer is the oracle's snapshot byte for byte.
+
+With `ARKDECK_DEVELOPMENT_HDC_SERVER=managed` (TASK-XPA-016) the isolated owner
+starts its development HDC as Swift's `HeadlessHDCServerHost` does before it
+serves: `hdc -s <endpoint> -m` on the inherited `OHOS_HDC_SERVER_PORT` or
+`127.0.0.1:8710` (a set port outside 1...65535 fails startup), ready once the
+listener answers and `checkserver` agrees, and bound to its own launch by the
+commandless identity proof (`ManagedHdcServer`); a registered HDC is then
+accepted, and development USB relations still only beside a fixture.
+`runtime.hdc.status` answers the observer over that launch, and
+`target.availability`'s tool leg is `ready` with the startup facts. Swift exits
+70 when the server ends unexpectedly, for launchd to restart it (design §L.1
+item 13); here no HDC plan is dispatched once the server is not the one
+launched. SIGTERM and SIGINT stop the Rust-serving daemon as Swift's
+`drainAndStop` does: the socket is closed and its name removed, the frames being
+answered finish, every connection is ended within 20 s, the managed server is
+stopped, `arkdeck-agentd stopped` is printed and the daemon exits 0; its locks
+go only with the process. `tests/managed_hdc_process.rs` drives this with a fake
+HDC compiled from `tests/fixtures/managed-hdc/fake-hdc.c`.
 
 `runtime.hdc.impact-preview`, `runtime.hdc.restart` and `control-action.list`,
 `.show` and `.reconcile` reach `HostServices::control_action` unread, since

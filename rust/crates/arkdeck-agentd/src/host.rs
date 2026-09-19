@@ -110,11 +110,11 @@ pub struct Host {
     /// publications this process makes.
     #[cfg(target_os = "macos")]
     claims: std::sync::Arc<arkdeck_hoststore::StorageClaims>,
-    /// The isolated owner's development HDC: the fixture executable its
+    /// The isolated owner's development HDC: the executable its
     /// device-bound Jobs dispatch to, through the process dispatch every HDC
-    /// plan takes.
+    /// plan takes, and the managed server it started, if it started one.
     #[cfg(target_os = "macos")]
-    hdc: Option<std::sync::Arc<arkdeck_provider_hdc::ProcessDispatch>>,
+    hdc: Option<std::sync::Arc<crate::managed_hdc::DevelopmentHdc>>,
     /// The device sessions this daemon's control sessions hold (Swift
     /// `deviceSessionHolds`).
     #[cfg(target_os = "macos")]
@@ -190,8 +190,30 @@ impl Host {
         mut self,
         dispatch: Option<arkdeck_provider_hdc::ProcessDispatch>,
     ) -> Self {
-        self.hdc = dispatch.map(std::sync::Arc::new);
+        self.hdc = dispatch.map(|dispatch| {
+            std::sync::Arc::new(crate::managed_hdc::DevelopmentHdc::new(dispatch, None))
+        });
         self
+    }
+    /// The development HDC with the managed server it addresses: its status
+    /// answers `runtime.hdc.status`, its startup facts the tool leg of
+    /// `target.availability`, and no plan is dispatched once it is not the
+    /// server launched.
+    #[cfg(target_os = "macos")]
+    pub fn with_managed_development_hdc(
+        mut self,
+        dispatch: arkdeck_provider_hdc::ProcessDispatch,
+        managed: std::sync::Arc<crate::managed_hdc::ManagedHdc>,
+    ) -> Self {
+        self.hdc = Some(std::sync::Arc::new(
+            crate::managed_hdc::DevelopmentHdc::new(dispatch, Some(managed)),
+        ));
+        self
+    }
+    /// The managed server this composition started, if it started one.
+    #[cfg(target_os = "macos")]
+    fn managed_hdc(&self) -> Option<&crate::managed_hdc::ManagedHdc> {
+        self.hdc.as_ref().and_then(|hdc| hdc.managed())
     }
     /// The USB relations the Target observation owner reads: a test's, or
     /// the development source the isolated owner names.
@@ -1581,11 +1603,19 @@ impl HostServices for Host {
         store.handle(method, params, &utc_now())
     }
     /// Swift's daemon answers from the observer its HDC host gives it, and
-    /// `unconfigured()` without one. This composition starts no managed HDC
-    /// server, so it answers as Swift's daemon without its HDC host does.
+    /// `unconfigured()` without one: this composition has a host only when
+    /// the isolated owner started a managed server.
     #[cfg(target_os = "macos")]
     fn runtime_hdc_status(&self) -> Result<serde_json::Value, WireError> {
-        Ok(arkdeck_provider_hdc::unconfigured_status(None))
+        Ok(match self.managed_hdc() {
+            Some(managed) => managed.status(&utc_now),
+            None => arkdeck_provider_hdc::unconfigured_status(None),
+        })
+    }
+    #[cfg(target_os = "macos")]
+    fn managed_hdc_tool(&self) -> Option<arkdeck_control::ManagedToolFacts> {
+        self.managed_hdc()
+            .map(crate::managed_hdc::ManagedHdc::tool_facts)
     }
 
     fn observed_at(&self) -> String {

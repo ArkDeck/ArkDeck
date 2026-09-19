@@ -6,6 +6,8 @@ mod bootstrap_readers;
 mod control_action_control;
 #[cfg(target_os = "macos")]
 mod development_usb;
+#[cfg(unix)]
+mod drain;
 #[cfg(target_os = "macos")]
 mod facade;
 #[cfg(target_os = "macos")]
@@ -13,6 +15,8 @@ mod facade_owners;
 #[cfg(all(test, target_os = "macos"))]
 mod hdc_status_control;
 mod host;
+#[cfg(target_os = "macos")]
+mod managed_hdc;
 #[cfg(all(test, target_os = "macos"))]
 mod operation_availability_control;
 #[cfg(all(test, target_os = "macos"))]
@@ -30,17 +34,47 @@ use std::sync::{
 };
 use std::time::Duration;
 
+/// Swift `drainAndStop(deadline: 20)`: one cutoff for the frames being
+/// answered and the connections still open.
+#[cfg(unix)]
+const DRAIN_DEADLINE: Duration = Duration::from_secs(20);
+
+/// How long a connection may wait for its next byte.
+const CONNECTION_IDLE: Duration = Duration::from_secs(20);
+
+/// The isolated owner's development HDC, as its composition takes it.
+#[cfg(target_os = "macos")]
+struct DevelopmentHdc {
+    dispatch: arkdeck_provider_hdc::ProcessDispatch,
+    managed: Option<Arc<managed_hdc::ManagedHdc>>,
+}
+
 /// The isolated owner's development HDC, named by
 /// `ARKDECK_DEVELOPMENT_HDC_PATH`, pinned by the digest of its bytes at
 /// startup and dispatched as every HDC plan is (`ProcessDispatch`, with the
-/// server port the daemon inherited). It must be a fixture: a registered HDC
-/// executable would address a real server and device, which needs the
-/// existing-server identity proof the isolated owner does not have, so one is
-/// refused.
+/// server port the daemon inherited).
+///
+/// On its own it must be a fixture: a registered HDC executable would
+/// address a real server and device, which needs the existing-server identity
+/// proof, so one is refused. `ARKDECK_DEVELOPMENT_HDC_SERVER=managed` is that
+/// proof, opted into separately: the owner first starts the executable as its
+/// own managed server on the endpoint Swift's selector picks, and the
+/// commandless identity proof binds the endpoint's listener to that very
+/// launch. A registered HDC is then accepted, and every dispatch addresses
+/// that server while it is still the one launched.
 #[cfg(target_os = "macos")]
-fn development_hdc()
--> Result<Option<arkdeck_provider_hdc::ProcessDispatch>, Box<dyn std::error::Error>> {
+fn development_hdc() -> Result<Option<DevelopmentHdc>, Box<dyn std::error::Error>> {
+    let managed = match std::env::var_os("ARKDECK_DEVELOPMENT_HDC_SERVER") {
+        None => false,
+        Some(mode) if mode == "managed" => true,
+        Some(_) => return Err("ARKDECK_DEVELOPMENT_HDC_SERVER accepts only managed".into()),
+    };
     let Some(path) = std::env::var_os("ARKDECK_DEVELOPMENT_HDC_PATH") else {
+        if managed {
+            return Err(
+                "a managed development HDC server needs ARKDECK_DEVELOPMENT_HDC_PATH".into(),
+            );
+        }
         return Ok(None);
     };
     let path = std::path::PathBuf::from(path);
@@ -48,18 +82,44 @@ fn development_hdc()
         return Err("ARKDECK_DEVELOPMENT_HDC_PATH must be an explicit absolute path".into());
     }
     let digest = arkdeck_contract::sha256_hex(&std::fs::read(&path)?);
-    let registered = arkdeck_platform::VerifiedTool::open(&path, &digest)?;
-    if arkdeck_provider_hdc::HdcReadOnlyProvider::new(registered).is_ok() {
+    let registered = arkdeck_provider_hdc::HdcReadOnlyProvider::new(
+        arkdeck_platform::VerifiedTool::open(&path, &digest)?,
+    )
+    .is_ok();
+    if registered && !managed {
         return Err(
             "the isolated Rust development owner runs a fixture HDC only; a registered HDC \
              needs the existing-server identity proof"
                 .into(),
         );
     }
-    Ok(Some(arkdeck_provider_hdc::ProcessDispatch::new(
-        arkdeck_platform::VerifiedTool::open(&path, &digest)?,
-        arkdeck_provider_hdc::ProcessDispatch::inherited_server_port().as_deref(),
-    )))
+    // A harness's relations stand in for the ArkForge lane's reader only
+    // beside a fixture: for a registered HDC they would be a trusted fact
+    // about a real device that no physical relation proved.
+    if registered && std::env::var_os("ARKDECK_DEVELOPMENT_USB_RELATIONS").is_some() {
+        return Err("development USB relations are configured only beside a fixture HDC".into());
+    }
+    let managed = if managed {
+        let selection = arkdeck_provider_hdc::EndpointSelection::select(
+            std::env::var_os(arkdeck_provider_hdc::SERVER_PORT_VARIABLE)
+                .map(|port| port.to_string_lossy().into_owned())
+                .as_deref(),
+        )?;
+        Some(Arc::new(managed_hdc::ManagedHdc::start(
+            &arkdeck_platform::VerifiedTool::open(&path, &digest)?,
+            &path.to_string_lossy(),
+            selection,
+        )?))
+    } else {
+        None
+    };
+    Ok(Some(DevelopmentHdc {
+        dispatch: arkdeck_provider_hdc::ProcessDispatch::new(
+            arkdeck_platform::VerifiedTool::open(&path, &digest)?,
+            arkdeck_provider_hdc::ProcessDispatch::inherited_server_port().as_deref(),
+        ),
+        managed,
+    }))
 }
 
 fn serve() -> Result<(), Box<dyn std::error::Error>> {
@@ -82,7 +142,14 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
                 .into(),
         );
     }
-    if development.is_none() && std::env::var_os("ARKDECK_DEVELOPMENT_HDC_PATH").is_some() {
+    if development.is_none()
+        && [
+            "ARKDECK_DEVELOPMENT_HDC_PATH",
+            "ARKDECK_DEVELOPMENT_HDC_SERVER",
+        ]
+        .iter()
+        .any(|key| std::env::var_os(key).is_some())
+    {
         return Err("a development HDC is configured only for an isolated development root".into());
     }
     if std::env::var_os("ARKDECK_DEVELOPMENT_USB_RELATIONS").is_some()
@@ -99,6 +166,13 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
     if std::env::args_os().len() != 1 {
         return Err("arkdeck-agentd takes no device, command, path or authority arguments; configure the local host environment".into());
     }
+    // As Swift's daemon, before anything it owns is started: SIGTERM and
+    // SIGINT are recorded, and the serving loop drains and stops for them.
+    #[cfg(unix)]
+    let stop = arkdeck_platform::StopSignal::install()?;
+    // The managed server the isolated owner starts, which it stops last.
+    #[cfg(target_os = "macos")]
+    let mut managed_hdc = None;
     let endpoint = match std::env::var_os("ARKDECK_ENDPOINT") {
         Some(path) => LocalEndpoint::new(path),
         None => default_user_endpoint()?,
@@ -215,8 +289,18 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
                         ))
                     })
                     .transpose()?,
-            )
-            .with_development_hdc(development_hdc()?);
+            );
+        let host = match development_hdc()? {
+            Some(DevelopmentHdc {
+                dispatch,
+                managed: Some(managed),
+            }) => {
+                managed_hdc = Some(Arc::clone(&managed));
+                host.with_managed_development_hdc(dispatch, managed)
+            }
+            Some(DevelopmentHdc { dispatch, .. }) => host.with_development_hdc(Some(dispatch)),
+            None => host.with_development_hdc(None),
+        };
         // Only beside the development HDC's fixture: the relations a harness
         // names stand in for the ArkForge lane's reader.
         match development_usb::DevelopmentUsbRelations::from_environment()? {
@@ -246,9 +330,17 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         configuration.listen(Arc::clone(&control))?;
     }
     let active = Arc::new(AtomicUsize::new(0));
+    #[cfg(unix)]
+    let serving = Arc::new(drain::Serving::new()?);
     loop {
-        let connection = match listener.accept() {
-            Ok(connection) => connection,
+        #[cfg(unix)]
+        let accepted = listener.accept_until(&stop);
+        #[cfg(not(unix))]
+        let accepted = listener.accept().map(Some);
+        let connection = match accepted {
+            Ok(Some(connection)) => connection,
+            // A stop was requested: nothing more is accepted.
+            Ok(None) => break,
             Err(error)
                 if matches!(
                     error.kind(),
@@ -263,8 +355,15 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             active.fetch_sub(1, Ordering::AcqRel);
             continue;
         }
+        #[cfg(unix)]
+        let Some(registered) = serving.register(&connection) else {
+            active.fetch_sub(1, Ordering::AcqRel);
+            continue;
+        };
         let control = Arc::clone(&control);
         let active = Arc::clone(&active);
+        #[cfg(unix)]
+        let serving = Arc::clone(&serving);
         std::thread::spawn(move || {
             struct Active(Arc<AtomicUsize>);
             impl Drop for Active {
@@ -273,12 +372,10 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
             let _active = Active(active);
-            if connection
-                .set_read_timeout(Some(Duration::from_secs(20)))
-                .is_err()
-                || connection
-                    .set_write_timeout(Some(Duration::from_secs(20)))
-                    .is_err()
+            #[cfg(unix)]
+            let _registered = registered;
+            if connection.set_read_timeout(Some(CONNECTION_IDLE)).is_err()
+                || connection.set_write_timeout(Some(CONNECTION_IDLE)).is_err()
             {
                 return;
             }
@@ -286,14 +383,31 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             // Bound a connection's work without rejecting the required health
             // followed by business exchange. A new connection reauthenticates.
             for _ in 0..128 {
+                // The start of the next frame, or the drain ending this
+                // connection (see `drain`), or the idle timeout.
+                #[cfg(unix)]
+                if reader.buffer().is_empty()
+                    && !matches!(
+                        reader
+                            .get_ref()
+                            .wait_readable(serving.closing(), CONNECTION_IDLE),
+                        Ok(arkdeck_platform::Readiness::Readable)
+                    )
+                {
+                    return;
+                }
                 let frame = match read_frame(&mut reader, MAX_REQUEST_BYTES) {
                     Ok(frame) => frame,
                     Err(error) if error.kind() == io::ErrorKind::InvalidData => {
+                        #[cfg(unix)]
+                        let _request = serving.request();
                         let _ = reader.get_mut().write_all(&control.handle_frame(&[]));
                         return;
                     }
                     Err(_) => return,
                 };
+                #[cfg(unix)]
+                let _request = serving.request();
                 let reply = control.handle_frame(&frame);
                 if reader.get_mut().write_all(&reply).is_err() || reader.get_mut().flush().is_err()
                 {
@@ -302,6 +416,28 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             }
         });
     }
+    // Swift `drainAndStop`: the socket is closed and its name removed, the
+    // frames being answered finish, then every connection is ended, within
+    // one deadline. Jobs running in the background are neither awaited nor
+    // cancelled; the App ingress is not drained.
+    #[cfg(unix)]
+    {
+        let _lock = listener.stop_listening();
+        serving.drain(std::time::Instant::now() + DRAIN_DEADLINE);
+        // Swift stops its HDC host next. Unlike Swift, which lets go of its
+        // instance lock at the end of the drain, the transport directory and
+        // every store stay owned until the process ends, so a successor never
+        // meets this server on the endpoint.
+        #[cfg(target_os = "macos")]
+        if let Some(managed) = managed_hdc {
+            let _ = managed.stop();
+        }
+        println!("arkdeck-agentd stopped");
+        let _ = io::stdout().flush();
+        std::process::exit(0);
+    }
+    #[cfg(not(unix))]
+    unreachable!("only a stop request ends accepting");
 }
 
 fn main() {

@@ -290,6 +290,11 @@ pub trait HostServices: Send + Sync {
             details: None,
         })
     }
+    /// The startup facts of the HDC server the Runtime manages, which
+    /// `target.availability` reports as its tool leg; none without one.
+    fn managed_hdc_tool(&self) -> Option<ManagedToolFacts> {
+        None
+    }
     /// `runtime.hdc.status`: the live HDC status the Runtime answers. A host
     /// without it keeps the foundation's refusal.
     fn runtime_hdc_status(&self) -> Result<Value, WireError> {
@@ -407,6 +412,17 @@ pub trait HostServices: Send + Sync {
     fn observed_at(&self) -> String;
     fn hdc_status(&self, deep: bool) -> HdcStatus;
     fn observations(&self) -> Result<DeviceObservationsResult, WireError>;
+}
+
+/// Swift `HDCManagedRuntimeDiagnostics` as `target.availability`'s tool leg
+/// reports them: the verified tool's digest, the client and server versions
+/// the startup `checkserver` answered, and how the endpoint was selected.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ManagedToolFacts {
+    pub tool_sha256: String,
+    pub client_version: String,
+    pub server_version: String,
+    pub endpoint_source: String,
 }
 
 #[derive(Debug, Clone)]

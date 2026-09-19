@@ -62,10 +62,20 @@ impl<H: HostServices> Control<H> {
                 "reason": "the Runtime has no device observation source configured",
             },
             // Like runtime.hdc.status, this reports the managed server owner,
-            // not a development/external HDC executable's existence.
-            "tool": {
-                "state": "absent", "reasonCode": "runtime_tool_unavailable",
-                "reason": "Runtime has no managed HDC server",
+            // not a development/external HDC executable's existence: Swift
+            // `encodeToolLeg`, from the facts its startup established.
+            "tool": match self.host.managed_hdc_tool() {
+                Some(facts) => json!({
+                    "state": "ready",
+                    "toolSha256": facts.tool_sha256,
+                    "clientVersion": facts.client_version,
+                    "serverVersion": facts.server_version,
+                    "endpointSource": facts.endpoint_source,
+                }),
+                None => json!({
+                    "state": "absent", "reasonCode": "runtime_tool_unavailable",
+                    "reason": "Runtime has no managed HDC server",
+                }),
             },
             "operations": {
                 "scope": "host", "targetResolution": "unresolved",

@@ -68,7 +68,7 @@ impl ProcessDispatch {
 
 /// Swift `HDCServerEndpointSelector.validPort`: an integer in 1...65535,
 /// nothing else.
-fn valid_port(value: &str) -> Option<u16> {
+pub(crate) fn valid_port(value: &str) -> Option<u16> {
     let port: u16 = value.parse().ok()?;
     (port >= 1).then_some(port)
 }
