@@ -65,6 +65,7 @@ impl JobRunner<'_> {
         device_facts::validate(facts, &request.target_id, request.expected_binding_revision)
             .map_err(|s| reject(s.into()))?;
         let planner = JobPlanner {
+            imports: self.imports,
             artifacts: Some(self.artifacts),
             analyzer: self.analyzer,
             state_root: owner.state_root,

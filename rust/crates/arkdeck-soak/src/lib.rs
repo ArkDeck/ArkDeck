@@ -262,6 +262,7 @@ fn execute_cycle(root: &Path, run_id: &str, cycle: u64, count: u64) -> Result<(u
     };
     let home = std::env::var("HOME").map_err(error)?;
     let runner = JobRunner {
+        imports: None,
         mutation: None,
         jobs: &owners.jobs,
         artifacts: &owners.artifacts,
@@ -330,6 +331,7 @@ fn execute_cycle(root: &Path, run_id: &str, cycle: u64, count: u64) -> Result<(u
             .map_err(error)?;
         let admitter = JobAdmitter {
             planner: JobPlanner {
+                imports: None,
                 artifacts: Some(&owners.artifacts),
                 analyzer: None,
                 state_root: root,

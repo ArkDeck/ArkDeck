@@ -367,6 +367,15 @@ impl ArtifactReadStore {
         if job_id.starts_with("imp-") {
             return Err("an Import lease is resolved by the Import owner".into());
         }
+        self.owned_lease(job_id, artifact_id)
+    }
+
+    /// Import callers must have verified their receipt under the lifetime lock.
+    pub(crate) fn owned_lease(
+        &self,
+        job_id: &str,
+        artifact_id: &str,
+    ) -> Result<LeasedArtifact, String> {
         let unreadable = || swift_artifact_error("indexCorrupted", "artifact index is unreadable");
         let absent = || swift_artifact_error("artifactNotFound", artifact_id);
         let (job, index, rows) = match self.index(job_id) {

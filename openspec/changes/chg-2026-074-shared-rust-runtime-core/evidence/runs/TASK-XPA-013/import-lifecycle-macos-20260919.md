@@ -1,0 +1,254 @@
+# Rust Import lease lifecycle — macOS
+
+Implementation worktree: `agent/rust-import-lifecycle-20260919`, initially based on
+publication commit `c01b23d17596e50be207a30cdccdbf96318e6f59`. This is host implementation
+and isolated fixture evidence, not hardware acceptance. The delivered revision is the
+merge with protected `main` `81957589`; its unified gate passed (last section). The
+sections in between are the chronological development record and keep their
+original "pending" wording for the revisions they describe.
+
+| Already on `main` | This slice | Still remaining (TASK-XPA-013) |
+|---|---|---|
+| Import begin/append/abort/inspect/list and commit/publication with durable receipts (#1983); Job Artifact read/inspect/export; Pointer execution with durable authority (#1984) | Import leases resolved only in Catalog Artifact input slots; RAII hold through durable admission; `artifact.import.inspection` Job-reference census; `artifact.import.release` with the generation-3 release receipt and bounded-deadline recovery; `arkdeck artifact import release`; daemon and host analyzer runner share one Import owner | quota/retention/GC and cleanup-debt, the canonical alias HDC route, the publish crash-window matrix, owner activation at the M5 cutover, GJ-1/2/3 re-pass; `debug.hap@1` and `deploy.native-library.app-owned@1` are the first device consumers of these leases |
+
+## Ownership and behavior
+
+- Exact Import leases are recognized only in Catalog-declared Artifact input slots.
+  The Import owner verifies its committed receipt, immutable Artifact identity,
+  binding, publication status, retention, length and digest before materialization.
+  Generic Job Artifact lease resolution continues to reject Import ownership.
+- A private RAII hold bridges materialization through durable Job admission and
+  journal initialization. Every return path releases that transient hold. A
+  durable Job input, rather than a separately persisted reference counter, protects
+  the input after process restart. A retry resolves its original idempotency entry
+  before acquiring another hold or reading a changed tool.
+- Release holds the Import lifetime mutex and the complete Job activity census
+  through its durable closing checkpoint. The lock order is Import lifetime,
+  transient-use registry, Job activity, then Artifact retention. Job insertion
+  never acquires Import ownership while holding Job activity.
+- The census validates every SQLite row, including unrelated terminal history,
+  before considering its state. Current Catalog inputs use their typed slots;
+  another Catalog conservatively retains lease-shaped strings and arrays.
+  Terminal Jobs with unknown outcomes remain active. Invalid history fails closed.
+  Rust's record-before-SQLite persistence window is checked against the on-disk
+  record; a known terminal directory additionally requires an exact-identity,
+  finalized journal with no uncertain/outstanding effects or torn tail.
+- Submission verification follows Swift `RuntimeJobRecord.hasVerifiedSubmissionFingerprint`:
+  canonical typed `originalSubmissionRequest` (or the exact stored request when no
+  original exists) must hash to the SQLite fingerprint. With an original, all
+  execution fields must match it except Runtime-added authorization. Rust reuses
+  `OperationRequest::canonical_bytes`/`fingerprint`, including the existing
+  Foundation-compatible `session_json` encoder; it does not hash ordinary JSON.
+- The durable generation-3 release receipt closes the lease before metadata unpin.
+  Recovery finishes only that receipt's original bounded deadline, never deletes
+  bytes or recreates a reclaimed pin/payload. Generation-2 retries return the same
+  receipt. New input use refuses released owners. Historical Artifact reads remain
+  available under their original sensitive-access rules and advertise no lease.
+- The daemon and host analyzer runner share one Import owner. CLI inspection and
+  release consume the existing typed contracts. No capability, trusted Target
+  fact, device operation, recovery proof or signing policy changes here.
+
+## Verification in progress
+
+Targeted owner tests already exercised release idempotency and historical reads,
+both release checkpoint/unpin failure windows, a barrier-controlled materialization
+versus release race, durable admission and restart reference retention, and active,
+unknown-terminal, terminal, foreign-Catalog and corrupted submission history.
+Targeted results (2026-09-19, `--jobs 2`, `RUST_TEST_THREADS=2`):
+
+- `cargo test -p arkdeck-hoststore --test import_upload`: 30 tests passed.
+  Includes simultaneous release receipts, retention drift after release checkpoint,
+  original/altered/enriched submission fingerprints, unfinished and wrong-Artifact
+  input refusal. The restarted admission test additionally verifies on-disk record
+  drift and an orphan Job directory fail closed; its final rerun passed.
+- `cargo test -p arkdeck-hoststore --test import_upload sigkill_after_release -- --nocapture`:
+  passed both real subprocess SIGKILL windows (0.40 seconds): after the durable
+  release checkpoint and after metadata unpin. Fresh owners recover the same
+  receipt/deadline with the lease closed. The child-only fixture is ignored during
+  ordinary test discovery and invoked explicitly by this test.
+- `cargo test -p arkdeck-cli --test import_resources`: 11 tests passed, including
+  exact release owner/generation/deadline response validation.
+- `cargo build -p arkdeck-cli -p arkdeck-agentd` followed by
+  `cargo test -p arkdeck-agentd --test import_publication_process -- --nocapture`:
+  passed. Real CLI commands and separate daemon processes exercise all three Import
+  formats, restart/lost commit reply, plan and admission from an Import lease, active
+  reference rejection of release, restart, and successful host analyzer execution.
+  After known completion, all three imports release and retry across another daemon
+  restart; Artifact history remains readable and advertises `lease: null`.
+- `cargo clippy -p arkdeck-hoststore -p arkdeck-agentd -p arkdeck-cli --all-targets -- -D warnings`:
+  passed. No timeout was increased.
+
+The final repository-wide unified gate is pending; these targeted results are not
+reported as its completion.
+
+The native Swift behavior is in `RuntimeImportReferences.swift`,
+`RuntimeArtifactStore.acquireImportInputs/releaseImport/finishImportReleaseIfNeeded`,
+and `ImportLifecycleContractTests`. In particular its authorized-Job test proves
+that authorization enrichment preserves the original canonical submission hash,
+while missing or altered original/execution requests cannot clear references.
+
+## Remaining product boundaries
+
+This slice does not deploy HAP/native libraries or execute device mutations. The
+host process test's isolated analyzer is an explicit test fixture, never a real
+GJ result. Device capability admission, deployed workflows, workspace execution,
+installed-runtime cutover and real-device GJ acceptance remain independent work.
+
+## Terminal-directory census follow-up
+
+On the lifecycle branch after merging protected main `98cb3b96`, inspection and
+release now reject any terminal SQL Job whose complete durable Job directory is
+missing. Rust admission/cancellation/execution create and advance the Journal
+before recording a terminal state; no production Job-directory reclamation path
+exists. Swift's persisted-row census is not evidence that a missing Rust Journal
+safely closes the Rust record-before-SQL crash window.
+
+The regression creates an actual isolated host Job through `JobAdmitter`, cancels
+it with `JobCanceller` and publishes its Session, first observes clear references,
+then deletes the entire Job directory and reopens the durable owners. Both
+inspection and release refuse with `recordUnreadable`; the committed receipt and
+Artifact retention remain unchanged. Synthetic terminal-only SQL rows (including
+unknown-outcome rows) now also refuse instead of bypassing this proof. No locks
+or guards were added: Import lifetime → uses → Job activity order is unchanged;
+`ImportUse::drop` still acquires only the uses mutex.
+
+Validation: `RUST_TEST_THREADS=2 cargo test -p arkdeck-hoststore --test import_upload
+--jobs 2 -- --nocapture` passed: 32 tests, zero failures, one intentionally ignored
+SIGKILL child fixture (exercised by its parent test), 4.74 seconds. This is targeted
+host validation, not the pending unified gate or real-device acceptance.
+
+## Protected-main capability-admission integration
+
+Integrated protected main `187321ea397419353ac430a8bd48e027f56cd02e` through
+publication merge `43b9ac1a`, retaining the Import owner and RAII hold across
+preauthorization and durable admission. The two new host-only admission fixtures
+explicitly use `authority: None`; the incoming pointer-admission fixture uses
+`imports: None`. Materialized's lifetime is explicit in the authority helper.
+Daemon authority wiring and original-submission fingerprint preservation remain
+unchanged. This is not capability consumption or imported device deployment.
+
+`cargo check --workspace --all-targets --jobs 1` passed after integration in
+16.74 seconds; formatting and diff checks passed. Final unified validation remains
+pending its serialized slot.
+
+## Static integration after publication review
+
+Integrated publication `590d09f2` (PR #1983) and protected main `94b28966`;
+merge HEAD was `69378fcd`. The only textual conflict was the CLI command summary,
+resolved by retaining both resume commands and Import release. Three new resume
+fixture `JobPlanner` initializers explicitly use `imports: None`.
+
+Static review confirmed the same Arc-owned Import owner reaches foreground and
+background Job runners and all planners; daemon `authority()` wiring remains on
+both admitters. The private Materialized hold lives across preauthorization and
+durable admission, and its Drop still takes only the uses mutex. Import release
+remains in the owner → uses → Job activity → retention lock order. CLI release
+still accepts only exact Import identity/generation; resume parsing is retained.
+The published-method compatibility test is retained unchanged, while the candidate
+process journey adds materialization, admission, active-reference refusal, restart
+execution and durable release/history checks.
+
+No build or test was run for this merge while another slice occupied the heavy
+validation slot. Prior targeted passes and complete-gate failures are retained as
+historical evidence, not promoted to this merged revision's final validation.
+
+## Additional failure-path tests awaiting execution
+
+Added targeted regressions for successful admission handing a transient Import
+hold to a durable Job without a release clearance window; payload/receipt
+corruption between admission and execution producing a failed Job with no analyzer
+marker or Journal step intent; and a complete writer-validated unknown terminal
+history retaining its Import after restart. The latter is explicitly isolated
+history-fixture coverage, not device execution or recovery acceptance.
+
+The admission race uses bounded channels, a ten-second test-only handoff deadline,
+and a Drop guard that releases the worker before scoped-thread joining even if a
+main-thread assertion panics. A failure before the worker reaches its hold is
+bounded by receive timeout. The release loop has its own test hang guard; no
+production budget or acceptance threshold changes.
+
+These new tests have only been formatted and statically reviewed. Their execution
+and the final integrated unified gate remain pending the allocated validation slot.
+
+### Static Pointer/main integration (not yet compiled)
+
+Merged protected main `510b4650` after verifying every conflicting publication
+file was byte-identical to the already integrated `590d09f2`; retained the
+lifecycle additions rather than dropping release/inspection/history semantics.
+This ancestry merge is `642262a4` and has no tree delta.
+
+Integrated Pointer execution `79338c83`. Constructor conflicts combine both
+`imports` and `mutation`, including foreground/background Host composition.
+Pointer test planners/runners explicitly have no Import owner; the lifecycle
+corruption test explicitly has no mutation owner. The fresh mutation planner
+carries `self.imports` through the combined interface. The Pointer authority
+fields, state-root checks and lifecycle `Materialized<'_>` hold remain intact.
+No execution policy, capability semantics or recovery behavior was changed.
+
+Static formatting and `git diff --check` passed. No build/tests were run during
+this integration. Next verification must cover the three new lifecycle safety
+tests, all Import lifecycle/CLI/daemon paths, Pointer execution/authority tests,
+and the full repository unified gate on this combined branch.
+
+## Integrated lifecycle and Pointer targeted validation
+
+**PASS — exit 0**, session `53461`, 2026-09-19, source `bc504d04`.
+The three additional safety regressions each passed individually. The subsequent
+complete Import suite passed 35 tests (one intentionally ignored child fixture is
+executed by its SIGKILL parent test). Pointer plan/execute/admit passed 1/9/4 tests,
+capability writes 4, mutation-state continuity 7, Import CLI 11, and the actual
+Rust CLI/daemon three-format restart/lost-reply/lifecycle journey 1. Commands used
+`CARGO_BUILD_JOBS=1 RUST_TEST_THREADS=1` and authorized native test execution.
+No production changes, timeouts or assertions were needed to make them pass.
+All roots and dispatches are isolated host fixtures, not real hardware evidence.
+
+Command script: `/private/tmp/arkdeck-lifecycle-targeted-20260919.sh`.
+Log: `/private/tmp/arkdeck-lifecycle-pointer-targeted-20260919.log`.
+
+The branch is based on main `510b4650` plus Pointer commit `79338c83`. The latter's
+Git tree is `c48c8b9947d2bfe4e963978f6c49a09426a46c14`, independently verified equal
+to protected-main Pointer squash `bda735df496bc078a37caa05ecf1a6ffea17ad55`.
+This describes identical integrated source content, not ancestry from that squash.
+The full repository gate below will still use the frozen `origin/main` at
+`510b4650`; no shared ref is changed during another slice's validation.
+
+## Unified gate on the 510b4650 base (recorded after the fact)
+
+The gate announced above ran on `d3883c29` with merge base `510b4650` and exited 0
+(`plan.py ... --run-local` with `CARGO_BUILD_JOBS=1 RUST_TEST_THREADS=1`; rust lane
+only). The executing session stopped at its usage limit before writing the result,
+so it is recorded here: log `/private/tmp/arkdeck-lifecycle-unified-main510-pointer-20260919.log`,
+SHA-256 `df72217a68eba421e11981c98520d32685cecd2deeacdfa82665b0de07cdf547`. The
+targeted log above has SHA-256
+`192d6301fa6b7fb09cbf34a743f969e770c2e0d80aa450dd2f46c430fdbad682`.
+
+## Protected-main 81957589 integration and final unified gate
+
+Protected main squash-merged Pointer execution as `bda735df` (#1984), whose tree
+equals this branch's Pointer ancestor `79338c83`, then App History reads as
+`81957589` (#1985). A plain three-way merge from `510b4650` reports false
+conflicts in 13 files wherever lifecycle edits overlap Pointer hunks, so merge
+`3be24565` (parents `d3883c29`, `81957589`) takes its tree from
+`git merge-tree --write-tree --merge-base=79338c83 origin/main d3883c29`. Its diff
+from `81957589` (37 files, +2389/−111) has the same stable patch-id,
+`41a048d4ef1cfc45`, as `79338c83..d3883c29`: exactly the lifecycle delta. #1985
+touches no lifecycle file.
+
+Gate: `ARKDECK_PYTHON=/private/tmp/arkdeck-validation-venv/bin/python
+/private/tmp/arkdeck-validation-venv/bin/python scripts/ci/plan.py --repo-root .
+--base-revision origin/main --head-revision HEAD --merge-base --include-worktree
+--run-local` on `3be24565`, merge base `81957589`, 2026-09-19 13:28:01–13:30:51 CST,
+**exit 0**. Lanes: rust only (the diff has no Swift, App or design-system file).
+Every cargo test summary in the log (development, candidate and published views)
+sums to 894 passed, 0 failed, 16 ignored; published and candidate contract checks,
+`check-sdd` (0 errors), `generate-contract.py --check`, `cargo deny` and
+`cargo vet` passed. Log: `/private/tmp/claude-501/-Users-fuhanfeng-Dropbox-Code-Github-ArkDeck--claude-worktrees-macos-agent-branches-20260919-7896b5/e4ca8ae5-02b3-4669-8ede-6d7975251bb2/scratchpad/logs/lifecycle-gate-3be24565.log`,
+SHA-256 `c502ffdf162fa2c73c6e21e76c8f7f9acfd280b6fc16ec2936c404b258448c80`.
+
+`cargo clippy --workspace --all-targets --locked --target <t> -- -D warnings` for
+`x86_64-unknown-linux-gnu` and `x86_64-pc-windows-msvc`: both exit 0.
+
+Not run: Swift, App build-for-testing and UI lanes (not selected; no Swift file
+changed); no real device, installed Runtime or Golden Journey — nothing here is
+hardware evidence. Maintainer gates: none consumed; recovery semantics beyond the
+release receipt's own bounded deadline stay behind design §L.1 item 13.

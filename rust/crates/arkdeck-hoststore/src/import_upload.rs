@@ -1,5 +1,7 @@
 //! Single owner of the existing Import upload lifetime. Begin/append/abort and
 //! rediscovery never dispatch a device operation or mint a target binding.
+#[path = "import_lifecycle.rs"]
+mod lifecycle;
 #[path = "import_publication.rs"]
 mod publication;
 use arkdeck_contract::{
@@ -12,6 +14,7 @@ use arkdeck_platform::{
     DocumentPublishError, HostDirectory, HostReadLock, HostUploadFile, UploadChunkCheckpoint,
     UploadWritePoint,
 };
+pub(crate) use lifecycle::ImportUse;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 use std::{
@@ -215,6 +218,9 @@ pub enum ImportUploadFault {
     AfterPayloadPublication,
     AfterPublication,
     AfterReceiptCheckpoint,
+    AfterReleaseCheckpoint,
+    AfterReleaseUnpin,
+    AfterInputHold,
 }
 type Fault = Arc<dyn Fn(ImportUploadFault) -> io::Result<()> + Send + Sync>;
 
@@ -229,6 +235,7 @@ pub struct ImportUploadStore {
     // The synchronous Swift Artifact actor serialized upload lifetime changes.
     // The stable file lock additionally excludes another Rust process owner.
     verified: Mutex<BTreeMap<String, String>>,
+    uses: Mutex<BTreeMap<String, Vec<crate::job_owner::import_references::ImportReference>>>,
     fault: Fault,
 }
 impl ImportUploadStore {
@@ -252,6 +259,7 @@ impl ImportUploadStore {
             payloads,
             lock,
             verified: Mutex::new(BTreeMap::new()),
+            uses: Mutex::new(BTreeMap::new()),
             fault,
         };
         value.validate().map_err(|_| {
@@ -392,15 +400,7 @@ impl ImportUploadStore {
         record: &Record,
         cache: &mut BTreeMap<String, String>,
     ) -> Result<(), WireError> {
-        // Released lifetimes can require an Artifact unpin. That coordination
-        // is intentionally unavailable until the publication/release owner joins.
-        if record.state == "released" {
-            return Err(failure(
-                "operationUnavailable",
-                "Import release reconciliation owner is not configured",
-            ));
-        }
-        if ["committed", "aborted"].contains(&record.state.as_str()) {
+        if ["committed", "released", "aborted"].contains(&record.state.as_str()) {
             self.remove_staging(record)?;
             cache.remove(&record.id);
             return Ok(());

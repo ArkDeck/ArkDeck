@@ -527,6 +527,8 @@ def local_commands(repo_root: pathlib.Path, plan: CIPlan) -> tuple[tuple[str, ..
     if plan.lanes.swift:
         commands.extend(
             [
+                (python, "Packages/ArkDeckKit/Scripts/generate-clientkit-models.py", "--check"),
+                (python, "Packages/ArkDeckKit/Scripts/test_generate_clientkit_models.py"),
                 (python, "Packages/ArkDeckKit/Scripts/test_run_swiftpm.py"),
                 ("sh", "Packages/ArkDeckKit/Scripts/run-test-lane.sh", "full"),
             ]

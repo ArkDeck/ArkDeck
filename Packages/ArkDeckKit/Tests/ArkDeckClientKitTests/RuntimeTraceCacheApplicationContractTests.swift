@@ -1,8 +1,8 @@
 import Foundation
 import XCTest
 
+@testable import ArkDeckClientKit
 @testable import ArkDeckCore
-@testable import ArkDeckWorkflows
 
 final class RuntimeTraceCacheApplicationContractTests: XCTestCase {
   private actor Scenario {

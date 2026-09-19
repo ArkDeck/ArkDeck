@@ -78,6 +78,7 @@ fn rust_plans_the_swift_pointer_gestures() {
         now: fixed_now,
     };
     let planner = JobPlanner {
+        imports: None,
         artifacts: Some(&artifacts),
         analyzer: None,
         state_root: &root,

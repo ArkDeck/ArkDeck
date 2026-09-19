@@ -256,6 +256,7 @@ fn rust_raises_and_reads_the_physical_assistance_swift_asked_for() {
     let resources = HumanActionResources::open(&root.join("human-action-snapshots")).unwrap();
     let admitter = JobAdmitter {
         planner: JobPlanner {
+            imports: None,
             artifacts: Some(&artifacts),
             analyzer: None,
             state_root: root,
@@ -446,6 +447,7 @@ fn adopting_run(
     };
     let admitter = JobAdmitter {
         planner: JobPlanner {
+            imports: None,
             artifacts: Some(&artifacts),
             analyzer: None,
             state_root: root,
@@ -585,6 +587,7 @@ fn adopting_run(
             probe: &probe,
         };
         JobRunner {
+            imports: None,
             mutation: None,
             jobs: &jobs,
             artifacts: &artifacts,
@@ -716,6 +719,7 @@ fn crash_between_target_and_execution_commit_reopens_all_owners_and_keeps_origin
         };
         let admitter = JobAdmitter {
             planner: JobPlanner {
+                imports: None,
                 artifacts: Some(&artifacts),
                 analyzer: None,
                 state_root: root,
@@ -840,6 +844,7 @@ fn physical_resume_keeps_original_intent_and_unique_job() {
         };
         let admitter = JobAdmitter {
             planner: JobPlanner {
+                imports: None,
                 artifacts: Some(&artifacts),
                 analyzer: None,
                 state_root: root,
@@ -1026,6 +1031,7 @@ fn physical_resume_keeps_original_intent_and_unique_job() {
                         };
                         let admitter = JobAdmitter {
                             planner: JobPlanner {
+                                imports: None,
                                 artifacts: Some(artifacts),
                                 analyzer: None,
                                 state_root: root,
@@ -1186,6 +1192,7 @@ fn resolved_resume_commit_gap_preserves_status_then_run_continuation() {
         };
         let admitter = JobAdmitter {
             planner: JobPlanner {
+                imports: None,
                 artifacts: Some(&artifacts),
                 analyzer: None,
                 state_root: root,

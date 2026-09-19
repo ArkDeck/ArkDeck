@@ -507,3 +507,81 @@ fn import_list_rejects_malformed_paging_and_foreign_inventory_without_retry() {
         );
     }
 }
+
+#[test]
+fn release_uses_original_generation_and_refuses_foreign_or_unbounded_receipts() {
+    let id = "imp-00000000-0000-4000-8000-000000000001";
+    let invocation = parse(&argv(&[
+        "artifact",
+        "import",
+        "release",
+        "--import",
+        id,
+        "--generation",
+        "2",
+    ]))
+    .unwrap();
+    assert_eq!(invocation.method, "artifact.import.release");
+    assert_eq!(
+        invocation.params.as_ref().unwrap(),
+        json!({"importId":id,"generation":"2"}).as_object().unwrap()
+    );
+    for args in [
+        vec!["artifact", "import", "release", "--import", id],
+        vec![
+            "artifact",
+            "import",
+            "release",
+            "--import",
+            id,
+            "--generation",
+            "0",
+        ],
+        vec![
+            "artifact",
+            "import",
+            "release",
+            "--import",
+            id,
+            "--generation",
+            "9007199254740992",
+        ],
+    ] {
+        assert!(parse(&argv(&args)).is_err());
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let artifact = "ART-00000000000000000000000000000000";
+        let receipt = json!({"schemaVersion":"arkdeck.import-release/1","importId":id,"importRequestId":"release","owner":{"kind":"import","id":id},"artifactId":artifact,"lease":format!("lease-v1:{id}:{artifact}"),"releasedGeneration":"2","generation":"3","state":"released","releasedAtUtc":"2026-09-12T00:00:00Z","retention":{"class":"default","pinned":false,"deadlineUtc":"2026-09-19T00:00:00Z"}});
+        assert_eq!(
+            arkdeck_cli::execute_import(&invocation, |method, _, _| {
+                assert_eq!(method, "artifact.import.release");
+                Ok(receipt.clone())
+            })
+            .unwrap(),
+            receipt
+        );
+        for (key, value) in [
+            (
+                "importId",
+                json!("imp-00000000-0000-4000-8000-000000000002"),
+            ),
+            ("generation", json!("4")),
+            (
+                "lease",
+                json!("lease-v1:job-other:ART-00000000000000000000000000000000"),
+            ),
+            (
+                "retention",
+                json!({"class":"default","pinned":false,"deadlineUtc":"2026-09-11T00:00:00Z"}),
+            ),
+        ] {
+            let mut bad = receipt.clone();
+            bad[key] = value;
+            assert!(
+                arkdeck_cli::execute_import(&invocation, |_, _, _| Ok(bad.clone())).is_err(),
+                "{key}"
+            );
+        }
+    }
+}

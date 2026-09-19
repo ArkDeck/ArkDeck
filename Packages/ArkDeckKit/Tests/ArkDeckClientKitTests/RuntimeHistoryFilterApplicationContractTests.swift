@@ -135,4 +135,29 @@ final class RuntimeHistoryFilterApplicationContractTests: XCTestCase {
     XCTAssertEqual(calls.first?.1?["expectedGeneration"], .string("7"))
   }
 
+  func testGeneratedListStructurePreservesNonNullIdentitiesAndSemanticChecks() throws {
+    func list(generation: String, query: JSONValue) throws -> Data {
+      guard case .success(let data) = try response(.object([
+        "schemaVersion": .string("arkdeck.history-filter-list/1"),
+        "generation": .string(generation),
+        "filters": .array([resource(generation: generation, query: query)]),
+        "updatedAtUtc": .string("2026-09-01T08:30:00.000Z"),
+      ])) else { throw HistoryWireError.invalidShape }
+      return data
+    }
+    guard case .success(let decoded) = RuntimeHistoryFilterResponseDecoding.list(
+      try list(generation: "2", query: query.projection))
+    else { return XCTFail("published non-null identities must survive generated decoding") }
+    XCTAssertEqual(decoded.query, query)
+    for generation in ["02", "0", "9223372036854775808"] {
+      guard case .failure = RuntimeHistoryFilterResponseDecoding.list(
+        try list(generation: generation, query: query.projection))
+      else { return XCTFail("non-canonical generation accepted: \(generation)") }
+    }
+    let invalid = RuntimeHistoryFilterQuery(status: "not-a-status")
+    guard case .failure = RuntimeHistoryFilterResponseDecoding.list(
+      try list(generation: "2", query: invalid.projection))
+    else { return XCTFail("generated structure erased enum validation") }
+  }
+
 }

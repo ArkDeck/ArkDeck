@@ -31,6 +31,16 @@ Job state an accepted run read, that state must not be terminal. A request
 naming `<nextCursor of X>` sends the cursor exchange X's page minted. The
 fake must receive the oracle's calls, in order.
 
+An adoption oracle has no Jobs: its daemon starts with no Target and adopts
+the device itself. An exchange that plugs USB relations names them
+(`usbRelations`, with `usbRelationsAfter` for a replug the oracle times by its
+reads), and the harness writes them to the file the daemon reads as its
+development source (ARKDECK_DEVELOPMENT_USB_RELATIONS). An identity the owner
+mints at random (`obs-`, `har-`, `resume-`, `candidate-`) reads as the
+oracle's label for its kind in order of first appearance, and a request naming
+a label sends the identity it stands for. Once replayed, the Target document
+and the candidate names must be Swift's, their times read alike.
+
 The daemon is then restarted over the same root, and every Job's status,
 record, result and evidence, and every execution's status, must read as they
 did before; the Rust CLI reads the first Job's result and evidence as the
@@ -39,9 +49,9 @@ list and the first Job's Artifacts. It then abandons every execution at the
 generation it read (one that owns a Job is refused, since abandonment never
 cancels a Job, and a settled one is answered as it is) and runs a new
 `observe.device@1` execution to its end as Golden Journey 1 enters (`agent run
---operation … --target …`). Two startups
-are refused: a development HDC without a development root, and one named by a
-relative path.
+--operation … --target …`). Four startups are refused: a development HDC
+without a development root or named by a relative path, and development USB
+relations without a development HDC or named by a relative path.
 
 Byte equality of what the Jobs and executions leave (T0) is the in-process
 replays' (`cargo test -p arkdeck-hoststore --test observe_device --test
@@ -72,7 +82,12 @@ TIME = re.compile(r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z')
 # Swift's wording, and values that cover the owner's own clock.
 LABELS = {'message', 'manifestSha256', 'snapshotRevision', 'nextCursor'}
 SERVED = {'job.plan', 'job.submit', 'job.run', 'job.result', 'job.evidence', 'artifact.list',
-          'agent.run', 'agent.status', 'agent.list', 'agent.abandon'}
+          'agent.run', 'agent.status', 'agent.list', 'agent.abandon', 'device.observations',
+          'target.adopt'}
+# The identities an owner mints at random, which an oracle labels by kind in
+# order of first appearance.
+MINTED = re.compile(r'\b(har|resume|candidate|obs)-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-'
+                    r'[0-9a-f]{4}-[0-9a-f]{12}\b')
 TERMINAL = {'planned', 'succeeded', 'recovered', 'failed', 'cancelled', 'interrupted'}
 # An execution that has not yet recorded its Job's end.
 UNSETTLED = {'orchestrating', 'creatingJob', 'jobOwned'}
@@ -207,16 +222,41 @@ def main() -> None:
             state = base / 'state'
             state.mkdir(mode=0o700)
             (state / 'targets-state').mkdir(mode=0o700)
-            shutil.copyfile(fixture / 'targets-state/targets.json',
-                            state / 'targets-state/targets.json')
-            # Owner-only, as the Target owner requires and Swift wrote it.
-            (state / 'targets-state/targets.json').chmod(0o600)
+            # A Job oracle adopted its Target before its runs; an adoption
+            # oracle starts with none and adopts it itself.
+            if oracle.get('jobs'):
+                shutil.copyfile(fixture / 'targets-state/targets.json',
+                                state / 'targets-state/targets.json')
+                # Owner-only, as the Target owner requires and Swift wrote it.
+                (state / 'targets-state/targets.json').chmod(0o600)
+            # The USB relations each exchange plugs, which the daemon reads as
+            # its development source; none until one is plugged.
+            usb = base / 'usb-relations.json'
             endpoint = state / 'control.sock'
             clean = {key: value for key, value in os.environ.items()
                      if not key.startswith('ARKDECK_') and key != 'CFFIXED_USER_HOME'}
             env = dict(clean, ARKDECK_DEVELOPMENT_STATE_ROOT=str(state),
                        ARKDECK_ENDPOINT=str(endpoint),
-                       ARKDECK_DEVELOPMENT_HDC_PATH=str(HDC_ROOT / 'hdc'))
+                       ARKDECK_DEVELOPMENT_HDC_PATH=str(HDC_ROOT / 'hdc'),
+                       ARKDECK_DEVELOPMENT_USB_RELATIONS=str(usb))
+            identities: dict[str, str] = {}
+            kinds: dict[str, int] = {}
+
+            def with_labels(value):
+                """The value with each minted identity read as the oracle's label."""
+                def swap(match):
+                    if match.group(0) not in identities:
+                        kinds[match.group(1)] = kinds.get(match.group(1), 0) + 1
+                        identities[match.group(0)] = f'<{match.group(1)}-{kinds[match.group(1)]}>'
+                    return identities[match.group(0)]
+                return json.loads(MINTED.sub(swap, json.dumps(value, sort_keys=True)))
+
+            def without_labels(value):
+                """The value with each label read back as the identity it stands for."""
+                text = json.dumps(value)
+                for identity, label in identities.items():
+                    text = text.replace(label, identity)
+                return json.loads(text)
 
             calls = HDC_ROOT / 'hdc-invocations.log'
             daemon_process = start(env, endpoint)
@@ -230,7 +270,12 @@ def main() -> None:
                 if method not in SERVED:
                     summary['skipped'].append(name)
                     continue
-                params = dict(item['params'])
+                params = without_labels(dict(item['params']))
+                if 'usbRelations' in item:
+                    plug = {'relations': item['usbRelations']}
+                    if 'usbRelationsAfter' in item:
+                        plug['after'] = item['usbRelationsAfter']
+                    usb.write_text(json.dumps(plug))
                 if 'mode' in item:
                     (HDC_ROOT / 'hdc-mode').write_text(f"{item['mode']}\n")
                     if item['mode'] == 'held':
@@ -253,7 +298,7 @@ def main() -> None:
                 if isinstance(params.get('cursor'), str) and (minted := CURSOR.fullmatch(params['cursor'])):
                     params['cursor'] = answers[minted[1]]['result']['nextCursor']
                     opened = listings.get(minted[1], minted[1])
-                answer = exchange(endpoint, method, params)
+                answer = with_labels(exchange(endpoint, method, params))
                 answers[name] = answer
                 answer = labelled(answer, item['answer'])
                 if method in LISTINGS and answer.get('ok') and item['answer'].get('ok'):
@@ -277,7 +322,14 @@ def main() -> None:
                 replayed += 1
             recorded, received = (fixture / 'hdc-invocations.log').read_bytes(), calls.read_bytes()
             check('the fake received the oracle\'s calls in order', received == recorded)
-            jobs = oracle['jobs']
+            if not oracle.get('jobs'):
+                # The oracle adopted its device: the Target document and the
+                # candidate names are Swift's, their times read alike.
+                for document in ('targets.json', 'target-display-names.json'):
+                    ours = TIME.sub('<time>', (state / 'targets-state' / document).read_text())
+                    swift = TIME.sub('<time>', (fixture / 'targets-state' / document).read_text())
+                    check(f'the Target owner\'s {document}', ours == swift, (ours, swift))
+            jobs = oracle.get('jobs', {})
             executions = oracle.get('executions', {})
             reads = [(run, method, {'jobId': job}) for run, job in jobs.items() for method in READS]
             reads += [(run, 'agent.status', {'executionId': execution})
@@ -292,7 +344,7 @@ def main() -> None:
                       exchange(endpoint, method, params) == before[(run, method)])
             first = next(iter(oracle['exchanges']))['name'].split('.')[0]
             cli_env = dict(clean, ARKDECK_ENDPOINT=str(endpoint), ARKDECK_DAEMON_PATH=str(daemon))
-            for command, method in (('result', 'job.result'), ('evidence', 'job.evidence')):
+            for command, method in (('result', 'job.result'), ('evidence', 'job.evidence')) if jobs else ():
                 completed = subprocess.run(
                     [str(cli), '--output', 'json', 'job', command, '--job', jobs[first]],
                     env=cli_env, capture_output=True, timeout=120)
@@ -371,6 +423,11 @@ def main() -> None:
                             'a development HDC is configured only for an isolated development root')
             refused_startup(dict(env, ARKDECK_DEVELOPMENT_HDC_PATH='arkdeck-hdc-oracle/hdc'),
                             'ARKDECK_DEVELOPMENT_HDC_PATH must be an explicit absolute path')
+            refused_startup({key: value for key, value in env.items()
+                             if key != 'ARKDECK_DEVELOPMENT_HDC_PATH'},
+                            'development USB relations are configured only with a development HDC')
+            refused_startup(dict(env, ARKDECK_DEVELOPMENT_USB_RELATIONS='usb-relations.json'),
+                            'ARKDECK_DEVELOPMENT_USB_RELATIONS must be an explicit absolute path')
             summary.update(replayed=replayed, checks=len(checks),
                            invocations=hashlib.sha256(received).hexdigest())
         finally:

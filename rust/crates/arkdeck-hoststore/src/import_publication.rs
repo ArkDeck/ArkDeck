@@ -309,32 +309,13 @@ impl ImportUploadStore {
         }
         let mut cache = self.verified.lock().map_err(unreadable)?;
         let record = self.by_id(id, &mut cache)?.record;
+        self.finish_release(artifacts, &record)?;
         let rows = artifacts.listed_rows(id).map_err(unreadable)?;
         for row in &rows {
-            let receipt = record
-                .receipt
-                .as_ref()
-                .filter(|_| record.state == "committed")
-                .ok_or_else(|| unreadable("uncommitted publication"))?;
-            if row["artifactID"] != receipt["artifactId"]
-                || row["jobID"] != id
-                || row["name"] != record.intent.name
-                || row["sha256"] != record.intent.sha256
-                || row["byteCount"].as_u64() != Some(record.intent.byte_count)
-                || row["mediaType"] != record.intent.media_type()
-                || row["privacy"] != record.intent.privacy()
-                || row["redactionApplied"] != false
-                || row["providerID"] != "host"
-                || row["sessionID"] != format!("import-{id}")
-                || row["stepID"] != format!("import-{}", record.intent.kind)
-                || row["retention"]["retentionClass"] != "pinnedUntilVerified"
-                || row["retention"]["pinned"] != true
-                || row["sourceOperation"] != format!("artifact.import-{}", record.intent.kind)
-                || row["bindingSnapshot"]
-                    != serde_json::to_value(&record.binding).map_err(unreadable)?
-            {
-                return Err(unreadable("receipt metadata mismatch"));
+            if !["committed", "released"].contains(&record.state.as_str()) {
+                return Err(unreadable("uncommitted publication"));
             }
+            record.verifies_metadata(row)?;
         }
         let require_owner = |requested: &str| {
             if requested == id {
@@ -343,16 +324,48 @@ impl ImportUploadStore {
                 Err(invalid())
             }
         };
-        if method == "artifact.list" {
-            artifacts.handle_owned_list(params, snapshots, require_owner)
+        let mut value = if method == "artifact.list" {
+            artifacts.handle_owned_list(params, snapshots, require_owner)?
         } else {
-            artifacts.handle_owned_resource(method, params, require_owner)
+            artifacts.handle_owned_resource(method, params, require_owner)?
+        };
+        if record.state == "released"
+            && let Some(object) = value.as_object_mut()
+        {
+            if object.contains_key("lease") {
+                object.insert("lease".into(), Value::Null);
+            }
+            if let Some(Value::Array(items)) = object.get_mut("items") {
+                for item in items {
+                    if let Some(row) = item.as_object_mut() {
+                        row.insert("lease".into(), Value::Null);
+                    }
+                }
+            }
         }
+        Ok(value)
     }
 }
 
 impl ImportUploadStore {
     pub fn list(&self, fields: &Map<String, Value>) -> Result<Value, WireError> {
+        self.list_inner(fields, None)
+    }
+    pub fn list_with_artifacts(
+        &self,
+        fields: &Map<String, Value>,
+        artifacts: &ArtifactReadStore,
+    ) -> Result<Value, WireError> {
+        if artifacts.path != self.artifact_path {
+            return Err(unreadable("different Artifact owner"));
+        }
+        self.list_inner(fields, Some(artifacts))
+    }
+    fn list_inner(
+        &self,
+        fields: &Map<String, Value>,
+        artifacts: Option<&ArtifactReadStore>,
+    ) -> Result<Value, WireError> {
         if fields
             .keys()
             .any(|k| !["target", "state", "pageSize", "cursor"].contains(&k.as_str()))
@@ -421,6 +434,9 @@ impl ImportUploadStore {
                             return Ok(());
                         }
                         self.recover(&record, &mut cache)?;
+                        if let Some(artifacts) = artifacts {
+                            self.finish_release(artifacts, &record)?;
+                        }
                         captured.push((
                             import_timestamp(&record.created_at)
                                 .ok_or_else(|| unreadable("timestamp"))?,

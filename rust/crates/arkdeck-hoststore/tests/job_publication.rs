@@ -40,6 +40,7 @@ fn rust_publishes_the_swift_sessions() {
     for case in cases {
         let accepted = JobAdmitter {
             planner: JobPlanner {
+                imports: None,
                 artifacts: Some(&artifact_store),
                 analyzer: Some(&profile),
                 state_root: &root,
@@ -65,6 +66,7 @@ fn rust_publishes_the_swift_sessions() {
         probe: &probe,
     };
     let runner = JobRunner {
+        imports: None,
         mutation: None,
         jobs: &jobs,
         artifacts: &artifact_store,

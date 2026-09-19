@@ -3,6 +3,8 @@ mod app_ingress;
 #[cfg(target_os = "macos")]
 mod bootstrap_readers;
 #[cfg(target_os = "macos")]
+mod development_usb;
+#[cfg(target_os = "macos")]
 mod facade;
 #[cfg(target_os = "macos")]
 mod facade_owners;
@@ -81,6 +83,11 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
     if development.is_none() && std::env::var_os("ARKDECK_DEVELOPMENT_HDC_PATH").is_some() {
         return Err("a development HDC is configured only for an isolated development root".into());
     }
+    if std::env::var_os("ARKDECK_DEVELOPMENT_USB_RELATIONS").is_some()
+        && std::env::var_os("ARKDECK_DEVELOPMENT_HDC_PATH").is_none()
+    {
+        return Err("development USB relations are configured only with a development HDC".into());
+    }
     #[cfg(target_os = "macos")]
     if development.is_none()
         && let Some(swift) = facade::swift_executable()
@@ -151,50 +158,59 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
                 root.join("human-action-snapshots"),
             ],
         )?;
-        host.with_targets(arkdeck_hoststore::TargetStore::open(
-            &root.join("targets-state"),
-        )?)
-        .with_history(arkdeck_hoststore::HistoryStore::open(&root)?)
-        .with_workspace_projects(arkdeck_hoststore::WorkspaceProjectStore::open(
-            &root.join("workspace-projects"),
-        )?)
-        .with_imports(arkdeck_hoststore::ImportUploadStore::open(&artifacts)?)
-        .with_artifacts(arkdeck_hoststore::ArtifactReadStore::open(&artifacts)?)
-        .with_trace_cache(arkdeck_hoststore::TraceCacheStore::open(&trace_cache)?)
-        .with_storage(
-            sessions,
-            arkdeck_hoststore::ArtifactUsage::open(&artifacts, host::ARTIFACT_QUOTA)?,
-        )
-        .with_bootstrap(&bootstrap)?
-        // The isolated owner admits Jobs, so it holds the Job owner connection.
-        .with_jobs(arkdeck_hoststore::JobStore::open_owner(
-            &root.join("jobs-state"),
-        )?)
-        // Beside the Job state, as the Swift daemon keeps its agent
-        // executions; each owns a Job of this owner.
-        .with_agent_executions(arkdeck_hoststore::AgentExecutionStore::open(
-            &root.join("agent-executions"),
-        )?)
-        // Swift's combined human-action owner pages the executions' actions
-        // in its own directory beside them.
-        .with_human_actions(arkdeck_hoststore::HumanActionResources::open(
-            &root.join("human-action-snapshots"),
-        )?)
-        // Beside the Job state, as the Swift engine keeps it: read only.
-        .with_capabilities(arkdeck_hoststore::CapabilityStore::open(
-            &root.join("jobs-state").join("capabilities"),
-        )?)
-        // As the Swift daemon: an analyzer is configured only by naming its
-        // executable, and a named path that is not one fails startup.
-        .with_planning(
-            &root,
-            std::env::var_os("ARKDECK_ANALYZER_PATH")
-                .map(|path| {
-                    arkdeck_hoststore::AnalyzerProfile::crash_signature(std::path::Path::new(&path))
-                })
-                .transpose()?,
-        )
-        .with_development_hdc(development_hdc()?)
+        let host = host
+            .with_targets(arkdeck_hoststore::TargetStore::open(
+                &root.join("targets-state"),
+            )?)
+            .with_history(arkdeck_hoststore::HistoryStore::open(&root)?)
+            .with_workspace_projects(arkdeck_hoststore::WorkspaceProjectStore::open(
+                &root.join("workspace-projects"),
+            )?)
+            .with_imports(arkdeck_hoststore::ImportUploadStore::open(&artifacts)?)
+            .with_artifacts(arkdeck_hoststore::ArtifactReadStore::open(&artifacts)?)
+            .with_trace_cache(arkdeck_hoststore::TraceCacheStore::open(&trace_cache)?)
+            .with_storage(
+                sessions,
+                arkdeck_hoststore::ArtifactUsage::open(&artifacts, host::ARTIFACT_QUOTA)?,
+            )
+            .with_bootstrap(&bootstrap)?
+            // The isolated owner admits Jobs, so it holds the Job owner connection.
+            .with_jobs(arkdeck_hoststore::JobStore::open_owner(
+                &root.join("jobs-state"),
+            )?)
+            // Beside the Job state, as the Swift daemon keeps its agent
+            // executions; each owns a Job of this owner.
+            .with_agent_executions(arkdeck_hoststore::AgentExecutionStore::open(
+                &root.join("agent-executions"),
+            )?)
+            // Swift's combined human-action owner pages the executions' actions
+            // in its own directory beside them.
+            .with_human_actions(arkdeck_hoststore::HumanActionResources::open(
+                &root.join("human-action-snapshots"),
+            )?)
+            // Beside the Job state, as the Swift engine keeps it: read only.
+            .with_capabilities(arkdeck_hoststore::CapabilityStore::open(
+                &root.join("jobs-state").join("capabilities"),
+            )?)
+            // As the Swift daemon: an analyzer is configured only by naming its
+            // executable, and a named path that is not one fails startup.
+            .with_planning(
+                &root,
+                std::env::var_os("ARKDECK_ANALYZER_PATH")
+                    .map(|path| {
+                        arkdeck_hoststore::AnalyzerProfile::crash_signature(std::path::Path::new(
+                            &path,
+                        ))
+                    })
+                    .transpose()?,
+            )
+            .with_development_hdc(development_hdc()?);
+        // Only beside the development HDC's fixture: the relations a harness
+        // names stand in for the ArkForge lane's reader.
+        match development_usb::DevelopmentUsbRelations::from_environment()? {
+            Some(usb) => host.with_usb_relations(std::sync::Arc::new(usb)),
+            None => host,
+        }
     } else {
         host
     };

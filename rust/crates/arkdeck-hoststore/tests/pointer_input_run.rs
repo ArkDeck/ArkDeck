@@ -232,6 +232,7 @@ fn replay(fault: Fault) {
         probe: &probe,
     };
     let planner = || JobPlanner {
+        imports: None,
         artifacts: Some(&artifacts),
         analyzer: None,
         state_root: &root,
@@ -244,6 +245,7 @@ fn replay(fault: Fault) {
         sessions: Some(&sessions),
     };
     let runner = JobRunner {
+        imports: None,
         mutation: (fault != Fault::NoOwner).then_some(arkdeck_hoststore::MutationExecution {
             authority,
             state_root: &root,
@@ -324,6 +326,7 @@ fn replay(fault: Fault) {
                                 now: fixed_now,
                             };
                             JobRunner {
+                                imports: None,
                                 mutation: Some(arkdeck_hoststore::MutationExecution {
                                     authority,
                                     state_root: root_ref,
@@ -469,6 +472,7 @@ fn replay(fault: Fault) {
                 drop(jobs);
                 let reopened = JobStore::open_owner(&default_root).unwrap();
                 let reopened_runner = JobRunner {
+                    imports: None,
                     mutation: Some(arkdeck_hoststore::MutationExecution {
                         authority,
                         state_root: &root,
@@ -598,6 +602,7 @@ fn restart_after_consumption_or_intent_never_replays_and_blocks_new_gesture() {
             holds: &holds,
         };
         let runner = JobRunner {
+            imports: None,
             mutation: Some(arkdeck_hoststore::MutationExecution {
                 authority,
                 state_root: &root,
@@ -633,6 +638,7 @@ fn restart_after_consumption_or_intent_never_replays_and_blocks_new_gesture() {
             .unwrap();
         let refusal = JobAdmitter {
             planner: JobPlanner {
+                imports: None,
                 artifacts: Some(&artifacts),
                 analyzer: None,
                 state_root: &root,
