@@ -13,9 +13,13 @@ use crate::operation_request::OperationRequest;
 use crate::session_json;
 use arkdeck_contract::{CATALOG_DIGEST, sha256_hex};
 use serde_json::{Map, Value, json};
+use std::collections::BTreeMap;
 use std::io;
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
+
+#[path = "debug_hap_plan.rs"]
+mod debug_hap_plan;
 
 const MAXIMUM_REQUEST_JSON_BYTES: usize = 4 * 1024 * 1024;
 const MAXIMUM_ANALYZER_BYTES: u64 = 128 * 1024 * 1024;
@@ -136,6 +140,7 @@ pub struct JobPlanner<'a> {
 pub(crate) struct Materialized<'a> {
     _import_use: Option<crate::import_upload::ImportUse<'a>>,
     pub(crate) digest: String,
+    pub(crate) artifact_facts: BTreeMap<String, String>,
     pub(crate) identity: Option<String>,
     pub(crate) binding_revision: Option<i64>,
 }
@@ -182,7 +187,7 @@ impl<'a> JobPlanner<'a> {
                 "planOnly does not accept or consume a Runtime capability",
             ));
         }
-        let descriptor = Self::descriptor(&request)?;
+        let descriptor = Self::descriptor_for_plan(&request)?;
         Self::validate_inputs(&request, descriptor)?;
         let fingerprint = request.fingerprint();
         let materialized = self.materialized(&request, descriptor)?;
@@ -243,6 +248,16 @@ impl<'a> JobPlanner<'a> {
         Ok(descriptor)
     }
 
+    fn descriptor_for_plan(
+        request: &OperationRequest,
+    ) -> Result<&'static CatalogOperation, PlanRefusal> {
+        if request.reference() == "debug.hap@1" {
+            return CatalogOperation::lookup(&request.operation_id, request.operation_version)
+                .ok_or_else(internal_failure);
+        }
+        Self::descriptor(request)
+    }
+
     /// Swift `validateInputs`; a catalog constraint this validator does not
     /// evaluate is refused rather than skipped.
     pub(crate) fn validate_inputs(
@@ -291,6 +306,7 @@ impl<'a> JobPlanner<'a> {
         Ok(Materialized {
             _import_use: hold,
             digest: self.materialize(request, descriptor)?,
+            artifact_facts: BTreeMap::new(),
             identity: None,
             binding_revision: None,
         })
@@ -350,6 +366,11 @@ impl<'a> JobPlanner<'a> {
             request.expected_binding_revision,
         )
         .map_err(|reason| unmaterialized(format!("failed({})", swift_string(reason))))?;
+        // Planning HAP does not expand the admission allowlist. Its complete
+        // Artifact authorization envelope and execution owner remain separate work.
+        if reference == "debug.hap@1" {
+            return self.materialize_hap(request, descriptor, &facts);
+        }
         self.refuse_debug_permit(request)?;
         // Swift names a ring-buffered capture's coverage anchor in its
         // markers; this Runtime does not compose it yet.
@@ -433,6 +454,7 @@ impl<'a> JobPlanner<'a> {
         let bytes = session_json::encode(&document).map_err(|_| internal_failure())?;
         Ok(Materialized {
             _import_use: None,
+            artifact_facts: BTreeMap::new(),
             digest: sha256_hex(&bytes),
             identity: Some(facts.identity),
             binding_revision: Some(facts.binding_revision),
@@ -577,4 +599,31 @@ impl<'a> JobPlanner<'a> {
         let bytes = session_json::encode(&document).map_err(|_| internal_failure())?;
         Ok(sha256_hex(&bytes))
     }
+}
+
+/// Swift RuntimeJobEngine.stepSetDigest. This is provenance, never dispatch permission.
+pub(crate) fn step_set_digest(
+    descriptor: &CatalogOperation,
+    inputs: &Map<String, Value>,
+) -> Result<String, PlanRefusal> {
+    let mut lines: Vec<String> = descriptor
+        .steps
+        .iter()
+        .filter(|step| descriptor.step_is_selected(step, inputs))
+        .map(|step| {
+            format!(
+                "{}|{}|{}|{}|{}",
+                step.step_id, step.kind, step.effect, step.cancellation, step.binding
+            )
+        })
+        .collect();
+    if descriptor.reference() == "debug.hap@1" {
+        for step in debug_hap_plan::compensations(descriptor, inputs)? {
+            lines.push(format!(
+                "compensation-{}|{}|{}|{}|{}",
+                step.step_id, step.kind, step.effect, step.cancellation, step.binding
+            ));
+        }
+    }
+    Ok(sha256_hex(lines.join("\n").as_bytes()))
 }

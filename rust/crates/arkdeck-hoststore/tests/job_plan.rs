@@ -256,14 +256,20 @@ fn rust_refuses_plans_it_cannot_materialize_yet() {
         });
         Map::from_iter([("requestJson".into(), json!(request.to_string()))])
     };
+    // debug.hap@1 is planned now (its admission stays closed; see
+    // debug_hap_plan.rs); an operation this Runtime still does not
+    // materialize is refused before its inputs are judged.
     let refusal = planner
-        .handle(&device_request("debug.hap", "idem-rust-debug-0001"))
+        .handle(&device_request(
+            "deploy.native-library.app-owned",
+            "idem-rust-native-0001",
+        ))
         .unwrap_err();
     assert_eq!(
         (refusal.code, refusal.message.as_str()),
         (
             "rejected",
-            "debug.hap@1 is not materialized by the Rust Runtime yet"
+            "deploy.native-library.app-owned@1 is not materialized by the Rust Runtime yet"
         )
     );
     // Swift's daemon without an HDC registration: no provider plans it.

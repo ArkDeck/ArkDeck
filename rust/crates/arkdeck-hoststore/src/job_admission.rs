@@ -23,7 +23,6 @@ use crate::operation_catalog::CatalogOperation;
 use crate::operation_request::OperationRequest;
 use arkdeck_contract::{CATALOG_DIGEST, sha256_hex};
 use serde_json::{Map, Value, json};
-use std::collections::BTreeMap;
 
 /// Swift `RuntimeDefaultReadOnlyPolicy` bounds.
 const READ_ONLY_TIMEOUT_SECONDS: i64 = 900;
@@ -319,8 +318,8 @@ impl JobAdmitter<'_> {
             target_binding_revision: Some(binding_revision),
             plan_digest: Some(materialized.digest.clone()),
             inputs: capability_policy::subject(descriptor, &request.inputs),
-            // The operations admitted here resolve no Artifact.
-            artifact_facts: BTreeMap::new(),
+            // Facts come from the exact owner-validated materialization.
+            artifact_facts: materialized.artifact_facts.clone(),
             workspace_identity_sha256: None,
             workspace_revision: None,
             workspace_file_scopes_digest: None,

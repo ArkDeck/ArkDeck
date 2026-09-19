@@ -1,0 +1,19 @@
+{
+  "producerCommit": "8be18a6ea18794dd1e0f51d64f2e84c2f15361de",
+  "producerTest": "DebugHapOracleContractTests/testSwiftDebugsAHapOnTheSharedFakeDevice",
+  "command": "ARKDECK_SWIFT_EXECUTABLE=/private/tmp/arkdeck-swift-jobs2.sh ARKDECK_RUST_DEBUG_HAP_RECORD=/private/tmp/arkdeck-hap-plan-native-20260919 sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --filter DebugHapOracleContractTests/testSwiftDebugsAHapOnTheSharedFakeDevice",
+  "result": "exit 0; 1 test, 0 failures",
+  "log": "/private/tmp/arkdeck-hap-plan-native-20260919.log",
+  "priorFixtureCommit": "8be18a6ea18794dd1e0f51d64f2e84c2f15361de",
+  "priorCasesSHA256": "a3df56b43a3a96ef5df30ba7ee9bb73c9ee6fc6a36152f0747724ddd09dea59f",
+  "priorProvenanceSHA256": "3d5a59c4a2fa799043a39caa50f2fc8920326f7000adc4d9f6f4969e8082a67c",
+  "recordedCasesSHA256": "0c2f7259622a8d72776e329525faa5b093fa015d52957dea49f10136196eb36e",
+  "recordedProvenanceSHA256": "c6378f032c2056b867bccd5f3f52cbf96340c6fe73f8c0bcf725939d654f95d2",
+  "oldExchangesUnchanged": true,
+  "allOtherFixtureFilesUnchanged": true,
+  "addedPlanCases": [
+    "omittedDefaults.plan",
+    "retainRunning.plan"
+  ],
+  "hardwareEvidence": false
+}

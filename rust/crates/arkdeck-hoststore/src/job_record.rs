@@ -427,6 +427,26 @@ impl JobRecord {
                 )
                 .as_bytes(),
             );
+            if self.operation == "debug.hap@1" {
+                // Every consumed HAP carries its owner-resolved primary digest.
+                // This structural read is not authority to replay a historical Job.
+                if !correlation["artifactSHA256"].as_str().is_some_and(digest) {
+                    return Err(unreadable(()));
+                }
+                if self.catalog == arkdeck_contract::CATALOG_DIGEST {
+                    let descriptor =
+                        crate::operation_catalog::CatalogOperation::lookup("debug.hap", Some(1))
+                            .ok_or_else(|| unreadable(()))?;
+                    let inputs = self.request["inputs"]
+                        .as_object()
+                        .ok_or_else(|| unreadable(()))?;
+                    let expected =
+                        crate::job_plan::step_set_digest(descriptor, inputs).map_err(unreadable)?;
+                    if correlation["stepSetDigestSHA256"] != expected {
+                        return Err(unreadable(()));
+                    }
+                }
+            }
             if evidence["reference"] != self.request["authorization"]["capabilityId"]
                 || correlation["reservationID"] != self.request["idempotencyKey"]
                 || correlation["useOrdinal"].as_i64().is_none_or(|n| n <= 0)
@@ -920,5 +940,38 @@ mod mutation_provenance_tests {
             let error = JobRecord::decode(&serde_json::to_vec(&changed).unwrap()).unwrap_err();
             assert_eq!(error.code, "recordUnreadable", "{field}");
         }
+    }
+}
+
+#[cfg(test)]
+mod hap_provenance_tests {
+    use super::*;
+    #[test]
+    fn reopening_native_hap_rejects_missing_artifact_and_changed_step_correlation() {
+        let bytes = include_bytes!(
+            "../../../tests/fixtures/debug-hap/store/jobs/job-e79d1b4e261f4a13d0bfb58a97fbf163/job-record.json"
+        );
+        JobRecord::decode(bytes).expect("native Swift HAP record");
+        let original: Value = serde_json::from_slice(bytes).unwrap();
+        for field in [
+            "artifactSHA256",
+            "stepSetDigestSHA256",
+            "reservationID",
+            "planDigestSHA256",
+        ] {
+            let mut changed = original.clone();
+            changed["admissionEvidence"]["runtimeCapabilityCorrelation"]
+                .as_object_mut()
+                .unwrap()
+                .remove(field);
+            assert!(
+                JobRecord::decode(&serde_json::to_vec(&changed).unwrap()).is_err(),
+                "{field}"
+            );
+        }
+        let mut changed = original;
+        changed["admissionEvidence"]["runtimeCapabilityCorrelation"]["stepSetDigestSHA256"] =
+            json!("0".repeat(64));
+        assert!(JobRecord::decode(&serde_json::to_vec(&changed).unwrap()).is_err());
     }
 }
