@@ -12,6 +12,16 @@ pub struct OperationAvailabilityContext<'a> {
     pub mutation_owner: bool,
 }
 
+/// The executable operations that mutate a device: each consumes a Runtime
+/// capability use first, so none is available without the mutation owner.
+const MUTATIONS: [&str; 5] = [
+    "input.tap@1",
+    "input.long-press@1",
+    "input.swipe@1",
+    "port-forward.create@1",
+    "port-forward.remove@1",
+];
+
 /// Swift RuntimeJobEngine.operationAvailability's provider, dispatcher and
 /// Artifact checks, limited to the operations this Rust executor can run.
 /// None preserves provider_not_registered. Unsupported plans must never turn
@@ -28,8 +38,7 @@ pub fn operation_unavailability(
         return None;
     }
     let mut reasons = Vec::new();
-    let pointer = ["input.tap@1", "input.long-press@1", "input.swipe@1"].contains(&reference);
-    if pointer && !context.mutation_owner {
+    if MUTATIONS.contains(&reference) && !context.mutation_owner {
         reasons.push((
             "provider_tool_unavailable",
             "runtime.mutationOwnerUnavailable".into(),
@@ -102,7 +111,13 @@ mod tests {
                     .is_empty()
             );
         }
-        for reference in ["input.tap@1", "input.long-press@1", "input.swipe@1"] {
+        for reference in [
+            "input.tap@1",
+            "input.long-press@1",
+            "input.swipe@1",
+            "port-forward.create@1",
+            "port-forward.remove@1",
+        ] {
             assert_eq!(
                 operation_unavailability(reference, "hdc", &c).unwrap()[0],
                 (

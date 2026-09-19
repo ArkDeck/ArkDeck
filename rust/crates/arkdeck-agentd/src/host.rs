@@ -508,6 +508,8 @@ impl HostServices for Host {
                         "input.tap@1",
                         "input.long-press@1",
                         "input.swipe@1",
+                        "port-forward.create@1",
+                        "port-forward.remove@1",
                     ]
                     .contains(&reference)
                 {
