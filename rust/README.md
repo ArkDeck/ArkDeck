@@ -332,7 +332,11 @@ Artifact census. Unreconciled Job history, any retained Artifact namespace or
 file, and any upload record, identity or payload in the Import namespace
 preserve all cache entries and private residuals; the Import owner's idle
 `.imports-v1` skeleton alone does not. Unsafe or unreadable owners refuse
-maintenance before any deletion. An inactive census permits only inode-bound
+maintenance before any deletion. The Artifact census reads the whole store,
+each directory listing bounded at 100 000 entries and the store as a whole not
+at all. Artifact writers take only the census's lock, so a large store slows a
+purge and never refuses a publication.
+An inactive census permits only inode-bound
 derived cache quarantine/removal under the existing leases. Original Trace
 Artifacts remain untouched. Callers cannot pass a cache path, Session root
 selection excludes the entire cache parent, and uncertain CLI results never
