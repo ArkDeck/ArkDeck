@@ -118,6 +118,12 @@ Spikes SPK-6..11 are defined in `tasks.md` and design §J.3; their records land 
 
 ## History
 
+Post-baseline update: #1984 merged the Rust pointer execution runner. Its fixed-root
+mutation continuity, fresh plan/facts checks and durable capability outcomes have
+host-fixture evidence; installed Rust activation and real-device pointer/GJ
+acceptance remain outstanding. The pinned-main counts above are not increased by
+this later runner implementation.
+
 2026-09-19 (`510b4650`): #1983 merges immutable publication for HAP,
 application-owned native libraries and workspace patches, durable retry receipts
 and CLI-to-daemon restart readback. Recounted 72 routes and 68 registered CLI
