@@ -143,6 +143,16 @@ pub trait HostServices: Send + Sync {
             details: None,
         })
     }
+    /// `job.reconcile` reconciles a Job whose outcome is unknown against its
+    /// durable intent. A host without a Job owner that reconciles answers as
+    /// the read-only foundation always has.
+    fn job_reconcile(&self, _params: &serde_json::Map<String, Value>) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "rejected".into(),
+            message: "this method is unavailable in the read-only Rust foundation".into(),
+            details: None,
+        })
+    }
     /// `agent.run`, `agent.status`, `agent.list` and `agent.abandon` advance,
     /// read, list and abandon agent executions. A host without an agent
     /// execution owner answers as the read-only foundation always has.
@@ -1018,6 +1028,10 @@ impl<H: HostServices> Control<H> {
                 id: request.id.clone(),
                 outcome: self.host.job_cancel(&params),
             },
+            "job.reconcile" => Response {
+                id: request.id.clone(),
+                outcome: self.host.job_reconcile(&params),
+            },
             "job.result" | "job.evidence" => Response {
                 id: request.id.clone(),
                 outcome: self.host.job_result_resource(&request.method, &params),
@@ -1184,10 +1198,10 @@ impl<H: HostServices> Control<H> {
 
     /// Swift `RuntimeControlPlaneHandler.doctorReport(deep:)`: every finding
     /// from the host's owners as they are now. Two Swift findings come from
-    /// start-up recovery, which is not ported (design §L.1 item 13), and are
-    /// never emitted: `runtime.jobRecordUnreadable` (the recovery
-    /// quarantine) and `runtime.durableRecordsUnreadable` (the deep census of
-    /// undecodable Job records).
+    /// start-up recovery and are never emitted yet: `runtime.jobRecordUnreadable`
+    /// (the recovery quarantine, which the isolated daemon reports on its
+    /// standard error at its start) and `runtime.durableRecordsUnreadable`
+    /// (the deep census of undecodable Job records).
     fn doctor(&self, deep: bool) -> Value {
         let hdc = self.host.hdc_status(deep);
         let facts = self.host.doctor_facts(deep);

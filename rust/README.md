@@ -665,14 +665,36 @@ a new product and never evicts one, the payload sealed `0400` before the index
 names it. Terminal transitions and records are spelled as Swift writes them. A
 timeout, a signal death or an unobservable child leaves the intent outstanding
 and parks the Job in `waitingForRecovery`; nothing is dispatched twice. Recovery
-is being ported as the maintainer ruled on 2026-09-19 (design §L.1 item 13): the
-carriers the ADR-0009 decision package names, unchanged. Until the Job slices
-land, a Job in any resumable state, or whose journal has left `preflight`, is
-refused. Landed so far: `recovery_manifest.rs`, Swift's `RecoveryManifestCodec`
-(the Session manifest's `recovery` member, which the Session reader now decodes
-through it before checking its relations to the Session's steps); its unit tests
-replay `rust/tests/fixtures/recovery-manifest/` (Swift
-`RecoveryManifestOracleContractTests`, re-recorded with
+is ported as the maintainer ruled on 2026-09-19 (design §L.1 item 13): the
+carriers the ADR-0009 decision package names, unchanged. Before it serves, the
+isolated daemon recovers its active Jobs (`job_recovery.rs`, Swift
+`recoverActiveJobs` and `recover(records:)` over `RuntimeRecoveryService.replay`;
+`recover_jobs` recovers named Jobs, a terminal one included, for its other
+callers): each journal is replayed, every unresolved intent or unknown outcome is
+parked (journaled `recovery-t-<n>` when the Job had left no recovery state),
+only decisions the journal already holds are completed, the record gains its
+`recovered: …` marker once and is persisted again (record, then index row), and
+a runtime capability's use outcome is re-asserted; nothing is dispatched or
+published. A record it cannot read is quarantined; an ArkForge execution and a
+complete-overwrite recovery Job are refused untouched. `job.reconcile`
+(`job_reconcile.rs`) reconciles an analyzer Job whose outcome is unknown: its
+source is resolved again, the provider confirms the intent not executed only
+for the source it named, the decision is journaled with the `confirmedNotExecuted`
+step outcome, and the Job fails and is published as a Session, or stays parked;
+what a failed reconcile journaled stays resident in memory, as Swift's engine
+keeps it. A Job of any other operation is answered only where Swift writes
+nothing, and refused otherwise. `tests/job_reconcile.rs` replays
+`rust/tests/fixtures/job-reconcile-analyzer/` (Swift
+`testSwiftRecoversAndReconcilesTheParkedAnalyzerJobs`, re-recorded with
+`ARKDECK_RUST_JOB_RECONCILE_RECORD=/private/tmp/<new>`): two starts and eight
+reconciles, every answer, read and store snapshot byte for byte;
+`tests/job_recovery.rs` covers the branches it does not reach. `job.run` still
+refuses a Job in any resumable state, or whose journal has left `preflight`:
+resumption is a later slice. Also landed: `recovery_manifest.rs`, Swift's
+`RecoveryManifestCodec` (the Session manifest's `recovery` member, which the
+Session reader now decodes through it before checking its relations to the
+Session's steps); its unit tests replay `rust/tests/fixtures/recovery-manifest/`
+(Swift `RecoveryManifestOracleContractTests`, re-recorded with
 `ARKDECK_RUST_RECOVERY_MANIFEST_RECORD=/private/tmp/<new>`): every decision and
 canonical byte, and one member more or less written by Rust at each level as the
 document Swift refused. Nothing writes a non-null member, in Swift or here.
@@ -827,7 +849,8 @@ the receipt once the catalog holds the entry, `awaitingStorage` when the volume
 has no room, a confirmed failure otherwise; reads report the publication fact
 from it. A parked Job, whose outcome is unknown, publishes nothing. As in
 Swift, a restart never resumes a publication and nothing retries one;
-reconciliation stays unported (L.1 item 13).
+`job.reconcile` publishes an analyzer Job's Session once it confirms the parked
+intent not executed (see Job run).
 
 `rust/tests/fixtures/job-publication-analyzer/` is the oracle Swift
 `JobRunAnalyzerOracleContractTests.testSwiftPublishesTheSharedAnalyzerSessions`

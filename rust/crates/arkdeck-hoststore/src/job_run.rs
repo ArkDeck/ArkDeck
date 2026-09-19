@@ -795,7 +795,7 @@ impl JobRunner<'_> {
 /// request may read an Artifact collected from its own target; any other
 /// binding must be the materialized one. The refusal is Swift's
 /// interpolation of its `RuntimeJobEngineError`.
-fn binding_refusal(leased: &LeasedArtifact, record: &JobRecord) -> Option<String> {
+pub(crate) fn binding_refusal(leased: &LeasedArtifact, record: &JobRecord) -> Option<String> {
     let binding = &leased.row["bindingSnapshot"];
     let target = &record.request["target"];
     let revision = target

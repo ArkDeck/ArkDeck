@@ -8,7 +8,7 @@ mod retention_census;
 mod workspace_references;
 use crate::job_record::{JobRecord, STATES, digest, failure, unreadable};
 use crate::job_repository::{
-    AdmissionVerdict, JobRepository, JobWriteError, identifier, order_key,
+    AdmissionVerdict, JobRepository, JobRow, JobWriteError, identifier, order_key,
 };
 use crate::snapshot_pager::SnapshotPager;
 use arkdeck_contract::WireError;
@@ -27,6 +27,12 @@ pub struct JobStore {
     path: PathBuf,
     root: HostDirectory,
     activity: std::sync::Mutex<()>,
+    /// Swift's resident runtime records that are ahead of their durable
+    /// record: a `job.reconcile` that failed after its journal moved keeps
+    /// what it had journaled in memory, never on disk. Every read of the Job
+    /// sees it, as Swift's `recordForRead` does, until the Job is persisted
+    /// again or the process ends.
+    resident: std::sync::Mutex<std::collections::BTreeMap<String, JobRecord>>,
 }
 const RECORD_BOUND: usize = 16 * 1024 * 1024;
 
@@ -59,7 +65,111 @@ impl JobStore {
             path: path.into(),
             root,
             activity: std::sync::Mutex::new(()),
+            resident: Default::default(),
         })
+    }
+
+    /// Keep `record` as the Job's resident record, ahead of its durable one.
+    pub(crate) fn hold_resident(&self, record: JobRecord) {
+        self.resident
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .insert(record.job_id.clone(), record);
+    }
+
+    fn resident(&self, job_id: &str) -> Option<JobRecord> {
+        self.resident
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .get(job_id)
+            .cloned()
+    }
+
+    /// Whether the Job's record is held resident ahead of its durable one.
+    pub(crate) fn holds_resident(&self, job_id: &str) -> bool {
+        self.resident
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .contains_key(job_id)
+    }
+
+    /// Swift `RuntimeJobRepository.job(jobID:)`: the Job's index row, if any.
+    pub(crate) fn job_row(&self, id: &str) -> io::Result<Option<JobRow>> {
+        if !identifier(id) {
+            return Ok(None);
+        }
+        self.root.validate_path(&self.path)?;
+        Ok(self.repository.rows(Some(id))?.into_iter().next())
+    }
+
+    /// Swift `RuntimeJobRepository.activeJobs()`: every row whose state is
+    /// not terminal, a state this build does not know included, in creation
+    /// and then identity order.
+    pub(crate) fn active_rows(&self) -> io::Result<Vec<JobRow>> {
+        self.root.validate_path(&self.path)?;
+        Ok(self
+            .repository
+            .rows(None)?
+            .into_iter()
+            .filter(|row| !crate::job_record::terminal(&row.state))
+            .collect())
+    }
+
+    /// The Job's `job-record.json` as it stands, read through no link and
+    /// creating nothing.
+    pub(crate) fn record_bytes(&self, job_id: &str) -> io::Result<Vec<u8>> {
+        if !identifier(job_id) {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "The Job identity is not a Runtime identifier",
+            ));
+        }
+        self.root
+            .child("jobs")?
+            .child(job_id)?
+            .read("job-record.json", RECORD_BOUND)
+    }
+
+    /// Whether the Job's directory holds an entry `name`; an absent Job
+    /// directory holds none.
+    pub(crate) fn job_entry_exists(&self, job_id: &str, name: &str) -> io::Result<bool> {
+        let absent = |error: &io::Error| error.kind() == io::ErrorKind::NotFound;
+        let jobs = match self.root.child("jobs") {
+            Err(error) if absent(&error) => return Ok(false),
+            other => other?,
+        };
+        let job = match jobs.child(job_id) {
+            Err(error) if absent(&error) => return Ok(false),
+            other => other?,
+        };
+        match job.kind_and_size(name) {
+            Ok(_) => Ok(true),
+            Err(error) if absent(&error) => Ok(false),
+            Err(error) => Err(error),
+        }
+    }
+
+    /// Swift `RuntimeJobRecord.persist(into:)`: `jobs/<jobID>/job-record.json`
+    /// alone, for a row that already describes the record; the index row is
+    /// left as it is.
+    pub(crate) fn publish_record_file(&self, record: &JobRecord) -> Result<(), JobWriteError> {
+        let (key, bytes) = self.writable_record(record)?;
+        let _guard = self.activity.lock().map_err(|_| guard_unavailable())?;
+        self.root
+            .validate_path(&self.path)
+            .map_err(JobWriteError::Refused)?;
+        self.repository
+            .describes(&record.job_id, key, record.created())
+            .map_err(JobWriteError::Refused)?;
+        self.root
+            .private_child("jobs")
+            .and_then(|jobs| jobs.private_child(&record.job_id))
+            .map_err(JobWriteError::Refused)?
+            .publish_document("job-record.json", &bytes, RECORD_BOUND)
+            .map_err(|error| match error {
+                DocumentPublishError::BeforePublication(error) => JobWriteError::Refused(error),
+                DocumentPublishError::OutcomeUnknown(error) => JobWriteError::OutcomeUnknown(error),
+            })
     }
 
     /// Swift `RuntimeJobEngine`'s `cli-job-snapshots`: where this owner's
@@ -187,7 +297,13 @@ impl JobStore {
                     io::ErrorKind::InvalidInput,
                     message,
                 )),
-            })
+            })?;
+        // The durable record is the Job's record again.
+        self.resident
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .remove(&record.job_id);
+        Ok(())
     }
 
     fn writable_record<'a>(
@@ -285,6 +401,10 @@ impl JobStore {
                 "invalidInput",
                 "An exact bounded Job identity is required",
             ));
+        }
+        // A resident record is what Swift reads first.
+        if let Some(record) = self.resident(id) {
+            return Ok(record);
         }
         // Swift `RuntimeJobResourceReader` spellings: an absent Job, a record
         // that cannot be read, and an index that cannot be read at all.

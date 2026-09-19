@@ -101,6 +101,10 @@ pub struct Host {
     observations: Mutex<ObservationState>,
     #[cfg(target_os = "macos")]
     running: std::sync::Arc<Mutex<std::collections::HashMap<String, std::sync::Arc<RunSlot>>>>,
+    /// The `job.reconcile` of each Job under way, which a concurrent one of
+    /// the same Job joins (Swift `jobReconciliations`).
+    #[cfg(target_os = "macos")]
+    reconciling: Mutex<std::collections::HashMap<String, std::sync::Arc<RunSlot>>>,
     /// Swift `NSHomeDirectory()`, which Artifact redaction replaces.
     #[cfg(target_os = "macos")]
     home: String,
@@ -160,6 +164,24 @@ impl Host {
     pub fn with_jobs(mut self, jobs: arkdeck_hoststore::JobStore) -> Self {
         self.jobs = Some(std::sync::Arc::new(jobs));
         self
+    }
+    /// Swift `recoverActiveJobs()` at the daemon's start, before it serves:
+    /// every active Job of this owner reopened, its unresolved intents parked
+    /// and nothing dispatched, each use its capability store settles
+    /// re-asserted. None without a Job owner.
+    #[cfg(target_os = "macos")]
+    pub fn recover_active_jobs(
+        &self,
+    ) -> Result<Option<arkdeck_hoststore::RecoveredJobs>, arkdeck_hoststore::RecoveryError> {
+        let Some(jobs) = &self.jobs else {
+            return Ok(None);
+        };
+        arkdeck_hoststore::recover_active_jobs(
+            jobs,
+            self.capabilities.as_deref(),
+            arkdeck_hoststore::runtime_now,
+        )
+        .map(Some)
     }
     /// `agent.run` and `agent.status` advance and read this owner's
     /// executions, which own Jobs of the Job owner.
@@ -513,6 +535,8 @@ impl Host {
             observations: Mutex::new(ObservationState::default()),
             #[cfg(target_os = "macos")]
             running: Default::default(),
+            #[cfg(target_os = "macos")]
+            reconciling: Default::default(),
             #[cfg(target_os = "macos")]
             home: arkdeck_platform::runtime_home().unwrap_or_default(),
             #[cfg(target_os = "macos")]
@@ -1350,6 +1374,76 @@ impl HostServices for Host {
         // Released before its waiters wake, so a waiting run starts its own.
         if let Ok(mut running) = self.running.lock() {
             running.remove(job);
+        }
+        slot.finish(&result);
+        result
+    }
+    /// `job.reconcile` in the owner that admitted the Job, with the Session
+    /// publication writer its runs use. A Job a run of this owner holds is
+    /// decided by that run alone: its status is answered and nothing is
+    /// written. A concurrent reconcile of one Job joins the one under way, as
+    /// Swift's callers join `jobReconciliations`.
+    #[cfg(target_os = "macos")]
+    fn job_reconcile(
+        &self,
+        params: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<serde_json::Value, WireError> {
+        let (Some(jobs), Some(artifacts)) = (&self.jobs, &self.artifacts) else {
+            return Err(WireError {
+                code: "rejected".into(),
+                message: "this method is unavailable in the read-only Rust foundation".into(),
+                details: None,
+            });
+        };
+        let probe = arkdeck_hoststore::SystemStorageProbe;
+        let publisher =
+            self.storage
+                .as_deref()
+                .map(|(sessions, _)| arkdeck_hoststore::SessionPublisher {
+                    sessions,
+                    claims: &self.claims,
+                    probe: &probe,
+                });
+        let reconciler = arkdeck_hoststore::JobReconciler {
+            jobs,
+            artifacts,
+            imports: self.imports.as_deref(),
+            now: arkdeck_hoststore::runtime_now,
+            sessions: publisher.as_ref(),
+        };
+        // Swift attaches no details to any `job.reconcile` refusal.
+        let uncertain = || WireError {
+            code: "internalError".into(),
+            message: "the Runtime could not complete the Job lifecycle request".into(),
+            details: None,
+        };
+        let Some(job) = params.get("jobId").and_then(serde_json::Value::as_str) else {
+            return reconciler.handle(params);
+        };
+        let executing = self
+            .running
+            .lock()
+            .map_err(|_| uncertain())?
+            .get(job)
+            .is_some_and(|slot| !slot.cancelling);
+        if executing {
+            return reconciler.status(params);
+        }
+        let slot = {
+            let mut reconciling = self.reconciling.lock().map_err(|_| uncertain())?;
+            if let Some(slot) = reconciling.get(job).cloned() {
+                drop(reconciling);
+                return slot.wait().unwrap_or_else(|| Err(uncertain()));
+            }
+            let slot = std::sync::Arc::new(RunSlot::default());
+            reconciling.insert(job.to_owned(), slot.clone());
+            slot
+        };
+        let result =
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| reconciler.handle(params)))
+                .unwrap_or_else(|_| Err(uncertain()));
+        if let Ok(mut reconciling) = self.reconciling.lock() {
+            reconciling.remove(job);
         }
         slot.finish(&result);
         result

@@ -6,8 +6,9 @@
 //! write-once Manifest and the catalog entry; and, whatever happened, the
 //! ownership marker the Job record keeps.
 //!
-//! As in Swift, a restart never resumes a publication and nothing retries
-//! one; reconciliation stays unported (L.1 item 13).
+//! As in Swift, a restart never resumes a publication; only `job.reconcile`
+//! starts one again, after the writer's confirmed refusal of an unbound
+//! source (`job_reconcile.rs`).
 use crate::job_journal_events::{self as events, Envelope};
 use crate::job_journal_replay::ReplayFacts;
 use crate::job_journal_writer::JournalWriter;

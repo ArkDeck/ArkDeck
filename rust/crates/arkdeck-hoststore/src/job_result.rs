@@ -7,10 +7,11 @@
 //! verification cache while it reads.
 //!
 //! Only Jobs of the operations this Runtime runs are read. A Job carrying a
-//! Trace probe, and a store holding recovery epochs, are refused or degraded
-//! until their owners join (recovery waits for the L.1 item 13 ruling). A
-//! product the request chose not to take may stay missing; any other missing
-//! product fails the evidence.
+//! Trace probe is refused until its owner joins. An unreadable recovery-epoch
+//! store, or an epoch naming the Job as the Job that recovered (a
+//! `recoveryEpoch` the published schema still pins to null), degrades the
+//! evidence. A product the request chose not to take may stay missing; any
+//! other missing product fails the evidence.
 use crate::artifact_read_owner::ArtifactReadStore;
 use crate::artifact_usage::decode_index;
 use crate::device_steps;
