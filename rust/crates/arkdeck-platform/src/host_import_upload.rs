@@ -175,6 +175,133 @@ impl HostUploadFile {
             s.st_nlink
         ))
     }
+    /// Hash the exact currently named staging inode without materializing it.
+    pub fn complete_digest(&self, expected: u64) -> io::Result<String> {
+        let before = self.stat()?;
+        if before.st_size < 0 || before.st_size as u64 != expected {
+            return Err(fail());
+        }
+        let digest = range_digest(&self.file, 0, expected)?;
+        if !same(&before, &self.stat()?) {
+            return Err(fail());
+        }
+        Ok(digest)
+    }
+
+    /// Bounded validator input from the retained staging inode.
+    pub fn validator_bytes(&self, maximum: usize, prefix_only: bool) -> io::Result<Vec<u8>> {
+        let before = self.stat()?;
+        let length = usize::try_from(before.st_size).map_err(|_| fail())?;
+        if !prefix_only && length > maximum {
+            return Err(fail());
+        }
+        let mut bytes = vec![0; length.min(maximum)];
+        self.file.read_exact_at(&mut bytes, 0)?;
+        if !same(&before, &self.stat()?) {
+            return Err(fail());
+        }
+        Ok(bytes)
+    }
+
+    /// Stream exact validated bytes to an exclusive, sealed Artifact inode.
+    /// The derived destination is never replaced. Interrupted copies remain
+    /// private temporary files; only a fully synced payload becomes visible.
+    pub fn publish_immutable(
+        &self,
+        root: &HostDirectory,
+        name: &str,
+        expected: u64,
+        digest: &str,
+    ) -> io::Result<()> {
+        let before = self.stat()?;
+        if before.st_size < 0 || before.st_size as u64 != expected {
+            return Err(fail());
+        }
+        owned(&root.0, true, Ownership::Private)?;
+        let target = segment(name)?;
+        // The Import owner serializes this derived destination. Recover only
+        // its private, unpublished copy files left by process termination.
+        let prefix = format!(".{name}.");
+        for entry in root.names(4096)? {
+            if let Some(nonce) = entry
+                .strip_prefix(&prefix)
+                .and_then(|v| v.strip_suffix(".tmp"))
+            {
+                if nonce.len() != 32
+                    || !nonce
+                        .bytes()
+                        .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+                {
+                    return Err(fail());
+                }
+                let metadata = root.document_metadata(&entry)?;
+                root.remove_document(&entry, &metadata)?;
+            }
+        }
+        let nonce = u128::from_ne_bytes(crate::random_bytes::<16>()?);
+        let temporary = format!(".{name}.{nonce:032x}.tmp");
+        let cname = segment(&temporary)?;
+        // SAFETY: retained directory and checked NUL-free component; exclusive create.
+        let fd = unsafe {
+            libc::openat(
+                root.0.as_raw_fd(),
+                cname.as_ptr(),
+                libc::O_RDWR | libc::O_CREAT | libc::O_EXCL | libc::O_NOFOLLOW | libc::O_CLOEXEC,
+                0o600,
+            )
+        };
+        if fd < 0 {
+            return Err(io::Error::last_os_error());
+        }
+        let mut stage = CheckpointStage {
+            root,
+            name: temporary,
+            // SAFETY: openat returned a new owned descriptor above.
+            file: unsafe { File::from_raw_fd(fd) },
+            published: false,
+        };
+        let mut hash = Sha256::new();
+        let mut offset = 0;
+        let mut buffer = vec![0; 1024 * 1024];
+        while offset < expected {
+            let count = (expected - offset).min(buffer.len() as u64) as usize;
+            self.file.read_exact_at(&mut buffer[..count], offset)?;
+            hash.update(&buffer[..count]);
+            stage.file.write_all(&buffer[..count])?;
+            offset += count as u64;
+        }
+        if format!("{:x}", hash.finalize()) != digest || !same(&before, &self.stat()?) {
+            return Err(fail());
+        }
+        stage.validate()?;
+        // SAFETY: the exclusive temporary inode is retained by stage.file.
+        if unsafe { libc::fchmod(stage.file.as_raw_fd(), 0o400) } != 0 {
+            return Err(io::Error::last_os_error());
+        }
+        full_sync(&stage.file)?;
+        let sealed = file_stat(&stage.file)?;
+        let linked = root.stat_at(&stage.name)?;
+        if !same(&sealed, &linked) || !same(&before, &self.stat()?) {
+            return Err(fail());
+        }
+        // SAFETY: both components are checked and the directory descriptor is retained.
+        if unsafe {
+            libc::renameatx_np(
+                root.0.as_raw_fd(),
+                cname.as_ptr(),
+                root.0.as_raw_fd(),
+                target.as_ptr(),
+                libc::RENAME_EXCL,
+            )
+        } != 0
+        {
+            return Err(io::Error::last_os_error());
+        }
+        stage.published = true;
+        root.0.sync_all()?;
+        root.verify_payload(name, expected, digest)
+    }
+
     pub fn recover(&mut self, chunks: &[UploadChunkCheckpoint], committed: u64) -> io::Result<()> {
         if committed > MAX_UPLOAD || chunks.len() > 16384 {
             return Err(fail());

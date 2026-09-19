@@ -92,7 +92,10 @@
                 "additionalProperties": false,
                 "properties": {
                   "bindingRevision": {
-                    "type": "integer"
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
                   },
                   "stableIdentitySha256": {
                     "type": [
@@ -274,8 +277,8 @@
   "x-arkdeck-method": "artifact.list",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 13,
-    "request": 58,
-    "result": 45
+    "error": 6,
+    "request": 20,
+    "result": 14
   }
 }

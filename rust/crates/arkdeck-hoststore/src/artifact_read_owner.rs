@@ -99,8 +99,10 @@ fn not_found() -> io::Error {
     )
 }
 fn job_id(value: &str) -> bool {
+    if value.starts_with("imp-") {
+        return arkdeck_contract::import_id(value);
+    }
     !value.is_empty()
-        && !value.starts_with("imp-")
         && value.len() <= 128
         && value
             .bytes()

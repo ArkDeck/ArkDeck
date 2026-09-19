@@ -57,8 +57,8 @@ impl Drop for Fixture {
 fn binding(intent: &ImportIntent) -> Result<ImportBinding, WireError> {
     Ok(ImportBinding {
         target_id: intent.target_id.clone(),
-        binding_revision: Some(intent.binding_revision),
-        stable_identity_sha256: Some("a".repeat(64)),
+        binding_revision: (intent.kind != "workspace-patch").then_some(intent.binding_revision),
+        stable_identity_sha256: (intent.kind != "workspace-patch").then(|| "a".repeat(64)),
     })
 }
 fn unavailable(_: &ImportIntent) -> Result<ImportBinding, WireError> {
@@ -726,4 +726,471 @@ fn native_swift_upload_snapshot_reopens_and_resumes_without_rewriting_prior_reco
         call(&fixture.store(), "inspect", json!({"importId":id})).unwrap(),
         result
     );
+}
+
+fn commit(
+    store: &ImportUploadStore,
+    artifacts: &arkdeck_hoststore::ArtifactReadStore,
+    id: &str,
+) -> Result<Value, WireError> {
+    store.commit(
+        json!({"importId":id,"generation":"1"}).as_object().unwrap(),
+        NOW,
+        false,
+        artifacts,
+        1024 * 1024,
+        binding,
+    )
+}
+#[test]
+fn publication_preserves_exact_bytes_receipt_identity_and_restart() {
+    let fixture = Fixture::new();
+    let bytes = b"PK\x03\x04token=must-not-redact";
+    let store = fixture.store();
+    let artifacts = arkdeck_hoststore::ArtifactReadStore::open(&fixture.artifacts).unwrap();
+    let initial = call(&store, "begin", fixture.metadata("publication", bytes)).unwrap();
+    let id = initial["importId"].as_str().unwrap();
+    append(&store, id, 0, bytes).unwrap();
+    let result = commit(&store, &artifacts, id).unwrap();
+    assert_eq!(result["state"], "committed");
+    assert_eq!(result["generation"], "2");
+    let receipt = &result["receipt"];
+    assert_eq!(
+        fs::read(
+            fixture
+                .artifacts
+                .join(id)
+                .join(receipt["artifactId"].as_str().unwrap())
+        )
+        .unwrap(),
+        bytes
+    );
+    let params = json!({"owner":{"kind":"import","id":id},"artifactId":receipt["artifactId"]});
+    let inspected = store
+        .artifact_resource(
+            &artifacts,
+            "artifact.inspect",
+            params.as_object().unwrap(),
+            &fixture.root.join("snapshots"),
+        )
+        .unwrap();
+    assert_eq!(inspected["owner"]["kind"], "import");
+    assert_eq!(inspected["redactionApplied"], false);
+    assert_eq!(commit(&store, &artifacts, id).unwrap(), result);
+    drop(store);
+    let restarted = fixture.store();
+    assert_eq!(commit(&restarted, &artifacts, id).unwrap(), result);
+    assert!(!fixture.stage(id).exists());
+}
+#[test]
+fn interrupted_publication_requires_receipt_and_recovers_same_identity() {
+    for fault in [
+        ImportUploadFault::AfterCommitIntent,
+        ImportUploadFault::AfterPayloadPublication,
+        ImportUploadFault::AfterPublication,
+        ImportUploadFault::AfterReceiptCheckpoint,
+    ] {
+        let fixture = Fixture::new();
+        let store = ImportUploadStore::open_with_fault(
+            &fixture.artifacts,
+            Arc::new(move |point| {
+                if point == fault {
+                    Err(io::Error::other("crash fixture"))
+                } else {
+                    Ok(())
+                }
+            }),
+        )
+        .unwrap();
+        let artifacts = arkdeck_hoststore::ArtifactReadStore::open(&fixture.artifacts).unwrap();
+        let bytes = b"PK\x03\x04immutable";
+        let initial = call(&store, "begin", fixture.metadata("interrupted", bytes)).unwrap();
+        let id = initial["importId"].as_str().unwrap();
+        append(&store, id, 0, bytes).unwrap();
+        assert_eq!(
+            commit(&store, &artifacts, id).unwrap_err().code,
+            "recordUnreadable"
+        );
+        if fault == ImportUploadFault::AfterPublication {
+            let params = json!({"owner":{"kind":"import","id":id}});
+            assert_eq!(
+                store
+                    .artifact_resource(
+                        &artifacts,
+                        "artifact.list",
+                        params.as_object().unwrap(),
+                        &fixture.root.join("snapshots")
+                    )
+                    .unwrap_err()
+                    .code,
+                "recordUnreadable"
+            );
+        }
+        drop(store);
+        let restarted = fixture.store();
+        let done = restarted
+            .commit(
+                json!({"importId":id,"generation":"1"}).as_object().unwrap(),
+                NOW,
+                false,
+                &artifacts,
+                1024 * 1024,
+                unavailable,
+            )
+            .unwrap();
+        assert_eq!(done["state"], "committed");
+        assert_eq!(names(&fixture.artifacts.join(id)).len(), 2);
+        assert!(!fixture.stage(id).exists());
+    }
+}
+#[test]
+fn patch_publication_is_exact_and_sensitive_with_path_escape_refusal() {
+    for (bytes, valid) in [
+        (
+            b"diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n+secret=unredacted\n"
+                .as_slice(),
+            true,
+        ),
+        (b"diff --git a/../escape b/../escape\n".as_slice(), false),
+    ] {
+        let fixture = Fixture::new();
+        let store = fixture.store();
+        let artifacts = arkdeck_hoststore::ArtifactReadStore::open(&fixture.artifacts).unwrap();
+        let mut metadata = fixture.metadata("patch", bytes);
+        metadata["kind"] = json!("workspace-patch");
+        metadata["name"] = json!("change.patch");
+        let initial = call(&store, "begin", metadata).unwrap();
+        let id = initial["importId"].as_str().unwrap();
+        append(&store, id, 0, bytes).unwrap();
+        let result = commit(&store, &artifacts, id);
+        if !valid {
+            assert_eq!(result.unwrap_err().code, "invalidInput");
+            continue;
+        }
+        let result = result.unwrap();
+        let mut params =
+            json!({"owner":{"kind":"import","id":id},"artifactId":result["receipt"]["artifactId"]});
+        assert_eq!(
+            store
+                .artifact_resource(
+                    &artifacts,
+                    "artifact.read",
+                    params.as_object().unwrap(),
+                    &fixture.root.join("snapshots")
+                )
+                .unwrap_err()
+                .code,
+            "sensitiveAccessDenied"
+        );
+        params["allowSensitive"] = json!(true);
+        let read = store
+            .artifact_resource(
+                &artifacts,
+                "artifact.read",
+                params.as_object().unwrap(),
+                &fixture.root.join("snapshots"),
+            )
+            .unwrap();
+        assert_eq!(read["base64"], encode_import_chunk(bytes).unwrap());
+    }
+}
+
+#[test]
+fn native_import_requires_registered_code_sign_structure_and_preserves_validation() {
+    let signed=fs::read(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/fixtures/deploy-native-library/artifacts/job-input-native-library/ART-469c10579b3c5461ab4d0a891c316397")).unwrap();
+    let mut unsigned = signed.clone();
+    let trailer = unsigned.len() - 32;
+    unsigned[trailer] = b'x';
+    assert!(arkdeck_provider_hdc::validate_elf(&unsigned, None, false).is_ok());
+    for bytes in [signed.as_slice(), unsigned.as_slice()] {
+        let fixture = Fixture::new();
+        let store = fixture.store();
+        let artifacts = arkdeck_hoststore::ArtifactReadStore::open(&fixture.artifacts).unwrap();
+        let mut metadata = fixture.metadata("native", bytes);
+        metadata["kind"] = json!("native-library");
+        metadata["name"] = json!("libentry.so");
+        let initial = call(&store, "begin", metadata).unwrap();
+        let id = initial["importId"].as_str().unwrap();
+        append(&store, id, 0, bytes).unwrap();
+        let result = commit(&store, &artifacts, id);
+        if bytes == unsigned {
+            assert_eq!(result.unwrap_err().code, "invalidInput");
+            assert!(!fixture.artifacts.join(id).exists());
+        } else {
+            let result = result.unwrap();
+            assert_eq!(result["receipt"]["validation"]["abi"], "arm64-v8a");
+            assert_eq!(
+                result["receipt"]["validation"]["buildId"],
+                "00112233445566778899aabbccddeeff10213243"
+            );
+        }
+    }
+}
+#[test]
+fn publication_refuses_partial_digest_binding_and_quota_without_a_receipt() {
+    for case in ["partial", "digest", "binding", "quota", "format"] {
+        let fixture = Fixture::new();
+        let store = fixture.store();
+        let artifacts = arkdeck_hoststore::ArtifactReadStore::open(&fixture.artifacts).unwrap();
+        let bytes = if case == "format" {
+            b"BAD!payload".as_slice()
+        } else {
+            b"PK\x03\x04payload".as_slice()
+        };
+        let mut metadata = fixture.metadata("refusal", bytes);
+        if case == "digest" {
+            metadata["sha256"] = json!("0".repeat(64));
+        }
+        let initial = call(&store, "begin", metadata).unwrap();
+        let id = initial["importId"].as_str().unwrap();
+        append(
+            &store,
+            id,
+            0,
+            if case == "partial" {
+                &bytes[..4]
+            } else {
+                bytes
+            },
+        )
+        .unwrap();
+        let error = store
+            .commit(
+                json!({"importId":id,"generation":"1"}).as_object().unwrap(),
+                NOW,
+                false,
+                &artifacts,
+                if case == "quota" { 1 } else { 1024 },
+                |intent| {
+                    let mut b = binding(intent)?;
+                    if case == "binding" {
+                        b.binding_revision = Some(8);
+                    }
+                    Ok(b)
+                },
+            )
+            .unwrap_err();
+        assert_eq!(
+            error.code,
+            match case {
+                "partial" | "binding" => "resourceConflict",
+                "digest" => "artifactIntegrityFailed",
+                "quota" => "quotaExceeded",
+                _ => "invalidInput",
+            },
+            "{case}"
+        );
+        let inspected = call(&store, "inspect", json!({"importId":id})).unwrap();
+        assert!(inspected["receipt"].is_null());
+    }
+}
+#[test]
+fn import_discovery_snapshot_export_and_receipt_metadata_poisoning() {
+    let fixture = Fixture::new();
+    let store = fixture.store();
+    let artifacts = arkdeck_hoststore::ArtifactReadStore::open(&fixture.artifacts).unwrap();
+    let bytes = b"PK\x03\x04exact";
+    let initial = call(&store, "begin", fixture.metadata("first", bytes)).unwrap();
+    let id = initial["importId"].as_str().unwrap();
+    append(&store, id, 0, bytes).unwrap();
+    let pending = store
+        .list(json!({"state":"inProgress"}).as_object().unwrap())
+        .unwrap();
+    assert_eq!(pending["items"].as_array().unwrap().len(), 1);
+    let done = commit(&store, &artifacts, id).unwrap();
+    let aid = done["receipt"]["artifactId"].as_str().unwrap();
+    let list = store
+        .list(
+            json!({"state":"committed","target":"TGT-fixture"})
+                .as_object()
+                .unwrap(),
+        )
+        .unwrap();
+    assert_eq!(list["items"][0], done);
+    assert!(
+        store
+            .list(json!({"state":"bogus"}).as_object().unwrap())
+            .is_err()
+    );
+    let output = fixture.root.join("export");
+    fs::DirBuilder::new().mode(0o700).create(&output).unwrap();
+    let exported=store.artifact_resource(&artifacts,"artifact.export",json!({"owner":{"kind":"import","id":id},"artifactId":aid,"destinationDirectory":output}).as_object().unwrap(),&fixture.root.join("snapshots")).unwrap();
+    assert_eq!(exported["owner"]["kind"], "import");
+    assert_eq!(
+        fs::read(output.join(format!("{aid}-fixture.hap"))).unwrap(),
+        bytes
+    );
+    let index = fixture.artifacts.join(id).join("index.json");
+    let mut document = read(&index);
+    document["artifacts"][0]["sourceOperation"] = json!("artifact.import-native-library");
+    fs::write(index, serde_json::to_vec(&document).unwrap()).unwrap();
+    assert_eq!(
+        store
+            .artifact_resource(
+                &artifacts,
+                "artifact.inspect",
+                json!({"owner":{"kind":"import","id":id},"artifactId":aid})
+                    .as_object()
+                    .unwrap(),
+                &fixture.root.join("snapshots")
+            )
+            .unwrap_err()
+            .code,
+        "recordUnreadable"
+    );
+}
+
+#[test]
+fn receipt_identity_digest_generation_and_validation_corruption_cannot_supply_bytes() {
+    let fixture = Fixture::new();
+    let store = fixture.store();
+    let artifacts = arkdeck_hoststore::ArtifactReadStore::open(&fixture.artifacts).unwrap();
+    let bytes = b"PK\x03\x04exact";
+    let initial = call(&store, "begin", fixture.metadata("receipt", bytes)).unwrap();
+    let id = initial["importId"].as_str().unwrap();
+    append(&store, id, 0, bytes).unwrap();
+    let done = commit(&store, &artifacts, id).unwrap();
+    let path = fixture.record("receipt");
+    let original = read(&path);
+    for (key, value) in [
+        (
+            "importId",
+            json!("imp-00000000-0000-0000-0000-000000000000"),
+        ),
+        ("importRequestId", json!("other")),
+        ("owner", json!({"kind":"job","id":id})),
+        ("artifactId", json!("ART-other")),
+        ("artifactDigest", json!("0".repeat(64))),
+        ("generation", json!("3")),
+        ("validation", json!({"kind":"hap","container":"other"})),
+        ("bindingRevision", json!("8")),
+    ] {
+        let mut changed = original.clone();
+        changed["receipt"][key] = value;
+        fs::write(&path, serde_json::to_vec(&changed).unwrap()).unwrap();
+        assert_eq!(store.artifact_resource(&artifacts,"artifact.read",json!({"owner":{"kind":"import","id":id},"artifactId":done["receipt"]["artifactId"]}).as_object().unwrap(),&fixture.root.join("snapshots")).unwrap_err().code,"recordUnreadable","{key}");
+    }
+}
+#[test]
+fn import_list_pagination_keeps_snapshot_and_rejects_foreign_query_cursor() {
+    let fixture = Fixture::new();
+    let store = fixture.store();
+    for request in ["one", "two"] {
+        call(&store, "begin", fixture.metadata(request, b"PK\x03\x04")).unwrap();
+    }
+    let first = store
+        .list(json!({"pageSize":1}).as_object().unwrap())
+        .unwrap();
+    assert_eq!(first["items"].as_array().unwrap().len(), 1);
+    assert_eq!(first["hasMore"], true);
+    call(&store, "begin", fixture.metadata("three", b"PK\x03\x04")).unwrap();
+    let cursor = &first["nextCursor"];
+    let second = store
+        .list(json!({"pageSize":1,"cursor":cursor}).as_object().unwrap())
+        .unwrap();
+    assert_eq!(second["items"].as_array().unwrap().len(), 1);
+    assert_eq!(second["hasMore"], false);
+    assert_eq!(
+        store
+            .list(
+                json!({"pageSize":1,"cursor":cursor,"state":"inProgress"})
+                    .as_object()
+                    .unwrap()
+            )
+            .unwrap_err()
+            .code,
+        "invalidCursor"
+    );
+    for invalid in [
+        json!({"pageSize":1.5}),
+        json!({"pageSize":0}),
+        json!({"target":"../path"}),
+        json!({"cursor":null}),
+        json!({"extra":true}),
+    ] {
+        assert!(store.list(invalid.as_object().unwrap()).is_err());
+    }
+}
+
+#[test]
+fn unfinished_copy_is_reclaimed_but_linked_copy_never_touches_external_bytes() {
+    use std::os::unix::fs::PermissionsExt;
+    for linked in [false, true] {
+        let fixture = Fixture::new();
+        let store = fixture.store();
+        let artifacts = arkdeck_hoststore::ArtifactReadStore::open(&fixture.artifacts).unwrap();
+        let bytes = b"PK\x03\x04exact";
+        let initial = call(&store, "begin", fixture.metadata("copy", bytes)).unwrap();
+        let id = initial["importId"].as_str().unwrap();
+        append(&store, id, 0, bytes).unwrap();
+        let digest = sha256_hex(format!("{id}\0fixture.hap\0{}", sha256_hex(bytes)).as_bytes());
+        let aid = format!("ART-{}", &digest[..32]);
+        let dir = fixture.artifacts.join(id);
+        fs::DirBuilder::new().mode(0o700).create(&dir).unwrap();
+        let temporary = dir.join(format!(".{aid}.{}.tmp", "0".repeat(32)));
+        let outside = fixture.root.join("outside");
+        fs::write(&outside, b"keep").unwrap();
+        if linked {
+            symlink(&outside, &temporary).unwrap();
+        } else {
+            fs::write(&temporary, b"partial copy").unwrap();
+            fs::set_permissions(&temporary, fs::Permissions::from_mode(0o600)).unwrap();
+        }
+        let result = commit(&store, &artifacts, id);
+        if linked {
+            assert_eq!(result.unwrap_err().code, "recordUnreadable");
+            assert_eq!(fs::read(outside).unwrap(), b"keep");
+        } else {
+            result.unwrap();
+            assert!(!temporary.exists());
+            assert_eq!(fs::read(dir.join(aid)).unwrap(), bytes);
+        }
+    }
+}
+
+#[test]
+fn published_but_unreceipted_missing_or_corrupt_payload_cannot_finish_commit() {
+    use std::os::unix::fs::PermissionsExt;
+    for missing in [true, false] {
+        let fixture = Fixture::new();
+        let store = ImportUploadStore::open_with_fault(
+            &fixture.artifacts,
+            Arc::new(|point| {
+                if point == ImportUploadFault::AfterPublication {
+                    Err(io::Error::other("interruption"))
+                } else {
+                    Ok(())
+                }
+            }),
+        )
+        .unwrap();
+        let artifacts = arkdeck_hoststore::ArtifactReadStore::open(&fixture.artifacts).unwrap();
+        let bytes = b"PK\x03\x04exact";
+        let initial = call(&store, "begin", fixture.metadata("poison", bytes)).unwrap();
+        let id = initial["importId"].as_str().unwrap();
+        append(&store, id, 0, bytes).unwrap();
+        assert!(commit(&store, &artifacts, id).is_err());
+        drop(store);
+        let index = read(&fixture.artifacts.join(id).join("index.json"));
+        let payload = fixture
+            .artifacts
+            .join(id)
+            .join(index["artifacts"][0]["artifactID"].as_str().unwrap());
+        if missing {
+            fs::remove_file(&payload).unwrap();
+        } else {
+            fs::set_permissions(&payload, fs::Permissions::from_mode(0o600)).unwrap();
+            fs::write(&payload, b"BAD!exact").unwrap();
+            fs::set_permissions(&payload, fs::Permissions::from_mode(0o400)).unwrap();
+        }
+        let restarted = fixture.store();
+        assert_eq!(
+            commit(&restarted, &artifacts, id).unwrap_err().code,
+            "recordUnreadable"
+        );
+        let state = call(&restarted, "inspect", json!({"importId":id})).unwrap();
+        assert_eq!(state["state"], "committing");
+        assert!(state["receipt"].is_null());
+        assert_eq!(fs::read(fixture.stage(id)).unwrap(), bytes);
+    }
 }
