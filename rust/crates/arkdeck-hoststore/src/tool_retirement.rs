@@ -146,7 +146,9 @@ impl ToolRegistryStore {
         owner.retirement_index(BUNDLES, &bundles)?;
         owner.retirement_index(TOOLS, &tools)?;
         if !retire_record(&mut document, position)? {
-            return Ok(decoded.projection[position].clone());
+            return self
+                .row(&tools.bytes, reference)
+                .ok_or_else(|| unreadable("projection"));
         }
         let encoded = canonical_json(&document).map_err(unreadable)?;
         if encoded.len() > MAX_INDEX {
@@ -155,7 +157,9 @@ impl ToolRegistryStore {
                 "tool index exceeds its bounded storage",
             ));
         }
-        let updated = decode_tools(&encoded).map_err(unreadable)?;
+        let updated = self
+            .row(&encoded, reference)
+            .ok_or_else(|| unreadable("projection"))?;
         owner.retirement_binding(&lock)?;
         owner.retirement_index(BUNDLES, &bundles)?;
         owner.retirement_index(TOOLS, &tools)?;
@@ -173,7 +177,7 @@ impl ToolRegistryStore {
             Ok(())
         })();
         result.map_err(|_: WireError| unknown())?;
-        Ok(updated.projection[position].clone())
+        Ok(updated)
     }
 }
 struct RetirementRoot<'a> {

@@ -101,17 +101,6 @@ fn record(content: &ToolContent, now: &str) -> Value {
         .retain(|_, value| !value.is_null());
     value
 }
-fn projection(bytes: &[u8], reference: &str) -> Result<Value, WireError> {
-    decode_tools(bytes)
-        .map_err(unreadable)?
-        .projection
-        .as_array()
-        .ok_or_else(|| unreadable("projection"))?
-        .iter()
-        .find(|value| value["toolRef"] == reference)
-        .cloned()
-        .ok_or_else(|| unreadable("missing reference"))
-}
 
 impl ToolRegistryStore {
     /// Clock comes from the host, not the wire. Source bytes are captured under
@@ -312,7 +301,9 @@ impl ToolRegistryStore {
             }
             self.verify_tool_record(old)?;
             self.registration_bytes(&lock, &bundles, &bytes)?;
-            return projection(&bytes, &reference);
+            return self
+                .row(&bytes, &reference)
+                .ok_or_else(|| unreadable("missing reference"));
         }
         let record = record(&content, now);
         let name = format!("tool-{}.hdc", content.digest);
@@ -350,7 +341,9 @@ impl ToolRegistryStore {
             ));
         }
         let document = decode_tools(&encoded).map_err(unreadable)?.document;
-        let result = projection(&document, &reference)?;
+        let result = self
+            .row(&document, &reference)
+            .ok_or_else(|| unreadable("missing reference"))?;
         self.registration_bytes(&lock, &bundles, &bytes)?;
         checkpoint("beforeContentPublication").map_err(unreadable)?;
         self.registration_bytes(&lock, &bundles, &bytes)?;

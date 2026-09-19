@@ -500,7 +500,13 @@ mod tool_registry_owner;
 #[cfg(target_os = "macos")]
 mod tool_retirement;
 #[cfg(target_os = "macos")]
-pub use tool_registry_owner::ToolRegistryStore;
+mod tool_selection_ledger;
+#[cfg(target_os = "macos")]
+pub use tool_registry_owner::{PublishedIdentities, ToolRegistryStore};
+#[cfg(target_os = "macos")]
+pub use tool_selection_ledger::{
+    DurableSelectionOutcome, SelectionCandidate, SelectionSnapshot, StartupSelection,
+};
 
 #[cfg(target_os = "macos")]
 pub mod bundle_content;

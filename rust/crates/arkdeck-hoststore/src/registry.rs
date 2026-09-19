@@ -10,7 +10,7 @@ fn digest(value: &str) -> bool {
             .bytes()
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
-fn identifier(value: &str) -> bool {
+pub(crate) fn identifier(value: &str) -> bool {
     (1..=128).contains(&value.len())
         && value.as_bytes()[0].is_ascii_alphanumeric()
         && value
@@ -54,11 +54,11 @@ fn state(value: &str, generation: u64, references: &[Owner]) -> bool {
             || (value == "removed" && generation == 2 && references.is_empty()))
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, PartialEq, Serialize)]
 #[serde(deny_unknown_fields)]
-struct Owner {
-    kind: String,
-    id: String,
+pub(crate) struct Owner {
+    pub(crate) kind: String,
+    pub(crate) id: String,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -135,9 +135,9 @@ pub fn decode_bundles(bytes: &[u8]) -> Result<DecodedStore, DecodeError> {
     })
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-struct ToolTrust {
+pub(crate) struct ToolTrust {
     signature: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     identifier: Option<String>,
@@ -154,7 +154,7 @@ struct ToolTrust {
 // This reproduces HDCRegisteredToolIdentity.match; it neither adds a supported
 // operation nor grants trust, selection or dispatch authority. Actual Swift
 // lookup parity and source pins cover both published identities.
-fn published_identity(sha256: &str) -> Option<Value> {
+pub(crate) fn published_identity(sha256: &str) -> Option<Value> {
     let (version, profiles): (&str, &[&str]) = match sha256 {
         "48395ba8d87115dffca47df2a640a6c868bc9a2bd4eb49611e4138ff88d8d260" => {
             ("3.2.0d", &["OPENHARMONY-TOOLS@0.3.0"])
@@ -212,9 +212,9 @@ impl ToolTrust {
     }
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-struct Dependency {
+pub(crate) struct Dependency {
     name: String,
     sha256: String,
     #[serde(rename = "byteCount")]
@@ -224,83 +224,100 @@ struct Dependency {
     trust: ToolTrust,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-struct ToolRecord {
-    reference: String,
+pub(crate) struct ToolRecord {
+    pub(crate) reference: String,
     #[serde(rename = "contentDigest")]
-    content_digest: String,
+    pub(crate) content_digest: String,
     #[serde(rename = "executableSHA256")]
-    executable_sha256: String,
+    pub(crate) executable_sha256: String,
     #[serde(rename = "registeredAt")]
-    registered_at: String,
+    pub(crate) registered_at: String,
     #[serde(rename = "byteCount")]
-    byte_count: i64,
+    pub(crate) byte_count: i64,
     #[serde(rename = "quarantineSHA256", skip_serializing_if = "Option::is_none")]
-    quarantine_sha256: Option<String>,
-    trust: ToolTrust,
-    dependencies: Vec<Dependency>,
-    relocatable: bool,
-    generation: i64,
-    state: String,
-    references: Vec<Owner>,
+    pub(crate) quarantine_sha256: Option<String>,
+    pub(crate) trust: ToolTrust,
+    pub(crate) dependencies: Vec<Dependency>,
+    pub(crate) relocatable: bool,
+    pub(crate) generation: i64,
+    pub(crate) state: String,
+    pub(crate) references: Vec<Owner>,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-struct Selection {
+pub(crate) struct Selection {
     #[serde(rename = "activeToolRef")]
-    active_tool_ref: String,
+    pub(crate) active_tool_ref: String,
     #[serde(rename = "activeGeneration")]
-    active_generation: u64,
+    pub(crate) active_generation: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pending: Option<PendingSelection>,
+    pub(crate) pending: Option<PendingSelection>,
     #[serde(rename = "lastOutcome", skip_serializing_if = "Option::is_none")]
-    last_outcome: Option<SelectionOutcome>,
+    pub(crate) last_outcome: Option<SelectionOutcome>,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-struct PendingSelection {
+pub(crate) struct PendingSelection {
     #[serde(rename = "actionID")]
-    action_id: String,
+    pub(crate) action_id: String,
     #[serde(rename = "oldToolRef")]
-    old_tool_ref: String,
+    pub(crate) old_tool_ref: String,
     #[serde(rename = "newToolRef")]
-    new_tool_ref: String,
+    pub(crate) new_tool_ref: String,
     #[serde(rename = "expectedActiveGeneration")]
-    expected_active_generation: u64,
+    pub(crate) expected_active_generation: u64,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-struct SelectionOutcome {
+pub(crate) struct SelectionOutcome {
     #[serde(rename = "actionID")]
-    action_id: String,
-    result: String,
+    pub(crate) action_id: String,
+    pub(crate) result: String,
     #[serde(rename = "oldToolRef")]
-    old_tool_ref: String,
+    pub(crate) old_tool_ref: String,
     #[serde(rename = "newToolRef")]
-    new_tool_ref: String,
+    pub(crate) new_tool_ref: String,
     #[serde(rename = "activeGeneration")]
-    active_generation: u64,
+    pub(crate) active_generation: u64,
     #[serde(rename = "reasonCode", skip_serializing_if = "Option::is_none")]
-    reason_code: Option<String>,
+    pub(crate) reason_code: Option<String>,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-struct ToolIndex {
+pub(crate) struct ToolIndex {
     #[serde(rename = "schemaVersion")]
-    schema_version: String,
-    records: Vec<ToolRecord>,
+    pub(crate) schema_version: String,
+    pub(crate) records: Vec<ToolRecord>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    selection: Option<Selection>,
+    pub(crate) selection: Option<Selection>,
 }
 
 /// Unregistered-tool projections only. Matching a fresh, published Provider
 /// identity is deliberately not inferred from stored metadata.
 pub fn decode_tools(bytes: &[u8]) -> Result<DecodedStore, DecodeError> {
+    let (index, document) = read_tools(bytes)?;
+    let projection = Value::Array(
+        index
+            .records
+            .iter()
+            .map(|r| tool_projection(&index, r, published_identity(&r.executable_sha256)))
+            .collect(),
+    );
+    Ok(DecodedStore {
+        document,
+        projection,
+    })
+}
+
+/// Swift `readIndex`'s bounded schema, record and selection-ledger checks
+/// over the strictly decoded index, and its re-encoded bytes.
+pub(crate) fn read_tools(bytes: &[u8]) -> Result<(ToolIndex, Vec<u8>), DecodeError> {
     let (index, document) = roundtrip::<ToolIndex>(bytes, 4 * 1024 * 1024, false)?;
     if !["arkdeck.bootstrap-tools/1", "arkdeck.bootstrap-tools/2"]
         .contains(&index.schema_version.as_str())
@@ -333,40 +350,40 @@ pub fn decode_tools(bytes: &[u8]) -> Result<DecodedStore, DecodeError> {
     {
         return Err(DecodeError::Header);
     }
-    let projection = Value::Array(
-        index
-            .records
-            .iter()
-            .map(|r| {
-                let generation = index
-                    .selection
-                    .as_ref()
-                    .filter(|s| s.active_tool_ref == r.reference)
-                    .map(|s| s.active_generation.to_string());
-                let dependencies: Vec<_> = r.dependencies.iter().map(|d| json!({
-            "name": d.name, "sha256": d.sha256, "byteCount": d.byte_count.to_string(),
-            "quarantineSHA256": d.quarantine_sha256, "trust": d.trust.projection(None),
-        })).collect();
-                json!({
-                    "schemaVersion": "arkdeck.runtime-tool/1", "toolRef": r.reference,
-                    "kind": "hdc", "platform": "macos", "source": "registeredCopy",
-                    "generation": r.generation.to_string(), "state": r.state,
-                    "contentDigest": r.content_digest, "digestAlgorithm": "sha256-jcs",
-                    "contentSchemaVersion": "arkdeck.tool-content/1",
-                    "executableSHA256": r.executable_sha256, "byteCount": r.byte_count.to_string(),
-                    "quarantineSHA256": r.quarantine_sha256, "registeredAt": r.registered_at,
-                    "trust": r.trust.projection(published_identity(&r.executable_sha256)), "dependencies": dependencies,
-                    "dependencyLayout": "hdc-sibling-libusb/1", "relocatable": r.relocatable,
-                    "selected": r.references.iter().any(|o| o.kind == "activeSelection"),
-                    "activeSelectionGeneration": generation, "references": r.references,
-                    "contentRetained": true,
-                })
+    Ok((index, document))
+}
+
+/// A record's `arkdeck.runtime-tool/1` row in `index`, with the published
+/// identity its executable matches, if any.
+pub(crate) fn tool_projection(index: &ToolIndex, r: &ToolRecord, identity: Option<Value>) -> Value {
+    let generation = index
+        .selection
+        .as_ref()
+        .filter(|s| s.active_tool_ref == r.reference)
+        .map(|s| s.active_generation.to_string());
+    let dependencies: Vec<_> = r
+        .dependencies
+        .iter()
+        .map(|d| {
+            json!({
+                "name": d.name, "sha256": d.sha256, "byteCount": d.byte_count.to_string(),
+                "quarantineSHA256": d.quarantine_sha256, "trust": d.trust.projection(None),
             })
-            .collect(),
-    );
-    Ok(DecodedStore {
-        document,
-        projection,
+        })
+        .collect();
+    json!({
+        "schemaVersion": "arkdeck.runtime-tool/1", "toolRef": r.reference,
+        "kind": "hdc", "platform": "macos", "source": "registeredCopy",
+        "generation": r.generation.to_string(), "state": r.state,
+        "contentDigest": r.content_digest, "digestAlgorithm": "sha256-jcs",
+        "contentSchemaVersion": "arkdeck.tool-content/1",
+        "executableSHA256": r.executable_sha256, "byteCount": r.byte_count.to_string(),
+        "quarantineSHA256": r.quarantine_sha256, "registeredAt": r.registered_at,
+        "trust": r.trust.projection(identity), "dependencies": dependencies,
+        "dependencyLayout": "hdc-sibling-libusb/1", "relocatable": r.relocatable,
+        "selected": r.references.iter().any(|o| o.kind == "activeSelection"),
+        "activeSelectionGeneration": generation, "references": r.references,
+        "contentRetained": true,
     })
 }
 
