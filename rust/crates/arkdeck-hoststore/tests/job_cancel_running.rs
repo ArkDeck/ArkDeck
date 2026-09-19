@@ -46,6 +46,7 @@ impl Composition<'_> {
         after_commit: Option<&'b (dyn Fn(&str) + Sync)>,
     ) -> JobRunner<'b> {
         JobRunner {
+            mutation: None,
             jobs: self.jobs,
             artifacts: self.artifacts,
             analyzer: Some(self.profile),

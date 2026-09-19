@@ -198,6 +198,7 @@ fn rust_lists_and_abandons_the_swift_agent_executions() {
             now: fixed_now,
         };
         let _ = JobRunner {
+            mutation: None,
             jobs: &jobs,
             artifacts: &artifacts,
             analyzer: None,

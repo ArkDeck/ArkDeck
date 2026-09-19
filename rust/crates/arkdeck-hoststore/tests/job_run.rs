@@ -234,6 +234,7 @@ fn rust_runs_reproduce_the_swift_oracle() {
         .iter()
         .map(|(seconds, profile)| {
             let runner = JobRunner {
+                mutation: None,
                 jobs: &jobs,
                 artifacts: &artifacts,
                 analyzer: Some(profile),

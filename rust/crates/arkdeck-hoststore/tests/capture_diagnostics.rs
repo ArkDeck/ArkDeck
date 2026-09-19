@@ -151,6 +151,7 @@ fn rust_captures_diagnostics_of_the_swift_fake_device() {
         hdc: Some(&hdc),
     };
     let runner = JobRunner {
+        mutation: None,
         jobs: &jobs,
         artifacts: &artifacts,
         analyzer: None,

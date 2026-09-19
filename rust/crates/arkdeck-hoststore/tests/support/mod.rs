@@ -314,16 +314,20 @@ fn artifacts(base: &Path) -> BTreeMap<String, Vec<u8>> {
 /// agent execution directory beside the Job state is read as well. The Job
 /// owner must be closed first.
 pub fn assert_leftovers(fixture: &Path, root: &Path) {
-    assert_eq!(
-        index(&root.join("jobs-state")),
-        document(fixture, "store/index.json")
-    );
+    assert_leftovers_at(fixture, root, &root.join("jobs-state"));
+}
+
+pub fn assert_leftovers_at(fixture: &Path, root: &Path, jobs: &Path) {
+    assert_eq!(index(jobs), document(fixture, "store/index.json"));
     let (mut files, mut tree) = (BTreeMap::new(), Vec::new());
     let mut bases = vec![
-        (root.join("jobs-state/jobs"), "store/jobs"),
+        (jobs.join("jobs"), "store/jobs"),
         (root.join("Sessions"), "sessions"),
         (root.join("session-owner"), "session-owner"),
     ];
+    if jobs.join("capabilities").exists() {
+        bases.insert(1, (jobs.join("capabilities"), "store/capabilities"));
+    }
     if root.join("agent-executions").exists() {
         bases.push((root.join("agent-executions"), "agent-executions"));
     }
@@ -346,6 +350,7 @@ pub fn assert_leftovers(fixture: &Path, root: &Path) {
     {
         if [
             "store/jobs/",
+            "store/capabilities/",
             "sessions/",
             "session-owner/",
             "artifacts/",
