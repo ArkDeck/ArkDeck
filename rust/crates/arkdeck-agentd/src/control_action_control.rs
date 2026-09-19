@@ -8,11 +8,15 @@
 //! control-action owner, and every refusal Swift's handler gives before it
 //! consults an owner. Refusals compare whole (code, message, details); a page
 //! compares whole once its random `snapshotRevision` is checked and set aside.
-//! The five success frames of an impact source (a preview, an approval
-//! request, a record read twice and a listed action) need a managed server and
-//! are counted, not replayed. The control layer admits each answer under the
-//! compiled method schema: a view whose schemas predate the no-host frames
-//! answers what they do not publish with `internalError`.
+//! The exchanges of a daemon whose HDC server host started need a managed
+//! server and are counted, not replayed: the success frames of an impact
+//! source (a preview, an approval request, a record read twice and a listed
+//! action), the answers `ControlActionWithHostContractTests` recorded over the
+//! production impact source (previews, records read, reconciled and paged),
+//! and the lifecycle refusals of an HDC control-action owner. The control
+//! layer admits each answer under the compiled method schema: a view whose
+//! schemas predate the no-host frames answers what they do not publish with
+//! `internalError`.
 use arkdeck_contract::{
     CONTRACT_IDENTITY, CONTRACT_INPUTS, PROTOCOL_VERSION, sha256_hex, strict_json,
     validate_method_value,
@@ -230,7 +234,7 @@ fn every_no_host_exchange_of_the_corpora_is_answered_as_swift_recorded_it() {
     let owned = fixture.owned();
     let standalone = Control::new(crate::host::Host::from_environment()).unwrap();
     let (mut by_owner, mut without_owner, mut managed, mut lines) = (0, 0, 0, 0);
-    let mut owner_absent = 0;
+    let (mut owner_absent, mut hdc_owner) = (0, 0);
     for method in METHODS {
         for (index, recorded) in corpus(method).into_iter().enumerate() {
             lines += 1;
@@ -250,6 +254,14 @@ fn every_no_host_exchange_of_the_corpora_is_answered_as_swift_recorded_it() {
                 continue;
             }
             let message = recorded["error"]["message"].as_str().unwrap();
+            if matches!(method, "runtime.hdc.impact-preview" | "runtime.hdc.restart")
+                && message != HDC_UNAVAILABLE
+            {
+                // Only an HDC control-action owner reads a lifecycle
+                // request's parameters; without one it is unavailable.
+                hdc_owner += 1;
+                continue;
+            }
             if message == NO_OWNER {
                 // Recorded from a handler with no control-action owner at
                 // all; the isolated composition always has one.
@@ -274,12 +286,24 @@ fn every_no_host_exchange_of_the_corpora_is_answered_as_swift_recorded_it() {
         .filter(|recorded| recorded["ok"] == true && recorded["result"]["items"] == json!([]))
         .count();
     assert_eq!(fixture.snapshot_files().len(), pages);
-    assert_eq!(managed, 5, "the impact source's success frames");
-    assert_eq!(owner_absent, 1, "the list of a handler with no owner");
-    assert_eq!(lines, by_owner + owner_absent + managed);
+    // Floors: a later recording only appends to the corpora.
+    assert!(
+        managed >= 5,
+        "the impact sources' success frames: {managed}"
+    );
+    assert!(owner_absent >= 1, "the list of a handler with no owner");
+    assert_eq!(lines, by_owner + owner_absent + managed + hdc_owner);
     if !published_view() {
-        // Every exchange the no-host run recorded, beside the corpus's own.
-        assert_eq!((lines, by_owner, without_owner), (25, 19, 10));
+        // Every exchange the no-host run recorded, beside the corpus's own,
+        // and those of a daemon whose HDC server host started.
+        assert!(
+            lines >= 44 && by_owner >= 19 && without_owner >= 10 && managed >= 20,
+            "{lines} lines: {by_owner} by the owner, {without_owner} without one, {managed} with a host"
+        );
+        assert!(
+            hdc_owner >= 4,
+            "an HDC owner's lifecycle refusals: {hdc_owner}"
+        );
     }
     drop(owned);
     fixture.assert_only_the_owner_wrote();

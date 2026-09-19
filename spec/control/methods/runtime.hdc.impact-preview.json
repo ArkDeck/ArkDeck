@@ -3,13 +3,16 @@
     "errorCode": {
       "enum": [
         "conflict",
+        "idempotencyConflict",
         "internalError",
+        "invalidInput",
         "invalidParams",
         "malformedFrame",
         "notFound",
         "operationUnavailable",
         "recordUnreadable",
         "rejected",
+        "resourceNotFound",
         "unknownMethod",
         "unsupportedProtocolVersion",
         "workspaceReferenceNotFound"
@@ -55,7 +58,10 @@
           "type": "string"
         },
         "blockerReasonCode": {
-          "type": "null"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "catalogDigest": {
           "type": "string"
@@ -154,209 +160,261 @@
           "type": "object"
         },
         "preview": {
-          "additionalProperties": false,
-          "properties": {
-            "action": {
-              "type": "string"
-            },
-            "affectedDeviceObservations": {
-              "type": "array"
-            },
-            "affectedJobIds": {
-              "type": "array"
-            },
-            "affectedTargetIds": {
-              "type": "array"
-            },
-            "confirmationRequired": {
-              "type": "boolean"
-            },
-            "controlActionId": {
-              "type": "string"
-            },
-            "createdAt": {
-              "type": "string"
-            },
-            "criticalJobGate": {
+          "anyOf": [
+            {
               "additionalProperties": false,
               "properties": {
-                "blocking": {
+                "action": {
+                  "type": "string"
+                },
+                "affectedDeviceObservations": {
                   "type": "array"
                 },
-                "reasonCode": {
-                  "type": "null"
+                "affectedJobIds": {
+                  "type": "array"
                 },
-                "state": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "blocking",
-                "reasonCode",
-                "state"
-              ],
-              "type": "object"
-            },
-            "detectedOtherClientIds": {
-              "type": "array"
-            },
-            "digestAlgorithm": {
-              "type": "string"
-            },
-            "dispatchCount": {
-              "type": "integer"
-            },
-            "endpoint": {
-              "type": "string"
-            },
-            "expiresAt": {
-              "type": "string"
-            },
-            "interruption": {
-              "additionalProperties": false,
-              "properties": {
-                "affectsAllParticipants": {
+                "affectedTargetIds": {
+                  "type": "array"
+                },
+                "confirmationRequired": {
                   "type": "boolean"
                 },
-                "kind": {
+                "controlActionId": {
                   "type": "string"
-                }
-              },
-              "required": [
-                "affectsAllParticipants",
-                "kind"
-              ],
-              "type": "object"
-            },
-            "kind": {
-              "type": "string"
-            },
-            "otherClientsMayExist": {
-              "type": "boolean"
-            },
-            "owner": {
-              "additionalProperties": false,
-              "properties": {
-                "id": {
+                },
+                "createdAt": {
                   "type": "string"
+                },
+                "criticalJobGate": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "blocking": {
+                      "type": "array"
+                    },
+                    "reasonCode": {
+                      "type": "null"
+                    },
+                    "state": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "blocking",
+                    "reasonCode",
+                    "state"
+                  ],
+                  "type": "object"
+                },
+                "detectedOtherClientIds": {
+                  "type": "array"
+                },
+                "digestAlgorithm": {
+                  "type": "string"
+                },
+                "dispatchCount": {
+                  "type": "integer"
+                },
+                "endpoint": {
+                  "type": "string"
+                },
+                "expiresAt": {
+                  "type": "string"
+                },
+                "interruption": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "affectsAllParticipants": {
+                      "type": "boolean"
+                    },
+                    "kind": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "affectsAllParticipants",
+                    "kind"
+                  ],
+                  "type": "object"
                 },
                 "kind": {
                   "type": "string"
-                }
-              },
-              "required": [
-                "id",
-                "kind"
-              ],
-              "type": "object"
-            },
-            "previewDigest": {
-              "type": "string"
-            },
-            "previewId": {
-              "type": "string"
-            },
-            "recovery": {
-              "additionalProperties": false,
-              "properties": {
-                "kind": {
-                  "type": "string"
                 },
-                "replayAllowed": {
+                "otherClientsMayExist": {
                   "type": "boolean"
+                },
+                "owner": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind"
+                  ],
+                  "type": "object"
+                },
+                "previewDigest": {
+                  "type": "string"
+                },
+                "previewId": {
+                  "type": "string"
+                },
+                "recovery": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "kind": {
+                      "type": "string"
+                    },
+                    "replayAllowed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "replayAllowed"
+                  ],
+                  "type": "object"
+                },
+                "schemaVersion": {
+                  "type": "string"
+                },
+                "serverEndpointRef": {
+                  "type": "string"
+                },
+                "serverGeneration": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "serverHealth": {
+                  "type": "string"
+                },
+                "serverOwnership": {
+                  "type": "string"
+                },
+                "serverVersion": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "tool": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "executablePath": {
+                      "type": "string"
+                    },
+                    "reference": {
+                      "type": "null"
+                    },
+                    "sha256": {
+                      "type": "string"
+                    },
+                    "signature": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "executionAssessment": {
+                              "type": "string"
+                            },
+                            "identifier": {
+                              "type": "string"
+                            },
+                            "platformTrust": {
+                              "type": "string"
+                            },
+                            "state": {
+                              "type": "string"
+                            },
+                            "teamIdentifier": {
+                              "type": "null"
+                            }
+                          },
+                          "required": [
+                            "executionAssessment",
+                            "identifier",
+                            "platformTrust",
+                            "state",
+                            "teamIdentifier"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "type": [
+                            "null"
+                          ]
+                        }
+                      ]
+                    },
+                    "source": {
+                      "type": "string"
+                    },
+                    "trust": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": [
+                        "null",
+                        "string"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "executablePath",
+                    "reference",
+                    "sha256",
+                    "signature",
+                    "source",
+                    "trust",
+                    "version"
+                  ],
+                  "type": "object"
                 }
               },
               "required": [
+                "action",
+                "affectedDeviceObservations",
+                "affectedJobIds",
+                "affectedTargetIds",
+                "confirmationRequired",
+                "controlActionId",
+                "createdAt",
+                "criticalJobGate",
+                "detectedOtherClientIds",
+                "digestAlgorithm",
+                "dispatchCount",
+                "endpoint",
+                "expiresAt",
+                "interruption",
                 "kind",
-                "replayAllowed"
+                "otherClientsMayExist",
+                "owner",
+                "previewDigest",
+                "previewId",
+                "recovery",
+                "schemaVersion",
+                "serverEndpointRef",
+                "serverGeneration",
+                "serverHealth",
+                "serverOwnership",
+                "serverVersion",
+                "tool"
               ],
               "type": "object"
             },
-            "schemaVersion": {
-              "type": "string"
-            },
-            "serverEndpointRef": {
-              "type": "string"
-            },
-            "serverGeneration": {
-              "type": "string"
-            },
-            "serverHealth": {
-              "type": "string"
-            },
-            "serverOwnership": {
-              "type": "string"
-            },
-            "serverVersion": {
-              "type": "string"
-            },
-            "tool": {
-              "additionalProperties": false,
-              "properties": {
-                "executablePath": {
-                  "type": "string"
-                },
-                "reference": {
-                  "type": "null"
-                },
-                "sha256": {
-                  "type": "string"
-                },
-                "signature": {
-                  "type": "null"
-                },
-                "source": {
-                  "type": "string"
-                },
-                "trust": {
-                  "type": "string"
-                },
-                "version": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "executablePath",
-                "reference",
-                "sha256",
-                "signature",
-                "source",
-                "trust",
-                "version"
-              ],
-              "type": "object"
+            {
+              "type": [
+                "null"
+              ]
             }
-          },
-          "required": [
-            "action",
-            "affectedDeviceObservations",
-            "affectedJobIds",
-            "affectedTargetIds",
-            "confirmationRequired",
-            "controlActionId",
-            "createdAt",
-            "criticalJobGate",
-            "detectedOtherClientIds",
-            "digestAlgorithm",
-            "dispatchCount",
-            "endpoint",
-            "expiresAt",
-            "interruption",
-            "kind",
-            "otherClientsMayExist",
-            "owner",
-            "previewDigest",
-            "previewId",
-            "recovery",
-            "schemaVersion",
-            "serverEndpointRef",
-            "serverGeneration",
-            "serverHealth",
-            "serverOwnership",
-            "serverVersion",
-            "tool"
-          ],
-          "type": "object"
+          ]
         },
         "requestFingerprint": {
           "type": "string"
@@ -400,8 +458,8 @@
   "x-arkdeck-method": "runtime.hdc.impact-preview",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 2,
-    "request": 6,
-    "result": 4
+    "error": 5,
+    "request": 8,
+    "result": 3
   }
 }
