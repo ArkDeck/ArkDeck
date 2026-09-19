@@ -2,6 +2,7 @@ import Foundation
 import XCTest
 
 @testable import ArkDeckAgentDaemon
+@testable import ArkDeckClientKit
 @testable import ArkDeckCore
 @testable import ArkDeckStorage
 @testable import ArkDeckWorkflows
