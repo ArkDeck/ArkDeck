@@ -14,8 +14,10 @@
 //! the Job; no caller supplies a device path. The library's facts come from
 //! [`crate::native_elf::validate_elf`] over its bytes, never from a caller.
 use crate::capture_files::{FileActionError, FilePlan, FileReceipt, Invocation, path_presence};
-use crate::debug_hap::{BundleReference, ResolvedArtifact, bounded_process_diagnostic};
-use crate::native_elf::{NativeAbi, NativeLibraryFacts, validate_elf};
+use crate::debug_hap::{
+    BundleReference, PersistedArguments, ResolvedArtifact, bounded_process_diagnostic,
+};
+use crate::native_elf::{CodeSignFacts, NativeAbi, NativeLibraryFacts, validate_elf};
 use crate::{Outcome, Receipt};
 use serde_json::{Map, Value, json};
 use std::collections::BTreeMap;
@@ -488,6 +490,127 @@ impl Deployment {
     }
 }
 
+/// Swift `materialize()`'s `nativeDeployment()`: the profiles first, then the
+/// ELF machine, the code-sign facts and the helper's facts, each complete or
+/// absent, then the deployment built over its recorded exact paths, every
+/// argument read in Swift's order.
+fn deployment(persisted: &PersistedArguments<'_>) -> Result<Deployment, FileActionError> {
+    let unknown_profile = || persisted.refuse("carries an unknown native deployment profile");
+    let Some(abi) = NativeAbi::parse(persisted.string("abi")?) else {
+        return unknown_profile();
+    };
+    let Some(restart_profile) = RestartProfile::parse(persisted.string("restartProfile")?) else {
+        return unknown_profile();
+    };
+    let Some(verification_profile) =
+        VerificationProfile::parse(persisted.string("verificationProfile")?)
+    else {
+        return unknown_profile();
+    };
+    let Some(rollback_policy) = RollbackPolicy::parse(persisted.string("rollbackPolicy")?) else {
+        return unknown_profile();
+    };
+    let Ok(machine) = u16::try_from(persisted.integer("machine")?) else {
+        return persisted.refuse("native ELF machine is outside UInt16");
+    };
+    let code_sign = match persisted.optional_integer("codeSignFormatVersion")? {
+        None => None,
+        Some(format_version) => {
+            // Swift's `guard let` reads each fact only while the ones before
+            // it were present.
+            let incomplete = || persisted.refuse("carries incomplete native code-sign facts");
+            let Some(code_sign_version) = persisted.optional_integer("codeSignVersion")? else {
+                return incomplete();
+            };
+            let Some(signed_data_byte_count) = persisted.optional_integer("signedDataByteCount")?
+            else {
+                return incomplete();
+            };
+            let Some(signature_byte_count) = persisted.optional_integer("signatureByteCount")?
+            else {
+                return incomplete();
+            };
+            Some(CodeSignFacts {
+                format_version,
+                code_sign_version,
+                signed_data_byte_count,
+                signature_byte_count,
+            })
+        }
+    };
+    let helper = match persisted.optional_string("codeSignHelperABI")? {
+        None => None,
+        Some(raw) => {
+            let incomplete = || persisted.refuse("carries incomplete code-sign helper facts");
+            let Some(abi) = NativeAbi::parse(raw) else {
+                return incomplete();
+            };
+            let Some(build_id) = persisted.optional_string("codeSignHelperBuildId")? else {
+                return incomplete();
+            };
+            let Some(sha256) = persisted.optional_string("codeSignHelperSha256")? else {
+                return incomplete();
+            };
+            let Some(byte_count) = persisted.optional_integer("codeSignHelperByteCount")? else {
+                return incomplete();
+            };
+            if persisted
+                .optional_string("codeSignHelperRemotePath")?
+                .is_none()
+            {
+                return incomplete();
+            }
+            Some(CodeSignHelperFacts {
+                abi,
+                build_id: build_id.to_owned(),
+                sha256: sha256.to_owned(),
+                byte_count,
+            })
+        }
+    };
+    let job_id = persisted.string("jobId")?;
+    let artifact_lease_id = persisted.string("artifactLeaseId")?;
+    let artifact_id = persisted.string("artifactId")?;
+    let bundle = persisted.bundle()?;
+    let library_logical_name = persisted.string("libraryLogicalName")?;
+    let artifact_facts = NativeLibraryFacts {
+        abi,
+        elf_class_bits: persisted.integer("elfClassBits")?,
+        machine,
+        build_id: persisted.string("buildId")?.to_owned(),
+        sha256: persisted.string("sha256")?.to_owned(),
+        byte_count: persisted.integer("byteCount")?,
+        code_sign,
+    };
+    let exact_paths = ExactPaths {
+        directory_path: persisted.string("directoryPath")?.to_owned(),
+        target_path: persisted.string("targetPath")?.to_owned(),
+        loader_visible_path: persisted.string("loaderVisiblePath")?.to_owned(),
+        staging_directory_path: persisted
+            .optional_string("stagingDirectoryPath")?
+            .map(str::to_owned),
+        staging_path: persisted.string("stagingPath")?.to_owned(),
+        backup_path: persisted.string("backupPath")?.to_owned(),
+        rollback_staging_path: persisted.string("rollbackStagingPath")?.to_owned(),
+        code_sign_helper_remote_path: persisted
+            .optional_string("codeSignHelperRemotePath")?
+            .map(str::to_owned),
+    };
+    Deployment::new(
+        job_id,
+        artifact_lease_id,
+        artifact_id,
+        bundle,
+        library_logical_name,
+        artifact_facts,
+        restart_profile,
+        verification_profile,
+        rollback_policy,
+        helper,
+        Some(&exact_paths),
+    )
+}
+
 /// Swift `HDCNativeFileIdentity`: what `ls -ln` shows of a file.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct NativeFileIdentity {
@@ -634,6 +757,35 @@ impl NativeAction {
             unreachable!("an object literal")
         };
         (kind, arguments)
+    }
+
+    /// Swift `PersistedTypedProviderAction.materialize()` for the native
+    /// family: the deployment rebuilt from its persisted arguments (its
+    /// recorded paths accepted only when they are exactly the namespace's),
+    /// refused as Swift refuses it. `None` is a kind of another family.
+    pub fn from_persisted(
+        kind: &str,
+        arguments: &Map<String, Value>,
+    ) -> Result<Option<Self>, FileActionError> {
+        let persisted = PersistedArguments { kind, arguments };
+        Ok(Some(match kind {
+            "hdc.sendNativeLibraryToStaging" => Self::SendToStaging(deployment(&persisted)?),
+            "hdc.backupNativeLibrary" => Self::Backup(deployment(&persisted)?),
+            "hdc.publishNativeLibrary" => Self::Publish(deployment(&persisted)?),
+            "hdc.stopNativeTarget" => Self::StopTarget(deployment(&persisted)?),
+            "hdc.startNativeTarget" => Self::StartTarget(deployment(&persisted)?),
+            "hdc.cleanupNativeLibrary" => Self::Cleanup(deployment(&persisted)?),
+            "hdc.rollbackNativeLibrary" => Self::Rollback(deployment(&persisted)?),
+            "hdc.inspectNativeLibrary" => {
+                let Some(expectation) = Inspection::parse(persisted.string("expectation")?) else {
+                    return Err(FileActionError::Unsupported(
+                        "persisted native inspection expectation is unknown".into(),
+                    ));
+                };
+                Self::Inspect(deployment(&persisted)?, expectation)
+            }
+            _ => return Ok(None),
+        }))
     }
 
     /// Swift `lower` (`nativeSequence` / `nativeInspectionPlan`): every
@@ -2527,6 +2679,131 @@ mod tests {
             "readOnly"
         );
         assert_eq!(NativeAction::Backup(deployment).effect(), "deviceMutation");
+    }
+
+    /// Swift `materialize()`: every persisted native form reads back as the
+    /// action that wrote it, with or without the helper and the code-sign
+    /// facts, and each missing, foreign or moved fact is refused as Swift
+    /// refuses it.
+    #[test]
+    fn persisted_forms_materialize_as_swift_materializes_them() {
+        let deployment = deployment();
+        let mut facts = deployment.artifact_facts.clone();
+        facts.code_sign = None;
+        let plain = Deployment::new(
+            JOB,
+            LEASE,
+            ARTIFACT,
+            deployment.bundle.clone(),
+            "libexample.so",
+            facts,
+            RestartProfile::RestartAbility,
+            VerificationProfile::HashOnly,
+            RollbackPolicy::RetainBackup,
+            None,
+            None,
+        )
+        .unwrap();
+        let mut actions = Vec::new();
+        for deployment in [deployment.clone(), plain] {
+            actions.extend([
+                NativeAction::SendToStaging(deployment.clone()),
+                NativeAction::Backup(deployment.clone()),
+                NativeAction::Publish(deployment.clone()),
+                NativeAction::StopTarget(deployment.clone()),
+                NativeAction::StartTarget(deployment.clone()),
+                NativeAction::Cleanup(deployment.clone()),
+                NativeAction::Rollback(deployment.clone()),
+            ]);
+            actions.extend(
+                [
+                    Inspection::StagingMatchesArtifact,
+                    Inspection::BackupMatchesTarget,
+                    Inspection::TargetMatchesArtifact,
+                    Inspection::TargetStopped,
+                    Inspection::TargetStarted,
+                    Inspection::TargetLoaded,
+                    Inspection::CleanupComplete,
+                    Inspection::RollbackRestored,
+                ]
+                .map(|expectation| NativeAction::Inspect(deployment.clone(), expectation)),
+            );
+        }
+        for action in actions {
+            let (kind, arguments) = action.persisted();
+            assert_eq!(
+                NativeAction::from_persisted(kind, &arguments).unwrap(),
+                Some(action),
+                "{kind}"
+            );
+        }
+
+        let (kind, arguments) = NativeAction::Cleanup(deployment.clone()).persisted();
+        let refused = |change: &dyn Fn(&mut Map<String, Value>)| {
+            let mut changed = arguments.clone();
+            change(&mut changed);
+            NativeAction::from_persisted(kind, &changed)
+                .unwrap_err()
+                .to_string()
+        };
+        let prefix = "unsupportedAction(\"persisted hdc.cleanupNativeLibrary";
+        assert_eq!(
+            refused(&|arguments| {
+                arguments.remove("abi");
+            }),
+            format!("{prefix} is missing string abi\")")
+        );
+        assert_eq!(
+            refused(&|arguments| {
+                arguments.insert("rollbackPolicy".into(), json!("never"));
+            }),
+            format!("{prefix} carries an unknown native deployment profile\")")
+        );
+        assert_eq!(
+            refused(&|arguments| {
+                arguments.insert("machine".into(), json!(65_536));
+            }),
+            format!("{prefix} native ELF machine is outside UInt16\")")
+        );
+        assert_eq!(
+            refused(&|arguments| {
+                arguments.remove("signedDataByteCount");
+            }),
+            format!("{prefix} carries incomplete native code-sign facts\")")
+        );
+        assert_eq!(
+            refused(&|arguments| {
+                arguments.remove("codeSignHelperRemotePath");
+            }),
+            format!("{prefix} carries incomplete code-sign helper facts\")")
+        );
+        assert_eq!(
+            refused(&|arguments| {
+                arguments.insert("byteCount".into(), json!("588"));
+            }),
+            format!("{prefix} is missing integer byteCount\")")
+        );
+        assert_eq!(
+            refused(&|arguments| {
+                arguments.insert("stagingPath".into(), json!("/data/local/tmp/libexample.so"));
+            }),
+            "unsupportedAction(\"persisted native deployment paths escape the provider-owned \
+             namespace\")"
+        );
+        let mut inspected = NativeAction::Inspect(deployment, Inspection::CleanupComplete)
+            .persisted()
+            .1;
+        inspected.insert("expectation".into(), json!("cleanupSkipped"));
+        assert_eq!(
+            NativeAction::from_persisted("hdc.inspectNativeLibrary", &inspected)
+                .unwrap_err()
+                .to_string(),
+            "unsupportedAction(\"persisted native inspection expectation is unknown\")"
+        );
+        assert_eq!(
+            NativeAction::from_persisted("hdc.uninstallPackage", &arguments).unwrap(),
+            None
+        );
     }
 
     /// The parsers on their own.

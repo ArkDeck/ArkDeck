@@ -9,8 +9,8 @@
 //! record once per Job and step: one already there, settled or not, is never
 //! written again. Every other failed cleanup (a native deployment's) appends
 //! its record each time it fails. `cleanupDebt.list` reads the ledger as the
-//! daemon lists it; settling and retrying a debt (`cleanupDebt.continue`) are
-//! not served here.
+//! daemon lists it, and `cleanupDebt.continue` (`cleanup_debt_continue.rs`)
+//! begins, concludes and settles one debt's retry here.
 use crate::artifact_read_owner::ArtifactReadStore;
 use crate::session_json;
 use crate::strict_json::swift_quoted;
@@ -30,7 +30,7 @@ pub(crate) enum Residue {
 impl Residue {
     /// Swift `CleanupResidue.identity`: the bare path, or the bundle under
     /// its own prefix so that it never collides with a path.
-    fn identity(&self) -> String {
+    pub(crate) fn identity(&self) -> String {
         match self {
             Self::RemotePath(path) => path.clone(),
             Self::InstalledBundle(bundle) => format!("bundle:{bundle}"),
@@ -176,6 +176,12 @@ pub(crate) fn append(
         }
     }
     records.push(record);
+    persist(artifacts, records)
+}
+
+/// Swift `persistCleanupDebt`: the whole ledger written again through a fresh
+/// file renamed into place.
+fn persist(artifacts: &ArtifactReadStore, records: Vec<Value>) -> Result<(), String> {
     let bytes = session_json::encode_pretty(&Value::Array(records))
         .map_err(|_| "cannot encode the cleanup debt ledger".to_owned())?;
     artifacts
@@ -205,6 +211,111 @@ pub(crate) fn outstanding_jobs(
         .collect())
 }
 
+/// Swift `RuntimeArtifactError.indexCorrupted`: the store's refusal of a
+/// ledger it cannot read or decode.
+fn corrupted(detail: String) -> String {
+    format!("indexCorrupted({})", swift_quoted(&detail))
+}
+
+/// Swift `RuntimeArtifactError.ioFailure`.
+fn io_failure(detail: &str) -> String {
+    format!("ioFailure({})", swift_quoted(detail))
+}
+
+/// A record the Job still owes for this residue identity.
+fn owes(record: &Value, job_id: &str, residue: &str) -> bool {
+    record["jobID"] == job_id && identity(record) == residue && record.get("settledAtUTC").is_none()
+}
+
+/// The first record the Job still owes for this residue identity, as
+/// `continueCleanupDebt` finds it among `outstandingCleanupDebt()`. Errors
+/// are the store's, as Swift renders them.
+pub(crate) fn outstanding_record(
+    artifacts: &ArtifactReadStore,
+    job_id: &str,
+    residue: &str,
+) -> Result<Option<Value>, String> {
+    Ok(load(artifacts)
+        .map_err(corrupted)?
+        .into_iter()
+        .find(|record| owes(record, job_id, residue)))
+}
+
+/// Swift `settleCleanupDebt(jobID:identity:)`: every record the Job still
+/// owes for the residue settled at `now_utc`, and the ledger written again
+/// whether or not one was.
+pub(crate) fn settle(
+    artifacts: &ArtifactReadStore,
+    job_id: &str,
+    residue: &str,
+    now_utc: &str,
+) -> Result<(), String> {
+    let mut records = load(artifacts).map_err(corrupted)?;
+    for record in records
+        .iter_mut()
+        .filter(|record| owes(record, job_id, residue))
+    {
+        record["settledAtUTC"] = json!(now_utc);
+    }
+    persist(artifacts, records).map_err(|detail| io_failure(&detail))
+}
+
+/// Swift `beginCleanupDebtRetry(jobID:identity:)`: the one retry the debt
+/// allows made durable before it is dispatched. A retry already begun, or
+/// one whose outcome was lost, forbids another.
+pub(crate) fn begin_retry(
+    artifacts: &ArtifactReadStore,
+    job_id: &str,
+    residue: &str,
+    now_utc: &str,
+) -> Result<(), String> {
+    let mut records = load(artifacts).map_err(corrupted)?;
+    let Some(record) = records
+        .iter_mut()
+        .find(|record| owes(record, job_id, residue))
+    else {
+        return Err(not_owed(job_id, residue));
+    };
+    if record["retryOutcomeUnknown"] == true || record.get("retryAttemptStartedAtUTC").is_some() {
+        return Err(io_failure(
+            "cleanup retry has an unknown outcome; mutation resend is forbidden",
+        ));
+    }
+    record["retryAttemptStartedAtUTC"] = json!(now_utc);
+    persist(artifacts, records).map_err(|detail| io_failure(&detail))
+}
+
+/// Swift `completeCleanupDebtRetry(jobID:identity:outcomeUnknown:)`: a retry
+/// that concluded without settling the debt. A lost outcome is kept, and
+/// forbids any resend; a confirmed failure clears the attempt.
+pub(crate) fn complete_retry(
+    artifacts: &ArtifactReadStore,
+    job_id: &str,
+    residue: &str,
+    outcome_unknown: bool,
+) -> Result<(), String> {
+    let mut records = load(artifacts).map_err(corrupted)?;
+    let Some(record) = records
+        .iter_mut()
+        .find(|record| owes(record, job_id, residue))
+    else {
+        return Err(not_owed(job_id, residue));
+    };
+    record["retryOutcomeUnknown"] = json!(outcome_unknown);
+    if !outcome_unknown && let Some(fields) = record.as_object_mut() {
+        fields.remove("retryAttemptStartedAtUTC");
+    }
+    persist(artifacts, records).map_err(|detail| io_failure(&detail))
+}
+
+/// Swift `RuntimeArtifactError.artifactNotFound` for a debt no longer owed.
+fn not_owed(job_id: &str, residue: &str) -> String {
+    format!(
+        "artifactNotFound({})",
+        swift_quoted(&format!("cleanup-debt:{job_id}:{residue}"))
+    )
+}
+
 /// The daemon's `cleanupDebt.list` (Swift `listCleanupDebt`, encoded by
 /// `encodeCleanupDebt`): every record not yet settled, ordered by Job, then
 /// remote path (empty for a bundle), then when it was owed, each with its
@@ -212,9 +323,7 @@ pub(crate) fn outstanding_jobs(
 /// cannot be read or decoded refuses the whole list with the store error
 /// Swift renders; nothing is written.
 pub fn list_cleanup_debt(artifacts: &ArtifactReadStore) -> Result<Value, String> {
-    let records =
-        load(artifacts).map_err(|detail| format!("indexCorrupted({})", swift_quoted(&detail)))?;
-    Ok(listing(records))
+    Ok(listing(load(artifacts).map_err(corrupted)?))
 }
 
 fn listing(records: Vec<Value>) -> Value {

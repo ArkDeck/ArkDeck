@@ -243,6 +243,123 @@ fn unsupported<T>(detail: &str) -> Result<T, FileActionError> {
     Err(FileActionError::Unsupported(detail.to_owned()))
 }
 
+/// The arguments of a persisted action of `kind`, read as Swift's
+/// `PersistedTypedProviderAction.materialize()` reads them: each reader
+/// refuses as its Swift namesake does, and the owned references are rebuilt
+/// through their constructors.
+pub(crate) struct PersistedArguments<'a> {
+    pub(crate) kind: &'a str,
+    pub(crate) arguments: &'a Map<String, Value>,
+}
+
+impl PersistedArguments<'_> {
+    pub(crate) fn refuse<T>(&self, detail: &str) -> Result<T, FileActionError> {
+        unsupported(&format!("persisted {} {detail}", self.kind))
+    }
+
+    pub(crate) fn string(&self, key: &str) -> Result<&str, FileActionError> {
+        match self.arguments.get(key) {
+            Some(Value::String(text)) => Ok(text),
+            _ => self.refuse(&format!("is missing string {key}")),
+        }
+    }
+
+    pub(crate) fn integer(&self, key: &str) -> Result<i64, FileActionError> {
+        match self.arguments.get(key).and_then(Value::as_i64) {
+            Some(value) => Ok(value),
+            None => self.refuse(&format!("is missing integer {key}")),
+        }
+    }
+
+    pub(crate) fn optional_string(&self, key: &str) -> Result<Option<&str>, FileActionError> {
+        match self.arguments.get(key) {
+            None => Ok(None),
+            Some(Value::String(text)) => Ok(Some(text)),
+            Some(_) => unsupported(&format!("persisted {}.{key} is not a string", self.kind)),
+        }
+    }
+
+    pub(crate) fn optional_integer(&self, key: &str) -> Result<Option<i64>, FileActionError> {
+        match self.arguments.get(key) {
+            None => Ok(None),
+            Some(value) => match value.as_i64() {
+                Some(number) => Ok(Some(number)),
+                None => unsupported(&format!("persisted {}.{key} is not an integer", self.kind)),
+            },
+        }
+    }
+
+    /// Swift's `path()`: the owned path rebuilt from its components, which
+    /// must name exactly the recorded path.
+    fn path(&self) -> Result<OwnedRemotePath, FileActionError> {
+        let path = OwnedRemotePath::new(
+            self.string("jobId")?,
+            self.string("stepId")?,
+            self.string("nonce")?,
+            ImageType::Png,
+        )?;
+        if path.remote_path != self.string("remotePath")? {
+            return self.refuse("remote path does not match its owned components");
+        }
+        Ok(path)
+    }
+
+    pub(crate) fn bundle(&self) -> Result<BundleReference, FileActionError> {
+        Ok(BundleReference::new(self.string("bundleName")?)?)
+    }
+
+    fn ability(&self) -> Result<AbilityReference, FileActionError> {
+        let bundle = self.bundle()?;
+        Ok(AbilityReference::new(bundle, self.string("abilityName")?)?)
+    }
+
+    fn staged(&self) -> Result<StagedArtifact, FileActionError> {
+        Ok(StagedArtifact {
+            path: self.path()?,
+            artifact_lease_id: self.string("artifactLeaseId")?.to_owned(),
+            expected_sha256: self.optional_string("expectedSha256")?.map(str::to_owned),
+        })
+    }
+
+    fn directory(&self) -> Result<OwnedRemoteDirectory, FileActionError> {
+        Ok(OwnedRemoteDirectory::new(
+            self.string("jobId")?,
+            self.string("stepId")?,
+            self.string("nonce")?,
+            DirectoryPurpose::Packages,
+        )?)
+    }
+
+    /// Swift's `packageSet()`: each package named by its path's last
+    /// component without `.hap`, its recorded path otherwise unread, and a
+    /// hash that is not text read as none.
+    fn package_set(&self) -> Result<StagedPackageSet, FileActionError> {
+        let directory = self.directory()?;
+        let Some(Value::Array(entries)) = self.arguments.get("packages") else {
+            return self.refuse("carries no staged package list");
+        };
+        let mut packages = Vec::with_capacity(entries.len());
+        for entry in entries {
+            let (Some(remote_path), Some(lease)) = (
+                entry.get("remotePath").and_then(Value::as_str),
+                entry.get("artifactLeaseId").and_then(Value::as_str),
+            ) else {
+                return self.refuse("carries a malformed staged package");
+            };
+            let Some(last) = remote_path.split('/').rfind(|part| !part.is_empty()) else {
+                return self.refuse("carries a malformed staged package");
+            };
+            packages.push(StagedPackage::new(
+                &directory,
+                &last.replace(".hap", ""),
+                lease,
+                entry.get("sha256").and_then(Value::as_str),
+            )?);
+        }
+        Ok(StagedPackageSet::new(directory, packages)?)
+    }
+}
+
 /// Swift `stagedPackageSet(inputs:context:)`: the set exists only when the
 /// request carried additional leases; the identity of each package comes
 /// from its lease (`lease-v1:<job>:<artifactID>`), the hash from the
@@ -477,6 +594,51 @@ impl HapAction {
             unreachable!("an object literal")
         };
         (kind, arguments)
+    }
+
+    /// Swift `PersistedTypedProviderAction.materialize()` for this family:
+    /// the action a persisted kind and its arguments name, rebuilt through
+    /// the same constructors and refused as Swift refuses it. `None` is a
+    /// kind of another family.
+    pub fn from_persisted(
+        kind: &str,
+        arguments: &Map<String, Value>,
+    ) -> Result<Option<Self>, FileActionError> {
+        let persisted = PersistedArguments { kind, arguments };
+        Ok(Some(match kind {
+            "hdc.cleanupOwnedRemotePath" => Self::CleanupOwnedRemotePath {
+                path: persisted.path()?,
+            },
+            "hdc.sendArtifactToStaging" => Self::SendArtifactToStaging(persisted.staged()?),
+            "hdc.installPackage" => Self::InstallPackage {
+                staged: persisted.staged()?,
+                bundle: persisted.bundle()?,
+            },
+            "hdc.sendPackageSetToStaging" => {
+                Self::SendPackageSetToStaging(persisted.package_set()?)
+            }
+            "hdc.installPackageSet" => Self::InstallPackageSet {
+                set: persisted.package_set()?,
+                bundle: persisted.bundle()?,
+            },
+            "hdc.cleanupStagedPackageSet" => {
+                Self::CleanupStagedPackageSet(persisted.package_set()?)
+            }
+            "hdc.readOwnedDirectoryPresence" => {
+                Self::ReadOwnedDirectoryPresence(persisted.directory()?)
+            }
+            "hdc.queryPackageReadback" => Self::QueryPackageReadback(persisted.bundle()?),
+            "hdc.startAbility" => Self::StartAbility(persisted.ability()?),
+            "hdc.verifyProcessState" => Self::VerifyProcessState(persisted.bundle()?),
+            "hdc.stopAbility" => Self::StopAbility(persisted.ability()?),
+            "hdc.uninstallPackage" => Self::UninstallPackage(persisted.bundle()?),
+            "hdc.readPackagePresence" => Self::ReadPackagePresence(persisted.bundle()?),
+            "hdc.readProcessPresence" => Self::ReadProcessPresence(persisted.bundle()?),
+            "hdc.readOwnedPathPresence" => Self::ReadOwnedPathPresence {
+                path: persisted.path()?,
+            },
+            _ => return Ok(None),
+        }))
     }
 
     /// Swift `lower`: the process or sequence the executor runs. A device
@@ -2082,6 +2244,97 @@ mod tests {
         assert_eq!(
             directory.verify(&receipt(vec![sub("", 0)]), None),
             Outcome::Unknown("owned-directory presence readback has no definite result".into())
+        );
+    }
+
+    /// Swift `materialize()`: every persisted form of the family reads back
+    /// as the action that wrote it, and what Swift refuses is refused.
+    #[test]
+    fn persisted_forms_materialize_as_swift_materializes_them() {
+        let (single, set) = (single_inputs(), set_inputs());
+        let mut actions: Vec<HapAction> = [
+            ("sendFile", None, &single),
+            ("installPackage", None, &single),
+            ("cleanupOwnedRemotePath", None, &single),
+            ("sendFile", None, &set),
+            ("installPackage", None, &set),
+            ("cleanupOwnedRemotePath", None, &set),
+            ("startApplication", None, &single),
+            ("verifyRemoteState", None, &single),
+            ("stopApplication", None, &single),
+            ("uninstallPackage", None, &single),
+            ("runApprovedRemoteRead", Some("packageInfo"), &single),
+        ]
+        .into_iter()
+        .map(|(kind, action, inputs)| step(kind, action, inputs, &[entry(), feature()]))
+        .collect();
+        let readbacks: Vec<HapAction> = actions.iter().filter_map(HapAction::readback).collect();
+        actions.extend(readbacks);
+        for action in actions {
+            let (kind, arguments) = action.persisted();
+            assert_eq!(
+                HapAction::from_persisted(kind, &arguments).unwrap(),
+                Some(action),
+                "{kind}"
+            );
+        }
+
+        let refused = |kind: &str, arguments: Value| {
+            HapAction::from_persisted(kind, arguments.as_object().unwrap())
+                .unwrap_err()
+                .to_string()
+        };
+        assert_eq!(
+            refused("hdc.uninstallPackage", json!({})),
+            "unsupportedAction(\"persisted hdc.uninstallPackage is missing string bundleName\")"
+        );
+        assert_eq!(
+            refused("hdc.uninstallPackage", json!({"bundleName": "demo"})),
+            "malformed(field: \"bundleName\", detail: \"reverse-DNS identifier expected\")"
+        );
+        let cleanup = step("cleanupOwnedRemotePath", None, &single, &[])
+            .persisted()
+            .1;
+        let mut moved = Value::Object(cleanup);
+        moved["remotePath"] = json!("/data/local/tmp/elsewhere.hap");
+        assert_eq!(
+            refused("hdc.cleanupOwnedRemotePath", moved),
+            "unsupportedAction(\"persisted hdc.cleanupOwnedRemotePath remote path does not \
+             match its owned components\")"
+        );
+        let mut hashed = Value::Object(step("sendFile", None, &single, &[]).persisted().1);
+        hashed["expectedSha256"] = json!(1);
+        assert_eq!(
+            refused("hdc.sendArtifactToStaging", hashed),
+            "unsupportedAction(\"persisted hdc.sendArtifactToStaging.expectedSha256 is not a \
+             string\")"
+        );
+        let mut listed = Value::Object(
+            step("cleanupOwnedRemotePath", None, &set, &[])
+                .persisted()
+                .1,
+        );
+        let packages = listed["packages"].clone();
+        listed.as_object_mut().unwrap().remove("packages");
+        assert_eq!(
+            refused("hdc.cleanupStagedPackageSet", listed.clone()),
+            "unsupportedAction(\"persisted hdc.cleanupStagedPackageSet carries no staged package \
+             list\")"
+        );
+        listed["packages"] = packages;
+        listed["packages"][1]
+            .as_object_mut()
+            .unwrap()
+            .remove("artifactLeaseId");
+        assert_eq!(
+            refused("hdc.cleanupStagedPackageSet", listed),
+            "unsupportedAction(\"persisted hdc.cleanupStagedPackageSet carries a malformed staged \
+             package\")"
+        );
+        // Another family's kind is not this family's to read.
+        assert_eq!(
+            HapAction::from_persisted("hdc.injectPointerInput", &Map::new()).unwrap(),
+            None
         );
     }
 

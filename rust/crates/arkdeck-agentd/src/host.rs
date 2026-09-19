@@ -1299,26 +1299,61 @@ impl HostServices for Host {
             })
     }
     /// `cleanupDebt.list` reads the cleanup debt ledger beside this owner's
-    /// Artifacts as the Swift daemon lists it, and writes nothing. Swift
-    /// answers any failure of the store as an internal error.
+    /// Artifacts as the Swift daemon lists it, and writes nothing; Swift reads
+    /// no parameter of it. `cleanupDebt.continue` continues one debt through
+    /// the owners `job.run` runs with: the Job's record, its capability use
+    /// and the HDC composition. Swift answers any failure of the store as an
+    /// internal error.
     #[cfg(target_os = "macos")]
     fn cleanup_debt(
         &self,
-        _method: &str,
-        _params: &serde_json::Map<String, serde_json::Value>,
+        method: &str,
+        params: &serde_json::Map<String, serde_json::Value>,
     ) -> Result<serde_json::Value, WireError> {
+        let foundation = || WireError {
+            code: "rejected".into(),
+            message: "this method is unavailable in the read-only Rust foundation".into(),
+            details: None,
+        };
         let Some(artifacts) = &self.artifacts else {
-            return Err(WireError {
-                code: "rejected".into(),
-                message: "this method is unavailable in the read-only Rust foundation".into(),
+            return Err(foundation());
+        };
+        if method == "cleanupDebt.list" {
+            return arkdeck_hoststore::list_cleanup_debt(artifacts).map_err(|message| WireError {
+                code: "internalError".into(),
+                message,
                 details: None,
             });
+        }
+        let Some(jobs) = &self.jobs else {
+            return Err(foundation());
         };
-        arkdeck_hoststore::list_cleanup_debt(artifacts).map_err(|message| WireError {
-            code: "internalError".into(),
-            message,
-            details: None,
-        })
+        let hdc = self.hdc();
+        arkdeck_hoststore::JobRunner {
+            imports: self.imports.as_deref(),
+            mutation: self.authority().zip(self.planning.as_ref()).map(
+                |(authority, (state_root, _))| arkdeck_hoststore::MutationExecution {
+                    authority,
+                    state_root,
+                },
+            ),
+            jobs,
+            artifacts,
+            analyzer: self
+                .planning
+                .as_ref()
+                .and_then(|(_, analyzer)| analyzer.as_ref()),
+            quota: ARTIFACT_QUOTA,
+            home: &self.home,
+            now: arkdeck_hoststore::runtime_now,
+            precise_now: arkdeck_hoststore::runtime_precise_now,
+            // A continuation publishes no Session and cancels nothing.
+            sessions: None,
+            cancellation: None,
+            after_commit: None,
+            hdc: hdc.as_ref(),
+        }
+        .continue_cleanup_debt(params)
     }
     /// `job.cancel` cancels an admitted Job in the owner that admitted it. A
     /// Job this owner is running is cancelled by its run, which alone writes
