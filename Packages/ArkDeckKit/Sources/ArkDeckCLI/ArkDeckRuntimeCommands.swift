@@ -8,6 +8,7 @@
 
 import ArkDeckAgentClient
 import ArkDeckBootstrap
+import ArkDeckClientKit
 import ArkDeckCore
 import ArkDeckLaunchAgent
 import ArkDeckRuntime
