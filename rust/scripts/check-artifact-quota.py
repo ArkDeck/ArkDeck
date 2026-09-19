@@ -13,17 +13,24 @@ oracle's and the other daemon's, with the root spelled `<root>`, both CLIs must
 end the same way, and the Rust owner's read must leave its root exactly as its
 startup left it.
 
+Seeding moves every recorded retention deadline forward by one whole number
+of days, the same for every index, so the earliest lands at least a week
+after the run starts (`fixture-deadlines.py`): both daemons sweep expired
+Artifacts at startup with the real clock, and the recorded ones lapse on
+2026-09-21. The quota counts bytes, never a deadline.
+
 Swift children get CFFIXED_USER_HOME inside the disposable root. Host-only: no
 device, installed state or hardware evidence.
 """
 from __future__ import annotations
 
 import argparse
+import datetime
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
-import shutil
 import signal
 import socket
 import subprocess
@@ -34,14 +41,19 @@ ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = ROOT / 'rust/tests/fixtures/artifact-quota'
 LABEL = '<root>'
 CACHE = '.payload-verification-v1.json'
+_deadlines_spec = importlib.util.spec_from_file_location(
+    'fixture_deadlines', Path(__file__).with_name('fixture-deadlines.py'))
+fixture_deadlines = importlib.util.module_from_spec(_deadlines_spec)
+_deadlines_spec.loader.exec_module(fixture_deadlines)
 
 
 def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def build(root: Path, scenario: str, before: list[dict]) -> None:
-    """The scenario's Artifact root as the oracle's read found it."""
+def build(root: Path, scenario: str, before: list[dict], moved_by: datetime.timedelta) -> None:
+    """The scenario's Artifact root as the oracle's read found it, its
+    deadlines moved `moved_by`."""
     root.mkdir(mode=0o700)
     for entry in before:
         path = root / entry['path']
@@ -49,7 +61,7 @@ def build(root: Path, scenario: str, before: list[dict]) -> None:
             path.mkdir(mode=0o700)
             path.chmod(int(entry['mode'], 8))
         elif entry['kind'] == 'file':
-            shutil.copyfile(FIXTURE / 'stores' / scenario / entry['path'], path)
+            fixture_deadlines.copy(FIXTURE / 'stores' / scenario / entry['path'], path, moved_by)
             path.chmod(int(entry['mode'], 8))
         elif entry['kind'] == 'symlink':
             os.symlink(entry['target'], path)
@@ -109,6 +121,9 @@ def main() -> None:
     trees = json.loads((FIXTURE / 'tree.json').read_text())
     checks: list[str] = []
     children: list[subprocess.Popen] = []
+
+    moved_by = fixture_deadlines.shift(sorted(
+        path for path in (FIXTURE / 'stores').rglob('index.json') if path.is_file() and not path.is_symlink()))
 
     with tempfile.TemporaryDirectory(prefix='xpa013-artifact-quota-', dir='/private/tmp') as temporary:
         base = Path(temporary).resolve()
@@ -171,7 +186,7 @@ def main() -> None:
                 swift_state = base / f'swift-{index}'
                 swift_state.mkdir(mode=0o700)
                 swift_root = swift_state / 'artifacts'
-                build(swift_root, scenario, before)
+                build(swift_root, scenario, before, moved_by)
                 swift_socket = swift_state / 'agentd.sock'
                 swift = start([str(swift_daemon), '--state-dir', str(swift_state)], clean, swift_socket)
                 swift_answer = labelled(exchange(swift_socket, 'artifact.quota', {}), swift_root)
@@ -182,7 +197,7 @@ def main() -> None:
                 rust_state = base / f'rust-{index}'
                 rust_state.mkdir(mode=0o700)
                 rust_root = rust_state / 'artifacts'
-                build(rust_root, scenario, before)
+                build(rust_root, scenario, before, moved_by)
                 rust_socket = rust_state / 'control.sock'
                 rust = start([str(rust_daemon)],
                              dict(clean, ARKDECK_DEVELOPMENT_STATE_ROOT=str(rust_state),
@@ -215,6 +230,7 @@ def main() -> None:
         'result': 'PASS',
         'scenarios': len(cases),
         'checks': len(checks),
+        'recordedDeadlinesMovedDays': moved_by.days,
         'deviceDispatchCount': 0,
         'rustDaemonSHA256': sha256(rust_daemon),
         'rustCliSHA256': sha256(rust_cli),

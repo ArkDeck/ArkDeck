@@ -10,6 +10,12 @@ Artifact store at the same path. Each answers every request of the Swift oracle
 and the answers must be identical. Both name /usr/bin/true as the
 crash-signature analyzer, which planning pins by digest and never runs.
 
+Seeding moves every recorded retention deadline forward by one whole number
+of days, the same for every index, so the earliest lands at least a week
+after the run starts (`fixture-deadlines.py`): both daemons sweep expired
+Artifacts at startup with the real clock, and the recorded ones lapse on
+2026-09-21. Nothing either owner answers reads a deadline.
+
 Swift children get CFFIXED_USER_HOME inside the disposable root, so neither
 owner opens installed Application Support state. Host-only: no device,
 hardware evidence or installed state.
@@ -17,11 +23,12 @@ hardware evidence or installed state.
 from __future__ import annotations
 
 import argparse
+import datetime
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
-import shutil
 import signal
 import socket
 import subprocess
@@ -31,14 +38,19 @@ import time
 ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = ROOT / 'rust/tests/fixtures/job-plan-analyzer'
 ANALYZER = Path('/usr/bin/true')
+_deadlines_spec = importlib.util.spec_from_file_location(
+    'fixture_deadlines', Path(__file__).with_name('fixture-deadlines.py'))
+fixture_deadlines = importlib.util.module_from_spec(_deadlines_spec)
+_deadlines_spec.loader.exec_module(fixture_deadlines)
 
 
 def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def seed(state: Path) -> None:
-    """The recorded Artifact store, with the modes Swift publication leaves."""
+def seed(state: Path, moved_by: datetime.timedelta) -> None:
+    """The recorded Artifact store, with the modes Swift publication leaves and
+    its deadlines moved `moved_by`."""
     state.mkdir(mode=0o700)
     artifacts = state / 'artifacts'
     artifacts.mkdir(mode=0o700)
@@ -46,7 +58,7 @@ def seed(state: Path) -> None:
         destination = artifacts / job.name
         destination.mkdir(mode=0o700)
         for source in sorted(job.iterdir()):
-            shutil.copyfile(source, destination / source.name)
+            fixture_deadlines.copy(source, destination / source.name, moved_by)
             (destination / source.name).chmod(0o600 if source.name == 'index.json' else 0o400)
 
 
@@ -82,6 +94,8 @@ def main() -> None:
     checks: list[str] = []
     children: list[subprocess.Popen] = []
     summary: dict = {}
+
+    moved_by = fixture_deadlines.shift(sorted((FIXTURE / 'artifacts').glob('*/index.json')))
 
     with tempfile.TemporaryDirectory(prefix='xpa014-job-plan-', dir='/private/tmp') as temporary:
         base = Path(temporary).resolve()
@@ -151,7 +165,7 @@ def main() -> None:
 
         try:
             # Phase A: the standalone Swift daemon plans over the recorded store.
-            seed(state)
+            seed(state, moved_by)
             swift_socket = state / 'agentd.sock'
             swift = start([str(swift_daemon), '--state-dir', str(state)], clean, swift_socket)
             before = tree(state / 'artifacts')
@@ -165,7 +179,7 @@ def main() -> None:
             state.rename(base / 'state-swift')
 
             # Phase B: the isolated Rust owner plans over a fresh copy at the same path.
-            seed(state)
+            seed(state, moved_by)
             rust_socket = state / 'control.sock'
             rust_env = dict(clean, ARKDECK_DEVELOPMENT_STATE_ROOT=str(state), ARKDECK_ENDPOINT=str(rust_socket))
             rust = start([str(rust_daemon)], rust_env, rust_socket)
@@ -210,7 +224,7 @@ def main() -> None:
                 'plannedDigest': rust_answers['planned']['result']['materializedPlanDigest'],
                 'rustDaemonSHA256': sha256(rust_daemon), 'rustCliSHA256': sha256(rust_cli),
                 'swiftDaemonSHA256': sha256(swift_daemon), 'swiftCliSHA256': sha256(swift_cli),
-                'deviceDispatchCount': 0,
+                'recordedDeadlinesMovedDays': moved_by.days, 'deviceDispatchCount': 0,
             }
         finally:
             for child in children:
