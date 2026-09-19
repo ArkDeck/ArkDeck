@@ -1,5 +1,6 @@
-//! Read-only validation of retained Swift preset state. Project registration
-//! preserves these records; this module never pins, mutates or recovers them.
+//! Load-time validation of the preset records and the retained dependency
+//! mutation in the workspace project document, as Swift's `load` checks them
+//! before any request reads the document.
 use super::*;
 use arkdeck_contract::canonical_json;
 fn text<'a>(v: &'a Value, key: &str) -> Result<&'a str, WireError> {
@@ -30,7 +31,7 @@ fn reference(v: &Value) -> bool {
     v.as_str()
         .is_some_and(|s| s.starts_with("preset-") && identifier(s, 128))
 }
-fn definition(record: &Value, registration: bool) -> Result<String, WireError> {
+pub(super) fn definition(record: &Value, registration: bool) -> Result<String, WireError> {
     let get = |name: &str| -> Value {
         let key = if registration {
             format!("registration{}{}", name[..1].to_uppercase(), &name[1..])
@@ -255,9 +256,12 @@ pub(super) fn validate(document: &Value, projects: &HashSet<&String>) -> Result<
         || !optional(&pending["releaseAfterAcquireRef"], tool)
         || !optional(&pending["releaseAfterAcquireCredentialRef"], credential)
     {
-        return Err(unreadable(()));
+        return Err(failure(
+            "recordUnreadable",
+            "workspace preset transaction is inconsistent",
+        ));
     }
-    // Swift requires dependency owners before reconciling the proposed record.
-    // This project-only composition cannot perform that transaction.
+    // The transaction itself, and the proposed record it would publish, are
+    // checked where Swift checks them: when it is reconciled.
     Ok(())
 }

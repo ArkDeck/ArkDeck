@@ -110,7 +110,16 @@ impl CliError {
         }
     }
     pub fn from_client(error: ClientError, method: &str) -> Self {
-        if method == "workspace.project.register" && !matches!(error, ClientError::Remote(_)) {
+        if matches!(
+            method,
+            "workspace.project.register"
+                | "workspace.project.update"
+                | "workspace.project.remove"
+                | "workspace.preset.register"
+                | "workspace.preset.update"
+                | "workspace.preset.remove"
+        ) && !matches!(error, ClientError::Remote(_))
+        {
             return CliError::new(
                 "outcomeUnknown",
                 "workspace registration response is unconfirmed; no request was replayed",
@@ -299,15 +308,16 @@ impl CliError {
                             && d.get("newDispatchCount") == Some(&json!(0))
                             && d.get("purgeScope") == Some(&json!("inactiveDerivedDatabases"))
                     });
-                let workspace_proof = matches!(
-                    method,
-                    "workspace.project.register"
-                        | "workspace.project.list"
-                        | "workspace.project.show"
-                ) && error.details.as_ref().is_some_and(|d| {
-                    d.get("phase") == Some(&json!("workspaceProjectOwner"))
-                        && d.get("newDispatchCount") == Some(&json!(0))
-                });
+                let workspace_proof = (method.starts_with("workspace.project.")
+                    && error.details.as_ref().is_some_and(|d| {
+                        d.get("phase") == Some(&json!("workspaceProjectOwner"))
+                            && d.get("newDispatchCount") == Some(&json!(0))
+                    }))
+                    || (method.starts_with("workspace.preset.")
+                        && error.details.as_ref().is_some_and(|d| {
+                            d.get("phase") == Some(&json!("workspacePresetOwner"))
+                                && d.get("newDispatchCount") == Some(&json!(0))
+                        }));
                 let host_proof = host_proof
                     || bootstrap_proof
                     || artifact_proof
@@ -476,7 +486,18 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                 | "--time"
                 | "--activity"
                 | "--registration-request-id"
+                | "--mutation-request-id"
                 | "--project"
+                | "--preset"
+                | "--template"
+                | "--toolchain"
+                | "--toolchain-generation"
+                | "--credential"
+                | "--timeout-seconds"
+                | "--module"
+                | "--product"
+                | "--build-mode"
+                | "--relative-source-map"
                 | "--kind"
                 | "--file"
                 | "--tool"
@@ -556,7 +577,16 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                         "--maximum-wait" => "maximumWait",
                         "--reviewed-plan-digest" => "reviewedPlanDigest",
                         "--registration-request-id" => "registrationRequestId",
+                        "--mutation-request-id" => "mutationRequestId",
                         "--project" => "projectRef",
+                        "--preset" => "presetRef",
+                        "--template" => "templateRef",
+                        "--toolchain" => "toolchainRef",
+                        "--toolchain-generation" => "toolchainGeneration",
+                        "--credential" => "credentialRef",
+                        "--timeout-seconds" => "timeoutSeconds",
+                        "--build-mode" => "buildMode",
+                        "--relative-source-map" => "relativeSourceMap",
                         other => &other[2..],
                     };
                     method_options.insert(key.to_owned(), json!(value));
@@ -615,6 +645,13 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["workspace", "project", "register"] => "workspace.project.register",
         ["workspace", "project", "list"] => "workspace.project.list",
         ["workspace", "project", "show"] => "workspace.project.show",
+        ["workspace", "project", "update"] => "workspace.project.update",
+        ["workspace", "project", "remove"] => "workspace.project.remove",
+        ["workspace", "preset", "list"] => "workspace.preset.list",
+        ["workspace", "preset", "show"] => "workspace.preset.show",
+        ["workspace", "preset", "register"] => "workspace.preset.register",
+        ["workspace", "preset", "update"] => "workspace.preset.update",
+        ["workspace", "preset", "remove"] => "workspace.preset.remove",
         ["artifact", "import", "hap"] => "artifact.import.hap",
         ["artifact", "import", "workspace-patch"] => "artifact.import.workspace-patch",
         ["artifact", "import", "native-library"] => "artifact.import.native-library",
@@ -830,6 +867,55 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         "workspace.project.register" => &["registrationRequestId", "kind", "rootPath", "timeout"],
         "workspace.project.list" => &["timeout"],
         "workspace.project.show" => &["projectRef", "timeout"],
+        "workspace.project.update" => &[
+            "projectRef",
+            "expectedGeneration",
+            "kind",
+            "rootPath",
+            "timeout",
+        ],
+        "workspace.project.remove" => &["projectRef", "expectedGeneration", "timeout"],
+        "workspace.preset.list" => &["projectRef", "kind", "timeout"],
+        "workspace.preset.show" => &["projectRef", "presetRef", "timeout"],
+        "workspace.preset.register" => &[
+            "registrationRequestId",
+            "projectRef",
+            "kind",
+            "templateRef",
+            "toolchainRef",
+            "toolchainGeneration",
+            "credentialRef",
+            "timeoutSeconds",
+            "module",
+            "product",
+            "buildMode",
+            "relativeSourceMap",
+            "timeout",
+        ],
+        "workspace.preset.update" => &[
+            "mutationRequestId",
+            "projectRef",
+            "presetRef",
+            "expectedGeneration",
+            "kind",
+            "templateRef",
+            "toolchainRef",
+            "toolchainGeneration",
+            "credentialRef",
+            "timeoutSeconds",
+            "module",
+            "product",
+            "buildMode",
+            "relativeSourceMap",
+            "timeout",
+        ],
+        "workspace.preset.remove" => &[
+            "mutationRequestId",
+            "projectRef",
+            "presetRef",
+            "expectedGeneration",
+            "timeout",
+        ],
         "artifact.list" => &[
             "jobId",
             "import",
@@ -1132,6 +1218,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         params: if command == "doctor" {
             Some(serde_json::from_value(json!({"deep":deep})).unwrap())
         } else if command.starts_with("workspace.project.")
+            || command.starts_with("workspace.preset.")
             || command.starts_with("history.filter.")
             || command.starts_with("runtime.storage.")
             || matches!(

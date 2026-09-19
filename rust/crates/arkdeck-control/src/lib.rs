@@ -335,14 +335,19 @@ pub trait HostServices: Send + Sync {
     }
     fn workspace_project(
         &self,
-        _method: &str,
+        method: &str,
         _params: &serde_json::Map<String, Value>,
     ) -> Result<Value, WireError> {
+        let phase = if method.starts_with("workspace.preset.") {
+            "workspacePresetOwner"
+        } else {
+            "workspaceProjectOwner"
+        };
         Err(WireError {
             code: "operationUnavailable".into(),
             message: "workspace project owner is unavailable".into(),
             details: Some(serde_json::Map::from_iter([
-                ("phase".into(), json!("workspaceProjectOwner")),
+                ("phase".into(), json!(phase)),
                 ("newDispatchCount".into(), json!(0)),
             ])),
         })
@@ -1108,6 +1113,24 @@ impl<H: HostServices> Control<H> {
                     }
                 }
             }
+            // As Swift's handler, check for check and message for message:
+            // exact keys and a canonical generation for a mutation, one closed
+            // typed definition for a preset registration or update, a project
+            // for every preset read.
+            "workspace.project.update"
+            | "workspace.project.remove"
+            | "workspace.preset.list"
+            | "workspace.preset.show"
+            | "workspace.preset.register"
+            | "workspace.preset.update"
+            | "workspace.preset.remove" => match workspace_params_refusal(&request.method, &params)
+            {
+                Some(message) => Response::failure(&request.id, "invalidParams", message),
+                None => Response {
+                    id: request.id.clone(),
+                    outcome: self.host.workspace_project(&request.method, &params),
+                },
+            },
             // As Swift's handler: a caller's facts are refused before any observation.
             "runtime.hdc.status" if params.is_empty() => Response {
                 id: request.id.clone(),
@@ -1598,4 +1621,119 @@ fn response_bytes(response: Response) -> Vec<u8> {
         )
         .expect("bounded error response")
     })
+}
+
+/// Swift `canonicalPositiveUInt64`: canonical decimal text in 1...Int64.max.
+fn canonical_positive(value: Option<&Value>) -> bool {
+    value.and_then(Value::as_str).is_some_and(|text| {
+        text.parse::<u64>()
+            .is_ok_and(|n| n > 0 && n <= i64::MAX as u64 && n.to_string() == text)
+    })
+}
+
+/// Swift `decodeWorkspacePresetDefinition`: the mutation keys and the
+/// definition's required keys present, nothing else but its optional keys,
+/// every value typed.
+fn preset_definition(params: &serde_json::Map<String, Value>, mutation_keys: &[&str]) -> bool {
+    const OPTIONAL: [&str; 7] = [
+        "toolchainRef",
+        "toolchainGeneration",
+        "credentialRef",
+        "module",
+        "product",
+        "buildMode",
+        "relativeSourceMap",
+    ];
+    let required: Vec<&str> = mutation_keys
+        .iter()
+        .copied()
+        .chain(["kind", "templateRef", "timeoutSeconds"])
+        .collect();
+    required.iter().all(|key| params.contains_key(*key))
+        && params
+            .keys()
+            .all(|key| required.contains(&key.as_str()) || OPTIONAL.contains(&key.as_str()))
+        && params.get("kind").is_some_and(Value::is_string)
+        && params.get("templateRef").is_some_and(Value::is_string)
+        && canonical_positive(params.get("timeoutSeconds"))
+        && OPTIONAL
+            .iter()
+            .filter(|key| **key != "toolchainGeneration")
+            .all(|key| params.get(*key).is_none_or(Value::is_string))
+        && params
+            .get("toolchainGeneration")
+            .is_none_or(|value| canonical_positive(Some(value)))
+}
+
+/// The `invalidParams` message Swift's handler answers for a malformed
+/// workspace mutation or preset read, or `None` when it would proceed.
+fn workspace_params_refusal(
+    method: &str,
+    params: &serde_json::Map<String, Value>,
+) -> Option<&'static str> {
+    let text = |key: &str| params.get(key).and_then(Value::as_str);
+    let nonempty = |key: &str| text(key).is_some_and(|value| !value.is_empty());
+    let exact =
+        |keys: &[&str]| params.len() == keys.len() && keys.iter().all(|key| text(key).is_some());
+    let generation = || canonical_positive(params.get("expectedGeneration"));
+    match method {
+        "workspace.project.update" => {
+            (!(exact(&["projectRef", "expectedGeneration", "kind", "root"]) && generation()))
+                .then_some(
+                    "workspace project update requires exact project, generation, kind and root",
+                )
+        }
+        "workspace.project.remove" => (!(exact(&["projectRef", "expectedGeneration"])
+            && generation()))
+        .then_some("workspace project remove requires exact project and generation"),
+        "workspace.preset.list" => {
+            if !nonempty("projectRef") {
+                Some("projectRef is required")
+            } else if params
+                .keys()
+                .any(|key| key != "projectRef" && key != "kind")
+            {
+                Some("workspace preset list accepts only projectRef and kind")
+            } else if params.get("kind").is_some_and(|kind| !kind.is_string()) {
+                Some("kind must be text")
+            } else {
+                None
+            }
+        }
+        "workspace.preset.show" => {
+            if !nonempty("projectRef") || !nonempty("presetRef") {
+                Some("projectRef and presetRef are required")
+            } else if params.len() != 2 {
+                Some("workspace preset show requires exact projectRef and presetRef")
+            } else {
+                None
+            }
+        }
+        "workspace.preset.register" => {
+            (!(preset_definition(params, &["registrationRequestId", "projectRef"])
+                && text("registrationRequestId").is_some()
+                && text("projectRef").is_some()))
+            .then_some("workspace preset register requires one closed typed definition")
+        }
+        "workspace.preset.update" => (!(preset_definition(
+            params,
+            &[
+                "mutationRequestId",
+                "projectRef",
+                "presetRef",
+                "expectedGeneration",
+            ],
+        ) && ["mutationRequestId", "projectRef", "presetRef"]
+            .iter()
+            .all(|key| text(key).is_some())
+            && generation()))
+        .then_some("workspace preset update requires identity, exact generation and definition"),
+        _ => (!(exact(&[
+            "mutationRequestId",
+            "projectRef",
+            "presetRef",
+            "expectedGeneration",
+        ]) && generation()))
+        .then_some("workspace preset remove requires identity and exact generation"),
+    }
 }

@@ -7,7 +7,10 @@
 #[cfg(target_os = "macos")]
 mod workspace_project;
 #[cfg(target_os = "macos")]
-pub use workspace_project::WorkspaceProjectStore;
+pub use workspace_project::{
+    CredentialAcquire, PinPair, PinningResult, ToolchainAcquire, WorkspaceCredentialPinning,
+    WorkspaceProjectStore, WorkspaceReference, WorkspaceToolchainPinning,
+};
 
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 

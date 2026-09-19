@@ -1,0 +1,10 @@
+{
+  "frames": "frames.jsonl, a byte copy of openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-015/workspace-mutation-native-recording/frames.jsonl (#2041)",
+  "framesSHA256": "e97b23815d0f6d6c59230872fb388ad7f030445345266d5bf66f959e7c448ef7",
+  "frameCount": 78,
+  "recordedBy": "AgentDaemonContractTests.testWorkspacePresetAndProjectMutationControlFramesRecordTheirRefusals, production daemon handler over RuntimeWorkspaceProjectStore, with ARKDECK_CONTROL_FRAME_LOG",
+  "why": "the frames in their recorded order; the per-method ControlFrames corpora are deduplicated by shape and cannot be replayed as one sequence",
+  "replayedBy": "rust/crates/arkdeck-hoststore/tests/workspace_mutation_oracle.rs",
+  "swiftProjects": "swift-projects.json, the owner's projects.json as Swift's RuntimeWorkspaceProjectStore wrote it after frame 52, copied out by a local, uncommitted ARKDECK_WORKSPACE_STORE_CAPTURE step added to the same Swift test after its project removal and reverted afterwards; Swift test result: 1 test, 0 failures (10.2 s)",
+  "swiftProjectsSHA256": "fa06646335089fe059d18137c810a7aa05e778dae00edc4017655962825b4d70"
+}

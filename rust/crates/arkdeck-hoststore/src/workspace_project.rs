@@ -1,5 +1,7 @@
-//! Runtime-owned workspace registration. Root paths and inode grants stay private;
-//! this owner does not compose presets, execute tools or acquire signing authority.
+//! Runtime-owned workspace registration and its presets. Root paths and inode
+//! grants stay private. A preset's DevEco toolchain and signing credential are
+//! pinned only through the owners the composition root supplies; this store
+//! never resolves, executes or signs with either.
 use arkdeck_contract::{WireError, sha256_hex, strict_json};
 use arkdeck_platform::{DocumentPublishError, HostDirectory};
 use serde::{Deserialize, Serialize};
@@ -13,16 +15,56 @@ use std::{
     sync::Mutex,
 };
 
+#[path = "workspace_project_document.rs"]
+mod document;
+#[path = "workspace_project_mutations.rs"]
+mod mutations;
+#[path = "workspace_preset_mutations.rs"]
+mod preset_mutations;
 #[path = "workspace_project_presets.rs"]
 mod presets;
 const DOCUMENT: &str = "projects.json";
 const LOCK: &str = ".projects.lock";
 const MAXIMUM: usize = 1024 * 1024;
 
+/// A refusal from a dependency owner. Swift rethrows its code and message.
+pub type PinningResult = Result<(), WireError>;
+/// A dependency owner's call over two references.
+pub type PinPair = Box<dyn Fn(&str, &str) -> PinningResult + Send + Sync>;
+/// The DevEco owner's acquire of (toolchain, generation, preset).
+pub type ToolchainAcquire = Box<dyn Fn(&str, u64, &str) -> PinningResult + Send + Sync>;
+/// The credential owner's acquire of (credential, preset, project).
+pub type CredentialAcquire = Box<dyn Fn(&str, &str, &str) -> PinningResult + Send + Sync>;
+
+/// Swift `RuntimeWorkspaceToolchainPinning`: the DevEco toolchain owner's
+/// acquire (reference, generation, preset) and release (reference, preset).
+pub struct WorkspaceToolchainPinning {
+    pub acquire: ToolchainAcquire,
+    pub release: PinPair,
+}
+
+/// Swift `RuntimeWorkspaceCredentialPinning`. `validate_binding` (credential,
+/// project) runs before the store writes its intent; `acquire` (credential,
+/// preset, project) and `release` (credential, preset) run inside it.
+pub struct WorkspaceCredentialPinning {
+    pub validate_binding: PinPair,
+    pub acquire: CredentialAcquire,
+    pub release: PinPair,
+}
+
+/// What a mutation asks the durable Job census about.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WorkspaceReference<'a> {
+    Project(&'a str),
+    Preset(&'a str),
+}
+
 pub struct WorkspaceProjectStore {
     path: PathBuf,
     root: HostDirectory,
     transaction: Mutex<()>,
+    toolchain_pinning: Option<WorkspaceToolchainPinning>,
+    credential_pinning: Option<WorkspaceCredentialPinning>,
 }
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -31,7 +73,7 @@ struct Root {
     device: u64,
     inode: u64,
 }
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct Record {
     project_ref: String,
@@ -198,23 +240,61 @@ fn resource(r: &Record) -> Value {
     json!({"schemaVersion":"arkdeck.workspace-project/1","projectRef":r.project_ref,"generation":r.generation.to_string(),"kind":r.kind,"registeredAtUtc":r.registered_at,"updatedAtUtc":r.updated_at,"configurationStatus":"runtimeRestartRequired","availability":"unavailable","reasonCode":"workspace_runtime_restart_required","reason":"restart the Runtime to compose the registered root before submitting a workspace Job","allowedFileGlobs":[],"presetRefs":[],"operations":[]})
 }
 impl WorkspaceProjectStore {
+    /// An owner with no dependency owners composed: a preset that pins a
+    /// toolchain or credential is refused as Swift refuses it without them.
     pub fn open(path: &Path) -> io::Result<Self> {
         Ok(Self {
             path: path.into(),
             root: HostDirectory::open(path)?,
             transaction: Mutex::new(()),
+            toolchain_pinning: None,
+            credential_pinning: None,
         })
     }
+
+    /// The dependency owners Swift's composition root passes to its store.
+    pub fn with_dependency_pinning(
+        mut self,
+        toolchain: Option<WorkspaceToolchainPinning>,
+        credential: Option<WorkspaceCredentialPinning>,
+    ) -> Self {
+        self.toolchain_pinning = toolchain;
+        self.credential_pinning = credential;
+        self
+    }
+
+    /// One workspace project or preset control request. `now` is read where
+    /// Swift reads its injected clock, inside the owner transaction. A
+    /// project or preset mutation first asks `require_no_active_reference`,
+    /// the durable Job census Swift consults before it opens its document.
     pub fn handle(
         &self,
         method: &str,
         params: &Map<String, Value>,
-        now: &str,
+        now: &dyn Fn() -> String,
+        require_no_active_reference: &dyn Fn(WorkspaceReference<'_>) -> Result<(), WireError>,
     ) -> Result<Value, WireError> {
-        let fields: &[&str] = match method {
-            "workspace.project.register" => &["registrationRequestId", "kind", "root"],
-            "workspace.project.list" => &[],
-            "workspace.project.show" => &["projectRef"],
+        let (fields, message): (&[&str], &str) = match method {
+            "workspace.project.register" => (
+                &["registrationRequestId", "kind", "root"],
+                "workspace project register requires request identity, kind and root",
+            ),
+            "workspace.project.list" => (&[], "workspace project list accepts no parameters"),
+            "workspace.project.show" => (&["projectRef"], "projectRef is required"),
+            "workspace.project.update"
+            | "workspace.project.remove"
+            | "workspace.preset.list"
+            | "workspace.preset.show" => {
+                return self.handle_mutation(method, params, now, require_no_active_reference);
+            }
+            "workspace.preset.register" | "workspace.preset.update" | "workspace.preset.remove" => {
+                return self.handle_preset_mutation(
+                    method,
+                    params,
+                    now,
+                    require_no_active_reference,
+                );
+            }
             _ => return Err(failure("unknownMethod", "not a workspace project method")),
         };
         if fields.len() != params.len()
@@ -222,10 +302,7 @@ impl WorkspaceProjectStore {
                 .iter()
                 .any(|k| !params.get(*k).is_some_and(Value::is_string))
         {
-            return Err(failure(
-                "invalidParams",
-                "workspace project request requires its exact typed parameters",
-            ));
+            return Err(preset_mutations::invalid_params(message));
         }
         let registration = if method.ends_with(".register") {
             let request = params["registrationRequestId"].as_str().unwrap();
@@ -250,134 +327,79 @@ impl WorkspaceProjectStore {
                 "workspace project reference is malformed",
             ));
         }
-        let _transaction = self.transaction.lock().map_err(unreadable)?;
-        self.root.validate_path(&self.path).map_err(unreadable)?;
-        let lock = self.root.lock_document(LOCK).map_err(|e| {
-            if e.kind() == io::ErrorKind::WouldBlock {
-                failure("resourceConflict", "workspace project store lock is busy")
-            } else {
-                unreadable(e)
-            }
-        })?;
-        let bytes = self
-            .root
-            .read_owner_only(DOCUMENT, MAXIMUM)
-            .map_err(unreadable)?;
-        let mut document = match bytes {
-            Some(bytes) => strict_json(&bytes).map_err(unreadable)?,
-            None => {
-                json!({"schemaVersion":"arkdeck.workspace-project-store/3","records":[],"presets":[]})
-            }
-        };
-        let mut records = validate_records(&document)?;
-        lock.validate_link(&self.root, LOCK).map_err(unreadable)?;
-        self.root.validate_path(&self.path).map_err(unreadable)?;
-        if !document["pendingToolchainMutation"].is_null() {
-            return Err(failure(
-                "operationUnavailable",
-                "workspace preset dependency owners are unavailable; pending mutation is retained",
-            ));
-        }
-        if let Some((request, family, root)) = registration {
-            let digest = root_digest(family, &root);
-            let reference = format!("project-{}", &sha256_hex(request.as_bytes())[..24]);
-            if let Some(existing) = records
-                .iter()
-                .find(|r| r.registration_request_id == request)
-            {
-                if existing.registration_digest != digest || existing.project_ref != reference {
-                    return Err(failure(
-                        "idempotencyConflict",
-                        "registration request identity belongs to another project",
-                    ));
+        self.with_document(
+            || Ok(()),
+            |transaction, document| {
+                let mut next = document;
+                if let Some((request, family, root)) = registration {
+                    let digest = root_digest(family, &root);
+                    let reference = format!("project-{}", &sha256_hex(request.as_bytes())[..24]);
+                    if let Some(existing) = next
+                        .records
+                        .iter()
+                        .find(|r| r.registration_request_id == request)
+                    {
+                        if existing.registration_digest != digest
+                            || existing.project_ref != reference
+                        {
+                            return Err(failure(
+                                "idempotencyConflict",
+                                "registration request identity belongs to another project",
+                            ));
+                        }
+                        return Ok(resource(existing));
+                    }
+                    if next.records.len() >= 64 {
+                        return Err(failure(
+                            "quotaExceeded",
+                            "workspace project registration limit is reached",
+                        ));
+                    }
+                    if next
+                        .records
+                        .iter()
+                        .any(|r| r.project_ref == reference || r.root == root)
+                    {
+                        return Err(failure(
+                            "resourceConflict",
+                            "workspace root or project reference is already registered",
+                        ));
+                    }
+                    let at = preset_mutations::valid_timestamp(now)?;
+                    let record = Record {
+                        project_ref: reference,
+                        generation: 1,
+                        kind: family.into(),
+                        root: root.clone(),
+                        registration_request_id: request.into(),
+                        registration_kind: family.into(),
+                        registration_root: root,
+                        registration_digest: digest,
+                        registered_at: at.clone(),
+                        updated_at: at,
+                    };
+                    let answer = resource(&record);
+                    next.records.push(record);
+                    transaction.save(&next)?;
+                    Ok(answer)
+                } else if method.ends_with(".list") {
+                    next.records.sort_by(|a, b| a.project_ref.cmp(&b.project_ref));
+                    Ok(
+                        json!({"schemaVersion":"arkdeck.workspace-project-list/1","projects":next.records.iter().map(resource).collect::<Vec<_>>()}),
+                    )
+                } else {
+                    next.records
+                        .iter()
+                        .find(|r| Some(r.project_ref.as_str()) == params["projectRef"].as_str())
+                        .map(resource)
+                        .ok_or_else(|| {
+                            failure(
+                                "workspaceReferenceNotFound",
+                                "workspace project is not registered",
+                            )
+                        })
                 }
-                return Ok(resource(existing));
-            }
-            if records.len() >= 64 {
-                return Err(failure(
-                    "quotaExceeded",
-                    "workspace project registration limit is reached",
-                ));
-            }
-            if records
-                .iter()
-                .any(|r| r.project_ref == reference || r.root == root)
-            {
-                return Err(failure(
-                    "resourceConflict",
-                    "workspace root or project reference is already registered",
-                ));
-            }
-            if timestamp(now).is_none() {
-                return Err(failure(
-                    "recordUnreadable",
-                    "workspace project clock is unavailable",
-                ));
-            }
-            let record = Record {
-                project_ref: reference,
-                generation: 1,
-                kind: family.into(),
-                root: root.clone(),
-                registration_request_id: request.into(),
-                registration_kind: family.into(),
-                registration_root: root,
-                registration_digest: digest,
-                registered_at: now.into(),
-                updated_at: now.into(),
-            };
-            let answer = resource(&record);
-            records.push(record);
-            records.sort_by(|a, b| a.project_ref.cmp(&b.project_ref));
-            document["schemaVersion"] = json!("arkdeck.workspace-project-store/3");
-            document["records"] = serde_json::to_value(records).map_err(unreadable)?;
-            if document.get("presets").is_none() {
-                document["presets"] = json!([]);
-            }
-            let encoded = crate::session_json::encode(&document).map_err(unreadable)?;
-            if encoded.len() > MAXIMUM {
-                return Err(failure(
-                    "quotaExceeded",
-                    "workspace project store document exceeds its bound",
-                ));
-            }
-            self.root
-                .publish_document(DOCUMENT, &encoded, MAXIMUM)
-                .map_err(|e| match e {
-                    DocumentPublishError::BeforePublication(_) => failure(
-                        "ioFailure",
-                        "workspace project publication failed before commit",
-                    ),
-                    DocumentPublishError::OutcomeUnknown(_) => failure(
-                        "outcomeUnknown",
-                        "workspace project publication could not be verified",
-                    ),
-                })?;
-            lock.validate_link(&self.root, LOCK)
-                .and_then(|_| self.root.validate_path(&self.path))
-                .map_err(|_| {
-                    failure(
-                        "outcomeUnknown",
-                        "workspace project namespace changed during publication",
-                    )
-                })?;
-            Ok(answer)
-        } else if method.ends_with(".list") {
-            records.sort_by(|a, b| a.project_ref.cmp(&b.project_ref));
-            Ok(
-                json!({"schemaVersion":"arkdeck.workspace-project-list/1","projects":records.iter().map(resource).collect::<Vec<_>>()}),
-            )
-        } else {
-            records
-                .iter()
-                .find(|r| Some(r.project_ref.as_str()) == params["projectRef"].as_str())
-                .map(resource)
-                .ok_or_else(|| {
-                    failure(
-                        "workspaceReferenceNotFound",
-                        "workspace project is not registered",
-                    )
-                })
-        }
+            },
+        )
     }
 }

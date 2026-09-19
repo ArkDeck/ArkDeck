@@ -84,5 +84,15 @@ provenance.
 ## CI
 
 The PR's `guard` and `swift` aggregate are the unified gate. The Swift lane
-runs because a Swift test changed; the Rust lane runs because contract inputs
-changed. Their result is added here once the PR is green.
+ran because a Swift test changed; the Rust lane ran because contract inputs
+changed. Both were green at head `dfdf5fe4`, and #2041 merged as `3e95ac6d`.
+This result is recorded by the next slice, #2041's Rust port.
+
+| Workflow run | Job | Result |
+|---|---|---|
+| Swift CI 35447197759 | `swift` aggregate | pass |
+| Swift CI 35447197759 | `swift-tests` | pass (5m56s) |
+| Swift CI 35447197759 | Rust workspace on macos-26, ubuntu-latest and windows-latest; host-independent checks | pass (12m23s, 2m52s, 5m3s, 26s) |
+| Swift CI 35447197759 | `app-build` | skipped by the plan |
+| SDD Guard 35447197591 | `guard`, `ds-tokens` | pass |
+| Agent PR 35447197611 | `open-pr` | pass |

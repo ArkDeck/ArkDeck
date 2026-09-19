@@ -4,6 +4,8 @@
 pub(crate) mod import_references;
 #[path = "job_retention_census.rs"]
 mod retention_census;
+#[path = "workspace_references.rs"]
+mod workspace_references;
 use crate::job_record::{JobRecord, STATES, digest, failure, unreadable};
 use crate::job_repository::{
     AdmissionVerdict, JobRepository, JobWriteError, identifier, order_key,
