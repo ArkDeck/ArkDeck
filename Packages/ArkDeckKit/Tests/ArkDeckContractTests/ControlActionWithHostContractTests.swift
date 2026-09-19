@@ -30,7 +30,19 @@ import XCTest
 /// Job gate left unknown, with its reason, by a Target inventory that changed
 /// while the impact was read: the fixture port removes the durable Target
 /// document while the device list is read, so no Job, Target or device row
-/// remains to name.
+/// remains to name. An unsigned tool (the HDC oracles' shell driver, which
+/// nothing runs) is previewed with no signing identity at all.
+///
+/// `runtime.hdc.restart` requests the impact approval of a ready preview. No
+/// fixture preview is ready: only the registered 3.2.0d server proves its
+/// health, by a `checkserver` that would have to run. The restart tests read
+/// the impact through `RegisteredHealthyServer`, which answers that server's
+/// facts over the production reading of everything else. They request the
+/// approval, repeat and refuse the request, read the approval through the
+/// control-action routes and the human-action union owner (composed as the
+/// daemon composes it), and let it drift and expire. Nothing resumes it: no
+/// challenge is issued, no lifecycle driver is composed and nothing is
+/// dispatched.
 final class ControlActionWithHostContractTests: XCTestCase {
   /// 2026-09-19T00:00:00Z, as the records spell it.
   private static let start = Date(timeIntervalSince1970: 1_789_776_000)
@@ -38,6 +50,18 @@ final class ControlActionWithHostContractTests: XCTestCase {
   private static let intentRequired = "an exact restart intent and request identity are required"
   private static let endpointMissing = "the exact HDC endpoint reference is not configured"
   private static let otherIntent = "the request identity belongs to a different lifecycle intent"
+  private static let tupleRequired = "restart requires one exact control-action preview tuple"
+  private static let actionMissing = "control action does not exist"
+  private static let otherPreview = "restart does not name the exact immutable preview"
+  private static let ineligible = "the control action is not eligible for impact approval"
+  private static let unprovenImpact = "fresh HDC impact could not be proven"
+  private static let differentImpact = "fresh HDC impact differs from the reviewed preview"
+  private static let clockBackwards = "control-action clock moved backwards"
+  /// What the production inspection reads from an unsigned executable.
+  private static let unsignedSignature: JSONValue = .object([
+    "state": .string("unsigned"), "identifier": .null, "teamIdentifier": .null,
+    "platformTrust": .string("unverified"), "executionAssessment": .string("notPerformed"),
+  ])
   private static let reference =
     "hdc-endpoint:" + SHA256Hex.string(of: Data("127.0.0.1:8710".utf8))
   private var root: URL!
@@ -112,8 +136,43 @@ final class ControlActionWithHostContractTests: XCTestCase {
     var unionSnapshots: URL { state.appending(path: "control-action-snapshots") }
   }
 
+  /// What only a registered 3.2.0d server proves, which no fixture can.
+  /// `HDCControlServerObserver` proves a server's health only for the
+  /// registered 3.2.0d executable: its commandless identity, a `checkserver`
+  /// in the healthy family, the same identity again. Every other digest,
+  /// the fixture's among them, proves no health, so its previews are never
+  /// ready. This source reads through the production source (the executable's
+  /// path, digest and signature, the Jobs, the Targets and the devices) and
+  /// then answers what that observation gives such a server: generation
+  /// 100000023, health healthy, version 3.2.0d, no blocker. The tool's client
+  /// version is the one the registered digest names, 3.2.0d: only that
+  /// executable proves health, so every ready preview carries it. With no
+  /// launch record the ownership stays unknown, as the production source
+  /// derives it.
+  private struct RegisteredHealthyServer: HDCControlImpactObserving {
+    let source: HeadlessHDCControlImpactSource
+    var endpointReference: String { source.endpointReference }
+
+    func readImpact() async throws -> HDCControlImpactReading {
+      let reading = try await source.readImpact()
+      var facts = reading.impact.value
+      facts["serverGeneration"] = .string("100000023")
+      facts["serverHealth"] = .string("healthy")
+      facts["serverVersion"] = .string("3.2.0d")
+      if case .object(var tool)? = facts["tool"] {
+        tool["version"] = .string("3.2.0d")
+        facts["tool"] = .object(tool)
+      }
+      return .init(
+        impact: try HDCControlImpact(facts), observationRelations: reading.observationRelations,
+        blockerReasonCode: nil)
+    }
+  }
+
   /// One daemon start over the host: the HDC control-action owner with a fresh
-  /// epoch, the union owner over it (no tool-selection owner), and the handler.
+  /// epoch, the union owner over it (no tool-selection owner), the
+  /// human-action union owner over the AgentExecution owner and that union
+  /// owner, and the handler.
   private struct Daemon {
     let handler: RuntimeControlPlaneHandler
     let owner: RuntimeHDCControlActionCoordinator
@@ -183,17 +242,27 @@ final class ControlActionWithHostContractTests: XCTestCase {
   /// A daemon start, as `ArkDeckAgentDaemonMain` composes it once its HDC
   /// server host started (without the tool-selection owner, which holds no
   /// action here, and without the lifecycle driver, which only an approved
-  /// restart reaches).
-  private func start(_ host: Host, clock: Clock) throws -> Daemon {
+  /// restart reaches). With `healthy`, the owner reads the impact through
+  /// `RegisteredHealthyServer`.
+  private func start(_ host: Host, clock: Clock, healthy: Bool = false) throws -> Daemon {
+    let source: any HDCControlImpactObserving =
+      healthy ? RegisteredHealthyServer(source: host.source) : host.source
     let owner = try RuntimeHDCControlActionCoordinator(
-      directory: host.state.appending(path: "hdc-control-actions"), source: host.source,
+      directory: host.state.appending(path: "hdc-control-actions"), source: source,
       catalogDigest: RuntimeOperationCatalog.catalogDigest, now: { clock.now() })
     let controls = try RuntimeControlActionResourceCoordinator(
       directory: host.unionSnapshots, hdc: owner, tools: nil)
+    let agents = try RuntimeAgentExecutionCoordinator(
+      directory: host.state.appending(path: "agent-executions"), engine: host.engine,
+      targets: host.targets, observations: host.observations)
+    let humanActions = try RuntimeHumanActionResourceCoordinator(
+      directory: host.state.appending(path: "human-action-snapshots"), agents: agents,
+      controlResources: controls)
     let handler = RuntimeControlPlaneHandler(
       engine: host.engine, capabilityStore: host.capabilities, providerIDs: [],
       nowUTC: { "2026-09-19T00:00:00Z" }, targetStore: host.targets,
-      targetObservations: host.observations, hdcControlActions: owner,
+      targetObservations: host.observations, agentExecutions: agents,
+      humanActionResources: humanActions, hdcControlActions: owner,
       toolSelectionActions: nil, controlActions: controls)
     return Daemon(handler: handler, owner: owner)
   }
@@ -236,10 +305,12 @@ final class ControlActionWithHostContractTests: XCTestCase {
   }
 
   /// The record's projection: its identity, the request it answers, and the
-  /// facts a state change moves.
+  /// facts a state change moves. What to do next follows the state: inspect a
+  /// ready preview, answer the approval an awaiting action names, reconcile
+  /// anything else.
   private func assertRecord(
     _ record: [String: JSONValue], request: String, state: String, generation: String,
-    blocker: String, created: Date, observed: Date,
+    blocker: String?, created: Date, observed: Date, humanAction: JSONValue = .null,
     file: StaticString = #filePath, line: UInt = #line
   ) throws {
     let id = try XCTUnwrap(Self.string(record["controlActionId"]), file: file, line: line)
@@ -275,22 +346,37 @@ final class ControlActionWithHostContractTests: XCTestCase {
       record["expiresAt"], .string(Self.timestamp(created.addingTimeInterval(300))),
       file: file, line: line)
     XCTAssertEqual(record["lastObservedAt"], .string(Self.timestamp(observed)), file: file, line: line)
-    XCTAssertEqual(record["blockerReasonCode"], .string(blocker), file: file, line: line)
-    XCTAssertEqual(record["humanAction"], .null, file: file, line: line)
+    let reason: JSONValue = blocker.map(JSONValue.string) ?? .null
+    XCTAssertEqual(record["blockerReasonCode"], reason, file: file, line: line)
+    XCTAssertEqual(record["humanAction"], humanAction, file: file, line: line)
     XCTAssertEqual(record["dispatchCount"], .integer(0), file: file, line: line)
-    XCTAssertEqual(
-      record["nextAction"],
-      .object([
-        "kind": .string("reconcile"), "owner": owner, "resource": owner,
-        "reasonCode": .string(blocker),
-      ]), file: file, line: line)
+    let next: [String: JSONValue]
+    let approvalID: JSONValue = Self.object(humanAction)?["actionId"] ?? .null
+    switch state {
+    case "previewReady":
+      next = [
+        "kind": .string("inspectControlAction"), "owner": owner, "resource": owner,
+        "reasonCode": .string("controlAction.previewAvailable"),
+      ]
+    case "awaitingImpactApproval":
+      next = [
+        "kind": .string("humanAction"), "owner": owner,
+        "resource": .object(["kind": .string("humanAction"), "id": approvalID]),
+        "reasonCode": .string("policy.impactApprovalRequired"),
+      ]
+    default:
+      next = ["kind": .string("reconcile"), "owner": owner, "resource": owner, "reasonCode": reason]
+    }
+    XCTAssertEqual(record["nextAction"], .object(next), file: file, line: line)
   }
 
-  /// The preview a fixture HDC yields: no generation, version or health, the
-  /// fixture's digest and native signature, an empty participant set, and
-  /// the critical Job gate, clear unless the inventory changed during the read.
-  private func assertUnprovedPreview(
-    _ record: [String: JSONValue], host: Host, created: Date,
+  /// The preview a fixture HDC yields: no generation, version or health, and
+  /// no client version (or, when `proved`, those `RegisteredHealthyServer`
+  /// answers), the tool's digest and native signature, an empty participant
+  /// set, and the critical Job gate, clear unless the inventory changed during
+  /// the read.
+  private func assertPreview(
+    _ record: [String: JSONValue], host: Host, created: Date, proved: Bool = false,
     gate: JSONValue = .object([
       "state": .string("clear"), "blocking": .array([]), "reasonCode": .null,
     ]),
@@ -318,6 +404,9 @@ final class ControlActionWithHostContractTests: XCTestCase {
       digest,
       .string(SHA256Hex.string(of: try PortableCanonicalJSON.canonicalBytes(.object(digested)))),
       file: file, line: line)
+    let generation: JSONValue = proved ? .string("100000023") : .null
+    let health: JSONValue = .string(proved ? "healthy" : "unknown")
+    let version: JSONValue = proved ? .string("3.2.0d") : .null
     XCTAssertEqual(
       preview,
       [
@@ -328,12 +417,12 @@ final class ControlActionWithHostContractTests: XCTestCase {
         "confirmationRequired": .bool(true), "dispatchCount": .integer(0),
         "digestAlgorithm": .string("sha256-jcs"), "previewDigest": digest,
         "serverEndpointRef": .string(Self.reference), "endpoint": .string("127.0.0.1:8710"),
-        "serverOwnership": .string("unknown"), "serverGeneration": .null,
-        "serverHealth": .string("unknown"), "serverVersion": .null,
+        "serverOwnership": .string("unknown"), "serverGeneration": generation,
+        "serverHealth": health, "serverVersion": version,
         "tool": .object([
           "reference": .null, "executablePath": .string(host.executable.path),
           "source": .string("runtimeConfiguration"), "sha256": .string(host.executable.sha256),
-          "signature": .object(signature), "version": .null, "trust": .string("unverified"),
+          "signature": .object(signature), "version": version, "trust": .string("unverified"),
         ]),
         "affectedTargetIds": .array([]), "affectedJobIds": .array([]),
         "detectedOtherClientIds": .array([]), "otherClientsMayExist": .bool(true),
@@ -415,7 +504,7 @@ final class ControlActionWithHostContractTests: XCTestCase {
     try assertRecord(
       blocked, request: "host-blocked", state: "blocked", generation: "2",
       blocker: "hdc.serverIdentityUnproven", created: Self.start, observed: Self.start)
-    try assertUnprovedPreview(blocked, host: host, created: Self.start)
+    try assertPreview(blocked, host: host, created: Self.start)
     XCTAssertEqual(host.port.listCount, 2)
 
     // A lost receipt returns the same action without observing again; the
@@ -581,7 +670,7 @@ final class ControlActionWithHostContractTests: XCTestCase {
     try assertRecord(
       preview, request: "host-team-signed", state: "blocked", generation: "2",
       blocker: "hdc.serverIdentityUnproven", created: Self.start, observed: Self.start)
-    try assertUnprovedPreview(preview, host: host, created: Self.start)
+    try assertPreview(preview, host: host, created: Self.start)
     // The tool's signature is its static signing facts as read: verified,
     // with the team that signed it.
     let tool = try XCTUnwrap(Self.object(Self.object(preview["preview"])?["tool"]))
@@ -611,7 +700,7 @@ final class ControlActionWithHostContractTests: XCTestCase {
     // The gate is unknown, with its reason, although no Job, Target or device
     // remains to name: every Target the preview names is one read after the
     // devices, and none is left.
-    try assertUnprovedPreview(
+    try assertPreview(
       preview, host: host, created: Self.start,
       gate: .object([
         "state": .string("unknown"), "blocking": .array([]),
@@ -623,5 +712,412 @@ final class ControlActionWithHostContractTests: XCTestCase {
     try adopted.write(to: document)
     try await assertReadReconciledAndListed(preview, daemon: daemon, host: host)
     XCTAssertTrue(try host.targets.list().isEmpty)
+  }
+
+  /// The HDC oracles' unsigned shell driver, which nothing here runs.
+  private func unsignedTool() throws -> URL {
+    let driver = root.appending(path: "unsigned-hdc")
+    try HDCOracleFake.driver.write(to: driver)
+    XCTAssertEqual(chmod(driver.path, 0o700), 0)
+    return driver
+  }
+
+  func testAnUnsignedToolIsPreviewedWithoutASigningIdentity() async throws {
+    let host = try makeHost(tool: try unsignedTool())
+    XCTAssertEqual(
+      try HeadlessHDCStatusObserver.signature(URL(filePath: host.executable.path)),
+      Self.unsignedSignature)
+    let daemon = try start(host, clock: Clock(Self.start))
+
+    let preview = try await daemon.answer(
+      "runtime.hdc.impact-preview", intent("host-unsigned"))
+    try assertRecord(
+      preview, request: "host-unsigned", state: "blocked", generation: "2",
+      blocker: "hdc.serverIdentityUnproven", created: Self.start, observed: Self.start)
+    try assertPreview(preview, host: host, created: Self.start)
+    // The tool's signature names no signing identity and no team.
+    let tool = try XCTUnwrap(Self.object(Self.object(preview["preview"])?["tool"]))
+    XCTAssertEqual(tool["signature"], Self.unsignedSignature)
+    try await assertReadReconciledAndListed(preview, daemon: daemon, host: host)
+    // Its exact tuple names a blocked preview, which is not eligible for an
+    // impact approval.
+    assertRefused(
+      try await daemon.send("runtime.hdc.restart", tuple(preview)), "admissionDenied",
+      Self.ineligible)
+    XCTAssertEqual(host.port.listCount, 2, "a refused restart observes nothing")
+  }
+
+  // MARK: restart
+
+  /// The restart tuple naming a record's exact preview.
+  private func tuple(_ record: [String: JSONValue]) throws -> [String: JSONValue] {
+    let preview = try XCTUnwrap(Self.object(record["preview"]))
+    return [
+      "controlAction": try XCTUnwrap(record["controlActionId"]),
+      "previewId": try XCTUnwrap(preview["previewId"]),
+      "previewDigest": try XCTUnwrap(preview["previewDigest"]),
+    ]
+  }
+
+  /// A preview `RegisteredHealthyServer` proves: ready at generation 2.
+  private func readyPreview(
+    _ daemon: Daemon, host: Host, request: String, at created: Date,
+    file: StaticString = #filePath, line: UInt = #line
+  ) async throws -> [String: JSONValue] {
+    let ready = try await daemon.answer(
+      "runtime.hdc.impact-preview", intent(request), file: file, line: line)
+    try assertRecord(
+      ready, request: request, state: "previewReady", generation: "2", blocker: nil,
+      created: created, observed: created, file: file, line: line)
+    try assertPreview(ready, host: host, created: created, proved: true, file: file, line: line)
+    return ready
+  }
+
+  /// The impact approval a restart requests: owned by the control action,
+  /// bound to its exact preview and to the generation that awaits it, and
+  /// closing with the preview. Returns its identity.
+  @discardableResult
+  private func assertApproval(
+    _ value: JSONValue?, of record: [String: JSONValue], generation: String, created: Date,
+    status: String, file: StaticString = #filePath, line: UInt = #line
+  ) throws -> String {
+    let approval = try XCTUnwrap(Self.object(value), file: file, line: line)
+    let id = try XCTUnwrap(Self.string(approval["actionId"]), file: file, line: line)
+    XCTAssertTrue(id.hasPrefix("har-"), id, file: file, line: line)
+    let resume = try XCTUnwrap(Self.string(approval["resumeReference"]), file: file, line: line)
+    XCTAssertTrue(resume.hasPrefix("resume-"), resume, file: file, line: line)
+    let preview = try XCTUnwrap(Self.object(record["preview"]), file: file, line: line)
+    let action: JSONValue = record["controlActionId"] ?? .null
+    let expires: JSONValue = record["expiresAt"] ?? .null
+    let previewID: JSONValue = preview["previewId"] ?? .null
+    let digest: JSONValue = preview["previewDigest"] ?? .null
+    let binding: JSONValue = .object([
+      "controlActionId": action, "previewId": previewID, "previewDigest": digest,
+      "generation": .string(generation),
+    ])
+    XCTAssertEqual(
+      approval,
+      [
+        "schemaVersion": .string("arkdeck.human-action/1"), "actionId": .string(id),
+        "owner": .object(["kind": .string("controlAction"), "id": action]),
+        "resumeReference": .string(resume), "category": .string("impactApproval"),
+        "reasonCode": .string("policy.impactApprovalRequired"),
+        "minimumAction": .string("human.reviewImpact"),
+        "prohibitedAutomation": .array([.string("selfApproval")]),
+        "createdAt": .string(Self.timestamp(created)), "expiresAt": expires,
+        "status": .string(status), "newDispatchCount": .integer(0), "selectionSchema": .null,
+        "choices": .array([]), "binding": binding,
+      ], file: file, line: line)
+    return id
+  }
+
+  /// A restart refused because the fresh impact is not the reviewed one: no
+  /// approval, and the action it invalidated in the refusal's details, which
+  /// this returns.
+  private func assertDrifted(
+    _ response: AgentWireProtocol.Response, _ message: String,
+    file: StaticString = #filePath, line: UInt = #line
+  ) throws -> [String: JSONValue] {
+    XCTAssertFalse(response.ok, file: file, line: line)
+    XCTAssertNil(response.result, file: file, line: line)
+    XCTAssertEqual(response.error?.code, "factsDrifted", file: file, line: line)
+    XCTAssertEqual(response.error?.message, message, file: file, line: line)
+    let details = try XCTUnwrap(response.error?.details, file: file, line: line)
+    XCTAssertEqual(Set(details.keys), ["controlAction", "newDispatchCount"], file: file, line: line)
+    XCTAssertEqual(details["newDispatchCount"], .integer(0), file: file, line: line)
+    return try XCTUnwrap(Self.object(details["controlAction"]), file: file, line: line)
+  }
+
+  func testRestartOfAReadyPreviewRequestsItsImpactApprovalOnce() async throws {
+    let host = try makeHost()
+    let clock = Clock(Self.start)
+    let daemon = try start(host, clock: clock, healthy: true)
+    let ready = try await readyPreview(daemon, host: host, request: "host-restart", at: Self.start)
+    XCTAssertEqual(host.port.listCount, 1)
+    let id = try XCTUnwrap(Self.string(ready["controlActionId"]))
+    let exact = try tuple(ready)
+    let restart = "runtime.hdc.restart"
+
+    // The request is exactly the tuple, each member an exact identity or a
+    // lowercase digest.
+    assertRefused(try await daemon.send(restart, [:]), "invalidInput", Self.tupleRequired)
+    var uppercase = exact
+    uppercase["previewDigest"] = .string((Self.string(exact["previewDigest"]) ?? "").uppercased())
+    assertRefused(try await daemon.send(restart, uppercase), "invalidInput", Self.tupleRequired)
+    // An action no record holds; this action with another digest or preview.
+    var unknown = exact
+    unknown["controlAction"] = .string("control-action-" + UUID().uuidString.lowercased())
+    assertRefused(try await daemon.send(restart, unknown), "resourceNotFound", Self.actionMissing)
+    var otherDigest = exact
+    otherDigest["previewDigest"] = .string(String(repeating: "0", count: 64))
+    assertRefused(
+      try await daemon.send(restart, otherDigest), "reviewedPlanMismatch", Self.otherPreview)
+    var otherPreviewID = exact
+    otherPreviewID["previewId"] = .string("preview-" + UUID().uuidString.lowercased())
+    assertRefused(
+      try await daemon.send(restart, otherPreviewID), "reviewedPlanMismatch", Self.otherPreview)
+    // No refusal observes or changes the action (asked of the owner, so
+    // nothing is recorded).
+    XCTAssertEqual(host.port.listCount, 1, "no refusal observes")
+    let unchanged = try await daemon.owner.show(id)
+    XCTAssertEqual(unchanged, .object(ready))
+
+    // The exact tuple, half a minute after the preview: the fresh impact is
+    // the reviewed one, so the action awaits its impact approval.
+    clock.advance(30)
+    let requested = clock.now()
+    let awaiting = try await daemon.answer(restart, exact)
+    XCTAssertEqual(host.port.listCount, 2, "the restart observed the impact again")
+    let approval = try assertApproval(
+      awaiting["humanAction"], of: awaiting, generation: "3", created: requested,
+      status: "waiting")
+    try assertRecord(
+      awaiting, request: "host-restart", state: "awaitingImpactApproval", generation: "3",
+      blocker: nil, created: Self.start, observed: requested,
+      humanAction: awaiting["humanAction"] ?? .null)
+    XCTAssertEqual(awaiting["preview"], ready["preview"])
+
+    // A lost receipt answers the same approval without observing again;
+    // another digest still names no preview of this action.
+    let repeated = try await daemon.answer(restart, exact)
+    XCTAssertEqual(repeated, awaiting)
+    XCTAssertEqual(host.port.listCount, 2)
+    assertRefused(
+      try await daemon.send(restart, otherDigest), "reviewedPlanMismatch", Self.otherPreview)
+    // The preview's request identity, sent again, answers the action as it
+    // now is, observed no more.
+    let previewedAgain = try await daemon.answer(
+      "runtime.hdc.impact-preview", intent("host-restart"))
+    XCTAssertEqual(previewedAgain, awaiting)
+    XCTAssertEqual(host.port.listCount, 2)
+
+    // Read, reconciled over the same impact without a change, and listed,
+    // whole and by its state.
+    let shown = try await daemon.answer("control-action.show", ["controlAction": .string(id)])
+    XCTAssertEqual(shown, awaiting)
+    let reconciled = try await daemon.answer(
+      "control-action.reconcile", ["controlAction": .string(id)])
+    XCTAssertEqual(reconciled, awaiting)
+    XCTAssertEqual(host.port.listCount, 3, "reconciling observed again")
+    let filterSets: [[String: JSONValue]] = [[:], ["state": .string("awaitingImpactApproval")]]
+    for filters in filterSets {
+      let page = try await daemon.answer("control-action.list", filters)
+      XCTAssertEqual(page["items"], .array([.object(awaiting)]), "\(filters)")
+      XCTAssertEqual(page["hasMore"], .bool(false), "\(filters)")
+    }
+
+    // The human-action union owner serves the approval as the control action
+    // projects it.
+    let projected: JSONValue = awaiting["humanAction"] ?? .null
+    let shownApproval = try await daemon.answer(
+      "human-action.show", ["humanAction": .string(approval)])
+    XCTAssertEqual(JSONValue.object(shownApproval), projected)
+    let approvals = try await daemon.answer(
+      "human-action.list", ["ownerKind": .string("controlAction"), "owner": .string(id)])
+    XCTAssertEqual(approvals["items"], JSONValue.array([projected]))
+
+    // A clock behind the action's last observation is refused before any read.
+    clock.advance(-1)
+    assertRefused(
+      try await daemon.send(restart, exact), "orchestrationClockUntrusted", Self.clockBackwards)
+    XCTAssertEqual(host.port.listCount, 3)
+
+    // One owner-only record; nothing dispatched, no Job and no Target.
+    let recordFile = "action-" + SHA256Hex.string(of: Data("host-restart".utf8)) + ".json"
+    XCTAssertEqual(try names(host.records), [".lock", recordFile])
+    XCTAssertEqual(host.dispatcher.dispatchCount, 0)
+    let jobs = try await host.engine.listJobs()
+    XCTAssertTrue(jobs.isEmpty)
+    XCTAssertTrue(try host.targets.list().isEmpty)
+  }
+
+  func testRestartIsRefusedWhenTheFreshImpactIsUnprovenOrNotTheReviewedOne() async throws {
+    let host = try makeHost()
+    let clock = Clock(Self.start)
+    let daemon = try start(host, clock: clock, healthy: true)
+    let restart = "runtime.hdc.restart"
+    let unproven = try await readyPreview(
+      daemon, host: host, request: "host-restart-unproven", at: Self.start)
+    let drifted = try await readyPreview(
+      daemon, host: host, request: "host-restart-drifted", at: Self.start)
+    clock.advance(30)
+    let refusedAt = clock.now()
+
+    // The fresh observation fails: no approval is requested, and the action is
+    // invalidated with that reason, its reviewed preview kept.
+    host.port.setAnswers(false)
+    let failed = try assertDrifted(
+      try await daemon.send(restart, tuple(unproven)), Self.unprovenImpact)
+    try assertRecord(
+      failed, request: "host-restart-unproven", state: "previewDrifted", generation: "3",
+      blocker: "hdc.impactObservationUnavailable", created: Self.start, observed: refusedAt)
+    XCTAssertEqual(failed["preview"], unproven["preview"])
+    let durable = try await daemon.owner.show(try XCTUnwrap(Self.string(failed["controlActionId"])))
+    XCTAssertEqual(durable, .object(failed))
+    // An invalidated action is not eligible for an impact approval.
+    assertRefused(
+      try await daemon.send(restart, tuple(unproven)), "admissionDenied", Self.ineligible)
+    host.port.setAnswers(true)
+
+    // A Target adopted after the review: the fresh impact names it, the
+    // reviewed preview does not.
+    _ = try host.targets.adopt(
+      stableIdentitySHA256: String(repeating: "d", count: 64), connectKey: "synthetic-adopted",
+      toolVersion: "fixture", nowUTC: "2026-09-19T00:00:30Z")
+    let changed = try assertDrifted(
+      try await daemon.send(restart, tuple(drifted)), Self.differentImpact)
+    try assertRecord(
+      changed, request: "host-restart-drifted", state: "previewDrifted", generation: "3",
+      blocker: "hdc.previewDrifted", created: Self.start, observed: refusedAt)
+    XCTAssertEqual(changed["preview"], drifted["preview"])
+    XCTAssertEqual(host.port.listCount, 4, "each restart observed once")
+    XCTAssertEqual(host.dispatcher.dispatchCount, 0)
+    let jobs = try await host.engine.listJobs()
+    XCTAssertTrue(jobs.isEmpty)
+  }
+
+  func testAnAwaitedImpactApprovalDriftsOrExpiresWithoutDispatch() async throws {
+    let host = try makeHost()
+    let clock = Clock(Self.start)
+    let daemon = try start(host, clock: clock, healthy: true)
+    let restart = "runtime.hdc.restart"
+    let expiring = try await readyPreview(
+      daemon, host: host, request: "host-approval-expiring", at: Self.start)
+    clock.advance(1)
+    let driftingAt = clock.now()
+    let drifting = try await readyPreview(
+      daemon, host: host, request: "host-approval-drifting", at: driftingAt)
+    clock.advance(29)
+    let requested = clock.now()
+    let expiringID = try XCTUnwrap(Self.string(expiring["controlActionId"]))
+    let driftingID = try XCTUnwrap(Self.string(drifting["controlActionId"]))
+    let awaitingExpiring = try await daemon.answer(restart, tuple(expiring))
+    let expiringApproval = try assertApproval(
+      awaitingExpiring["humanAction"], of: awaitingExpiring, generation: "3",
+      created: requested, status: "waiting")
+    let awaitingDrifting = try await daemon.answer(restart, tuple(drifting))
+    let driftingApproval = try assertApproval(
+      awaitingDrifting["humanAction"], of: awaitingDrifting, generation: "3",
+      created: requested, status: "waiting")
+
+    // The impact changes while the approval is awaited: reconciling reads it
+    // again, invalidates the action and expires its approval.
+    _ = try host.targets.adopt(
+      stableIdentitySHA256: String(repeating: "d", count: 64), connectKey: "synthetic-adopted",
+      toolVersion: "fixture", nowUTC: "2026-09-19T00:00:30Z")
+    clock.advance(30)
+    let driftedAt = clock.now()
+    let drifted = try await daemon.answer(
+      "control-action.reconcile", ["controlAction": .string(driftingID)])
+    try assertApproval(
+      drifted["humanAction"], of: drifted, generation: "3", created: requested,
+      status: "expired")
+    try assertRecord(
+      drifted, request: "host-approval-drifting", state: "previewDrifted", generation: "4",
+      blocker: "hdc.previewDrifted", created: driftingAt, observed: driftedAt,
+      humanAction: drifted["humanAction"] ?? .null)
+    XCTAssertEqual(drifted["preview"], drifting["preview"])
+    let shownDrifted = try await daemon.answer(
+      "control-action.show", ["controlAction": .string(driftingID)])
+    XCTAssertEqual(shownDrifted, drifted)
+    let expiredDrifting = try await daemon.answer(
+      "human-action.show", ["humanAction": .string(driftingApproval)])
+    XCTAssertEqual(drifted["humanAction"], JSONValue.object(expiredDrifting))
+    assertRefused(
+      try await daemon.send(restart, tuple(drifting)), "admissionDenied", Self.ineligible)
+
+    // The approval closes with its preview, 300 seconds after the preview was
+    // made; reading the action then expires both.
+    clock.advance(240)
+    let expiredAt = clock.now()
+    XCTAssertEqual(expiredAt, Self.start.addingTimeInterval(300))
+    let expired = try await daemon.answer(
+      "control-action.show", ["controlAction": .string(expiringID)])
+    try assertApproval(
+      expired["humanAction"], of: expired, generation: "3", created: requested,
+      status: "expired")
+    try assertRecord(
+      expired, request: "host-approval-expiring", state: "expired", generation: "4",
+      blocker: "controlAction.expired", created: Self.start, observed: expiredAt,
+      humanAction: expired["humanAction"] ?? .null)
+    XCTAssertEqual(expired["preview"], expiring["preview"])
+    let reconciledExpired = try await daemon.answer(
+      "control-action.reconcile", ["controlAction": .string(expiringID)])
+    XCTAssertEqual(reconciledExpired, expired)
+    let expiredApproval = try await daemon.answer(
+      "human-action.show", ["humanAction": .string(expiringApproval)])
+    XCTAssertEqual(expired["humanAction"], JSONValue.object(expiredApproval))
+    assertRefused(
+      try await daemon.send(restart, tuple(expiring)), "admissionDenied", Self.ineligible)
+    let listed = try await daemon.answer("control-action.list", [:])
+    XCTAssertEqual(listed["items"], .array([.object(expired), .object(drifted)]))
+
+    // Two previews, two restarts and one reconciliation observed; nothing was
+    // dispatched.
+    XCTAssertEqual(host.port.listCount, 5)
+    XCTAssertEqual(host.dispatcher.dispatchCount, 0)
+    let jobs = try await host.engine.listJobs()
+    XCTAssertTrue(jobs.isEmpty)
+  }
+
+  /// A ready preview of `host`'s tool awaits its approval with the tool's
+  /// signature as read, and another's restart, refused once the observation
+  /// fails, keeps that signature in the action it invalidated.
+  private func assertRestartKeepsTheSignature(
+    of host: Host, request: String, signature: JSONValue,
+    file: StaticString = #filePath, line: UInt = #line
+  ) async throws {
+    let clock = Clock(Self.start)
+    let daemon = try start(host, clock: clock, healthy: true)
+    let ready = try await readyPreview(
+      daemon, host: host, request: request, at: Self.start, file: file, line: line)
+    let other = try await readyPreview(
+      daemon, host: host, request: request + "-unproven", at: Self.start, file: file, line: line)
+    let tool = try XCTUnwrap(
+      Self.object(Self.object(ready["preview"])?["tool"]), file: file, line: line)
+    XCTAssertEqual(tool["signature"], signature, file: file, line: line)
+    clock.advance(30)
+    let requested = clock.now()
+    let awaiting = try await daemon.answer(
+      "runtime.hdc.restart", tuple(ready), file: file, line: line)
+    try assertApproval(
+      awaiting["humanAction"], of: awaiting, generation: "3", created: requested,
+      status: "waiting", file: file, line: line)
+    try assertRecord(
+      awaiting, request: request, state: "awaitingImpactApproval", generation: "3",
+      blocker: nil, created: Self.start, observed: requested,
+      humanAction: awaiting["humanAction"] ?? .null, file: file, line: line)
+    XCTAssertEqual(awaiting["preview"], ready["preview"], file: file, line: line)
+    host.port.setAnswers(false)
+    let invalid = try assertDrifted(
+      try await daemon.send("runtime.hdc.restart", tuple(other)), Self.unprovenImpact,
+      file: file, line: line)
+    try assertRecord(
+      invalid, request: request + "-unproven", state: "previewDrifted", generation: "3",
+      blocker: "hdc.impactObservationUnavailable", created: Self.start, observed: requested,
+      file: file, line: line)
+    XCTAssertEqual(invalid["preview"], other["preview"], file: file, line: line)
+    XCTAssertEqual(host.dispatcher.dispatchCount, 0, file: file, line: line)
+  }
+
+  func testAnUnsignedToolsRestartKeepsItsSignature() async throws {
+    try await assertRestartKeepsTheSignature(
+      of: try makeHost(tool: try unsignedTool()), request: "host-unsigned-restart",
+      signature: Self.unsignedSignature)
+  }
+
+  func testATeamSignedToolsRestartKeepsItsTeamIdentifier() async throws {
+    let published = HDCStatusControlFramesContractTests.teamSignedExecutable
+    guard FileManager.default.fileExists(atPath: published.path) else {
+      throw XCTSkip("DevEco is not installed; no team-signed executable to preview")
+    }
+    let host = try makeHost(tool: published)
+    guard
+      case .object(let signature) = try HeadlessHDCStatusObserver.signature(
+        URL(filePath: host.executable.path)),
+      case .string(_)? = signature["teamIdentifier"]
+    else { throw XCTSkip("the DevEco executable carries no team identifier") }
+    try await assertRestartKeepsTheSignature(
+      of: host, request: "host-team-signed-restart", signature: .object(signature))
   }
 }
