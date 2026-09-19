@@ -19,7 +19,43 @@ pub(crate) fn configure(
             "Import requires its exact request identity, owner and options",
         )
     };
-    if command == "artifact.import.inspect" {
+    if command == "artifact.import.list" {
+        if let Some(size) = fields.remove("pageSize") {
+            let size = size
+                .as_str()
+                .and_then(|s| s.parse::<u64>().ok())
+                .filter(|n| (1..=1000).contains(n))
+                .ok_or_else(invalid)?;
+            fields.insert("pageSize".into(), json!(size));
+        }
+        if let Some(target) = fields.remove("targetId") {
+            fields.insert("target".into(), target);
+        }
+        if fields
+            .get("target")
+            .is_some_and(|v| !v.as_str().is_some_and(arkdeck_contract::import_identifier))
+            || fields.get("state").is_some_and(|v| {
+                !v.as_str().is_some_and(|s| {
+                    [
+                        "inProgress",
+                        "committing",
+                        "committed",
+                        "aborted",
+                        "released",
+                    ]
+                    .contains(&s)
+                })
+            })
+            || fields
+                .get("pageSize")
+                .is_some_and(|v| !v.as_u64().is_some_and(|n| (1..=1000).contains(&n)))
+            || fields
+                .get("cursor")
+                .is_some_and(|v| !v.as_str().is_some_and(|s| !s.is_empty() && s.len() <= 2048))
+        {
+            return Err(invalid());
+        }
+    } else if command == "artifact.import.inspect" {
         if fields.contains_key("import") == fields.contains_key("importRequestId") {
             return Err(invalid());
         }
@@ -108,6 +144,60 @@ pub fn execute_import(
     let mut send = |method: &str, params: Map<String, Value>| request(method, params, remaining()?);
     let fields = invocation.params.as_ref().ok_or_else(invalid)?;
     let result = (|| {
+        if invocation.command == "artifact.import.list" {
+            let value = send(invocation.method, fields.clone())?;
+            arkdeck_contract::validate_method_value(invocation.method, "result", &value)
+                .map_err(|_| invalid())?;
+            let revision = value["snapshotRevision"]
+                .as_str()
+                .filter(|s| crate::session_resources::uuid(s))
+                .ok_or_else(invalid)?;
+            let rows = value["items"].as_array().ok_or_else(invalid)?;
+            let more = value["hasMore"].as_bool().ok_or_else(invalid)?;
+            if value["schemaVersion"] != "arkdeck.cli.page/1"
+                || value["pageKind"] != "snapshot"
+                || value["order"] != "createdAtDescImportIdAsc"
+                || rows.len() as u64
+                    > fields
+                        .get("pageSize")
+                        .and_then(Value::as_u64)
+                        .unwrap_or(100)
+                || (more && rows.is_empty())
+                || (if more {
+                    !value["nextCursor"].as_str().is_some_and(|s| {
+                        s.len() <= 2048
+                            && s.strip_prefix(revision)
+                                .is_some_and(|tail| tail.starts_with('.'))
+                    })
+                } else {
+                    !value["nextCursor"].is_null()
+                })
+            {
+                return Err(invalid());
+            }
+            let mut seen = std::collections::BTreeSet::new();
+            let mut previous: Option<(f64, String)> = None;
+            for row in rows {
+                let imported = ImportProjection::parse(row).map_err(|_| invalid())?;
+                let created = row["createdAtUtc"]
+                    .as_str()
+                    .and_then(arkdeck_contract::import_timestamp)
+                    .ok_or_else(invalid)?;
+                if !seen.insert(imported.id.clone())
+                    || fields
+                        .get("target")
+                        .is_some_and(|v| v != &imported.intent.target_id)
+                    || fields.get("state").is_some_and(|v| v != &imported.state)
+                    || previous.as_ref().is_some_and(|(date, id)| {
+                        created > *date || (created == *date && imported.id <= *id)
+                    })
+                {
+                    return Err(invalid());
+                }
+                previous = Some((created, imported.id));
+            }
+            return Ok(value);
+        }
         if invocation.command == "artifact.import.abort" {
             let current = projection(send(invocation.method, fields.clone())?)?;
             if fields.get("importRequestId") != Some(&json!(current.intent.request_id))

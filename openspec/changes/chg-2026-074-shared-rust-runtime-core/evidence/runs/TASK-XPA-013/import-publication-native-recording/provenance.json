@@ -1,0 +1,17 @@
+{
+  "producerCommit": "b710252d1d7844f1fcd361e58c66429a06173493",
+  "testPatchSHA256": "a0e7b3bdd63246b96765e0d7dbccbd83a6083892e129b886553f150d342a37c9",
+  "framesSHA256": "a2e2d43883abdfbdbdeafe056f3cb674f553a17f205ed5b0878f94a43d9c079c",
+  "command": "ARKDECK_CONTROL_FRAME_LOG=/private/tmp/arkdeck-import-swift-frames-20260919 sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --filter DurableImportContractTests/testCommittedImportViewsPreserveEveryRegisteredValidationAndNullablePatchBinding",
+  "testResult": "1 test, 0 failures",
+  "producerDependency": "PR #1976 SDK compatibility; not a claim this commit was merged to protected main",
+  "scope": "host-only isolated fixture; zero device dispatch",
+  "additionalRecording": {
+    "frames": "list-errors-frames.jsonl",
+    "framesSHA256": "5a822c6ec5e25c3bb4c0934869d05b3ed4604372110f0beef8d25c365a232ea0",
+    "testPatch": "producer-list-errors-test.patch",
+    "testPatchSHA256": "8d141b57d4eab46ef70a307aa9c1df8f620e2b4c063ee0c372a060bb505dd4db",
+    "command": "ARKDECK_CONTROL_FRAME_LOG=/private/tmp/arkdeck-import-swift-errors-20260919 sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --filter DurableImportContractTests/testCommittedImportViewsPreserveEveryRegisteredValidationAndNullablePatchBinding",
+    "testResult": "1 test, 0 failures"
+  }
+}

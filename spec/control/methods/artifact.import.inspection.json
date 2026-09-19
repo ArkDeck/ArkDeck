@@ -178,15 +178,32 @@
                     "validation": {
                       "additionalProperties": false,
                       "properties": {
+                        "abi": {
+                          "type": "string"
+                        },
+                        "buildId": {
+                          "type": "string"
+                        },
                         "container": {
                           "type": "string"
                         },
+                        "elfClassBits": {
+                          "type": "integer"
+                        },
                         "kind": {
                           "type": "string"
+                        },
+                        "machine": {
+                          "type": "integer"
+                        },
+                        "touchedFiles": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
                         }
                       },
                       "required": [
-                        "container",
                         "kind"
                       ],
                       "type": "object"
@@ -292,7 +309,7 @@
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
     "error": 2,
-    "request": 6,
-    "result": 4
+    "request": 11,
+    "result": 9
   }
 }
