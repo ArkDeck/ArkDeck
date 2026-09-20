@@ -41,7 +41,12 @@ pub use agent_executions::{
     resume_params, settle_execution, validate_execution,
 };
 pub use artifact_resources::validate_artifact_page;
-pub use command_registry::{command_registry, command_registry_human};
+pub use command_registry::{
+    command_registry, command_registry_human, completion_script, help_text, is_node,
+};
+
+/// This CLI's product version (Swift `CLIProductVersion.product`).
+pub const CLI_VERSION: &str = "0.1.0";
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Invocation {
@@ -741,6 +746,9 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["history", "filter", "save"] => "history.filter.save",
         ["history", "filter", "delete"] => "history.filter.delete",
         ["commands"] => "commands",
+        ["completion", _] => "completion",
+        ["completion"] => "completion",
+        ["help", ..] => "help",
         // Answered by name before any flag (`command_registry::answer_by_name`).
         ["agent", "chat"] => "agent.chat",
         ["capability", "draft"] => "capability.draft",
@@ -752,6 +760,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["flash", "continue"] => "flash.continue",
         ["flash", "postflight"] => "flash.postflight",
         [] if help => "help",
+        // `arkdeck <node> --help` is that node's help, as Swift answers it.
+        path if help && command_registry::is_node(path) => "help",
         _ => {
             return Err(CliError::new(
                 "invalidCommand",
@@ -764,6 +774,29 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
     // This CLI sends every registration to the Runtime that owns the Bootstrap
     // store, so the endpoint is exactly what this leaf needs; the divergence is
     // recorded in TASK-XPA-018's audit.
+    // Neither local leaf reaches a Runtime, and `completion` writes a script
+    // to stdout, so it takes no output mode at all (CLI spec §8.1).
+    if command == "completion"
+        && (mode.is_some()
+            || id.is_some()
+            || socket.is_some()
+            || !(help
+                || matches!(
+                    positional.as_slice(),
+                    ["completion", "bash" | "zsh" | "fish" | "powershell"]
+                )))
+    {
+        return Err(CliError::new(
+            "invalidOption",
+            "completion takes one shell: bash, zsh, fish or powershell",
+        ));
+    }
+    if command == "help" && (mode.is_some() || id.is_some() || socket.is_some()) {
+        return Err(CliError::new(
+            "invalidOption",
+            "help renders human text only",
+        ));
+    }
     // Swift's `commands` leaf takes only `--output`: it never reaches a Runtime.
     if command == "commands" && (id.is_some() || socket.is_some()) {
         return Err(CliError::new(
@@ -1247,7 +1280,21 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         } else {
             command
         },
-        params: if command == "doctor" {
+        params: if matches!(command, "help" | "completion") {
+            // The path this help renders, or the shell this script is for;
+            // neither leaf sends a request. `arkdeck help <path>` and
+            // `arkdeck completion <shell>` drop the leaf's own token, while
+            // `arkdeck <node> --help` is already the path.
+            let tokens: &[&str] = match positional.first() {
+                Some(&"help" | &"completion") => &positional[1..],
+                Some(_) => &positional[..],
+                None => &[],
+            };
+            Some(Map::from_iter([(
+                "path".to_owned(),
+                json!(tokens.iter().map(|token| json!(token)).collect::<Vec<_>>()),
+            )]))
+        } else if command == "doctor" {
             Some(serde_json::from_value(json!({"deep":deep})).unwrap())
         } else if command.starts_with("workspace.project.")
             || command.starts_with("workspace.preset.")

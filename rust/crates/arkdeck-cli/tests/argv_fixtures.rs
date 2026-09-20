@@ -5,20 +5,19 @@
 //! The cases this parser still answers otherwise are listed exactly, each a
 //! parity defect of a leaf it serves (TASK-XPA-018's audit,
 //! `evidence/runs/TASK-XPA-018/cli-parity-audit-20260919.md`).
-use arkdeck_cli::{command_registry, failure_envelope, parse, render};
+use arkdeck_cli::{
+    command_registry, completion_script, failure_envelope, help_text, parse, render,
+};
 use serde_json::{Value, json};
 use std::{collections::BTreeSet, fs, path::Path, process::Command};
 
-/// `(fixture, case, macOS only)`: `help` is served only as `--help`, where
-/// Swift also serves `arkdeck help [path…]`; and `runtime tool register`
-/// takes `--socket` for every kind, where Swift's parser refuses it unless the
-/// kind is DevEco — Swift registers an HDC in its own process, while this CLI
-/// sends every registration to the Runtime that owns the Bootstrap store, so
-/// the endpoint is what the leaf needs (`tool_register.rs`). Off macOS
-/// `--socket` is `unsupportedOnPlatform` for either.
+/// `(fixture, case, macOS only)`: `runtime tool register` takes `--socket`
+/// for every kind, where Swift's parser refuses it unless the kind is DevEco —
+/// Swift registers an HDC in its own process, while this CLI sends every
+/// registration to the Runtime that owns the Bootstrap store, so the endpoint
+/// is what the leaf needs (`tool_register.rs`). Off macOS `--socket` is
+/// `unsupportedOnPlatform`, which is what the replay expects there.
 const KNOWN_DEVIATIONS: &[(&str, &str, bool)] = &[
-    ("help", "leafHelp", false),
-    ("help", "valid", false),
     ("runtime.tool.register", "hdcSocketRefused", true),
     ("runtime.tool.register", "macosCompatibilityOption", true),
 ];
@@ -74,6 +73,15 @@ fn deviation(case: &Value) -> Option<String> {
                 && !invocation.help
                 && invocation.json == (expected["outputMode"] == "json")
         }
+        ("completion", Ok(invocation)) => {
+            invocation.command == "completion"
+                && !invocation.help
+                && invocation
+                    .params
+                    .as_ref()
+                    .and_then(|params| params["path"][0].as_str())
+                    == expected["shell"].as_str()
+        }
         ("rootHelp", Ok(invocation)) => invocation.command == "help",
         _ => false,
     };
@@ -123,13 +131,8 @@ fn commands_lists_the_leaves_this_cli_serves_in_the_registrys_order() {
         .map(|entry| entry["command"].as_str().unwrap().to_owned())
         .collect();
     // Every listed leaf is one whose Swift argv fixture replays above, and
-    // every such leaf is listed but `help`, which this parser serves only as
-    // `--help`.
-    let replayed: BTreeSet<String> = fixtures()
-        .into_iter()
-        .map(|(name, _)| name)
-        .filter(|name| name != "help")
-        .collect();
+    // every such leaf is listed.
+    let replayed: BTreeSet<String> = fixtures().into_iter().map(|(name, _)| name).collect();
     assert_eq!(
         listed.iter().cloned().collect::<BTreeSet<_>>(),
         replayed,
@@ -236,4 +239,98 @@ fn a_retired_leaf_answers_swifts_removed_command_envelope() {
     );
     let help = parse(&["flash".to_owned(), "plan".to_owned(), "--help".to_owned()]).unwrap();
     assert_eq!((help.command, help.help), ("flash.plan", true));
+}
+
+#[test]
+fn help_and_completion_render_the_registry_this_cli_serves() {
+    // Root help lists the first token of every served leaf, and a leaf's help
+    // is its own summary, usage and published options.
+    let root = help_text(&[]).unwrap();
+    assert!(root.starts_with("arkdeck 0.1.0 — headless product face"));
+    for token in ["job", "artifact", "runtime", "commands", "help"] {
+        assert!(root.contains(&format!("  {token}")), "{token} missing");
+    }
+    let leaf = help_text(&["job".to_owned(), "status".to_owned()]).unwrap();
+    assert!(leaf.starts_with("arkdeck job status — "));
+    assert!(leaf.contains("usage: arkdeck job status --job <job-id>"));
+    assert!(leaf.contains("connects to the local Runtime"));
+    let node = help_text(&["runtime".to_owned(), "tool".to_owned()]).unwrap();
+    assert!(node.contains("select"), "{node}");
+    // A retired leaf's help says so rather than a usage it cannot serve.
+    let retired = help_text(&["agent".to_owned(), "chat".to_owned()]).unwrap();
+    assert!(
+        retired.contains("retired. use `arkdeck agent run`."),
+        "{retired}"
+    );
+    assert_eq!(
+        help_text(&["nope".to_owned()]).unwrap_err().code,
+        "invalidCommand"
+    );
+
+    // `arkdeck <node> --help` is that node's help, as Swift answers it, and the
+    // path is the node itself; `arkdeck help <path>` drops its own token.
+    let invocation = parse(&["runtime".to_owned(), "--help".to_owned()]).unwrap();
+    assert_eq!(invocation.command, "help");
+    assert_eq!(
+        invocation.params.as_ref().unwrap()["path"],
+        serde_json::json!(["runtime"])
+    );
+    let asked = Command::new(env!("CARGO_BIN_EXE_arkdeck"))
+        .args(["runtime", "tool", "--help"])
+        .output()
+        .unwrap();
+    assert_eq!(asked.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8(asked.stdout).unwrap(),
+        format!("{node}\n")
+    );
+    // A node of the registry this CLI serves nothing under is still refused,
+    // and so is a node's help in a machine mode.
+    for argv in [
+        vec!["debug", "--help"],
+        vec!["nope", "--help"],
+        vec!["runtime", "--help", "--output", "json"],
+    ] {
+        let answer = Command::new(env!("CARGO_BIN_EXE_arkdeck"))
+            .args(&argv)
+            .output()
+            .unwrap();
+        assert_eq!(answer.status.code(), Some(64), "{argv:?}");
+    }
+
+    // Every shell the registry publishes has a script, and each names every
+    // served leaf's tokens; nothing else does.
+    for shell in ["bash", "zsh", "fish", "powershell"] {
+        let script = completion_script(shell).unwrap();
+        assert!(script.ends_with('\n'));
+        assert!(script.contains("runtime tool select"), "{shell}");
+        assert!(script.contains("--expected-active-generation"), "{shell}");
+        assert!(
+            !script.contains("flash lane-preview"),
+            "{shell} names a leaf this CLI refuses"
+        );
+    }
+    assert!(completion_script("elvish").is_none());
+    for argv in [
+        vec!["completion"],
+        vec!["completion", "elvish"],
+        vec!["completion", "bash", "--output", "json"],
+        vec!["help", "--output", "json"],
+    ] {
+        let error = parse(&argv.into_iter().map(str::to_owned).collect::<Vec<_>>()).unwrap_err();
+        assert_eq!(
+            (error.code, error.exit_code()),
+            ("invalidOption", 64),
+            "{error:?}"
+        );
+    }
+    let script = Command::new(env!("CARGO_BIN_EXE_arkdeck"))
+        .args(["completion", "zsh"])
+        .output()
+        .unwrap();
+    assert_eq!(script.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8(script.stdout).unwrap(),
+        completion_script("zsh").unwrap()
+    );
 }

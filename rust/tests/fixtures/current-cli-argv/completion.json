@@ -1,0 +1,78 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "completion",
+        "bash"
+      ],
+      "expected": {
+        "outcome": "completion",
+        "shell": "bash"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "completion",
+        "--help"
+      ],
+      "expected": {
+        "command": "completion",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "completion",
+        "bash",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "completion",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "completion"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "completion",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "completion",
+        "bash",
+        "--endpoint",
+        "local"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "completion",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "endpointRefused"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "completion",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "completion"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}
