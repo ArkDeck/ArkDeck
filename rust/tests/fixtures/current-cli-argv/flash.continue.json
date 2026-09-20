@@ -1,0 +1,39 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "flash",
+        "continue"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "commandRemoved",
+        "command": "flash.continue",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "flash",
+        "continue",
+        "--help"
+      ],
+      "expected": {
+        "command": "flash.continue",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "flash.continue",
+  "kind": "tombstone",
+  "lifecycleStatus": "removed",
+  "path": [
+    "flash",
+    "continue"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

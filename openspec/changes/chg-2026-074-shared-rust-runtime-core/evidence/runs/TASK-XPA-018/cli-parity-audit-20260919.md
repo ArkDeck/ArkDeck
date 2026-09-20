@@ -1,8 +1,9 @@
 # TASK-XPA-018 — the Rust CLI against the feature coverage ledger (macOS, 2026-09-19)
 
-TASK-XPA-018 remains in progress. Audited on protected main `674c2ed7` (#2060) with this slice's
-`arkdeck commands` and argv replay (`cli-commands-run.md`). Nothing here is device evidence
-(POL-VERIFY-001, POL-MODE-001).
+TASK-XPA-018 remains in progress. First recorded on protected main `674c2ed7` with `arkdeck
+commands` and the argv replay (#2065, `cli-commands-run.md`); updated 2026-09-20 on `5205b3ec` with the
+parse-staging slice (`cli-parse-staging-run.md`), which answers the nine leaves that are not
+executable. Nothing here is device evidence (POL-VERIFY-001, POL-MODE-001).
 
 Every one of the 256 entries of `openspec/contracts/cli-feature-coverage.json` is put in one of four
 categories, against the Rust CLI's own `arkdeck commands --output json` and the isolated Rust
@@ -10,21 +11,21 @@ daemon's routes:
 
 | Category | Entries | Meaning |
 | --- | --- | --- |
-| 1 implemented | 129 | the leaf the entry targets is one the Rust CLI serves, or the entry names no leaf (13 presentation-only App surfaces) |
-| 2 leaf missing, daemon routed | 64 | the Rust CLI lacks the leaf, and nothing else is missing: every method its Swift handler sends is routed by the isolated daemon, or the leaf needs no Runtime |
+| 1 implemented | 138 | the leaf the entry targets is one the Rust CLI serves — including the retired and refused leaves it answers by name — or the entry names no leaf (13 presentation-only App surfaces) |
+| 2 leaf missing, daemon routed | 61 | the Rust CLI lacks the leaf, and nothing else is missing: every method its Swift handler sends is routed by the isolated daemon, or the leaf needs no Runtime |
 | 3 daemon or host owner missing | 42 | a method the leaf sends is not routed, or the leaf runs a host subsystem in the Swift CLI's process that has no Rust port |
-| 4 tombstone per §12 | 21 | a leaf Swift already answers as removed, or a deprecated or legacy spelling CLI spec §12 moves to a tombstone |
+| 4 tombstone per §12 | 15 | a deprecated or legacy spelling CLI spec §12 moves to a tombstone in the next CLI major |
 
 Across the registry's 209 leaves (entries also reach leaves through `equivalentCommands`, and aliases
-have no entry of their own), the Rust CLI serves 89; of the 120 others, 56 are category 2, 39
-category 3 and 25 category 4. The isolated daemon routes 89 of the 105 control methods.
+have no entry of their own), the Rust CLI serves 98; of the 111 others, 53 are category 2, 39
+category 3 and 19 category 4. The isolated daemon routes 89 of the 105 control methods.
 
 The dashboard's CLI cell (`evidence/macos-remaining.md`) keeps its own definition — parser names that
-are also feature names — and reads **87 / 256** at this slice (90 parser names; the three unmatched
-are `artifact.import.hap`, `artifact.import.native-library` and `device.candidates`, as before): 79
-plus the seven workspace leaves of #2056 and `commands`. The audit counts differently on purpose: an
-App or Catalog entry is implemented through the leaf that covers it, and `help`, a parser name, is
-not a leaf the Rust CLI serves (below).
+are also feature names — and reads **96 / 256** after these two slices (99 parser names; the three
+unmatched are `artifact.import.hap`, `artifact.import.native-library` and `device.candidates`, as
+before): 79, plus the seven workspace leaves of #2056, `commands`, and the nine retired and refused
+leaves. The audit counts differently on purpose: an App or Catalog entry is implemented through the
+leaf that covers it, and `help`, a parser name, is not a leaf the Rust CLI serves (below).
 
 ## How an entry is classified
 
@@ -32,11 +33,12 @@ not a leaf the Rust CLI serves (below).
    `equivalentCommands` are alternatives and are not required.
 2. **Served.** The leaf is in the Rust CLI's `arkdeck commands --output json`, which lists a registry
    leaf exactly when the Rust parser serves its path. Every served leaf's Swift argv fixture now
-   replays through the Rust parser (`argv_fixtures.rs`: 90 fixtures, 577 cases, `help` included);
-   six served leaves answer 14 of those cases otherwise and are counted implemented with the
+   replays through the Rust parser (`argv_fixtures.rs`: 99 fixtures, 595 cases, `help` included);
+   two served leaves answer four of those cases otherwise and are counted implemented with the
    deviation named (next section).
 3. **Not served**, by the leaf's registry entry:
-   - a Swift tombstone, or a deprecated or legacy spelling §12 moves to a tombstone: category 4;
+   - a deprecated or legacy spelling §12 moves to a tombstone: category 4 (Swift's own tombstones
+     and refused stubs are served: this CLI answers them by name, as Swift does);
    - a leaf with no Runtime connection: category 2 when it needs nothing but the CLI (the refused
      `capability` stubs, `completion`, `debug template list`, `help`), category 3 when Swift runs it
      over a host subsystem in its own process that has no Rust port (the LaunchAgent service, signing
@@ -58,34 +60,27 @@ neighbours); the table is in `cli-parity-audit.py`, which produces every table b
 
 ## Served leaves that answer an argv case otherwise
 
-Before this slice 41 served leaves had no copy of their Swift argv fixture under
+Before the audit, 41 served leaves had no copy of their Swift argv fixture under
 `rust/tests/fixtures/current-cli-argv`, and the Rust tests replayed only three of those from Swift's
 own directory (`doctor`, `operation list`, `device candidates`). Replaying every fixture whole found
-these. Swift's parser checks only its registry grammar — unknown, repeated or missing required
-options, and value grammar — and leaves value semantics to the handler; these leaves check at parse
-what Swift checks later, or in another order. `runtime tool register`'s own test already recorded
-its cases as a deliberate choice (the missing path refused before any connection); the `--socket`
-cases still exit 65 where Swift exits 64.
+fourteen cases in six leaves. Swift's parser checks only its registry grammar — unknown, repeated or
+missing required options, and value grammar — and leaves what a value *means* to the handler that
+sends the request; five of those leaves checked it at parse and therefore answered a different code.
+`cli-parse-staging-run.md` moved each check to where Swift makes it, and two cases remain:
 
-| Leaf | Cases | Swift | Rust |
+| Leaf | Cases | Swift | This CLI |
 | --- | --- | --- | --- |
-| `artifact import release` | `valid`, `macosCompatibilityOption` | `--import sample --generation 1` dispatches | refuses at parse, `invalidOption` ("Import requires its exact request identity, owner and options") |
-| `help` | `valid`, `leafHelp` | `arkdeck help [path…]` is root or leaf help; `help --help` is help's own | only `--help` is served; `help` is `invalidCommand` |
-| `runtime bundle register` | `valid` | a relative `--file` dispatches; the handler judges the path | refuses at parse, `invalidInput` |
-| `runtime tool register` | `valid`, `macosCompatibilityOption`, `hdcSocketRefused` | `--kind hdc` without `--file` dispatches; `--socket` is refused at parse (`invalidOption`), the leaf takes none | refuses the missing path at parse, `invalidInput`, before looking at `--socket` |
-| `session cleanup apply`, `session export apply` | `valid`, `missingRequired`, `macosCompatibilityOption` | an opaque `--preview-id sample` dispatches; a missing required option is `invalidOption` (64) | checks the preview tuple at parse, `invalidInput`; a missing option is `invalidInput` (65) |
+| `help` | `valid`, `leafHelp` | serves `arkdeck help [path…]`, and help for the `help` leaf | serves help only as `--help`; the leaf follows with `completion` |
+| `runtime tool register` | `macosCompatibilityOption`, `hdcSocketRefused` (macOS only) | refuses `--socket` unless `--kind deveco`: its HDC registration runs in Swift's own process | takes `--socket` for every kind: this CLI registers through the Runtime that owns the Bootstrap store, so the endpoint is exactly what the leaf needs. A deliberate divergence of the port, not a defect of it |
 
-`argv_fixtures.rs` pins exactly these cases (the `--socket` ones only where `--socket` is accepted,
-macOS), so fixing one removes it from the list and a new deviation fails. The fix is the next
-slice: parse to the registry grammar alone, and judge values after it, before any request, in
-Swift's order.
+`argv_fixtures.rs` pins exactly these cases (the `--socket` ones only where `--socket` is accepted at
+all, macOS), so closing one removes it from the list and a new one fails.
 
 ## Category 2: what the next slices add
 
-56 registry leaves, grouped by what they need:
+53 registry leaves, grouped by what they need:
 
-- **No Runtime:** `completion`, `help` (with the deviations above), `debug template list`, and the
-  refused stubs `capability draft|install|revoke`.
+- **No Runtime:** `completion`, `help` (with the deviation above) and `debug template list`.
 - **Reads over routed methods:** `runtime health`, `operation validate`, `device wait`, `job wait`,
   `job watch`, `recovery cleanup list` (with its §12 alias `cleanup-debt list`, which §12 keeps),
   `trace export`, `diagnostics inspect|preview|export`, `ui-dump inspect|hit-test`.
@@ -116,8 +111,9 @@ Swift's order.
 
 - **Already removed in Swift** (6): `agent chat` and `flash plan|preview|execute|continue|postflight`.
   Swift answers each before any connection with `commandRemoved`, exit 64,
-  `details.lifecycleStatus: "removed"`, the replacement pattern (or null) and the removal version;
-  the Rust CLI must answer the same, and needs no owner to.
+  `details.lifecycleStatus: "removed"`, the replacement pattern (or null) and the removal version.
+  This CLI answers them the same way, from the registry copy (`cli-parse-staging-run.md`), so they
+  are category 1 above; the three refused `capability` stubs with them.
 - **Deprecated or legacy spellings §12 moves to a tombstone in the next CLI major** (19 leaves):
   `agentd *` (6), `signing *` (5), `update-feed *` (2), `device list|show`,
   `debug start|evaluate|status`, and `flash install-binding` (once the current Loader binding path
@@ -172,7 +168,7 @@ Read-only; it reads the ledger, `rust/crates/arkdeck-cli/src/command_registry.js
 | Feature | Classification | Lifecycle | Target leaf | Category | Note |
 | --- | --- | --- | --- | --- | --- |
 | agent.abandon | direct | current | `agent.abandon` | 1 implemented |  |
-| agent.chat | refused | removed | `agent.chat` | 4 tombstone per §12 | removed: Swift answers `commandRemoved`; Rust must answer the same |
+| agent.chat | refused | removed | `agent.chat` | 1 implemented |  |
 | agent.list | direct | current | `agent.list` | 1 implemented |  |
 | agent.resume | direct | current | `agent.resume` | 1 implemented |  |
 | agent.run | direct | current | `agent.run` | 1 implemented |  |
@@ -264,17 +260,17 @@ Read-only; it reads the ledger, `rust/crates/arkdeck-cli/src/command_registry.js
 | artifact.import.inspect | direct | current | `artifact.import.inspect` | 1 implemented |  |
 | artifact.import.inspection | internal | current | `artifact.import.hap` | 1 implemented |  |
 | artifact.import.list | direct | current | `artifact.import.list` | 1 implemented |  |
-| artifact.import.release | direct | current | `artifact.import.release` | 1 implemented | argv deviates: macosCompatibilityOption, valid |
+| artifact.import.release | direct | current | `artifact.import.release` | 1 implemented |  |
 | artifact.import.workspace-patch | direct | current | `artifact.import.workspace-patch` | 1 implemented |  |
 | artifact.inspect | local | current | `artifact.inspect` | 1 implemented |  |
 | artifact.list | local | current | `artifact.list` | 1 implemented |  |
 | artifact.quota | local | current | `artifact.quota` | 1 implemented |  |
 | artifact.read | local | current | `artifact.read` | 1 implemented |  |
-| capability.draft | refused | current | `capability.draft` | 2 leaf missing, daemon routed | refused stub: needs no Runtime |
+| capability.draft | refused | current | `capability.draft` | 1 implemented |  |
 | capability.inspect | direct | current | `capability.inspect` | 1 implemented |  |
-| capability.install | refused | current | `capability.install` | 2 leaf missing, daemon routed | refused stub: needs no Runtime |
+| capability.install | refused | current | `capability.install` | 1 implemented |  |
 | capability.list | direct | current | `capability.list` | 1 implemented |  |
-| capability.revoke | refused | current | `capability.revoke` | 2 leaf missing, daemon routed | refused stub: needs no Runtime |
+| capability.revoke | refused | current | `capability.revoke` | 1 implemented |  |
 | capture.diagnostics@1 | direct | current | `trace.capture` | 2 leaf missing, daemon routed | domain leaf; `capture.diagnostics@1` runs on the isolated daemon |
 | capture.screen-sequence@1 | direct | current | `screen.record` | 2 leaf missing, daemon routed | domain leaf; `capture.screen-sequence@1` runs only against the default root; the isolated daemon reports it unavailable |
 | cleanupDebt.continue | direct | current | `recovery.cleanup.continue` | 3 daemon or host owner missing | not routed: `cleanupDebt.continue` |
@@ -300,17 +296,17 @@ Read-only; it reads the ledger, `rust/crates/arkdeck-cli/src/command_registry.js
 | doctor | direct | current | `doctor` | 1 implemented |  |
 | flash.bind-current-loader | direct | current | `flash.bind-loader` | 3 daemon or host owner missing | not routed: `flash.bind-current-loader` |
 | flash.bootloader-status | direct | current | `flash.bootloader-status` | 3 daemon or host owner missing | not routed: `flash.bootloader-status` |
-| flash.continue | refused | removed | `flash.continue` | 4 tombstone per §12 | removed: Swift answers `commandRemoved`; Rust must answer the same |
+| flash.continue | refused | removed | `flash.continue` | 1 implemented |  |
 | flash.dayu200 | generic | current | `job.submit` | 1 implemented |  |
 | flash.device-access | direct | current | `flash.device-access` | 3 daemon or host owner missing | not routed: `flash.device-access` |
-| flash.execute | refused | removed | `flash.execute` | 4 tombstone per §12 | removed: Swift answers `commandRemoved`; Rust must answer the same |
+| flash.execute | refused | removed | `flash.execute` | 1 implemented |  |
 | flash.full-restore@1 | direct | current | `flash.run` | 2 leaf missing, daemon routed | domain leaf; `flash.full-restore@1` has no Rust runner, so the isolated daemon does not execute it |
 | flash.install-binding | local | legacy | `flash.install-binding` | 4 tombstone per §12 | legacy: tombstone once the current Loader binding path closes |
 | flash.lanePlanPreview | direct | current | `flash.lane-preview` | 3 daemon or host owner missing | not routed: `flash.lanePlanPreview` |
-| flash.plan | refused | removed | `flash.plan` | 4 tombstone per §12 | removed: Swift answers `commandRemoved`; Rust must answer the same |
-| flash.postflight | refused | removed | `flash.postflight` | 4 tombstone per §12 | removed: Swift answers `commandRemoved`; Rust must answer the same |
+| flash.plan | refused | removed | `flash.plan` | 1 implemented |  |
+| flash.postflight | refused | removed | `flash.postflight` | 1 implemented |  |
 | flash.prerequisites | direct | current | `flash.prerequisites` | 3 daemon or host owner missing | not routed: `flash.prerequisites` |
-| flash.preview | refused | removed | `flash.preview` | 4 tombstone per §12 | removed: Swift answers `commandRemoved`; Rust must answer the same |
+| flash.preview | refused | removed | `flash.preview` | 1 implemented |  |
 | flash.reconcile-alias | direct | current | `flash.reconcile-alias` | 3 daemon or host owner missing | not routed: `flash.reconcile-alias` |
 | health | direct | current | `runtime.health` | 2 leaf missing, daemon routed | methods: `health` |
 | help | local | current | `help` | 2 leaf missing, daemon routed | local: needs no Runtime |
@@ -350,7 +346,7 @@ Read-only; it reads the ledger, `rust/crates/arkdeck-cli/src/command_registry.js
 | recovery.flash-invocation.list | direct | current | `recovery.flash-invocation.list` | 3 daemon or host owner missing | not routed: `recovery.flash-invocation.list` |
 | runtime.bundle.inspect | local | current | `runtime.bundle.inspect` | 1 implemented |  |
 | runtime.bundle.list | local | current | `runtime.bundle.list` | 1 implemented |  |
-| runtime.bundle.register | local | current | `runtime.bundle.register` | 1 implemented | argv deviates: valid |
+| runtime.bundle.register | local | current | `runtime.bundle.register` | 1 implemented |  |
 | runtime.bundle.remove | local | current | `runtime.bundle.remove` | 1 implemented |  |
 | runtime.hdc.impact-preview | direct | current | `runtime.hdc.impact-preview` | 1 implemented |  |
 | runtime.hdc.restart | direct | current | `runtime.hdc.restart` | 1 implemented |  |
@@ -370,16 +366,16 @@ Read-only; it reads the ledger, `rust/crates/arkdeck-cli/src/command_registry.js
 | runtime.storage.status | local | current | `runtime.storage.status` | 1 implemented |  |
 | runtime.tool.inspect | local | current | `runtime.tool.inspect` | 1 implemented |  |
 | runtime.tool.list | local | current | `runtime.tool.list` | 1 implemented |  |
-| runtime.tool.register | local | current | `runtime.tool.register` | 1 implemented | argv deviates: hdcSocketRefused, macosCompatibilityOption, valid |
+| runtime.tool.register | local | current | `runtime.tool.register` | 1 implemented | argv deviates: hdcSocketRefused, macosCompatibilityOption |
 | runtime.tool.remove | local | current | `runtime.tool.remove` | 1 implemented |  |
 | runtime.tool.select | direct | current | `runtime.tool.select` | 1 implemented |  |
 | runtime.update.cancel | local | current | `runtime.update.cancel` | 3 daemon or host owner missing | local; updater (ClientKit, #2054) has no Rust port |
 | runtime.update.cleanup | local | current | `runtime.update.cleanup` | 3 daemon or host owner missing | local; updater (ClientKit, #2054) has no Rust port |
 | runtime.update.download | local | current | `runtime.update.download` | 3 daemon or host owner missing | local; updater (ClientKit, #2054) has no Rust port |
 | runtime.update.handoff | local | current | `runtime.update.handoff` | 3 daemon or host owner missing | local; updater (ClientKit, #2054) has no Rust port |
-| session.cleanup.apply | local | current | `session.cleanup.apply` | 1 implemented | argv deviates: macosCompatibilityOption, missingRequired, valid |
+| session.cleanup.apply | local | current | `session.cleanup.apply` | 1 implemented |  |
 | session.cleanup.preview | local | current | `session.cleanup.preview` | 1 implemented |  |
-| session.export.apply | local | current | `session.export.apply` | 1 implemented | argv deviates: macosCompatibilityOption, missingRequired, valid |
+| session.export.apply | local | current | `session.export.apply` | 1 implemented |  |
 | session.export.preview | local | current | `session.export.preview` | 1 implemented |  |
 | session.list | local | current | `session.list` | 1 implemented |  |
 | session.pin | local | current | `session.pin` | 1 implemented |  |
@@ -428,7 +424,7 @@ Read-only; it reads the ledger, `rust/crates/arkdeck-cli/src/command_registry.js
 | workspace.sweep-isolated-copies@1 | direct | current | `workspace.sweep` | 2 leaf missing, daemon routed | domain leaf; `workspace.sweep-isolated-copies@1` has no Rust runner, so the isolated daemon does not execute it |
 | workspace.symbolize-crash@1 | direct | current | `workspace.symbolize` | 2 leaf missing, daemon routed | domain leaf; `workspace.symbolize-crash@1` has no Rust runner, so the isolated daemon does not execute it |
 
-| Registry leaf not served (120 of 209) | Kind, lifecycle | Category | Note |
+| Registry leaf not served (111 of 209) | Kind, lifecycle | Category | Note |
 | --- | --- | --- | --- |
 | `help` | executable, current | 2 leaf missing, daemon routed | local: needs no Runtime |
 | `completion` | executable, current | 2 leaf missing, daemon routed | local: needs no Runtime |
@@ -464,10 +460,6 @@ Read-only; it reads the ledger, `rust/crates/arkdeck-cli/src/command_registry.js
 | `job.wait` | executable, current | 2 leaf missing, daemon routed | methods: `job.status` |
 | `job.watch` | executable, current | 2 leaf missing, daemon routed | methods: `job.events`, `job.status` |
 | `job.reconcile` | executable, current | 3 daemon or host owner missing | not routed: `job.reconcile` |
-| `agent.chat` | tombstone, removed | 4 tombstone per §12 | removed: Swift answers `commandRemoved`; Rust must answer the same |
-| `capability.draft` | refused, current | 2 leaf missing, daemon routed | refused stub: needs no Runtime |
-| `capability.install` | refused, current | 2 leaf missing, daemon routed | refused stub: needs no Runtime |
-| `capability.revoke` | refused, current | 2 leaf missing, daemon routed | refused stub: needs no Runtime |
 | `recovery.cleanup.list` | executable, current | 2 leaf missing, daemon routed | methods: `cleanupDebt.list` |
 | `recovery.cleanup.continue` | executable, current | 3 daemon or host owner missing | not routed: `cleanupDebt.continue` |
 | `recovery.flash-invocation.list` | executable, current | 3 daemon or host owner missing | not routed: `recovery.flash-invocation.list` |
@@ -524,11 +516,6 @@ Read-only; it reads the ledger, `rust/crates/arkdeck-cli/src/command_registry.js
 | `flash.lane-preview` | executable, current | 3 daemon or host owner missing | not routed: `flash.lanePlanPreview` |
 | `flash.reconcile-alias` | executable, current | 3 daemon or host owner missing | not routed: `flash.reconcile-alias` |
 | `flash.bind-loader` | executable, current | 3 daemon or host owner missing | not routed: `flash.bind-current-loader` |
-| `flash.plan` | tombstone, removed | 4 tombstone per §12 | removed: Swift answers `commandRemoved`; Rust must answer the same |
-| `flash.preview` | tombstone, removed | 4 tombstone per §12 | removed: Swift answers `commandRemoved`; Rust must answer the same |
-| `flash.execute` | tombstone, removed | 4 tombstone per §12 | removed: Swift answers `commandRemoved`; Rust must answer the same |
-| `flash.continue` | tombstone, removed | 4 tombstone per §12 | removed: Swift answers `commandRemoved`; Rust must answer the same |
-| `flash.postflight` | tombstone, removed | 4 tombstone per §12 | removed: Swift answers `commandRemoved`; Rust must answer the same |
 | `maintainer.update-feed.prepare` | executable, current | 3 daemon or host owner missing | local; update-feed signing (maintainer tooling) has no Rust port |
 | `maintainer.update-feed.assemble` | executable, current | 3 daemon or host owner missing | local; update-feed signing (maintainer tooling) has no Rust port |
 | `maintainer.contracts.export` | executable, current | 3 daemon or host owner missing | local; contract bundle export (XPA-018 acceptance) has no Rust port |
@@ -553,6 +540,6 @@ Read-only; it reads the ledger, `rust/crates/arkdeck-cli/src/command_registry.js
 
 | Registry leaves not served, by category | Leaves |
 | --- | --- |
-| 2 leaf missing, daemon routed | 56 |
+| 2 leaf missing, daemon routed | 53 |
 | 3 daemon or host owner missing | 39 |
-| 4 tombstone per §12 | 25 |
+| 4 tombstone per §12 | 19 |

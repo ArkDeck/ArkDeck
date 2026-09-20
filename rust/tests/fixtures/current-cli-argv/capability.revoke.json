@@ -1,0 +1,39 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "capability",
+        "revoke"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidCommand",
+        "command": "capability.revoke",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "capability",
+        "revoke",
+        "--help"
+      ],
+      "expected": {
+        "command": "capability.revoke",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "capability.revoke",
+  "kind": "refused",
+  "lifecycleStatus": "current",
+  "path": [
+    "capability",
+    "revoke"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

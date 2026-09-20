@@ -5,32 +5,22 @@
 //! The cases this parser still answers otherwise are listed exactly, each a
 //! parity defect of a leaf it serves (TASK-XPA-018's audit,
 //! `evidence/runs/TASK-XPA-018/cli-parity-audit-20260919.md`).
-use arkdeck_cli::{command_registry, parse, render};
+use arkdeck_cli::{command_registry, failure_envelope, parse, render};
 use serde_json::{Value, json};
 use std::{collections::BTreeSet, fs, path::Path, process::Command};
 
-/// `(fixture, case, macOS only)`: Swift's parser takes an opaque value or
-/// leaves a missing input to its handler, where this parser refuses at once
-/// (`invalidInput`, or `invalidOption` for an import's placeholder values);
-/// Swift answers a missing required option `invalidOption` where this parser
-/// says `invalidInput`; Swift refuses `--socket` on `runtime tool register`
-/// before any path check; and `help` is served only as `--help`. The
-/// `--socket` cases deviate only where `--socket` is accepted at all: macOS.
+/// `(fixture, case, macOS only)`: `help` is served only as `--help`, where
+/// Swift also serves `arkdeck help [path…]`; and `runtime tool register`
+/// takes `--socket` for every kind, where Swift's parser refuses it unless the
+/// kind is DevEco — Swift registers an HDC in its own process, while this CLI
+/// sends every registration to the Runtime that owns the Bootstrap store, so
+/// the endpoint is what the leaf needs (`tool_register.rs`). Off macOS
+/// `--socket` is `unsupportedOnPlatform` for either.
 const KNOWN_DEVIATIONS: &[(&str, &str, bool)] = &[
-    ("artifact.import.release", "macosCompatibilityOption", true),
-    ("artifact.import.release", "valid", false),
     ("help", "leafHelp", false),
     ("help", "valid", false),
-    ("runtime.bundle.register", "valid", false),
     ("runtime.tool.register", "hdcSocketRefused", true),
     ("runtime.tool.register", "macosCompatibilityOption", true),
-    ("runtime.tool.register", "valid", false),
-    ("session.cleanup.apply", "macosCompatibilityOption", true),
-    ("session.cleanup.apply", "missingRequired", false),
-    ("session.cleanup.apply", "valid", false),
-    ("session.export.apply", "macosCompatibilityOption", true),
-    ("session.export.apply", "missingRequired", false),
-    ("session.export.apply", "valid", false),
 ];
 
 fn fixtures() -> Vec<(String, Value)> {
@@ -203,4 +193,47 @@ fn the_commands_leaf_answers_as_swifts_local_envelope() {
         let error = parse(&argv.into_iter().map(str::to_owned).collect::<Vec<_>>()).unwrap_err();
         assert_eq!((error.code, error.exit_code()), ("invalidOption", 64));
     }
+}
+
+#[test]
+fn a_retired_leaf_answers_swifts_removed_command_envelope() {
+    // Swift's published sample, copied unchanged from its CLI fixtures.
+    let sample =
+        include_bytes!("../../../tests/fixtures/current-cli-envelopes/result-removed-command.json");
+    let error = parse(&["agent".to_owned(), "chat".to_owned()]).unwrap_err();
+    let envelope = failure_envelope(error.command.unwrap(), &error, "ctl-fixture-0001", false);
+    assert_eq!(render(&envelope).unwrap(), sample.to_vec());
+    // Answered by name before any flag, as Swift's parser answers it.
+    for argv in [
+        vec!["agent", "chat", "--no-such-option"],
+        vec!["--output", "json", "agent", "chat", "--prompt", "x"],
+    ] {
+        let error = parse(&argv.into_iter().map(str::to_owned).collect::<Vec<_>>()).unwrap_err();
+        assert_eq!(
+            (error.code, error.command),
+            ("commandRemoved", Some("agent.chat"))
+        );
+    }
+    let error = parse(&["flash".to_owned(), "continue".to_owned()]).unwrap_err();
+    assert_eq!(
+        error.message,
+        "`flash continue` is retired: historical campaigns are decode-only"
+    );
+    assert_eq!(
+        error.details["reason"],
+        "historical campaigns are decode-only"
+    );
+    assert_eq!(error.details["replacementArgvPattern"], Value::Null);
+    let error = parse(&["capability".to_owned(), "install".to_owned()]).unwrap_err();
+    assert_eq!((error.code, error.exit_code()), ("invalidCommand", 64));
+    assert_eq!(
+        error.message,
+        "`capability install` is not caller-facing: capability administration is Runtime-owned"
+    );
+    assert_eq!(
+        Value::Object(error.details),
+        json!({"command": "capability.install"})
+    );
+    let help = parse(&["flash".to_owned(), "plan".to_owned(), "--help".to_owned()]).unwrap();
+    assert_eq!((help.command, help.help), ("flash.plan", true));
 }

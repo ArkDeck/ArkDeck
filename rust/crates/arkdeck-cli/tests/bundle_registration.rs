@@ -49,19 +49,24 @@ fn registration_only_sends_kind_and_file_and_keeps_published_method_gate() {
     ] {
         assert_eq!(invocation(&options).unwrap_err().code, "invalidOption");
     }
+    // Swift's parser takes any `--file`; its handler refuses a path that is
+    // not absolute and canonical before any request, and so does this CLI.
     for file in [
         "relative.app",
         "/tmp/../Source.app",
         "/tmp/./Source.app",
         "/Source.app\0",
     ] {
+        let parsed = invocation(&["--kind", "daemon-bundle", "--file", file]).unwrap();
         assert_eq!(
-            invocation(&["--kind", "daemon-bundle", "--file", file])
-                .unwrap_err()
-                .code,
+            validate_bootstrap_request(&parsed).unwrap_err().code,
             "invalidInput"
         );
     }
+    assert_eq!(
+        invocation(&["--kind", "daemon-bundle"]).unwrap_err().code,
+        "invalidOption"
+    );
     assert!(invocation(&["--help"]).unwrap().help);
 }
 #[test]

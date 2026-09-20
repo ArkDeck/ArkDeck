@@ -280,7 +280,7 @@ fn export_apply_requires_one_exact_preview_tuple_and_keeps_its_method_scope() {
         parse(&args(&["session", "export", "apply"]))
             .unwrap_err()
             .code,
-        "invalidInput"
+        "invalidOption"
     );
     let digest = "a".repeat(64);
     let valid = args(&[
@@ -295,9 +295,16 @@ fn export_apply_requires_one_exact_preview_tuple_and_keeps_its_method_scope() {
     let invocation = parse(&valid).unwrap();
     assert_eq!(invocation.command, "session.export.apply");
     assert_eq!(invocation.params.unwrap()["previewDigest"], digest);
+    // Swift's parser takes the preview identity as given; its handler, and
+    // this CLI before any request, refuse one that is not the preview's UUID.
     let mut bad = valid.clone();
     bad[4] = "bad".into();
-    assert_eq!(parse(&bad).unwrap_err().code, "invalidInput");
+    assert_eq!(
+        validate_session_request(&parse(&bad).unwrap())
+            .unwrap_err()
+            .code,
+        "invalidInput"
+    );
     let mut extra = valid;
     extra.extend(args(&["--allow-sensitive"]));
     assert_eq!(parse(&extra).unwrap_err().code, "invalidOption");
@@ -310,7 +317,7 @@ fn cleanup_apply_requires_one_exact_preview_tuple_and_keeps_its_method_scope() {
         parse(&args(&["session", "cleanup", "apply"]))
             .unwrap_err()
             .code,
-        "invalidInput"
+        "invalidOption"
     );
     let digest = "a".repeat(64);
     let valid = args(&[
@@ -325,9 +332,16 @@ fn cleanup_apply_requires_one_exact_preview_tuple_and_keeps_its_method_scope() {
     let invocation = parse(&valid).unwrap();
     assert_eq!(invocation.command, "session.cleanup.apply");
     assert_eq!(invocation.params.unwrap()["previewDigest"], digest);
+    // Swift's parser takes the preview identity as given; its handler, and
+    // this CLI before any request, refuse one that is not the preview's UUID.
     let mut bad = valid.clone();
     bad[4] = "bad".into();
-    assert_eq!(parse(&bad).unwrap_err().code, "invalidInput");
+    assert_eq!(
+        validate_session_request(&parse(&bad).unwrap())
+            .unwrap_err()
+            .code,
+        "invalidInput"
+    );
     let mut extra = valid;
     extra.extend(args(&["--allow-sensitive"]));
     assert_eq!(parse(&extra).unwrap_err().code, "invalidOption");

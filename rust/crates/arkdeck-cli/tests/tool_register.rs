@@ -28,6 +28,17 @@ fn recordings() -> Vec<Value> {
         .map(|s| serde_json::from_str(s).unwrap())
         .collect()
 }
+/// The code this CLI answers for `argv`, from its parse or from the check
+/// that runs before any request (Swift judges the path in its handler).
+fn refusal(argv: &[String]) -> Option<&'static str> {
+    match parse(argv) {
+        Err(error) => Some(error.code),
+        Ok(invocation) => validate_bootstrap_request(&invocation)
+            .err()
+            .map(|error| error.code),
+    }
+}
+
 #[test]
 fn current_argv_is_retained_with_rust_hdc_transport_support() {
     let fixture: Value = serde_json::from_str(include_str!(
@@ -42,14 +53,23 @@ fn current_argv_is_retained_with_rust_hdc_transport_support() {
             .map(|v| v.as_str().unwrap().into())
             .collect();
         let parsed = parse(&argv);
+        let hdc = argv.windows(2).any(|p| p == ["--kind", "hdc"]);
         if !cfg!(target_os = "macos") && argv.iter().any(|v| v == "--socket") {
             assert_eq!(parsed.unwrap_err().code, "unsupportedOnPlatform");
-        } else if argv.windows(2).any(|p| p == ["--kind", "hdc"])
-            && (argv.iter().any(|v| v == "--socket") || case["name"] == "valid")
-        {
-            // Swift's parser defers the missing file to its local handler;
-            // Rust rejects it before contacting the Runtime.
-            assert_eq!(parsed.unwrap_err().code, "invalidInput");
+        } else if hdc && argv.iter().any(|v| v == "--socket") {
+            // Swift refuses `--socket` here because its HDC registration runs
+            // in its own process; this CLI registers through the Runtime that
+            // owns the Bootstrap store, so the endpoint is what it needs.
+            assert_eq!(parsed.unwrap().command, "runtime.tool.register");
+        } else if hdc && case["name"] == "valid" {
+            // Swift's parser takes the leaf without `--file`; both refuse the
+            // missing path before any request reaches a Runtime.
+            assert_eq!(
+                validate_bootstrap_request(&parsed.unwrap())
+                    .unwrap_err()
+                    .code,
+                "invalidInput"
+            );
         } else if case["expected"]["outcome"] == "failure" {
             assert_eq!(parsed.unwrap_err().code, case["expected"]["code"], "{case}");
         } else {
@@ -87,12 +107,10 @@ fn paths_match_swift_local_grammar_and_request_is_closed_before_connect() {
         "/tmp/\0root",
     ] {
         assert_eq!(
-            parse(&args(&[
+            refusal(&args(&[
                 "runtime", "tool", "register", "--kind", "deveco", "--root", root
-            ]))
-            .unwrap_err()
-            .code,
-            "invalidInput"
+            ])),
+            Some("invalidInput")
         );
     }
     for extra in [
@@ -422,12 +440,10 @@ fn hdc_request_rejects_wrong_kind_path_and_caller_owned_fields() {
         "/tmp/\0hdc",
     ] {
         assert_eq!(
-            parse(&args(&[
+            refusal(&args(&[
                 "runtime", "tool", "register", "--kind", "hdc", "--file", file
-            ]))
-            .unwrap_err()
-            .code,
-            "invalidInput"
+            ])),
+            Some("invalidInput")
         );
     }
     for extra in [
@@ -438,6 +454,6 @@ fn hdc_request_rejects_wrong_kind_path_and_caller_owned_fields() {
     ] {
         let mut argv = args(&["runtime", "tool", "register", "--kind", "hdc"]);
         argv.extend(args(&extra));
-        assert!(parse(&argv).is_err());
+        assert!(refusal(&argv).is_some(), "{argv:?}");
     }
 }
