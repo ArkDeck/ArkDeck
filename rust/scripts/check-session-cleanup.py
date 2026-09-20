@@ -126,7 +126,15 @@ def main():
         try:
             child=start()
             child.kill();child.wait(timeout=10)
-            seed_job('job-active','running',1)
+            # `preflight` is the one non-terminal state a Job can hold with no
+            # durable projection yet: the admission commits its row, and the
+            # record and journal follow. A daemon recovers its active Jobs when
+            # it starts and completes exactly that pair from the row
+            # (Swift `restoreInitialAdmissionProjectionIfNeeded`), so a row that
+            # claims a later state with no files is a store no owner accepts.
+            # What this fixture needs of the Job is only that it is not
+            # terminal, so that its Session holds an active lease.
+            seed_job('job-active','preflight',1)
             seed_job('job-unknown','interrupted',2,unknown=True)
             seed_job('job-history','succeeded',3,history=True)
             seed_job('job-session-first','succeeded',4)
@@ -175,12 +183,18 @@ def main():
             refused('session.cleanup.apply',dict(tuple_params,previewDigest='f'*64),'resourceConflict')
             assert first.exists() and latest.exists() and (first/'raw.bin').read_bytes()==payload
             child.kill();child.wait(timeout=10)
-            alter_job('job-session-first',state='running')
+            alter_job('job-session-first',state='preflight')
             child=start()
             refused('session.cleanup.apply',tuple_params,'resourceConflict')
             assert first.exists() and all(path.exists() for path in protected)
             child.kill();child.wait(timeout=10)
             alter_job('job-session-first',state='succeeded')
+            # These fixture Jobs have no durable projection; the start above
+            # completed one for this Job while its row was `preflight`, as a
+            # daemon does for an admitted Job whose record and journal were
+            # lost. Take it away again with the row, so the fixture keeps
+            # saying that nothing durable of this Job remains.
+            shutil.rmtree(root/'jobs-state/jobs/job-session-first',ignore_errors=True)
             child=start()
             orphan=root/'jobs-state/jobs/unindexed-job'
             orphan.mkdir(mode=0o700)

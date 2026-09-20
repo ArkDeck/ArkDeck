@@ -1,0 +1,1032 @@
+//! Swift's `job.reconcile` handler case (`AgentDaemon.swift`) over
+//! `RuntimeJobEngine.reconcile(jobID:)` / `reconcileOwned(jobID:)` and
+//! `finishReconcile`, for the host-only analyzer Jobs this Runtime runs
+//! (`analyzer.extract-crash-signature@1`): ADR-0009 decisions 2 and 4 as the
+//! maintainer ruled on 2026-09-19 (design §L.1 item 13).
+//!
+//! A Job whose outcome is unknown is reconciled against its durable intent,
+//! and nothing is dispatched: the journal moves to `reconciling` and records
+//! the attempt (`reconcileStarted`, `recovery-<job>-<sequence>`), the source
+//! Artifact is resolved again, and the analyzer provider confirms the intent
+//! not executed only when that source is the one the intent named. The
+//! decision is journaled as Swift journals it (a `confirmedNotExecuted` step
+//! outcome, the `reconcileOutcome`, the transitions); the Job then fails with
+//! `executionConfirmedNotPerformed` and is published as a Session, or stays
+//! `waitingForRecovery` when the provider cannot say. A decision the journal
+//! already holds is completed, never taken again. What a failed reconcile has
+//! journaled stays resident, as Swift's engine keeps it in memory, while the
+//! record file keeps its last durable state.
+//!
+//! A Job of any other operation is answered only where Swift writes nothing:
+//! its status. Every reconcile Swift would carry out for one (device-bound
+//! readbacks, capability lineage repairs, cancellation settlement, HAP
+//! failure finalization, Session retries) is refused with nothing written.
+//! No answer carries details.
+use crate::artifact_read_owner::{ArtifactReadStore, swift_string};
+use crate::job_journal_events as events;
+use crate::job_journal_writer::{JournalWriter, inspect_journal};
+use crate::job_owner::JobStore;
+use crate::job_owner::import_references::ImportReference;
+use crate::job_record::{JobRecord, STATES, terminal};
+use crate::job_run::{Run, RunRefusal, binding_refusal, failure};
+use crate::operation_catalog::CatalogOperation;
+use crate::session_publication::SessionPublisher;
+use arkdeck_contract::WireError;
+use serde_json::{Map, Value};
+use std::path::PathBuf;
+
+const ANALYZER: &str = "analyzer.extract-crash-signature@1";
+/// Swift `RuntimeJobEngine.confirmedNotExecutedSemanticCode`.
+const CONFIRMED_NOT_EXECUTED: &str = "confirmedNotExecuted";
+/// Swift's Manifest proposal beside a Job's record.
+const PROPOSAL: &str = "session-manifest.proposal.json";
+
+/// A refusal; Swift's `job.reconcile` sends none with details.
+fn refused(code: &str, message: impl Into<String>) -> WireError {
+    WireError {
+        code: code.into(),
+        message: message.into(),
+        details: None,
+    }
+}
+
+/// A `RuntimeJobEngineError`, which Swift's handler answers as `rejected`
+/// with its interpolation.
+fn engine(case: &str, detail: &str) -> WireError {
+    refused("rejected", format!("{case}({})", swift_string(detail)))
+}
+
+/// Any other error, which Swift's handler answers as `internalError` with its
+/// interpolation.
+fn other(message: impl Into<String>) -> WireError {
+    refused("internalError", message)
+}
+
+fn from_run(refusal: RunRefusal) -> WireError {
+    refused(refusal.code, refusal.message)
+}
+
+/// Swift `ProviderReconcileOutcome`.
+enum Decision {
+    /// `.confirmedCompleted(summary:)`, with the summary's keys.
+    Completed(Vec<String>),
+    /// `.confirmedNotExecuted`.
+    NotExecuted,
+    /// `.stillUnknown(reason:)`.
+    Unknown(String),
+}
+
+/// Swift `ProviderResolvedInputArtifact`: the source resolved again.
+struct Source {
+    artifact_id: String,
+    sha256: Option<String>,
+    byte_count: Option<i64>,
+}
+
+/// Swift `AnalyzerRecoveryIdentity`, as a persisted `analyzer.analyze`
+/// action materializes it.
+struct Identity {
+    analyzer_ref: String,
+    source_artifact_id: String,
+    source_sha256: String,
+    source_byte_count: i64,
+    request_digest: Option<String>,
+}
+
+fn lowercase_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+}
+
+/// Swift's interpolation of a `[String]`.
+fn swift_array(items: &[String]) -> String {
+    let quoted: Vec<String> = items.iter().map(|item| swift_string(item)).collect();
+    format!("[{}]", quoted.join(", "))
+}
+
+/// Swift `RuntimeSessionPublicationRecord.isUnboundSourceFailure`: the
+/// writer's confirmed refusal of an unreadable source, which alone may start
+/// a new publication attempt.
+fn unbound_source_failure(marker: &Value) -> bool {
+    let absent = |key: &str| marker.get(key).is_none_or(Value::is_null);
+    marker["failure"]["code"] == "sourceIntegrityFailed"
+        && marker["failure"]["certainty"] == "confirmed"
+        && marker["phase"] == "awaitingStorage"
+        && [
+            "receipt",
+            "proposal",
+            "checkpointSeal",
+            "journalSeal",
+            "sessionRootIdentity",
+        ]
+        .iter()
+        .all(|key| absent(key))
+        && marker["claims"].as_array().is_some_and(Vec::is_empty)
+        && marker["relativeSessionPath"] == ""
+        && marker["root"]["path"] == ""
+        && marker["root"]["device"] == "0"
+        && marker["root"]["inode"] == "0"
+        && marker["root"]["volumeIdentity"] == ""
+        && marker["policyGeneration"] == "0"
+}
+
+/// Swift's `DeviceProviderError.unsupportedAction`.
+fn unsupported(detail: &str) -> WireError {
+    other(format!("unsupportedAction({})", swift_string(detail)))
+}
+
+/// Swift `PersistedTypedProviderAction.materialize()` for `analyzer.analyze`,
+/// which recovery materializes only as its recovery identity.
+fn materialize(action: &Value) -> Result<Identity, WireError> {
+    let kind = action["kind"].as_str().unwrap_or_default();
+    if kind != "analyzer.analyze" {
+        return Err(unsupported(&format!(
+            "persisted typed provider action kind {kind} is unknown"
+        )));
+    }
+    let empty = Map::new();
+    let arguments = action["arguments"].as_object().unwrap_or(&empty);
+    let string = |key: &str| {
+        arguments
+            .get(key)
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+            .ok_or_else(|| unsupported(&format!("persisted {kind} is missing string {key}")))
+    };
+    let analyzer_ref = string("analyzerRef")?;
+    let mut expected = vec![
+        "analyzerRef",
+        "analyzerVersion",
+        "sourceArtifactId",
+        "sourceSha256",
+        "sourceByteCount",
+    ];
+    let request_digest = if analyzer_ref == "trace-analysis@1" {
+        expected.push("requestDigestSha256");
+        Some(string("requestDigestSha256")?)
+    } else {
+        None
+    };
+    if arguments.len() != expected.len() || !expected.iter().all(|key| arguments.contains_key(*key))
+    {
+        return Err(unsupported(
+            "persisted analyzer.analyze has a non-closed recovery identity",
+        ));
+    }
+    let analyzer_version = string("analyzerVersion")?;
+    let source_artifact_id = string("sourceArtifactId")?;
+    let source_sha256 = string("sourceSha256")?;
+    let source_byte_count = arguments
+        .get("sourceByteCount")
+        .and_then(Value::as_i64)
+        .ok_or_else(|| {
+            unsupported(&format!(
+                "persisted {kind} is missing integer sourceByteCount"
+            ))
+        })?;
+    if analyzer_ref.is_empty()
+        || analyzer_version.is_empty()
+        || source_artifact_id.is_empty()
+        || source_byte_count <= 0
+        || !lowercase_sha256(&source_sha256)
+        || request_digest
+            .as_deref()
+            .is_some_and(|digest| !lowercase_sha256(digest))
+    {
+        return Err(unsupported(
+            "persisted analyzer.analyze has an invalid recovery identity",
+        ));
+    }
+    Ok(Identity {
+        analyzer_ref,
+        source_artifact_id,
+        source_sha256,
+        source_byte_count,
+        request_digest,
+    })
+}
+
+/// Swift `AnalyzerProvider.reconcile`: analysis writes nothing outside its
+/// own derived Artifact, so its intent is confirmed not executed once the
+/// source resolved again is exactly the one the intent named.
+fn analyzer_reconcile(identity: &Identity, source: Option<&Source>) -> Decision {
+    if identity.analyzer_ref == "trace-analysis@1"
+        && !identity
+            .request_digest
+            .as_deref()
+            .is_some_and(lowercase_sha256)
+    {
+        return Decision::Unknown("analyzer reconcile request identity is incomplete".into());
+    }
+    match source {
+        Some(source)
+            if source.artifact_id == identity.source_artifact_id
+                && source.sha256.as_deref() == Some(identity.source_sha256.as_str())
+                && source.byte_count == Some(identity.source_byte_count) =>
+        {
+            Decision::NotExecuted
+        }
+        _ => Decision::Unknown("analyzer reconcile source identity does not match".into()),
+    }
+}
+
+/// A Job the reconcile holds: its run state (record, journal, next sequence)
+/// and Swift's `jobs[jobID]`, the record as the engine last stored it, which
+/// stays resident when the reconcile fails ahead of its record.
+struct Held {
+    run: Run,
+    stored: JobRecord,
+    directory: PathBuf,
+    /// The journal moved since the record was last durable.
+    ahead: bool,
+}
+
+impl Held {
+    fn open(
+        record: JobRecord,
+        directory: PathBuf,
+        now: fn() -> Option<String>,
+    ) -> Result<Self, WireError> {
+        let journal =
+            JournalWriter::open(&directory, false).map_err(|error| other(format!("{error}")))?;
+        let sequence = journal
+            .facts()
+            .last_durable_sequence
+            .map_or(0, |last| last + 1);
+        Ok(Self {
+            stored: record.clone(),
+            run: Run {
+                record,
+                journal,
+                sequence,
+                now,
+                consumed: None,
+            },
+            directory,
+            ahead: false,
+        })
+    }
+
+    fn append(&mut self, event: Value) -> Result<(), WireError> {
+        self.run.append(event).map_err(from_run)?;
+        self.ahead = true;
+        Ok(())
+    }
+
+    /// Swift `transition(&runtime, …)`: journaled and synchronized, then the
+    /// record's state and timeline, and the runtime stored.
+    fn transition(
+        &mut self,
+        from: &str,
+        to: &str,
+        reason: &str,
+        trigger: Option<&str>,
+    ) -> Result<(), WireError> {
+        let envelope = self
+            .run
+            .envelope(format!("t-{}", self.run.sequence))
+            .map_err(from_run)?;
+        self.append(events::state_transition(
+            &envelope, from, to, reason, trigger,
+        ))?;
+        self.run.record.state = to.into();
+        self.run.record.timeline.push(format!("{from}->{to}"));
+        self.run.record.timeline.push(format!("reason: {reason}"));
+        self.store();
+        Ok(())
+    }
+
+    fn store(&mut self) {
+        self.stored = self.run.record.clone();
+    }
+
+    /// Swift `persistRuntimeRecord`, then the runtime stored.
+    fn persist(&mut self, jobs: &JobStore) -> Result<(), WireError> {
+        self.run.persist(jobs).map_err(from_run)?;
+        self.ahead = false;
+        self.store();
+        Ok(())
+    }
+
+    /// Swift `statusAndReleaseTerminalRuntime`: a terminal Job whose outcome
+    /// is known is published as a Session.
+    fn release(
+        mut self,
+        jobs: &JobStore,
+        sessions: Option<&SessionPublisher<'_>>,
+    ) -> Result<Value, WireError> {
+        self.run
+            .release(jobs, sessions, &self.directory)
+            .map_err(from_run)?;
+        Ok(self.run.record.status())
+    }
+
+    /// Every complete record of the journal, in order (Swift
+    /// `DurableJournalRecovery.inspect(url:).events`).
+    fn events(&self, jobs: &JobStore) -> Result<Vec<Value>, WireError> {
+        journal_events(jobs, &self.run.record.job_id)
+    }
+}
+
+fn journal_events(jobs: &JobStore, job_id: &str) -> Result<Vec<Value>, WireError> {
+    let bytes = jobs
+        .journal_bytes(job_id)
+        .map_err(|error| other(format!("{error}")))?;
+    let durable = bytes
+        .iter()
+        .rposition(|byte| *byte == b'\n')
+        .map_or(0, |last| last + 1);
+    bytes[..durable]
+        .split(|byte| *byte == b'\n')
+        .filter(|line| !line.is_empty())
+        .map(|line| {
+            serde_json::from_slice(line)
+                .map_err(|_| other("sequenceViolation(\"the Job Journal cannot be replayed\")"))
+        })
+        .collect()
+}
+
+/// The recovery attempt a start left without its decision, if any.
+fn unfinished_attempt(events: &[Value]) -> Option<String> {
+    let completed: Vec<&str> = events
+        .iter()
+        .filter(|event| event["kind"] == "reconcileOutcome")
+        .filter_map(|event| event["payload"]["recoveryAttemptId"].as_str())
+        .collect();
+    events
+        .iter()
+        .rev()
+        .filter(|event| event["kind"] == "reconcileStarted")
+        .filter_map(|event| event["payload"]["recoveryAttemptId"].as_str())
+        .find(|attempt| !completed.contains(attempt))
+        .map(str::to_owned)
+}
+
+pub struct JobReconciler<'a> {
+    pub jobs: &'a JobStore,
+    pub artifacts: &'a ArtifactReadStore,
+    pub imports: Option<&'a crate::ImportUploadStore>,
+    pub now: fn() -> Option<String>,
+    /// The standalone daemon's Session publication writer, as the runner's.
+    pub sessions: Option<&'a SessionPublisher<'a>>,
+}
+
+impl JobReconciler<'_> {
+    /// Swift's `job.reconcile`: the reconciled Job's `arkdeck.job-status/1`.
+    pub fn handle(&self, params: &Map<String, Value>) -> Result<Value, WireError> {
+        let Some(id) = params.get("jobId").and_then(Value::as_str) else {
+            return Err(refused("invalidParams", "jobId is required"));
+        };
+        let record = self.read(id)?;
+        if record.operation() != ANALYZER {
+            return unported(record);
+        }
+        if terminal(&record.state) {
+            return self.released(record);
+        }
+        self.resident(record)
+    }
+
+    /// The answer to `job.reconcile` while a run of the Job holds it: that
+    /// run alone decides the Job, so its status is answered and nothing is
+    /// written, as Swift answers a Job its live executor holds.
+    pub fn status(&self, params: &Map<String, Value>) -> Result<Value, WireError> {
+        let Some(id) = params.get("jobId").and_then(Value::as_str) else {
+            return Err(refused("invalidParams", "jobId is required"));
+        };
+        Ok(self.read(id)?.status())
+    }
+
+    /// Swift `recordForRead` and the handler's spellings of its refusals.
+    fn read(&self, id: &str) -> Result<JobRecord, WireError> {
+        match self.jobs.read_snapshot(id) {
+            Ok(record) => Ok(record),
+            Err(error) if matches!(error.code.as_str(), "notFound" | "invalidInput") => {
+                Err(refused("notFound", format!("unknown job {id}")))
+            }
+            Err(error)
+                if error
+                    .message
+                    .starts_with("the referenced Job record is unreadable") =>
+            {
+                Err(engine("jobRecordUnreadable", id))
+            }
+            Err(_) => Err(engine(
+                "internalFailure",
+                &format!("Runtime job history index is unreadable for {id}"),
+            )),
+        }
+    }
+
+    fn clock(&self) -> Result<String, WireError> {
+        (self.now)().ok_or_else(|| other("the Runtime clock is unavailable"))
+    }
+
+    /// Swift's non-resident branch of `reconcileOwned`: a terminal Job. Only
+    /// a writer's confirmed refusal of an unbound source starts its Session
+    /// publication again; a Job under the default read-only policy has no
+    /// capability lineage to repair.
+    fn released(&self, record: JobRecord) -> Result<Value, WireError> {
+        let id = record.job_id.clone();
+        let retry = record.session_publication().is_some_and(|marker| {
+            unbound_source_failure(marker)
+                && marker["sessionID"] == format!("session-{id}")
+                && marker["catalogDigest"] == record.catalog_digest()
+        }) && !record.outcome_unknown();
+        if !retry {
+            return Ok(record.status());
+        }
+        let directory = self
+            .jobs
+            .job_directory(&id)
+            .map_err(|error| other(format!("{error:?}")))?;
+        let replay = inspect_journal(&directory).map_err(|error| other(format!("{error}")))?;
+        let proposal_absent = matches!(
+            std::fs::symlink_metadata(directory.join(PROPOSAL)),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound
+        );
+        if replay.requires_recovery
+            || replay.finalized
+            || replay.current_state.as_deref() != Some(record.state.as_str())
+            || !proposal_absent
+        {
+            return Ok(record.status());
+        }
+        Held::open(record, directory, self.now)?.release(self.jobs, self.sessions)
+    }
+
+    /// Swift's resident branch of `reconcileOwned` for an analyzer Job, with
+    /// what a failure has journaled kept resident.
+    fn resident(&self, record: JobRecord) -> Result<Value, WireError> {
+        let settles = matches!(
+            record.state.as_str(),
+            "cancelRequested" | "cancellingAtSafeBoundary"
+        );
+        if !record.outcome_unknown() && !settles {
+            return Ok(record.status());
+        }
+        let directory = self
+            .jobs
+            .job_directory(&record.job_id)
+            .map_err(|error| other(format!("{error:?}")))?;
+        let mut held = Held::open(record, directory, self.now)?;
+        let result = if held.run.record.outcome_unknown() {
+            self.reconcile_unknown(&mut held)
+        } else {
+            self.settle_cancellation(&mut held)
+        };
+        match result {
+            Ok(Some(status)) => Ok(status),
+            Ok(None) => held.release(self.jobs, self.sessions),
+            Err(error) => {
+                if held.ahead {
+                    self.jobs.hold_resident(held.stored);
+                }
+                Err(error)
+            }
+        }
+    }
+
+    /// Swift's settlement of a cancellation whose executor no longer exists:
+    /// nothing uncertain happened, so no device work is needed.
+    fn settle_cancellation(&self, held: &mut Held) -> Result<Option<Value>, WireError> {
+        if held.run.record.state == "cancelRequested" {
+            held.transition(
+                "cancelRequested",
+                "cancellingAtSafeBoundary",
+                "cancellation executor did not survive; settling on reconcile",
+                None,
+            )?;
+        }
+        held.transition(
+            "cancellingAtSafeBoundary",
+            "cancelled",
+            "no executor remains to carry the durable cancellation intent",
+            None,
+        )?;
+        held.run.record.set_operation_failure(Some(failure(
+            "cancelled",
+            "cancelled",
+            "notAutomatic",
+            "none",
+        )));
+        held.run.record.finish(&self.clock()?);
+        held.persist(self.jobs)?;
+        Ok(None)
+    }
+
+    /// Swift `reconcileOwned` from its outcome-unknown gate: `Some(status)`
+    /// when the Job stays resident, `None` when it is to be released.
+    fn reconcile_unknown(&self, held: &mut Held) -> Result<Option<Value>, WireError> {
+        let id = held.run.record.job_id.clone();
+        let mut events = held.events(self.jobs)?;
+        let mut facts = held.run.journal.facts();
+
+        // Finish a reconcile decision that was already durable when the
+        // process stopped: no readback and no dispatch is needed.
+        if let Some(last) = events
+            .last()
+            .filter(|last| last["kind"] == "reconcileOutcome")
+            && let Some(next) = last["payload"]["nextState"]
+                .as_str()
+                .filter(|next| STATES.contains(next))
+        {
+            let (next, trigger) = (next.to_owned(), last["eventId"].as_str().map(str::to_owned));
+            held.transition(
+                "reconciling",
+                &next,
+                "complete durable reconcile decision",
+                trigger.as_deref(),
+            )?;
+            events = held.events(self.jobs)?;
+            facts = held.run.journal.facts();
+        }
+        let confirmed = facts.last_reconcile_outcome_certainty.as_deref() == Some("confirmed");
+        let current = facts.current_state.clone();
+        if current.as_deref() == Some("resumeAtConfirmedSafeBoundary") && confirmed {
+            let record = &mut held.run.record;
+            record.clear_outcome_unknown();
+            record.set_recovery(None, None, None);
+            record.state = "resumeAtConfirmedSafeBoundary".into();
+            record
+                .timeline
+                .push("reconciled: durable confirmed completion".into());
+            held.persist(self.jobs)?;
+            return Ok(Some(held.run.record.status()));
+        }
+        if current.as_deref() == Some("finalizing") && confirmed {
+            held.transition(
+                "finalizing",
+                "failed",
+                "reconciliation confirmed the original action did not complete",
+                None,
+            )?;
+            let record = &mut held.run.record;
+            record.clear_outcome_unknown();
+            record.set_recovery(None, None, None);
+            record.finish(&self.clock()?);
+            held.persist(self.jobs)?;
+            return Ok(None);
+        }
+        if !facts.unknown_outcomes.is_empty() {
+            held.run.record.timeline.push(
+                "reconcile refused: legacy outcomeUnknown event cannot be rewritten; original \
+                 not resent"
+                    .into(),
+            );
+            held.persist(self.jobs)?;
+            return Ok(Some(held.run.record.status()));
+        }
+        let record = &held.run.record;
+        let (Some(step), Some(action), Some(intent)) = (
+            record.recovery_step().map(str::to_owned),
+            record.recovery_action().cloned(),
+            record.recovery_intent().map(str::to_owned),
+        ) else {
+            return Err(engine(
+                "internalFailure",
+                &format!("unknown outcome has no persisted exact typed action for {id}"),
+            ));
+        };
+        match current.as_deref() {
+            Some("waitingForRecovery") => {
+                held.transition(
+                    "waitingForRecovery",
+                    "reconciling",
+                    "begin exact typed provider reconciliation",
+                    None,
+                )?;
+                events = held.events(self.jobs)?;
+                facts = held.run.journal.facts();
+            }
+            Some("reconciling") => {}
+            state => {
+                return Err(engine(
+                    "internalFailure",
+                    &format!(
+                        "unknown outcome journal is {}, not at a recovery boundary",
+                        state.unwrap_or("missing")
+                    ),
+                ));
+            }
+        }
+        let attempt = match unfinished_attempt(&events) {
+            Some(attempt) => attempt,
+            None => {
+                let sequence = held.run.sequence;
+                let attempt = format!("recovery-{id}-{sequence}");
+                let envelope = held
+                    .run
+                    .envelope(format!("reconcile-start-{sequence}"))
+                    .map_err(from_run)?;
+                held.append(events::reconcile_started(
+                    &envelope,
+                    &attempt,
+                    "waitingForRecovery",
+                    facts.last_durable_sequence.unwrap_or(0),
+                    "manual",
+                ))?;
+                held.run
+                    .record
+                    .timeline
+                    .push(format!("reconcile started {step}"));
+                held.store();
+                events = held.events(self.jobs)?;
+                attempt
+            }
+        };
+        let operation = held.run.record.operation().to_owned();
+        let known = operation
+            .rsplit_once('@')
+            .and_then(|(name, version)| CatalogOperation::lookup(name, version.parse().ok()));
+        if known.is_none() {
+            return Err(engine(
+                "internalFailure",
+                &format!("catalog operation vanished for {id}"),
+            ));
+        }
+        // A host-only reconcile inspects only its Job-owned input: no device
+        // facts are resolved.
+        let source = self.resolve_source(&held.run.record)?;
+        let identity = materialize(&action)?;
+        let Some(exact) = events
+            .iter()
+            .find(|event| event["eventId"] == intent.as_str())
+        else {
+            return Err(engine(
+                "internalFailure",
+                "persisted reconciliation action has no matching intent",
+            ));
+        };
+        if exact["kind"] == "compensationIntent" {
+            // Only a debug HAP's compensation keeps its original failure.
+            return Err(engine(
+                "internalFailure",
+                "compensation lost original operation failure",
+            ));
+        }
+        let resolution = events.iter().rev().find(|event| {
+            matches!(
+                event["kind"].as_str(),
+                Some("stepOutcome" | "compensationOutcome")
+            ) && event["payload"]["correlatesToIntentEventId"] == intent.as_str()
+                && event["payload"]["outcomeCertainty"] == "confirmed"
+        });
+        let decision = match resolution {
+            Some(resolution) if resolution["payload"]["result"] == "succeeded" => {
+                Decision::Completed(vec!["source".into()])
+            }
+            Some(_) => Decision::NotExecuted,
+            None => analyzer_reconcile(&identity, source.as_ref()),
+        };
+        self.finish(held, &events, &intent, &step, &attempt, decision)
+    }
+
+    /// Swift `resolvedInputArtifact(jobID:)` for an analyzer: its source
+    /// lease resolved again, then checked against the materialized request.
+    fn resolve_source(&self, record: &JobRecord) -> Result<Option<Source>, WireError> {
+        let Some(lease) = record.request["inputs"]["sourceArtifactRef"].as_str() else {
+            return Ok(None);
+        };
+        let leased = match ImportReference::parse(lease) {
+            Ok(Some(reference)) => self
+                .imports
+                .ok_or_else(|| other("Import owner is unavailable"))?
+                .resolve_input(self.artifacts, &reference)
+                .map_err(|error| other(error.message))?,
+            Ok(None) => self.artifacts.lease(lease).map_err(other)?,
+            Err(error) => return Err(other(error.message)),
+        };
+        if let Some(reason) = binding_refusal(&leased, record) {
+            return Err(refused("rejected", reason));
+        }
+        Ok(Some(Source {
+            sha256: leased.row["sha256"].as_str().map(str::to_owned),
+            byte_count: leased.row["byteCount"].as_i64(),
+            artifact_id: leased.artifact_id,
+        }))
+    }
+
+    /// Swift `finishReconcile` for an analyzer step: the decision journaled
+    /// and its record written, `Some(status)` for a Job that stays resident.
+    fn finish(
+        &self,
+        held: &mut Held,
+        events: &[Value],
+        intent: &str,
+        step: &str,
+        attempt: &str,
+        decision: Decision,
+    ) -> Result<Option<Value>, WireError> {
+        let Some(exact) = events.iter().find(|event| event["eventId"] == intent) else {
+            return Err(engine("internalFailure", "reconcile intent disappeared"));
+        };
+        let dispatched = exact["payload"]["step"]["id"]
+            .as_str()
+            .unwrap_or_default()
+            .to_owned();
+        let durable = events.iter().any(|event| {
+            matches!(
+                event["kind"].as_str(),
+                Some("stepOutcome" | "compensationOutcome")
+            ) && event["payload"]["correlatesToIntentEventId"] == intent
+                && event["payload"]["outcomeCertainty"] == "confirmed"
+        });
+        // The correlated outcome, unless the journal already holds one.
+        let outcome =
+            |held: &mut Held, result: &str, code: Option<&str>| -> Result<(), WireError> {
+                if durable {
+                    return Ok(());
+                }
+                let sequence = held.run.sequence;
+                let envelope = held
+                    .run
+                    .envelope(format!("reconciled-outcome-{sequence}"))
+                    .map_err(from_run)?;
+                held.append(events::step_outcome(
+                    &envelope,
+                    &dispatched,
+                    1,
+                    intent,
+                    result,
+                    "confirmed",
+                    code,
+                    None,
+                ))
+            };
+        let (next, result, certainty, safe, detail) = match &decision {
+            Decision::Completed(keys) => {
+                outcome(held, "succeeded", None)?;
+                (
+                    "resumeAtConfirmedSafeBoundary",
+                    "resumeHostOnlyAtConfirmedSafeBoundary",
+                    "confirmed",
+                    true,
+                    format!("confirmed completed {}", swift_array(keys)),
+                )
+            }
+            Decision::NotExecuted => {
+                outcome(held, "failed", Some(CONFIRMED_NOT_EXECUTED))?;
+                (
+                    "finalizing",
+                    "finalizeHostOnlyConfirmedFailure",
+                    "confirmed",
+                    true,
+                    "confirmed not executed; original not resent".to_owned(),
+                )
+            }
+            Decision::Unknown(reason) => (
+                "waitingForRecovery",
+                "waitingForRecovery",
+                "outcomeUnknown",
+                false,
+                reason.clone(),
+            ),
+        };
+        let decided = format!("reconcile-outcome-{}", held.run.sequence);
+        let envelope = held.run.envelope(decided.clone()).map_err(from_run)?;
+        held.append(events::reconcile_outcome(
+            &envelope,
+            None,
+            attempt,
+            result,
+            next,
+            certainty,
+            safe,
+            &[detail.as_str()],
+        ))?;
+        held.transition(
+            "reconciling",
+            next,
+            &format!("persist exact typed reconcile decision: {detail}"),
+            Some(&decided),
+        )?;
+        match decision {
+            Decision::Completed(_) => {
+                let record = &mut held.run.record;
+                record.clear_outcome_unknown();
+                record.clear_finished();
+                record.set_operation_failure(None);
+                record.set_recovery(None, None, None);
+                record
+                    .timeline
+                    .push(format!("reconciled: confirmed completed {step}"));
+            }
+            Decision::NotExecuted => {
+                held.run.record.clear_outcome_unknown();
+                held.run.record.set_operation_failure(Some(failure(
+                    "executionConfirmedNotPerformed",
+                    "externalTool",
+                    "runtimeDecisionRequired",
+                    "submitNewTypedRequestAfterRuntimeProof",
+                )));
+                held.transition(
+                    "finalizing",
+                    "failed",
+                    &format!("reconciliation confirmed {step} did not complete"),
+                    None,
+                )?;
+                let now = self.clock()?;
+                let record = &mut held.run.record;
+                record.set_recovery(None, None, None);
+                record.finish(&now);
+                record
+                    .timeline
+                    .push(format!("reconciled: confirmed not executed {step}"));
+            }
+            Decision::Unknown(_) => {
+                held.run.record.set_outcome_unknown();
+                held.run
+                    .record
+                    .timeline
+                    .push(format!("reconcile inconclusive: {detail}"));
+            }
+        }
+        held.persist(self.jobs)?;
+        if terminal(&held.run.record.state) && !held.run.record.outcome_unknown() {
+            return Ok(None);
+        }
+        Ok(Some(held.run.record.status()))
+    }
+}
+
+/// A Job of an operation this Runtime does not reconcile yet: its status
+/// where Swift's reconcile writes nothing for it, and otherwise a refusal
+/// with nothing written.
+fn unported(record: JobRecord) -> Result<Value, WireError> {
+    let state = record.state.as_str();
+    let writes = if terminal(state) {
+        record
+            .session_publication()
+            .is_some_and(unbound_source_failure)
+            || (!record.outcome_unknown()
+                && matches!(state, "failed" | "cancelled")
+                && record
+                    .admission_evidence()
+                    .is_some_and(|evidence| evidence["kind"] == "runtimeCapability"))
+    } else {
+        record.outcome_unknown()
+            || matches!(state, "cancelRequested" | "cancellingAtSafeBoundary")
+            || (record.operation() == "debug.hap@1" && state == "finalizing")
+    };
+    if !writes {
+        return Ok(record.status());
+    }
+    Err(refused(
+        "rejected",
+        format!(
+            "job {} runs {}, which the Rust Runtime does not reconcile yet; nothing was \
+             dispatched or written",
+            record.job_id,
+            record.operation()
+        ),
+    ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn identity(source: &str, sha256: &str, count: i64) -> Identity {
+        Identity {
+            analyzer_ref: "crash-signature@1".into(),
+            source_artifact_id: source.into(),
+            source_sha256: sha256.into(),
+            source_byte_count: count,
+            request_digest: None,
+        }
+    }
+
+    #[test]
+    fn the_analyzer_confirms_non_execution_only_for_the_source_its_intent_named() {
+        let sha = "a".repeat(64);
+        let named = identity("ART-1", &sha, 30);
+        let same = Source {
+            artifact_id: "ART-1".into(),
+            sha256: Some(sha.clone()),
+            byte_count: Some(30),
+        };
+        assert!(matches!(
+            analyzer_reconcile(&named, Some(&same)),
+            Decision::NotExecuted
+        ));
+        for other in [
+            Source {
+                artifact_id: "ART-2".into(),
+                sha256: Some(sha.clone()),
+                byte_count: Some(30),
+            },
+            Source {
+                artifact_id: "ART-1".into(),
+                sha256: Some("b".repeat(64)),
+                byte_count: Some(30),
+            },
+            Source {
+                artifact_id: "ART-1".into(),
+                sha256: Some(sha.clone()),
+                byte_count: Some(31),
+            },
+        ] {
+            assert!(matches!(
+                analyzer_reconcile(&named, Some(&other)),
+                Decision::Unknown(reason) if reason == "analyzer reconcile source identity does not match"
+            ));
+        }
+        assert!(matches!(
+            analyzer_reconcile(&named, None),
+            Decision::Unknown(_)
+        ));
+    }
+
+    #[test]
+    fn a_persisted_action_materializes_only_as_its_closed_recovery_identity() {
+        let sha = "c".repeat(64);
+        let action = json!({"kind": "analyzer.analyze", "arguments": {
+            "analyzerRef": "crash-signature@1", "analyzerVersion": "arkdeck-fault-log-ledger@1",
+            "sourceArtifactId": "ART-1", "sourceSha256": sha, "sourceByteCount": 30}});
+        let materialized = materialize(&action).unwrap();
+        assert_eq!(materialized.source_byte_count, 30);
+        let mut extra = action.clone();
+        extra["arguments"]["future"] = json!(true);
+        let mut uppercase = action.clone();
+        uppercase["arguments"]["sourceSha256"] = json!("C".repeat(64));
+        let mut empty = action.clone();
+        empty["arguments"]["sourceByteCount"] = json!(0);
+        let mut foreign = action;
+        foreign["kind"] = json!("hdc.shell");
+        for (refused, message) in [
+            (
+                extra,
+                "unsupportedAction(\"persisted analyzer.analyze has a non-closed recovery identity\")",
+            ),
+            (
+                uppercase,
+                "unsupportedAction(\"persisted analyzer.analyze has an invalid recovery identity\")",
+            ),
+            (
+                empty,
+                "unsupportedAction(\"persisted analyzer.analyze has an invalid recovery identity\")",
+            ),
+            (
+                foreign,
+                "unsupportedAction(\"persisted typed provider action kind hdc.shell is unknown\")",
+            ),
+        ] {
+            let Err(error) = materialize(&refused) else {
+                panic!("{refused}");
+            };
+            assert_eq!(
+                (error.code.as_str(), error.message.as_str()),
+                ("internalError", message)
+            );
+        }
+    }
+
+    #[test]
+    fn only_the_writers_confirmed_unbound_refusal_starts_a_publication_again() {
+        let marker = json!({"sessionID": "session-job-a", "catalogDigest": "d",
+            "policyGeneration": "0",
+            "root": {"path": "", "device": "0", "inode": "0", "volumeIdentity": ""},
+            "relativeSessionPath": "", "claims": [], "phase": "awaitingStorage",
+            "failure": {"code": "sourceIntegrityFailed", "certainty": "confirmed",
+                "detail": "the Job Journal does not open with its own creation facts"}});
+        assert!(unbound_source_failure(&marker));
+        let mut storage = marker.clone();
+        storage["failure"]["code"] = json!("storageUnavailable");
+        let mut bound = marker.clone();
+        bound["policyGeneration"] = json!("1");
+        let mut proposed = marker;
+        proposed["proposal"] = json!({"manifestSHA256": "e"});
+        for other in [storage, bound, proposed] {
+            assert!(!unbound_source_failure(&other), "{other}");
+        }
+    }
+
+    #[test]
+    fn an_attempt_without_its_decision_is_the_one_continued() {
+        let started = |attempt: &str| json!({"kind": "reconcileStarted", "payload": {"recoveryAttemptId": attempt}});
+        let decided = |attempt: &str| json!({"kind": "reconcileOutcome", "payload": {"recoveryAttemptId": attempt}});
+        assert_eq!(unfinished_attempt(&[]), None);
+        assert_eq!(
+            unfinished_attempt(&[started("recovery-a-6")]).as_deref(),
+            Some("recovery-a-6")
+        );
+        assert_eq!(
+            unfinished_attempt(&[started("recovery-a-6"), decided("recovery-a-6")]),
+            None
+        );
+        assert_eq!(
+            unfinished_attempt(&[
+                started("recovery-a-6"),
+                decided("recovery-a-6"),
+                started("recovery-a-9"),
+            ])
+            .as_deref(),
+            Some("recovery-a-9")
+        );
+        assert_eq!(swift_array(&["source".into()]), "[\"source\"]");
+    }
+}

@@ -561,6 +561,11 @@ impl JobRecord {
     pub(super) fn finish(&mut self, now: &str) {
         self.finished = Some(now.into());
     }
+    /// Swift `finishedAtUTC = nil`: a Job recovery or reconciliation leaves
+    /// open again.
+    pub(super) fn clear_finished(&mut self) {
+        self.finished = None;
+    }
     pub(super) fn set_operation_failure(&mut self, failure: Option<Value>) {
         self.operation_failure = failure;
     }
@@ -580,6 +585,10 @@ impl JobRecord {
     pub(super) fn recovery_intent(&self) -> Option<&str> {
         self.recovery_intent.as_deref()
     }
+    /// The step that intent belongs to, if any.
+    pub(super) fn recovery_step(&self) -> Option<&str> {
+        self.recovery_step.as_deref()
+    }
     pub(super) fn recovery_action(&self) -> Option<&Value> {
         self.recovery_action.as_ref()
     }
@@ -591,6 +600,11 @@ impl JobRecord {
     }
     pub(super) fn set_outcome_unknown(&mut self) {
         self.unknown = true;
+    }
+    /// Swift `outcomeUnknown = false`, which only a journal-proven recovery
+    /// or reconcile decision writes.
+    pub(super) fn clear_outcome_unknown(&mut self) {
+        self.unknown = false;
     }
     pub(super) fn provider(&self) -> &str {
         &self.provider
@@ -803,6 +817,10 @@ impl JobRecord {
     /// The step kinds the record kept, in the order they first ran.
     pub(super) fn step_kinds(&self) -> Option<&[String]> {
         self.step_kinds.as_deref()
+    }
+    /// Swift `actualStepKinds = kinds`, empty or not.
+    pub(super) fn set_step_kinds(&mut self, kinds: Vec<String>) {
+        self.step_kinds = Some(kinds);
     }
     pub(super) fn status(&self) -> Value {
         let uncertain =

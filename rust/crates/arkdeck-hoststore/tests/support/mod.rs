@@ -217,6 +217,38 @@ pub fn index(path: &Path) -> Value {
     json!({"userVersion": version, "journalMode": mode, "schema": schema, "rows": rows})
 }
 
+/// A Job store snapshot the Swift oracle recorded under `prefix` (its
+/// `storeSnapshot`: the Job index and every file below the Job directories,
+/// each Job record read machine-independently) against the store at `jobs`,
+/// which may still be open.
+pub fn assert_store(fixture: &Path, prefix: &str, jobs: &Path) {
+    assert_eq!(
+        index(jobs),
+        document(fixture, &format!("{prefix}/index.json")),
+        "{prefix}/index.json"
+    );
+    let (mut actual, mut recorded) = (BTreeMap::new(), BTreeMap::new());
+    walk(&jobs.join("jobs"), prefix, &mut actual, &mut Vec::new());
+    walk(
+        &fixture.join(prefix).join("jobs"),
+        prefix,
+        &mut recorded,
+        &mut Vec::new(),
+    );
+    assert_eq!(
+        actual.keys().collect::<Vec<_>>(),
+        recorded.keys().collect::<Vec<_>>(),
+        "{prefix}"
+    );
+    for (path, bytes) in &recorded {
+        assert_eq!(
+            String::from_utf8_lossy(&actual[path]),
+            String::from_utf8_lossy(bytes),
+            "{path}"
+        );
+    }
+}
+
 /// Every entry below `base` as `prefix/<relative path>`: each file's bytes
 /// (a Job record's read machine-independently) and each entry's kind and mode.
 fn walk(

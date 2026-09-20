@@ -399,12 +399,42 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
     if development.is_some() {
         return Err("development host-store owner is not yet supported on this platform".into());
     }
-    // As Swift's daemon, once, before serving: expired Artifacts are
-    // reclaimed. Swift sweeps after its Job recovery; once that is ported
-    // (design §L.1 item 13) it runs first, though the sweep's census keeps
-    // every Job not proven settled either way. A failure is reported and
-    // never stops the daemon, since an un-reclaimable store is what the sweep
-    // exists to make visible.
+    // Swift `recoverActiveJobs()` before the daemon serves: the isolated owner
+    // reopens its active Jobs, parks every unresolved intent and dispatches
+    // nothing. A Job it cannot read, or whose recovery needs state it does not
+    // hold, is named here and left as it is; a recovery that fails stops the
+    // start, as Swift's does.
+    #[cfg(target_os = "macos")]
+    if let Some(recovered) = host.recover_active_jobs()? {
+        if !recovered.statuses.is_empty() {
+            println!(
+                "recovered {} active job(s); unknown outcomes parked",
+                recovered.statuses.len()
+            );
+            let _ = io::stdout().flush();
+        }
+        for (job, reason) in &recovered.quarantined {
+            eprintln!(
+                "arkdeck-agentd: job {job} is quarantined: {reason}; it will not run and its \
+                 record was not modified"
+            );
+        }
+        if !recovered.quarantined.is_empty() {
+            eprintln!(
+                "arkdeck-agentd: {} Job record(s) this build cannot read; every mutation they \
+                 could affect stays refused",
+                recovered.quarantined.len()
+            );
+        }
+        for (job, reason) in &recovered.refused {
+            eprintln!("arkdeck-agentd: job {job} was not recovered: {reason}");
+        }
+    }
+    // As Swift's daemon, once, before serving and after its Job recovery
+    // above: expired Artifacts are reclaimed; the sweep's census keeps every
+    // Job not proven settled. A failure is reported and never stops the
+    // daemon, since an un-reclaimable store is what the sweep exists to make
+    // visible.
     #[cfg(target_os = "macos")]
     if let Some(sweep) = host.collect_expired_artifacts() {
         match sweep {
