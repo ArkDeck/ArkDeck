@@ -130,6 +130,9 @@ ClientKit 仍只依赖 Core，依赖图保持无环。CLI 经 Workflows → Clie
 诊断会话的只读读取器（`DiagnosticSessionReading` 的展示模型、`DiagnosticSessionApplicationReader` 与离线巡检 `DiagnosticSessionOfflineInspector`）
 也在 ClientKit，CLI 经过渡边共用；hilog 摘要的展示模型在 ClientKit，而校验它的 `DiagnosticHilogSummaryReader` 留在 Workflows——
 它要用 analyzer provider 的 `HilogSummaryDerivedAnalyzer` 验报告，ClientKit 够不着。
+Debug 工作区的 facade（`DebugApplicationFacade`）与 App 的产品能力登记（`AppProductCapabilityRegistry`）也在 ClientKit；
+原生库校验器（读 ELF 与代码签名事实，App 选库时先校验）随之移入，部署用的 restart/verification/rollback profile 与描述符留 Workflows；
+debug 探针只把 App 要的读模型移过来，探针本体 `FoundationDebugRuntimeProbe` 与 daemon 组合用的类型不动。
 
 ## 3. Ownership Rules(事实源唯一)
 

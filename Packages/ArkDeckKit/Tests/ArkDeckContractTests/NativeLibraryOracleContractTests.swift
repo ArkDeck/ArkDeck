@@ -3,6 +3,7 @@
 
 import Darwin
 import XCTest
+@testable import ArkDeckClientKit
 
 @testable import ArkDeckAgentDaemon
 @testable import ArkDeckCore

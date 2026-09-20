@@ -6,6 +6,7 @@
 // the in-process RockchipFlashExecutionHost whole — that host was retired in
 // T25, and the engine is now the only thing that executes ArkForge Flash.
 
+import ArkDeckClientKit
 import ArkDeckCore
 import ArkDeckOpenHarmony
 import CryptoKit

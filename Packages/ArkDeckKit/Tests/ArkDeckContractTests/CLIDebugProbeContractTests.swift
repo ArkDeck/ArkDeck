@@ -1,6 +1,7 @@
 import Darwin
 import Foundation
 import XCTest
+@testable import ArkDeckClientKit
 
 @testable import ArkDeckAgentDaemon
 @testable import ArkDeckCLI

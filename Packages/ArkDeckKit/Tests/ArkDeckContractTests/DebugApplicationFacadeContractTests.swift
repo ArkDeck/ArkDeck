@@ -485,7 +485,7 @@ final class DebugApplicationFacadeContractTests: XCTestCase {
       contentsOf: URL(filePath: #filePath)
         .deletingLastPathComponent().deletingLastPathComponent()
         .deletingLastPathComponent()
-        .appending(path: "Sources/ArkDeckWorkflows/DebugApplicationFacade.swift"),
+        .appending(path: "Sources/ArkDeckClientKit/DebugApplicationFacade.swift"),
       encoding: .utf8)
 
     let protocolBody = try XCTUnwrap(

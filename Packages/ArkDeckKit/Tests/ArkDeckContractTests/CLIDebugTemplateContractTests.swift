@@ -1,5 +1,6 @@
 import Foundation
 import XCTest
+@testable import ArkDeckClientKit
 
 @testable import ArkDeckCLI
 @testable import ArkDeckCore
