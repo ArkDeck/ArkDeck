@@ -618,6 +618,18 @@ admitted under a Runtime capability, as Swift's `preauthorize` admits it (M2):
 - **The Job.** It runs the request naming the capability and keeps the caller's
   as its original submission. It carries no admission evidence until a use is
   consumed, and nothing is consumed yet.
+- **The storage state.** The admission proves that this owner's Job root and the
+  Session root it publishes into are the account-fixed ones
+  (`MutationAuthority::require_state`, through the Session owner's
+  `runtime.storage.status`). Reading that status takes the storage owner's lock
+  and the retention catalog's, so an admission leaves
+  `session-owner/.session-storage.lock`,
+  `sessions/.arkdeck-retention-catalog.json` and its lock where Swift's
+  admission leaves none: Swift reads the Session root without them and writes
+  exactly these bytes when it first publishes. A declared difference from
+  Swift, in when the files appear and in nothing else (r11 §3, incidental
+  side-effect files); the crash-window replay, whose Jobs never publish a
+  Session, is where it shows.
 - **Not served.** A descriptor without `defaultPolicyIssuance` counts as enabled,
   as Swift's generated catalog reads it. Destructive effects, the
   `runtimeCapability` policy and workspace subjects are still refused.
@@ -711,7 +723,17 @@ re-recorded with `ARKDECK_RUST_JOB_RECONCILE_RECORD`,
 `ARKDECK_RUST_READBACK_RECONCILE_RECORD=/private/tmp/<new>`): every start,
 reconcile, answer, read and store snapshot byte for byte, the capability store
 and the fake's calls included; `tests/job_recovery.rs` and the other tests of
-`tests/readback_reconcile.rs` cover the branches they do not reach. `job.run`
+`tests/readback_reconcile.rs` cover the branches they do not reach.
+`tests/crash_window.rs` replays `crash-window/` (Swift
+`CrashWindowOracleContractTests`, `ARKDECK_RUST_CRASH_WINDOW_RECORD`) with this
+runner killed at the four quadrants XPA-AC-7 names — before the consume, after
+a read-only intent, after the consume, after the mutation intent — each in a
+child of the test binary that exits where the window falls: the store the dead
+run leaves is Swift's, and so are the two starts over it, the two reconciles,
+the next admission and every read. The one leftover Swift does not share is the
+Session owner's lock and an empty retention catalog, which this Runtime's
+admission creates when its storage-state check reads the Session root and Swift's writes
+only when it first publishes. `job.run`
 still refuses a Job in any resumable state, or whose journal has left
 `preflight`: resumption is a later slice. Also landed: `recovery_manifest.rs`, Swift's
 `RecoveryManifestCodec` (the Session manifest's `recovery` member, which the

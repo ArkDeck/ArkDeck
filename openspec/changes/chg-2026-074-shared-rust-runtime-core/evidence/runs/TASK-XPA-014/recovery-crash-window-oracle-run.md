@@ -115,7 +115,9 @@ Per `AGENTS.md` (#2015) the unified gate is the PR's CI; locally, through
 
 ## CI
 
-The PR's `guard` and `swift` aggregate: recorded in the next slice's record.
+| PR | Head | Runs | Result |
+| --- | --- | --- | --- |
+| #2061 | `790be6d7` | 35452718257, 35452718314, 35452718530 | 11 checks passed, `app-build` skipped; merged as `68d4e08d` |
 
 ## Not in this slice
 

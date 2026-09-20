@@ -147,7 +147,9 @@ Still unpublished, because no frame here produces it: `threadId` other than null
 
 ## CI
 
-The PR's `guard` and `swift` aggregate: recorded in the next slice's record.
+| PR | Head | Runs | Result |
+| --- | --- | --- | --- |
+| #2050 | `f7ee84a3` (rebased twice; first `b6bf1536`, then `c96d024e`) | 35458809490, 35458809498, 35458809661 | 11 checks passed, `app-build` skipped; merged as `28d2016c` |
 
 ## Not in this slice
 

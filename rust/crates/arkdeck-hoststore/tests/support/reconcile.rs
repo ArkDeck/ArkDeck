@@ -95,6 +95,30 @@ impl Daemon {
         daemon
     }
 
+    /// A daemon over the root another process left at the fixed root, not
+    /// rebuilt and with no owner open yet: what a run that died there left,
+    /// before any start reads it.
+    pub fn attach(name: &str) -> Self {
+        let fixture = super::fixture(name);
+        let provenance = document(&fixture, "provenance.json");
+        let root = PathBuf::from(debug_hap::ROOT);
+        let digest = sha256_hex(&fs::read(root.join("hdc")).unwrap());
+        assert_eq!(provenance["hdcSHA256"], digest.as_str());
+        Self {
+            dispatch: ProcessDispatch::new(
+                VerifiedTool::open(root.join("hdc"), &digest).unwrap(),
+                None,
+            ),
+            probe: OracleProbe::new(&provenance),
+            default_root: root.join("store"),
+            fixture,
+            root,
+            digest,
+            provenance,
+            stores: None,
+        }
+    }
+
     /// Every owner opened afresh over the root, the Job owner first: its
     /// repository holds the account-fixed root, and the capability store is
     /// opened inside it.
@@ -185,6 +209,17 @@ impl Daemon {
         params: &Map<String, Value>,
         cancellation: Option<&RunCancellation>,
     ) -> Value {
+        self.run_on(dispatch, params, cancellation, fixed_now)
+    }
+
+    /// [`Daemon::run`] with the runner reading the clock `now`.
+    pub fn run_on(
+        &self,
+        dispatch: &(dyn HdcDispatch + Sync),
+        params: &Map<String, Value>,
+        cancellation: Option<&RunCancellation>,
+        now: fn() -> Option<String>,
+    ) -> Value {
         let stores = self.stores();
         let hdc = self.hdc(dispatch);
         let publisher = self.publisher();
@@ -199,7 +234,7 @@ impl Daemon {
             analyzer: None,
             quota: self.provenance["quotaBytes"].as_u64().unwrap(),
             home: self.provenance["home"].as_str().unwrap(),
-            now: fixed_now,
+            now,
             precise_now: fixed_precise_now,
             sessions: Some(&publisher),
             cancellation,
