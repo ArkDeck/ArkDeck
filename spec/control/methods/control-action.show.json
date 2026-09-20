@@ -571,7 +571,7 @@
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
     "error": 4,
-    "request": 15,
-    "result": 11
+    "request": 19,
+    "result": 15
   }
 }

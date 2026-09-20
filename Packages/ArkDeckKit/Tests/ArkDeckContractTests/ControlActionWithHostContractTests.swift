@@ -118,6 +118,24 @@ final class ControlActionWithHostContractTests: XCTestCase {
     }
   }
 
+  /// The observation provider `ArkDeckAgentDaemonMain` registers, so a
+  /// `job.submit` of `observe.device` reaches the Runtime's durable admission
+  /// — where a confirmed HDC lifecycle action blocks it. Nothing here runs an
+  /// HDC: no Job is ever admitted, let alone dispatched.
+  private struct Facts: HDCObservationFactsPort {
+    func currentFacts(targetID: String) async throws -> ProviderFacts {
+      ProviderFacts(
+        providerID: "hdc", toolVersion: "3.2.0f",
+        toolSHA256: String(repeating: "a", count: 64), serverFacts: [:],
+        targetID: targetID, bindingRevision: 7,
+        deviceIdentitySHA256:
+          "83405c84ff74eab0b5652d35a03b094891b08e27d9d24164f57f95e1a4937ea1",
+        executionConnectKey: "150100424a544e4600",
+        deviceMode: nil, buildFingerprint: nil,
+        profileID: "openharmony-standard@1", collectedAtUTC: "2026-09-19T00:00:00Z")
+    }
+  }
+
   /// What survives a daemon restart: the state root, the Job and Target owners
   /// and the host's impact source over the fixture HDC.
   private struct Host {
@@ -136,6 +154,14 @@ final class ControlActionWithHostContractTests: XCTestCase {
     var unionSnapshots: URL { state.appending(path: "control-action-snapshots") }
   }
 
+  /// How many times a source was read, so a hook can name one reading.
+  private final class Reads: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+    func next() -> Int { lock.withLock { count += 1; return count } }
+    var value: Int { lock.withLock { count } }
+  }
+
   /// What only a registered 3.2.0d server proves, which no fixture can.
   /// `HDCControlServerObserver` proves a server's health only for the
   /// registered 3.2.0d executable: its commandless identity, a `checkserver`
@@ -151,9 +177,15 @@ final class ControlActionWithHostContractTests: XCTestCase {
   /// derives it.
   private struct RegisteredHealthyServer: HDCControlImpactObserving {
     let source: HeadlessHDCControlImpactSource
+    /// Runs before the nth reading of this source, so a test can read the
+    /// durable record at a position only the lifecycle reaches, or change the
+    /// host so the next reading is no longer the reviewed one.
+    var beforeRead: (@Sendable (Int) async -> Void)?
+    let reads = Reads()
     var endpointReference: String { source.endpointReference }
 
     func readImpact() async throws -> HDCControlImpactReading {
+      if let beforeRead { await beforeRead(reads.next()) }
       let reading = try await source.readImpact()
       var facts = reading.impact.value
       facts["serverGeneration"] = .string("100000023")
@@ -180,7 +212,8 @@ final class ControlActionWithHostContractTests: XCTestCase {
     /// One request frame through the handler's line entry, as a socket
     /// client's frame reaches it.
     func send(
-      _ method: String, _ params: [String: JSONValue]
+      _ method: String, _ params: [String: JSONValue],
+      context: RuntimeControlRequestContext = .direct
     ) async throws -> AgentWireProtocol.Response {
       let frame = try PortableCanonicalJSON.canonicalBytes(.object([
         "protocolVersion": .string(ArkDeckControlProtocol.currentVersion),
@@ -189,15 +222,17 @@ final class ControlActionWithHostContractTests: XCTestCase {
         "method": .string(method), "params": .object(params),
       ]))
       return try JSONDecoder().decode(
-        AgentWireProtocol.Response.self, from: await handler.handleLine(frame))
+        AgentWireProtocol.Response.self,
+        from: await handler.handleLine(frame, context: context))
     }
 
     /// An answered record, as an object.
     func answer(
       _ method: String, _ params: [String: JSONValue],
+      context: RuntimeControlRequestContext = .direct,
       file: StaticString = #filePath, line: UInt = #line
     ) async throws -> [String: JSONValue] {
-      let response = try await send(method, params)
+      let response = try await send(method, params, context: context)
       XCTAssertTrue(response.ok, "\(method) \(params): \(String(describing: response.error))",
         file: file, line: line)
       guard case .object(let result)? = response.result else {
@@ -209,20 +244,29 @@ final class ControlActionWithHostContractTests: XCTestCase {
   }
 
   /// The host over a copy of `tool`, by default the fixture HDC executable.
-  private func makeHost(tool: URL? = nil) throws -> Host {
-    let state = root.appending(path: "state")
-    let capabilities = try RuntimeCapabilityStore(directoryURL: root.appending(path: "caps"))
+  /// A `name` gives one test more than one independent host under its root.
+  private func makeHost(tool: URL? = nil, name: String = "") throws -> Host {
+    let base = name.isEmpty ? root! : root.appending(path: name)
+    let state = base.appending(path: "state")
+    let capabilities = try RuntimeCapabilityStore(directoryURL: base.appending(path: "caps"))
     let dispatcher = RuntimeAgentExecutionContractTests.Dispatcher()
     let engine = try RuntimeJobEngine(
-      configuration: .init(stateDirectory: root.appending(path: "engine")),
-      providers: DeviceProviderRegistry(providers: []), dispatcher: dispatcher,
-      capabilityStore: capabilities, nowUTC: { "2026-09-19T00:00:00Z" })
-    let targets = try RuntimeTargetStore(directoryURL: root.appending(path: "targets"))
+      configuration: .init(stateDirectory: base.appending(path: "engine")),
+      providers: DeviceProviderRegistry(providers: [
+        HDCObservationProviderAdapter(factsPort: Facts())
+      ]), dispatcher: dispatcher,
+      capabilityStore: capabilities,
+      artifactStore: try RuntimeArtifactStore(
+        rootURL: base.appending(path: "artifacts"), nowUTC: { "2026-09-19T00:00:00Z" }),
+      nowUTC: { "2026-09-19T00:00:00Z" })
+    let targets = try RuntimeTargetStore(directoryURL: base.appending(path: "targets"))
     let port = Port()
     let observations = TargetObservationCoordinator(
       observation: port, targetStore: targets, usbRelations: { [] },
       nowUTC: { "2026-09-19T00:00:00Z" })
-    let path = root.appending(path: "hdc")
+    let path = base.appending(path: "hdc")
+    try FileManager.default.createDirectory(
+      at: base, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
     try FileManager.default.copyItem(
       at: tool ?? Bundle(for: Self.self).bundleURL.deletingLastPathComponent().appending(
         path: "ArkDeckFakeHDCFixture"),
@@ -244,11 +288,17 @@ final class ControlActionWithHostContractTests: XCTestCase {
   /// action here, and without the lifecycle driver, which only an approved
   /// restart reaches). With `healthy`, the owner reads the impact through
   /// `RegisteredHealthyServer`.
-  private func start(_ host: Host, clock: Clock, healthy: Bool = false) throws -> Daemon {
+  private func start(
+    _ host: Host, clock: Clock, healthy: Bool = false,
+    lifecycle: (any HDCControlLifecycleDriving)? = nil,
+    beforeRead: (@Sendable (Int) async -> Void)? = nil
+  ) throws -> Daemon {
     let source: any HDCControlImpactObserving =
-      healthy ? RegisteredHealthyServer(source: host.source) : host.source
+      healthy
+      ? RegisteredHealthyServer(source: host.source, beforeRead: beforeRead) : host.source
     let owner = try RuntimeHDCControlActionCoordinator(
       directory: host.state.appending(path: "hdc-control-actions"), source: source,
+      lifecycleDriver: lifecycle,
       catalogDigest: RuntimeOperationCatalog.catalogDigest, now: { clock.now() })
     let controls = try RuntimeControlActionResourceCoordinator(
       directory: host.unionSnapshots, hdc: owner, tools: nil)
@@ -1119,5 +1169,700 @@ final class ControlActionWithHostContractTests: XCTestCase {
     else { throw XCTSkip("the DevEco executable carries no team identifier") }
     try await assertRestartKeepsTheSignature(
       of: host, request: "host-team-signed-restart", signature: .object(signature))
+  }
+
+  // MARK: the console approval and the lifecycle it starts
+
+  /// The interactive challenge only a foreground console over the Unix socket
+  /// receives, and which only that console's answer can consume.
+  private static let console = RuntimeControlRequestContext.unixSocket(foregroundConsole: true)
+  private static let interlockHeld =
+    "a confirmed host-wide HDC lifecycle action currently blocks new Job admission"
+  private static let currentJobs = "current Runtime Jobs block the HDC lifecycle action"
+
+  /// Hooks a test installs after the daemon is composed, so the driver and
+  /// the impact source can read the daemon back at a durable position only a
+  /// running lifecycle reaches.
+  private final class Hooks: @unchecked Sendable {
+    private let lock = NSLock()
+    private var held: (@Sendable () async -> Void)?
+    private var dispatching: (@Sendable () async -> Void)?
+    private var reading: (@Sendable (Int) async -> Void)?
+
+    func whileInterlockHeld(_ body: @escaping @Sendable () async -> Void) {
+      lock.withLock { held = body }
+    }
+    func whileDispatching(_ body: @escaping @Sendable () async -> Void) {
+      lock.withLock { dispatching = body }
+    }
+    func beforeRead(_ body: @escaping @Sendable (Int) async -> Void) {
+      lock.withLock { reading = body }
+    }
+    func runWhileInterlockHeld() async { await (lock.withLock { held })?() }
+    func runWhileDispatching() async { await (lock.withLock { dispatching })?() }
+    func runBeforeRead(_ index: Int) async { await (lock.withLock { reading })?(index) }
+  }
+
+  /// `HeadlessHDCControlLifecycleDriver` with the two observations only the
+  /// registered 3.2.0d executable and its live server could answer replaced by
+  /// the approved facts, as `RegisteredHealthyServer` replaces the health
+  /// proof for the preview:
+  ///
+  /// - the production driver proves the existing server by
+  ///   `observeRegisteredExistingServer` (the commandless identity, a
+  ///   `checkserver`, the identity again), which refuses every digest but the
+  ///   registered one; this seam applies the approved reading's own generation
+  ///   and ownership to the Supervisor instead;
+  /// - the production post-dispatch probe re-observes that same identity for
+  ///   up to 12 s; this seam answers `observation` directly.
+  ///
+  /// Everything between is production: the Runtime's own Job-admission
+  /// interlock, the Supervisor's participant inventory, impact preview,
+  /// confirmation and dispatch, the real `HDCProcessLifecycleExecutor` — which
+  /// really launches `<the fixture HDC> -s <endpoint> kill -r` and classifies
+  /// its exit through the registered semantic profile — and the control
+  /// action's own durable lifecycle audit.
+  private final class Lifecycle: HDCControlLifecycleDriving, @unchecked Sendable {
+    let engine: RuntimeJobEngine
+    let executable: ResolvedExecutable
+    let endpoint: HDCServerEndpointSelection
+    let invocationLog: URL
+    /// `ARKDECK_FAKE_HDC_LIFECYCLE_MODE`, which picks the fake's `kill`
+    /// behaviour: nil is exit 0 with unregistered output, `nonzero` is exit
+    /// 23, `semantic-failure` is a registered failure line.
+    let childMode: String?
+    let observation: @Sendable (Int) -> HDCServerLifecyclePostDispatchObservation?
+    let hooks: Hooks
+    private let lock = NSLock()
+    private var launches = 0
+    private var restarts = 0
+    var launchWindowCount: Int { lock.withLock { launches } }
+    var restartCount: Int { lock.withLock { restarts } }
+
+    init(
+      engine: RuntimeJobEngine, executable: ResolvedExecutable,
+      endpoint: HDCServerEndpointSelection, invocationLog: URL, childMode: String? = nil,
+      hooks: Hooks,
+      observation: @escaping @Sendable (Int) -> HDCServerLifecyclePostDispatchObservation?
+    ) {
+      self.engine = engine
+      self.executable = executable
+      self.endpoint = endpoint
+      self.invocationLog = invocationLog
+      self.childMode = childMode
+      self.hooks = hooks
+      self.observation = observation
+    }
+
+    func acquireFinalInterlock() async throws -> any HDCControlLifecycleInterlock {
+      RuntimeHDCLifecycleInterlockOwner(
+        engine: engine, lease: try await engine.acquireHDCLifecycleInterlock())
+    }
+
+    func noteLaunchWindowEntered() { lock.withLock { launches += 1 } }
+
+    func restart(
+      approved: HDCControlActionRecord,
+      reading: HDCControlImpactReading,
+      audit: RuntimeHDCControlLifecycleAuditStore
+    ) async throws -> HDCControlActionRecord {
+      lock.withLock { restarts += 1 }
+      // The Runtime's Job-admission interlock is held from here until the
+      // coordinator releases it, whatever this returns.
+      await hooks.runWhileInterlockHeld()
+      guard let preview = approved.preview, preview.impact == reading.impact,
+        case .string(let generationText)? = reading.impact.value["serverGeneration"],
+        let generation = Int(generationText),
+        case .string(let ownershipText)? = reading.impact.value["serverOwnership"],
+        let ownership = HDCServerOwnership(rawValue: ownershipText),
+        reading.impact.value["endpoint"] == .string(endpoint.endpoint.rawValue),
+        reading.impact.value["serverHealth"] == .string("healthy"),
+        reading.blockerReasonCode == nil, reading.impact.criticalGateIsClear,
+        reading.impact.value["affectedJobIds"] == .array([])
+      else {
+        throw HDCControlValue.failure(
+          "factsDrifted", "final HDC impact cannot reproduce the approved lifecycle scope")
+      }
+      let router = RuntimeHDCControlLifecycleAuditRouter()
+      let binding = try router.bind(audit)
+      defer { try? router.unbind(binding) }
+      let supervisor = HDCServerSupervisor(auditStore: router)
+      await supervisor.observeExistingServer(
+        HDCExistingServerObservation(
+          state: HDCServerState(
+            endpoint: endpoint.endpoint, health: .healthy, version: .known("3.2.0d"),
+            generation: generation, ownership: ownership)),
+        reason: "the approved control-action reading")
+      guard await supervisor.replaceParticipants([], for: endpoint.endpoint) else {
+        throw HDCControlValue.failure(
+          "factsDrifted", "the final HDC participant inventory contains current Jobs")
+      }
+      await supervisor.setOtherClientDetection(
+        .unavailableExternalClientsMayStillExist, for: endpoint.endpoint)
+      guard
+        case .ready(let lifecyclePreview) = await supervisor.createImpactPreview(
+          action: .restartConfirmedGeneration, endpoint: endpoint.endpoint)
+      else {
+        throw HDCControlValue.failure(
+          "admissionDenied", "HDC lifecycle preview was blocked")
+      }
+      guard case .accepted(let confirmation) = await supervisor.confirm(lifecyclePreview.id)
+      else {
+        throw HDCControlValue.failure(
+          "factsDrifted", "HDC lifecycle confirmation was blocked")
+      }
+      let coreStep = try HDCServerLifecycleStep.coreWorkflowStep(confirmation: confirmation)
+      let toolchain = HDCCandidate(
+        path: URL(filePath: executable.path), source: .userConfigured,
+        sha256: executable.sha256)
+      var environment = ["ARKDECK_FAKE_HDC_INVOCATION_LOG": invocationLog.path]
+      if let childMode { environment["ARKDECK_FAKE_HDC_LIFECYCLE_MODE"] = childMode }
+      let executor = HDCProcessLifecycleExecutor(
+        toolchain: toolchain,
+        semanticProfile: HDCRegisteredSemanticProfile.testOnlyFake(
+          executableSHA256: executable.sha256,
+          selectedDeviceAuthorizationSHA256: String(repeating: "c", count: 64)),
+        endpointSelection: endpoint, additionalChildEnvironment: environment,
+        durableAuthorization: router, supervisor: supervisor,
+        postDispatchProbe: { [hooks, observation] step in
+          // The record is `dispatching` here: the launch window is durably
+          // entered and the process has already exited.
+          await hooks.runWhileDispatching()
+          return observation(step.expectedGeneration ?? 0)
+        })
+      switch await supervisor.dispatch(
+        confirmationID: confirmation.id, coreStep: coreStep, using: executor)
+      {
+      case .completed:
+        return try audit.record()
+      case .blocked(let block):
+        let record = try audit.record()
+        if record.state == "failed" { return record }
+        throw HDCControlValue.failure(
+          "admissionDenied", "HDC lifecycle dispatch was blocked: \(String(describing: block))",
+          details: ["controlAction": record.projection])
+      }
+    }
+  }
+
+  /// The argv the fake HDC was really launched with, one line per invocation.
+  private func invocations(_ log: URL) throws -> [[String]] {
+    guard FileManager.default.fileExists(atPath: log.path) else { return [] }
+    return try String(contentsOf: log, encoding: .utf8).split(separator: "\n").map {
+      $0.split(separator: "\u{1F}", omittingEmptySubsequences: false).map(String.init)
+    }
+  }
+
+  /// The challenge `human-action.resume` issues to a foreground console. It
+  /// carries the one-time plaintext, its binding and the action as it stays:
+  /// awaiting, unobserved, with nothing dispatched.
+  @discardableResult
+  private func assertChallenge(
+    _ challenge: [String: JSONValue], of record: [String: JSONValue], approval: String,
+    file: StaticString = #filePath, line: UInt = #line
+  ) throws -> String {
+    let plaintext = try XCTUnwrap(Self.string(challenge["challenge"]), file: file, line: line)
+    XCTAssertTrue(plaintext.hasPrefix("ARKDECK-"), plaintext, file: file, line: line)
+    XCTAssertEqual(plaintext.utf8.count, 17, plaintext, file: file, line: line)
+    let preview = try XCTUnwrap(Self.object(record["preview"]), file: file, line: line)
+    let action: JSONValue = record["controlActionId"] ?? .null
+    XCTAssertEqual(
+      Set(challenge.keys),
+      [
+        "schemaVersion", "interactionOrigin", "challenge", "challengeId", "expiresAt",
+        "humanAction", "controlAction", "binding", "newDispatchCount",
+      ], file: file, line: line)
+    XCTAssertEqual(
+      challenge["schemaVersion"], .string("arkdeck.impact-approval-challenge/1"),
+      file: file, line: line)
+    XCTAssertEqual(
+      challenge["interactionOrigin"], .string("interactiveConsole"), file: file, line: line)
+    XCTAssertEqual(challenge["newDispatchCount"], .integer(0), file: file, line: line)
+    XCTAssertEqual(
+      challenge["binding"],
+      .object([
+        "controlActionId": action, "humanActionId": .string(approval),
+        "previewId": preview["previewId"] ?? .null,
+        "previewDigest": preview["previewDigest"] ?? .null,
+        "generation": record["generation"] ?? .null,
+      ]), file: file, line: line)
+    // The action the challenge shows is the one it was issued for, still
+    // awaiting the approval and still dispatching nothing.
+    let shown = try XCTUnwrap(Self.object(challenge["controlAction"]), file: file, line: line)
+    XCTAssertEqual(shown["state"], .string("awaitingImpactApproval"), file: file, line: line)
+    XCTAssertEqual(shown["dispatchCount"], .integer(0), file: file, line: line)
+    XCTAssertEqual(shown["preview"], record["preview"], file: file, line: line)
+    XCTAssertEqual(challenge["humanAction"], record["humanAction"], file: file, line: line)
+    return plaintext
+  }
+
+  /// A terminal lifecycle record: the approval it resolved, the dispatch count
+  /// its launch window proves, and the blocker and next action its outcome
+  /// gives.
+  private func assertTerminal(
+    _ record: [String: JSONValue], request: String, state: String, generation: String,
+    created: Date, observed: Date, dispatches: Int64,
+    file: StaticString = #filePath, line: UInt = #line
+  ) throws {
+    let blocker: String? =
+      state == "failed"
+      ? "hdc.lifecycleFailedBeforeLaunch"
+      : state == "outcomeUnknown" ? "hdc.lifecycleOutcomeUnknown" : nil
+    let id = try XCTUnwrap(Self.string(record["controlActionId"]), file: file, line: line)
+    let owner: JSONValue = .object(["kind": .string("controlAction"), "id": .string(id)])
+    XCTAssertEqual(record["state"], .string(state), file: file, line: line)
+    XCTAssertEqual(record["actionRequestId"], .string(request), file: file, line: line)
+    XCTAssertEqual(record["generation"], .string(generation), file: file, line: line)
+    XCTAssertEqual(record["createdAt"], .string(Self.timestamp(created)), file: file, line: line)
+    XCTAssertEqual(record["lastObservedAt"], .string(Self.timestamp(observed)), file: file, line: line)
+    XCTAssertEqual(record["dispatchCount"], .integer(dispatches), file: file, line: line)
+    XCTAssertEqual(
+      record["blockerReasonCode"], blocker.map(JSONValue.string) ?? .null,
+      file: file, line: line)
+    XCTAssertEqual(
+      record["nextAction"],
+      .object([
+        "kind": .string(["succeeded", "failed"].contains(state) ? "none" : "reconcile"),
+        "owner": owner, "resource": owner,
+        "reasonCode": .string(
+          state == "succeeded" ? "controlAction.completed" : blocker ?? ""),
+      ]), file: file, line: line)
+    // The approval the console answered is resolved, and only the receipt
+    // (which no projection carries) proves the plaintext.
+    let approval = try XCTUnwrap(Self.object(record["humanAction"]), file: file, line: line)
+    XCTAssertEqual(approval["status"], .string("resolved"), file: file, line: line)
+    XCTAssertEqual(approval["newDispatchCount"], .integer(0), file: file, line: line)
+  }
+
+  /// One console approval end to end, on its own host: the ready preview, the
+  /// restart, the challenge, and the answer that runs the lifecycle. Returns
+  /// the terminal record, the daemon and the driver.
+  private func runConsoleApproval(
+    request: String, childMode: String? = nil,
+    observation: @escaping @Sendable (Int) -> HDCServerLifecyclePostDispatchObservation?,
+    beforeRead: (@Sendable (Int, Host, Daemon) async -> Void)? = nil,
+    whileHeld: (@Sendable (Daemon) async -> Void)? = nil,
+    whileDispatching: (@Sendable (Daemon) async -> Void)? = nil,
+    file: StaticString = #filePath, line: UInt = #line
+  ) async throws -> (record: [String: JSONValue], daemon: Daemon, driver: Lifecycle, host: Host) {
+    let host = try makeHost(name: request)
+    let clock = Clock(Self.start)
+    let hooks = Hooks()
+    let driver = Lifecycle(
+      engine: host.engine, executable: host.executable,
+      endpoint: try HDCServerEndpointSelector.select(inheritedEnvironment: [:]),
+      invocationLog: root.appending(path: "\(request)-invocations.log"), childMode: childMode,
+      hooks: hooks, observation: observation)
+    let daemon = try start(
+      host, clock: clock, healthy: true, lifecycle: driver,
+      beforeRead: { index in await hooks.runBeforeRead(index) })
+    if let whileHeld { hooks.whileInterlockHeld { await whileHeld(daemon) } }
+    if let whileDispatching { hooks.whileDispatching { await whileDispatching(daemon) } }
+    if let beforeRead { hooks.beforeRead { index in await beforeRead(index, host, daemon) } }
+
+    let ready = try await readyPreview(
+      daemon, host: host, request: request, at: Self.start, file: file, line: line)
+    clock.advance(30)
+    let requested = clock.now()
+    let awaiting = try await daemon.answer(
+      "runtime.hdc.restart", tuple(ready), file: file, line: line)
+    let approval = try assertApproval(
+      awaiting["humanAction"], of: awaiting, generation: "3", created: requested,
+      status: "waiting", file: file, line: line)
+    let resume = try XCTUnwrap(
+      Self.string(Self.object(awaiting["humanAction"])?["resumeReference"]),
+      file: file, line: line)
+    let reference: [String: JSONValue] = [
+      "humanAction": .string(approval), "resumeReference": .string(resume),
+    ]
+
+    // Only a foreground console over the Unix socket is issued the one-time
+    // challenge; the same request from anywhere else gets the approval back.
+    let challenge = try await daemon.answer(
+      "human-action.resume", reference, context: Self.console, file: file, line: line)
+    let plaintext = try assertChallenge(
+      challenge, of: awaiting, approval: approval, file: file, line: line)
+    // Issuing the challenge advanced the action's generation without leaving
+    // its awaiting state or dispatching anything.
+    XCTAssertEqual(
+      Self.object(challenge["controlAction"])?["generation"], .string("4"),
+      file: file, line: line)
+
+    var answer = reference
+    answer["challengeResponse"] = .string(plaintext)
+    let terminal = try await daemon.answer(
+      "human-action.resume", answer, context: Self.console, file: file, line: line)
+    XCTAssertEqual(driver.restartCount, 1, file: file, line: line)
+    return (terminal, daemon, driver, host)
+  }
+
+  func testAForegroundConsoleApprovalRestartsTheServerThroughTheLifecycleDriver() async throws {
+    let request = "host-lifecycle-succeeded"
+    let observed = Self.start.addingTimeInterval(30)
+    // The record as the lifecycle passes each durable boundary, read back
+    // through the routes while the driver holds the Job interlock.
+    let states = StateLog()
+    let (terminal, daemon, driver, host) = try await runConsoleApproval(
+      request: request,
+      // A restart is proved only by a strictly newer server generation.
+      observation: { expected in .generation(expected + 1) },
+      beforeRead: { index, _, daemon in
+        // The fourth reading is the final impact validation inside the
+        // executor's durable authorization, after the Supervisor persisted
+        // its intent: the record is `dispatchPrepared`.
+        guard index == 4 else { return }
+        await states.record("dispatchPrepared", daemon)
+      },
+      whileHeld: { daemon in
+        // The console's answer is durably recorded before any dispatch.
+        await states.record("approvalRecorded", daemon)
+      },
+      whileDispatching: { daemon in
+        await states.record("dispatching", daemon)
+      })
+    let id = try XCTUnwrap(Self.string(terminal["controlActionId"]))
+
+    // Every intermediate boundary is a readable control action, each one
+    // generation later, and only the launch window makes the dispatch count 1.
+    let boundaries = await states.rows()
+    XCTAssertEqual(boundaries.map(\.0), ["approvalRecorded", "dispatchPrepared", "dispatching"])
+    for (state, record) in boundaries {
+      XCTAssertEqual(record["state"], .string(state), state)
+      XCTAssertEqual(record["blockerReasonCode"], .null, state)
+      XCTAssertEqual(
+        record["dispatchCount"], .integer(state == "dispatching" ? 1 : 0), state)
+      XCTAssertEqual(
+        Self.object(record["humanAction"])?["status"], .string("resolved"), state)
+      XCTAssertEqual(record["controlActionId"], .string(id), state)
+    }
+    XCTAssertEqual(boundaries.map { Self.string($0.1["generation"]) }, ["5", "8", "10"])
+
+    // The restart succeeded: the launch window was entered exactly once, the
+    // fake really ran `kill -r` once, and nothing else was launched.
+    try assertTerminal(
+      terminal, request: request, state: "succeeded", generation: "12",
+      created: Self.start, observed: observed, dispatches: 1)
+    XCTAssertEqual(driver.launchWindowCount, 1)
+    XCTAssertEqual(
+      try invocations(driver.invocationLog),
+      [["-s", "127.0.0.1:8710", "kill", "-r"]])
+
+    // Read, reconciled without observing again, and listed, whole and by its
+    // state; the approval is served as resolved.
+    let shown = try await daemon.answer("control-action.show", ["controlAction": .string(id)])
+    XCTAssertEqual(shown, terminal)
+    let reads = host.port.listCount
+    let reconciled = try await daemon.answer(
+      "control-action.reconcile", ["controlAction": .string(id)])
+    XCTAssertEqual(reconciled, terminal)
+    XCTAssertEqual(host.port.listCount, reads, "a terminal action reconciles without observing")
+    for filters in [[:], ["state": JSONValue.string("succeeded")]] as [[String: JSONValue]] {
+      let page = try await daemon.answer("control-action.list", filters)
+      XCTAssertEqual(page["items"], .array([.object(terminal)]), "\(filters)")
+    }
+    let approval = try XCTUnwrap(Self.string(Self.object(terminal["humanAction"])?["actionId"]))
+    let resolved = try await daemon.answer(
+      "human-action.show", ["humanAction": .string(approval)])
+    XCTAssertEqual(JSONValue.object(resolved), terminal["humanAction"])
+    let page = try await daemon.answer(
+      "human-action.list", ["ownerKind": .string("controlAction"), "owner": .string(id)])
+    XCTAssertEqual(page["items"], .array([terminal["humanAction"] ?? .null]))
+
+    // A restart of a terminal action is not eligible, and the one-time
+    // challenge cannot be answered twice.
+    assertRefused(
+      try await daemon.send("runtime.hdc.restart", tuple(terminal)), "admissionDenied",
+      Self.ineligible)
+    XCTAssertEqual(host.dispatcher.dispatchCount, 0)
+    let jobs = try await host.engine.listJobs()
+    XCTAssertTrue(jobs.isEmpty)
+  }
+
+  /// The records read back at a lifecycle boundary, in the order they were
+  /// reached.
+  private actor StateLog {
+    private var entries: [(String, [String: JSONValue])] = []
+
+    func record(_ state: String, _ daemon: Daemon) async {
+      guard let page = try? await daemon.send("control-action.list", [:]),
+        case .object(let result)? = page.result, case .array(let items)? = result["items"],
+        case .object(let row)? = items.first
+      else { return }
+      entries.append((state, row))
+    }
+
+    func rows() -> [(String, [String: JSONValue])] { entries }
+  }
+
+  /// A terminal lifecycle record read, reconciled without observing again and
+  /// listed by its own state, with its resolved approval served beside it.
+  private func assertTerminalIsServed(
+    _ record: [String: JSONValue], daemon: Daemon, host: Host,
+    file: StaticString = #filePath, line: UInt = #line
+  ) async throws {
+    let id = try XCTUnwrap(Self.string(record["controlActionId"]), file: file, line: line)
+    let shown = try await daemon.answer(
+      "control-action.show", ["controlAction": .string(id)], file: file, line: line)
+    XCTAssertEqual(shown, record, file: file, line: line)
+    let reads = host.port.listCount
+    let reconciled = try await daemon.answer(
+      "control-action.reconcile", ["controlAction": .string(id)], file: file, line: line)
+    XCTAssertEqual(reconciled, record, file: file, line: line)
+    XCTAssertEqual(
+      host.port.listCount, reads, "a terminal action reconciles without observing",
+      file: file, line: line)
+    let state = try XCTUnwrap(Self.string(record["state"]), file: file, line: line)
+    let page = try await daemon.answer(
+      "control-action.list", ["state": .string(state)], file: file, line: line)
+    XCTAssertEqual(page["items"], .array([.object(record)]), file: file, line: line)
+    let approval = try XCTUnwrap(
+      Self.string(Self.object(record["humanAction"])?["actionId"]), file: file, line: line)
+    let resolved = try await daemon.answer(
+      "human-action.show", ["humanAction": .string(approval)], file: file, line: line)
+    XCTAssertEqual(JSONValue.object(resolved), record["humanAction"], file: file, line: line)
+    XCTAssertEqual(host.dispatcher.dispatchCount, 0, file: file, line: line)
+  }
+
+  func testALifecycleWithoutAProvenNewGenerationOrALaunchIsUnknownOrFailed() async throws {
+    // The process ran but proved no newer generation.
+    let (stale, staleDaemon, staleDriver, staleHost) = try await runConsoleApproval(
+      request: "host-lifecycle-stale", observation: { expected in .generation(expected) })
+    try assertTerminal(
+      stale, request: "host-lifecycle-stale", state: "outcomeUnknown", generation: "12",
+      created: Self.start, observed: Self.start.addingTimeInterval(30), dispatches: 1)
+    XCTAssertEqual(staleDriver.launchWindowCount, 1)
+    XCTAssertEqual(
+      try invocations(staleDriver.invocationLog), [["-s", "127.0.0.1:8710", "kill", "-r"]])
+    try await assertTerminalIsServed(stale, daemon: staleDaemon, host: staleHost)
+
+    // The process exited nonzero after the launch window: the external effect
+    // is uncertain, never a proven failure.
+    let (nonzero, _, nonzeroDriver, _) = try await runConsoleApproval(
+      request: "host-lifecycle-nonzero", childMode: "nonzero",
+      observation: { expected in .generation(expected + 1) })
+    try assertTerminal(
+      nonzero, request: "host-lifecycle-nonzero", state: "outcomeUnknown", generation: "12",
+      created: Self.start, observed: Self.start.addingTimeInterval(30), dispatches: 1)
+    XCTAssertEqual(nonzeroDriver.launchWindowCount, 1)
+
+    // The impact drifts between the approval and the final validation the
+    // executor's durable authorization performs: nothing is launched, so the
+    // failure is definite and the dispatch count stays 0.
+    let (failed, failedDaemon, failedDriver, failedHost) = try await runConsoleApproval(
+      request: "host-lifecycle-failed", observation: { expected in .generation(expected + 1) },
+      beforeRead: { index, host, _ in
+        guard index == 4 else { return }
+        _ = try? host.targets.adopt(
+          stableIdentitySHA256: String(repeating: "d", count: 64),
+          connectKey: "synthetic-final", toolVersion: "fixture",
+          nowUTC: "2026-09-19T00:00:30Z")
+      })
+    try assertTerminal(
+      failed, request: "host-lifecycle-failed", state: "failed", generation: "9",
+      created: Self.start, observed: Self.start.addingTimeInterval(30), dispatches: 0)
+    XCTAssertEqual(failedDriver.launchWindowCount, 0)
+    XCTAssertEqual(try invocations(failedDriver.invocationLog), [], "nothing was launched")
+    XCTAssertEqual(failedHost.dispatcher.dispatchCount, 0)
+    try await assertTerminalIsServed(failed, daemon: failedDaemon, host: failedHost)
+  }
+
+  func testAConfirmedLifecycleBlocksNewJobAdmissionAndCurrentJobsBlockIt() async throws {
+    let submit = """
+      {"documentType":"runtime-operation-request","schemaVersion":"1.0.0",\
+      "requestId":"req-hdc-lifecycle","idempotencyKey":"idem-hdc-lifecycle-01",\
+      "target":{"targetId":"TGT-HDC-LIFECYCLE-01","expectedBindingRevision":7},\
+      "operation":{"id":"observe.device","version":1}}
+      """
+    let refusals = Refusals()
+    let (terminal, _, _, host) = try await runConsoleApproval(
+      request: "host-lifecycle-interlock",
+      observation: { expected in .generation(expected + 1) },
+      whileHeld: { daemon in
+        // The confirmed lifecycle owns the Job interlock: no new Job may be
+        // admitted while it runs.
+        if let answer = try? await daemon.send(
+          "job.submit", ["requestJson": .string(submit)])
+        {
+          await refusals.add("job.submit", answer)
+        }
+        // `job.run` is not admission: it is refused only by the Job it names.
+        if let answer = try? await daemon.send("job.run", ["jobId": .string("JOB-ABSENT")]) {
+          await refusals.add("job.run", answer)
+        }
+      })
+    try assertTerminal(
+      terminal, request: "host-lifecycle-interlock", state: "succeeded", generation: "12",
+      created: Self.start, observed: Self.start.addingTimeInterval(30), dispatches: 1)
+    let refused = await refusals.rows()
+    XCTAssertEqual(refused.map(\.0), ["job.submit", "job.run"])
+    XCTAssertEqual(refused[0].1.error?.code, "resourceConflict")
+    XCTAssertEqual(refused[0].1.error?.message, Self.interlockHeld)
+    XCTAssertEqual(
+      refused[0].1.error?.details,
+      ["newDispatchCount": .integer(0), "phase": .string("preAdmission")])
+    XCTAssertEqual(refused[1].1.error?.code, "resourceNotFound")
+    XCTAssertEqual(
+      refused[1].1.error?.message, "the referenced Job does not exist",
+      "job.run is not gated by the admission interlock")
+    let jobs = try await host.engine.listJobs()
+    XCTAssertTrue(jobs.isEmpty, "no Job was admitted")
+
+    // The other side of the interlock. A Job admitted before the preview is
+    // read would already block it — the critical-Job gate is not clear, so no
+    // preview is ready and no approval exists. The interlock's own refusal is
+    // therefore reachable only by a Job admitted after the challenge was
+    // issued: the console's answer takes the interlock before it reads the
+    // impact again, and that Job blocks it.
+    let busy = try makeHost(name: "host-lifecycle-busy")
+    let clock = Clock(Self.start)
+    let hooks = Hooks()
+    let driver = Lifecycle(
+      engine: busy.engine, executable: busy.executable,
+      endpoint: try HDCServerEndpointSelector.select(inheritedEnvironment: [:]),
+      invocationLog: root.appending(path: "busy-invocations.log"), hooks: hooks,
+      observation: { expected in .generation(expected + 1) })
+    let daemon = try start(
+      busy, clock: clock, healthy: true, lifecycle: driver,
+      beforeRead: { index in await hooks.runBeforeRead(index) })
+    let ready = try await readyPreview(
+      daemon, host: busy, request: "host-lifecycle-busy", at: Self.start)
+    clock.advance(30)
+    let awaiting = try await daemon.answer("runtime.hdc.restart", tuple(ready))
+    let approval = try XCTUnwrap(Self.object(awaiting["humanAction"]))
+    let params: [String: JSONValue] = [
+      "humanAction": approval["actionId"] ?? .null,
+      "resumeReference": approval["resumeReference"] ?? .null,
+    ]
+    let challenge = try await daemon.answer(
+      "human-action.resume", params, context: Self.console)
+    let admitted = try await daemon.answer("job.submit", ["requestJson": .string(submit)])
+    XCTAssertEqual(admitted["deduplicated"], .bool(false))
+    let current = try await busy.engine.listCurrentJobs()
+    XCTAssertFalse(current.isEmpty)
+    var answer = params
+    answer["challengeResponse"] = challenge["challenge"] ?? .null
+    let blocked = try await daemon.send("human-action.resume", answer, context: Self.console)
+    XCTAssertFalse(blocked.ok)
+    XCTAssertEqual(blocked.error?.code, "factsDrifted")
+    XCTAssertEqual(blocked.error?.message, Self.currentJobs)
+    XCTAssertEqual(
+      blocked.error?.details,
+      ["newDispatchCount": .integer(0), "phase": .string("preAdmission")])
+    XCTAssertEqual(driver.restartCount, 0, "the lifecycle never started")
+    XCTAssertEqual(driver.launchWindowCount, 0)
+    XCTAssertEqual(try invocations(driver.invocationLog), [])
+    // The action stays awaiting its approval, one generation on from the
+    // challenge, and its approval is still waiting.
+    let after = try await daemon.answer(
+      "control-action.show", ["controlAction": awaiting["controlActionId"] ?? .null])
+    XCTAssertEqual(after["state"], .string("awaitingImpactApproval"))
+    XCTAssertEqual(after["dispatchCount"], .integer(0))
+    XCTAssertEqual(Self.object(after["humanAction"])?["status"], .string("waiting"))
+  }
+
+
+  func testAConsoleAnswerThatIsNotTheChallengeOrIsTooLateNeverApproves() async throws {
+    let host = try makeHost(name: "host-lifecycle-challenge")
+    let clock = Clock(Self.start)
+    let hooks = Hooks()
+    let driver = Lifecycle(
+      engine: host.engine, executable: host.executable,
+      endpoint: try HDCServerEndpointSelector.select(inheritedEnvironment: [:]),
+      invocationLog: root.appending(path: "challenge-invocations.log"), hooks: hooks,
+      observation: { expected in .generation(expected + 1) })
+    let daemon = try start(
+      host, clock: clock, healthy: true, lifecycle: driver,
+      beforeRead: { index in await hooks.runBeforeRead(index) })
+    let ready = try await readyPreview(
+      daemon, host: host, request: "host-lifecycle-challenge", at: Self.start)
+    clock.advance(30)
+    let awaiting = try await daemon.answer("runtime.hdc.restart", tuple(ready))
+    let id = try XCTUnwrap(Self.string(awaiting["controlActionId"]))
+    let approval = try XCTUnwrap(Self.object(awaiting["humanAction"]))
+    let params: [String: JSONValue] = [
+      "humanAction": approval["actionId"] ?? .null,
+      "resumeReference": approval["resumeReference"] ?? .null,
+    ]
+    let challenge = try await daemon.answer(
+      "human-action.resume", params, context: Self.console)
+    let plaintext = try XCTUnwrap(Self.string(challenge["challenge"]))
+
+    // A well-formed answer that is not the issued plaintext never approves,
+    // and never consumes the one-time challenge.
+    var wrong = params
+    wrong["challengeResponse"] = .string("ARKDECK-987654321")
+    XCTAssertNotEqual(Self.string(wrong["challengeResponse"]), plaintext)
+    let mismatched = try await daemon.send(
+      "human-action.resume", wrong, context: Self.console)
+    XCTAssertFalse(mismatched.ok)
+    XCTAssertEqual(mismatched.error?.code, "impactApprovalChallengeMismatch")
+    XCTAssertEqual(
+      mismatched.error?.details,
+      ["newDispatchCount": .integer(0), "phase": .string("preAdmission")])
+    let afterMismatch = try await daemon.answer(
+      "control-action.show", ["controlAction": .string(id)])
+    XCTAssertEqual(afterMismatch["state"], .string("awaitingImpactApproval"))
+    XCTAssertEqual(
+      Self.object(afterMismatch["humanAction"])?["status"], .string("waiting"))
+
+    // The challenge closes 120 seconds after it was issued, well inside the
+    // control action's own 300; the right plaintext after that never approves.
+    clock.advance(121)
+    var late = params
+    late["challengeResponse"] = .string(plaintext)
+    let expired = try await daemon.send("human-action.resume", late, context: Self.console)
+    XCTAssertFalse(expired.ok)
+    XCTAssertEqual(expired.error?.code, "impactApprovalChallengeExpired")
+    XCTAssertEqual(
+      expired.error?.details,
+      ["newDispatchCount": .integer(0), "phase": .string("preAdmission")])
+    XCTAssertEqual(driver.restartCount, 0, "no lifecycle ran")
+    XCTAssertEqual(driver.launchWindowCount, 0)
+    XCTAssertEqual(try invocations(driver.invocationLog), [])
+    let afterExpiry = try await daemon.answer(
+      "control-action.show", ["controlAction": .string(id)])
+    XCTAssertEqual(afterExpiry["state"], .string("awaitingImpactApproval"))
+    XCTAssertEqual(afterExpiry["dispatchCount"], .integer(0))
+    XCTAssertEqual(host.dispatcher.dispatchCount, 0)
+  }
+
+  func testAPreviewOfAnotherServerGenerationIsBlockedAndNotEligible() async throws {
+    // The proved server is generation 100000023; this intent names another,
+    // so the preview is blocked with that reason, its critical-Job gate clear
+    // and no participant row.
+    let host = try makeHost(name: "host-generation-changed")
+    let daemon = try start(host, clock: Clock(Self.start), healthy: true)
+    let preview = try await daemon.answer(
+      "runtime.hdc.impact-preview",
+      intent("host-generation-changed", generation: "100000024"))
+    XCTAssertEqual(preview["state"], .string("blocked"))
+    XCTAssertEqual(
+      preview["blockerReasonCode"], .string("hdc.serverGenerationChanged"))
+    let facts = try XCTUnwrap(Self.object(preview["preview"]))
+    XCTAssertEqual(facts["serverGeneration"], .string("100000023"))
+    XCTAssertEqual(
+      facts["criticalJobGate"],
+      .object([
+        "state": .string("clear"), "blocking": .array([]), "reasonCode": .null,
+      ]))
+    XCTAssertEqual(facts["affectedJobIds"], .array([]))
+    XCTAssertEqual(facts["affectedTargetIds"], .array([]))
+    let shown = try await daemon.answer(
+      "control-action.show",
+      ["controlAction": preview["controlActionId"] ?? .null])
+    XCTAssertEqual(shown, preview)
+    assertRefused(
+      try await daemon.send("runtime.hdc.restart", tuple(preview)), "admissionDenied",
+      Self.ineligible)
+    XCTAssertEqual(host.dispatcher.dispatchCount, 0)
+  }
+
+  /// The refusals a hook collected, in the order it sent them.
+  private actor Refusals {
+    private var entries: [(String, AgentWireProtocol.Response)] = []
+    func add(_ method: String, _ response: AgentWireProtocol.Response) {
+      entries.append((method, response))
+    }
+    func rows() -> [(String, AgentWireProtocol.Response)] { entries }
   }
 }
