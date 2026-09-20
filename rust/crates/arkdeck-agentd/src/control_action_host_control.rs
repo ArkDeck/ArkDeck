@@ -25,8 +25,13 @@
 //! random snapshot revision and next cursor are checked and set aside, and
 //! the second page is asked through the cursor this owner issued. What only
 //! a foreground console reaches is counted, not replayed (C2b): the console
-//! challenge `human-action.resume` issues there, and the lifecycle a person's
-//! answer to it starts.
+//! challenge `human-action.resume` issues there, every record the answer to
+//! it advanced past `awaitingImpactApproval` (the approval receipt, the two
+//! dispatch boundaries and the three outcomes), the approval it resolved, and
+//! the refusal the Runtime's final Job interlock gives. One further line is
+//! deferred for a different reason: the corpora keep one line per answer
+//! shape, so the expired impact approval is shown by a line whose action no
+//! other line makes, and nothing here can create the record to answer it.
 use arkdeck_contract::{
     CATALOG_DIGEST, CONTRACT_IDENTITY, DeviceObservationsResult, PROTOCOL_VERSION, WireError,
     sha256_hex,
@@ -66,6 +71,9 @@ const CONSOLE_ANSWERS: [&str; 2] = [
     "arkdeck.impact-approval-challenge/1",
     "arkdeck.control-action/1",
 ];
+/// What the Runtime's final Job interlock answers a console's approval when a
+/// Job was admitted after the challenge was issued.
+const CURRENT_JOBS: &str = "current Runtime Jobs block the HDC lifecycle action";
 /// 2026-09-01T00:00:00Z, the fake impact source's clock.
 const FAKE_SOURCE_START: u64 = 1_788_220_800_000;
 /// 2026-09-19T00:00:00Z, the production impact source's.
@@ -107,7 +115,11 @@ fn with_host(method: &str, frame: &Value) -> bool {
         "human-action.show" => frame["ok"] == true && owned(&frame["result"]),
         "human-action.list" => frame["params"]["ownerKind"] == "controlAction",
         "human-action.resume" => {
-            frame["ok"] == true && (owned(&frame["result"]) || console_answer(method, frame))
+            (frame["ok"] == true && (owned(&frame["result"]) || console_answer(method, frame)))
+                // Only a control-action owner with a lifecycle driver takes
+                // the Runtime's final Job interlock, so only it can be told a
+                // current Job blocks the action.
+                || (frame["ok"] == false && frame["error"]["message"] == CURRENT_JOBS)
         }
         "agent.resume" => owned(&frame["error"]["details"]["humanAction"]),
         _ if frame["ok"] == true => {
@@ -131,6 +143,43 @@ fn console_answer(method: &str, frame: &Value) -> bool {
         && CONSOLE_ANSWERS
             .iter()
             .any(|schema| frame["result"]["schemaVersion"] == *schema)
+}
+
+/// The states only the lifecycle a console's answer started can reach: the
+/// approval receipt, the two dispatch boundaries and the three outcomes.
+const LIFECYCLE_STATES: [&str; 6] = [
+    "approvalRecorded",
+    "dispatchPrepared",
+    "dispatching",
+    "succeeded",
+    "failed",
+    "outcomeUnknown",
+];
+
+/// Whether a line is one only C2b answers: the console's challenge, a record
+/// its answer advanced past `awaitingImpactApproval`, the approval that
+/// answer resolved, or the refusal the final Job interlock gives. This owner
+/// records no approval and dispatches nothing, so it reaches none of them.
+fn c2b_answer(method: &str, frame: &Value) -> bool {
+    if console_answer(method, frame) {
+        return true;
+    }
+    if actions(frame).iter().any(|action| {
+        LIFECYCLE_STATES
+            .iter()
+            .any(|state| action["state"] == *state)
+    }) {
+        return true;
+    }
+    if records(frame)
+        .iter()
+        .any(|row| row["schemaVersion"] == "arkdeck.human-action/1" && row["status"] == "resolved")
+    {
+        return true;
+    }
+    method == "human-action.resume"
+        && frame["ok"] == false
+        && frame["error"]["message"] == CURRENT_JOBS
 }
 
 /// The records a frame answers with: itself, or a page's items.
@@ -281,6 +330,14 @@ impl Corpora {
 
     /// The action of a request identity, from every line that shows it.
     fn action(&self, request: &str) -> Action {
+        self.optional_action(request)
+            .unwrap_or_else(|| panic!("no committed line shows {request}"))
+    }
+
+    /// The same, for a request only some views' corpora hold: the published
+    /// view is the contract of the merge-base, so a line this slice appended
+    /// is not in it.
+    fn optional_action(&self, request: &str) -> Option<Action> {
         let mut found: Option<Action> = None;
         for (_, _, frame) in &self.lines {
             for record in actions(frame) {
@@ -331,7 +388,27 @@ impl Corpora {
                 }
             }
         }
-        found.unwrap_or_else(|| panic!("no committed line shows {request}"))
+        found
+    }
+
+    /// A record no committed line makes. The corpora hold one line per
+    /// answer shape, so a record whose identity appears in no other line
+    /// cannot be created here at all — whatever this owner can reach. The
+    /// expired impact approval `human-action.show` answers is the one such
+    /// line: the restart that made its action answered exactly as another
+    /// line already did, so only the show of it was kept.
+    fn unmade(&self, method: &str, frame: &Value) -> bool {
+        if !method.starts_with("human-action.") {
+            return false;
+        }
+        let Some(owner) = frame["result"]["owner"]["id"].as_str() else {
+            return false;
+        };
+        self.lines
+            .iter()
+            .filter(|(_, _, other)| other.to_string().contains(owner))
+            .count()
+            == 1
     }
 
     /// The one with-host line `select` picks.
@@ -681,9 +758,11 @@ fn every_with_host_exchange_of_the_corpora_is_answered_as_swift_recorded_it() {
         replay(&mut corpora, &control, line.clone(), None)["result"]["humanAction"].clone();
     // A lost receipt answers the same approval.
     replay(&mut corpora, &control, line, None);
-    let line = corpora.line("human-action.show", |_| true);
+    let line = corpora.line("human-action.show", |frame| frame["result"] == approval);
     replay(&mut corpora, &control, line, None);
-    let line = corpora.line("human-action.list", |_| true);
+    let line = corpora.line("human-action.list", |frame| {
+        frame["result"]["items"] == json!([approval])
+    });
     replay(&mut corpora, &control, line, None);
     // Outside a foreground console a resume never advances it: `agent.resume`
     // cannot consume it, and `human-action.resume` gets it back unchanged,
@@ -797,6 +876,25 @@ fn every_with_host_exchange_of_the_corpora_is_answered_as_swift_recorded_it() {
     replay(&mut corpora, &control, page, None);
     drop(control);
     drop(scenario);
+
+    // A preview asked for a generation the observed server does not have is
+    // blocked on that, in a host of its own as the Swift test made it. Only
+    // the view whose corpora hold that action replays it: the published view
+    // is the merge-base's contract, which this slice's lines are not in.
+    if let Some(generation_changed) = corpora.optional_action("host-generation-changed") {
+        let scenario = Scenario::new(HOST_START);
+        let control = scenario.start("epoch-1", CATALOG_DIGEST);
+        scenario.identities(&generation_changed);
+        scenario.observe(Some(&generation_changed));
+        // Its reconcile answered exactly as another blocked action's did, so
+        // the corpora kept only the preview and the read.
+        for method in ["runtime.hdc.impact-preview", "control-action.show"] {
+            let line = corpora.answered(method, "host-generation-changed", "blocked");
+            replay(&mut corpora, &control, line, None);
+        }
+        drop(control);
+        drop(scenario);
+    }
 
     // A Runtime restart and an expiry, read without observing again.
     let restarted = corpora.action("host-restarted");
@@ -1080,8 +1178,8 @@ fn every_with_host_exchange_of_the_corpora_is_answered_as_swift_recorded_it() {
         drop(scenario);
     }
 
-    // Every with-host line is reproduced but what only a foreground console
-    // receives (C2b): each line is replayed or the console's, never both.
+    // Every with-host line is reproduced but what only a foreground console's
+    // approval reaches (C2b): each line is replayed or C2b's, never both.
     let unreplayed: Vec<_> = corpora
         .lines
         .iter()
@@ -1089,18 +1187,24 @@ fn every_with_host_exchange_of_the_corpora_is_answered_as_swift_recorded_it() {
         .collect();
     for (method, index, frame) in &unreplayed {
         assert!(
-            console_answer(method, frame),
+            c2b_answer(method, frame) || corpora.unmade(method, frame),
             "{method} line {index} was not replayed: {frame}"
         );
     }
+    let deferred = corpora
+        .lines
+        .iter()
+        .filter(|(method, _, frame)| c2b_answer(method, frame) || corpora.unmade(method, frame))
+        .count();
+    assert_eq!(unreplayed.len(), deferred, "a C2b answer was replayed");
+    // The challenge and the lifecycle after it are one each in every view;
+    // the fake source's lines and C1's are replayed in every view.
     let console = corpora
         .lines
         .iter()
         .filter(|(method, _, frame)| console_answer(method, frame))
         .count();
-    assert_eq!(unreplayed.len(), console, "a console answer was replayed");
-    // The challenge and the lifecycle after it are one each in every view;
-    // the fake source's lines and C1's are replayed in every view.
     assert!(console >= 2, "{console}");
+    assert!(deferred >= console, "{deferred} < {console}");
     assert!(corpora.replayed.len() >= 29, "{:?}", corpora.replayed);
 }

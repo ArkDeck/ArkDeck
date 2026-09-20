@@ -7,6 +7,8 @@
         "factsDrifted",
         "humanActionExpired",
         "idempotencyConflict",
+        "impactApprovalChallengeExpired",
+        "impactApprovalChallengeMismatch",
         "internalError",
         "invalidInput",
         "invalidParams",
@@ -155,7 +157,10 @@
           ]
         },
         "blockerReasonCode": {
-          "type": "string"
+          "type": [
+            "null",
+            "string"
+          ]
         },
         "catalogDigest": {
           "type": "string"
@@ -532,7 +537,41 @@
                       "type": "string"
                     },
                     "signature": {
-                      "type": "null"
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "executionAssessment": {
+                              "type": "string"
+                            },
+                            "identifier": {
+                              "type": "string"
+                            },
+                            "platformTrust": {
+                              "type": "string"
+                            },
+                            "state": {
+                              "type": "string"
+                            },
+                            "teamIdentifier": {
+                              "type": "null"
+                            }
+                          },
+                          "required": [
+                            "executionAssessment",
+                            "identifier",
+                            "platformTrust",
+                            "state",
+                            "teamIdentifier"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "type": [
+                            "null"
+                          ]
+                        }
+                      ]
                     },
                     "source": {
                       "type": "string"
@@ -1344,7 +1383,41 @@
                   "type": "string"
                 },
                 "signature": {
-                  "type": "null"
+                  "anyOf": [
+                    {
+                      "additionalProperties": false,
+                      "properties": {
+                        "executionAssessment": {
+                          "type": "string"
+                        },
+                        "identifier": {
+                          "type": "string"
+                        },
+                        "platformTrust": {
+                          "type": "string"
+                        },
+                        "state": {
+                          "type": "string"
+                        },
+                        "teamIdentifier": {
+                          "type": "null"
+                        }
+                      },
+                      "required": [
+                        "executionAssessment",
+                        "identifier",
+                        "platformTrust",
+                        "state",
+                        "teamIdentifier"
+                      ],
+                      "type": "object"
+                    },
+                    {
+                      "type": [
+                        "null"
+                      ]
+                    }
+                  ]
                 },
                 "source": {
                   "type": "string"
@@ -1447,8 +1520,8 @@
   "x-arkdeck-method": "human-action.resume",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 16,
-    "request": 24,
-    "result": 8
+    "error": 14,
+    "request": 26,
+    "result": 12
   }
 }
