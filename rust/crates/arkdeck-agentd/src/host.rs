@@ -138,6 +138,10 @@ pub struct Host {
     /// adopted.
     #[cfg(target_os = "macos")]
     usb: std::sync::Arc<dyn arkdeck_provider_hdc::UsbRelations + Send + Sync>,
+    /// The bundled OpenHarmony code-sign helper this composition verified;
+    /// without one a native deployment stays unavailable.
+    #[cfg(target_os = "macos")]
+    code_sign_helper: Option<arkdeck_provider_hdc::CodeSignHelper>,
     /// The combined human-action owner over the agent executions and the
     /// union control-action owner.
     #[cfg(target_os = "macos")]
@@ -326,8 +330,17 @@ impl Host {
             receive_root: Some(&self.receive_root),
             tool_sha256: dispatch.tool_sha256(),
             now: arkdeck_hoststore::runtime_now,
-            code_sign_helper: None,
+            code_sign_helper: self.code_sign_helper.as_ref(),
         })
+    }
+    /// The bundled code-sign helper a native deployment stages, verified by
+    /// the composition that found it (`code_sign_helper.rs`). With one,
+    /// `deploy.native-library.app-owned@1` is available and planned; without
+    /// one it stays unavailable, as Swift's composition leaves it.
+    #[cfg(target_os = "macos")]
+    pub fn with_code_sign_helper(mut self, helper: arkdeck_provider_hdc::CodeSignHelper) -> Self {
+        self.code_sign_helper = Some(helper);
+        self
     }
     /// The state root a device mutation proves its continuity against, in
     /// place of the installed Runtime's, which an isolated development owner
@@ -372,6 +385,7 @@ impl Host {
         );
         let imports = self.imports.clone();
         let receive_root = self.receive_root.clone();
+        let helper = self.code_sign_helper.clone();
         let default_mutation_root = self.default_mutation_root.clone();
         let capabilities = self.capabilities.clone();
         let holds = self.holds.clone();
@@ -399,7 +413,7 @@ impl Host {
                     receive_root: Some(&receive_root),
                     tool_sha256: dispatch.tool_sha256(),
                     now: arkdeck_hoststore::runtime_now,
-                    code_sign_helper: None,
+                    code_sign_helper: helper.as_ref(),
                 }),
                 _ => None,
             };
@@ -572,6 +586,8 @@ impl Host {
             #[cfg(target_os = "macos")]
             usb: std::sync::Arc::new(arkdeck_provider_hdc::NoUsbRelations),
             #[cfg(target_os = "macos")]
+            code_sign_helper: None,
+            #[cfg(target_os = "macos")]
             human_actions: None,
             #[cfg(target_os = "macos")]
             control_actions: None,
@@ -602,9 +618,7 @@ impl HostServices for Host {
                     .authority()
                     .zip(self.jobs.as_deref())
                     .is_some_and(|(authority, jobs)| authority.require_state(jobs).is_ok()),
-                // The daemon composes no code-sign helper yet
-                // (`HdcComposition::code_sign_helper`).
-                code_sign_helper: false,
+                code_sign_helper: self.code_sign_helper.is_some(),
                 hdc_tool_current: if provider == "hdc"
                     && [
                         "observe.device@1",

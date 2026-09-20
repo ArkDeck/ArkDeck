@@ -187,6 +187,43 @@ pub fn validate_elf(
     })
 }
 
+/// Swift `HDCNativeCodeSignHelperArtifact.isStaticExecutable`: an ELF
+/// executable (`ET_EXEC`) with at least one loadable segment and no
+/// interpreter, which is what the bundled code-sign helper must be to run on
+/// a device that has no loader for it.
+pub fn static_executable(data: &[u8]) -> bool {
+    const EXECUTABLE: u16 = 2;
+    const LOAD: u32 = 1;
+    const INTERPRETER: u32 = 3;
+    if read_u16(data, 16) != Some(EXECUTABLE) {
+        return false;
+    }
+    let (Some(offset), Some(entry_size), Some(count)) = (
+        read_u64(data, 32).and_then(|value| usize::try_from(value).ok()),
+        read_u16(data, 54).map(usize::from),
+        read_u16(data, 56).map(usize::from),
+    ) else {
+        return false;
+    };
+    if entry_size < 56 || count == 0 || offset > data.len() {
+        return false;
+    }
+    if count > (data.len() - offset) / entry_size {
+        return false;
+    }
+    let mut loadable = false;
+    for index in 0..count {
+        let Some(kind) = read_u32(data, offset + index * entry_size) else {
+            return false;
+        };
+        if kind == INTERPRETER {
+            return false;
+        }
+        loadable |= kind == LOAD;
+    }
+    loadable
+}
+
 /// Swift `openHarmonyCodeSignFacts(in:required:)`: the V1 sign block that
 /// OpenHarmony appends to a code-signed ELF — a 32-byte trailer naming the
 /// block, one or two 12-byte block descriptors, the Merkle tree block and

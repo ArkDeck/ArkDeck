@@ -176,6 +176,36 @@ pub struct CodeSignHelper {
     pub host_path: PathBuf,
 }
 
+impl CodeSignHelper {
+    /// Swift `HDCNativeCodeSignHelperArtifact.bundled()`, without its
+    /// resource lookup: the bytes a composition found are an arm64 ELF the
+    /// library validator accepts, carry no mutable input signature, and are a
+    /// static executable. The facts are the ones the device actions name.
+    /// A refusal is Swift's `unsupportedAction` text, which a composition
+    /// reports as its reason for leaving the operation unavailable.
+    pub fn verified(data: &[u8], host_path: PathBuf) -> Result<Self, String> {
+        let facts = validate_elf(data, Some(NativeAbi::Arm64), false)
+            .map_err(|error| format!("bundled code-sign helper is invalid: {error}"))?;
+        if facts.code_sign.is_some() {
+            return Err(
+                "bundled code-sign helper unexpectedly carries a mutable input signature".into(),
+            );
+        }
+        if !crate::native_elf::static_executable(data) {
+            return Err("bundled code-sign helper is not a static arm64 executable".into());
+        }
+        Ok(Self {
+            facts: CodeSignHelperFacts {
+                abi: facts.abi,
+                build_id: facts.build_id,
+                sha256: facts.sha256,
+                byte_count: facts.byte_count,
+            },
+            host_path,
+        })
+    }
+}
+
 /// Swift `HDCAppOwnedNativeLibraryExactPaths`: the paths persisted with a
 /// native action, which recovery validates against the closed namespace and
 /// then reuses verbatim.
@@ -3302,6 +3332,112 @@ mod tests {
         assert_eq!(
             NativeAction::Backup(deployment).reconcile(Outcome::Verified(BTreeMap::new())),
             Reconcile::ConfirmedCompleted(BTreeMap::new())
+        );
+    }
+
+    /// A bounded arm64 static executable with a GNU build id and no
+    /// OpenHarmony signature: what the bundled code-sign helper is.
+    fn helper_elf(kind: u16, machine: u16, segments: &[u32]) -> Vec<u8> {
+        const HEADER: usize = 64;
+        const PROGRAM_ENTRY: usize = 56;
+        const SECTION_ENTRY: usize = 64;
+        let note_name = b"GNU\0";
+        let description: [u8; 20] = [
+            0x4e, 0x6f, 0x74, 0x41, 0x52, 0x65, 0x61, 0x6c, 0x42, 0x75, 0x69, 0x6c, 0x64, 0x49,
+            0x64, 0x00, 0x11, 0x22, 0x33, 0x44,
+        ];
+        let programs = HEADER;
+        let sections = programs + segments.len() * PROGRAM_ENTRY;
+        let note = sections + SECTION_ENTRY;
+        let note_size = 12 + note_name.len() + description.len();
+        let mut data = vec![0_u8; note + note_size];
+        data[..4].copy_from_slice(&[0x7f, b'E', b'L', b'F']);
+        data[4] = 2;
+        data[5] = 1;
+        data[16..18].copy_from_slice(&kind.to_le_bytes());
+        data[18..20].copy_from_slice(&machine.to_le_bytes());
+        data[32..40].copy_from_slice(&(programs as u64).to_le_bytes());
+        data[40..48].copy_from_slice(&(sections as u64).to_le_bytes());
+        data[54..56].copy_from_slice(&(PROGRAM_ENTRY as u16).to_le_bytes());
+        data[56..58].copy_from_slice(&(segments.len() as u16).to_le_bytes());
+        data[58..60].copy_from_slice(&(SECTION_ENTRY as u16).to_le_bytes());
+        data[60..62].copy_from_slice(&1_u16.to_le_bytes());
+        for (index, segment) in segments.iter().enumerate() {
+            let at = programs + index * PROGRAM_ENTRY;
+            data[at..at + 4].copy_from_slice(&segment.to_le_bytes());
+        }
+        data[sections + 4..sections + 8].copy_from_slice(&7_u32.to_le_bytes());
+        data[sections + 24..sections + 32].copy_from_slice(&(note as u64).to_le_bytes());
+        data[sections + 32..sections + 40].copy_from_slice(&(note_size as u64).to_le_bytes());
+        data[note..note + 4].copy_from_slice(&(note_name.len() as u32).to_le_bytes());
+        data[note + 4..note + 8].copy_from_slice(&(description.len() as u32).to_le_bytes());
+        data[note + 8..note + 12].copy_from_slice(&3_u32.to_le_bytes());
+        data[note + 12..note + 12 + note_name.len()].copy_from_slice(note_name);
+        let at = note + 12 + note_name.len();
+        data[at..at + description.len()].copy_from_slice(&description);
+        data
+    }
+
+    #[test]
+    fn the_helper_is_a_static_arm64_executable_without_a_signature() {
+        let bytes = helper_elf(2, 183, &[1]);
+        let helper = CodeSignHelper::verified(&bytes, PathBuf::from("/host/helper")).unwrap();
+        assert_eq!(helper.facts.abi, NativeAbi::Arm64);
+        assert_eq!(helper.facts.byte_count, bytes.len() as i64);
+        assert_eq!(
+            helper.facts.sha256,
+            crate::native_elf::validate_elf(&bytes, None, false)
+                .unwrap()
+                .sha256
+        );
+        assert_eq!(helper.facts.build_id.len(), 40);
+        assert_eq!(helper.host_path, PathBuf::from("/host/helper"));
+        // An interpreter, no loadable segment, a shared object and another
+        // ABI are each refused, as Swift's bundled() refuses them.
+        for (kind, machine, segments) in [
+            (2_u16, 183_u16, vec![1_u32, 3]),
+            (2, 183, vec![2]),
+            (3, 183, vec![1]),
+            (2, 40, vec![1]),
+        ] {
+            assert!(
+                CodeSignHelper::verified(&helper_elf(kind, machine, &segments), PathBuf::new())
+                    .is_err(),
+                "{kind} {machine} {segments:?}"
+            );
+        }
+        assert!(CodeSignHelper::verified(b"not an ELF", PathBuf::new()).is_err());
+    }
+
+    /// The helper ArkDeckWorkflows carries, when this checkout has it: the
+    /// isolated contract view keeps only `rust/`, so its absence is not a
+    /// failure. Its facts are the ones the oracle recorded for the helper
+    /// Swift staged.
+    #[test]
+    fn the_bundled_helper_carries_the_facts_the_oracle_recorded() {
+        let cases: Value = serde_json::from_slice(
+            &std::fs::read(
+                Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join("../../tests/fixtures/deploy-native-library/cases.json"),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        let recorded = &cases["codeSignHelper"];
+        assert_eq!(recorded["sha256"], HELPER_SHA256);
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../../Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Resources")
+            .join("OpenHarmonyNativeCodeSign/arkdeck-code-sign-enable");
+        let Ok(bytes) = std::fs::read(&path) else {
+            return;
+        };
+        let helper = CodeSignHelper::verified(&bytes, path.clone()).unwrap();
+        assert_eq!(helper.facts.abi, NativeAbi::Arm64);
+        assert_eq!(helper.facts.sha256, recorded["sha256"].as_str().unwrap());
+        assert_eq!(helper.facts.build_id, recorded["buildId"].as_str().unwrap());
+        assert_eq!(
+            helper.facts.byte_count,
+            recorded["byteCount"].as_i64().unwrap()
         );
     }
 }

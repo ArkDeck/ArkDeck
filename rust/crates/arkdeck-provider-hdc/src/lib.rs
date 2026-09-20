@@ -59,7 +59,7 @@ pub use live_mode::{
 pub use managed_server::{EndpointSelection, ManagedHdcServer, StartBudget, StartFailure};
 pub use native_elf::{
     CodeSignFacts, MAXIMUM_LIBRARY_BYTES, NativeAbi, NativeLibraryFacts, ValidationError,
-    is_static_executable, validate_elf,
+    is_static_executable, static_executable, validate_elf,
 };
 pub use native_library::{
     Attestation, CodeSignHelper, CodeSignHelperFacts, Deployment, ExactPaths, Inspection,
