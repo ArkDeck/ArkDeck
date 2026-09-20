@@ -307,6 +307,15 @@ impl Host {
             code_sign_helper: None,
         })
     }
+    /// The state root a device mutation proves its continuity against, in
+    /// place of the installed Runtime's, which an isolated development owner
+    /// is not: its own Job state, taken only as `development_mutation::admit`
+    /// allows.
+    #[cfg(target_os = "macos")]
+    pub fn with_development_mutation_root(mut self, root: std::path::PathBuf) -> Self {
+        self.default_mutation_root = Some(root);
+        self
+    }
     /// What a device mutation is authorized from: the capability store and
     /// this daemon's device sessions. Without a store no mutation is admitted.
     #[cfg(target_os = "macos")]
@@ -2078,6 +2087,64 @@ fn timestamp(seconds: u64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    /// The development authority moves the root a device mutation proves its
+    /// state continuity against, and changes nothing else about that proof.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn the_development_mutation_root_is_the_root_the_isolated_owner_proves() {
+        use std::{fs, os::unix::fs::DirBuilderExt};
+        let path = std::env::temp_dir()
+            .canonicalize()
+            .unwrap()
+            .join(format!("development-mutation-host-{}", fresh_id().unwrap()));
+        let jobs = path.join("jobs-state");
+        fs::DirBuilder::new()
+            .mode(0o700)
+            .recursive(true)
+            .create(&jobs)
+            .unwrap();
+        let store = arkdeck_hoststore::JobStore::open_owner(&jobs).unwrap();
+        let host = Host::from_environment().with_capabilities(
+            arkdeck_hoststore::CapabilityStore::open(&jobs.join("capabilities")).unwrap(),
+        );
+        // The installed Runtime's root, which an isolated owner is not: its
+        // mutation state can never be proved continuous with it.
+        let installed = host.authority().unwrap();
+        assert_ne!(installed.default_root, jobs);
+        assert_eq!(
+            installed.require_state(&store).unwrap_err().code,
+            "recordUnreadable"
+        );
+        // Taken, the proof is anchored at this owner's own Job state.
+        let host = host.with_development_mutation_root(jobs.clone());
+        assert_eq!(host.authority().unwrap().default_root, jobs);
+        host.authority().unwrap().require_state(&store).unwrap();
+        // Everything else the proof refuses, it still refuses there: recorded
+        // authorization usage beside the root, and a Session root that is a
+        // link out of it.
+        fs::write(path.join("AuthorizationUsage"), b"").unwrap();
+        assert_eq!(
+            host.authority()
+                .unwrap()
+                .require_state(&store)
+                .unwrap_err()
+                .code,
+            "recordUnreadable"
+        );
+        fs::remove_file(path.join("AuthorizationUsage")).unwrap();
+        std::os::unix::fs::symlink(&path, path.join("Sessions")).unwrap();
+        assert_eq!(
+            host.authority()
+                .unwrap()
+                .require_state(&store)
+                .unwrap_err()
+                .code,
+            "recordUnreadable"
+        );
+        fs::remove_file(path.join("Sessions")).unwrap();
+        host.authority().unwrap().require_state(&store).unwrap();
+        fs::remove_dir_all(&path).unwrap();
+    }
     #[cfg(target_os = "macos")]
     #[test]
     fn candidate_name_owner_uses_only_runtime_snapshot_and_advances_cas() {

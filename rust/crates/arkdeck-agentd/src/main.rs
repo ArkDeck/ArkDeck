@@ -9,6 +9,8 @@ mod control_action_control;
 #[cfg(all(test, target_os = "macos"))]
 mod control_action_host_control;
 #[cfg(target_os = "macos")]
+mod development_mutation;
+#[cfg(target_os = "macos")]
 mod development_usb;
 #[cfg(unix)]
 mod drain;
@@ -183,6 +185,17 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
     {
         return Err("development USB relations are configured only with a development HDC".into());
     }
+    // The standalone daemon and the facade prove a device mutation's state
+    // continuity against the installed Runtime's own root, and never take a
+    // development authority, acknowledged or not.
+    #[cfg(target_os = "macos")]
+    if development.is_none() && std::env::var_os(development_mutation::ACKNOWLEDGMENT).is_some() {
+        return Err(
+            "a development mutation authority is acknowledged only for an isolated development \
+             root"
+                .into(),
+        );
+    }
     #[cfg(target_os = "macos")]
     if development.is_none()
         && let Some(swift) = facade::swift_executable()
@@ -355,9 +368,27 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         // Beside the development HDC's fixture, or acknowledged beside the
         // registered HDC it started as its managed server (`development_hdc`):
         // the relations the file names stand in for the ArkForge lane's reader.
-        match development_usb::DevelopmentUsbRelations::from_environment()? {
+        let host = match development_usb::DevelopmentUsbRelations::from_environment()? {
             Some(usb) => host.with_usb_relations(std::sync::Arc::new(usb)),
             None => host,
+        };
+        // Acknowledged, and with the development HDC started as the managed
+        // server, this owner proves a device mutation's state continuity
+        // against its own Job state instead of the installed Runtime's root,
+        // which it can never be (maintainer decision 2026-09-20, as option A
+        // of 2026-09-19). Everything else about that proof, the capability and
+        // the device hold is unchanged, and what it proves about a real device
+        // is development-root evidence, never REAL_DEVICE_PASS.
+        if development_mutation::admit(
+            true,
+            managed_server,
+            development_mutation::acknowledged(
+                std::env::var_os(development_mutation::ACKNOWLEDGMENT).as_deref(),
+            )?,
+        )? {
+            host.with_development_mutation_root(root.join("jobs-state"))
+        } else {
+            host
         }
     } else {
         host
