@@ -1,6 +1,5 @@
-import ArkDeckClientKit
 import AppKit
-import ArkDeckWorkflows
+import ArkDeckClientKit
 import Foundation
 import Observation
 import SwiftUI

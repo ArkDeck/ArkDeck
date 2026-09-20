@@ -9,6 +9,7 @@
 // clients. Verification is semantic: there is deliberately no constructor
 // from "exit 0" to a verified outcome.
 
+import ArkDeckClientKit
 import ArkDeckCore
 import ArkDeckStorage
 import CryptoKit

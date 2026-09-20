@@ -1,4 +1,5 @@
 import XCTest
+@testable import ArkDeckClientKit
 
 @testable import ArkDeckCore
 @testable import ArkDeckOpenHarmony

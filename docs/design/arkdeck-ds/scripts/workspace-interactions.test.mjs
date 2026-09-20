@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {readFileSync, readdirSync} from 'node:fs';
+import {existsSync, readFileSync, readdirSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
 import {join, relative} from 'node:path';
 import test from 'node:test';
@@ -11,6 +11,16 @@ import {renderToStaticMarkup} from 'react-dom/server';
 
 const root = fileURLToPath(new URL('../../../../', import.meta.url));
 const read = path => readFileSync(join(root, path), 'utf8');
+// CHG-2026-074 moves the App-facing facades from ArkDeckWorkflows to
+// ArkDeckClientKit one slice at a time, so a facade is read from whichever
+// module declares it rather than from a pinned directory.
+const readFacade = file => {
+  for (const module of ['ArkDeckClientKit', 'ArkDeckWorkflows']) {
+    const path = `Packages/ArkDeckKit/Sources/${module}/${file}`;
+    if (existsSync(join(root, path))) return read(path);
+  }
+  throw new Error(`${file} is in neither ArkDeckClientKit nor ArkDeckWorkflows`);
+};
 const coverage = JSON.parse(read('docs/design/implementation-coverage.json'));
 const report = read('docs/design/implementation-audit-2026-08-27.md');
 const html = read('docs/design/prototype.html');
@@ -434,7 +444,7 @@ test('History workspace revisits retain exact read-only source context across al
     const before=h.run('JSON.stringify(S.historyContext)');
     h.run("openHistoryDesignWorkspace('missing');openHistoryDesignWorkspace('S-0825-04')");
     assert.equal(h.run('JSON.stringify(S.historyContext)'),before);
-    const debugSource=read('Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DebugApplicationFacade.swift');
+    const debugSource=readFacade('DebugApplicationFacade.swift');
     for(const [constant,tab] of [['debugHAPReference','apps'],['nativeLibraryReference','artifacts'],['captureDiagnosticsReference','logs'],['createPortForwardReference','net'],['removePortForwardReference','net']]) {
       const operation=debugSource.match(new RegExp(`static let ${constant} = "([^"]+)"`))[1];
       h.run(`HIST.unshift({id:'source-${constant}',kind:'debug',op:${JSON.stringify(operation)},st:'succeeded'});openHistoryDesignWorkspace('source-${constant}')`);

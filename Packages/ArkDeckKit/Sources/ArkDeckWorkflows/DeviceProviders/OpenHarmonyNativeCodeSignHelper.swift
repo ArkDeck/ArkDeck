@@ -1,3 +1,4 @@
+import ArkDeckClientKit
 import Foundation
 
 package struct HDCNativeCodeSignHelperArtifact: Sendable {
