@@ -137,6 +137,7 @@ impl CliError {
             "job.submit"
                 | "job.run"
                 | "job.cancel"
+                | "job.reconcile"
                 | "agent.run"
                 | "agent.abandon"
                 | "agent.resume"
@@ -698,6 +699,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["job", "submit"] => "job.submit",
         ["job", "run"] => "job.run",
         ["job", "cancel"] => "job.cancel",
+        ["job", "reconcile"] => "job.reconcile",
         ["capability", "list"] => "capability.list",
         ["capability", "inspect"] => "capability.inspect",
         ["device", "candidates"] => "device.candidates",
@@ -995,7 +997,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         "job.status" | "job.show" | "job.evidence" | "job.result" | "job.run" => {
             &["jobId", "timeout"]
         }
-        "job.cancel" => &["jobId"],
+        "job.cancel" | "job.reconcile" => &["jobId"],
         "capability.inspect" => &["capabilityId"],
         "job.timeline" => &["jobId", "pageSize", "cursor", "timeout"],
         "job.events" => &["jobId", "pageSize", "afterCursor", "timeout"],
@@ -1284,6 +1286,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                     | "job.submit"
                     | "job.run"
                     | "job.cancel"
+                    | "job.reconcile"
                     | "job.result"
                     | "capability.inspect"
                     | "agent.run"

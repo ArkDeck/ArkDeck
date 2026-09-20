@@ -879,12 +879,14 @@ but is not resident, …")`). A run of a Job no run holds waits a cancellation
 out and then meets the cancelled Job (`resourceConflict` with the zero-dispatch
 proof), and concurrent cancellations of one Job join.
 
-`arkdeck job cancel --job <id>` sends the opaque identity as Swift's CLI does,
-prints the answer and exits 0. As for any mutation-capable method without the
-zero-dispatch proof, `notFound` is `resourceNotFound`, `invalidParams` is
+`arkdeck job cancel --job <id>` and `arkdeck job reconcile --job <id>` send the
+opaque identity as Swift's CLI does, print the answer and exit 0. A reconcile's
+answer is the Job's status, and an outcome it leaves unknown is that answer, not
+a failed request. Swift classifies both methods as mutation-capable, so without
+the zero-dispatch proof `notFound` is `resourceNotFound`, `invalidParams` is
 `invalidInput`, `rejected` and `internalError` are `outcomeUnknown` (75), and so is
-a reply lost after the request went out; a connect failure stays
-`runtimeUnavailable`.
+a reply lost after the request went out, which is never resent; a connect failure
+stays `runtimeUnavailable`.
 
 `rust/tests/fixtures/job-cancel-analyzer/` is the oracle Swift
 `JobRunAnalyzerOracleContractTests.testSwiftCancelsTheSharedAnalyzerJobs` records

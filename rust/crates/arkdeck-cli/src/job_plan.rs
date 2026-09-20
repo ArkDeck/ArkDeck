@@ -60,18 +60,19 @@ fn valid_identifier(id: &str) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || b"._-".contains(&byte))
 }
 
-/// Parse-time `job plan`, `job submit` and `job cancel` checks. Returns the
-/// client deadline: none for a cancellation, which Swift sends without one,
-/// otherwise 30 s unless `--timeout` names another bounded one.
+/// Parse-time `job plan`, `job submit`, `job cancel` and `job reconcile`
+/// checks. Returns the client deadline: none for a cancellation or a
+/// reconcile, which Swift sends without one, otherwise 30 s unless
+/// `--timeout` names another bounded one.
 pub(super) fn configure(
     command: &str,
     fields: &mut Map<String, Value>,
     help: bool,
 ) -> Result<Option<u64>, CliError> {
-    if !help && command == "job.cancel" {
+    if !help && matches!(command, "job.cancel" | "job.reconcile") {
         // Swift sends the opaque `--job` as given; the Runtime answers it.
         if !fields.contains_key("jobId") {
-            return Err(usage("job.cancel requires --job"));
+            return Err(usage(format!("{command} requires --job")));
         }
         return Ok(None);
     }
@@ -301,6 +302,9 @@ pub(crate) fn mutation_error(error: ClientError, method: &str) -> CliError {
                     }
                     "job.cancel" => {
                         "the Job cancellation reply is unconfirmed; read the Job with job status to learn whether it was cancelled"
+                    }
+                    "job.reconcile" => {
+                        "the Job reconcile reply is unconfirmed; read the Job with job status to learn what it settled; the original effect is never replayed"
                     }
                     "target.adopt" => {
                         "the target adoption reply is unconfirmed; read the device candidates and the target list to learn whether it was adopted"
