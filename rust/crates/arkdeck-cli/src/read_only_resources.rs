@@ -8,7 +8,7 @@ pub(super) fn invalid() -> CliError {
         "Runtime returned an invalid read-only resource",
     )
 }
-fn identifier(s: &str) -> bool {
+pub(crate) fn identifier(s: &str) -> bool {
     valid_correlation(s) && !s.contains(':')
 }
 pub(super) fn duration(s: &str) -> Option<u64> {

@@ -1,10 +1,11 @@
 # TASK-XPA-018 — the Rust CLI against the feature coverage ledger (macOS, 2026-09-19)
 
 TASK-XPA-018 remains in progress. First recorded on protected main `674c2ed7` with `arkdeck
-commands` and the argv replay (#2065, `cli-commands-run.md`); updated 2026-09-20 on `64ff5380` with the
+commands` and the argv replay (#2065, `cli-commands-run.md`); updated 2026-09-20 on `5c9075c5` with the
 parse-staging slice (`cli-parse-staging-run.md`), which answers the nine leaves that are not
 executable, the help and completion slice (`cli-help-completion-run.md`), the first two read leaves
-(`cli-read-leaves-run.md`) and `device wait` (`cli-device-wait-run.md`). Nothing here is device evidence (POL-VERIFY-001, POL-MODE-001).
+(`cli-read-leaves-run.md`), `device wait` (`cli-device-wait-run.md`) and `job watch`
+(`cli-job-watch-run.md`). Nothing here is device evidence (POL-VERIFY-001, POL-MODE-001).
 
 Every one of the 256 entries of `openspec/contracts/cli-feature-coverage.json` is put in one of four
 categories, against the Rust CLI's own `arkdeck commands --output json` and the isolated Rust
@@ -18,18 +19,18 @@ daemon's routes:
 | 4 tombstone per §12 | 15 | a deprecated or legacy spelling CLI spec §12 moves to a tombstone in the next CLI major |
 
 Across the registry's 209 leaves (entries also reach leaves through `equivalentCommands`, and aliases
-have no entry of their own), the Rust CLI serves 104; of the 105 others, 50 are category 2, 36
+have no entry of their own), the Rust CLI serves 105; of the 104 others, 49 are category 2, 36
 category 3 and 19 category 4. The isolated daemon routes 91 of the 105 control methods.
 
 The dashboard's CLI cell (`evidence/macos-remaining.md`) keeps its own definition — parser names that
 are also feature names — and reads **99 / 256** at this head (104 parser names): 97 after the help
 and completion slice, plus `operation validate` and `job reconcile` (#2072). The audit counts
 differently on purpose: an App or Catalog entry is implemented through the leaf that covers it, and
-five of the served leaves — `artifact.import.hap`, `artifact.import.native-library`,
-`device.candidates`, `runtime.health` and `device.wait` — are parser names the ledger spells
-otherwise (it calls the last two `health` and `device.observations`), so the dashboard's
-intersection never counts them. That is why `runtime health` and `device wait` move the audit by
-two entries each and the dashboard by none.
+six of the served leaves — `artifact.import.hap`, `artifact.import.native-library`,
+`device.candidates`, `runtime.health`, `device.wait` and `job.watch` — are parser names the ledger
+spells otherwise (it reaches the last three as `health`, `device.observations` and through
+`job.events`'s equivalents), so the dashboard's intersection never counts them. That is why these
+three leaves move the audit's served count and leave the dashboard where it was.
 
 ## How an entry is classified
 
@@ -37,7 +38,7 @@ two entries each and the dashboard by none.
    `equivalentCommands` are alternatives and are not required.
 2. **Served.** The leaf is in the Rust CLI's `arkdeck commands --output json`, which lists a registry
    leaf exactly when the Rust parser serves its path. Every served leaf's Swift argv fixture now
-   replays through the Rust parser (`argv_fixtures.rs`: 104 fixtures, 626 cases);
+   replays through the Rust parser (`argv_fixtures.rs`: 105 fixtures, 632 cases);
    one served leaf answers two of those cases otherwise and is counted implemented with the
    divergence named (next section).
 3. **Not served**, by the leaf's registry entry:
@@ -84,7 +85,7 @@ all, macOS), so closing one removes it from the list and a new one fails.
 
 ## Category 2: what the next slices add
 
-50 registry leaves, grouped by what they need:
+49 registry leaves, grouped by what they need:
 
 - **No Runtime:** `debug template list`. It reaches no Runtime, but it is not registry-driven like
   `help` and `completion`: it projects Swift's closed `DebugRuntimeCommandTemplate` set — each
@@ -92,9 +93,9 @@ all, macOS), so closing one removes it from the list and a new one fails.
   published `debug.template@1` descriptor disagree. It needs that table ported, not just a leaf.
 - **Reads over routed methods**, the group these slices are working through: `runtime health` and
   `operation validate` are served from `cli-read-leaves-run.md` on, `device wait` from
-  `cli-device-wait-run.md`; the rest follow — `job wait`, `job watch`, `recovery cleanup list`
-  (with its §12 alias `cleanup-debt list`, which §12 keeps), `trace export`,
-  `diagnostics inspect|preview|export`, `ui-dump inspect|hit-test`.
+  `cli-device-wait-run.md` and `job watch` from `cli-job-watch-run.md`; the rest follow —
+  `job wait`, `recovery cleanup list` (with its §12 alias `cleanup-debt list`, which §12 keeps),
+  `trace export`, `diagnostics inspect|preview|export`, `ui-dump inspect|hit-test`.
 - **Workspace continuation:** `workspace continuation inspect|submit|run`.
 - **Domain leaves**, one request builder for all 34: `target observe`, `trace capture`,
   `screen capture|record`, `input tap|long-press|swipe`, `diagnostics capture`,
@@ -435,7 +436,7 @@ Read-only; it reads the ledger, `rust/crates/arkdeck-cli/src/command_registry.js
 | workspace.sweep-isolated-copies@1 | direct | current | `workspace.sweep` | 2 leaf missing, daemon routed | domain leaf; `workspace.sweep-isolated-copies@1` has no Rust runner, so the isolated daemon does not execute it |
 | workspace.symbolize-crash@1 | direct | current | `workspace.symbolize` | 2 leaf missing, daemon routed | domain leaf; `workspace.symbolize-crash@1` has no Rust runner, so the isolated daemon does not execute it |
 
-| Registry leaf not served (105 of 209) | Kind, lifecycle | Category | Note |
+| Registry leaf not served (104 of 209) | Kind, lifecycle | Category | Note |
 | --- | --- | --- | --- |
 | `runtime.service.install` | executable, current | 3 daemon or host owner missing | local; LaunchAgent service (maintainer gate) has no Rust port |
 | `runtime.service.update` | executable, current | 3 daemon or host owner missing | local; LaunchAgent service (maintainer gate) has no Rust port |
@@ -464,7 +465,6 @@ Read-only; it reads the ledger, `rust/crates/arkdeck-cli/src/command_registry.js
 | `trace.inspect` | executable, current | 3 daemon or host owner missing | not routed: `trace.inspect` |
 | `trace.export` | executable, current | 2 leaf missing, daemon routed | methods: `artifact.inspect`, `artifact.export` |
 | `job.wait` | executable, current | 2 leaf missing, daemon routed | methods: `job.status` |
-| `job.watch` | executable, current | 2 leaf missing, daemon routed | methods: `job.events`, `job.status` |
 | `recovery.cleanup.list` | executable, current | 2 leaf missing, daemon routed | methods: `cleanupDebt.list` |
 | `recovery.cleanup.continue` | executable, current | 2 leaf missing, daemon routed | methods: `cleanupDebt.continue` |
 | `recovery.flash-invocation.list` | executable, current | 3 daemon or host owner missing | not routed: `recovery.flash-invocation.list` |
@@ -545,6 +545,6 @@ Read-only; it reads the ledger, `rust/crates/arkdeck-cli/src/command_registry.js
 
 | Registry leaves not served, by category | Leaves |
 | --- | --- |
-| 2 leaf missing, daemon routed | 50 |
+| 2 leaf missing, daemon routed | 49 |
 | 3 daemon or host owner missing | 36 |
 | 4 tombstone per §12 | 19 |

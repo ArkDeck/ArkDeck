@@ -12,6 +12,17 @@ use std::os::unix::net::UnixListener;
 use std::path::PathBuf;
 use std::process::{Command, Output};
 
+/// The CLI, asked for the machine answer unless the test names its own output
+/// mode (the two streaming leaves serve `jsonl`, and one of them no `json`).
+fn invoke(argv: &[&str], socket: &PathBuf) -> Output {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_arkdeck"));
+    command.args(argv);
+    if !argv.contains(&"--output") {
+        command.args(["--output", "json"]);
+    }
+    command.arg("--socket").arg(socket).output().unwrap()
+}
+
 /// The CLI run with `argv` against a fake Runtime that serves exactly one
 /// connection and answers the exchanges `replies` names, in order, each
 /// request having to carry exactly that method and parameters. The first
@@ -84,12 +95,7 @@ fn session(argv: &[&str], replies: Vec<(String, Value, Value)>, exact: bool) -> 
         assert_eq!(read, 0, "one exchange beyond those named: {rest}");
         unserved
     });
-    let output = Command::new(env!("CARGO_BIN_EXE_arkdeck"))
-        .args(argv)
-        .args(["--output", "json", "--socket"])
-        .arg(&path)
-        .output()
-        .unwrap();
+    let output = invoke(argv, &path);
     let unserved = server.join().unwrap();
     assert!(
         !exact || unserved.is_empty(),
@@ -171,26 +177,47 @@ fn connections(
                 ended = !exact;
                 continue;
             };
-            stream.set_nonblocking(false).unwrap();
-            stream
-                .set_read_timeout(Some(std::time::Duration::from_secs(5)))
-                .unwrap();
+            // A peer that has already closed refuses these on macOS (EINVAL),
+            // which is one way a leaf whose deadline ended shows up here.
+            if stream.set_nonblocking(false).is_err()
+                || stream
+                    .set_read_timeout(Some(std::time::Duration::from_secs(5)))
+                    .is_err()
+            {
+                unserved.push(method);
+                ended = !exact;
+                continue;
+            }
             let mut reader = BufReader::new(stream);
             let mut line = String::new();
-            reader.read_line(&mut line).unwrap();
-            let health: Value = serde_json::from_str(&line).unwrap();
-            assert_eq!(health["method"], "health");
-            let health = json!({"id":"health","ok":true,"result":{"status":"ok","protocolVersion":PROTOCOL_VERSION,
-                "contractIdentity":CONTRACT_IDENTITY,"catalogDigest":CATALOG_DIGEST,"providers":[],"publishedMethods":METHODS}});
-            writeln!(reader.get_mut(), "{health}").unwrap();
+            // A leaf whose own deadline ended may close this connection at any
+            // point: an exchange it walked away from is one it never asked for.
+            let mut walked_away = reader.read_line(&mut line).unwrap_or(0) == 0;
+            if !walked_away {
+                let health: Value = serde_json::from_str(&line).unwrap();
+                assert_eq!(health["method"], "health");
+                let health = json!({"id":"health","ok":true,"result":{"status":"ok","protocolVersion":PROTOCOL_VERSION,
+                    "contractIdentity":CONTRACT_IDENTITY,"catalogDigest":CATALOG_DIGEST,"providers":[],"publishedMethods":METHODS}});
+                walked_away = writeln!(reader.get_mut(), "{health}").is_err();
+            }
             line.clear();
-            reader.read_line(&mut line).unwrap();
+            if !walked_away {
+                walked_away = reader.read_line(&mut line).unwrap_or(0) == 0;
+            }
+            if walked_away {
+                unserved.push(method);
+                ended = !exact;
+                continue;
+            }
             let request: Value = serde_json::from_str(&line).unwrap();
             assert_eq!(request["method"], method.as_str());
             assert_eq!(request["params"], params, "{method}");
             let mut answer = answer;
             answer["id"] = request["id"].clone();
-            writeln!(reader.get_mut(), "{answer}").unwrap();
+            if writeln!(reader.get_mut(), "{answer}").is_err() {
+                ended = !exact;
+                continue;
+            }
             // The CLI closes the connection once it has read the answer.
             // Closing it here first races the bounded client, which sets
             // its read timeout before every read: macOS refuses that
@@ -200,12 +227,7 @@ fn connections(
         }
         unserved
     });
-    let output = Command::new(env!("CARGO_BIN_EXE_arkdeck"))
-        .args(argv)
-        .args(["--output", "json", "--socket"])
-        .arg(&path)
-        .output()
-        .unwrap();
+    let output = invoke(argv, &path);
     let unserved = server.join().unwrap();
     assert!(
         !exact || unserved.is_empty(),
