@@ -64,4 +64,13 @@ runs because a Swift test changed. Their result is added by the Rust port.
 
 The first run, on `293ff532` (Swift CI 35453383350), was red in `swift-tests`
 only, in `JobPlanAnalyzerOracleContractTests`, which #2062 fixed on `main`; this
-oracle's test ran and passed there. The change was rebased on `655c8199`.
+oracle's test ran and passed there. Rebased on `655c8199`, everything was green
+at head `3006c164`, and #2064 merged. This result is recorded by the next
+slice, the frames of the DevEco owner's refusals.
+
+| Workflow run | Job | Result |
+|---|---|---|
+| Swift CI 35458757373 | `swift` aggregate, `swift-tests` | pass (3m48s) |
+| Swift CI 35458757373 | Rust workspace on macos-26, ubuntu-latest and windows-latest; host-independent checks | pass (4m51s, 1m11s, 2m56s, 30s) |
+| SDD Guard 35458757349 | `guard`, `ds-tokens` | pass |
+| Agent PR 35458757345 | `open-pr` | pass |

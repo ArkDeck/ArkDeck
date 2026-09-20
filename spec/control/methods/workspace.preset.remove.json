@@ -148,8 +148,8 @@
   "x-arkdeck-method": "workspace.preset.remove",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 9,
+    "error": 10,
     "request": 13,
-    "result": 4
+    "result": 3
   }
 }

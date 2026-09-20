@@ -15,6 +15,7 @@
         "recordUnreadable",
         "rejected",
         "resourceConflict",
+        "resourceNotFound",
         "unknownMethod",
         "unsupportedProtocolVersion",
         "workspaceReferenceNotFound"
@@ -175,8 +176,8 @@
   "x-arkdeck-method": "workspace.preset.update",
   "x-arkdeck-protocolVersion": "1.0.0",
   "x-arkdeck-sampleCounts": {
-    "error": 10,
-    "request": 13,
+    "error": 12,
+    "request": 15,
     "result": 3
   }
 }

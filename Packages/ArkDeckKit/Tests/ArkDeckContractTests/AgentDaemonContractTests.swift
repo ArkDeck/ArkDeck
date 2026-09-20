@@ -5,6 +5,7 @@ import XCTest
 
 @testable import ArkDeckAgentClient
 @testable import ArkDeckAgentDaemon
+@testable import ArkDeckBootstrap
 @testable import ArkDeckCore
 @testable import ArkDeckOpenHarmony
 @testable import ArkDeckRuntime
@@ -1279,6 +1280,226 @@ final class AgentDaemonContractTests: XCTestCase {
   /// failures, so that their published schemas carry the vocabulary a Rust
   /// owner replays. Dependency pinning is test-owned and accepts every pin
   /// except one foreign credential; every path is a test-owned root.
+  /// The DevEco toolchain owner's own refusals, as a workspace preset meets
+  /// them through the production pin (TASK-XPA-015, M3).
+  ///
+  /// The preset oracle pinned through a test owner that accepted everything,
+  /// so the published schemas carry none of the registry's codes: an
+  /// unregistered toolchain, a retired one, its reference bound, a missing
+  /// child and changed content. The isolated Rust daemon composes the same pin
+  /// over its own registry, so it answers them too.
+  func testWorkspacePresetPinsRecordTheDevEcoRegistryRefusals() async throws {
+    let home = stateDirectory.appending(path: "deveco-pin-frames", directoryHint: .isDirectory)
+    let projectRoot = home.appending(path: "project", directoryHint: .isDirectory)
+    try FileManager.default.createDirectory(at: projectRoot, withIntermediateDirectories: true)
+    guard let physical = realpath(projectRoot.path, nil) else { throw POSIXError(.ENOENT) }
+    defer { free(physical) }
+    let registryRoot = home.appending(path: "registry", directoryHint: .isDirectory)
+    let inspect: (URL) throws -> BootstrapToolTrust = { url in
+      url.pathExtension == "app"
+        ? BootstrapToolTrust(
+          signature: "verified", identifier: "com.huawei.devecostudio.ds",
+          teamIdentifier: "TZEA3TN37Q", codeDirectorySHA256: String(repeating: "a", count: 64))
+        : BootstrapToolTrust(
+          signature: "verified", identifier: "node", teamIdentifier: "HX7739G8FX",
+          codeDirectorySHA256: String(repeating: "b", count: 64))
+    }
+    let registry = BootstrapDevEcoToolchainRegistry(
+      owner: BootstrapBundleRegistry(root: registryRoot),
+      inspectTrust: inspect, inspectPublisherTrust: inspect,
+      verifySignedResources: { contents, expected in
+        for (relativePath, digest) in expected {
+          guard
+            SHA256Hex.string(of: try Data(contentsOf: contents.appending(path: relativePath)))
+              == digest
+          else { throw AgentExecutionControlFailure("fileIdentityChanged", "resource changed") }
+        }
+      },
+      nowUTC: { "2026-09-01T00:00:00Z" })
+    // Three fabricated toolchains: one retired mid-timeline, one that reaches
+    // its reference bound and then changes, one that loses a child.
+    func toolchain(_ name: String) throws -> String {
+      let contents = try Self.devEcoContents(
+        at: home.appending(path: "\(name)/DevEco-Studio.app/Contents", directoryHint: .isDirectory),
+        marker: name)
+      guard case .object(let fields) = try registry.register(root: contents),
+        case .string(let reference)? = fields["toolRef"]
+      else { throw POSIXError(.EINVAL) }
+      return reference
+    }
+    let first = try toolchain("first")
+    let second = try toolchain("second")
+    let third = try toolchain("third")
+    let unknown = "toolchain:sha256:" + String(repeating: "e", count: 64)
+
+    // The composition root's pin, as `ArkDeckAgentDaemonMain` builds it.
+    let pinning = RuntimeWorkspaceToolchainPinning(
+      acquire: { reference, generation, presetRef in
+        do {
+          let owner = try BootstrapBundleRegistry.ReferenceOwner(
+            kind: .workspacePreset, id: presetRef)
+          _ = try registry.acquire(
+            reference, expectedGeneration: String(generation), owner: owner)
+        } catch let failure as AgentExecutionControlFailure {
+          throw RuntimeWorkspaceProjectFailure(failure.code, failure.message)
+        }
+      },
+      release: { reference, presetRef in
+        do {
+          let owner = try BootstrapBundleRegistry.ReferenceOwner(
+            kind: .workspacePreset, id: presetRef)
+          try registry.release(reference, owner: owner)
+        } catch let failure as AgentExecutionControlFailure {
+          throw RuntimeWorkspaceProjectFailure(failure.code, failure.message)
+        }
+      })
+    let store = try RuntimeWorkspaceProjectStore(
+      rootURL: home.appending(path: "owner", directoryHint: .isDirectory),
+      toolchainPinning: pinning, nowUTC: { "2026-09-19T00:00:00.000Z" })
+    let (handler, _) = try makeStack(workspaceProjectStore: store)
+    func answer(
+      _ method: String, _ params: [String: JSONValue], _ code: String? = nil,
+      file: StaticString = #filePath, line: UInt = #line
+    ) async throws -> [String: JSONValue] {
+      let response = try await request(handler, method: method, params: params)
+      if let code {
+        XCTAssertEqual(response.error?.code, code, "\(method)", file: file, line: line)
+        return [:]
+      }
+      XCTAssertTrue(
+        response.ok, "\(method): \(String(describing: response.error))", file: file, line: line)
+      guard case .object(let result)? = response.result else { return [:] }
+      return result
+    }
+    let project = try await answer(
+      "workspace.project.register",
+      ["registrationRequestId": .string("pin-project"), "kind": .string("openharmony"),
+       "root": .string(String(cString: physical))])
+    guard case .string(let projectRef)? = project["projectRef"] else {
+      return XCTFail("registration must name its project")
+    }
+    func build(_ toolchain: String, generation: String = "1") -> [String: JSONValue] {
+      ["projectRef": .string(projectRef), "kind": .string("build"),
+       "templateRef": .string("openharmony.hvigor-build@1"), "timeoutSeconds": .string("600"),
+       "toolchainRef": .string(toolchain), "toolchainGeneration": .string(generation),
+       "module": .string("entry"), "product": .string("default"),
+       "buildMode": .string("debug")]
+    }
+    func register(
+      _ request: String, _ fields: [String: JSONValue], _ code: String? = nil
+    ) async throws -> [String: JSONValue] {
+      try await answer(
+        "workspace.preset.register",
+        fields.merging(["registrationRequestId": .string(request)], uniquingKeysWith: { _, new in new }),
+        code)
+    }
+    func update(
+      _ request: String, _ presetRef: String, _ generation: String,
+      _ fields: [String: JSONValue], _ code: String? = nil
+    ) async throws -> [String: JSONValue] {
+      try await answer(
+        "workspace.preset.update",
+        fields.merging(
+          ["mutationRequestId": .string(request), "presetRef": .string(presetRef),
+           "expectedGeneration": .string(generation)], uniquingKeysWith: { _, new in new }),
+        code)
+    }
+
+    // A pin that the registry grants, and the refusals it answers instead.
+    let pinned = try await register("pin-first", build(first))
+    guard case .string(let presetRef)? = pinned["presetRef"] else {
+      return XCTFail("registration must name its preset")
+    }
+    _ = try await register("pin-unknown", build(unknown), "resourceNotFound")
+    _ = try await register("pin-stale", build(first, generation: "2"), "resourceConflict")
+    _ = try await update("pin-to-unknown", presetRef, "1", build(unknown), "resourceNotFound")
+    let moved = try await update("pin-to-second", presetRef, "1", build(second))
+    XCTAssertEqual(moved["toolchainRef"], .string(second))
+    _ = try registry.remove(first, expectedGeneration: "1")
+    _ = try await update("pin-to-retired", presetRef, "2", build(first), "resourceConflict")
+    let removed = try await answer(
+      "workspace.preset.remove",
+      ["mutationRequestId": .string("pin-remove"), "projectRef": .string(projectRef),
+       "presetRef": .string(presetRef), "expectedGeneration": .string("2")])
+    XCTAssertEqual(removed["configurationStatus"], .string("removed"))
+
+    // A missing child, the reference bound, and changed content.
+    try FileManager.default.removeItem(
+      at: home.appending(path: "third/DevEco-Studio.app/Contents/tools/node/bin/node"))
+    _ = try await register("pin-missing-child", build(third), "fileIdentityChanged")
+    let held = try await register("pin-second", build(second))
+    guard case .string(let heldRef)? = held["presetRef"] else {
+      return XCTFail("registration must name its preset")
+    }
+    try Self.seedToolchainReferences(
+      at: registryRoot.appending(path: "deveco-toolchains.json"), reference: second, count: 1_024)
+    _ = try await register("pin-bound", build(second), "quotaExceeded")
+    try Data("changed hvigor".utf8).write(
+      to: home.appending(
+        path: "second/DevEco-Studio.app/Contents/tools/hvigor/bin/hvigorw.js"))
+    _ = try await register("pin-changed", build(second), "recordUnreadable")
+    // The release verifies the same content, so a removal cannot complete it.
+    // Its intent stays, and every later request meets it; this is last.
+    _ = try await answer(
+      "workspace.preset.remove",
+      ["mutationRequestId": .string("pin-remove-changed"), "projectRef": .string(projectRef),
+       "presetRef": .string(heldRef), "expectedGeneration": .string("1")],
+      "recordUnreadable")
+  }
+
+  /// `BootstrapToolRegistryContractTests.devecoFixture`'s Contents root, whose
+  /// `marker` makes one fabricated toolchain differ from the next.
+  private static func devEcoContents(at contents: URL, marker: String) throws -> URL {
+    for relative in [
+      "Resources", "sdk/default/openharmony", "tools/node/bin", "tools/hvigor/bin",
+      "_CodeSignature",
+    ] {
+      try FileManager.default.createDirectory(
+        at: contents.appending(path: relative, directoryHint: .isDirectory),
+        withIntermediateDirectories: true)
+    }
+    try Data("""
+      {"name":"DevEco Studio","version":"26.0.0.2","buildNumber":"26002",
+       "productCode":"DS","productVendor":"Huawei",
+       "launch":[{"os":"macOS","arch":"aarch64"}]}
+      """.utf8).write(to: contents.appending(path: "Resources/product-info.json"))
+    try Data("""
+      {"data":{"apiVersion":"26","platformVersion":"26.0.0","version":"26.0.0.25"}}
+      """.utf8).write(to: contents.appending(path: "sdk/default/sdk-pkg.json"))
+    let node = contents.appending(path: "tools/node/bin/node")
+    try Data("fixture native node \(marker)".utf8).write(to: node)
+    guard chmod(node.path, 0o755) == 0 else { throw POSIXError(.EPERM) }
+    try Data("fixture hvigor".utf8).write(
+      to: contents.appending(path: "tools/hvigor/bin/hvigorw.js"))
+    try Data("fixture signed resource envelope".utf8).write(
+      to: contents.appending(path: "_CodeSignature/CodeResources"))
+    return contents
+  }
+
+  /// `count` workspace-preset pins written into the registry index in its own
+  /// canonical form. Acquiring them one by one synchronizes the file each time.
+  private static func seedToolchainReferences(at index: URL, reference: String, count: Int) throws {
+    guard
+      case .object(var document) = try JSONDecoder().decode(
+        JSONValue.self, from: Data(contentsOf: index)),
+      case .array(var records)? = document["records"]
+    else { throw POSIXError(.EINVAL) }
+    for (offset, record) in records.enumerated() {
+      guard case .object(var fields) = record, fields["reference"] == .string(reference) else {
+        continue
+      }
+      fields["references"] = .array(
+        (0..<count).map {
+          .object([
+            "kind": .string("workspacePreset"), "id": .string(String(format: "seed-%04d", $0)),
+          ])
+        })
+      records[offset] = .object(fields)
+    }
+    document["records"] = .array(records)
+    try CanonicalJSONEncoders.canonical().encode(JSONValue.object(document)).write(to: index)
+  }
+
   func testWorkspacePresetAndProjectMutationControlFramesRecordTheirRefusals() async throws {
     let roots = stateDirectory.appending(path: "workspace-mutation-roots")
     try FileManager.default.createDirectory(at: roots, withIntermediateDirectories: true)
