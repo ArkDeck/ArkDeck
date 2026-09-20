@@ -3,7 +3,7 @@ use arkdeck_cli::{
 };
 use arkdeck_client::Client;
 use arkdeck_platform::{LocalEndpoint, ServerIdentity, default_user_endpoint, random_bytes};
-use serde_json::Value;
+use serde_json::{Map, Value, json};
 use std::io::{self, Write};
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
@@ -94,6 +94,23 @@ fn execute(invocation: &Invocation, id: &str) -> Result<Value, CliError> {
         "agent.run" | "agent.resume" | "human-action.resume"
     ) {
         return run_agent(invocation, id, &endpoint, &identity);
+    }
+    if invocation.command == "runtime.health" {
+        // The contract preflight is the call, as it is in Swift's client, so a
+        // health document off the contract is this read's own malformed answer
+        // and not a refusal to admit a business request that was never sent.
+        let mut client = Client::connect(&endpoint, &identity, Duration::from_secs(20))
+            .map_err(|error| CliError::from_client(error, "health"))?;
+        return client.health(id).map_err(|error| match error {
+            arkdeck_client::ClientError::Contract(_) => CliError::new(
+                "protocolMalformed",
+                "the local Runtime response does not conform to the current contract",
+            ),
+            error => CliError::from_client(error, "health"),
+        });
+    }
+    if invocation.command == "operation.validate" {
+        return validate_operation(invocation, id, &endpoint, &identity);
     }
     if matches!(
         invocation.command,
@@ -309,6 +326,49 @@ fn stopped() -> CliError {
     )
 }
 
+/// Swift `RuntimeCLI.emitOperationValidation`: the descriptor the daemon
+/// published answers first, then the typed inputs are read and judged against
+/// it, and the digest that judged them is read on the same connection. A
+/// descriptor this Runtime does not publish, and a document that is not one
+/// bounded UTF-8 JSON object, are refused before anything is judged.
+fn validate_operation(
+    invocation: &Invocation,
+    id: &str,
+    endpoint: &LocalEndpoint,
+    identity: &ServerIdentity,
+) -> Result<Value, CliError> {
+    let params = invocation.params.clone().unwrap_or_default();
+    let reference = params["reference"].as_str().unwrap_or_default().to_owned();
+    let inputs_file = params["inputsFile"].as_str().unwrap_or_default().to_owned();
+    let mut client = Client::connect(endpoint, identity, Duration::from_secs(20))
+        .map_err(|error| CliError::from_client(error, "operation.describe"))?;
+    let descriptor = client
+        .request(
+            id,
+            "operation.describe",
+            Some(Map::from_iter([("reference".to_owned(), json!(reference))])),
+        )
+        .map_err(|error| CliError::from_client(error, "operation.describe"))?;
+    let document = arkdeck_cli::bounded_input_document(&inputs_file)?;
+    let Some(inputs) = descriptor["inputs"].as_array() else {
+        return Err(CliError::new(
+            "recordUnreadable",
+            format!("the Runtime published no input contract for {reference}"),
+        ));
+    };
+    let findings = arkdeck_cli::input_findings(&document, inputs);
+    // The digest is reported with the answer, and a Runtime that cannot name
+    // it does not make the structural answer wrong.
+    let digest = client
+        .request(id, "health", None)
+        .ok()
+        .map(|health| health["catalogDigest"].clone())
+        .unwrap_or(Value::Null);
+    Ok(arkdeck_cli::validation_document(
+        &reference, findings, digest,
+    ))
+}
+
 /// Swift `runRuntimeExecution` for run and physical resume: parameters are built and
 /// checked before any connection, then the execution is read with
 /// `agent.status`, backing off from 100 ms to 2 s, until it settles or
@@ -509,6 +569,7 @@ fn main() -> std::process::ExitCode {
                 "job.run" => {
                     arkdeck_cli::run_exit(&result).map(|(code, reason)| (code, reason.to_owned()))
                 }
+                "operation.validate" => arkdeck_cli::validation_attention(&result),
                 "job.result" => Some(arkdeck_cli::result_exit(&result))
                     .filter(|code| *code != 0)
                     .map(|code| {
