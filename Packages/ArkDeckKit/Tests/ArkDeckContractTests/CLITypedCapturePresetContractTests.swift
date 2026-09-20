@@ -3,6 +3,7 @@ import XCTest
 
 @testable import ArkDeckAgentClient
 @testable import ArkDeckCLI
+@testable import ArkDeckClientKit
 @testable import ArkDeckCore
 @testable import ArkDeckWorkflows
 

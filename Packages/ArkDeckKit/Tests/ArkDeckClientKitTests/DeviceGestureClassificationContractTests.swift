@@ -2,7 +2,7 @@ import CoreGraphics
 import Foundation
 import XCTest
 
-@testable import ArkDeckWorkflows
+@testable import ArkDeckClientKit
 
 /// What a pointer sequence becomes (IDC-AC-8: "长按（≥500 ms, <6 pt）产出
 /// long-press 而非 tap，tap 锚定 down 点").

@@ -1,6 +1,4 @@
-import ArkDeckClientKit
 import ArkDeckCore
-import ArkDeckRuntime
 import Foundation
 
 /// The Device device-control surface: an on-demand screenshot and the three
@@ -549,7 +547,7 @@ actor DeviceProductionProvider: DeviceControlProviding {
 /// tests and on the actor without pulling AppKit into the workflow layer.
 public enum DeviceScreenshotIntegrity {
   public static func sha256Hex(_ data: Data) -> String {
-    RuntimeJobRecord.sha256Hex(data)
+    SHA256Hex.string(of: data)
   }
 
   /// PNG dimensions come from the IHDR header, which is fixed-position: an

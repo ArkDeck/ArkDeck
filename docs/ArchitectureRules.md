@@ -116,6 +116,9 @@ Workflows 的 Debug facade 经既有的 Workflows → ClientKit 边使用它。�
 Overview 运行记录与「开始新一次」行的投影（`OverviewRunRecordProjection`、`OverviewActionProjection`）是只读展示逻辑，也在 ClientKit；
 只读延续——`RuntimeWorkspaceContinuation`（从历史 Job 重建一份新的请求草稿）、提交并运行它的 XPC provider 与 `make()`——
 也在 ClientKit，CLI 经过渡边使用；它构造的 v2 请求 DTO 在 Core（§1）。
+设备控制面（`DeviceControlFacade`：按需截图、三种手势、录屏与帧归档，以及录制预算/合成/校验/导出、帧活性与手势分类、UI fixture）整体在 ClientKit，
+它的生产 provider 只经 ClientKit 的 XPC transport 说话；随之移入的还有工作区线程标识 `RuntimeWorkspaceThread` 与 typed 采集预设 `DiagnosticCapturePreset`，
+Workflows 的 Debug/Flash/Trace/UIDump facade 与 CLI 经既有边共用这一份。
 App 与 CLI 共用的自动更新（feed 解析与验签、下载、状态/制品/重放文件存储、服务状态机、`RuntimeUpdateApplicationFacade` 与 UI fixture）也在 ClientKit；
 依赖 ArkDeckRuntime `SystemLogger` 的生产装配——`SystemAutoUpdateEventLogger` 与 `AutoUpdateApplicationFacade.make()`——留在 Workflows。
 CLI 因此直接 import ClientKit：CLI → ClientKit 是 CHG-2026-074 的过渡边，随第一个需要它的 CLI 代码（自动更新）同 PR 加入（§6 判例 5），

@@ -80,9 +80,20 @@ runs the full Swift suite on the rebased head.
 
 ## CI
 
-Recorded by the next slice, because a green head is merged without an amend. This commit records,
-in their own run records: the runtime support bundle slice's CI (#2057), and the message fix's CI
-(#2062) together with the local Swift result that its own push could not wait for.
+PR #2067, merged as `42d1fb97`. On head `79553ba9` (base `28d2016c`) every check passed:
+
+| Workflow run | Jobs | Conclusion |
+| --- | --- | --- |
+| Swift CI `35495975327` | `plan`, `swift-tests`, `app-build`, `ds-interactions` and the required `swift` aggregate; `rust-checks` skipped, as the plan selected no Rust lane | success |
+| SDD Guard `35495975250` | the required `guard`, `ds-tokens` | success |
+| Agent PR `35495975236` | `open-pr` | success |
+
+This was also the first full Swift suite to run on a base that carried #2062, the fix for the
+failure #2058 left on main, so it confirmed main was green again.
+
+A green head is merged without an amend, so the Device control slice records this section. This
+slice's commit recorded, in their own run records: the runtime support bundle slice's CI (#2057),
+and the message fix's CI (#2062) with the local Swift result that its own push could not wait for.
 
 ## Not run
 

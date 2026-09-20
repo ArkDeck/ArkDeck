@@ -1,7 +1,7 @@
 import Foundation
 import XCTest
 
-@testable import ArkDeckWorkflows
+@testable import ArkDeckClientKit
 
 final class DeviceRecordingExportTests: XCTestCase {
   @MainActor

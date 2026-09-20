@@ -1,9 +1,8 @@
 import Foundation
 import XCTest
 
+@testable import ArkDeckClientKit
 @testable import ArkDeckCore
-@testable import ArkDeckRuntime
-@testable import ArkDeckWorkflows
 
 /// Current wire fixtures exercise the real App provider, without device dispatch.
 final class DeviceProductionProviderContractTests: XCTestCase {
