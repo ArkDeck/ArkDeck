@@ -1,6 +1,6 @@
 # Remaining macOS Rust implementation
 
-Updated 2026-09-20 against protected main `28d2016c` (#2067), revision 11. This list tracks
+Updated 2026-09-20 against protected main `3f033e83` (#2082), revision 11. This list tracks
 implementation, installed activation and macOS real-device acceptance separately. The current
 goal includes pure-Rust macOS GJ-1–5 acceptance; Windows and Linux product work are outside scope.
 
@@ -8,7 +8,7 @@ goal includes pure-Rust macOS GJ-1–5 acceptance; Windows and Linux product wor
 
 | Routed methods on the standalone Rust daemon | Operations executable in Rust | Golden Journeys on Rust | App facades on ClientKit | Registered CLI feature names on Rust | Swift targets deleted |
 | --- | --- | --- | --- | --- | --- |
-| 89 / 105 (installed facade serves 3 locally) | 3 / 30 (10%; analyzer, observe, default diagnostic capture) | 0 / 5 | 9 extracted; 6 matching source files remain | 87 / 256 (90 parser command names total) | 0 / 6 |
+| 90 / 105 (installed facade serves 3 locally) | 3 / 30 (10%; analyzer, observe, default diagnostic capture) | 0 / 5 | 9 extracted; 6 matching source files remain | 97 / 256 (100 parser command names total) | 0 / 6 |
 
 These are separate coverage measures, not a weighted completion percentage. A routed method or
 CLI entry is not proof of complete behavior, installed activation or hardware acceptance. In
@@ -43,12 +43,27 @@ capability-ledger unknown outcomes (#2033, #2034); its oracles now reach parked 
 reconcile of parked port rules (#2067), and `cleanupDebt.list` is served (#2047). #2031 signs
 HAPs in Rust (SPK-10). The control actions with a managed server are answered for the reads
 (#2012 frames, #2017) and their remaining frames are published: a team-signed tool and an
-unknown critical-Job gate (#2037), and `runtime.hdc.restart` with its impact approval (#2052);
-the Rust restart path itself is not ported. The Rust CLI serves `arkdeck commands` from the
-registry projection (#2065), whose reconciliation counts 129 entries implemented, 64 with the
-leaf missing but the daemon routed, 42 blocked on a missing daemon method or host subsystem and
-21 tombstones (`runs/TASK-XPA-018/cli-commands-run.md`,
+unknown critical-Job gate (#2037), and `runtime.hdc.restart` with its impact approval (#2052).
+The Rust daemon now requests that restart's impact approval as Swift's daemon does (#2074); the
+restart execution path itself is still not ported. The Rust CLI serves `arkdeck commands` from
+the registry projection (#2065) and parses as Swift's registry parses, answering the nine
+non-executable leaves by name (#2079); its reconciliation counts 140 entries implemented, 59
+with the leaf missing but the daemon routed, 42 blocked on a missing daemon method or host
+subsystem and 15 tombstones (`runs/TASK-XPA-018/cli-commands-run.md`,
 `runs/TASK-XPA-018/cli-parity-audit-20260919.md`).
+
+Since that pin: `job.reconcile` is routed, parked Jobs are carried over a daemon start and
+analyzer Jobs are reconciled as Swift's oracle replays them (#2071), with its CLI leaf served
+(#2072). An acknowledged isolated owner can prove a device mutation against its own development
+root under a three-condition opt-in (#2078), and GJ-2's `debug.hap@1` rehearsal on that daemon
+with a fake HDC is recorded together with what the real-device leg still needs (#2081) — see the
+operations measure below. A workspace preset's DevEco toolchain is pinned on the Rust registry
+owner (#2073 frames, #2076). The workspace continuation (#2067), the device control surface
+(#2077) and the diagnostic session readers (#2080) moved into ClientKit without changing the
+facade-file inventory. SPK-11 is recorded on the isolated daemon (#2070), its scheduled lane now
+picks the baseline of the daemon it measured (#2075), and the plan and quota harnesses read the
+Swift runtime's `DecodingError` rendering as a label so macOS 27's wording drift is not a
+difference (#2069).
 
 How each number is measured at the pinned main:
 
@@ -77,7 +92,16 @@ How each number is measured at the pinned main:
   same rule applies to every `deviceMutation`/`destructive` operation, so GJ-2/3/4 cannot
   raise this count on an isolated root; they count when the daemon that owns the default
   root admits and runs them (the M5 activation, or an earlier reviewed change to that
-  authority rule).
+  authority rule). #2078 is such a reviewed change, for development use only: with an isolated
+  development root, a managed HDC server and `ARKDECK_DEVELOPMENT_MUTATION_AUTHORITY=acknowledged`
+  all three present, the isolated owner anchors its continuity proof on its own root and admits
+  device mutations; every other combination, and both the standalone and facade startups, refuse
+  to start (exit 69). Under it, GJ-2's `debug.hap@1` rehearsal ran end to end through the real
+  CLI and the isolated daemon to `succeeded` — Swift's ten step kinds in order, three Artifacts,
+  one `deviceMutation` capability use — against a fake HDC, not a device (#2081). Whether a
+  fake-HDC rehearsal on an acknowledged development root satisfies this measure is the
+  maintainer's call; until it is ruled the numerator stays 3/30 and `debug.hap@1` is not
+  counted.
 - **Golden Journeys:** `REAL_DEVICE_PASS` records on the pure Rust daemon. Fake-HDC/oracle
   replay and the earlier paired-facade acceptance do not increase this count, nor does the
   development-root GJ-1 run on the isolated daemon (#2024), which the maintainer's option-A
@@ -91,15 +115,21 @@ How each number is measured at the pinned main:
   with the Swift CLI's transitional edge to it). Six matching source files remain in Workflows:
   Debug, Flash, Rockchip device access, the runtime support bundle (its contract moved in
   #2057), Trace and UI dump.
+  #2067, #2077 and #2080 moved the workspace continuation, the device control surface and the
+  diagnostic session readers into ClientKit; none of the three is a `*ApplicationFacade.swift`
+  file, so this inventory is unchanged by them.
   This explicit source inventory replaces the old unaudited 13-facade denominator;
   file movement is not complete App dependency removal. All six retirement targets
   remain, and signed standalone Rust App acceptance (SPK-8) is incomplete.
 - **CLI:** unique canonical names returned by the positional-command match in
   `rust/crates/arkdeck-cli/src/lib.rs`, intersected with `feature` in
-  `openspec/contracts/cli-feature-coverage.json`. There are 81 parser names, of which 78 match
+  `openspec/contracts/cli-feature-coverage.json`. There are 100 parser names, of which 97 match
   the 256 registered feature names. `artifact.import.hap`, `artifact.import.native-library`
   and `device.candidates` are the three unmatched names; they are not added to this numerator.
-  Internal RPC strings such as `artifact.import.append` are not CLI command leaves.
+  Internal RPC strings such as `artifact.import.append` are not CLI command leaves. Nine of the
+  matched names are parsed but not served: #2079 answers Swift's tombstones and refused stubs
+  (`agent chat`, `capability draft|install|revoke`, `flash plan|preview|execute|continue|postflight`)
+  by name before any flag is judged, so this count rose by nine without new served behavior.
 
 Reproduce the source counts from the repository root (read-only; no build or device use):
 
@@ -109,7 +139,7 @@ import json
 import re
 import subprocess
 
-ref = "28d2016ced48778a3898aa79b62e627b6b057e34"
+ref = "3f033e83a59f30ded89099063ad16cc882188801"
 def read(path):
     return subprocess.check_output(["git", "show", f"{ref}:{path}"], text=True)
 
@@ -144,9 +174,9 @@ PYCOUNT
 
 | Milestone | Golden Journey | Delivers | Lane | State |
 | --- | --- | --- | --- | --- |
-| M1 | GJ-1 | `observe.device@1`, `capture.diagnostics@1`, `agent.*` with HAR, `human-action.*`, `target.adopt/availability`, `runtime.hdc.*`, restart carry-over | A (+ B for the executor) | in progress: observe/capture and agent run/status (#1920, #1932, #1938), agent list/abandon (#1945, CLI #1946), waiting-execution records (#1953), Target owner/routes (#1959, #1966; CLI #1967), HDC status (#1956), physical-assistance raise and human-action list/show (#1970), host operation availability (#1973), bounded Target availability and HAR CLI reads (#1974), proved Target adoption inside agent.run with commit-gap restart coverage (#1975). HAR resume, adoption and subsequent Job (#1981), live Target operation projection (#1978), development USB relations and the adoption oracle against the real daemon (#1988), CLI `runtime hdc status` (#1992), `runtime hdc impact-preview/restart` (#1995) and `control-action list/show/reconcile` (#1996), the daemon's no-host control-action answers (#2002 frames, #2003 routes), the managed HDC server in the isolated owner with live `runtime.hdc.status` and Target tool leg and Swift's daemon stop (#2004), `doctor` computed from the owners (#2008), the managed-server impact preview and control-action reads (#2012, #2017), acknowledged development USB relations beside a managed registered HDC (#2023), and GJ-1 development-root evidence against the real DAYU200 (#2024). Remaining: trusted USB relation source, the control actions' restart/approval path (its frames first), restart carry-over of parked Jobs (§L.1 item 13 ruled 2026-09-19; port in progress), and GJ-1 acceptance — by the maintainer's option-A ruling the isolated-root run is development evidence (#2024), not `REAL_DEVICE_PASS`; a counted pass still needs a trusted USB relation source and the daemon setup that counts before M5 |
-| M2 | GJ-2/3 | Artifact publication and import commit, capability mint/reserve/consume, `debug.*`, `deploy.native-library.app-owned@1`, `capability.*`, `cleanupDebt.*` | A (+ B) | foundations delivered: HAP provider (#1951), native-library provider (#1955), pointer/port-rule providers (#1961), capability store install/consume/outcome writes (#1963), pointer planning (#1964), pointer Runtime capability admission (#1968), pointer execution runner with durable authority (#1984; fixed-root host fixtures only — an isolated root has no mutation owner). Artifact publication and CLI restart readback (#1983), the Import lease lifecycle (#1987), `debug.hap@1` planning (#1993), admission (#2000) and run with compensations and the cleanup-debt ledger (#2005), port-rule operations on the durable runner (#1998) and the `capture.screen-sequence@1` oracle (#2006) are delivered (runs proven in fixed-root host fixtures). `deploy.native-library.app-owned@1` plan/admission (#2011) and run (#2027), the screen-sequence host-store run (#2020) and capability-ledger unknown-outcome resolution (#2033, #2034) are delivered (fixed-root host fixtures). `cleanupDebt.*` (§L.1 item 13 ruled 2026-09-19; port in progress), isolated-root versus default-root mutation authority for GJ-2/3, and GJ-2/3 acceptance remain |
-| M3 | GJ-5 | 13 `workspace.*` operations, `workspace.preset/project.*`, registered toolchain, hap-sign-tool, Keychain | D | `workspace.project.register/list/show` on the Rust owner with CLI (#1989); HAP signing in Rust through the Keychain, the DevEco decoder and registered toolchains (SPK-10, #2031); the other preset/project methods, the workspace operations and the bounded AI journey still require their actual dependencies |
+| M1 | GJ-1 | `observe.device@1`, `capture.diagnostics@1`, `agent.*` with HAR, `human-action.*`, `target.adopt/availability`, `runtime.hdc.*`, restart carry-over | A (+ B for the executor) | in progress: observe/capture and agent run/status (#1920, #1932, #1938), agent list/abandon (#1945, CLI #1946), waiting-execution records (#1953), Target owner/routes (#1959, #1966; CLI #1967), HDC status (#1956), physical-assistance raise and human-action list/show (#1970), host operation availability (#1973), bounded Target availability and HAR CLI reads (#1974), proved Target adoption inside agent.run with commit-gap restart coverage (#1975). HAR resume, adoption and subsequent Job (#1981), live Target operation projection (#1978), development USB relations and the adoption oracle against the real daemon (#1988), CLI `runtime hdc status` (#1992), `runtime hdc impact-preview/restart` (#1995) and `control-action list/show/reconcile` (#1996), the daemon's no-host control-action answers (#2002 frames, #2003 routes), the managed HDC server in the isolated owner with live `runtime.hdc.status` and Target tool leg and Swift's daemon stop (#2004), `doctor` computed from the owners (#2008), the managed-server impact preview and control-action reads (#2012, #2017), acknowledged development USB relations beside a managed registered HDC (#2023), GJ-1 development-root evidence against the real DAYU200 (#2024), and the daemon's restart impact approval with `job.reconcile` carrying parked Jobs over a daemon start (#2074, #2071, #2072). Remaining: trusted USB relation source, the control actions' restart/approval path (its frames first), restart carry-over of parked Jobs (§L.1 item 13 ruled 2026-09-19; port in progress), and GJ-1 acceptance — by the maintainer's option-A ruling the isolated-root run is development evidence (#2024), not `REAL_DEVICE_PASS`; a counted pass still needs a trusted USB relation source and the daemon setup that counts before M5 |
+| M2 | GJ-2/3 | Artifact publication and import commit, capability mint/reserve/consume, `debug.*`, `deploy.native-library.app-owned@1`, `capability.*`, `cleanupDebt.*` | A (+ B) | foundations delivered: HAP provider (#1951), native-library provider (#1955), pointer/port-rule providers (#1961), capability store install/consume/outcome writes (#1963), pointer planning (#1964), pointer Runtime capability admission (#1968), pointer execution runner with durable authority (#1984; fixed-root host fixtures only — an isolated root has no mutation owner). Artifact publication and CLI restart readback (#1983), the Import lease lifecycle (#1987), `debug.hap@1` planning (#1993), admission (#2000) and run with compensations and the cleanup-debt ledger (#2005), port-rule operations on the durable runner (#1998) and the `capture.screen-sequence@1` oracle (#2006) are delivered (runs proven in fixed-root host fixtures). `deploy.native-library.app-owned@1` plan/admission (#2011) and run (#2027), the screen-sequence host-store run (#2020) and capability-ledger unknown-outcome resolution (#2033, #2034) are delivered (fixed-root host fixtures). `cleanupDebt.*` (§L.1 item 13 ruled 2026-09-19; port in progress) and GJ-2/3 acceptance remain. Isolated-root mutation authority is answered for development use: #2078's three-condition opt-in lets an acknowledged isolated owner admit device mutations, and GJ-2's `debug.hap@1` rehearsal ran end to end on it against a fake HDC (#2081); the real-device leg needs the installed daemon booted out of the USB interface, and GJ-3 also needs the bundled arm64 code-sign helper composed into the isolated daemon |
+| M3 | GJ-5 | 13 `workspace.*` operations, `workspace.preset/project.*`, registered toolchain, hap-sign-tool, Keychain | D | `workspace.project.register/list/show` on the Rust owner with CLI (#1989); HAP signing in Rust through the Keychain, the DevEco decoder and registered toolchains (SPK-10, #2031); a preset's DevEco toolchain pinned on the Rust registry owner (#2073, #2076); the other preset/project methods, the workspace operations and the bounded AI journey still require their actual dependencies |
 | M4 | GJ-4 | ArkForge lane through `arkforge-client`, `flash.*`, Rockchip probes, DEC-016 recovery epoch | A + D | Rockchip live-mode probe (#1934), post-flash observation (#1936), Loader transition (#1937) and alias-store primitives/oracle/store (#1939–#1941) are merged. ArkForge lane and flash methods still wait for SPK-9 prerequisites; the DEC-016 recovery epoch follows the §L.1 item 13 port (ruled 2026-09-19; port in progress) |
 | M5 | cutover | G.4 preflight, LaunchAgent to the standalone Rust binary, deletions, DMG, lock and traceability flip (TASK-XPA-017) | all | after 018, 019, 025 |
 
@@ -156,12 +186,12 @@ PYCOUNT
 | --- | --- | --- | --- |
 | XPA-012 | in-progress | Isolated Rust owners for History, Session, Trace cache, Bootstrap, DevEco/HDC registration, tool/bundle registry, Target queries; facade History filter owner (#1888); owner locks unlock on drop (#1903); `runtime.tool.select` without a tool-selection owner (#2032); host-check run-directory cleanup (#2013); the tool-selection control-action store (#2038, #2046) and the HDC selection ledger in `tools.json` (#2055, #2060) | tool selection writes, trace database preparation; installed per-store composition withdrawn (r11) — activation only at M5 |
 | XPA-013 | in-progress | Artifact read/inspect/export, durable Import upload (#1881), quota query (#1911), device Import binding identity fix (#1969), durable HAP/native-library/workspace-patch publication and CLI readback (#1983), Import leases in Job inputs with reference inspection and release (#1987); startup Artifact GC (#2039); the canonical post-Flash alias route (#2045); publication kept off the Trace census (#2059) | quota/retention/GC and cleanup-debt, the canonical alias HDC route, the publish crash-window matrix — inside M2 |
-| XPA-014 | in-progress | Job journal/index/records and analyzer lifecycle; observe/capture and agent run/status/list/abandon; Target observation/adoption/availability routes; live host operation availability (#1973/#1974); agent.run Target adoption (#1975); HDC status; physical-assistance raise and human-action reads; capability store writes, pointer planning and capability admission (#1963, #1964, #1968); pointer execution runner (#1984); development USB relations (#1988); `debug.hap@1` planning (#1993), admission (#2000) and run (#2005); port rules (#1998); no-host control actions (#2002, #2003); screen-sequence oracle (#2006) and run (#2020); computed `doctor` (#2008); managed-server impact preview and control-action reads (#2012, #2017); acknowledged development USB relations (#2023); GJ-1 development-root evidence (#2024); native-library plan/admit (#2011) and run (#2027); recovery port — manifest (#2018, #2021), epochs (#2025), Job-state preflight table (#2026), restart carry-over (#2028, #2030), ledger unknown outcomes (#2033, #2034), parked device Jobs (#2040), crash-window tap recovery (#2061), parked port-rule reconcile (#2067) and `cleanupDebt.list` (#2047); with-host control-action frames for a team-signed tool and an unknown gate (#2037) and for `runtime.hdc.restart` (#2052) | M1 trusted USB relation source and remaining HDC lifecycle; M2 integrated authority and device operation execution; M3/M4; recovery (§L.1 item 13 ruled 2026-09-19; port in progress) |
-| XPA-015 | ready (r11) | HDC observation/parsers and process foundation; workspace project registration owner and CLI (#1989); SPK-10 HAP signing (#2031); the seven remaining workspace preset/project methods (#2063) and the DevEco toolchain pins their presets keep (#2064) | the 13 workspace build/sign operations; the three ArkTrace/hilog analyzers after M4 |
-| XPA-016 | in-progress | SPK-6 executor foundation; Rockchip probes/transition/alias store (#1934–#1941); HDC status (#1947); capture providers (#1949); physical relation proof port (#1952); HAP (#1951), native-library (#1955), pointer/port-rule (#1961) providers; the managed HDC server composed into the isolated daemon, with the daemon's stop semantics (#2004); `sha2` optimized in dev builds so a debug daemon observes its HDC server (#2022); the host tests' loopback ports moved below the ephemeral range after two macOS 26 port races (#2042, #2051) | M1/M2 end-to-end acceptance; M4 ArkForge-served ports after SPK-9 |
-| XPA-018 | in-progress | 90 parser command names, 87 matching registered features; `arkdeck commands` from the registry projection with its reconciliation — 129 implemented, 64 leaf-missing but routed, 42 blocked, 21 tombstones (#2065); target adopt/availability (#1967), HAR list/show (#1974), HAR and agent resume (#1981), workspace-patch import (#1983), Import release (#1987), workspace project (#1989), `runtime hdc status/impact-preview/restart` and `control-action list/show/reconcile` (#1992, #1995, #1996), `runtime tool select` (#2032) | remaining commands, full parity/export; Swift CLI retirement with M5 |
-| XPA-019 | in-progress | ClientKit transport/models and History filter (#1976), History readers/JobControl (#1982); isolated Rust App ingress (#1980) serving the six History reads (#1985); Device list (#1991), Trace cache (#1997), Overview capability (#2007; its hidumper row fixed, #2014; run record and action projections #2048), Settings (#2036), remote build source (#2044) and the updater (#2054) facades; the v2 request contract declared in ArkDeckCore (#2058) and the support bundle contract moved (#2057) | SPK-8 acceptance, remaining facades; hard prerequisite of M5 |
-| XPA-025 | in-progress | Rust benchmark launcher/probe (#1972), Rust performance lane integration (#1979); isolated Rust owner soak tool merged (#1977), successful/cancelled/reopen workload; Swift performance baseline; merge-lane micro-benchmarks retired (#1902) | SPK-11 repeated measurements, Rust soak and remaining lanes on the Rust daemon |
+| XPA-014 | in-progress | Job journal/index/records and analyzer lifecycle; observe/capture and agent run/status/list/abandon; Target observation/adoption/availability routes; live host operation availability (#1973/#1974); agent.run Target adoption (#1975); HDC status; physical-assistance raise and human-action reads; capability store writes, pointer planning and capability admission (#1963, #1964, #1968); pointer execution runner (#1984); development USB relations (#1988); `debug.hap@1` planning (#1993), admission (#2000) and run (#2005); port rules (#1998); no-host control actions (#2002, #2003); screen-sequence oracle (#2006) and run (#2020); computed `doctor` (#2008); managed-server impact preview and control-action reads (#2012, #2017); acknowledged development USB relations (#2023); GJ-1 development-root evidence (#2024); native-library plan/admit (#2011) and run (#2027); recovery port — manifest (#2018, #2021), epochs (#2025), Job-state preflight table (#2026), restart carry-over (#2028, #2030), ledger unknown outcomes (#2033, #2034), parked device Jobs (#2040), crash-window tap recovery (#2061), parked port-rule reconcile (#2067) and `cleanupDebt.list` (#2047); with-host control-action frames for a team-signed tool and an unknown gate (#2037) and for `runtime.hdc.restart` (#2052); the daemon's restart impact approval (#2074); `job.reconcile` routed with parked Jobs carried over a daemon start and analyzer Jobs reconciled against Swift's oracle (#2071) and its CLI leaf (#2072); development mutation authority for an acknowledged isolated owner (#2078) and GJ-2's fake-HDC `debug.hap@1` rehearsal on it (#2081); the `DecodingError` wording label in the plan and quota harnesses (#2069) | M1 trusted USB relation source and remaining HDC lifecycle; M2 integrated authority and device operation execution; M3/M4; recovery (§L.1 item 13 ruled 2026-09-19; port in progress) |
+| XPA-015 | ready (r11) | HDC observation/parsers and process foundation; workspace project registration owner and CLI (#1989); SPK-10 HAP signing (#2031); the seven remaining workspace preset/project methods (#2063) and the DevEco toolchain pins their presets keep (#2064); what the DevEco owner refuses through a preset's pin with the three widened preset schemas (#2073) and the pinned toolchain on the Rust registry owner, composed in the isolated daemon (#2076) | the 13 workspace build/sign operations; the three ArkTrace/hilog analyzers after M4 |
+| XPA-016 | in-progress | SPK-6 executor foundation; Rockchip probes/transition/alias store (#1934–#1941); HDC status (#1947); capture providers (#1949); physical relation proof port (#1952); HAP (#1951), native-library (#1955), pointer/port-rule (#1961) providers; the managed HDC server composed into the isolated daemon, with the daemon's stop semantics (#2004); `sha2` optimized in dev builds so a debug daemon observes its HDC server (#2022); the host tests' loopback ports moved below the ephemeral range after two macOS 26 port races (#2042, #2051), and the lease tests' own turn-taking with a listener readiness proof after a third (#2082) | M1/M2 end-to-end acceptance; M4 ArkForge-served ports after SPK-9 |
+| XPA-018 | in-progress | 100 parser command names, 97 matching registered features; `arkdeck commands` from the registry projection with its reconciliation — 140 implemented, 59 leaf-missing but routed, 42 blocked, 15 tombstones (#2065, #2079); target adopt/availability (#1967), HAR list/show (#1974), HAR and agent resume (#1981), workspace-patch import (#1983), Import release (#1987), workspace project (#1989), `runtime hdc status/impact-preview/restart` and `control-action list/show/reconcile` (#1992, #1995, #1996), `runtime tool select` (#2032); parsing as Swift's registry parses, with the nine non-executable leaves answered by name (#2079) | remaining commands, full parity/export; Swift CLI retirement with M5 |
+| XPA-019 | in-progress | ClientKit transport/models and History filter (#1976), History readers/JobControl (#1982); isolated Rust App ingress (#1980) serving the six History reads (#1985); Device list (#1991), Trace cache (#1997), Overview capability (#2007; its hidumper row fixed, #2014; run record and action projections #2048), Settings (#2036), remote build source (#2044) and the updater (#2054) facades; the v2 request contract declared in ArkDeckCore (#2058) and the support bundle contract moved (#2057); the workspace continuation (#2067), the device control surface (#2077) and the diagnostic session readers (#2080) moved into ClientKit without a facade file changing hands | SPK-8 acceptance, remaining facades; hard prerequisite of M5 |
+| XPA-025 | in-progress | Rust benchmark launcher/probe (#1972), Rust performance lane integration (#1979); isolated Rust owner soak tool merged (#1977), successful/cancelled/reopen workload; Swift performance baseline; merge-lane micro-benchmarks retired (#1902); SPK-11 recorded on the isolated Rust daemon (#2070) with the scheduled lane picking the baseline of the daemon it measured (#2075) | SPK-11 repeated measurements, Rust soak and remaining lanes on the Rust daemon |
 | XPA-017 | blocked | — | M5 |
 
 Spikes SPK-6..11 are defined in `tasks.md` and design §J.3; their records land under
@@ -170,6 +200,19 @@ Spikes SPK-6..11 are defined in `tasks.md` and design §J.3; their records land 
 maintainer's 2026-09-19 ruling to port the carriers it names unchanged.
 
 ## History
+
+2026-09-20 (`3f033e83`): #2067–#2082 merged. Recounted 90 routes (+1: `job.reconcile`, #2071),
+100 parser and 97 registered CLI names (+10: that leaf, #2072, and the nine non-executable
+leaves #2079 answers by name), and the same nine ClientKit facade files with six left in
+Workflows — #2067, #2077 and #2080 moved subsystems that are not facade files. Executable
+operations stay 3/30, GJ on Rust 0/5 and Swift retirement 0/6. #2078 gives an acknowledged
+isolated owner development mutation authority under a three-condition opt-in and #2081 records
+GJ-2's fake-HDC `debug.hap@1` rehearsal on that daemon; whether such a rehearsal satisfies the
+operations measure is put to the maintainer, so the numerator is unchanged here. The daemon
+requests a restart's impact approval (#2074) while the restart execution path stays unported;
+SPK-11 is recorded on the isolated daemon (#2070, #2075); and the host tests' third macOS 26
+race is closed by the lease tests taking their turn and their listeners proving themselves
+listening (#2082).
 
 2026-09-20 (`28d2016c`): #2037–#2067 merged. Recounted 89 routes (+8: `cleanupDebt.list`, #2047,
 and the seven remaining `workspace.preset.*`/`workspace.project.*` methods, #2063), 90 parser and
