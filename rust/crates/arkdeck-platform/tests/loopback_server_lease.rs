@@ -3,39 +3,74 @@
 //! loopback listener and birth identity, without any connect or spawn of the
 //! observed tool. Spawning children, these tests keep a binary of their own.
 //!
-//! The lease selects candidates by executable path, and the tests here run in
-//! parallel threads, each spawning and killing a listener of its own. The
-//! listener is this binary itself: re-executed with `listener_process`
+//! The listener is this binary itself: re-executed with `listener_process`
 //! selected and the endpoint named in its environment, it binds one TCP
-//! listener and holds it until it is killed. So every test's candidate
-//! population is this binary's own processes — which the vanished-candidate
-//! rule keeps from disturbing each other — and no `nc` on the machine is a
-//! candidate at all (a copied Apple binary cannot run: the kernel kills it).
+//! listener and holds it until it is killed. The lease selects candidates by
+//! executable path, so one test's children are candidates in another test's
+//! scan, where a child read between being listed and exiting can fail the
+//! scan rather than be skipped by it. The tests that scan therefore take
+//! their turn one at a time, each judging a population of its own making —
+//! and no `nc` on the machine is a candidate at all (a copied Apple binary
+//! cannot run: the kernel kills it).
 #![cfg(target_os = "macos")]
 
-use arkdeck_platform::{LoopbackServerLease, VerifiedTool};
+use arkdeck_platform::{LoopbackServerLease, VerifiedTool, random_bytes};
 use sha2::{Digest, Sha256};
 use std::fs;
-use std::io::ErrorKind;
+use std::io::{ErrorKind, Read};
 use std::net::{Ipv4Addr, SocketAddrV4, TcpListener};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
+use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, Instant};
 
 const LISTENER_HOST: &str = "ARKDECK_LEASE_LISTENER_HOST";
 const LISTENER_PORT: &str = "ARKDECK_LEASE_LISTENER_PORT";
+const LISTENER_READY: &str = "ARKDECK_LEASE_LISTENER_READY";
+
+/// A scanning test's turn, held for as long as the test has children so that
+/// the running processes of the verified executable are only ever its own.
+fn alone() -> MutexGuard<'static, ()> {
+    static TURN: Mutex<()> = Mutex::new(());
+    TURN.lock().unwrap_or_else(PoisonError::into_inner)
+}
 
 /// The listener process's body: selected by name in a re-execution of this
 /// binary, it holds exactly one TCP listener on the named endpoint until it
-/// is killed. Run as an ordinary test, it does nothing.
+/// is killed, and names itself listening by writing the file it was given.
+/// Run as an ordinary test, it does nothing.
 #[test]
 fn listener_process() {
     let (Ok(host), Ok(port)) = (std::env::var(LISTENER_HOST), std::env::var(LISTENER_PORT)) else {
         return;
     };
-    let _listener = TcpListener::bind((host.as_str(), port.parse::<u16>().unwrap())).unwrap();
+    // The address is parsed, never looked up: binding must not wait on a
+    // name service that a loaded host can keep waiting.
+    let address = SocketAddrV4::new(host.parse().unwrap(), port.parse().unwrap());
+    let _listener = TcpListener::bind(address).unwrap();
+    fs::write(std::env::var(LISTENER_READY).unwrap(), b"listening").unwrap();
     loop {
         std::thread::sleep(Duration::from_secs(3600));
+    }
+}
+
+/// The directory a test's listeners report themselves listening in.
+struct Directory(PathBuf);
+
+impl Directory {
+    fn new() -> Self {
+        let path = std::env::temp_dir().canonicalize().unwrap().join(format!(
+            "arkdeck-lease-{:032x}",
+            u128::from_le_bytes(random_bytes().unwrap())
+        ));
+        fs::create_dir(&path).unwrap();
+        Self(path)
+    }
+}
+
+impl Drop for Directory {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.0);
     }
 }
 
@@ -43,6 +78,7 @@ fn listener_process() {
 struct Executable {
     path: PathBuf,
     tool: VerifiedTool,
+    reports: Directory,
 }
 
 impl Executable {
@@ -50,22 +86,33 @@ impl Executable {
         let path = std::env::current_exe().unwrap().canonicalize().unwrap();
         let digest = format!("{:x}", Sha256::digest(fs::read(&path).unwrap()));
         let tool = VerifiedTool::open(&path, &digest).unwrap();
-        Self { path, tool }
+        Self {
+            path,
+            tool,
+            reports: Directory::new(),
+        }
     }
 
-    /// One TCP listener on `host:port`, held by a process of this binary; no
-    /// connection is ever made to it.
+    /// One TCP listener on `host:port`, held by a process of this binary and
+    /// listening by the time it is returned; no connection is ever made to
+    /// it.
     fn listener(&self, host: &str, port: u16) -> Listener {
+        let report = self.reports.0.join(format!("listening-{port}"));
         let child = Command::new(&self.path)
             .args(["--exact", "listener_process", "--test-threads", "1"])
             .env(LISTENER_HOST, host)
             .env(LISTENER_PORT, port.to_string())
+            .env(LISTENER_READY, &report)
             .stdin(Stdio::null())
-            .stdout(Stdio::null())
+            // The harness prints a panicking child's reason on its stdout,
+            // which is read only once the child is known to have exited.
+            .stdout(Stdio::piped())
             .stderr(Stdio::null())
             .spawn()
             .unwrap();
-        Listener(child)
+        let mut listener = Listener(child);
+        listener.wait_until_listening(&report);
+        listener
     }
 }
 
@@ -79,6 +126,30 @@ struct Listener(Child);
 impl Listener {
     fn pid(&self) -> i32 {
         i32::try_from(self.0.id()).unwrap()
+    }
+
+    /// Waits until the child says it is listening, and stops the moment it
+    /// exits instead: a child that never bound is reported as that, rather
+    /// than left to look like an endpoint no process owns.
+    fn wait_until_listening(&mut self, report: &Path) {
+        let deadline = Instant::now() + Duration::from_secs(20);
+        loop {
+            if report.exists() {
+                return;
+            }
+            if let Some(status) = self.0.try_wait().unwrap() {
+                let mut reason = String::new();
+                if let Some(stdout) = self.0.stdout.as_mut() {
+                    let _ = stdout.read_to_string(&mut reason);
+                }
+                panic!("the listener exited before it listened: {status}\n{reason}");
+            }
+            assert!(
+                Instant::now() < deadline,
+                "the listener never reported itself listening"
+            );
+            std::thread::sleep(Duration::from_millis(10));
+        }
     }
 }
 
@@ -107,6 +178,7 @@ fn acquire_within(
 
 #[test]
 fn an_existing_loopback_listener_of_the_verified_executable_is_proved_without_a_connect() {
+    let _alone = alone();
     let this = Executable::new();
     let port = free_port();
     let mut listener = this.listener("127.0.0.1", port);
@@ -119,7 +191,7 @@ fn an_existing_loopback_listener_of_the_verified_executable_is_proved_without_a_
     assert_eq!(identity.endpoint, endpoint);
     assert!(identity.start_microseconds < 1_000_000);
     lease.revalidate().unwrap();
-    // `nc -l` exits on its first connection; none was made.
+    // Proved without a word to it: the listener still runs, unspoken to.
     assert!(matches!(listener.0.try_wait(), Ok(None)));
     drop(listener);
     let deadline = Instant::now() + Duration::from_secs(5);
@@ -133,6 +205,7 @@ fn an_existing_loopback_listener_of_the_verified_executable_is_proved_without_a_
 
 #[test]
 fn no_process_on_the_endpoint_is_unavailable_not_unknown() {
+    let _alone = alone();
     let this = Executable::new();
     let endpoint = SocketAddrV4::new(Ipv4Addr::LOCALHOST, free_port());
     let error = LoopbackServerLease::acquire(&this.tool, endpoint).unwrap_err();
@@ -150,6 +223,7 @@ fn no_process_on_the_endpoint_is_unavailable_not_unknown() {
 /// and the verdict for the endpoint stays `unavailable`, never `unknown`.
 #[test]
 fn listeners_of_the_executable_that_come_and_go_on_other_ports_do_not_disturb_the_verdict() {
+    let _alone = alone();
     let this = Executable::new();
     let endpoint = SocketAddrV4::new(Ipv4Addr::LOCALHOST, free_port());
     let deadline = Instant::now() + Duration::from_secs(3);
@@ -172,6 +246,7 @@ fn listeners_of_the_executable_that_come_and_go_on_other_ports_do_not_disturb_th
 /// listener of another executable, however exact, is never the server.
 #[test]
 fn a_listener_owned_by_another_executable_is_not_the_server() {
+    let _alone = alone();
     let this = Executable::new();
     let port = free_port();
     let other = Listener(
@@ -197,6 +272,7 @@ fn a_listener_owned_by_another_executable_is_not_the_server() {
 
 #[test]
 fn a_wildcard_listener_of_the_verified_executable_is_unknown() {
+    let _alone = alone();
     let this = Executable::new();
     let port = free_port();
     let _listener = this.listener("0.0.0.0", port);
