@@ -295,6 +295,31 @@ fn live_discovery_and_describe_follow_actual_executors_and_executable_drift_with
         entry(&rows, "capture.diagnostics@1")["availability"],
         "unavailable"
     );
+    // Composed with a verified helper, the operation loses that reason and
+    // keeps only what this composition is still missing. The helper
+    // ArkDeckWorkflows carries is read when this checkout has it: the
+    // isolated contract view keeps only `rust/`, so its absence is not a
+    // failure.
+    let bundled = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../Packages/ArkDeckKit/Sources/ArkDeckWorkflows/Resources")
+        .join("OpenHarmonyNativeCodeSign/arkdeck-code-sign-enable");
+    // The Job owner is this composition's; the first Control holds it
+    // until it goes.
+    drop(control);
+    if bundled.exists() {
+        let helper = crate::code_sign_helper::verified(&bundled).unwrap();
+        assert_eq!(helper.facts.abi, arkdeck_provider_hdc::NativeAbi::Arm64);
+        let composed =
+            Control::new(fixture.host(true, true).with_code_sign_helper(helper)).unwrap();
+        let rows = call(&composed, "operation.list", json!({}));
+        let native = entry(&rows, "deploy.native-library.app-owned@1");
+        assert_eq!(native["availability"], "unavailable");
+        assert_eq!(native["reasonCodes"], json!(["provider_tool_unavailable"]));
+        assert_eq!(
+            native["reasons"],
+            json!(["runtime.mutationOwnerUnavailable"])
+        );
+    }
 }
 #[test]
 fn absent_artifact_and_job_owners_are_configuration_failures_not_available() {

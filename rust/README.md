@@ -643,8 +643,18 @@ also named by the entry package's owner-validated facts. An admitted HAP waits i
 `deploy.native-library.app-owned@1` is planned and admitted as Swift does
 (`native_library_plan.rs`). Its HDC composition must carry the verified
 code-sign helper the deployment stages (`HdcComposition::code_sign_helper`);
-without one the operation is runtime unavailable, and the daemon composes none
-yet. Once the Target's facts hold, the library's lease (a Job Artifact or an
+without one the operation is runtime unavailable. The daemon composes it as
+Swift's `HDCNativeCodeSignHelperArtifact.bundled()` does (`code_sign_helper.rs`):
+`arkdeck-code-sign-enable` from ArkDeckWorkflows' resource bundle beside this
+executable, verified as an arm64 ELF the library validator accepts, carrying no
+mutable input signature, and a static executable (`ET_EXEC`, a loadable segment,
+no interpreter). An isolated development root may name one with
+`ARKDECK_DEVELOPMENT_CODE_SIGN_HELPER`, an absolute path whose bytes are
+verified the same way, so the facts a deployment carries are that file's; the
+standalone daemon and the facade refuse that variable at startup, as they refuse
+every other development one, and a named helper that does not verify fails
+startup. With no helper anywhere the operation stays unavailable with
+`provider_tool_unavailable`, as before. Once the Target's facts hold, the library's lease (a Job Artifact or an
 Import) is resolved and bound to them, its bytes are read, and each step's
 action is named from them (`StepAction::Native`, claimed by the operation before
 any step kind): the provider verifies them as the expected ABI's code-signed ELF,
@@ -802,6 +812,12 @@ byte for byte; three faulted runs cover a failed rollback, a failed
 compensation cleanup and one whose outcome is lost. The daemon composes no
 code-sign helper, so the isolated daemon lists the operation as unavailable
 and plans none.
+`tests/native_library_run.rs` replays the native-library oracle but its debt
+continuation and the list after it through `tests/support/hdc_oracle.rs`, which
+the debug HAP replay shares: every answer, the fake's first 210 calls, the four
+Jobs the continuation leaves alone byte for byte and the continued one and the
+ledger as they stood before it; three faulted runs cover a failed rollback, a
+failed compensation cleanup and one whose outcome is lost.
 
 `cleanupDebt.list` reads the ledger as Swift's daemon lists it
 (`listCleanupDebt`, `encodeCleanupDebt`): every record not settled, ordered by

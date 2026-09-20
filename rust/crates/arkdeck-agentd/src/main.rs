@@ -4,6 +4,8 @@ mod app_ingress;
 mod bootstrap_readers;
 #[cfg(all(test, target_os = "macos"))]
 mod cleanup_debt_control;
+#[cfg(target_os = "macos")]
+mod code_sign_helper;
 #[cfg(all(test, target_os = "macos"))]
 mod control_action_control;
 #[cfg(all(test, target_os = "macos"))]
@@ -185,6 +187,14 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
     {
         return Err("development USB relations are configured only with a development HDC".into());
     }
+    // The standalone daemon and the facade compose the helper their own
+    // bundle holds, never one a caller names.
+    #[cfg(target_os = "macos")]
+    if development.is_none() && std::env::var_os(code_sign_helper::DEVELOPMENT_HELPER).is_some() {
+        return Err(
+            "a development code-sign helper is named only for an isolated development root".into(),
+        );
+    }
     // The standalone daemon and the facade prove a device mutation's state
     // continuity against the installed Runtime's own root, and never take a
     // development authority, acknowledged or not.
@@ -217,6 +227,20 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         None => default_user_endpoint()?,
     };
     let host = host::Host::from_environment();
+    // Swift's `HDCNativeCodeSignHelperArtifact.bundled()`: the helper this
+    // bundle holds, verified. Without one, a native deployment stays
+    // unavailable with the reason the availability answer carries; a helper
+    // that is there and does not verify is reported and the daemon serves.
+    #[cfg(target_os = "macos")]
+    let host = match code_sign_helper::bundled() {
+        Ok(Some(helper)) => host.with_code_sign_helper(helper),
+        Ok(None) => host,
+        Err(reason) => {
+            println!("native deployment stays unavailable: {reason}");
+            let _ = io::stdout().flush();
+            host
+        }
+    };
     #[cfg(target_os = "macos")]
     let host = if let Some(root) = development {
         let root = std::path::PathBuf::from(root);
@@ -381,6 +405,16 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
         // of 2026-09-19). Everything else about that proof, the capability and
         // the device hold is unchanged, and what it proves about a real device
         // is development-root evidence, never REAL_DEVICE_PASS.
+        // An isolated development root may name the helper outright; its
+        // bytes are verified here, so the facts a deployment carries are
+        // exactly this file's. A named helper that does not verify fails
+        // startup rather than leaving the operation quietly unavailable.
+        let host = match code_sign_helper::development(
+            std::env::var_os(code_sign_helper::DEVELOPMENT_HELPER).as_deref(),
+        )? {
+            Some(path) => host.with_code_sign_helper(code_sign_helper::verified(&path)?),
+            None => host,
+        };
         if development_mutation::admit(
             true,
             managed_server,

@@ -628,3 +628,44 @@ fn the_development_mutation_authority_is_acknowledged_only_as_named() {
     let (status, _) = runtime.terminate(Duration::from_secs(60));
     assert_eq!(status.code(), Some(0));
 }
+
+#[test]
+fn the_development_code_sign_helper_is_named_only_where_it_may_be() {
+    // The helper a native deployment stages is the one this bundle carries;
+    // an isolated development root may name another, and every composition
+    // that may not, or names one that does not verify, fails startup.
+    const HELPER: &str = "ARKDECK_DEVELOPMENT_CODE_SIGN_HELPER";
+    let runtime = Runtime::new();
+    let junk = runtime.root.join("not-a-helper");
+    std::fs::write(&junk, b"not an ELF at all").unwrap();
+    let junk = junk.to_str().unwrap();
+    for (environment, message) in [
+        (
+            vec![(HELPER, "arkdeck-code-sign-enable")],
+            "ARKDECK_DEVELOPMENT_CODE_SIGN_HELPER must be an explicit absolute path",
+        ),
+        (vec![(HELPER, junk)], "bundled code-sign helper is invalid"),
+    ] {
+        let output = runtime.refused(&environment);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(stderr.contains(message), "{environment:?}: {stderr}");
+        assert!(!runtime.fake_running(), "{environment:?}");
+    }
+    // The standalone daemon and the facade compose only their own bundle's.
+    // The endpoint here is one no daemon could bind, so a daemon that did not
+    // refuse would fail on another message, never serve.
+    let output = runtime
+        .command(&[(HELPER, junk)])
+        .env_remove("ARKDECK_DEVELOPMENT_HDC_PATH")
+        .env_remove("ARKDECK_DEVELOPMENT_STATE_ROOT")
+        .env("ARKDECK_ENDPOINT", runtime.root.join("absent/control.sock"))
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(69));
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains(
+            "a development code-sign helper is named only for an isolated development root"
+        )
+    );
+    assert!(!runtime.fake_running());
+}
