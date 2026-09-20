@@ -21,6 +21,7 @@ fn correlation() -> io::Result<String> {
 fn execute(invocation: &Invocation, id: &str) -> Result<Value, CliError> {
     arkdeck_cli::validate_read_only_request(invocation)?;
     arkdeck_cli::validate_bootstrap_request(invocation)?;
+    arkdeck_cli::validate_session_request(invocation)?;
     let endpoint = match invocation
         .socket
         .clone()
@@ -402,9 +403,8 @@ fn main() -> std::process::ExitCode {
         Ok(invocation) => invocation,
         Err(error) => {
             if machine {
-                if write_document(&failure_envelope("registry.parse", &error, parse_id, false))
-                    .is_err()
-                {
+                let command = error.command.unwrap_or("registry.parse");
+                if write_document(&failure_envelope(command, &error, parse_id, false)).is_err() {
                     return 74.into();
                 }
             } else {

@@ -56,13 +56,14 @@ pub(crate) fn configure(
             return Err(invalid());
         }
     } else if command == "artifact.import.release" {
+        // The registry's grammar: `--import` opaque, `--generation` a positive
+        // integer. Swift sends the identity as given; the Runtime judges it.
         let id = fields.remove("import").ok_or_else(invalid)?;
-        if !id.as_str().is_some_and(arkdeck_contract::import_id)
-            || !fields
-                .get("generation")
-                .and_then(Value::as_str)
-                .and_then(|s| s.parse::<u64>().ok())
-                .is_some_and(|n| (1..=9_007_199_254_740_991).contains(&n))
+        if !fields
+            .get("generation")
+            .and_then(Value::as_str)
+            .and_then(|s| s.parse::<u64>().ok())
+            .is_some_and(|n| (1..=9_007_199_254_740_991).contains(&n))
         {
             return Err(invalid());
         }

@@ -92,6 +92,28 @@ fn row(value: &Value) -> Result<(&str, u64, &str), CliError> {
     }
     Ok((id, generation, completed))
 }
+/// A Session apply's preview tuple, judged before any request as Swift's
+/// handler judges it after the parse: the lowercase UUID the preview minted.
+pub fn validate_session_request(invocation: &Invocation) -> Result<(), CliError> {
+    let verb = match invocation.command {
+        "session.cleanup.apply" => "cleanup",
+        "session.export.apply" => "export",
+        _ => return Ok(()),
+    };
+    if invocation
+        .params
+        .as_ref()
+        .and_then(|params| params.get("previewId"))
+        .and_then(Value::as_str)
+        .is_some_and(uuid)
+    {
+        return Ok(());
+    }
+    Err(CliError::new(
+        "invalidInput",
+        format!("Session {verb} apply requires one exact preview tuple"),
+    ))
+}
 pub fn validate_session_response(invocation: &Invocation, value: &Value) -> Result<(), CliError> {
     if invocation.command == "session.cleanup.apply" {
         let validate = || {

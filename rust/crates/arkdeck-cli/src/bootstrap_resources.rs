@@ -24,19 +24,12 @@ pub(crate) fn configure(
                 "Bundle kind must be daemon-bundle",
             ));
         }
-        if !params
-            .get("file")
-            .and_then(Value::as_str)
-            .is_some_and(|path| {
-                path.starts_with('/')
-                    && path.len() <= 16_384
-                    && !path.contains('\0')
-                    && !path.split('/').any(|part| matches!(part, "." | ".."))
-            })
-        {
+        // The registry takes any `--file`; the path is judged before any
+        // request (`validate_bootstrap_request`), as Swift's handler does.
+        if !params.contains_key("file") {
             return Err(CliError::new(
-                "invalidInput",
-                "Bundle registration requires an absolute local --file",
+                "invalidOption",
+                "Bundle registration requires --file",
             ));
         }
         return Ok(());
@@ -48,39 +41,24 @@ pub(crate) fn configure(
         let kind = params.get("kind").and_then(Value::as_str).ok_or_else(|| {
             CliError::new("invalidOption", "runtime.tool.register requires --kind")
         })?;
-        let (option, wire_key, other) = match kind {
-            "deveco" => ("rootPath", "root", "file"),
-            "hdc" => ("file", "file", "rootPath"),
-            _ => {
-                return Err(CliError::new(
-                    "invalidOption",
-                    "kind must name a supported host tool role",
-                ));
-            }
-        };
-        if params.contains_key(other) {
+        if !matches!(kind, "deveco" | "hdc") {
             return Err(CliError::new(
-                "invalidInput",
-                "registration accepts only the path for its tool kind",
+                "invalidOption",
+                "kind must name a supported host tool role",
             ));
         }
-        let path = params.remove(option).ok_or_else(|| {
-            CliError::new(
-                "invalidInput",
-                "registration requires the path for its tool kind",
-            )
-        })?;
-        if !path.as_str().is_some_and(|s| {
-            s.starts_with('/')
-                && !s.contains('\0')
-                && !s.split('/').any(|part| part == "." || part == "..")
-        }) {
+        if params.contains_key("file") && params.contains_key("rootPath") {
             return Err(CliError::new(
-                "invalidInput",
-                "tool registration paths must be canonical absolute local paths",
+                "invalidOption",
+                "--file and --root are mutually exclusive",
             ));
         }
-        params.insert(wire_key.into(), path);
+        // Which path the kind needs, and whether it is canonical, is judged
+        // before any request (`validate_bootstrap_request`), as Swift's
+        // handler judges it after the parse.
+        if let Some(root) = params.remove("rootPath") {
+            params.insert("root".into(), root);
+        }
         return Ok(());
     }
     let key = match command {
@@ -96,6 +74,49 @@ pub(crate) fn configure(
     }
     Ok(())
 }
+fn canonical_absolute(path: &str) -> bool {
+    path.starts_with('/')
+        && path.len() <= 16_384
+        && !path.contains('\0')
+        && !path.split('/').any(|part| matches!(part, "." | ".."))
+}
+
+/// A registration's path, judged before any connection as Swift's handler
+/// judges it after the parse: the one path the kind needs, canonical and
+/// absolute.
+fn registration_path(invocation: &Invocation) -> Result<(), CliError> {
+    let params = invocation.params.clone().unwrap_or_default();
+    let text = |key: &str| params.get(key).and_then(Value::as_str);
+    if invocation.command == "runtime.bundle.register" {
+        return if text("file").is_some_and(canonical_absolute) {
+            Ok(())
+        } else {
+            Err(CliError::new(
+                "invalidInput",
+                "Bundle registration requires an absolute local --file",
+            ))
+        };
+    }
+    let (needed, other) = if text("kind") == Some("deveco") {
+        ("root", "file")
+    } else {
+        ("file", "root")
+    };
+    if params.contains_key(other) || !params.contains_key(needed) {
+        return Err(CliError::new(
+            "invalidInput",
+            "HDC registration requires only --file; DevEco registration requires only --root",
+        ));
+    }
+    if !text(needed).is_some_and(canonical_absolute) {
+        return Err(CliError::new(
+            "invalidInput",
+            "tool registration paths must be canonical absolute local paths",
+        ));
+    }
+    Ok(())
+}
+
 /// Registration must be a method in this compiled contract before any connection.
 pub fn validate_bootstrap_request(invocation: &Invocation) -> Result<(), CliError> {
     if !matches!(
@@ -104,6 +125,7 @@ pub fn validate_bootstrap_request(invocation: &Invocation) -> Result<(), CliErro
     ) {
         return Ok(());
     }
+    registration_path(invocation)?;
     if !arkdeck_contract::METHODS.contains(&invocation.method) {
         return Err(CliError::new(
             "controlMethodUnavailable",

@@ -1,0 +1,39 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "flash",
+        "preview"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "commandRemoved",
+        "command": "flash.preview",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "flash",
+        "preview",
+        "--help"
+      ],
+      "expected": {
+        "command": "flash.preview",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "flash.preview",
+  "kind": "tombstone",
+  "lifecycleStatus": "removed",
+  "path": [
+    "flash",
+    "preview"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

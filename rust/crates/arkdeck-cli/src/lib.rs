@@ -24,7 +24,7 @@ pub use job_plan::{
 };
 mod session_resources;
 pub use bootstrap_resources::{validate_bootstrap_request, validate_bootstrap_response};
-pub use session_resources::validate_session_response;
+pub use session_resources::{validate_session_request, validate_session_response};
 mod workspace_projects;
 pub use workspace_projects::validate_workspace_project_response;
 mod target_resources;
@@ -62,6 +62,10 @@ pub struct CliError {
     pub code: &'static str,
     pub message: String,
     pub details: Map<String, Value>,
+    /// The leaf a refusal belongs to once its path resolved (Swift
+    /// `CLIRegistryError.command`); a machine answer names it instead of
+    /// `registry.parse`.
+    pub command: Option<&'static str>,
 }
 impl CliError {
     pub fn new(code: &'static str, message: impl Into<String>) -> Self {
@@ -69,11 +73,12 @@ impl CliError {
             code,
             message: message.into(),
             details: Map::new(),
+            command: None,
         }
     }
     pub fn exit_code(&self) -> u8 {
         match self.code {
-            "invalidCommand" | "invalidOption" => 64,
+            "invalidCommand" | "invalidOption" | "commandRemoved" => 64,
             "invalidInput"
             | "invalidCursor"
             | "inputTooLarge"
@@ -419,6 +424,9 @@ pub fn valid_correlation(id: &str) -> bool {
 }
 
 pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
+    if let Some(answer) = command_registry::answer_by_name(argv) {
+        return answer;
+    }
     let mut positional = Vec::new();
     let mut method_options = Map::new();
     let mut seen = std::collections::BTreeSet::new();
@@ -733,6 +741,16 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["history", "filter", "save"] => "history.filter.save",
         ["history", "filter", "delete"] => "history.filter.delete",
         ["commands"] => "commands",
+        // Answered by name before any flag (`command_registry::answer_by_name`).
+        ["agent", "chat"] => "agent.chat",
+        ["capability", "draft"] => "capability.draft",
+        ["capability", "install"] => "capability.install",
+        ["capability", "revoke"] => "capability.revoke",
+        ["flash", "plan"] => "flash.plan",
+        ["flash", "preview"] => "flash.preview",
+        ["flash", "execute"] => "flash.execute",
+        ["flash", "continue"] => "flash.continue",
+        ["flash", "postflight"] => "flash.postflight",
         [] if help => "help",
         _ => {
             return Err(CliError::new(
@@ -741,6 +759,11 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             ));
         }
     };
+    // Swift's parser refuses `--socket` on `runtime tool register` unless the
+    // kind is DevEco, because its HDC registration runs in its own process.
+    // This CLI sends every registration to the Runtime that owns the Bootstrap
+    // store, so the endpoint is exactly what this leaf needs; the divergence is
+    // recorded in TASK-XPA-018's audit.
     // Swift's `commands` leaf takes only `--output`: it never reaches a Runtime.
     if command == "commands" && (id.is_some() || socket.is_some()) {
         return Err(CliError::new(
@@ -1030,19 +1053,18 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             "Session command requires --session",
         ));
     }
+    // The registry's grammar: both options required, the digest lowercase
+    // hex; the preview identity is judged before any request.
     if !help
         && matches!(command, "session.export.apply" | "session.cleanup.apply")
-        && (!method_options
-            .get("previewId")
-            .and_then(Value::as_str)
-            .is_some_and(session_resources::uuid)
+        && (!method_options.contains_key("previewId")
             || !method_options
                 .get("previewDigest")
                 .is_some_and(session_resources::digest))
     {
         return Err(CliError::new(
-            "invalidInput",
-            "Session apply requires an exact preview tuple",
+            "invalidOption",
+            "Session apply requires --preview-id and a lowercase SHA-256 --preview-digest",
         ));
     }
     if !help && command == "session.export.preview" {
