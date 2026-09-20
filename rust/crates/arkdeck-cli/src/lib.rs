@@ -10,6 +10,7 @@ pub use artifact_resources::{
 };
 pub use import_resources::execute_import;
 mod bootstrap_resources;
+mod device_wait;
 mod operation_validation;
 mod read_only_resources;
 pub use read_only_resources::{
@@ -45,6 +46,7 @@ pub use artifact_resources::validate_artifact_page;
 pub use command_registry::{
     command_registry, command_registry_human, completion_script, help_text, is_node,
 };
+pub use device_wait::{proved_row, wait_document, wait_request, wait_timeout};
 pub use operation_validation::{
     bounded_input_document, input_findings, validation_attention, validation_document,
 };
@@ -713,6 +715,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["capability", "list"] => "capability.list",
         ["capability", "inspect"] => "capability.inspect",
         ["device", "candidates"] => "device.candidates",
+        ["device", "wait"] => "device.wait",
         ["target", "adopt"] => "target.adopt",
         ["target", "list"] => "target.list",
         ["target", "show"] => "target.show",
@@ -1024,6 +1027,13 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         "runtime.bundle.inspect" => &["bundle"],
         "operation.describe" | "operation.example" => &["operation"],
         "operation.validate" => &["operation", "inputsFile"],
+        "device.wait" => &[
+            "candidate",
+            "observationId",
+            "observationGeneration",
+            "state",
+            "timeout",
+        ],
         "job.plan" | "job.submit" => &[
             "requestFile",
             "targetId",
@@ -1261,7 +1271,13 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         human_action_resources::configure(command, &mut method_options, help)?;
     let agent_timeout = agent_executions::configure(command, &mut method_options, help)?;
     let hdc_timeout = hdc_control::configure(command, &mut method_options, help)?;
+    let device_wait_timeout = if command == "device.wait" && !help {
+        device_wait::configure(&mut method_options)?
+    } else {
+        None
+    };
     let timeout_ms = read_only_resources::configure(command, &mut method_options, help)?
+        .or(device_wait_timeout)
         .or(import_timeout)
         .or(artifact_timeout)
         .or(target_timeout)
@@ -1290,6 +1306,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             "operation.describe"
         } else if command == "runtime.health" {
             "health"
+        } else if command == "device.wait" {
+            "device.observations"
         } else {
             command
         },
@@ -1335,6 +1353,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                 "operation.describe"
                     | "operation.example"
                     | "operation.validate"
+                    | "device.wait"
                     | "job.status"
                     | "job.list"
                     | "job.show"

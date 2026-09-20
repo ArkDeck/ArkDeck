@@ -112,6 +112,9 @@ fn execute(invocation: &Invocation, id: &str) -> Result<Value, CliError> {
     if invocation.command == "operation.validate" {
         return validate_operation(invocation, id, &endpoint, &identity);
     }
+    if invocation.command == "device.wait" {
+        return wait_for_device(invocation, id, &endpoint, &identity);
+    }
     if matches!(
         invocation.command,
         "agent.status"
@@ -324,6 +327,72 @@ fn stopped() -> CliError {
         "clientTimeout",
         "client stopped waiting; the Runtime execution and Job were not cancelled",
     )
+}
+
+/// Swift `RuntimeCLI.emitDeviceWait`: one connection, bounded by the client's
+/// own deadline, that asks the Runtime to prove the exact observation again on
+/// every read — never an event stream — backing off from 100 ms to 2 s until
+/// the requested state is proved. Nothing is adopted and nothing is cancelled,
+/// whichever way the wait ends.
+fn wait_for_device(
+    invocation: &Invocation,
+    id: &str,
+    endpoint: &LocalEndpoint,
+    identity: &ServerIdentity,
+) -> Result<Value, CliError> {
+    let (request, state, provider) =
+        arkdeck_cli::wait_request(&invocation.params.clone().unwrap_or_default());
+    let following = request["following"].clone();
+    let initial = following["observationGeneration"]
+        .as_str()
+        .and_then(|text| text.parse::<i64>().ok())
+        .unwrap_or_default();
+    let deadline = Instant::now() + Duration::from_millis(invocation.timeout_ms.unwrap_or(30_000));
+    let mut last: Option<i64> = None;
+    let mut interval = 100;
+    loop {
+        // Every read is its own connection, and so its own contract preflight,
+        // as Swift's client makes it: `AgentClient.exchange` opens and closes a
+        // socket per request. A Runtime that restarted mid-wait is proved again
+        // instead of ending the wait, and what is left of the client's deadline
+        // bounds the read.
+        let left = deadline.saturating_duration_since(Instant::now());
+        if left.is_zero() {
+            return Err(arkdeck_cli::wait_timeout(&following, &state, last));
+        }
+        let snapshot = Client::connect_bounded(endpoint, identity, left)
+            .and_then(|mut client| client.request(id, "device.observations", Some(request.clone())))
+            .map_err(|error| {
+                let error = CliError::from_client(error, "device.observations");
+                if error.code == "clientTimeout" {
+                    arkdeck_cli::wait_timeout(&following, &state, last)
+                } else {
+                    error
+                }
+            })?;
+        let (row, generation, observed_at) =
+            arkdeck_cli::proved_row(&snapshot, &following, last.unwrap_or(initial))?;
+        last = Some(generation);
+        // The wait is over when the deadline passes, even if this very
+        // snapshot proves the state: Swift checks it here, before the match.
+        let rest = deadline.saturating_duration_since(Instant::now());
+        if rest.is_zero() {
+            return Err(arkdeck_cli::wait_timeout(&following, &state, last));
+        }
+        if row["authorizationState"] == provider.as_str() {
+            return Ok(arkdeck_cli::wait_document(
+                row,
+                generation,
+                &observed_at,
+                &state,
+            ));
+        }
+        std::thread::sleep(Duration::from_millis(interval).min(rest));
+        if Instant::now() >= deadline {
+            return Err(arkdeck_cli::wait_timeout(&following, &state, last));
+        }
+        interval = (interval * 2).min(2000);
+    }
 }
 
 /// Swift `RuntimeCLI.emitOperationValidation`: the descriptor the daemon
