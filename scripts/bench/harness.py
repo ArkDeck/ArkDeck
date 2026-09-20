@@ -76,6 +76,35 @@ def assert_host_is_quiet() -> float:
     return one_minute
 
 
+def wait_for_quiet_host(
+    max_wait_seconds: float = 0.0, poll_seconds: float = 5.0
+) -> tuple[float, float]:
+    """Return `(one-minute load, seconds waited)` once the host is quiet.
+
+    With no wait budget this is exactly `assert_host_is_quiet`.  With one, a
+    loaded host is checked again every `poll_seconds` until it is quiet or the
+    budget is spent, and is then refused exactly as `assert_host_is_quiet`
+    refuses it.  A run still starts only on a quiet host.  The wait exists
+    because the check runs at the start of every run: on a shared host whose
+    idle load sits near the ceiling, one momentary spike at the second or third
+    run's start would otherwise discard the runs already measured.  The budget
+    is a wait, so it is timed on the continuous clock (REQ-NFR-001).
+    """
+
+    if max_wait_seconds < 0:
+        raise ValueError("the quiet-host wait must not be negative")
+    if poll_seconds <= 0:
+        raise ValueError("the quiet-host poll interval must be positive")
+    started = clocks.elapsed_seconds()
+    while True:
+        try:
+            return assert_host_is_quiet(), clocks.elapsed_seconds() - started
+        except HostTooBusy:
+            if clocks.elapsed_seconds() - started + poll_seconds > max_wait_seconds:
+                raise
+            time.sleep(poll_seconds)
+
+
 def host_facts() -> dict[str, object]:
     """Non-identifying host description.
 

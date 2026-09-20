@@ -1,0 +1,743 @@
+{
+  "baselineEligible": true,
+  "change": "CHG-2026-074-shared-rust-runtime-core",
+  "clocks": {
+    "awakeWorkClock": "CLOCK_UPTIME_RAW",
+    "continuousClock": "CLOCK_MONOTONIC"
+  },
+  "eligibilityReason": "release build measured on a quiet host with the required run count",
+  "gapCount": 14,
+  "generatedAtUtc": "2026-09-19T17:36:40Z",
+  "host": {
+    "arch": "arm64",
+    "cpuCount": 8,
+    "os": "Darwin",
+    "osVersion": "27.0",
+    "python": "3.14.7"
+  },
+  "measuredMetricCount": 10,
+  "metrics": {
+    "app.timeToInteractive": {
+      "blockedBy": "device window and UI lane",
+      "designRow": "I.2 row 3 (App time to interactive)",
+      "reason": "AppShellUITests asserts a connected device row before its 2s budget, so the measurement needs a real device and the UI lane",
+      "status": "NOT_MEASURED"
+    },
+    "artifact.open": {
+      "blockedBy": "a maintainer ruling on the zero-copy artifact path",
+      "designRow": "I.2 row 6 (large artifact transfer, zero-copy leg)",
+      "reason": "artifact.open does not exist; whether to build it is itself one of the decisions section I.3 expects SPK-1 to unblock, so it cannot be baselined before it is decided",
+      "status": "NOT_MEASURED"
+    },
+    "artifact.pagedRead": {
+      "blockedBy": "artifact fixture generation in the perf lane",
+      "designRow": "I.2 row 6 (large artifact transfer, paged base64 leg)",
+      "reason": "measurable in principle through artifact.read, but a seeded Job's Artifacts total a few kilobytes and the 128 MiB and 1 GiB fixtures are built only by the Swift opt-in slow artifact tests, not by this harness",
+      "status": "NOT_MEASURED"
+    },
+    "calibration.busyLoop": {
+      "aggregate": {
+        "p50": 1.8841659766621888,
+        "p95": 2.057500008959323,
+        "p99": 2.209250000305474
+      },
+      "derivedBudget": 3.0862500134389848,
+      "description": "fixed CPU workload used as the ratio denominator",
+      "designRow": "noise control (design section I.2, ratio-based PR gate)",
+      "p95SpreadRatio": 0.021385,
+      "runCount": 3,
+      "runs": [
+        {
+          "count": 200,
+          "max": 2.457124995999038,
+          "min": 1.799583958927542,
+          "p50": 1.8723340472206473,
+          "p95": 2.033500000834465,
+          "p99": 2.121583034750074
+        },
+        {
+          "count": 200,
+          "max": 8.42220796039328,
+          "min": 1.8058749847114086,
+          "p50": 1.8881669966503978,
+          "p95": 2.057500008959323,
+          "p99": 3.395457984879613
+        },
+        {
+          "count": 200,
+          "max": 2.676290983799845,
+          "min": 1.8060420406982303,
+          "p50": 1.8841659766621888,
+          "p95": 2.077499986626208,
+          "p99": 2.209250000305474
+        }
+      ],
+      "scale": {
+        "ipcSamplesPerConnection": 32,
+        "jobListPageSize": 50,
+        "jobStoreRowCount": 20,
+        "residentSetReleaseAtSeconds": null,
+        "residentSetReleaseObserved": false,
+        "residentSetSampleCount": 173,
+        "seedJobsPerCycle": 10,
+        "seedRestartIntervalSeconds": 1,
+        "seedSeconds": 6
+      },
+      "scaleConsistentAcrossRuns": true,
+      "stable": true,
+      "status": "MEASURED",
+      "unit": "milliseconds"
+    },
+    "daemon.busyResources": {
+      "blockedBy": "a harness leg that drives a Golden Journey loop on the isolated daemon",
+      "designRow": "I.2 row 8 (busy resource footprint)",
+      "reason": "the resource window samples an idle daemon only; a busy footprint needs a Golden Journey loop driving the daemon, and this harness is read-only by construction and submits no operation",
+      "status": "NOT_MEASURED"
+    },
+    "daemon.coldStart": {
+      "aggregate": {
+        "p50": 24.336875008884817,
+        "p95": 31.418750004377216,
+        "p99": 60.34979096148163
+      },
+      "derivedBudget": 47.128125006565824,
+      "description": "process spawn through the first successful health response",
+      "designRow": "I.2 row 1 (daemon cold start)",
+      "p95SpreadRatio": 0.135759,
+      "runCount": 3,
+      "runs": [
+        {
+          "count": 50,
+          "max": 131.0394160100259,
+          "min": 19.261833978816867,
+          "p50": 25.395750009920448,
+          "p95": 35.454583005048335,
+          "p99": 131.0394160100259
+        },
+        {
+          "count": 50,
+          "max": 53.099208045750856,
+          "min": 19.10191698698327,
+          "p50": 24.336875008884817,
+          "p95": 31.18920896667987,
+          "p99": 53.099208045750856
+        },
+        {
+          "count": 50,
+          "max": 60.34979096148163,
+          "min": 18.71012500487268,
+          "p50": 24.24120804062113,
+          "p95": 31.418750004377216,
+          "p99": 60.34979096148163
+        }
+      ],
+      "scale": {
+        "ipcSamplesPerConnection": 32,
+        "jobListPageSize": 50,
+        "jobStoreRowCount": 20,
+        "residentSetReleaseAtSeconds": null,
+        "residentSetReleaseObserved": false,
+        "residentSetSampleCount": 173,
+        "seedJobsPerCycle": 10,
+        "seedRestartIntervalSeconds": 1,
+        "seedSeconds": 6
+      },
+      "scaleConsistentAcrossRuns": true,
+      "stable": true,
+      "status": "MEASURED",
+      "unit": "milliseconds"
+    },
+    "daemon.idleCpuPercent": {
+      "aggregate": {
+        "p50": 0.0,
+        "p95": 0.0,
+        "p99": 0.0
+      },
+      "derivedBudget": 0.0,
+      "description": "CPU share of a freshly started daemon as ps reports it, which is an average over the process lifetime rather than an instantaneous reading",
+      "designRow": "I.2 row 8 (idle resource footprint)",
+      "p95SpreadRatio": 0.0,
+      "runCount": 3,
+      "runs": [
+        {
+          "count": 173,
+          "max": 0.1,
+          "min": 0.0,
+          "p50": 0.0,
+          "p95": 0.0,
+          "p99": 0.0
+        },
+        {
+          "count": 173,
+          "max": 0.1,
+          "min": 0.0,
+          "p50": 0.0,
+          "p95": 0.0,
+          "p99": 0.0
+        },
+        {
+          "count": 173,
+          "max": 0.1,
+          "min": 0.0,
+          "p50": 0.0,
+          "p95": 0.0,
+          "p99": 0.0
+        }
+      ],
+      "scale": {
+        "ipcSamplesPerConnection": 32,
+        "jobListPageSize": 50,
+        "jobStoreRowCount": 20,
+        "residentSetReleaseAtSeconds": null,
+        "residentSetReleaseObserved": false,
+        "residentSetSampleCount": 173,
+        "seedJobsPerCycle": 10,
+        "seedRestartIntervalSeconds": 1,
+        "seedSeconds": 6
+      },
+      "scaleConsistentAcrossRuns": true,
+      "stable": true,
+      "status": "MEASURED",
+      "unit": "percent"
+    },
+    "daemon.idleOpenFileDescriptorCount": {
+      "aggregate": {
+        "p50": 42.0,
+        "p95": 42.0,
+        "p99": 42.0
+      },
+      "derivedBudget": 63.0,
+      "description": "open descriptors of a freshly started daemon",
+      "designRow": "I.2 row 8 (idle resource footprint)",
+      "p95SpreadRatio": 0.0,
+      "runCount": 3,
+      "runs": [
+        {
+          "count": 173,
+          "max": 42.0,
+          "min": 42.0,
+          "p50": 42.0,
+          "p95": 42.0,
+          "p99": 42.0
+        },
+        {
+          "count": 173,
+          "max": 42.0,
+          "min": 42.0,
+          "p50": 42.0,
+          "p95": 42.0,
+          "p99": 42.0
+        },
+        {
+          "count": 173,
+          "max": 42.0,
+          "min": 42.0,
+          "p50": 42.0,
+          "p95": 42.0,
+          "p99": 42.0
+        }
+      ],
+      "scale": {
+        "ipcSamplesPerConnection": 32,
+        "jobListPageSize": 50,
+        "jobStoreRowCount": 20,
+        "residentSetReleaseAtSeconds": null,
+        "residentSetReleaseObserved": false,
+        "residentSetSampleCount": 173,
+        "seedJobsPerCycle": 10,
+        "seedRestartIntervalSeconds": 1,
+        "seedSeconds": 6
+      },
+      "scaleConsistentAcrossRuns": true,
+      "stable": true,
+      "status": "MEASURED",
+      "unit": "count"
+    },
+    "daemon.idleThreadCount": {
+      "aggregate": {
+        "p50": 2.0,
+        "p95": 2.0,
+        "p99": 2.0
+      },
+      "derivedBudget": 3.0,
+      "description": "thread count of a freshly started daemon",
+      "designRow": "I.2 row 8 (idle resource footprint)",
+      "p95SpreadRatio": 0.0,
+      "runCount": 3,
+      "runs": [
+        {
+          "count": 173,
+          "max": 2.0,
+          "min": 2.0,
+          "p50": 2.0,
+          "p95": 2.0,
+          "p99": 2.0
+        },
+        {
+          "count": 173,
+          "max": 2.0,
+          "min": 2.0,
+          "p50": 2.0,
+          "p95": 2.0,
+          "p99": 2.0
+        },
+        {
+          "count": 173,
+          "max": 2.0,
+          "min": 2.0,
+          "p50": 2.0,
+          "p95": 2.0,
+          "p99": 2.0
+        }
+      ],
+      "scale": {
+        "ipcSamplesPerConnection": 32,
+        "jobListPageSize": 50,
+        "jobStoreRowCount": 20,
+        "residentSetReleaseAtSeconds": null,
+        "residentSetReleaseObserved": false,
+        "residentSetSampleCount": 173,
+        "seedJobsPerCycle": 10,
+        "seedRestartIntervalSeconds": 1,
+        "seedSeconds": 6
+      },
+      "scaleConsistentAcrossRuns": true,
+      "stable": true,
+      "status": "MEASURED",
+      "unit": "count"
+    },
+    "daemon.residentSetPlateau": {
+      "aggregate": {
+        "p50": 16285696.0,
+        "p95": 16285696.0,
+        "p99": 16285696.0
+      },
+      "derivedBudget": 24428544.0,
+      "description": "resident set an idle daemon holds from start until it releases its start-up working set",
+      "designRow": "I.2 row 8 (idle resource footprint)",
+      "p95SpreadRatio": 0.006036,
+      "runCount": 3,
+      "runs": [
+        {
+          "count": 173,
+          "max": 16203776.0,
+          "min": 16203776.0,
+          "p50": 16203776.0,
+          "p95": 16203776.0,
+          "p99": 16203776.0
+        },
+        {
+          "count": 173,
+          "max": 16302080.0,
+          "min": 16302080.0,
+          "p50": 16302080.0,
+          "p95": 16302080.0,
+          "p99": 16302080.0
+        },
+        {
+          "count": 173,
+          "max": 16285696.0,
+          "min": 16285696.0,
+          "p50": 16285696.0,
+          "p95": 16285696.0,
+          "p99": 16285696.0
+        }
+      ],
+      "scale": {
+        "ipcSamplesPerConnection": 32,
+        "jobListPageSize": 50,
+        "jobStoreRowCount": 20,
+        "residentSetReleaseAtSeconds": null,
+        "residentSetReleaseObserved": false,
+        "residentSetSampleCount": 173,
+        "seedJobsPerCycle": 10,
+        "seedRestartIntervalSeconds": 1,
+        "seedSeconds": 6
+      },
+      "scaleConsistentAcrossRuns": true,
+      "stable": true,
+      "status": "MEASURED",
+      "unit": "bytes"
+    },
+    "daemon.residentSetSteady": {
+      "aggregate": {
+        "p50": 16285696.0,
+        "p95": 16285696.0,
+        "p99": 16285696.0
+      },
+      "derivedBudget": 24428544.0,
+      "description": "resident set an idle daemon holds after that release",
+      "designRow": "I.2 row 8 (idle resource footprint)",
+      "p95SpreadRatio": 0.006036,
+      "runCount": 3,
+      "runs": [
+        {
+          "count": 173,
+          "max": 16203776.0,
+          "min": 16203776.0,
+          "p50": 16203776.0,
+          "p95": 16203776.0,
+          "p99": 16203776.0
+        },
+        {
+          "count": 173,
+          "max": 16302080.0,
+          "min": 16302080.0,
+          "p50": 16302080.0,
+          "p95": 16302080.0,
+          "p99": 16302080.0
+        },
+        {
+          "count": 173,
+          "max": 16285696.0,
+          "min": 16285696.0,
+          "p50": 16285696.0,
+          "p95": 16285696.0,
+          "p99": 16285696.0
+        }
+      ],
+      "scale": {
+        "ipcSamplesPerConnection": 32,
+        "jobListPageSize": 50,
+        "jobStoreRowCount": 20,
+        "residentSetReleaseAtSeconds": null,
+        "residentSetReleaseObserved": false,
+        "residentSetSampleCount": 173,
+        "seedJobsPerCycle": 10,
+        "seedRestartIntervalSeconds": 1,
+        "seedSeconds": 6
+      },
+      "scaleConsistentAcrossRuns": true,
+      "stable": true,
+      "status": "MEASURED",
+      "unit": "bytes"
+    },
+    "daemon.warmStartRecovery": {
+      "blockedBy": "design section L.1 item 13 (recovery ruling) and a Rust 10k fixture",
+      "designRow": "I.2 rows 2 and 7 (warm start and 10k journal/history recovery)",
+      "reason": "JournalRecoveryContractTests in the Swift nightly slow lane time the Swift engine, not this daemon; the Rust owner has no 10k-event journal or 10k-Job fixture, and it ports journal recovery and restart reconciliation only after design section L.1 item 13 is ruled",
+      "status": "NOT_MEASURED"
+    },
+    "ipc.health": {
+      "aggregate": {
+        "p50": 0.061583996284753084,
+        "p95": 0.11004199041053653,
+        "p99": 0.1483340165577829
+      },
+      "derivedBudget": 0.1650629856158048,
+      "description": "health round trip on an established Unix domain socket connection",
+      "designRow": "I.2 row 4 (IPC request p50/p95/p99, UDS leg)",
+      "p95SpreadRatio": 0.026508,
+      "runCount": 3,
+      "runs": [
+        {
+          "count": 1000,
+          "max": 0.27583399787545204,
+          "min": 0.0363329891115427,
+          "p50": 0.06308301817625761,
+          "p95": 0.10725000174716115,
+          "p99": 0.1483340165577829
+        },
+        {
+          "count": 1000,
+          "max": 0.2235410502180457,
+          "min": 0.03883300814777613,
+          "p50": 0.06029201904311776,
+          "p95": 0.11004199041053653,
+          "p99": 0.14154199743643403
+        },
+        {
+          "count": 1000,
+          "max": 0.3085409989580512,
+          "min": 0.03770802868530154,
+          "p50": 0.061583996284753084,
+          "p95": 0.11016696225851774,
+          "p99": 0.15891698421910405
+        }
+      ],
+      "scale": {
+        "ipcSamplesPerConnection": 32,
+        "jobListPageSize": 50,
+        "jobStoreRowCount": 20,
+        "residentSetReleaseAtSeconds": null,
+        "residentSetReleaseObserved": false,
+        "residentSetSampleCount": 173,
+        "seedJobsPerCycle": 10,
+        "seedRestartIntervalSeconds": 1,
+        "seedSeconds": 6
+      },
+      "scaleConsistentAcrossRuns": true,
+      "stable": true,
+      "status": "MEASURED",
+      "unit": "milliseconds"
+    },
+    "ipc.jobList": {
+      "aggregate": {
+        "p50": 11.845792003441602,
+        "p95": 15.276167017873377,
+        "p99": 16.64766698377207
+      },
+      "derivedBudget": 22.914250526810065,
+      "description": "job.list round trip over a seeded Job store",
+      "designRow": "I.2 row 4 (IPC request p50/p95/p99, UDS leg)",
+      "p95SpreadRatio": 0.025473,
+      "runCount": 3,
+      "runs": [
+        {
+          "count": 1000,
+          "max": 21.050083043519408,
+          "min": 6.931917043402791,
+          "p50": 12.185542029328644,
+          "p95": 15.35695797065273,
+          "p99": 17.40966597571969
+        },
+        {
+          "count": 1000,
+          "max": 22.209167014807463,
+          "min": 6.6368329571560025,
+          "p50": 11.70829200418666,
+          "p95": 15.276167017873377,
+          "p99": 16.629416029900312
+        },
+        {
+          "count": 1000,
+          "max": 20.570792024955153,
+          "min": 6.005208007991314,
+          "p50": 11.845792003441602,
+          "p95": 14.967833005357534,
+          "p99": 16.64766698377207
+        }
+      ],
+      "scale": {
+        "ipcSamplesPerConnection": 32,
+        "jobListPageSize": 50,
+        "jobStoreRowCount": 20,
+        "residentSetReleaseAtSeconds": null,
+        "residentSetReleaseObserved": false,
+        "residentSetSampleCount": 173,
+        "seedJobsPerCycle": 10,
+        "seedRestartIntervalSeconds": 1,
+        "seedSeconds": 6
+      },
+      "scaleConsistentAcrossRuns": true,
+      "stable": true,
+      "status": "MEASURED",
+      "unit": "milliseconds"
+    },
+    "ipc.jobStatus": {
+      "aggregate": {
+        "p50": 0.35920797381550074,
+        "p95": 0.5758340121246874,
+        "p99": 0.9637910407036543
+      },
+      "derivedBudget": 0.8637510181870311,
+      "description": "job.status round trip for one terminal Job",
+      "designRow": "I.2 row 4 (IPC request p50/p95/p99, UDS leg)",
+      "p95SpreadRatio": 0.035529,
+      "runCount": 3,
+      "runs": [
+        {
+          "count": 1000,
+          "max": 1.6995840123854578,
+          "min": 0.20045798737555742,
+          "p50": 0.35920797381550074,
+          "p95": 0.5758340121246874,
+          "p99": 0.9637910407036543
+        },
+        {
+          "count": 1000,
+          "max": 1.3915000017732382,
+          "min": 0.20112498896196485,
+          "p50": 0.35304203629493713,
+          "p95": 0.5931250052526593,
+          "p99": 0.9840840357355773
+        },
+        {
+          "count": 1000,
+          "max": 1.2862079893238842,
+          "min": 0.20358298206701875,
+          "p50": 0.362291990313679,
+          "p95": 0.5726660019718111,
+          "p99": 0.859334017150104
+        }
+      ],
+      "scale": {
+        "ipcSamplesPerConnection": 32,
+        "jobListPageSize": 50,
+        "jobStoreRowCount": 20,
+        "residentSetReleaseAtSeconds": null,
+        "residentSetReleaseObserved": false,
+        "residentSetSampleCount": 173,
+        "seedJobsPerCycle": 10,
+        "seedRestartIntervalSeconds": 1,
+        "seedSeconds": 6
+      },
+      "scaleConsistentAcrossRuns": true,
+      "stable": true,
+      "status": "MEASURED",
+      "unit": "milliseconds"
+    },
+    "ipc.namedPipe": {
+      "blockedBy": "TASK-XPA-002 (Windows transport)",
+      "designRow": "I.2 row 4 (IPC, named-pipe leg)",
+      "reason": "no named-pipe transport exists on any platform yet",
+      "status": "NOT_MEASURED"
+    },
+    "ipc.xpc": {
+      "blockedBy": "an absolute XPC measurement from a client the daemon accepts",
+      "designRow": "I.2 row 4 (IPC, XPC leg)",
+      "reason": "the XPC leg accepts only the signed App as its peer, and this harness is an unsigned Unix-domain-socket client; RuntimeXPCTransportCostTests publishes relative XPC cost only; the Rust daemon's XPC ingress is also opt-in (ARKDECK_APP_INGRESS=history)",
+      "status": "NOT_MEASURED"
+    },
+    "job.cancelReconcile": {
+      "blockedBy": "design section L.1 item 13 (recovery ruling), a harness leg that submits and cancels a Job, and a device window",
+      "designRow": "I.2 row 9 (cancel and reconcile latency)",
+      "reason": "the row times the cancellation of a running readOnly Job; this harness is read-only by construction and never submits the Job it would cancel, and the terminal leg needs an HDC child process on a real device; the Rust daemon also refuses job.reconcile as unavailable in its read-only foundation",
+      "status": "NOT_MEASURED"
+    },
+    "job.eventsPage": {
+      "blockedBy": "a fixture that produces a 1,000-event Job",
+      "designRow": "I.2 row 5 (job.events 1,000-row page)",
+      "reason": "job.events is published and read-only, but every seeded Job is an observe.device Job carrying a handful of events, not the 1,000-event Job the budget is written for; a page of a seeded Job would only budget its own scale",
+      "status": "NOT_MEASURED"
+    },
+    "job.eventsWait": {
+      "blockedBy": "a registry, schema and client change that publishes job.events.wait",
+      "designRow": "I.2 row 5 (job.events.wait idle CPU)",
+      "reason": "job.events.wait is a proposal in design section F.2 and is not in the published single v1 method table; only the job.events pull page exists",
+      "status": "NOT_MEASURED"
+    },
+    "job.journalAppend": {
+      "blockedBy": "a timed durable-append leg over a 1,000-event Job",
+      "designRow": "I.2 row 5 (journal append per event)",
+      "reason": "no leg times a durable journal append: this harness only reads, and the soak appends journals without timing them; the Swift per-event figure came from JournalRecoveryContractTests' opt-in journal benchmark, which times the Swift engine",
+      "status": "NOT_MEASURED"
+    },
+    "package.size": {
+      "blockedBy": "TASK-XPA-022 (Windows packaging) and a macOS installer producer",
+      "designRow": "I.2 row 12 (installer size and update delta)",
+      "reason": "no DMG or MSIX producer exists in the repository, so there is no artefact to size",
+      "status": "NOT_MEASURED"
+    },
+    "ui.frameResponse": {
+      "blockedBy": "UI lane",
+      "designRow": "I.2 row 11 (UI frame response)",
+      "reason": "needs the UI lane on both platforms",
+      "status": "NOT_MEASURED"
+    },
+    "viewer.scale": {
+      "blockedBy": "a maintainer ruling on wall-clock Viewer budgets, and the UI lane",
+      "designRow": "I.2 row 10 (Viewer build, search, hit-test, scroll)",
+      "reason": "build, search and hit-test are covered by the existing ratio gate in ViewerScalePerformanceTests, whose header refuses wall-clock budgets; the scroll leg needs the UI lane",
+      "status": "NOT_MEASURED"
+    }
+  },
+  "runs": [
+    {
+      "finishedAtUtc": "2026-09-19T17:29:29Z",
+      "index": 0,
+      "loadAverageOneMinuteEnd": 4.433,
+      "loadAverageOneMinuteStart": 3.625,
+      "measuredMetrics": [
+        "calibration.busyLoop",
+        "daemon.coldStart",
+        "daemon.idleCpuPercent",
+        "daemon.idleOpenFileDescriptorCount",
+        "daemon.idleThreadCount",
+        "daemon.residentSetPlateau",
+        "daemon.residentSetSteady",
+        "ipc.health",
+        "ipc.jobList",
+        "ipc.jobStatus"
+      ],
+      "quietWaitSeconds": 0.0,
+      "scale": {
+        "ipcSamplesPerConnection": 32,
+        "jobListPageSize": 50,
+        "jobStoreRowCount": 20,
+        "residentSetReleaseAtSeconds": null,
+        "residentSetReleaseObserved": false,
+        "residentSetSampleCount": 173,
+        "seedJobsPerCycle": 10,
+        "seedRestartIntervalSeconds": 1,
+        "seedSeconds": 6
+      },
+      "startedAtUtc": "2026-09-19T17:26:05Z"
+    },
+    {
+      "finishedAtUtc": "2026-09-19T17:33:17Z",
+      "index": 1,
+      "loadAverageOneMinuteEnd": 3.913,
+      "loadAverageOneMinuteStart": 3.998,
+      "measuredMetrics": [
+        "calibration.busyLoop",
+        "daemon.coldStart",
+        "daemon.idleCpuPercent",
+        "daemon.idleOpenFileDescriptorCount",
+        "daemon.idleThreadCount",
+        "daemon.residentSetPlateau",
+        "daemon.residentSetSteady",
+        "ipc.health",
+        "ipc.jobList",
+        "ipc.jobStatus"
+      ],
+      "quietWaitSeconds": 25.0,
+      "scale": {
+        "ipcSamplesPerConnection": 32,
+        "jobListPageSize": 50,
+        "jobStoreRowCount": 20,
+        "residentSetReleaseAtSeconds": null,
+        "residentSetReleaseObserved": false,
+        "residentSetSampleCount": 173,
+        "seedJobsPerCycle": 10,
+        "seedRestartIntervalSeconds": 1,
+        "seedSeconds": 6
+      },
+      "startedAtUtc": "2026-09-19T17:29:54Z"
+    },
+    {
+      "finishedAtUtc": "2026-09-19T17:36:40Z",
+      "index": 2,
+      "loadAverageOneMinuteEnd": 3.792,
+      "loadAverageOneMinuteStart": 3.913,
+      "measuredMetrics": [
+        "calibration.busyLoop",
+        "daemon.coldStart",
+        "daemon.idleCpuPercent",
+        "daemon.idleOpenFileDescriptorCount",
+        "daemon.idleThreadCount",
+        "daemon.residentSetPlateau",
+        "daemon.residentSetSteady",
+        "ipc.health",
+        "ipc.jobList",
+        "ipc.jobStatus"
+      ],
+      "quietWaitSeconds": 0.0,
+      "scale": {
+        "ipcSamplesPerConnection": 32,
+        "jobListPageSize": 50,
+        "jobStoreRowCount": 20,
+        "residentSetReleaseAtSeconds": null,
+        "residentSetReleaseObserved": false,
+        "residentSetSampleCount": 173,
+        "seedJobsPerCycle": 10,
+        "seedRestartIntervalSeconds": 1,
+        "seedSeconds": 6
+      },
+      "startedAtUtc": "2026-09-19T17:33:17Z"
+    }
+  ],
+  "schema": "arkdeck-perf-baseline-1.1.0",
+  "selfCheckPassed": true,
+  "spike": "SPK-11",
+  "spikeVerdict": "PASS",
+  "task": "TASK-XPA-025",
+  "toolchain": {
+    "buildConfiguration": "release",
+    "calibrationIterations": 60000,
+    "daemonSha256": "74d94541fcfce64af2b7885ec1edbbcb075f42858e54feb5d6bf0785f357974a",
+    "runtimeKind": "rust",
+    "soakFixtureSha256": "71ce635ff1206bae761b1bc9003928b57fec3b47de0aa14c222da6b68e1b0e78"
+  },
+  "unstableMetrics": []
+}

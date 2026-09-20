@@ -6,7 +6,9 @@ import json
 import math
 import pathlib
 import os
+import tempfile
 import unittest
+from unittest import mock
 
 from bench import __main__ as main
 from bench import baseline
@@ -179,6 +181,19 @@ class DocumentTests(unittest.TestCase):
         self.assertEqual(document["task"], baseline.TASK_ID)
         self.assertEqual(document["spike"], baseline.SPIKE_ID)
 
+    def test_a_given_identity_is_carried_instead_of_the_swift_one(self) -> None:
+        document = self._build(task="TASK-XPA-025", spike="SPK-11")
+        self.assertEqual(document["task"], "TASK-XPA-025")
+        self.assertEqual(document["spike"], "SPK-11")
+
+    def test_the_identity_follows_the_runtime_kind(self) -> None:
+        self.assertEqual(
+            baseline.document_identity("swift"), (baseline.TASK_ID, baseline.SPIKE_ID)
+        )
+        self.assertEqual(baseline.document_identity("rust"), ("TASK-XPA-025", "SPK-11"))
+        with self.assertRaises(baseline.BaselineError):
+            baseline.document_identity("guess")
+
     def test_gaps_and_metrics_share_one_sorted_table(self) -> None:
         document = self._build()
         self.assertEqual(list(document["metrics"]), ["ipc.health", "ui.frameResponse"])
@@ -247,6 +262,108 @@ class AdvisoryDeclarationTests(unittest.TestCase):
         declaration = source.index("if arguments.allow_loaded_host:")
         loop = source.index("for index in range(arguments.runs):")
         self.assertLess(declaration, loop)
+
+
+class CaptureDocumentIdentityTests(unittest.TestCase):
+    """The capture command labels and explains a document by its daemon."""
+
+    def _capture(self, runtime_kind: str) -> tuple[int, dict]:
+        executable = pathlib.Path(main.__file__)
+        with tempfile.TemporaryDirectory() as directory:
+            out = pathlib.Path(directory)
+            with mock.patch.object(main.harness, "assert_host_is_quiet", return_value=0.5), \
+                 mock.patch.object(main.harness, "load_average", return_value=(0.5, 0.5, 0.5)), \
+                 mock.patch.object(
+                     main.harness, "temporary_state_directory", return_value=out / "state"
+                 ), \
+                 mock.patch.object(
+                     main.metrics,
+                     "execute_run",
+                     return_value=({"ipc.health": [1.0] * 10}, {"jobStoreRowCount": 20}),
+                 ) as execute_run, \
+                 mock.patch.object(main, "_toolchain_facts", return_value={}):
+                code = main.main([
+                    "capture", "--daemon", str(executable), "--soak", str(executable),
+                    "--runtime-kind", runtime_kind, "--out-dir", str(out / "perf"),
+                ])
+            self.assertEqual(execute_run.call_count, baseline.MINIMUM_RUNS)
+            written = list((out / "perf").glob("perf-baseline-*.json"))
+            self.assertEqual(len(written), 1)
+            return code, json.loads(written[0].read_text(encoding="utf-8"))
+
+    def test_a_rust_capture_is_recorded_under_its_own_task_and_spike(self) -> None:
+        code, document = self._capture("rust")
+        self.assertEqual(code, 0)
+        self.assertEqual(document["task"], "TASK-XPA-025")
+        self.assertEqual(document["spike"], "SPK-11")
+        self.assertEqual(document["toolchain"]["runtimeKind"], "rust")
+        self.assertIn("job.reconcile", document["metrics"]["job.cancelReconcile"]["reason"])
+        self.assertIn("L.1 item 13", document["metrics"]["daemon.warmStartRecovery"]["reason"])
+
+    def test_a_swift_capture_keeps_the_historical_identity(self) -> None:
+        code, document = self._capture("swift")
+        self.assertEqual(code, 0)
+        self.assertEqual(document["task"], baseline.TASK_ID)
+        self.assertEqual(document["spike"], baseline.SPIKE_ID)
+        self.assertIn(
+            "JournalRecoveryContractTests",
+            document["metrics"]["daemon.warmStartRecovery"]["reason"],
+        )
+
+
+class CaptureQuietWaitTests(unittest.TestCase):
+    """The capture passes its wait budget to every run and records the wait."""
+
+    def _capture(self, *extra: str) -> tuple[int, dict, list]:
+        executable = pathlib.Path(main.__file__)
+        with tempfile.TemporaryDirectory() as directory:
+            out = pathlib.Path(directory)
+            with mock.patch.object(
+                     main.harness, "wait_for_quiet_host", return_value=(0.5, 42.0)
+                 ) as wait, \
+                 mock.patch.object(main.harness, "load_average", return_value=(0.5, 0.5, 0.5)), \
+                 mock.patch.object(
+                     main.harness, "temporary_state_directory", return_value=out / "state"
+                 ), \
+                 mock.patch.object(
+                     main.metrics,
+                     "execute_run",
+                     return_value=({"ipc.health": [1.0] * 10}, {"jobStoreRowCount": 20}),
+                 ), \
+                 mock.patch.object(main, "_toolchain_facts", return_value={}):
+                code = main.main([
+                    "capture", "--daemon", str(executable), "--soak", str(executable),
+                    "--runtime-kind", "rust", "--out-dir", str(out / "perf"), *extra,
+                ])
+            written = list((out / "perf").glob("perf-baseline-*.json"))
+            self.assertEqual(len(written), 1)
+            document = json.loads(written[0].read_text(encoding="utf-8"))
+            return code, document, [call.args for call in wait.call_args_list]
+
+    def test_the_budget_reaches_every_run_and_the_wait_is_recorded(self) -> None:
+        code, document, calls = self._capture("--quiet-wait-seconds", "600")
+        self.assertEqual(code, 0)
+        self.assertEqual(calls, [(600.0,)] * baseline.MINIMUM_RUNS)
+        self.assertEqual([run["quietWaitSeconds"] for run in document["runs"]], [42.0] * 3)
+        self.assertTrue(document["baselineEligible"])
+
+    def test_the_default_keeps_the_immediate_refusal(self) -> None:
+        _, _, calls = self._capture()
+        self.assertEqual(calls, [(0.0,)] * baseline.MINIMUM_RUNS)
+
+    def test_an_advisory_capture_does_not_wait(self) -> None:
+        _, document, calls = self._capture(
+            "--quiet-wait-seconds", "600", "--allow-loaded-host"
+        )
+        self.assertEqual(calls, [(0.0,)] * baseline.MINIMUM_RUNS)
+        self.assertFalse(document["baselineEligible"])
+
+    def test_a_negative_wait_is_a_usage_error(self) -> None:
+        with self.assertRaises(SystemExit):
+            main.build_parser().parse_args([
+                "capture", "--daemon", main.__file__, "--soak", main.__file__,
+                "--out-dir", "/nonexistent", "--quiet-wait-seconds", "-1",
+            ])
 
 
 class CaptureExitCodeTests(unittest.TestCase):

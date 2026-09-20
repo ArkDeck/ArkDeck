@@ -71,6 +71,20 @@ Swift captures remain available with `--runtime-kind swift` (the compatibility
 default) and a matching Swift soak executable. The committed Swift baseline is
 preserved; a Rust reference-host baseline still requires three qualifying runs.
 
+A capture document names the task and spike of the daemon it measured: a Swift
+capture keeps `TASK-XPA-023`/`SPK-1`, the identity of the committed Swift
+baseline, and a Rust capture carries `TASK-XPA-025`/`SPK-11`. The rows the
+harness cannot measure are declared per daemon, each with the reason that holds
+for that daemon (`metrics.gap_definitions(runtime_kind)`); for example, recovery
+and `job.reconcile` on the Rust daemon wait for design section L.1 item 13,
+which does not apply to the Swift engine. The first quiet-host Rust capture is
+recorded beside its run record,
+`openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-025/spk-11-run.md`,
+not in `baselines/`. A document in `baselines/` becomes the nightly lane's
+comparison reference (the lane takes the last file by name), and whether this
+host's newer macOS and Xcode can stand in for the reference host of design
+section I.2 is a maintainer decision.
+
 ## What decides whether a run counts
 
 A capture is only baseline-eligible when all of the following hold; otherwise
@@ -80,7 +94,7 @@ the document records why, stays advisory, and must not be committed.
 | --- | --- |
 | release build | Design section I.2 pins both reference hosts to release builds; a debug build is a different program. |
 | each phase on its own daemon | Cold start, IPC and the resource window each get a fresh process. Sampling resources on the daemon that just answered thousands of requests measures a served-then-quiet footprint, not an idle one. |
-| quiet host (1-minute load average at most half the CPU count) | Wall-clock percentiles on a loaded host are this repository's documented flake mode (`ViewerScalePerformanceTests.swift`). `--allow-loaded-host` waives the requirement and downgrades the run to advisory instead of lying about it. It disqualifies unconditionally, not only when the guard trips: a shared runner is often quiet at the start of a run and busy during it, which the start-of-run guard cannot see. |
+| quiet host (1-minute load average at most half the CPU count) | Wall-clock percentiles on a loaded host are this repository's documented flake mode (`ViewerScalePerformanceTests.swift`). The guard runs at the start of every run. `--quiet-wait-seconds N` lets a run wait up to N seconds for a loaded host to go quiet instead of refusing the whole capture at once; the run still starts only on a quiet host, and each run records its wait (`quietWaitSeconds`). `--allow-loaded-host` waives the requirement and downgrades the run to advisory instead of lying about it. It disqualifies unconditionally, not only when the guard trips: a shared runner is often quiet at the start of a run and busy during it, which the start-of-run guard cannot see. |
 | at least three independent runs | Section I.3. |
 | p95 spread at most 30% across those runs | Section I.3's failure criterion: a wider spread means host load is being measured, not the product. |
 

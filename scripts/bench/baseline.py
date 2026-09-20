@@ -28,6 +28,13 @@ SCHEMA = "arkdeck-perf-baseline-1.1.0"
 CHANGE_ID = "CHG-2026-074-shared-rust-runtime-core"
 TASK_ID = "TASK-XPA-023"
 SPIKE_ID = "SPK-1"
+# A Rust capture belongs to TASK-XPA-025 and its spike SPK-11 (the Spikes table
+# of the change's tasks.md).  Labelling it SPK-1 would give a Rust document the
+# identity of the historical Swift baseline it is meant to sit beside.
+DOCUMENT_IDENTITY = {
+    "swift": (TASK_ID, SPIKE_ID),
+    "rust": ("TASK-XPA-025", "SPK-11"),
+}
 
 MINIMUM_RUNS = 3
 # Section I.3: three runs whose p95 spread exceeds 30% mean the method, not the
@@ -42,6 +49,15 @@ STATUS_NOT_MEASURED = "NOT_MEASURED"
 
 class BaselineError(RuntimeError):
     """A baseline document could not be assembled or would leak host identity."""
+
+
+def document_identity(runtime_kind: str) -> tuple[str, str]:
+    """`(task, spike)` a capture of the given daemon composition belongs to."""
+
+    identity = DOCUMENT_IDENTITY.get(runtime_kind)
+    if identity is None:
+        raise BaselineError(f"unknown runtime kind {runtime_kind!r}")
+    return identity
 
 
 def percentile(samples: list[float], quantile: float) -> float:
@@ -215,6 +231,8 @@ def build_document(
     gaps: dict[str, Gap],
     baseline_eligible: bool,
     eligibility_reason: str,
+    task: str = TASK_ID,
+    spike: str = SPIKE_ID,
 ) -> dict[str, object]:
     measured = {name: metric.as_document() for name, metric in metrics.items()}
     unmeasured = {name: gap.as_document() for name, gap in gaps.items()}
@@ -232,8 +250,8 @@ def build_document(
     return {
         "schema": SCHEMA,
         "change": CHANGE_ID,
-        "task": TASK_ID,
-        "spike": SPIKE_ID,
+        "task": task,
+        "spike": spike,
         "generatedAtUtc": clocks.utc_now(),
         "host": host,
         "clocks": clocks.clock_identity(),

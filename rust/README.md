@@ -1943,7 +1943,12 @@ cargo run --release --locked -p arkdeck-soak -- \
 It atomically writes `runtime-soak-metrics.json`, reopens owners between cycles,
 verifies published Artifact evidence and journals, and fails on unresolved
 intents, cleanup debt or excessive RSS/FD growth. The default duration is 24
-hours. This owner-only fixture does not exercise IPC, qualify a performance
-baseline, or provide hardware acceptance evidence. See
-[the run record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-025/rust-soak-run.md)
-for validation and remaining scope.
+hours. Unlike the Swift fixture it calls the owners directly instead of going
+through the daemon's socket, so it exercises no IPC itself;
+`scripts/bench capture --runtime-kind rust` uses it to seed each run's store and
+then measures the isolated release `arkdeck-agentd` over its socket (SPK-11).
+Neither the soak nor a capture approves a budget, commits a reference baseline
+or provides hardware acceptance evidence. See
+[the soak record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-025/rust-soak-run.md)
+and [the SPK-11 record](../openspec/changes/chg-2026-074-shared-rust-runtime-core/evidence/runs/TASK-XPA-025/spk-11-run.md)
+for validation, the three-run Rust numbers and the remaining scope.
