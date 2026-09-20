@@ -60,6 +60,14 @@ on:
           lane runs a bounded soak instead.
         required: false
         default: "4"
+      soak-restart-interval-seconds:
+        description: >-
+          Seconds between cycles. The weekly schedule keeps 300, which spends
+          most of a four-hour soak waiting; a dispatch may shorten it to reach
+          the same cycle count sooner when the question is how a resource grows
+          per cycle rather than how the owners behave when left alone.
+        required: false
+        default: "300"
 
 permissions:
   contents: read
@@ -228,14 +236,15 @@ jobs:
       - name: Run the Runtime soak
         env:
           SOAK_HOURS: ${{ github.event.inputs.soak-hours || '4' }}
+          SOAK_RESTART_INTERVAL_SECONDS: ${{ github.event.inputs.soak-restart-interval-seconds || '300' }}
         run: |
           set -eu
           BIN="$GITHUB_WORKSPACE/rust/target/release"
-          echo "soak hours: $SOAK_HOURS"
+          echo "soak hours: $SOAK_HOURS, restart interval: ${SOAK_RESTART_INTERVAL_SECONDS}s"
           "$BIN/arkdeck-soak" \
             --state-directory "$SOAK_STATE" \
             --duration-seconds "$((SOAK_HOURS * 3600))" \
-            --restart-interval-seconds 300 \
+            --restart-interval-seconds "$SOAK_RESTART_INTERVAL_SECONDS" \
             --jobs-per-cycle 10
       - name: Archive the soak metrics
         if: always()

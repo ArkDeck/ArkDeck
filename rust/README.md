@@ -2087,7 +2087,9 @@ cargo run --release --locked -p arkdeck-soak -- \
 
 It atomically writes `runtime-soak-metrics.json`, reopens owners between cycles,
 verifies published Artifact evidence and journals, and fails on unresolved
-intents, cleanup debt or excessive RSS/FD growth. The default duration is 24
+intents, cleanup debt or excessive RSS/FD growth. Every cycle prints its
+resident set, its growth against the first cycle, the descriptor count and the
+state size, so a failed resource gate leaves a series rather than one number. The default duration is 24
 hours. Unlike the Swift fixture it calls the owners directly instead of going
 through the daemon's socket, so it exercises no IPC itself;
 `scripts/bench capture --runtime-kind rust` uses it to seed each run's store and
