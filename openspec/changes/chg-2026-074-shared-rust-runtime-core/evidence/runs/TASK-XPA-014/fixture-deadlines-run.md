@@ -114,7 +114,14 @@ The Rust owners reproduce the recorded spelling. So on this host `check-job-plan
 defect. These two older harnesses compare every message byte for byte, which is stricter than r11.
 Masking the T2 wording there is left to its own slice.
 
+## CI
+
+The PR's CI (`guard` + `swift`) is the unified gate. #2063, head `f6082b0a`, merged as `655c8199`:
+SDD Guard run 35453104783 (`guard`, `ds-tokens`) success, and Swift CI run 35453104898 (`swift`)
+success, with `plan`, the Rust host-independent checks and the Rust workspace on macOS 26, Ubuntu
+and Windows green and the Swift, design-system and App lanes skipped by the planner. Recorded by
+the next slice, `decoding-error-wording-t2-run.md`.
+
 ## Not run
 
-Any device, real HDC or installed Runtime. CI does not run these harnesses; the PR's CI (`guard` +
-`swift`) is the unified gate for the change itself.
+Any device, real HDC or installed Runtime. CI does not run these harnesses.

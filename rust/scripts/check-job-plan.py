@@ -16,6 +16,11 @@ after the run starts (`fixture-deadlines.py`): both daemons sweep expired
 Artifacts at startup with the real clock, and the recorded ones lapse on
 2026-09-21. Nothing either owner answers reads a deadline.
 
+A refusal's `DecodingError` rendering belongs to the Swift runtime and changes
+with the host's OS, so it is T2 under r11 section 3 and read as a label
+(`decoding-error-wording.py`). The case the runtime names, the ArkDeck wording
+around it, the error code, the answer's shape and its order stay compared.
+
 Swift children get CFFIXED_USER_HOME inside the disposable root, so neither
 owner opens installed Application Support state. Host-only: no device,
 hardware evidence or installed state.
@@ -42,6 +47,11 @@ _deadlines_spec = importlib.util.spec_from_file_location(
     'fixture_deadlines', Path(__file__).with_name('fixture-deadlines.py'))
 fixture_deadlines = importlib.util.module_from_spec(_deadlines_spec)
 _deadlines_spec.loader.exec_module(fixture_deadlines)
+_wording_spec = importlib.util.spec_from_file_location(
+    'decoding_error_wording', Path(__file__).with_name('decoding-error-wording.py'))
+decoding_error_wording = importlib.util.module_from_spec(_wording_spec)
+_wording_spec.loader.exec_module(decoding_error_wording)
+masked = decoding_error_wording.masked
 
 
 def sha256(path: Path) -> str:
@@ -198,11 +208,13 @@ def main() -> None:
 
             oracle = {case['name']: case['response'] for case in cases}
             for name, swift_answer in swift_answers.items():
-                check(f'identical.{name}', rust_answers[name] == swift_answer,
+                check(f'identical.{name}', masked(rust_answers[name]) == masked(swift_answer),
                       {'swift': swift_answer, 'rust': rust_answers[name]})
                 # The live Swift composition answers as the recorded oracle,
-                # apart from the digest of the analyzer each one pins.
-                check(f'oracle.{name}', without_digest(swift_answer) == without_digest(oracle[name]),
+                # apart from the digest of the analyzer each one pins and the
+                # runtime's own rendering of a DecodingError.
+                check(f'oracle.{name}',
+                      masked(without_digest(swift_answer)) == masked(without_digest(oracle[name])),
                       {'live': swift_answer, 'oracle': oracle[name]})
             zero = {'phase': 'preAdmission', 'newDispatchCount': 0}
             check('refusalsProveZeroDispatch', all(
