@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import math
 import pathlib
@@ -309,6 +311,87 @@ class CaptureDocumentIdentityTests(unittest.TestCase):
             "JournalRecoveryContractTests",
             document["metrics"]["daemon.warmStartRecovery"]["reason"],
         )
+
+
+class BaselineSelectionTests(unittest.TestCase):
+    """Choosing the committed reference by the daemon a capture measured."""
+
+    def test_a_document_without_the_field_measured_the_swift_daemon(self) -> None:
+        self.assertEqual(baseline.runtime_kind({}), "swift")
+        self.assertEqual(baseline.runtime_kind({"toolchain": {}}), "swift")
+        self.assertEqual(baseline.runtime_kind({"toolchain": []}), "swift")
+        self.assertEqual(baseline.runtime_kind({"toolchain": {"runtimeKind": ""}}), "swift")
+
+    def test_the_field_is_read_when_present(self) -> None:
+        for kind in ("swift", "rust"):
+            document = {"toolchain": {"runtimeKind": kind}}
+            self.assertEqual(baseline.runtime_kind(document), kind)
+
+    def _directory(self, root: pathlib.Path, documents: dict[str, str | None]) -> pathlib.Path:
+        directory = root / "baselines"
+        directory.mkdir()
+        for name, kind in documents.items():
+            toolchain = {} if kind is None else {"runtimeKind": kind}
+            (directory / name).write_text(
+                json.dumps({"toolchain": toolchain}), encoding="utf-8"
+            )
+        return directory
+
+    def _select(self, directory: pathlib.Path, candidate: pathlib.Path) -> tuple[int, str]:
+        stdout = io.StringIO()
+        stderr = io.StringIO()
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            code = main.main([
+                "select-baseline", "--candidate", str(candidate),
+                "--directory", str(directory),
+            ])
+        return code, (stdout.getvalue() or stderr.getvalue()).strip()
+
+    def test_the_newest_baseline_of_the_same_daemon_is_chosen(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            root = pathlib.Path(root)
+            directory = self._directory(root, {
+                "perf-baseline-2026-09-04.json": None,
+                "perf-baseline-2026-09-19.json": "rust",
+                "perf-baseline-2026-09-30.json": "swift",
+            })
+            candidate = root / "candidate.json"
+            candidate.write_text(
+                json.dumps({"toolchain": {"runtimeKind": "rust"}}), encoding="utf-8"
+            )
+            code, out = self._select(directory, candidate)
+            self.assertEqual(code, 0)
+            self.assertEqual(pathlib.Path(out).name, "perf-baseline-2026-09-19.json")
+
+            candidate.write_text(json.dumps({"toolchain": {}}), encoding="utf-8")
+            code, out = self._select(directory, candidate)
+            self.assertEqual(code, 0)
+            self.assertEqual(pathlib.Path(out).name, "perf-baseline-2026-09-30.json")
+
+    def test_no_baseline_of_that_daemon_is_reported_not_substituted(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            root = pathlib.Path(root)
+            directory = self._directory(root, {"perf-baseline-2026-09-04.json": "swift"})
+            candidate = root / "candidate.json"
+            candidate.write_text(
+                json.dumps({"toolchain": {"runtimeKind": "rust"}}), encoding="utf-8"
+            )
+            code, message = self._select(directory, candidate)
+            self.assertEqual(code, 1)
+            self.assertIn("no committed baseline measures a rust daemon", message)
+
+    def test_an_unreadable_committed_baseline_is_an_error_not_a_skip(self) -> None:
+        with tempfile.TemporaryDirectory() as root:
+            root = pathlib.Path(root)
+            directory = self._directory(root, {"perf-baseline-2026-09-04.json": "rust"})
+            (directory / "perf-baseline-2026-09-19.json").write_text("{", encoding="utf-8")
+            candidate = root / "candidate.json"
+            candidate.write_text(
+                json.dumps({"toolchain": {"runtimeKind": "rust"}}), encoding="utf-8"
+            )
+            code, message = self._select(directory, candidate)
+            self.assertEqual(code, 1)
+            self.assertIn("perf-baseline-2026-09-19.json", message)
 
 
 class CaptureQuietWaitTests(unittest.TestCase):

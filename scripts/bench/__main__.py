@@ -245,6 +245,44 @@ def command_capture(arguments: argparse.Namespace) -> int:
     return capture_exit_code(list(document["unstableMetrics"]), disqualifiers)
 
 
+def command_select_baseline(arguments: argparse.Namespace) -> int:
+    """Print the committed baseline that measured the same daemon.
+
+    A lane that compares a Rust capture against the Swift baseline gets
+    "not comparable" for every metric, because the two seed different Job
+    counts, and reads as a red lane rather than as a regression.  Choosing the
+    reference by the daemon it measured keeps the comparison meaningful; with
+    no such baseline the caller archives and says so instead of comparing.
+    """
+
+    try:
+        candidate = json.loads(arguments.candidate.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        print(f"bench: ERROR: {arguments.candidate}: {error}", file=sys.stderr)
+        return 1
+    kind = baseline.runtime_kind(candidate)
+    matching: list[pathlib.Path] = []
+    for path in sorted(arguments.directory.glob("perf-baseline-*.json")):
+        try:
+            committed = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            # A committed baseline that cannot be read is a repository defect,
+            # not a missing reference: say so rather than selecting past it.
+            print(f"bench: ERROR: {path}: {error}", file=sys.stderr)
+            return 1
+        if baseline.runtime_kind(committed) == kind:
+            matching.append(path)
+    if not matching:
+        print(
+            f"bench: no committed baseline measures a {kind} daemon in "
+            f"{arguments.directory}",
+            file=sys.stderr,
+        )
+        return 1
+    print(matching[-1])
+    return 0
+
+
 def command_compare(arguments: argparse.Namespace) -> int:
     from . import compare as comparison
 
@@ -334,6 +372,20 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     capture.set_defaults(handler=command_capture)
+
+    select = subparsers.add_parser(
+        "select-baseline",
+        help="print the committed baseline that measured the same daemon",
+        allow_abbrev=False,
+    )
+    select.add_argument("--candidate", type=_existing_file, required=True)
+    select.add_argument(
+        "--directory",
+        type=pathlib.Path,
+        required=True,
+        help="directory of committed baselines",
+    )
+    select.set_defaults(handler=command_select_baseline)
 
     compare = subparsers.add_parser(
         "compare",

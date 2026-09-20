@@ -387,8 +387,11 @@ is selected because `rust/README.md` lives under `rust/`.
 
 ## 11. CI
 
-Pushed to `agent/xpa-025-spk-11-20260919`; the Agent PR workflow opens the pull request.
-The PR number, CI run id and conclusion are appended once CI reports.
+PR #2070 on `agent/xpa-025-spk-11-20260919`, merged as `65b2a073` on 2026-09-20T07:18:09Z. Every
+check succeeded: SDD Guard `35496107727`, Swift CI `35496107837` (the aggregate that carries the
+Rust lane), Performance lanes `35496107734` (the harness unit tests, which a `scripts/bench` change
+triggers) and Agent PR `35496107724`. This section was filled by the next slice, as the 2026-09-19
+policy allows.
 
 ## 12. Not run, and why
 

@@ -51,6 +51,20 @@ class BaselineError(RuntimeError):
     """A baseline document could not be assembled or would leak host identity."""
 
 
+def runtime_kind(document: dict) -> str:
+    """Which daemon composition a capture document measured.
+
+    A document written before the field existed measured the Swift daemon, so
+    its absence is that answer rather than an unknown.
+    """
+
+    toolchain = document.get("toolchain")
+    if not isinstance(toolchain, dict):
+        return "swift"
+    kind = toolchain.get("runtimeKind")
+    return kind if isinstance(kind, str) and kind else "swift"
+
+
 def document_identity(runtime_kind: str) -> tuple[str, str]:
     """`(task, spike)` a capture of the given daemon composition belongs to."""
 
