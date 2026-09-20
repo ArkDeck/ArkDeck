@@ -63,6 +63,7 @@ pub(crate) fn answer_by_name(argv: &[String]) -> Option<Result<Invocation, CliEr
             method: command,
             params: None,
             json: false,
+            jsonl: false,
             raw: false,
             help: true,
             require_healthy: false,
@@ -196,6 +197,26 @@ fn pad(text: &str, width: usize) -> String {
         "{text:width$} ",
         width = width.saturating_sub(1).max(text.len())
     )
+}
+
+/// The output modes one leaf publishes, as the registry declares them. A leaf
+/// the registry does not name takes the two every Runtime leaf takes.
+pub fn output_modes(command: &str) -> Vec<String> {
+    let registry: Value = serde_json::from_str(REGISTRY).expect("the checked-in command registry");
+    registry["commands"]
+        .as_array()
+        .expect("the registry's commands")
+        .iter()
+        .find(|entry| entry["command"] == command)
+        .and_then(|entry| entry["outputModes"].as_array())
+        .map(|modes| {
+            modes
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::to_owned)
+                .collect()
+        })
+        .unwrap_or_else(|| vec!["human".to_owned(), "json".to_owned()])
 }
 
 /// Whether `path` names a node of the registry: some leaf's path begins with

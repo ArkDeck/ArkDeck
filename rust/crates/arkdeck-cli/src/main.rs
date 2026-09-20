@@ -115,6 +115,9 @@ fn execute(invocation: &Invocation, id: &str) -> Result<Value, CliError> {
     if invocation.command == "device.wait" {
         return wait_for_device(invocation, id, &endpoint, &identity);
     }
+    if invocation.command == "job.watch" {
+        return watch_job(invocation, id, &endpoint, &identity);
+    }
     if matches!(
         invocation.command,
         "agent.status"
@@ -327,6 +330,172 @@ fn stopped() -> CliError {
         "clientTimeout",
         "client stopped waiting; the Runtime execution and Job were not cancelled",
     )
+}
+
+/// Swift `RuntimeCLI.emitJobEventObservation` for `watch`: durable Job events
+/// are followed until the client's own deadline or an interruption, and never
+/// past either. Nothing here runs or cancels a Job.
+///
+/// The leaf has no terminal condition of its own — it ends in `clientTimeout`
+/// or `clientInterrupted` — so every line it writes is written as it goes, and
+/// the stream always closes with one terminal line in a machine mode.
+fn watch_job(
+    invocation: &Invocation,
+    id: &str,
+    endpoint: &LocalEndpoint,
+    identity: &ServerIdentity,
+) -> Result<Value, CliError> {
+    let params = invocation.params.clone().unwrap_or_default();
+    let mut stream = arkdeck_cli::EventStream::new(&params);
+    // No overall timeout was asked for: only this observation has a 30 s
+    // budget, counted from its first request and never renewed.
+    let deadline = Instant::now() + Duration::from_millis(invocation.timeout_ms.unwrap_or(30_000));
+    let stop = Interruption::install();
+    let interrupted = || {
+        CliError::new(
+            "clientInterrupted",
+            "client observation interrupted; the Job was not cancelled",
+        )
+    };
+    let timed_out = || {
+        CliError::new(
+            "clientTimeout",
+            "client observation timed out; the Job was not cancelled",
+        )
+    };
+    let check = |stop: &Interruption| -> Result<Duration, CliError> {
+        if stop.requested() {
+            return Err(interrupted());
+        }
+        let left = deadline.saturating_duration_since(Instant::now());
+        if left.is_zero() {
+            return Err(timed_out());
+        }
+        Ok(left)
+    };
+    // Swift's `pause`: the wait is cut into 50 ms steps so an interruption or
+    // the deadline is answered without waiting out the whole pause.
+    let pause = |stop: &Interruption, milliseconds: u64| -> Result<(), CliError> {
+        for _ in 0..(milliseconds / 50).max(1) {
+            let left = check(stop)?;
+            std::thread::sleep(Duration::from_millis(50).min(left));
+        }
+        check(stop).map(|_| ())
+    };
+    // The closure borrows the stream, and the answer it fails with is read
+    // from that same stream: it ends here, before the terminal line is built.
+    let mut failure = {
+        let mut follow = || -> Result<Value, CliError> {
+            loop {
+                let request = stream.request();
+                let mut attempt = 0;
+                let page = loop {
+                    let left = check(&stop)?;
+                    match Client::connect_bounded(endpoint, identity, left).and_then(
+                        |mut client| client.request(id, "job.events", Some(request.clone())),
+                    ) {
+                        Ok(page) => break page,
+                        Err(error) => {
+                            let error = CliError::from_client(error, "job.events");
+                            // Swift retries an unavailable Runtime twice, 100 ms
+                            // apart, before it gives the caller that answer.
+                            if error.code != "runtimeUnavailable" || attempt >= 2 {
+                                return Err(if error.code == "clientTimeout" {
+                                    timed_out()
+                                } else {
+                                    error
+                                });
+                            }
+                            attempt += 1;
+                            pause(&stop, 100)?;
+                        }
+                    }
+                };
+                stream.page(&page)?;
+                for row in page["items"].as_array().cloned().unwrap_or_default() {
+                    if let Some(delivered) = stream.row(&row)? {
+                        let sequence = stream.take_sequence();
+                        if invocation.jsonl {
+                            write_document(&arkdeck_cli::event_line(
+                                invocation.command,
+                                sequence,
+                                &delivered,
+                                id,
+                            ))
+                            .map_err(|_| {
+                                CliError::new("ioFailure", "the stream could not be written")
+                            })?;
+                        } else {
+                            println!(
+                                "{}",
+                                serde_json::to_string_pretty(&delivered).expect("a checked event")
+                            );
+                        }
+                    }
+                    check(&stop)?;
+                }
+                if stream.finish(&page)? {
+                    continue;
+                }
+                pause(&stop, 250)?;
+            }
+        };
+        follow().expect_err("this leaf ends only in a failure")
+    };
+    // Swift's `failStream`: the answer names the Job it was following and the
+    // cursor a caller could resume from, and in a machine mode the stream's own
+    // terminal line carries it before the process exits.
+    failure.command = Some(invocation.command);
+    failure
+        .details
+        .insert("jobId".into(), Value::String(stream.job().to_owned()));
+    if let Some(cursor) = stream.cursor() {
+        failure
+            .details
+            .insert("afterCursor".into(), Value::String(cursor.to_owned()));
+    }
+    if invocation.jsonl {
+        let line = arkdeck_cli::terminal_line(
+            invocation.command,
+            stream.take_sequence(),
+            id,
+            stream.last_cursor(),
+            Err(&failure),
+        );
+        let _ = write_document(&line);
+    }
+    Err(failure)
+}
+
+/// The stop an observation answers, where the host has one. Swift ignores
+/// SIGINT and watches it with a dispatch source; this catches SIGTERM with it,
+/// which ends the observation the same way rather than killing the process
+/// mid-line. A host without signals never reports a stop.
+struct Interruption {
+    #[cfg(unix)]
+    signal: Option<arkdeck_platform::StopSignal>,
+}
+
+impl Interruption {
+    fn install() -> Self {
+        Self {
+            #[cfg(unix)]
+            signal: arkdeck_platform::StopSignal::install().ok(),
+        }
+    }
+
+    fn requested(&self) -> bool {
+        #[cfg(unix)]
+        {
+            self.signal
+                .as_ref()
+                .is_some_and(arkdeck_platform::StopSignal::requested)
+        }
+        #[cfg(not(unix))]
+        {
+            false
+        }
+    }
 }
 
 /// Swift `RuntimeCLI.emitDeviceWait`: one connection, bounded by the client's

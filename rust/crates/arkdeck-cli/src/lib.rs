@@ -44,9 +44,10 @@ pub use agent_executions::{
 };
 pub use artifact_resources::validate_artifact_page;
 pub use command_registry::{
-    command_registry, command_registry_human, completion_script, help_text, is_node,
+    command_registry, command_registry_human, completion_script, help_text, is_node, output_modes,
 };
 pub use device_wait::{proved_row, wait_document, wait_request, wait_timeout};
+pub use job_events::{EventStream, event_line, terminal_line};
 pub use operation_validation::{
     bounded_input_document, input_findings, validation_attention, validation_document,
 };
@@ -60,6 +61,9 @@ pub struct Invocation {
     pub method: &'static str,
     pub params: Option<Map<String, Value>>,
     pub json: bool,
+    /// The one stream mode the registry publishes, for the two leaves that
+    /// follow durable events rather than answering one document.
+    pub jsonl: bool,
     pub raw: bool,
     pub help: bool,
     pub require_healthy: bool,
@@ -122,6 +126,7 @@ impl CliError {
             | "targetSelectionRequired"
             | "targetAmbiguous"
             | "targetTrustPending"
+            | "eventHistoryUnavailable"
             | "previewExpired" => 75,
             "clientInterrupted" => 130,
             _ => 70,
@@ -623,10 +628,13 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                             })?;
                     match argument.as_str() {
                         "--output" => {
-                            if !["human", "json"].contains(&value.as_str()) {
+                            // The option's own grammar is the registry's
+                            // enumeration; which of them this leaf serves is
+                            // its `outputModes`, judged once the path resolves.
+                            if !["human", "json", "jsonl"].contains(&value.as_str()) {
                                 return Err(CliError::new(
                                     "invalidOption",
-                                    "--output must be human or json",
+                                    "--output must be human, json or jsonl",
                                 ));
                             }
                             mode = Some(value.clone());
@@ -707,6 +715,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["job", "result"] => "job.result",
         ["job", "timeline"] => "job.timeline",
         ["job", "events"] => "job.events",
+        ["job", "watch"] => "job.watch",
         ["job", "plan"] => "job.plan",
         ["job", "submit"] => "job.submit",
         ["job", "run"] => "job.run",
@@ -807,6 +816,25 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             "invalidOption",
             "help renders human text only",
         ));
+    }
+    // Each leaf publishes the modes it serves, and the registry's `--output`
+    // enumeration is wider than any one of them (CLI spec §8.1).
+    if let Some(mode) = mode.as_deref()
+        && !help
+        && !command_registry::output_modes(command)
+            .iter()
+            .any(|published| published == mode)
+    {
+        let mut error = CliError::new(
+            "invalidOption",
+            format!(
+                "`{}` --output must be one of {}",
+                positional.join(" "),
+                command_registry::output_modes(command).join("|")
+            ),
+        );
+        error.command = Some(command);
+        return Err(error);
     }
     // Swift's `commands` leaf takes only `--output`: it never reaches a Runtime.
     if command == "commands" && (id.is_some() || socket.is_some()) {
@@ -1051,6 +1079,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         "capability.inspect" => &["capabilityId"],
         "job.timeline" => &["jobId", "pageSize", "cursor", "timeout"],
         "job.events" => &["jobId", "pageSize", "afterCursor", "timeout"],
+        "job.watch" => &["jobId", "pageSize", "afterCursor", "timeout"],
         "job.list" => &[
             "pageSize",
             "cursor",
@@ -1276,8 +1305,14 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
     } else {
         None
     };
+    let watch_timeout = if command == "job.watch" && !help {
+        job_events::configure_watch(&mut method_options)?
+    } else {
+        None
+    };
     let timeout_ms = read_only_resources::configure(command, &mut method_options, help)?
         .or(device_wait_timeout)
+        .or(watch_timeout)
         .or(import_timeout)
         .or(artifact_timeout)
         .or(target_timeout)
@@ -1308,6 +1343,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             "health"
         } else if command == "device.wait" {
             "device.observations"
+        } else if command == "job.watch" {
+            "job.events"
         } else {
             command
         },
@@ -1360,6 +1397,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                     | "job.evidence"
                     | "job.timeline"
                     | "job.events"
+                    | "job.watch"
                     | "job.plan"
                     | "job.submit"
                     | "job.run"
@@ -1386,6 +1424,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             None
         },
         json: mode.as_deref() == Some("json"),
+        jsonl: mode.as_deref() == Some("jsonl"),
         raw,
         help,
         require_healthy,
