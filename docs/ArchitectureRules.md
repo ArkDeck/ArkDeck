@@ -127,6 +127,9 @@ ClientKit 仍只依赖 Core，依赖图保持无环。CLI 经 Workflows → Clie
 本地诊断包导出的契约（`RuntimeSupportBundlePreview`、`RuntimeSupportBundleExportReceipt`、`RuntimeSupportBundleServiceError`、
 `RuntimeSupportBundleProviding`）也在 ClientKit，CLI 经这条边直接用；经 Storage 读本机文件的生产 provider 与
 `RuntimeSupportBundleApplicationFacade.make()` 留在 Workflows。
+诊断会话的只读读取器（`DiagnosticSessionReading` 的展示模型、`DiagnosticSessionApplicationReader` 与离线巡检 `DiagnosticSessionOfflineInspector`）
+也在 ClientKit，CLI 经过渡边共用；hilog 摘要的展示模型在 ClientKit，而校验它的 `DiagnosticHilogSummaryReader` 留在 Workflows——
+它要用 analyzer provider 的 `HilogSummaryDerivedAnalyzer` 验报告，ClientKit 够不着。
 
 ## 3. Ownership Rules(事实源唯一)
 

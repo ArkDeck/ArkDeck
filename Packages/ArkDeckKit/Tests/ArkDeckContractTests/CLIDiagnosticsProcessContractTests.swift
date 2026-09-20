@@ -4,6 +4,7 @@ import XCTest
 
 @testable import ArkDeckAgentDaemon
 @testable import ArkDeckCLI
+@testable import ArkDeckClientKit
 @testable import ArkDeckCore
 @testable import ArkDeckRuntime
 @testable import ArkDeckStorage
