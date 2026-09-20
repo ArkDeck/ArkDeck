@@ -2052,6 +2052,35 @@ pub fn fresh_id() -> io::Result<String> {
     ))
 }
 
+/// Swift's `RuntimeWorkspaceToolchainPinning` over its
+/// `BootstrapDevEcoToolchainRegistry`: a workspace preset's pin on its DevEco
+/// toolchain, held by the preset in the registry at `bootstrap`. A refusal
+/// keeps the registry's code and message, as Swift rethrows it.
+#[cfg(target_os = "macos")]
+pub(crate) fn toolchain_pinning(
+    bootstrap: &std::path::Path,
+) -> io::Result<arkdeck_hoststore::WorkspaceToolchainPinning> {
+    let acquiring = std::sync::Arc::new(arkdeck_hoststore::DevEcoRegistryStore::open_existing(
+        bootstrap,
+    )?);
+    let releasing = std::sync::Arc::clone(&acquiring);
+    Ok(arkdeck_hoststore::WorkspaceToolchainPinning {
+        acquire: Box::new(move |reference, generation, preset| {
+            acquiring
+                .acquire(
+                    reference,
+                    &generation.to_string(),
+                    "workspacePreset",
+                    preset,
+                )
+                .map(|_| ())
+        }),
+        release: Box::new(move |reference, preset| {
+            releasing.release(reference, "workspacePreset", preset)
+        }),
+    })
+}
+
 pub(crate) fn utc_now() -> String {
     timestamp(
         SystemTime::now()

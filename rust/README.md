@@ -1903,7 +1903,11 @@ intent is written first, completed by the next access if the process dies, and
 abandoned if a pin is refused. The pins go through the
 `WorkspaceToolchainPinning` and `WorkspaceCredentialPinning` owners the
 composition root passes to `with_dependency_pinning`. The isolated daemon
-passes none yet, so such a preset is refused as Swift refuses it without them.
+passes the toolchain owner: `DevEcoRegistryStore::acquire/release`
+(`tool_retirement::pins`) hold a preset's pin in its own bootstrap registry,
+as Swift's `BootstrapDevEcoToolchainRegistry` holds it, and retirement refuses
+a pinned toolchain. It passes no credential owner yet, so a signing preset is
+refused as Swift refuses it without one.
 `AgentDaemonContractTests.testWorkspacePresetAndProjectMutationControlFramesRecordTheirRefusals`
 is the Swift oracle, and `tests/workspace_mutation_oracle.rs` replays its 78
 frames in order.
