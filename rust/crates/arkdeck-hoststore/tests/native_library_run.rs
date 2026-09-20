@@ -1,12 +1,10 @@
 //! Replays the Swift native-library oracle
 //! (`rust/tests/fixtures/deploy-native-library`, recorded by
 //! `NativeLibraryOracleContractTests` over the shared fake HDC) through the
-//! production Rust planner, admitter, runner, result reader and capability
-//! reads, under the durable mutation authority the pointer, port-rule and
-//! debug HAP replays run under, and its cleanup debt list, up to its cleanup
-//! debt continuation (`cleanupDebt.continue`, not served by this Runtime).
-//! Every exchange but it and the list after it answers as Swift answered it,
-//! message included:
+//! production Rust planner, admitter, runner, result reader, cleanup debt
+//! list and continuation, and capability reads, under the durable mutation
+//! authority the pointer, port-rule and debug HAP replays run under. Every
+//! exchange answers as Swift answered it, message included:
 //! - the deployments. The library is verified on the host, sent into the
 //!   Job's owned staging with the code-sign helper and believed only through
 //!   its staging readback, backed up, published by the helper with its
@@ -19,15 +17,19 @@
 //!   fails with its original failure;
 //! - the debt. A cleanup that removes nothing is skipped and owed in the
 //!   cleanup debt ledger with the exact action that failed, and its Job
-//!   succeeds with the residue counted; `cleanupDebt.list` lists it.
+//!   succeeds with the residue counted; `cleanupDebt.list` lists it;
+//! - its continuation, with the fake answering normally again. The
+//!   succeeded Job is loaded as restart recovery loads it (its record marked
+//!   `recovered: journal clean`), the readback finds the staging present, the
+//!   one retry is made durable and removes and reads it absent under the use
+//!   the Job consumed, and the debt is settled, the residue counted 0 and the
+//!   list empty.
 //!
 //! Each Job consumes its one capability use before its send, every later
 //! mutation and the compensations run under it, and it is settled with the
-//! Job. The fake receives Swift's first 210 calls in order (the rest are the
-//! continuation's), and everything the replay leaves below the root is
-//! Swift's byte for byte: the four Jobs the continuation does not touch with
-//! their persist counts, the one it settles as it stood before it, and the
-//! ledger without its settlement members.
+//! Job; the continuation consumes none. The fake receives Swift's 225 calls
+//! in order, and everything the replay leaves below the root is Swift's byte
+//! for byte.
 //!
 //! Three more tests fault what no oracle records, each on the loader failure
 //! the oracle does record: a rollback that does not restore the previous
@@ -48,23 +50,16 @@ use std::time::Duration;
 use support::debug_hap;
 use support::hdc_oracle::{self, Owners, exchange};
 
-/// The fake's calls Swift's runs made before its continuation.
-const CALLS: usize = 210;
-/// The run whose debt the continuation settles.
-const CONTINUED: [&str; 1] = ["cleanupFailure"];
-/// Every exchange but the continuation and the list after it: nine plans,
-/// five submissions, five runs and a refused rerun, the three reads of each
-/// Job, the list of the debt, and the two capability reads.
-const EXCHANGES: usize = 38;
+/// Every call Swift's runs and its continuation made.
+const CALLS: usize = 225;
+/// Every exchange: nine plans, five submissions, five runs and a refused
+/// rerun, the three reads of each Job, the list of the debt, its
+/// continuation and the list after it, and the two capability reads.
+const EXCHANGES: usize = 40;
 
 #[test]
 fn rust_runs_every_swift_native_library_deployment_as_swift_does() {
-    hdc_oracle::assert_replays_before_continuations(
-        "deploy-native-library",
-        &CONTINUED,
-        EXCHANGES,
-        CALLS,
-    );
+    hdc_oracle::assert_replays("deploy-native-library", EXCHANGES, CALLS);
 }
 
 /// What a fault does to the one command it names: a rollback's move that

@@ -105,8 +105,21 @@ Two earlier runs used the same commands over `282d1bdc`, before the rebase:
 
 ## CI
 
-The PR's checks (`guard` and the `swift` aggregate with the rust lane) are the gate. Their run id and
-conclusion go into this record with the next slice.
+PR #2047, head `a54c4852`, all green. It merged on 2026-09-19 as `aec690f2`.
+
+| Check | Run | Conclusion |
+| --- | --- | --- |
+| SDD Guard `guard` | 35448949866 | success |
+| Swift CI `plan` | 35448949993 | success |
+| Rust host-independent checks | 35448949993 | success |
+| Rust workspace, `ubuntu-latest` | 35448949993 | success |
+| Rust workspace, `macos-26` | 35448949993 | success |
+| Rust workspace, `windows-latest` | 35448949993 | success |
+| `swift` aggregate | 35448949993 | success |
+
+`swift-tests`, `app-build` and `ds-interactions` were not selected for this diff and were skipped.
+These rows were added by the `cleanupDebt.continue` slice, since the PR merged as soon as it was
+green.
 
 ## Not run
 

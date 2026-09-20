@@ -207,7 +207,8 @@ pub trait HostServices: Send + Sync {
         })
     }
     /// `cleanupDebt.list` reads the Job cleanup debt ledger beside the
-    /// Artifacts. A host without an Artifact owner answers as the read-only
+    /// Artifacts, and `cleanupDebt.continue` continues one of its debts. A
+    /// host without the Artifact and Job owners answers as the read-only
     /// foundation always has.
     fn cleanup_debt(
         &self,
@@ -1041,8 +1042,7 @@ impl<H: HostServices> Control<H> {
                 id: request.id.clone(),
                 outcome: self.host.capability_resource(&request.method, &params),
             },
-            // Swift reads no parameter of a list request.
-            "cleanupDebt.list" => Response {
+            "cleanupDebt.list" | "cleanupDebt.continue" => Response {
                 id: request.id.clone(),
                 outcome: self.host.cleanup_debt(&request.method, &params),
             },

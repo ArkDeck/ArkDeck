@@ -2,16 +2,14 @@
 //! (`HDCOracleFake`, at the fixed root `support/debug_hap.rs` rebuilds) share
 //! when their Jobs mutate a device under Runtime capabilities: the owners a
 //! daemon composes over that root, the code-sign helper where the oracle
-//! composed one, and the replay of every recorded request but the oracle's
-//! cleanup debt continuations (`cleanupDebt.continue`, not served by this
-//! Runtime) and the list that follows them, each run while the fake answers
-//! in the mode the oracle names with its application state cleared first, as
-//! each oracle clears it. What the replay leaves is Swift's byte for byte, the
-//! Jobs whose debts the continuations settle and the ledger as they stood
-//! before them.
+//! composed one, and the replay of every recorded request, each run while the
+//! fake answers in the mode the oracle names — its application state cleared
+//! first before a Job's run, as each oracle clears it, and left as the runs
+//! left it for the cleanup debt continuations. What the replay leaves is
+//! Swift's byte for byte.
 use super::native_library::code_sign_helper;
 use super::{OracleProbe, debug_hap, document, fixed_now, fixed_precise_now};
-use arkdeck_contract::sha256_hex;
+use arkdeck_contract::{sha256_hex, validate_method_value};
 use arkdeck_hoststore::{
     ArtifactReadStore, CapabilityStore, DeviceHolds, HdcComposition, JobAdmitter, JobPlanner,
     JobResultReader, JobRunner, JobStore, MutationAuthority, MutationExecution, SessionPublisher,
@@ -27,10 +25,6 @@ use std::path::{Path, PathBuf};
 /// it runs: whether a package is installed, whether the ability runs, and
 /// whether a new native library is published.
 const APPLICATION_STATE: [&str; 3] = ["device-installed", "device-running", "device-published"];
-/// What a continuation adds to the ledger record it settles.
-const SETTLEMENT: [&str; 2] = ["retryAttemptStartedAtUTC", "settledAtUTC"];
-/// A continuation's persists of its Job: its recovery load and its residue.
-const CONTINUATION_PERSISTS: i64 = 2;
 
 pub fn refused(code: &str, message: String, details: Option<Map<String, Value>>) -> Value {
     let mut error = json!({"code": code, "message": message});
@@ -45,6 +39,20 @@ pub fn proven() -> Map<String, Value> {
         ("phase".into(), json!("preAdmission")),
         ("newDispatchCount".into(), json!(0)),
     ])
+}
+
+/// An answer as the daemon's control layer admits it: a result under the
+/// method's result schema, a refusal's code and details under its own.
+pub fn assert_conforms(method: &str, answer: &Value) {
+    let conforms = if answer["ok"] == true {
+        validate_method_value(method, "result", &answer["result"]).is_ok()
+    } else {
+        validate_method_value(method, "errorCode", &answer["error"]["code"]).is_ok()
+            && answer["error"].get("details").is_none_or(|details| {
+                validate_method_value(method, "errorDetails", details).is_ok()
+            })
+    };
+    assert!(conforms, "{method}: {answer}");
 }
 
 pub fn exchange<'a>(cases: &'a Value, name: &str) -> &'a Value {
@@ -213,61 +221,26 @@ impl Owners {
         for state in APPLICATION_STATE {
             let _ = fs::remove_file(self.root.join(state));
         }
+        self.set_mode(mode);
+    }
+
+    /// The fake answers in `mode` from now on, over the application state the
+    /// runs left (Swift `HDCOracleFake.setMode`).
+    pub fn set_mode(&self, mode: &str) {
         fs::write(self.root.join("hdc-mode"), format!("{mode}\n")).unwrap();
     }
 }
 
-/// A fixture file as it stood before the continuations settled their debts:
-/// the ledger without its settlement members, and a continued Job's record
-/// without its recovery load's timeline entry and with its residue still
-/// owed.
-fn before_continuations(path: &str, bytes: Vec<u8>, continued: &[String]) -> Vec<u8> {
-    if path == "artifacts/cleanup-debt.json" {
-        let text = String::from_utf8(bytes).unwrap();
-        let kept: Vec<&str> = text
-            .split('\n')
-            .filter(|line| {
-                !SETTLEMENT
-                    .iter()
-                    .any(|key| line.trim_start().starts_with(&format!("\"{key}\"")))
-            })
-            .collect();
-        return kept.join("\n").into_bytes();
-    }
-    if continued
-        .iter()
-        .any(|job| path == format!("store/jobs/{job}/job-record.json"))
-    {
-        let text = String::from_utf8(bytes).unwrap();
-        let recovered = ",\n    \"recovered: journal clean\"\n  ]";
-        let settled = "\"outstandingResidueCount\" : 0,";
-        assert!(text.contains(recovered) && text.contains(settled), "{path}");
-        return text
-            .replace(recovered, "\n  ]")
-            .replace(settled, "\"outstandingResidueCount\" : 1,")
-            .into_bytes();
-    }
-    bytes
-}
-
-/// Every recorded request of the oracle `name` but its cleanup debt
-/// continuations and the lists after them, answered in order by the Rust
+/// Every recorded request of the oracle `name`, answered in order by the Rust
 /// owners: `exchanges` of them, each answered as Swift answered it, message
-/// included; the list before them lists the debts its runs owe. The fake must have
-/// received Swift's first `calls` calls, each Job must have consumed its one
-/// use before its first mutation (every later mutation of its run continued
-/// under it), and everything the replay leaves below the root must be
-/// Swift's byte for byte: for the Jobs of the `continued` cases, whose debts
-/// the continuations settle, their record and index row as they stood
-/// before (the continuation's recovery load appends `recovered: journal
-/// clean`, and its two persists count the settled residue), and the ledger
-/// without its settlement members.
-pub fn assert_replays_before_continuations(
-    name: &str,
-    continued: &[&str],
-    exchanges: usize,
-    calls: usize,
-) {
+/// included, the cleanup debt lists and continuations among them. The fake
+/// must have received Swift's `calls` calls in order, each Job must have
+/// consumed its one use before its first mutation (every later mutation of
+/// its run, and a continuation's retry, continued under it), and everything
+/// the replay leaves below the root must be Swift's byte for byte: a
+/// continued Job's record with its recovery load's `recovered: journal
+/// clean` and its settled residue, and the ledger with its settlements.
+pub fn assert_replays(name: &str, exchanges: usize, calls: usize) {
     let _lock = debug_hap::exclusive();
     let fixture = super::fixture(name);
     let cases = document(&fixture, "cases.json");
@@ -280,13 +253,9 @@ pub fn assert_replays_before_continuations(
         jobs: &owners.jobs,
         artifacts: &owners.artifacts,
     };
-    let (mut differences, mut replayed, mut continued_yet) = (Vec::new(), 0, false);
+    let (mut differences, mut replayed) = (Vec::new(), 0);
     for exchange in cases["exchanges"].as_array().unwrap() {
         let (name, method) = (&exchange["name"], exchange["method"].as_str().unwrap());
-        continued_yet |= method == "cleanupDebt.continue";
-        if continued_yet && method.starts_with("cleanupDebt.") {
-            continue;
-        }
         replayed += 1;
         let params = exchange["params"].as_object().unwrap();
         let actual = match method {
@@ -340,8 +309,24 @@ pub fn assert_replays_before_continuations(
                 Ok(result) => json!({"ok": true, "result": result}),
                 Err(message) => refused("internalError", message, None),
             },
+            // The oracle continues its debts over the state its runs left,
+            // in the mode it names.
+            "cleanupDebt.continue" => {
+                if let Some(mode) = exchange["mode"].as_str() {
+                    owners.set_mode(mode);
+                }
+                match runner.continue_cleanup_debt(params) {
+                    Ok(result) => json!({"ok": true, "result": result}),
+                    Err(error) => refused(&error.code, error.message, error.details),
+                }
+            }
             other => panic!("{name}: the oracle sent {other}"),
         };
+        // What the daemon would answer passes the method's published
+        // contract, as its control layer requires of every answer.
+        if method.starts_with("cleanupDebt.") {
+            assert_conforms(method, &actual);
+        }
         if actual != exchange["answer"] {
             differences.push(format!(
                 "{name}:\n  swift {}\n  rust  {actual}",
@@ -350,15 +335,12 @@ pub fn assert_replays_before_continuations(
         }
     }
     assert!(differences.is_empty(), "{}", differences.join("\n"));
-    assert_eq!(
-        replayed, exchanges,
-        "every exchange but the continuations and the lists after them"
-    );
+    assert_eq!(replayed, exchanges, "every exchange");
 
-    // The fake received Swift's calls, in order, up to the continuations.
+    // The fake received Swift's calls, in order.
     let swift = fs::read_to_string(fixture.join("hdc-invocations.log")).unwrap();
-    let before: String = swift.split_inclusive('\n').take(calls).collect();
-    assert_eq!(owners.calls(), before, "the fake's calls");
+    assert_eq!(swift.lines().count(), calls);
+    assert_eq!(owners.calls(), swift, "the fake's calls");
     assert_eq!(
         fs::read(owners.root.join("targets-state/targets.json")).unwrap(),
         fs::read(fixture.join("targets-state/targets.json")).unwrap(),
@@ -366,7 +348,7 @@ pub fn assert_replays_before_continuations(
     );
 
     // Each Job consumed its one use before its first mutation; every later
-    // mutation of its run continued under it.
+    // mutation of its run, and a continuation's retry, continued under it.
     for (case, job) in cases["jobs"].as_object().unwrap() {
         let timeline = owners.record(job.as_str().unwrap())["timeline"].clone();
         let consumed = timeline
@@ -378,10 +360,6 @@ pub fn assert_replays_before_continuations(
         assert_eq!(consumed, 1, "{case}");
     }
 
-    let continued: Vec<String> = continued
-        .iter()
-        .map(|case| cases["jobs"][case].as_str().unwrap().to_owned())
-        .collect();
     let Owners {
         jobs,
         root,
@@ -389,25 +367,5 @@ pub fn assert_replays_before_continuations(
         ..
     } = owners;
     drop(jobs);
-    super::assert_leftovers_with(
-        &fixture,
-        &root,
-        &default_root,
-        |path, bytes| before_continuations(path, bytes, &continued),
-        |index| {
-            // A continued Job's row as its last persist before them left it:
-            // an earlier version, holding the record as it stood.
-            for row in index["rows"].as_array_mut().unwrap() {
-                let Some(job) = continued.iter().find(|job| row["jobId"] == job.as_str()) else {
-                    continue;
-                };
-                let version = row["version"].as_i64().unwrap();
-                row["version"] = json!(version - CONTINUATION_PERSISTS);
-                let path = format!("store/jobs/{job}/job-record.json");
-                let record = fs::read(fixture.join(&path)).unwrap();
-                row["recordSHA256"] =
-                    json!(sha256_hex(&before_continuations(&path, record, &continued)));
-            }
-        },
-    );
+    super::assert_leftovers_at(&fixture, &root, &default_root);
 }

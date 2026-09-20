@@ -5,9 +5,8 @@
 //! replays run under: the account-fixed Job root, each Job's one capability
 //! use consumed before its first mutation's intent and continued by every
 //! later mutation and compensation of the same run, and the use settled once
-//! the Job is terminal or parked. Every exchange but the cleanup debt
-//! continuations (`cleanupDebt.continue`, not served by this Runtime) and the
-//! list after them answers as Swift answered it, message included:
+//! the Job is terminal or parked. Every exchange answers as Swift answered
+//! it, message included:
 //! - the success lanes: a HAP debugged on its own and with an additional
 //!   package, sent into the Job's owned staging, installed and started as
 //!   dispatches the package and process readbacks believe, its HiLog read,
@@ -21,14 +20,15 @@
 //!   and a staging cleanup that fails as a required one are each owed in the
 //!   cleanup debt ledger with the exact action that failed, and
 //!   `cleanupDebt.list` lists both;
-//! - an empty HiLog capture, which parks its Job with its intent outstanding.
+//! - an empty HiLog capture, which parks its Job with its intent outstanding;
+//! - the continuations, with the fake answering normally: the bundle's then
+//!   the path's. Each Job is loaded as restart recovery loads it (its record
+//!   marked `recovered: journal clean`), the readback finds the residue still
+//!   there, the one retry is made durable and uninstalls or removes it under
+//!   the use the Job consumed, and the debt is settled and the list empty.
 //!
-//! The fake receives Swift's first 103 calls in order, and everything the
-//! replay leaves below the root is Swift's byte for byte. For the two Jobs
-//! whose debts the continuations later settle, that is their record and index
-//! row as they stood before (the continuation's recovery load appends
-//! `recovered: journal clean`, and its two persists count the settled
-//! residue), and the ledger without its two settlement members.
+//! The fake receives Swift's 108 calls in order, and everything the replay
+//! leaves below the root is Swift's byte for byte.
 //!
 //! More tests take what no oracle records. Four hold the runner to its
 //! authority: evidence a run did not consume itself is never continued, a
@@ -53,18 +53,16 @@ use support::debug_hap;
 use support::fixed_now;
 use support::hdc_oracle::{self, Owners, exchange};
 
-/// The fake's calls Swift's runs made before its continuations.
-const CALLS: usize = 103;
-/// The runs whose debts the continuations settle.
-const CONTINUED: [&str; 2] = ["stillInstalled", "cleanupDebt"];
+/// Every call Swift's runs and continuations made.
+const CALLS: usize = 108;
 
-/// Every recorded request but the continuations and the list after them,
-/// answered in order by the Rust owners. Every answer must be Swift's, its
-/// message included, and so must each call the fake received, the Target
-/// document and everything the replay leaves below the root.
+/// Every recorded request, answered in order by the Rust owners. Every
+/// answer must be Swift's, its message included, and so must each call the
+/// fake received, the Target document and everything the replay leaves below
+/// the root.
 #[test]
 fn rust_runs_every_swift_debug_hap_as_swift_does() {
-    hdc_oracle::assert_replays_before_continuations("debug-hap", &CONTINUED, 60, CALLS);
+    hdc_oracle::assert_replays("debug-hap", 63, CALLS);
 }
 
 /// The installed case admitted as Swift admitted it, with the fake in `mode`.

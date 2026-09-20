@@ -21,6 +21,7 @@ use crate::capability_store::{CapabilityQuery, Effect, UseOutcome};
 use crate::device_facts::{self, DeviceFacts};
 use crate::job_admission::MutationAuthority;
 use crate::job_plan::JobPlanner;
+use crate::job_record::JobRecord;
 use crate::job_run::{JobRunner, Run, RunRefusal, uncertain};
 use crate::operation_catalog::CatalogOperation;
 use crate::operation_request::OperationRequest;
@@ -86,53 +87,13 @@ impl JobRunner<'_> {
                 ));
             }
         }
-        owner
-            .authority
-            .require_state(self.jobs)
-            .map_err(|e| reject(e.message))?;
-        let request = OperationRequest::decode(
-            &serde_json::to_vec(&run.record.request).map_err(|e| reject(e.to_string()))?,
-        )
-        .map_err(|_| reject("the persisted request is unreadable".into()))?;
-        let capability = request
-            .capability_id
-            .as_deref()
-            .ok_or_else(|| reject("mutation has no runtime capability reference".into()))?;
-        device_facts::validate(facts, &request.target_id, request.expected_binding_revision)
-            .map_err(|s| reject(s.into()))?;
-        let planner = JobPlanner {
-            imports: self.imports,
-            artifacts: Some(self.artifacts),
-            analyzer: self.analyzer,
-            state_root: owner.state_root,
-            hdc: self.hdc,
-        };
-        let fresh = planner
-            .materialized(&request, descriptor)
-            .map_err(|_| reject("fresh typed plan could not be materialized".into()))?;
-        if Some(fresh.digest.as_str()) != run.record.materialized_plan()
-            || fresh.identity.as_deref() != run.record.materialized_identity()
-            || fresh.binding_revision != run.record.materialized_binding()
-            || Some(facts.identity.as_str()) != fresh.identity.as_deref()
-            || Some(facts.binding_revision) != fresh.binding_revision
-        {
-            return Err(reject(
-                "fresh typed plan, target or binding drifted before dispatch".into(),
-            ));
-        }
-        let query = CapabilityQuery {
-            operation_id: descriptor.id().into(),
-            operation_version: descriptor.version(),
-            effect: Effect::DeviceMutation,
-            target_stable_identity_sha256: fresh.identity,
-            target_binding_revision: fresh.binding_revision,
-            plan_digest: Some(fresh.digest.clone()),
-            inputs: capability_policy::subject(descriptor, &request.inputs),
-            artifact_facts: fresh.artifact_facts.clone(),
-            workspace_identity_sha256: None,
-            workspace_revision: None,
-            workspace_file_scopes_digest: None,
-        };
+        let FreshUse {
+            request,
+            capability,
+            fresh,
+            query,
+        } = self.fresh_use(&owner, &run.record, descriptor, facts)?;
+        let capability = capability.as_str();
         let store = owner.authority.capabilities;
         if let Some(evidence) = persisted {
             // Swift's persisted-evidence arm: the state proven once more at
@@ -162,28 +123,15 @@ impl JobRunner<'_> {
                 let now = run
                     .clock()
                     .map_err(|_| reject("Runtime clock unavailable".into()))?;
-                let receipt = store
-                    .validate_continuation(
-                        capability,
-                        &request.idempotency_key,
-                        &run.record.job_id,
-                        &query,
-                        &now,
-                    )
-                    .map_err(|e| {
-                        reject(format!("capability denied before mutation: {}", e.swift()))
-                    })?;
-                let correlation = &evidence["runtimeCapabilityCorrelation"];
-                let step_set = crate::job_plan::step_set_digest(descriptor, &request.inputs)
-                    .map_err(|_| reject("complete step set could not be materialized".into()))?;
-                if evidence["consumptionFingerprintSHA256"]
-                    != receipt.query_fingerprint_sha256.as_str()
-                    || correlation["useOrdinal"].as_i64() != Some(receipt.ordinal)
-                    || correlation["reservationID"] != receipt.reservation_id.as_str()
-                    || correlation["stepSetDigestSHA256"] != step_set.as_str()
-                {
-                    return Err("compensation capability correlation drifted".into());
-                }
+                self.continuation_correlates(
+                    &run.record,
+                    descriptor,
+                    &evidence,
+                    capability,
+                    &request,
+                    &query,
+                    &now,
+                )?;
             }
             return Ok(MutationConsumption::Held);
         }
@@ -288,5 +236,196 @@ impl JobRunner<'_> {
                 &run.clock()?,
             )
             .map_err(|_| uncertain())
+    }
+}
+
+/// What every use of a Job's capability proves first, whether a run consumes
+/// it now or the Job already holds it: the persisted request names the
+/// capability, the Target facts hold for it, and the whole typed plan
+/// materialized again against them is the plan, identity and binding the
+/// Job's admission materialized. The query is what the store judges.
+struct FreshUse<'a> {
+    request: OperationRequest,
+    capability: String,
+    fresh: crate::job_plan::Materialized<'a>,
+    query: CapabilityQuery,
+}
+
+impl<'a> JobRunner<'a> {
+    fn fresh_use(
+        &self,
+        owner: &MutationExecution<'a>,
+        record: &JobRecord,
+        descriptor: &CatalogOperation,
+        facts: &DeviceFacts,
+    ) -> Result<FreshUse<'a>, String> {
+        let reject = |detail: String| format!("authorizationRequired: {detail}");
+        owner
+            .authority
+            .require_state(self.jobs)
+            .map_err(|e| reject(e.message))?;
+        let request = OperationRequest::decode(
+            &serde_json::to_vec(&record.request).map_err(|e| reject(e.to_string()))?,
+        )
+        .map_err(|_| reject("the persisted request is unreadable".into()))?;
+        let capability = request
+            .capability_id
+            .clone()
+            .ok_or_else(|| reject("mutation has no runtime capability reference".into()))?;
+        device_facts::validate(facts, &request.target_id, request.expected_binding_revision)
+            .map_err(|s| reject(s.into()))?;
+        let planner = JobPlanner {
+            imports: self.imports,
+            artifacts: Some(self.artifacts),
+            analyzer: self.analyzer,
+            state_root: owner.state_root,
+            hdc: self.hdc,
+        };
+        let fresh = planner
+            .materialized(&request, descriptor)
+            .map_err(|_| reject("fresh typed plan could not be materialized".into()))?;
+        if Some(fresh.digest.as_str()) != record.materialized_plan()
+            || fresh.identity.as_deref() != record.materialized_identity()
+            || fresh.binding_revision != record.materialized_binding()
+            || Some(facts.identity.as_str()) != fresh.identity.as_deref()
+            || Some(facts.binding_revision) != fresh.binding_revision
+        {
+            return Err(reject(
+                "fresh typed plan, target or binding drifted before dispatch".into(),
+            ));
+        }
+        let query = CapabilityQuery {
+            operation_id: descriptor.id().into(),
+            operation_version: descriptor.version(),
+            effect: Effect::DeviceMutation,
+            target_stable_identity_sha256: fresh.identity.clone(),
+            target_binding_revision: fresh.binding_revision,
+            plan_digest: Some(fresh.digest.clone()),
+            inputs: capability_policy::subject(descriptor, &request.inputs),
+            artifact_facts: fresh.artifact_facts.clone(),
+            workspace_identity_sha256: None,
+            workspace_revision: None,
+            workspace_file_scopes_digest: None,
+        };
+        Ok(FreshUse {
+            request,
+            capability,
+            fresh,
+            query,
+        })
+    }
+
+    /// Swift `validateContinuation` for a debug HAP compensation: the use is
+    /// still the Job's own, unsettled, for the same query and still
+    /// authorized, and correlated as it was consumed.
+    #[allow(clippy::too_many_arguments)]
+    fn continuation_correlates(
+        &self,
+        record: &JobRecord,
+        descriptor: &CatalogOperation,
+        evidence: &serde_json::Value,
+        capability: &str,
+        request: &OperationRequest,
+        query: &CapabilityQuery,
+        now: &str,
+    ) -> Result<(), String> {
+        let reject = |detail: String| format!("authorizationRequired: {detail}");
+        let store = self
+            .mutation
+            .ok_or_else(|| reject("Runtime mutation owner is unavailable".into()))?
+            .authority
+            .capabilities;
+        let receipt = store
+            .validate_continuation(
+                capability,
+                &request.idempotency_key,
+                &record.job_id,
+                query,
+                now,
+            )
+            .map_err(|e| reject(format!("capability denied before mutation: {}", e.swift())))?;
+        let correlation = &evidence["runtimeCapabilityCorrelation"];
+        let step_set = crate::job_plan::step_set_digest(descriptor, &request.inputs)
+            .map_err(|_| reject("complete step set could not be materialized".into()))?;
+        if evidence["consumptionFingerprintSHA256"] != receipt.query_fingerprint_sha256.as_str()
+            || correlation["useOrdinal"].as_i64() != Some(receipt.ordinal)
+            || correlation["reservationID"] != receipt.reservation_id.as_str()
+            || correlation["stepSetDigestSHA256"] != step_set.as_str()
+        {
+            return Err("compensation capability correlation drifted".into());
+        }
+        Ok(())
+    }
+
+    /// Swift `consumeCapabilityBeforeMutation`'s persisted-evidence arm for a
+    /// Job no run holds: a cleanup debt's retry (`continueCleanupDebt`)
+    /// dispatches under the use the Job consumed once every fresh check has
+    /// passed again, and consumes nothing. A debug HAP still finalizing or
+    /// reconciling also proves the use is still its own. Swift would consume
+    /// a new use for a Job without that evidence, which no Rust runner leaves
+    /// owing a debt; it is refused here.
+    pub(crate) fn continue_held_use(
+        &self,
+        record: &JobRecord,
+        descriptor: &CatalogOperation,
+        facts: &DeviceFacts,
+        now: &str,
+    ) -> Result<(), String> {
+        let reject = |detail: String| format!("authorizationRequired: {detail}");
+        let owner = self
+            .mutation
+            .ok_or_else(|| reject("Runtime mutation owner is unavailable".into()))?;
+        let _reservation_guard = owner
+            .authority
+            .holds
+            .mutation_reservation_guard()
+            .map_err(&reject)?;
+        let dispatcher = self
+            .hdc
+            .ok_or_else(|| reject("Runtime HDC owner unavailable".into()))?;
+        if !dispatcher.dispatch.mutation_identity_current() {
+            return Err(reject("fresh tool identity cannot be proved".into()));
+        }
+        let Some(evidence) = record.admission_evidence().cloned() else {
+            return Err(reject(
+                "the Job holds no persisted mutation evidence".into(),
+            ));
+        };
+        if evidence["kind"] != "runtimeCapability"
+            || evidence["reference"] != record.request["authorization"]["capabilityId"]
+        {
+            return Err(reject(
+                "persisted admission evidence does not match the mutation".into(),
+            ));
+        }
+        let FreshUse {
+            request,
+            capability,
+            query,
+            ..
+        } = self.fresh_use(&owner, record, descriptor, facts)?;
+        owner
+            .authority
+            .require_state(self.jobs)
+            .map_err(|e| reject(e.message))?;
+        if !dispatcher.dispatch.mutation_identity_current() {
+            return Err(reject(
+                "fresh tool identity drifted before consumption".into(),
+            ));
+        }
+        if descriptor.reference() == "debug.hap@1"
+            && matches!(record.state.as_str(), "finalizing" | "reconciling")
+        {
+            self.continuation_correlates(
+                record,
+                descriptor,
+                &evidence,
+                &capability,
+                &request,
+                &query,
+                now,
+            )?;
+        }
+        Ok(())
     }
 }
