@@ -2,27 +2,36 @@
 //! `RuntimeHDCControlActionStore` (CHG-2026-074, TASK-XPA-014): the Runtime's
 //! HDC control-action owner, which the daemon composes once its HDC server
 //! host has started, in its private `hdc-control-actions` directory. It
-//! answers `runtime.hdc.impact-preview` — a durable action for one exact
-//! restart intent, observed once into an immutable preview — and the records
-//! `control-action.list`, `.show` and `.reconcile` read through the union
-//! owner (`control_action.rs`).
+//! answers `runtime.hdc.impact-preview` (a durable action for one exact
+//! restart intent, observed once into an immutable preview),
+//! `runtime.hdc.restart` (the impact approval of that preview, requested of
+//! a person) and the records `control-action.list`, `.show` and `.reconcile`
+//! read through the union owner (`control_action.rs`); the approvals it holds
+//! are what the human-action owner lists for a `controlAction` owner
+//! (`human_action.rs`).
 //!
-//! What is here is what an action holds before anyone asks to restart:
+//! What is here is what an action holds until a person answers its approval:
 //! the intent and its fingerprint (`HDCControlActionIntent`), the impact and
 //! its preview with their canonical collections and digest
 //! (`HDCControlImpact`, `HDCControlActionPreview`), the record in the states
-//! `observing`, `previewReady`, `blocked`, `expired` and `previewDrifted`
-//! (`HDCControlActionRecord`), the store's transaction lock and CAS
-//! transitions, and the coordinator's preview, reconcile and age refresh.
-//! Restart, the impact approval human action, its console challenge, the
-//! lifecycle audit and the recovery of an interrupted lifecycle are not: a
-//! record carrying an approval, a challenge, a receipt or an audit is refused
-//! as unreadable, and this owner never writes one.
+//! `observing`, `previewReady`, `blocked`, `awaitingImpactApproval`,
+//! `expired` and `previewDrifted`, with its waiting or expired approval
+//! (`HDCControlActionRecord`, `HDCControlHumanAction`), the store's
+//! transaction lock and CAS transitions, and the coordinator's preview,
+//! restart request, reconcile and age refresh. Restart never restarts
+//! anything: it records the approval request, and only a person's answer to
+//! the console challenge of `human-action.resume` would lead to a lifecycle
+//! dispatch. That challenge, its receipt, the lifecycle audit and the
+//! recovery of an interrupted lifecycle are not here: a record carrying a
+//! challenge, a receipt, an audit or a resolved approval is refused as
+//! unreadable, and this owner never writes one.
 //!
 //! The owner serves one request at a time. Swift's actor lets another
 //! request run while a preview awaits its observation and joins the
 //! observation in flight; here that request waits instead.
+use crate::agent_execution::ActionRow;
 use crate::control_action::{identifier, refused, unreadable};
+use crate::control_action_approval::ImpactApproval;
 use crate::control_action_store::{ActionStore, StoredAction};
 use crate::control_action_value::{
     digest, exact_keys, generation, hash, one_of, optional_digest, optional_generation,
@@ -558,6 +567,9 @@ pub struct Record {
     value: Map<String, Value>,
     intent: Intent,
     preview: Option<Preview>,
+    /// The impact approval a restart requested: waiting while the action
+    /// awaits it, expired once the action was invalidated.
+    approval: Option<ImpactApproval>,
     id: String,
     generation: u64,
     state: String,
@@ -633,8 +645,8 @@ impl Record {
     }
 
     /// Swift `HDCControlActionRecord.init(value:)`, for the records this
-    /// owner writes: an approval, a challenge, a receipt or a lifecycle audit
-    /// is not read here.
+    /// owner writes: a waiting or an expired approval is read, a resolved
+    /// one, a challenge, a receipt or a lifecycle audit is not.
     fn parse(value: Map<String, Value>) -> Result<Self, WireError> {
         let text = |key: &str| value.get(key).and_then(Value::as_str);
         let invalid = || record_unreadable("control-action record has invalid identity or state");
@@ -690,11 +702,24 @@ impl Record {
                 return Err(record_unreadable("control-action preview is malformed"));
             }
         };
-        // What only an impact approval and its lifecycle hold.
-        if value.get("humanAction") != Some(&Value::Null)
-            || value.get("interactionChallenge") != Some(&Value::Null)
+        let approval = match value.get("humanAction") {
+            Some(Value::Null) => None,
+            Some(Value::Object(fields)) => Some(ImpactApproval::parse(fields.clone())?),
+            _ => {
+                return Err(record_unreadable(
+                    "control-action human action is malformed",
+                ));
+            }
+        };
+        // What only a person's answer to the approval and the lifecycle
+        // after it hold: the console challenge, its receipt, the approval
+        // that receipt resolved and the lifecycle audit.
+        if value.get("interactionChallenge") != Some(&Value::Null)
             || value.get("interactionReceipt") != Some(&Value::Null)
             || value.get("lifecycleAudit") != Some(&json!([]))
+            || approval
+                .as_ref()
+                .is_some_and(|approval| approval.status() == "resolved")
         {
             return Err(unreadable());
         }
@@ -737,7 +762,7 @@ impl Record {
                 return Err(record_unreadable("ready preview lacks its complete gate"));
             }
         } else if state == "observing" {
-            if blocker != Some(&Value::Null) || !relations.is_empty() {
+            if blocker != Some(&Value::Null) || !relations.is_empty() || approval.is_some() {
                 return Err(record_unreadable("unobserved action has resolved facts"));
             }
         } else if blocker == Some(&Value::Null)
@@ -746,8 +771,40 @@ impl Record {
             return Err(record_unreadable("blocked control action has no reason"));
         }
         if state == "awaitingImpactApproval" {
+            // Waiting, bound to this action's exact preview and to a
+            // generation it reached, closing with the action.
+            let bound = match (&preview, &approval) {
+                (Some(preview), Some(approval)) => {
+                    let fields = approval.value();
+                    approval.status() == "waiting"
+                        && fields.get("controlActionId") == Some(&json!(id))
+                        && fields.get("previewId") == preview.value.get("previewId")
+                        && fields.get("previewDigest") == preview.value.get("previewDigest")
+                        && fields
+                            .get("controlActionGeneration")
+                            .and_then(Value::as_str)
+                            .and_then(crate::control_action_value::generation)
+                            .is_some_and(|awaited| awaited <= generation)
+                        && fields.get("expiresAt") == Some(&json!(expires))
+                        && latest < end
+                }
+                _ => false,
+            };
+            if !bound {
+                return Err(record_unreadable(
+                    "impact approval is not bound to its exact preview generation",
+                ));
+            }
+        } else if approval.is_some()
+            && !(["expired", "previewDrifted"].contains(&state)
+                && approval
+                    .as_ref()
+                    .is_some_and(|approval| approval.status() == "expired"))
+        {
+            // Only an invalidated action keeps an approval it no longer
+            // awaits (a resolved one was refused above).
             return Err(record_unreadable(
-                "impact approval is not bound to its exact preview generation",
+                "control action retains an invalid human-action state",
             ));
         }
         if [
@@ -823,6 +880,7 @@ impl Record {
             observed: observed.to_owned(),
             intent,
             preview,
+            approval,
             value,
         })
     }
@@ -884,8 +942,8 @@ impl Record {
         Self::parse(fields)
     }
 
-    /// `expired` or `previewDrifted` for `reason`; a record past these states
-    /// is itself.
+    /// `expired` or `previewDrifted` for `reason`, and a waiting approval
+    /// with it; a record past these states is itself.
     fn invalidated(&self, reason: &str, expired: bool, now: u64) -> Result<Self, WireError> {
         if !OPEN.contains(&self.state.as_str()) {
             return Ok(self.clone());
@@ -896,6 +954,56 @@ impl Record {
             json!(if expired { "expired" } else { "previewDrifted" }),
         );
         fields.insert("blockerReasonCode".into(), json!(reason));
+        if let Some(approval) = &self.approval {
+            fields.insert(
+                "humanAction".into(),
+                Value::Object(approval.expiring()?.value().clone()),
+            );
+        }
+        // Swift also withdraws a challenge no receipt answered; a record
+        // here never holds one.
+        fields.insert("interactionChallenge".into(), Value::Null);
+        Self::parse(fields)
+    }
+
+    /// Swift `requestingImpactApproval`: the approval of this action's
+    /// ready preview, awaited from the next generation, requested `now` and
+    /// closing with the action; `action` and `resume` are the random
+    /// identities Swift draws for `har-` and `resume-`.
+    fn requesting_impact_approval(
+        &self,
+        preview_id: &str,
+        preview_digest: &str,
+        now: u64,
+        action: &str,
+        resume: &str,
+    ) -> Result<Self, WireError> {
+        let Some(preview) = self.preview.as_ref().filter(|preview| {
+            self.state == "previewReady"
+                && self.approval.is_none()
+                && preview.value.get("previewId") == Some(&json!(preview_id))
+                && preview.value.get("previewDigest") == Some(&json!(preview_digest))
+        }) else {
+            return Err(refused(
+                "reviewedPlanMismatch",
+                "restart must name this action's exact immutable preview",
+            ));
+        };
+        let mut fields = self.advanced(now)?;
+        let approval = ImpactApproval::new(
+            &self.id,
+            &preview.value,
+            self.generation + 1,
+            &timestamp(now),
+            &self.expires,
+            action,
+            resume,
+        )?;
+        fields.insert("state".into(), json!("awaitingImpactApproval"));
+        fields.insert(
+            "humanAction".into(),
+            Value::Object(approval.value().clone()),
+        );
         Self::parse(fields)
     }
 
@@ -921,6 +1029,13 @@ impl Record {
             _ if blocker.is_null() => json!("controlAction.previewAvailable"),
             _ => blocker.clone(),
         };
+        // An awaited approval is the next thing to act on.
+        let resource = match &self.approval {
+            Some(approval) if self.state == "awaitingImpactApproval" => {
+                json!({"kind": "humanAction", "id": approval.action_id()})
+            }
+            _ => owner(id),
+        };
         json!({
             "schemaVersion": "arkdeck.control-action/1", "controlActionId": id,
             "actionRequestId": self.intent.request,
@@ -930,8 +1045,10 @@ impl Record {
             "catalogDigest": self.value.get("catalogDigest"), "createdAt": self.created,
             "expiresAt": self.expires, "lastObservedAt": self.observed,
             "preview": self.preview.as_ref().map(|preview| Value::Object(preview.value.clone())),
-            "blockerReasonCode": blocker, "humanAction": null, "dispatchCount": 0,
-            "nextAction": {"kind": kind, "owner": owner(id), "resource": owner(id), "reasonCode": reason},
+            "blockerReasonCode": blocker,
+            "humanAction": self.approval.as_ref().map(ImpactApproval::projection),
+            "dispatchCount": 0,
+            "nextAction": {"kind": kind, "owner": owner(id), "resource": resource, "reasonCode": reason},
         })
     }
 
@@ -968,8 +1085,9 @@ impl StoredAction for Record {
         &self.created
     }
 
-    /// Never its intent, lifetime, epoch, catalog or published preview, and
-    /// only over a permitted transition.
+    /// Never its intent, lifetime, epoch, catalog, published preview or
+    /// requested approval (whose status only leaves `waiting`), and only
+    /// over a permitted transition.
     fn replaces(previous: &Self, next: &Self) -> bool {
         previous.intent == next.intent
             && previous.created == next.created
@@ -980,6 +1098,11 @@ impl StoredAction for Record {
             && (previous.preview.is_none()
                 || previous.value.get("observationRelations")
                     == next.value.get("observationRelations"))
+            && previous.approval.as_ref().is_none_or(|approval| {
+                next.approval
+                    .as_ref()
+                    .is_some_and(|next| approval.continues(next))
+            })
             && time(&previous.observed)
                 .zip(time(&next.observed))
                 .is_some_and(|(old, new)| new >= old)
@@ -1232,6 +1355,97 @@ impl HdcControlActions {
         Ok(latest.projection())
     }
 
+    /// Swift `requestRestart`: the exact restart of a reviewed preview makes
+    /// its impact approval, requested of a person, and nothing else — no
+    /// confirmation, no lifecycle dispatch. The action's age is refreshed
+    /// first; the tuple must name its exact preview; an action already
+    /// awaiting its approval answers as it is (a lost receipt), and any other
+    /// but a ready one is not eligible. A fresh reading of the impact must
+    /// then prove the reviewed one, or the action is invalidated and the
+    /// refusal carries it; otherwise the approval is recorded by CAS.
+    pub fn restart(
+        &self,
+        id: &str,
+        preview_id: &str,
+        preview_digest: &str,
+        source: &dyn ImpactSource,
+    ) -> Result<Value, WireError> {
+        let record = self.refresh_age(self.required(id)?)?;
+        let Some(preview) = record.preview.clone().filter(|preview| {
+            preview.value.get("previewId") == Some(&json!(preview_id))
+                && preview.value.get("previewDigest") == Some(&json!(preview_digest))
+        }) else {
+            return Err(refused(
+                "reviewedPlanMismatch",
+                "restart does not name the exact immutable preview",
+            ));
+        };
+        if record.state == "awaitingImpactApproval" {
+            return Ok(record.projection());
+        }
+        if record.state != "previewReady" {
+            return Err(refused(
+                "admissionDenied",
+                "the control action is not eligible for impact approval",
+            ));
+        }
+        let Ok(reading) = source.read_impact() else {
+            let invalid = self.invalidate_latest(&record, "hdc.impactObservationUnavailable")?;
+            return Err(drifted_action(
+                "fresh HDC impact could not be proven",
+                &invalid,
+            ));
+        };
+        let latest = self.refresh_age(self.required(id)?)?;
+        if latest.generation != record.generation {
+            return Ok(latest.projection());
+        }
+        if preview.impact != reading.impact
+            || record.value.get("observationRelations")
+                != Some(&Value::Array(reading.relations.clone()))
+            || blocker(&reading, &record.intent).is_some()
+        {
+            let invalid = self.invalidate_latest(&record, "hdc.previewDrifted")?;
+            return Err(drifted_action(
+                "fresh HDC impact differs from the reviewed preview",
+                &invalid,
+            ));
+        }
+        let now = self.clock()?;
+        let (action, resume) = ((self.context.uuid)()?, (self.context.uuid)()?);
+        let next =
+            latest.requesting_impact_approval(preview_id, preview_digest, now, &action, &resume)?;
+        self.store.replace(&next, latest.generation)?;
+        Ok(next.projection())
+    }
+
+    /// Swift `humanActionResourceRows`: the approval each action holds (only
+    /// the one `owner` names, when given), as the human-action owner lists
+    /// it. The records are read as stored: listing an approval refreshes no
+    /// action's age.
+    pub(crate) fn human_action_rows(
+        &self,
+        owner: Option<&str>,
+    ) -> Result<Vec<ActionRow>, WireError> {
+        if owner.is_some_and(|owner| !identifier(owner)) {
+            return Err(refused("invalidInput", "invalid human-action owner"));
+        }
+        Ok(self
+            .store
+            .list()?
+            .into_iter()
+            .filter(|record| owner.is_none_or(|owner| owner == record.id))
+            .filter_map(|record| {
+                let approval = record.approval?;
+                Some(ActionRow {
+                    created: approval.value().get("createdAt")?.as_str()?.to_owned(),
+                    id: approval.action_id().to_owned(),
+                    value: approval.projection(),
+                })
+            })
+            .collect())
+    }
+
     fn finish_observation(
         &self,
         initial: &Record,
@@ -1311,6 +1525,18 @@ fn clock_backwards() -> WireError {
         "orchestrationClockUntrusted",
         "control-action clock moved backwards",
     )
+}
+
+/// A restart refused because the fresh impact is not the reviewed one: the
+/// action it invalidated rides in the refusal's details, beside the
+/// zero-dispatch proof.
+fn drifted_action(message: &str, action: &Record) -> WireError {
+    let mut error = refused("factsDrifted", message);
+    error
+        .details
+        .get_or_insert_with(Map::new)
+        .insert("controlAction".into(), action.projection());
+    error
 }
 
 /// Swift `blocker(for:intent:)`, in its order: no proved server identity,

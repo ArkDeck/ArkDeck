@@ -1,7 +1,9 @@
 //! Swift `HDCControlActionContractTests`' owner cases, ported: the intent and
 //! its fingerprint, the canonical impact, the preview digest, the blocker
-//! order, the store's CAS and lock, and the coordinator's preview, reconcile
-//! and age refresh over a source and a clock the test holds.
+//! order, the store's CAS and lock, and the coordinator's preview, restart
+//! request, reconcile and age refresh over a source and a clock the test
+//! holds, with the approval a restart requests read back, refused in Swift's
+//! order, expired with its action and listed for the human-action owner.
 use super::*;
 use std::collections::VecDeque;
 use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
@@ -633,8 +635,8 @@ fn records_this_owner_does_not_hold_or_that_contradict_themselves_are_refused() 
         fields.insert(key.into(), value);
         Record::parse(fields)
     };
-    // An approval, a challenge, a receipt or an audit is not read here.
-    for key in ["humanAction", "interactionChallenge", "interactionReceipt"] {
+    // A challenge, a receipt or an audit is not read here.
+    for key in ["interactionChallenge", "interactionReceipt"] {
         let error = with(key, json!({"actionId": "har-1"})).unwrap_err();
         assert_eq!(
             (error.code.as_str(), error.message.as_str()),
@@ -643,6 +645,18 @@ fn records_this_owner_does_not_hold_or_that_contradict_themselves_are_refused() 
                 "control-action state cannot be read or persisted"
             ),
             "{key}"
+        );
+    }
+    // An approval reads as Swift's `HDCControlHumanAction` does.
+    for value in [json!({"actionId": "har-1"}), json!("har-1"), json!([])] {
+        let error = with("humanAction", value.clone()).unwrap_err();
+        assert_eq!(
+            (error.code.as_str(), error.message.as_str()),
+            (
+                "recordUnreadable",
+                "control-action human action is malformed"
+            ),
+            "{value}"
         );
     }
     assert_eq!(
@@ -926,4 +940,536 @@ fn age_invalidates_an_open_action_when_it_is_read() {
             "control-action clock moved backwards"
         )
     );
+}
+
+/// The restart tuple naming a record's exact preview.
+fn tuple(record: &Value) -> (String, String, String) {
+    let text = |value: &Value| value.as_str().unwrap().to_owned();
+    (
+        text(&record["controlActionId"]),
+        text(&record["preview"]["previewId"]),
+        text(&record["preview"]["previewDigest"]),
+    )
+}
+
+fn refusal(result: Result<Value, WireError>) -> (String, String) {
+    let error = result.unwrap_err();
+    assert_eq!(
+        error.details,
+        Some(Map::from_iter([("newDispatchCount".into(), json!(0))])),
+        "{error:?}"
+    );
+    (error.code, error.message)
+}
+
+fn pair(code: &str, message: &str) -> (String, String) {
+    (code.into(), message.into())
+}
+
+const NOT_ELIGIBLE: &str = "the control action is not eligible for impact approval";
+const OTHER_PREVIEW: &str = "restart does not name the exact immutable preview";
+
+#[test]
+fn a_restart_requests_the_approval_of_its_ready_preview_once() {
+    let directory = Directory::new();
+    let clock = Arc::new(AtomicU64::new(NOW));
+    let owner = owner(
+        &directory,
+        "epoch",
+        CATALOG,
+        &clock,
+        &["one", "preview-one", "approval", "resume"],
+    );
+    let source = Source::new(Ok(reading(json!({}))));
+    let ready = owner
+        .preview(&intent("request-one", "100000023"), &source)
+        .unwrap();
+    let (id, preview, digest) = tuple(&ready);
+    // An action no record holds, and this one with another preview: nothing
+    // is observed or changed.
+    assert_eq!(
+        refusal(owner.restart("control-action-none", &preview, &digest, &source)),
+        pair("resourceNotFound", "control action does not exist")
+    );
+    for (other_preview, other_digest) in [
+        (preview.as_str(), "0".repeat(64)),
+        ("preview-other", digest.clone()),
+    ] {
+        assert_eq!(
+            refusal(owner.restart(&id, other_preview, &other_digest, &source)),
+            pair("reviewedPlanMismatch", OTHER_PREVIEW)
+        );
+    }
+    assert_eq!(owner.show(&id).unwrap(), ready);
+    assert_eq!(source.reads(), 1);
+
+    // The exact tuple half a minute later: the fresh impact is the reviewed
+    // one, so the action awaits its approval from the next generation.
+    clock.fetch_add(30_000, Ordering::SeqCst);
+    let awaiting = owner.restart(&id, &preview, &digest, &source).unwrap();
+    assert_eq!(source.reads(), 2);
+    let approval = json!({
+        "schemaVersion": "arkdeck.human-action/1", "actionId": "har-approval",
+        "owner": {"kind": "controlAction", "id": id}, "resumeReference": "resume-resume",
+        "category": "impactApproval", "reasonCode": "policy.impactApprovalRequired",
+        "minimumAction": "human.reviewImpact", "prohibitedAutomation": ["selfApproval"],
+        "createdAt": "2026-09-01T00:00:30.000Z", "expiresAt": "2026-09-01T00:05:00.000Z",
+        "status": "waiting", "newDispatchCount": 0, "selectionSchema": null, "choices": [],
+        "binding": {"controlActionId": id, "previewId": preview, "previewDigest": digest,
+            "generation": "3"},
+    });
+    let mut expected = ready.clone();
+    for (key, value) in [
+        ("state", json!("awaitingImpactApproval")),
+        ("generation", json!("3")),
+        ("lastObservedAt", json!("2026-09-01T00:00:30.000Z")),
+        ("humanAction", approval.clone()),
+        (
+            "nextAction",
+            json!({"kind": "humanAction", "owner": {"kind": "controlAction", "id": id},
+                "resource": {"kind": "humanAction", "id": "har-approval"},
+                "reasonCode": "policy.impactApprovalRequired"}),
+        ),
+    ] {
+        expected[key] = value;
+    }
+    assert_eq!(awaiting, expected);
+    // The record keeps the approval as Swift's does, and nothing else.
+    let record = Store::open(&directory.records())
+        .unwrap()
+        .load(&id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        record.value["humanAction"],
+        json!({"actionId": "har-approval", "resumeReference": "resume-resume",
+            "controlActionId": id, "previewId": preview, "previewDigest": digest,
+            "controlActionGeneration": "3", "createdAt": "2026-09-01T00:00:30.000Z",
+            "expiresAt": "2026-09-01T00:05:00.000Z", "status": "waiting"})
+    );
+    for key in ["interactionChallenge", "interactionReceipt"] {
+        assert_eq!(record.value[key], Value::Null, "{key}");
+    }
+    assert_eq!(record.value["lifecycleAudit"], json!([]));
+
+    // A lost receipt answers the same approval without observing again;
+    // another digest still names no preview of this action.
+    assert_eq!(
+        owner.restart(&id, &preview, &digest, &source).unwrap(),
+        awaiting
+    );
+    assert_eq!(
+        refusal(owner.restart(&id, &preview, &"0".repeat(64), &source)),
+        pair("reviewedPlanMismatch", OTHER_PREVIEW)
+    );
+    assert_eq!(source.reads(), 2);
+    // Read, previewed again and listed as it is; reconciled over the same
+    // impact, unchanged.
+    assert_eq!(owner.show(&id).unwrap(), awaiting);
+    assert_eq!(
+        owner
+            .preview(&intent("request-one", "100000023"), &source)
+            .unwrap(),
+        awaiting
+    );
+    assert_eq!(owner.reconcile(&id, &source).unwrap(), awaiting);
+    assert_eq!(source.reads(), 3);
+    let rows = owner.human_action_rows(None).unwrap();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(
+        (rows[0].created.as_str(), rows[0].id.as_str()),
+        ("2026-09-01T00:00:30.000Z", "har-approval")
+    );
+    assert_eq!(rows[0].value, approval);
+    assert_eq!(owner.human_action_rows(Some(&id)).unwrap().len(), 1);
+    assert!(
+        owner
+            .human_action_rows(Some("control-action-other"))
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(
+        refusal(
+            owner
+                .human_action_rows(Some("control action"))
+                .map(|_| Value::Null)
+        ),
+        pair("invalidInput", "invalid human-action owner")
+    );
+    // A clock behind the last observation is refused before anything.
+    clock.fetch_sub(1, Ordering::SeqCst);
+    assert_eq!(
+        refusal(owner.restart(&id, &preview, &digest, &source)),
+        pair(
+            "orchestrationClockUntrusted",
+            "control-action clock moved backwards"
+        )
+    );
+    assert_eq!(source.reads(), 3);
+    let name = format!("action-{}.json", sha256_hex(b"request-one"));
+    assert_eq!(directory.names(), [".lock".to_owned(), name]);
+}
+
+#[test]
+fn a_restart_is_refused_in_swift_order_before_any_approval() {
+    let directory = Directory::new();
+    let clock = Arc::new(AtomicU64::new(NOW));
+    let owner = owner(&directory, "epoch", CATALOG, &clock, &[]);
+    let source = Source::new(Err("empty observation output".into()));
+    // An action whose observation failed has no preview to name.
+    let unobserved = owner
+        .preview(&intent("unobserved", "100000023"), &source)
+        .unwrap();
+    assert_eq!(unobserved["preview"], Value::Null);
+    let unobserved_id = unobserved["controlActionId"].as_str().unwrap();
+    assert_eq!(
+        refusal(owner.restart(unobserved_id, "preview-one", &"0".repeat(64), &source)),
+        pair("reviewedPlanMismatch", OTHER_PREVIEW)
+    );
+    // A blocked preview, named exactly, is not eligible; nothing is read.
+    source.set(Ok(reading(
+        json!({"serverHealth": "unknown", "serverVersion": null}),
+    )));
+    let blocked = owner
+        .preview(&intent("blocked", "100000023"), &source)
+        .unwrap();
+    assert_eq!(blocked["state"], "blocked");
+    let (id, preview, digest) = tuple(&blocked);
+    let reads = source.reads();
+    assert_eq!(
+        refusal(owner.restart(&id, &preview, &digest, &source)),
+        pair("admissionDenied", NOT_ELIGIBLE)
+    );
+    assert_eq!(owner.show(&id).unwrap(), blocked);
+    assert_eq!(source.reads(), reads);
+
+    // Ready previews whose fresh reading does not prove the reviewed impact.
+    source.set(Ok(reading(json!({}))));
+    let ready: Vec<Value> = ["unproven", "differing", "related", "own-reason"]
+        .iter()
+        .map(|request| {
+            owner
+                .preview(&intent(request, "100000023"), &source)
+                .unwrap()
+        })
+        .collect();
+    clock.fetch_add(30_000, Ordering::SeqCst);
+    let relation = json!({"observationId": "obs-1", "generation": "7",
+        "serial": "150100424a544e4600", "location": "100", "attachmentId": "17",
+        "vendorId": 8711, "productId": 20480});
+    let impact = reading(json!({})).impact;
+    for (record, fresh, message, reason) in [
+        (
+            &ready[0],
+            Err("empty observation output".to_owned()),
+            "fresh HDC impact could not be proven",
+            "hdc.impactObservationUnavailable",
+        ),
+        (
+            &ready[1],
+            Ok(reading(json!({"affectedTargetIds": ["TGT-adopted"]}))),
+            "fresh HDC impact differs from the reviewed preview",
+            "hdc.previewDrifted",
+        ),
+        (
+            &ready[2],
+            Ok(ImpactReading {
+                impact: impact.clone(),
+                relations: vec![relation.clone()],
+                blocker: None,
+            }),
+            "fresh HDC impact differs from the reviewed preview",
+            "hdc.previewDrifted",
+        ),
+        (
+            &ready[3],
+            Ok(ImpactReading {
+                impact: impact.clone(),
+                relations: Vec::new(),
+                blocker: Some("hdc.serverFactsDrifted".into()),
+            }),
+            "fresh HDC impact differs from the reviewed preview",
+            "hdc.previewDrifted",
+        ),
+    ] {
+        source.set(fresh);
+        let (id, preview, digest) = tuple(record);
+        let error = owner.restart(&id, &preview, &digest, &source).unwrap_err();
+        let invalid = owner.show(&id).unwrap();
+        assert_eq!(
+            (error.code.as_str(), error.message.as_str()),
+            ("factsDrifted", message)
+        );
+        // The action it invalidated rides in the details.
+        assert_eq!(
+            error.details,
+            Some(Map::from_iter([
+                ("controlAction".into(), invalid.clone()),
+                ("newDispatchCount".into(), json!(0)),
+            ]))
+        );
+        assert_eq!(invalid["state"], "previewDrifted");
+        assert_eq!(invalid["generation"], "3");
+        assert_eq!(invalid["blockerReasonCode"], reason);
+        assert_eq!(invalid["lastObservedAt"], "2026-09-01T00:00:30.000Z");
+        assert_eq!(invalid["preview"], record["preview"]);
+        assert_eq!(invalid["humanAction"], Value::Null);
+        // An invalidated action is not eligible, and is not read again.
+        let reads = source.reads();
+        assert_eq!(
+            refusal(owner.restart(&id, &preview, &digest, &source)),
+            pair("admissionDenied", NOT_ELIGIBLE)
+        );
+        assert_eq!(source.reads(), reads);
+    }
+    assert!(owner.human_action_rows(None).unwrap().is_empty());
+}
+
+#[test]
+fn a_restart_refreshes_the_actions_age_before_it_reads_the_tuple() {
+    let directory = Directory::new();
+    let clock = Arc::new(AtomicU64::new(NOW));
+    let owner = owner(&directory, "epoch", CATALOG, &clock, &[]);
+    let source = Source::new(Ok(reading(json!({}))));
+    let ready = owner
+        .preview(&intent("request-one", "100000023"), &source)
+        .unwrap();
+    let (id, preview, digest) = tuple(&ready);
+    let zeros = "0".repeat(64);
+    // A clock behind the last observation, before another preview's digest.
+    clock.fetch_sub(1, Ordering::SeqCst);
+    assert_eq!(
+        refusal(owner.restart(&id, &preview, &zeros, &source)),
+        pair(
+            "orchestrationClockUntrusted",
+            "control-action clock moved backwards"
+        )
+    );
+    // Expired by that read, then compared: another digest is still another
+    // preview; the exact one names an action no longer eligible.
+    clock.store(NOW + 300_000, Ordering::SeqCst);
+    assert_eq!(
+        refusal(owner.restart(&id, &preview, &zeros, &source)),
+        pair("reviewedPlanMismatch", OTHER_PREVIEW)
+    );
+    let expired = owner.show(&id).unwrap();
+    assert_eq!(expired["state"], "expired");
+    assert_eq!(expired["blockerReasonCode"], "controlAction.expired");
+    assert_eq!(expired["generation"], "3");
+    assert_eq!(
+        refusal(owner.restart(&id, &preview, &digest, &source)),
+        pair("admissionDenied", NOT_ELIGIBLE)
+    );
+    assert_eq!(source.reads(), 1);
+}
+
+#[test]
+fn an_awaited_approval_expires_with_its_action() {
+    let directory = Directory::new();
+    let clock = Arc::new(AtomicU64::new(NOW));
+    let source = Source::new(Ok(reading(json!({}))));
+    let a = owner(&directory, "epoch-a", CATALOG, &clock, &[]);
+    let awaited = |request: &str| {
+        let ready = a.preview(&intent(request, "100000023"), &source).unwrap();
+        let (id, preview, digest) = tuple(&ready);
+        let awaiting = a.restart(&id, &preview, &digest, &source).unwrap();
+        assert_eq!(awaiting["humanAction"]["status"], "waiting");
+        awaiting
+    };
+    let drifting = awaited("drifting");
+    let restarted = awaited("restarted");
+    let recataloged = awaited("recataloged");
+    let expiring = awaited("expiring");
+    let invalid = |before: &Value, after: &Value, state: &str, reason: &str| {
+        assert_eq!(after["state"], state);
+        assert_eq!(after["blockerReasonCode"], reason);
+        assert_eq!(after["generation"], "4");
+        assert_eq!(after["preview"], before["preview"]);
+        let mut approval = before["humanAction"].clone();
+        approval["status"] = json!("expired");
+        assert_eq!(after["humanAction"], approval);
+        let id = after["controlActionId"].clone();
+        assert_eq!(
+            after["nextAction"],
+            json!({"kind": "reconcile", "owner": {"kind": "controlAction", "id": id},
+                "resource": {"kind": "controlAction", "id": id}, "reasonCode": reason})
+        );
+    };
+    let id = |record: &Value| record["controlActionId"].as_str().unwrap().to_owned();
+    // The impact changes while the approval is awaited: reconciling reads it
+    // again and invalidates both.
+    source.set(Ok(reading(
+        json!({"detectedOtherClientIds": ["late-client"]}),
+    )));
+    let drifted = a.reconcile(&id(&drifting), &source).unwrap();
+    invalid(&drifting, &drifted, "previewDrifted", "hdc.previewDrifted");
+    source.set(Ok(reading(json!({}))));
+    // Another Runtime start, and another catalog.
+    clock.fetch_add(60_000, Ordering::SeqCst);
+    let b = owner(&directory, "epoch-b", CATALOG, &clock, &[]);
+    let shown = b.show(&id(&restarted)).unwrap();
+    invalid(
+        &restarted,
+        &shown,
+        "previewDrifted",
+        "controlAction.runtimeRestarted",
+    );
+    let c = owner(&directory, "epoch-a", &"c".repeat(64), &clock, &[]);
+    let shown = c.show(&id(&recataloged)).unwrap();
+    invalid(
+        &recataloged,
+        &shown,
+        "previewDrifted",
+        "controlAction.catalogChanged",
+    );
+    // At the action's expiry the approval is still listed as stored, until a
+    // read of the action expires both.
+    clock.store(NOW + 300_000, Ordering::SeqCst);
+    let listed = |owner: &HdcControlActions, record: &Value| {
+        owner.human_action_rows(Some(&id(record))).unwrap()[0].value["status"].clone()
+    };
+    assert_eq!(listed(&a, &expiring), "waiting");
+    let expired = a.show(&id(&expiring)).unwrap();
+    invalid(&expiring, &expired, "expired", "controlAction.expired");
+    assert_eq!(listed(&a, &expiring), "expired");
+    // None is eligible again, and each keeps its approval.
+    for record in [&drifting, &restarted, &recataloged, &expiring] {
+        let (id, preview, digest) = tuple(record);
+        assert_eq!(
+            refusal(a.restart(&id, &preview, &digest, &source)),
+            pair("admissionDenied", NOT_ELIGIBLE)
+        );
+        assert_eq!(listed(&a, record), "expired");
+    }
+    assert_eq!(a.human_action_rows(None).unwrap().len(), 4);
+}
+
+#[test]
+fn an_approval_reads_back_only_bound_to_its_awaiting_or_invalidated_action() {
+    let directory = Directory::new();
+    let clock = Arc::new(AtomicU64::new(NOW));
+    let owner = owner(
+        &directory,
+        "epoch",
+        CATALOG,
+        &clock,
+        &["one", "preview-one", "approval", "resume"],
+    );
+    let source = Source::new(Ok(reading(json!({}))));
+    let ready = owner
+        .preview(&intent("request-one", "100000023"), &source)
+        .unwrap();
+    let (id, preview, digest) = tuple(&ready);
+    owner.restart(&id, &preview, &digest, &source).unwrap();
+    let record = Store::open(&directory.records())
+        .unwrap()
+        .load(&id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(Record::parse(record.value.clone()).unwrap(), record);
+    let with = |changes: Value| {
+        let mut fields = record.value.clone();
+        for (key, value) in object(changes) {
+            fields.insert(key, value);
+        }
+        Record::parse(fields)
+    };
+    let approval = |key: &str, value: Value| {
+        let mut approval = record.value["humanAction"].clone();
+        approval[key] = value;
+        approval
+    };
+    let message = |result: Result<Record, WireError>| {
+        let error = result.unwrap_err();
+        assert_eq!(error.code, "recordUnreadable");
+        error.message
+    };
+    // While awaited: waiting, bound to this action's exact preview and to a
+    // generation it reached, and closing with it.
+    let unbound = "impact approval is not bound to its exact preview generation";
+    for (key, value) in [
+        ("status", json!("expired")),
+        ("controlActionId", json!("control-action-other")),
+        ("previewId", json!("preview-other")),
+        ("previewDigest", json!("0".repeat(64))),
+        ("controlActionGeneration", json!("4")),
+        ("expiresAt", json!("2026-09-01T00:04:59.999Z")),
+    ] {
+        assert_eq!(
+            message(with(json!({"humanAction": approval(key, value.clone())}))),
+            unbound,
+            "{key} {value}"
+        );
+    }
+    assert_eq!(message(with(json!({"humanAction": null}))), unbound);
+    assert!(with(json!({"humanAction": approval("controlActionGeneration", json!("2"))})).is_ok());
+    // A resolved approval is a person's answer, which is not read here.
+    assert_eq!(
+        message(with(
+            json!({"humanAction": approval("status", json!("resolved"))})
+        )),
+        "control-action state cannot be read or persisted"
+    );
+    // Only an invalidated action keeps an approval it no longer awaits.
+    let retained = "control action retains an invalid human-action state";
+    assert_eq!(message(with(json!({"state": "previewReady"}))), retained);
+    for state in ["expired", "previewDrifted"] {
+        let invalidated = json!({"state": state, "blockerReasonCode": "hdc.previewDrifted"});
+        assert_eq!(message(with(invalidated.clone())), retained, "{state}");
+        let mut expired = invalidated;
+        expired["humanAction"] = approval("status", json!("expired"));
+        assert!(with(expired).is_ok(), "{state}");
+    }
+    let mut blocked = json!({"state": "blocked", "blockerReasonCode": "hdc.serverHealthUnproven"});
+    blocked["humanAction"] = approval("status", json!("expired"));
+    assert_eq!(message(with(blocked)), retained);
+    // An unobserved action has none.
+    let request = Intent::parse(&intent("request-two", "100000023")).unwrap();
+    let mut unobserved = Record::new(&request, CATALOG, "epoch", NOW, "two")
+        .unwrap()
+        .value;
+    unobserved.insert("humanAction".into(), approval("status", json!("waiting")));
+    assert_eq!(
+        message(Record::parse(unobserved)),
+        "unobserved action has resolved facts"
+    );
+}
+
+#[test]
+fn the_store_keeps_an_approval_whose_status_only_leaves_waiting() {
+    let directory = Directory::new();
+    let clock = Arc::new(AtomicU64::new(NOW));
+    let owner = owner(&directory, "epoch", CATALOG, &clock, &[]);
+    let source = Source::new(Ok(reading(json!({}))));
+    let ready = owner
+        .preview(&intent("request-one", "100000023"), &source)
+        .unwrap();
+    let (id, preview, digest) = tuple(&ready);
+    owner.restart(&id, &preview, &digest, &source).unwrap();
+    let store = Store::open(&directory.records()).unwrap();
+    let record = store.load(&id).unwrap().unwrap();
+    let conflict = |next: &Record| {
+        let error = store.replace(next, 3).unwrap_err();
+        assert_eq!(
+            (error.code.as_str(), error.message.as_str()),
+            (
+                "resourceConflict",
+                "control action changed or update replaces immutable facts"
+            )
+        );
+    };
+    // Another approval in its place, or none at all.
+    let mut other = record.value.clone();
+    other.insert("generation".into(), json!("4"));
+    other["humanAction"]["actionId"] = json!("har-other");
+    conflict(&Record::parse(other).unwrap());
+    let invalidated = record
+        .invalidated("hdc.previewDrifted", false, NOW)
+        .unwrap();
+    let mut dropped = invalidated.value.clone();
+    dropped.insert("humanAction".into(), Value::Null);
+    conflict(&Record::parse(dropped).unwrap());
+    // Its expiry with the action.
+    store.replace(&invalidated, 3).unwrap();
+    assert_eq!(store.load(&id).unwrap(), Some(invalidated));
 }

@@ -120,7 +120,7 @@ const PROVEN: [&str; 13] = [
     "admissionDenied",
 ];
 const ADVANCE: &str = "execution could not be advanced; inspect the exact owner";
-const UNREADABLE: &str =
+pub(crate) const UNREADABLE: &str =
     "execution resource could not be read or advanced; inspect the exact owner";
 
 /// Swift `AgentExecutionControlFailure` as the daemon answers it: a named
@@ -141,12 +141,12 @@ fn failure_with(
     }
 }
 
-fn failure(code: &str, message: impl Into<String>) -> WireError {
+pub(crate) fn failure(code: &str, message: impl Into<String>) -> WireError {
     failure_with(code, message, Map::new())
 }
 
 /// A failure the daemon reports without any owner proof.
-fn internal(message: &str) -> WireError {
+pub(crate) fn internal(message: &str) -> WireError {
     WireError {
         code: "internalError".into(),
         message: message.into(),

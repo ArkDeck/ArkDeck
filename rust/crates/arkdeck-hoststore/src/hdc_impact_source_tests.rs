@@ -181,7 +181,8 @@ impl Legs {
         }
     }
 
-    fn read(&self) -> Result<ImpactReading, String> {
+    /// Runs `body` over the impact source these legs compose.
+    fn with_source<T>(&self, body: impl FnOnce(&dyn ImpactSource) -> T) -> T {
         let launch = || self.launch.clone();
         let jobs = || self.jobs.next();
         let targets = || self.targets.next();
@@ -199,7 +200,11 @@ impl Legs {
             devices: &devices,
         };
         assert_eq!(source.endpoint_reference(), server_endpoint_ref(ENDPOINT));
-        source.read_impact()
+        body(&source)
+    }
+
+    fn read(&self) -> Result<ImpactReading, String> {
+        self.with_source(|source| source.read_impact())
     }
 
     fn server(&self) -> ServerObservation {
@@ -517,5 +522,126 @@ fn the_registered_family_proves_health_through_a_bracketed_checkserver() {
     // No identity first: nothing runs.
     let legs = registered();
     assert_eq!(legs.server(), unavailable);
+    assert!(legs.dispatch.arguments().is_empty());
+}
+
+/// Swift's `RegisteredHealthyServer` (`ControlActionWithHostContractTests`),
+/// the seam its with-host restart frames were recorded through: the
+/// production reading of everything else, then what only the registered
+/// 3.2.0d server proves (a `checkserver` in its healthy family between two
+/// identity observations, which would run an HDC) — generation 100000023,
+/// healthy, version 3.2.0d and that tool version — and no blocker. Tests
+/// only: no composition reads through it.
+struct RegisteredHealthyServer<'a>(&'a dyn ImpactSource);
+
+impl ImpactSource for RegisteredHealthyServer<'_> {
+    fn endpoint_reference(&self) -> String {
+        self.0.endpoint_reference()
+    }
+
+    fn read_impact(&self) -> Result<ImpactReading, String> {
+        let reading = self.0.read_impact()?;
+        let mut facts = reading.impact.value().clone();
+        facts.insert("serverGeneration".into(), json!("100000023"));
+        facts.insert("serverHealth".into(), json!("healthy"));
+        facts.insert("serverVersion".into(), json!("3.2.0d"));
+        if let Some(Value::Object(tool)) = facts.get_mut("tool") {
+            tool.insert("version".into(), json!("3.2.0d"));
+        }
+        Ok(ImpactReading {
+            impact: Impact::new(facts).map_err(|error| error.message)?,
+            relations: reading.relations,
+            blocker: None,
+        })
+    }
+}
+
+#[test]
+fn only_a_proved_healthy_server_previews_a_restart_whose_approval_is_requested() {
+    use crate::hdc_control_action::{HdcControlActions, OwnerContext};
+    use std::os::unix::fs::DirBuilderExt;
+    let directory = std::env::temp_dir().canonicalize().unwrap().join(format!(
+        "hdc-impact-source-restart-{:032x}",
+        u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
+    ));
+    std::fs::DirBuilder::new()
+        .mode(0o700)
+        .create(&directory)
+        .unwrap();
+    struct Remove(std::path::PathBuf);
+    impl Drop for Remove {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+    let _remove = Remove(directory.clone());
+    let owner = HdcControlActions::open(
+        &directory,
+        OwnerContext {
+            epoch: "epoch".into(),
+            catalog: "a".repeat(64),
+            // 2026-09-19T00:00:00.000Z, Swift's with-host clock.
+            clock: Box::new(|| Some(1_789_776_000_000)),
+            uuid: Box::new(crate::snapshot_pager::uuid),
+        },
+    )
+    .unwrap();
+    let intent = |request: &str| {
+        json!({"action": "restart", "actionRequestId": request,
+            "serverEndpointRef": server_endpoint_ref(ENDPOINT),
+            "expectedServerGeneration": "100000023"})
+        .as_object()
+        .unwrap()
+        .clone()
+    };
+    let tuple = |record: &Value| {
+        [
+            record["controlActionId"].as_str().unwrap().to_owned(),
+            record["preview"]["previewId"].as_str().unwrap().to_owned(),
+            record["preview"]["previewDigest"]
+                .as_str()
+                .unwrap()
+                .to_owned(),
+        ]
+    };
+    // An executable without an identity family, as the fixture HDC and the
+    // isolated daemon's managed fake are, over nothing affected.
+    let legs = Legs::new();
+    legs.with_source(|production| {
+        // The production reading proves no server: the preview is blocked
+        // and its restart is not eligible, as Swift's daemon answers.
+        let blocked = owner.preview(&intent("fixture"), production).unwrap();
+        assert_eq!(blocked["state"], "blocked");
+        assert_eq!(blocked["blockerReasonCode"], "hdc.serverIdentityUnproven");
+        let [id, preview, digest] = tuple(&blocked);
+        let error = owner
+            .restart(&id, &preview, &digest, production)
+            .unwrap_err();
+        assert_eq!(
+            (error.code.as_str(), error.message.as_str()),
+            (
+                "admissionDenied",
+                "the control action is not eligible for impact approval"
+            )
+        );
+        // Over Swift's seam the same reading is a ready preview, and its
+        // restart requests the approval.
+        let healthy = RegisteredHealthyServer(production);
+        let ready = owner.preview(&intent("healthy"), &healthy).unwrap();
+        assert_eq!(ready["state"], "previewReady");
+        assert_eq!(ready["preview"]["serverHealth"], "healthy");
+        assert_eq!(ready["preview"]["tool"]["version"], "3.2.0d");
+        assert_eq!(
+            ready["preview"]["tool"]["signature"],
+            json!({"state": "adHoc", "identifier": "hdc", "teamIdentifier": null,
+                "platformTrust": "unverified", "executionAssessment": "notPerformed"})
+        );
+        let [id, preview, digest] = tuple(&ready);
+        let awaiting = owner.restart(&id, &preview, &digest, &healthy).unwrap();
+        assert_eq!(awaiting["state"], "awaitingImpactApproval");
+        assert_eq!(awaiting["humanAction"]["status"], "waiting");
+        assert_eq!(awaiting["dispatchCount"], 0);
+    });
+    // Nothing ran the executable: no command at all, so no `kill`.
     assert!(legs.dispatch.arguments().is_empty());
 }

@@ -158,8 +158,9 @@ pub trait HostServices: Send + Sync {
         })
     }
     /// `human-action.list` and `human-action.show` read the physical
-    /// assistance agent executions ask for. A host without the human-action
-    /// owner answers as the read-only foundation always has.
+    /// assistance agent executions ask for and the impact approvals control
+    /// actions request. A host without the human-action owner answers as the
+    /// read-only foundation always has.
     fn human_action(
         &self,
         _method: &str,

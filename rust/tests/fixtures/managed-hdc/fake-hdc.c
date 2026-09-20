@@ -4,8 +4,12 @@
  * registered line with a compile-time server version; anything else is
  * unregistered. EXIT_EARLY ends the server before it binds, NEVER_BIND keeps
  * it alive without a listener, PRINT_PORT reports the server port variable
- * it was given. No real HDC, server or device is involved. */
+ * it was given. LIST_EMPTY answers `list targets -v` with no target, and
+ * RECORD_CALLS names a file every invocation appends its arguments to, one
+ * line each, before it does anything else (TASK-XPA-014). No real HDC,
+ * server or device is involved. */
 #include <arpa/inet.h>
+#include <fcntl.h>
 #include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,18 +22,50 @@
 #ifndef COLD_MS
 #define COLD_MS 0
 #endif
+#ifdef RECORD_CALLS
+/* One line of this invocation's arguments, appended in one write. */
+static void record_call(int argc, char **argv) {
+    char line[4096];
+    size_t used = 0;
+    for (int i = 1; i < argc; i++) {
+        size_t length = strlen(argv[i]);
+        if (used + length + 2 > sizeof line) break;
+        if (i > 1) line[used++] = ' ';
+        memcpy(line + used, argv[i], length);
+        used += length;
+    }
+    line[used++] = '\n';
+    int fd = open(RECORD_CALLS, O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC, 0600);
+    if (fd >= 0) {
+        (void)write(fd, line, used);
+        close(fd);
+    }
+}
+#endif
 int main(int argc, char **argv) {
+#ifdef RECORD_CALLS
+    record_call(argc, argv);
+#endif
     const char *endpoint = NULL;
-    int foreground = 0, check = 0;
+    int foreground = 0, check = 0, list = 0;
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-s") == 0 && i + 1 < argc) endpoint = argv[++i];
         else if (strcmp(argv[i], "-m") == 0) foreground = 1;
         else if (strcmp(argv[i], "checkserver") == 0) check = 1;
+        else if (strcmp(argv[i], "list") == 0) list = 1;
     }
     if (check) {
         printf("Client version:Ver: 3.2.0d, server version:Ver: " SERVER_VERSION "\n");
         return 0;
     }
+#ifdef LIST_EMPTY
+    if (list) {
+        printf("[Empty]\n");
+        return 0;
+    }
+#else
+    (void)list;
+#endif
     if (!foreground || endpoint == NULL) {
         fprintf(stderr, "unregistered fixture output\n");
         return 23;
