@@ -2,7 +2,6 @@
 import Foundation
 import XCTest
 
-@testable import ArkDeckWorkflows
 
 final class TraceApplicationFacadeContractTests: XCTestCase {
   func testPublishedOperationFactsAreProjectedWithoutInventingProbeOrArtifacts() {
@@ -249,7 +248,7 @@ final class TraceApplicationFacadeContractTests: XCTestCase {
 
   func testFacadeExposesClosedTypedTraceSubmitRunAndCancel() throws {
     let facade = try source(
-      "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/TraceApplicationFacade.swift")
+      "Packages/ArkDeckKit/Sources/ArkDeckClientKit/TraceApplicationFacade.swift")
     let protocolBody = try XCTUnwrap(
       facade.split(separator: "public protocol TraceApplicationProviding", maxSplits: 1)
         .last?.split(separator: "public enum TraceApplicationFacade", maxSplits: 1).first)

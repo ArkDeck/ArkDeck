@@ -43,11 +43,6 @@ package enum TraceProbeAdapterProfile {
     "d8475c07177f87f8640ef3a52382e0ccaed42115c6a1592ef42c99fffb18204a"
 }
 
-package enum TraceProbeTool: String, Equatable, Sendable {
-  case hitrace
-  case bytrace
-}
-
 package enum TraceProbeAdapterSelection: Equatable, Sendable {
   case captureEligible(tool: TraceProbeTool, family: String)
   case probeOnlyNotCaptureEligible(tool: TraceProbeTool, family: String)

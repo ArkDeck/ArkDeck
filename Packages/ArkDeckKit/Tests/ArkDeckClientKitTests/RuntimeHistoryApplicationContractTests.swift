@@ -1257,12 +1257,22 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
     for _ in 0..<5 { repository.deleteLastPathComponent() }
     let workflow = repository.appending(
       path: "Packages/ArkDeckKit/Sources/ArkDeckWorkflows")
+    // CHG-2026-074 moves these facades to ClientKit one at a time, so each is
+    // read from whichever module currently declares it rather than from a
+    // pinned directory.
+    let modules = [
+      repository.appending(path: "Packages/ArkDeckKit/Sources/ArkDeckClientKit"),
+      workflow,
+    ]
     for file in [
       "DebugApplicationFacade.swift", "TraceApplicationFacade.swift",
       "UIDumpApplicationFacade.swift",
     ] {
-      let source = try String(
-        contentsOf: workflow.appending(path: file), encoding: .utf8)
+      let owner = try XCTUnwrap(
+        modules.map { $0.appending(path: file) }
+          .first { FileManager.default.fileExists(atPath: $0.path) },
+        "\(file) is in neither ArkDeckClientKit nor ArkDeckWorkflows")
+      let source = try String(contentsOf: owner, encoding: .utf8)
       XCTAssertTrue(
         source.contains("params: RuntimeAppReadResources.recentSummaryParams"),
         "\(file) must not restore an unbounded startup history read")

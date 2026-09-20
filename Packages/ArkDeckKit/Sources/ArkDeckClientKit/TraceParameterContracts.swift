@@ -1,4 +1,3 @@
-import ArkDeckClientKit
 import Foundation
 
 public struct TraceDebugParameterDefinition: Equatable, Sendable {

@@ -4,6 +4,7 @@
 // it owns the JSON snapshot shape and the only durable-record IO boundary,
 // while journals remain the authoritative external-effect history.
 
+import ArkDeckClientKit
 import ArkDeckCore
 import ArkDeckRuntime
 import ArkDeckStorage
