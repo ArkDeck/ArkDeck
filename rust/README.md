@@ -1457,6 +1457,17 @@ accepted, and development USB relations beside it only with
 maintainer's option A of 2026-09-19: what the owner proves about the real device
 is development-root evidence, never `REAL_DEVICE_PASS`), which startup refuses in
 any other composition and outside an isolated root.
+Beside that server, `ARKDECK_DEVELOPMENT_MUTATION_AUTHORITY=acknowledged` lets
+the isolated owner prove a device mutation's state continuity against its own
+Job state instead of the installed Runtime's root, which it can never be, so
+M2's real-device acceptance can run there (the maintainer's decision of
+2026-09-20, handled as that option A: development-root evidence again, and the
+dashboard's Golden Journey count does not move). Startup refuses the
+acknowledgment without the managed server, outside an isolated root, and in the
+standalone daemon and the facade. Nothing else about the proof changes: recorded
+authorization usage beside the root, a Job history that is not read-only, and an
+unsafe or foreign Session root still refuse it, and a mutation still needs its
+capability and its device hold.
 `runtime.hdc.status` answers the observer over that launch, and
 `target.availability`'s tool leg is `ready` with the startup facts. Swift exits
 70 when the server ends unexpectedly, for launchd to restart it (design §L.1

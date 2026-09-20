@@ -135,12 +135,23 @@ impl Runtime {
 
     /// The daemon with its managed server, answering health.
     fn start(&mut self) {
+        self.start_with(&[]);
+    }
+
+    /// The managed server, with whatever else the caller composes.
+    fn start_with(&mut self, environment: &[(&str, &str)]) {
         let port = self.port.to_string();
         self.child = Some(
-            self.command(&[
-                ("ARKDECK_DEVELOPMENT_HDC_SERVER", "managed"),
-                ("OHOS_HDC_SERVER_PORT", &port),
-            ])
+            self.command(
+                &[
+                    ("ARKDECK_DEVELOPMENT_HDC_SERVER", "managed"),
+                    ("OHOS_HDC_SERVER_PORT", &port),
+                ]
+                .iter()
+                .copied()
+                .chain(environment.iter().copied())
+                .collect::<Vec<_>>(),
+            )
             .stdout(Stdio::piped())
             .stderr(Stdio::inherit())
             .spawn()
@@ -558,4 +569,62 @@ fn development_usb_relations_beside_a_registered_hdc_are_acknowledged_only_as_na
              isolated development root"
     ));
     assert!(!runtime.fake_running());
+}
+
+#[test]
+fn the_development_mutation_authority_is_acknowledged_only_as_named() {
+    // The acknowledgment (maintainer decision 2026-09-20, as option A of
+    // 2026-09-19) lets the isolated owner prove a device mutation's state
+    // continuity against its own root. Every composition it does not name
+    // fails startup before any server starts.
+    const ACKNOWLEDGMENT: &str = "ARKDECK_DEVELOPMENT_MUTATION_AUTHORITY";
+    let mut runtime = Runtime::new();
+    let port = runtime.port.to_string();
+    let acknowledged_only = "ARKDECK_DEVELOPMENT_MUTATION_AUTHORITY is acknowledged only with an \
+                             isolated development state root whose development HDC the owner \
+                             starts as its managed server";
+    for (environment, message) in [
+        (
+            vec![
+                (ACKNOWLEDGMENT, "yes"),
+                ("ARKDECK_DEVELOPMENT_HDC_SERVER", "managed"),
+                ("OHOS_HDC_SERVER_PORT", port.as_str()),
+            ],
+            "ARKDECK_DEVELOPMENT_MUTATION_AUTHORITY accepts only acknowledged",
+        ),
+        // Acknowledged without the managed server, which the owner must start
+        // for the device it then mutates.
+        (vec![(ACKNOWLEDGMENT, "acknowledged")], acknowledged_only),
+    ] {
+        let output = runtime.refused(&environment);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(stderr.contains(message), "{environment:?}: {stderr}");
+        assert!(output.stdout.is_empty(), "{environment:?}");
+        assert!(
+            !runtime.fake_running(),
+            "{environment:?}: no managed server was started"
+        );
+    }
+    // The standalone daemon proves its continuity against the installed
+    // Runtime's root and never takes this authority. Its endpoint here is one
+    // no daemon could bind, so a daemon that did not refuse would fail on
+    // another message, never serve.
+    let output = runtime
+        .command(&[(ACKNOWLEDGMENT, "acknowledged")])
+        .env_remove("ARKDECK_DEVELOPMENT_HDC_PATH")
+        .env_remove("ARKDECK_DEVELOPMENT_STATE_ROOT")
+        .env("ARKDECK_ENDPOINT", runtime.root.join("absent/control.sock"))
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(69));
+    assert!(String::from_utf8_lossy(&output.stderr).contains(
+        "a development mutation authority is acknowledged only for an isolated development \
+             root"
+    ));
+    assert!(!runtime.fake_running());
+    // The one composition it names serves, with its managed server.
+    runtime.start_with(&[(ACKNOWLEDGMENT, "acknowledged")]);
+    assert_eq!(runtime.call("health", json!({}))["ok"], true);
+    let (status, _) = runtime.terminate(Duration::from_secs(60));
+    assert_eq!(status.code(), Some(0));
 }
