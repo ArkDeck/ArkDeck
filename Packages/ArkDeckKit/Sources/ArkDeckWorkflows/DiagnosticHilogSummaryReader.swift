@@ -2,28 +2,10 @@ import ArkDeckClientKit
 import ArkDeckCore
 import Foundation
 
-/// A verified summary Artifact and its recorded provenance. No source log,
-/// transport, operation execution or device-health verdict is exposed here.
-public struct DiagnosticHilogSummaryPresentation: Sendable, Equatable {
-  public let jobID: String
-  public let sourceJobID: String
-  public let sourceArtifactID: String
-  public let sourceSHA256: String
-  public let sourceByteCount: Int
-  public let analyzerExecutableSHA256: String
-  public let analyzerOutputSHA256: String
-  public let headerCoverage: String
-  public let lineCount: Int
-  public let blankLineCount: Int
-  public let unrecognizedLineCount: Int
-  public let levelCounts: [String: Int]
-  public let artifact: RuntimeArtifactPresentation
-}
-
-public enum DiagnosticHilogSummaryLoadResult: Sendable, Equatable {
-  case loaded(DiagnosticHilogSummaryPresentation)
-  case unavailable(String)
-}
+// The reader stays here: it verifies the summary Artifact against
+// HilogSummaryDerivedAnalyzer, the analyzer provider's own validator, which
+// ClientKit may not reach. What it returns — the presentation and the load
+// result — is ClientKit's (docs/ArchitectureRules.md).
 
 public struct DiagnosticHilogSummaryReader: Sendable {
   private let provider: any RuntimeJobDetailApplicationProviding

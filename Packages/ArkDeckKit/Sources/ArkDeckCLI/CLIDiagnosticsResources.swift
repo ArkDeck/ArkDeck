@@ -1,4 +1,5 @@
 import ArkDeckAgentClient
+import ArkDeckClientKit
 import ArkDeckCore
 import ArkDeckRuntime
 import ArkDeckWorkflows

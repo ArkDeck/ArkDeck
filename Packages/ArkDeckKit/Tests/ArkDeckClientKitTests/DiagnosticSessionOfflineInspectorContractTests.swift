@@ -2,7 +2,7 @@ import Foundation
 import XCTest
 
 @testable import ArkDeckCore
-@testable import ArkDeckWorkflows
+@testable import ArkDeckClientKit
 
 final class DiagnosticSessionOfflineInspectorContractTests:
   XCTestCase
@@ -170,7 +170,7 @@ final class DiagnosticSessionOfflineInspectorContractTests:
     let app = try String(
       contentsOf: root.appending(
         path:
-          "Sources/ArkDeckWorkflows/DiagnosticSessionApplicationReader.swift"),
+          "Sources/ArkDeckClientKit/DiagnosticSessionApplicationReader.swift"),
       encoding: .utf8)
     let cli = try String(
       contentsOf: root.appending(

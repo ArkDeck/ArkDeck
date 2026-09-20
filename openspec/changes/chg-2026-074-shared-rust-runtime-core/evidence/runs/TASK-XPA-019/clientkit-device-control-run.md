@@ -92,8 +92,16 @@ unified gate is not run (AGENTS.md "验证与完成"); the PR's CI is the gate.
 
 ## CI
 
-Recorded by the next slice, because a green head is merged without an amend. The workspace
-continuation slice's CI (#2067) is recorded in its own run record by this commit.
+PR #2077, merged as `62123ea8`. On head `02994729` (base `42d1fb97`) every check passed:
+
+| Workflow run | Jobs | Conclusion |
+| --- | --- | --- |
+| Swift CI `35496710718` | `plan`, `swift-tests`, `app-build`, `ds-interactions` and the required `swift` aggregate; `rust-checks` skipped, as the plan selected no Rust lane | success |
+| SDD Guard `35496710593` | the required `guard`, `ds-tokens` | success |
+| Agent PR `35496710589` | `open-pr` | success |
+
+A green head is merged without an amend, so the diagnostic readers slice records this section.
+This slice's commit recorded the workspace continuation slice's CI (#2067) in its own run record.
 
 ## Not run
 
