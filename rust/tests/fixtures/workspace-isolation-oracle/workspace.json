@@ -1,0 +1,14 @@
+{
+  "allowedPaths" : [
+    "Sources/App.txt"
+  ],
+  "workspace" : {
+    "allowedPathsDigest" : "3427fcf49cad72b72643b9724e6fc2107d75e572a8efb16c1fc044bcc44b151b",
+    "baseRevision" : "f55c16a181e89d99f439585ec7fff7fb037b62a2d3236bdf24141e6c572fa684",
+    "createdAtUTC" : "2026-09-20T00:00:00.000Z",
+    "htaskID" : "runtime-job-825787507429b81047c9726a1373a83b",
+    "projectRef" : "evolution-e2ae7c7152894a5b51d9",
+    "sourceProjectRef" : "IsolationOracleProject",
+    "workspaceID" : "evo-e2ae7c7152894a5b51d95e92"
+  }
+}
