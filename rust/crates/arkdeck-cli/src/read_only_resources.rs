@@ -36,6 +36,7 @@ pub(crate) fn configure(
             command,
             "operation.describe"
                 | "operation.example"
+                | "operation.validate"
                 | "job.status"
                 | "job.list"
                 | "job.show"
@@ -51,7 +52,10 @@ pub(crate) fn configure(
     if command == "job.list" {
         crate::job_resources::configure_list(fields)?;
     } else {
-        let key = if matches!(command, "operation.describe" | "operation.example") {
+        let key = if matches!(
+            command,
+            "operation.describe" | "operation.example" | "operation.validate"
+        ) {
             "operation"
         } else {
             "jobId"
@@ -69,10 +73,21 @@ pub(crate) fn configure(
                 ),
             )
         })?;
-        if matches!(command, "operation.describe" | "operation.example") {
+        if matches!(
+            command,
+            "operation.describe" | "operation.example" | "operation.validate"
+        ) {
             let reference = text.to_owned();
             fields.remove("operation");
             fields.insert("reference".into(), json!(reference));
+            // The registry requires both options; the document itself is read
+            // after the descriptor answers, as Swift reads it.
+            if command == "operation.validate" && !fields.contains_key("inputsFile") {
+                return Err(CliError::new(
+                    "invalidOption",
+                    "operation.validate requires --inputs-file",
+                ));
+            }
             return Ok(None);
         }
         if !identifier(text) {

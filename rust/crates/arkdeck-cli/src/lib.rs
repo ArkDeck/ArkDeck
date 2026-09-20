@@ -10,6 +10,7 @@ pub use artifact_resources::{
 };
 pub use import_resources::execute_import;
 mod bootstrap_resources;
+mod operation_validation;
 mod read_only_resources;
 pub use read_only_resources::{
     evidence_exit, project_read_only_response, result_exit, validate_read_only_request,
@@ -43,6 +44,9 @@ pub use agent_executions::{
 pub use artifact_resources::validate_artifact_page;
 pub use command_registry::{
     command_registry, command_registry_human, completion_script, help_text, is_node,
+};
+pub use operation_validation::{
+    bounded_input_document, input_findings, validation_attention, validation_document,
 };
 
 /// This CLI's product version (Swift `CLIProductVersion.product`).
@@ -692,6 +696,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["doctor"] => "doctor",
         ["operation", "list"] => "operation.list",
         ["operation", "describe"] => "operation.describe",
+        ["operation", "validate"] => "operation.validate",
         ["operation", "example"] => "operation.example",
         ["job", "status"] => "job.status",
         ["job", "list"] => "job.list",
@@ -727,6 +732,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["runtime", "bundle", "inspect"] => "runtime.bundle.inspect",
         ["runtime", "bundle", "list"] => "runtime.bundle.list",
         ["runtime", "bundle", "remove"] => "runtime.bundle.remove",
+        ["runtime", "health"] => "runtime.health",
         ["runtime", "hdc", "status"] => "runtime.hdc.status",
         ["runtime", "hdc", "impact-preview"] => "runtime.hdc.impact-preview",
         ["runtime", "hdc", "restart"] => "runtime.hdc.restart",
@@ -1017,6 +1023,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         "runtime.bundle.register" => &["kind", "file"],
         "runtime.bundle.inspect" => &["bundle"],
         "operation.describe" | "operation.example" => &["operation"],
+        "operation.validate" => &["operation", "inputsFile"],
         "job.plan" | "job.submit" => &[
             "requestFile",
             "targetId",
@@ -1277,8 +1284,12 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                 | "artifact.import.flash-bundle"
         ) {
             "artifact.import.begin"
-        } else if command == "operation.example" {
+        } else if matches!(command, "operation.example" | "operation.validate") {
+            // `operation validate` reads the descriptor first and judges the
+            // inputs against it here; `health` follows on the same connection.
             "operation.describe"
+        } else if command == "runtime.health" {
+            "health"
         } else {
             command
         },
@@ -1323,6 +1334,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                 command,
                 "operation.describe"
                     | "operation.example"
+                    | "operation.validate"
                     | "job.status"
                     | "job.list"
                     | "job.show"

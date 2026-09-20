@@ -75,6 +75,33 @@ impl<S: Read + Write> Client<S> {
         }
     }
 
+    /// The verified `health` document. The contract preflight *is* this call:
+    /// Swift's client skips its own preflight for `health`
+    /// (`verifyContract: method != "health"`), so the leaf that reads health
+    /// makes one exchange, not two.
+    pub fn health(&mut self, id: &str) -> Result<Value, ClientError> {
+        if self.unusable {
+            return Err(ClientError::ConnectionUnusable);
+        }
+        let result = self.health_inner(id);
+        if matches!(
+            result,
+            Err(ClientError::Transport(_) | ClientError::Contract(_))
+        ) {
+            self.unusable = true;
+        }
+        result
+    }
+
+    fn health_inner(&mut self, id: &str) -> Result<Value, ClientError> {
+        self.check_deadline()?;
+        let response = self.exchange(&Request::new(id, "health", None))?;
+        validate_health(&response)?;
+        self.verified = true;
+        self.check_deadline()?;
+        response.outcome.map_err(ClientError::Remote)
+    }
+
     pub fn request(
         &mut self,
         id: &str,
