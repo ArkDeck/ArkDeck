@@ -425,6 +425,55 @@ fn main() -> std::process::ExitCode {
             return error.exit_code().into();
         }
     };
+    if invocation.command == "help" || (invocation.help && invocation.command != "commands") {
+        // `arkdeck help <path>` renders that path; `<leaf> --help` renders the
+        // leaf's own, both from the registry (Swift `CLIHelpRenderer`).
+        let path: Vec<String> = if invocation.command == "help" {
+            invocation
+                .params
+                .as_ref()
+                .and_then(|params| params["path"].as_array().cloned())
+                .unwrap_or_default()
+                .iter()
+                .filter_map(|token| token.as_str().map(str::to_owned))
+                .collect()
+        } else {
+            arkdeck_cli::command_registry()["commands"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .find(|entry| entry["command"] == invocation.command)
+                .and_then(|entry| entry["path"].as_array().cloned())
+                .unwrap_or_default()
+                .iter()
+                .filter_map(|token| token.as_str().map(str::to_owned))
+                .collect()
+        };
+        return match arkdeck_cli::help_text(&path) {
+            Ok(text) => {
+                println!("{text}");
+                0.into()
+            }
+            Err(error) => {
+                eprintln!("arkdeck: {}", error.message);
+                error.exit_code().into()
+            }
+        };
+    }
+    if invocation.command == "completion" {
+        let shell = invocation
+            .params
+            .as_ref()
+            .and_then(|params| params["path"][0].as_str())
+            .unwrap_or_default()
+            .to_owned();
+        let script = arkdeck_cli::completion_script(&shell).expect("the parser's closed shell set");
+        return if io::stdout().lock().write_all(script.as_bytes()).is_err() {
+            74.into()
+        } else {
+            0.into()
+        };
+    }
     if invocation.help {
         println!(
             "ArkDeck commands:\n  commands\n  doctor [--deep] [--require-healthy]\n  operation list\n  operation describe|example --operation <reference>\n  job status|show|evidence|result --job <id> [--timeout <duration>]\n  job timeline --job <id> [--page-size <n>] [--cursor <cursor>] [--timeout <duration>]\n  job events --job <id> [--page-size <n>] [--after-cursor <cursor>] [--timeout <duration>]\n  job plan --request-file <path> | --target <id> --operation <reference> [--inputs-file <path>] [--expected-binding-revision <n>] [--request-id <id>] [--idempotency-key <key>] [--timeout <duration>]\n  job submit --request-file <path> | --target <id> --operation <reference> [--inputs-file <path>] [--expected-binding-revision <n>] [--request-id <id>] [--idempotency-key <key>] [--timeout <duration>]\n  job run --job <id> [--timeout <duration>]\n  job cancel --job <id>\n  job reconcile --job <id>\n  capability list\n  capability inspect --capability <id>\n  job list [--page-size <n>] [--cursor <cursor>] [--order <order>] [--include-current] [--include-timeline] [--state <state>] [--operation <reference>] [--target <id>] [--thread <id>] [--timeout <duration>]\n  artifact import hap|native-library|workspace-patch|flash-bundle --import-request-id <id> --target <id> --file <path> [--timeout <duration>]\n  artifact import list [--target <id>] [--state <state>] [--page-size <n>] [--cursor <cursor>] [--timeout <duration>]\n  artifact import abort --import-request-id <id> --expected-generation <n> [--timeout <duration>]\n  artifact import release --import <id> --generation <n> [--timeout <duration>]\n  artifact import inspect --import-request-id <id>|--import <id> [--timeout <duration>]\n  artifact inspect --job <id>|--import <id> --artifact <id> [--timeout <duration>]\n  artifact read --job <id>|--import <id> --artifact <id> [--offset <n>] [--max-bytes <n>] [--allow-sensitive] [--raw] [--timeout <duration>]\n  artifact export --job <id>|--import <id> --artifact <id> --destination <directory> [--allow-sensitive] [--overwrite] [--timeout <duration>]\n  artifact quota\n  artifact list --job <id>|--import <id> [--page-size <n>] [--cursor <cursor>] [--timeout <duration>]\n  agent run --operation <reference> [--target <id>] [--expected-binding-revision <n>] [--inputs-file <path>] [--request-id <id>] [--idempotency-key <key>] [--capability <id>] [--reviewed-plan-digest <sha256>] | --request-file <path>, [--execution-id <id>] [--maximum-wait <duration>] [--timeout <duration>]\n  agent status --execution-id <id> [--timeout <duration>]\n  agent list [--state <state>] [--operation <reference>] [--target <id>] [--page-size <n>] [--cursor <cursor>] [--timeout <duration>]\n  agent abandon --execution-id <id> --expected-generation <n> [--timeout <duration>]\n  human-action list [--owner-kind agentExecution|controlAction --owner <id>] [--page-size <n>] [--cursor <cursor>] [--timeout <duration>]\n  human-action show --human-action <id> [--timeout <duration>]\n  agent resume --resume-reference <ref>|--resume-token <ref> [--selection <choice>|--selection-file <path>] [--timeout <duration>]\n  human-action resume --human-action <id> --resume-reference <ref> [--selection <choice>|--selection-file <path>] [--timeout <duration>]\n  device candidates\n  target adopt --candidate <key> --observation <id> --observation-generation <n> [--timeout <duration>]\n  target list\n  target show --target <id> [--timeout <duration>]\n  target availability --target <id> [--timeout <duration>]\n  target display-name set|clear --target <id> --expected-generation <n> [--name <text>]\n  device display-name set|clear --candidate <key> --observation <id> --observation-generation <n> [--name <text>]\n  trace cache status|purge\n  history filter list\n  history filter save --expected-generation <n> [--search <text>] [--status <status>] [--mode <mode>] [--session <id>] [--target <id>] [--time <range>] [--activity <activity>]\n  history filter delete --expected-generation <n>\n  runtime tool register --kind deveco --root <absolute-path>\n  runtime tool register --kind hdc --file <absolute-path>\n  runtime tool list [--page-size <n>] [--cursor <cursor>]\n  runtime tool remove --tool <reference> --expected-generation <n>\n  runtime tool inspect --tool <reference>\n  runtime tool select --tool <reference> --expected-active-generation <n> --action-request-id <id> [--timeout <duration>]\n  runtime bundle register --kind daemon-bundle --file <absolute-path>\n  runtime bundle inspect --bundle <reference>\n  runtime bundle list [--page-size <n>] [--cursor <cursor>]\n  runtime bundle remove --bundle <reference> --expected-generation <n>\n  runtime hdc status\n  runtime hdc impact-preview --action restart --server-endpoint-ref <ref> --expected-server-generation <n> --action-request-id <id> [--timeout <duration>]\n  runtime hdc restart --control-action <id> --preview-id <id> --preview-digest <sha256> [--timeout <duration>]\n  control-action list [--kind hdcLifecycle] [--state <state>] [--page-size <n>] [--cursor <cursor>] [--timeout <duration>]\n  control-action show|reconcile --control-action <id> [--timeout <duration>]\n  runtime storage status\n  runtime storage policy --expected-generation <n> --total-quota-bytes <bytes> --safety-margin-bytes <bytes> --retention-days <days>\n  runtime storage root --expected-generation <n> (--root <path> | --default)\n  session list [--page-size <n>] [--cursor <cursor>]\n  session show --session <id>\n  session pin|unpin --session <id> --expected-generation <n>\n  session cleanup preview\n  session cleanup apply --preview-id <uuid> --preview-digest <sha256>\n  session export preview --session <id> --destination <path> [--allow-sensitive]\n  session export apply --preview-id <uuid> --preview-digest <sha256>\n  workspace project register --registration-request-id <id> --kind arkdeck|openharmony --root <absolute-path>\n  workspace project list\n  workspace project show --project <ref>\n  workspace project update --project <ref> --expected-generation <n> --kind arkdeck|openharmony --root <absolute-path>\n  workspace project remove --project <ref> --expected-generation <n>\n  workspace preset list --project <ref> [--kind build|test|signing|symbol]\n  workspace preset show --project <ref> --preset <ref>\n  workspace preset register --registration-request-id <id> --project <ref> <definition>\n  workspace preset update --mutation-request-id <id> --project <ref> --preset <ref> --expected-generation <n> <definition>\n  workspace preset remove --mutation-request-id <id> --project <ref> --preset <ref> --expected-generation <n>\n    <definition>: --kind build|test|signing|symbol --template <ref> --timeout-seconds <1-3600> [--toolchain <ref> --toolchain-generation <n>] [--credential <ref>] [--module <name> --product <name> --build-mode <mode>] [--relative-source-map <path>]\n\nOptions: --output human|json, --control-request-id <id>\nA private local Runtime must be running. Windows requires the installed daemon identity."
