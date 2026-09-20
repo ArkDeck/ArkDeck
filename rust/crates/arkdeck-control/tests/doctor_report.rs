@@ -173,12 +173,6 @@ fn every_recorded_report_is_reproduced_from_the_inputs_it_states() {
         let Some(result) = recorded.get("result") else {
             continue;
         };
-        let findings: Vec<&str> = result["findings"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|finding| finding["code"].as_str().unwrap())
-            .collect();
         *report.lock().unwrap() = result.clone();
         answered.store(0, Ordering::SeqCst);
         let answer = call(&control, recorded.get("params").cloned());
