@@ -19,6 +19,11 @@ after the run starts (`fixture-deadlines.py`): both daemons sweep expired
 Artifacts at startup with the real clock, and the recorded ones lapse on
 2026-09-21. The quota counts bytes, never a deadline.
 
+A refusal's `DecodingError` rendering belongs to the Swift runtime and changes
+with the host's OS, so it is T2 under r11 section 3 and read as a label
+(`decoding-error-wording.py`). The case the runtime names, the ArkDeck wording
+around it, the error code, the answer's shape and its order stay compared.
+
 Swift children get CFFIXED_USER_HOME inside the disposable root. Host-only: no
 device, installed state or hardware evidence.
 """
@@ -45,6 +50,11 @@ _deadlines_spec = importlib.util.spec_from_file_location(
     'fixture_deadlines', Path(__file__).with_name('fixture-deadlines.py'))
 fixture_deadlines = importlib.util.module_from_spec(_deadlines_spec)
 _deadlines_spec.loader.exec_module(fixture_deadlines)
+_wording_spec = importlib.util.spec_from_file_location(
+    'decoding_error_wording', Path(__file__).with_name('decoding-error-wording.py'))
+decoding_error_wording = importlib.util.module_from_spec(_wording_spec)
+_wording_spec.loader.exec_module(decoding_error_wording)
+masked = decoding_error_wording.masked
 
 
 def sha256(path: Path) -> str:
@@ -212,9 +222,9 @@ def main() -> None:
                       {'started': started, 'after': entries(rust_root)})
                 stop(rust)
 
-                check(f'swift.oracle.{scenario}', swift_answer == case['response'],
+                check(f'swift.oracle.{scenario}', masked(swift_answer) == masked(case['response']),
                       {'swift': swift_answer, 'oracle': case['response']})
-                check(f'identical.{scenario}', rust_answer == swift_answer,
+                check(f'identical.{scenario}', masked(rust_answer) == masked(swift_answer),
                       {'swift': swift_answer, 'rust': rust_answer})
                 check(f'cli.{scenario}', rust_cli_read == swift_cli_read,
                       {'swift': swift_cli_read, 'rust': rust_cli_read})
