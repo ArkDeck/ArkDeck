@@ -462,6 +462,14 @@ pub struct DoctorFacts {
     pub targets: TargetStoreFacts,
     pub discovery: bool,
     pub cleanup_debt: Option<u64>,
+    /// The Jobs start-up recovery set aside, in its order, each with the
+    /// reason it gave (Swift `engine.quarantinedJobRecords`).
+    pub quarantined: Vec<(String, String)>,
+    /// Every durable Job record in the store this build cannot decode, and a
+    /// bounded sample of their identities in the index's order (Swift
+    /// `engine.unreadableDurableRecords()`, whose sample stops at 16). Read
+    /// only for a deep report, so absent otherwise.
+    pub unreadable_records: Option<(u64, Vec<String>)>,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -1229,6 +1237,44 @@ impl<H: HostServices> Control<H> {
             "the target control protocol is serving bounded diagnostic requests",
             None,
         );
+
+        // Swift: the Jobs whose durable record this build cannot decode. They
+        // are why the daemon may be serving with part of its own store
+        // unreadable, so each is a blocker naming the Job and the reason
+        // recovery gave. Recovery already answered; nothing is read again.
+        for (job, reason) in &facts.quarantined {
+            add(
+                "runtime.jobRecordUnreadable",
+                "blocker",
+                "runtime",
+                &format!(
+                    "a Job record in this store was written in a shape this build cannot read: {job} — {reason}. The Job is not live, its record was not modified, and it still counts as active"
+                ),
+                None,
+            );
+        }
+        // Recovery's query excludes terminal states, so the findings above
+        // name only still-active Jobs. A deep report counts the whole ledger
+        // and names a bounded sample, as one finding rather than one per row.
+        if let Some((total, sample)) = &facts.unreadable_records
+            && *total > 0
+        {
+            let named = sample.join(", ");
+            add(
+                "runtime.durableRecordsUnreadable",
+                "blocker",
+                "runtime",
+                &format!(
+                    "{total} durable Job records in this store were written in a shape this build cannot read{}. No byte of these records is modified; every History page that would include one is refused, and every mutation face they could affect stays refused",
+                    if named.is_empty() {
+                        String::new()
+                    } else {
+                        format!(", among them {named}")
+                    }
+                ),
+                None,
+            );
+        }
 
         // Swift `engine.operationAvailability()` and `providerIDs`: an
         // operation is available when the host answers it with no reason, and

@@ -325,6 +325,26 @@ impl JobStore {
         Ok((key, bytes))
     }
 
+    /// Swift `RuntimeJobEngine.unreadableDurableRecords(sampleLimit:)`: every
+    /// durable Job record in the index this build cannot decode, counted, with
+    /// the first `limit` identities in the index's order. It reads the index
+    /// only, changes nothing, and grants no authority; `doctor --deep` names
+    /// what it finds. A store whose index cannot be read at all is the
+    /// caller's refusal, not an empty answer.
+    pub fn unreadable_records(&self, limit: usize) -> Result<(u64, Vec<String>), WireError> {
+        let rows = self.repository.rows(None).map_err(unreadable)?;
+        let (mut total, mut sample) = (0_u64, Vec::new());
+        for row in &rows {
+            if JobRecord::from_row(row).is_err() {
+                total += 1;
+                if sample.len() < limit {
+                    sample.push(row.id.clone());
+                }
+            }
+        }
+        Ok((total, sample))
+    }
+
     /// Keep the complete Job activity census stable through a Session owner's
     /// preview/apply turn. Every future Job writer must acquire this same guard.
     /// Unreadable or unsupported records prevent reclamation; absence of an
