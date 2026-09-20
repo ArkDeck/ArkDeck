@@ -47,6 +47,22 @@ python3 -m bench compare \
   --mode ratio --threshold 0.20
 ```
 
+```bash
+cd scripts
+python3 -m bench select-baseline \
+  --candidate /tmp/arkdeck-perf/perf-baseline-<date>.json \
+  --directory bench/baselines
+```
+
+`select-baseline` prints the committed baseline that measured the same daemon
+as the capture, which is what the scheduled lane compares against. A Rust
+capture judged against the Swift baseline reports every metric as not
+comparable, because the two soaks seed different Job counts, so picking the
+reference by filename order would read as a red lane rather than as a
+regression. With no baseline for that daemon it exits 1 and says so; the lane
+then archives the measurement instead of comparing. A document written before
+`toolchain.runtimeKind` existed measured the Swift daemon.
+
 Unit tests:
 
 ```bash

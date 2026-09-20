@@ -109,8 +109,6 @@ jobs:
     # Measured locally (warm build, release): three runs at full sample counts
     # take about nine minutes, most of it the 120 s resource window per run.
     timeout-minutes: 60
-    env:
-      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
     steps:
       - name: Checkout default branch with runner Git
         run: |
@@ -152,7 +150,14 @@ jobs:
           path: ${{ runner.temp }}/perf/perf-baseline-*.json
           if-no-files-found: error
           retention-days: 90
-      - name: Compare against the committed baseline (ratio, +10%)
+      - name: Compare against the committed baseline of the same daemon (ratio, +10%)
+        # The reference is chosen by the daemon it measured, not by filename
+        # order. Every committed baseline is Swift today, and this job captures
+        # Rust: comparing the two reports "not comparable" for every metric,
+        # because the Swift and Rust soaks seed different Job counts. On this
+        # runner the host mismatch hides that behind a skip; on a runner whose
+        # host does match it would turn the lane red without a regression.
+        #
         # `pipefail` matters here: without it the exit status of the pipeline
         # is `tee`'s, and a reported regression would leave the step green. The
         # first run of the retired per-push lane did exactly that.
@@ -160,7 +165,16 @@ jobs:
           set -euo pipefail
           cd scripts
           CANDIDATE="$(ls "$RUNNER_TEMP"/perf/perf-baseline-*.json | tail -1)"
-          COMMITTED="$(ls bench/baselines/perf-baseline-*.json | tail -1)"
+          if ! COMMITTED="$(python3 -m bench select-baseline \
+            --candidate "$CANDIDATE" --directory bench/baselines)"; then
+            {
+              echo "No committed baseline measures the daemon this run captured."
+              echo "The measurement is archived; this lane compares once such a"
+              echo "baseline is committed (design section L.1 item 15 and the"
+              echo "reference-host decision gate that)."
+            } | tee -a "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           python3 -m bench compare \
             --committed "$COMMITTED" --candidate "$CANDIDATE" \
             --mode ratio --threshold 0.10 \
@@ -178,8 +192,6 @@ jobs:
     # margin the slow lanes use; the full 24-hour figure is recorded as an open
     # gap in the SPK-1 report.
     timeout-minutes: 330
-    env:
-      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
     steps:
       - name: Checkout default branch with runner Git
         run: |
