@@ -299,8 +299,9 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
             .with_agent_executions(arkdeck_hoststore::AgentExecutionStore::open(
                 &root.join("agent-executions"),
             )?)
-            // Swift's combined human-action owner pages the executions' actions
-            // in its own directory beside them.
+            // Swift's combined human-action owner pages the executions' actions,
+            // and the approvals of the control-action owner below, in its own
+            // directory beside them.
             .with_human_actions(arkdeck_hoststore::HumanActionResources::open(
                 &root.join("human-action-snapshots"),
             )?)

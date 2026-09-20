@@ -11,9 +11,12 @@
 //! an exact identity is not found and a listing is one empty snapshot page.
 //! Once its HDC server host has started the union owner routes to the HDC
 //! control-action owner (`hdc_control_action.rs`), which previews and holds
-//! the actions; the tool-selection owner is not composed here, so a
-//! selection is unavailable before any parameter is read, and
-//! `runtime.hdc.restart` stays unavailable: its impact approval is not here.
+//! the actions and requests a restart's impact approval, and it hands the
+//! approvals to the human-action owner (`human_action.rs`); the
+//! tool-selection owner is not composed here, so a selection is unavailable
+//! before any parameter is read.
+use crate::agent_execution::ActionRow;
+use crate::control_action_value::digest;
 use crate::hdc_control_action::{HdcControlActions, ImpactSource};
 use crate::snapshot_pager::SnapshotPager;
 use arkdeck_contract::WireError;
@@ -84,6 +87,27 @@ fn exact_identity(params: &Map<String, Value>) -> Result<&str, WireError> {
                 "an exact control-action identity is required",
             )
         })
+}
+
+/// The handler's `runtime.hdc.restart` check: exactly the tuple naming one
+/// preview of one action, each an exact identity or a lowercase digest.
+fn restart_tuple(params: &Map<String, Value>) -> Result<(&str, &str, &str), WireError> {
+    let text = |key: &str| params.get(key).and_then(Value::as_str);
+    match (
+        text("controlAction"),
+        text("previewId"),
+        text("previewDigest"),
+    ) {
+        (Some(action), Some(preview), Some(value))
+            if params.len() == 3 && identifier(action) && identifier(preview) && digest(value) =>
+        {
+            Ok((action, preview, value))
+        }
+        _ => Err(refused(
+            "invalidInput",
+            "restart requires one exact control-action preview tuple",
+        )),
+    }
 }
 
 /// A `control-action.list` request as the handler passes it to its owner.
@@ -186,10 +210,16 @@ impl ControlActionResources {
                 let _gate = self.gate.lock().map_err(|_| unreadable())?;
                 hdc.preview(params, source)
             }
-            // The impact approval a restart requests is not composed here,
-            // so this answers as a daemon without its HDC owner does, before
-            // any parameter is read.
-            "runtime.hdc.restart" => Err(hdc_owner_unavailable()),
+            // Swift's handler asks its HDC owner directly, not the union:
+            // the owner's presence, then the tuple, then the request.
+            "runtime.hdc.restart" => {
+                let Some((hdc, source)) = hdc else {
+                    return Err(hdc_owner_unavailable());
+                };
+                let (id, preview, value) = restart_tuple(params)?;
+                let _gate = self.gate.lock().map_err(|_| unreadable())?;
+                hdc.restart(id, preview, value, source)
+            }
             "runtime.tool.select" => Err(tool_selection_owner_unavailable()),
             "control-action.show" | "control-action.reconcile" => {
                 let id = exact_identity(params)?;
@@ -213,6 +243,20 @@ impl ControlActionResources {
                 self.list(request, hdc.map(|(hdc, _)| hdc))
             }
             _ => Err(unknown_method()),
+        }
+    }
+
+    /// Swift's union `humanActionResourceRows`: the impact approvals its
+    /// owners hold (only those of the action `owner` names, when given) —
+    /// the HDC owner's, since no tool-selection owner is composed.
+    pub(crate) fn human_action_rows(
+        &self,
+        owner: Option<&str>,
+    ) -> Result<Vec<ActionRow>, WireError> {
+        let _gate = self.gate.lock().map_err(|_| unreadable())?;
+        match &self.hdc {
+            Some(hdc) => hdc.human_action_rows(owner),
+            None => Ok(Vec::new()),
         }
     }
 
@@ -421,6 +465,35 @@ mod tests {
         assert_eq!(
             exact_identity(&params(json!({"controlAction": "a"}))).unwrap(),
             "a"
+        );
+        // Restart: exactly the tuple, each member an exact identity or a
+        // lowercase digest.
+        let digest = "a".repeat(64);
+        for fields in [
+            json!({}),
+            json!({"controlAction": "a", "previewId": "p"}),
+            json!({"controlAction": "a", "previewId": "p", "previewDigest": digest.to_uppercase()}),
+            json!({"controlAction": "a", "previewId": "p", "previewDigest": "a".repeat(63)}),
+            json!({"controlAction": "a b", "previewId": "p", "previewDigest": digest}),
+            json!({"controlAction": "a", "previewId": 1, "previewDigest": digest}),
+            json!({"controlAction": "a", "previewId": "p", "previewDigest": digest, "x": 1}),
+        ] {
+            let error = restart_tuple(&params(fields.clone())).err().unwrap();
+            assert_eq!(
+                (error.code.as_str(), error.message.as_str()),
+                (
+                    "invalidInput",
+                    "restart requires one exact control-action preview tuple"
+                ),
+                "{fields}"
+            );
+        }
+        assert_eq!(
+            restart_tuple(&params(
+                json!({"controlAction": "a", "previewId": "p", "previewDigest": digest})
+            ))
+            .unwrap(),
+            ("a", "p", digest.as_str())
         );
     }
 }

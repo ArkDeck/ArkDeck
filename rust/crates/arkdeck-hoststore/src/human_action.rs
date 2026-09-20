@@ -1,11 +1,18 @@
 //! Swift `RuntimeHumanActionResourceCoordinator` over the agent execution
-//! owner (CHG-2026-074, TASK-XPA-014): `human-action.list` and
-//! `human-action.show` as Swift's daemon answers them with its combined
-//! human-action owner. The rows are every execution's physical-assistance
-//! actions, paged in one snapshot and cursor namespace the owner keeps in its
-//! own directory (`human-action-snapshots`). The Rust Runtime keeps no
-//! control-action approvals, so a `controlAction` owner lists nothing.
-use crate::agent_execution::{AgentExecutionStore, valid_identifier};
+//! owner and the union control-action owner (CHG-2026-074, TASK-XPA-014):
+//! `human-action.list` and `human-action.show` as Swift's daemon answers them
+//! with its combined human-action owner. The rows are every execution's
+//! physical-assistance actions and every control action's impact approval,
+//! paged in one snapshot and cursor namespace the owner keeps in its own
+//! directory (`human-action-snapshots`).
+//!
+//! An approval is answered by a person through the console challenge of
+//! `human-action.resume`, which is not here. The combined owner still finds
+//! it for a resume, as Swift's daemon does, and answers as that daemon
+//! answers a request that cannot carry the challenge: the approval itself,
+//! unchanged, for `human-action.resume`, and a refusal for `agent.resume`.
+use crate::agent_execution::{ActionRow, AgentExecutionStore, valid_identifier};
+use crate::control_action::ControlActionResources;
 use crate::snapshot_pager::SnapshotPager;
 use arkdeck_contract::WireError;
 use serde_json::{Map, Value, json};
@@ -41,6 +48,33 @@ fn owned(error: WireError) -> WireError {
     refused(&error.code, error.message)
 }
 
+/// A refusal of a resume, as the handler that took it answers: the combined
+/// human-action handler proves zero dispatch for every owner refusal, the
+/// agent execution handler only for its named ones, and neither for a
+/// failure that is not a refusal.
+fn resume_failure(method: &str, code: &str, message: String) -> WireError {
+    match method {
+        "agent.resume" if code == "internalError" => {
+            crate::agent_execution::internal(crate::agent_execution::UNREADABLE)
+        }
+        "agent.resume" => crate::agent_execution::failure(code, message),
+        _ => refused(code, message),
+    }
+}
+
+/// Swift `matching`: every execution's actions, then every control
+/// action's approval.
+fn rows(
+    agents: &AgentExecutionStore,
+    controls: Option<&ControlActionResources>,
+) -> Result<Vec<ActionRow>, WireError> {
+    let mut rows = agents.human_action_rows(None).map_err(owned)?;
+    if let Some(controls) = controls {
+        rows.extend(controls.human_action_rows(None).map_err(owned)?);
+    }
+    Ok(rows)
+}
+
 /// Swift's `identifier`: a field that is a bounded resource identity.
 fn identity<'a>(params: &'a Map<String, Value>, key: &str) -> Result<&'a str, WireError> {
     params
@@ -74,12 +108,14 @@ impl HumanActionResources {
     }
 
     /// The daemon's `human-action.show` and `human-action.list`, with its
-    /// checks in its order, answered by the combined owner over `agents`.
+    /// checks in its order, answered by the combined owner over `agents` and
+    /// the union control-action owner the daemon composes beside them.
     pub fn answer(
         &self,
         method: &str,
         params: &Map<String, Value>,
         agents: &AgentExecutionStore,
+        controls: Option<&ControlActionResources>,
     ) -> Result<Value, WireError> {
         let _gate = self
             .gate
@@ -94,9 +130,7 @@ impl HumanActionResources {
                     ));
                 }
                 let id = identity(params, "humanAction")?;
-                let mut rows = agents
-                    .human_action_rows(None)
-                    .map_err(owned)?
+                let mut rows = rows(agents, controls)?
                     .into_iter()
                     .filter(|row| row.id == id);
                 match (rows.next(), rows.next()) {
@@ -108,9 +142,109 @@ impl HumanActionResources {
                     )),
                 }
             }
-            "human-action.list" => self.list(params, agents),
+            "human-action.list" => self.list(params, agents, controls),
             _ => Err(refused("internalError", UNREADABLE)),
         }
+    }
+
+    /// Swift's daemon for `human-action.resume` and `agent.resume` when the
+    /// request names a control action's impact approval: `None` otherwise,
+    /// and the agent execution owner answers as before. A request whose
+    /// fields or identities Swift's handler refuses is that owner's too.
+    ///
+    /// Swift's owner lookup reads both owners' rows, and a reference both
+    /// hold has multiple owners. An approval's `human-action.resume` answers
+    /// the approval unchanged, as Swift's daemon answers every request
+    /// outside a foreground console: only that console gets the challenge a
+    /// person answers, and none is issued here. `agent.resume` cannot consume
+    /// an approval.
+    pub fn resume_control_action(
+        &self,
+        method: &str,
+        params: &Map<String, Value>,
+        agents: &AgentExecutionStore,
+        controls: &ControlActionResources,
+    ) -> Option<Result<Value, WireError>> {
+        let text = |key: &str| {
+            params
+                .get(key)
+                .and_then(Value::as_str)
+                .filter(|value| valid_identifier(value))
+        };
+        let action = match method {
+            "human-action.resume"
+                if params.contains_key("humanAction")
+                    && params.contains_key("resumeReference")
+                    && params.keys().all(|key| {
+                        matches!(
+                            key.as_str(),
+                            "resumeReference" | "humanAction" | "selection" | "challengeResponse"
+                        )
+                    }) =>
+            {
+                Some(text("humanAction")?)
+            }
+            "agent.resume"
+                if params.contains_key("resumeReference")
+                    && params
+                        .keys()
+                        .all(|key| matches!(key.as_str(), "resumeReference" | "selection")) =>
+            {
+                None
+            }
+            _ => return None,
+        };
+        let reference = text("resumeReference")?;
+        let named = |row: &ActionRow| {
+            row.value.get("resumeReference") == Some(&json!(reference))
+                && action.is_none_or(|action| row.id == action)
+        };
+        let gate = match self.gate.lock() {
+            Ok(gate) => gate,
+            Err(_) => {
+                return Some(Err(resume_failure(
+                    method,
+                    "internalError",
+                    UNREADABLE.into(),
+                )));
+            }
+        };
+        let approvals = match controls.human_action_rows(None) {
+            Ok(rows) => rows.into_iter().filter(named).collect::<Vec<_>>(),
+            Err(error) => return Some(Err(resume_failure(method, &error.code, error.message))),
+        };
+        let approval = approvals.first()?.value.clone();
+        let physical = match agents.human_action_rows(None) {
+            Ok(rows) => rows.iter().filter(|row| named(row)).count(),
+            Err(error) => return Some(Err(resume_failure(method, &error.code, error.message))),
+        };
+        drop(gate);
+        if approvals.len() + physical > 1 {
+            return Some(Err(resume_failure(
+                method,
+                "recordUnreadable",
+                "human action reference has multiple owners".into(),
+            )));
+        }
+        Some(if method == "agent.resume" {
+            let mut error = resume_failure(
+                method,
+                "admissionDenied",
+                "agent resume cannot consume an impact approval".into(),
+            );
+            error
+                .details
+                .get_or_insert_with(Map::new)
+                .insert("humanAction".into(), approval);
+            Err(error)
+        } else if params.contains_key("selection") {
+            Err(refused(
+                "invalidInput",
+                "impact approval accepts no selection",
+            ))
+        } else {
+            Ok(approval)
+        })
     }
 
     /// The daemon's list checks, then Swift's `list`: every action the owner
@@ -120,6 +254,7 @@ impl HumanActionResources {
         &self,
         params: &Map<String, Value>,
         agents: &AgentExecutionStore,
+        controls: Option<&ControlActionResources>,
     ) -> Result<Value, WireError> {
         if !params
             .keys()
@@ -167,12 +302,17 @@ impl HumanActionResources {
                 size,
                 cursor,
                 || {
-                    // The Rust Runtime keeps no control-action approvals.
-                    let mut rows = if kind.and_then(Value::as_str) == Some("controlAction") {
-                        Vec::new()
-                    } else {
-                        agents.human_action_rows(owner.and_then(Value::as_str))?
-                    };
+                    let (kind, owner) =
+                        (kind.and_then(Value::as_str), owner.and_then(Value::as_str));
+                    let mut rows = Vec::new();
+                    if kind.is_none_or(|kind| kind == "agentExecution") {
+                        rows.extend(agents.human_action_rows(owner)?);
+                    }
+                    if kind.is_none_or(|kind| kind == "controlAction")
+                        && let Some(controls) = controls
+                    {
+                        rows.extend(controls.human_action_rows(owner)?);
+                    }
                     let mut identities = BTreeSet::new();
                     if !rows.iter().all(|row| identities.insert(row.id.clone())) {
                         return Err(refused(

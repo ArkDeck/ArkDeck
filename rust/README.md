@@ -1104,12 +1104,16 @@ one observation through the Target observation owner and, when a person must
 act, raises Swift's action: `connectDevice` for no device, `selectDevice` for
 several, and `trustDevice` or `connectDevice` naming the one observed device
 that is not authorized and connected. A connected device whose physical identity
-is unproved is refused with `admissionDenied`. One whose identity is proved is
-refused as not served yet: Swift adopts it inside the run, which no oracle
-records. `human-action.list` and `human-action.show` are the combined
-human-action owner's (`human_action.rs`, paged in `human-action-snapshots`).
-Not served yet: `agent.resume`, `human-action.resume` and adoption. A restart
-leaves an owned Job as it is: nothing resumes a run (L.1 item 13).
+is unproved is refused with `admissionDenied`; one whose identity is proved is
+adopted through the observation owner before the Job is made.
+`human-action.list` and `human-action.show` are the combined human-action
+owner's (`human_action.rs`, paged in `human-action-snapshots`), over the
+executions' actions and the control actions' impact approvals. `agent.resume`
+and `human-action.resume` continue an execution's action through fresh
+observations and guarded adoption; a control action's approval is looked up
+first and answered as Swift's daemon answers a request outside a foreground
+console (the control-action section below). A restart leaves an owned Job as it
+is: nothing resumes a run (L.1 item 13).
 
 `rust/tests/fixtures/agent-execution/` is the oracle Swift
 `AgentExecutionOracleContractTests` records over the shared fake HDC with the
@@ -1532,16 +1536,34 @@ owner's current Jobs, the durable Targets and a Target observation through the
 development HDC). The preview is `previewReady` or `blocked` in Swift's blocker
 order, or the action `previewDrifted` when the impact is unavailable. Show,
 list and reconcile read the actions, invalidating an expired one, one of an
-earlier daemon start or of another catalog when they read it; restart stays
-`operationUnavailable`, since the impact approval, its challenge, the lifecycle
-and its recovery are not here. A daemon outside an isolated root keeps no state
+earlier daemon start or of another catalog when they read it, and the
+approval an invalidated action awaited with it. `runtime.hdc.restart` checks
+the exact preview tuple, then, as Swift's `requestRestart`: the action and
+its age, its exact preview (`reviewedPlanMismatch`), an action already
+awaiting its approval answered as it is, any other but a ready one
+`admissionDenied`, a fresh impact reading that must be the reviewed one
+(otherwise `factsDrifted`, the invalidated action in the details), then the
+impact approval by CAS (`awaitingImpactApproval`, a waiting `har-` action
+with its `resume-` reference, bound to the preview and the new generation,
+closing with the action). Restart dispatches nothing. The approval is
+listed and shown by the combined human-action owner (`human-action.list`,
+`.show`); `human-action.resume` of it answers the approval unchanged and
+`agent.resume` refuses it, as Swift's daemon answers any request outside a
+foreground console. The console challenge, the receipt of a person's answer,
+the lifecycle it starts (`kill -r`), the Job interlock and the recovery of an
+interrupted lifecycle are not here, and a record holding any of them is
+unreadable. Over the fake server, whose digest proves no server as the
+fixture HDC's proves none to Swift, a preview is blocked and its restart
+`admissionDenied`; a ready preview needs the registered 3.2.0d server's
+health proof. A daemon outside an isolated root keeps no state
 and answers as Swift's handler with no owner at all, except that show and
 reconcile of an exact identity keep the foundation's refusal, since their
 schemas do not publish Swift's `operationUnavailable`. In agentd
 `control_action_control.rs` replays every no-host exchange of the corpora
 through `Control`, `control_action_host_control.rs` every exchange of a daemon
-with an HDC server host but the approval request, and
-`tests/control_action_host_process.rs` drives the managed fake server.
+with an HDC server host but the console's challenge and the lifecycle after
+it, and `tests/control_action_host_process.rs` drives the managed fake server
+(compiled to record its invocations, and to list no target).
 
 ## Capture file legs (TASK-XPA-016, M1)
 

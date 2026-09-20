@@ -134,7 +134,8 @@ pub struct Host {
     /// adopted.
     #[cfg(target_os = "macos")]
     usb: std::sync::Arc<dyn arkdeck_provider_hdc::UsbRelations + Send + Sync>,
-    /// The combined human-action owner over the agent executions.
+    /// The combined human-action owner over the agent executions and the
+    /// union control-action owner.
     #[cfg(target_os = "macos")]
     human_actions: Option<arkdeck_hoststore::HumanActionResources>,
     /// The union control-action owner, over the HDC control-action owner
@@ -272,7 +273,8 @@ impl Host {
         })
     }
     /// `human-action.list` and `human-action.show` read the physical
-    /// assistance this owner's agent executions ask for.
+    /// assistance this owner's agent executions ask for and the impact
+    /// approvals of the union control-action owner's actions.
     #[cfg(target_os = "macos")]
     pub fn with_human_actions(
         mut self,
@@ -283,7 +285,8 @@ impl Host {
     }
     /// `control-action.list`, `.show` and `.reconcile` page and look up the
     /// control actions of this union owner; `runtime.hdc.impact-preview`
-    /// previews through its HDC control-action owner, if it has one.
+    /// previews and `runtime.hdc.restart` requests an impact approval through
+    /// its HDC control-action owner, if it has one.
     #[cfg(target_os = "macos")]
     pub fn with_control_actions(
         mut self,
@@ -849,6 +852,16 @@ impl HostServices for Host {
         method: &str,
         params: &serde_json::Map<String, serde_json::Value>,
     ) -> Result<serde_json::Value, WireError> {
+        // Swift's handlers look the resume reference up in the combined
+        // human-action owner first: a control action's impact approval is
+        // answered there, never by the agent execution owner.
+        if matches!(method, "agent.resume" | "human-action.resume")
+            && let (Some(agents), Some(resources), Some(controls)) =
+                (&self.agents, &self.human_actions, &self.control_actions)
+            && let Some(answer) = resources.resume_control_action(method, params, agents, controls)
+        {
+            return answer;
+        }
         let (
             Some(agents),
             Some((state_root, analyzer)),
@@ -924,7 +937,8 @@ impl HostServices for Host {
     }
 
     /// `human-action.list` and `human-action.show`, as the Swift daemon
-    /// answers them with its combined human-action owner.
+    /// answers them with its combined human-action owner over the agent
+    /// executions and the union control-action owner.
     #[cfg(target_os = "macos")]
     fn human_action(
         &self,
@@ -941,7 +955,7 @@ impl HostServices for Host {
                 ])),
             });
         };
-        resources.answer(method, params, agents)
+        resources.answer(method, params, agents, self.control_actions.as_ref())
     }
 
     /// `runtime.hdc.impact-preview`, `runtime.hdc.restart`,

@@ -307,7 +307,9 @@ fn rust_raises_and_reads_the_physical_assistance_swift_asked_for() {
             serde_json::from_str(&labels.identity(&exchange["params"].to_string())).unwrap();
         let params = params.as_object().unwrap();
         let answer = if method.starts_with("human-action.") {
-            resources.answer(method, params, &agents)
+            // As the daemon composes it without a managed HDC server: no
+            // control action holds an approval.
+            resources.answer(method, params, &agents, None)
         } else {
             agents
                 .advance(method, params, &engine)
