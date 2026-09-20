@@ -1,0 +1,176 @@
+{
+  "cases": [
+    {
+      "argv": [
+        "device",
+        "wait",
+        "--candidate",
+        "sample",
+        "--observation",
+        "sample",
+        "--observation-generation",
+        "1",
+        "--state",
+        "connected"
+      ],
+      "expected": {
+        "command": "device.wait",
+        "handlerArguments": [
+          "device",
+          "wait",
+          "--candidate",
+          "sample",
+          "--observation",
+          "sample",
+          "--observation-generation",
+          "1",
+          "--state",
+          "connected"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "valid"
+    },
+    {
+      "argv": [
+        "device",
+        "wait",
+        "--help"
+      ],
+      "expected": {
+        "command": "device.wait",
+        "outcome": "leafHelp"
+      },
+      "name": "leafHelp"
+    },
+    {
+      "argv": [
+        "device",
+        "wait",
+        "--candidate",
+        "sample",
+        "--observation",
+        "sample",
+        "--observation-generation",
+        "1",
+        "--state",
+        "connected",
+        "--no-such-option"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "device.wait",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "unknownOption"
+    },
+    {
+      "argv": [
+        "device",
+        "wait",
+        "--candidate",
+        "sample",
+        "--observation",
+        "sample",
+        "--observation-generation",
+        "1",
+        "--state",
+        "connected",
+        "--candidate",
+        "sample"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "device.wait",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "duplicateOption"
+    },
+    {
+      "argv": [
+        "device",
+        "wait"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "device.wait",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "missingRequired"
+    },
+    {
+      "argv": [
+        "device",
+        "wait",
+        "--candidate",
+        "sample",
+        "--observation",
+        "sample",
+        "--observation-generation",
+        "1",
+        "--state",
+        "connected",
+        "--output",
+        "jsonl"
+      ],
+      "expected": {
+        "category": "usage",
+        "code": "invalidOption",
+        "command": "device.wait",
+        "exitCode": 64,
+        "outcome": "failure"
+      },
+      "name": "jsonlRefused"
+    },
+    {
+      "argv": [
+        "device",
+        "wait",
+        "--candidate",
+        "sample",
+        "--observation",
+        "sample",
+        "--observation-generation",
+        "1",
+        "--state",
+        "connected",
+        "--socket",
+        "sample"
+      ],
+      "expected": {
+        "command": "device.wait",
+        "handlerArguments": [
+          "device",
+          "wait",
+          "--candidate",
+          "sample",
+          "--observation",
+          "sample",
+          "--observation-generation",
+          "1",
+          "--state",
+          "connected",
+          "--socket",
+          "sample"
+        ],
+        "outcome": "dispatch"
+      },
+      "name": "macosCompatibilityOption"
+    }
+  ],
+  "cliVersion": "0.1.0",
+  "command": "device.wait",
+  "kind": "executable",
+  "lifecycleStatus": "current",
+  "path": [
+    "device",
+    "wait"
+  ],
+  "schemaVersion": "arkdeck.cli.argv-fixture/1"
+}

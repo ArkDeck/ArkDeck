@@ -89,4 +89,8 @@ The unified local gate was not run: the PR's CI is the gate (`AGENTS.md`, #2015)
 
 ## CI
 
-Recorded once this PR's CI finishes.
+The first run of #2091 (head `052ee1bd`) failed the Rust workspace on `ubuntu-latest` and
+`windows-latest`: the bounded-document unit test wrote its files under `/private/tmp`, which is
+macOS's own temporary directory. It uses the host's (`std::env::temp_dir`) from `33c1e6e9` on, and
+the whole lane passed on all three hosts (`guard`, `plan`, `swift`, `ds-tokens` and the Rust
+host-independent checks with it).

@@ -19,6 +19,17 @@ use std::process::{Command, Output};
 /// when that request is `health`. A leaf that asks for anything else, or that
 /// opens a second connection, fails the test.
 pub fn run_session(argv: &[&str], replies: Vec<(String, Value, Value)>) -> (Output, Value) {
+    session(argv, replies, true)
+}
+
+/// The same, for a leaf whose own deadline may end the wait before it asks for
+/// every answer the test offers: the trailing replies it never asks for are
+/// allowed.
+pub fn run_session_partial(argv: &[&str], replies: Vec<(String, Value, Value)>) -> (Output, Value) {
+    session(argv, replies, false)
+}
+
+fn session(argv: &[&str], replies: Vec<(String, Value, Value)>, exact: bool) -> (Output, Value) {
     let root = PathBuf::from(format!(
         "/private/tmp/arkdeck-cli-runtime-{:032x}",
         u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
@@ -81,7 +92,7 @@ pub fn run_session(argv: &[&str], replies: Vec<(String, Value, Value)>) -> (Outp
         .unwrap();
     let unserved = server.join().unwrap();
     assert!(
-        unserved.is_empty(),
+        !exact || unserved.is_empty(),
         "the CLI never asked for {unserved:?}: {} {}",
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
@@ -102,6 +113,21 @@ pub fn run_session(argv: &[&str], replies: Vec<(String, Value, Value)>) -> (Outp
 /// the method and parameters `replies` names, with its answer. The CLI
 /// may make no other connection.
 pub fn run(argv: &[&str], replies: Vec<(String, Value, Value)>) -> (Output, Value) {
+    connections(argv, replies, true)
+}
+
+/// The same, for a leaf whose own deadline may end its wait before it asks for
+/// every answer the test offers: the trailing exchanges it never asks for are
+/// allowed.
+pub fn run_partial(argv: &[&str], replies: Vec<(String, Value, Value)>) -> (Output, Value) {
+    connections(argv, replies, false)
+}
+
+fn connections(
+    argv: &[&str],
+    replies: Vec<(String, Value, Value)>,
+    exact: bool,
+) -> (Output, Value) {
     let root = PathBuf::from(format!(
         "/private/tmp/arkdeck-cli-runtime-{:032x}",
         u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
@@ -117,10 +143,17 @@ pub fn run(argv: &[&str], replies: Vec<(String, Value, Value)>) -> (Output, Valu
     acceptor.set_nonblocking(true).unwrap();
     let server = std::thread::spawn(move || {
         let mut unserved = Vec::new();
+        let mut ended = false;
         for (method, params, answer) in replies {
-            // The CLI may have ended before this exchange: never wait for
-            // it past a bound.
-            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+            if ended {
+                unserved.push(method);
+                continue;
+            }
+            // The CLI may have ended before this exchange: never wait for it
+            // past a bound, and where its own deadline decides how many
+            // exchanges there are, stop waiting as soon as one does not come.
+            let deadline = std::time::Instant::now()
+                + std::time::Duration::from_secs(if exact { 10 } else { 1 });
             let stream = loop {
                 match acceptor.accept() {
                     Ok((stream, _)) => break Some(stream),
@@ -135,6 +168,7 @@ pub fn run(argv: &[&str], replies: Vec<(String, Value, Value)>) -> (Output, Valu
             };
             let Some(stream) = stream else {
                 unserved.push(method);
+                ended = !exact;
                 continue;
             };
             stream.set_nonblocking(false).unwrap();
@@ -174,7 +208,7 @@ pub fn run(argv: &[&str], replies: Vec<(String, Value, Value)>) -> (Output, Valu
         .unwrap();
     let unserved = server.join().unwrap();
     assert!(
-        unserved.is_empty(),
+        !exact || unserved.is_empty(),
         "the CLI never asked for {unserved:?}: {} {}",
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)

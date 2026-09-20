@@ -20,7 +20,10 @@ fn positive(v: &Value) -> Option<u64> {
         .ok()
         .filter(|n| (1..=i64::MAX as u64).contains(n) && n.to_string() == s)
 }
-fn text(s: &str) -> bool {
+/// A caller-facing display name as the Runtime publishes it: 1…256 UTF-8
+/// bytes, trimmed and free of control characters, by the host's own character
+/// sets where it has them (`device wait` adds the host's precomposition).
+pub(super) fn display_name(s: &str) -> bool {
     #[cfg(target_os = "macos")]
     {
         (1..=256).contains(&s.len())
@@ -97,7 +100,7 @@ pub(crate) fn configure(
             .any(|k| fields.get(*k).is_some_and(|v| positive(v).is_none()))
         || fields
             .get("name")
-            .is_some_and(|v| !v.as_str().is_some_and(text))
+            .is_some_and(|v| !v.as_str().is_some_and(display_name))
         || [("candidate", 1024), ("observationId", 128)]
             .iter()
             .any(|(k, max)| {
@@ -160,7 +163,7 @@ fn exact(v: &Value, keys: &[&str]) -> bool {
         .is_some_and(|m| m.len() == keys.len() && keys.iter().all(|k| m.contains_key(*k)))
 }
 fn name(v: &Value) -> bool {
-    v.is_null() || v.as_str().is_some_and(text)
+    v.is_null() || v.as_str().is_some_and(display_name)
 }
 fn timestamp(v: &Value) -> bool {
     v.as_str().is_some_and(|s| {
