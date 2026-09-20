@@ -1,4 +1,3 @@
-@testable import ArkDeckClientKit
 // What the Overview may conclude from a run record.
 //
 // Two judgements carry the page: which runs were one piece of work, and
@@ -11,7 +10,7 @@ import ArkDeckCore
 import Foundation
 import XCTest
 
-@testable import ArkDeckWorkflows
+@testable import ArkDeckClientKit
 
 final class OverviewRunRecordContractTests: XCTestCase {
   func testContinuationCopiesTypedInputsAndThreadButCreatesNewRequestIdentity() throws {

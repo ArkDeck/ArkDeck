@@ -114,11 +114,12 @@ Citadel/NIOSSH/NIOCore/swift-crypto/swift-log 随之由 ClientKit 而非 Workflo
 Workflows 的 Debug facade 经既有的 Workflows → ClientKit 边使用它。远程构建源用到的 `DebugTypedValueValidator`
 （Catalog 标识符与原生库文件名规则）也随之移到 ClientKit，Workflows、daemon 与 App 共用这一份，不另抄规则。
 Overview 运行记录与「开始新一次」行的投影（`OverviewRunRecordProjection`、`OverviewActionProjection`）是只读展示逻辑，也在 ClientKit；
-`RuntimeWorkspaceContinuation`（依赖 ArkDeckRuntime、CLI 也在用）暂留 Workflows。
+只读延续——`RuntimeWorkspaceContinuation`（从历史 Job 重建一份新的请求草稿）、提交并运行它的 XPC provider 与 `make()`——
+也在 ClientKit，CLI 经过渡边使用；它构造的 v2 请求 DTO 在 Core（§1）。
 App 与 CLI 共用的自动更新（feed 解析与验签、下载、状态/制品/重放文件存储、服务状态机、`RuntimeUpdateApplicationFacade` 与 UI fixture）也在 ClientKit；
 依赖 ArkDeckRuntime `SystemLogger` 的生产装配——`SystemAutoUpdateEventLogger` 与 `AutoUpdateApplicationFacade.make()`——留在 Workflows。
 CLI 因此直接 import ClientKit：CLI → ClientKit 是 CHG-2026-074 的过渡边，随第一个需要它的 CLI 代码（自动更新）同 PR 加入（§6 判例 5），
-Swift CLI 在 M5 删除时随之消失；`RuntimeWorkspaceContinuation` 之后移入时沿用这条边。
+Swift CLI 在 M5 删除时随之消失；本地诊断包导出与只读延续移入后也经这条边供 CLI 使用。
 ClientKit 仍只依赖 Core，依赖图保持无环。CLI 经 Workflows → ClientKit 本就链接 ClientKit，这条边不给可执行文件增加库，只放开 CLI 源码直接点名它的类型。
 本地诊断包导出的契约（`RuntimeSupportBundlePreview`、`RuntimeSupportBundleExportReceipt`、`RuntimeSupportBundleServiceError`、
 `RuntimeSupportBundleProviding`）也在 ClientKit，CLI 经这条边直接用；经 Storage 读本机文件的生产 provider 与
