@@ -8,6 +8,7 @@ import XCTest
 import os
 
 @testable import ArkDeckAgentDaemon
+@testable import ArkDeckClientKit
 @testable import ArkDeckWorkflows
 
 final class AgentXPCTransportContractTests: XCTestCase {

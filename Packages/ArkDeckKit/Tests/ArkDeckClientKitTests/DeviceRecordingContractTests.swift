@@ -4,7 +4,7 @@ import Foundation
 import ImageIO
 import XCTest
 
-@testable import ArkDeckWorkflows
+@testable import ArkDeckClientKit
 
 /// The host-composed recording (TASK-IDC-002, recorded gap 2 of 5, App leg).
 ///

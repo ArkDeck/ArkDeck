@@ -1,7 +1,7 @@
 import Foundation
 import XCTest
 
-@testable import ArkDeckWorkflows
+@testable import ArkDeckClientKit
 
 /// A press must not be aimed at a picture the device has moved past
 /// (TASK-IDC-002, recorded gap 1 of 5).
