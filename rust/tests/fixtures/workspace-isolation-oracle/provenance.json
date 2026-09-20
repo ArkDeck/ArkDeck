@@ -1,0 +1,15 @@
+{
+  "command": "ARKDECK_RUST_WORKSPACE_ISOLATION_RECORD=<dir> ARKDECK_CONTROL_FRAME_LOG=<dir> sh Packages/ArkDeckKit/Scripts/run-swiftpm.sh test --filter WorkspaceIsolationOracleContractTests",
+  "determinism": "the clock is fixed and the request carries no path, so the Job identity (job-825787507429b81047c9726a1373a83b) and the copy's identity (evo-e2ae7c7152894a5b51d95e92) repeat exactly",
+  "durable": "workspace.json is the manifest the Runtime wrote for the copy; tree.json lists the copied files with their digests",
+  "files": {
+    "frames.jsonl": "aa3ef38122da9c26d14281cb26fa666184716604336764a7a1cf90a4550351b3",
+    "tree.json": "8636c901a2f86a16950d22f5f91bc58b8ccc5d7cff609c5903a743236f348d73",
+    "workspace.json": "58c07ab35246942b07b227cc8d51bbd2883cda11c2fa762e5cc4bb146e52c299"
+  },
+  "frames": "job.plan, job.submit, job.run and job.result of one workspace.prepare-isolated-copy@1 Job, in the order the control plane answered them",
+  "recordedBy": "WorkspaceIsolationOracleContractTests.testTheControlPlanePreparesOneIsolatedCopyAsRecorded",
+  "replayedBy": "the Rust port of workspace.prepare-isolated-copy@1 (TASK-XPA-015, M3)",
+  "source": "the production RuntimeControlPlaneHandler over a RuntimeJobEngine whose only provider is WorkspaceOperationsProvider, with EvolutionWorkspaceManager as its isolation manager, over a fabricated source tree under /private/tmp/arkdeck-workspace-isolation-oracle",
+  "why": "the job.* corpora carry no frame of this operation and are deduplicated by shape, so they cannot be replayed as one sequence"
+}
