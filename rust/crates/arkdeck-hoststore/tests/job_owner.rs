@@ -532,3 +532,48 @@ fn sqlite_refuses_symlinks_and_multi_statement_input() {
     .unwrap();
     assert!(JobStore::open(&root.0).is_err());
 }
+
+/// Swift `unreadableDurableRecords(sampleLimit:)`: every row this build
+/// cannot decode is counted, and the sample stops at the limit, in the
+/// index's order. Nothing is written, and a store this build reads whole
+/// answers zero. `doctor --deep` is the only caller.
+#[test]
+fn undecodable_rows_are_counted_and_sampled_in_the_indexs_order() {
+    let root = Root::initialized();
+    for (index, id) in ["job-a", "job-b", "job-c", "job-d"].iter().enumerate() {
+        root.seed(id, "succeeded", index as i64 + 1);
+    }
+    let store = JobStore::open_owner(&root.0).unwrap();
+    assert_eq!(store.unreadable_records(16).unwrap(), (0, Vec::new()));
+    drop(store);
+    let before = fs::read(root.0.join("runtime-jobs.sqlite3")).unwrap();
+    for id in ["job-b", "job-c", "job-d"] {
+        let mut value = record(id, "succeeded");
+        value["futureField"] = json!(true);
+        root.db()
+            .execute(
+                "UPDATE runtime_job SET initial_record_json = ? WHERE job_id = ?",
+                &[
+                    Sql::Blob(serde_json::to_vec(&value).unwrap()),
+                    Sql::Text(id.into()),
+                ],
+            )
+            .unwrap();
+    }
+    let store = JobStore::open_owner(&root.0).unwrap();
+    assert_eq!(
+        store.unreadable_records(16).unwrap(),
+        (3, vec!["job-b".into(), "job-c".into(), "job-d".into()])
+    );
+    // The count is the whole ledger; the sample is bounded.
+    assert_eq!(
+        store.unreadable_records(2).unwrap(),
+        (3, vec!["job-b".into(), "job-c".into()])
+    );
+    drop(store);
+    assert_ne!(
+        fs::read(root.0.join("runtime-jobs.sqlite3")).unwrap(),
+        before,
+        "the fixture's own alteration"
+    );
+}

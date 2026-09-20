@@ -93,6 +93,17 @@ because this phase has no operation execution provider. Without a usable HDC
 observation provider, candidates returns a structured refusal, not an empty
 successful snapshot. The wire method is `device.observations`.
 
+`doctor` also names what start-up recovery could not read, as Swift's report
+does (TASK-XPA-014): one `runtime.jobRecordUnreadable` blocker per Job recovery
+set aside, with the reason it gave, and, for a deep report,
+`runtime.durableRecordsUnreadable` counting every undecodable record in the
+index with a bounded sample of their identities
+(`JobStore::unreadable_records`, Swift's `unreadableDurableRecords`, whose
+sample stops at sixteen). Both come before the Catalog's findings, as in Swift;
+recovery already answered the first, and only the deep report reads the ledger.
+`tests/doctor_report.rs` reproduces every recorded report of Swift's `doctor`
+corpus, the one naming an undecodable record included.
+
 `arkdeck commands --output json` needs no daemon (TASK-XPA-018): it answers Swift's
 registry projection (`CLIRegistryProjection`, published as
 `openspec/contracts/cli-command-registry.yaml`) for exactly the leaves this CLI

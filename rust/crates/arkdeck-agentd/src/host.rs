@@ -61,6 +61,11 @@ impl RunSlot {
 }
 
 pub struct Host {
+    /// What start-up recovery set aside, in its order: a Job whose durable
+    /// record this build cannot read, and the reason. `doctor` names them,
+    /// as Swift's reads `engine.quarantinedJobRecords`.
+    #[cfg(target_os = "macos")]
+    quarantined: std::sync::OnceLock<Vec<(String, String)>>,
     #[cfg(target_os = "macos")]
     imports: Option<std::sync::Arc<arkdeck_hoststore::ImportUploadStore>>,
     // The owners a background agent run keeps using after its request has
@@ -177,12 +182,15 @@ impl Host {
         let Some(jobs) = &self.jobs else {
             return Ok(None);
         };
-        arkdeck_hoststore::recover_active_jobs(
+        let recovered = arkdeck_hoststore::recover_active_jobs(
             jobs,
             self.capabilities.as_deref(),
             arkdeck_hoststore::runtime_now,
-        )
-        .map(Some)
+        )?;
+        // Recovery answered which records it could not read; `doctor` says so
+        // rather than reading them again.
+        let _ = self.quarantined.set(recovered.quarantined.clone());
+        Ok(Some(recovered))
     }
     /// `agent.run` and `agent.status` advance and read this owner's
     /// executions, which own Jobs of the Job owner.
@@ -520,6 +528,8 @@ impl Host {
             _ => (None, "hdc.toolConfigurationIncomplete"),
         };
         Self {
+            #[cfg(target_os = "macos")]
+            quarantined: std::sync::OnceLock::new(),
             #[cfg(target_os = "macos")]
             imports: None,
             #[cfg(target_os = "macos")]
@@ -1966,6 +1976,13 @@ impl HostServices for Host {
                 discovery: (self.hdc.is_some() && self.targets.is_some())
                     || self.provider.is_some(),
                 cleanup_debt,
+                quarantined: self.quarantined.get().cloned().unwrap_or_default(),
+                // Swift reads the whole ledger only for a deep report, and
+                // names at most sixteen of what it finds.
+                unreadable_records: match (&self.jobs, deep) {
+                    (Some(jobs), true) => jobs.unreadable_records(16).ok(),
+                    _ => None,
+                },
             }
         }
         #[cfg(not(target_os = "macos"))]
