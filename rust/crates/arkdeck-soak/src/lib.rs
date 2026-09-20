@@ -737,11 +737,21 @@ fn run_workload(
             max_resident_set_bytes: metrics.baseline_resident_set_bytes,
             open_file_descriptor_count: metrics.baseline_open_file_descriptor_count,
         });
+        // The Swift fixture prints its resident set per cycle; without it a
+        // failed resource gate reports one number at the end and no series, so
+        // a reader cannot tell a leak from a peak that grows with the store.
+        // The growth, descriptors and state size travel with it for the same
+        // reason: they are what the gate compares and what it scales against.
         println!(
-            "Rust soak cycle={cycle} jobs={} active={} recovered={} simulatedProvider=true",
+            "Rust soak cycle={cycle} jobs={} active={} recovered={} rssBytes={} \
+rssGrowthBytes={} fdCount={} stateBytes={} simulatedProvider=true",
             metrics.terminal_job_count + metrics.active_job_count,
             metrics.active_job_count,
-            metrics.recovered_this_cycle
+            metrics.recovered_this_cycle,
+            metrics.max_resident_set_bytes,
+            metrics.resident_set_growth_bytes,
+            metrics.open_file_descriptor_count,
+            metrics.state_byte_count
         );
         pause(
             clock,
