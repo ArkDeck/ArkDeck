@@ -10,6 +10,7 @@
 pub mod debug_hap;
 pub mod hdc_oracle;
 pub mod native_library;
+pub mod reconcile;
 
 use arkdeck_hoststore::{StorageProbe, StorageSnapshot};
 use arkdeck_platform::{HostDirectory, HostSqlite, SqliteValue as Sql};

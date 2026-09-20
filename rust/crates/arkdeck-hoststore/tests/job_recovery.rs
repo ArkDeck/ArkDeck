@@ -237,6 +237,8 @@ fn a_start_parks_a_job_whose_intent_is_outstanding_and_nothing_resolves_it() {
         imports: None,
         now: fixed_now,
         sessions: None,
+        hdc: None,
+        capabilities: None,
     }
     .handle(&Map::from_iter([("jobId".into(), json!(ADMITTED))]))
     .unwrap_err();

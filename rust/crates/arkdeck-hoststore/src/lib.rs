@@ -127,6 +127,8 @@ mod job_recovery;
 #[cfg(target_os = "macos")]
 pub use job_recovery::{RecoveredJobs, RecoveryError, recover_active_jobs, recover_jobs};
 #[cfg(target_os = "macos")]
+mod job_lineage_repair;
+#[cfg(target_os = "macos")]
 mod job_reconcile;
 #[cfg(target_os = "macos")]
 pub use job_reconcile::JobReconciler;

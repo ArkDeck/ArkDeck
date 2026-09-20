@@ -394,6 +394,15 @@ impl SessionPublisher<'_> {
                     })?,
                 );
             }
+            // Swift `SessionManifestJournalValidator` over the Session's
+            // Journal copy, under the terminal lock and every shard.
+            let copied_events = events_of(&copied)?;
+            if let Some(rule) = unbound_reconcile_revision(&manifest, &copied_events) {
+                return Err(storage(format!(
+                    "invalidManifest({})",
+                    crate::artifact_read_owner::swift_string(&rule)
+                )));
+            }
             session
                 .publish_exclusive("manifest.json", &manifest)
                 .map_err(|error| publish_failed(&session_path.join("manifest.json"), error))?;
@@ -971,6 +980,38 @@ fn touches_device(events: &[Value]) -> bool {
             && (declaration["effect"].as_str() != Some("hostOnly")
                 || declaration["bindingRequirement"].as_str() != Some("none"))
     })
+}
+
+/// The rule of Swift's `SessionManifestJournalValidator` a Manifest this
+/// writer composes can break, which it names: a `reconcileOutcome` whose
+/// binding revision the Manifest's binding history does not hold. A
+/// device-bound Job reconciled before any of its steps confirmed a binding
+/// journals the fresh facts' revision there, and Swift then refuses the
+/// Manifest. The validator's other rules correlate the Journal's intents,
+/// outcomes and finalized record with the Manifest, which is composed from
+/// that same Journal.
+fn unbound_reconcile_revision(manifest: &[u8], events: &[Value]) -> Option<String> {
+    let manifest: Value = serde_json::from_slice(manifest).ok()?;
+    let revisions: BTreeSet<i64> = manifest["bindingHistory"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|binding| binding["revision"].as_i64())
+        .collect();
+    events
+        .iter()
+        .filter(|event| event["kind"] == "reconcileOutcome")
+        .find(|event| {
+            event["bindingRevision"]
+                .as_i64()
+                .is_some_and(|revision| !revisions.contains(&revision))
+        })
+        .map(|event| {
+            format!(
+                "journal binding revision does not exist in Manifest: {}",
+                event["eventId"].as_str().unwrap_or_default()
+            )
+        })
 }
 
 /// Every record of a Journal whose tail is whole.
