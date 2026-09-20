@@ -149,7 +149,10 @@ enum HDCOracleHarness {
   /// landing path is in the receive argv, so in the materialized plan and its
   /// digest — and the oracle records what is left in it. With
   /// `fixedInvocationSeconds`, every dispatched child reports that duration
-  /// (`FixedDurationDispatcher`). With `testHooks`, the engine calls the
+  /// (`FixedDurationDispatcher`). With `debugRuntimeProbe`, the handler has
+  /// the Debug Runtime probe the daemon composes beside a started HDC server
+  /// host, which answers `debug.probe` and `debug.template.run` outside the
+  /// engine. With `testHooks`, the engine calls the
   /// package-only hooks of `RuntimeJobEngine.Configuration.TestHooks` (none
   /// unless an oracle names them). None of these is applied unless an oracle
   /// names it.
@@ -161,6 +164,7 @@ enum HDCOracleHarness {
     hdcRuntimeDiagnostics: HDCManagedRuntimeDiagnostics? = nil,
     hostReceiveRoot: URL? = nil,
     fixedInvocationSeconds: Double? = nil,
+    debugRuntimeProbe: (any DebugRuntimeProbing)? = nil,
     testHooks: RuntimeJobEngine.Configuration.TestHooks = .none
   ) throws -> Composition {
     let root = settings.root
@@ -236,6 +240,7 @@ enum HDCOracleHarness {
       humanActionResources: union, hdcRuntimeDiagnostics: hdcRuntimeDiagnostics,
       artifactStore: store,
       flashBundleImportDirectory: nil, flashBundleImportPolicy: .production,
+      debugRuntimeProbe: debugRuntimeProbe,
       methodObserver: nil)
     return Composition(
       handler: handler, engine: engine, artifactStore: store, targets: targets,

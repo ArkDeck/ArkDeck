@@ -1,0 +1,26 @@
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa fport ls
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa rport ls
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bm dump -a
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa fport ls
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa rport ls
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bm dump -a
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa fport ls
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa rport ls
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bm dump -a
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa fport ls
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa rport ls
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bm dump -a
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa fport ls
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa rport ls
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bm dump -a
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa fport ls
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa rport ls
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bm dump -a
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell bm dump -a
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell hidumper -s WindowManagerService -a -a
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell uptime
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell uptime
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell uptime
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.debug.enabled
+-t aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa shell param get persist.ace.debug.enabled

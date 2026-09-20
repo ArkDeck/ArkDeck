@@ -134,8 +134,8 @@
       "successes": 1
     },
     "debug.probe": {
-      "errors": 3,
-      "requests": 4,
+      "errors": 5,
+      "requests": 6,
       "successes": 1
     },
     "debug.start": {
@@ -149,8 +149,8 @@
       "successes": 1
     },
     "debug.template.run": {
-      "errors": 1,
-      "requests": 2,
+      "errors": 5,
+      "requests": 6,
       "successes": 1
     },
     "device.display-name.clear": {
@@ -530,14 +530,14 @@
     }
   },
   "corpusRecordCounts": {
-    "errors": 424,
-    "requests": 904,
+    "errors": 430,
+    "requests": 910,
     "successes": 480
   },
   "directoryDigests": {
     "Catalog/operations": "16671abf96551e9d5b9c3382fe4eb08f3fcd150cff68e7419634cd10ecda4bfd",
     "Catalog/profiles": "58ca1d970d40019ba2718646fde81fefda22533c5448e620217582e30f5d648f",
-    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "a63ca8b148f617f209f03f89da3133fe8972e37e4b6ce27a846e66a03ab739e2",
+    "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "e6d6c86f5f1386911041788373e3606b0cedc83b7fd4f6f0edce5a95a1d9fc12",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC": "9ae93642e7b81bcea918469216711d7f6a17135a29cf021556ceef0f2f789196",
     "spec/control/methods": "9ddd6155131b3d6b285ab01d7526fb506a146158cd8d4aba54ee80b5c08c6380"
   },
@@ -819,8 +819,8 @@
       "sha256": "fd92ead73687ae4c26078a376e1c9b130f5ee6db9d7becd1289c65afa27d5672"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/debug.probe.jsonl": {
-      "blob": "5210b850b8586cc6836c53bdf2fecfff0b210754",
-      "sha256": "66e8882b477f7e784e8d2005b1dbc2200bff57c03f1b1f4f361b9b3a8ee94302"
+      "blob": "2ef149457dda3a1e3d89783f4f5972d8413be1ab",
+      "sha256": "ece1a843dd4c600b34f8a00d91c27bf53035554f42d5b8ffa24d8dfd40f701f4"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/debug.start.jsonl": {
       "blob": "1ecfc9db86cbfa5ff49c986047c7487d0a88592f",
@@ -831,8 +831,8 @@
       "sha256": "e90bf6d5615989a9396db194aad2909d2f24da95ce9e417e10394a38d8c34b01"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/debug.template.run.jsonl": {
-      "blob": "558612a05b1b1ca82c07b6e963e78bdafcf4880f",
-      "sha256": "8f31d6246a13ff40f2bad904d9235d46bdd40c47b88265f52c58609efeb5eaec"
+      "blob": "374273233c07a985ea3f740d7954e0f45090a1d5",
+      "sha256": "aea8a28066820c3b886e4bc48e8baf7878d64ed8081da08524c46e7c514dcfe1"
     },
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/device.display-name.clear.jsonl": {
       "blob": "65e347bf1862f65824773b73072017d67165519e",
@@ -1731,7 +1731,7 @@
       "sha256": "c3a4af1a193b0273926fdf46bdda5e3f178c135476014651408f7c73dd1d3a77"
     }
   },
-  "inputDigest": "5173fe369dc88cd49b4a5e473dd4a58adc2310ed19c40838d5f747e63a60fbb9",
+  "inputDigest": "6337da66ff149e206b1557b727f3a497dcb388eab498c217b79aa860fa35e900",
   "kind": "development",
   "methodCount": 105,
   "protocolVersion": "1.0.0",

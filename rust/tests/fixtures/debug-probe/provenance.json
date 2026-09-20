@@ -1,0 +1,16 @@
+{
+  "files" : {
+    "cases.json" : "d2eee73d953a8ce6a6971db185521e7c49fd1218115f19e0980e632baad47c2f",
+    "hdc" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+    "hdc-answers.sh" : "89a81906994b7c8a570999a047920489e1bc62a874c58c7f1d97ba50218604aa",
+    "hdc-calls.log" : "9badd2b8ec9671bfb983cb079743c1aab487a1e9f6764c9d440a17d607ce93ed",
+    "targets-state/targets.json" : "219caf0d443d902a3fa31adf44d28f1e3611bd25df00ee3a53e696e855077b22"
+  },
+  "hdcSHA256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+  "home" : "/private/tmp/arkdeck-hdc-oracle/home",
+  "invocationSeconds" : 0.012,
+  "nowUTC" : "2026-09-14T00:00:00Z",
+  "producer" : "DebugProbeOracleContractTests.testSwiftProbesTheSharedFakeDebugRuntime",
+  "root" : "/private/tmp/arkdeck-hdc-oracle",
+  "targetId" : "TGT-3ba3f5f43b92"
+}

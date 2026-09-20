@@ -1,0 +1,566 @@
+{
+  "exchanges" : [
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : 1,
+          "packages" : [
+            "com.example.alpha",
+            "com.example.zeta"
+          ],
+          "portRules" : [
+            {
+              "direction" : "forward",
+              "localPort" : 9000,
+              "remotePort" : 9001
+            },
+            {
+              "direction" : "reverse",
+              "localPort" : 9100,
+              "remotePort" : 9101
+            }
+          ],
+          "schemaVersion" : "arkdeck.debug-probe/1",
+          "targetId" : "TGT-3ba3f5f43b92",
+          "warnings" : [
+
+          ]
+        }
+      },
+      "method" : "debug.probe",
+      "mode" : "normal",
+      "name" : "probe.full",
+      "params" : {
+        "targetId" : "TGT-3ba3f5f43b92"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : 1,
+          "packages" : [
+
+          ],
+          "portRules" : [
+            {
+              "direction" : "forward",
+              "localPort" : 9000,
+              "remotePort" : 9001
+            },
+            {
+              "direction" : "reverse",
+              "localPort" : 9100,
+              "remotePort" : 9101
+            }
+          ],
+          "schemaVersion" : "arkdeck.debug-probe/1",
+          "targetId" : "TGT-3ba3f5f43b92",
+          "warnings" : [
+            "packageInventoryUnavailable"
+          ]
+        }
+      },
+      "method" : "debug.probe",
+      "mode" : "packagesUnavailable",
+      "name" : "probe.packagesUnavailable",
+      "params" : {
+        "targetId" : "TGT-3ba3f5f43b92"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : 1,
+          "packages" : [
+
+          ],
+          "portRules" : [
+            {
+              "direction" : "forward",
+              "localPort" : 9000,
+              "remotePort" : 9001
+            },
+            {
+              "direction" : "reverse",
+              "localPort" : 9100,
+              "remotePort" : 9101
+            }
+          ],
+          "schemaVersion" : "arkdeck.debug-probe/1",
+          "targetId" : "TGT-3ba3f5f43b92",
+          "warnings" : [
+            "packageInventoryUnparseable"
+          ]
+        }
+      },
+      "method" : "debug.probe",
+      "mode" : "packagesUnparseable",
+      "name" : "probe.packagesUnparseable",
+      "params" : {
+        "targetId" : "TGT-3ba3f5f43b92"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : 1,
+          "packages" : [
+            "com.example.alpha",
+            "com.example.zeta"
+          ],
+          "portRules" : [
+            {
+              "direction" : "reverse",
+              "localPort" : 9100,
+              "remotePort" : 9101
+            }
+          ],
+          "schemaVersion" : "arkdeck.debug-probe/1",
+          "targetId" : "TGT-3ba3f5f43b92",
+          "warnings" : [
+            "forwardRulesUnavailable"
+          ]
+        }
+      },
+      "method" : "debug.probe",
+      "mode" : "forwardUnavailable",
+      "name" : "probe.forwardUnavailable",
+      "params" : {
+        "targetId" : "TGT-3ba3f5f43b92"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : 1,
+          "packages" : [
+            "com.example.alpha",
+            "com.example.zeta"
+          ],
+          "portRules" : [
+            {
+              "direction" : "forward",
+              "localPort" : 9000,
+              "remotePort" : 9001
+            }
+          ],
+          "schemaVersion" : "arkdeck.debug-probe/1",
+          "targetId" : "TGT-3ba3f5f43b92",
+          "warnings" : [
+            "reverseRulesUnavailable"
+          ]
+        }
+      },
+      "method" : "debug.probe",
+      "mode" : "reverseUnavailable",
+      "name" : "probe.reverseUnavailable",
+      "params" : {
+        "targetId" : "TGT-3ba3f5f43b92"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "bindingRevision" : 1,
+          "packages" : [
+
+          ],
+          "portRules" : [
+
+          ],
+          "schemaVersion" : "arkdeck.debug-probe/1",
+          "targetId" : "TGT-3ba3f5f43b92",
+          "warnings" : [
+            "forwardRulesUnavailable",
+            "packageInventoryUnavailable",
+            "reverseRulesUnavailable"
+          ]
+        }
+      },
+      "method" : "debug.probe",
+      "mode" : "allUnavailable",
+      "name" : "probe.allUnavailable",
+      "params" : {
+        "targetId" : "TGT-3ba3f5f43b92"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Debug Runtime probe failed: target TGT-000000000000 has not been adopted"
+        },
+        "ok" : false
+      },
+      "method" : "debug.probe",
+      "mode" : "normal",
+      "name" : "probe.unadopted",
+      "params" : {
+        "targetId" : "TGT-000000000000"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidParams",
+          "message" : "Debug Runtime probe accepts only targetId"
+        },
+        "ok" : false
+      },
+      "method" : "debug.probe",
+      "name" : "probe.noParameters",
+      "params" : {
+
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidParams",
+          "message" : "Debug Runtime probe accepts only targetId"
+        },
+        "ok" : false
+      },
+      "method" : "debug.probe",
+      "name" : "probe.extraKey",
+      "params" : {
+        "rawCommand" : "hdc shell id",
+        "targetId" : "TGT-3ba3f5f43b92"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidParams",
+          "message" : "targetId must be a bounded durable target identity"
+        },
+        "ok" : false
+      },
+      "method" : "debug.probe",
+      "name" : "probe.emptyTarget",
+      "params" : {
+        "targetId" : ""
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidParams",
+          "message" : "targetId must be a bounded durable target identity"
+        },
+        "ok" : false
+      },
+      "method" : "debug.probe",
+      "name" : "probe.longTarget",
+      "params" : {
+        "targetId" : "ttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "arguments" : [
+            "-t",
+            "<redacted-connect-key>",
+            "shell",
+            "bm",
+            "dump",
+            "-a"
+          ],
+          "bindingRevision" : 1,
+          "durationMilliseconds" : 12,
+          "effect" : "readOnly",
+          "executable" : "hdc",
+          "executableSha256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+          "exitCode" : 0,
+          "loweringSha256" : "8479255d83ab81c1502c67fc6f93e764766348d2ca1ed39a16fee00ebee5be4c",
+          "outputTruncated" : false,
+          "stderr" : "",
+          "stdout" : "Bundle names:\n\tcom.example.alpha\n\tcom.example.zeta\n",
+          "targetId" : "TGT-3ba3f5f43b92",
+          "templateId" : "device.packageInventory"
+        }
+      },
+      "method" : "debug.template.run",
+      "mode" : "normal",
+      "name" : "template.packages",
+      "params" : {
+        "targetId" : "TGT-3ba3f5f43b92",
+        "templateId" : "device.packageInventory"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "arguments" : [
+            "-t",
+            "<redacted-connect-key>",
+            "shell",
+            "param",
+            "get",
+            "persist.ace.debug.enabled"
+          ],
+          "bindingRevision" : 1,
+          "durationMilliseconds" : 12,
+          "effect" : "readOnly",
+          "executable" : "hdc",
+          "executableSha256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+          "exitCode" : 0,
+          "loweringSha256" : "15132b2ec46674b481559c4b8fafe19d0feff2c409af9610ec066989a6d3a3d1",
+          "outputTruncated" : false,
+          "stderr" : "",
+          "stdout" : "true\n",
+          "targetId" : "TGT-3ba3f5f43b92",
+          "templateId" : "device.debugParameterRead"
+        }
+      },
+      "method" : "debug.template.run",
+      "mode" : "normal",
+      "name" : "template.parameter",
+      "params" : {
+        "targetId" : "TGT-3ba3f5f43b92",
+        "templateId" : "device.debugParameterRead"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "arguments" : [
+            "-t",
+            "<redacted-connect-key>",
+            "shell",
+            "hidumper",
+            "-s",
+            "WindowManagerService",
+            "-a",
+            "-a"
+          ],
+          "bindingRevision" : 1,
+          "durationMilliseconds" : 12,
+          "effect" : "readOnly",
+          "executable" : "hdc",
+          "executableSha256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+          "exitCode" : 0,
+          "loweringSha256" : "74c53e75bf280dce60c8c2c8943fe16b43bfc0dff783207574d734ba74315e77",
+          "outputTruncated" : false,
+          "stderr" : "",
+          "stdout" : "WindowManagerService\n----------\nfocus window: com.example.alpha\n",
+          "targetId" : "TGT-3ba3f5f43b92",
+          "templateId" : "device.windowInventory"
+        }
+      },
+      "method" : "debug.template.run",
+      "mode" : "normal",
+      "name" : "template.windows",
+      "params" : {
+        "targetId" : "TGT-3ba3f5f43b92",
+        "templateId" : "device.windowInventory"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "arguments" : [
+            "-t",
+            "<redacted-connect-key>",
+            "shell",
+            "uptime"
+          ],
+          "bindingRevision" : 1,
+          "durationMilliseconds" : 12,
+          "effect" : "readOnly",
+          "executable" : "hdc",
+          "executableSha256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+          "exitCode" : 0,
+          "loweringSha256" : "8d87494f95720388ee480ec4d58faf3dff267529519e4740a5f1e2e15a850180",
+          "outputTruncated" : false,
+          "stderr" : "",
+          "stdout" : " 10:00:00 up 1 day,  2:03,  0 users\n",
+          "targetId" : "TGT-3ba3f5f43b92",
+          "templateId" : "device.uptime"
+        }
+      },
+      "method" : "debug.template.run",
+      "mode" : "normal",
+      "name" : "template.uptime",
+      "params" : {
+        "targetId" : "TGT-3ba3f5f43b92",
+        "templateId" : "device.uptime"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "arguments" : [
+            "-t",
+            "<redacted-connect-key>",
+            "shell",
+            "uptime"
+          ],
+          "bindingRevision" : 1,
+          "durationMilliseconds" : 12,
+          "effect" : "readOnly",
+          "executable" : "hdc",
+          "executableSha256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+          "exitCode" : 7,
+          "loweringSha256" : "8d87494f95720388ee480ec4d58faf3dff267529519e4740a5f1e2e15a850180",
+          "outputTruncated" : false,
+          "stderr" : "uptime: cannot read /proc/uptime\n",
+          "stdout" : "",
+          "targetId" : "TGT-3ba3f5f43b92",
+          "templateId" : "device.uptime"
+        }
+      },
+      "method" : "debug.template.run",
+      "mode" : "templateFailure",
+      "name" : "template.failingExit",
+      "params" : {
+        "targetId" : "TGT-3ba3f5f43b92",
+        "templateId" : "device.uptime"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Debug template failed: outcomeUnknown(\"process died on signal 9; the child never reached its own semantic boundary. Its crash report is in ~/Library/Logs/DiagnosticReports/ (look for a same-second entry named after the executable).\")"
+        },
+        "ok" : false
+      },
+      "method" : "debug.template.run",
+      "mode" : "templateKilled",
+      "name" : "template.killed",
+      "params" : {
+        "targetId" : "TGT-3ba3f5f43b92",
+        "templateId" : "device.uptime"
+      }
+    },
+    {
+      "answer" : {
+        "ok" : true,
+        "result" : {
+          "arguments" : [
+            "-t",
+            "<redacted-connect-key>",
+            "shell",
+            "param",
+            "get",
+            "persist.ace.debug.enabled"
+          ],
+          "bindingRevision" : 1,
+          "durationMilliseconds" : 12,
+          "effect" : "readOnly",
+          "executable" : "hdc",
+          "executableSha256" : "208ff918ad4756bb6f269b41e33da7cc8b2e3d73322cedd45db63d3c35cfa002",
+          "exitCode" : 0,
+          "loweringSha256" : "15132b2ec46674b481559c4b8fafe19d0feff2c409af9610ec066989a6d3a3d1",
+          "outputTruncated" : true,
+          "stderr" : "",
+          "stdout" : "persist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npersist.ace.debug.enabled=true\npers",
+          "targetId" : "TGT-3ba3f5f43b92",
+          "templateId" : "device.debugParameterRead"
+        }
+      },
+      "method" : "debug.template.run",
+      "mode" : "templateTruncated",
+      "name" : "template.truncated",
+      "params" : {
+        "targetId" : "TGT-3ba3f5f43b92",
+        "templateId" : "device.debugParameterRead"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Debug template failed: Debug read-only template output is not UTF-8"
+        },
+        "ok" : false
+      },
+      "method" : "debug.template.run",
+      "mode" : "templateBinary",
+      "name" : "template.notUTF8",
+      "params" : {
+        "targetId" : "TGT-3ba3f5f43b92",
+        "templateId" : "device.debugParameterRead"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "rejected",
+          "message" : "Debug template failed: target TGT-000000000000 has not been adopted"
+        },
+        "ok" : false
+      },
+      "method" : "debug.template.run",
+      "mode" : "normal",
+      "name" : "template.unadopted",
+      "params" : {
+        "targetId" : "TGT-000000000000",
+        "templateId" : "device.uptime"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidParams",
+          "message" : "targetId and a closed templateId are required"
+        },
+        "ok" : false
+      },
+      "method" : "debug.template.run",
+      "name" : "template.unknownTemplate",
+      "params" : {
+        "targetId" : "TGT-3ba3f5f43b92",
+        "templateId" : "device.reboot"
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidParams",
+          "message" : "targetId and a closed templateId are required"
+        },
+        "ok" : false
+      },
+      "method" : "debug.template.run",
+      "name" : "template.noParameters",
+      "params" : {
+
+      }
+    },
+    {
+      "answer" : {
+        "error" : {
+          "code" : "invalidParams",
+          "message" : "targetId and a closed templateId are required"
+        },
+        "ok" : false
+      },
+      "method" : "debug.template.run",
+      "name" : "template.noTemplate",
+      "params" : {
+        "targetId" : "TGT-3ba3f5f43b92"
+      }
+    }
+  ],
+  "target" : {
+    "bindingRevision" : 1,
+    "connectKey" : "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "targetId" : "TGT-3ba3f5f43b92",
+    "toolVersion" : "3.2.0d"
+  },
+  "unadoptedTarget" : "TGT-000000000000"
+}
