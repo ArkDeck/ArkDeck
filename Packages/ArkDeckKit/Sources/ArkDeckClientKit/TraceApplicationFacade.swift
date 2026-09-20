@@ -1,4 +1,3 @@
-import ArkDeckClientKit
 // App-facing Trace projection over Runtime's closed typed XPC door.
 //
 // capture.diagnostics@1 publishes a typed traceCategories leg, but the App
@@ -9,8 +8,6 @@ import ArkDeckClientKit
 // obtained from Runtime. It has no parameter-write or arbitrary command path.
 
 import ArkDeckCore
-import ArkDeckOpenHarmony
-import ArkDeckRuntime
 import Foundation
 import os
 

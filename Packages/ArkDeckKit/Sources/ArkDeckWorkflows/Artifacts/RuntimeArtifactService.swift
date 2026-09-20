@@ -6,6 +6,7 @@
 // detail, kept out of RuntimeJobEngine so admission, recovery and job-running
 // code do not become the source of truth for Artifact policy.
 
+import ArkDeckClientKit
 import ArkDeckCore
 import ArkDeckRuntime
 import Foundation

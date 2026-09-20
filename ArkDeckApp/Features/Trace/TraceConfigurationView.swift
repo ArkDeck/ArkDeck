@@ -1,4 +1,4 @@
-import ArkDeckWorkflows
+import ArkDeckClientKit
 import SwiftUI
 
 struct TraceConfigurationView: View {

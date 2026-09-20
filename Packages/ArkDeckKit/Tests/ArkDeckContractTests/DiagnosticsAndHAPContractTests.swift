@@ -1,3 +1,4 @@
+@testable import ArkDeckClientKit
 import XCTest
 
 @testable import ArkDeckAgentClient

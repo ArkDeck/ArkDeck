@@ -1,3 +1,4 @@
+@testable import ArkDeckClientKit
 import Foundation
 import XCTest
 
@@ -188,7 +189,7 @@ final class ViewerTraceDesignSynchronizationContractTests: XCTestCase {
     let viewerDesignSystem = try source(
       "docs/design/arkdeck-ds/src/components/viewer.tsx")
     let durationSource = try source(
-      "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/TraceApplicationFacade.swift")
+      "Packages/ArkDeckKit/Sources/ArkDeckClientKit/TraceApplicationFacade.swift")
 
     // The Viewer prototype grew partial-unavailability states alongside
     // "captured" (#1588); a capture is present in all four, so hasCapture is

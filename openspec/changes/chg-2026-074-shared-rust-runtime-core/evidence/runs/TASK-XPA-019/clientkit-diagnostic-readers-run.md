@@ -98,8 +98,16 @@ not run (AGENTS.md "验证与完成"); the PR's CI is the gate.
 
 ## CI
 
-Recorded by the next slice, because a green head is merged without an amend. The device control
-slice's CI (#2077) is recorded in its own run record by this commit.
+PR #2080, merged as `5fec28f3`. On head `b183a243` (base `62123ea8`) every check passed:
+
+| Workflow run | Jobs | Conclusion |
+| --- | --- | --- |
+| Swift CI `35497690998` | `plan`, `swift-tests`, `app-build`, `ds-interactions` and the required `swift` aggregate; `rust-checks` skipped, as the plan selected no Rust lane | success |
+| SDD Guard `35497689773` | the required `guard`, `ds-tokens` | success |
+| Agent PR `35497689779` | `open-pr` | success |
+
+A green head is merged without an amend, so the Trace slice records this section. This slice's
+commit recorded the device control slice's CI (#2077) in its own run record.
 
 ## Not run
 
