@@ -1,13 +1,14 @@
-import ArkDeckClientKit
 import ArkDeckCore
 import Foundation
 
 /// App uploads use the same typed, generation-bound import resource as CLI.
+/// Lives in ClientKit because the Debug and Flash facades both drive it and the
+/// Debug facade is a ClientKit type; it needs only ArkDeckCore.
 /// The caller retains local file access; only bounded bytes cross transport.
-enum RuntimeAppArtifactUpload {
-  typealias Send = @Sendable (String, [String: JSONValue]) async throws -> Data
+package enum RuntimeAppArtifactUpload {
+  package typealias Send = @Sendable (String, [String: JSONValue]) async throws -> Data
 
-  static func upload(
+  package static func upload(
     fileURL: URL, kind: String, targetID: String, bindingRevision: Int,
     name: String, byteCount: Int, sha256: String, send: Send
   ) async throws -> [String: JSONValue] {

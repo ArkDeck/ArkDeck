@@ -98,6 +98,41 @@ type.
 Recorded by the next slice, because a green head is merged without an amend. The Trace slice's
 CI (#2089) is recorded in its own run record when that slice's own follow-up lands.
 
+CI r1 on head ae3581e6 (Swift CI run 35500712746) was red in `swift-tests` and `app-build`: the
+moved `DebugApplicationFacade.swift` calls `RuntimeAppArtifactUpload.upload`, and that enum still
+lived in `Sources/ArkDeckWorkflows/XPCConnectionBox.swift`, which ClientKit cannot see, so the
+`receipt` expressions at lines 658 and 1085 failed to type-check. The fix moves the enum, unchanged
+apart from `package` access on the type, its `Send` alias and `upload`, to
+`Sources/ArkDeckClientKit/RuntimeAppArtifactUpload.swift` (it needs only ArkDeckCore); the
+Workflows file held nothing else and is gone. `FlashApplicationFacade` and
+`DurableImportContractTests` reach it in-package.
+
+With ClientKit compiling, Workflows showed the second gap CI could not reach: its
+`DebugWindowInventoryJobRunner` names `DebugTemplateJobSubmission.Request`,
+`DebugTemplateJobExecution.run` and `DebugXPCReadTransport.request`, three enums that were
+module-internal beside the facade and moved with it. They are `package` now (type and the one
+member each the runner uses); their signatures name only public types
+(`DebugXPCReadFailure`, `DebugLogJobRunResult`, `JSONValue`). No dependency edge changes: the
+runner already imported ClientKit for `OverviewWindowInventoryJobRunning`.
+
+The test target showed the third: `DebugApplicationFacadeContractTests.swift` names ten
+module-internal facade types (`DebugWorkspaceResponseDecoding`, `DebugNativeLibraryRequestBuilder`,
+`DebugRuntimeResponseDecoding`, the HAP local-artifact inspector and friends) and had no
+`@testable import ArkDeckClientKit`; it has one now, first like the other test files.
+
+`ArchitectureBoundaryContractTests.testSourceImportsRespectLayerMatrix` then caught the fourth:
+the moved facade still said `import ArkDeckRuntime`, which ClientKit may not import. The import
+was dead; removing it compiles and the matrix test passes.
+
+Local result of the fix commit: SwiftPM package build green; the filtered
+`ArchitectureBoundaryContractTests` (16), `DurableImportContractTests` (29) and
+`DebugApplicationFacadeContractTests` (23) runs: 68 tests, 0 failures; `check_sdd` 0 errors.
+
+The coordinating session pushed both fixes while the authoring session was archived; its local
+check was one SwiftPM package build plus the filtered `ArchitectureBoundaryContractTests`,
+`DurableImportContractTests` and `DebugApplicationFacadeContractTests` runs, recorded in the
+commit body. The App build stays with CI's `app-build`.
+
 ## Not run
 
 - The Debug workspace UI walks through `run-ui-tests.sh`. The App build-for-testing compiles the

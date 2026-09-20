@@ -7,7 +7,6 @@
 // and the App receives a disclosure.
 
 import ArkDeckCore
-import ArkDeckRuntime
 import CryptoKit
 import Foundation
 import os
@@ -747,8 +746,8 @@ enum DebugTemplateRequestBuilder {
   }
 }
 
-enum DebugTemplateJobSubmission {
-  typealias Request =
+package enum DebugTemplateJobSubmission {
+  package typealias Request =
     @Sendable (String, [String: JSONValue]?) async
     -> Result<Data, DebugXPCReadFailure>
 
@@ -807,8 +806,8 @@ enum DebugJobRunExecution {
   }
 }
 
-enum DebugTemplateJobExecution {
-  static func run(
+package enum DebugTemplateJobExecution {
+  package static func run(
     targetID: String,
     bindingRevision: Int,
     templateID: String,
@@ -1649,8 +1648,8 @@ public enum DebugXPCReadFailure: Error, Sendable, Equatable {
   }
 }
 
-enum DebugXPCReadTransport {
-  static func request(
+package enum DebugXPCReadTransport {
+  package static func request(
     method: String,
     params: [String: JSONValue]? = nil
   ) async -> Result<Data, DebugXPCReadFailure> {

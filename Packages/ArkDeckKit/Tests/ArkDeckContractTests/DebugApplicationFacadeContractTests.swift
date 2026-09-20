@@ -1,4 +1,4 @@
-import ArkDeckClientKit
+@testable import ArkDeckClientKit
 import ArkDeckCore
 import ArkDeckRuntime
 import Foundation
