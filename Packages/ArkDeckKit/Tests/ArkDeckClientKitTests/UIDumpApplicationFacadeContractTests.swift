@@ -2,8 +2,6 @@
 import Foundation
 import XCTest
 
-@testable import ArkDeckWorkflows
-
 final class UIDumpApplicationFacadeContractTests: XCTestCase {
   func testViewerRequestPinsTargetAndEnablesOnlyPublishedCaptureInputs() throws {
     let target = UIDumpTargetPresentation(
@@ -293,7 +291,7 @@ final class UIDumpApplicationFacadeContractTests: XCTestCase {
   func testProductionFacadeContainsNoFixtureOrRawCommandFallback() throws {
     let source = try String(
       contentsOf: repository.appending(
-        path: "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/UIDumpApplicationFacade.swift"),
+        path: "Packages/ArkDeckKit/Sources/ArkDeckClientKit/UIDumpApplicationFacade.swift"),
       encoding: .utf8)
     XCTAssertTrue(source.contains("method: \"job.submit\""))
     XCTAssertTrue(source.contains("method: \"artifact.read\""))

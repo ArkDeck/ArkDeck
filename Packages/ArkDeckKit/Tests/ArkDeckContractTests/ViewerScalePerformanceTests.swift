@@ -1,8 +1,7 @@
+@testable import ArkDeckClientKit
 import Darwin
 import Foundation
 import XCTest
-
-@testable import ArkDeckWorkflows
 
 /// What Viewer costs as a device tree grows.
 ///

@@ -1,8 +1,7 @@
+@testable import ArkDeckClientKit
 import CryptoKit
 import Foundation
 import XCTest
-
-@testable import ArkDeckWorkflows
 
 final class UIDumpOfflineInspectorContractTests: XCTestCase {
   func testInspectionBindsVersionParserSourcesAndHitTest() throws {
@@ -107,7 +106,7 @@ final class UIDumpOfflineInspectorContractTests: XCTestCase {
       .deletingLastPathComponent()
     let app = try String(
       contentsOf: root.appending(
-        path: "Sources/ArkDeckWorkflows/UIDumpApplicationFacade.swift"),
+        path: "Sources/ArkDeckClientKit/UIDumpApplicationFacade.swift"),
       encoding: .utf8)
     let cli = try String(
       contentsOf: root.appending(
