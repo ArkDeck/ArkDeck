@@ -635,14 +635,18 @@ fn records_this_owner_does_not_hold_or_that_contradict_themselves_are_refused() 
         fields.insert(key.into(), value);
         Record::parse(fields)
     };
-    // A challenge, a receipt or an audit is not read here.
+    // Malformed challenge and receipt shapes remain unreadable.
     for key in ["interactionChallenge", "interactionReceipt"] {
         let error = with(key, json!({"actionId": "har-1"})).unwrap_err();
         assert_eq!(
             (error.code.as_str(), error.message.as_str()),
             (
                 "recordUnreadable",
-                "control-action state cannot be read or persisted"
+                if key == "interactionChallenge" {
+                    "interactive challenge is malformed"
+                } else {
+                    "control-action interaction receipt is malformed"
+                }
             ),
             "{key}"
         );
@@ -1403,12 +1407,12 @@ fn an_approval_reads_back_only_bound_to_its_awaiting_or_invalidated_action() {
     }
     assert_eq!(message(with(json!({"humanAction": null}))), unbound);
     assert!(with(json!({"humanAction": approval("controlActionGeneration", json!("2"))})).is_ok());
-    // A resolved approval is a person's answer, which is not read here.
+    // A resolved approval cannot remain in the awaiting state.
     assert_eq!(
         message(with(
             json!({"humanAction": approval("status", json!("resolved"))})
         )),
-        "control-action state cannot be read or persisted"
+        unbound
     );
     // Only an invalidated action keeps an approval it no longer awaits.
     let retained = "control action retains an invalid human-action state";
@@ -1472,4 +1476,435 @@ fn the_store_keeps_an_approval_whose_status_only_leaves_waiting() {
     // Its expiry with the action.
     store.replace(&invalidated, 3).unwrap();
     assert_eq!(store.load(&id).unwrap(), Some(invalidated));
+}
+
+fn awaiting_console(owner: &HdcControlActions, source: &Source) -> (String, Value) {
+    let preview = owner
+        .preview(&intent("console-lifecycle", "100000023"), source)
+        .unwrap();
+    let id = preview["controlActionId"].as_str().unwrap().to_owned();
+    let approval = owner
+        .restart(
+            &id,
+            preview["preview"]["previewId"].as_str().unwrap(),
+            preview["preview"]["previewDigest"].as_str().unwrap(),
+            source,
+        )
+        .unwrap();
+    let human = &approval["humanAction"];
+    let challenge = owner
+        .issue_interactive_challenge(
+            human["actionId"].as_str().unwrap(),
+            human["resumeReference"].as_str().unwrap(),
+        )
+        .unwrap();
+    (id, challenge)
+}
+
+/// Synthetic host-only lifecycle boundaries; never dispatches a process.
+struct LifecycleBoundaries<'a> {
+    stop_after: usize,
+    crash: bool,
+    jobs: &'a crate::JobStore,
+}
+impl HdcLifecycleDriver for LifecycleBoundaries<'_> {
+    fn restart(
+        &self,
+        reading: &ImpactReading,
+        audit: &HdcLifecycleAudit<'_>,
+    ) -> Result<(), WireError> {
+        assert_eq!(
+            self.jobs
+                .acquire_hdc_lifecycle_interlock()
+                .err()
+                .unwrap()
+                .code,
+            "resourceConflict"
+        );
+        assert!(audit.impact_is_current()?);
+        assert_eq!(audit.record()?.state, "approvalRecorded");
+        let id = "12345678-1234-1234-1234-123456789abc";
+        let step = "22345678-1234-1234-1234-123456789abc";
+        let confirmation = "32345678-1234-1234-1234-123456789abc";
+        let i = reading.impact.value();
+        let hash = "d".repeat(64);
+        let generation: i64 = i["serverGeneration"].as_str().unwrap().parse().unwrap();
+        let outcome =
+            json!({"result":"succeeded","resultingGeneration":generation+1,"reason":null});
+        let events = [
+            (
+                "impactPreview",
+                json!({"previewId":id,"action":"restartConfirmedGeneration","endpoint":i["endpoint"],"generation":generation,"ownership":i["serverOwnership"],"scopeHash":hash,"affectedDeviceCoordinators":i["affectedTargetIds"],"affectedJobs":i["affectedJobIds"],"otherClientDetection":{"kind":"unavailableExternalClientsMayStillExist","clients":[]},"expectedInterruption":"interrupted","recoveryPath":"reconcile"}),
+            ),
+            (
+                "confirmation",
+                json!({"confirmationId":confirmation,"previewId":id,"action":"restartConfirmedGeneration","endpoint":i["endpoint"],"generation":generation,"ownership":i["serverOwnership"],"scopeHash":hash}),
+            ),
+            (
+                "intent",
+                json!({"stepId":step,"confirmationId":confirmation,"action":"restartConfirmedGeneration","endpoint":i["endpoint"],"expectedGeneration":generation,"expectedOwnership":i["serverOwnership"],"impactSnapshotHash":hash}),
+            ),
+            (
+                "actualCommand",
+                json!({"stepId":step,"executable":"/fixture/hdc","argv":["-s",i["endpoint"],"kill","-r"],"endpoint":i["endpoint"]}),
+            ),
+            (
+                "launchWindowEntered",
+                json!({"stepId":step,"executable":"/fixture/hdc","argv":["-s",i["endpoint"],"kill","-r"],"endpoint":i["endpoint"],"authorizedExecutable":"/fixture/hdc","inodeLaunchPath":"/.vol/1/2","executableDevice":"1","executableInode":"2","executableFileSize":1,"executableMode":"448","executableSha256":"b".repeat(64)}),
+            ),
+            ("outcome", json!({"stepId":step,"outcome":outcome})),
+            (
+                "reconciliation",
+                json!({"reconciliationId":id,"stepId":step,"expectedScopeHash":hash,"historicalOutcome":outcome,"outwardOutcome":outcome,"postDispatchObservation":{"kind":"generation","generation":generation+1},"requiresReconcile":false,"reason":"durable lifecycle outcome reconciled against unchanged supervisor scope","observedScope":{"action":"restartConfirmedGeneration","endpoint":i["endpoint"],"health":"healthy","version":null,"generation":generation,"generationEvidence":null,"ownership":i["serverOwnership"],"affectedDeviceCoordinators":[],"affectedJobs":[],"otherClientDetection":{"kind":"unavailableExternalClientsMayStillExist","clients":[]},"criticalJobs":[],"impactReliable":true,"scopeHash":hash}}),
+            ),
+        ];
+        for (kind, payload) in events.into_iter().take(self.stop_after) {
+            if kind == "actualCommand" {
+                let mut rebound = payload.clone();
+                rebound["endpoint"] = json!("127.0.0.1:8711");
+                rebound["argv"] = json!(["-s", "127.0.0.1:8711", "kill", "-r"]);
+                assert_eq!(code(audit.append(kind, id, rebound)), "recordUnreadable");
+            }
+            if kind == "launchWindowEntered" {
+                let mut rebound = payload.clone();
+                rebound["inodeLaunchPath"] = json!("/.vol/1/999");
+                assert_eq!(code(audit.append(kind, id, rebound)), "recordUnreadable");
+            }
+            audit.append(kind, id, payload)?;
+        }
+        assert!(!self.crash, "injected process crash at durable boundary");
+        if self.stop_after < 7 {
+            return Err(refused("internalError", "injected lifecycle interruption"));
+        }
+        Ok(())
+    }
+}
+
+#[test]
+fn console_approval_is_bound_private_and_recovers_every_durable_boundary() {
+    for boundary in 0..=7 {
+        let directory = Directory::new();
+        let job_directory = Directory::new();
+        let jobs = crate::JobStore::open_owner(&job_directory.0).unwrap();
+        let clock = Arc::new(AtomicU64::new(NOW));
+        let owner = owner(&directory, "epoch", CATALOG, &clock, &[]);
+        let source = Source::new(Ok(reading(json!({}))));
+        let (id, challenge) = awaiting_console(&owner, &source);
+        assert_eq!(challenge["controlAction"]["generation"], "4");
+        let plaintext = challenge["challenge"].as_str().unwrap();
+        let stored = owner.required(&id).unwrap();
+        assert!(
+            !serde_json::to_string(&stored.value)
+                .unwrap()
+                .contains(plaintext)
+        );
+        let reference = challenge["humanAction"]["resumeReference"]
+            .as_str()
+            .unwrap();
+        let driver = LifecycleBoundaries {
+            stop_after: boundary,
+            crash: false,
+            jobs: &jobs,
+        };
+        let result =
+            owner.consume_interactive_challenge(&id, reference, plaintext, &jobs, &source, &driver);
+        assert_eq!(result.is_ok(), boundary == 7);
+        let record = owner.required(&id).unwrap();
+        let expected = match boundary {
+            0..=2 => "previewDrifted",
+            3..=4 => "failed",
+            5..=6 => "outcomeUnknown",
+            _ => "succeeded",
+        };
+        assert_eq!(record.state, expected, "boundary {boundary}");
+        assert_eq!(
+            record.projection()["dispatchCount"],
+            usize::from(boundary >= 5)
+        );
+        assert_eq!(record.approval.as_ref().unwrap().status(), "resolved");
+        assert!(jobs.acquire_hdc_lifecycle_interlock().is_ok());
+        let before = record.clone();
+        assert_eq!(owner.recover_interrupted(&id).unwrap(), before);
+        assert_eq!(owner.show(&id).unwrap(), before.projection());
+        assert_eq!(
+            code(
+                owner.consume_interactive_challenge(
+                    &id, reference, plaintext, &jobs, &source, &driver
+                )
+            ),
+            "humanActionExpired"
+        );
+        // Every terminal boundary survives a new owner without dispatch.
+        drop(owner);
+        let reopened = super::tests::owner(&directory, "next-epoch", CATALOG, &clock, &[]);
+        assert_eq!(reopened.show(&id).unwrap(), before.projection());
+    }
+}
+
+#[test]
+fn challenges_refuse_wrong_expired_replaced_and_drifted_approvals() {
+    let directory = Directory::new();
+    let job_directory = Directory::new();
+    let jobs = crate::JobStore::open_owner(&job_directory.0).unwrap();
+    let clock = Arc::new(AtomicU64::new(NOW));
+    let owner = owner(&directory, "epoch", CATALOG, &clock, &[]);
+    let source = Source::new(Ok(reading(json!({}))));
+    let (id, challenge) = awaiting_console(&owner, &source);
+    let reference = challenge["humanAction"]["resumeReference"]
+        .as_str()
+        .unwrap();
+    let human = challenge["humanAction"]["actionId"].as_str().unwrap();
+    let plaintext = challenge["challenge"].as_str().unwrap();
+    let driver = LifecycleBoundaries {
+        stop_after: 7,
+        crash: false,
+        jobs: &jobs,
+    };
+    let occupied = jobs.acquire_hdc_lifecycle_interlock().unwrap();
+    assert_eq!(
+        code(
+            owner.consume_interactive_challenge(&id, reference, plaintext, &jobs, &source, &driver)
+        ),
+        "resourceConflict"
+    );
+    assert!(owner.required(&id).unwrap().value["interactionReceipt"].is_null());
+    drop(occupied);
+    assert_eq!(
+        code(owner.consume_interactive_challenge(
+            &id,
+            reference,
+            "ARKDECK-WRONG0000",
+            &jobs,
+            &source,
+            &driver
+        )),
+        "impactApprovalChallengeMismatch"
+    );
+    assert_eq!(owner.show(&id).unwrap()["state"], "awaitingImpactApproval");
+    let replaced = owner.issue_interactive_challenge(human, reference).unwrap();
+    assert_ne!(replaced["challengeId"], challenge["challengeId"]);
+    assert_eq!(
+        code(
+            owner.consume_interactive_challenge(&id, reference, plaintext, &jobs, &source, &driver)
+        ),
+        "impactApprovalChallengeMismatch"
+    );
+    clock.store(NOW + 120_000, Ordering::SeqCst);
+    assert_eq!(
+        code(owner.consume_interactive_challenge(
+            &id,
+            reference,
+            replaced["challenge"].as_str().unwrap(),
+            &jobs,
+            &source,
+            &driver
+        )),
+        "impactApprovalChallengeExpired"
+    );
+    let renewed = owner.issue_interactive_challenge(human, reference).unwrap();
+    *source.reading.lock().unwrap() = Ok(reading(json!({"serverGeneration":"100000024"})));
+    assert_eq!(
+        code(owner.consume_interactive_challenge(
+            &id,
+            reference,
+            renewed["challenge"].as_str().unwrap(),
+            &jobs,
+            &source,
+            &driver
+        )),
+        "factsDrifted"
+    );
+    let record = owner.required(&id).unwrap();
+    assert_eq!(record.state, "previewDrifted");
+    assert!(record.value["interactionReceipt"].is_null());
+    assert!(record.value["interactionChallenge"].is_null());
+    assert!(record.audit().is_empty());
+}
+
+#[test]
+fn a_new_runtime_recovers_the_persisted_boundary_without_replaying_it() {
+    for boundary in 0..7 {
+        let directory = Directory::new();
+        let job_directory = Directory::new();
+        let jobs = crate::JobStore::open_owner(&job_directory.0).unwrap();
+        let clock = Arc::new(AtomicU64::new(NOW));
+        let runtime = owner(&directory, "before-crash", CATALOG, &clock, &[]);
+        let source = Source::new(Ok(reading(json!({}))));
+        let (id, challenge) = awaiting_console(&runtime, &source);
+        let crash = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _ = runtime.consume_interactive_challenge(
+                &id,
+                challenge["humanAction"]["resumeReference"]
+                    .as_str()
+                    .unwrap(),
+                challenge["challenge"].as_str().unwrap(),
+                &jobs,
+                &source,
+                &LifecycleBoundaries {
+                    stop_after: boundary,
+                    crash: true,
+                    jobs: &jobs,
+                },
+            );
+        }));
+        assert!(crash.is_err());
+        assert_eq!(runtime.required(&id).unwrap().audit().len(), boundary);
+        assert_eq!(
+            jobs.acquire_hdc_lifecycle_interlock().err().unwrap().code,
+            "internalError"
+        );
+        drop(runtime);
+        let reopened = owner(&directory, "after-crash", CATALOG, &clock, &[]);
+        let projection = reopened.show(&id).unwrap();
+        let expected = match boundary {
+            0..=2 => "previewDrifted",
+            3..=4 => "failed",
+            _ => "outcomeUnknown",
+        };
+        assert_eq!(projection["state"], expected, "boundary {boundary}");
+        assert_eq!(projection["dispatchCount"], usize::from(boundary >= 5));
+        let recovered = reopened.required(&id).unwrap();
+        if boundary == 6 {
+            let reconciliation = &recovered.audit().last().unwrap()["payload"];
+            assert_eq!(reconciliation["historicalOutcome"]["result"], "succeeded");
+            assert_eq!(reconciliation["outwardOutcome"]["result"], "outcomeUnknown");
+        }
+        assert_eq!(reopened.show(&id).unwrap(), projection);
+    }
+}
+
+#[test]
+fn lifecycle_records_reject_rebound_receipts_and_reordered_or_rewritten_audits() {
+    let directory = Directory::new();
+    let job_directory = Directory::new();
+    let jobs = crate::JobStore::open_owner(&job_directory.0).unwrap();
+    let clock = Arc::new(AtomicU64::new(NOW));
+    let owner = owner(&directory, "epoch", CATALOG, &clock, &[]);
+    let source = Source::new(Ok(reading(json!({}))));
+    let (id, challenge) = awaiting_console(&owner, &source);
+    owner
+        .consume_interactive_challenge(
+            &id,
+            challenge["humanAction"]["resumeReference"]
+                .as_str()
+                .unwrap(),
+            challenge["challenge"].as_str().unwrap(),
+            &jobs,
+            &source,
+            &LifecycleBoundaries {
+                stop_after: 7,
+                crash: false,
+                jobs: &jobs,
+            },
+        )
+        .unwrap();
+    let terminal = owner.required(&id).unwrap();
+    for (pointer, replacement) in [
+        (
+            "/interactionReceipt/controlActionId",
+            json!("control-action-another"),
+        ),
+        ("/interactionReceipt/challengeSha256", json!("0".repeat(64))),
+        (
+            "/interactionReceipt/confirmedAt",
+            json!(timestamp(NOW + 120_000)),
+        ),
+        ("/interactionChallenge/previewDigest", json!("0".repeat(64))),
+        ("/lifecycleAudit/0/sequence", json!(2)),
+        (
+            "/lifecycleAudit/0/payload/affectedJobs",
+            json!(["job-other"]),
+        ),
+        ("/lifecycleAudit/1/payload/scopeHash", json!("0".repeat(64))),
+        ("/lifecycleAudit/2/payload/expectedGeneration", json!(2)),
+        ("/lifecycleAudit/3/payload/argv", json!(["kill", "-r"])),
+        (
+            "/lifecycleAudit/4/payload/stepId",
+            json!("42345678-1234-1234-1234-123456789abc"),
+        ),
+        (
+            "/lifecycleAudit/5/auditId",
+            json!("42345678-1234-1234-1234-123456789abc"),
+        ),
+        (
+            "/lifecycleAudit/6/payload/outwardOutcome/result",
+            json!("failed"),
+        ),
+    ] {
+        let mut modified = Value::Object(terminal.value.clone());
+        *modified.pointer_mut(pointer).unwrap() = replacement;
+        assert_eq!(
+            code(Record::parse(object(modified))),
+            "recordUnreadable",
+            "{pointer}"
+        );
+    }
+    let mut rewritten = terminal.clone();
+    rewritten.value["lifecycleAudit"].as_array_mut().unwrap()[0]["payload"]["recoveryPath"] =
+        json!("changed");
+    assert!(!lifecycle::continues(&terminal, &rewritten));
+}
+
+#[test]
+fn fresh_impact_is_required_again_before_the_actual_command_is_durable() {
+    struct DriftBeforeCommand<'a> {
+        source: &'a Source,
+        jobs: &'a crate::JobStore,
+    }
+    impl HdcLifecycleDriver for DriftBeforeCommand<'_> {
+        fn restart(
+            &self,
+            reading: &ImpactReading,
+            audit: &HdcLifecycleAudit<'_>,
+        ) -> Result<(), WireError> {
+            let driver = LifecycleBoundaries {
+                stop_after: 3,
+                crash: false,
+                jobs: self.jobs,
+            };
+            assert_eq!(code(driver.restart(reading, audit)), "internalError");
+            *self.source.reading.lock().unwrap() = Ok(super::tests::reading(
+                json!({"serverGeneration":"100000024"}),
+            ));
+            let record = audit.record()?;
+            let intent = record.audit().last().unwrap();
+            audit.append(
+                "actualCommand",
+                intent["auditId"].as_str().unwrap(),
+                json!({"stepId":intent["payload"]["stepId"],"endpoint":"127.0.0.1:8710",
+                    "executable":"/fixture/hdc","argv":["-s","127.0.0.1:8710","kill","-r"]}),
+            )?;
+            panic!("a changed impact cannot enter the executor");
+        }
+    }
+    let directory = Directory::new();
+    let job_directory = Directory::new();
+    let jobs = crate::JobStore::open_owner(&job_directory.0).unwrap();
+    let clock = Arc::new(AtomicU64::new(NOW));
+    let owner = owner(&directory, "epoch", CATALOG, &clock, &[]);
+    let source = Source::new(Ok(reading(json!({}))));
+    let (id, challenge) = awaiting_console(&owner, &source);
+    assert_eq!(
+        code(
+            owner.consume_interactive_challenge(
+                &id,
+                challenge["humanAction"]["resumeReference"]
+                    .as_str()
+                    .unwrap(),
+                challenge["challenge"].as_str().unwrap(),
+                &jobs,
+                &source,
+                &DriftBeforeCommand {
+                    source: &source,
+                    jobs: &jobs
+                }
+            )
+        ),
+        "factsDrifted"
+    );
+    let record = owner.required(&id).unwrap();
+    assert_eq!(record.state, "failed");
+    assert_eq!(record.projection()["dispatchCount"], 0);
+    assert!(!record.audit().iter().any(|e| e["kind"] == "actualCommand"));
+    assert!(jobs.acquire_hdc_lifecycle_interlock().is_ok());
 }

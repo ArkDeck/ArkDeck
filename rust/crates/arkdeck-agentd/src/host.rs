@@ -993,6 +993,54 @@ impl HostServices for Host {
         )
     }
 
+    #[cfg(target_os = "macos")]
+    fn interactive_human_action_resume(
+        &self,
+        params: &serde_json::Map<String, serde_json::Value>,
+    ) -> Result<serde_json::Value, WireError> {
+        if let (Some(agents), Some(resources), Some(controls)) =
+            (&self.agents, &self.human_actions, &self.control_actions)
+            && let Some(answer) =
+                resources.resume_control_action("human-action.resume", params, agents, controls)
+        {
+            let approval = answer?;
+            if params.contains_key("challengeResponse") {
+                // The shared Supervisor and managed-server exit handoff must
+                // be composed before accepting a receipt that can dispatch.
+                return Err(WireError {
+                    code: "admissionDenied".into(),
+                    message: "interactive HDC lifecycle execution is unavailable".into(),
+                    details: Some(serde_json::Map::from_iter([
+                        ("newDispatchCount".into(), serde_json::json!(0)),
+                        ("phase".into(), serde_json::json!("preAdmission")),
+                    ])),
+                });
+            }
+            let action = approval["actionId"].as_str().ok_or_else(|| WireError {
+                code: "recordUnreadable".into(),
+                message: "impact approval identity is unavailable".into(),
+                details: None,
+            })?;
+            let reference = approval["resumeReference"]
+                .as_str()
+                .ok_or_else(|| WireError {
+                    code: "recordUnreadable".into(),
+                    message: "impact approval reference is unavailable".into(),
+                    details: None,
+                })?;
+            return controls
+                .issue_interactive_challenge(action, reference)
+                .map_err(|mut error| {
+                    error
+                        .details
+                        .get_or_insert_with(serde_json::Map::new)
+                        .insert("phase".into(), serde_json::json!("preAdmission"));
+                    error
+                });
+        }
+        self.agent_execution("human-action.resume", params)
+    }
+
     /// `human-action.list` and `human-action.show`, as the Swift daemon
     /// answers them with its combined human-action owner over the agent
     /// executions and the union control-action owner.

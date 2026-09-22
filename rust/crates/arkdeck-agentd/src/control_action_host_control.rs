@@ -1208,3 +1208,144 @@ fn every_with_host_exchange_of_the_corpora_is_answered_as_swift_recorded_it() {
     assert!(deferred >= console, "{deferred} < {console}");
     assert!(corpora.replayed.len() >= 29, "{:?}", corpora.replayed);
 }
+
+/// Replay the recorded console challenge through the production Host. The
+/// impact is synthetic; this proves transport routing and durable ownership,
+/// not a process dispatch or real-device acceptance.
+#[test]
+fn production_host_issues_the_recorded_challenge_only_to_console_origin() {
+    let recorded = corpus("human-action.resume")
+        .into_iter()
+        .find(|frame| frame["result"]["schemaVersion"] == "arkdeck.impact-approval-challenge/1")
+        .unwrap();
+    let expected = &recorded["result"];
+    let action = &expected["controlAction"];
+    let scenario = Scenario::new(FAKE_SOURCE_START);
+    let preview = action["preview"].as_object().unwrap();
+    *scenario.source.reading.lock().unwrap() = Ok(ImpactReading {
+        impact: Impact::new(
+            preview
+                .iter()
+                .filter(|(key, _)| !PREVIEW_METADATA.contains(&key.as_str()))
+                .map(|(key, value)| (key.clone(), value.clone()))
+                .collect(),
+        )
+        .unwrap(),
+        relations: Vec::new(),
+        blocker: None,
+    });
+    let suffix = expected["challenge"]
+        .as_str()
+        .unwrap()
+        .strip_prefix("ARKDECK-")
+        .unwrap();
+    let ids = VecDeque::from([
+        action["controlActionId"]
+            .as_str()
+            .unwrap()
+            .strip_prefix("control-action-")
+            .unwrap()
+            .to_owned(),
+        preview["previewId"]
+            .as_str()
+            .unwrap()
+            .strip_prefix("preview-")
+            .unwrap()
+            .to_owned(),
+        expected["humanAction"]["actionId"]
+            .as_str()
+            .unwrap()
+            .strip_prefix("har-")
+            .unwrap()
+            .to_owned(),
+        expected["humanAction"]["resumeReference"]
+            .as_str()
+            .unwrap()
+            .strip_prefix("resume-")
+            .unwrap()
+            .to_owned(),
+        // UUID prefix is the nine-character suffix across the first hyphen.
+        format!(
+            "{}-{}000-4000-8000-000000000000",
+            &suffix[..8],
+            &suffix[8..]
+        ),
+        expected["challengeId"]
+            .as_str()
+            .unwrap()
+            .strip_prefix("challenge-")
+            .unwrap()
+            .to_owned(),
+    ]);
+    let ids = Mutex::new(ids);
+    let owner = HdcControlActions::open(
+        &scenario.root.join("hdc-control-actions"),
+        OwnerContext {
+            epoch: "console-host-epoch".into(),
+            catalog: action["catalogDigest"].as_str().unwrap().into(),
+            clock: Box::new(|| Some(FAKE_SOURCE_START)),
+            uuid: Box::new(move || Ok(ids.lock().unwrap().pop_front().expect("recorded identity"))),
+        },
+    )
+    .unwrap();
+    let ready = owner.preview(json!({"action":"restart", "actionRequestId":action["actionRequestId"],
+        "serverEndpointRef":preview["serverEndpointRef"], "expectedServerGeneration":preview["serverGeneration"]}).as_object().unwrap(), scenario.source.as_ref()).unwrap();
+    owner
+        .restart(
+            ready["controlActionId"].as_str().unwrap(),
+            preview["previewId"].as_str().unwrap(),
+            preview["previewDigest"].as_str().unwrap(),
+            scenario.source.as_ref(),
+        )
+        .unwrap();
+    let host = crate::host::Host::from_environment()
+        .with_agent_executions(
+            AgentExecutionStore::open(&scenario.root.join("agent-executions")).unwrap(),
+        )
+        .with_human_actions(
+            HumanActionResources::open(&scenario.root.join("human-action-snapshots")).unwrap(),
+        )
+        .with_control_actions(
+            ControlActionResources::open(&scenario.root.join("control-action-snapshots"))
+                .unwrap()
+                .with_hdc(owner),
+        );
+    let control = Control::new(host).unwrap();
+    let send = |params: Value, console: bool| -> Value {
+        let request = serde_json::to_vec(&json!({"protocolVersion":PROTOCOL_VERSION,
+            "contractIdentity":CONTRACT_IDENTITY,"id":"console-host","method":"human-action.resume","params":params})).unwrap();
+        serde_json::from_slice(
+            control
+                .handle_frame_with_console(&request, console)
+                .trim_ascii_end(),
+        )
+        .unwrap()
+    };
+    let ordinary = send(recorded["params"].clone(), false);
+    assert_eq!(ordinary["result"], expected["humanAction"]);
+    let mut forged = recorded["params"].clone();
+    forged["interactionOrigin"] = json!("interactiveConsole");
+    assert_eq!(send(forged, false)["ok"], false);
+    let console = send(recorded["params"].clone(), true);
+    assert_eq!(console["result"], *expected, "{console}");
+    let mut answer = recorded["params"].clone();
+    answer["challengeResponse"] = expected["challenge"].clone();
+    // A challenge is not dispatch authority while the executor is unconfigured.
+    let refusal = send(answer, true);
+    assert_eq!(refusal["error"]["code"], "admissionDenied", "{refusal}");
+    assert_eq!(refusal["error"]["details"]["newDispatchCount"], 0);
+    let mut records = 0;
+    for entry in fs::read_dir(scenario.root.join("hdc-control-actions/records")).unwrap() {
+        let path = entry.unwrap().path();
+        if path.extension().is_none_or(|extension| extension != "json") {
+            continue;
+        }
+        let contents = fs::read_to_string(path).unwrap();
+        records += 1;
+        assert!(!contents.contains(expected["challenge"].as_str().unwrap()));
+        let value: Value = serde_json::from_str(&contents).unwrap();
+        assert!(value["interactionReceipt"].is_null());
+        assert_eq!(value["state"], "awaitingImpactApproval");
+    }
+    assert_eq!(records, 1);
+}

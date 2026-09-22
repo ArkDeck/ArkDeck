@@ -10,21 +10,19 @@
 //! are what the human-action owner lists for a `controlAction` owner
 //! (`human_action.rs`).
 //!
-//! What is here is what an action holds until a person answers its approval:
+//! The owner retains the complete approval and lifecycle history:
 //! the intent and its fingerprint (`HDCControlActionIntent`), the impact and
 //! its preview with their canonical collections and digest
-//! (`HDCControlImpact`, `HDCControlActionPreview`), the record in the states
-//! `observing`, `previewReady`, `blocked`, `awaitingImpactApproval`,
-//! `expired` and `previewDrifted`, with its waiting or expired approval
+//! (`HDCControlImpact`, `HDCControlActionPreview`), the durable record and approval
 //! (`HDCControlActionRecord`, `HDCControlHumanAction`), the store's
 //! transaction lock and CAS transitions, and the coordinator's preview,
 //! restart request, reconcile and age refresh. Restart never restarts
 //! anything: it records the approval request, and only a person's answer to
 //! the console challenge of `human-action.resume` would lead to a lifecycle
-//! dispatch. That challenge, its receipt, the lifecycle audit and the
-//! recovery of an interrupted lifecycle are not here: a record carrying a
-//! challenge, a receipt, an audit or a resolved approval is refused as
-//! unreadable, and this owner never writes one.
+//! dispatch. `lifecycle` binds that challenge and its receipt to the exact
+//! preview, validates the ordered audit, and recovers interrupted lifecycle
+//! boundaries without replay. Consumption holds the Job admission interlock
+//! until the configured Runtime driver finishes or recovery is persisted.
 //!
 //! The owner serves one request at a time. Swift's actor lets another
 //! request run while a preview awaits its observation and joins the
@@ -43,6 +41,10 @@ use serde_json::{Map, Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 use std::io;
 use std::path::Path;
+
+#[path = "hdc_control_lifecycle.rs"]
+mod lifecycle;
+pub use lifecycle::{HdcLifecycleAudit, HdcLifecycleDriver};
 
 /// An action's and its preview's life: `expiresAt` is `createdAt` plus 300 s.
 const LIFETIME_MS: u64 = 300_000;
@@ -644,9 +646,8 @@ impl Record {
         Self::parse(value)
     }
 
-    /// Swift `HDCControlActionRecord.init(value:)`, for the records this
-    /// owner writes: a waiting or an expired approval is read, a resolved
-    /// one, a challenge, a receipt or a lifecycle audit is not.
+    /// Swift `HDCControlActionRecord.init(value:)`, including the challenge,
+    /// receipt, resolved approval and lifecycle audit invariants.
     fn parse(value: Map<String, Value>) -> Result<Self, WireError> {
         let text = |key: &str| value.get(key).and_then(Value::as_str);
         let invalid = || record_unreadable("control-action record has invalid identity or state");
@@ -711,18 +712,15 @@ impl Record {
                 ));
             }
         };
-        // What only a person's answer to the approval and the lifecycle
-        // after it hold: the console challenge, its receipt, the approval
-        // that receipt resolved and the lifecycle audit.
-        if value.get("interactionChallenge") != Some(&Value::Null)
-            || value.get("interactionReceipt") != Some(&Value::Null)
-            || value.get("lifecycleAudit") != Some(&json!([]))
-            || approval
-                .as_ref()
-                .is_some_and(|approval| approval.status() == "resolved")
-        {
-            return Err(unreadable());
-        }
+        lifecycle::validate(
+            &value,
+            id,
+            state,
+            end,
+            approval.as_ref(),
+            preview.as_ref(),
+            &intent,
+        )?;
         let blocker = value.get("blockerReasonCode");
         if let Some(preview) = &preview {
             if preview.value.get("controlActionId") != Some(&json!(id))
@@ -795,30 +793,14 @@ impl Record {
                     "impact approval is not bound to its exact preview generation",
                 ));
             }
-        } else if approval.is_some()
-            && !(["expired", "previewDrifted"].contains(&state)
-                && approval
-                    .as_ref()
-                    .is_some_and(|approval| approval.status() == "expired"))
-        {
-            // Only an invalidated action keeps an approval it no longer
-            // awaits (a resolved one was refused above).
+        } else if approval.as_ref().is_some_and(|approval| {
+            let resolved = lifecycle::ADVANCED.contains(&state)
+                || ["expired", "previewDrifted"].contains(&state);
+            !(resolved && approval.status() == "resolved"
+                || ["expired", "previewDrifted"].contains(&state) && approval.status() == "expired")
+        }) {
             return Err(record_unreadable(
                 "control action retains an invalid human-action state",
-            ));
-        }
-        if [
-            "approvalRecorded",
-            "dispatchPrepared",
-            "dispatching",
-            "succeeded",
-            "failed",
-            "outcomeUnknown",
-        ]
-        .contains(&state)
-        {
-            return Err(record_unreadable(
-                "advanced control action lacks interactive approval proof",
             ));
         }
         let mut bound = BTreeSet::new();
@@ -960,9 +942,9 @@ impl Record {
                 Value::Object(approval.expiring()?.value().clone()),
             );
         }
-        // Swift also withdraws a challenge no receipt answered; a record
-        // here never holds one.
-        fields.insert("interactionChallenge".into(), Value::Null);
+        if fields.get("interactionReceipt") == Some(&Value::Null) {
+            fields.insert("interactionChallenge".into(), Value::Null);
+        }
         Self::parse(fields)
     }
 
@@ -1047,7 +1029,7 @@ impl Record {
             "preview": self.preview.as_ref().map(|preview| Value::Object(preview.value.clone())),
             "blockerReasonCode": blocker,
             "humanAction": self.approval.as_ref().map(ImpactApproval::projection),
-            "dispatchCount": 0,
+            "dispatchCount": usize::from(self.audit().iter().any(|event| event["kind"] == "launchWindowEntered")),
             "nextAction": {"kind": kind, "owner": owner(id), "resource": resource, "reasonCode": reason},
         })
     }
@@ -1103,6 +1085,7 @@ impl StoredAction for Record {
                     .as_ref()
                     .is_some_and(|next| approval.continues(next))
             })
+            && lifecycle::continues(previous, next)
             && time(&previous.observed)
                 .zip(time(&next.observed))
                 .is_some_and(|(old, new)| new >= old)
@@ -1478,9 +1461,7 @@ impl HdcControlActions {
             && ["approvalRecorded", "dispatchPrepared", "dispatching"]
                 .contains(&record.state.as_str())
         {
-            // An interrupted lifecycle is recovered by its audit, which this
-            // owner never holds (such a record does not parse here).
-            return Err(unreadable());
+            return self.recover_interrupted(&record.id);
         }
         if !OPEN.contains(&record.state.as_str()) {
             return Ok(record);
