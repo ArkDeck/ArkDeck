@@ -232,6 +232,7 @@ fn rust_admits_the_swift_hap_submissions_under_the_capabilities_swift_issued() {
             }
             _ => continue,
         };
+        let actual = support::legacy_plan_answer(actual);
         if actual != exchange["answer"] {
             differences.push(format!(
                 "{}:\n  swift {}\n  rust  {actual}",

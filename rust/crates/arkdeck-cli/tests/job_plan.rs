@@ -218,6 +218,7 @@ fn only_a_complete_unadmitted_plan_projection_is_accepted() {
         ("jobAdmitted", json!(true)),
         ("dispatchDisposition", json!("dispatched")),
         ("materializedPlanDigest", json!("ABC")),
+        ("stepSetDigestSHA256", json!("ABC")),
         ("bindingRevision", json!(0)),
         ("authorizationPolicy", json!("anything")),
         ("providerAdmissionBlocker", json!("")),
@@ -230,6 +231,11 @@ fn only_a_complete_unadmitted_plan_projection_is_accepted() {
             "{field}"
         );
     }
+    let mut with_review = planned.clone();
+    with_review["stepSetDigestSHA256"] =
+        json!("a06552647a3ebed582afc39bd534a856e40263d79623edd8b8bd85b1f476c509");
+    validate_plan(&with_review).unwrap();
+    arkdeck_contract::validate_method_value("job.plan", "result", &with_review).unwrap();
     let mut unknown = planned.clone();
     unknown["extra"] = json!(1);
     assert!(validate_plan(&unknown).is_err());

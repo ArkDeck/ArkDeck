@@ -539,7 +539,7 @@
     "Catalog/profiles": "58ca1d970d40019ba2718646fde81fefda22533c5448e620217582e30f5d648f",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames": "f71f1ff220663e12b1cb118144e614bd9379def281091e4cb073cc6eadd043f3",
     "Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/HDC": "9ae93642e7b81bcea918469216711d7f6a17135a29cf021556ceef0f2f789196",
-    "spec/control/methods": "f1017c2b8a1708ea33fc0c19772ceba0e0223adcd50e0768b6efc89806e9557c"
+    "spec/control/methods": "016c1044b5dce5a4172dd891792634dd95dcb0927264c9091f3e24fce4189682"
   },
   "files": {
     "Catalog/generated/effect-authorization-matrix.md": {
@@ -1515,8 +1515,8 @@
       "sha256": "1c3b65b94a01c3bb658a8c85270eeb297215b9fcfd3839010a377cef8370c234"
     },
     "spec/control/methods/job.plan.json": {
-      "blob": "2f69de7dd8ef73dd5043617fde225991ee79d722",
-      "sha256": "58533d6ad86e9ed1e3b123e3607866a2cbe435cd4694160560dc0d69e12d624e"
+      "blob": "99eaacad0e08d8dfa198d6c0c6eeb2d8c6e9e351",
+      "sha256": "52619ff1529ec167fa96ff57742ce371350a006b8a13d45deb43f66a597519c5"
     },
     "spec/control/methods/job.reconcile.json": {
       "blob": "fa80e0a42e6d84abd1186fe014fbb3323006e766",
@@ -1731,7 +1731,7 @@
       "sha256": "c3a4af1a193b0273926fdf46bdda5e3f178c135476014651408f7c73dd1d3a77"
     }
   },
-  "inputDigest": "1b550503f0320c3a713a754736dafe52008eafbfaa7b03dc04f39fb2f09ed8ef",
+  "inputDigest": "b127e5856b7b27ebc69739e3b1fe7f191948b57ac868d98826e66300d5a12dec",
   "kind": "development",
   "methodCount": 105,
   "protocolVersion": "1.0.0",

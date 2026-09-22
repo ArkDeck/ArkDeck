@@ -212,16 +212,8 @@ impl<'a> JobPlanner<'a> {
         let materialized = self.materialized(&request, descriptor)?;
         let reference = descriptor.reference();
         let effect = descriptor.effective_effect(&request.inputs);
-        let steps: Vec<Value> = descriptor
-            .steps
-            .iter()
-            .filter(|step| descriptor.step_is_selected(step, &request.inputs))
-            .map(|step| {
-                json!({"stepId": step.step_id, "kind": step.kind, "effect": step.effect,
-                    "cancellation": step.cancellation, "binding": step.binding,
-                    "optional": step.optional})
-            })
-            .collect();
+        let steps = crate::catalog_review::selected_steps(descriptor, &request.inputs);
+        let step_set = step_set_digest(descriptor, &request.inputs)?;
         Ok(json!({
             "schemaVersion": "arkdeck.job-plan/1",
             "executionMode": "planOnly",
@@ -233,6 +225,7 @@ impl<'a> JobPlanner<'a> {
             "catalogDigest": CATALOG_DIGEST,
             "requestFingerprintSha256": fingerprint,
             "materializedPlanDigest": materialized.digest,
+            "stepSetDigestSHA256": step_set,
             "inputs": request.inputs,
             "steps": steps,
             "effectiveEffect": effect,

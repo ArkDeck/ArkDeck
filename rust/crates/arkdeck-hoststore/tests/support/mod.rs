@@ -435,3 +435,24 @@ pub fn assert_leftovers_with(
         );
     }
 }
+
+/// Compare every existing Swift plan field unchanged after validating the one
+/// additive Rust review field. Frozen digest semantics are checked by the Flash,
+/// analyzer and Debug HAP tests; no other response property is removed here.
+pub fn legacy_plan_answer(mut answer: Value) -> Value {
+    if answer["ok"] == true && answer["result"]["schemaVersion"] == "arkdeck.job-plan/1" {
+        arkdeck_contract::validate_method_value("job.plan", "result", &answer["result"]).unwrap();
+        let digest = answer["result"]
+            .as_object_mut()
+            .unwrap()
+            .remove("stepSetDigestSHA256")
+            .expect("Rust plans must expose the review digest");
+        let text = digest.as_str().unwrap();
+        assert_eq!(text.len(), 64);
+        assert!(
+            text.bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        );
+    }
+    answer
+}

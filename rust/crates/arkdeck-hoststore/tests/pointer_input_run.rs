@@ -506,6 +506,7 @@ fn replay(fault: Fault) {
             }
             return;
         }
+        let actual = support::legacy_plan_answer(actual);
         let recorded = &exchange["answer"];
         if semantic(&actual) != semantic(recorded) {
             differences.push(format!("{name}:\n  swift {recorded}\n  rust  {actual}"));

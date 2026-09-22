@@ -573,3 +573,8 @@ pub use import_upload::{ImportBinding, ImportUploadFault, ImportUploadStore};
 mod artifact_export;
 #[cfg(target_os = "macos")]
 pub use artifact_export::ArtifactExportRequest;
+
+#[cfg(target_os = "macos")]
+mod catalog_review;
+#[cfg(target_os = "macos")]
+pub use catalog_review::flash_catalog_review;

@@ -327,6 +327,7 @@ fn rust_captures_every_swift_screen_sequence_as_swift_does() {
             },
             other => panic!("{name}: the oracle sent {other}"),
         };
+        let actual = support::legacy_plan_answer(actual);
         if actual != exchange["answer"] {
             differences.push(format!(
                 "{name}:\n  swift {}\n  rust  {actual}",
@@ -427,7 +428,8 @@ fn the_host_receive_root_is_part_of_the_plan() {
         recorded["materializedPlanDigest"]
     );
     let rooted = owners.hdc(&dispatch, Some(&owners.receive_root));
-    assert_eq!(owners.planner(&rooted).handle(&params).unwrap(), *recorded);
+    let answer = json!({"ok":true,"result":owners.planner(&rooted).handle(&params).unwrap()});
+    assert_eq!(support::legacy_plan_answer(answer)["result"], *recorded);
     assert_eq!(owners.calls(), "", "planning dispatches nothing");
     assert!(!elsewhere.exists(), "planning prepares no landing");
 }

@@ -331,6 +331,7 @@ fn rust_changes_the_swift_port_rules_under_the_capabilities_swift_consumed() {
             }
             other => panic!("{name}: the oracle sent {other}"),
         };
+        let actual = support::legacy_plan_answer(actual);
         if actual != exchange["answer"] {
             differences.push(format!(
                 "{name}:\n  swift {}\n  rust  {actual}",

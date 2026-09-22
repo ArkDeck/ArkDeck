@@ -192,6 +192,7 @@ fn rust_admits_the_swift_gestures_under_the_capabilities_swift_issued() {
             }
             _ => continue,
         };
+        let actual = support::legacy_plan_answer(actual);
         if actual != exchange["answer"] {
             differences.push(format!(
                 "{name}:\n  swift {}\n  rust  {actual}",
