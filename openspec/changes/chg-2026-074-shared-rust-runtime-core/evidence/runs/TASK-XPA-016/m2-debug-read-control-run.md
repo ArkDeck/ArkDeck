@@ -51,7 +51,24 @@ acceptance and performance measurements were not run locally.
 
 ## CI
 
-Pending push and automatic PR. No skipped job is counted as passing.
+PR #2108, original head `202625807850b149f6063a07b7bf8f0eeea42ca5`:
+run `35705565526` selected host-independent and Ubuntu/macOS/Windows Rust lanes.
+Ubuntu job `106673575352` failed in `check-readonly.py`: its unimplemented-route
+expectation still required `rejected` for a missing Debug request. The router correctly
+returned `invalidParams`. The script now requires that exact result and separately
+checks well-shaped requests with no provider (`internalError`), extra raw commands and
+unknown templates (`invalidParams`); no assertion was removed or weakened.
+
+The failed command alone was rerun with the current agentd/CLI binaries and the existing
+`/private/tmp/arkdeck-validation-venv/bin/python` environment:
+`rust/scripts/check-readonly.py --bin-dir /private/tmp/arkdeck-1330-rust-target/debug
+--output-dir /private/tmp/arkdeck-debug-readonly-check`: exit 0, 129 control responses,
+12 CLI envelopes, 120 valid requests; `/private/tmp/arkdeck-debug-readonly.log`.
+The default Python lacked jsonschema; no dependency was installed. Prerequisite binary
+build: exit 0, `/private/tmp/arkdeck-debug-readonly-build.log`.
+
+Replacement CI is pending push. Swift tests/App/UI were skipped, not passing.
+SDD Guard passed; no CI result constitutes maintainer approval.
 
 ## Remaining
 
