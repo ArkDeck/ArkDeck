@@ -968,6 +968,9 @@ pub fn human_action_progress(error: &CliError) -> Option<String> {
 /// evidence that could not be verified (Swift `evidenceIntegrityExit`) and
 /// then the Job's terminal state (Swift `terminalJobExit`).
 pub fn agent_exit(result: &Value) -> Option<(u8, String)> {
+    if result["schemaVersion"] == "arkdeck.control-action/1" {
+        return crate::console_approval::control_action_exit(result);
+    }
     if result["executionOutcome"] == "abandoned" {
         return Some((1, "execution was abandoned; no Job was cancelled".into()));
     }
