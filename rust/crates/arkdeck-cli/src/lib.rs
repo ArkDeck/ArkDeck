@@ -10,7 +10,9 @@ pub use artifact_resources::{
 };
 pub use import_resources::execute_import;
 mod bootstrap_resources;
+mod debug_probe;
 mod device_wait;
+pub use debug_probe::validate_debug_probe;
 mod operation_validation;
 mod read_only_resources;
 pub use read_only_resources::{
@@ -67,6 +69,8 @@ pub struct Invocation {
     /// follow durable events rather than answering one document.
     pub jsonl: bool,
     pub raw: bool,
+    /// Legacy raw JSON reply for debug probe; distinct from Artifact bytes.
+    pub legacy_json: bool,
     pub help: bool,
     pub require_healthy: bool,
     pub control_request_id: Option<String>,
@@ -452,6 +456,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
     let (mut mode, mut id, mut socket) = (None, None, None);
     let (mut deep, mut require_healthy, mut help) = (false, false, false);
     let mut raw = false;
+    let mut legacy_json = false;
     let mut index = 0;
     while index < argv.len() {
         let argument = &argv[index];
@@ -466,6 +471,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                 "--help" | "-h" => help = true,
                 "--deep" => deep = true,
                 "--raw" => raw = true,
+                "--json" => legacy_json = true,
                 "--overwrite" => {
                     method_options.insert("overwrite".into(), json!(true));
                 }
@@ -717,6 +723,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ["job", "result"] => "job.result",
         ["job", "timeline"] => "job.timeline",
         ["job", "events"] => "job.events",
+        ["debug", "probe"] => "debug.probe",
         ["job", "watch"] => "job.watch",
         ["job", "plan"] => "job.plan",
         ["job", "submit"] => "job.submit",
@@ -791,6 +798,12 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
             ));
         }
     };
+    if legacy_json && (command != "debug.probe" || mode.is_some()) {
+        return Err(CliError::new(
+            "invalidOption",
+            "--json belongs to debug probe and excludes --output",
+        ));
+    }
     // Swift's parser refuses `--socket` on `runtime tool register` unless the
     // kind is DevEco, because its HDC registration runs in its own process.
     // This CLI sends every registration to the Runtime that owns the Bootstrap
@@ -858,6 +871,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         ));
     }
     let allowed: &[&str] = match command {
+        "debug.probe" => &["targetId"],
         "artifact.import.hap"
         | "artifact.import.native-library"
         | "artifact.import.workspace-patch" => &["importRequestId", "targetId", "file", "timeout"],
@@ -1312,6 +1326,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
     } else {
         None
     };
+    debug_probe::configure(command, &method_options, help)?;
     let timeout_ms = read_only_resources::configure(command, &mut method_options, help)?
         .or(device_wait_timeout)
         .or(watch_timeout)
@@ -1393,6 +1408,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
                     | "operation.example"
                     | "operation.validate"
                     | "device.wait"
+                    | "debug.probe"
                     | "job.status"
                     | "job.list"
                     | "job.show"
@@ -1428,6 +1444,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, CliError> {
         json: mode.as_deref() == Some("json"),
         jsonl: mode.as_deref() == Some("jsonl"),
         raw,
+        legacy_json,
         help,
         require_healthy,
         control_request_id: id,
