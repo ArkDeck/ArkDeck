@@ -353,6 +353,11 @@ fn overview_continuation_runs_fresh_observation_through_the_runtime() {
     production_uidump("continuation-capture");
     production_uidump("continuation-interrupted");
 }
+#[test]
+fn debug_template_jobs_execute_and_publish_through_the_app_ingress() {
+    production_uidump("template");
+    production_uidump("template-interrupted");
+}
 fn production_uidump(mode: &str) {
     use arkdeck_contract::sha256_hex;
     use arkdeck_hoststore::{
@@ -404,6 +409,7 @@ case "$*" in
 'list targets -v') printf '%s\t\tUSB\tConnected\tlocalhost\n' "$key";;
 "-t $key shell param get const.product.name") printf 'Fixture Device\n';;
 "-t $key shell param get const.ohos.fullname") printf 'Fixture OS\n';;
+"-t $key shell uptime") printf 'up 1 day\n';;
 "-t $key shell df -k /data/local/tmp") printf 'Filesystem 1K-blocks Used Available Use%% Mounted on\n/dev/block/data 1048576 1024 1047552 1%% /data\n';;
 "-t $key shell hidumper -s WindowManagerService -a -a") printf '{"windows":[]}\n';;
 "-t $key shell snapshot_display -t png -f /data/local/tmp/arkdeck-"*) cp "$root/image.png" "$root/device/${8##*/}"; printf 'success\n';;
@@ -420,6 +426,12 @@ esac
         script = script.replace(
             "cp \"$root/image.png\"",
             "kill -KILL $$; cp \"$root/image.png\"",
+        );
+    }
+    if mode == "template-interrupted" {
+        script = script.replace(
+            "shell uptime\") printf",
+            "shell uptime\") kill -KILL $$; printf",
         );
     }
     if mode == "continuation-interrupted" {
@@ -457,6 +469,13 @@ esac
     doc["idempotencyKey"] = doc["requestId"].clone();
     doc["target"]["targetId"] = json!("TGT-3ba3f5f43b92");
     doc["inputs"] = json!({"durationSeconds":1,"captureHilog":false,"hilogFilters":[],"uiDump":true,"crashLogs":false,"uiScreenshot":true,"uiComponentTree":true,"redactionProfile":"standard"});
+    let template = mode.starts_with("template");
+    if template {
+        doc["clientContext"] =
+            json!({"clientName":"ArkDeckApp.DebugWorkspace.Commands", "provenance":{}});
+        doc["operation"]["id"] = json!("debug.template");
+        doc["inputs"] = json!({"templateId":"device.uptime"});
+    }
     let continuation = mode.starts_with("continuation-");
     if continuation {
         doc["clientContext"] = json!({"clientName":"arkdeck-overview-continuation", "provenance":{"arkdeck.continuedFromJob":"job-historical", "arkdeck.threadId":"thread-continuation"}});
@@ -495,7 +514,10 @@ esac
     assert_eq!(accepted["newDispatchCount"], 0);
     let request = frame("job.run", json!({"jobId":id}));
     let status = result(&ingress.handle(&request, root.peer()), "job.run");
-    if matches!(mode, "missing" | "interrupted" | "continuation-interrupted") {
+    if matches!(
+        mode,
+        "missing" | "interrupted" | "continuation-interrupted" | "template-interrupted"
+    ) {
         assert_ne!(status["state"], "succeeded", "{status}");
         assert_eq!(status["outcomeUnknown"], true, "{status}");
         let artifacts = result(
@@ -526,7 +548,7 @@ esac
         let calls = fs::read(root.0.join("calls")).unwrap();
         assert_eq!(code(&ingress.handle(&request, root.peer())), "rejected");
         assert_eq!(fs::read(root.0.join("calls")).unwrap(), calls);
-        if continuation {
+        if continuation || template {
             // Even a caller explicitly resubmitting the identical request
             // cannot use a renewed App claim to replay an unknown Runtime intent.
             let duplicate = ingress.handle(&submit(&doc), root.peer());
@@ -569,7 +591,11 @@ esac
         .iter()
         .map(|item| item["name"].as_str().unwrap())
         .collect();
-    if !continuation {
+    if template {
+        assert_eq!(names.len(), 2, "{artifacts}");
+        assert!(names.contains(&"template-output.txt") && names.contains(&"template-report.json"));
+        assert_eq!(status["actualEffect"], "readOnly");
+    } else if !continuation {
         assert!(names.contains(&"screenshot.png"), "{artifacts}");
         assert!(names.contains(&"ui-tree.json"), "{artifacts}");
     } else {
@@ -583,6 +609,7 @@ esac
             continue;
         }
         if !continuation
+            && !template
             && !matches!(
                 item["name"].as_str(),
                 Some("screenshot.png" | "ui-tree.json")
@@ -607,6 +634,9 @@ esac
         assert!(!read["base64"].as_str().unwrap().is_empty());
         if !continuation {
             assert_eq!(read["eof"], true, "{read}");
+        }
+        if item["name"] == "template-output.txt" {
+            assert_eq!(read["base64"], "dXAgMSBkYXkK");
         }
         if item["name"] == "screenshot.png" {
             assert_eq!(

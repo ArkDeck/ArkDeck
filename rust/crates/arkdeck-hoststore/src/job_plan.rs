@@ -32,9 +32,10 @@ const MAXIMUM_ANALYZER_INPUT_BYTES: u64 = 512 * 1024 * 1024;
 /// The operations whose plans this Runtime materializes, and so plans and
 /// admits. Every other catalog operation is refused before its inputs are
 /// judged.
-const MATERIALIZED: [&str; 11] = [
+const MATERIALIZED: [&str; 12] = [
     "analyzer.extract-crash-signature@1",
     "observe.device@1",
+    "debug.template@1",
     "capture.diagnostics@1",
     "input.tap@1",
     "input.long-press@1",

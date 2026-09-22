@@ -169,8 +169,13 @@ mod tests {
         );
         c.mutation_owner = false;
         c.code_sign_helper = true;
+        assert!(
+            operation_unavailability("debug.template@1", "hdc", &c)
+                .unwrap()
+                .is_empty()
+        );
         assert_eq!(
-            operation_unavailability("debug.template@1", "hdc", &c).unwrap()[0].0,
+            operation_unavailability("debug.template@2", "hdc", &c).unwrap()[0].0,
             "operation_not_supported"
         );
         assert_eq!(

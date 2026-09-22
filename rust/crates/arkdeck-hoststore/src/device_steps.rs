@@ -36,8 +36,9 @@ const NATIVE_ABILITY: &str = "EntryAbility";
 pub(crate) const SCREEN_SEQUENCE: &str = "capture.screen-sequence@1";
 
 /// The device-bound operations this Runtime plans and runs.
-pub(crate) const DEVICE_OPERATIONS: [&str; 10] = [
+pub(crate) const DEVICE_OPERATIONS: [&str; 11] = [
     "observe.device@1",
+    "debug.template@1",
     "capture.diagnostics@1",
     "input.tap@1",
     "input.long-press@1",
@@ -169,6 +170,7 @@ pub(crate) struct LeasedLibrary {
 /// or a native library deployment's.
 pub(crate) enum StepAction {
     Hdc(Action),
+    Template(arkdeck_provider_hdc::DebugReadTemplate),
     Pointer(PointerAction),
     Port(PortAction),
     Hap(HapAction),
@@ -185,6 +187,10 @@ pub(crate) enum StepAction {
 impl StepAction {
     pub(crate) fn persisted(&self) -> (&'static str, Map<String, Value>) {
         match self {
+            Self::Template(template) => (
+                "hdc.runDebugTemplate",
+                Map::from_iter([("templateId".into(), json!(template.raw()))]),
+            ),
             Self::Pointer(action) => action.persisted(),
             Self::Port(action) => action.persisted(),
             Self::Hap(action) => action.persisted(),
@@ -234,6 +240,7 @@ impl StepAction {
             (Self::File { action, now_utc }, _) => action.verify(receipt, now_utc),
             (_, None) => Outcome::Unknown("dispatch produced no process result".into()),
             (Self::Hdc(action), Some(sole)) => action.verify(sole, expected),
+            (Self::Template(template), Some(sole)) => template.verify(sole),
             (Self::Pointer(action), Some(sole)) => action.verify(sole),
             (Self::Port(action), Some(sole)) => action.verify(sole),
         }
@@ -242,6 +249,7 @@ impl StepAction {
     pub(crate) fn effect(&self) -> &'static str {
         match self {
             Self::Hdc(action) => action.effect(),
+            Self::Template(_) => "readOnly",
             Self::Pointer(action) => action.effect(),
             Self::Port(action) => action.effect(),
             Self::Hap(action) => action.effect(),
@@ -275,6 +283,9 @@ impl StepAction {
     ) -> Result<FilePlan, String> {
         match self {
             Self::Hdc(action) => action.lower(step_id, connect_key).map(FilePlan::Process),
+            Self::Template(template) => connect_key
+                .map(|key| FilePlan::Process(template.plan(key)))
+                .ok_or_else(|| format!("{step_id} requires a bound connect key")),
             Self::Pointer(action) => action.lower(step_id, connect_key),
             Self::Port(action) => action.lower(step_id, connect_key),
             Self::Hap(action) => action.lower(step_id, connect_key, context.resolved),
@@ -343,6 +354,19 @@ pub(crate) fn action(
     inputs: &Map<String, Value>,
     now_utc: &str,
 ) -> Result<StepAction, ActionRefusal> {
+    if reference == "debug.template@1"
+        && step.step_id == "run-debug-template"
+        && step.kind == "runApprovedRemoteRead"
+    {
+        return inputs
+            .get("templateId")
+            .and_then(Value::as_str)
+            .and_then(arkdeck_provider_hdc::DebugReadTemplate::parse)
+            .map(StepAction::Template)
+            .ok_or_else(|| {
+                ActionRefusal::Invalid("a closed Debug template identity is required".into())
+            });
+    }
     if let Some(action) = Action::for_step(&step.kind, remote_action(step)) {
         return Ok(StepAction::Hdc(action));
     }
@@ -834,6 +858,11 @@ pub(crate) fn journal_arguments(
     inputs: &Map<String, Value>,
     action: &StepAction,
 ) -> Option<Value> {
+    if let StepAction::Template(template) = action {
+        return Some(
+            json!({"catalogId":"arkdeck-remote-operations","actionId":"debugTemplate","parameters":{"templateId":template.raw()},"artifactId":"template-output"}),
+        );
+    }
     Some(match step.kind.as_str() {
         "probeHostTool" => {
             json!({"toolIdentity": "hdc", "candidatePath": "resolved-by-provider"})
@@ -965,6 +994,9 @@ pub(crate) fn products(operation: &str, step_id: &str) -> &'static [&'static str
         ("capture.diagnostics@1", "capture-crash-log") => &["crash-log.txt"],
         ("port-forward.create@1" | "port-forward.remove@1", "verify-port-rule") => {
             &["port-rule-readback.json"]
+        }
+        ("debug.template@1", "run-debug-template") => {
+            &["template-output.txt", "template-report.json"]
         }
         (HAP, "package-readback") => &["install-readback.json"],
         (HAP, "process-readback") => &["process-readback.json"],
