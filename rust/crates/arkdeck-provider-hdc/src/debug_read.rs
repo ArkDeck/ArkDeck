@@ -21,6 +21,62 @@ impl DebugReadTemplate {
             _ => return None,
         })
     }
+    pub fn raw(self) -> &'static str {
+        match self {
+            Self::PackageInventory => "device.packageInventory",
+            Self::DebugParameter => "device.debugParameterRead",
+            Self::WindowInventory => "device.windowInventory",
+            Self::Uptime => "device.uptime",
+        }
+    }
+
+    /// Job verification, including zero-exit HDC transport failures. Raw output
+    /// is not decoded here: the declared sensitive Artifact retains its bytes.
+    pub fn verify(self, receipt: &Receipt) -> crate::Outcome {
+        use crate::{CommandFailure, Outcome};
+        if receipt.truncated {
+            return Outcome::Failed {
+                code: "truncated",
+                detail: "template output exceeded its byte budget".into(),
+            };
+        }
+        if receipt.exit_status != 0 {
+            return Outcome::Failed {
+                code: "templateExitStatus",
+                detail: format!("template {} exited {}", self.raw(), receipt.exit_status),
+            };
+        }
+        let mut parser = SemanticOutputParser::new();
+        parser.consume(&receipt.stdout);
+        parser.consume(&receipt.stderr);
+        if let CommandOutcome::Failure(failure) = parser.finish(0) {
+            let detail = match failure {
+                CommandFailure::Unauthorized => "target authorization is unavailable".into(),
+                CommandFailure::Offline => "target is offline".into(),
+                CommandFailure::ExplicitFailureMarker => "HDC reported an explicit failure".into(),
+                CommandFailure::NonZeroExit(code) => format!("HDC exited {code}"),
+            };
+            return Outcome::Failed {
+                code: "targetUnavailable",
+                detail,
+            };
+        }
+        let millis = receipt.duration.as_millis()
+            + u128::from(receipt.duration.subsec_nanos() % 1_000_000 >= 500_000);
+        Outcome::Verified(std::collections::BTreeMap::from([
+            ("templateId".into(), self.raw().into()),
+            (
+                "remoteCommand".into(),
+                self.plan("").arguments[2..].join(" "),
+            ),
+            ("exitStatus".into(), receipt.exit_status.to_string()),
+            ("durationMilliseconds".into(), millis.to_string()),
+            ("stdoutByteCount".into(), receipt.stdout.len().to_string()),
+            ("stdoutTruncated".into(), "false".into()),
+            ("stderrByteCount".into(), receipt.stderr.len().to_string()),
+        ]))
+    }
+
     pub fn plan(self, connect_key: &str) -> ProcessPlan {
         let (command, capture_bytes): (&[&str], usize) = match self {
             Self::PackageInventory => (&["shell", "bm", "dump", "-a"], 2 * 1024 * 1024),

@@ -1678,8 +1678,13 @@ fn contents(
     receipt: &FileReceipt,
 ) -> Vec<u8> {
     match name {
-        "hilog.txt" | "ui-dump.json" | "advanced-dump.txt" | "crash-index.txt"
-        | "crash-log.txt" | "debug-hilog.txt" => receipt
+        "hilog.txt"
+        | "ui-dump.json"
+        | "advanced-dump.txt"
+        | "crash-index.txt"
+        | "crash-log.txt"
+        | "debug-hilog.txt"
+        | "template-output.txt" => receipt
             .subprocesses
             .first()
             .map(|process| process.stdout.clone())
