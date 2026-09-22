@@ -366,7 +366,11 @@ final class HDCStatusUITests: XCTestCase {
       .map(String.init)
       .filter { $0.hasPrefix("import ArkDeck") }
 
-    XCTAssertEqual(Set(productImports), ["import ArkDeckWorkflows"])
+    // Capability-matrix presentation moved to ClientKit; HDC diagnostics
+    // still comes through the Workflows presentation facade until XPA-019
+    // finishes its migration. Keep the exact imports and execution bans.
+    XCTAssertEqual(
+      Set(productImports), ["import ArkDeckClientKit", "import ArkDeckWorkflows"])
     let forbiddenCapabilities = [
       "ArkDeckOpenHarmony",
       "HDCDeviceObservationSnapshot",
