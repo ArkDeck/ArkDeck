@@ -239,10 +239,10 @@ fn actual_cli_never_resumes_after_wrong_input_or_expired_deadline_and_never_repl
     assert_eq!(envelope["error"]["code"], "outcomeUnknown");
 }
 
-#[cfg(unix)]
+#[cfg(target_os = "macos")]
 mod support;
 
-#[cfg(unix)]
+#[cfg(target_os = "macos")]
 #[test]
 fn actual_cli_refuses_a_challenge_without_terminal_input() {
     let frame = challenge();
@@ -261,17 +261,7 @@ fn actual_cli_refuses_a_challenge_without_terminal_input() {
             json!({"ok":true,"result":frame["result"]}),
         )],
     );
-    assert_eq!(
-        output.status.code(),
-        Some(if cfg!(target_os = "macos") { 2 } else { 75 })
-    );
-    assert_eq!(
-        envelope["error"]["code"],
-        if cfg!(target_os = "macos") {
-            "recordUnreadable"
-        } else {
-            "humanActionRequired"
-        }
-    );
+    assert_eq!(output.status.code(), Some(2));
+    assert_eq!(envelope["error"]["code"], "recordUnreadable");
     assert!(!String::from_utf8_lossy(&output.stderr).contains("Type this one-time challenge"));
 }

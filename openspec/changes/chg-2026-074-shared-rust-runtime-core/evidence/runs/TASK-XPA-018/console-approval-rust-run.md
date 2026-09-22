@@ -55,6 +55,10 @@ All Rust checks use `CARGO_BUILD_JOBS=2` and independent
   `/private/tmp/arkdeck-1330-console-unix-temp.log`. CLI clippy, fmt and SDD
   also exit 0 (`...-unix-temp-clippy.log`, `...-unix-temp-fmt.log`,
   `...-unix-temp-sdd.log`). No full local gate was repeated.
+- Final transport-scope correction: all 6 macOS console tests passed;
+  `/private/tmp/arkdeck-1330-console-macos-scope.log`. CLI clippy, fmt and SDD
+  exit 0 (`...-macos-scope-clippy.log`, `...-macos-scope-fmt.log`,
+  `...-macos-scope-sdd.log`). The three pure tests remain platform-independent.
 - No contract inputs, argv fixtures or generated vocabulary changed, so the
   contract generator check is not applicable.
 - No full local unified gate, performance measurement, installed Runtime
@@ -68,7 +72,12 @@ macOS `/private/tmp`, absent on Ubuntu (`ENOENT`). This is a test-path defect,
 not a load flake. The harness now canonicalizes Unix `/tmp` before creating
 its random 0700 directory and 0600 socket, retaining the existing permission
 and no-extra-request assertions. The macOS-only PTY coverage remains unchanged.
-The corrected head requires fresh CI; Ubuntu is not claimed validated locally.
+Head `694b63737` then failed Ubuntu job `106665416499` in run `35703051435`:
+CLI `--socket` is intentionally macOS-only, so the actual socket test cannot
+run on every Unix host. The real non-terminal test and its socket harness are
+now gated to macOS, alongside the PTY tests. The three pure logic tests still
+run cross-platform. This matches existing product scope without extending
+Linux transport or dropping any macOS assertion. Fresh CI is required.
 
 #2105's review correction passed all four selected Rust
 jobs and the swift aggregate in `35701423731`; guards `35701423514` and
