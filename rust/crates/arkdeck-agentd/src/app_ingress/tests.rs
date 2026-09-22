@@ -29,8 +29,8 @@ impl Root {
             .unwrap(),
         )
     }
-    fn ingress(&self) -> HistoryIngress<crate::host::Host> {
-        HistoryIngress::new(self.control(), fs::metadata(&self.0).unwrap().uid())
+    fn ingress(&self) -> AppIngress<crate::host::Host> {
+        AppIngress::new(self.control(), fs::metadata(&self.0).unwrap().uid())
     }
     // Synthetic kernel-origin fixture, not evidence of a live signed XPC peer.
     fn peer(&self) -> PeerOrigin {
@@ -74,7 +74,7 @@ fn code(bytes: &[u8]) -> String {
 fn history_uses_shared_control_persists_reopen_and_never_retries_conflict() {
     let root = Root::new();
     let control = root.control();
-    let ingress = HistoryIngress::new(Arc::clone(&control), root.peer().euid);
+    let ingress = AppIngress::new(Arc::clone(&control), root.peer().euid);
     let call = |method, params| ingress.handle(&frame(method, params), root.peer());
     let health = call("health", json!({}));
     arkdeck_contract::validate_health(
@@ -157,6 +157,11 @@ fn rejected_origins_methods_frames_and_parameters_never_enter_control() {
     for method in METHODS {
         if [
             "health",
+            "operation.list",
+            "target.list",
+            "device.observations",
+            "runtime.hdc.status",
+            "runtime.storage.status",
             "history.filter.list",
             "history.filter.save",
             "history.filter.delete",
@@ -263,3 +268,159 @@ fn opt_in_root_is_private_physical_and_separate_from_installed_state() {
 
 #[path = "read_tests.rs"]
 mod reads;
+
+#[test]
+fn app_discovery_reads_the_production_owners_without_promoting_availability() {
+    let root = Root::new();
+    let targets = root.0.join("targets");
+    fs::DirBuilder::new().mode(0o700).create(&targets).unwrap();
+    let control = Arc::new(
+        Control::new(
+            crate::host::Host::from_environment()
+                .with_targets(arkdeck_hoststore::TargetStore::open(&targets).unwrap()),
+        )
+        .unwrap(),
+    );
+    let ingress = AppIngress::new(Arc::clone(&control), root.peer().euid);
+    for method in [
+        "operation.list",
+        "target.list",
+        "runtime.hdc.status",
+        "runtime.storage.status",
+    ] {
+        let request = frame(method, json!({}));
+        let reply = ingress.handle(&request, root.peer());
+        assert_eq!(reply, control.handle_frame(&request), "{method}");
+        decode_response(reply.trim_ascii_end(), "request-1", method).unwrap();
+    }
+    assert_eq!(ingress.dispatches.load(Ordering::Relaxed), 4);
+    let operations = result(
+        &ingress.handle(&frame("operation.list", json!({})), root.peer()),
+        "operation.list",
+    );
+    let diagnostics = operations
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|operation| operation["reference"] == "capture.diagnostics@1")
+        .unwrap();
+    assert_eq!(diagnostics["availability"], "unavailable");
+}
+
+#[test]
+fn app_observation_handles_are_closed_and_never_become_caller_facts() {
+    use arkdeck_contract::{DeviceObservationsResult, WireError};
+    use std::sync::Mutex;
+    struct Observations {
+        calls: Mutex<Vec<Value>>,
+    }
+    impl HostServices for Observations {
+        fn observed_at(&self) -> String {
+            "2026-09-22T00:00:00Z".into()
+        }
+        fn hdc_status(&self, _deep: bool) -> arkdeck_control::HdcStatus {
+            arkdeck_control::HdcStatus::unavailable(false, "hdc.notConfigured")
+        }
+        fn observations(&self) -> Result<DeviceObservationsResult, WireError> {
+            self.calls.lock().unwrap().push(Value::Null);
+            let corpus = include_str!(
+                "../../../../../Packages/ArkDeckKit/Tests/ArkDeckContractTests/Fixtures/ControlFrames/device.observations.jsonl"
+            );
+            let result = corpus
+                .lines()
+                .map(|line| serde_json::from_str::<Value>(line).unwrap())
+                .find(|entry| entry["ok"] == true)
+                .unwrap()["result"]
+                .clone();
+            Ok(serde_json::from_value(result).unwrap())
+        }
+        fn observations_following(
+            &self,
+            reference: &Value,
+        ) -> Result<DeviceObservationsResult, WireError> {
+            self.calls.lock().unwrap().push(reference.clone());
+            Err(arkdeck_control::observation_refusal(
+                "resourceConflict",
+                "observation reference is stale",
+                Some(reference),
+            ))
+        }
+    }
+    let root = Root::new();
+    let ingress = AppIngress::new(
+        Arc::new(
+            Control::new(Observations {
+                calls: Mutex::new(vec![]),
+            })
+            .unwrap(),
+        ),
+        root.peer().euid,
+    );
+    let method = "device.observations";
+    let reference =
+        json!({"candidate":"device","observationId":"obs-1","observationGeneration":"1"});
+    result(
+        &ingress.handle(&frame(method, json!({})), root.peer()),
+        method,
+    );
+    let following = frame(method, json!({"following":reference}));
+    let refused = ingress.handle(&following, root.peer());
+    let refusal = decode_response(refused.trim_ascii_end(), "request-1", method)
+        .unwrap()
+        .outcome
+        .unwrap_err();
+    assert_eq!(refusal.code, "resourceConflict");
+    assert_eq!(refusal.details.as_ref().unwrap()["newDispatchCount"], 0);
+    assert_eq!(ingress.dispatches.load(Ordering::Relaxed), 2);
+    for params in [
+        json!({"candidateKey":"device"}),
+        json!({"snapshotGeneration":1}),
+        json!({"useWarmSnapshot":true}),
+        json!({"observationId":"obs-1"}),
+        json!({"following":null}),
+        json!({"following":{"candidate":"device"}}),
+        json!({"following":{"candidate":"device","observationId":"obs-1","observationGeneration":"01"}}),
+        json!({"following":{"candidate":"device","observationId":"obs-1","observationGeneration":"9223372036854775808"}}),
+        json!({"following":{"candidate":"device","observationId":"obs-1","observationGeneration":"1","serial":"forged"}}),
+        json!({"following":reference,"trustedFacts":{}}),
+    ] {
+        assert_eq!(
+            code(&ingress.handle(&frame(method, params), root.peer())),
+            "invalidParams"
+        );
+    }
+    for peer in [
+        PeerOrigin {
+            euid: root.peer().euid.wrapping_add(1),
+            ..root.peer()
+        },
+        PeerOrigin {
+            pid: 1,
+            ..root.peer()
+        },
+        PeerOrigin {
+            foreground_console: true,
+            ..root.peer()
+        },
+    ] {
+        assert_eq!(code(&ingress.handle(&following, peer)), "rejected");
+    }
+    for method in [
+        "operation.list",
+        "target.list",
+        "runtime.hdc.status",
+        "runtime.storage.status",
+    ] {
+        for params in [
+            json!({"path":"/tmp/foreign"}),
+            json!({"peerEUID":root.peer().euid}),
+            json!({"authorization":{}}),
+        ] {
+            assert_eq!(
+                code(&ingress.handle(&frame(method, params), root.peer())),
+                "invalidParams"
+            );
+        }
+    }
+    assert_eq!(ingress.dispatches.load(Ordering::Relaxed), 2);
+}

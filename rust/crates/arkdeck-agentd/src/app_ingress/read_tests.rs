@@ -61,7 +61,7 @@ fn history_reads_use_the_shared_owners_with_paging_and_restart() {
     let root = Root::new();
     let (public, _) = seed(&root);
     let control = compose(&root);
-    let ingress = HistoryIngress::new(control.clone(), root.peer().euid);
+    let ingress = AppIngress::new(control.clone(), root.peer().euid);
     let call = |method, params| ingress.handle(&frame(method, params), root.peer());
     let list_params = json!({"pageSize":1,"order":"createdAtDescJobIdAsc","includeTimeline":false,"includeCurrent":true});
     let first = result(&call("job.list", list_params.clone()), "job.list");
@@ -117,7 +117,7 @@ fn history_reads_use_the_shared_owners_with_paging_and_restart() {
     );
     drop(ingress);
     drop(control);
-    let reopened = HistoryIngress::new(compose(&root), root.peer().euid);
+    let reopened = AppIngress::new(compose(&root), root.peer().euid);
     assert_eq!(
         result(
             &reopened.handle(&frame("job.list", next), root.peer()),
@@ -132,7 +132,7 @@ fn artifact_sensitive_range_and_integrity_failures_are_preserved() {
     let root = Root::new();
     let (public, sensitive) = seed(&root);
     let control = compose(&root);
-    let ingress = HistoryIngress::new(control.clone(), root.peer().euid);
+    let ingress = AppIngress::new(control.clone(), root.peer().euid);
     let params = |id: &str| json!({"owner":{"kind":"job","id":"JOB-1"},"artifactId":id,"offset":0,"maxBytes":6});
     let assert_failure = |params: Value, expected: &str| {
         let request = frame("artifact.read", params);
