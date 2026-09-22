@@ -66,6 +66,93 @@ fn publication_marker() -> Value {
 }
 
 #[test]
+fn hdc_lifecycle_freezes_submission_and_releases_without_dispatch() {
+    let root = Root::new();
+    let jobs = JobStore::open_owner(&root.0).unwrap();
+    let lease = jobs.acquire_hdc_lifecycle_interlock().unwrap();
+    assert_eq!(
+        jobs.acquire_hdc_lifecycle_interlock().err().unwrap().code,
+        "resourceConflict"
+    );
+    let admitter = arkdeck_hoststore::JobAdmitter {
+        planner: arkdeck_hoststore::JobPlanner {
+            imports: None,
+            artifacts: None,
+            analyzer: None,
+            state_root: &root.0,
+            hdc: None,
+        },
+        jobs: &jobs,
+        now: arkdeck_hoststore::runtime_now,
+        authority: None,
+    };
+    let mut request = record("job-interlock", "queued")["request"].clone();
+    request["inputs"] = json!({});
+    let bytes = serde_json::to_vec(&request).unwrap();
+    for refusal in [
+        admitter.submit(&bytes).unwrap_err(),
+        admitter.submit_for_agent(&bytes).unwrap_err(),
+    ] {
+        assert_eq!(refusal.code, "resourceConflict");
+        assert!(refusal.proven);
+    }
+    let proposed = arkdeck_hoststore::JobRecord::decode(
+        &serde_json::to_vec(&record("job-interlock", "queued")).unwrap(),
+    )
+    .unwrap();
+    assert!(matches!(
+        jobs.admit(&proposed, &"b".repeat(64)),
+        Err(arkdeck_hoststore::JobWriteError::Refused(_))
+    ));
+    assert!(jobs.current_jobs().unwrap().is_empty());
+    assert!(!root.0.join("jobs").exists());
+    drop(lease);
+    // The HDC-less planner now refuses for its own reason, proving that
+    // dropping the lease released admission rather than leaving a sticky flag.
+    assert_ne!(
+        admitter.submit(&bytes).unwrap_err().code,
+        "resourceConflict"
+    );
+    assert!(jobs.acquire_hdc_lifecycle_interlock().is_ok());
+}
+
+#[test]
+fn hdc_lifecycle_requires_no_current_jobs_and_releases_after_census_error() {
+    for state in ["queued", "running", "waitingForRecovery", "futureState"] {
+        let root = Root::initialized();
+        root.seed("job-blocker", state, 1);
+        let jobs = JobStore::open(&root.0).unwrap();
+        let error = jobs.acquire_hdc_lifecycle_interlock().err().unwrap();
+        assert_eq!(
+            error.code,
+            if state == "futureState" {
+                "recordUnreadable"
+            } else {
+                "factsDrifted"
+            },
+            "{state}"
+        );
+        root.db().execute("DELETE FROM runtime_job", &[]).unwrap();
+        assert!(jobs.acquire_hdc_lifecycle_interlock().is_ok(), "{state}");
+    }
+    let root = Root::initialized();
+    root.seed("job-corrupt", "succeeded", 1);
+    root.db()
+        .execute(
+            "UPDATE runtime_job SET initial_record_json = ?",
+            &[Sql::Blob(b"{}".to_vec())],
+        )
+        .unwrap();
+    let jobs = JobStore::open(&root.0).unwrap();
+    assert_eq!(
+        jobs.acquire_hdc_lifecycle_interlock().err().unwrap().code,
+        "recordUnreadable"
+    );
+    root.db().execute("DELETE FROM runtime_job", &[]).unwrap();
+    assert!(jobs.acquire_hdc_lifecycle_interlock().is_ok());
+}
+
+#[test]
 fn native_swift_publication_snapshots_preserve_records_and_public_results() {
     let fixtures = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../tests/fixtures/job-publication-current");

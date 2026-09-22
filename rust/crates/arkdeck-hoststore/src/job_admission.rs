@@ -68,6 +68,17 @@ fn uncertain() -> AdmissionRefusal {
     }
 }
 
+fn interlock_refusal(error: arkdeck_contract::WireError) -> AdmissionRefusal {
+    refused(
+        if error.code == "resourceConflict" {
+            "resourceConflict"
+        } else {
+            "internalError"
+        },
+        error.message,
+    )
+}
+
 fn conflict() -> AdmissionRefusal {
     refused(
         "idempotencyConflict",
@@ -214,6 +225,7 @@ impl JobAdmitter<'_> {
             AdmissionVerdict::Conflict => return Err(conflict()),
             AdmissionVerdict::Admitted => (),
         }
+        drop(self.jobs.admission_interlock().map_err(interlock_refusal)?);
         let effect = descriptor.effective_effect(&request.inputs);
         // Swift `repairProvablyTerminalCapabilityOutcomeGaps`, before the
         // plan is materialized: a use whose Job's journal already proves it
@@ -236,6 +248,10 @@ impl JobAdmitter<'_> {
             &sha256_hex(format!("{}\n{fingerprint}", request.idempotency_key).as_bytes())[..32]
         );
         let materialized = self.planner.materialized(&request, descriptor)?;
+        // Materialization may have overlapped the final lifecycle census.
+        // Hold admission through authority issuance and the durable index
+        // commit; the lifecycle cannot slip between the check and commit.
+        let admission = self.jobs.admission_interlock().map_err(interlock_refusal)?;
         if request
             .reviewed_plan_digest
             .as_ref()
@@ -271,8 +287,7 @@ impl JobAdmitter<'_> {
             &materialized.digest,
         );
         record.set_materialized(materialized.identity, materialized.binding_revision);
-        match self
-            .jobs
+        match admission
             .admit(&record, &fingerprint)
             .map_err(|_| uncertain())?
         {

@@ -31,7 +31,7 @@ mod job_record_fields;
 #[cfg(target_os = "macos")]
 mod job_repository;
 #[cfg(target_os = "macos")]
-pub use job_owner::JobStore;
+pub use job_owner::{HdcLifecycleInterlock, JobStore};
 #[cfg(target_os = "macos")]
 pub use job_record::JobRecord;
 #[cfg(target_os = "macos")]
