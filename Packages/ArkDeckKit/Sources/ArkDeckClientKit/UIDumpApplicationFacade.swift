@@ -1,4 +1,3 @@
-import ArkDeckClientKit
 // App-facing Viewer projection over the Runtime's typed XPC door.
 //
 // Viewer is deliberately not a command surface. It submits only the
@@ -6,7 +5,6 @@ import ArkDeckClientKit
 // and reads immutable Job-bound Artifacts through the bounded Runtime API.
 
 import ArkDeckCore
-import ArkDeckRuntime
 import CryptoKit
 import Foundation
 
@@ -1073,7 +1071,22 @@ public enum UIDumpApplicationFacade {
   }
 }
 
-private actor UIDumpProductionApplicationProvider: UIDumpApplicationProviding {
+actor UIDumpProductionApplicationProvider: UIDumpApplicationProviding {
+  typealias Send = @Sendable (String, [String: JSONValue]?) async -> RuntimeXPCRequestTransport.ResultValue
+  private let send: Send
+
+  init(send: @escaping Send = { method, params in
+    await RuntimeXPCRequestTransport.request(method: method, params: params)
+  }) {
+    self.send = send
+  }
+
+  private func request(
+    method: String, params: [String: JSONValue]? = nil
+  ) async -> Result<Data, ViewerTransportFailure> {
+    await send(method, params).mapError { ViewerTransportFailure.transport($0.message) }
+  }
+
   /// Measured on a 446KB screenshot: 64KB chunks cost 21.7ms, 256KB cost
   /// 7.5ms, 1MB costs 4.8ms, and 4MB costs no less than 1MB. The cost is per
   /// request (~3ms each), not per byte, so this is the point where fewer
@@ -1084,15 +1097,15 @@ private actor UIDumpProductionApplicationProvider: UIDumpApplicationProviding {
   func refreshWorkspace(
     deviceObservation: DeviceListPresentation
   ) async -> UIDumpWorkspacePresentation {
-    async let operations = UIDumpXPCTransport.request(method: "operation.list")
+    async let operations = self.request(method: "operation.list")
     // `target.list` stays: it is a durable store read, not a device probe, and
     // it carries the adoption facts a candidate does not. What Viewer no
     // longer does is re-run the HDC probe — admission still requires a fresh
     // Connected route, but freshness is now a property the shared observation
     // stamps and this workspace checks, instead of an accident of having just
     // navigated here.
-    async let targets = UIDumpXPCTransport.request(method: "target.list")
-    async let jobs = UIDumpXPCTransport.request(
+    async let targets = self.request(method: "target.list")
+    async let jobs = request(
       method: "job.list", params: RuntimeAppReadResources.recentSummaryParams)
     return UIDumpWorkspaceResponseDecoding.presentation(
       operationResponse: await operations,
@@ -1111,7 +1124,7 @@ private actor UIDumpProductionApplicationProvider: UIDumpApplicationProviding {
       }
       let (submitted, submitMilliseconds) = try await ViewerSignpost.measure("viewer.submit") {
         try resultObject(
-          await UIDumpXPCTransport.request(
+          await self.request(
             method: "job.submit", params: ["requestJson": .string(requestJSON)]),
           label: "Viewer capture submission")
       }
@@ -1119,9 +1132,10 @@ private actor UIDumpProductionApplicationProvider: UIDumpApplicationProviding {
         return .failed("Runtime accepted Viewer capture without returning a Job ID")
       }
       let (terminal, runMilliseconds) = try await ViewerSignpost.measure("viewer.run") {
-        try resultObject(
-          await UIDumpXPCTransport.request(method: "job.run", params: ["jobId": .string(jobID)]),
+        _ = try resultObject(
+          await self.request(method: "job.run", params: ["jobId": .string(jobID)]),
           label: "Viewer capture")
+        return try await self.jobPresentation(jobID: jobID)
       }
       let facts = try terminalFacts(terminal, jobID: jobID, target: target)
       guard facts.state == "succeeded", !facts.outcomeUnknown,
@@ -1158,10 +1172,7 @@ private actor UIDumpProductionApplicationProvider: UIDumpApplicationProviding {
         bindingRevision: bindingRevision,
         toolVersion: "history",
         adoptedAtUTC: "")
-      let status = try resultObject(
-        await UIDumpXPCTransport.request(
-          method: "job.status", params: ["jobId": .string(jobID)]),
-        label: "Historical Viewer Job")
+      let status = try await jobPresentation(jobID: jobID)
       let facts = try terminalFacts(status, jobID: jobID, target: target)
       guard facts.state == "succeeded", !facts.outcomeUnknown,
         !facts.waitingForHuman, facts.outstandingResidueCount == 0
@@ -1196,15 +1207,16 @@ private actor UIDumpProductionApplicationProvider: UIDumpApplicationProviding {
         return .failed("Could not encode the typed Advanced Dump request")
       }
       let submitted = try resultObject(
-        await UIDumpXPCTransport.request(
+        await self.request(
           method: "job.submit", params: ["requestJson": .string(requestJSON)]),
         label: "Advanced Dump submission")
       guard let jobID = submitted["jobId"] as? String, !jobID.isEmpty else {
         return .failed("Runtime accepted Advanced Dump without returning a Job ID")
       }
-      let terminal = try resultObject(
-        await UIDumpXPCTransport.request(method: "job.run", params: ["jobId": .string(jobID)]),
+      _ = try resultObject(
+        await self.request(method: "job.run", params: ["jobId": .string(jobID)]),
         label: "Advanced Dump")
+      let terminal = try await jobPresentation(jobID: jobID)
       let facts = try terminalFacts(terminal, jobID: jobID, target: target)
       guard facts.state == "succeeded", !facts.outcomeUnknown,
         !facts.waitingForHuman, facts.outstandingResidueCount == 0
@@ -1226,9 +1238,17 @@ private actor UIDumpProductionApplicationProvider: UIDumpApplicationProviding {
     }
   }
 
+  // Run/status responses are acknowledgements. Only the current job.show
+  // projection supplies target identity, unknown outcome and residue facts.
+  private func jobPresentation(jobID: String) async throws -> [String: Any] {
+    try await RuntimeAppReadResources.statusPresentation(jobID: jobID) { method, params in
+      try await self.request(method: method, params: params).get()
+    }
+  }
+
   func cancel(jobID: String) async -> Bool {
     guard let result = try? await resultObject(
-      UIDumpXPCTransport.request(method: "job.cancel", params: ["jobId": .string(jobID)]),
+      self.request(method: "job.cancel", params: ["jobId": .string(jobID)]),
       label: "Viewer cancellation")
     else { return false }
     return result["cancelRequested"] as? Bool == true
@@ -1324,7 +1344,7 @@ private actor UIDumpProductionApplicationProvider: UIDumpApplicationProviding {
 
   private func inventory(jobID: String) async throws -> [ViewerArtifactMetadata] {
     let rows = try await RuntimeAppReadResources.artifactInventory(jobID: jobID) { method, params in
-      try await UIDumpXPCTransport.request(method: method, params: params).get()
+      try await self.request(method: method, params: params).get()
     }
     return try rows.map { row in
       let projection = try ArtifactResourceProjection(row)
@@ -1343,7 +1363,7 @@ private actor UIDumpProductionApplicationProvider: UIDumpApplicationProviding {
     var digest = SHA256()
     var offset: Int64 = 0
     while offset < artifact.byteCount {
-      let response = await UIDumpXPCTransport.request(
+      let response = await self.request(
         method: "artifact.read",
         params: [
           "owner": .object(["kind": .string("job"), "id": .string(jobID)]), "artifactId": .string(artifact.id),
@@ -1602,14 +1622,6 @@ private enum ViewerTransportFailure: Error, Sendable, Equatable {
   }
 }
 
-private enum UIDumpXPCTransport {
-  static func request(
-    method: String, params: [String: JSONValue]? = nil
-  ) async -> Result<Data, ViewerTransportFailure> {
-    await RuntimeXPCRequestTransport.request(method: method, params: params)
-      .mapError { ViewerTransportFailure.transport($0.message) }
-  }
-}
 
 private func resultObject(
   _ response: Result<Data, ViewerTransportFailure>, label: String
