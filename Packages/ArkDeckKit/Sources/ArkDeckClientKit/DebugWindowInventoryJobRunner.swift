@@ -1,4 +1,3 @@
-import ArkDeckClientKit
 
 /// The Overview capability matrix proves its hidumper row by running the Debug
 /// workspace's read-only `windowInventory` template as a `debug.template@1`
@@ -15,7 +14,7 @@ public struct DebugWindowInventoryJobRunner: OverviewWindowInventoryJobRunning {
   }
 
   /// Test seam: the Runtime requests this runner makes, answered in-process.
-  init(send: @escaping DebugTemplateJobSubmission.Request) {
+  package init(send: @escaping DebugTemplateJobSubmission.Request) {
     self.send = send
   }
 

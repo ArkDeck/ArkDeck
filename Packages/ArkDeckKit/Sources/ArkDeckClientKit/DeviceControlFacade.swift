@@ -316,9 +316,7 @@ actor DeviceProductionProvider: DeviceControlProviding {
       return .failed("the historical Device context is incomplete")
     }
     do {
-      let status = try await requestObject(
-        method: "job.status", params: ["jobId": .string(jobID)],
-        label: "Historical Device Job")
+      let status = try await RuntimeAppReadResources.statusPresentation(jobID: jobID, send: send)
       guard status["jobId"] as? String == jobID,
         status["targetId"] as? String == targetID,
         status["operation"] as? String == "capture.diagnostics@1",

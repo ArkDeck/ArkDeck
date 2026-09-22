@@ -7,9 +7,8 @@ import XCTest
 @testable import ArkDeckStorage
 @testable import ArkDeckWorkflows
 
-/// What of the Overview capability matrix stays in ArkDeckWorkflows: the Debug
-/// workspace's window-inventory Job, which the App composes into the ClientKit
-/// facade, and the Provider's Trace verdicts, which ClientKit mirrors by value.
+/// The ClientKit Overview runner is also checked against the existing Swift
+/// Runtime/Provider contract. These fixtures are not Rust device acceptance.
 final class DebugWindowInventoryJobRunnerContractTests: XCTestCase {
   private static let targetID = "TGT-DAYU200-01"
   private static let bindingRevision = 7
@@ -33,7 +32,7 @@ final class DebugWindowInventoryJobRunnerContractTests: XCTestCase {
     for _ in 0..<5 { repository.deleteLastPathComponent() }
     let runner = try String(
       contentsOf: repository.appending(
-        path: "Packages/ArkDeckKit/Sources/ArkDeckWorkflows/DebugWindowInventoryJobRunner.swift"),
+        path: "Packages/ArkDeckKit/Sources/ArkDeckClientKit/DebugWindowInventoryJobRunner.swift"),
       encoding: .utf8)
     XCTAssertTrue(runner.contains("DebugTemplateJobExecution.run("))
     XCTAssertTrue(
