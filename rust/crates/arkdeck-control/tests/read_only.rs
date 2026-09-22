@@ -107,6 +107,8 @@ fn every_unimplemented_method_is_refused_without_entering_the_host() {
     let (control, reads) = setup();
     for method in METHODS {
         if [
+            "debug.probe",
+            "debug.template.run",
             "workspace.project.register",
             "workspace.project.list",
             "workspace.project.show",
@@ -1180,4 +1182,27 @@ fn physical_resume_routes_reach_the_same_execution_owner() {
         }
     }
     assert_eq!(calls.load(Ordering::SeqCst), 18);
+}
+
+#[test]
+fn debug_reads_validate_before_unconfigured_owner() {
+    let (control, reads) = setup();
+    for method in ["debug.probe", "debug.template.run"] {
+        assert_eq!(
+            call(&control, method, json!({})).outcome.unwrap_err().code,
+            "invalidParams"
+        );
+    }
+    for (method, params) in [
+        ("debug.probe", json!({"targetId":"TGT-example"})),
+        (
+            "debug.template.run",
+            json!({"targetId":"TGT-example", "templateId":"device.uptime"}),
+        ),
+    ] {
+        let error = call(&control, method, params).outcome.unwrap_err();
+        assert_eq!(error.code, "internalError");
+        assert_eq!(error.message, "Debug Runtime probing is not configured");
+    }
+    assert_eq!(reads.load(Ordering::SeqCst), 0);
 }

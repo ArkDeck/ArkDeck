@@ -8,6 +8,8 @@
 
 mod capture_files;
 mod debug_hap;
+mod debug_read;
+pub use debug_read::{DebugInventory, DebugReadTemplate, debug_inventory};
 #[cfg(target_os = "macos")]
 mod dispatch;
 mod host_diagnostics;

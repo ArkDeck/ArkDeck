@@ -621,3 +621,6 @@ fn main() {
         std::process::exit(69);
     }
 }
+
+#[cfg(all(test, target_os = "macos"))]
+mod debug_read_control;

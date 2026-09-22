@@ -2028,6 +2028,20 @@ impl HostServices for Host {
         })?;
         store.handle(method, params, &utc_now())
     }
+    #[cfg(target_os = "macos")]
+    fn debug_read(
+        &self,
+        target_id: &str,
+        template_id: Option<&str>,
+    ) -> Result<serde_json::Value, WireError> {
+        self.hdc()
+            .ok_or_else(|| WireError {
+                code: "internalError".into(),
+                message: "Debug Runtime probing is not configured".into(),
+                details: None,
+            })?
+            .debug_read(target_id, template_id)
+    }
     /// Swift's daemon answers from the observer its HDC host gives it, and
     /// `unconfigured()` without one: this composition has a host only when
     /// the isolated owner started a managed server.
