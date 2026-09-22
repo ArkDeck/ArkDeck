@@ -1608,7 +1608,22 @@ fn console_approval_is_bound_private_and_recovers_every_durable_boundary() {
         };
         let result =
             owner.consume_interactive_challenge(&id, reference, plaintext, &jobs, &source, &driver);
-        assert_eq!(result.is_ok(), boundary == 7);
+        assert_eq!(result.is_ok(), boundary >= 5);
+        if let Err(error) = &result {
+            let details = error.details.as_ref().unwrap();
+            assert_eq!(details["newDispatchCount"], 0);
+            assert_eq!(details["phase"], "preAdmission");
+        } else {
+            assert_eq!(result.as_ref().unwrap()["dispatchCount"], 1);
+            assert_eq!(
+                result.as_ref().unwrap()["state"],
+                if boundary == 7 {
+                    "succeeded"
+                } else {
+                    "outcomeUnknown"
+                }
+            );
+        }
         let record = owner.required(&id).unwrap();
         let expected = match boundary {
             0..=2 => "previewDrifted",

@@ -156,6 +156,8 @@ pub struct Host {
     /// tool-selection owner.
     #[cfg(target_os = "macos")]
     control_actions: Option<arkdeck_hoststore::ControlActionResources>,
+    #[cfg(all(test, target_os = "macos"))]
+    pub(crate) test_hdc_impact: Option<Box<dyn arkdeck_hoststore::ImpactSource + Send + Sync>>,
 }
 
 impl Host {
@@ -334,6 +336,10 @@ impl Host {
         &self,
         run: impl FnOnce(Option<&dyn arkdeck_hoststore::ImpactSource>) -> R,
     ) -> R {
+        #[cfg(test)]
+        if let Some(source) = &self.test_hdc_impact {
+            return run(Some(&**source));
+        }
         let (Some(hdc), Some(targets), Some(jobs)) = (&self.hdc, &self.targets, &self.jobs) else {
             return run(None);
         };
@@ -659,6 +665,8 @@ impl Host {
             human_actions: None,
             #[cfg(target_os = "macos")]
             control_actions: None,
+            #[cfg(all(test, target_os = "macos"))]
+            test_hdc_impact: None,
         }
     }
 }
@@ -1065,7 +1073,10 @@ impl HostServices for Host {
             let refusal = |code: &str, message: &str| WireError {
                 code: code.into(),
                 message: message.into(),
-                details: None,
+                details: Some(serde_json::Map::from_iter([
+                    ("phase".into(), serde_json::json!("preAdmission")),
+                    ("newDispatchCount".into(), serde_json::json!(0)),
+                ])),
             };
             let result = if let Some(response) = params.get("challengeResponse") {
                 (|| {
@@ -1118,12 +1129,23 @@ impl HostServices for Host {
                         message: "impact approval reference is unavailable".into(),
                         details: None,
                     })?;
-                controls.issue_interactive_challenge(action, reference)
+                controls
+                    .issue_interactive_challenge(action, reference)
+                    .map_err(|mut error| {
+                        let details = error.details.get_or_insert_with(serde_json::Map::new);
+                        details.insert("phase".into(), serde_json::json!("preAdmission"));
+                        details.insert("newDispatchCount".into(), serde_json::json!(0));
+                        error
+                    })
             };
             return result.map_err(|mut error| {
-                let details = error.details.get_or_insert_with(serde_json::Map::new);
-                details.insert("phase".into(), serde_json::json!("preAdmission"));
-                details.insert("newDispatchCount".into(), serde_json::json!(0));
+                // The owner supplies this proof only before launch, or after
+                // durable recovery proved the launch window was never entered.
+                if let Some(details) = &mut error.details
+                    && details.get("newDispatchCount") == Some(&serde_json::json!(0))
+                {
+                    details.insert("phase".into(), serde_json::json!("preAdmission"));
+                }
                 error
             });
         }

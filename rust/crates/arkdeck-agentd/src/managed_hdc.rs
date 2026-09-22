@@ -292,6 +292,10 @@ mod tests {
     }
 
     fn fake_options(restart: bool, fail: bool) -> (Fake, VerifiedTool) {
+        fake_options_with_inventory(restart, fail, false)
+    }
+
+    fn fake_options_with_inventory(restart: bool, fail: bool, empty: bool) -> (Fake, VerifiedTool) {
         let directory = PathBuf::from(format!(
             "/private/tmp/arkdeck-managed-hdc-unit-{:032x}",
             u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
@@ -313,6 +317,9 @@ mod tests {
         }
         if fail {
             compiler.arg("-DFAIL_RESTART");
+        }
+        if empty {
+            compiler.arg("-DLIST_EMPTY");
         }
         let output = compiler.output().unwrap();
         assert!(output.status.success(), "{output:?}");
@@ -397,6 +404,197 @@ mod tests {
             reason,
             "dispatch refused: the managed HDC server was stopped"
         );
+    }
+
+    /// Real Host/control routing and isolated fake processes, including durable
+    /// audit failure after launch. This is not real-device evidence.
+    #[test]
+    fn host_never_claims_zero_dispatch_after_lifecycle_audit_failure() {
+        use arkdeck_contract::{CONTRACT_IDENTITY, PROTOCOL_VERSION, WireError};
+        use arkdeck_control::Control;
+        use arkdeck_hoststore::{
+            AgentExecutionStore, ControlActionResources, HdcControlActions, HumanActionResources,
+            Impact, ImpactReading, ImpactSource, JobStore, OwnerContext, TargetStore,
+        };
+        use serde_json::json;
+        use std::sync::atomic::{AtomicBool, Ordering};
+        struct Source(ImpactReading);
+        impl ImpactSource for Source {
+            fn endpoint_reference(&self) -> String {
+                self.0.impact.value()["serverEndpointRef"]
+                    .as_str()
+                    .unwrap()
+                    .into()
+            }
+            fn read_impact(&self) -> Result<ImpactReading, String> {
+                Ok(self.0.clone())
+            }
+        }
+        for stage in ["launchWindowEntered", "outcome"] {
+            for recovery_fails in [false, true] {
+                let (fake, tool) = fake_options_with_inventory(true, false, true);
+                let endpoint = SocketAddrV4::new(Ipv4Addr::LOCALHOST, loopback_ports::free_port());
+                let managed = Arc::new(
+                    ManagedHdc::start(
+                        &tool,
+                        &tool.path().to_string_lossy(),
+                        EndpointSelection {
+                            endpoint,
+                            source: "inheritedEnvironment",
+                        },
+                    )
+                    .unwrap(),
+                );
+                let root = arkdeck_platform::HostDirectory::open(&fake.0).unwrap();
+                for directory in ["actions", "jobs", "targets", "agents", "human", "controls"] {
+                    root.private_child(directory).unwrap();
+                }
+                let records = fake.0.join("actions/records");
+                let mut context = OwnerContext::production().unwrap();
+                let uuid = context.uuid;
+                let injected = Arc::new(AtomicBool::new(false));
+                let seen = injected.clone();
+                context.uuid = Box::new(move || {
+                    let reached = std::fs::read_dir(&records)
+                        .unwrap()
+                        .filter_map(Result::ok)
+                        .filter_map(|entry| std::fs::read(entry.path()).ok())
+                        .filter_map(|bytes| serde_json::from_slice::<Value>(&bytes).ok())
+                        .any(|record| {
+                            record["lifecycleAudit"]
+                                .as_array()
+                                .and_then(|events| events.last())
+                                .is_some_and(|event| event["kind"] == stage)
+                        });
+                    if reached && (recovery_fails || !seen.load(Ordering::SeqCst)) {
+                        seen.store(true, Ordering::SeqCst);
+                        if recovery_fails {
+                            std::fs::set_permissions(
+                                &records,
+                                std::fs::Permissions::from_mode(0o500),
+                            )
+                            .unwrap();
+                            return uuid();
+                        }
+                        return Err(WireError {
+                            code: "recordUnreadable".into(),
+                            message: "injected durable audit identity failure".into(),
+                            // Exercise sanitization of read-route error defaults.
+                            details: Some(serde_json::Map::from_iter([
+                                ("phase".into(), json!("preAdmission")),
+                                ("newDispatchCount".into(), json!(0)),
+                            ])),
+                        });
+                    }
+                    uuid()
+                });
+                let owner = HdcControlActions::open(&fake.0.join("actions"), context).unwrap();
+                let mut host = crate::host::Host::from_environment()
+                    .with_targets(TargetStore::open(&fake.0.join("targets")).unwrap())
+                    .with_jobs(JobStore::open_owner(&fake.0.join("jobs")).unwrap())
+                    .with_agent_executions(
+                        AgentExecutionStore::open(&fake.0.join("agents")).unwrap(),
+                    )
+                    .with_human_actions(HumanActionResources::open(&fake.0.join("human")).unwrap())
+                    .with_control_actions(
+                        ControlActionResources::open(&fake.0.join("controls"))
+                            .unwrap()
+                            .with_hdc(owner),
+                    )
+                    .with_managed_development_hdc(
+                        ProcessDispatch::new(
+                            VerifiedTool::open(tool.path(), tool.sha256()).unwrap(),
+                            Some(&endpoint.port().to_string()),
+                        ),
+                        managed.clone(),
+                    );
+                // This injection exists only in the unit-test binary. The fake
+                // executable cannot qualify as a registered HDC identity.
+                host.test_hdc_impact = Some(Box::new(Source(ImpactReading {
+                    impact: Impact::new(json!({
+                        "serverEndpointRef":arkdeck_provider_hdc::server_endpoint_ref(&endpoint.to_string()),
+                        "endpoint":endpoint.to_string(),"serverOwnership":"arkDeckManaged",
+                        "serverGeneration":managed.state(&endpoint.to_string()).unwrap().generation.to_string(),
+                        "serverHealth":"healthy","serverVersion":"3.2.0d",
+                        "tool":{"reference":null,"executablePath":tool.path(),"source":"runtimeConfiguration","sha256":tool.sha256(),"signature":null,"version":"3.2.0d","trust":"unverified"},
+                        "affectedTargetIds":[],"affectedJobIds":[],"detectedOtherClientIds":[],"otherClientsMayExist":true,"affectedDeviceObservations":[],
+                        "criticalJobGate":{"state":"clear","blocking":[],"reasonCode":null},
+                        "interruption":{"kind":"hdcEndpointUnavailable","affectsAllParticipants":true},
+                        "recovery":{"kind":"statusThenReconcile","replayAllowed":false}
+                    }).as_object().unwrap().clone()).unwrap(), relations:vec![], blocker:None,
+                })));
+                let control = Control::new(host).unwrap();
+                let send = |method: &str, params: Value| -> Value {
+                    let request = serde_json::to_vec(&json!({"protocolVersion":PROTOCOL_VERSION,
+                        "contractIdentity":CONTRACT_IDENTITY,"id":"audit-fault","method":method,"params":params})).unwrap();
+                    serde_json::from_slice(
+                        control
+                            .handle_frame_with_console(&request, true)
+                            .trim_ascii_end(),
+                    )
+                    .unwrap()
+                };
+                let ready = send(
+                    "runtime.hdc.impact-preview",
+                    json!({"action":"restart", "actionRequestId":"audit-fault",
+                    "serverEndpointRef":arkdeck_provider_hdc::server_endpoint_ref(&endpoint.to_string()),
+                    "expectedServerGeneration":managed.state(&endpoint.to_string()).unwrap().generation.to_string()}),
+                );
+                assert_eq!(ready["result"]["state"], "previewReady", "{ready}");
+                let action = &ready["result"];
+                let waiting = send(
+                    "runtime.hdc.restart",
+                    json!({"controlAction":action["controlActionId"],
+                    "previewId":action["preview"]["previewId"],"previewDigest":action["preview"]["previewDigest"]}),
+                );
+                assert_eq!(
+                    waiting["result"]["state"], "awaitingImpactApproval",
+                    "{waiting}"
+                );
+                let human = &waiting["result"]["humanAction"];
+                let mut params = json!({"humanAction":human["actionId"],"resumeReference":human["resumeReference"]});
+                let challenge = send("human-action.resume", params.clone());
+                assert_eq!(challenge["ok"], true, "{challenge}");
+                params["challengeResponse"] = challenge["result"]["challenge"].clone();
+                let failed = send("human-action.resume", params.clone());
+                // Stop the isolated replacement even if an assertion fails.
+                std::fs::write(fake.0.join("stop"), []).unwrap();
+                assert!(injected.load(Ordering::SeqCst), "{failed}");
+                if recovery_fails {
+                    assert_eq!(failed["error"]["code"], "recordUnreadable", "{failed}");
+                    assert!(failed["error"].get("details").is_none(), "{failed}");
+                    assert!(
+                        failed["error"]["message"]
+                            .as_str()
+                            .unwrap()
+                            .contains(action["controlActionId"].as_str().unwrap())
+                    );
+                    std::fs::set_permissions(
+                        fake.0.join("actions/records"),
+                        std::fs::Permissions::from_mode(0o700),
+                    )
+                    .unwrap();
+                } else {
+                    assert_eq!(failed["ok"], true, "{failed}");
+                    assert_eq!(failed["result"]["state"], "outcomeUnknown");
+                    assert_eq!(failed["result"]["dispatchCount"], 1);
+                    assert_eq!(
+                        failed["result"]["controlActionId"],
+                        action["controlActionId"]
+                    );
+                }
+                assert_eq!(send("human-action.resume", params)["ok"], false);
+                let calls = std::fs::read_to_string(fake.0.join("calls")).unwrap();
+                assert_eq!(
+                    calls
+                        .lines()
+                        .filter(|line| line.ends_with(" kill -r"))
+                        .count(),
+                    1
+                );
+                managed.stop();
+            }
+        }
     }
 
     /// Isolated process exercise of the production owner -> driver -> verified
