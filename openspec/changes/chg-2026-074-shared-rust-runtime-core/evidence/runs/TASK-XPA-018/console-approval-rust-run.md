@@ -51,6 +51,10 @@ All Rust checks use `CARGO_BUILD_JOBS=2` and independent
 - `cargo fmt --all --check --manifest-path rust/Cargo.toml` and `sh scripts/check-sdd.sh`:
   exit 0; `/private/tmp/arkdeck-1330-console-fmt.log` and
   `/private/tmp/arkdeck-1330-console-sdd.log` (zero errors/warnings).
+- Unix temporary-directory correction: `console_approval` 6 passed, exit 0;
+  `/private/tmp/arkdeck-1330-console-unix-temp.log`. CLI clippy, fmt and SDD
+  also exit 0 (`...-unix-temp-clippy.log`, `...-unix-temp-fmt.log`,
+  `...-unix-temp-sdd.log`). No full local gate was repeated.
 - No contract inputs, argv fixtures or generated vocabulary changed, so the
   contract generator check is not applicable.
 - No full local unified gate, performance measurement, installed Runtime
@@ -58,7 +62,15 @@ All Rust checks use `CARGO_BUILD_JOBS=2` and independent
 
 ## CI
 
-Pending this CLI PR. #2105's review correction passed all four selected Rust
+#2106 first head `82b7dd3c4` failed its Ubuntu CLI test in run
+`35702341935`, job `106663141998`: the shared Unix socket harness hard-coded
+macOS `/private/tmp`, absent on Ubuntu (`ENOENT`). This is a test-path defect,
+not a load flake. The harness now canonicalizes Unix `/tmp` before creating
+its random 0700 directory and 0600 socket, retaining the existing permission
+and no-extra-request assertions. The macOS-only PTY coverage remains unchanged.
+The corrected head requires fresh CI; Ubuntu is not claimed validated locally.
+
+#2105's review correction passed all four selected Rust
 jobs and the swift aggregate in `35701423731`; guards `35701423514` and
 `35701443334` passed. App/Swift tests/design-system interactions were skipped,
 not counted as passes. Maintainer review/merge is separate from these results.

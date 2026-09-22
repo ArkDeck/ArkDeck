@@ -41,8 +41,8 @@ pub fn run_session_partial(argv: &[&str], replies: Vec<(String, Value, Value)>) 
 }
 
 fn session(argv: &[&str], replies: Vec<(String, Value, Value)>, exact: bool) -> (Output, Value) {
-    let root = PathBuf::from(format!(
-        "/private/tmp/arkdeck-cli-runtime-{:032x}",
+    let root = std::fs::canonicalize("/tmp").unwrap().join(format!(
+        "arkdeck-cli-runtime-{:032x}",
         u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
     ));
     std::fs::DirBuilder::new()
@@ -134,8 +134,8 @@ fn connections(
     replies: Vec<(String, Value, Value)>,
     exact: bool,
 ) -> (Output, Value) {
-    let root = PathBuf::from(format!(
-        "/private/tmp/arkdeck-cli-runtime-{:032x}",
+    let root = std::fs::canonicalize("/tmp").unwrap().join(format!(
+        "arkdeck-cli-runtime-{:032x}",
         u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
     ));
     std::fs::DirBuilder::new()
