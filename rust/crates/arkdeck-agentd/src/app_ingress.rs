@@ -1,4 +1,4 @@
-//! Standalone App composition: health, History filters and History reads.
+//! Standalone App composition: device/Runtime discovery, History filters and reads.
 //! This is deliberately opt-in on the isolated development owner. It neither
 //! activates a LaunchAgent nor changes the installed service. The transport
 //! authenticates the actual XPC connection, never an identity in request JSON.
@@ -71,7 +71,7 @@ impl Configuration {
         self,
         control: Arc<Control<H>>,
     ) -> io::Result<()> {
-        let ingress = HistoryIngress::new(control, self.owner_uid);
+        let ingress = AppIngress::new(control, self.owner_uid);
         // libxpc installs the fixed code-signing requirement before activating
         // peers and checks their kernel euid. Only its authenticated callback
         // can enter here; PeerOrigin is never decoded from a request.
@@ -86,13 +86,13 @@ fn invalid(message: &str) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidInput, message)
 }
 
-struct HistoryIngress<H: HostServices> {
+struct AppIngress<H: HostServices> {
     control: Arc<Control<H>>,
     owner_uid: u32,
     #[cfg(test)]
     dispatches: std::sync::atomic::AtomicUsize,
 }
-impl<H: HostServices> HistoryIngress<H> {
+impl<H: HostServices> AppIngress<H> {
     fn new(control: Arc<Control<H>>, owner_uid: u32) -> Self {
         Self {
             control,
@@ -144,6 +144,11 @@ impl<H: HostServices> HistoryIngress<H> {
         if !matches!(
             request.method.as_str(),
             "health"
+                | "operation.list"
+                | "target.list"
+                | "device.observations"
+                | "runtime.hdc.status"
+                | "runtime.storage.status"
                 | "history.filter.list"
                 | "history.filter.save"
                 | "history.filter.delete"
@@ -157,14 +162,14 @@ impl<H: HostServices> HistoryIngress<H> {
             return refusal(
                 &request.id,
                 "rejected",
-                "method is not available through the standalone History App ingress",
+                "method is not available through the standalone App ingress",
             );
         }
         if !closed_parameters(&request) {
             return refusal(
                 &request.id,
                 "invalidParams",
-                "App History request requires its complete closed parameters",
+                "App request requires its complete closed parameters",
             );
         }
         #[cfg(test)]
@@ -177,6 +182,18 @@ impl<H: HostServices> HistoryIngress<H> {
 }
 fn closed_parameters(request: &Request) -> bool {
     let params = request.params.clone().unwrap_or_default();
+    // Observation references name Runtime-owned snapshots, never caller facts.
+    // The broad recorded schema alone also admits retired input shapes.
+    if request.method == "device.observations" {
+        return params.is_empty()
+            || (params.len() == 1
+                && params
+                    .get("following")
+                    .and_then(Value::as_object)
+                    .is_some_and(|reference| {
+                        arkdeck_hoststore::parse_reference(reference).is_ok()
+                    }));
+    }
     // Read schemas close every parameter object, including Artifact owner.
     // Resource owners retain defaults, identity/range/cursor validation and
     // sensitive-content admission; this boundary grants no execution authority.
@@ -192,7 +209,12 @@ fn closed_parameters(request: &Request) -> bool {
         return validate_method_value(&request.method, "request", &Value::Object(params)).is_ok();
     }
     let keys: &[&str] = match request.method.as_str() {
-        "health" | "history.filter.list" => &[],
+        "health"
+        | "history.filter.list"
+        | "operation.list"
+        | "target.list"
+        | "runtime.hdc.status"
+        | "runtime.storage.status" => &[],
         "history.filter.delete" => &["expectedGeneration"],
         "history.filter.save" => &[
             "expectedGeneration",
