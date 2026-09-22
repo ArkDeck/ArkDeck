@@ -386,6 +386,16 @@ impl JobRepository {
     }
 
     pub fn rows(&self, id: Option<&str>) -> io::Result<Vec<JobRow>> {
+        self.map_rows(id, Ok)
+    }
+
+    /// Project inside the same validated SQLite snapshot, releasing each full
+    /// record before reading the next. The original whole-query budget applies.
+    pub fn map_rows<T>(
+        &self,
+        id: Option<&str>,
+        mut project: impl FnMut(JobRow) -> io::Result<T>,
+    ) -> io::Result<Vec<T>> {
         self.validate()?;
         let mut db = self.db.lock().map_err(|_| corrupt())?;
         // Query and schema belong to one SQLite snapshot. Schema changes or
@@ -394,48 +404,48 @@ impl JobRepository {
         let result = (|| {
             current_layout(&mut db)?;
             let sql = "SELECT job_id, idempotency_key, request_hash, state, created_at_utc, updated_at_utc, version, initial_record_json, created_at_order_key, admission_sequence FROM runtime_job";
-            let rows = if let Some(id) = id {
-                db.query(
+            let decode = |row: Vec<SqliteValue>| {
+                if row.len() != 10 || row[9].integer().is_none_or(|n| n <= 0) {
+                    return Err(corrupt());
+                }
+                let text = |n: usize| {
+                    row[n]
+                        .text()
+                        .filter(|s| s.len() <= 4096)
+                        .map(str::to_owned)
+                        .ok_or_else(corrupt)
+                };
+                let row = JobRow {
+                    id: text(0)?,
+                    idempotency_key: text(1)?,
+                    request_hash: text(2)?,
+                    state: text(3)?,
+                    created: text(4)?,
+                    updated: text(5)?,
+                    version: row[6].integer().filter(|v| *v > 0).ok_or_else(corrupt)?,
+                    record: row[7].blob().ok_or_else(corrupt)?.to_vec(),
+                    order_key: text(8)?,
+                };
+                if !identifier(&row.id) || row.order_key != order_key(&row.created)? {
+                    return Err(corrupt());
+                }
+                project(row)
+            };
+            if let Some(id) = id {
+                db.query_map(
                     &format!("{sql} WHERE job_id = ?"),
                     &[SqliteValue::Text(id.into())],
                     17 * 1024 * 1024,
-                )?
+                    decode,
+                )
             } else {
-                db.query(
+                db.query_map(
                     &format!("{sql} ORDER BY created_at_order_key, job_id COLLATE BINARY"),
                     &[],
                     64 * 1024 * 1024,
-                )?
-            };
-            rows.into_iter()
-                .map(|row| {
-                    if row.len() != 10 || row[9].integer().is_none_or(|n| n <= 0) {
-                        return Err(corrupt());
-                    }
-                    let text = |n: usize| {
-                        row[n]
-                            .text()
-                            .filter(|s| s.len() <= 4096)
-                            .map(str::to_owned)
-                            .ok_or_else(corrupt)
-                    };
-                    let row = JobRow {
-                        id: text(0)?,
-                        idempotency_key: text(1)?,
-                        request_hash: text(2)?,
-                        state: text(3)?,
-                        created: text(4)?,
-                        updated: text(5)?,
-                        version: row[6].integer().filter(|v| *v > 0).ok_or_else(corrupt)?,
-                        record: row[7].blob().ok_or_else(corrupt)?.to_vec(),
-                        order_key: text(8)?,
-                    };
-                    if !identifier(&row.id) || row.order_key != order_key(&row.created)? {
-                        return Err(corrupt());
-                    }
-                    Ok(row)
-                })
-                .collect::<io::Result<Vec<_>>>()
+                    decode,
+                )
+            }
         })();
         let end = db.execute("ROLLBACK", &[]);
         self.validate()?;
