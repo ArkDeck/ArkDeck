@@ -49,6 +49,8 @@ pub use job_plan::{AnalyzerProfile, JobPlanner, PlanRefusal};
 #[cfg(target_os = "macos")]
 pub use operation_availability::{OperationAvailabilityContext, operation_unavailability};
 #[cfg(target_os = "macos")]
+mod debug_read;
+#[cfg(target_os = "macos")]
 mod device_facts;
 #[cfg(target_os = "macos")]
 pub use device_facts::HdcComposition;

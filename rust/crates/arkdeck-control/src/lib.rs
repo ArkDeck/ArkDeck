@@ -329,6 +329,14 @@ pub trait HostServices: Send + Sync {
     fn managed_hdc_tool(&self) -> Option<ManagedToolFacts> {
         None
     }
+    /// Fixed Debug reads. The router validates caller fields before reaching an owner.
+    fn debug_read(&self, _target_id: &str, _template_id: Option<&str>) -> Result<Value, WireError> {
+        Err(WireError {
+            code: "internalError".into(),
+            message: "Debug Runtime probing is not configured".into(),
+            details: None,
+        })
+    }
     /// `runtime.hdc.status`: the live HDC status the Runtime answers. A host
     /// without it keeps the foundation's refusal.
     fn runtime_hdc_status(&self) -> Result<Value, WireError> {
@@ -1172,6 +1180,42 @@ impl<H: HostServices> Control<H> {
                     outcome: self.host.workspace_project(&request.method, &params),
                 },
             },
+            "debug.probe" | "debug.template.run" => {
+                let target = params.get("targetId").and_then(Value::as_str);
+                let template = params.get("templateId").and_then(Value::as_str);
+                let error = if request.method == "debug.probe" {
+                    if params.len() != 1 || !params.contains_key("targetId") {
+                        Some("Debug Runtime probe accepts only targetId")
+                    } else if target.is_none() {
+                        Some("targetId is required")
+                    } else if target.is_some_and(|id| id.is_empty() || id.len() > 128) {
+                        Some("targetId must be a bounded durable target identity")
+                    } else {
+                        None
+                    }
+                } else if target.is_none()
+                    || !matches!(
+                        template,
+                        Some(
+                            "device.packageInventory"
+                                | "device.debugParameterRead"
+                                | "device.windowInventory"
+                                | "device.uptime"
+                        )
+                    )
+                {
+                    Some("targetId and a closed templateId are required")
+                } else {
+                    None
+                };
+                match error {
+                    Some(message) => Response::failure(&request.id, "invalidParams", message),
+                    None => Response {
+                        id: request.id.clone(),
+                        outcome: self.host.debug_read(target.unwrap(), template),
+                    },
+                }
+            }
             // As Swift's handler: a caller's facts are refused before any observation.
             "runtime.hdc.status" if params.is_empty() => Response {
                 id: request.id.clone(),

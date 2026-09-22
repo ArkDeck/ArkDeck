@@ -326,6 +326,9 @@ def main() -> None:
                        ["job", "status", "--job", "JOB-unknown"], 1, "operationFailed")
                 for method in registry["methods"]:
                     expected = ("rejected" if method not in SUPPORTED or method == "device.observations" else None)
+                    # Debug reads validate required typed parameters before asking for a provider.
+                    if method in {"debug.probe", "debug.template.run"}:
+                        expected = "invalidParams"
                     if method in {"runtime.tool.inspect", "runtime.bundle.inspect", "operation.describe", "runtime.tool.register", "runtime.bundle.remove", "runtime.tool.remove", "runtime.bundle.register", "target.availability"}:
                         expected = "invalidParams"
                     if method in {"runtime.bundle.list", "runtime.tool.list", "artifact.inspect", "artifact.read",
@@ -369,6 +372,10 @@ def main() -> None:
                     "operation.describe")
                 assert wire_descriptor["result"] == descriptor["result"]
                 for name, method, params, error in [
+                    ("debug-probe-missing-owner", "debug.probe", {"targetId": "target-fixture"}, "internalError"),
+                    ("debug-template-missing-owner", "debug.template.run", {"targetId": "target-fixture", "templateId": "device.uptime"}, "internalError"),
+                    ("debug-probe-extra", "debug.probe", {"targetId": "target-fixture", "rawCommand": "shell uptime"}, "invalidParams"),
+                    ("debug-template-unknown", "debug.template.run", {"targetId": "target-fixture", "templateId": "shell uptime"}, "invalidParams"),
                     ("availability-missing-owner", "target.availability", {"targetId": "target-fixture"}, "internalError"),
                     ("descriptor-not-found", "operation.describe", {"reference": "unknown@1"}, "notFound"),
                     ("descriptor-bad-type", "operation.describe", {"reference": 1}, "invalidParams"),
