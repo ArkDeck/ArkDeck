@@ -25,8 +25,8 @@ use arkdeck_contract::sha256_hex;
 use arkdeck_platform::{ServerIdentityReceipt, VerifiedTool};
 use arkdeck_provider_hdc::{
     HdcDispatch, IdentityObservation, IdentityObserver, ManagedLaunch, ManagedProcessVerifier,
-    ProcessPlan, Receipt, SignatureInspector, StatusExecutable, UsbRelation, generation,
-    published_client_version, server_endpoint_ref,
+    ProcessPlan, Receipt, SignatureInspector, StatusExecutable, SupervisedServer, SupervisorState,
+    UsbRelation, generation, published_client_version, server_endpoint_ref,
 };
 use serde_json::{Value, json};
 use std::collections::BTreeSet;
@@ -82,6 +82,8 @@ pub struct ManagedServerImpact<'a> {
     pub endpoint: String,
     /// Swift `activeLaunch()`: the spawn record while the server runs.
     pub launch: &'a dyn Fn() -> Option<ManagedLaunch>,
+    /// Shared Supervisor ownership, read on both sides of the observation.
+    pub supervisor: Option<&'a dyn SupervisorState>,
     pub identity: &'a dyn IdentityObserver,
     pub signature: &'a dyn SignatureInspector,
     pub verifier: &'a dyn ManagedProcessVerifier,
@@ -202,6 +204,8 @@ impl ManagedServerImpact<'_> {
         stable: bool,
         server: &ServerObservation,
         launch_before: Option<&ManagedLaunch>,
+        supervised_before: Option<&SupervisedServer>,
+        supervised_after: Option<&SupervisedServer>,
     ) -> (Value, &'static str) {
         let Some(receipt) = server.identity.as_ref().filter(|receipt| {
             stable
@@ -219,6 +223,12 @@ impl ManagedServerImpact<'_> {
                 && launch.matches(receipt)
                 && self.verifier.verifies(receipt, &launch.arguments)
                 && (self.launch)().as_ref() == Some(launch)
+        }) || supervised_before.is_some_and(|before| {
+            supervised_after == Some(before)
+                && before.endpoint == self.endpoint
+                && before.healthy
+                && u64::try_from(before.generation).ok() == Some(observed)
+                && before.ark_deck_managed
         });
         (
             json!(observed.to_string()),
@@ -241,6 +251,9 @@ impl ImpactSource for ManagedServerImpact<'_> {
             .map_err(|error| error.to_string())?;
         pinned.revalidate().map_err(|error| error.to_string())?;
         let launch_before = (self.launch)();
+        let supervised_before = self
+            .supervisor
+            .and_then(|owner| owner.state(&self.endpoint));
         let server = self.observe_server();
         pinned.revalidate().map_err(|error| error.to_string())?;
         let jobs = (self.jobs)()?;
@@ -303,9 +316,17 @@ impl ImpactSource for ManagedServerImpact<'_> {
             ("blocked", json!("hdc.currentJobs"))
         };
         let final_identity = self.observed_identity();
+        let supervised_after = self
+            .supervisor
+            .and_then(|owner| owner.state(&self.endpoint));
         let stable = final_identity == server.identity;
-        let (server_generation, ownership) =
-            self.server_facts(stable, &server, launch_before.as_ref());
+        let (server_generation, ownership) = self.server_facts(
+            stable,
+            &server,
+            launch_before.as_ref(),
+            supervised_before.as_ref(),
+            supervised_after.as_ref(),
+        );
         pinned.revalidate().map_err(|error| error.to_string())?;
         let Value::Object(fields) = json!({
             "serverEndpointRef": server_endpoint_ref(&self.endpoint),

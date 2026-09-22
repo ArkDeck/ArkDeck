@@ -153,11 +153,18 @@ impl<T: Clone> Reads<T> {
     }
 }
 
+impl SupervisorState for Reads<Option<SupervisedServer>> {
+    fn state(&self, _endpoint: &str) -> Option<SupervisedServer> {
+        self.next().unwrap()
+    }
+}
+
 struct Legs {
     executable: StatusExecutable,
     identity: Identity,
     verifier: Verifies,
     launch: Option<ManagedLaunch>,
+    supervisor: Reads<Option<SupervisedServer>>,
     dispatch: Dispatch,
     jobs: Reads<Vec<CurrentJob>>,
     targets: Reads<Vec<Value>>,
@@ -171,6 +178,7 @@ impl Legs {
             identity: Identity::new(Vec::new()),
             verifier: Verifies(true),
             launch: None,
+            supervisor: Reads::new(vec![Ok(None)]),
             dispatch: Dispatch::answering(23, b"", b"unregistered fixture output\n"),
             jobs: Reads::new(vec![Ok(Vec::new())]),
             targets: Reads::new(vec![Ok(Vec::new())]),
@@ -191,6 +199,7 @@ impl Legs {
             executable: self.executable.clone(),
             endpoint: ENDPOINT.into(),
             launch: &launch,
+            supervisor: Some(&self.supervisor),
             identity: &self.identity,
             signature: &Signed,
             verifier: &self.verifier,
@@ -216,6 +225,7 @@ impl Legs {
             executable: self.executable.clone(),
             endpoint: ENDPOINT.into(),
             launch: &launch,
+            supervisor: Some(&self.supervisor),
             identity: &self.identity,
             signature: &Signed,
             verifier: &self.verifier,
@@ -644,4 +654,75 @@ fn only_a_proved_healthy_server_previews_a_restart_whose_approval_is_requested()
     });
     // Nothing ran the executable: no command at all, so no `kill`.
     assert!(legs.dispatch.arguments().is_empty());
+}
+
+#[test]
+fn supervisor_ownership_requires_unchanged_exact_healthy_generation() {
+    let expected = SupervisedServer {
+        endpoint: ENDPOINT.into(),
+        healthy: true,
+        generation: 100_000_023,
+        ark_deck_managed: true,
+    };
+    let cases = [
+        (
+            Some(expected.clone()),
+            Some(expected.clone()),
+            "arkDeckManaged",
+        ),
+        (None, Some(expected.clone()), "unknown"),
+        (Some(expected.clone()), None, "unknown"),
+        (
+            Some(expected.clone()),
+            Some(SupervisedServer {
+                generation: 100_000_024,
+                ..expected.clone()
+            }),
+            "unknown",
+        ),
+        (
+            Some(SupervisedServer {
+                healthy: false,
+                ..expected.clone()
+            }),
+            Some(SupervisedServer {
+                healthy: false,
+                ..expected.clone()
+            }),
+            "unknown",
+        ),
+        (
+            Some(SupervisedServer {
+                ark_deck_managed: false,
+                ..expected.clone()
+            }),
+            Some(SupervisedServer {
+                ark_deck_managed: false,
+                ..expected.clone()
+            }),
+            "unknown",
+        ),
+        (
+            Some(SupervisedServer {
+                endpoint: "127.0.0.1:8711".into(),
+                ..expected.clone()
+            }),
+            Some(SupervisedServer {
+                endpoint: "127.0.0.1:8711".into(),
+                ..expected.clone()
+            }),
+            "unknown",
+        ),
+    ];
+    for (before, after, ownership) in cases {
+        let mut legs = Legs::new();
+        let identity = receipt(&legs.executable, 42);
+        legs.identity = Identity::new(vec![observed(&identity), observed(&identity)]);
+        legs.supervisor = Reads::new(vec![Ok(before), Ok(after)]);
+        let reading = legs.read().unwrap();
+        assert_eq!(reading.impact.value()["serverOwnership"], ownership);
+        // Ownership does not supply registered server health or bypass it.
+        assert_eq!(reading.blocker.as_deref(), Some("hdc.serverHealthUnproven"));
+        assert!(legs.dispatch.arguments().is_empty());
+    }
 }

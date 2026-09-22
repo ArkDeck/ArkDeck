@@ -79,5 +79,7 @@ performance/RSS soak acceptance.
 
 ## CI
 
-Pending the implementation PR. CI execution and any skipped jobs will be
-reported separately; green CI does not supply human approval or hardware PASS.
+PR #2104 merged as `d4b56cb6b` after maintainer review. Swift CI
+`35697917453` passed all four selected Rust jobs and the `swift` aggregate;
+Guard `35697917287` passed. App build, Swift tests and design-system
+interactions were skipped. These are not hardware acceptance results.

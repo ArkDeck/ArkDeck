@@ -6,22 +6,26 @@
 //! record feeds `runtime.hdc.status`, and the daemon stops it once it has
 //! drained.
 //!
-//! Swift's daemon exits 70 when the server ends unexpectedly, for launchd to
-//! start a fresh daemon and server (restart and recovery wait for design
-//! §L.1 item 13). Nothing restarts it here; instead no HDC plan is
-//! dispatched once the server is no longer the one launched, so a client can
-//! neither bootstrap a server of its own on the endpoint nor address one
-//! another process started there.
+//! A foreground-console-approved restart transfers dispatch ownership only
+//! after the durable lifecycle chain and a fresh identity proof establish a
+//! strictly newer server. An uncertain launch never falls back to the old
+//! child. Neither an unrelated process on the endpoint nor an unproved
+//! replacement may receive an HDC plan. The shared Supervisor supplies the
+//! same ownership fallback to status and impact observations as Swift does.
 use arkdeck_control::ManagedToolFacts;
-use arkdeck_platform::{ServerStop, VerifiedTool};
+use arkdeck_platform::{LoopbackServerLease, ServerStop, VerifiedTool};
 use arkdeck_provider_hdc::{
     CommandlessIdentity, DispatchFailure, EndpointSelection, HdcDispatch, HdcStatusObserver,
     ManagedHdcServer, ManagedLaunch, NativeSignature, ProcessDispatch, ProcessPlan, Receipt,
-    StartBudget, StartFailure, StartupDiagnostics, StatusExecutable, SystemManagedProcess,
+    StartBudget, StartFailure, StartupDiagnostics, StatusExecutable, SupervisedServer,
+    SupervisorState, SystemManagedProcess, generation,
 };
 use serde_json::Value;
 use std::io;
 use std::sync::{Arc, Mutex};
+
+#[path = "managed_hdc_lifecycle.rs"]
+mod lifecycle;
 
 /// The managed server and the facts its startup established.
 pub(crate) struct ManagedHdc {
@@ -29,6 +33,20 @@ pub(crate) struct ManagedHdc {
     server: Mutex<Option<ManagedHdcServer>>,
     executable: StatusExecutable,
     startup: StartupDiagnostics,
+    tool: VerifiedTool,
+    supervisor: Mutex<Option<SupervisedServer>>,
+    ownership: Mutex<DispatchOwnership>,
+}
+
+/// A replacement is owned only after an audited restart and a fresh kernel
+/// identity proof. A launch window with no terminal proof never falls back
+/// to the original child, even if that child still appears to be running.
+enum DispatchOwnership {
+    Original,
+    Pending,
+    Replacement(LoopbackServerLease),
+    Unknown,
+    Stopped,
 }
 
 impl ManagedHdc {
@@ -42,6 +60,7 @@ impl ManagedHdc {
         configured_path: &str,
         selection: EndpointSelection,
     ) -> Result<Self, String> {
+        let retained = VerifiedTool::open(tool.path(), tool.sha256()).map_err(|e| e.to_string())?;
         let server = ManagedHdcServer::start(tool, selection.endpoint, StartBudget::default())
             .map_err(|failure| match failure {
                 StartFailure::Refused(error) => {
@@ -60,6 +79,15 @@ impl ManagedHdc {
             endpoint: selection.endpoint.to_string(),
             endpoint_source: selection.source.to_owned(),
         };
+        let generation = generation(server.identity())
+            .and_then(|g| i64::try_from(g).ok())
+            .ok_or("the managed HDC server generation is unrepresentable")?;
+        let supervised = SupervisedServer {
+            endpoint: startup.endpoint.clone(),
+            healthy: true,
+            generation,
+            ark_deck_managed: true,
+        };
         Ok(Self {
             server: Mutex::new(Some(server)),
             executable: StatusExecutable {
@@ -67,6 +95,9 @@ impl ManagedHdc {
                 sha256: tool.sha256().to_owned(),
             },
             startup,
+            tool: retained,
+            supervisor: Mutex::new(Some(supervised)),
+            ownership: Mutex::new(DispatchOwnership::Original),
         })
     }
 
@@ -104,8 +135,8 @@ impl ManagedHdc {
     }
 
     /// Swift `statusObserver(daemonVersion:)` and its snapshot, with the
-    /// production identity observer, signature inspection and process
-    /// verification. This daemon has no supervisor, and as a bare binary no
+    /// production identity observer, signature inspection, process
+    /// verification and the shared Supervisor. As a bare binary it has no
     /// bundle version (Swift's SwiftPM daemon reports none either).
     pub(crate) fn status(&self, now_utc: &dyn Fn() -> String) -> Value {
         let launches = || self.active_launch();
@@ -114,7 +145,7 @@ impl ManagedHdc {
             self.startup.clone(),
             None,
             &launches,
-            None,
+            Some(self),
             &CommandlessIdentity::default(),
             &NativeSignature,
             &SystemManagedProcess,
@@ -134,9 +165,26 @@ impl ManagedHdc {
         }
     }
 
-    /// The server is still the one launched: running, with the launch's
-    /// birth, and still the one listener on its endpoint.
+    /// The original launch or its durably confirmed replacement still has
+    /// the exact retained birth and listener identity.
     fn current(&self) -> Result<(), String> {
+        let ownership = self
+            .ownership
+            .lock()
+            .map_err(|_| "HDC dispatch ownership is unavailable")?;
+        self.revalidate_ownership(&ownership)
+    }
+
+    fn revalidate_ownership(&self, ownership: &DispatchOwnership) -> Result<(), String> {
+        match ownership {
+            DispatchOwnership::Replacement(lease) => {
+                self.tool.revalidate().map_err(|e| e.to_string())?;
+                return lease.revalidate().map_err(|e| e.to_string());
+            }
+            DispatchOwnership::Original => {}
+            DispatchOwnership::Stopped => return Err("the managed HDC server was stopped".into()),
+            _ => return Err("HDC lifecycle ownership requires reconciliation".into()),
+        }
         let mut server = self
             .server
             .lock()
@@ -150,8 +198,21 @@ impl ManagedHdc {
     /// Swift `HeadlessHDCServerHost.stop`: TERM to the server's process
     /// group, KILL after its grace, and what it wrote. Once only.
     pub(crate) fn stop(&self) -> Option<io::Result<ServerStop>> {
+        *self.ownership.lock().ok()? = DispatchOwnership::Stopped;
+        *self.supervisor.lock().ok()? = None;
         let server = self.server.lock().ok()?.take()?;
         Some(server.stop())
+    }
+}
+
+impl SupervisorState for ManagedHdc {
+    fn state(&self, endpoint: &str) -> Option<SupervisedServer> {
+        self.supervisor
+            .lock()
+            .ok()?
+            .as_ref()
+            .filter(|state| state.endpoint == endpoint)
+            .cloned()
     }
 }
 
@@ -227,6 +288,10 @@ mod tests {
 
     /// The fake `hdc`, compiled into its own owner-only directory.
     fn fake() -> (Fake, VerifiedTool) {
+        fake_options(false, false)
+    }
+
+    fn fake_options(restart: bool, fail: bool) -> (Fake, VerifiedTool) {
         let directory = PathBuf::from(format!(
             "/private/tmp/arkdeck-managed-hdc-unit-{:032x}",
             u128::from_ne_bytes(arkdeck_platform::random_bytes::<16>().unwrap())
@@ -238,13 +303,18 @@ mod tests {
         let source = directory.join("fake-hdc.c");
         std::fs::write(&source, FAKE_HDC).unwrap();
         let binary = directory.join("hdc");
-        let output = std::process::Command::new("cc")
-            .arg("-O0")
-            .arg("-o")
-            .arg(&binary)
-            .arg(&source)
-            .output()
-            .unwrap();
+        let mut compiler = std::process::Command::new("cc");
+        compiler.arg("-O0").arg("-o").arg(&binary).arg(&source);
+        if restart {
+            compiler
+                .arg(format!("-DRESTART_DIR=\"{}\"", directory.display()))
+                .arg(format!("-DSELF_PATH=\"{}\"", binary.display()))
+                .arg(format!("-DRECORD_CALLS=\"{}/calls\"", directory.display()));
+        }
+        if fail {
+            compiler.arg("-DFAIL_RESTART");
+        }
+        let output = compiler.output().unwrap();
         assert!(output.status.success(), "{output:?}");
         std::fs::set_permissions(&binary, std::fs::Permissions::from_mode(0o700)).unwrap();
         let digest = arkdeck_contract::sha256_hex(&std::fs::read(&binary).unwrap());
@@ -327,5 +397,215 @@ mod tests {
             reason,
             "dispatch refused: the managed HDC server was stopped"
         );
+    }
+
+    /// Isolated process exercise of the production owner -> driver -> verified
+    /// runner -> replacement dispatch chain. The impact source is synthetic;
+    /// this is not registered HDC or real-device evidence.
+    #[test]
+    fn confirmed_restart_transfers_dispatch_only_after_terminal_identity_proof() {
+        use arkdeck_hoststore::{
+            HdcControlActions, Impact, ImpactReading, ImpactSource, JobStore, OwnerContext,
+        };
+        use serde_json::json;
+        struct Source(ImpactReading);
+        impl ImpactSource for Source {
+            fn endpoint_reference(&self) -> String {
+                self.0.impact.value()["serverEndpointRef"]
+                    .as_str()
+                    .unwrap()
+                    .into()
+            }
+            fn read_impact(&self) -> Result<ImpactReading, String> {
+                Ok(self.0.clone())
+            }
+        }
+        struct Cleanup {
+            root: PathBuf,
+            tool: VerifiedTool,
+            endpoint: SocketAddrV4,
+        }
+        impl Drop for Cleanup {
+            fn drop(&mut self) {
+                let _ = std::fs::write(self.root.join("stop"), []);
+                let deadline = Instant::now() + Duration::from_secs(3);
+                while LoopbackServerLease::acquire(&self.tool, self.endpoint).is_ok()
+                    && Instant::now() < deadline
+                {
+                    std::thread::sleep(Duration::from_millis(20));
+                }
+            }
+        }
+        for failed in [false, true] {
+            let (fake, tool) = fake_options(true, failed);
+            let port = loopback_ports::free_port();
+            let endpoint = SocketAddrV4::new(Ipv4Addr::LOCALHOST, port);
+            let managed = Arc::new(
+                ManagedHdc::start(
+                    &tool,
+                    &tool.path().to_string_lossy(),
+                    EndpointSelection {
+                        endpoint,
+                        source: "inheritedEnvironment",
+                    },
+                )
+                .unwrap(),
+            );
+            let _cleanup = Cleanup {
+                root: fake.0.clone(),
+                tool: VerifiedTool::open(tool.path(), tool.sha256()).unwrap(),
+                endpoint,
+            };
+            let root = arkdeck_platform::HostDirectory::open(&fake.0).unwrap();
+            root.private_child("actions").unwrap();
+            root.private_child("jobs").unwrap();
+            let owner = HdcControlActions::open(
+                &fake.0.join("actions"),
+                OwnerContext::production().unwrap(),
+            )
+            .unwrap();
+            let jobs = JobStore::open_owner(&fake.0.join("jobs")).unwrap();
+            let hdc = DevelopmentHdc::new(
+                ProcessDispatch::new(
+                    VerifiedTool::open(tool.path(), tool.sha256()).unwrap(),
+                    Some(&port.to_string()),
+                ),
+                Some(managed.clone()),
+            );
+            for turn in 0..if failed { 1 } else { 2 } {
+                let before = managed.state(managed.endpoint()).unwrap();
+                let endpoint_ref = arkdeck_provider_hdc::server_endpoint_ref(managed.endpoint());
+                let source = Source(ImpactReading { impact:Impact::new(json!({
+                    "serverEndpointRef":endpoint_ref,"endpoint":managed.endpoint(),"serverOwnership":"arkDeckManaged",
+                    "serverGeneration":before.generation.to_string(),"serverHealth":"healthy","serverVersion":"3.2.0d",
+                    "tool":{"reference":null,"executablePath":tool.path(),"source":"runtimeConfiguration","sha256":tool.sha256(),"signature":null,"version":"3.2.0d","trust":"unverified"},
+                    "affectedTargetIds":[],"affectedJobIds":[],"detectedOtherClientIds":[],"otherClientsMayExist":true,"affectedDeviceObservations":[],
+                    "criticalJobGate":{"state":"clear","blocking":[],"reasonCode":null},
+                    "interruption":{"kind":"hdcEndpointUnavailable","affectsAllParticipants":true},"recovery":{"kind":"statusThenReconcile","replayAllowed":false}
+                }).as_object().unwrap().clone()).unwrap(),relations:vec![],blocker:None });
+                let preview = owner.preview(json!({"action":"restart","actionRequestId":format!("managed-restart-{turn}"),"serverEndpointRef":endpoint_ref,"expectedServerGeneration":before.generation.to_string()}).as_object().unwrap(), &source).unwrap();
+                let id = preview["controlActionId"].as_str().unwrap();
+                let waiting = owner
+                    .restart(
+                        id,
+                        preview["preview"]["previewId"].as_str().unwrap(),
+                        preview["preview"]["previewDigest"].as_str().unwrap(),
+                        &source,
+                    )
+                    .unwrap();
+                let human = &waiting["humanAction"];
+                let challenge = owner
+                    .issue_interactive_challenge(
+                        human["actionId"].as_str().unwrap(),
+                        human["resumeReference"].as_str().unwrap(),
+                    )
+                    .unwrap();
+                let result = std::thread::scope(|threads| {
+                    let running = threads.spawn(|| {
+                        owner.consume_interactive_challenge(
+                            id,
+                            human["resumeReference"].as_str().unwrap(),
+                            challenge["challenge"].as_str().unwrap(),
+                            &jobs,
+                            &source,
+                            managed.as_ref(),
+                        )
+                    });
+                    if failed {
+                        // The failed process still requires a bounded probe;
+                        // admission must remain frozen throughout that wait.
+                        let deadline = Instant::now() + Duration::from_secs(3);
+                        while !std::fs::read_to_string(fake.0.join("calls"))
+                            .unwrap_or_default()
+                            .lines()
+                            .any(|line| line.ends_with(" kill -r"))
+                        {
+                            assert!(
+                                Instant::now() < deadline,
+                                "the lifecycle command did not enter its runner"
+                            );
+                            std::thread::sleep(Duration::from_millis(10));
+                        }
+                        assert_eq!(
+                            jobs.acquire_hdc_lifecycle_interlock().err().unwrap().code,
+                            "resourceConflict"
+                        );
+                    }
+                    running.join().unwrap().unwrap()
+                });
+                assert_eq!(result["dispatchCount"], 1);
+                assert_eq!(
+                    result["state"],
+                    if failed {
+                        "outcomeUnknown"
+                    } else {
+                        "succeeded"
+                    },
+                    "{result}"
+                );
+                assert_eq!(owner.show(id).unwrap(), result);
+                let replay = owner
+                    .consume_interactive_challenge(
+                        id,
+                        human["resumeReference"].as_str().unwrap(),
+                        challenge["challenge"].as_str().unwrap(),
+                        &jobs,
+                        &source,
+                        managed.as_ref(),
+                    )
+                    .unwrap_err();
+                assert_eq!(replay.code, "humanActionExpired");
+                let calls = std::fs::read_to_string(fake.0.join("calls")).unwrap();
+                assert_eq!(
+                    calls
+                        .lines()
+                        .filter(|line| line.ends_with(" kill -r"))
+                        .count(),
+                    turn + 1
+                );
+                assert!(jobs.acquire_hdc_lifecycle_interlock().is_ok());
+                if failed {
+                    assert!(!hdc.mutation_identity_current());
+                    assert!(hdc.dispatch(&plan()).is_err());
+                    assert!(!managed.state(managed.endpoint()).unwrap().healthy);
+                } else {
+                    assert!(managed.active_launch().is_none());
+                    assert!(hdc.mutation_identity_current());
+                    assert!(
+                        managed.state(managed.endpoint()).unwrap().generation > before.generation
+                    );
+                    let receipt = hdc
+                        .dispatch(&ProcessPlan {
+                            arguments: vec!["checkserver".into()],
+                            timeout: Duration::from_secs(3),
+                            capture_bytes: 4096,
+                        })
+                        .unwrap();
+                    assert_eq!(receipt.exit_status, 0);
+                }
+            }
+            if !failed {
+                let lease = LoopbackServerLease::acquire(&tool, endpoint).unwrap();
+                std::fs::write(fake.0.join("stop"), []).unwrap();
+                let deadline = Instant::now() + Duration::from_secs(3);
+                while lease.revalidate().is_ok() {
+                    assert!(
+                        Instant::now() < deadline,
+                        "the synthetic replacement did not stop"
+                    );
+                    std::thread::sleep(Duration::from_millis(20));
+                }
+                std::fs::remove_file(fake.0.join("stop")).unwrap();
+                let unrelated =
+                    ManagedHdcServer::start(&tool, endpoint, StartBudget::default()).unwrap();
+                assert!(!hdc.mutation_identity_current());
+                assert!(
+                    hdc.dispatch(&plan()).is_err(),
+                    "a newer unrelated process cannot inherit the lifecycle proof"
+                );
+                unrelated.stop().unwrap();
+            }
+            managed.stop();
+        }
     }
 }
