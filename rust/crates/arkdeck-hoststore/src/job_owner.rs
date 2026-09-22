@@ -22,11 +22,18 @@ use std::{
 #[path = "mutation_state_continuity.rs"]
 mod mutation_state_continuity;
 
+#[cfg(test)]
+#[path = "job_hdc_interlock_tests.rs"]
+mod hdc_interlock_tests;
+
 pub struct JobStore {
     repository: JobRepository,
     path: PathBuf,
     root: HostDirectory,
     activity: std::sync::Mutex<()>,
+    /// Readers cover final admission; a lifecycle exclusively freezes the
+    /// participant inventory. Acquisition never waits behind a lifecycle.
+    hdc_lifecycle: std::sync::RwLock<()>,
     /// Swift's resident runtime records that are ahead of their durable
     /// record: a `job.reconcile` that failed after its journal moved keeps
     /// what it had journaled in memory, never on disk. Every read of the Job
@@ -36,11 +43,79 @@ pub struct JobStore {
 }
 const RECORD_BOUND: usize = 16 * 1024 * 1024;
 
+/// Exclusive ownership of the final HDC participant inventory. Keep this
+/// lease until the lifecycle has durably settled or recovered its boundary.
+/// Dropping it releases admission, including on a normal error return.
+#[must_use = "keep the interlock until the lifecycle outcome or recovery is durable"]
+pub struct HdcLifecycleInterlock<'a> {
+    _guard: std::sync::RwLockWriteGuard<'a, ()>,
+}
+
+pub(crate) struct JobAdmissionInterlock<'a> {
+    jobs: &'a JobStore,
+    _guard: std::sync::RwLockReadGuard<'a, ()>,
+}
+
+impl JobAdmissionInterlock<'_> {
+    pub(crate) fn admit(
+        &self,
+        record: &JobRecord,
+        request_hash: &str,
+    ) -> Result<AdmissionVerdict, JobWriteError> {
+        self.jobs.admit_interlocked(record, request_hash)
+    }
+}
+
 fn guard_unavailable() -> JobWriteError {
     JobWriteError::Refused(io::Error::other("The Job activity guard is unavailable"))
 }
 
 impl JobStore {
+    /// Refuse immediately if a lifecycle has frozen admission. Ordinary
+    /// concurrent submissions share the gate; no waiting writer is installed.
+    pub(crate) fn admission_interlock(&self) -> Result<JobAdmissionInterlock<'_>, WireError> {
+        let guard = self.hdc_lifecycle.try_read().map_err(|error| match error {
+            std::sync::TryLockError::WouldBlock => failure(
+                "resourceConflict",
+                "a confirmed host-wide HDC lifecycle action currently blocks new Job admission",
+            ),
+            std::sync::TryLockError::Poisoned(_) => failure(
+                "internalError",
+                "the HDC lifecycle interlock is unavailable",
+            ),
+        })?;
+        Ok(JobAdmissionInterlock {
+            jobs: self,
+            _guard: guard,
+        })
+    }
+
+    /// Freeze admission before reading current Jobs. The same gate covers
+    /// final admission after materialization, so either the Job is visible
+    /// to this census or its admission is refused. No caller-supplied census.
+    pub fn acquire_hdc_lifecycle_interlock(&self) -> Result<HdcLifecycleInterlock<'_>, WireError> {
+        let guard = self
+            .hdc_lifecycle
+            .try_write()
+            .map_err(|error| match error {
+                std::sync::TryLockError::WouldBlock => failure(
+                    "resourceConflict",
+                    "another HDC lifecycle action or Job admission owns the final Job interlock",
+                ),
+                std::sync::TryLockError::Poisoned(_) => failure(
+                    "internalError",
+                    "the HDC lifecycle interlock is unavailable",
+                ),
+            })?;
+        if !self.current_jobs()?.is_empty() {
+            return Err(failure(
+                "factsDrifted",
+                "current Runtime Jobs block the HDC lifecycle action",
+            ));
+        }
+        Ok(HdcLifecycleInterlock { _guard: guard })
+    }
+
     pub fn open(path: &Path) -> io::Result<Self> {
         Self::open_with(path, JobRepository::open)
     }
@@ -65,6 +140,7 @@ impl JobStore {
             path: path.into(),
             root,
             activity: std::sync::Mutex::new(()),
+            hdc_lifecycle: std::sync::RwLock::new(()),
             resident: Default::default(),
         })
     }
@@ -193,6 +269,16 @@ impl JobStore {
     /// identity, initial state and exact initial record bytes commit in one
     /// transaction. The caller starts the Job's journal only after `Admitted`.
     pub fn admit(
+        &self,
+        record: &JobRecord,
+        request_hash: &str,
+    ) -> Result<AdmissionVerdict, JobWriteError> {
+        self.admission_interlock()
+            .map_err(|error| JobWriteError::Refused(io::Error::other(error.message)))?
+            .admit(record, request_hash)
+    }
+
+    fn admit_interlocked(
         &self,
         record: &JobRecord,
         request_hash: &str,
@@ -386,9 +472,10 @@ impl JobStore {
         action(&active)
     }
 
-    /// Swift `RuntimeJobEngine.listCurrentJobs`, from this owner's durable
-    /// rows: every Job not in a terminal state, holding outstanding cleanup
-    /// residue, or of unknown outcome, in identity order. Swift lets an
+    /// Swift `RuntimeJobEngine.listCurrentJobs`, from this owner's resident
+    /// records when ahead of its durable rows: every Job not in a terminal
+    /// state, holding outstanding cleanup residue, or of unknown outcome,
+    /// in identity order. Swift lets an
     /// established recovery epoch or a Target alias resolution settle an
     /// unknown outcome; this owner holds neither index, so an outcome-unknown
     /// Job stays current. An unreadable row fails the whole read.
@@ -397,7 +484,10 @@ impl JobStore {
         let rows = self.repository.rows(None).map_err(unreadable)?;
         let mut jobs = Vec::new();
         for row in &rows {
-            let record = JobRecord::from_row(row)?;
+            let record = self
+                .resident(&row.id)
+                .map(Ok)
+                .unwrap_or_else(|| JobRecord::from_row(row))?;
             let residues = record.residues().unwrap_or(0);
             if residues > 0
                 || record.outcome_unknown()
