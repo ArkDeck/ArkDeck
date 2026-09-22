@@ -310,6 +310,8 @@ def main() -> None:
                     ("candidates", ["device", "candidates"], 1, "operationFailed"),
                 ]:
                     invoke(cli, directory, rows, environment, name, command, code, error)
+                invoke(cli, directory, rows, environment, "debug-probe-cli-missing-owner",
+                       ["debug", "probe", "--target", "target-fixture"], 70, "internalError")
                 operations = invoke(cli, directory, rows, environment, "descriptor-source",
                                     ["operation", "list"], 0)["result"]
                 reference = operations[0]["reference"]

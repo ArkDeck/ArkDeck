@@ -284,10 +284,16 @@ fn help_and_completion_render_the_registry_this_cli_serves() {
         String::from_utf8(asked.stdout).unwrap(),
         format!("{node}\n")
     );
+    let debug = Command::new(env!("CARGO_BIN_EXE_arkdeck"))
+        .args(["debug", "--help"])
+        .output()
+        .unwrap();
+    assert!(debug.status.success());
+    assert!(String::from_utf8(debug.stdout).unwrap().contains("probe"));
     // A node of the registry this CLI serves nothing under is still refused,
     // and so is a node's help in a machine mode.
     for argv in [
-        vec!["debug", "--help"],
+        vec!["debug", "template", "--help"],
         vec!["nope", "--help"],
         vec!["runtime", "--help", "--output", "json"],
     ] {
@@ -304,6 +310,7 @@ fn help_and_completion_render_the_registry_this_cli_serves() {
         let script = completion_script(shell).unwrap();
         assert!(script.ends_with('\n'));
         assert!(script.contains("runtime tool select"), "{shell}");
+        assert!(script.contains("debug probe"), "{shell}");
         assert!(script.contains("--expected-active-generation"), "{shell}");
         assert!(
             !script.contains("flash lane-preview"),

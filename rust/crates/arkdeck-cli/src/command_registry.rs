@@ -65,6 +65,7 @@ pub(crate) fn answer_by_name(argv: &[String]) -> Option<Result<Invocation, CliEr
             json: false,
             jsonl: false,
             raw: false,
+            legacy_json: false,
             help: true,
             require_healthy: false,
             control_request_id: None,
