@@ -1,11 +1,8 @@
-import ArkDeckClientKit
 import ArkDeckCore
 import Foundation
 
-// The reader stays here: it verifies the summary Artifact against
-// HilogSummaryDerivedAnalyzer, the analyzer provider's own validator, which
-// ClientKit may not reach. What it returns — the presentation and the load
-// result — is ClientKit's (docs/ArchitectureRules.md).
+// Reads immutable Runtime artifacts through ClientKit and validates their pure
+// Core contract. No analyzer process or Runtime execution owner is imported.
 
 public struct DiagnosticHilogSummaryReader: Sendable {
   private let provider: any RuntimeJobDetailApplicationProviding
@@ -67,7 +64,7 @@ public struct DiagnosticHilogSummaryReader: Sendable {
       let report = try? document.result.canonicalData(),
       report.count == document.analyzerOutputByteCount,
       SHA256Hex.string(of: report) == document.analyzerOutputSHA256,
-      HilogSummaryDerivedAnalyzer.validateReport(
+      HilogSummaryArtifactContract.validateReport(
         report, sourceSHA256: document.result.sourceSHA256,
         sourceByteCount: document.result.sourceByteCount)
     else { return .unavailable("diagnostics_hilog_summary_integrity_mismatch") }
