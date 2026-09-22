@@ -51,7 +51,7 @@ actor RuntimeJobControlXPCProvider: RuntimeJobControlApplicationProviding {
     guard RuntimeJobControlApplicationFacade.canCancel(job) else {
       return .refused("job_cancel_requires_known_active_job")
     }
-    guard let status = await result("job.status", jobID: job.id),
+    guard let status = await statusPresentation(jobID: job.id),
       status["jobId"] as? String == job.id,
       status["operation"] as? String == job.operationReference,
       status["targetId"] as? String == job.targetID,
@@ -66,6 +66,15 @@ actor RuntimeJobControlXPCProvider: RuntimeJobControlApplicationProviding {
     // Request accepted is not cancelled: the Runtime may still be reaching
     // a safe boundary. Only a later status observation may report terminal.
     return .requested
+  }
+
+  private func statusPresentation(jobID: String) async -> [String: Any]? {
+    try? await RuntimeAppReadResources.statusPresentation(jobID: jobID) { [request] method, params in
+      switch await request(method, params) {
+      case .success(let bytes): return bytes
+      case .failure(let reason): throw AgentExecutionControlFailure("runtimeUnavailable", reason)
+      }
+    }
   }
 
   private func result(_ method: String, jobID: String) async -> [String: Any]? {

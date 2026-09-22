@@ -115,17 +115,17 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
 
   func testGlobalCancellationUsesFreshIdentityAndOnlyRequestsTheSafeBoundary() async throws {
     let transport = HistoryRPCScenario([
-      ("job.status", try response([
+      ("job.show", .success(try currentJobDetailResponse([
         "jobId": "job-cancel", "operation": "capture.diagnostics@1", "targetId": "target-cancel",
         "sessionId": "session-cancel", "state": "running", "outcomeUnknown": false,
-      ])),
+      ]))),
       ("job.cancel", try response(["cancelRequested": true])),
     ])
     let control = RuntimeJobControlXPCProvider(request: { await transport.request($0, $1) })
     let result = await control.cancel(cancellableJob())
     XCTAssertEqual(result, .requested, "acceptance must not be projected as terminal cancelled")
     let calls = await transport.recordedCalls()
-    XCTAssertEqual(calls.map(\.0), ["job.status", "job.cancel"])
+    XCTAssertEqual(calls.map(\.0), ["job.show", "job.cancel"])
     XCTAssertTrue(calls.allSatisfy { $0.1 == ["jobId": .string("job-cancel")] })
   }
 
@@ -147,12 +147,22 @@ final class RuntimeHistoryApplicationContractTests: XCTestCase {
         "sessionId": "session-cancel", "state": "running", "outcomeUnknown": false,
       ]
       status.merge(drift) { _, new in new }
-      let transport = HistoryRPCScenario([("job.status", try response(status))])
+      let transport = HistoryRPCScenario([("job.show", .success(try currentJobDetailResponse(status)))])
       let control = RuntimeJobControlXPCProvider(request: { await transport.request($0, $1) })
       guard case .refused = await control.cancel(cancellableJob()) else { return XCTFail("fresh drift was accepted") }
       let calls = await transport.recordedCalls()
-      XCTAssertEqual(calls.map(\.0), ["job.status"])
+      XCTAssertEqual(calls.map(\.0), ["job.show"])
     }
+  }
+
+  func testCancellationDisconnectDuringFreshReadDoesNotDispatch() async {
+    let transport = HistoryRPCScenario([("job.show", .failure("connection interrupted"))])
+    let control = RuntimeJobControlXPCProvider(request: { await transport.request($0, $1) })
+    guard case .refused = await control.cancel(cancellableJob()) else {
+      return XCTFail("cancellation requires current Job identity")
+    }
+    let calls = await transport.recordedCalls()
+    XCTAssertEqual(calls.map(\.0), ["job.show"])
   }
 
   // A complete answer is the only thing that produces an available history.

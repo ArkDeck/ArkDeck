@@ -139,7 +139,7 @@ actor RuntimeContinuationXPCProvider: RuntimeContinuationApplicationProviding {
         targets.filter({ $0["targetId"] as? String == draft.sourceJob.targetID }).count == 1,
         let target = targets.first(where: { $0["targetId"] as? String == draft.sourceJob.targetID }),
         let revision = target["bindingRevision"] as? Int,
-        let status = await result("job.status", params: ["jobId": .string(draft.sourceJob.id)]) as? [String: Any],
+        let status = await statusPresentation(jobID: draft.sourceJob.id),
         status["jobId"] as? String == draft.sourceJob.id,
         status["operation"] as? String == draft.sourceJob.operationReference,
         status["targetId"] as? String == draft.sourceJob.targetID,
@@ -172,7 +172,9 @@ actor RuntimeContinuationXPCProvider: RuntimeContinuationApplicationProviding {
       guard let draft = acceptedJobs.removeValue(forKey: jobID) else {
         return .failure(.init("continuation_run_requires_newly_accepted_job"))
       }
-      guard let status = await result("job.run", params: ["jobId": .string(jobID)]) as? [String: Any],
+      guard let acknowledgement = await result("job.run", params: ["jobId": .string(jobID)]) as? [String: Any],
+        acknowledgement["jobId"] as? String == jobID,
+        let status = await statusPresentation(jobID: jobID),
         status["jobId"] as? String == jobID,
         status["targetId"] as? String == draft.sourceJob.targetID,
         status["operation"] as? String == draft.sourceJob.operationReference,
@@ -180,6 +182,15 @@ actor RuntimeContinuationXPCProvider: RuntimeContinuationApplicationProviding {
         status["outcomeUnknown"] as? Bool == false
       else { return .failure(.init("continuation_run_result_unconfirmed_check_history")) }
       return .success(state)
+    }
+
+    private func statusPresentation(jobID: String) async -> [String: Any]? {
+      try? await RuntimeAppReadResources.statusPresentation(jobID: jobID) { [request] method, params in
+        switch await request(method, params) {
+        case .success(let bytes): return bytes
+        case .failure(let reason): throw AgentExecutionControlFailure("runtimeUnavailable", reason)
+        }
+      }
     }
 
     private func result(_ method: String, params: [String: JSONValue]? = nil) async -> Any? {

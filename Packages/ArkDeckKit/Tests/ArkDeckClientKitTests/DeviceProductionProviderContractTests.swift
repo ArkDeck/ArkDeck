@@ -134,6 +134,58 @@ final class DeviceProductionProviderContractTests: XCTestCase {
     XCTAssertEqual(calls.map(\.0), ["job.submit", "job.run", "job.show"])
   }
 
+  private func historicalStatus(_ changes: [String: Any] = [:]) -> [String: Any] {
+    var status: [String: Any] = [
+      "jobId": jobID, "targetId": target.id, "operation": "capture.diagnostics@1",
+      "state": "succeeded", "waitingForHuman": false, "outcomeUnknown": false,
+      "outstandingResidueCount": 0, "finishedAtUtc": "2026-09-05T00:00:00Z",
+    ]
+    status.merge(changes) { _, value in value }
+    return status
+  }
+
+  func testHistoricalScreenReadsCurrentDetailAndVerifiedArtifactWithoutDispatch() async throws {
+    let bytes = Data([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82,
+      0, 0, 0, 64, 0, 0, 0, 32])
+    let replies = Replies([
+      ("job.show", try currentJobDetailResponse(historicalStatus())),
+      ("artifact.list", try page([artifactRow("ART-screen", "screenshot.png", bytes)])),
+      ("artifact.read", try range("ART-screen", bytes)),
+    ])
+    let provider = DeviceProductionProvider { try await replies.send($0, $1) }
+    guard case .captured(let frame) = await provider.loadHistoricalScreen(jobID: jobID, targetID: target.id) else {
+      return XCTFail("a confirmed current Job and verified screenshot must reopen")
+    }
+    XCTAssertEqual(frame.imageData, bytes)
+    XCTAssertEqual(frame.width, 64)
+    XCTAssertEqual(frame.height, 32)
+    let calls = await replies.calls
+    XCTAssertEqual(calls.map(\.0), ["job.show", "artifact.list", "artifact.read"])
+  }
+
+  func testHistoricalUnknownIdentityDriftAndUnreadableJobNeverReadArtifactsOrDispatch() async throws {
+    for changes: [String: Any] in [
+      ["jobId": "foreign"], ["targetId": "foreign"], ["operation": "other@1"],
+      ["state": "failed"], ["waitingForHuman": true], ["outcomeUnknown": true],
+      ["outstandingResidueCount": 1],
+    ] {
+      let replies = Replies([("job.show", try currentJobDetailResponse(historicalStatus(changes)))])
+      let provider = DeviceProductionProvider { try await replies.send($0, $1) }
+      guard case .failed = await provider.loadHistoricalScreen(jobID: jobID, targetID: target.id) else {
+        return XCTFail("unconfirmed history must not be rendered as a capture")
+      }
+      let calls = await replies.calls
+      XCTAssertEqual(calls.map(\.0), ["job.show"])
+    }
+    let replies = Replies([])
+    let provider = DeviceProductionProvider { try await replies.send($0, $1) }
+    guard case .failed = await provider.loadHistoricalScreen(jobID: jobID, targetID: target.id) else {
+      return XCTFail("unreadable Job must remain unavailable")
+    }
+    let calls = await replies.calls
+    XCTAssertEqual(calls.map(\.0), ["job.show"])
+  }
+
   func testScreenshotRejectsForeignOwnerChangedRangeIdentityAndCorruptBytes() async throws {
     let bytes = Data([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82,
       0, 0, 0, 64, 0, 0, 0, 32])

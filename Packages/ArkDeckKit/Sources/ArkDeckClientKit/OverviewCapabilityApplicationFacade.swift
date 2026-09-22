@@ -137,7 +137,7 @@ public enum OverviewWindowInventoryJobResult: Sendable, Equatable {
 /// Submits and runs the read-only `debug.template@1` window-inventory Job on
 /// the resolved target. Its typed Runtime request (Catalog reference, expected
 /// binding revision, workspace thread, idempotency key) belongs to the Debug
-/// workspace, which is still in ArkDeckWorkflows, so the App supplies the
+/// workspace in ClientKit, so the App supplies the
 /// runner; this facade never composes a Runtime operation request itself.
 public protocol OverviewWindowInventoryJobRunning: Sendable {
   func runWindowInventory(
