@@ -130,7 +130,7 @@ actor HDCClientDiagnosticsFixture: HDCClientDiagnosticsProviding {
       endpoint: "127.0.0.1:18710",
       serverHealth: .healthy,
       generation: "7",
-      ownership: .external,
+      ownership: HDCClientDiagnosticsPresentation.Ownership.external,
       authorization: authorization,
       channelProtection: channelVerified
         ? .encryptedVerified(
@@ -175,7 +175,7 @@ actor HDCClientDiagnosticsFixture: HDCClientDiagnosticsProviding {
   private static func fixturePreview() -> HDCClientDiagnosticsPresentation.Impact {
     .init(
       action: .init("restartConfirmedGeneration"), endpoint: .init("127.0.0.1:18710"),
-      generation: 7, ownership: .external,
+      generation: 7, ownership: HDCClientDiagnosticsPresentation.Ownership.external,
       affectedDeviceCoordinators: ["device-a", "device-b"], affectedJobs: ["job-hdc"],
       otherClientDetection: .detected(["DevEco IDE"]),
       expectedInterruption: "HDC requests using this endpoint will be interrupted.",

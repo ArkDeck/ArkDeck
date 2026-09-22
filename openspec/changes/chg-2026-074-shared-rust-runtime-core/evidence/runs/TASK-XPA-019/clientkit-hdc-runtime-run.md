@@ -64,5 +64,15 @@ macOS login/VM with the fixed service free is the outstanding environment need.
 
 ## CI
 
-Pending this slice's PR. Fresh required guard/swift checks and maintainer review
-are required; previous merged PR results do not validate this diff.
+PR #2112 initial Swift run 35711260830 failed the legacy source-construction
+scan: the new display-only fixture's inferred `.external` labels were counted
+as Runtime ownership constructions. The fixture now spells its distinct
+`HDCClientDiagnosticsPresentation.Ownership.external` type explicitly. All
+original Runtime construction limits remain unchanged; the scan separately
+allows exactly two display constructions in that one explicit fixture.
+
+Local CI reproduction: `run-swiftpm.sh test --jobs 2 --filter
+HDCSupervisorObservabilityContractTests`, exit 0, 31 tests;
+`/private/tmp/arkdeck-e190-hdc-ci-repro.log`. No full local gate or repeated App/UI
+run is needed for the type qualification and scan. Fresh required guard/swift
+checks and maintainer review remain necessary on the follow-up head.
