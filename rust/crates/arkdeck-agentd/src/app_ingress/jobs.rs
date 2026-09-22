@@ -1,12 +1,13 @@
 //! The existing Swift App Job gate: closed client/operation pairs and one run
 //! of a successfully submitted Job. This is not Runtime execution authority.
 use arkdeck_contract::{Request, decode_response, strict_json};
-use arkdeck_hoststore::OperationRequest;
+use arkdeck_hoststore::{JobPlanner, OperationRequest};
 use serde_json::Value;
 use std::{collections::BTreeMap, sync::Mutex};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum Kind {
+    Continuation,
     Flash,
     Trace,
     Logs,
@@ -43,6 +44,31 @@ fn kind(text: &str) -> Option<Kind> {
     }
     if request.operation_version != Some(1) {
         return None;
+    }
+    if client == "arkdeck-overview-continuation" {
+        let source = request
+            .client_context
+            .as_ref()?
+            .provenance
+            .as_ref()?
+            .get("arkdeck.continuedFromJob")?;
+        if !matches!(operation, "observe.device" | "capture.diagnostics")
+            || !bounded_id(source)
+            || request.expected_binding_revision.is_none()
+            || request
+                .inputs
+                .get("markers")
+                .is_some_and(|value| value.as_array().is_none_or(|markers| !markers.is_empty()))
+            || !matches!(
+                JobPlanner::validated_effect(&request).ok().as_deref(),
+                Some("hostOnly" | "readOnly")
+            )
+        {
+            return None;
+        }
+        // Provenance is a label, never a persisted plan or execution authority.
+        // The regular Runtime still checks current binding and fresh facts.
+        return Some(Kind::Continuation);
     }
     Some(match (client, operation) {
         ("ArkDeckApp.TraceWorkspace", "capture.diagnostics") => Kind::Trace,

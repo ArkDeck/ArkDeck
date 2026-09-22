@@ -284,6 +284,58 @@ fn typed_app_pairs_are_closed_and_bad_authority_never_reaches_control() {
 }
 
 #[test]
+fn continuation_refuses_mutation_stale_markers_and_missing_context_before_control() {
+    let root = Root::new();
+    let (ingress, calls, _, _) = owner(&root, false);
+    let mut base = document("arkdeck-overview-continuation", "capture.diagnostics");
+    base["inputs"] =
+        json!({"durationSeconds":1,"captureHilog":false,"uiDump":false,"crashLogs":false});
+    base["clientContext"]["provenance"] = json!({"arkdeck.continuedFromJob":"job-historical"});
+    for change in [
+        "screenshot",
+        "tree",
+        "trace",
+        "markers",
+        "missingSource",
+        "missingBinding",
+        "wrongOperation",
+        "invalidInput",
+        "wrongVersion",
+    ] {
+        let mut doc = base.clone();
+        match change {
+            "screenshot" => doc["inputs"]["uiScreenshot"] = json!(true),
+            "tree" => doc["inputs"]["uiComponentTree"] = json!(true),
+            "trace" => doc["inputs"]["traceCategories"] = json!(["sched"]),
+            "markers" => doc["inputs"]["markers"] = json!(["old capture instant"]),
+            "missingSource" => doc["clientContext"]["provenance"] = json!({}),
+            "missingBinding" => {
+                doc["target"]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("expectedBindingRevision");
+            }
+            "wrongOperation" => doc["operation"]["id"] = json!("input.tap"),
+            "invalidInput" => doc["inputs"]["durationSeconds"] = json!(-1),
+            "wrongVersion" => doc["operation"]["version"] = json!(2),
+            _ => unreachable!(),
+        }
+        for method in ["job.plan", "job.submit"] {
+            assert_eq!(
+                code(&ingress.handle(
+                    &frame(method, json!({"requestJson":doc.to_string()})),
+                    root.peer()
+                )),
+                "rejected",
+                "{change}/{method}"
+            );
+        }
+    }
+    assert!(calls.lock().unwrap().is_empty());
+    assert_eq!(ingress.dispatches.load(Ordering::Relaxed), 0);
+}
+
+#[test]
 fn uidump_runs_through_production_host_and_publishes_its_file_artifacts() {
     production_uidump("success");
 }
@@ -294,6 +346,12 @@ fn uidump_missing_received_file_is_not_published_or_replayed() {
 #[test]
 fn uidump_interrupted_capture_is_unknown_and_never_replayed() {
     production_uidump("interrupted");
+}
+#[test]
+fn overview_continuation_runs_fresh_observation_through_the_runtime() {
+    production_uidump("continuation-observe");
+    production_uidump("continuation-capture");
+    production_uidump("continuation-interrupted");
 }
 fn production_uidump(mode: &str) {
     use arkdeck_contract::sha256_hex;
@@ -342,6 +400,7 @@ printf '%s\n' "$*" >> "$root/calls"
 key=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 case "$*" in
 '-v') printf 'Ver: 3.2.0d\n';;
+'checkserver') printf 'Client version:Ver: 3.2.0d, server version:Ver: 3.2.0d\n';;
 'list targets -v') printf '%s\t\tUSB\tConnected\tlocalhost\n' "$key";;
 "-t $key shell param get const.product.name") printf 'Fixture Device\n';;
 "-t $key shell param get const.ohos.fullname") printf 'Fixture OS\n';;
@@ -361,6 +420,12 @@ esac
         script = script.replace(
             "cp \"$root/image.png\"",
             "kill -KILL $$; cp \"$root/image.png\"",
+        );
+    }
+    if mode == "continuation-interrupted" {
+        script = script.replace(
+            "'checkserver') printf",
+            "'checkserver') kill -KILL $$; printf",
         );
     }
     let tool = root.0.join("hdc");
@@ -392,6 +457,30 @@ esac
     doc["idempotencyKey"] = doc["requestId"].clone();
     doc["target"]["targetId"] = json!("TGT-3ba3f5f43b92");
     doc["inputs"] = json!({"durationSeconds":1,"captureHilog":false,"hilogFilters":[],"uiDump":true,"crashLogs":false,"uiScreenshot":true,"uiComponentTree":true,"redactionProfile":"standard"});
+    let continuation = mode.starts_with("continuation-");
+    if continuation {
+        doc["clientContext"] = json!({"clientName":"arkdeck-overview-continuation", "provenance":{"arkdeck.continuedFromJob":"job-historical", "arkdeck.threadId":"thread-continuation"}});
+        doc["operation"]["id"] = json!(if mode != "continuation-capture" {
+            "observe.device"
+        } else {
+            "capture.diagnostics"
+        });
+        doc["inputs"] = if mode != "continuation-capture" {
+            json!({})
+        } else {
+            json!({"durationSeconds":1,"captureHilog":false,"uiDump":false,"crashLogs":false})
+        };
+        let mut stale = doc.clone();
+        stale["target"]["expectedBindingRevision"] = json!(2);
+        let refused = ingress.handle(&submit(&stale), root.peer());
+        assert!(
+            decode_response(refused.trim_ascii_end(), "request-1", "job.submit")
+                .unwrap()
+                .outcome
+                .is_err()
+        );
+        assert!(!root.0.join("calls").exists());
+    }
     let plan = result(
         &ingress.handle(
             &frame("job.plan", json!({"requestJson":doc.to_string()})),
@@ -406,7 +495,7 @@ esac
     assert_eq!(accepted["newDispatchCount"], 0);
     let request = frame("job.run", json!({"jobId":id}));
     let status = result(&ingress.handle(&request, root.peer()), "job.run");
-    if mode != "success" {
+    if matches!(mode, "missing" | "interrupted" | "continuation-interrupted") {
         assert_ne!(status["state"], "succeeded", "{status}");
         assert_eq!(status["outcomeUnknown"], true, "{status}");
         let artifacts = result(
@@ -437,6 +526,25 @@ esac
         let calls = fs::read(root.0.join("calls")).unwrap();
         assert_eq!(code(&ingress.handle(&request, root.peer())), "rejected");
         assert_eq!(fs::read(root.0.join("calls")).unwrap(), calls);
+        if continuation {
+            // Even a caller explicitly resubmitting the identical request
+            // cannot use a renewed App claim to replay an unknown Runtime intent.
+            let duplicate = ingress.handle(&submit(&doc), root.peer());
+            if decode_response(duplicate.trim_ascii_end(), "request-1", "job.submit")
+                .unwrap()
+                .outcome
+                .is_ok()
+            {
+                let reply = ingress.handle(&request, root.peer());
+                if let Ok(status) = decode_response(reply.trim_ascii_end(), "request-1", "job.run")
+                    .unwrap()
+                    .outcome
+                {
+                    assert_eq!(status["outcomeUnknown"], true, "{status}");
+                }
+            }
+            assert_eq!(fs::read(root.0.join("calls")).unwrap(), calls);
+        }
         drop(ingress);
         drop(control);
         let reopened = JobStore::open(&root.0.join("jobs")).unwrap();
@@ -461,13 +569,25 @@ esac
         .iter()
         .map(|item| item["name"].as_str().unwrap())
         .collect();
-    assert!(names.contains(&"screenshot.png"), "{artifacts}");
-    assert!(names.contains(&"ui-tree.json"), "{artifacts}");
+    if !continuation {
+        assert!(names.contains(&"screenshot.png"), "{artifacts}");
+        assert!(names.contains(&"ui-tree.json"), "{artifacts}");
+    } else {
+        assert!(!names.is_empty(), "{artifacts}");
+        assert_eq!(status["actualEffect"], "readOnly");
+        assert_eq!(status["threadId"], "thread-continuation");
+    }
+    let mut reads = 0;
     for item in artifacts["items"].as_array().unwrap() {
-        if !matches!(
-            item["name"].as_str(),
-            Some("screenshot.png" | "ui-tree.json")
-        ) {
+        if continuation && item["status"] != "published" {
+            continue;
+        }
+        if !continuation
+            && !matches!(
+                item["name"].as_str(),
+                Some("screenshot.png" | "ui-tree.json")
+            )
+        {
             continue;
         }
         let read = result(
@@ -483,7 +603,11 @@ esac
             ),
             "artifact.read",
         );
-        assert_eq!(read["eof"], true, "{read}");
+        reads += 1;
+        assert!(!read["base64"].as_str().unwrap().is_empty());
+        if !continuation {
+            assert_eq!(read["eof"], true, "{read}");
+        }
         if item["name"] == "screenshot.png" {
             assert_eq!(
                 read["base64"],
@@ -498,6 +622,7 @@ esac
             );
         }
     }
+    assert!(reads > 0, "{artifacts}");
     let shown = result(
         &ingress.handle(&frame("job.show", json!({"jobId":id})), root.peer()),
         "job.show",

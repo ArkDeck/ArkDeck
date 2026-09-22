@@ -184,6 +184,14 @@ pub(crate) fn request_json(params: &Map<String, Value>) -> Result<&str, PlanRefu
 }
 
 impl<'a> JobPlanner<'a> {
+    /// Classify a typed request using the same Catalog and input validation as
+    /// admission, without Target lookup, materialization or authority issuance.
+    pub fn validated_effect(request: &OperationRequest) -> Result<String, PlanRefusal> {
+        let descriptor = Self::descriptor(request)?;
+        Self::validate_inputs(request, descriptor)?;
+        Ok(descriptor.effective_effect(&request.inputs))
+    }
+
     /// The `job.plan` control parameters: exactly one bounded `requestJson`.
     pub fn handle(&self, params: &Map<String, Value>) -> Result<Value, PlanRefusal> {
         self.plan(request_json(params)?.as_bytes())
