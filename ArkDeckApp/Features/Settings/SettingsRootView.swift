@@ -6,7 +6,7 @@ import UniformTypeIdentifiers
 
 struct SettingsRootView<UpdatesContent: View>: View {
   var model: SettingsWorkspaceViewModel
-  let hdcPresentation: HDCDiagnosticsPresentation
+  let hdcPresentation: HDCClientDiagnosticsPresentation
   let isHDCRefreshInFlight: Bool
   let hdcConfigurationError: String?
   let hasActiveRuntimeJobs: Bool
@@ -17,7 +17,7 @@ struct SettingsRootView<UpdatesContent: View>: View {
 
   init(
     model: SettingsWorkspaceViewModel,
-    hdcPresentation: HDCDiagnosticsPresentation,
+    hdcPresentation: HDCClientDiagnosticsPresentation,
     isHDCRefreshInFlight: Bool,
     hdcConfigurationError: String?,
     hasActiveRuntimeJobs: Bool,
@@ -657,7 +657,7 @@ private struct ApplicationIconPreview: View {
 }
 
 private struct ToolchainsSettingsPane: View {
-  let presentation: HDCDiagnosticsPresentation
+  let presentation: HDCClientDiagnosticsPresentation
   let isRefreshInFlight: Bool
   let configurationError: String?
   let hasActiveRuntimeJobs: Bool
@@ -694,6 +694,12 @@ private struct ToolchainsSettingsPane: View {
             settingsFact("settings.toolchains.serverVersion", presentation.serverVersion)
             settingsFact("settings.toolchains.daemonVersion", presentation.daemonVersion)
             settingsFact("settings.toolchains.endpoint", presentation.endpoint)
+          }
+          if let reason = presentation.loadFailure {
+            Text(reason)
+              .font(WorkspaceFont.secondary)
+              .fixedSize(horizontal: false, vertical: true)
+              .accessibilityIdentifier("settings.toolchains.runtimeFailure")
           }
           Divider()
           HStack {

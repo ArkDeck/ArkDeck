@@ -215,146 +215,27 @@ final class HDCStatusUITests: XCTestCase {
     XCTAssertFalse(events.contains("2026-07-28T00:00:02.000Z"))
   }
 
-  /// TEST-AC-HDC-003-01 productionSessionCompositionUI, TASK-PI-001, and
-  /// OBS-APPFACE-001 / AP3. These need the *production* composition, which no
-  /// fixture instance can become, so they launch on their own.
-  func testProductionLaunchUsesDurableSessionDiagnosticsAndNoFixtureValues() {
+  /// Production composition must remain Runtime-owned even when legacy local
+  /// selection flags are supplied. This checks the App boundary, not a signed
+  /// Rust daemon or hardware acceptance result.
+  func testProductionLaunchCannotSelectLocalHDCOrRecovery() {
     let app = launch(
       arguments: [
         "--ui-test-reset-hdc-selection", "--ui-test-hdc-local-production-presentation",
-        "--arkdeck-hdc-user-configured-path", "/usr/bin/true",
-      ],
-      fixture: false)
+        "--arkdeck-hdc-user-configured-path", repositoryFakeHDCExecutable().path,
+      ], fixture: false)
     expandAdvancedDiagnostics(app)
     assertDisplayedValue(
-      element("hdc.toolchain.path", in: app), equals: "/usr/bin/true", timeout: 15)
+      element("hdc.toolchain.path", in: app), equals: "not exposed by Runtime", timeout: 15)
+    XCTAssertFalse(element("hdc.toolchain.chooseExecutable", in: app).exists)
+    XCTAssertFalse(app.buttons["hdc.lifecycle.requestImpactPreview"].exists)
+    XCTAssertFalse(app.buttons["hdc.lifecycle.dispatch"].exists)
     assertDisplayedValue(
       app.staticTexts["hdc.lifecycle.recoveryUnavailable"],
-      equals: "No recovery impact preview has been requested", timeout: 15)
-
-    let request = app.buttons["hdc.lifecycle.requestImpactPreview"]
-    XCTAssertTrue(request.exists)
-    request.click()
-    // participant 门已由 App-root registry 的空-完备 inventory 满足;剩余阻断
-    // 只能来自 server-identity/endpoint 前置(/usr/bin/true 非 pinned 3.2.0d)。
-    assertDisplayedValue(
-      app.staticTexts["hdc.lifecycle.recoveryBlocked"], equals: "impactCannotBeReliablyDetermined",
-      timeout: 5)
-    XCTAssertFalse(
-      app.staticTexts["hdc.lifecycle.recoveryUnavailable"].exists,
-      "the inventory-unavailable wording must be gone from the production launch path")
-    XCTAssertFalse(
-      app.staticTexts["hdc.lifecycle.impactPreview"].exists,
-      "a request that cannot produce an impact must not open a review sheet")
-
-    // AP3: the production path renders its own fail-closed presentation and
-    // cannot inherit the deterministic fixture events.
+      equals: "Recovery approval is not available through this Runtime connection", timeout: 15)
     let events = displayedText(for: app.staticTexts["hdc.devices.events"])
     XCTAssertFalse(events.contains("2026-07-28T00:00:00.000Z"))
-    XCTAssertFalse(events.contains("2026-07-28T00:00:01.000Z"))
     XCTAssertFalse(events.contains("redacted-device-0123456789abcdef01234567"))
-    XCTAssertFalse(app.buttons["hdc.lifecycle.dispatch"].exists)
-  }
-
-  /// M1-006 safety gate. A different production selection, so a different
-  /// launch: a non-pinned fake must not become executable merely by being
-  /// chosen.
-  func testProductionSandboxRejectsRepositoryFakeBeforeAnyHDCProbe() {
-    let fakeExecutable = repositoryFakeHDCExecutable()
-    let app = launch(
-      arguments: [
-        "--ui-test-reset-hdc-selection", "--ui-test-hdc-local-production-presentation",
-        "--arkdeck-hdc-user-configured-path", fakeExecutable.path,
-      ], fixture: false)
-    expandAdvancedDiagnostics(app)
-
-    assertDisplayedValue(
-      element("hdc.toolchain.path", in: app), equals: fakeExecutable.path, timeout: 15)
-    assertDisplayedValue(
-      element("hdc.toolchain.clientVersion", in: app),
-      equals: "unknown (registered client probe requires an existing server identity)",
-      timeout: 15)
-  }
-
-  /// PORT-FILE-ACCESS-001. The relaunch *is* the assertion — the bookmark has
-  /// to survive it — so this one deliberately launches twice.
-  func testUserPickerPersistsBookmarkAcrossRelaunch() throws {
-    let fixtureRoot = FileManager.default.temporaryDirectory
-      .appending(path: "arkdeck-hdc-picker-\(UUID().uuidString)", directoryHint: .isDirectory)
-      .resolvingSymlinksInPath().standardizedFileURL
-    defer { try? FileManager.default.removeItem(at: fixtureRoot) }
-    try FileManager.default.createDirectory(at: fixtureRoot, withIntermediateDirectories: true)
-    let pickerExecutable = fixtureRoot.appending(path: "hdc-picker-fixture")
-    try FileManager.default.copyItem(at: URL(filePath: "/usr/bin/true"), to: pickerExecutable)
-    try FileManager.default.setAttributes(
-      [.posixPermissions: 0o700], ofItemAtPath: pickerExecutable.path)
-    XCTAssertTrue(FileManager.default.isExecutableFile(atPath: pickerExecutable.path))
-
-    let selected = launch(
-      arguments: [
-        "--ui-test-reset-hdc-selection", "--ui-test-hdc-local-production-presentation",
-      ], fixture: false)
-    expandAdvancedDiagnostics(selected)
-    let chooseExecutable = element("hdc.toolchain.chooseExecutable", in: selected)
-    XCTAssertTrue(chooseExecutable.waitForExistenceFast(timeout: 5))
-    assertEnabled(chooseExecutable, equals: true, timeout: 15)
-    chooseExecutable.click()
-
-    let openPanel = selected.sheets.firstMatch
-    guard openPanel.waitForExistenceFast(timeout: 5) else {
-      XCTFail("Open panel must become interactive")
-      return
-    }
-    selected.typeKey("g", modifierFlags: [.command, .shift])
-    let pathField = openPanel.textFields.firstMatch
-    guard pathField.waitForExistenceFast(timeout: 5) else {
-      XCTFail("Open panel must expose Go to Folder")
-      return
-    }
-    // macOS can restore a per-window input source when the remote Open Panel
-    // text field takes focus. Re-select the already-enabled plain layout here
-    // so a third-party candidate window cannot consume the path or Return key.
-    KeyboardInputSourcePin.pinPlainKeyboardLayout()
-    // Go to Folder gives PathTextField keyboard focus. Asking XCUITest to
-    // click this remote-service element on macOS 26.6 can instead try to
-    // scroll the browser behind it and fail before sending any input.
-    pathField.typeKey("a", modifierFlags: .command)
-    pathField.typeText(pickerExecutable.path)
-    pathField.typeKey(.return, modifierFlags: [])
-    let selectedFile = openPanel.textFields.matching(
-      NSPredicate(format: "value == %@", pickerExecutable.lastPathComponent)
-    ).firstMatch
-    guard selectedFile.waitForExistenceFast(timeout: 10) else {
-      XCTFail("Open panel must select the requested executable")
-      return
-    }
-    selectedFile.click()
-    let openButton = openPanel.buttons["OKButton"]
-    guard openButton.waitForExistenceFast(timeout: 5) else {
-      XCTFail("Open panel must expose its final Open button")
-      return
-    }
-    assertEnabled(openButton, equals: true, timeout: 10)
-    openButton.click()
-    XCTAssertTrue(
-      openPanel.waitForNonExistenceFast(timeout: 10),
-      "the open panel must close before its selection is asserted")
-
-    let selectionError = element("hdc.toolchain.configurationError", in: selected)
-    if selectionError.waitForExistenceFast(timeout: 3) {
-      XCTFail("HDC picker returned an error: \(displayedText(for: selectionError))")
-      selected.terminate()
-      return
-    }
-    assertDisplayedValue(
-      element("hdc.toolchain.path", in: selected), equals: pickerExecutable.path, timeout: 15)
-    selected.terminate()
-
-    let reopened = launch(
-      arguments: ["--ui-test-hdc-local-production-presentation"], fixture: false)
-    expandAdvancedDiagnostics(reopened)
-    assertDisplayedValue(
-      element("hdc.toolchain.path", in: reopened), equals: pickerExecutable.path, timeout: 15)
   }
 
   // OBS-APPFACE-001 / AP4: a source audit, so it launches nothing at all.
@@ -366,11 +247,9 @@ final class HDCStatusUITests: XCTestCase {
       .map(String.init)
       .filter { $0.hasPrefix("import ArkDeck") }
 
-    // Capability-matrix presentation moved to ClientKit; HDC diagnostics
-    // still comes through the Workflows presentation facade until XPA-019
-    // finishes its migration. Keep the exact imports and execution bans.
-    XCTAssertEqual(
-      Set(productImports), ["import ArkDeckClientKit", "import ArkDeckWorkflows"])
+    // Runtime-only HDC and capability projections are both ClientKit-owned.
+    // Keep the exact import boundary and all execution bans below.
+    XCTAssertEqual(Set(productImports), ["import ArkDeckClientKit"])
     let forbiddenCapabilities = [
       "ArkDeckOpenHarmony",
       "HDCDeviceObservationSnapshot",

@@ -630,6 +630,7 @@ final class HDCSupervisorObservabilityContractTests: XCTestCase {
 
     var qualifiedExternalConstructions: [String: Int] = [:]
     var labeledExternalConstructions: [String: Int] = [:]
+    var displayExternalConstructions: [String: Int] = [:]
     var assignedExternalConstructions = 0
     let enumerator = FileManager.default.enumerator(
       at: sourcesRoot, includingPropertiesForKeys: nil)
@@ -644,6 +645,10 @@ final class HDCSupervisorObservabilityContractTests: XCTestCase {
       if labeled > 0 {
         labeledExternalConstructions[entry.lastPathComponent] = labeled
       }
+      let display = matchCount("HDCClientDiagnosticsPresentation\\.Ownership\\.external", in: text)
+      if display > 0 {
+        displayExternalConstructions[entry.lastPathComponent] = display
+      }
       assignedExternalConstructions += matchCount("ownership = \\.external", in: text)
     }
     XCTAssertEqual(
@@ -652,6 +657,9 @@ final class HDCSupervisorObservabilityContractTests: XCTestCase {
     XCTAssertEqual(
       labeledExternalConstructions, ["HDCApplicationDiagnosticsFacade.swift": 2],
       "the --ui-test-hdc-diagnostics fixture presentation holds the only labeled constructions")
+    XCTAssertEqual(
+      displayExternalConstructions, ["HDCClientDiagnosticsFixture.swift": 2],
+      "only the explicit ClientKit UI fixture constructs external display values; these are not HDCServerOwnership evidence")
     XCTAssertEqual(assignedExternalConstructions, 0)
   }
 

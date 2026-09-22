@@ -97,7 +97,7 @@ private final class ArkDeckAppModelStore {
   var reopenedHistoryContext: RuntimeHistoryWorkspaceContext?
 
   @ObservationIgnored lazy var hdcDiagnostics = HDCStatusViewModel(
-    provider: HDCApplicationDiagnosticsFacade.make())
+    provider: HDCClientDiagnosticsApplicationFacade.make())
   // The matrix reads through ClientKit; only its hidumper row's read-only
   // debug.template@1 Job is still submitted by the Debug workspace's runner.
   @ObservationIgnored lazy var overviewCapabilities = OverviewCapabilityViewModel(
@@ -1577,13 +1577,13 @@ private struct FinderUpdateArtifactRevealer: UpdateArtifactRevealing {
 @MainActor
 @Observable
 private final class HDCStatusViewModel {
-  private(set) var presentation: HDCDiagnosticsPresentation = .loading
+  private(set) var presentation: HDCClientDiagnosticsPresentation = .loading
   private(set) var configurationError: String?
   private(set) var isRefreshInFlight = false
   let lifecycleDispatchIsProductionComposed: Bool
-  private let provider: any HDCApplicationDiagnosticsProviding
+  private let provider: any HDCClientDiagnosticsProviding
 
-  init(provider: any HDCApplicationDiagnosticsProviding) {
+  init(provider: any HDCClientDiagnosticsProviding) {
     self.provider = provider
     lifecycleDispatchIsProductionComposed = provider.lifecycleDispatchIsProductionComposed
   }
@@ -1646,8 +1646,8 @@ private final class HDCStatusViewModel {
 
   private func load(
     _ operation:
-      @escaping @Sendable (any HDCApplicationDiagnosticsProviding) async
-      -> HDCDiagnosticsPresentation
+      @escaping @Sendable (any HDCClientDiagnosticsProviding) async
+      -> HDCClientDiagnosticsPresentation
   ) {
     let provider = provider
     Task { [weak self] in
