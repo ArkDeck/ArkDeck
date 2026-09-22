@@ -1,5 +1,4 @@
 import ArkDeckClientKit
-import ArkDeckWorkflows
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -8,7 +7,7 @@ import UniformTypeIdentifiers
 /// presentation value and send explicit preview, confirmation, and dispatch
 /// requests back to that use case.
 struct HDCStatusView<Header: View>: View {
-  let presentation: HDCDiagnosticsPresentation
+  let presentation: HDCClientDiagnosticsPresentation
   let capabilityMatrix: OverviewCapabilityMatrixPresentation
   let onRefresh: (() -> Void)?
   let isRefreshInFlight: Bool
@@ -28,7 +27,7 @@ struct HDCStatusView<Header: View>: View {
   @State private var impactSheetItem: HDCImpactSheetItem?
 
   init(
-    presentation: HDCDiagnosticsPresentation,
+    presentation: HDCClientDiagnosticsPresentation,
     capabilityMatrix: OverviewCapabilityMatrixPresentation = .loading,
     onRefresh: (() -> Void)? = nil,
     isRefreshInFlight: Bool = false,
@@ -389,12 +388,12 @@ struct HDCStatusView<Header: View>: View {
         field("overview.field.ownershipBasis", ownershipBasisText, id: "hdc.ownership.basis")
         field(
           "overview.field.autoLifecycleDispatches",
-          String(presentation.automaticLifecycleDispatchCount),
+          presentation.automaticLifecycleDispatchCount.map(String.init) ?? "unknown",
           id: "hdc.counters.autoLifecycle",
           style: .digits)
         field(
           "overview.field.autoSubserverDispatches",
-          String(presentation.automaticSubserverDispatchCount),
+          presentation.automaticSubserverDispatchCount.map(String.init) ?? "unknown",
           id: "hdc.counters.autoSubserver",
           style: .digits)
       }
@@ -455,7 +454,7 @@ struct HDCStatusView<Header: View>: View {
 
   @ViewBuilder
   private var recoveryPreviewButton: some View {
-    if let onRequestRecoveryImpactPreview {
+    if let onRequestRecoveryImpactPreview, !presentation.isRuntimeManaged {
       Button("overview.recovery.previewImpact") {
         isImpactReviewRequested = true
         onRequestRecoveryImpactPreview()
@@ -737,6 +736,7 @@ struct HDCStatusView<Header: View>: View {
   }
 
   private var deviceEventsText: String {
+    guard presentation.deviceEventsAvailable else { return "not reported by Runtime" }
     guard !presentation.deviceEvents.isEmpty else { return "none" }
     return presentation.deviceEvents.map { event in
       var components = [event.timestamp, event.kind.rawValue]
@@ -752,9 +752,9 @@ struct HDCStatusView<Header: View>: View {
 /// sheet can only confirm the exact snapshot it displays; it never dispatches.
 private struct HDCImpactSheetItem: Identifiable {
   let id: Int
-  let presentation: HDCDiagnosticsPresentation
+  let presentation: HDCClientDiagnosticsPresentation
 
-  init?(presentation: HDCDiagnosticsPresentation) {
+  init?(presentation: HDCClientDiagnosticsPresentation) {
     guard let snapshot = presentation.lifecycleImpactPreview else { return nil }
     id = snapshot.generation
     self.presentation = presentation
@@ -762,7 +762,7 @@ private struct HDCImpactSheetItem: Identifiable {
 }
 
 private struct HDCRecoveryImpactSheet: View {
-  let presentation: HDCDiagnosticsPresentation
+  let presentation: HDCClientDiagnosticsPresentation
   let onConfirm: (() -> Void)?
   let onCancel: () -> Void
   @FocusState private var isCancelFocused: Bool
@@ -842,7 +842,7 @@ private struct HDCRecoveryImpactSheet: View {
       identifier: id)
   }
 
-  private func otherClientText(_ detection: HDCServerOtherClientDetection) -> String {
+  private func otherClientText(_ detection: HDCClientDiagnosticsPresentation.OtherClients) -> String {
     switch detection {
     case .detected(let clients): "detected: \(clients.joined(separator: ", "))"
     case .noneDetectedExternalClientsMayStillExist:
