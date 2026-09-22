@@ -164,6 +164,8 @@ impl<H: HostServices> AppIngress<H> {
                     | "device.observations"
                     | "runtime.hdc.status"
                     | "runtime.storage.status"
+                    | "runtime.storage.policy"
+                    | "runtime.storage.root"
                     | "history.filter.list"
                     | "history.filter.save"
                     | "history.filter.delete"
@@ -232,6 +234,39 @@ impl<H: HostServices> AppIngress<H> {
 }
 fn closed_parameters(request: &Request) -> bool {
     let params = request.params.clone().unwrap_or_default();
+    // Only complete settings mutations cross this boundary. The existing owner
+    // retains generation CAS, quota relationships and filesystem admission.
+    if matches!(
+        request.method.as_str(),
+        "runtime.storage.policy" | "runtime.storage.root"
+    ) {
+        let positive = |key: &str| {
+            params.get(key).and_then(Value::as_str).is_some_and(|text| {
+                text.parse::<i64>()
+                    .is_ok_and(|value| value > 0 && value.to_string() == text)
+            })
+        };
+        let shape = if request.method == "runtime.storage.policy" {
+            params.len() == 4
+                && [
+                    "expectedGeneration",
+                    "totalQuotaBytes",
+                    "safetyMarginBytes",
+                    "retentionDays",
+                ]
+                .iter()
+                .all(|key| positive(key))
+        } else {
+            params.len() == 2
+                && positive("expectedGeneration")
+                && ((params.get("rootPath").is_some_and(Value::is_string)
+                    && !params.contains_key("resetToDefault"))
+                    || (params.get("resetToDefault") == Some(&Value::Bool(true))
+                        && !params.contains_key("rootPath")))
+        };
+        return shape
+            && validate_method_value(&request.method, "request", &Value::Object(params)).is_ok();
+    }
     // Observation references name Runtime-owned snapshots, never caller facts.
     // The broad recorded schema alone also admits retired input shapes.
     if request.method == "device.observations" {

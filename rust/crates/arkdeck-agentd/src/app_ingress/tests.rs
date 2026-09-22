@@ -162,6 +162,8 @@ fn rejected_origins_methods_frames_and_parameters_never_enter_control() {
             "device.observations",
             "runtime.hdc.status",
             "runtime.storage.status",
+            "runtime.storage.policy",
+            "runtime.storage.root",
             "history.filter.list",
             "history.filter.save",
             "history.filter.delete",
@@ -427,3 +429,6 @@ fn app_observation_handles_are_closed_and_never_become_caller_facts() {
 
 #[path = "job_tests.rs"]
 mod job_tests;
+
+#[path = "storage_tests.rs"]
+mod storage_tests;
