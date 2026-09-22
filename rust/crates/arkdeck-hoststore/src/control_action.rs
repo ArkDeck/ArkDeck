@@ -206,6 +206,24 @@ impl ControlActionResources {
             .issue_interactive_challenge(action, reference)
     }
 
+    /// The Runtime supplies the driver and impact source after resolving the
+    /// unique approval owner. They are never deserialized from an RPC frame.
+    pub fn consume_interactive_challenge(
+        &self,
+        action: &str,
+        reference: &str,
+        response: &str,
+        jobs: &crate::JobStore,
+        source: &dyn ImpactSource,
+        driver: &dyn crate::HdcLifecycleDriver,
+    ) -> Result<Value, WireError> {
+        let _gate = self.gate.lock().map_err(|_| unreadable())?;
+        self.hdc
+            .as_ref()
+            .ok_or_else(hdc_owner_unavailable)?
+            .consume_interactive_challenge(action, reference, response, jobs, source, driver)
+    }
+
     /// The handler's answer, with its checks in its order, over this owner.
     /// `source` is the impact source of the daemon's HDC server host; the
     /// HDC owner takes part only with it.

@@ -156,6 +156,8 @@ pub struct Host {
     /// tool-selection owner.
     #[cfg(target_os = "macos")]
     control_actions: Option<arkdeck_hoststore::ControlActionResources>,
+    #[cfg(all(test, target_os = "macos"))]
+    pub(crate) test_hdc_impact: Option<Box<dyn arkdeck_hoststore::ImpactSource + Send + Sync>>,
 }
 
 impl Host {
@@ -329,6 +331,68 @@ impl Host {
         self.control_actions = Some(resources);
         self
     }
+    #[cfg(target_os = "macos")]
+    fn with_hdc_impact<R>(
+        &self,
+        run: impl FnOnce(Option<&dyn arkdeck_hoststore::ImpactSource>) -> R,
+    ) -> R {
+        #[cfg(test)]
+        if let Some(source) = &self.test_hdc_impact {
+            return run(Some(&**source));
+        }
+        let (Some(hdc), Some(targets), Some(jobs)) = (&self.hdc, &self.targets, &self.jobs) else {
+            return run(None);
+        };
+        let Some(managed) = hdc.managed() else {
+            return run(None);
+        };
+        // Swift `host.controlImpactSource`: the managed server's executable,
+        // endpoint and launch; the Job owner, the Target store and the
+        // Target observation owner over this daemon's development HDC, whose
+        // gate refuses any command once the server is not the one launched.
+        let launch = || managed.active_launch();
+        let identity = arkdeck_provider_hdc::CommandlessIdentity::default();
+        let current_jobs = || jobs.current_jobs().map_err(|error| error.message);
+        let target_records = || targets.records().map_err(|error| error.message);
+        let devices = || {
+            let sources = arkdeck_hoststore::Sources {
+                dispatch: &**hdc,
+                relations: &*self.usb,
+                targets,
+                now: &utc_now,
+            };
+            self.target_observations
+                .snapshot(&sources, None)
+                .map(|snapshot| arkdeck_hoststore::DeviceReading {
+                    generation: snapshot.generation,
+                    rows: snapshot
+                        .observations
+                        .iter()
+                        .map(|observation| arkdeck_hoststore::DeviceRow {
+                            observation_id: observation.observation_id.clone(),
+                            state: observation.candidate.state.clone(),
+                            relation: observation.relation.clone(),
+                        })
+                        .collect(),
+                })
+                .map_err(|error| error.wire().message)
+        };
+        let source = arkdeck_hoststore::ManagedServerImpact {
+            executable: managed.executable().clone(),
+            endpoint: managed.endpoint().to_owned(),
+            launch: &launch,
+            supervisor: Some(managed),
+            identity: &identity,
+            signature: &arkdeck_provider_hdc::NativeSignature,
+            verifier: &arkdeck_provider_hdc::SystemManagedProcess,
+            dispatch: &**hdc,
+            jobs: &current_jobs,
+            targets: &target_records,
+            devices: &devices,
+        };
+        run(Some(&source))
+    }
+
     #[cfg(target_os = "macos")]
     fn hdc(&self) -> Option<arkdeck_hoststore::HdcComposition<'_>> {
         let (dispatch, targets) = (self.hdc.as_ref()?, self.targets.as_ref()?);
@@ -601,6 +665,8 @@ impl Host {
             human_actions: None,
             #[cfg(target_os = "macos")]
             control_actions: None,
+            #[cfg(all(test, target_os = "macos"))]
+            test_hdc_impact: None,
         }
     }
 }
@@ -1004,39 +1070,84 @@ impl HostServices for Host {
                 resources.resume_control_action("human-action.resume", params, agents, controls)
         {
             let approval = answer?;
-            if params.contains_key("challengeResponse") {
-                // The shared Supervisor and managed-server exit handoff must
-                // be composed before accepting a receipt that can dispatch.
-                return Err(WireError {
-                    code: "admissionDenied".into(),
-                    message: "interactive HDC lifecycle execution is unavailable".into(),
-                    details: Some(serde_json::Map::from_iter([
-                        ("newDispatchCount".into(), serde_json::json!(0)),
-                        ("phase".into(), serde_json::json!("preAdmission")),
-                    ])),
-                });
-            }
-            let action = approval["actionId"].as_str().ok_or_else(|| WireError {
-                code: "recordUnreadable".into(),
-                message: "impact approval identity is unavailable".into(),
-                details: None,
-            })?;
-            let reference = approval["resumeReference"]
-                .as_str()
-                .ok_or_else(|| WireError {
+            let refusal = |code: &str, message: &str| WireError {
+                code: code.into(),
+                message: message.into(),
+                details: Some(serde_json::Map::from_iter([
+                    ("phase".into(), serde_json::json!("preAdmission")),
+                    ("newDispatchCount".into(), serde_json::json!(0)),
+                ])),
+            };
+            let result = if let Some(response) = params.get("challengeResponse") {
+                (|| {
+                    let response = response.as_str().ok_or_else(|| {
+                        refusal(
+                            "invalidInput",
+                            "challengeResponse must be the bounded console challenge",
+                        )
+                    })?;
+                    let id = approval["owner"]["id"].as_str().ok_or_else(|| {
+                        refusal("recordUnreadable", "impact approval owner is unavailable")
+                    })?;
+                    let reference = approval["resumeReference"].as_str().ok_or_else(|| {
+                        refusal(
+                            "recordUnreadable",
+                            "impact approval reference is unavailable",
+                        )
+                    })?;
+                    let (Some(driver), Some(jobs)) = (
+                        self.hdc.as_ref().and_then(|hdc| hdc.managed()),
+                        self.jobs.as_ref(),
+                    ) else {
+                        return Err(refusal(
+                            "admissionDenied",
+                            "interactive HDC lifecycle execution is unavailable",
+                        ));
+                    };
+                    self.with_hdc_impact(|source| {
+                        let source = source.ok_or_else(|| {
+                            refusal(
+                                "admissionDenied",
+                                "interactive HDC lifecycle execution is unavailable",
+                            )
+                        })?;
+                        controls.consume_interactive_challenge(
+                            id, reference, response, jobs, source, driver,
+                        )
+                    })
+                })()
+            } else {
+                let action = approval["actionId"].as_str().ok_or_else(|| WireError {
                     code: "recordUnreadable".into(),
-                    message: "impact approval reference is unavailable".into(),
+                    message: "impact approval identity is unavailable".into(),
                     details: None,
                 })?;
-            return controls
-                .issue_interactive_challenge(action, reference)
-                .map_err(|mut error| {
-                    error
-                        .details
-                        .get_or_insert_with(serde_json::Map::new)
-                        .insert("phase".into(), serde_json::json!("preAdmission"));
-                    error
-                });
+                let reference = approval["resumeReference"]
+                    .as_str()
+                    .ok_or_else(|| WireError {
+                        code: "recordUnreadable".into(),
+                        message: "impact approval reference is unavailable".into(),
+                        details: None,
+                    })?;
+                controls
+                    .issue_interactive_challenge(action, reference)
+                    .map_err(|mut error| {
+                        let details = error.details.get_or_insert_with(serde_json::Map::new);
+                        details.insert("phase".into(), serde_json::json!("preAdmission"));
+                        details.insert("newDispatchCount".into(), serde_json::json!(0));
+                        error
+                    })
+            };
+            return result.map_err(|mut error| {
+                // The owner supplies this proof only before launch, or after
+                // durable recovery proved the launch window was never entered.
+                if let Some(details) = &mut error.details
+                    && details.get("newDispatchCount") == Some(&serde_json::json!(0))
+                {
+                    details.insert("phase".into(), serde_json::json!("preAdmission"));
+                }
+                error
+            });
         }
         self.agent_execution("human-action.resume", params)
     }
@@ -1079,56 +1190,7 @@ impl HostServices for Host {
         let Some(owner) = &self.control_actions else {
             return arkdeck_hoststore::control_action_without_owner(method, params);
         };
-        let (Some(hdc), Some(targets), Some(jobs)) = (&self.hdc, &self.targets, &self.jobs) else {
-            return owner.answer(method, params, None);
-        };
-        let Some(managed) = hdc.managed() else {
-            return owner.answer(method, params, None);
-        };
-        // Swift `host.controlImpactSource`: the managed server's executable,
-        // endpoint and launch; the Job owner, the Target store and the
-        // Target observation owner over this daemon's development HDC, whose
-        // gate refuses any command once the server is not the one launched.
-        let launch = || managed.active_launch();
-        let identity = arkdeck_provider_hdc::CommandlessIdentity::default();
-        let current_jobs = || jobs.current_jobs().map_err(|error| error.message);
-        let target_records = || targets.records().map_err(|error| error.message);
-        let devices = || {
-            let sources = arkdeck_hoststore::Sources {
-                dispatch: &**hdc,
-                relations: &*self.usb,
-                targets,
-                now: &utc_now,
-            };
-            self.target_observations
-                .snapshot(&sources, None)
-                .map(|snapshot| arkdeck_hoststore::DeviceReading {
-                    generation: snapshot.generation,
-                    rows: snapshot
-                        .observations
-                        .iter()
-                        .map(|observation| arkdeck_hoststore::DeviceRow {
-                            observation_id: observation.observation_id.clone(),
-                            state: observation.candidate.state.clone(),
-                            relation: observation.relation.clone(),
-                        })
-                        .collect(),
-                })
-                .map_err(|error| error.wire().message)
-        };
-        let source = arkdeck_hoststore::ManagedServerImpact {
-            executable: managed.executable().clone(),
-            endpoint: managed.endpoint().to_owned(),
-            launch: &launch,
-            identity: &identity,
-            signature: &arkdeck_provider_hdc::NativeSignature,
-            verifier: &arkdeck_provider_hdc::SystemManagedProcess,
-            dispatch: &**hdc,
-            jobs: &current_jobs,
-            targets: &target_records,
-            devices: &devices,
-        };
-        owner.answer(method, params, Some(&source))
+        self.with_hdc_impact(|source| owner.answer(method, params, source))
     }
 
     #[cfg(target_os = "macos")]

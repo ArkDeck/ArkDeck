@@ -856,10 +856,37 @@ impl HdcControlActions {
             }
             Ok(completed.projection())
         };
-        let result = run();
-        if result.is_err() {
-            self.recover_interrupted(id)?;
+        match run() {
+            Ok(value) => Ok(value),
+            Err(mut error) => {
+                // Driver/store errors may carry read-route zero-dispatch
+                // defaults. Only the durable recovery projection can prove
+                // whether this attempt crossed the launch window.
+                match self.recover_interrupted(id) {
+                    Ok(record) => {
+                        let projection = record.projection();
+                        if projection["dispatchCount"] != 0 {
+                            return Ok(projection);
+                        }
+                        error.details = Some(serde_json::Map::from_iter([
+                            ("phase".into(), json!("preAdmission")),
+                            ("newDispatchCount".into(), json!(0)),
+                        ]));
+                    }
+                    Err(_) => {
+                        // The published error vocabulary has recordUnreadable,
+                        // not outcomeUnknown. Keep the outcome unknown and the
+                        // query reference in its message; absence of details
+                        // deliberately provides no zero-dispatch proof.
+                        error.code = "recordUnreadable".into();
+                        error.message = format!(
+                            "HDC lifecycle outcome unknown: recovery could not be persisted for control-action {id}; query this action without replaying the request"
+                        );
+                        error.details = None;
+                    }
+                }
+                Err(error)
+            }
         }
-        result
     }
 }
