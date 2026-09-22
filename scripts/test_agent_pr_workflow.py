@@ -390,11 +390,27 @@ def validate_automatic_check_contract(
             )
     if not swift_aggregate_job.startswith("  swift:\n    if: always()\n"):
         raise WorkflowContractError("Swift aggregate job must run after every lane result")
+    for job_name, job_block in (
+        ("plan", plan_job), ("swift-tests", swift_tests_job),
+        ("app-build", app_build_job), ("ds-interactions", ds_job),
+    ):
+        for required in (
+            "ARKDECK_CI_SHA: ${{ github.sha }}",
+            '"+${ARKDECK_CI_SHA}:refs/remotes/origin/ci"',
+            'git checkout --detach refs/remotes/origin/ci',
+            'test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"',
+        ):
+            if required not in job_block:
+                raise WorkflowContractError(f"{job_name} must fetch and assert the event SHA: {required}")
+        if "ARKDECK_CI_REF" in job_block:
+            raise WorkflowContractError(f"{job_name} must not fetch a moving event ref")
+
     required_plan = (
         "    runs-on: ubuntu-latest\n",
         '"+refs/heads/main:refs/remotes/origin/main"',
-        '"+${ARKDECK_CI_REF}:refs/remotes/origin/ci"',
+        '"+${ARKDECK_CI_SHA}:refs/remotes/origin/ci"',
         "python3 scripts/ci/test_plan.py",
+        "python3 scripts/ci/test_event_checkout.py",
         "python3 scripts/test_agent_pr_workflow.py",
         "python3 scripts/ci/plan.py",
         '--event "$GITHUB_EVENT_PATH"',

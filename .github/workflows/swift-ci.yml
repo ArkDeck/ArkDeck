@@ -64,7 +64,6 @@ jobs:
     steps:
       - name: Checkout exact revision and current main with runner Git
         env:
-          ARKDECK_CI_REF: ${{ github.ref }}
           ARKDECK_CI_SHA: ${{ github.sha }}
         run: |
           set -eu
@@ -72,9 +71,12 @@ jobs:
           git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
           git fetch --no-tags --prune origin \
             "+refs/heads/main:refs/remotes/origin/main" \
-            "+${ARKDECK_CI_REF}:refs/remotes/origin/ci"
+            "+${ARKDECK_CI_SHA}:refs/remotes/origin/ci"
           git checkout --detach refs/remotes/origin/ci
           test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"
+
+      - name: Event revision checkout regression tests
+        run: python3 scripts/ci/test_event_checkout.py
 
       - name: CI planner contract tests
         run: python3 scripts/ci/test_plan.py
@@ -131,14 +133,13 @@ jobs:
     steps:
       - name: Checkout exact revision with runner Git
         env:
-          ARKDECK_CI_REF: ${{ github.ref }}
           ARKDECK_CI_SHA: ${{ github.sha }}
         run: |
           set -eu
           git init .
           git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
           git fetch --no-tags --prune origin \
-            "+${ARKDECK_CI_REF}:refs/remotes/origin/ci"
+            "+${ARKDECK_CI_SHA}:refs/remotes/origin/ci"
           git checkout --detach refs/remotes/origin/ci
           test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"
 
@@ -233,14 +234,13 @@ jobs:
     steps:
       - name: Checkout exact revision with runner Git
         env:
-          ARKDECK_CI_REF: ${{ github.ref }}
           ARKDECK_CI_SHA: ${{ github.sha }}
         run: |
           set -eu
           git init .
           git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
           git fetch --no-tags --prune origin \
-            "+${ARKDECK_CI_REF}:refs/remotes/origin/ci"
+            "+${ARKDECK_CI_SHA}:refs/remotes/origin/ci"
           git checkout --detach refs/remotes/origin/ci
           test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"
 
@@ -308,14 +308,13 @@ jobs:
     steps:
       - name: Checkout exact revision with runner Git
         env:
-          ARKDECK_CI_REF: ${{ github.ref }}
           ARKDECK_CI_SHA: ${{ github.sha }}
         run: |
           set -eu
           git init .
           git remote add origin "https://github.com/${GITHUB_REPOSITORY}.git"
           git fetch --no-tags --prune --depth=1 origin \
-            "+${ARKDECK_CI_REF}:refs/remotes/origin/ci"
+            "+${ARKDECK_CI_SHA}:refs/remotes/origin/ci"
           git checkout --detach refs/remotes/origin/ci
           test "$(git rev-parse HEAD)" = "$ARKDECK_CI_SHA"
 
