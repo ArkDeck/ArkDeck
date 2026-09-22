@@ -35,8 +35,14 @@ No materialized plan digest or execution-availability claim is present.
 its step rows use the shared selector. The result schema permits this property
 without requiring it from the still-published Swift daemon. The Rust CLI validates
 it whenever present and still accepts the old Swift result. No durable record or
-Runtime authority schema changes. The App's executing path must require the field
-and verify it against the reviewed projection; absence does not authorize execution.
+Runtime authority schema changes. If the field is present, the App verifies it against the reviewed projection; null
+is not omission. For the still-published Swift response format, omission alone
+provides no permission: the consumer may accept only a complete equivalent check
+of Catalog, target/binding, Artifact and typed inputs, all ordered step fields
+(including binding and optional), zero admission/dispatch and the materialized plan
+digest. Submission still pins reviewedPlanDigest and Runtime owns admission. Pure
+Rust execution tests and final acceptance must prove the new field exists and
+matches; clients neither fabricate a Runtime digest nor infer authority from omission.
 The existing 11 materialized operations acquire this provenance; Flash itself is
 still unavailable until its actual lane materialization exists.
 
