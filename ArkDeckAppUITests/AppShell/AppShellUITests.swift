@@ -1278,6 +1278,14 @@ final class AppShellUITests: XCTestCase {
       let image = element("flash.image.value", in: app)
       let selectedImage = displayedText(for: image)
       toggleFlashDetails(in: app, file: #filePath, line: #line)
+      // The visually elided, selectable archive hash must expose its complete
+      // native accessible value without recursively resolving an AX label.
+      let archiveHash = "6a023c738ac585b8a6f537c99f2ab2df95a5359fd6d4dd33150fad62e71f064e"
+      let hashName = language == "(en)" ? "Archive SHA-256" : "归档 SHA-256"
+      XCTAssertTrue(app.staticTexts[hashName].exists)
+      let hashText = app.staticTexts[archiveHash].firstMatch
+      XCTAssertTrue(hashText.exists)
+      XCTAssertEqual(hashText.value as? String, archiveHash)
       writeFixtureState("\(emptyHistory)\n--ui-test-flash-hardware-gated", in: app)
       app.buttons["flash.refresh"].click()
       let blocker = element("flash.execute.prerequisiteBlocker", in: app)

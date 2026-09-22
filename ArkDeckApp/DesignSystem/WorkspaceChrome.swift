@@ -565,7 +565,9 @@ struct WorkspaceFactRow: View {
         .lineLimit(1)
         .truncationMode(.middle)
         .help(elidedValue)
-        .accessibilityLabel(elidedValue)
+        // Keep Text's native full accessible value. Overriding its label
+        // before bridging selectable text can recurse through AppKit's AX
+        // label lookup when a hierarchy snapshot visits the elided row.
         .modifier(WorkspaceSelectableValue(isEnabled: isSelectable))
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityIdentifier(identifier ?? "")
