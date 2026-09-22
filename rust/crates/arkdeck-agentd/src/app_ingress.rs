@@ -1,4 +1,4 @@
-//! Standalone App composition: device/Runtime discovery, History filters and reads.
+//! Standalone App composition: discovery, History, artifacts and owned typed Jobs.
 //! This is deliberately opt-in on the isolated development owner. It neither
 //! activates a LaunchAgent nor changes the installed service. The transport
 //! authenticates the actual XPC connection, never an identity in request JSON.
@@ -10,6 +10,8 @@ use arkdeck_control::{Control, HostServices};
 use arkdeck_platform::{HostDirectory, PeerOrigin, listen_mach};
 use serde_json::Value;
 use std::{ffi::OsStr, io, os::unix::fs::MetadataExt, path::Path, sync::Arc};
+
+mod jobs;
 
 const SERVICE: &str = "com.arkdeck.agentd";
 // Same policy as AgentXPCContract and the production facade. No caller override.
@@ -89,6 +91,7 @@ fn invalid(message: &str) -> io::Error {
 struct AppIngress<H: HostServices> {
     control: Arc<Control<H>>,
     owner_uid: u32,
+    jobs: jobs::Gate,
     #[cfg(test)]
     dispatches: std::sync::atomic::AtomicUsize,
 }
@@ -97,6 +100,7 @@ impl<H: HostServices> AppIngress<H> {
         Self {
             control,
             owner_uid,
+            jobs: jobs::Gate::default(),
             #[cfg(test)]
             dispatches: Default::default(),
         }
@@ -141,43 +145,89 @@ impl<H: HostServices> AppIngress<H> {
                 );
             }
         };
-        if !matches!(
-            request.method.as_str(),
-            "health"
-                | "operation.list"
-                | "target.list"
-                | "device.observations"
-                | "runtime.hdc.status"
-                | "runtime.storage.status"
-                | "history.filter.list"
-                | "history.filter.save"
-                | "history.filter.delete"
-                | "job.list"
-                | "job.show"
-                | "job.timeline"
-                | "job.evidence"
-                | "artifact.list"
-                | "artifact.read"
-        ) {
+        let job = match jobs::Action::parse(&request) {
+            Ok(action) => action,
+            Err(()) => {
+                return refusal(
+                    &request.id,
+                    "rejected",
+                    "a closed typed App Job request is required",
+                );
+            }
+        };
+        if job.is_none()
+            && !matches!(
+                request.method.as_str(),
+                "health"
+                    | "operation.list"
+                    | "target.list"
+                    | "device.observations"
+                    | "runtime.hdc.status"
+                    | "runtime.storage.status"
+                    | "history.filter.list"
+                    | "history.filter.save"
+                    | "history.filter.delete"
+                    | "job.list"
+                    | "job.show"
+                    | "job.timeline"
+                    | "job.evidence"
+                    | "artifact.list"
+                    | "artifact.read"
+            )
+        {
             return refusal(
                 &request.id,
                 "rejected",
                 "method is not available through the standalone App ingress",
             );
         }
-        if !closed_parameters(&request) {
+        if job.is_none() && !closed_parameters(&request) {
             return refusal(
                 &request.id,
                 "invalidParams",
                 "App request requires its complete closed parameters",
             );
         }
+        // Retain the one-shot claim across the synchronous owner call, but
+        // never hold the gate mutex while executing; a parallel cancel must enter.
+        let _run = match &job {
+            Some(jobs::Action::Run(id)) => match self.jobs.begin(id) {
+                Some(run) => Some(run),
+                None => {
+                    return refusal(
+                        &request.id,
+                        "rejected",
+                        "Job is not runnable by this App ingress",
+                    );
+                }
+            },
+            Some(jobs::Action::Cancel(id)) if !self.jobs.owns(id) => {
+                return refusal(
+                    &request.id,
+                    "rejected",
+                    "Job is not owned by this App ingress",
+                );
+            }
+            _ => None,
+        };
         #[cfg(test)]
         self.dispatches
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         // Exactly once, without a retry, response cache or Swift fallback. The
         // owner keeps CAS, query validation and outcomeUnknown semantics.
-        self.control.handle_frame(frame)
+        let reply = self.control.handle_frame(frame);
+        if let Some(jobs::Action::Submit(kind)) = job
+            && !self.jobs.record_reply(&reply, &request.id, kind)
+        {
+            // Submission may have committed. Do not fabricate zero dispatch
+            // or retry the owner's response when ownership cannot be retained.
+            return refusal(
+                &request.id,
+                "internalError",
+                "App Job ownership could not be recorded",
+            );
+        }
+        reply
     }
 }
 fn closed_parameters(request: &Request) -> bool {

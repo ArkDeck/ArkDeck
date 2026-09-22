@@ -424,3 +424,6 @@ fn app_observation_handles_are_closed_and_never_become_caller_facts() {
     }
     assert_eq!(ingress.dispatches.load(Ordering::Relaxed), 2);
 }
+
+#[path = "job_tests.rs"]
+mod job_tests;

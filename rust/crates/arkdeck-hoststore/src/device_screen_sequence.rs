@@ -50,11 +50,11 @@ fn errno(error: &std::io::Error) -> i32 {
 }
 
 /// Swift `publishFile`'s source checks, then the bytes it copies: an absolute,
-/// non-empty binary file of the declared digest, opened without following a
+/// non-empty file of the declared digest, opened without following a
 /// link, still the declared regular file of the declared size, read whole
 /// (a received file is at most 64 MiB) and unchanged — the same inode, size
 /// and timestamps — once read. Those exact bytes are then published, which a
-/// binary product does not redact, under the identity the digest names.
+/// binary product does not redact; the received UI tree uses text redaction.
 fn publish_file(
     publisher: &ArtifactPublisher<'_>,
     product: &Product<'_>,
@@ -64,8 +64,8 @@ fn publish_file(
     if !landed.path.is_absolute()
         || landed.byte_count == 0
         || !crate::job_record::digest(digest)
-        || product.media_type.starts_with("text/")
-        || product.media_type == "application/json"
+        || ((product.media_type.starts_with("text/") || product.media_type == "application/json")
+            && !(product.name == "ui-tree.json" && product.media_type == "application/json"))
     {
         return Err(io_failure(
             "file-backed publication requires an absolute binary file with exact size and SHA-256",
@@ -106,6 +106,7 @@ fn publish_file(
             "file-backed Artifact source changed while being published",
         ));
     }
+    // The existing publisher redacts text/JSON; binary payloads stay exact.
     publisher.publish(product, &bytes)
 }
 
@@ -115,8 +116,8 @@ impl JobRunner<'_> {
     /// needs a landed, digested file, or it is recorded missing and the Job's
     /// publication fails. Published, the landing copy is removed; refused, it
     /// is recorded missing with the refusal and the Job's publication fails.
-    /// Swift's job byte budget bounds `capture.diagnostics@1` products only,
-    /// and no file leg of that operation runs here yet.
+    /// Diagnostics budgets the measured bytes before reading; received UI tree
+    /// text passes through the same redacting publisher as captured stdout.
     pub(super) fn publish_received(
         &self,
         run: &mut Run,
@@ -137,6 +138,26 @@ impl JobRunner<'_> {
             let _ = publisher.record_missing(product, &detail);
             return Err(Stop::Publication(detail));
         };
+        // Budget the measured received bytes before reading/redacting them.
+        if run.record.operation() == "capture.diagnostics@1" {
+            let budget = super::byte_budget(&run.record);
+            let used = publisher
+                .published_bytes(&run.record.job_id)
+                .map_err(|error| {
+                    Stop::Publication(format!(
+                        "cannot inspect job byte budget before {}: {error}",
+                        product.name
+                    ))
+                })?;
+            if used > budget || landed.byte_count > budget - used {
+                let detail = format!(
+                    "job byte budget {budget} exceeded while publishing {}",
+                    product.name
+                );
+                let _ = publisher.record_missing(product, &detail);
+                return Err(Stop::Publication(detail));
+            }
+        }
         match publish_file(&publisher, product, landed) {
             Ok(metadata) => {
                 // The store now owns the bytes; the landing copy is sensitive

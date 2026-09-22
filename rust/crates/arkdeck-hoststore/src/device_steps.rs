@@ -414,7 +414,7 @@ pub(crate) fn action_in(
     }
     // A screen sequence's capture, receive and cleanup are its file legs,
     // each naming the Job's own frame directory and archive.
-    if reference == SCREEN_SEQUENCE {
+    if matches!(reference, SCREEN_SEQUENCE | "capture.diagnostics@1") {
         let named = FileAction::for_step(
             &step.step_id,
             &step.kind,
@@ -1085,6 +1085,36 @@ pub(crate) fn file_journal_arguments(
     job_id: &str,
 ) -> Option<Value> {
     Some(match action {
+        FileAction::CaptureScreenshot { path, .. } | FileAction::CaptureComponentTree { path } => {
+            json!({
+                "catalogId":"trace-presets", "actionId":"custom", "parameters":{},
+                "artifactId":format!("artifact-{}",step.step_id), "ownedRemotePath":path.remote_path,
+            })
+        }
+        FileAction::CaptureTrace { request, path } => json!({
+            "catalogId":"trace-presets", "actionId":"custom",
+            "parameters":{"durationSeconds":request.duration_seconds,"categories":request.categories,"bufferKB":request.buffer_kb},
+            "artifactId":format!("artifact-{}",step.step_id), "ownedRemotePath":path.remote_path,
+        }),
+        FileAction::CleanupOwnedRemotePath { path } => json!({
+            "remotePath":path.remote_path,"ownershipEvidenceId":format!("owned-{job_id}"),
+        }),
+        FileAction::CaptureComponentDetail {
+            window_id,
+            component_id,
+        } => json!({
+            "catalogId":step.action.as_ref()?.0,"actionId":"componentDetail",
+            "parameters":{"windowId":window_id,"componentId":component_id,"byteBudget":8*1024*1024},
+            "artifactId":format!("artifact-{}",step.step_id),
+        }),
+        FileAction::CaptureCrashIndex { byte_budget } => json!({
+            "catalogId":step.action.as_ref()?.0,"actionId":"crashIndex",
+            "parameters":{"byteBudget":byte_budget},"artifactId":format!("artifact-{}",step.step_id),
+        }),
+        FileAction::CaptureCrashLog { name, byte_budget } => json!({
+            "catalogId":step.action.as_ref()?.0,"actionId":"crashLog",
+            "parameters":{"faultLogName":name.value(),"byteBudget":byte_budget},"artifactId":format!("artifact-{}",step.step_id),
+        }),
         FileAction::CaptureScreenSequence {
             request,
             frames,
@@ -1096,10 +1126,20 @@ pub(crate) fn file_journal_arguments(
             "artifactId": format!("artifact-{}", step.step_id),
             "ownedRemotePath": archive.remote_path,
         }),
-        FileAction::ReceiveOwnedArtifact(artifact) if step.step_id == "receive-screen-sequence" => {
+        FileAction::ReceiveOwnedArtifact(artifact) => {
+            let name = match step.step_id.as_str() {
+                "receive-screen-sequence" => "frames.tar",
+                "receive-ui-tree" => "ui-tree.json",
+                "receive-screenshot" if artifact.path.remote_path.ends_with(".jpeg") => {
+                    "screenshot.jpeg"
+                }
+                "receive-screenshot" => "screenshot.png",
+                "receive-trace" => "trace.htrace",
+                _ => return None,
+            };
             let mut arguments = json!({"remotePath": artifact.path.remote_path,
                 "artifactId": format!("artifact-{}", step.step_id),
-                "localRelativePath": "artifacts/raw/frames.tar"});
+                "localRelativePath": format!("artifacts/raw/{name}")});
             if let Some(expected) = &artifact.expected_sha256 {
                 arguments["expectedSha256"] = json!(expected);
             }
