@@ -576,7 +576,14 @@ fn serve() -> Result<(), Box<dyn std::error::Error>> {
                 };
                 #[cfg(unix)]
                 let _request = serving.request();
-                let reply = control.handle_frame(&frame);
+                #[cfg(target_os = "macos")]
+                let foreground_console = reader
+                    .get_ref()
+                    .origin()
+                    .is_ok_and(|peer| peer.foreground_console);
+                #[cfg(not(target_os = "macos"))]
+                let foreground_console = false;
+                let reply = control.handle_frame_with_console(&frame, foreground_console);
                 if reader.get_mut().write_all(&reply).is_err() || reader.get_mut().flush().is_err()
                 {
                     return;

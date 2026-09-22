@@ -167,6 +167,14 @@ pub trait HostServices: Send + Sync {
             details: None,
         })
     }
+    /// Invoked only with foreground-console evidence supplied by the local
+    /// transport. Frame parameters can never opt into this origin.
+    fn interactive_human_action_resume(
+        &self,
+        params: &serde_json::Map<String, Value>,
+    ) -> Result<Value, WireError> {
+        self.agent_execution("human-action.resume", params)
+    }
     /// `human-action.list` and `human-action.show` read the physical
     /// assistance agent executions ask for and the impact approvals control
     /// actions request. A host without the human-action owner answers as the
@@ -610,6 +618,12 @@ impl<H: HostServices> Control<H> {
 
     /// Payload excludes its LF delimiter. Every path returns one bounded frame.
     pub fn handle_frame(&self, bytes: &[u8]) -> Vec<u8> {
+        self.handle_frame_with_console(bytes, false)
+    }
+
+    /// `foreground_console` comes from the kernel-authenticated connection,
+    /// never from the request or the App transport.
+    pub fn handle_frame_with_console(&self, bytes: &[u8], foreground_console: bool) -> Vec<u8> {
         let request = match decode_request(bytes) {
             Ok(request) => request,
             Err(error) => {
@@ -1067,7 +1081,11 @@ impl<H: HostServices> Control<H> {
             | "agent.resume"
             | "human-action.resume" => Response {
                 id: request.id.clone(),
-                outcome: self.host.agent_execution(&request.method, &params),
+                outcome: if request.method == "human-action.resume" && foreground_console {
+                    self.host.interactive_human_action_resume(&params)
+                } else {
+                    self.host.agent_execution(&request.method, &params)
+                },
             },
             "human-action.list" | "human-action.show" => Response {
                 id: request.id.clone(),

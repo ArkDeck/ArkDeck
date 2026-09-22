@@ -58,7 +58,12 @@ record decoder rejects unknown states before a census can classify them.
 
 ## CI
 
-Pending the implementation PR. Main's green Performance lanes run `35653709244`
+PR #2102 merged as `c015bd15b`. Swift CI run `35695314850` passed its
+`swift` aggregate and all four selected Rust jobs; App/Swift/UI interaction
+jobs were skipped. SDD Guard runs `35695314763` and `35695375866` passed.
+These results validate the interlock slice, not hardware acceptance.
+
+Main's green Performance lanes run `35653709244`
 executed `harness-tests` and `nightly` but **skipped** `soak`; it does not clear
 the earlier soak failure. Main's slow UI run `35534480398` failed the
 presentation-only package import assertion. These remain separate work in the

@@ -192,6 +192,20 @@ impl ControlActionResources {
         self
     }
 
+    /// Called only after the combined human-action owner resolved the exact
+    /// approval and the transport proved a foreground console peer.
+    pub fn issue_interactive_challenge(
+        &self,
+        action: &str,
+        reference: &str,
+    ) -> Result<Value, WireError> {
+        let _gate = self.gate.lock().map_err(|_| unreadable())?;
+        self.hdc
+            .as_ref()
+            .ok_or_else(hdc_owner_unavailable)?
+            .issue_interactive_challenge(action, reference)
+    }
+
     /// The handler's answer, with its checks in its order, over this owner.
     /// `source` is the impact source of the daemon's HDC server host; the
     /// HDC owner takes part only with it.

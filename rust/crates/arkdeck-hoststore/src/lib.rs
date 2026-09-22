@@ -92,7 +92,8 @@ mod control_action_value;
 mod hdc_control_action;
 #[cfg(target_os = "macos")]
 pub use hdc_control_action::{
-    HdcControlActions, Impact, ImpactReading, ImpactSource, OwnerContext, Record,
+    HdcControlActions, HdcLifecycleAudit, HdcLifecycleDriver, Impact, ImpactReading, ImpactSource,
+    OwnerContext, Record,
 };
 #[cfg(target_os = "macos")]
 mod tool_selection;
